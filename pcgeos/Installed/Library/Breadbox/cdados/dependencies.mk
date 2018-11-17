@@ -1,0 +1,6 @@
+MANAGER.obj \
+MANAGER.eobj: GEOS.DEF RESOURCE.DEF EC.DEF DRIVER.DEF LMEM.DEF \
+                SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF CDAMAIN.ASM \
+                CDASTRAT.ASM
+
+cdadosEC.geo cdados.geo : 

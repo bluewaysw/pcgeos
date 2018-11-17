@@ -1,0 +1,385 @@
+/******************************************************************************
+ *
+ *	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS
+ * FILE:	gcnlist.goh
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	5/91		Initial version
+ *	doug	1/92		Moved from CInclude/Objects to CInclude
+ *
+ * DESCRIPTION:
+ *	This file contains the description of the general changed
+ *	notification routines and data structures.
+ *
+ *      $Id: gcnlist.goh,v 1.1 97/04/04 15:57:12 newdeal Exp $
+ *
+ *****************************************************************************/
+@optimize
+@deflib ui
+
+#include <lmem.h>	/* for LMemBlockHeader */
+#include <file.h>	/* for PathName */
+#include <timedate.h>   /* for TimerDateAndTime */
+@include <Objects/metaC.goh>	/* for GCNMetaMessages */
+
+/*
+ *		Constants and Structures
+ */
+
+/*
+ * NOTE:  All constants & structures common to both the Kernel GCN routines
+ * & MetaClass's META_GCN_* messages are defined in metaC.goh
+ */
+
+/*
+ * Structure at beginning of kernel's gcn list block
+ */
+typedef	struct {
+    LMemBlockHeader	GCNLBH_lmemHeader;
+    ChunkHandle 	GCNLBH_listOfLists;
+} GCNListBlockHeader;
+
+/*
+ *		Routines
+ */
+
+extern Boolean
+    _pascal GCNListAdd(optr OD, ManufacturerID manufID, word listType);
+
+#define GCNListAddHandles(mh, ch, mid, lt) \
+		GCNListAdd(ConstructOptr(mh, ch), mid, lt)
+
+extern Boolean
+    _pascal GCNListRemove(optr OD, ManufacturerID manufID, word listType);
+
+#define GCNListRemoveHandles(mh, ch, mid, lt) \
+		GCNListRemove(ConstructOptr(mh, ch), mid, lt)
+
+
+extern word	/* XXX */
+    _pascal GCNListSend(ManufacturerID manufID, word listType, EventHandle event,
+		MemHandle dataBlock, GCNListSendFlags gcnListSendFlags);
+
+/*
+ *		Low-level Routines
+ */
+
+extern ChunkHandle
+    _pascal GCNListCreateBlock(MemHandle mh);
+
+extern Boolean
+    _pascal GCNListAddToBlock(optr OD, ManufacturerID manufID, word listType,
+		      MemHandle mh, ChunkHandle listOfLists);
+
+extern Boolean
+    _pascal GCNListRemoveFromBlock(optr OD, ManufacturerID manufID, word listType,
+			   MemHandle mh, ChunkHandle listOfLists);
+
+extern word
+    _pascal GCNListSendToBlock(ManufacturerID manufID, word listType,
+		       EventHandle event, MemHandle dataBlock, MemHandle mh,
+		       ChunkHandle listOfLists, GCNListSendFlags flags);
+
+extern ChunkHandle
+    _pascal GCNListFindListInBlock(ManufacturerID manufID, word changeType,
+			   MemHandle mh, ChunkHandle listOfLists,
+			   Boolean createIfNotFound);
+
+extern void
+    _pascal GCNListDestroyBlock(MemHandle mh, ChunkHandle listOfLists);
+
+extern void
+    _pascal GCNListRelocateBlock(MemHandle mh, ChunkHandle listOfLists,
+				MemHandle relocBlock);
+
+extern Boolean
+    _pascal GCNListUnRelocateBlock(MemHandle mh, ChunkHandle listOfLists,
+				MemHandle relocBlock);
+
+/***/
+
+extern ChunkHandle
+    _pascal GCNListCreateList(MemHandle mh);
+
+extern Boolean
+    _pascal GCNListAddToList(optr OD, optr list);
+
+#define GCNListAddToListODHandles(mh, ch, list) \
+		GCNListAddToList(ConstructOptr(mh, ch), list)
+
+#define GCNListAddToListListHandles(OD, listmh, listch) \
+		GCNListAddToList(OD, ConstructOptr(listmh, listch))
+
+#define GCNListAddToListODListHandles(mh, ch, listmh, listch) \
+		GCNListAddToList(ConstructOptr(mh, ch), ConstructOptr(listmh, listch))
+
+extern Boolean
+    _pascal GCNListRemoveFromList(optr OD, optr list);
+
+#define GCNListRemoveFromListODHandles(mh, ch, list) \
+		GCNListRemoveFromList(ConstructOptr(mh, ch), list)
+
+#define GCNListRemoveFromListListHandles(OD, listmh, listch) \
+		GCNListRemoveFromList(OD, ConstructOptr(listmh, listch))
+
+#define GCNListRemoveFromListODListHandles(mh, ch, listmh, listch) \
+		GCNListRemoveFromList(ConstructOptr(mh, ch), ConstructOptr(listmh, listch))
+
+extern void
+    _pascal GCNListSendToList(optr list, EventHandle event, MemHandle dataBlock,
+		      GCNListSendFlags flags);
+
+#define GCNListSendToListHandles(mh, ch, ev, db, fl) \
+		GCNListSendToList(ConstructOptr(mh, ch), ev, db, fl)
+
+extern Boolean	/* XXX */
+    _pascal GCNListFindItemInList(optr OD, optr list);
+
+#define GCNListFindItemInListODHandles(mh, ch, list) \
+		GCNListFindItemInList(ConstructOptr(mh, ch), list)
+
+#define GCNListFindItemInListListHandles(OD, listmh, listch) \
+		GCNListFindItemInList(OD, ConstructOptr(listmh, listch))
+
+#define GCNListFindItemInListODListHandles(mh, ch, listmh, listch) \
+		GCNListFindItemInList(ConstructOptr(mh, ch), ConstructOptr(listmh, listch))
+
+extern void
+    _pascal GCNListDestroyList(optr list);
+
+#define GCNListDestroyListHandles(listmh, listch) \
+		GCNListDestroyList(ConstructOptr(listmh, listch))
+
+extern void
+    _pascal GCNListRelocateList(optr list, MemHandle relocBlock);
+
+extern void
+    _pascal GCNListUnRelocateList(optr list, MemHandle relocBlock);
+
+#define GCNListRelocateListHandles(lishmh, listch, rBlk) \
+		GCNListRelocateList(ConstructOptr(listhmh, listhch, rBlk))
+
+#define GCNListUnRelocateListHandles(lishmh, listch, rBlk) \
+		GCNListUnRelocateList(ConstructOptr(listhmh, listhch, rBlk))
+
+
+/* pre-defined Kernel GCN list types -- use with MANUFACTURER_ID_GEOWORKS */
+
+typedef enum {
+    GCNSLT_FILE_SYSTEM=0,
+    GCNSLT_APPLICATION=2,
+    GCNSLT_DATE_TIME=4,
+    GCNSLT_DICTIONARY=6,
+    GCNSLT_KEYBOARD_OBJECTS=8,
+    GCNSLT_EXPRESS_MENU_CHANGE=10,
+    GCNSLT_INSTALLED_PRINTERS=12,
+    GCNSLT_SHUTDOWN_CONTROL=14,
+    GCNSLT_TRANSFER_NOTIFICATION=16,
+    GCNSLT_EXPRESS_MENU_OBJECTS=18,
+    GCNSLT_TRANSPARENT_DETACH=20,
+    GCNSLT_TRANSPARENT_DETACH_DA=22,
+    GCNSLT_REMOVABLE_DISK=24,
+    GCNSLT_TRANSPARENT_DETACH_IN_PROGRESS=26,
+    GCNSLT_TRANSPARENT_DETACH_FULL_SCREEN_EXCL=28,
+    GCNSLT_EMAIL_DATABASE_CHANGE=30,
+    GCNSLT_FONT_CHANGES=32,
+    GCNSLT_INK=34,
+    GCNSLT_PRINT_JOB_STATUS=36,
+    GCNSLT_FOAM_DB_CHANGES=38,
+    GCNSLT_NOTIFY_SERIAL_LURKER=40,
+    GCNSLT_FAX_INFO_FILE_CHANGE=42,
+    GCNSLT_NOTIFY_INIT_FILE_CHANGE=44,
+    GCNSLT_NOTIFY_KEYBOARD_EVENT=46,
+    GCNSLT_NOTIFY_INDICATOR_EVENT=48,
+    GCNSLT_CONTACT_LIST_SELECTION=50,
+    GCNSLT_CONTACT_LOG_CHANGES=52,
+    GCNSLT_RESPONDER_NOTIFICATIONS=54,
+    GCNSLT_ACCESS_POINT_CHANGE=56,
+    GCNSLT_PCMCIA_NOTIFY_CARD_CHANGE=58,
+    GCNSLT_SECURITY_SETTINGS_NOTIFICATIONS=60,
+    GCNSLT_PENELOPE_HARDWARE_NOTIFICATIONS=62,
+    GCNSLT_PENELOPE_RADIO_STATUS_NOTIFICATIONS=64,
+    GCNSLT_PPP_STATUS_NOTIFICATIONS=66,
+    GCNSLT_FIELD_CHANGE_NOTIFICATIONS=68,
+    GCNSLT_PARENTAL_CONTROL_CHANGE=70,
+    GCNSLT_SCREEN_SAVER_NOTIFICATIONS=72,
+    GCNSLT_PARENTAL_CONTROL_WEBSITE_LIST_CHANGES=74,
+    GCNSLT_INSTANT_SUSPEND_RESUME_NOTIFICATIONS=76,
+    GCNSLT_TCPIP_STATUS_NOTIFICATIONS=78
+} GCNStandardListType;
+
+/* pre-defined change messages -- use with MANUFACTURER_ID_GEOWORKS */
+
+typedef enum {
+    FCNT_CREATE, FCNT_RENAME, FCNT_OPEN, FCNT_DELETE, FCNT_CONTENTS,
+    FCNT_ATTRIBUTES, FCNT_DISK_FORMAT, FCNT_CLOSE, FCNT_BATCH
+} FileChangeNotificationType;
+
+typedef struct {
+    word    	    FCND_disk; 	/* Handle for disk on which change occurred */
+    FileID  	    FCND_id;   	/* ID of affected file or containing dir,
+				 * as appropriate to notification type */
+    FileLongName    FCND_name;	/* Name of file, if appropriate (FCNT_CREATE,
+				 * FCNT_RENAME, and FCNT_OPEN only) */
+} FileChangeNotificationData;
+
+typedef struct {
+    FileChangeNotificationType	FCBNI_type;
+    word    	    	    	FCBNI_disk;
+    FileID  	    	    	FCBNI_id;
+    FileLongName    	    	FCBNI_name; /* Only present if required, else
+					     * next item is where this field
+					     * would otherwise be */
+} FileChangeBatchNotificationItem;
+
+typedef struct {    /* Notification block for FCNT_BATCH */
+    word    	    	    	    FCBND_end;   	/* First free byte in
+							 * the block */
+    FileChangeBatchNotificationItem FCBND_notifications[1]; /* First batched
+							     * notification */
+} FileChangeBatchNotificationData;
+    
+typedef enum {
+    GCNDCNT_CREATED,
+    GCNDCNT_DESTROYED
+} GCNDriveChangeNotificationType;
+
+typedef enum {
+    PCWLCT_DELETE,
+    PCWLCT_MODIFY,
+    PCWLCT_ADD
+} ParentalControlWebsiteListChangeType;
+
+typedef enum {
+    ISRT_SUSPEND,
+    ISRT_RESUME,
+    ISRT_SUSPEND_REFUSED
+} InstantSuspendResumeType;
+
+typedef enum {
+    TSNT_CLOSED,
+    TSNT_CLOSING,
+    TSNT_OPENING,
+    TSNT_OPEN
+} TcpipStatusNotificationType;
+
+typedef enum {
+    TDSNT_CONFIGURATION,
+    TDSNT_LEASE_RENEWED,
+    TDSNT_LEASE_EXPIRED,
+    TDSNT_REQUEST_FAILED
+} TcpipDhcpStatusNotificationType;
+
+typedef struct {
+    TcpipDhcpStatusNotificationType TDND_status;
+    byte TDND_ipAddr[4];
+    byte TDND_netmask[4];
+    byte TDND_gateway[4];
+    byte TDND_dns1[4];
+    byte TDND_dns2[4];
+    byte TDND_dhcpServer[4];
+    TimerDateAndTime TDND_leaseReceived;
+    TimerDateAndTime TDND_renewTime;
+    TimerDateAndTime TDND_rebindTime;
+    TimerDateAndTime TDND_expireTime;
+/* Should be same size as MAX_IP_ADDR_STRING_LENGTH_ZT
+   Not using that constant to avoid having to include socket headers */
+    char TDND_domainName[256];
+} TcpipDhcpNotificationData;
+
+@importMessage	MetaGCNMessages, void MSG_NOTIFY_FILE_CHANGE(
+			       FileChangeNotificationType notifyType = dx,
+			       MemHandle data = bp);
+
+@importMessage	MetaGCNMessages, void MSG_NOTIFY_DRIVE_CHANGE(
+				GCNDriveChangeNotificationType type=cx,
+				word driveNum=dx);
+
+@importMessage	MetaGCNMessages, void MSG_NOTIFY_APP_STARTED(MemHandle
+				 appStarted = dx);
+
+@importMessage	MetaGCNMessages, void MSG_NOTIFY_APP_EXITED(MemHandle
+							appExited = dx);
+
+@importMessage	MetaGCNMessages, void MSG_NOTIFY_DATE_TIME_CHANGE();
+
+@importMessage	MetaGCNMessages, void MSG_NOTIFY_USER_DICT_CHANGE(
+					MemHandle sendingSpellBox = dx,
+					MemHandle userDictChanged = bp);
+
+@importMessage	MetaGCNMessages, void MSG_NOTIFY_KEYBOARD_LAYOUT_CHANGE();
+
+typedef enum {
+    GCNEMNT_CREATED,
+    GCNEMNT_DESTROYED
+} GCNExpressMenuNotificationTypes;
+
+@importMessage	MetaGCNMessages, void MSG_NOTIFY_EXPRESS_MENU_CHANGE(
+				GCNExpressMenuNotificationTypes type = bp,
+				optr affectedExpressMenuControl = cx:dx);
+
+@importMessage	MetaGCNMessages, void MSG_PRINTER_INSTALLED_REMOVED();
+
+typedef enum {
+    GCNSCT_SUSPEND,
+    GCNSCT_SHUTDOWN,
+    GCNSCT_UNSUSPEND
+} GCNShutdownControlType;
+
+@importMessage	MetaGCNMessages, void MSG_META_CONFIRM_SHUTDOWN(
+			    word confirmed=cx,
+			    GCNShutdownControlType type=bp);
+
+@alias(MSG_META_CONFIRM_SHUTDOWN) void MSG_META_CONFIRM_SHUTDOWN_QUERY(
+				optr originator = cx:dx,
+				GCNShutdownControlType type=bp);
+
+@importMessage	MetaGCNMessages, void MSG_NOTIFY_INK_REDISPLAY();
+@importMessage	MetaGCNMessages, void MSG_PRINT_DIALOG_INITIALIZED();
+@importMessage	MetaGCNMessages, void MSG_PRINT_JOB_CANCELLED();
+
+typedef enum {
+	PSCT_NEW_PAGE,	/* Data is current physical page */
+	PSCT_COMPLETE,	/* Data is undefined */
+	PSCT_CANCELED,	/* Data is undefined */
+	PSCT_ERROR	/* Data is undefined */
+} PrintStatusChangeType;
+
+@importMessage	MetaGCNMessages, void MSG_PRINT_STATUS_CHANGE(
+			PrintStatusChangeType change = cx,
+			word jobID = dx,
+			word data = bp);
+
+/*
+ *	routine name aliases
+ */
+#ifdef __HIGHC__
+pragma Alias(GCNListAdd, "GCNLISTADD");
+pragma Alias(GCNListRemove, "GCNLISTREMOVE");
+pragma Alias(GCNListSend, "GCNLISTSEND");
+
+pragma Alias(GCNListAddToBlock, "GCNLISTADDTOBLOCK");
+pragma Alias(GCNListRemoveFromBlock, "GCNLISTREMOVEFROMBLOCK");
+pragma Alias(GCNListSendToBlock, "GCNLISTSENDTOBLOCK");
+pragma Alias(GCNListFindListInBlock, "GCNLISTFINDLISTINBLOCK");
+pragma Alias(GCNListCreateBlock, "GCNLISTCREATEBLOCK");
+pragma Alias(GCNListDestroyBlock, "GCNLISTDESTROYBLOCK");
+pragma Alias(GCNListRelocateBlock, "GCNLISTRELOCATEBLOCK");
+pragma Alias(GCNListUnRelocateBlock, "GCNLISTUNRELOCATEBLOCK");
+
+pragma Alias(GCNListAddToList, "GCNLISTADDTOLIST");
+pragma Alias(GCNListRemoveFromList, "GCNLISTREMOVEFROMLIST");
+pragma Alias(GCNListFindItemInList, "GCNLISTFINDITEMINLIST");
+pragma Alias(GCNListSendToList, "GCNLISTSENDTOLIST");
+pragma Alias(GCNListCreateList, "GCNLISTCREATELIST");
+pragma Alias(GCNListDestroyList, "GCNLISTDESTROYLIST");
+pragma Alias(GCNListRelocateList, "GCNLISTRELOCATELIST");
+pragma Alias(GCNListUnRelocateList, "GCNLISTUNRELOCATELIST");
+#endif
+
+@endlib
+

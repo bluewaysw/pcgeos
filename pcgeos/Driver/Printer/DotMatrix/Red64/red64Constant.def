@@ -1,0 +1,217 @@
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Canon Redwood 64-jet printer driver
+FILE:		red64Constant.def
+
+AUTHOR:		Dave Durran
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Dave	11/10/92	Initial revision
+
+
+DESCRIPTION:
+	This file contains constants and structure definitions used by the
+	canon 64-pin printer driver
+
+	$Id: red64Constant.def,v 1.1 97/04/18 11:55:07 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+;Equate used to determine which routines go into the fixed or common
+;code modules -----MUST BE PRESENT 
+DR_PRINT_LAST_RESIDENT	=	DR_PRINT_HOME_CURSOR
+;WARNING: if this is anything other than DR_PRINT_HOME_CURSOR, the 
+;printcomTables file will have to be pulled into the driver, and routines
+;be passed between it and the driver-specific tables.
+
+;constants defining the Gate-Array hardware are found in the file redPrint.def
+
+WATCHDOG_COUNT_INIT	=	600	;initial watchdog loop count value.
+
+
+;DMA related equates.
+DMATransferMode                 etype   byte, 0, 1
+DMATM_DEMAND_TRANSFER           enum    DMATransferMode
+DMATM_SINGLE_TRANSFER           enum    DMATransferMode
+DMATM_BLOCK_TRANSFER            enum    DMATransferMode
+DMATM_CASCADE_TRANSFER          enum    DMATransferMode
+
+DMATransferDirection            etype   byte, 0, 1
+DMATD_VERIFY                    enum    DMATransferDirection
+DMATD_WRITE                     enum    DMATransferDirection
+DMATD_READ                      enum    DMATransferDirection
+
+ModeRegisterMask        record
+        MRM_mode        DMATransferMode:2
+        MRM_decrement   :1
+        MRM_autoInit    :1
+        MRM_rw          DMATransferDirection:2
+        MRM_channel	:2
+ModeRegisterMask        end
+
+
+REDWOOD_DMA_CHANNEL_MASK	equ	02h
+REDWOOD_DMA_CHANNEL_NUMBER	equ	01h
+REDWOOD_DMA_SET_MASK		equ	REDWOOD_DMA_CHANNEL_NUMBER or 00000100b
+REDWOOD_DMA_MODE	equ	(DMATM_DEMAND_TRANSFER shl offset MRM_mode) or \
+				(0 shl offset MRM_decrement) or \
+				(0 shl offset MRM_autoInit) or \
+				(DMATD_READ shl offset MRM_rw) or \
+			(REDWOOD_DMA_CHANNEL_NUMBER shl offset MRM_channel)
+REDWOOD_DMA_DEC_MODE	equ	(DMATM_DEMAND_TRANSFER shl offset MRM_mode) or \
+				(1 shl offset MRM_decrement) or \
+				(0 shl offset MRM_autoInit) or \
+				(DMATD_READ shl offset MRM_rw) or \
+			(REDWOOD_DMA_CHANNEL_NUMBER shl offset MRM_channel)
+
+PRINT_DIRECTION_REVERSE	equ	0ffh
+
+;addresses of the Redwood DMA Hardware.
+CHANNEL_ZERO_OFFSET     equ     00h
+CHANNEL_ZERO_COUNT      equ     01h
+CHANNEL_ZERO_PAGE       equ     087h
+
+CHANNEL_ONE_OFFSET      equ     02h
+CHANNEL_ONE_COUNT       equ     03h
+CHANNEL_ONE_PAGE        equ     083h
+
+CHANNEL_TWO_OFFSET      equ     04h
+CHANNEL_TWO_COUNT       equ     05h
+CHANNEL_TWO_PAGE        equ     081h
+
+CHANNEL_THREE_OFFSET    equ     06h
+CHANNEL_THREE_COUNT     equ     07h
+CHANNEL_THREE_PAGE      equ     082h
+        ;
+        ; DMA Command Word Ports
+        ;
+PC_CONTROLLER_COMMAND   equ     08h
+PC_SINGLE_REQUEST       equ     09h
+PC_SINGLE_REQUEST_MASK  equ     0ah
+PC_CHANNEL_MODE         equ     0bh
+PC_CLEAR_FLIP_FLOP      equ     0ch
+PC_MASTER_CLEAR         equ     0dh
+PC_CLEAR_MASK           equ     0eh
+PC_ALL_REQUEST_MASK     equ     0fh
+
+;address offsets from the base of the hardware, as determined by the PortFind
+;routine.
+
+HCD		equ	0		;Host Data reg
+SCD		equ	HCD		;Slave CPU data reg
+HCM1		equ	HCD + 2		;Host Command 1 reg
+HCM2		equ	HCM1 + 2	;Host Command 2 reg
+HCM3		equ	HCM2 + 2	;Host Command 3 reg
+HCM4		equ	HCM3 + 2	;Host Command 4 reg
+HST1		equ	HCM1 		;Host Status reg
+HST2		equ	HST1 + 6	;Host Status reg
+PD		equ	HCD + 0ah	;Printer data reg.
+
+HCM2Bits	record
+	HCM2_DMAIOE:1,
+	HCM2_HOBEIC:1,
+	HCM2_HIBFIC:1,
+	HCM2_HOBEIE:1,
+	HCM2_HIBFIE:1
+HCM2Bits	end
+
+HST1Bits	record
+	HST1_SRES2:1,
+	HST1_SRES1:1,
+	HST1_PBBSY:1,
+	HST1_PBERR:1,
+	HST1_SDBSY:1,
+	HST1_HDBSY:1,
+	HST1_SCD:1,
+	HST1_HCD:1
+HST1Bits	end
+
+HST2Bits	record
+	HST2_RES7:1,
+        HST2_RES6:1,
+        HST2_RES5:1,
+        HST2_RES4:1,
+        HST2_RES3:1,
+	HST2_PERR:1,
+	HST2_POUT:1,
+	HST2_PBSY:1
+HST2Bits	end
+
+;system configuration bits, from EEPROM user data, location 00
+
+SysConfigBits	record
+	SC_UNUSED:5			;Unused bits.  If any non-zero, we'll
+					;  assume random data in the EEPROM
+	SC_USE_UK_INI:1			;If SC_USE_US_INI set, this is ignored.
+					;  Otherwise, it instructs GEOS to use
+					;  uk.ini if set.   Otherwise, GEOS 
+					;  will use oceania.ini.
+	SC_USE_US_INI:1			;If set, geos uses us.ini for various
+					;  additional .ini settings.
+	SC_MOUSELESS:1			;If set, system is mouseless
+SysConfigBits	end
+
+
+
+;strings passed back to read status...
+ASF_TEST_ID	equ	2003h
+ASF_TEST_ASF	equ	0104h
+ASF_TEST_MANUAL	equ	0004h
+
+;Paper Geometry contants
+MAX_PRINT_WIDTH	equ	3240		;9 inches at 360 dpi.
+
+;---------------------------------------------------------------------------
+;               Output, and band buffer structure
+;---------------------------------------------------------------------------
+
+;size of output buffer for this print driver (must be multiple of 8,24,32,48)
+PRINT_OUTPUT_BUFFER_SIZE        =       25920 ;9in x 8bytes x 360dpi
+
+GraphicPrintBuffer      struc
+	GPB_bandBuffer		label	byte	;no offset from start of block.
+        GPB_outputBuffer        byte PRINT_OUTPUT_BUFFER_SIZE dup (?)
+
+        GPB_endBuffer          label   byte
+                                        ;start of the band buffer,
+                                        ;size is based on mode and printer.
+GraphicPrintBuffer      ends
+
+
+;some local variables useful in dot-matrix printing.
+BandVariables	struc
+	BV_bandStart	word	?	;start of this band.
+	BV_interleave	byte	?	;number of interleaves in a band.
+	BV_scanlines	byte	?	;number of scanlines high for this band
+BandVariables	ends
+
+;---------------------------------------------------------------------------
+;               UI eval steering constants
+;---------------------------------------------------------------------------
+PRINT_UI_EVAL_ROUTINE   =       0       ;we are getting stuff from UI objs
+PRINT_UI_STUFF_ROUTINE  =       1       ;we are setting stuff in UI objs
+
+;---------------------------------------------------------------------------
+;		printer driver FatalError constants
+;---------------------------------------------------------------------------
+
+if	ERROR_CHECK
+
+BAD_CURSOR_POS                                       enum FatalErrors
+LINE_COUNT_OUT_OF_RANGE                              enum FatalErrors
+LINE_COUNT_PREMATURELY_ZERO                          enum FatalErrors
+LINE_INDEX_OUT_OF_RANGE                              enum FatalErrors
+SCANLINEINFO_WORD_TRASHED                            enum FatalErrors
+TRASHED_INPUT_POINTER                                enum FatalErrors
+TRASHED_PSTATE_POINTER                               enum FatalErrors
+DEREFERENCING_OFF_END_OF_BITMAP			     enum FatalErrors
+
+endif
+

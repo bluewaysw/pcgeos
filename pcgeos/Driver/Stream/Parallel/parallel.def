@@ -1,0 +1,290 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Parallel Driver -- Common definitions
+FILE:		parallel.def
+
+AUTHOR:		Adam de Boor, Feb  6, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	2/ 6/90		Initial revision
+
+
+DESCRIPTION:
+	Header for the parallel driver. Refer to parallelMain.asm for notes
+	of interest for the whole driver.
+		
+	$Id: parallel.def,v 1.1 97/04/18 11:46:03 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+_Driver		= 1
+
+;
+; Standard include files
+;
+include	geos.def
+include	heap.def
+include geode.def
+include	resource.def
+include	ec.def
+include	driver.def
+include system.def
+include sysstats.def
+include timer.def
+
+include	Internal/semInt.def
+include	Internal/interrup.def
+include	Internal/dos.def
+DefDriver	Internal/parallDr.def
+UseDriver	Internal/strDrInt.def
+
+UseDriver	Internal/strDrInt.def
+
+	.ioenable		; We're a driver, so we can use these things
+
+WATCHDOG_INTERVAL	= 60	; Interval for watchdog timer
+DEFAULT_TIMEOUT		= 5	; Default port timeout to 5 seconds
+ERROR_CONFIRM_COUNT	= 3	; Number of times we must detect an error
+				;  while in ParallelSendByte::busyLoop
+				;  before we try to debounce the thing
+				;  further.
+DEBOUNCE_INTERVAL	= 15	; Clock ticks to debounce an error
+				;  signal if it persists for ERROR_CONFIRM_COUNT
+				;  checks.
+
+;--------------
+
+TEST_PARALLEL		= FALSE
+
+; True to assemble in test code to maintain the following counts:
+;	ignoreIntCount - "default" interrupts
+;	primaryActiveCount - "default" interrupts found via semaphore
+
+;------------------------------------------------------------------------------
+;			    Useful Macros
+;------------------------------------------------------------------------------
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LoadVarSeg
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Point a segment register at our data segment
+
+PASS:		segment	= destination register
+		trash	= optional intermediate register to biff
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	2/ 6/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+LoadVarSeg	macro	segment, trash
+if <trash> ne <>
+		mov	trash, dgroup
+		mov	segment, trash
+elseif @CurSeg ne Resident
+		ErrMessage <LoadVarSeg without extra register can only function in Resident>
+else
+		mov	segment, cs:parallelData
+endif
+		endm
+
+;------------------------------------------------------------------------------
+;			     FATAL ERRORS
+;------------------------------------------------------------------------------
+
+if	ERROR_CHECK
+INVALID_FUNCTION					enum FatalErrors
+OPEN_BAD_FLAGS						enum FatalErrors
+CANNOT_READ_FROM_PARALLEL_PORT				enum FatalErrors
+PORT_NOT_OPEN						enum FatalErrors
+INIT_IS_LOW						enum FatalErrors
+PORT_NOT_INTERRUPT_DRIVEN				enum FatalErrors
+DOS_WRITE_RETURNED_ERROR				enum FatalErrors
+PORT_EXISTETH_NOT					enum FatalErrors
+INVALID_ERROR_MASK					enum FatalErrors
+DS_TRASHED						enum FatalErrors
+
+endif
+
+;------------------------------------------------------------------------------
+;			   PORT DESCRIPTORS
+;------------------------------------------------------------------------------
+
+ParallelControl	record
+    PC_IEN:1=1,		; If set, a transition on the ACK line from active to
+    			;  inactive will generate an interrupt
+    PC_SLCTIN:1=1,	; If set, brings printer on-line (some of them, anyway)
+    PC_INIT:1=0,	; Initialize the printer, when set 0 (for a minimum
+			;  of 50 microseconds).
+    PC_AUTOFEED:1=1,	; If set, causes the printer to automatically insert a
+    			;  linefeed after a line of data (presumably ended by
+			;  a carriage return...)
+    PC_STROBE:1=1	; Data strobe whereby data are clocked into the printer.
+			;  The pulse has a minimum length of 1/2 microsecond
+			;  (and, according to a BIOS listing, a maximum of 5
+			;  microseconds).
+ParallelControl	end
+
+STD_PC	equ	mask PC_IEN or mask PC_SLCTIN or mask PC_INIT
+
+ParallelStatus record
+    PS_BUSY:1=0,	; If active (0), the printer is busy and cannot accept
+    			;  data.
+    PS_ACK:1=0,		; If active (0), the printer has accepted the character
+			;  given it and is ready to accept another. However,
+			;  this signal is usually asserted 5 microseconds before
+			;  PS_BUSY goes inactive, according the the technical
+			;  reference...
+    PS_NOPAPER:1=1,	; If active (1), the printer has detected the end of
+			;  its paper supply. Detonation to follow shortly...
+    PS_SELECT:1=1,	; If active (1), the printer is on-line.
+    PS_ERROR:1=0,	; If active (0), the printer has detected some sort of
+    			;  error.
+    PS_IRQ:1=0,		; For MCA parallel controllers, if active (0), this
+			;  port is the source of the interrupt.
+    :2
+ParallelStatus	end
+
+
+;
+; Layout of the I/O space of a parallel port.
+;
+ParallelPorts	struct
+    PP_data	byte			; Data latch
+    PP_status	ParallelStatus		; Status register
+    PP_ctrl	ParallelControl		; Control register
+ParallelPorts	ends
+
+
+ParallelPortStatus	record
+    PPS_OPEN:1		
+ParallelPortStatus	end
+
+
+;
+; Data kept for each port
+;
+ParallelPortData	struct
+    PPD_base	word		0	; Base port for the printer
+    PPD_stream	sptr.StreamData	0	; Stream that manages our data for us
+    PPD_biosNum	word			; Port number, from BIOS's perspective
+    PPD_errMask	ParallelError 	-1	; Inverse set of masked errors (none
+    					;  masked)
+    PPD_lastSent byte		?	; Last byte sent (for restart)
+    PPD_timeout	byte	DEFAULT_TIMEOUT	; Timeout value for the port
+    PPD_counter	byte		0	; Non-zero if interrupt expected. Set to
+					;  PPD_timeout when byte sent out. Value
+					;  is decremented by the watchdog timer
+					;  each second. If it ever decrements to
+					;  0, an error of some sort is declared.
+    PPD_openSem	Semaphore	<>	; Semaphore on which things can wait
+    					;  that want to open the port
+    ;
+    ; Interrupt stuff
+    ;
+    PPD_irq	byte		0	; Interrupt level at which the port
+    					;  is operating.
+    PPD_ctrl	ParallelControl	<>	; Control byte to use when strobing
+    PPD_vector	nptr.ParallelVectorData	0	; Vector being used by port
+    PPD_nestedIntSem	sbyte	1	; Semaphore to deal with nested int's
+    PPD_errCount byte	ERROR_CONFIRM_COUNT; Counter of times left error must be
+					;  seen before we try further debounce
+					;  methods.
+    ;
+    ; Thread stuff, if interrupts not enabled for the port
+    ;
+    PPD_thread	hptr		0	; Handle for thread (debugging, mostly)
+
+    PPD_sem	Semaphore	<>
+    ; This semaphore is used in two different cases:
+    ; -  when creating a new thread, it's used as a blocking semaphore
+    ;    to make sure the new thread is properly initialized before
+    ;    the caller returns
+    ; -  When doing a verify - it's used as a blocking semaphore so
+    ;    that the caller's thread can receive verification results.
+    ;
+
+    ;
+    ; Variables for PARALLEL_VERIFY
+    ;
+    PPD_verCount byte		0	; Count of bytes that need to make it
+					;  out for verify to succeed
+    PPD_verRes	ParallelError	<>	; Result of verify
+
+    PPD_portStatus	ParallelPortStatus	<>
+
+ParallelPortData	ends
+
+ParallelVectorData	struct
+    PVD_old	fptr.far		; Old interrupt vector contents
+    PVD_port	nptr.ParallelPortData	; Port descriptor of port using the
+    					;  interrupt
+    PVD_handler	word			; Routine that handles this interrupt.
+ParallelVectorData	ends
+
+
+
+;------------------------------------------------------------------------------
+;		     GLOBAL VARIABLE DECLARATIONS
+;------------------------------------------------------------------------------
+idata		segment
+		global	lpt1:ParallelPortData, numPorts:word
+		global	printerPorts:nptr.ParallelPortData
+		global	primaryVec:ParallelVectorData
+		global	alternateVec:ParallelVectorData
+		global	weird1Vec:ParallelVectorData
+		global	weird2Vec:ParallelVectorData
+		global	interruptCommon:word
+idata		ends
+
+udata		segment
+		
+MAX_DELAY	= 15	; Greatest multiplier of base PC that we can handle
+		global	delayFactor:word
+		global	machine:SysMachineType
+		global	deviceMap:ParallelDeviceMap
+udata		ends
+
+Resident	segment	resource
+		;
+		; parallelMain.asm
+		;
+		global	parallelData:sptr
+		global	ParallelPortRestart:near
+		;
+		; parallelInt.asm
+		;
+		global	ParallelCheckError:near
+		global	ParallelNotify:far
+		global	ParallelPrimaryInt:far
+		global	ParallelAlternateInt:far
+		global	ParallelWeird1Int:far
+		global	ParallelWeird2Int:far
+		global	ParallelStartThread:near
+
+		global	ParallelRestart:near
+		global	ParallelWatchdog:far
+		
+		global	ParallelEdgeInt:near
+		global	ParallelLevelInt:near
+		
+		global	ParallelSuspend:near
+		global	ParallelUnsuspend:near
+		global	ParallelDecInUseCount:near
+Resident	ends
+
+Init		segment	resource
+		global	ParallelRealInit:far
+		global	ParallelRealExit:far
+Init		ends

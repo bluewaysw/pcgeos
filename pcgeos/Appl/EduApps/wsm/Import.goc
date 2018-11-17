@@ -1,0 +1,249 @@
+/***********************************************************************
+ *Copyright 1994-2001 Breadbox Computer Company LLC  All Rights Reserved
+ *
+ * PROJECT:	Breadbox Word Search Maker
+ * FILE:		import.goc
+ * AUTHOR:	John Howard   06/02
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+@include "wsm.goh"
+@include "externs.goh"
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	(GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_WSM_IMPORT_SELECTOR_ACTION
+ *                 for WSMProcessClass
+ *             (word entryNum, word entryFlags)
+ * DESCRIPTION:	 
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method WSMProcessClass, MSG_WSM_IMPORT_SELECTOR_ACTION
+{
+
+	 /* was it a double click? */
+    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) {
+	  if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)  {
+		@send, forceQueue process::MSG_WSM_IMPORT_WORD_LIST();
+		}
+	  }
+    else  {  /* if not dbl click see if we're on a file */
+	  if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
+		@send WSMImportButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+	  else
+		@send WSMImportButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+       }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_WSM_IMPORT_WORD_LIST for WSMProcessClass
+ *
+ * DESCRIPTION:	 Reads in the selected word list
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method WSMProcessClass, MSG_WSM_IMPORT_WORD_LIST
+{
+char		fileName[FILE_LONGNAME_BUFFER_SIZE], filePath[PATH_BUFFER_SIZE];
+dword		i, fileSize, readStart;
+FileHandle		fileHan;
+DiskHandle		diskHan;
+word		charRead, wordSize, numWords, j;
+char		lineBuffer[100], charBuffer[2];
+Boolean	headerStarted, foundHeader, goodWord;
+word		wasAdded;
+
+
+	/* first get the file name of the selection */
+	@call WSMImpFileSel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(fileName);
+
+	/* get the file's path and disk handle */
+	@call WSMImpFileSel::MSG_GEN_PATH_GET(filePath, sizeof(filePath));
+	diskHan = @call WSMImpFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+	/* save our current file directory */
+	FilePushDir();
+
+	/* and set the import file dir  - FileSel doesn't do this */
+	FileSetCurrentPath(diskHan, filePath);
+
+	/* dismiss the file selector box now */
+	@send WSMImportDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+	/* and open the file */
+	fileHan = FileOpen(fileName, (FILE_ACCESS_R | FILE_DENY_W));
+	/* if fileHan is NULL then there was an error */
+	if (!fileHan)  {
+		NotifyDBox(0, @ImpOpenErrMsg);
+		FilePopDir();
+		return;  /* bail out */
+		}
+
+	/* OK let's read the file...
+	 * FileRead returns -1 if there was an error */
+	/* first get the file size */
+	fileSize = FileSize(fileHan);
+	/* set the file read start */
+	readStart = 0;
+	/* first check for start marker - [LIST-START] */
+	headerStarted = FALSE;
+	wordSize = 0;
+	foundHeader = FALSE;
+	lineBuffer[0] = 0;  /* init the buffer */
+	for (i = 0; i < fileSize; i++)  {
+		charRead = FileRead(fileHan, charBuffer, 1, FALSE);
+		if (charRead == 1)  {  /* good read */
+			readStart++;
+			/* add null to end of char buffer */
+			charBuffer[1] = NULL;
+			/* check for starting [ or header text */
+			if ((charBuffer[0] == '[') || headerStarted) {
+				/* let's start and/or add to buffer */
+				headerStarted = TRUE;
+				strcat(lineBuffer, charBuffer);
+				wordSize++;
+				/* see if we've exceeded the length of our marker */
+				if (wordSize > WORD_MAX_SIZE) {
+					/* this was a spurious [] pair... keep looking */
+					headerStarted = FALSE;
+					lineBuffer[0] = 0;
+					wordSize = 0;
+					}
+				}
+			/* check for ending ] */
+			if ((charBuffer[0] == ']') && headerStarted)  {
+				/* here's where we check the header */
+				if (!strcmp(lineBuffer, "[LIST-START]")) {
+					/* this starts a valid list file */
+					foundHeader = TRUE;
+					break;
+					}
+				else  {
+					/* this was a spurious [] pair... keep looking */
+					headerStarted = FALSE;
+					lineBuffer[0] = 0;
+					wordSize = 0;
+					}
+				}  /* end of check for ending ] */
+			} /* end of good read if */
+		else  {
+			/* read error */
+			NotifyDBox(0, @ImpReadErrMsg);
+			/* close the file */
+			if (FileClose(fileHan, FALSE)) NotifyDBox(0, @ImpCloseErrMsg);
+			/* and restore the WSM file dir */
+			FilePopDir();
+			return;
+			}  /* end of bad read else */
+
+		} /* end of look for start marker for */
+
+	if (!foundHeader) {
+		/* not a valid start marker */
+		NotifyDBox(0, @ImpBadTypeErrMsg);
+		/* close the file */
+		if (FileClose(fileHan, FALSE)) NotifyDBox(0, @ImpCloseErrMsg);
+		FilePopDir();
+		return;
+		}   /* end of no start marker if */
+
+	/* OK now read file one char at a time ------------------- */
+	/* initialize the line buffer */
+	lineBuffer[0] = NULL;
+	wordSize = 0;
+	numWords = 0;
+	goodWord = TRUE;
+	/* start the reading loop */
+	for (i = readStart; i < fileSize; i++) {
+		charRead = FileRead(fileHan, charBuffer, 1, FALSE);
+		/* make sure it's a good read */
+		if (charRead == 1)  {  /* good read */
+			/* add null to end of char buffer */
+			charBuffer[1] = NULL;
+			/* check for CR/LF */
+			if ((charBuffer[0] != '\r') && (charBuffer[0] != '\n'))  {
+				/* not CR/LF so add to buffer */
+				strcat(lineBuffer, charBuffer);
+				wordSize++;
+				/* check for the unlikely event of a word buffer overflow */
+				if (wordSize >= 99) {
+					/* let's keep reading but just not add any more letters
+					 * to the buffer */
+					lineBuffer[99] = 0;
+					wordSize--;
+					}
+				}
+			else if ((charBuffer[0] == '\r') && wordSize) {
+				/* here's where we end the line and check the word */
+				/* first see if it is the end marker */
+				if (!strcmp(lineBuffer, "[LIST-END]")) {
+					/* we're done */
+					break;
+					}
+				/* see if we're within the word length limits */
+				if ((wordSize < WORD_MIN_SIZE) || (wordSize > WORD_MAX_SIZE)) {
+					if (wordSize < WORD_MIN_SIZE)
+						NotifyDBox(lineBuffer, @WordTooShortMsg);
+					else NotifyDBox(lineBuffer, @WordTooLongMsg);
+					goodWord = FALSE;
+					}
+				else {
+					/* are all the chars valid? */
+					for (j = 0; j < wordSize; j++) {
+						if (!LocalIsAlpha(lineBuffer[j])) {
+                     NotifyDBox(lineBuffer, @WordInvalidCharMsg);
+							goodWord = FALSE;
+							break;
+							}
+						}
+					}
+				/* our checks are done, if it's good add it to the list */
+				if (goodWord) {
+					wasAdded = WSMAddWord(lineBuffer);
+					/* any error?  if the word was a dupe we'll keep plugging
+					 * but if it was a list to long error we'll break */
+					if (wasAdded < ADD_WORD_DUPE) numWords++;
+					if (wasAdded == ADD_WORD_LIST_FULL) break;
+					}
+				/* now reset the line buffer for next word */
+				lineBuffer[0] = NULL;
+				wordSize = 0;
+				goodWord = TRUE;
+				}  /* end of end the line else if */
+			}  /* end of good read if */
+		else  {  /* bad read */
+			NotifyDBox(0, @ImpReadErrMsg);
+			break; /* bail out of for loop*/
+			}
+
+		}  /* end of reading for loop */
+
+	/* close the file */
+	if (FileClose(fileHan, FALSE)) NotifyDBox(0, @ImpCloseErrMsg);
+
+	/* and restore the WSM file dir */
+	FilePopDir();
+
+	if (numWords) {
+		/* now we need to do some UI stuff */
+		@send WSMWordList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(GDLP_FIRST, numWords);
+		@send WSMWordList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+		@send WSMImportDialog::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      }
+
+}
+
+
+
+

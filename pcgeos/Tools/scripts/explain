@@ -1,0 +1,51 @@
+#!/bin/sh -
+#
+# usage:
+#	explain <fatal error>
+# example:
+#	explain FLOAT_INIT_HAS_NOT_BEEN_CALLED_FOR_THIS_THREAD
+# NOTE:
+#	must be run in the appropriate source directory
+#
+# $Id: explain,v 1.2 93/01/19 11:53:51 gene Exp $
+#
+if [ $# -ne 1 ]; then
+    echo $0 -- FatalError not specified
+    exit 1
+fi
+#
+# Figure out the source directory
+#
+cwd=`pwd`
+rootdir=`expr "$cwd" : '\(.*/'${ROOTDIR-pcgeos}'\)/.*$' \| "$cwd" : '\(.*/'${ROOTDIR-pcgeos}'\)$'`
+case "$cwd" in
+    */Library/Motif | \
+    */Library/PM | \
+    */Library/PMBA | \
+    */Library/GeoPM)
+	srcdir=/staff/pcgeos/Library/CommonUI/
+	;;
+    $rootdir/Installed/*)
+    	srcdir=$rootdir/`expr "$cwd" : $rootdir'/Installed/\(.*\)$'`
+echo bar1
+	;;
+    $rootdir/[A-Z]*)
+    	srcdir=$rootdir/`expr "$cwd" : '^'$rootdir'/\(.*\)$'`
+echo bar2
+	;;
+    *)
+    	srcdir=$rootdir/`expr "$cwd" : $rootdir'/[^/]*/\(.*\)$'`
+echo bar3
+	;;
+esac
+#
+# sed for the appropriate fatal error, and printing all following lines
+# that begin with a semicolon until the first line that doesn't.
+#
+sed -n -e "
+/$1/{
+	:loop
+	p
+	n
+	/^;/bloop
+}" $srcdir/*.def

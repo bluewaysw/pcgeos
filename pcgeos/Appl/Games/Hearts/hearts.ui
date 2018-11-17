@@ -1,0 +1,935 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+ *
+ * PROJECT:	  PC GEOS
+ * MODULE:	  Hearts (Trivia Project)
+ * FILE:	  hearts.ui
+ *
+ * AUTHOR:  	  Peter Weck, Jan 19, 1993
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	PW	1/19/93   	Initial version
+ *
+ * DESCRIPTION:
+ *	This file contains the user Interface description for this
+ * application.  It will be a hearts game played with between 3 to
+ * 5 players, where exactly one of them is a person.
+ *
+ * 	$Id: hearts.ui,v 1.1 97/04/04 15:19:18 newdeal Exp $
+ *
+ ***********************************************************************/
+
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+/* first, read pre-defined class definitions. See the file
+ * /staff/pcgeos/Include/generic.uih. */
+
+#include "generic.uih"
+#include "cards.uih"
+/*#include "Art/mkrHearts.ui"
+*/
+#include "Art/mkheart.ui"
+
+
+/* ----------------------------------------------------------------------------
+	Class definitions
+-----------------------------------------------------------------------------*/
+
+class	HeartsApplication = GenApplication {
+
+}
+
+class	HeartsGame = Game {
+	HGI_maxScore = wordComp : 25;
+	HGI_heartsBroken = byteComp : 0;
+	HGI_shootData = byteComp : 0;
+	HGI_passCards = byteComp : 3;
+	HGI_cardsPlayed = byteComp : -1;
+	HGI_leadPointer = dwordComp : 0;
+	HGI_takeCardAttr = byteComp : 0;
+	HGI_takePointer = dwordComp : 0;
+	HGI_gameAttributes = bitFieldComp byte {
+				unused:5,
+				endEarly:1,
+				passingCards:1,
+				dontShowMovement:1
+			} : {};
+	HGI_modalBox = dwordComp : 0;
+	HGI_modalMessage = wordComp : 0;
+	HGI_soundAttributes = bitFieldComp byte {
+				unused:6,
+				jackPlayed:1,
+				queenPlayed:1
+			} : {};
+}
+
+
+class	HeartsDeck = Deck {
+
+	HI_playedCardPtr = dwordComp : 0;
+	HI_playersDataPtr = dwordComp : 0;
+	HI_passedCards = typeComp "PassData" : "";
+	HI_receivedCards = typeComp "PassData" : "";
+
+	HI_passStyle = typeComp "HeartsPassStyle" : "";
+	HI_shootStyle = typeComp "HeartsShootStyle" : "";
+	HI_scoreXPosition = wordComp : 0;
+	HI_scoreYPosition = wordComp : 0;
+	HI_nameXPosition = wordComp : 0;
+	HI_nameYPosition = wordComp : 0;
+	HI_nameYCharAdjust = wordComp:0;
+	HI_chosenCard = byteComp : 0;
+	HI_deckAttributes = bitFieldComp byte {
+				unused:4,
+				highlightScore,
+				displayCardsUp,
+				flippingTakeTrick,
+				computerPlayer
+			} : {};
+	HI_deckIdNumber = byteComp : 0;
+	HI_chunkPointer = dwordComp : 0;
+	HI_neighborPointer = dwordComp : 0;
+	HI_passPointer	= dwordComp : 0;
+	HI_passString = nptrComp : null;
+	HI_score = wordComp : 0;
+	HI_thisRoundScore = wordComp : 0;
+	HI_timerData = dwordComp : 0;
+	HI_nameString = nptrComp: null;
+}
+
+class	HeartsHand = Hand {
+}
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+/* The very top-level generic object of an application MUST be a GenApplication
+ * object. The hearts.gp file contains "appobj" statement which indicates
+ * that this "HeartsApp" object is in fact the top-level UI object.
+ * This object should be in its own resource so that GeoManager can load it
+ * quickly to grab the icon for this application. GeoManager will store this
+ * icon in its "Token Database", so that the icon image can be reused quickly.*/
+
+start	AppResource;
+
+HeartsApp = HeartsApplication {
+	children = HeartsPrimary;	/* The GenApplication object only
+					 * has one child: the main application
+					 * window. */
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = HeartsPrimary;
+					/* The main window should appear
+					 * on-screen when the application
+					 * is launched. */
+	gcnList (MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			HeartsCardBackSelector;
+	gcnList	(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+			HeartsToggleOptions,
+			SoundInteraction,
+			HeartsMaxPoints;
+
+	moniker = list {		
+		HeartsTextMoniker,	
+	/*	HeartsYMMoniker
+	*/
+		HeartsAppMoniker,
+		HeartsTinyMoniker
+	}
+
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char	"Hearts",0
+		},
+		ATTR_GEN_HELP_FILE { char "hearts", 0 }
+	}
+}
+
+visMoniker HeartsTextMoniker = "Hearts";
+
+end	AppResource;
+
+
+
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+/* Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed. */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+HeartsPrimary = GenPrimary {
+	children = 	HeartsMenu, 
+			HeartsView, 
+			HeartsWinner, 
+			HeartsLoser, 
+			HeartsTied, 
+			HeartsPassing,
+			HeartsExplaining, 
+			HeartsResetQuery,
+			HeartsTrashHand,
+			HeartsHumanShotMoon;
+
+	/* At present, we are not supplying the icon image for this 
+	 * application,
+	 * (just the text moniker given above), so we want to prevent the
+	 * user from minimizing this window. */
+
+	hints = {
+	 /*	ATTR_GEN_DISPLAY_NOT_MINIMIZABLE,
+		HINT_PRIMARY_FULL_SCREEN,  */
+	 	HINT_SIZE_WINDOW_AS_DESIRED, 
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_PRIMARY_NO_FILE_MENU,
+		ATTR_GEN_HELP_CONTEXT { 
+			char "TOC", 0
+		},
+		ATTR_GEN_WINDOW_KBD_OVERRIDE {
+			word	KO_NO_KEYBOARD
+		},
+		HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP,
+		ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT,
+		HINT_CENTER_WINDOW
+	}
+}
+
+
+/*-----------------------------------------------------------------------------
+			HeartsMenu
+-----------------------------------------------------------------------------*/
+
+HeartsMenu = GenInteraction {
+	children = HeartsGameMenu, HeartsOptionsMenu;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+
+/*-----------------------------------------------------------------------------
+			HeartsGameMenu
+-----------------------------------------------------------------------------*/
+
+HeartsGameMenu = GenInteraction {
+	visibility = popup;
+	moniker = 'G', "Game";
+	children = HeartsResetTrigger;
+	hints = { 
+		ATTR_GEN_INTERACTION_GROUP_TYPE { 
+			GenInteractionGroupType GIGT_FILE_MENU
+		}
+	}
+}
+
+HeartsResetTrigger = GenTrigger {
+	genStates = default +enabled;
+	moniker = 'N', "New Game";
+	action = MSG_HEARTS_GAME_RESET_GAME_WITH_QUEUE_FLUSH, HeartsPlayingTable;
+}
+
+/*-----------------------------------------------------------------------------
+			HeartsOptionsMenu
+-----------------------------------------------------------------------------*/
+
+HeartsOptionsMenu = GenInteraction {
+	visibility = popup;
+	children = HeartsSettings,  HeartsBooleans, HeartsMaxPoints,
+			 SaveSubGroup;
+	moniker = 'O', "Options";
+	hints = {
+		ATTR_GEN_INTERACTION_GROUP_TYPE  {
+			byte	GIGT_OPTIONS_MENU
+		}
+	}
+}
+
+HeartsSettings = GenInteraction {
+	children = HeartsCardBackSelector, SoundInteraction;
+	hints = {
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+/* HeartsTriggers = GenInteraction {
+	children = HeartsFlipTrigger;
+}
+*/
+HeartsBooleans = GenInteraction {
+	children = HeartsToggleOptions;
+	hints = {
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+
+HeartsCardBackSelector = CardBackSelector {
+	moniker = "Card Backs";
+	type = properties;
+	visibility = dialog;
+	hints = {
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 0>
+			SpecHeight <SST_PIXELS, 0>
+		}
+	}
+}
+
+/*HeartsFlipTrigger = GenTrigger {
+	genStates = default +enabled;
+	moniker = 'F', "Flip Computer's Cards";
+	action = MSG_HEARTS_GAME_FLIP_COMPUTER_DECKS, HeartsPlayingTable;
+}
+*/
+HeartsMaxPoints = GenInteraction {
+	moniker = "Set Maximum Points";
+	type = properties;
+	visibility = dialog;
+	attributes = default +modal; 
+	children = HeartsScoreValue,MaxSetTrigger,MaxCloseTrigger ;
+	hints = {
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN,
+
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbMaxPts", 0
+		}
+	}
+}
+
+HeartsScoreValue = GenValue {
+
+	/* GenClass Instance Data */
+
+		genStates = default +enabled;
+
+		moniker = "Play Until";
+
+	/* GenValueClass Instance Data */
+
+		value = 25;
+		maximum = 200;
+		destination = HeartsPlayingTable;
+		applyMsg = MSG_HEARTS_GAME_SET_MAX_SCORE;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"PlayTo",0
+		}
+	}
+}
+
+
+MaxCloseTrigger = GenTrigger {
+	moniker = 'C',"Cancel";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_HEARTS_GAME_CLOSE_MAX_SCORE, HeartsPlayingTable;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS},
+		HINT_SEEK_REPLY_BAR
+	}
+	
+}
+
+MaxSetTrigger = GenTrigger {
+	moniker = 'S',"Set";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_APPLY},
+		HINT_SEEK_REPLY_BAR
+	}
+	
+}
+
+HeartsToggleOptions = GenBooleanGroup {
+	selectedBooleans = "mask HTOS_CARD_MOVEMENT_BOOLEAN";
+	destination = HeartsPlayingTable;
+	applyMsg = MSG_HEARTS_GAME_TOGGLE_OPTIONS;
+	children = HeartsToggleCardMovementBoolean;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"ShowMove",0
+		}
+	}
+}
+
+HeartsToggleCardMovementBoolean = GenBoolean {
+	identifier = "mask HTOS_CARD_MOVEMENT_BOOLEAN";
+	moniker = "Show Card Movement";
+}
+
+SoundInteraction = GenInteraction {
+	visibility = popup;
+	moniker = 'S', "Sound";
+	children = SoundList;
+	hints = {
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+SoundList = GenItemGroup {
+	children = SoundOnEntry, SoundOffEntry, SoundSystemDefaultEntry;
+	selection = "GSS_SOUND_USE_SYSTEM_DEFAULT";
+	numSelections = 1;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"Sound",0
+		}
+	}
+}
+
+SoundOnEntry = GenItem {
+	moniker = 'S',"Sound On";
+	identifier = "GSS_SOUND_ON";
+}
+
+SoundOffEntry = GenItem {
+	moniker = 'O',"Sound Off";
+	identifier = "GSS_SOUND_OFF";
+}
+
+SoundSystemDefaultEntry = GenItem {
+	moniker = 'P', "Use System Preference";
+	identifier = "GSS_SOUND_USE_SYSTEM_DEFAULT";
+}
+
+SaveSubGroup = GenInteraction {
+	visibility = subGroup;
+	children = SaveOptionsTrigger;
+}
+
+SaveOptionsTrigger = GenTrigger {
+	moniker = 'O', "Save Options";
+	action = MSG_META_SAVE_OPTIONS, HeartsApp;
+}
+
+
+
+HeartsResetQuery = GenInteraction {
+	moniker = "Are You Sure?";
+	visibility = dialog;
+	type = affirmation;
+	attributes = default +notUserInitiatable, 
+			     +modal,
+			     +initiatedViaUserDoDialog;
+	children = HeartsResetQueryText;
+}
+
+
+HeartsResetQueryText = GenText {
+	genAttributes = default +readOnly;
+	text = "Changing this option will end the current game and begin a new one. Are you sure you want to do this?";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		},
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+
+HeartsWinner = GenInteraction {
+	moniker = "We Have A Winnah";
+	visibility = dialog;
+	type = notification;
+	attributes = default +notUserInitiatable, 
+			     +modal;
+	children = HeartsWinnerText, HeartsWinnerOKTrigger;
+}
+
+
+HeartsWinnerText = GenText {
+	genAttributes = default +readOnly;
+	text = "Stylin', you crushed those Siliconheads. They never had a chance.";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		},
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+HeartsWinnerOKTrigger = GenTrigger {
+	moniker = 'N',"No Kidding";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_OK},
+		HINT_SEEK_REPLY_BAR
+	}
+	action = MSG_HEARTS_GAME_RESET_GAME, HeartsPlayingTable;
+}
+
+HeartsLoser = GenInteraction {
+	moniker = "Bummer";
+	visibility = dialog;
+	type = notification;
+	attributes = default +notUserInitiatable, 
+			     +modal;
+	children = HeartsLoserText, HeartsLoserOKTrigger;
+}
+
+
+HeartsLoserText = GenText {
+	genAttributes = default +readOnly;
+	text = "Ha, you lost. You've been put in your place again by a wafer-thin piece of silicon.";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		},
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+HeartsLoserOKTrigger = GenTrigger {
+	moniker = 'D',"Dang";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_OK},
+		HINT_SEEK_REPLY_BAR
+	}
+	action = MSG_HEARTS_GAME_RESET_GAME, HeartsPlayingTable;
+}
+
+HeartsTied = GenInteraction {
+	moniker = "Ho Hum";
+	visibility = dialog;
+	type = notification;
+	attributes = default +notUserInitiatable, 
+			     +modal;
+	children = HeartsTiedText, HeartsTiedOKTrigger;
+}
+
+
+HeartsTiedText = GenText {
+	genAttributes = default +readOnly;
+	text = "How mediocre. You tied. That's certainly something to write home about. Yeah right.";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		},
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+HeartsTiedOKTrigger = GenTrigger {
+	moniker = 'G',"Grumble";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_OK},
+		HINT_SEEK_REPLY_BAR
+	}
+	action = MSG_HEARTS_GAME_RESET_GAME, HeartsPlayingTable;
+}
+
+HeartsHumanShotMoon = GenInteraction {
+	moniker = "To The Moon";
+	visibility = dialog;
+	type = notification;
+	attributes = default +notUserInitiatable, 
+			     +modal,
+			     +initiatedViaUserDoDialog;
+	children = HeartsHumanShotMoonText, HeartsHumanShotMoonTrigger;
+}
+
+
+HeartsHumanShotMoonText = GenText {
+	genAttributes = default +readOnly;
+	text = "Sweet! You just Shot The Moon. Give Me Five!";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		},
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+HeartsHumanShotMoonTrigger = GenTrigger {
+	moniker = 'F',"Five!";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_OK},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+HeartsPassing = GenInteraction {
+	type = multipleResponse;
+	visibility = dialog;
+	children = HeartsPassText, HeartsPassTrigger;
+	attributes = notUserInitiatable;
+	hints = {
+		HINT_INTERACTION_UNRELATED_PROPERTIES,
+		HINT_DO_NOT_USE_MONIKER,
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbPass", 0
+		}
+	}
+}
+
+HeartsPassText = GenText {
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 30>
+		},
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+HeartsPassTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = "Pass Cards";
+	action = MSG_HEARTS_DECK_COMPLETE_PASS_CARDS, MyDeck;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+HeartsExplaining = GenInteraction {
+	moniker = "Oops";
+	type = notification;
+	visibility = dialog;
+	children = HeartsExplainText;
+	attributes = notUserInitiatable,initiatedViaUserDoDialog,modal;
+	hints = {
+		HINT_INTERACTION_UNRELATED_PROPERTIES,
+		HINT_DO_NOT_USE_MONIKER,
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+HeartsExplainText = GenText {
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		},
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+HeartsTrashHand = GenInteraction {
+	moniker = "What's The Point?";
+	type	= affirmation;
+	visibility = dialog;
+	children = HeartsTrashHandText,HeartsTrashYesTrigger, 
+			HeartsTrashNoTrigger;
+	attributes = notUserInitiatable, modal;
+	hints = {
+		HINT_DO_NOT_USE_MONIKER
+	}
+}	
+
+
+HeartsTrashHandText = GenText {
+	genAttributes = default +readOnly;
+	text = "The Queen of Spades, Jack of Diamonds and all of the Hearts in this hand have been played. Since you cannot gain or lose any more points would you like to skip to the end of the hand?";
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+
+}
+
+HeartsTrashYesTrigger = GenTrigger {
+	moniker = 'Y',"Yes";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_YES},
+		HINT_SEEK_REPLY_BAR,
+	}
+	action = MSG_HEARTS_GAME_SKIP_TO_END_OF_HAND, HeartsPlayingTable;
+}
+
+HeartsTrashNoTrigger = GenTrigger {
+	moniker = 'N',"No";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_NO},
+		HINT_SEEK_REPLY_BAR
+	}
+	action = MSG_HEARTS_GAME_DONT_SKIP_TO_END_OF_HAND, HeartsPlayingTable;
+}
+
+
+/*-----------------------------------------------------------------------------
+			HeartsView
+-----------------------------------------------------------------------------*/
+
+HeartsView = GenView {
+
+	output = HeartsPlayingTable;
+	backColorR = C_GREEN;
+	horizAttributes = default +noLargerThanContent;
+	vertAttributes = default +noLargerThanContent;
+
+	hints = {
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 620>
+			SpecHeight<SST_PIXELS, 360>
+		},
+		HINT_DEFAULT_TARGET
+	}
+
+/*	
+	docRight = "5*72";	
+	docBottom  = "4*72";	
+*/
+	/* make view scrollable in X and Y.  Also, we'll keep the view
+	 * from getting larger than the content.
+	 */
+/*
+	horizAttributes = noLargerThanContent;
+	vertAttributes  = noLargerThanContent;
+*/
+
+}
+
+
+end Interface;
+
+
+
+start StuffResource;
+
+
+chunk PassToTheLeft		= "Pass three cards to the \\\rWest Player";
+chunk PassToTheRight		= "Pass three cards to the \\\rEast Player";
+chunk PassAcross		= "Pass three cards to the \\\rNorth Player";
+chunk HoldHand			= "Hold hand, don't pass";
+
+
+HeartsPlayingTable = HeartsGame {
+	view = HeartsView;
+	children = MyHand, MyDeck, 
+		ComputerDeck1, ComputerDeck2, ComputerDeck3,
+		DiscardDeck, MyDiscardDeck, ShowLastTrickDeck;
+	left = 0;
+	top = 0;
+	right = 620;
+	bottom = 360;
+
+	visCompGeoAttrs = default +customManageChildren;
+
+	whichBack = 1;		
+
+	initialFadeMask = SDM_100;		/* no fading */
+}
+
+
+MyHand = HeartsHand {
+}
+
+MyDeck = HeartsDeck {
+	HI_deckAttributes = displayCardsUp;
+	HI_passString = HoldHand;
+	HI_deckIdNumber = 4;
+	HI_scoreXPosition = CHART_NAME_TEXT_X;
+	HI_scoreYPosition = CHART_YOU_NAME_TEXT_Y;
+	HI_nameString = "YOU";
+
+	deckAttrs = dragWhichCards none, ignoreExpressDrag;
+	offsetFromUpCardX = 18;
+	offsetFromUpCardY = 0;
+	offsetFromDownCardX = 18;
+	offsetFromDownCardY = 0;
+	noCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+	upCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+	
+}
+
+MyDiscardDeck = HeartsDeck {
+	deckAttrs = dragWhichCards none, ignoreExpressDrag;
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 0;
+	offsetFromDownCardX = 0;
+	offsetFromDownCardY = 0;
+	noCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+	upCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+}
+
+ShowLastTrickDeck = HeartsDeck {
+	attr = default -detectable;
+
+	deckAttrs = dragWhichCards none, ignoreExpressDrag;
+	offsetFromUpCardX = 20;
+	offsetFromUpCardY = 0;
+	offsetFromDownCardX = 20;
+	offsetFromDownCardY = 0;
+	noCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+	upCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+}
+
+ComputerDeck1 = HeartsDeck {
+	attr = default -detectable;
+
+	HI_passStyle = "30, \
+			<1, PASSING_VOID_SUITS_IF_POSSIBLE, \
+			PASSING_VOID_SUITS_UNCONDITIONALLY>, \
+			<2, PASSING_DONT_BE_DUMB, \
+			PASSING_DONT_BE_DUMB>";
+	HI_shootStyle = "10,30, ";
+	HI_deckAttributes = computerPlayer;
+	HI_passString = PassToTheLeft;
+  	HI_deckIdNumber = 3;  
+	HI_scoreXPosition = CHART_NAME_TEXT_X;
+	HI_scoreYPosition = CHART_WEST_NAME_TEXT_Y;
+	HI_nameString = "EAST";
+ /*	HI_nameXPosition = -14; jfh - put the name on the other side */
+	HI_nameXPosition = 80;
+	HI_nameYPosition = 82;
+	HI_nameYCharAdjust = TEXT_POINT_SIZE;
+
+	deckAttrs = dragWhichCards none, ignoreExpressDrag;
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 11;
+	offsetFromDownCardX = 0;
+	offsetFromDownCardY = 11;
+	noCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+	upCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+}	
+
+ComputerDeck2 = HeartsDeck {
+	attr = default -detectable;
+
+	HI_passStyle = "30, \
+			<1, PASSING_VOID_SUITS_IF_POSSIBLE, \
+			PASSING_DONT_BE_DUMB>, \
+			<2, PASSING_DONT_BE_DUMB, \
+			PASSING_DONT_BE_DUMB>";
+	HI_shootStyle = "20,40, ";
+	HI_deckAttributes = computerPlayer;
+	HI_passString = PassAcross;
+	HI_deckIdNumber = 2;
+	HI_scoreXPosition = CHART_NAME_TEXT_X;
+	HI_scoreYPosition = CHART_NORTH_NAME_TEXT_Y;
+	HI_nameString = "NORTH";
+	HI_nameXPosition = 70;
+	HI_nameYPosition = -13;
+	HI_nameYCharAdjust = 0;
+
+	deckAttrs = dragWhichCards none, ignoreExpressDrag;
+	offsetFromUpCardX = 11;
+	offsetFromUpCardY = 0;
+	offsetFromDownCardX = 11;
+	offsetFromDownCardY = 0;
+	noCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+	upCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+}	
+
+ComputerDeck3 = HeartsDeck {
+	attr = default -detectable;
+
+	HI_passStyle = "30, \
+			<1, PASSING_DONT_BE_DUMB, \
+			PASSING_DONT_BE_DUMB>, \
+			<1, PASSING_VOID_SUITS_IF_POSSIBLE, \
+			PASSING_VOID_SUITS_UNCONDITIONALLY>";
+	HI_shootStyle = "30,50, ";
+	HI_deckAttributes = computerPlayer;
+	HI_passString = PassToTheRight;
+	HI_deckIdNumber = 1;
+	HI_scoreXPosition = CHART_NAME_TEXT_X;
+	HI_scoreYPosition = CHART_EAST_NAME_TEXT_Y;
+	HI_nameString = "WEST";
+ /*	HI_nameXPosition = 80; jfh - put the name on the other side */
+	HI_nameXPosition = -14;
+	HI_nameYPosition = 82;
+	HI_nameYCharAdjust = TEXT_POINT_SIZE;
+
+	deckAttrs = dragWhichCards none, ignoreExpressDrag;
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 11;
+	offsetFromDownCardX = 0;
+	offsetFromDownCardY = 11;
+	noCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+	upCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank none;
+}	
+
+DiscardDeck = HeartsDeck {
+	deckAttrs = dragWhichCards untilSelected, ignoreExpressDrag;
+	offsetFromUpCardX = 20;
+	offsetFromUpCardY = 0;
+	noCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank wild;
+	upCardAcceptanceConditions = suitConditions anySuit,
+		rankConditions absolute, absoluteRank wild;
+
+}
+
+
+
+end StuffResource;
+
+
+start StringResource, data;
+
+chunk PlayTwoOfClubs = "Since you have the Two of Clubs, you must play it to start the game.";
+chunk HeartsNotBroken	= "You cannot lead with a Heart until a Heart or the Queen of Spades has been played.";
+chunk MustFollowSuit	= "You must play a card in the same suit as the card that was led.";
+
+chunk	HandText = "Hand";
+chunk   GameText = "Game";
+chunk 	PlayingUntilText = "Playing Until";
+chunk	PlayerText = "Player";
+
+chunk	ComputerPlayerShotMoonText = data {
+	char "Holy Cow! The ", C_CTRL_A, " player just Shot the Moon!",0;
+}
+
+/* These strings, used as instructions, must start with the x offset
+ * where they are to be drawn
+ */
+
+
+chunk   ItsYourTurnText = data {
+	word 200
+	char "Hey! It's your turn"
+	byte 0
+}
+chunk   YourCardsText = data {
+	word 200
+	char "Look! New cards";
+	byte 0
+}
+chunk	StartWithTwoOfClubsText = data { 
+	word 200
+	char "Yo! Start with the Two of Clubs"
+	byte 0
+}
+chunk   BlankText = data {
+	word 0
+	char " "
+	byte 0
+}
+chunk	HeartsHaveBeenBrokenText = data {
+	word 200
+	char "Hearts have been broken"
+	byte 0
+}
+
+
+end StringResource;
+

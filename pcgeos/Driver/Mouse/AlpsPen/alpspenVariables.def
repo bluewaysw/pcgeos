@@ -1,0 +1,101 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		alpspenVariables.def
+
+AUTHOR:		Jim Guggemos, Dec 12, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	12/12/94   	Initial revision
+
+
+DESCRIPTION:
+	Variables for Alps Digitizer
+		
+	$Id: alpspenVariables.def,v 1.1 97/04/18 11:48:09 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;------------------------------------------------------------------------------
+;				DEVICE STRINGS
+;------------------------------------------------------------------------------
+MouseExtendedInfoSeg	segment	lmem LMEM_TYPE_GENERAL
+
+mouseExtendedInfo	DriverExtendedInfoTable <
+		{},				; lmem header added by Esp
+		length mouseNameTable,		; Number of supported devices
+		offset mouseNameTable,
+		offset mouseInfoTable
+>
+ForceRef	mouseExtendedInfo
+
+mouseNameTable	lptr.char	alpsPen
+		lptr.char	0	; null-terminator
+
+alpsPen		chunk.char 'Alps Pen', 0
+
+mouseInfoTable	MouseExtendedInfo	\
+		0			;alpsPen
+
+CheckHack <length mouseInfoTable eq length mouseNameTable>
+MouseExtendedInfoSeg	ends
+
+;------------------------------------------------------------------------------
+;			    VARIABLES/DATA/CONSTANTS
+;------------------------------------------------------------------------------
+
+idata		segment
+
+oldVector	fptr.far
+
+calibration	AlpsCalibrationInfo	< < DEFAULT_SCALE_X, \
+					    DEFAULT_SCALE_Y >, \
+					  < DEFAULT_OFFSET_X, \
+					    DEFAULT_OFFSET_Y > >
+					  
+if 0
+offScreenMessage word			;offscreen message.
+hardIconOD	optr			;offscreen hard icons.
+
+hardIconState	byte	0
+endif
+
+mouseRates	label	byte	; Needed to avoid assembly errors.
+MOUSE_NUM_RATES	equ	0	; We can't change the report rate.
+
+
+condFlags	AlpsFlags	0
+    ; Just some condition flags to indicate certain modes, etc.
+
+penCondition	AlpsCurrentPenCondition		ACPC_PEN_UP
+
+lastRawPoint	Point		<0, 0>
+lastDpyPoint	Point		<0, 0>
+    ; Used by the MouseGetRawCoordinate handler
+
+; Used for hard icons.
+digitizerHardIconSpan	word		0
+    ; Length, in digitizer coordinates, of each hard icon (Y span).
+
+digitizerMaxY	word		0
+    ; Maximum Y value (in digitizer coordinates).
+
+if ERROR_CHECK
+
+reentryToHandler	byte	0
+    ; Variable that should always be 0 unless we are processing an pen
+    ; interrupt.  This is should NEVER be more than one.  Used to check to
+    ; make sure we haven't "re-entered" the interrupt handler.
+
+endif ;ERROR_CHECK
+
+idata		ends

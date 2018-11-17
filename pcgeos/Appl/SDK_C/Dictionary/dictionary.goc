@@ -1,0 +1,1458 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Dictionary (Sample GEOS application
+MODULE:		Main
+FILE:		dictionary.goc
+
+AUTHOR:		Joon Song, Sep 21, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Joon	9/21/94   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: dictionary.goc,v 1.1 97/04/04 16:40:11 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <spell.goh>
+@include <Internal/spelllib.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class	DictionaryProcessClass, GenProcessClass;
+
+/* Define messages for this class here. */
+
+@endc;	/* end of class definition */
+
+
+@class	DictionaryManagerClass, GenInteractionClass;
+
+    @message void MSG_DM_LOOKUP();
+    /*
+     * Lookup word in @DictionaryLookupText
+     */
+
+    @message void MSG_DM_MEANING_SELECTED(word selection = cx);
+    /*
+     * Update "Full Text of Definition" (@DictionaryDefinitionText)
+     * and "Synonyms" (@DictionarySynonymList)
+     */
+
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_DM_GET_MEANING_MONIKER;
+    /*
+     * Get moniker for @DictionaryDefinitionList
+     */
+
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_DM_GET_SYNONYM_MONIKER;
+    /*
+     * Get moniker for @DictionarySynonymList
+     */
+
+    @message void MSG_DM_SYNONYM_SELECTED(word selection = cx);
+    /*
+     * Copy selected synonym to @DictionaryLookupText
+     */
+
+    @message void MSG_DM_SYNONYM_DOUBLE_CLICK(word selection = cx);
+    /*
+     * Lookup word selected in @DictionarySynonymList
+     */
+
+    @instance MemHandle	DMI_meaningsBlock;
+    @instance ChunkHandle DMI_meaningsChunk;
+    @instance ChunkHandle DMI_grammarsChunk;
+    @instance optr DMI_synonyms;
+
+    @instance char DMI_lastWord[MAX_ENTRY_LENGTH+1];
+
+@endc;	/* end of class definition */
+
+
+@class	SpellCheckManagerClass, GenInteractionClass;
+
+    @message void MSG_SCM_CHECK_WORD();
+    /*
+     * Spell check for in @SpellCheckLookupText
+     */
+
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_SCM_GET_SUGGESTION_MONIKER;
+    /*
+     * Get moniker for @SpellCheckSuggestList
+     */
+
+    @message void MSG_SCM_SUGGESTION_SELECTED(word selection = cx);
+    /*
+     * Copy selected suggestion to @SpellCheckLookupText
+     */
+
+    @message void MSG_SCM_SUGGESTION_DOUBLE_CLICK(word selection = cx);
+    /*
+     * Spell check word selected in @SpellCheckSuggestList
+     */
+
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_SCM_GET_USER_DICTIONARY_MONIKER;
+    /*
+     * Get moniker for @SpellCheckUserDictionaryList
+     */
+
+    @message void MSG_SCM_GET_ANAGRAMS();
+    /*
+     * Get anagrams
+     */
+
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_SCM_GET_ANAGRAM_MONIKER;
+    /*
+     * Get moniker for @AnagramList
+     */
+
+    @message void MSG_SCM_GET_WILDCARDS();
+    /*
+     * Get wildcards
+     */
+
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_SCM_GET_WILDCARD_MONIKER;
+    /*
+     * Get moniker for @WildcardList
+     */
+
+    @instance MemHandle SCMI_icBuff;
+    @instance MemHandle SCMI_userList;
+
+@endc;	/* end of class definition */
+
+
+/*
+ * Each object class requires a "class record" be stored in fixed memory
+ * for it. The class record is used by the GEOS message system for the
+ * delivery of messages sent to an object of the class. The class record needs
+ * to be defined in the file where the methods (i.e. the routines defined
+ * with @method) for the class are defined. The @classdecl GOC directive
+ * tells GOC to create the class record here.
+ *
+ * The neverSaved flag is necessary because ProcessClass objects are
+ * hybrid objects. It tells the system that no object of this class will
+ * never be loaded from or stored to a file.
+ */
+
+@classdecl	DictionaryProcessClass, neverSaved;
+@classdecl	DictionaryManagerClass;
+@classdecl	SpellCheckManagerClass;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ *		Application Object
+ *
+ * The very top-level generic object of an application MUST be a GenApplication
+ * object. The dictionary.gp file contains "appobj" statement which indicates
+ * that this "DictionaryApp" object is in fact the top-level UI object.
+ *
+ * This object should be in its own resource, as it is all that need be in
+ * memory when the application is iconified. As such, its resource should be
+ * as small as possible.
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass DictionaryApp = {
+
+    /*
+     * While the application object isn't shown on the screen, it has a list
+     * of VisMonikers for three purposes:
+     *	1) the GenPrimary (see below) inherits the moniker when it comes up
+     *	   on screen.
+     *	2) when GeoManager needs to display an icon for the application, and
+     *	   there's none for it in the Token Database, it launches the app and
+     *	   sends a message to the application object to install its list of
+     *	   monikers in the token database under the application's token.
+     *	3) when the GenPrimary is minimized, it uses the most appropriate
+     *	   graphical moniker from this list for the application's icon.
+     *	   if there's an abbreviated-text moniker in the list, that's used
+     *	   as the icon title. else any regular-text moniker is used.
+     */
+    GI_visMoniker = list { @DictionaryTextMoniker }
+
+    /*
+     * The GenApplication object has at least one child: the main application
+     * window.
+     */
+    GI_comp = @DictionaryPrimary;
+
+    /*
+     * The main window should appear on-screen when the application is
+     * launched, so place it on the GAGCNLT_WINDOWS GCN list. This causes
+     * the application object to bring it on-screen at the appropriate time.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @DictionaryPrimary;
+}
+
+@visMoniker DictionaryTextMoniker = "C Dictionary Sample Application";
+
+@end	AppResource;
+
+/*
+ *		Primary window
+ *
+ * Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed.
+ */
+
+@start	Interface;		/* this resource is for misc UI objects */
+
+@object GenPrimaryClass DictionaryPrimary = {
+
+    GI_comp = @LeftGroup, @RightGroup;
+
+    HINT_DIVIDE_WIDTH_EQUALLY;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass LeftGroup = {
+
+    GI_comp = @DictionaryGroup, @AnagramGroup;
+
+}
+
+@object GenInteractionClass RightGroup = {
+
+    GI_comp = @SpellCheckGroup, @WildcardGroup;
+
+}
+
+@object DictionaryManagerClass DictionaryGroup = {
+
+    GI_visMoniker = "Dictionary/Thesaurus";
+    GI_comp = @DictionaryLookupGroup,
+	      @DictionaryDefinitionGroup,
+	      @DictionarySynonymList;
+
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass DictionaryLookupGroup = {
+
+    GI_comp = @DictionaryLookupText, @DictionaryLookupTrigger;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass DictionaryLookupText = {
+
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = MAX_ENTRY_LENGTH;
+    GTXI_applyMsg = MSG_DM_LOOKUP;
+    GTXI_destination = @DictionaryGroup;
+
+    HINT_DEFAULT_FOCUS;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+}
+
+@object GenTriggerClass DictionaryLookupTrigger = {
+
+    GI_visMoniker = 'L', "Lookup";
+    GI_attrs = @default | GA_INITIATES_INPUT_IGNORE;
+    GTI_actionMsg = MSG_DM_LOOKUP;
+    GTI_destination = @DictionaryGroup;
+}
+
+@object GenInteractionClass DictionaryDefinitionGroup = {
+
+    GI_comp = @DictionaryDefinitionWord, @DictionaryDefinitionList;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass DictionaryDefinitionWord = {
+
+    GI_visMoniker = "Definitions for:";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = MAX_ENTRY_LENGTH;
+
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_SHOW_ENTIRE_MONIKER;
+}
+
+@object GenDynamicListClass DictionaryDefinitionList = {
+
+    GDLI_queryMsg = MSG_DM_GET_MEANING_MONIKER;
+    GIGI_applyMsg = MSG_DM_MEANING_SELECTED;
+    GIGI_destination = @DictionaryGroup;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_MAXIMUM_SIZE = { 0, SST_LINES_OF_TEXT | 4, 4 };
+    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+}
+
+@object GenDynamicListClass DictionarySynonymList = {
+
+    GI_visMoniker = "Synonyms for This Definition:";
+    GDLI_queryMsg = MSG_DM_GET_SYNONYM_MONIKER;
+    GIGI_applyMsg = MSG_DM_SYNONYM_SELECTED;
+    GIGI_destination = @DictionaryGroup;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_MAXIMUM_SIZE = { 0, SST_LINES_OF_TEXT | 4, 4 };
+    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = { MSG_DM_SYNONYM_DOUBLE_CLICK };
+}
+
+
+/*
+ * AnagramGroup
+ */
+
+@object GenInteractionClass AnagramGroup = {
+
+    GI_visMoniker = "Anagrams";
+    GI_comp = @AnagramLookupGroup, @AnagramMinLength, @AnagramList;
+
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass AnagramLookupGroup = {
+
+    GI_comp = @AnagramLookupText, @AnagramLookupTrigger;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AnagramLookupText = {
+
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = MAX_ENTRY_LENGTH;
+    GTXI_applyMsg = MSG_SCM_GET_ANAGRAMS;
+    GTXI_destination = @SpellCheckGroup;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+}
+
+@object GenTriggerClass AnagramLookupTrigger = {
+
+    GI_visMoniker = 'J', "Jumble";
+    GTI_actionMsg = MSG_SCM_GET_ANAGRAMS;
+    GTI_destination = @SpellCheckGroup;
+}
+
+@object GenValueClass AnagramMinLength = {
+
+    GI_visMoniker = 'M', "Min Length:";
+    GVLI_value = 2;
+    GVLI_minimum = 2;
+}
+
+@object GenDynamicListClass AnagramList = {
+
+    GDLI_queryMsg = MSG_SCM_GET_ANAGRAM_MONIKER;
+    GIGI_destination = @SpellCheckGroup;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_MAXIMUM_SIZE = { 0, SST_LINES_OF_TEXT | 4, 4 };
+}
+
+
+/*
+ * SpellCheckGroup
+ */
+
+@object SpellCheckManagerClass SpellCheckGroup = {
+
+    GI_visMoniker = "Spell Check";
+    GI_comp = @SpellCheckLookupGroup, @SpellCheckWord,
+    	      @SpellCheckStatusLine, @SpellCheckSuggestList,
+    	      @SpellCheckUserDictionaryList;
+
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass SpellCheckLookupGroup = {
+
+    GI_comp = @SpellCheckLookupText, @SpellCheckLookupTrigger;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass SpellCheckLookupText = {
+
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = MAX_ENTRY_LENGTH;
+    GTXI_applyMsg = MSG_SCM_CHECK_WORD;
+    GTXI_destination = @SpellCheckGroup;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+}
+
+@object GenTriggerClass SpellCheckLookupTrigger = {
+
+    GI_visMoniker = 'S', "Spell Check";
+    GI_attrs = @default | GA_INITIATES_INPUT_IGNORE;
+    GTI_actionMsg = MSG_SCM_CHECK_WORD;
+    GTI_destination = @SpellCheckGroup;
+}
+
+@object GenTextClass SpellCheckWord = {
+
+    GI_visMoniker = "Spell Checked Word:";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "<none>";
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass SpellCheckStatusLine = {
+
+    GI_visMoniker = "Spell Check Status: ";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "<none>";
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenDynamicListClass SpellCheckSuggestList = {
+
+    GI_visMoniker = "Suggestions:";
+    GDLI_queryMsg = MSG_SCM_GET_SUGGESTION_MONIKER;
+    GIGI_applyMsg = MSG_SCM_SUGGESTION_SELECTED;
+    GIGI_destination = @SpellCheckGroup;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_MAXIMUM_SIZE = { 0, SST_LINES_OF_TEXT | 4, 4 };
+    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS =
+	{ MSG_SCM_SUGGESTION_DOUBLE_CLICK };
+}
+
+@object GenDynamicListClass SpellCheckUserDictionaryList = {
+
+    GI_visMoniker = "User Dictionary Words:";
+    GDLI_queryMsg = MSG_SCM_GET_USER_DICTIONARY_MONIKER;
+    GIGI_destination = @SpellCheckGroup;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_MAXIMUM_SIZE = { 0, SST_LINES_OF_TEXT | 4, 4 };
+}
+
+
+/*
+ * WildcardGroup
+ */
+
+@object GenInteractionClass WildcardGroup = {
+
+    GI_visMoniker = "Wildcards";
+    GI_comp = @WildcardLookupGroup, @WildcardList;
+
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass WildcardLookupGroup = {
+
+    GI_comp = @WildcardLookupText, @WildcardLookupTrigger;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass WildcardLookupText = {
+
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = MAX_ENTRY_LENGTH;
+    GTXI_applyMsg = MSG_SCM_GET_WILDCARDS;
+    GTXI_destination = @SpellCheckGroup;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+}
+
+@object GenTriggerClass WildcardLookupTrigger = {
+
+    GI_visMoniker = 'W', "Wildcards";
+    GTI_actionMsg = MSG_SCM_GET_WILDCARDS;
+    GTI_destination = @SpellCheckGroup;
+}
+
+@object GenDynamicListClass WildcardList = {
+
+    GDLI_queryMsg = MSG_SCM_GET_WILDCARD_MONIKER;
+    GIGI_destination = @SpellCheckGroup;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_MAXIMUM_SIZE = { 0, SST_LINES_OF_TEXT | 4, 4 };
+}
+
+@end Interface;
+
+
+@start DictionaryStrings, data;
+
+@chunk char wordNotFoundString[] = "The word was not found. Check for misspellings.";
+
+@chunk char synonymErrorString[] = "There was an error while searching for synonyms.";
+
+@end DictionaryStrings;
+
+
+
+/*
+ ***************************************************************************
+ *		Code for DictionaryManagerClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_DM_LOOKUP for DictionaryManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Look up the word that is currently in the
+ *		    @DictionaryLookupText field
+ * PARAMETERS:	    void ()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method DictionaryManagerClass, MSG_DM_LOOKUP
+{
+    MeaningsRetParams meaningsRetParams;
+    char textBuffer[MAX_ENTRY_LENGTH+1];
+    int  numMeanings;
+    optr appObj = GeodeGetAppObject(0);
+
+    /*
+     * Mark the application as busy (just changes the cursor)
+     */
+    @call appObj::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /*
+     * Get word to look up
+     */
+    @call DictionaryLookupText::MSG_VIS_TEXT_GET_ALL_PTR(textBuffer);
+
+    /*
+     * Get meanings
+     */
+    numMeanings = ThesaurusGetMeanings(textBuffer, &meaningsRetParams);
+
+    if (numMeanings > 0) {
+	/*
+	 * Found meanings for word.  Save this word as last word looked up.
+	 */
+	strcpy(pself->DMI_lastWord, textBuffer);
+
+	/*
+	 * Copy word to @DictionaryDefinitionWord.
+	 */
+	@call DictionaryDefinitionWord::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+								textBuffer, 0);
+
+	/*
+	 * Free the chunk array memory block we got for pervious word
+	 */
+	if (pself->DMI_meaningsBlock != NULL)
+	    MemFree(pself->DMI_meaningsBlock);
+
+	/*
+	 * Store the chunk array and grammar array
+	 */
+	pself->DMI_meaningsBlock = meaningsRetParams.MRP_meaningsBlock;
+	pself->DMI_meaningsChunk = meaningsRetParams.MRP_meaningsChunk;
+	pself->DMI_grammarsChunk = meaningsRetParams.MRP_grammarsChunk;
+
+	/*
+	 * Initialize DictionaryDefinitionList with number of meanings
+	 */
+	@call DictionaryDefinitionList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+								numMeanings);
+
+	/*
+	 * Select first item in list
+	 */
+	@call DictionaryDefinitionList::
+	    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, 0);
+
+	/*
+	 * Update synonyms list by notifying it that an item has been selected.
+	 */
+	@call oself::MSG_DM_MEANING_SELECTED(0);
+
+    } else {
+	/*
+	 * Word not found.  Notify user and clear out all other areas.
+	 */
+	UserStandardDialogOptr(NULL,			/* helpContext */
+			       NULL,			/* customTriggers */
+			       NULL,			/* arg2 */
+			       NULL,			/* arg1 */
+			       @wordNotFoundString,	/* string */
+			       CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET |
+			       GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET);	/* CustomDialogBoxFlags */
+
+	@call DictionaryDefinitionWord::MSG_VIS_TEXT_DELETE_ALL();
+	@call DictionaryDefinitionList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+	@call DictionarySynonymList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+    }
+
+    @call appObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+}	/* End of MSG_DM_LOOKUP. */
+
+
+
+/***********************************************************************
+ *		MSG_DM_MEANING_SELECTED for DictionaryManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get synonyms for selected meaning and put them
+ *		    in the @DictionarySynonymList.
+ * PARAMETERS:	    void (word selection);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method DictionaryManagerClass, MSG_DM_MEANING_SELECTED
+{
+    optr synonymsArray;
+    int numSynonyms;
+
+    if (selection != GIGS_NONE) {
+	/*
+	 * Get the synonyms for the selected meaning.
+	 */
+	numSynonyms = ThesaurusGetSynonyms(pself->DMI_lastWord,
+					   selection+1,
+					   &synonymsArray);
+	if (numSynonyms < 0)
+	    numSynonyms = 0;
+
+	/*
+	 * Free the chunk array memory block we got for previous meaning
+	 */
+	if (HandleOf(pself->DMI_synonyms) != NULL)
+	    MemFree(HandleOf(pself->DMI_synonyms));
+
+	/*
+	 * Store the chunk array
+	 */
+	pself->DMI_synonyms = synonymsArray;
+
+	/*
+	 * Initialize the DictionarySynonymList.
+	 */
+	@call DictionarySynonymList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+								numSynonyms);
+	@call DictionarySynonymList::MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE(0);
+    }
+}	/* End of MSG_DM_MEANING_SELECTED. */
+
+
+
+/***********************************************************************
+ *		MSG_DM_GET_MEANING_MONIKER for DictionaryManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Update item in DictionaryDefinitionList
+ * PARAMETERS:	    void (optr list, word item);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method DictionaryManagerClass, MSG_DM_GET_MEANING_MONIKER
+{
+    char adjectiveString[] = "(adj) ";
+    char nounString[] = "(n) ";
+    char adverbString[] = "(adv) ";
+    char verbString[] = "(v) ";
+    char textBuffer[MAX_DEFINITION_SIZE+MAX_GRAMMAR_STRING+1];
+    word *grPtr, grammarClass;
+    char *elPtr;
+    word elSize;
+
+    /*
+     * Lock DMI_meaningsBlock
+     */
+    MemLock(pself->DMI_meaningsBlock);
+
+    /*
+     * Get the grammar class
+     */
+    grPtr = LMemDerefHandles(pself->DMI_meaningsBlock,
+			     pself->DMI_grammarsChunk);
+    grammarClass = grPtr[item];
+
+    /*
+     * Copy the appropriate grammar string into the textBuffer.
+     */
+    if (grammarClass == 0) {
+	strcpy(textBuffer, adjectiveString);
+    } else if (grammarClass == 1) {
+	strcpy(textBuffer, nounString);
+    } else if (grammarClass == 2) {
+	strcpy(textBuffer, adverbString);
+    } else if (grammarClass == 3) {
+	strcpy(textBuffer, verbString);
+    }
+
+    /*
+     * Get the definition
+     */
+    elPtr = ChunkArrayElementToPtr(ConstructOptr(pself->DMI_meaningsBlock,
+						 pself->DMI_meaningsChunk),
+				   item,
+				   &elSize);
+
+    /*
+     * Now copy the definition into the textBuffer.
+     */
+    strcat(textBuffer, elPtr);
+
+    /*
+     * We don't need the meaningsBlock anymore, so unlock it.
+     */
+    MemUnlock(pself->DMI_meaningsBlock);
+
+    /*
+     * Update the moniker in the definitions list.
+     */
+    @call DictionaryDefinitionList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+							item, textBuffer);
+
+}	/* End of MSG_DM_GET_MEANING_MONIKER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_DM_GET_SYNONYM_MONIKER for DictionaryManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get moniker for synonyms list
+ * PARAMETERS:	    void (optr list, word item);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method DictionaryManagerClass, MSG_DM_GET_SYNONYM_MONIKER
+{
+    char *elPtr;
+    word elSize;
+
+    /*
+     * Lock chunk array containing list of synonyms
+     */
+    MemLock(HandleOf(pself->DMI_synonyms));
+
+    /*
+     * Get text of requested synonym
+     */
+    elPtr = ChunkArrayElementToPtr(pself->DMI_synonyms, item, &elSize);
+
+    /*
+     * Update moniker in synonyms list
+     */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, elPtr);
+
+    /*
+     * Unlock chunk array containing list of synonyms
+     */
+    pself = ObjDerefGen(oself);
+    MemUnlock(HandleOf(pself->DMI_synonyms));
+    
+}	/* End of MSG_DM_GET_SYNONYM_MONIKER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_DM_SYNONYM_SELECTED for DictionaryManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Copy selected synonym to DictionaryLookupText
+ * PARAMETERS:	    void (word selection);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method DictionaryManagerClass, MSG_DM_SYNONYM_SELECTED
+{
+    void *elPtr;
+    word elSize;
+
+    if (selection != GIGS_NONE) {
+	/*
+	 * Lock chunk array containing list of synonyms
+	 */
+	MemLock(HandleOf(pself->DMI_synonyms));
+
+	/*
+	 * Get text of selected synonym
+	 */
+	elPtr = ChunkArrayElementToPtr(pself->DMI_synonyms, selection,&elSize);
+
+	/*
+	 * Copy text of selected synonym into @DictionaryLookupText.
+	 */
+	@call DictionaryLookupText::MSG_VIS_TEXT_REPLACE_ALL_PTR(elPtr, 0);
+	
+	/*
+	 * Unlock chunk array containing list of synonyms
+	 */
+	pself = ObjDerefGen(oself);
+	MemUnlock(HandleOf(pself->DMI_synonyms));
+    }
+}	/* End of MSG_DM_SYNONYM_SELECTED.	*/
+
+
+
+/***********************************************************************
+ *		MSG_DM_SYNONYM_DOUBLE_CLICK for DictionaryManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Send MSG_DM_SYNONYM_SELECTED followed by MSG_DM_LOOKUP
+ *		    to handle a double-click in the DictionarySynonymList.
+ * PARAMETERS:	    void (word selection);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method DictionaryManagerClass, MSG_DM_SYNONYM_DOUBLE_CLICK
+{
+    @call oself::MSG_DM_SYNONYM_SELECTED(selection);
+    @call oself::MSG_DM_LOOKUP();
+
+}	/* End of MSG_DM_SYNONYM_DOUBLE_CLICK.	*/
+
+
+
+/*
+ ***************************************************************************
+ *		Code for SpellCheckManagerClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_VIS_OPEN for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize spell checking
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_VIS_OPEN
+{
+    UserDictionaryListInfo *userListInfoPtr;
+
+    @callsuper();
+
+    /*
+     * Dereference instance data pointer after calling superclass
+     */
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Setup spell checking
+     */
+    if (pself->SCMI_icBuff == NULL) {
+	ICInit(&pself->SCMI_icBuff);
+    }
+
+    /*
+     * We'll just build out the user list here
+     */	
+    if (pself->SCMI_userList == NULL) {
+	pself->SCMI_userList = ICBuildUserList(pself->SCMI_icBuff);
+
+	/*
+	 * Initialize @SpellCheckUserDictionaryList
+	 */
+	userListInfoPtr = MemLock(pself->SCMI_userList);
+	
+	@call SpellCheckUserDictionaryList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+					userListInfoPtr->UDLI_numEntries);
+	pself = ObjDerefGen(oself);
+	MemUnlock(pself->SCMI_userList);
+    }
+}	/* End of MSG_VIS_OPEN. */
+
+
+
+/***********************************************************************
+ *		MSG_VIS_CLOSE for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Cleanup spell checking
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_VIS_CLOSE
+{
+    @callsuper();
+
+    /*
+     * Dereference instance data pointer after calling superclass
+     */
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Now do cleanup
+     */
+    if (pself->SCMI_icBuff != NULL) {
+	/*
+	 * Exit spell checking
+	 */
+	ICExit(pself->SCMI_icBuff);
+	pself->SCMI_icBuff = NULL;
+    }
+
+    if (pself->SCMI_userList != NULL) {
+	/*
+	 * Free user dictionary list block
+	 */
+	MemFree(pself->SCMI_userList);
+	pself->SCMI_userList = NULL;
+    }
+}	/* End of MSG_VIS_CLOSE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SCM_CHECK_WORD for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Spell check word in @SpellCheckLookupText
+ * PARAMETERS:	    void (void);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_SCM_CHECK_WORD
+{
+    char checkWord[SPELL_MAX_WORD_LENGTH];
+    SpellResult spellResult;
+
+    /*
+     * Get word to spell check
+     */
+    @call SpellCheckLookupText::MSG_VIS_TEXT_GET_ALL_PTR(checkWord);
+
+    /*
+     * Copy word to @SpellCheckWord
+     */
+    @call SpellCheckWord::MSG_VIS_TEXT_REPLACE_ALL_PTR(checkWord, 0);
+
+    if (pself->SCMI_icBuff != NULL) {
+	spellResult = ICCheckWord(pself->SCMI_icBuff, checkWord);
+
+	if (spellResult == IC_RET_FOUND) {
+	    /*
+	     * Word spelled OK.
+	     */
+	    @call SpellCheckStatusLine::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+					"Word found in dictionary.", 0);
+
+	    /*
+	     * Clear out @SpellCheckSuggestList
+	     */
+	    @call SpellCheckSuggestList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+
+	} else if (spellResult == IC_RET_OK) {
+	    /*
+	     * Word misspelled.
+	     */
+	    @call SpellCheckStatusLine::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+					"Word not found in dictionary.", 0);
+
+	    /*
+	     * Build out suggestions list
+	     */
+	    ICSetTask(pself->SCMI_icBuff, ST_CORRECT);
+
+	    /*
+	     * Keep looking until we have all the alternates
+	     */
+	    while (ICSpl(pself->SCMI_icBuff, "") == IC_RET_FOUND)
+		;
+
+	    /*
+	     * Initialize SpellCheckSuggestList
+	     */
+	    @call SpellCheckSuggestList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+					ICGetNumAlts(pself->SCMI_icBuff));
+	} else {
+	    /*
+	     * What happened?
+	     */
+	    char myBuff[100];
+
+	    sprintf(myBuff, "Unknown error code no.%d", spellResult);
+	    @call SpellCheckStatusLine::MSG_VIS_TEXT_REPLACE_ALL_PTR(myBuff,0);
+	}
+    }
+}	/* End of MSG_SCM_CHECK_WORD. */
+
+
+
+/***********************************************************************
+ *		MSG_SCM_GET_SUGGESTION_MONIKER for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get moniker for suggestion
+ * PARAMETERS:	    void (optr list, word item);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_SCM_GET_SUGGESTION_MONIKER
+{
+    char checkWord[SPELL_MAX_WORD_LENGTH];
+    char altWord[SPELL_MAX_WORD_LENGTH];
+    SpellResult spellResult;
+
+    if (pself->SCMI_icBuff != NULL) {
+	/*
+	 * Get word to get suggestion for
+	 */
+	@call SpellCheckLookupText::MSG_VIS_TEXT_GET_ALL_PTR(checkWord);
+	
+	/*
+	 * Get suggestion word
+	 */
+	ICGetAlternate(pself->SCMI_icBuff, item, checkWord, altWord);
+
+	/*
+	 * Update @SpellCheckSuggestList
+	 */
+	@call SpellCheckSuggestList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+								item, altWord);
+    }
+}	/* End of MSG_SCM_GET_SUGGESTION_MONIKER. */
+
+
+
+/***********************************************************************
+ *		MSG_SCM_SUGGESTION_SELECTED for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Copy word selected in SpellCheckSuggestList to
+ *		    SpellCheckLookupText
+ * PARAMETERS:	    void (word selection)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_SCM_SUGGESTION_SELECTED
+{
+    char checkWord[SPELL_MAX_WORD_LENGTH];
+    char altWord[SPELL_MAX_WORD_LENGTH];
+
+    if (pself->SCMI_icBuff != NULL) {
+	/*
+	 * Get word to get suggestion for
+	 */
+	@call SpellCheckLookupText::MSG_VIS_TEXT_GET_ALL_PTR(checkWord);
+	
+	/*
+	 * Get suggestion word
+	 */
+	ICGetAlternate(pself->SCMI_icBuff, selection, checkWord, altWord);
+
+	/*
+	 * Update @SpellCheckSuggestList
+	 */
+	@call SpellCheckLookupText::MSG_VIS_TEXT_REPLACE_ALL_PTR(altWord, 0);
+    }
+}	/* End of MSG_SCM_SUGGESTION_SELECTED. */
+
+
+
+/***********************************************************************
+ *		MSG_SCM_SUGGESTION_DOUBLE_CLICK for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Send MSG_SCM_SUGGESTION_SELECTED followed by
+ *		    MSG_SCM_CHECK_WORD to handle a double-click
+ *		    in the SpellCheckSuggestList.
+ * PARAMETERS:	    void (word selection);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_SCM_SUGGESTION_DOUBLE_CLICK
+{
+    @call oself::MSG_SCM_SUGGESTION_SELECTED(selection);
+    @call oself::MSG_SCM_CHECK_WORD();
+
+}	/* End of MSG_SCM_SUGGESTION_DOUBLE_CLICK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SCM_GET_USER_DICTIONARY_MONIKER for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get moniker for SpellCheckUserDictionaryList
+ * PARAMETERS:	    void (optr list, word item);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	9/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_SCM_GET_USER_DICTIONARY_MONIKER
+{
+    UserDictionaryListInfo *userListInfoPtr;
+    char *wordPtr;
+    int i;
+
+    if (pself->SCMI_userList != NULL) {
+	/*
+	 * Lock down user dictionary list
+	 */
+	userListInfoPtr = MemLock(pself->SCMI_userList);
+
+	/*
+	 * Set wordPtr to first word in user dictionary.
+	 * Words start after the UserDictionaryListInfo structure.
+	 */
+	wordPtr = (char *) &userListInfoPtr[1];
+
+	/*
+	 * Get user dictionary word
+	 */
+	for (i = 0; i < item; i++) {
+	    wordPtr += strlen(wordPtr) + 1;
+	}
+
+	/*
+	 * Update @SpellCheckUserDictionaryList
+	 */
+	@call SpellCheckUserDictionaryList::
+		MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, wordPtr);
+
+	/*
+	 * Unlock user dictionary list
+	 */
+	pself = ObjDerefGen(oself);
+	MemUnlock(pself->SCMI_userList);
+    }
+}	/* End of MSG_SCM_GET_USER_DICTIONARY_MONIKER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SCM_GET_ANAGRAMS for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get anagrams
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	10/20/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_SCM_GET_ANAGRAMS
+{
+    char checkWord[SPELL_MAX_WORD_LENGTH];
+    SpellResult spellResult;
+    WWFixedAsDWord minLength;
+    optr appObj = GeodeGetAppObject(0);
+
+    /*
+     * Mark the application as busy (just changes the cursor)
+     */
+    @call appObj::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /*
+     * Get word to spell check
+     */
+    @call AnagramLookupText::MSG_VIS_TEXT_GET_ALL_PTR(checkWord);
+
+    /*
+     * Get minimum length for anagrams
+     */
+    minLength = @call AnagramMinLength::MSG_GEN_VALUE_GET_VALUE();
+
+    if (pself->SCMI_icBuff != NULL) {
+	spellResult = ICGetAnagrams(pself->SCMI_icBuff, checkWord,
+				    IntegerOf(minLength));
+
+	/*
+	 * Initialize SpellCheckSuggestList
+	 */
+	@call AnagramList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+					ICGetNumAlts(pself->SCMI_icBuff));
+    }
+
+    @call appObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+}	/* End of MSG_SCM_GET_ANAGRAMS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SCM_GET_ANAGRAM_MONIKER for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get moniker for AnagramList
+ * PARAMETERS:	    void (optr list, word item);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	10/20/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_SCM_GET_ANAGRAM_MONIKER
+{
+    char checkWord[SPELL_MAX_WORD_LENGTH];
+    char altWord[SPELL_MAX_WORD_LENGTH];
+    SpellResult spellResult;
+
+    if (pself->SCMI_icBuff != NULL) {
+	/*
+	 * Get word to get anagram for
+	 */
+	@call AnagramLookupText::MSG_VIS_TEXT_GET_ALL_PTR(checkWord);
+	
+	/*
+	 * Get anagram
+	 */
+	ICGetAlternate(pself->SCMI_icBuff, item, checkWord, altWord);
+
+	/*
+	 * Update @AnagramList
+	 */
+	@call AnagramList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+							item, altWord);
+    }
+}	/* End of MSG_SCM_GET_ANAGRAM_MONIKER.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SCM_GET_WILDCARDS for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get wildcards
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	10/20/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_SCM_GET_WILDCARDS
+{
+    char checkWord[SPELL_MAX_WORD_LENGTH];
+    char *p;
+    SpellResult spellResult;
+    optr appObj = GeodeGetAppObject(0);
+
+    /*
+     * Mark the application as busy (just changes the cursor)
+     */
+    @call appObj::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /*
+     * Get word to spell check
+     */
+    @call WildcardLookupText::MSG_VIS_TEXT_GET_ALL_PTR(checkWord);
+
+    if (pself->SCMI_icBuff != NULL) {
+	spellResult = ICGetWildcards(pself->SCMI_icBuff, checkWord);
+
+	/*
+	 * Initialize SpellCheckSuggestList
+	 */
+	@call WildcardList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+					ICGetNumAlts(pself->SCMI_icBuff));
+    }
+
+    @call appObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+}	/* End of MSG_SCM_GET_WILDCARDS.	*/
+
+
+
+/***********************************************************************
+ *		MSG_SCM_GET_WILDCARD_MONIKER for SpellCheckManagerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Get moniker for WildcardList
+ * PARAMETERS:	    void (optr list, word item);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	10/20/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method SpellCheckManagerClass, MSG_SCM_GET_WILDCARD_MONIKER
+{
+    char checkWord[SPELL_MAX_WORD_LENGTH];
+    char altWord[SPELL_MAX_WORD_LENGTH];
+    SpellResult spellResult;
+
+    if (pself->SCMI_icBuff != NULL) {
+	/*
+	 * Get word to get wildcard for
+	 */
+	@call WildcardLookupText::MSG_VIS_TEXT_GET_ALL_PTR(checkWord);
+	
+	/*
+	 * Get wildcard
+	 */
+	ICGetAlternate(pself->SCMI_icBuff, item, checkWord, altWord);
+
+	/*
+	 * Update @WildcardList
+	 */
+	@call WildcardList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+							item, altWord);
+    }
+}	/* End of MSG_SCM_GET_WILDCARD_MONIKER.	*/

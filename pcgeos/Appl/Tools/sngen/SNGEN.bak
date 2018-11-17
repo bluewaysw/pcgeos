@@ -1,0 +1,547 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Test Applications
+ * MODULE:	Serial Number Generator
+ * FILE:		sngen.goc
+ * AUTHOR:	jfh  4/02
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <ansi/string.h>
+#include <math.h>
+
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+@class	TestProcessClass, GenProcessClass ;
+	@message void MSG_TEST_GENERATE();
+   @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_TEST_PRODUCT_LIST_APPLY;
+
+@endc
+
+@classdecl	TestProcessClass, neverSaved ;
+
+
+/*
+ ***************************************************************************
+ *		Globals & Defines
+ ***************************************************************************
+ */
+
+#define D_BBOX		1
+#define D_CLICKS	2
+#define D_SUN		3
+#define D_RTW		4
+#define D_UK      5
+
+#define P_ENS     1
+#define P_EDU     2
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass TestApp = {
+	 GI_visMoniker = list { @TestTextMoniker }
+    GI_comp = @TestPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TestPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			 @SerNumEditControl;
+}
+
+@visMoniker TestTextMoniker = "SerNum Generator";
+
+@end	AppResource
+
+@start	Interface;
+
+@object GenPrimaryClass TestPrimary  = {
+	 GI_comp = @SerNumEditControl, @ProductSection, @VersionValue,
+				  @DistribSection, @ProjectValue, @NumSerialsValue,
+				  @ResultWindow, @SerialTrigger;
+	 GI_attrs = @default | GA_TARGETABLE
+					 | GA_KBD_SEARCH_PATH;
+	 HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenEditControlClass SerNumEditControl = {
+	 GI_attrs = @default | GA_TARGETABLE
+					 | GA_KBD_SEARCH_PATH;
+	 GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_EDIT_MENU;
+	 ATTR_GEN_CONTROL_PROHIBIT_UI = GECF_UNDO
+							| GECF_CUT
+							| GECF_PASTE
+							| GECF_DELETE
+							| GECF_CLIP_ART
+							| GECF_CHAR_MAP;
+}
+
+@object GenInteractionClass ProductSection = {
+	GI_comp = @ProductGlyph, @ProductGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass ProductGlyph = {
+	 GI_visMoniker = "Product:";
+}
+
+@object GenItemGroupClass ProductGroup = {
+	 GI_visMoniker = "Product:";
+	 GI_comp = @PGEnsemble, @PGEduApps;
+	 GIGI_selection = P_ENS;
+    GIGI_destination = process;
+	 GIGI_applyMsg = MSG_TEST_PRODUCT_LIST_APPLY;
+	 HINT_ITEM_GROUP_MINIMIZE_SIZE;
+	 HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemClass PGEnsemble = {
+	 GI_visMoniker = "Ensemble";
+	 GII_identifier = P_ENS;
+}
+
+@object GenItemClass PGEduApps = {
+	 GI_visMoniker = "EduApps";
+	 GII_identifier = P_EDU;
+}
+
+@object GenInteractionClass DistribSection = {
+	GI_comp = @DistribGlyph, @DistribGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass DistribGlyph = {
+	 GI_visMoniker = "Distributor:";
+}
+
+@object GenItemGroupClass DistribGroup = {
+	 GI_visMoniker = "Distributor:";
+	 GI_comp = @DGItemBbox, @DGItemClicks, @DGItemSun,
+				  @DGItemRTW, @DGItemUK;
+	 GIGI_selection = D_BBOX;
+	 HINT_ITEM_GROUP_MINIMIZE_SIZE;
+	 HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemClass DGItemBbox = {
+	 GI_visMoniker = "Breadbox";
+	 GII_identifier = D_BBOX;
+}
+
+@object GenItemClass DGItemClicks = {
+	 GI_visMoniker = "Clicks";
+	 GII_identifier = D_CLICKS;
+}
+
+@object GenItemClass DGItemSun = {
+	 GI_visMoniker = "Sun";
+	 GII_identifier = D_SUN;
+}
+
+@object GenItemClass DGItemRTW = {
+	 GI_visMoniker = "RTW";
+	 GII_identifier = D_RTW;
+}
+
+@object GenItemClass DGItemUK = {
+	 GI_visMoniker = "UK";
+	 GII_identifier = D_UK;
+}
+
+@object GenValueClass VersionValue = {
+	GI_visMoniker = "Version Number:";
+	GVLI_value = MakeWWFixed(4000);
+}
+
+@object GenValueClass ProjectValue = {
+	GI_visMoniker = "Project Number:";
+	GVLI_maximum = MakeWWFixed(999);
+}
+
+@object GenValueClass NumSerialsValue = {
+	GI_visMoniker = "How Many Numbers:";
+	GVLI_value = MakeWWFixed(1);
+	GVLI_minimum = MakeWWFixed(1);
+	GVLI_maximum = MakeWWFixed(999);
+}
+
+@object GenTextClass ResultWindow = {
+	 GI_visMoniker = "Number(s):";
+	 GI_attrs = @default | GA_TARGETABLE
+					 | GA_KBD_SEARCH_PATH;
+	 GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTriggerClass SerialTrigger = {
+	 GI_visMoniker = "Generate";
+	 GTI_destination = process;
+	 GTI_actionMsg = MSG_TEST_GENERATE;
+}
+
+@end Interface
+
+/*
+ ***************************************************************************
+ *		Code for TestProcessClass
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * FUNCTION:	SumOfDigits(word number)
+ *
+ * DESCRIPTION:  sums the digits of any number < 1000
+ *
+ *
+ ***********************************************************************/
+word SumOfDigits(word number)
+{
+ word		sum, temp;
+
+
+	sum = 0;
+	if(number > 99) {
+		temp = number/100;
+		sum += temp;
+		number -= temp*100;
+		}
+	if(number > 9) {
+		temp = number/10;
+		sum += temp;
+		number -= temp*10;
+		}
+	sum += number;
+	return(sum);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetDigitValue(char *string, word digit)
+ *
+ * DESCRIPTION:  returns the digit value of a give digit
+ *
+ *
+ ***********************************************************************/
+word GetDigitValue(char *string, word digit)
+{
+ word		number;
+
+
+	switch (string[digit]) {
+		case '1':
+			number = 1;
+			break;
+		case '2':
+			number = 2;
+			break;
+		case '3':
+			number = 3;
+			break;
+		case '4':
+			number = 4;
+			break;
+		case '5':
+			number = 5;
+			break;
+		case '6':
+			number = 6;
+			break;
+		case '7':
+			number = 7;
+			break;
+		case '8':
+			number = 8;
+			break;
+		case '9':
+			number = 9;
+			break;
+		default:
+			number = 0;
+		}
+	return (number);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TEST_PRODUCT_LIST_APPLY() for TestProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user selection in the products list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ *
+ ***********************************************************************/
+@method TestProcessClass, MSG_TEST_PRODUCT_LIST_APPLY
+{
+
+	if (selection == P_ENS)  {
+		@send VersionValue::MSG_GEN_VALUE_SET_VALUE(MakeWWFixed(4000), FALSE);
+		@send VersionValue::MSG_GEN_VALUE_SET_MINIMUM(MakeWWFixed(4000));
+		@send VersionValue::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(9999));
+		}
+	else {
+		@send VersionValue::MSG_GEN_VALUE_SET_VALUE(MakeWWFixed(40), FALSE);
+		@send VersionValue::MSG_GEN_VALUE_SET_MINIMUM(MakeWWFixed(40));
+		@send VersionValue::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(99));
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TEST_GENERATE for TestProcessClass
+ *
+ * DESCRIPTION:	Generates up to 1000 (0 - 999) unique serial numbers
+ *
+ *
+ ***********************************************************************/
+@method TestProcessClass, MSG_TEST_GENERATE
+{
+ word		numSers, verNum, product, distNum, i, check1, check2;
+ dword	tempDWNum;
+ char		serNumStr[20],
+			check1Str[3], check2Str[2], numStr[5], padNumStr[11];
+ word		numArray[1000], randNum, j;
+ long double	randomX;
+ Boolean		dupe;
+
+
+	@call ResultWindow::MSG_VIS_TEXT_DELETE_ALL();
+
+	@send TestApp::MSG_GEN_APPLICATION_MARK_BUSY();
+	@send ResultWindow::MSG_META_SUSPEND();
+
+	numSers = @call NumSerialsValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	/* fill an array with numSers random numbers (0 - 999) */
+	for (i = 0; i < numSers; i++)  {
+		dupe = FALSE;
+		/* get a random # between 0(incl) and 999(excl) */
+		randomX = 999 + 1;   /* the 1 is to include 999 */
+		FloatPushNumber(&randomX);
+		FloatRandomN();
+		FloatPopNumber(&randomX);
+		randNum = (word) randomX;
+		/* don't accept dupes */
+		for (j = 0; j < i; j++)  {
+			if (numArray[j] == randNum) {
+				i--;
+				dupe = TRUE;
+				break;
+				}
+			}
+		if (!dupe) numArray[i] = randNum;
+		}
+
+	product = @call ProductGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (product == P_ENS) {
+		/* The algorithm for Ensemble:
+			For a serial number vvvv-dddP-ppxx-yyyz...
+			- vvvv is the version starting at 4000
+			- ddd is the distributer code
+			- Ppp is distributer project code
+			- xx is a check pair
+			- yyy is the randomly generated ser number
+			- z is a check digit
+			xx = right 2 digits of the sum of y+y+y+P+pp
+			z = sum of 3rd y, 2nd x, 1st v & 2nd d
+		*/
+
+		/* Put together the first part of the number... */
+
+		/* Get the version number & convert it */
+		verNum = @call VersionValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+		UtilHex32ToAscii(serNumStr, (dword)verNum, UHTAF_NULL_TERMINATE);
+		strcat(serNumStr, "-");
+		/* and add the distributor number... */
+		distNum = @call DistribGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+		switch (distNum) {
+			case D_BBOX:
+				strcat(serNumStr, "224");
+				break;
+			case D_CLICKS:
+				strcat(serNumStr, "315");
+				break;
+			case D_SUN:
+				strcat(serNumStr, "196");
+				break;
+			case D_RTW:
+				strcat(serNumStr, "187");
+				break;
+			case D_UK:
+				strcat(serNumStr, "857");
+				break;
+			}
+		/* add the proj code */
+		verNum = @call ProjectValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+		UtilHex32ToAscii(padNumStr, (dword)verNum,
+							  UHTAF_INCLUDE_LEADING_ZEROS | UHTAF_NULL_TERMINATE);
+		strcpy(numStr, &padNumStr[7]); //the last 3 digits
+		padNumStr[8] = 0;  //now it's just the 1s digit
+		strcat(serNumStr, &padNumStr[7]);
+		strcat(serNumStr, "-");
+		strcat(serNumStr, &numStr[1]); //and the 2nd & 3rd proj code digits
+
+		/* generate the full serial number */
+		for (i = 0; i < numSers; i++) {
+			/* sum the random number digits (yyy)*/
+			check1 = SumOfDigits(numArray[i]);
+			/* add the value of the project code digits (pp)*/
+			UtilAsciiToHex32(&serNumStr[10], &tempDWNum);
+			/* to check1 (xx) */
+			check1 += (word)tempDWNum;
+			/* and add P */
+			check1 += GetDigitValue(serNumStr, 8);
+			/* if check1 is >= 100 subtract 100 */
+			if (check1 >= 100) check1 -= 100;
+			UtilHex32ToAscii(padNumStr, (dword)check1,
+							  UHTAF_INCLUDE_LEADING_ZEROS | UHTAF_NULL_TERMINATE);
+			strcpy(check1Str, &padNumStr[8]);
+			UtilHex32ToAscii(padNumStr, (dword)(numArray[i]),
+							  UHTAF_INCLUDE_LEADING_ZEROS | UHTAF_NULL_TERMINATE);
+			strcpy(numStr, &padNumStr[7]);
+			strcat(serNumStr, check1Str);
+			strcat(serNumStr, "-");
+			strcat(serNumStr, numStr);
+			/* z = sum of 3rd y (17), 2nd x (13), 1st v (0) & 2nd d (6) */
+			check2 = GetDigitValue(serNumStr, 0);
+			check2 += GetDigitValue(serNumStr, 6);
+			check2 += GetDigitValue(serNumStr, 13);
+			check2 += GetDigitValue(serNumStr, 17);
+			if (check2 >= 30) check2 -= 30;
+			if (check2 >= 20) check2 -= 10;
+			if (check2 >= 10) check2 -= 10;
+			if (!check2) strcpy(check2Str, "0");
+			else UtilHex32ToAscii(check2Str, (dword)check2, UHTAF_NULL_TERMINATE);
+			strcat(serNumStr, check2Str);
+			strcat(serNumStr, "\r");
+			@call ResultWindow::MSG_VIS_TEXT_APPEND_PTR(serNumStr, 0);
+			serNumStr[12] = 0;
+			}
+		} /* end of product = Ensemble if */
+
+	else {
+		/* The algorithm for EduApps:
+			For a serial number vvdP-ppxx-yyyz...
+			- vv is the version starting at 40
+			- d is the distributer code
+			- Ppp is distributer project code
+			- xx is a check pair
+			- yyy is the randomly generated ser number
+			- z is a check digit
+			xx = right 2 digits of the sum of y+y+y+P+pp
+			z = sum of 3rd y, 2nd x, 1st v & d
+		*/
+
+		/* Put together the first part of the number... */
+
+		/* Get the version number & convert it */
+		verNum = @call VersionValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+		UtilHex32ToAscii(serNumStr, (dword)verNum, UHTAF_NULL_TERMINATE);
+		/* and add the distributor number... */
+		distNum = @call DistribGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+		switch (distNum) {
+			case D_BBOX:
+				strcat(serNumStr, "2");
+				break;
+			case D_CLICKS:
+				strcat(serNumStr, "3");
+				break;
+			case D_SUN:
+				strcat(serNumStr, "1");
+				break;
+			case D_RTW:
+				strcat(serNumStr, "4");
+				break;
+			case D_UK:
+				strcat(serNumStr, "8");
+				break;
+			}
+		/* add the proj code */
+		verNum = @call ProjectValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+		UtilHex32ToAscii(padNumStr, (dword)verNum,
+							  UHTAF_INCLUDE_LEADING_ZEROS | UHTAF_NULL_TERMINATE);
+		strcpy(numStr, &padNumStr[7]); //the last 3 digits
+		padNumStr[8] = 0;  //now it's just the 1s digit
+		strcat(serNumStr, &padNumStr[7]);
+		strcat(serNumStr, "-");
+		strcat(serNumStr, &numStr[1]); //and the 2nd & 3rd proj code digits
+
+		/* generate the full serial number */
+		for (i = 0; i < numSers; i++) {
+			/* sum the random number digits (yyy)*/
+			check1 = SumOfDigits(numArray[i]);
+			/* add the value of the project code digits (pp)*/
+			UtilAsciiToHex32(&serNumStr[5], &tempDWNum);
+			/* to check1 (xx) */
+			check1 += (word)tempDWNum;
+			/* and add P */
+			check1 += GetDigitValue(serNumStr, 3);
+			/* if check1 is >= 100 subtract 100 */
+			if (check1 >= 100) check1 -= 100;
+			UtilHex32ToAscii(padNumStr, (dword)check1,
+							  UHTAF_INCLUDE_LEADING_ZEROS | UHTAF_NULL_TERMINATE);
+			strcpy(check1Str, &padNumStr[8]);
+			UtilHex32ToAscii(padNumStr, (dword)(numArray[i]),
+							  UHTAF_INCLUDE_LEADING_ZEROS | UHTAF_NULL_TERMINATE);
+			strcpy(numStr, &padNumStr[7]);
+			strcat(serNumStr, check1Str);
+			strcat(serNumStr, "-");
+			strcat(serNumStr, numStr);
+			/* z = sum of 3rd y (12), 2nd x (8), 1st v (0) & d (2) */
+			check2 = GetDigitValue(serNumStr, 0);
+			check2 += GetDigitValue(serNumStr, 2);
+			check2 += GetDigitValue(serNumStr, 8);
+			check2 += GetDigitValue(serNumStr, 12);
+			if (check2 >= 30) check2 -= 30;
+			if (check2 >= 20) check2 -= 10;
+			if (check2 >= 10) check2 -= 10;
+			if (!check2) strcpy(check2Str, "0");
+			else UtilHex32ToAscii(check2Str, (dword)check2, UHTAF_NULL_TERMINATE);
+			strcat(serNumStr, check2Str);
+			strcat(serNumStr, "\r");
+			@call ResultWindow::MSG_VIS_TEXT_APPEND_PTR(serNumStr, 0);
+			serNumStr[7] = 0;
+			}
+		} /* end of product = EduApps else */
+
+	@send TestApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	@send ResultWindow::MSG_META_UNSUSPEND();
+
+}
+
+
+
+
+

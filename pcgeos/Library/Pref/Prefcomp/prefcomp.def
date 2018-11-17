@@ -1,0 +1,106 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		prefcomp.def
+
+AUTHOR:		Adam de Boor, Jan 18, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/18/93		Initial revision
+
+
+DESCRIPTION:
+	Constants & definitions for Computer section of Preferences
+		
+	$Id: prefcomp.def,v 1.1 97/04/05 01:32:57 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DRIVER_NAME_NOT_GEODE_NAME_SIZE				enum FatalErrors
+NEED_MONIKER_FOR_ERROR_MESSAGE				enum FatalErrors
+PARALLEL_ITEM_GROUP_MAY_HAVE_ONLY_ONE_THING_SELECTED	enum FatalErrors
+CHECK_MESSAGE_NOT_PROVIDED				enum FatalErrors
+
+UNHANDLED_STREAM_ERROR_CODE_FROM_DEFINE_PORT		enum Warnings
+
+
+PrefCompMemItemClass	class	PrefStringItemClass
+
+MemoryType	etype	word, 0
+
+MT_NONE		enum	MemoryType
+MT_XMS  	enum	MemoryType
+MT_EMS		enum 	MemoryType
+MT_EXTENDED 	enum 	MemoryType
+
+MSG_PREF_COMP_MEM_ITEM_VERIFY_SELECTION_OK	message
+;
+; Make sure it's ok for the user to have selected this item.
+;
+; Context:	Sent by PrefCompMemItemGroup to all its kids when it receives a 
+;		MSG_PREF_HAS_STATE_CHANGED. Allows us to implement the
+;		semantics demanded by the ATTR_PREF_COMP_MEM_ITEM_CHECK*
+;		vardata.
+; Source:	PrefCompMemItemGroup
+; Destination:	PrefCompMemItem
+; Interception:	Not bloody likely.
+;
+; Pass:		nothing
+; Return:	nothing
+; 		ax, cx, dx, bp - destroyed
+; 
+
+
+ATTR_PREF_COMP_MEM_ITEM_CHECK_KEY		vardata	char
+; boolean key in same category to check before adding item to ini file. if
+; key is true, confirmation message is put up.
+; 
+
+SBCS <ATTR_PREF_COMP_MEM_ITEM_CHECK_MESSAGE	vardata	optr.char	>
+DBCS <ATTR_PREF_COMP_MEM_ITEM_CHECK_MESSAGE	vardata	optr.wchar	>
+; confirmation message
+
+    PCMII_driverName	lptr.char	0	; char for both SBCS and DBCS
+PrefCompMemItemClass	endc
+
+PrefCompMemItemGroupClass class PrefItemGroupClass
+PrefCompMemItemGroupClass endc
+
+PrefCompSerialValueClass class	PrefValueClass
+PrefCompSerialValueSpecialValue	etype byte
+    PCSVSV_KNOWN	enum	PrefCompSerialValueSpecialValue
+    PCSVSV_OFF		enum	PrefCompSerialValueSpecialValue
+    PCSVSV_UNKNOWN	enum	PrefCompSerialValueSpecialValue
+
+PrefCompSerialValueState	record
+    PCSVS_SPECIAL_VALUE PrefCompSerialValueSpecialValue:2
+    ; Special interpretation of current value to avoid tampering with the
+    ; default value of the port.
+
+    PCSVS_ORIG_SPECIAL_VALUE PrefCompSerialValueSpecialValue:2
+    ; Value to which to reset PCSVS_SPECIAL_VALUE on MSG_GEN_RESET
+
+    :4
+PrefCompSerialValueState	end
+
+PCSV_ACTUAL_MIN		equ	2
+PCSV_HACK_OFF_VALUE	equ	1
+
+    PCSVI_portNum	SerialPortNum		0
+    PCSVI_portBase	word	0
+    PCSVI_state		PrefCompSerialValueState	\
+				PCSVSV_UNKNOWN shl offset PCSVS_SPECIAL_VALUE
+PrefCompSerialValueClass endc
+
+PrefCompParallelItemGroupClass class PrefItemGroupClass
+    PCPIGI_portNum	ParallelPortNum	0
+PrefCompParallelItemGroupClass endc

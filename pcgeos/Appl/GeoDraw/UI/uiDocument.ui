@@ -1,0 +1,439 @@
+/*
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		UI
+FILE:		uiDocument.ui
+
+AUTHOR:		Steve Scholl
+
+	
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	Steve Scholl	2/92		Initial Revision
+
+DESCRIPTION:
+	$Id: uiDocument.ui,v 1.2 97/07/02 09:48:17 newdeal Exp $
+
+*/
+
+
+start FileMenuUI;
+
+/*
+ * The GenDocumentControl should be put in the same resource as the
+ * GenPrimary (for efficiency).  The GenDocumentControl will build the
+ * file menu.
+ */
+
+DrawDocumentControlObj = DrawGenDocumentControl {
+	/*
+	 * Document file's token
+	 */
+	documentTokenChars = "'D', 'D', 'A', 'T'";
+	documentTokenID = "MANUFACTURER_ID_GEOWORKS";
+	/*
+	 * Creator's file's token
+	 */
+	/*
+	 * Text to display in the header area of the primary when no
+	 * document is open.
+	 */
+	noNameText = "No Document";
+	/*
+	 * Template directory
+	 */
+#if DO_DBCS
+	templateDir = "Artist";
+#else
+	templateDir = "Artist Templates";
+#endif
+	/*
+	 * .ini file key
+	 * iniCategory = "artist";
+	 */
+	/*
+	 * Special attributes: allow multiple open files, don't display
+	 * name on primary (this will be handled via the display control)
+	 */
+	dcAttributes = default +multipleOpenFiles;
+	features = default -displayNameOnPrimary;
+	/*
+	 * Pointer to the GenDocumentGroup
+	 */
+	appDC = DrawDocumentGroupObj;
+
+	enableDisableList = DrawEnableDisableList;
+
+	/*
+	 * Special strings
+	 */
+
+/* #ifdef GPC_ONLY
+	dialogUserLevelText = "/BChange Program Level:/B\\\rChange how simple or"
+					" complex you would like Artist to be.";    jfh */
+/* #else  jfh */
+	dialogUserLevelText = "Change Program Level:\\\rChange how simple or"
+			      " complex you would like Artist to be.";
+/* #endif    jfh */
+
+/* no user level in New/Open dialog for GPC, we still need it for user level
+   from options menu, though */
+/* #if _NDO2000    jfh */
+	userLevelDialog = SetUserLevelDialog;
+/* #endif    jfh */
+
+
+	hints = {
+	    HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		 GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTRODUCTORY,
+		 GDC_SUGGESTED_INTRODUCTORY_FEATURES or mask GDCF_SAVE_AS>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 GDC_SUGGESTED_BEGINNING_FEATURES or mask GDCF_SAVE_AS>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTERMEDIATE,
+		 GDC_SUGGESTED_INTERMEDIATE_FEATURES or mask GDCF_SAVE_AS>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_ADVANCED,
+		 GDC_SUGGESTED_ADVANCED_FEATURES or mask GDCF_SAVE_AS>},
+
+	    HINT_GEN_CONTROL_MODIFY_INITIAL_UI { GenControlUserData <
+		  mask GCUF_USER_TOOLBOX_UI,
+		  0,0,
+		  0,mask GDCToolboxFeatures
+		> }
+	}
+}
+
+chunk	DrawEnableDisableList = data {
+	UN_OPTR DrawPrintControl
+	UN_OPTR DrawPageSizeControl
+	UN_OPTR DrawTransformMenu
+	UN_OPTR DrawArrangeMenu
+	UN_OPTR DrawAttributeMenu
+	UN_OPTR DrawSearchReplaceControl
+	UN_OPTR DrawSpellControl
+}
+
+end FileMenuUI;
+
+start	Interface;
+
+DrawDisplayGroupObj = GenDisplayGroup {
+	hints = {
+		HINT_DEFAULT_FOCUS, HINT_DEFAULT_TARGET,
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_70>,
+			SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_55>,
+			0
+		},
+		HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE
+	}
+}
+
+end	Interface;
+
+/***/
+
+start DrawDocumentGroupRes;
+
+/*
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread.
+ */
+
+DrawDocumentGroupObj = GenDocumentGroup {
+	/*
+	 * Name for untitled documents
+	 */
+#ifdef DO_DBCS
+	defaultName = "Artist Unt.";
+#else
+	defaultName = "Artist Untitled";
+#endif
+	/*
+	 * Document object in a resource that will be duplicated to
+	 * create the document. The ruler contents are also in
+	 * this block.
+	 */
+	genDocument = DrawDocumentObjTemp;
+	/*
+	 * GenDisplayGroup to attach to duplicated displays to 
+	 */
+	genDisplayGroup = DrawDisplayGroupObj;
+	/*
+	 * GenDisplay and GenView that will be duplicated on 
+	 * MSG_GEN_DOCUMENT_CREATE_UI and the DrawDocument will be
+	 * connected to the view. The GenDisplay and the GenView
+	 * must be in the same block. Any other objects in the
+	 * same block will of course also be duplicated. This is
+	 * taken advantage of to create the View and Contents for
+	 * the Rulers
+	 */
+	genDisplay = DrawDisplayObjTemp;
+	genView = DrawMainViewObjTemp;
+	/*
+	 * Document protocol
+	 */
+	protocolMajor = "DOCUMENT_PROTOCOL_MAJOR";
+	protocolMinor = "DOCUMENT_PROTOCOL_MINOR";
+	/*
+	 * Pointer to the GenDocumentControl
+	 */
+	uiDC = DrawDocumentControlObj;
+
+	attributes = default +vmFileContainsObjects;
+}
+
+end DrawDocumentGroupRes;
+
+
+/*
+ * DrawDocumentRulerContentResTemp is duplicated by the
+ * DocumentGroup to create the DrawDocument object. It also
+ * contains the Ruler contents because these need to be run by
+ * the application thread, but don't want to actually be part
+ * of the vm file
+ */
+
+start	DrawDocumentRulerContentResTemp;
+
+
+DrawDocumentObjTemp = DrawDocument {
+}
+
+/*
+ * The DrawColumnContentObjTemp is duplicated as part of the 
+ * DrawDocumentRulerContentResTemp
+ * and is the content for the ruler that runs horizontally across the top
+ * of the document.
+ */
+
+DrawColumnContentObjTemp = RulerContent {
+	left = 0;
+	top = 0;
+	right = "DEFAULT_DOCUMENT_WIDTH";
+	bottom = "HEADER_HEIGHT";
+	attr = default -managed;
+	optFlags = default -geometryInvalid, -updatePath;
+	contentAttrs =
+		sameHeightAsSubview,
+		largeDocumentModel,
+		windowCoordinateMouseEvents;
+}
+
+/*
+ * The DrawRowContentObjTemp is duplicated as part of the 
+ * DrawDocumentRulerContentResTemp
+ * and is the content for the ruler that runs vertically down the left side
+ * of the document.
+ */
+
+DrawRowContentObjTemp = RulerContent {
+	left = 0;
+	top = 0;
+	right = "HEADER_WIDTH";
+	bottom = "DEFAULT_DOCUMENT_HEIGHT";
+	attr = default -managed;
+	optFlags = default -geometryInvalid, -updatePath;
+	contentAttrs =
+		sameWidthAsSubview,
+		largeDocumentModel,
+		windowCoordinateMouseEvents;
+}
+
+end	DrawDocumentRulerContentResTemp;
+
+
+/*
+ * DrawMainResTemp contains the display and the main view and ruler views,
+ * It is duplicated by the DocumentControl and
+ * run by the ui thread.
+ */
+
+start DrawMainResTemp;
+
+DrawDisplayObjTemp = DrawDisplay {
+	/*
+	 * The display starts not usable since it is not in the generic tree.
+	 * It will be set usable after being added to the display control.
+	 */
+	genStates = default -usable;
+	children = DrawViewGroupObjTemp;
+	attributes = default +userDismissable;
+	hints = {
+		ATTR_GEN_DISPLAY_NOT_MINIMIZABLE,
+		HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT {
+			dw   mask SWSS_RATIO or PCT_80
+			dw   mask SWSS_RATIO or PCT_80
+	    }
+	}
+	
+}
+
+
+/*
+ * The DrawViewGroupObjTemp is duplicated as part of the DrawMainResTemp
+ * and contains the main view for showing the document as well as the
+ * views for showing the rulers.
+ */
+
+DrawViewGroupObjTemp = GenInteraction {
+	children = DrawTopViewGroupObjTemp, DrawBottomViewGroupObjTemp;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+
+
+/*
+ * The DrawTopViewGroupObjTemp is duplicated as part of the DrawMainResTemp
+ * and contains the view which serves as the filler between the two
+ * rulers and the view for the ruler that runs horizontally across the top
+ */
+
+DrawTopViewGroupObjTemp = GenInteraction {
+	children =
+		DrawCornerViewObjTemp,
+		DrawColumnViewObjTemp;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+/*
+ * The DrawBottomViewGroupObjTemp is duplicated as part of the DrawMainResTemp
+ * and contains the view for the ruler that runs vertically down the left side
+ * of the document and the main view that the document is diplayed in
+ */
+
+DrawBottomViewGroupObjTemp = GenInteraction {
+	children =
+		DrawRowViewObjTemp,
+		DrawMainViewObjTemp;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+
+/*
+ * The DrawCornerViewGroupObjTemp is duplicated as part of the DrawMainResTemp
+ * and is the view which serves as the filler between the two
+ * rulers.
+ */
+
+DrawCornerViewObjTemp = GenView {
+	genAttributes = default
+		-targetable;
+	viewAttributes = default
+		+sameColorAsParentWin;
+	horizAttributes = default
+		+noLargerThanContent;
+	vertAttributes = default
+		+noLargerThanContent;
+	docRight = HEADER_WIDTH;
+	docBottom = HEADER_HEIGHT;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, HEADER_WIDTH>
+			SpecHeight <SST_PIXELS, HEADER_HEIGHT>
+		}
+	}
+}
+
+
+/*
+ * The DrawColumnViewObjTemp is duplicated as part of the DrawMainResTemp
+ * and is the view for the ruler that runs horizontally across the top
+ * of the document.
+ */
+
+DrawColumnViewObjTemp = RulerView {
+	docRight = DEFAULT_DOCUMENT_WIDTH;
+	docBottom = HEADER_HEIGHT;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <0, 0>
+			SpecHeight <SST_PIXELS, HEADER_HEIGHT>
+		}
+	}
+	vertLink = DrawMainViewObjTemp;
+}
+
+
+/*
+ * The DrawRowViewObjTemp is duplicated as part of the DrawMainResTemp
+ * and is the view for the ruler that runs vertically down the left side
+ * of the document.
+ */
+
+DrawRowViewObjTemp = RulerView {
+        rulerAttrs = default -horizontal;
+	docBottom = DEFAULT_DOCUMENT_HEIGHT;
+	docRight = HEADER_WIDTH;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, HEADER_WIDTH>
+			SpecHeight <0, 0>
+		}
+	}
+	horizLink = DrawMainViewObjTemp;
+}
+
+
+
+/*
+ * The DrawMainViewObjTemp is duplicated as part of the DrawMainResTemp
+ * and is the view in which the document is actually displayed
+ */
+
+
+DrawMainViewObjTemp = GenView {
+	genAttributes = default +targetable;
+	horizAttributes = default +scrollable, +noLargerThanContent; 
+	vertAttributes = default +scrollable, +noLargerThanContent; 
+	horizIncrement = HORIZONTAL_SCROLL_INCREMENT;
+	vertIncrement = VERTICAL_SCROLL_INCREMENT;
+	viewAttributes = default
+			+controlled,
+			+dragScrolling,
+			+windowCoordinateMouseEvents,
+			+dontSendKbdReleases;
+	docRight = "DEFAULT_DOCUMENT_WIDTH";
+	docBottom = "DEFAULT_DOCUMENT_HEIGHT";
+	hints = {
+		HINT_DEFAULT_TARGET,
+		HINT_DEFAULT_FOCUS
+	}
+
+	horizLink = DrawRowViewObjTemp;
+	vertLink = DrawColumnViewObjTemp;
+}
+
+
+end DrawMainResTemp;
+
+
+
+
+start	DrawHeadRes;
+
+DrawGrObjHeadObj = GrObjHead {
+	currentTool = PointerClass;
+	initFloaterData = 0;
+}
+
+end	DrawHeadRes;

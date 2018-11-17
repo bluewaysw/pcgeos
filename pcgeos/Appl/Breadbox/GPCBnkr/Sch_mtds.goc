@@ -1,0 +1,233 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/*
+ **************************************************************************
+ *  FILE:			sch_mtds.goc
+ *  PROJECT:		GPC Banker
+ *  DESCRIPTION:	This file has methods for the search
+ *				functions
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "gpcbnkr.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+/****************************************************************************
+ *		Code for GPCBnkrProcessClass Search
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_SEARCH for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *              	is clicked
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_OPEN_SEARCH
+{
+ TimerDateAndTime	date;
+
+
+    /* set the starting date (3 months before today) */
+    TimerGetDateAndTime(&date);
+    if ((date.TDAT_month) > 3)  {
+	  @call FDBStartYear::
+		MSG_GEN_VALUE_SET_INTEGER_VALUE(date.TDAT_year, FALSE);
+	  @call FDBStartMonth::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION((date.TDAT_month) - 3, FALSE);
+	  }
+    else  {
+	  @call FDBStartYear::
+		MSG_GEN_VALUE_SET_INTEGER_VALUE((date.TDAT_year) - 1, FALSE);
+	  @call FDBStartMonth::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION((date.TDAT_month) + 9, FALSE);
+	  }
+
+    /* Disable the next button */
+    @send FDBFindNext::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* Open the dialog box */
+    @call FindDBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SEARCH_TRANS for GPCBnkrProcessClass
+ *              (int whichSearch)
+ *
+ * DESCRIPTION:   whichSearch is either first or next
+ *              
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method GPCBnkrProcessClass, MSG_SEARCH_TRANS
+{
+char		searchStr[ENTRY_SIZE], testStr[ENTRY_SIZE];
+word		length, month, year;
+word		i, j, k, startSearch, startField, startPosit;
+Boolean	noMatch = TRUE;
+TransStruct		*trans;
+DBItem		transItem;
+MemHandle		mh;
+TransSortStruct	*trArrayElement;
+
+
+    /*get the search string */
+    length = @call FDBSearchText::MSG_VIS_TEXT_GET_ALL_PTR(searchStr);
+    if (!length) {
+	  return;
+	  }
+
+    /* get the month and year ... */
+    month = @call FDBStartMonth::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    year = @call FDBStartYear::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+    /* mark app busy */
+    @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    @send FDBFind::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+
+    /* start the search loop */
+    if (whichSearch == FIRST)  startSearch = 0;
+    else  startSearch = findTrans;
+    for (i = startSearch; i < numTrans; i++) {
+	  /* get the sort array info */
+	  transListVMBHandle = VMFind(GPCBnkrFile, NullHandle, (currentAcct*10)+ALLSORT);
+	  VMLock(GPCBnkrFile, transListVMBHandle ,&mh);
+	  trArrayElement = ChunkArrayElementToPtrHandles(
+				    mh,
+				    transListChunkArray,
+				    i,
+					 0);
+	  transItem = trArrayElement->TSS_item;
+	  if ((trArrayElement->TSS_year) >= year) {
+		/* year is OK - continue */
+		if (((trArrayElement->TSS_month) >= month)  ||
+				 ((trArrayElement->TSS_year) > year))  {
+		   /* we're in the search window - check for a match */
+		   /* open the DBItem */
+		   trans = DBLock(GPCBnkrFile, currentAcctGroup, transItem);
+		   startField = 0;
+		   /* loop thru the fields */
+		   for (j = startField; j < 4; j++) {
+			 if (j == 0) {
+			    /* do we need to look for a check #? */
+			    if ((trans->TS_number) == 0)  j++;
+			    }
+			 switch (j) {
+			    case 0:
+				  UtilHex32ToAscii(testStr,
+							    (sdword) trans->TS_number,
+							    UHTAF_NULL_TERMINATE);
+				  break;
+			    case 1:
+				  strcpy(testStr, trans->TS_payee);
+				  break;
+			    case 2:
+				  strcpy(testStr, trans->TS_category);
+				  break;
+			    case 3:
+				  strcpy(testStr, trans->TS_memo);
+			    //	  break;
+			    }  /* end of fields switch */
+			 /* check lengths - no match if searchStr > dataStr */
+			 if (strlen(testStr) >= length) {
+			    /* check for match */
+			    startPosit = 0;
+			    for (k = startPosit; k <= (strlen(testStr) - length); k++) {
+				  noMatch = LocalCmpStringsNoCase(searchStr,
+						 &testStr[k],
+						 length);
+				  if (!noMatch)  { /* found one! */
+					/* enable the next button */
+					@send FDBFindNext::MSG_GEN_SET_ENABLED(VUM_NOW);
+					/* have the reg select the found trans */
+					@send RegisterDList::
+						MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(i, FALSE);
+					@send RegisterDList::
+					     MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE);
+					/* save our search indices here */
+					findTrans = i + 1;
+					/* and exit the loops */
+					k = strlen(testStr) - length +1;
+					j = 4;
+					i = numTrans;
+					}  /* end of found match if */
+				  } /* end of check for match for (k) */
+			    }  /* end of check lengths if */
+			 }  /* end of check fields for (j) */
+		   DBUnlock(trans);
+		   }  /* end of start month OK if */
+		}  /* end of start year OK if */
+	  VMUnlock(mh);
+	  } /* end of search transactions for (i) */
+
+    @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    if (noMatch)  { /* no match found */
+	  /* tell user */
+	  if (whichSearch == FIRST) NotifyDBox(searchStr, @SrchNotFoundMsg);
+	  else NotifyDBox(0, @SrchNextNotFoundMsg);
+	  /* and disable the search next button */
+	  @send FDBFindNext::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+       @send FDBSearchText::MSG_VIS_TEXT_DELETE_ALL();
+	  }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_META_KBD_CHAR for GPCBnkrProcessClass
+ *
+ *
+ * DESCRIPTION:   enables find button on text changes
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method FindGenTextClass, MSG_META_KBD_CHAR
+{
+char		searchStr[ENTRY_SIZE];
+
+
+    @callsuper();
+
+    if(@call FDBSearchText::MSG_VIS_TEXT_GET_ALL_PTR(searchStr))
+		 @send FDBFind::MSG_GEN_SET_ENABLED(VUM_NOW);
+    else  {
+	  @send FDBFind::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	  @send FDBFindNext::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	  }
+}
+

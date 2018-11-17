@@ -1,0 +1,197 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	TRule (Sample PC/GEOS application)
+ * File:	trule.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user Interface description for this
+ * application. This file is written in a language called ESPIRE, which is
+ * compiled by the UIC compiler. See Spec/User/uic.doc for info.
+ *
+ * IMPORTANT NOTE:
+ *	This sample application is primarily intended to demonstrate a
+ *	model for handling documents.  Basic parts of a PC/GEOS application
+ *	are not documented heavily here.  See the "Hello" sample application
+ *	for more detailed documentation on the standard parts of a PC/GEOS
+ *	application.
+ *
+ * RCS STAMP:
+ *	$Id: trule.ui,v 1.1 97/04/04 16:33:42 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+#include "generic.uih"
+#include "Objects/Text/tCtrl.uih"
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+start	AppResource;
+
+TRApp = GenApplication {
+	children = TRPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = TRPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		TRPointSizeControl, TRJustificationControl, TRTabControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		TRTabControl;
+	moniker = list {
+		TRTextMoniker
+	}
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+		char	"trule", 0
+		}
+	}
+}
+
+visMoniker TRTextMoniker = "Text Ruler Sample Application";
+
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenUIDocumentControl must be a child of the primary, and must be
+ * on the active list.
+ */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+TRPrimary = GenPrimary {
+	children = ParagraphMenu, TRPointSizeControl, TRRulerView, TRText;
+	hints = { HINT_SIZE_WINDOW_AS_DESIRED }
+}
+
+/*-----------------------------------------------------------------------------
+	UI controller objects
+-----------------------------------------------------------------------------*/
+
+TRPointSizeControl = PointSizeControl {
+	moniker = 'z', "Sizes";
+	visibility = popup;
+}
+
+/* --- */
+
+ParagraphMenu = GenInteraction {
+	moniker = 'P', "Paragraph";
+	children = TRJustificationControl, TRTabControl;
+	visibility = popup;
+}
+
+TRJustificationControl = JustificationControl {
+	visibility = subGroup;
+	hints = {
+		HINT_SAME_CATEGORY_AS_PARENT
+	}
+}
+
+TRTabControl = TabControl {
+	moniker = 'T', "Tabs";
+	type = properties;
+	visibility = dialog;
+	hints = { HINT_CENTER_WINDOW }
+}
+
+/* --- */
+
+TRRulerView = RulerView {
+	horizAttributes = default +noLargerThanContent;
+	output = TRRulerContent;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <0, 0>
+			SpecHeight <SST_PIXELS, TEXT_RULER_HEIGHT>
+		}
+	}
+}
+
+TRRulerContent = RulerContent {
+	left = 0;
+	top = 0;
+	right = 8192;
+	bottom = "TEXT_RULER_HEIGHT";
+	attr = default -managed;
+	optFlags = default -geometryInvalid, -updatePath;
+	visCompGeoAttrs = default +customManageChildren;
+	contentAttrs = sameHeightAsSubview, largeDocumentModel,
+		      windowCoordinateMouseEvents;
+		      children = TRTextRuler;
+}
+
+TRTextRuler = TextRuler {
+	rulerAttrs = default +horizontal, +isMaster, -showGrid;
+
+	textRulerFlags = alwaysMoveBothMargins, roundCoordinates;
+	right = 8192;
+	attr = default -managed;
+	optFlags = default -geometryInvalid, -updatePath;
+	tabControl = "0x103c003a";
+/*	tabControl = TRTabControl; */
+	gcnContent = 1;		/* Send to app */
+}
+
+/* --- */
+
+TRText = GenText {
+	text = "I am a one-line text object";
+	genAttributes = default +targetable;
+	textDisplayAttributes = default +singleLineText, -useTabForNavigation;
+	hints = {
+		ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS {
+			word TRCharAttrRuns
+		},
+		ATTR_GEN_TEXT_MULTIPLE_PARA_ATTR_RUNS {
+			word TRParaAttrRuns
+		},
+		HINT_TEXT_WHITE_WASH_COLOR,
+		HINT_DEFAULT_FOCUS,
+		HINT_DEFAULT_TARGET,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_90>
+			SpecHeight <>
+		}
+	}
+}
+
+chunk TRCharAttrRuns = data {
+    RUN_ARRAY_HEADER(1, TRCharAttrElements)
+    TextRunArrayElement TRAE_ALL(0),
+    TRAE_END
+}
+
+chunk TRCharAttrElements = data {
+    CHAR_ATTR_ELEMENT_ARRAY_HEADER(1)
+    CHAR_ATTR_FONT_SIZE(FID_DTC_URW_ROMAN, 12)
+}
+
+
+chunk TRParaAttrRuns = data {
+    RUN_ARRAY_HEADER(2, TRParaAttrElements)
+    TextRunArrayElement TRAE_ALL(STANDARD_PARA_ATTR),
+    TRAE_END
+}
+
+chunk TRParaAttrElements = data {
+TRRE_base	label	byte
+	; Header
+    PARA_ATTR_ELEMENT_ARRAY_HEADER(1)
+	; Offsets
+    word TRRE_0-TRRE_base
+	; Data
+STANDARD_PARA_ATTR = 0
+TRRE_0	label	byte
+    PARA_ATTR_JUST_LEFT_RIGHT_PARA_TABS(2,J_LEFT,0,0,0,0)
+}
+
+end Interface;

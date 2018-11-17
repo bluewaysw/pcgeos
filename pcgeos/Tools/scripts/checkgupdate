@@ -1,0 +1,104 @@
+#!/usr/public/perl
+# -*- perl -*-
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1997.  All rights reserved.
+#       GEOWORKS CONFIDENTIAL
+#
+# PROJECT:	GEOS
+# MODULE:	
+# FILE: 	checkgupdate
+# AUTHOR: 	Chris Thomas, May 23, 1997
+#
+# REVISION HISTORY:
+#	Name		Date		Description
+#	----		----		-----------
+#	cthomas 	5/23/97   	Initial Revision
+#
+# DESCRIPTION:
+#	
+#	Looks through a siteUpdate log to see if any files
+#	have failed to be updated.
+#
+#	$Id: checkgupdate,v 1.1 98/01/09 20:07:16 cthomas Exp $
+#
+###############################################################################
+
+while ($ARGV[0] =~ /^-/) {
+    $arg = shift;
+
+    $verbose = ($arg eq '-v');
+}
+
+$logfile = $ARGV[0] || "/staff/sysop/log/siteUpdate.log.pcgeos";
+
+open(logfile) || die "cant open $logfile";
+
+#
+# Scan through the log file, looking for entries of the form:
+#
+#	Updating file: <file>
+#	  From source: ...
+#	Done ...
+#
+# Any error output replaces the 'Done' line
+#
+
+#
+# States that the scanner is in
+#
+
+$file = '';
+$error = '';
+
+while (<logfile>) {
+
+    if (/^Updating file:\s*(\S+)/) {
+	&ResolveFile($file, $error);
+	$file = $1;
+	$error = '';
+    }
+
+    if ($file) {
+	$error .= $_;
+    }
+
+    if (/^Done/) {
+	&ResolveFile($file, '');
+	$file = '';
+	$error = '';
+    }
+}
+
+&ResolveFile($file, $error);
+
+close(logfile);
+
+#
+# Now that we have scanned the log file, print out the files that have
+# not been successfuly gupdated, and the portion of the log
+#
+
+foreach $file (keys %unresolvedFiles) {
+    print "$file\n";
+    if ($verbose) {
+	$unresolvedFiles{$file} =~ s/^/    /g;
+	$unresolvedFiles{$file} =~ s/\n/\n    /g;
+	print $unresolvedFiles{$file}, "\n";
+    }
+}
+
+sub ResolveFile {
+    local ($file, $error) = @_;
+
+    if ($file) {
+	if ($error) {
+	    # There is an error associated with the file: log it.
+	    $unresolvedFiles{$file} = $error;
+	} else {
+	    # There is no associated error: delete any previous errors.
+	    delete $unresolvedFiles{$file};
+	}
+    }
+}
+

@@ -1,0 +1,115 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) Berkeley Softworks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Convert
+FILE:		convertGeoWrite.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	3/92		Initial version
+
+DESCRIPTION:
+	This file contains definitions for 1.X GeoWrite
+
+	$Id: convertGeoWrite.def,v 1.1 97/04/04 17:52:44 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+GW12_ChunkArrayHeader	struc
+    GW12_CAH_count		word	;number of elements in array
+    GW12_CAH_elementSize	word	;size of each element
+    GW12_CAH_firstElement	label	byte	; start of array elements
+GW12_ChunkArrayHeader	ends
+
+;	Pages
+
+; Pages are managed using the ChunkArray mechanism.  Each element of the
+; array is a PageArrayElement.
+
+GW12_PageAttributes	record
+    GW12_PA_MAXIMIZED:1			;Unused
+    :15
+GW12_PageAttributes	end
+
+GW12_PageArrayElement	struc
+    GW12_PAE_vmBlock	word		;VM block of page (block is
+					;originally duplicated from WritePageUI)
+    GW12_PAE_size	XYSize		;size of page (not including borders)
+    GW12_PAE_attrs	GW12_PageAttributes
+
+	; These values will (later) allow us to open views in a state closer
+	; to the state that they were closed in
+
+    GW12_PAE_viewPosition Point		;Position of display (unused)
+    GW12_PAE_viewSize	XYSize		;Size of display (unused)
+    GW12_PAE_documentOffset XYOffset	;Document offset of view (unused)
+
+    GW12_PAE_unused	byte 9 dup (?)
+    even
+GW12_PageArrayElement	ends
+
+;-----------------
+
+GW12_PaperOrientation 	etype	byte, 0	
+    GW12_PO_PORTRAIT 	enum	GW12_PaperOrientation; tall
+    GW12_PO_LANDSCAPE 	enum	GW12_PaperOrientation; wide
+
+GW12_PageSetupAttributes	struc
+    GW12_PSA_oldPageSize	word		;PageSizeEntryData
+    GW12_PSA_orientation	GW12_PaperOrientation
+    GW12_PSA_numColumns		byte
+    GW12_PSA_columnSpacing	byte
+    GW12_PSA_ruleWidth		byte
+    GW12_PSA_pagingType		word
+    GW12_PSA_titlePage		word
+    GW12_PSA_margins		Rectangle
+GW12_PageSetupAttributes	ends
+
+GW12_WriteDocumentAttrs	record
+    GW12_WDA_TITLE_PAGE:1			;File is being opened
+    GW12_WDA_USES_EXTENDED_SIZE:1		;Extended size is valid
+    :14
+GW12_WriteDocumentAttrs	end
+
+;------------
+
+GW12_PageContent	=	22h	;???
+
+;------------
+
+; The administration data for write data files is kept in the map block
+;
+;
+GW12_PAGE_ARRAY_CHUNK		=	22 + 4
+GW12_MASTER_PAGE_ARRAY_CHUNK	=	22 + 6
+GW12_DOCUMENT_DATA_CHUNK	=	22 + 8
+
+GW12_WriteDocumentDataFlags	record
+    GW12_WDDF_OVERSTRIKE_MODE:1	; Set, document is in overstrike mode.
+    :7				; Unused.
+GW12_WriteDocumentDataFlags	end
+
+GW12_DOCUMENT_DATA_RESERVED	=	29
+
+GW12_WriteDocumentData	struc
+    GW12_WDD_pageSetup		GW12_PageSetupAttributes
+    GW12_WDD_attrs		GW12_WriteDocumentAttrs
+
+    GW12_WDD_styleVMBlock	word	;VM block containing style elements
+    GW12_WDD_rulerVMBlock	word	;VM block containing ruler elements
+    GW12_WDD_gstringVMBlock	word	;VM block containing gstring elements
+    GW12_WDD_nameVMBlock	word	;VM block containing names
+
+    GW12_WDD_unused		word
+
+    GW12_WDD_flags		GW12_WriteDocumentDataFlags	;Misc flags.
+
+    ; added for localization release
+
+    GW12_WDD_extendedPageSize	XYSize
+
+    GW12_WDD_reserved		byte 	GW12_DOCUMENT_DATA_RESERVED dup (?)
+GW12_WriteDocumentData	ends

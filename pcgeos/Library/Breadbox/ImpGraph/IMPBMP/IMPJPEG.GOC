@@ -1,0 +1,870 @@
+@include <stdapp.goh>
+#include <ansi\stdio.h>
+#include <jpeglib.h>
+#include <gstring.h>
+#include <ansi\string.h>
+#include <ansi\stdlib.h>
+@include "impbmp\impjpeg.h"
+#include <initfile.h>
+@include <htmldrv.h>
+
+#include "impbmp\ibcommon.h"
+
+static void ConvertLine(byte *dest, byte *src, word size)
+{
+    while (size--)  {
+        *(dest++) = *(src++) + 40 ;
+    }
+}
+
+    byte color16downgrade[64] = {
+        0,    0,    1,    1,    0,    8,    1,    9,
+        2,    2,    3,    3,    2,    10,    3,    11,
+        0,    8,    1,    9,    6,    8,    8,    9,
+        2,    8,    3,    9,    10,    10,    10,    11,
+        4,    4,    5,    5,    6,    6,    5,    9,
+        6,    7,    7,    7,    10,    10,    7,    11,
+        4,    12,    5,    13,    6,    12,    12,    13,
+        6,    12,    7,    13,    14,    14,    14,    15
+    } ;
+
+/*
+static byte color16downgrade[8] = {
+    0,
+    1,
+    2,
+    11,
+    4,
+    13,
+    14,
+    15,
+} ;
+*/
+
+byte monoPattern[16][4] = {
+    { 1, 1, 1, 1 },
+    { 1, 0, 1, 1 },
+    { 1, 0, 1, 1 },
+    { 1, 0, 0, 1 },
+    { 1, 0, 1, 1 },
+    { 1, 0, 0, 1 },
+    { 1, 0, 1, 1 },
+    { 1, 0, 0, 0 },
+    { 1, 0, 1, 1 },
+    { 1, 0, 0, 1 },
+    { 1, 0, 0, 1 },
+    { 1, 0, 0, 0 },
+    { 1, 0, 0, 1 },
+    { 1, 0, 0, 0 },
+    { 1, 0, 0, 0 },
+    { 0, 0, 0, 0 },
+} ;
+
+static void MonoDowngrade(byte *dest, byte *src, word size, word line)
+{
+    byte mask = 0x80 ;
+    byte value = 0 ;
+    byte pat = (line & 1) << 1 ;
+
+    while (size--)  {
+        if (monoPattern[color16downgrade[*(src++)]][pat])
+            value |= mask ;
+        mask >>= 1 ;
+        if (!mask)  {
+            if (size)
+                mask = 0x80 ;
+            *(dest++) = value;
+            value = 0 ;
+        }
+        pat^=1 ;
+    }
+
+    /* store partial mask (if any) */
+    if (mask)
+        *dest = value ;
+}
+
+static void ConvertLine16Color(byte *dest, byte *src, word size)
+{
+
+    /* Do the 16 color translation */
+    while (size--)  {
+        *dest = color16downgrade[src[0]]<<4 ;
+        if (size) {
+            *dest |= color16downgrade[src[1]] ;
+            size-- ;
+        }
+        dest++ ;
+        src+=2 ;
+    }
+}
+
+static void ConvertGreyLine(byte *dest, byte *src, word size)
+{
+    while (size--)  {
+        *(dest++) = (*(src++)>>4) + 16 ;
+    }
+}
+
+DisplayClass convertToAllowedDisplayClass[DC_CF_RGB+1] = {
+    DC_COLOR_8,       /* DC_TEXT */
+    DC_GRAY_1,        /* DC_GRAY_1 */
+    DC_COLOR_8,       /* DC_GRAY_2 */
+    DC_COLOR_4,       /* DC_GRAY_4 */
+    DC_COLOR_8,       /* DC_GRAY_8 */
+    DC_COLOR_8,       /* DC_COLOR_2 */
+    DC_COLOR_4,       /* DC_COLOR_4 */
+    DC_COLOR_8,       /* DC_COLOR_8 */
+    DC_CF_RGB,        /* DC_CF_RGB */
+} ;
+DisplayClass convertToDisplayClass[MIME_RES_UNKNOWN] = {
+          DC_COLOR_8,   /* MIME_RES_DISPLAY_DEFAULT */
+          DC_GRAY_1,    /* MIME_RES_MONOCHROME */
+          DC_GRAY_2,    /* MIME_RES_4_GREY */
+          DC_COLOR_4,   /* MIME_RES_16_COLOR */
+          DC_GRAY_4,    /* MIME_RES_16_GREY */
+          DC_COLOR_8,   /* MIME_RES_256_COLOR */
+          DC_GRAY_8,    /* MIME_RES_256_GREY */
+          DC_CF_RGB,    /* MIME_RES_24_BIT */
+      } ;
+
+/* define to only support JFIF tagged JPEGs */
+/*#define JFIF_ONLY*/
+
+typedef struct  {
+    word soi ;            /* start of image */
+#ifdef JFIF_ONLY
+    word app0 ;           /* Application Use Marker */
+    word length ;         /* Length of this record */
+    byte identifier[5] ;  /* JFIF zero terminated id string */
+#else
+    byte marker;          /* start of some marker */
+#endif
+    /* ... don't need the rest ... */
+} T_jpegHeader ;
+
+static Boolean isJpeg(FileHandle file)
+{
+    FILE *infile;		/* source file */
+    T_jpegHeader header ;
+    Boolean status = FALSE ;
+
+    FilePos(file, 0, FILE_POS_START) ;
+    infile = fdopen(file, "r");
+    if (infile)  {
+        fread(&header, sizeof(header), 1, infile);
+
+        /* Check the header for the correct start and identifier */
+#ifdef JFIF_ONLY
+        if ((header.soi == 0xD8FF) &&
+            (header.app0 == 0xE0FF) &&
+            (memcmp(header.identifier, "JFIF", 5)==0))  {
+#else
+        if ((header.soi == 0xD8FF) &&
+            (header.marker == 0xFF)) {
+#endif
+
+            /* Looks like a JPEG to me! */
+            status = TRUE ;
+        }
+        fdclose(infile) ;
+    }
+    FilePos(file, 0, FILE_POS_START) ;
+
+    return status ;
+}
+
+extern word set_error_handler(word *context);
+
+#if PROGRESS_DISPLAY
+/* number of scanlines per import progress update */
+#define SLICE_HEIGHT 10
+#endif
+
+/* Don't allow registers to be used in the local variables in JpegImport */
+/* so that if an error occurs from set_error_handler then we return and */
+/* can remove the existing incomplete bitmap (mainly when progressive). */
+#pragma option -rd
+
+VMBlockHandle
+JpegImport(TCHAR *file,
+           VMFileHandle vmf,
+           XYSize *picsize,
+           MimeRes resolution,
+           AllocWatcherHandle watcher,
+           dword *usedMem, 
+#if SCANLINE_COMPRESS
+           Boolean scanlineCompress, 
+#endif
+           Boolean *p_completeGraphic
+#if PROGRESS_DISPLAY
+           , _ImportProgressParams_
+#endif
+           , MimeStatus *mimeStatus
+           )
+{
+  /* This struct contains the JPEG decompression parameters and pointers to
+   * working space (which is allocated as needed by the JPEG library).
+   */
+  struct jpeg_decompress_struct *cinfo = malloc(sizeof(struct jpeg_decompress_struct));
+  struct jpeg_error_mgr jerr;
+  /* More stuff */
+  FILE * infile = 0;		/* source file */
+  JSAMPARRAY buffer;		/* Output row buffer */
+  int row_stride;		/* physical row width in output buffer */
+
+  VMBlockHandle bmblock = 0;
+  VMBlockHandle dataVMBlock;
+#if SCANLINE_COMPRESS
+  EditableBitmap *srcHeader, *destHeader;
+  word cScanSize;
+  VMBlockHandle cbmblock;
+  MemHandle cBuf = 0;
+#if LZG_COMPRESS
+  Boolean lzgCompress = TRUE;
+  MemHandle lzgStack = 0;
+#endif
+EC(dword bSize = 0;)
+EC(dword cbSize = 0;)
+#endif
+  word size;
+  void *lineptr;
+  Boolean flag = FALSE ;
+  FileHandle filehan = 0;
+  DisplayClass displayClass ;
+  word iniResolution ;
+  dword requiredMemory = 0, requiredTempMemory = 0 ;
+  Boolean gotAlloc = FALSE ;
+  Boolean gotTempAlloc = FALSE ;
+  Boolean headerErr = FALSE;
+  word errorHandlerContext;
+#if PROGRESS_DISPLAY
+  _LoadProgressParams_;
+  Boolean status = FALSE;
+  Boolean onErrorDontKeepPartial = TRUE ;
+
+  /* point to load progress data, if any */
+  if (importProgressDataP && importProgressDataP->IPD_callback) {
+      loadProgressDataP = importProgressDataP->IPD_loadProgressDataP;
+  } else {
+      loadProgressDataP = NULL;
+  }
+#endif
+
+  *usedMem = 0 ;
+#if PROGRESS_DISPLAY
+  /* we don't need file if we've got a data stream to read from */
+  if (loadProgressDataP && loadProgressDataP->LPD_dataStream) {
+      filehan = 0;
+  } else {
+      filehan = FileOpen(file, FILE_ACCESS_R|FILE_DENY_W);
+      if(filehan == 0) {
+        
+        free(cinfo);
+        return(0);
+      }
+  }
+#else
+  filehan = FileOpen(file, FILE_ACCESS_R|FILE_DENY_W);
+
+  if(filehan == 0) {
+
+    free(cinfo);
+    return(0);
+  }
+#endif
+
+  /* Make sure it is a jpeg or else don't load it */
+#if PROGRESS_DISPLAY
+  if (loadProgressDataP) {
+      /* isJpeg routine is inlined here */
+      T_jpegHeader header;
+      word rSize;
+
+      /* reset stream state (in case of failed GIF) and get data */
+      ((pcfm_LoadProgressCallback *)ProcCallFixedOrMovable_pascal)(
+	  loadProgressDataP, LPCT_RESET_STREAM_STATE, 0, 0,
+	  loadProgressDataP->LPD_callback);
+      rSize = ((pcfm_LoadProgressCallback *)ProcCallFixedOrMovable_pascal)(
+	  loadProgressDataP, LPCT_PEEK,
+	  &header, sizeof(header),
+	  loadProgressDataP->LPD_callback);
+#ifdef JFIF_ONLY
+      if (rSize == sizeof(header) &&
+	  (header.soi == 0xD8FF) &&
+	  (header.app0 == 0xE0FF) &&
+	  (memcmp(&(header.identifier), "JFIF", 5)==0)) {
+#else
+      if (rSize == sizeof(header) &&
+	  (header.soi == 0xD8FF) &&
+	  (header.marker == 0xFF)) {
+#endif
+	  status = TRUE;
+      }
+  } else {
+      status = isJpeg(filehan);
+      if (status == FALSE) FileClose(filehan, TRUE);
+  }
+  if (status == FALSE) {
+      
+      free(cinfo);
+      return 0;
+  }
+#else
+  if (!isJpeg(filehan)) {
+      free(cinfo);
+      return 0 ;
+  }
+#endif
+
+#if PROGRESS_DISPLAY
+  if (!loadProgressDataP) {
+#endif
+  infile = fdopen(filehan, "r");
+  if(infile == 0)
+  {
+        FileClose(filehan, TRUE);
+        free(cinfo);
+        return(0);
+  }
+#if PROGRESS_DISPLAY
+  } else {
+      infile = 0;
+  }
+#endif
+
+#if LZG_COMPRESS
+  InitFileReadBoolean("impgraph", "lzgCompress", &lzgCompress);
+#endif
+
+//  InitFileWriteInteger("timing", "jpegstart", TimerGetCount());
+  /* If the resolution is not set correctly, we will declare it to be */
+  /* same as the display */
+  if (resolution >= MIME_RES_UNKNOWN)
+      resolution = MIME_RES_DISPLAY_DEFAULT ;
+
+  if (resolution == MIME_RES_DISPLAY_DEFAULT)  {
+      /* Use the .ini setting if we are to use the default */
+      /* Only use it if we can find the settting and it is legal */
+      if ((!InitFileReadInteger("impgraph", "resolution", &iniResolution)) &&
+          (iniResolution < MIME_RES_UNKNOWN))
+          resolution = iniResolution ;
+  }
+
+  if (resolution == MIME_RES_DISPLAY_DEFAULT)  {
+      DisplayScheme display ;
+
+      /* If we got to here, we are wanting to use the application's */
+      /* current display setting */
+      @call application::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&display) ;
+      displayClass = (display.DS_displayType & DT_DISP_CLASS) ;
+  } else {
+      /* Convert MimeRes to DisplayClass (based on what we allow) */
+      displayClass = convertToDisplayClass[resolution] ;
+  }
+
+  /* Convert the DisplayClass to one's we allow */
+  /* NOTE:  Only allow two at this time */
+  /*        GRAY_8 is only allowed when using greyscale images */
+  displayClass = convertToAllowedDisplayClass[displayClass] ;
+
+  /* Step 1: allocate and initialize JPEG decompression object */
+
+  /* We set up the normal JPEG error routines, then override error_exit. */
+  cinfo->err = jpeg_std_error(&jerr);
+
+  /* set error handler */
+  if (!set_error_handler(&errorHandlerContext)) {
+      jpeg_set_error_handler_context(cinfo, errorHandlerContext);
+  } else {
+      /* All the registers here need to be NOT register optimized */
+      jpeg_set_error_handler_context(cinfo, 0);
+      jpeg_destroy_decompress(cinfo);
+      if (infile) fdclose(infile);
+      if (filehan) FileClose(filehan, TRUE);  /* close source file */
+      /* Return the memory */
+      if (gotAlloc)
+	  AllocWatcherFree(watcher, requiredMemory) ;
+      if (gotTempAlloc)
+	  AllocWatcherFree(watcher, requiredTempMemory) ;
+
+      /* Free the existing data if we have any */
+      dataVMBlock = bmblock ;
+      if ((dataVMBlock) && (onErrorDontKeepPartial))  {
+        VMFreeVMChain(vmf, VMCHAIN_MAKE_FROM_VM_BLOCK(dataVMBlock));
+        dataVMBlock = 0;
+      }
+
+      /* More clean up */
+#if SCANLINE_COMPRESS
+      if (scanlineCompress) {
+        if (cBuf) 
+            MemFree(cBuf);
+#if LZG_COMPRESS
+        if (lzgCompress && lzgStack) 
+            LZGFreeCompressStack(lzgStack);
+#endif /* LZG_COMPRESS */
+      }
+#endif /* SCANLINE_COMPRESS */
+      free(cinfo);
+      return(dataVMBlock);
+  }
+
+  /* Now we can initialize the JPEG decompression object. */
+  jpeg_create_decompress(cinfo);
+
+  /* Step 2: specify data source (eg, a file) */
+
+  jpeg_stdio_src(cinfo, infile);
+
+#if PROGRESS_DISPLAY
+  /* point to loading progress data, if any */
+  jpeg_init_loadProgress(cinfo, loadProgressDataP);
+#endif
+
+  /* Step 3: read file parameters with jpeg_read_header() */
+
+  /* We handle header errors by bailing out, since we don't support
+     suspending, JPEG_SUSPENDED means we got error looking for header
+     data */
+  headerErr = (jpeg_read_header(cinfo, TRUE) == JPEG_SUSPENDED);
+  /* We can ignore the return value from jpeg_read_header since
+   *   (a) suspension is not possible with the stdio data source, and
+   *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
+   * See libjpeg.doc for more info.
+   */
+
+  /* give back size */
+  picsize->XYS_width = cinfo->image_width;
+  picsize->XYS_height = cinfo->image_height;
+
+  /* Attempt to estimate the amount of temporary storage for progressive mode */
+  if(cinfo->progressive_mode)
+  {
+    requiredTempMemory =
+      (((long)cinfo->image_width * (long)cinfo->image_height *
+        cinfo->num_components * sizeof(JCOEF)) / 9) * 10;
+  }
+  else
+    requiredTempMemory = 0;
+
+  gotTempAlloc = AllocWatcherAllocate(watcher, requiredTempMemory) ;
+
+  /* Don't do graphics bigger than 1024 x or 1024 y (either way) */
+  if (headerErr==FALSE && gotTempAlloc/* &&
+      ((picsize->XYS_width <= 2048) && (picsize->XYS_height <= 2048)) &&
+      (((dword)(picsize->XYS_width) * (dword)(picsize->XYS_height)) <=
+       (1024L * 1024L))*/)  {
+      /* Step 4: set parameters for decompression */
+
+      cinfo->dct_method = JDCT_FASTEST;        /* fastest, but less acurate */
+
+      /* We now know if this is a gray image.  If it is, we override the */
+      /* requested display settings and make it an appropriate gray scale */
+      /* image */
+      if (cinfo->jpeg_color_space == JCS_GRAYSCALE)  {
+          /* For to 256 color greyscale image */
+          /* NOTE:  DC_GRAY_8 is only allowed when dealing with greyscale images */
+          displayClass = DC_GRAY_8 ;
+      }
+
+    /* Set up the dithering parameters (if doing a 256 color or less image) */
+#ifndef PRODUCT_FJPEG
+      if (displayClass != DC_CF_RGB)  {
+        if (displayClass == DC_GRAY_1)  {
+            cinfo->dither_mode = JDITHER_FS ;
+            cinfo->do_fancy_upsampling = 0 ;
+            cinfo->quantize_colors = TRUE ;
+            cinfo->two_pass_quantize = FALSE;
+            cinfo->desired_number_of_colors = 64 ;  /* orthogonal colors */
+        } else if (displayClass == DC_COLOR_4)  {
+            cinfo->dither_mode = JDITHER_FS ;
+            cinfo->do_fancy_upsampling = 0 ;
+            cinfo->quantize_colors = TRUE ;
+            cinfo->two_pass_quantize = FALSE;
+            cinfo->desired_number_of_colors = 64 ;  /* orthogonal colors */
+        } else {
+            cinfo->dither_mode = JDITHER_FS ;
+            cinfo->do_fancy_upsampling = 0 ;
+            cinfo->quantize_colors = TRUE ;
+            cinfo->two_pass_quantize = FALSE;
+            cinfo->desired_number_of_colors = 216 ;
+        }
+        jpeg_calc_output_dimensions(cinfo) ;
+      }
+#endif
+
+      /* Step 5: Start decompressor */
+
+      (void) jpeg_start_decompress(cinfo);
+      /* We can ignore the return value since suspension is not possible
+       * with the stdio data source.
+       */
+
+      /* We may need to do some setup of our own at this point before reading
+       * the data.  After jpeg_start_decompress() we have the correct scaled
+       * output image dimensions available, as well as the output colormap
+       * if we asked for color quantization.
+       * In this example, we need to make an output work buffer of the right size.
+       */
+
+      /* Ok, let's determined the required memory if this picture */
+      /* is fully uncompressed in the desired mode */
+      requiredMemory = cinfo->output_width ;
+      requiredMemory *= cinfo->output_height ;
+
+      /* But it might not be 1 byte per pixel.  Adjust for that */
+      if (displayClass == DC_GRAY_1)
+          requiredMemory >>= 3 ;   /* 8 pixels per byte */
+      if (displayClass == DC_GRAY_2)
+          requiredMemory >>= 2 ;   /* 4 pixels per byte */
+      if ((displayClass == DC_COLOR_4) || (displayClass == DC_GRAY_4))
+          requiredMemory >>= 1 ;   /* 2 pixels per byte */
+      if (displayClass == DC_CF_RGB)
+          requiredMemory *= 3 ;    /* 3 bytes per pixel */
+
+      /* Only create the bitmap if we have enough memory */
+      gotAlloc = AllocWatcherAllocate(watcher, requiredMemory) ;
+      if (gotAlloc)  {
+#if SCANLINE_COMPRESS
+	  if (scanlineCompress) {
+	      /* create degenerate HugeBitmap so we can copy bitmap info */
+	      if (displayClass == DC_CF_RGB)  {
+		  bmblock = GrCreateBitmapRaw(BMF_24BIT|BMT_COMPLEX|BMT_PALETTE,
+					   1,
+					   1,
+					   vmf);
+	      } else if (displayClass == DC_COLOR_4)  {
+		  bmblock = GrCreateBitmapRaw(BMF_4BIT|BMT_COMPLEX,
+					   1,
+					   1,
+					   vmf);
+	      } else if (displayClass == DC_GRAY_1)  {
+		  bmblock = GrCreateBitmapRaw(BMF_MONO|BMT_COMPLEX,
+					   1,
+					   1,
+					   vmf);
+	      } else {
+		  bmblock = GrCreateBitmapRaw(BMF_8BIT|BMT_COMPLEX,
+					   1,
+					   1,
+					   vmf);
+	      }
+	  } else {
+	      /* create output HugeBitmap in the VM file now */
+	      if (displayClass == DC_CF_RGB)  {
+		  bmblock = GrCreateBitmapRaw(BMF_24BIT|BMT_COMPLEX|BMT_PALETTE,
+					   cinfo->output_width,
+					   cinfo->output_height,
+					   vmf);
+	      } else if (displayClass == DC_COLOR_4)  {
+		  bmblock = GrCreateBitmapRaw(BMF_4BIT|BMT_COMPLEX,
+					   cinfo->output_width,
+					   cinfo->output_height,
+					   vmf);
+	      } else if (displayClass == DC_GRAY_1)  {
+		  bmblock = GrCreateBitmapRaw(BMF_MONO|BMT_COMPLEX,
+					   cinfo->output_width,
+					   cinfo->output_height,
+					   vmf);
+	      } else {
+		  bmblock = GrCreateBitmapRaw(BMF_8BIT|BMT_COMPLEX,
+					   cinfo->output_width,
+					   cinfo->output_height,
+					   vmf);
+	      }
+	  }
+#else
+          /* create output HugeBitmap in the VM file now */
+          if (displayClass == DC_CF_RGB)  {
+              bmblock = GrCreateBitmapRaw(BMF_24BIT|BMT_COMPLEX|BMT_PALETTE,
+                                       cinfo->output_width,
+                                       cinfo->output_height,
+                                       vmf);
+          } else if (displayClass == DC_COLOR_4)  {
+              bmblock = GrCreateBitmapRaw(BMF_4BIT|BMT_COMPLEX,
+                                       cinfo->output_width,
+                                       cinfo->output_height,
+                                       vmf);
+          } else if (displayClass == DC_GRAY_1)  {
+              bmblock = GrCreateBitmapRaw(BMF_MONO|BMT_COMPLEX,
+                                       cinfo->output_width,
+                                       cinfo->output_height,
+                                       vmf);
+          } else {
+              bmblock = GrCreateBitmapRaw(BMF_8BIT|BMT_COMPLEX,
+                                       cinfo->output_width,
+                                       cinfo->output_height,
+                                       vmf);
+          }
+#endif
+      } else {
+          /* limit reached -- don't import the graphic at all */
+          bmblock = 0 ;
+      }
+  } else {
+      bmblock = 0 ;
+  }
+
+  if (bmblock == 0)
+  {
+      jpeg_abort(cinfo) ;
+
+      jpeg_destroy_decompress(cinfo);
+
+      if (infile) fdclose(infile);
+
+      if (filehan) FileClose(filehan, TRUE);  /* close source file */
+
+      /* Return the memory */
+      if (gotAlloc)
+          AllocWatcherFree(watcher, requiredMemory) ;
+      if (gotTempAlloc)
+          AllocWatcherFree(watcher, requiredTempMemory) ;
+
+      free(cinfo);
+      return(0);
+  }
+
+#if SCANLINE_COMPRESS
+  if (scanlineCompress) {
+      /* create actual compressed bitmap for output */
+      HugeArrayLockDir(vmf, bmblock, &srcHeader);
+      cbmblock = HugeArrayCreate(vmf, 0,
+				 srcHeader->EB_header.HAD_header.LMBH_offset);
+      HugeArrayLockDir(vmf, cbmblock, &destHeader);
+      /* copy everything after HugeArrayDirectory header */
+      memcpy(&(destHeader->EB_bm), &(srcHeader->EB_bm),
+	     (srcHeader->EB_header.HAD_header.LMBH_offset -
+	      offsetof(EditableBitmap, EB_bm)));
+      /* free degenerate huge bitmap */
+      HugeArrayUnlockDir(srcHeader);
+      VMFreeVMChain(vmf, VMCHAIN_MAKE_FROM_VM_BLOCK(bmblock));
+      bmblock = cbmblock;
+      destHeader->EB_bm.CB_simple.B_width = cinfo->output_width;
+      destHeader->EB_bm.CB_simple.B_height = 0;  /* no scanlines yet */
+      destHeader->EB_bm.CB_simple.B_compact = BMC_PACKBITS;
+#if LZG_COMPRESS
+      if (lzgCompress)
+	  destHeader->EB_bm.CB_simple.B_compact = BMC_LZG;
+#endif
+      destHeader->EB_bm.CB_devInfo = 0;
+      HugeArrayDirty(destHeader);
+      HugeArrayUnlockDir(destHeader);
+      /* allocate buffer for uncompressed/compressed scanlines */
+      switch(displayClass) {
+	  /* first, get bytes per scanline */
+      case DC_CF_RGB:
+	  size = cinfo->output_width*3;  /* 24 bit */
+	  break;
+      case DC_COLOR_4:
+	  size = (cinfo->output_width+1)>>1;  /* 4 bit */
+	  break;
+      case DC_GRAY_1:
+	  size = (cinfo->output_width+7)>>3;  /* 1 bit */
+	  break;
+      default:
+	  size = cinfo->output_width;  /* 8 bit */
+      }
+      /* size needed for compressed scanline (taken from GrCompactBitmap) */
+      cScanSize = (size+2) + ((size+2)>>7);
+      /* handle worse case for LZG (10% extra guessimate) */
+#if LZG_COMPRESS
+      if (lzgCompress && (cScanSize < (size + size/10)))
+	  cScanSize = size + size/10;
+#endif
+      cBuf = MemAlloc(size+cScanSize, HF_DYNAMIC, HAF_STANDARD);
+      /* allocate LZG compression stack */
+#if LZG_COMPRESS
+      if (lzgCompress)
+	  lzgStack = LZGAllocCompressStack(0);
+#endif
+  }
+#endif
+
+  /* JSAMPLEs per row in output buffer */
+  row_stride = cinfo->output_width * cinfo->output_components;
+  /* Make a one-row-high sample array that will go away when done with image */
+  buffer = MCALL4(alloc_sarray, cinfo->mem,
+                  (j_common_ptr) cinfo, JPOOL_IMAGE, row_stride, 1);
+  /* Step 6: while (scan lines remain to be read) */
+  /*           jpeg_read_scanlines(...); */
+
+  /* Here we use the library's state variable cinfo->output_scanline as the
+   * loop counter, so that we don't have to keep track ourselves.
+   */
+#if SCANLINE_COMPRESS
+  while ((cinfo->output_scanline < cinfo->output_height) && (flag == FALSE) && (!scanlineCompress || cBuf)) {
+#else
+  while ((cinfo->output_scanline < cinfo->output_height) & (flag == FALSE)) {
+#endif
+    /* jpeg_read_scanlines expects an array of pointers to scanlines.
+     * Here the array is only one element long, but you could ask for
+     * more than one scanline at a time if that's more convenient.
+     */
+    (void) jpeg_read_scanlines(cinfo, buffer, 1);
+
+#if SCANLINE_COMPRESS
+    if (scanlineCompress) {
+	lineptr = MemLock(cBuf);
+    } else {
+	if(HAL_COUNT(HugeArrayLock(vmf, bmblock,
+				   (dword)cinfo->output_scanline - 1,
+				   &lineptr,&size)) == 0) {
+	    lineptr = 0;
+	}
+    }
+    if (lineptr)
+    {
+#else
+    if(HAL_COUNT(HugeArrayLock(vmf, bmblock,
+                  (dword)cinfo->output_scanline - 1,&lineptr,&size)) != 0)
+    {
+#endif
+        if (displayClass == DC_GRAY_8)
+            ConvertGreyLine(lineptr, buffer[0], size) ;
+        else if (displayClass == DC_COLOR_8)
+            ConvertLine(lineptr, buffer[0], size) ;
+        else if (displayClass == DC_COLOR_4)
+            ConvertLine16Color(lineptr, buffer[0], cinfo->output_width) ;
+        else if (displayClass == DC_GRAY_1)
+	        MonoDowngrade(lineptr, buffer[0], cinfo->output_width, cinfo->output_scanline-1) ;
+        else
+            memcpy(lineptr, buffer[0], size) ;
+
+#if SCANLINE_COMPRESS
+	if (scanlineCompress) {
+	    /* compress into work buffer */
+#if LZG_COMPRESS
+	    if (lzgCompress) {
+		cScanSize = LZGCompress((byte *)lineptr+size, lineptr,
+					size, lzgStack);
+	    } else {
+		cScanSize = ImpPackBits((byte *)lineptr+size, lineptr, size);
+	    }
+#else
+	    cScanSize = ImpPackBits((byte *)lineptr+size, lineptr, size);
+#endif
+	    EC(     bSize += size; cbSize += cScanSize;)
+		/* create compressed scanline in dest huge bitmap */
+		HugeArrayAppend(vmf, bmblock, cScanSize, (byte *)lineptr+size);
+		/* update header with number of scanlines */
+		HugeArrayLockDir(vmf, bmblock, &destHeader);
+		destHeader->EB_bm.CB_simple.B_height++;
+		HugeArrayDirty(destHeader);
+		HugeArrayUnlockDir(destHeader);
+		/* unlock scanline work buffer */
+		MemUnlock(cBuf);
+	} else {
+	    HugeArrayDirty(lineptr);
+	    HugeArrayUnlock(lineptr);
+	}
+#else
+	HugeArrayDirty(lineptr);
+	HugeArrayUnlock(lineptr);
+#endif
+
+#if PROGRESS_DISPLAY
+	/* send out progress if desired number of scanlines have been seen */
+	if (importProgressDataP && importProgressDataP->IPD_callback &&
+	    (((cinfo->output_scanline % SLICE_HEIGHT) == 0) || 
+                 (cinfo->output_scanline == cinfo->output_height))) {
+	    importProgressDataP->IPD_bitmap = bmblock;
+	    importProgressDataP->IPD_iad.IAD_size.XYS_width = cinfo->output_width;
+	    importProgressDataP->IPD_iad.IAD_size.XYS_height = cinfo->output_height;
+	    /* this invalidates too much for the last partial slice, but
+	       it doesn't matter */
+	    importProgressDataP->IPD_firstLine = cinfo->output_scanline-SLICE_HEIGHT;
+	    importProgressDataP->IPD_lastLine = cinfo->output_scanline-1;
+	    ((pcfm_ImportProgressCallback *)ProcCallFixedOrMovable_pascal)
+                (importProgressDataP, importProgressDataP->IPD_callback);
+	}
+	/* this stop one line too late for abort imports, but we don't want
+	   to stop full imports prematurely */
+	if (cinfo->src->eoi) {
+	    /* stop while loop, but don't set flag = TRUE as we want to
+	       keep partial graphic */
+	    break;
+	}
+	/* mark the graphic as completed, if so */
+	if (cinfo->output_scanline == cinfo->output_height)
+	    *p_completeGraphic = TRUE ;
+
+    /* Stop here if we are aborting and we're NOT progressive */
+    if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)  {
+        if ((loadProgressDataP) && (importProgressDataP->IPD_bitmap != NullHandle))  {
+            flag = FALSE ;
+
+            /* But keep the partial image we have (we don't need a big red X) */
+            /* We aren't complete either */
+            onErrorDontKeepPartial = FALSE ;
+        } else {
+            flag = TRUE ;
+        }
+        break ;
+    }
+
+#else /* !PROGRESS_DISPLAY */
+    /* Stop here if we are aborting */
+    if (mimeStatus->MS_mimeFlags & MIME_STATUS_ABORT)
+        break ;
+#endif
+    }
+    else
+        flag = TRUE;
+  }
+
+#if SCANLINE_COMPRESS
+  if (scanlineCompress) {
+    if (cBuf) {
+	MemFree(cBuf);
+	cBuf = 0;
+    }
+#if LZG_COMPRESS
+    if (lzgCompress && lzgStack) {
+	LZGFreeCompressStack(lzgStack);
+	lzgStack = 0;
+    }
+#endif
+  }
+#endif
+
+  /* Step 7: Finish decompression */
+  (void) jpeg_finish_decompress(cinfo);
+  /* We can ignore the return value since suspension is not possible
+   * with the stdio data source.
+   */
+
+  /* Step 8: Release JPEG decompression object */
+
+  /* This is an important step since it will release a good deal of memory. */
+  jpeg_set_error_handler_context(cinfo, 0);
+
+  jpeg_destroy_decompress(cinfo);
+
+  if (infile) fdclose(infile);
+
+  if (filehan) FileClose(filehan, TRUE);   /* close source file */
+
+  if(flag == FALSE)
+        dataVMBlock = bmblock;
+  else                        /* import failed: release bitmap right now */
+  {                           
+        VMFreeVMChain(vmf, VMCHAIN_MAKE_FROM_VM_BLOCK(bmblock));
+        dataVMBlock = 0;
+  }
+
+  /* We know that the temporarily allocated memory has been freed. */
+  if (gotTempAlloc)
+      AllocWatcherFree(watcher, requiredTempMemory) ;
+
+  if ((dataVMBlock == 0) && (gotAlloc))
+      AllocWatcherFree(watcher, requiredMemory) ;
+  else
+      *usedMem = requiredMemory ;
+
+//  InitFileWriteInteger("timing", "jpegend", TimerGetCount());
+
+  free(cinfo);
+  return (dataVMBlock);
+}

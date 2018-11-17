@@ -1,0 +1,260 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Internal -- DOS IFS driver definition
+FILE:		dosFSDr.def
+
+AUTHOR:		Adam de Boor, Mar 27, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	3/27/92		Initial revision
+
+
+DESCRIPTION:
+	Definition of primary and secondary responsibilities for DOS-based
+	IFS drivers.
+	
+	The primary driver for a DOS-like system accepts all the regular
+	filesystem calls from the secondary through its altStrat routine, and
+	provides additional services beyond that.
+	
+	The secondary driver for a DOS-like system must accept calls from the
+	primary driver to assist the primary in performing the function
+	the secondary asked it to perform, e.g. returning values for 
+	extended attributes not supported by the primary.
+		
+
+	NOTE: if the primary is called to perform an operation, the
+	private data for the operand must be what was returned by the primary
+	when the operand was created. E.g. HF_private should be what was
+	returned in DX from DR_FS_ALLOC_OP when the secondary called the
+	primary to open the file. Failure to do this will wreak havoc.
+
+	$Id: dosFSDr.def,v 1.1 97/04/04 14:15:56 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__DOSFSDR
+
+;------------------------------------------------------------------------------
+;			PRIMARY INTERFACE
+;------------------------------------------------------------------------------
+
+DOS_PRIMARY_FS_PROTO_MAJOR	equ	FS_PROTO_MAJOR+1
+DOS_PRIMARY_FS_PROTO_MINOR	equ	FS_PROTO_MINOR+5
+
+DOSPrimaryFSFunction	etype	word, FSFunction, 2
+DR_DPFS_ALLOC_DOS_HANDLE	enum	DOSPrimaryFSFunction
+;
+;	Desc:	Allocate a DOS file handle for use by a file operation in DOS
+;	Pass:	bl	= SFN from file handle
+;	Return:	bx	= DOS file handle
+;	Destroyed: 	nothing
+;
+
+DR_DPFS_FREE_DOS_HANDLE		enum	DOSPrimaryFSFunction
+;
+;	Desc: 	Release a DOS file handle previously allocated by
+;		DR_DPFS_ALLOC_DOS_HANDLE.
+;	Pass:	bx	= DOS handle
+;	Return:	bl	= SFN of the handle
+;	Destroyed:	bh, bp
+;
+
+DR_DPFS_LOCK_CWD		enum	DOSPrimaryFSFunction
+;
+;	Desc:	Gain exclusive access to DOS's working directory
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroyed:	di, bp
+;
+
+DR_DPFS_UNLOCK_CWD		enum	DOSPrimaryFSFunction
+;
+;	Desc:	Release exclusive access to DOS's working directory
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroyed:	di, bp
+;
+
+DR_DPFS_OPEN_INTERNAL		enum	DOSPrimaryFSFunction
+;
+;	Desc:	Open a file for internal-use only. Overrides normal
+;		access restrictions, where possible, enlarges the
+;		SFT to accomodate the file, if possible and necessary.
+;	Pass:	ds:dx	= name to open
+;		al	= FileAccess requested
+;	Return:	carry set on error:
+;			ax	= error code
+;		carry set on success:
+;			ax	= DOS handle
+;	Destroyed:	di, bp
+;
+
+DR_DPFS_INIT_HANDLE		enum	DOSPrimaryFSFunction
+;
+;	Desc:	Take over control for a file opened before the calling
+;		driver was loaded. XXX: File handle must still be managed by
+;		the skeleton FS driver for this to work.
+;	Pass:	ds:bx	= handle of file to take over
+;	Return:	nothing
+;	Destroyed:	ax, di, es, si, bp
+;
+
+DR_DPFS_INVAL_CUR_PATH		enum	DOSPrimaryFSFunction
+;
+;	Desc:	Secondary driver has done something that makes the cached
+;		current directory invalid (e.g. it changed the directory
+;		for a drive, or changed the default drive)
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroyed:	bp
+;
+
+DR_DPFS_MAP_VOLUME_NAME		enum	DOSPrimaryFSFunction
+;
+;	Desc:	Map a DOS volume name into the GEOS character set, suitable
+;		for storing in the DD_volumeLabel field of a disk descriptor
+;	Pass:	ds:dx	= DOS volume name (VOLUME_NAME_LENGTH space-padded
+;			  bytes)
+;		es:si	= place to store the result
+;	Return:	nothing
+;	Destroyed:	bp
+;
+
+DR_DPFS_MAP_TO_DOS		enum	DOSPrimaryFSFunction
+;
+;	Desc:	Map a name in the GEOS character set to an 8/3 name (i.e.
+;		8 root chars + 3 extension chars uppercase in DOS character
+;		space-padded with no period)
+;	Pass:	ds:dx	= file name to map
+;		cx	= number of chars in the name
+;		es:si	= place to store the result
+;	Return:	carry set if name not a valid DOS name
+;	Destroyed:	bp
+;
+
+DR_DPFS_CALL_DOS		enum	DOSPrimaryFSFunction
+;
+;	Desc: 	Issue an int 21h call, coping with critical errors, extended 
+;	      	error codes, etc.
+;	Pass:	ah	= DOS function
+;		other registers as appropriate
+;	Return:	carry set on error:
+;			ax	= FileError
+;	Destroyed:	bp
+;
+
+DR_DPFS_PREVENT_CRITICAL_ERR	enum	DOSPrimaryFSFunction
+;
+;	Desc:	Should subsequent operations generate a critical error, the
+;		primary will automatically fail them without asking the
+;		user. This has the side effect of grabbing the BIOS lock,
+;		so very little other than the operation that is to be
+;		protected may be performed by the caller when this function
+;		returns.
+;
+;		Each call to this function must be paired with a call to
+;		DR_DPFS_ALLOW_CRITICAL_ERR.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroyed:	bp
+;
+
+DR_DPFS_ALLOW_CRITICAL_ERR	enum	DOSPrimaryFSFunction
+;
+;	Desc:	Revert to normal critical-error handling, prompting the
+;		user for action. Releases the previous grab of the BIOS lock.
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroyed:	bp
+;
+
+DR_DPFS_P_LOCK_SECTOR_BUFFER	enum	DOSPrimaryFSFunction
+;
+;	Desc:	Gain exclusive access to the buffer the primary maintains
+;		for reading in sectors. Calls to this routine may *not* be
+;		nested.
+;	Pass:	nothing
+;	Return:	ax	= segment of buffer
+;	Destroyed:	bp
+;
+
+DR_DPFS_UNLOCK_V_SECTOR_BUFFER	enum	DOSPrimaryFSFunction
+;
+;	Desc:	Release exclusive access to the primary driver's sector buffer.
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroyed:	bp, flags
+;
+
+;------------------------------------------------------------------------------
+;			 SECONDARY INTERFACE
+;------------------------------------------------------------------------------
+DOS_SECONDARY_FS_PROTO_MAJOR	equ	1
+DOS_SECONDARY_FS_PROTO_MINOR	equ	1
+
+DOSSecondaryFSFunction	etype	word, 0, 2
+DR_DSFS_GET_EXT_ATTRIBUTE	enum	DOSSecondaryFSFunction
+;
+;	Desc:	Fetch an extended attribute not supported by the primary
+;		FSD
+;	Pass:	ds:si	= FileExtAttrDesc
+;		ax:dx	= far pointer. If segment non-zero, this
+;			  is the name of the file being messed with.
+;			  If segment is 0, the offset is the DOS file handle.
+;	Return:	carry set if attribute also not supported by secondary or
+;		    isn't present for the file:
+;			ax	= ERROR_ATTR_NOT_FOUND
+;				= ERROR_ATTR_NOT_SUPPORTED
+;		carry clear if attribute fetched
+;
+;
+
+DR_DSFS_SET_EXT_ATTRIBUTE	enum	DOSSecondaryFSFunction
+;
+;	Desc:	Set an extended attribute not supported by the primary FSD
+;	Pass:	ds:si	= FileExtAttrDesc
+;		ax:dx	= far pointer. If segment non-zero, this
+;			  is the name of the file being messed with.
+;			  If segment is 0, the offset is the DOS file handle.
+;	Return:	carry set if attribute couldn't be set:
+;			ax	= ERROR_ATTR_NOT_SUPPORTED
+;				= ERROR_ATTR_NOT_FOUND
+;				= ERROR_ATTR_CANNOT_BE_SET
+;		carry clear if attribute set
+;
+
+DR_DSFS_GET_WRITABLE		enum	DOSSecondaryFSFunction
+;
+;	Desc:	Get flag indicating whether the disk is writable or
+;		not.  If carry is returned the primary will not
+;		write to the boot sector to find out if the drive is 
+;		writable or not.  This call is added so pcmcia drivers
+;		can return whether a card is writable or not, without 
+;		writing to the card.  Some cards allow limited number
+;		of writes.
+;	
+;	Pass: 	es:si	= DriveStatusEntry
+;	Return:	carry set if we know whether or not it is writable.
+;		al 	= DF_WRITABLE bit set accordingly
+;		or
+;		carry clear if do not whether or not it is writable
+;		al 	= destroyed
+;
+
+	
+;------------------------------------------------------------------------------
+;			MISC
+;------------------------------------------------------------------------------
+;This is the DOS filename for the file that DOS FS drivers create,
+;to hold the extended attributes for a directory (such as the directory's
+;longname, links, etc.) MakeDisk needs this.
+
+FS_DIR_EXT_ATTRS_DOS_FILENAME	equ	<"@DIRNAME.000">
+

@@ -1,0 +1,699 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1990, 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		stylesC.def
+
+DECLARER:	Styles Library
+
+DESCRIPTION:
+	This file contains the definition of styles UI controller classes
+
+	$Id: styles.def,v 1.1 97/04/04 14:18:50 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef __STYLESC
+
+StartLibrary	styles
+
+;------------------------------------------------------------------------------
+;	Routines
+;------------------------------------------------------------------------------
+
+global StyleSheetCopyElement:far
+;
+; Copy an element between an attribute array in document space and an attribute
+; array in transfer space, copying underlying style information as needed
+;
+; Pass:
+;	ss:bp - StyleSheetParams
+;		SSP_styleArray, SSP_attrArrays,
+;		SSP_xferStyleArray, SSP_xferAttrArrays
+;	ax - element # to copy (in source space)
+;	bx - offset of attribute array to work on
+;	cx - non-zero to copy from transfer space
+;	di - optimization block handle (or 0 to allocate one)
+;
+; Return:
+;	bx - element # in destination (in destination space)
+;	di - optimization block
+
+global StyleSheetImportStyles:far
+;
+; Import styles from an outside source.
+;
+; Pass:
+;	ss:bp - StyleSheetParams
+;		SSP_styleArray, SSP_attrArrays,
+;		SSP_xferStyleArray, SSP_xferAttrArrays
+;	cx - non-zero change document style's if defined differently in the
+;	     import source
+;
+; Return:
+;	ax - non-zero if recalculation is necessary
+
+global StyleSheetDescribeStyle:far
+;
+; Return a text description of a style
+;
+; Pass:
+;	ss:bp - StyleSheetParams
+;		SSP_styleArray, SSP_attrArrays,
+;		SSP_descriptionCallbacks
+;	ss:di - SSCDescribeStyleParams
+;
+; Return:
+;	none
+
+global StyleSheetDescribeAttrs:far
+;
+; Return a text description of a set of attributes
+;
+; Pass:
+;	ss:bp - StyleSheetParams
+;		SSP_styleArray, SSP_attrArrays,
+;		SSP_descriptionCallbacks
+;	cx:dx - GenText
+;	ss:di - StyleSheetDescribeAttrsParams
+;
+; Return:
+;	none
+
+global StyleSheetGetStyle:far
+;
+; Get a style from a style sheet
+;
+; Pass:
+;	es:di - buffer (size NameArrayMaxElement)
+;	ss:bx - StyleChunkDesc for style array
+;	ax - style token
+;
+; Return:
+;	ax - size of structure
+;	bx - used index
+;	cx - used tool index
+
+global StyleSheetGetStyleCounts:far
+;
+; Get the number of styles
+;
+; Pass:
+;	ss:bx - StyleChunkDesc for style array
+;
+; Return:
+;	ax - number of styles
+;	bx - number of toolbox styles
+
+global StyleSheetRequestEntryMoniker:far
+;
+; Handle request for list entry moniker from a GenList displaying the list
+; of styles.
+;
+; Pass:
+;	ss:bx - StyleChunkDesc for style array
+;	ss:bp - SSCListInteractionParams
+
+global StyleSheetUpdateModifyBox:far
+;
+; Update the modify style dialog box
+;
+; Pass:
+;	ss:bp - SSCUpdateModifyParams
+;	ss:bx - StyleChunkDesc for style array
+;	ax:di - callback routine for setting custom UI
+;
+;	Callback:
+;	Pass:
+;		cx:di - UI to update
+;		ds:si - style structure
+;		ds:dx - base style structure (dx = 0 if none)
+;	Return:
+;		none
+;	Destroyed:
+;		ax, bx, cx, dx, si, di, bp, ds, es
+
+global StyleSheetModifyStyle:far
+;
+; Modify a style
+;
+; Pass:
+;	ss:bp - SSCUpdateModifyParams
+;	ss:bx - StyleChunkDesc for style array
+;	ax:di - callback routine for custom stuff
+;
+;	Callback:
+;	Pass:
+;		cx:di - UI to update
+;		ds:si - style structure
+;		ds:dx - base style structure (dx = 0 if none)
+;	Return:
+;		none
+;	Destroyed:
+;		ax, bx, cx, dx, si, di, bp, ds, es
+
+global StyleSheetDeleteStyle:far
+;
+; Delete a style
+;
+; Pass:
+;	ss:bp - StyleSheetParams
+;	cx - used index
+;	dx - non-zero to revert to base style
+;	ss:bx - StyleChunkDesc for style array
+; Return:
+;	ax - non-zero if recalculation is necessary
+
+global StyleSheetDefineStyle:far
+;
+; Define a style
+;
+; Pass:
+;	*ds:si - styled object (this object will receive a
+;		 MSG_META_STYLED_OBJECT_APPLY_STYLE message)
+;	ss:bp - StyleSheetParams
+;	ss:cx - SSCDefineStyleParams
+;	ax:di - callback routine for setting custom stuff
+
+global StyleSheetRedefineStyle:far
+;
+; Redefine a style
+;
+; Pass:
+;	ss:bp - StyleSheetParams
+;	ss:cx - SSCDefineStyleParams
+;	ss:bx - StyleChunkDesc for style array
+;	ax:di - callback routine for setting custom stuff
+; Return:
+;	ax - non-zero if recalculation is necessary
+
+global StyleSheetGetStyleToApply:far
+;
+; Get the token of the style to apply
+;
+; Pass:
+;	*ds:si - style array
+;	cx - used index or token (depends on dh)
+;	dl - non-zero if toolbox style being applied
+;	dh - non-zero if cx is a used index, zero if cx is a token
+; Return:
+;	ax - token
+
+global StyleSheetGetNotifyCounter:far
+;
+; Get the counter value to send out with GWNT_STYLE_SHEET notifications
+;
+; Pass:
+;	none
+; Return:
+;	ax - counter
+
+global StyleSheetIncNotifyCounter:far
+;
+; Increment the counter value to send out with GWNT_STYLE_SHEET notifications.
+; An application does this whenever it knows that the style sheet information
+; has changed
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+global StyleSheetOpenFileForImport:far
+;
+; Open a file for importing a style sheet
+;
+; Pass:
+;	ss:bp - SSCLoadStyleSheetParams
+; Return:
+;	carry - set if error
+;	bx - file handle
+
+global StyleSheetSaveStyle:far
+;
+; Save a style
+;
+; Pass:
+;	ss:bp - StyleSheetParams
+;	ss:ax - SSCSaveStyleParams
+
+global StyleSheetPrepareForRecallStyle:far
+;
+; Prepare for recall style by copying saved attributes back into the arrays
+;
+; Pass:
+;	ss:bp - StyleSheetParams
+;	cx - block containing saved style
+; Return:
+;	ss:bp - StyleSheetParams with SSP_attrTokens filled in
+
+;------------------------------------------------------------------------------
+;	Helper Routines
+;------------------------------------------------------------------------------
+
+; structure for StyleSheetDescribeExclusiveWord
+
+SSDescribeWordEntry	struct
+    SSDWE_value	word
+    SSDWE_name	lptr.char
+SSDescribeWordEntry	end
+
+; structure for StyleSheetCallDescribeRoutines
+
+SSDiffFlags	record
+    SSDF_NEW_CATEGORY:1
+    :7
+SSDiffFlags	end
+
+SSDiffEntry	struct
+    SSDE_offset		byte			;offset of word to check
+    SSDE_mask		word			;mask to check
+    SSDE_routine	nptr.near		;routine to call
+    SSDE_flags		SSDiffFlags
+SSDiffEntry	ends
+
+; structure for StyleSheetCallMergeRoutines
+
+SSMergeEntry	struct
+    SSME_offset		byte			;offset of word to check
+    SSME_mask		word			;mask to check
+    SSME_routine	nptr.near		;routine to call
+    SSME_data		word
+SSMergeEntry	ends
+
+SSDescribeDistanceFlags	record
+    SSDDF_RELATIVE:1
+    SSDDF_PLURAL_FOR_NON_RELATIVE_IF_NEEDED:1
+    :14
+SSDescribeDistanceFlags	end
+
+global StyleSheetCallDescribeRoutines:far
+global StyleSheetCallMergeRoutines:far
+global StyleSheetDescribeExclusiveWord:far
+global StyleSheetDescribeNonExclusiveWord:far
+ifdef FULL_EXECUTE_IN_PLACE
+global StyleSheetDescribeExclusiveWordXIP:far
+global StyleSheetDescribeNonExclusiveWordXIP:far
+endif
+global StyleSheetDescribeWWFixed:far
+global StyleSheetDescribeDistance:far
+global StyleSheetAddNameFromChunk:far
+global StyleSheetAddCharToDescription:far
+global StyleSheetAddAttributeHeader:far
+global StyleSheetLockStyleChunk:far
+global StyleSheetUnlockStyleChunk:far
+global StyleSheetGenerateChecksum:far
+global StyleSheetAddNameFromPtr:far
+global StyleSheetAddWord:far
+
+;------------------------------------------------------------------------------
+;	Messages
+;------------------------------------------------------------------------------
+
+; These messages are sent to the styled object
+
+SSCListInteractionParams	struct
+    SSCLIP_styledClass		fptr.ClassStruc
+    SSCLIP_list			optr		;GenList to respond to
+    SSCLIP_defaultEntries	word		;# of default entries
+    SSCLIP_toolboxFlag		word
+    SSCLIP_entryNumber		word
+SSCListInteractionParams	ends
+
+MSG_META_STYLED_OBJECT_REQUEST_ENTRY_MONIKER		method MetaStylesMessages
+;
+; Handle a request (originally from a GenList displaying the list of styles)
+; for a moniker for a style.
+;
+; Pass:
+;	ss:bp - SSCListInteractionParams
+; Return:
+;	none (respond via MSG_GEN_LIST_SET_ENTRY_MONIKER to the GenList)
+
+SSCUpdateModifyParams	struct
+    SSCUMP_styledClass	fptr.ClassStruc
+    SSCUMP_usedIndex	word		;used index of style in array
+    SSCUMP_textObject	optr		;text object to put name into
+    SSCUMP_attrList	optr
+    SSCUMP_baseList	optr		;base style list to update
+    SSCUMP_extraUI	optr		;added UI to update
+SSCUpdateModifyParams	ends
+
+MSG_META_STYLED_OBJECT_UPDATE_MODIFY_BOX		method MetaStylesMessages
+;
+; Handle a request to update stuff for the modify style dialog box
+;
+; Pass:
+;	ss:bp - SSCUpdateModifyParams
+; Return:
+;	none (respond to objects)
+
+MSG_META_STYLED_OBJECT_MODIFY_STYLE		method MetaStylesMessages
+;
+; Modify a style
+;
+; Pass:
+;	ss:bp - SSCUpdateModifyParams
+; Return:
+;	none
+
+SSCDescribeAttrsParams	struct
+    SSCDAP_styledClass	fptr.ClassStruc
+    SSCDAP_textObject	optr		;text object to put name into
+    SSCDAP_attrList	optr
+    SSCDAP_attrTokens	word	MAX_STYLE_SHEET_ATTRS dup (?)
+    SSCDAP_extraUI	optr
+SSCDescribeAttrsParams	ends
+
+MSG_META_STYLED_OBJECT_DESCRIBE_ATTRS		method MetaStylesMessages
+;
+; Describe a set of attribute tokens
+;
+; Pass:
+;	ss:bp - SSCDescribeAttrsParams
+; Return:
+;	none (respond to objects)
+
+SSCDescribeStyleParams	struct
+    SSCDSP_describeStyledClass		fptr.ClassStruc
+    SSCDSP_describeTextObject		optr
+    SSCDSP_usedIndex			word
+    SSCDSP_describeDeleteTrigger	optr
+    SSCDSP_describeDeleteRevertTrigger	optr
+SSCDescribeStyleParams	ends
+
+MSG_META_STYLED_OBJECT_DESCRIBE_STYLE		method MetaStylesMessages
+;
+; Get a description of a style and put it in a text object
+;
+; Pass:
+;	ss:bp - SSCDescribeStyleParams
+; Return:
+;	none
+
+SSCApplyDeleteStyleFlags	record
+
+	SSCADSF_TOOLBOX_STYLE : 1		;for apply style only
+	SSCADSF_TOKEN_IS_USED_INDEX : 1
+	SSCADSF_REVERT_TO_BASE_STYLE : 1	;for delete style only
+
+	: 13
+
+SSCApplyDeleteStyleFlags	end
+
+SSCApplyDeleteStyleParams	struct
+    SSCADSP_deleteStyledClass	fptr.ClassStruc
+    SSCADSP_flags		SSCApplyDeleteStyleFlags
+    SSCADSP_token		word
+SSCApplyDeleteStyleParams	ends
+
+
+MSG_META_STYLED_OBJECT_APPLY_STYLE		method MetaStylesMessages
+;
+; Apply a style
+;
+; Pass:
+;	ss:bp - SSCApplyDeleteStyleParams
+; Return:
+;	none
+
+MSG_META_STYLED_OBJECT_DELETE_STYLE		method MetaStylesMessages
+;
+; Delete a style
+;
+; Pass:
+;	ss:bp - SSCApplyDeleteStyleStruct
+; Return:
+;	none
+
+SSCDefineStyleParams	struct
+    SSCDSP_defineStyledClasss	fptr.ClassStruc
+    SSCDSP_attrTokens	word	MAX_STYLE_SHEET_ATTRS dup (?)
+    SSCDSP_baseStyle	word
+    SSCDSP_attrList	optr
+    SSCDSP_textObject	optr		;text object to geet name from
+    SSCDSP_extraUI	optr
+			CheckHack <(size SEH_reserved) eq 6>
+    SSCDSP_reserved	byte 6 dup (?)
+SSCDefineStyleParams	ends
+
+MSG_META_STYLED_OBJECT_DEFINE_STYLE		method MetaStylesMessages
+;
+; Define a new style based on the attributes of the currently selected object
+;
+; Pass:
+;	ss:bp - SSCDefineStyleParams
+; Return:
+;	none
+
+MSG_META_STYLED_OBJECT_REDEFINE_STYLE	method MetaStylesMessages
+;
+; Redefine the style based on the attributes of the currently selected object
+;
+; Pass:
+;	ss:bp - SSCDefineStyleParams
+; Return:
+;	none
+
+SSCReturnToBaseStyleParams	struct
+	SSCRTBSP_styledClass	fptr.ClassStruc
+SSCReturnToBaseStyleParams	ends
+
+MSG_META_STYLED_OBJECT_RETURN_TO_BASE_STYLE		method MetaStylesMessages
+;
+; Return the selected objects to their base style
+;
+; Pass:
+;	ss:bp - SSCCReturnToBaseStyleParams
+; Return:
+;	none
+
+
+SSCLoadStyleSheetParams	struct
+    SSCLSSP_styledClass		fptr.ClassStruc
+    SSCLSSP_fileSelector	optr
+SSCLoadStyleSheetParams	ends
+
+MSG_META_STYLED_OBJECT_LOAD_STYLE_SHEET	method MetaStylesMessages
+;
+; Load a style sheet from the given file
+;
+; Pass:
+;	ss:bp - SSCLoadStyleSheetParams
+; Return:
+;	none
+
+SSCSaveStyleParams	struct
+    SSCSSP_styledClass	fptr.ClassStruc
+    SSCSSP_attrTokens	word	MAX_STYLE_SHEET_ATTRS dup (?)
+    SSCSSP_replyObject	optr	;obj to send MSG_STYLE_SHEET_SET_SAVED_STYLE to
+SSCSaveStyleParams	ends
+
+MSG_META_STYLED_OBJECT_SAVE_STYLE	method MetaStylesMessages
+;
+; Save a style
+;
+; Pass:
+;	ss:bp - SSCSaveStyleParams
+; Return:
+;	none
+
+
+SSCRecallStyleParams	struct
+    SSCRSP_styledClass	fptr.ClassStruc
+    SSCRSP_blockHandle	hptr
+SSCRecallStyleParams	ends
+
+MSG_META_STYLED_OBJECT_RECALL_STYLE	method MetaStylesMessages
+;
+; Recall a style.  MemDecRefCount must be called on the block when
+; finished.
+;
+; Pass:
+;	ss:bp - SSCRecallStyleParams
+; Return:
+;	none
+
+;******************************************************************************
+;		StyleSheetControlClass
+;******************************************************************************
+;
+; Messages sent out:
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_STYLE_SHEET_CHANGE: NotifyStylesChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+StyleSheetControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Messages
+;-----------------------------------------------------------------------------
+
+MSG_STYLE_SHEET_GET_MODIFY_UI		message
+;
+; Get the OD of the tree of objects to add to the modify style dialog box
+;
+; Pass:
+;	none
+; Return:
+;	cx:dx = group to add
+
+MSG_STYLE_SHEET_GET_DEFINE_UI		message
+;
+; Get the OD of the tree of objects to add to the define style dialog box
+;
+; Pass:
+;	none
+; Return:
+;	cx:dx = group to add
+
+MSG_STYLE_SHEET_SET_SAVED_STYLE		message
+;
+; Set the block of the saved style
+;
+; Pass:
+;	cx - block handle (with ref count uninitialized)
+; Return:
+;	none
+
+;-----------------------------------------------------------------------------
+;		Internal messages
+;-----------------------------------------------------------------------------
+
+MSG_SSC_SELECT_STYLE		message
+MSG_SSC_STATUS_STYLE		message
+MSG_SSC_QUERY_STYLE		message
+MSG_SSC_QUERY_BASE_STYLE	message
+MSG_SSC_APPLY_STYLE		message
+MSG_SSC_APPLY_BOX_STYLE		message
+MSG_SSC_APPLY_TOOLBOX_STYLE	message
+
+MSG_SSC_INITIATE_MODIFY_STYLE	message
+MSG_SSC_MODIFY_STYLE		message
+MSG_SSC_DELETE_STYLE		message
+MSG_SSC_DELETE_REVERT_STYLE	message
+MSG_SSC_DEFINE_STYLE		message
+MSG_SSC_REDEFINE_STYLE		message
+MSG_SSC_RETURN_TO_BASE_STYLE	message
+MSG_SSC_LOAD_STYLE_SHEET	message
+MSG_SSC_LOAD_STYLE_SHEET_FILE_SELECTED message
+MSG_SSC_SAVE_STYLE		message
+MSG_SSC_RECALL_STYLE		message
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSCFeatures	record
+    SSCF_DEFINE:1
+    SSCF_REDEFINE:1
+    SSCF_RETURN_TO_BASE:1
+    SSCF_APPLY:1
+    SSCF_MANAGE:1
+    SSCF_LOAD:1
+    SSCF_SAVE_STYLE:1
+    SSCF_RECALL_STYLE:1
+SSCFeatures	end
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+
+SSCToolboxFeatures	record
+    SSCTF_REDEFINE:1
+    SSCTF_RETURN_TO_BASE:1
+    SSCTF_STYLE_LIST:1
+    SSCTF_SAVE_STYLE:1
+    SSCTF_RECALL_STYLE:1
+SSCToolboxFeatures	end
+
+
+
+
+
+SSC_DEFAULT_FEATURES equ mask SSCF_DEFINE or mask SSCF_REDEFINE \
+				or mask SSCF_RETURN_TO_BASE \
+				or mask SSCF_APPLY or mask SSCF_MANAGE \
+				or mask SSCF_LOAD or mask SSCF_SAVE_STYLE \
+				or mask SSCF_RECALL_STYLE
+SSC_DEFAULT_TOOLBOX_FEATURES equ mask SSCTF_STYLE_LIST \
+				or mask SSCTF_SAVE_STYLE \
+				or mask SSCTF_RECALL_STYLE
+
+; Notification structures
+
+NotifyStyleChange	struct
+    NSC_style		NameArrayMaxElement
+    NSC_styleToken	word
+    NSC_usedIndex	word
+    NSC_usedToolIndex	word
+    NSC_styleSize	word
+    NSC_attrTokens	word	MAX_STYLE_SHEET_ATTRS dup (?)
+    NSC_attrChecksums	dword	MAX_STYLE_SHEET_ATTRS dup (?)
+    NSC_indeterminate	byte
+    NSC_canRedefine	byte
+    NSC_canReturnToBase	byte
+    NSC_styleCounter	word		;from StyleSheetGetNotifyCounter
+NotifyStyleChange	ends
+
+NotifyStyleSheetChange	struct
+    NSSHC_styleArray	StyleChunkDesc
+    NSSHC_counter	word		;from StyleSheetGetNotifyCounter
+    NSSHC_styleCount	word
+    NSSHC_toolStyleCount word
+NotifyStyleSheetChange	ends
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+ATTR_STYLE_SHEET_LOAD_STYLE_SHEET_PATH	vardata	GenFilePath
+;
+; This is the intial path for the file selector in "Load Style Sheet".  If
+; this ATTR is not present then the default is SP_DOCUMENT
+
+ATTR_STYLE_SHEET_LOAD_STYLE_SHEET_TOKEN	vardata	GeodeToken
+;
+; This is the token to match for "load style sheet".
+
+TEMP_STYLE_SHEET_MANAGE_UI	vardata	optr
+	noreloc	TEMP_STYLE_SHEET_MANAGE_UI
+;
+; OD of UI added to the manage sytles group
+
+TEMP_STYLE_SHEET_DEFINE_UI	vardata	optr
+	noreloc	TEMP_STYLE_SHEET_DEFINE_UI
+;
+; OD of UI added to the manage sytles group
+
+SSCTempAttrInfo	struct
+    SSCTAI_attrTokens		word	MAX_STYLE_SHEET_ATTRS dup (?)
+    SSCTAI_baseStyle		word
+    SSCTAI_canRedefine		byte
+    SSCTAI_indeterminate	byte
+    SSCTAI_styleFlags		StyleElementFlags
+SSCTempAttrInfo	ends
+
+TEMP_SYTLE_SHEET_ATTR_TOKENS		vardata	SSCTempAttrInfo
+
+TEMP_SYTLE_SHEET_SAVED_STYLE		vardata hptr
+	noreloc TEMP_SYTLE_SHEET_SAVED_STYLE
+
+;---
+
+SSCI_targetClass	fptr.ClassStruc
+SSCI_styledClass	fptr.ClassStruc
+
+StyleSheetControlClass	endc
+
+EndLibrary	styles

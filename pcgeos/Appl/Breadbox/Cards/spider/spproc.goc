@@ -1,0 +1,223 @@
+/***********************************************************************
+*      Copyright 1994-2002  Breadbox Computer Company LLC
+* PROJECT:	Anarchy
+* MODULE:	Spider
+*
+* FILE:		spproc.goc
+*
+* AUTHOR:	jfh 12/02
+*
+*
+***********************************************************************/
+
+/* ----------------------------------------------------------------------------
+		Include files
+-----------------------------------------------------------------------------*/
+
+@include "spider.goh"
+
+@extern object SpiderColorSelector;
+@extern object SoundGroup;
+@extern object SpiderView;
+@extern object MyPlayingTable;
+@extern object DragItemGroup;
+@extern chunk TooSmallString;
+
+const word dealSoundBuf[] = {
+	SSE_CHANGE,             0, IP_BASS_DRUM_1, IT_STANDARD_TABLE,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, FR_BASS_DRUM_1, DYNAMIC_F,
+	SSDTT_TICKS,            5,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word winSoundBuf[] = {     /* from blackjack win sound */
+	SSE_CHANGE,             0, IP_ACOUSTIC_GRAND_PIANO, IT_STANDARD_TABLE,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_C, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_E, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_G, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, HIGH_C, DYNAMIC_F,
+	SSDTT_TICKS,            15,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_G, DYNAMIC_F,
+	SSDTT_TICKS,            8,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, HIGH_C, DYNAMIC_F,
+	SSDTT_TICKS,            25,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+
+@classdecl	SpiderProcessClass, neverSaved;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for SpiderProcessClass
+ *               (AppAttachFlags	attachFlags,
+ *			  			MemHandle		launchBlock,
+ *			  			MemHandle 		extraState)
+ * DESCRIPTION:	 do some opening stuff
+ *
+ ***********************************************************************/
+@method SpiderProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ DisplayScheme		displayScheme;
+ byte			displaySize;
+ Boolean		initError;
+ ColorQuad	tableColor;
+
+
+	/* make sure the screen res is at least 800x600 */
+	@call application::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&displayScheme);
+	displaySize = (displayScheme.DS_displayType & DT_DISP_SIZE)
+						>> DT_DISP_SIZE_OFFSET;
+	if (displaySize <= DS_STANDARD) {
+		UserStandardDialogOptr(0, 0, 0, 0,
+				@TooSmallString,
+				((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+				(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+		return;
+		}
+
+	@callsuper();
+
+	/* Do the game setup stuff  */
+	@send MyPlayingTable::MSG_GAME_SETUP_STUFF();
+
+	/* check for sound */
+	initError = InitFileReadInteger("Spider", "sound", &g_sound);
+	if (initError) g_sound = SOUND_SYSTEM;
+	@call SoundGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(g_sound, FALSE);
+	SoundAllocMusic(dealSoundBuf, 1, &g_dealSound);
+	SoundAllocMusic(winSoundBuf, 1, &g_winSound);
+
+	/* I'm having problems restoring from state, so we'll just not do it
+		but we have to @callsuper() & MSG_GAME_SETUP_STUFF before we send
+		QUIT */
+	if (attachFlags & AAF_RESTORING_FROM_STATE)   {
+		@send application::MSG_META_QUIT();
+		}
+
+	else { /* starting fresh */
+		initError = InitFileReadDataBuffer("Spider", "tableColor", &tableColor,
+												  sizeof(ColorQuad), 0);
+		if (!initError) {
+			@send SpiderColorSelector::MSG_COLOR_SELECTOR_SET_COLOR(tableColor, FALSE);
+			@send self::MSG_META_COLORED_OBJECT_SET_COLOR(tableColor);
+			}
+
+		/* gotta enable the color selector */
+		@send SpiderColorSelector::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+		/* and start a new game */
+		@send MyPlayingTable::MSG_SPIDER_NEW_GAME();
+
+      } /* end of starting fresh else */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_CLOSE_APPLICATION for SpiderProcessClass
+ *
+ * DESCRIPTION:	 do some closing stuff
+ *
+ *
+ ***********************************************************************/
+@method SpiderProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+
+	InitFileWriteInteger("Spider", "sound", g_sound);
+	InitFileCommit();
+	SoundStopMusic(g_dealSound);
+	SoundStopMusic(g_winSound);
+	SoundFreeMusic(g_dealSound);
+	SoundFreeMusic(g_winSound);
+
+	/* Do the game closing stuff */
+	@send MyPlayingTable::MSG_GAME_SHUTDOWN();
+
+	@callsuper();
+
+	return (0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_COLORED_OBJECT_SET_COLOR for SpiderProcessClass
+ *                     (ColorQuad colorQuad)
+ *
+ * DESCRIPTION:	 set the table's (the GenView) color
+ *
+ *
+ ***********************************************************************/
+@method SpiderProcessClass, MSG_META_COLORED_OBJECT_SET_COLOR
+{
+
+
+
+	@send SpiderView::MSG_GEN_VIEW_SET_COLOR(
+						colorQuad.CQ_redOrIndex, colorQuad.CQ_info,
+						((word)(((word)colorQuad.CQ_blue)<<8)|
+						((word)colorQuad.CQ_green)));
+
+	InitFileWriteData("Spider", "tableColor", &colorQuad, sizeof(ColorQuad));
+	InitFileCommit();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_SOUND_CHANGED for SpiderClass
+ *             (word selection, numSelections, flags)
+ *
+ * DESCRIPTION:	Set the global
+ *
+ *
+ ***********************************************************************/
+@method SpiderProcessClass, MSG_SPIDER_SOUND_CHANGED
+{
+	 g_sound = selection ;
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:		SpiderPlaySound(MemHandle soundHandle)
+ *
+ *
+ * DESCRIPTION:	Set the global
+ *
+ *
+ ***********************************************************************/
+void SpiderPlaySound(MemHandle soundHandle)
+{
+ word 		tempo = 8;
+
+
+	 if (g_sound == SOUND_SYSTEM)
+		 /* this routine abides by syst sound setting */
+		 UserStandardSound(SST_CUSTOM_SOUND, soundHandle, 1);
+	 else if (g_sound == SOUND_OFF)  return;
+	 else {
+		 /* this routine doesn't check syst sound setting -
+		  * but we need to supply the tempo */
+		 SoundPlayMusic(soundHandle, SP_GAME, tempo, EOSF_UNLOCK);
+		 }
+}
+
+

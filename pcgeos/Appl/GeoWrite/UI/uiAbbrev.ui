@@ -1,0 +1,246 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994 -- All Rights Reserved
+ *
+ * PROJECT:	  NIKE
+ * MODULE:	  abbreviated phrase.
+ * FILE:	  uiAbbrev.ui
+ *
+ * AUTHOR:  	  Lulu Lin, Aug 18, 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LL	8/18/94   	Initial version
+ *
+ * DESCRIPTION:	The file includes all the ui for abbreviated phrase 
+ * feature in NIKE project.
+ *
+ * 	$Id: uiAbbrev.ui,v 1.1 97/04/04 15:55:50 newdeal Exp $
+ *
+ ***********************************************************************/
+/* ---------------------------------------------------------------------------
+	Include files
+----------------------------------------------------------------------------*/
+
+/* ---------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+#if _ABBREVIATED_PHRASE
+
+start	PrimaryUI;
+WriteAbbrPhraseControl = GenInteraction {
+	moniker = 'P',"Abbreviated Phrase";
+	children = AbbrevPhraseObj,
+		   LoadSaveDataOptions,
+		   AbbrevPhraseModificationDialog;
+	visibility = dialog;
+	genAttributes = default +targetable;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_NO_WIDER_THAN_CHILDREN_REQUIRE
+	}
+}
+
+
+end	PrimaryUI;
+
+start	AbbrevPhraseUI;
+
+AbbrevPhraseModificationDialog = GenInteraction {
+	children = AbbreviationName, AbbreviationPhrase,
+		   AbbrevPhraseApplyButton;
+	type = properties;
+	visibility = dialog;
+	attributes = default +notUserInitiatable;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_INTERACTION_RELATED_PROPERTIES,
+		HINT_INTERACTION_SLOW_RESPONSE_PROPERTIES,
+		HINT_INTERACTION_REQUIRES_VALIDATION,
+		HINT_DEFAULT_FOCUS,
+		HINT_DEFAULT_TARGET,
+		HINT_INTERACTION_SINGLE_USAGE
+/*
+		ATTR_GEN_HELP_FILE	{
+			char "dbAbbr Help", 0
+		}
+ */
+	}
+}
+
+AbbrevPhraseApplyButton = GenTrigger {
+	moniker = "Apply";
+	action = MSG_WAL_ABBREV_MODIFIED, AbbrevPhraseObj;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			InteractionCommand IC_APPLY
+		},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+AbbrevPhraseObj	= WriteAbbrevList {
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS,
+				   ABBREV_PHRASE_LENGTH>
+			SpecHeight <>
+		}
+	}
+}
+
+AbbreviationName = GenText {
+	moniker = 'A',"Abbreviation:";
+	text = "";
+	maxLength = MAX_ABBREV_LENGTH;
+	textDisplayAttributes = default + singleLineText;
+	destination = AbbrevPhraseObj;
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		ATTR_GEN_TEXT_NO_SPACES,
+		ATTR_GEN_TEXT_ALPHA_NUMERIC
+	}
+}
+
+AbbreviationPhrase = GenText {
+	moniker = 'P',"Phrase:";
+	text = "";
+	maxLength = MAX_PHRASE_LENGTH;
+	destination = AbbrevPhraseObj;
+	hints = {
+		ATTR_GEN_TEXT_ALLOW_SPACES
+	}
+}
+
+LoadSaveDataOptions = GenInteraction {
+	children = AddAbbrevTrigger, EditAbbrevTrigger,
+		   DeleteAbbrevTrigger, DeleteAllTrigger,
+  		   LoadPhraseTrigger, SavePhraseTrigger,
+		   CloseAbbrevTrigger, HelpAbbrevTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+LoadPhraseTrigger = GenTrigger {
+	moniker = 'L', "Load";
+	action = MSG_WAL_LOAD_ABBREV_PHRASE, AbbrevPhraseObj;
+}
+
+SavePhraseTrigger = GenTrigger {
+	moniker = 'S', "Save";
+	genStates = default - enabled;
+	action = MSG_WAL_SAVE_ABBREV_PHRASE, AbbrevPhraseObj;
+}
+
+AddAbbrevTrigger = GenTrigger {
+	moniker = 'A', "Add";
+	action = MSG_WAL_ADD_ABBREV_PHRASE, AbbrevPhraseObj;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+EditAbbrevTrigger = GenTrigger {
+	moniker	= 'E', "Edit";
+	action = MSG_WAL_EDIT_ABBREV_PHRASE, AbbrevPhraseObj;
+	genStates = default - enabled;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+DeleteAbbrevTrigger = GenTrigger {
+	moniker	= 'D', "Delete";
+	genStates = default - enabled;
+	action = MSG_WAL_DELETE_ABBREV_PHRASE, AbbrevPhraseObj;
+}
+
+DeleteAllTrigger = GenTrigger {
+	moniker	= 't', "Delete All";
+	action = MSG_WAL_DELETE_ALL_ABBREV_PHRASE, AbbrevPhraseObj;
+}
+
+CloseAbbrevTrigger = GenTrigger {
+	moniker = 'C', "Close";
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			InteractionCommand IC_DISMISS
+		}
+	}
+}
+
+HelpAbbrevTrigger = GenTrigger {
+	genStates = default +enabled;
+	action = MSG_META_BRING_UP_HELP, "TO_SELF";
+	hints = {
+		HINT_SEEK_TITLE_BAR_RIGHT,
+		HINT_CENTER_MONIKER,
+		ATTR_GEN_DEFAULT_MONIKER {
+			GenDefaultMonikerType GDMT_HELP_PRIMARY
+		},
+		ATTR_GEN_HELP_CONTEXT	{
+			char "dbAbbrHelp", 0
+		}
+	}
+}
+
+
+/* added this trigger just for now... need to work on these features */
+
+WriteExpandControl = GenTrigger {
+	moniker = 'E',"Expand Abbreviation";
+	action = MSG_WRITE_PROCESS_EXPAND_CURRENT_ABBREV, process;
+ 	kbdAccelerator = control 'x'; 
+}
+
+visMoniker AddAbbrevMoniker = "Add Abbreviation";
+visMoniker EditAbbrevMoniker = "Edit Abbreviation";
+
+end	AbbrevPhraseUI;
+
+start	Strings, data;
+/* chunk	AbbrevFileName = "ABBREV"; */
+
+chunk	DeleteAllWarningStr = "Are you sure you want to delete all the phrases in the current abbreviated phrase database?";
+
+chunk	ExistInMemoryStr = "An abbreviated phrase database has already been loaded.  Do you want to overwrite this database?";
+
+chunk	InsertDiskStr 	= "Insert disk with your abbreviated phrase database and try the operation again.";
+
+chunk	ExistInDiskStr 	= "An abbreviated phrase database already exists on the disk in the drive.  Do you want to overwrite this database?";
+
+chunk	DuplicateAbbrevStr 	= " A phrase with this abbreviation already exists.  Choose a different abbreviation and try the operation again.";
+
+chunk	AbbrevNotFoundStr 	= "No phrase was found for this abbreviation.  Check the abbreviation and try the operation again.";
+
+chunk	IncompleteEntryStr 	= "There is not enough information to create an abbreviated phrase.  Check that both the abbreviation and phrase fields are filled and try the operation again.";
+
+chunk	PhraseNotSaved 		= "There is not enough room on the disk to save the abbreviated phrase database.  Insert a different disk or delete files from the existing disk and try the operation again.";
+
+chunk 	InvalidFileFormatStr 	= "Could not load the abbreviated phrase database.  Check to ensure that the file format has not been changed and try the operation again.";
+
+chunk	NotEnoughMemoryStr 	= "There is not enough memory available to complete the operation.  To free up memory, close documents or applications that are not currently in use.";
+
+chunk	FileErrorStr 		= "Unable to complete the operation.  Try the operation again.";
+
+chunk	NoItemSelectedStr	= "You must first select an item to perform this operation.";
+
+chunk	PairLimitExceedStr	= "The abbreviated phrase database is full.  Delete some phrases or create a new database to save new items.";
+
+chunk	NoTextTargetToExpandStr = "There is no phrase near the cursor to expand.  Reposition the cursor and try the operation again.";
+
+chunk	FileNotFoundStr		= "No abbreviated phrase database was found.  Check the file name and try the operation again.";
+
+end	Strings;
+
+#endif	/* if _ABBREVIATED_PHRASE */
+
+
+

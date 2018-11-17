@@ -1,0 +1,191 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		heap.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines heap management structures and routines.
+
+	$Id: heap.def,v 1.1 97/04/04 14:24:22 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__Heap
+
+StartKernel
+
+global MemAlloc:appfar
+global MemReAlloc:far
+global MemFree:far
+global MemDiscard:far
+global MemGetInfo:far
+global MemModifyFlags:far
+global HandleModifyOwner:far
+global MemModifyOtherInfo:far
+global MemLock:far
+global MemUnlock:far
+global HandleP:far
+global HandleV:far
+global MemPLock:far
+global MemUnlockV:far
+global MemThreadGrab:appfar
+global MemThreadGrabNB:far
+global MemThreadRelease:appfar
+global MemDerefDS:far
+global MemDerefStackDS:far
+global MemDerefES:far
+global MemDerefStackES:far
+global MemOwner:appfar
+global MemAllocSetOwner:appfar
+global MemSegmentToHandle:far
+global MemInitRefCount:far
+global MemIncRefCount:far
+global MemDecRefCount:far
+
+global MemLockShared:far
+global MemLockExcl:far
+global MemUnlockShared:far
+
+MemUnlockExcl equ MemUnlockShared	; the operations are exactly the same,
+					;  believe it or not...
+global MemUpgradeSharedLock:far
+global MemDowngradeExclLock:far
+
+global MemLockFixedOrMovable:far
+global MemUnlockFixedOrMovable:far
+
+global LZGAllocCompressStack:far
+global LZGFreeCompressStack:far
+global LZGCompress:far
+global LZGUncompress:far
+global LZGGetUncompressedSize:far
+
+;------------------------------------------------------------------------------
+;		Constants for values to pass to heap routines
+;------------------------------------------------------------------------------
+
+;	Flags for block type
+
+HeapFlags	record
+	HF_FIXED:1		; Block won't ever move
+	HF_SHARABLE:1		; May be locked by other than owner
+	HF_DISCARDABLE:1	; May be discarded if space needed
+	HF_SWAPABLE:1		; May be swapped if space needed
+	HF_LMEM:1		; Managed by LMem module
+	HF_DEBUG:1		; Swat cares what happens to it -- DO NOT PASS
+				; THIS FLAG.  IT IS RESERVED FOR INTERNAL USE
+				; BY THE DEBUGGER
+	HF_DISCARDED:1		; Discarded and must be brought in fresh from
+				;  executable/resource file
+	HF_SWAPPED:1		; Swapped to memory or disk.
+HeapFlags	end
+
+;	Flags for allocation type
+
+HeapAllocFlags	record
+	HAF_ZERO_INIT:1		; Initialize new memory to 0
+	HAF_LOCK:1		; Return with block locked
+	HAF_NO_ERR:1		; Caller can't handle errors
+	HAF_UI:1		; If HAF_OBJECT_RESOURCE, set HM_otherInfo to
+				;  the handle of the UI as that's who's to
+				;  operate objects in the block
+	HAF_READ_ONLY:1		; Data in block will not/may not be modified
+	HAF_OBJECT_RESOURCE:1	; Block contains objects
+	HAF_CODE:1		; Block contains executable code
+	HAF_CONFORMING:1	; Block contains code that may be executed by
+				;  a less privileged entity
+HeapAllocFlags	end
+
+;	a few shortcuts for allocation flags
+
+	; standard block allocation flags
+HAF_STANDARD	=	0
+HAF_STANDARD_NO_ERR	=	mask HAF_NO_ERR
+
+	; allocation flags to allocate locked block
+HAF_STANDARD_LOCK	=	mask HAF_LOCK
+HAF_STANDARD_NO_ERR_LOCK =	mask HAF_NO_ERR or mask HAF_LOCK
+
+	; standard flags to allocate memory that does not change
+ALLOC_STATIC		=	mask HF_DISCARDABLE or mask HF_SWAPABLE
+ALLOC_STATIC_NO_ERR	=	(mask HAF_NO_ERR shl 8) or mask HF_DISCARDABLE or mask HF_SWAPABLE
+ALLOC_STATIC_LOCK	=	(mask HAF_LOCK shl 8) or ALLOC_STATIC
+ALLOC_STATIC_NO_ERR_LOCK =	(mask HAF_LOCK shl 8) or ALLOC_STATIC_NO_ERR
+
+	; standard flags to allocate memory that changes
+ALLOC_DYNAMIC		=	mask HF_SWAPABLE
+ALLOC_DYNAMIC_NO_ERR	=	(mask HAF_NO_ERR shl 8) or mask HF_SWAPABLE
+ALLOC_DYNAMIC_LOCK	=	(mask HAF_LOCK shl 8) or ALLOC_DYNAMIC
+ALLOC_DYNAMIC_NO_ERR_LOCK =	(mask HAF_LOCK shl 8) or ALLOC_DYNAMIC_NO_ERR
+
+	; standard flags to allocate fixed memory
+ALLOC_FIXED		=	mask HF_FIXED
+
+;
+;	Argument for MSG_PROCESS_MEM_FULL (cx)
+;
+HeapCongestion	etype	word
+    HC_SCRUBBING	enum HeapCongestion	; Heap is being scrubbed.
+						;  Might be a good idea to
+						;  free some things.
+						; ** Not currently used **
+    HC_CONGESTED	enum HeapCongestion	; Couldn't nuke enough
+						;  memory to satisfy the
+						;  heap scrubber.
+    HC_DESPERATE	enum HeapCongestion	; Heap is perilously close
+						;  to overflowing. Nuke stuff
+						;  *now*.
+
+;------------------------------------------------------------------------------
+;	Paramters to MemGetInfo
+;------------------------------------------------------------------------------
+
+MemGetInfoType	etype	word, 0, 2
+MGIT_SIZE			enum	MemGetInfoType
+MGIT_FLAGS_AND_LOCK_COUNT	enum	MemGetInfoType
+MGIT_OWNER_OR_VM_FILE_HANDLE	enum	MemGetInfoType
+MGIT_ADDRESS			enum	MemGetInfoType
+MGIT_OTHER_INFO			enum	MemGetInfoType
+MGIT_EXEC_THREAD		enum	MemGetInfoType
+
+;----------------------
+
+; C Interface routines
+
+global MEMALLOCSETOWNER:far
+global MEMREALLOC:far
+global MEMGETINFO:far
+global MEMMODIFYFLAGS:far
+global HANDLEMODIFYOWNER:far
+global MEMMODIFYOTHERINFO:far
+global MEMPTRTOHANDLE:far
+global MEMALLOC:far
+global MEMFREE:far
+global MEMDISCARD:far
+global MEMDEREF:far
+global MEMPLOCK:far
+global MEMUNLOCK:far
+global MEMOWNER:far
+global MEMUNLOCKV:far
+global MEMTHREADGRAB:far
+global MEMTHREADGRABNB:far
+global MEMTHREADRELEASE:far
+global HANDLEP:far
+global HANDLEV:far
+global MEMLOCK:far
+global MEMINITREFCOUNT:far
+global MEMINCREFCOUNT:far
+global MEMDECREFCOUNT:far
+global MEMLOCKFIXEDORMOVABLE:far
+global MEMUNLOCKFIXEDORMOVABLE:far
+global MEMLOCKSHARED:far
+global MEMLOCKEXCL:far
+global MEMUNLOCKSHARED:far
+global MEMUPGRADESHAREDLOCK:far
+global MEMDOWNGRADEEXCLLOCK:far
+
+EndKernel

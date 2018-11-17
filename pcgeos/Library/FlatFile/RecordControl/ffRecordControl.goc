@@ -1,0 +1,2080 @@
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		FlatFile/RecordControl
+FILE:		ffRecordControl.goc
+
+AUTHOR:		John D. Mitchell
+
+METHODS:
+
+Name				Description
+----				-----------
+MSG_GEN_CONTROL_GET_INFO	Provide the system with the information
+				necessary to manage the Record Control
+				Panel UI controller.
+MSG_GEN_CONTROL_UPDATE_UI	Update the display objects expressing the
+				state of the currently selected database.
+MSG_FFRCP_CREATE_NEW_RECORD	Create a 'new'/empty record.
+MSG_FFRCP_DELETE_CURRENT_RECORD	Nuke the current record.
+MSG_FFRCP_REVERT_CURRENT_RECORD		Restore the temporary record to the
+				unmodified state (i.e. reset it to the
+				pristine, default state (for new records)
+				or to the contents of the record that it
+				represents.
+MSG_FFRCP_SELECT_RECORD		Manage the timer for the Goto Record
+				gadget.
+MSG_FFRCP_GOTO_RECORD		Jump the current database record indicator
+				to the record specified by the Goto Record 
+				gadget through the select record message.
+MSG_FFRCP_GOTO_FIRST_RECORD	Jump the current database record indicator
+				to the first record in the database.
+MSG_FFRCP_GOTO_PREVIOUS_RECORD	Jump the current database record indicator
+				to the record preceding the current record.
+MSG_FFRCP_GOTO_NEXT_RECORD	Jump the current database record indicator
+				to the record following the current record.
+MSG_FFRCP_GOTO_LAST_RECORD	Jump the current database record indicator
+				to the last record in the database.
+
+FUNCTIONS:
+
+Scope	Name				Description
+-----	----				-----------
+Int	FFRCPSendRecordControlRequest	Send the specifid record control
+					request to the database for
+					processing.
+Int	FFRCPUpdateDisplay		Update the Record Control Panel UI
+					objects in the given resource
+					according to the given featues
+					flags.
+Int	FFRCPUpdateCountDisplay		Update the record count portion of
+					the Record Control Panel's display.
+Int	FFRCPUpdateNavigationDisplay	Update the navigation portion of
+					the Record Control Panel's display.
+Int	FFRCPUpdateGotoDisplay		Update the goto record portion of
+					the Record Control Panel's display.
+Int	FFRCPUpdateReplyDisplay		Update the reply bar portion of the
+					Record Control Panel's display.
+Int	ECCheckRecordCountArguments	Validates the given current record
+					index and total record count.
+Int	ECCheckRecordControlStatusFlags	Validates the given status message
+					block for invalid status flags.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.06.30	Initial version.
+	JDM	92.08.20	Updated to FFRecordControlStatusFlags.
+	JDM	92.10.01	Updated code to nicer style conventions.
+
+DESCRIPTION:
+	This file contains the implementation of the FFRecordControlClass.
+
+	$Id: ffRecordControl.goc,v 1.1 97/04/04 18:03:32 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#include <geos.h>
+#include <geode.h>
+@include <stdapp.goh>			/* Standard PC/GEOS.	*/
+
+#include <geoworks.h>			/* GeoWorks.	*/
+@include <gcnlist.goh>
+#include <graphics.h>
+#include <gstring.h>
+@include <Objects/gInterC.goh>
+@include <Objects/gTextC.goh>
+#include <lmem.h>
+
+#include <Ansi/stdio.h>			/* Standard C.	*/
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
+#include <char.h>
+
+@include <ffile.goh>			/* FlatFile.	*/
+#include <ffFatal.h>
+@include <Objects/FlatFile/ffileC.goh>
+@include <Objects/FlatFile/ffRecC.goh>
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		External Objects
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/* Name of the Record Control Panel (RCP). */
+@extern	chunk	@FFRCPControllerName;
+
+/* Names of each of the features provided by the RCP. */
+@extern	chunk	@FFRCPMarkRecordsFeatureName;
+@extern	chunk	@FFRCPCurrentFeatureName;
+@extern chunk	@FFRCPNavigationFeatureName;
+@extern chunk	@FFRCPGotoFeatureName;
+@extern chunk	@FFRCPCreateFeatureName;
+@extern chunk	@FFRCPCommitFeatureName;
+@extern chunk	@FFRCPRevertFeatureName;
+@extern chunk	@FFRCPDeleteFeatureName;
+
+/* Current record display strings. */
+@extern	chunk	@FFRCPNewRecordString;
+@extern	chunk	@FFRCPOfRecordString;
+@extern	chunk	@FFRCPEmptyDBString;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Variables & Class Declarations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@classdecl	FFRecordControlClass;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Internal Types
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * UIObjectChunks --
+ *	Contains the chunk handles of Record Control Panel's UI objects.
+ */
+typedef struct
+{
+    ChunkHandle	currentRecord;
+    ChunkHandle	firstRecord;
+    ChunkHandle	prevRecord;
+    ChunkHandle	nextRecord;
+    ChunkHandle	lastRecord;
+    ChunkHandle	markRecord;
+    ChunkHandle	gotoRecord;
+    ChunkHandle	createRecord;
+    ChunkHandle	commitRecord;
+    ChunkHandle	revertRecord;
+    ChunkHandle	deleteRecord;
+} UIObjectChunks;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Internal Prototypes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal FFRCPSendRecordControlRequest
+			(optr oself,
+			 FFRecordControlInstance *pself,
+			 FFRecordControlRequest rcpRequest,
+			 word data);
+static void _pascal FFRCPUpdateDisplay
+			(WordFlags featureFlags,
+			 FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr);
+static void _pascal FFRCPUpdateCountDisplay
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr);
+static void _pascal FFRCPUpdateNavigationDisplay
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr);
+static void _pascal FFRCPUpdateGotoDisplay
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr);
+static void _pascal FFRCPUpdateReplyDisplay
+			(WordFlags featureFlags,
+			 FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr);
+static void 	    FFRCPUpdateMarkedTrigger
+    	    	    	(FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr);
+static void _pascal ECCheckRecordCountArguments
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp);
+static void _pascal ECCheckRecordControlStatusFlags
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp);
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                Features User Interface Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern	object @FFRCPBigTopGroup;
+@extern	object @FFRCPNavigationGroup;
+@extern	object @FFRCPFirstRecord;
+@extern	object @FFRCPCurrentRecord;
+@extern	object @FFRCPPreviousRecord;
+@extern	object @FFRCPNextRecord;
+@extern	object @FFRCPLastRecord;
+@extern	object @FFRCPMarkGroup;
+@extern	object @FFRCPMarkRecordList;
+@extern	object @FFRCPMarkRecordEntry;
+@extern	object @FFRCPGotoRecord;
+@extern	object @FFRCPGotoGadget;
+@extern	object @FFRCPCreateRecord;
+@extern	object @FFRCPCommitRecord;
+@extern	object @FFRCPRevertRecord;
+@extern	object @FFRCPDeleteRecord;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        Toolbox Features User Interface Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern object @FFRCPCurrentRecordTool;
+@extern object @FFRCPNavigationGroupTool;
+@extern object @FFRCPFirstRecordTool;
+@extern object @FFRCPPreviousRecordTool;
+@extern object @FFRCPNextRecordTool;
+@extern object @FFRCPLastRecordTool;
+@extern object @FFRCPGotoRecordTool;
+@extern object @FFRCPGotoGadgetTool;
+@extern object @FFRCPCreateRecordTool;
+@extern object @FFRCPCommitRecordTool;
+@extern object @FFRCPRevertRecordTool;
+@extern object @FFRCPDeleteRecordTool;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	FFRecordControlClass UI Controller Message Handlers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GEN_CONTROL_GET_INFO
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Describe the Record Control Panel UI controller.
+
+PASS: 		GenControlBuildInfo 	*info	= UI controller information
+						  structure.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Fill in the given UI controller information block describing the
+	Record Control Panl controller.
+
+REQUIRES:	???
+
+ASSERTS:	UI controller information structure given is completely
+		filled out with the appropriate data for this controller.
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:
+	MemLockFixedOrMovable return value unchecked.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_GEN_CONTROL_GET_INFO
+{
+    /* First, define static controller information.	*/
+
+#ifdef __HIGHC__
+_pragma_const_in_code;
+#endif
+
+    /* General change notification messages.	*/
+    static const GCNListType FFRCP_gcnList[] =
+	{
+	    {
+	    MANUFACTURER_ID_GEOWORKS,
+	    GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_RCP_STATUS_CHANGE
+	    }
+	};
+
+    /* Application custom GCN notification type.	*/
+    static const NotificationType FFRCP_notifyTypeList[] =
+	{
+	    {
+	    MANUFACTURER_ID_GEOWORKS,
+	    GWNT_FLAT_FILE_RCP_STATUS_CHANGE
+	    }
+	};
+
+    /* The Features UI children.	*/
+    static const GenControlChildInfo FFRCP_childList[] =
+	{
+	    {
+	    @FFRCPBigTopGroup,
+	    FFRCPF_NAVIGATION | FFRCPF_MARK_RECORDS,
+	    0
+	    },
+	    {
+	    @FFRCPGotoRecord,
+	    FFRCPF_GOTO_RECORD,
+	    0
+	    },
+	    {
+	    @FFRCPCreateRecord,
+	    FFRCPF_CREATE_NEW_RECORD,
+	    GCCF_IS_DIRECTLY_A_FEATURE
+	    },
+	    {
+	    @FFRCPCommitRecord,
+	    FFRCPF_COMMIT_CURRENT_RECORD,
+	    GCCF_IS_DIRECTLY_A_FEATURE
+	    },
+	    {
+	    @FFRCPRevertRecord,
+	    FFRCPF_REVERT_CURRENT_RECORD,
+	    GCCF_IS_DIRECTLY_A_FEATURE
+	    },
+	    {
+	    @FFRCPDeleteRecord,
+	    FFRCPF_DELETE_CURRENT_RECORD,
+	    GCCF_IS_DIRECTLY_A_FEATURE
+	    }
+	};
+
+    /*
+     * Controller features information.
+     * Careful, this table is in the *opposite* order of the bit-flags to
+     * which it corresponds.
+     */
+    static const GenControlFeaturesInfo FFRCP_featuresList[] =
+	{
+	    { @FFRCPDeleteRecord,	@FFRCPDeleteFeatureName,	0 },
+	    { @FFRCPRevertRecord,	@FFRCPRevertFeatureName,	0 },
+	    { @FFRCPCommitRecord,	@FFRCPCommitFeatureName,	0 },
+	    { @FFRCPCreateRecord,	@FFRCPCreateFeatureName,	0 },
+	    { @FFRCPGotoRecord,		@FFRCPGotoFeatureName,		0 },
+	    { @FFRCPNavigationGroup,	@FFRCPNavigationFeatureName,	0 },
+	    { @FFRCPMarkGroup,		@FFRCPMarkRecordsFeatureName,	0 },
+	};
+
+    /* The Toolbox UI children.	*/
+    static const GenControlChildInfo FFRCP_toolList[] =
+	{
+	    {
+	    @FFRCPCurrentRecordTool,
+	    FFRCPTF_CURRENT_RECORD,
+	    GCCF_IS_DIRECTLY_A_FEATURE
+	    },
+	    {
+	    @FFRCPNavigationGroupTool,
+	    FFRCPTF_NAVIGATION,
+	    0
+	    },
+	    {
+	    @FFRCPGotoRecordTool,
+	    FFRCPTF_GOTO_RECORD,
+	    0
+	    },
+	    {
+	    @FFRCPCreateRecordTool,
+	    FFRCPTF_CREATE_NEW_RECORD,
+	    GCCF_IS_DIRECTLY_A_FEATURE
+	    },
+	    {
+	    @FFRCPCommitRecordTool,
+	    FFRCPTF_COMMIT_CURRENT_RECORD,
+	    GCCF_IS_DIRECTLY_A_FEATURE
+	    },
+	    {
+	    @FFRCPRevertRecordTool,
+	    FFRCPF_REVERT_CURRENT_RECORD,
+	    GCCF_IS_DIRECTLY_A_FEATURE
+	    },
+	    {
+	    @FFRCPDeleteRecordTool,
+	    FFRCPTF_DELETE_CURRENT_RECORD,
+	    GCCF_IS_DIRECTLY_A_FEATURE
+	    }
+	};
+
+    /*
+     * Controller toolbox features information.
+     * Careful, this table is in the *opposite* order of the record which
+     * it corresponds to.
+     */
+    static const GenControlFeaturesInfo FFRCP_toolboxFeaturesList[] =
+	{
+	    { @FFRCPDeleteRecordTool,	@FFRCPDeleteFeatureName,	0 },
+	    { @FFRCPRevertRecordTool,	@FFRCPRevertFeatureName,	0 },
+	    { @FFRCPCommitRecordTool,	@FFRCPCommitFeatureName,	0 },
+	    { @FFRCPCreateRecordTool,	@FFRCPCreateFeatureName,	0 },
+	    { @FFRCPGotoRecordTool,	@FFRCPGotoFeatureName,		0 },
+	    { @FFRCPNavigationGroupTool, @FFRCPNavigationFeatureName,	0 },
+	    { @FFRCPCurrentRecordTool,	@FFRCPCurrentFeatureName,	0 }
+	};
+
+    /*
+     * The UI controller information structure.
+     * Note that "##" denotes fields filled in at runtime.
+     */
+    static const GenControlBuildInfo FFRCP_dupInfo =
+	{
+	0,				/* GCBI_flags		*/
+	NULL,				/* GCBI_initFileKey	*/
+	FFRCP_gcnList,			/* GCBI_gcnList		*/
+	ARRAY_LEN (FFRCP_gcnList,GCNListType),	/* GCBI_gcnCount	*/
+	FFRCP_notifyTypeList,		/* GCBI_notificationList	*/
+	ARRAY_LEN (FFRCP_notifyTypeList, NotificationType),
+					/* GCBI_notificationCount	*/
+	@FFRCPControllerName,		/* GCBI_controllerName	*/
+/* ## */NullHandle,			/* GCBI_dupBlock	*/
+	FFRCP_childList,		/* GCBI_childList	*/
+	ARRAY_LEN (FFRCP_childList, GenControlChildInfo),
+					/* GCBI_childCount	*/
+	FFRCP_featuresList,		/* GCBI_featuresList	*/
+	ARRAY_LEN (FFRCP_featuresList, GenControlFeaturesInfo),
+					/* GCBI_featuresCount	*/
+
+	FFRCP_DEFAULT_FEATURES,		/* GCBI_features	*/
+/* ## */NullHandle,			/* GCBI_toolBlock	*/
+	FFRCP_toolList,			/* GCBI_toolList	*/
+	ARRAY_LEN (FFRCP_toolList, GenControlChildInfo),
+					/* GCBI_toolCount	*/
+	FFRCP_toolboxFeaturesList,	/* GCBI_toolFeaturesList	*/
+	ARRAY_LEN (FFRCP_toolboxFeaturesList, GenControlFeaturesInfo),
+					/* GCBI_toolFeaturesCount	*/
+	FFRCP_DEFAULT_TOOLBOX_FEATURES,	/* GCBI_toolFeatures	*/
+	"dbRCP"	    	    	    	/* GCBI_helpContext 	*/
+	};
+
+#ifdef __HIGHC__
+_pragma_end_const_in_code;
+#endif
+
+    /*
+     * Copy our structure which contains most of the correct
+     * fields (everything that can be correct given compiler limitations).
+     */
+    memcpy (info, MemLockFixedOrMovable (&FFRCP_dupInfo),
+	    sizeof (GenControlBuildInfo));
+    MemUnlockFixedOrMovable (&FFRCP_dupInfo);
+
+    /* Fill in the rest of the fields by hand.	*/
+    info->GCBI_dupBlock = OptrToHandle (@FFRCPCurrentRecord);
+    info->GCBI_toolBlock = OptrToHandle (@FFRCPCurrentRecordTool);
+}	/* End of MSG_GEN_CONTROL_GET_INFO.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GEN_CONTROL_UPDATE_UI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Update the Record Control Panel UI controller.
+
+PASS: 		MemHandle	toolBlock	= Handle of block
+						  containing tools.
+		MemHandle	childBlock	= Handle of block
+						  containing UI children.
+		WordFlags	toolboxFeatures	= Toolbox features flags.
+		WordFlags	features	= Controller features
+						  flags.
+		MemHandle	data		= Handle of block
+						  containing the data given
+						  to MSG_META_NOTIFIY_...
+						  ...WITH_DATA_BLOCK.
+		word		changeID	= GCN type.
+		ManufacturerID	manufID		= ID of manufacturer of the
+						  notify message.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Extract the data out of the given data block.
+	Update the regular features (if necessary).
+	Update the toolbox features (if necessary).
+
+REQUIRES:	Nothing is assumed about the state of the controllers UI
+		objects.
+
+ASSERTS:	The controller's UI objects corresponding to the given
+		features are in a state consistent with the given state of
+		the database.
+
+CHECKS:		Validate the notification.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.09	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_GEN_CONTROL_UPDATE_UI
+{
+    FFRecordControlStatusMessageBlock	*ffrcpsmbp;
+    FFRecordControlStatusMessageBlock	statusBlock;
+    UIObjectChunks	objChunks;
+
+#if ERROR_CHECK
+
+    /* Is this notification for us?	*/
+    if ((MANUFACTURER_ID_GEOWORKS != manufID) ||
+	(GWNT_FLAT_FILE_RCP_STATUS_CHANGE != changeID))
+	{
+	EC_ERROR (RCP_INVALID_CHANGE_ID_IN_UPDATE_UI);
+	}
+
+#endif
+
+    /* Get access to the data block.	*/
+    ffrcpsmbp = MemLock (data);
+
+    /* Extract the information out of the data block.	*/
+    statusBlock = *ffrcpsmbp;
+
+    /* Get rid of the data block.	*/
+    MemUnlock (data);
+
+    /* Update the 'features' UI.	*/
+    if (features)
+	{
+	/* First, get the chunk handles to the features UI objects.	*/
+	objChunks.currentRecord	= OptrToChunk (@FFRCPCurrentRecord);
+	objChunks.firstRecord	= OptrToChunk (@FFRCPFirstRecord);
+	objChunks.prevRecord	= OptrToChunk (@FFRCPPreviousRecord);
+	objChunks.nextRecord	= OptrToChunk (@FFRCPNextRecord);
+	objChunks.lastRecord	= OptrToChunk (@FFRCPLastRecord);
+	objChunks.markRecord	= OptrToChunk (@FFRCPMarkRecordList);
+	objChunks.gotoRecord	= OptrToChunk (@FFRCPGotoGadget);
+	objChunks.createRecord	= OptrToChunk (@FFRCPCreateRecord);
+	objChunks.commitRecord	= OptrToChunk (@FFRCPCommitRecord);
+	objChunks.revertRecord	= OptrToChunk (@FFRCPRevertRecord);
+	objChunks.deleteRecord	= OptrToChunk (@FFRCPDeleteRecord);
+
+	/* Update 'em!	*/
+	FFRCPUpdateDisplay (features, &statusBlock,
+			    childBlock, &objChunks);
+	}	/* End of if features.	*/
+
+    /* Update the toolbox features UI.	*/
+    if (toolboxFeatures)
+	{
+	/* First, get the chunk handles to the features UI objects.	*/
+	objChunks.currentRecord	= OptrToChunk (@FFRCPCurrentRecordTool);
+	objChunks.firstRecord	= OptrToChunk (@FFRCPFirstRecordTool);
+	objChunks.prevRecord	= OptrToChunk (@FFRCPPreviousRecordTool);
+	objChunks.nextRecord	= OptrToChunk (@FFRCPNextRecordTool);
+	objChunks.lastRecord	= OptrToChunk (@FFRCPLastRecordTool);
+	objChunks.markRecord	= OptrToChunk (@FFRCPMarkRecordList);
+	objChunks.gotoRecord	= OptrToChunk (@FFRCPGotoGadgetTool);
+	objChunks.createRecord	= OptrToChunk (@FFRCPCreateRecordTool);
+	objChunks.commitRecord	= OptrToChunk (@FFRCPCommitRecordTool);
+	objChunks.revertRecord	= OptrToChunk (@FFRCPRevertRecordTool);
+	objChunks.deleteRecord	= OptrToChunk (@FFRCPDeleteRecordTool);
+
+	/* Update 'em!	*/
+	FFRCPUpdateDisplay (toolboxFeatures, &statusBlock,
+			    toolBlock, &objChunks);
+	}	/* End of if toolbox features.	*/
+}	/* End of MSG_GEN_CONTROL_UPDATE_UI.	*/
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_FUP_KBD_CHAR for FFRecordControlClass
+ *
+ * DESCRIPTION:	We intercept this message to determine if we need to
+ *	    	do some sort of keyboard shortcut fun.  Returns a TRUE
+ *	    	if we handle the shortcut.
+ *
+ * PARAMETERS:	Boolean MSG_META_FUP_KBD_CHAR(
+ *	    	    word character,
+ *	    	    word flags,
+ *	    	    word state);
+ *	
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/24/93		Initial version
+ *
+ ***********************************************************************/
+@method FFRecordControlClass, MSG_META_FUP_KBD_CHAR
+{
+    ShortcutCode  shortcut;
+    KeyboardShortcut shortcutTable[] = {
+	FF_SHORTCUT_TABLE
+     };
+#define	NUM_TABLE_SHORTCUTS (sizeof(shortcutTable) / sizeof(KeyboardShortcut))
+
+    if (!((byte) flags & CF_RELEASE)) {
+	/*
+	 * The key was pressed.  Check to see if this is a key we're
+	 * interested in.
+	 */
+	shortcut = FlowCheckKbdShortcut(shortcutTable, NUM_TABLE_SHORTCUTS,
+					character, flags, state);
+	if (shortcut < 0) {
+	    /*
+	     * No record navigation was necessary.  Let the superclass
+	     * deal with it.
+	     */
+	    return @callsuper();
+	} else switch (shortcut) {
+	    case SC_NEW_RECORD:
+	    case SC_NEW_RECORD_2:
+	    	FFRCPSendRecordControlRequest (oself, pself,
+					       FFRCR_CREATE_NEW_RECORD, 0);
+	    	break;
+
+	    case SC_PREVIOUS_RECORD:
+		FFRCPSendRecordControlRequest (oself, pself,
+					       FFRCR_GOTO_PREVIOUS_RECORD, 0);
+		break;
+
+	    case SC_NEXT_RECORD:
+		FFRCPSendRecordControlRequest (oself, pself,
+					       FFRCR_GOTO_NEXT_RECORD, 0);
+		break;
+
+	    case SC_FIRST_RECORD:
+		FFRCPSendRecordControlRequest (oself, pself,
+					       FFRCR_GOTO_FIRST_RECORD, 0);
+		break;
+
+	    case SC_LAST_RECORD:
+		FFRCPSendRecordControlRequest (oself, pself,
+					       FFRCR_GOTO_LAST_RECORD, 0);
+		break;
+
+	    case SC_MARK_RECORD:
+		if (@call OptrToChunk(@FFRCPMarkRecordList)::
+		    MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(1)) {
+		    FFRCPSendRecordControlRequest(oself, pself,
+						FFRCR_UNMARK_CURRENT_RECORD, 0);
+		} else {
+		    FFRCPSendRecordControlRequest(oself, pself,
+						  FFRCR_MARK_CURRENT_RECORD, 0);
+		}
+		break;
+
+	    case SC_COMMIT_RECORD:
+		FFRCPSendRecordControlRequest (oself, pself,
+					       FFRCR_COMMIT_CURRENT_RECORD, 0);
+		break;
+
+	    default:
+	    	/*
+		 * Not a shortcut we can handle here.  Let the superclass
+		 * deal with it.
+		 */
+	    	return @callsuper();
+	}
+    }
+
+    /*
+     * We handled it.  Leave.
+     */
+    return TRUE;
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_SELECT_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Initiate the changing of the currently displayed record to
+		the user's choice.
+
+PASS: 		WWFixedAsDWord		value	= Current value of the Goto
+						  Record GenValue.
+		GenValueStateFlags	stateFlags = Current status of the
+						  Goto Record GenValue.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Nuke any outstanding current timer.
+	Start a one-shot, event timer.  This will trigger off the handler
+	that actually performs the current record movement.
+
+REQUIRES:	Self.timerHandle non-zero iff a timer is running.
+		If Self.timerHandle non-zero then
+			Self.timerHandle assumed to be the TimerHandle of
+			the currently running timer.
+			Self.timerID assumed to be the timer identifier of
+			the currently running timer.
+
+ASSERTS:	Self.timerHandle and Self.timerID set appropriately for the
+		current timer. 
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.01	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_SELECT_RECORD
+{
+    /* Is there a timer currently running?	*/
+    if (pself->timerHandle) {
+	/*
+	 * Timer running, so nuke it.
+	 */
+	TimerStop(pself->timerHandle, pself->timerID);
+	pself->timerHandle = 0;
+    }
+
+    /*
+     * If we're jumping to record zero, ignore the request, since
+     * "create new record" has already been applied.
+     */
+    if (value == 0) {
+	return;
+    }
+
+    /*
+     * Start up a timer that will invoke the handler that actually changes
+     * the current record to that specified in the Goto Record gadget.
+     * Save the value of the request for the change record handler
+     * (remember to correct for the zero-based index).
+     */
+     pself->timerGotoRecordNumber = IntegerOf (value) - 1;
+     pself->timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself,
+				     FFRCP_SELECT_RECORD_TIMER_TICKS,
+				     MSG_FFRCP_GOTO_RECORD, 0,
+				     &(pself->timerID));
+}	/* End of MSG_FFRCP_SELECT_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_GOTO_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Make the record specified by the Goto Record gadget the
+		current record in the database.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the database to make the record specified by the Goto
+	Record gadget the current record in the database.
+
+REQUIRES:	Self.timerGotoRecordNumber == Database record to display.
+
+ASSERTS:	Self.timerGotoRecordNumber == 0.
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.14	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_GOTO_RECORD
+{
+    /*
+     * Instruct the database to make the specified record the current
+     * record.
+     */
+    FFRCPSendRecordControlRequest (oself, pself, FFRCR_GOTO_RECORD,
+				   pself->timerGotoRecordNumber);
+
+    /*
+     * Let the Goto Record gadget handler know that it needn't turn this
+     * timer off.
+     */
+    pself = ObjDerefGen (oself);
+    pself->timerHandle = 0;
+}	/* End of MSG_FFRCP_GOTO_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_JUMP_TO_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Handle incrementing/decrementing the Goto Record gadget
+		when currently editing a "new" record.
+
+PASS: 		FFRCPJumpType	jumpType	= Action to perform.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			???
+
+PSEUDO CODE/STRATEGY:	???
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jeremy	10/30/92	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_JUMP_TO_RECORD
+{
+    FFRecordControlRequest rcpRequest;
+
+    switch (jumpType)
+	{
+	case FFRCPV_FIRST_RECORD:
+	    rcpRequest = FFRCR_GOTO_FIRST_RECORD;
+	    break;
+
+	case FFRCPV_LAST_RECORD:
+	    /* Fall through.	*/
+
+	default:
+	    rcpRequest = FFRCR_GOTO_LAST_RECORD;
+	    break;
+	}
+
+    /*
+     * Attempt to jump to the first or last record.
+     */
+    FFRCPSendRecordControlRequest (oself, pself, rcpRequest, 0);
+}	/* End of MSG_FFRCP_JUMP_TO_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_GOTO_FIRST_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Make the first record in the database the current record.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the database to make the first record the current record.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.17	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_GOTO_FIRST_RECORD
+{
+    /* Instruct the database to make the first record the current one.	*/
+    FFRCPSendRecordControlRequest (oself, pself,
+				   FFRCR_GOTO_FIRST_RECORD, 0);
+}	/* End of MSG_FFRCP_GOTO_FIRST_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_GOTO_PREVIOUS_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Make the record preceding the current record in the
+		database the current record. 
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the database to make the preceding record the current
+	record.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.17	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_GOTO_PREVIOUS_RECORD
+{
+    /*
+     * Instruct the database to make the preceding record the current
+     * record.
+     */
+    FFRCPSendRecordControlRequest (oself, pself,
+				   FFRCR_GOTO_PREVIOUS_RECORD, 0);
+}	/* End of MSG_FFRCP_GOTO_PREVIOUS_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_GOTO_NEXT_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Make the record following the current record in the
+		database the current record.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the database to make the following record the current
+	record. 
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.17	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_GOTO_NEXT_RECORD
+{
+    /*
+     * Instruct the database to make the preceding record the current
+     * record.
+     */
+    FFRCPSendRecordControlRequest (oself, pself,
+				   FFRCR_GOTO_NEXT_RECORD, 0);
+}	/* End of MSG_FFRCP_GOTO_NEXT_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_GOTO_LAST_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Make the last record in the database the current record.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the database to make the last record the current record.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.17	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_GOTO_LAST_RECORD
+{
+    /* Instruct the database to make the last record the current one.	*/
+    FFRCPSendRecordControlRequest (oself, pself,
+				   FFRCR_GOTO_LAST_RECORD, 0);
+}	/* End of MSG_FFRCP_GOTO_LAST_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_CREATE_NEW_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Create a 'new'/empty record in the database.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the database to create a new record.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jeremy	5/21/92		Initial version.
+	JDM	92.07.01	Modified for controller.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method FFRecordControlClass, MSG_FFRCP_CREATE_NEW_RECORD
+{
+    /* Instruct the database to create a new record.	*/
+    FFRCPSendRecordControlRequest (oself, pself,
+				   FFRCR_CREATE_NEW_RECORD, 0);
+}	/* End of MSG_FFRCP_CREATE_NEW_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_COMMIT_CURRENT_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Commit the current record from the database.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the database to commit the current record (if any).
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.15	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_COMMIT_CURRENT_RECORD
+{
+    /* Instruct the database to commit the current record.	*/
+    FFRCPSendRecordControlRequest (oself, pself,
+				   FFRCR_COMMIT_CURRENT_RECORD, 0);
+}	/* End of MSG_FFRCP_COMMIT_CURRENT_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_REVERT_CURRENT_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Revert the temporary database row to the contents stored in
+		the database.  Clear out all fields iff a new record.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the database to revert the contents of the current record
+	to their last saved state.  Clear out and reset any defaults if
+	it's a new record.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.15	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_REVERT_CURRENT_RECORD
+{
+    /* Instruct the database to delete the current record.	*/
+    FFRCPSendRecordControlRequest (oself, pself,
+				   FFRCR_REVERT_CURRENT_RECORD, 0);
+}	/* End of MSG_FFRCP_REVERT_CURRENT_RECORD.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_FFRCP_DELETE_CURRENT_RECORD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Delete the current record from the database.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the database to delete the current record (if any).
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.15	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFRecordControlClass, MSG_FFRCP_DELETE_CURRENT_RECORD
+{
+    /* Instruct the database to delete the current record.	*/
+    FFRCPSendRecordControlRequest (oself, pself,
+				   FFRCR_DELETE_CURRENT_RECORD, 0);
+}	/* End of MSG_FFRCP_DELETE_CURRENT_RECORD.	*/
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFRCP_SET_RECORD_MARKING for FFRecordControlClass
+ *
+ * DESCRIPTION:	This message sets the marking information for the current
+ *	    	record.
+ *
+ * PARAMETERS:
+ *	void (word selectedBooleans,
+ *	      word indeterminateBooleans,
+ *	      word modifiedBooleans)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	1/ 9/93		Initial version
+ *
+ ***********************************************************************/
+@method FFRecordControlClass, MSG_FFRCP_SET_RECORD_MARKING
+{
+    /*
+     * Since we only have one item in the group, just see if there is
+     * anything selected to determine if the field is marked.
+     */
+    if (selectedBooleans) {
+	FFRCPSendRecordControlRequest(oself, pself,
+				      FFRCR_MARK_CURRENT_RECORD, 0);
+    } else {
+	FFRCPSendRecordControlRequest(oself, pself,
+				      FFRCR_UNMARK_CURRENT_RECORD, 0);
+    }	
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Utility Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FFRCPSendRecordControlRequest
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Send the specified FFRecordControlRequest off to the
+		current database.
+
+CALLED BY:	MSG_FFRCP_CREATE_NEW_RECORD,
+		MSG_FFRCP_COMMIT_CURRENT_RECORD,
+		MSG_FFRCP_DELETE_CURRENT_RECORD,
+		MSG_FFRCP_REVERT_CURRENT_RECORD,
+		MSG_FFRCP_GOTO_RECORD,
+		MSG_FFRCP_GOTO_FIRST_RECORD,
+		MSG_FFRCP_GOTO_PREVIOUS_RECORD,
+		MSG_FFRCP_GOTO_NEXT_RECORD,
+		MSG_FFRCP_GOTO_LAST_RECORD.
+
+PASS:		optr	oself			= Object pointer to the
+						  calling instance of the
+						  FFRecordControlClass.
+		FFRecordControlInstance	*pself	= Dereferenced 'oself'.
+		FFRecordControlRequest	rcpRequest	= Action to request
+						  of the database.
+		word	data			= Optional data to pass
+						  along to the database.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Build and dispatch a record control message with the given data to
+	the database.
+
+REQUIRES:	????
+
+ASSERTS:	????
+
+CHECKS:		Validates the FFRecordControlRequest.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.17	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal FFRCPSendRecordControlRequest
+			(optr oself,
+			 FFRecordControlInstance *pself,
+			 FFRecordControlRequest rcpRequest,
+			 word data)
+{
+    Message	msg;
+
+#if ERROR_CHECK
+
+    /* Validate the request.	*/
+    if ((FFRCR_NULL_REQUEST >= rcpRequest) ||
+	(FFRCR_INVALID_REQUEST <= rcpRequest))
+	{
+	EC_ERROR (INVALID_RECORD_CONTROL_REQUEST);
+	}
+
+#endif
+
+    /* Insert the Temporary record into the database proper.	*/
+    msg = @record FlatFileDatabaseClass::MSG_FFD_RECORD_CONTROL
+			(rcpRequest, data);
+    @send oself::MSG_GEN_OUTPUT_ACTION (msg, pself->GCI_output);
+}	/* End of FFRCPSendRecordControlRequest().	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FFRCPUpdateDisplay
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Update the Record Control Panel UI controller's user
+		interface objects.
+
+CALLED BY:	Internal --	MSG_GEN_CONTROL_UPDATE_UI.
+
+PASS:		WordFlags	featureFlags	= Record Control Panel
+						  features (regular or
+						  toolbox) to update.
+		FFRecordControlStatusMessageBlock	*ffrcpsmbp
+						= Notification block.
+		MemHandle	childBlock	= Handle to block which
+						  contains the UI children
+						  to update.
+		UIObjectChunks	*chunksPtr	= Pointer to block which
+						  contains the chunk
+						  handles for each of the
+						  UI children to update.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Check each of the Record Control Panel flags against the feature
+	flags given and update the appropriate UI objects.
+
+REQUIRES:	The toolbox feature flags *must* be exactly the same as the
+		regular feature flags!
+
+ASSERTS:	The Record Control Panel's UI is updated as per the given
+		arguments.
+
+CHECKS:		Validates the record count values.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.20	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal FFRCPUpdateDisplay
+			(WordFlags featureFlags,
+			 FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr)
+{
+#if ERROR_CHECK
+
+    /* Go validate the arguments.	*/
+    ECCheckRecordCountArguments (ffrcpsmbp);
+    ECCheckRecordControlStatusFlags (ffrcpsmbp);
+
+#endif
+
+    /*
+     * If all we're doing is changing the auto-marking feature,
+     * don't do anything but  update the marked trigger.
+     */
+
+    if (! FFRCPSMB_IS_CHANGING_AUTO_MARKING(*ffrcpsmbp)) {
+	
+	/* Display navigation controls?	*/
+	if (featureFlags & FFRCPF_NAVIGATION) {
+	    FFRCPUpdateNavigationDisplay (ffrcpsmbp, childBlock, chunksPtr);
+	}
+
+	/* Display the Goto record thingy?	*/
+	if (featureFlags & FFRCPF_GOTO_RECORD) {
+	    FFRCPUpdateGotoDisplay (ffrcpsmbp, childBlock, chunksPtr);
+	    FFRCPUpdateCountDisplay (ffrcpsmbp, childBlock, chunksPtr); 
+	}
+
+	/* Go update the reply objects.	*/
+	FFRCPUpdateReplyDisplay (featureFlags, ffrcpsmbp,
+				 childBlock, chunksPtr);
+    }
+
+    /* Display the marked record trigger? */
+    if (featureFlags & FFRCPF_MARK_RECORDS) {
+	FFRCPUpdateMarkedTrigger(ffrcpsmbp, childBlock, chunksPtr);
+    }
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FFRCPUpdateCountDisplay
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Update the fields displaying the current and total number
+		of records in the current database in the Record Control
+		Panel UI controller.
+
+CALLED BY:	Internal --	FFRCOUpdateDisplay.
+
+PASS:		FFRecordControlStatusMessageBlock	*ffrcpsmbp
+					= Status notification block.
+		MemHandle	childBlock	= Handle to block which
+						  contains the UI children
+						  to update.
+		UIObjectChunks	*chunksPtr	= Pointer to block which
+						  contains the chunk
+						  handles for each of the
+						  UI children to update.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	If new record status state then
+		Tell the "Current record" spin gadget to say "New".
+	Otherwise,
+	    If we are currently viewing all records,
+		Build and display string of the form:
+			"of [total] {(check_mark)}".
+	    Otherwise, if we are currently viewing only marked records,
+		Build and display string of the form:
+			"of [total] (check_mark)".
+
+REQUIRES:	Nothing is assumed about the state of the count display
+		items.
+		All localizable strings used are assumed to be in the same
+		resource.
+
+ASSERTS:	Record count portions of the controller's display is
+		consistent with the given arguments.
+
+CHECKS:		Validates the arguments.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.02	Initial version.
+	JDM	92.08.20	Modified for FFRecordControlStatusFlags.
+	JDM	92.09.21	Modified for subsets.
+	jdashe	10/31/92    	Modified to make the dialogue box smaller.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal FFRCPUpdateCountDisplay
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr)
+{
+    TCHAR	caTempStr[FFRCP_CURRENT_RECORD_DISPLAY_STRING_SIZE + 1];
+    TCHAR	caOutputStr[FFRCP_CURRENT_RECORD_DISPLAY_STRING_SIZE + 1];
+    int		len;
+
+#if ERROR_CHECK
+
+    /* Validate the arguments.	*/
+    ECCheckRecordCountArguments (ffrcpsmbp);
+    ECCheckRecordControlStatusFlags (ffrcpsmbp);
+
+#endif
+
+    /*
+     * If there are no records, mention that we're in an empty database.
+     */
+    if (0 == ffrcpsmbp->numRecords)
+	{
+	MemLock (OptrToHandle (@FFRCPEmptyDBString));
+	strcpy (caOutputStr, LMemDeref (@FFRCPEmptyDBString));
+
+	/*
+	 * Get rid of the pesky string block.
+	 */
+	MemUnlock (OptrToHandle (@FFRCPEmptyDBString));
+	}
+    else
+	{
+	/*
+	 * Copy in the " of " string.
+	 * This string is assumed to contain both the leading and trailing
+	 * spacing.
+	 */
+	MemLock (OptrToHandle (@FFRCPOfRecordString));
+	strcpy (caOutputStr, LMemDeref (@FFRCPOfRecordString));
+	
+	/* Add in the total number of records part.	*/
+	sprintf (caTempStr, _TEXT("%d"), ffrcpsmbp->numRecords);
+	
+	/*
+	 * If we're currently displaying only marked records, add a
+	 * "[check-mark]" to the end of the string.
+	 */
+	if (FFRCPSMB_IS_DISPLAY_ONLY_MARKED (*ffrcpsmbp))
+	    {
+	    len = strlen (caTempStr);
+	    caTempStr [len++] = _TEXT(' ');
+	    caTempStr [len++] = _TEXT(' ');
+	    caTempStr [len++] = _TEXT('[');
+#ifdef DO_DBCS
+	    caTempStr [len++] = C_SQUARE_ROOT;		/* square root */
+#else
+	    caTempStr [len++] = C_ROOT;
+#endif
+	    caTempStr [len++] = _TEXT(']');
+	    caTempStr [len] = _TEXT('\0');
+	    }
+
+	strcat (caOutputStr, caTempStr);
+    
+	/* Get rid of the pesky string block.	*/
+	MemUnlock (OptrToHandle (@FFRCPOfRecordString));
+	}
+
+    /* Update the display.	*/
+    @call childBlock, chunksPtr->currentRecord::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR (caOutputStr, 0);
+}	/* End of FFRCPUpdateCountDisplay().	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FFRCPUpdateNavigationDisplay
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Update the record navigation buttons in the Record Control
+		Panel UI controller.
+
+CALLED BY:	Internal.
+
+PASS:		FFRecordControlStatusMessageBlock	*ffrcpsmbp
+					= Status notification block.
+		MemHandle	childBlock	= Handle to block which
+						  contains the UI children
+						  to update.
+		UIObjectChunks	*chunksPtr	= Pointer to block which
+						  contains the chunk
+						  handles for each of the
+						  UI children to update.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	If no records or the last attempted operation failed then
+		Disable all buttons.
+	Otherwise,
+		Figure out what to turn on/off:
+			Assume everything is on.
+			If working on a new record then
+				Turn off next and last.
+			If on the first record then
+				Turn off first and previous.
+			If on the last record then
+				Turn off next and last.
+
+REQUIRES:	Nothing is assumed about the prior state of the navigation
+		buttons.
+
+ASSERTS:	The navigation button state is consistent with the given
+		arguments.
+
+CHECKS:		Validates the arguments.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	anna	6/2/92	    	Initial version.
+	JDM	92.07.02	Modified for controller.
+	JDM	92.08.20	Modified for FFRecordControlStatusFlags.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal FFRCPUpdateNavigationDisplay
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr)
+{
+    optr	objectPtr;
+    Boolean	firstOn;
+    Boolean	prevOn;
+    Boolean	nextOn;
+    Boolean	lastOn;
+    word	curRecord;
+    word	numRecords;
+
+#if ERROR_CHECK
+
+    /* Go validate the arguments.	*/
+    ECCheckRecordCountArguments (ffrcpsmbp);
+    ECCheckRecordControlStatusFlags (ffrcpsmbp);
+
+#endif
+
+    /* Extract the heavily used information from the status block.	*/
+    curRecord = ffrcpsmbp->curRecord;
+    numRecords = ffrcpsmbp->numRecords;
+
+    /*
+     * No records in the database or did the last attempted operation
+     * fail?
+     */
+    if ((0 == numRecords) || (FFRCPSMB_IS_FAILED_OP (*ffrcpsmbp))) {
+	/*
+	 * Yep.  Turn everything off.
+	 */
+	firstOn = prevOn = nextOn = lastOn = FALSE;
+    } else {
+	/*
+	 * Nope.  Either nothing particular, a new record, and/or a
+	 * modified record.
+	 * Assume everything's on.
+	 */
+	firstOn = lastOn = TRUE;
+	nextOn = prevOn = FALSE;
+
+	/* New record?	*/
+	if (!FFRCPSMB_IS_NEW_RECORD (*ffrcpsmbp)) {
+	    if (curRecord != FFRCP_NEW_RECORD) {
+		/*
+		 * Not a new record.  Enable next and previous triggers.
+		 */
+		nextOn = prevOn = TRUE;
+	    }
+	}
+
+	/* First record?	*/
+	if (0 == curRecord) {
+	    firstOn = prevOn = FALSE;
+	}
+
+	/* Last record?	*/
+	if ((curRecord + 1) == numRecords) {
+	    nextOn = lastOn = FALSE;
+	}
+    }
+
+    /* Now light up or shut down each of the buttons appropriately.	*/
+    objectPtr = ConstructOptr (childBlock, chunksPtr->firstRecord);
+    if (firstOn)
+	@call objectPtr::MSG_GEN_SET_ENABLED (VUM_NOW);
+    else
+	@call objectPtr::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+
+    objectPtr = ConstructOptr (childBlock, chunksPtr->prevRecord);
+    if (prevOn)
+	@call objectPtr::MSG_GEN_SET_ENABLED (VUM_NOW);
+    else
+	@call objectPtr::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+
+    objectPtr = ConstructOptr (childBlock, chunksPtr->nextRecord);
+    if (nextOn)
+	@call objectPtr::MSG_GEN_SET_ENABLED (VUM_NOW);
+    else
+	@call objectPtr::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+
+    objectPtr = ConstructOptr (childBlock, chunksPtr->lastRecord);
+    if (lastOn)
+	@call objectPtr::MSG_GEN_SET_ENABLED (VUM_NOW);
+    else
+	@call objectPtr::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+}	/* End of FFRCPUpdateNavigationDisplay().	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FFRCPUpdateGotoDisplay
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Update the jump to a specific record display portion of the
+		Record Control Panel UI controller.
+
+CALLED BY:	Internal.
+
+PASS:		FFRecordControlStatusMessageBlock	*ffrcpsmbp
+					= Status notification block.
+		MemHandle	childBlock	= Handle to block which
+						  contains the UI children
+						  to update.
+		UIObjectChunks	*chunksPtr	= Pointer to block which
+						  contains the chunk
+						  handles for each of the
+						  UI children to update.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	If there are no records in the database or the last attempted
+	   operation failed then
+		Disable the goto record gadgetry.
+	Otherwise,
+		Activate the goto record gadgetry.
+	If editing a new record then
+		Indicate that this record will be the new last record.
+	Set the minimum and maximum values.
+	Set the Goto gadget to the current record value.
+
+REQUIRES:	Nothing is assumed about the prior state of the goto record
+		display items.
+
+ASSERTS:	The goto record state is consistent with the given
+		arguments.
+
+CHECKS:		Validates the arguments.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	anna	6/2/92	    	Initial version.
+	JDM	92.07.02	Modified for controller.
+	JDM	92.08.20	Modified for FFRecordControlStatusFlags.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal FFRCPUpdateGotoDisplay
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr)
+{
+    optr	objectPtr;
+    word	curRecord;
+    word	numRecords;
+
+#if ERROR_CHECK
+
+    /* Go validate the arguments.	*/
+    ECCheckRecordCountArguments (ffrcpsmbp);
+    ECCheckRecordControlStatusFlags (ffrcpsmbp);
+
+#endif
+
+    /* Extract heavily used information from the status block.	*/
+    curRecord = ffrcpsmbp->curRecord;
+    numRecords = ffrcpsmbp->numRecords;
+    objectPtr = ConstructOptr (childBlock, chunksPtr->gotoRecord);
+
+    /* Should we even be alive?	*/
+    if ((0 == numRecords) || (FFRCPSMB_IS_FAILED_OP (*ffrcpsmbp)))
+	{
+	/* Nope.  Lounge about.	*/
+	@call objectPtr::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	}
+    else
+	{
+	/* Yep.  Make ourself useful.	*/
+	@call objectPtr::MSG_GEN_SET_ENABLED (VUM_NOW);
+	}
+
+    /* Set the maximum value for the spin gadget.	*/
+    @call objectPtr::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(numRecords));
+
+    /*
+     * Set the Goto record gadget's current value.
+     * Remember to increment the current record value (to translate from a
+     * zero-based index).
+     */
+    if (FFRCPSMB_IS_NEW_RECORD(*ffrcpsmbp))
+	{
+	@call objectPtr::MSG_GEN_VALUE_SET_INTEGER_VALUE (0, FALSE);
+	}
+    else
+	{
+	@call objectPtr::MSG_GEN_VALUE_SET_INTEGER_VALUE
+			(curRecord + 1, FALSE);
+	}
+
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FFRCPUpdateReplyDisplay
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Update the Record Control Panel's Reply Bar UI.
+
+ 	    	We want all triggers to be set not enabled when
+		editing an unmodified new record.  If a new record
+		has been modified, enable all triggers except "revert."
+
+		If we're editing an unmodified existing record, enable
+		just "create new" and "delete."  Turn on all of them
+		if an existing record has been modified.
+		
+CALLED BY:	Internal -- FFRCPUpdateDisplay.
+
+PASS:		WordFlags	featureFlags	= Record Control Panel
+						  features (regular or
+						  toolbox) to update.
+		FFRecordControlStatusMessageBlock	*ffrcpsmbp
+						= Notification block.
+		MemHandle	childBlock	= Handle to block which
+						  contains the UI children
+						  to update.
+		UIObjectChunks	*chunksPtr	= Pointer to block which
+						  contains the chunk
+						  handles for each of the
+						  UI children to update.
+RETURN:		Void.
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.28	Initial version.
+	JDM	92.08.20	Modified for FFRecordControlStatusFlags.
+	jdashe	11/4/92	    	Changed behavior.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+static void _pascal
+FFRCPUpdateReplyDisplay(WordFlags featureFlags,
+			FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			MemHandle childBlock,
+			UIObjectChunks *chunksPtr)
+{
+    word	numRecords;
+    Message 	createRecordMsg,
+    	    	commitRecordMsg,
+    	    	revertRecordMsg,
+    	    	deleteRecordMsg;
+
+#if ERROR_CHECK
+
+    /* Go validate the arguments.	*/
+    ECCheckRecordCountArguments (ffrcpsmbp);
+    ECCheckRecordControlStatusFlags (ffrcpsmbp);
+
+#endif
+
+    /* Extract heavily used information from the status block.	*/
+    numRecords = ffrcpsmbp->numRecords;
+
+    /*
+     * Assume we'll be able to create a new record or delete
+     * the current record.
+     */
+    createRecordMsg = deleteRecordMsg = MSG_GEN_SET_ENABLED;
+    revertRecordMsg = commitRecordMsg = MSG_GEN_SET_NOT_ENABLED;
+
+    /* Except we can't delete when numRecords == 0, and user hasn't
+     * started entering new records yet.
+     * This should fix bug 26366. -Chung 9/22/93
+     */
+    if (!numRecords && !FFRCPSMB_IS_MODIFIED(*ffrcpsmbp))
+	deleteRecordMsg = MSG_GEN_SET_NOT_ENABLED;
+
+    /*
+     * If the last action failed or we're creating a new record that has
+     * not yet been modified, disable everything.
+     */
+    if (FFRCPSMB_IS_FAILED_OP(*ffrcpsmbp)   ||
+	(FFRCPSMB_IS_NEW_RECORD(*ffrcpsmbp) &&
+	 !FFRCPSMB_IS_MODIFIED(*ffrcpsmbp))) {
+	/*
+	 * Turn off the create/delete buttons, too.
+	 */
+	createRecordMsg = deleteRecordMsg = MSG_GEN_SET_NOT_ENABLED;
+    } else {
+	/*
+	 * Turn on specific triggers.
+	 *
+	 * Do we already have the maximum number of records?
+	 */
+	if (numRecords > MAX_NUM_RECORDS) {
+	    /* Yes.  No more records. */
+	    createRecordMsg = MSG_GEN_SET_NOT_ENABLED;
+	}
+
+	if (FFRCPSMB_IS_MODIFIED (*ffrcpsmbp)) {
+	    /*
+	     * Allow the user to commit the current record.
+	     */
+	    commitRecordMsg = MSG_GEN_SET_ENABLED;
+
+	    if (!FFRCPSMB_IS_NEW_RECORD_IGNORE_MARKING(*ffrcpsmbp)) {
+		/*
+		 * Allow the user to revert the current record if it is
+		 * NOT a new record.
+		 */
+		revertRecordMsg = MSG_GEN_SET_ENABLED;
+	    }
+	}
+    }
+
+    /*
+     * Send the notices.
+     */
+    if (featureFlags & FFRCPF_CREATE_NEW_RECORD) {
+	@send {ENABLE_DISABLE_PROTOTYPE}
+	    ConstructOptr(childBlock, chunksPtr->createRecord)::
+	    (createRecordMsg)(VUM_NOW);
+    }
+
+    if (featureFlags & FFRCPF_DELETE_CURRENT_RECORD) {
+	@send {ENABLE_DISABLE_PROTOTYPE}
+	    ConstructOptr(childBlock, chunksPtr->deleteRecord)::
+	    (deleteRecordMsg)(VUM_NOW);
+    }
+	
+    if (featureFlags & FFRCPF_REVERT_CURRENT_RECORD) {
+	@send {ENABLE_DISABLE_PROTOTYPE}
+	    ConstructOptr(childBlock, chunksPtr->revertRecord)::
+	    (revertRecordMsg)(VUM_NOW);
+    }
+
+    if (featureFlags & FFRCPF_COMMIT_CURRENT_RECORD) {
+	@send {ENABLE_DISABLE_PROTOTYPE}
+	    ConstructOptr(childBlock, chunksPtr->commitRecord)::
+	    (commitRecordMsg)(VUM_NOW);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFRCPUpdateMarkedTrigger
+ *
+ * DESCRIPTION:	This function sets the "marked record" trigger as appropriate
+ *	    	for the current record.
+ *
+ * PARAMETERS:	FFRecordControlStatusMessageBlock	*ffrcpsmbp
+ *					    	= Status notification block.
+ *		MemHandle	childBlock	= Handle to block which
+ *						  contains the UI children
+ *						  to update.
+ *		UIObjectChunks	*chunksPtr	= Pointer to block which
+ *						  contains the chunk
+ *						  handles for each of the
+ * 						  UI children to update.
+ * RETURN:	Void.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	1/ 9/93		Initial version
+ *
+ ***********************************************************************/
+void
+FFRCPUpdateMarkedTrigger(FFRecordControlStatusMessageBlock *ffrcpsmbp,
+			 MemHandle childBlock,
+			 UIObjectChunks *chunksPtr)
+{
+    word setBooleans, clearBooleans;
+    optr markTrigger;
+
+    markTrigger = ConstructOptr(childBlock, chunksPtr->markRecord);
+    
+    /*
+     * If we're changing the automatic marking feature, enable or disable
+     * the marking trigger.  Otherwise, set it or clear it as appropriate.
+     */
+    if (FFRCPSMB_IS_CHANGING_AUTO_MARKING(*ffrcpsmbp)) {
+	if (FFRCPSMB_IS_AUTO_MARKED(*ffrcpsmbp)) {
+	    @send markTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	} else {
+	    @send markTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	}
+    } else {
+
+	/*
+	 * If there are no records, and the user hasn't started entering
+	 * a new record yet, then keep the markTrigger disabled.
+	 * -Chung 9/22/93
+	 */
+	if (!ffrcpsmbp->numRecords && !FFRCPSMB_IS_MODIFIED(*ffrcpsmbp)) {
+	    @send markTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	} else {
+	    @send markTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	}
+
+	/*
+	 * Set the trigger to indicate whether we're marked or not.
+	 */
+	if (FFRCPSMB_IS_MARKED(*ffrcpsmbp)) {
+	    setBooleans = 1;
+	    clearBooleans = 0;
+	} else {
+	    setBooleans = 0;
+	    clearBooleans = 1;
+	}
+    
+	/*
+	 * Set the trigger as appropriate.
+	 */
+	@send markTrigger::
+	    MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(setBooleans, clearBooleans);
+    }
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ECCheckRecordCountArguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Validate the given record count arguments.
+
+CALLED BY:	Internal --
+			FFRCPUpdateCountDisplay,
+			FFRCPUpdateNavigationDisplay,
+			FFRCPUpdateGotoDisplay,
+			FFRCPUpdateReplyDisplay.
+
+PASS:		FFRecordControlStatusMessageBlock	*ffrcpsmbp
+					= Status notification block.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Check for invalid number of records.
+	Check for new record settings.
+	Check for current record in valid range.
+
+REQUIRES:	????
+
+ASSERTS:	Arguments consistent with either:  Initialize, new record,
+		or normal record settings.
+
+CHECKS:		Nothing but.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.02	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal ECCheckRecordCountArguments
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp)
+{
+    word	curRecord;
+    word	numRecords;
+
+    /*
+     * If we're simply changing the automatic marking flag, leave.
+     */
+    if (FFRCPSMB_IS_CHANGING_AUTO_MARKING(*ffrcpsmbp)) {
+	return;
+    }
+
+    /* Extract heavily used information from the status block.	*/
+    curRecord = ffrcpsmbp->curRecord;
+    numRecords = ffrcpsmbp->numRecords;
+
+    /* Validate the total number of records count.        */
+    if (MAX_NUM_RECORDS < numRecords)
+	{
+	EC_ERROR (RCP_INVALID_NUM_RECORDS);
+	}
+
+    /* Zero of Zero?	*/
+    if ((0 == curRecord) && (0 == numRecords))
+	return;
+
+    /* Validate the current record index. */
+    if ((FFRCP_NEW_RECORD != curRecord) && (curRecord >= numRecords))
+	{
+	EC_ERROR (RCP_CURRENT_GREATER_THAN_TOTAL_RECORDS);
+	}
+}	/* End of ECCheckRecordCountArguments().	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ECCheckRecordControlStatusFlags
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check for some patently silly status message block
+		settings.
+
+CALLED BY:	Internal --	
+
+PASS:		FFRecordControlStatusFlags	*ffrcpsmbp
+						= Status message block to
+						  validate.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Check for a clear status message block.
+	Check for a disable the Record Control Panel status message block
+	(should be intercepted and never actually sent to the controller).
+	Check for an unmarked record being displayed in show only marked
+	record mode.
+
+REQUIRES:	????
+
+ASSERTS:	The given status message block is *not* completely devoid
+		of information and does *not* specify that the Record
+		Control Panel should be completely disabled.
+
+CHECKS:		Nothing but.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.20	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal ECCheckRecordControlStatusFlags
+			(FFRecordControlStatusMessageBlock *ffrcpsmbp)
+{
+    /*
+     * If we're just turning auto marking on or off, leave.
+     */
+    if (FFRCPSMB_IS_CHANGING_AUTO_MARKING(*ffrcpsmbp)) {
+	return;
+    }
+
+    /* Empty or disable status blocks?	*/
+    if ((FFRCPSMB_IS_CLEAR (*ffrcpsmbp)) ||
+	(FFRCPSMB_IS_DISABLE_RCP (*ffrcpsmbp)))
+	{
+	/* Ahh!!!  Die horribly.	*/
+	EC_ERROR (RCP_INVALID_STATUS_MESSAGE_FLAGS);
+	}
+}	/* End of ECCheckRecordControlStatusFlags().	*/

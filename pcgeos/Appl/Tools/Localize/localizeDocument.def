@@ -1,0 +1,1223 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		ResEdit
+FILE:		localizeDocument.def
+
+AUTHOR:		Cassie Hartzog, Oct 12, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	cassie	10/12/92	Initial revision
+
+
+DESCRIPTION:
+	This file contains the description of the ResEditDocumentClass.
+
+	Associated with each document is a DB file - the translation file.
+	It contains a bi-level DB structure which keeps track of all the 
+	editable resources and chunks by name.
+
+	The map block of the Translation DB file consists of some extra
+	header info (TransMapHeader) and data (a NameArray whose elements 
+	are ResourceMapData structures.)
+
+	The TransMapHeader stores information about the translation
+	file (its path, version number) and the associated geode (path,
+	number of resources, version).  
+
+	The ResourceMapData structure for each resource has a DB
+	group:item pointer to another NameArray, the array of
+	chunks in that resource.  In addition, it stores the number 
+	of chunks, the type of resource, and the resource number.
+
+	The NameArray of chunks has elements which are ResourceArrayData
+	structures.  They contain some information from the original
+	chunk, such as mnemonic and keyboard shortcut.  They also contain
+	some of the instruction information and flags used internally
+	to keep track of the state of the chunk.  The original data,
+	the translated data, and the instruction, are stored in separate
+	DB items in the same group as the chunks in the resource.
+
+			
+	$Id: localizeDocument.def,v 1.1 97/04/04 17:13:52 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ResEditDocumentClass	class	GenDocumentClass
+	uses 	VisContentClass
+
+;----------------------------------------------------------------------------
+;			Messages
+;----------------------------------------------------------------------------
+MSG_RESEDIT_DOCUMENT_DELAY_MESSAGE		message
+;
+; Delays the sending of a message to the document by passing it through 
+; the event queue an extra time.
+;
+; Pass:
+;	dx - the real message to be sent
+; Return:
+;	none
+;
+
+MSG_RESEDIT_DOCUMENT_GET_RESOURCE_NAME	 	message
+MSG_RESEDIT_DOCUMENT_GET_CHUNK_NAME	 	message
+;
+; These messages are sent when the Chunk or ResourceList  needs a name 
+; for an item.  The handler calls MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT
+; to notify the list of the name.
+;	
+; Pass: 
+;	bp - position of item requested
+;	^lcx:dx	- the dynamic list
+; Return:
+;	none
+
+MSG_RESEDIT_DOCUMENT_CHANGE_RESOURCE_AND_CHUNK 	message
+;
+; Changes the current resource information and updates the visuals
+; when the user selects a new resource from the ResourceList.
+;
+; Pass:
+;	cx - resource
+;	dx - chunk
+; Return:
+;	none
+
+MSG_RESEDIT_DOCUMENT_CHANGE_RESOURCE_LIST 	message
+;
+; Message sent by the ResourceList when the user selects a 
+; new resource.  Change to that resource, and the first chunk
+; within that resource.
+;
+; Pass:
+;	cx - position of item requested
+; Return:
+;	none
+
+MSG_RESEDIT_DOCUMENT_CHANGE_RESOURCE	 	message
+;
+; Changes the current resource information and updates the visuals
+; when the user selects a new resource from the ResourceList.
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_RESEDIT_DOCUMENT_CHANGE_CHUNK	 	message
+;
+; Changes the current chunk information and updates the visuals
+; when the user selects a new resource from the ResourceList, or
+; by clicking on the chunk in the view.
+;
+; Pass:
+;	cx - position of item requested
+; Return:
+;	none
+
+MSG_RESEDIT_DOCUMENT_KBD_NEXT_RESOURCE		message
+MSG_RESEDIT_DOCUMENT_KBD_PREV_RESOURCE		message
+MSG_RESEDIT_DOCUMENT_KBD_NEXT_CHUNK		message
+MSG_RESEDIT_DOCUMENT_KBD_PREV_CHUNK		message
+;
+; Go to next/previous resource/chunk.
+;
+; Pass:	nothing
+; Return: nothing
+;
+
+MSG_RESEDIT_DOCUMENT_GET_NUM_CHUNKS		message
+;
+; Return the number of chunks in the passed resource number.
+;
+; Pass:
+;	dx - resource number
+; Return:
+;	ax - number of chunks
+;
+
+MSG_RESEDIT_DOCUMENT_MAKE_CHUNK_VISIBLE		message
+;
+; Scrolls the view to make the requested chunk visible
+;
+; Pass:
+;	cx - chunk number
+; Return:
+;	none
+;
+
+MSG_RESEDIT_DOCUMENT_UPDATE_HIGHLIGHT		message
+;
+; Undraws the rectangle around the currently highlighted chunk, and
+; draws a highlight rectangle around the new current chunk.
+;
+; Pass:
+;	cx - element to highlight
+;	dx - element to unhighlight
+;	^hbp - gstate, or 0 if one should be created
+; Return:
+;	none
+;
+
+MSG_RESEDIT_DOCUMENT_HEIGHT_NOTIFY		message
+;
+; The height of the current chunk has changed while being edited,
+; so recalculate PosArray and redraw the view accordingly.
+;
+; Pass:
+;	dx	- new height
+; Return:
+;	none
+;
+
+MSG_RESEDIT_DOCUMENT_DRAW			message
+;
+; Sent to the document by the content object when it receives 
+; MSG_VIS_DRAW.  This routine determines which chunks need to be
+; redrawn in the exposed region and uses ChunkArrayEnum and a 
+; callback to do the drawing.
+;
+; Pass:
+;	ss:bp	- VisDrawParams
+; Return:
+;	none
+;
+
+
+MSG_RESEDIT_DOCUMENT_SAVE_CHUNK			message
+;
+; Sent when it is necessary to save any changes to the current
+; chunk to the DB file so that subsequent drawing will use the 
+; most recent data.
+;
+; Pass:
+;	cx - chunk to save
+; Return:
+;	none
+;
+
+MSG_RESEDIT_DOCUMENT_VIEW_SIZE_CHANGED		message
+;
+; The content has received a MSG_META_CONTENT_VIEW_SIZE_CHANGED
+; and is just passing to the document to handle with this message.
+; The document does not handle this META message, so that it will
+; not also try to resize the views by handling that message.
+;
+; Pass:
+;	cx - width
+;	dx - height
+; Return:
+;	none
+;
+
+MSG_RESEDIT_DOCUMENT_CREATE_EXECUTABLE		message
+;
+; Rebuilds the geode using the new, translated data in the translation file.
+; 
+; Pass:  nothing
+;
+; Return: nothing
+;
+
+MSG_RESEDIT_DOCUMENT_CREATE_PATCH_FILE		message
+;
+; Create a new executable, and then generate a patch file by comparing it
+; to the original geode.
+; 
+; Pass:   nothing
+; Return: nothing
+;
+
+MSG_RESEDIT_DOCUMENT_CREATE_NULL_PATCH_FILE		message
+;
+; Build a null geode and a language patch file with respect to it.
+; 
+; Pass:   nothing
+; Return: carry set on error
+;
+
+MSG_RESEDIT_DOCUMENT_UPDATE_TRANSLATION		message
+;
+; Updates the translation file by opening a new localization file for 
+; the geode, and detecting changes from the previous version.
+; 
+; Pass:  nothing
+;
+; Return: nothing
+;
+
+MSG_RESEDIT_DOCUMENT_COMMIT_UPDATE		message
+;
+; Commits the update just made by deleting the "Deleted Chunks" resource
+; and clearing all the ChunkState bits from the ResourceArrayElements.
+; 
+; Pass:  nothing
+;
+; Return: nothing
+;
+
+MSG_RESEDIT_DOCUMENT_SET_COPYRIGHT		message
+;
+; Set the copyright/screen saver module name for the geode being edited.
+;
+; Pass: nothing -- triggered by interaction
+;
+; Return: nothing
+;
+
+MSG_RESEDIT_DOCUMENT_SET_NAME_AND_NOTES		message
+;
+; Set the name and user notes for the geode being edited.
+; 
+; Pass:  nothing
+;
+; Return: nothing
+;
+
+MSG_RESEDIT_DOCUMENT_DISPLAY_MESSAGE		message
+;
+; Display an error or warning message.
+; 
+; Pass:  cx - ErrorValue
+;
+; Return: nothing
+;
+
+MSG_RESEDIT_DOCUMENT_SET_CHUNK_TYPE_FILTERS	message
+;
+; The currently selected ChunkType filters have changed
+;
+; Pass: 	cx - GenBooleans which are set
+;		dx - GenBooleans which are indeterminate
+;		bp - GenBooleans whose state has changed
+;
+; Return:	nothing
+;
+
+MSG_RESEDIT_DOCUMENT_SET_STATE			message
+;
+; Set and clear the passed DocumentState flags in the document's
+; instance data.
+;
+; Pass:		cl - flags to clear
+;		ch - flags to set
+;
+; Return:	nothing
+;
+MSG_RESEDIT_DOCUMENT_GET_STATE			message
+;
+; 
+; Pass:		nothing
+;
+; Return:	cl - DocumentState
+;
+
+MSG_RESEDIT_DOCUMENT_SET_CHUNK_STATE_FILTERS	message
+;
+; The currently selected ChunkState filter have changed
+;
+; Pass: 	cx - current selection
+;		bp - number of selections 
+;		dl - GenItemGroupStateFlags
+;
+; Return:	nothing
+;
+
+MSG_RESEDIT_DOCUMENT_ENABLE_MNEMONIC_LIST	message
+; 
+; Add to the MnemonicList the number of characters in the text moniker
+; and enable it. Set as the selection the current mnemonic.
+;
+
+MSG_RESEDIT_DOCUMENT_DISABLE_MNEMONIC_LIST	message
+; 
+; Remove from the MnemonicList the number of characters in the text moniker
+; and disable the list.
+;
+
+MSG_RESEDIT_DOCUMENT_CHANGE_MNEMONIC		message
+;
+; User has changed the current mnemonic character via the GenValue
+; object.  Update the UI and store the new menmonic in the item.
+;
+; Pass:		dx - MnemonicChange
+; Return:	nothing
+;
+
+MSG_RESEDIT_DOCUMENT_MNEMONIC_TEXT_CHANGED	message
+;
+; User has changed the mnemonic text.  Find the char in the text
+; update the UI, and store the new menmonic in the item.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_RESEDIT_DOCUMENT_GET_MNEMONIC		message
+;
+; Return the moniker for the passed item number.
+;
+
+MSG_RESEDIT_DOCUMENT_DELETE_MNEMONIC		message
+;
+; The user wants to delete the MnemonicText.  Set the internal
+; state to no mnemonic, and clear all underlines.
+;
+
+MSG_RESEDIT_DOCUMENT_USER_MODIFIED_TEXT			message
+;
+; This message is sent by EditText after the text has been modified
+; by the user and the mnemonic underline has moved.
+;
+; Pass:		cl - offset of mnemonic char
+;		  -or- VMO_NO_MNEMONIC if none
+;		dl - new mnemonic char
+; Return: 	nothing
+;
+
+MSG_RESEDIT_DOCUMENT_RESET_SOURCE_PATH		message
+;
+; Resets the path of the source geode.
+;
+
+MSG_RESEDIT_DOCUMENT_REVERT_TO_ORIGINAL_ITEM		message
+;
+; Deletes the current translation item, redraws the item using
+; the original item.
+;
+
+MSG_RESEDIT_DOCUMENT_REDRAW_CURRENT_CHUNK		message
+;
+; Redraws the current chunk, or the entire document, if the
+; current chunk's size has changed due to cut, paste or Replace All.
+;
+
+MSG_RESEDIT_DOCUMENT_SET_TYPE_FILTER_LIST_STATE		message
+;
+; Sets the ChunkTypeFilterList state to match the document's
+; internal state.
+;
+
+MSG_RESEDIT_DOCUMENT_SET_STATE_FILTER_LIST_STATE	message
+;
+; Sets the ChunkStateFilterList state to match the document's
+; internal state.
+;
+
+MSG_RESEDIT_DOCUMENT_TRANSFER_TARGET			message
+;
+; Moves the target between EditText and OrigText, depending on
+; who the document wants to give the target to.
+;
+
+MSG_RESEDIT_DOCUMENT_SET_NEW_TARGET			message
+;
+; Sets the target field in the document to translation or original.
+;
+;
+
+MSG_RESEDIT_DOCUMENT_START_SELECT			message
+MSG_RESEDIT_DOCUMENT_END_SELECT				message
+MSG_RESEDIT_DOCUMENT_PTR				message
+;
+; Common handlers for their MetaUIMessage counterparts.
+;
+
+MSG_RESEDIT_DOCUMENT_CLEAR_SELECTION			message
+;
+; Clears the selection from the current text chunk, if there is one.
+;
+
+MSG_RESEDIT_DOCUMENT_ENABLE_KBD_SHORTCUT		message
+MSG_RESEDIT_DOCUMENT_DISABLE_KBD_SHORTCUT		message
+; 
+; Enable or disable the keyboard shortcut interaction.
+;
+
+MSG_RESEDIT_DOCUMENT_APPLY_NEW_SHORTCUT			message
+;
+; Message that is sent when the user applies changes made to
+; the shortcut text object or the shortcut modifier list.
+;
+
+MSG_RESEDIT_DOCUMENT_TOGGLE_SHORTCUT			message
+;
+; Status message sent by ShortcutItemGroup when it is modified.
+;
+; Pass:
+;	cx - item selected, or GIGS_NONE
+;	bp - number of selections
+; 	dl - GenItemGroupStatusFlags
+;
+
+MSG_RESEDIT_DOCUMENT_UPDATE_PRINT_UI			message
+;
+; The Print dialog has become visible.  Need to put the default
+; starting resource name and number of resources in the text objects.
+;
+; Pass:
+;	cx:dx	- optr of object becoming visible
+;	bp - non-zero if open, 0 if close
+
+MSG_RESEDIT_DOCUMENT_COUNT_ALL_WORDS			message
+MSG_RESEDIT_DOCUMENT_COUNT_UNIQUE_WORDS			message
+MSG_RESEDIT_DOCUMENT_PRINT_UNIQUE_WORDS			message
+MSG_RESEDIT_DOCUMENT_SAVE_PRINT_OPTIONS			message
+MSG_RESEDIT_DOCUMENT_DESTROY_WORD_COUNT_ARRAY		message
+
+MSG_RESEDIT_DOCUMENT_UPDATE_GEODE_NAME			message
+;
+; Modify the source geode name as stored in the TransMapHeader.
+; For use when the name of the geode (its longname has changed)
+; between updates.
+;
+;	Pass:	nothing
+; 	Return: nothing
+;
+
+MSG_RESEDIT_DOCUMENT_ASCII_EXPORT			message
+;
+; Export an ASCII translation file.
+;
+; Pass:
+;	nothing
+; Return: 
+;	nothing
+; Destroyed:
+;	nothing
+
+MSG_RESEDIT_DOCUMENT_ASCII_IMPORT			message
+;
+; Import an ASCII translation file.
+;
+; Pass:
+;	nothing
+; Return: 
+;	nothing
+; Destroyed:
+;	nothing
+
+MSG_RESEDIT_DOCUMENT_LOCK_MAP		message
+;
+; Lock the document's TransMapHeader.  Use
+; DBUnlock to unlock it.
+;
+; Pass:		nothing
+; Return:	cx:dx	= TransMapHeader
+; Destroyed:	nothing
+
+MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_SOURCE_PATH		message
+MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_DESTINATION_PATH	message
+;
+; Changes to the full source/destination path (including geode's 
+; relative path).
+;
+; Pass:		nothing
+; Return:	if error, 
+;			carry set
+;			ax = EV_NO_ERROR (it puts up error dialog).
+;		else
+;			carry clear
+; Destroyed:	ax (if no error)
+; Side effects:	Locks and unlocks document's TransMapHeader.
+
+MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_PATH		message
+;
+; Changes to the full path top-level path specified by the 
+; indicated .ini key and the geode's relative path. 
+;
+; Pass:		bp 	= offset of .ini key for top-level path
+; Return:	if error, 
+;			carry set
+;			ax = EV_NO_ERROR (it puts up error dialog).
+;		else
+;			carry clear
+; Destroyed:	ax (if no error)
+; Side effects:	Locks and unlocks document's TransMapHeader.
+
+MSG_RESEDIT_DOCUMENT_GET_FULL_SOURCE_PATH		message
+MSG_RESEDIT_DOCUMENT_GET_FULL_DESTINATION_PATH		message
+;
+; Copy the full source/destination path (including geode's
+; relative path.
+;
+; Pass:		cx:dx	= buffer
+; Return:	cx:dx	= buffer filled with path
+; Destroyed:	ax
+; Side effects:	Locks and unlocks document's TransMapHeader.
+
+MSG_RESEDIT_DOCUMENT_GET_FULL_PATH			message
+;
+; Fills the passed buffer with the top-level path specified
+; by the indicated .ini key and the geode's relative path.
+;
+; Pass:		cx:dx	= buffer
+;		bp	= offset of .ini key for top-level path
+; Return:	cx:dx	= buffer filled with path
+; Destroyed:	ax
+; Side effects:	Locks and unlocks document's TransMapHeader.
+
+MSG_RESEDIT_DOCUMENT_OPEN_LOCALIZATION_FILE		message
+; 
+; Open a document's localization file.
+;
+; Pass:		nothing
+; Return:	if error,
+;			carry set
+; 			ax = EV_NO_ERROR
+;		else
+;			carry clear
+;			ax = handle to localization file
+; Side effects:	Locks and unlocks document's TransMapHeader.
+
+MSG_RESEDIT_DOCUMENT_OPEN_SOURCE_GEODE			message
+;
+; Open the source geode.
+;
+; Pass:		ss:bp	= TranslationFileFrame
+; Return:	if error,
+;			carry set
+;			ax = ErrorValue
+;		else
+;			carry clear
+; Destroyed:	ax
+
+MSG_RESEDIT_DOCUMENT_READ_SOURCE_GEODE			message
+;
+; Read source geode information.
+;
+; Pass:		ss:bp	= TranslationFileFrame
+; Return:	if error,
+;			carry set
+;			ax = ErrorValue
+;		else
+;			carry clear
+;			cx = number of editable resources
+; Destroyed:	ax
+
+MSG_RESEDIT_DOCUMENT_PROMPT_FOR_SOURCE_GEODE_NAME	message
+;
+; Get the name and relative path of the source geode from the user.
+;
+; Pass:		nothing
+; Return:	if error,
+;			carry set
+;			ax = ErrorValue
+;		else
+;			carry clear
+; Destroyed:	ax
+
+MSG_RESEDIT_DOCUMENT_VALIDATE				message
+;
+; Check the document to make sure string arguments match and no strings
+; are outside size limits.
+;
+; Return:	if error,
+;			carry set
+;			ax = ErrorValue
+;		else
+;			carry clear
+; Destroyed:	ax
+
+MSG_RESEDIT_DOCUMENT_MARK_CLEAN				message
+;
+; Mark the document clean so that on close the user won't be prompted to
+; save/discard changes.  We want the changes automatically written out to
+; disk, but not committed, so the user can revert the changes.  This is used
+; in batch processing.
+;
+; Pass:		nothing
+; Return:	nothing
+
+
+;----------------------------------------------------------------------------
+;			Constants
+;----------------------------------------------------------------------------
+
+DOCUMENT_PROTOCOL_MAJOR	= 3
+DOCUMENT_PROTOCOL_MINOR	= 2
+
+;
+; Error codes returned by LoadResource
+;
+LoadResourceError	etype	byte
+    LRE_MEMALLOC	enum 	LoadResourceError
+    LRE_FILE_READ	enum 	LoadResourceError
+    LRE_ZERO_SIZE	enum 	LoadResourceError
+    LRE_NOT_LMEM	enum 	LoadResourceError
+    LRE_NO_HANDLES	enum 	LoadResourceError
+    LRE_HANDLE_TABLE_FULL enum	LoadResourceError
+    LRE_NONE	 	enum 	LoadResourceError
+
+;
+; Flag passed to DocumentChangeMnemonic signifying whether the
+; user has clicked the "up" or "down" scroller in the mnemonic list.
+;
+MnemonicChange		etype	byte
+    MC_FORWARD		enum	MnemonicChange
+    MC_BACKWARD		enum	MnemonicChange
+
+;
+; Position of mnemonic in the mnemonic list.
+;
+MnemonicPos	etype	byte, 0, 1
+    MP_NIL		enum	MnemonicPos
+    MP_ESC		enum	MnemonicPos
+    MP_FIRST_TEXT_CHAR	enum 	MnemonicPos
+
+;
+; Number of entries in the ResourceHandleTable, and hence, the number of
+; resource blocks which are currently in memory from the geode being parsed.
+;
+RESOURCE_TABLE_SIZE	= 10		; # entries in ResourceHandleTable
+			
+SHORTCUT_TEXT_LENGTH	= 1		; length of buffer for ShortcutText
+SHORTCUT_BUFFER_LENGTH	= SHORTCUT_TEXT_LENGTH + 1
+
+;----------------------------------------------------------------------------
+;			 Records
+;----------------------------------------------------------------------------
+;
+; Current state of the document object:
+;
+DocumentState		record
+    DS_CHANGING_RESOURCE	: 1		; chunk is being edited
+    DS_IGNORE_HEIGHT_CHANGES 	: 1		; ignore text object height chg
+    DS_UPDATE_NOT_COMMITTED	: 1		; just what it sez
+    DS_SEARCH_MATCH		: 1		; handling a search match
+    :4
+DocumentState 		end
+
+;
+; Value returned by VerifyChunksMatch, in documentUpdate.asm
+;
+MatchType		record
+    MT_MATCH			: 1		; the chunks match completely
+    MT_WRONG_TYPE		: 1		; they have the wrong type
+    MT_SIZE_MISMATCH		: 1 		; they have different sizes
+    MT_DATA_MISMATCH		: 1 		; they have different data
+    MT_DIFFERENT_HANDLES	: 1		; they have diff chunk handles
+    MT_ALREADY_MATCHED		: 1		; the old chunk has been used
+						;   already in another match
+    :2
+MatchType		end
+
+;
+; Flags used during search and replace.  Mainly for "Replace All".
+; The resource dirty flag signifies that at least one of the chunks in 
+; the current resource has had its text replaced.  The chunk dirty flag
+; means that the current chunk has had text replaced, and its db item has
+; changed, and EditText needs to be updated to display it. 
+;
+SearchReplaceFlags	record
+    SRF_REPLACE_ALL		: 1		; replace all operation
+    SRF_RESOURCE_DIRTY		: 1		; chunks have changed
+    SRF_CHUNK_DIRTY		: 1		; curChunk has changed
+    :5
+SearchReplaceFlags	end
+
+;
+; Some flags to guide ASCII export.
+;
+ExportFlags		record
+    EF_CHANGED_ONLY		: 1		; export only changed
+						; chunks
+    :7
+ExportFlags		end
+			
+;----------------------------------------------------------------------------
+;			Structures
+;----------------------------------------------------------------------------
+
+;
+;  Handle table used for caching a geode's resources.  If there are no
+;  free entries (resource number = -1), the last unused block in the table
+;  freed. (The block is free if the low bit of the handle is set.)
+;  The new block is then placed at the front of the table.
+;
+ResourceHandleTable	struct
+    RHT_number		byte			; resource number, -1 if unused
+    RHT_counter		byte			; number of times referenced
+    RHT_handle		hptr			; low bit set == freed by app
+ResourceHandleTable	ends
+
+;
+; This structure is used during the creation of localization files, when
+; updating a translation file (when the updated geode is parsed, a 'new'
+; translation file is built out and replaces the 'old' one), and when 
+; building of new geodes.  
+;
+DocumentHandlesStruct	struct
+    DHS_handle		hptr.MemHandle		; my handle
+    DHS_signature	word			; used for error checking
+;
+;  Information about the geode.
+;
+    DHS_geode		hptr.FileHandle
+    DHS_importTable	hptr.MemHandle
+    DHS_exportTable	hptr.MemHandle
+    DHS_resourceTable	hptr.MemHandle
+;
+; ResourceHandleTable used for caching resources read from the geode.
+; Used when a new translation file is being built.
+;
+    DHS_resourceHandleTable	label word
+DocumentHandlesStruct	ends
+
+DOCUMENT_HANDLES_STRUCT_SIG	= 1573h
+
+;
+; The TranslationFileFrame structure is used when creating or updating a
+; translation file. 
+;
+; TFF_source fields are used in documentDB.asm to refer to the 
+; localization file's DB structures, while the dest fields point to
+; the translation file/geode's DB structures.  In documentUpdate.asm,
+; they refer to the DB structures for the old translation file, while the
+; TFF_dest fields point to the DB structures for the updated translation.
+;
+TranslationFileFrame	struc
+    TFF_signature	word		; used for error checking
+    TFF_handles		word		; segment of DocumentHandlesStruct
+    TFF_numResources	word		; total # resources in the geode
+    TFF_transFile	hptr.FileHandle	; translation file handle
+    TFF_locFile 	hptr.FileHandle	; localization file handle
+    TFF_geodeFile 	hptr.FileHandle	; geode file handle
+    TFF_destGroup	word		; destination file ResourceMap 
+    TFF_destItem	word		;   DBGroup and DBItem
+    TFF_destArray	dword		; destination array or element
+    TFF_sourceGroup	word		; source file ResourceMap 
+    TFF_sourceItem	word		;   DBGroup and DBItem
+    TFF_sourceArray	dword		; source array or element 
+    TFF_sourceType  	word		; GeosFileType
+    TFF_chunkNumber	word		; for deleted chunks in Update
+    TFF_documentState	DocumentState
+    TFF_nameType	CreateExecutableNameEnum	
+	; Indicates translated vs. original name for new geode.
+    TFF_destType	CreateExecutableDestinationEnum
+	; Indicates SP_WASTE_BASKET or dest dir as destination new geode.  
+    TFF_geodeType	CreateExecutableTypeEnum
+	; Indicates translated vs. null-string geode.
+    TFF_updateType	CreateExecutableUpdateEnum
+	; Indicates whether an update has already been attempted.
+    TFF_sourceGeodeName	FileLongName	; Long name for source geode.	
+align word
+TranslationFileFrame	ends
+
+TRANSLATION_FILE_FRAME_SIG	= 1963h
+
+;
+; The ParseFrame is used during creation of a translation file, when
+; the geode is being parsed.  
+;
+ParseFrame		struc
+    PF_signature	word		;
+    PF_TFFoffset	word		; offset to TranslationFileFrame
+    PF_transFile	hptr.FileHandle ; duplicate of TFF_transFile
+    PF_numResources	word		; number of resources
+    PF_size		word		; size of the chunk
+    PF_resource		word		; resource number being parsed
+    PF_element		word		; ResourceArray element # being parsed
+    PF_object		dword		; resource block:chunk handle
+    PF_group		word		; group for the resource XXX
+    PF_resArray		optr		; ResourceArray XXX
+    PF_number		word		; number of editable chunks in resource
+    PF_mnemonic		byte		; mnemonic type
+SBCS< PF_mnemonicChar	byte		; mnemonic if not in moniker text	>
+DBCS< PF_mnemonicChar	word		; mnemonic if not in moniker text	>
+    PF_flags		ParseFlags	; parse state
+align	word
+ParseFrame		ends
+
+PARSE_FRAME_SIG	= 3189h
+
+;
+; Used during creation of a new geode.  This code uses many of the 
+; same routines as are used when creating a new geode, thus the 
+; structure incorporates a TranslationFileFrame.
+;
+CreateExecutableFrame	struct
+    CEF_TFF		TranslationFileFrame
+    CEF_document	optr
+    CEF_newGeode	hptr.FileHandle
+    CEF_count		word		; # resource remaining to be udpated
+    CEF_resNumber	word		; element # of resource being updated
+    CEF_curPos		dword		; current file position in new geode
+    CEF_resTablePos	dword		; file position of resource table
+    CEF_resTableSize	word		; size of the resource table
+    CEF_relocTable	hptr.MemHandle	; block for relocation table
+    CEF_resourceTable   hptr.MemHandle	; copy of resource table for loading
+					; resources from orig geode
+    CEF_updatedTrans	byte		; we have tried updating the
+					; translation file
+align	word
+CreateExecutableFrame	ends
+
+; 
+; Used in RecalcChunkPositions to pass parameters to the callback
+; routine in the enumeration.
+;
+RecalcPosParams		struct
+    RPP_filters		word			;low word is ChunkState,
+						;high word is ChunkType
+    RPP_count		word			;# matches so far
+    RPP_element		word			;current matching element
+    RPP_posArray	hptr
+    RPP_document	optr
+RecalcPosParams		ends
+
+SearchReplaceParams	struct
+;
+;info about the current chunk to use in case of a wrapped search
+;
+    SRP_curChunk	word			;current chunk #
+    SRP_curResource	word			;current resource #
+    SRP_curSource	byte			;curChunk SourceType
+;
+; variables updated during a search
+;
+    SRP_resourceNum	word			;resource number being searched
+    SRP_lastChunk	word			;chunk to stop search at
+    SRP_chunkNum	word			;chunk number being searched
+    SRP_chunkSource	byte			;SourceType: trans or original
+    SRP_textRange	VisTextRange		;match's text range
+    SRP_endRange	word			;string position to stop at
+    SRP_callback	fptr
+;
+; general data
+;
+    SRP_fileHandle	hptr.FileHandle		;translation file handle
+    SRP_document	optr			;document OD
+    SRP_filters		word			;type and state chunk filters
+    SRP_searchStructSeg	sptr.SearchReplaceStruct ;segment of block in dx
+    SRP_searchOptions	byte			;SearchOption flags
+    SRP_flags		SearchReplaceFlags	;my own SearchReplace flags
+	even
+SearchReplaceParams	ends
+
+;
+; Structure passed to EnumAllChunks.  Can be embedded within a larger struct.
+;
+EnumAllChunksStruct	struct
+    EACS_size		word			; size of the structure
+    EACS_callback	fptr			; callback routine
+    EACS_data		label byte		; additional data
+EnumAllChunksStruct	ends
+
+;
+; Used for export.  Structure passed by callback routine.
+;
+ExportChunkStruct		struct
+    ECS_EACS	EnumAllChunksStruct
+    ECS_transFile		hptr.FileHandle	; File handle of
+						;  internal DB xlatn
+						;  file
+    ECS_exportFile		hptr.FileHandle	; File handle of ASCII
+						;  xlatn file
+    ECS_flags			ExportFlags
+    ECS_extra			byte		; useful extra byte
+    align	word
+ExportChunkStruct		ends
+
+;
+; Structure used to update an earlier incompatible document.
+;
+UpdateResourceArraryStruct	struct
+    URAS_EACS		EnumAllChunksStruct
+    URAS_insertOffset	word		; where in ResArrayElement to insert
+    URAS_insertLength	word		; number of bytes to insert
+UpdateResourceArraryStruct	ends
+
+;----------------------------------------------------------------------------
+;			DB File Records and Structures 
+;----------------------------------------------------------------------------
+; This structure as used in 1.0 documents...
+;
+TextStringArgs1	record
+    TEXT_FIRST_ARGUMENT_10 : 1			;there is a '\1' in the text
+    TEXT_SECOND_ARGUMENT_10 : 1			;there is a '\2' in the text
+	: 6
+TextStringArgs1	end
+
+; ... and as used in 2.0 documents...
+;
+TextStringArgs	record
+    TEXT_FIRST_ARGUMENT : 8			;number of '\1' substitutions
+    TEXT_SECOND_ARGUMENT : 8			;number of '\2' substitutions
+TextStringArgs	end
+
+
+ArrayType	etype	byte
+    AT_RESOURCE_MAP	enum ArrayType
+    AT_RESOURCE_ARRAY	enum ArrayType
+
+TransMapHeaderFlags	record
+   TMHF_UI_LIBRARY:1				; this geode is the UI library
+TransMapHeaderFlags	end
+
+;
+; The translation file's map block header structures (NameArray of resources)
+;
+TransMapHeader		struct
+    TMH_meta		NameArrayHeader
+    TMH_arrayType	ArrayType
+    TMH_totalResources	word			; total number of resources
+    TMH_stateFlags	DocumentState		; document (update) state
+    TMH_flags		byte
+    ;						
+    ; source geode's complete path specification
+    ;
+    TMH_sourceName	FileLongName		; original geode's name
+    TMH_relativePath	PathName		; original geode's rel. path
+    TMH_pathLength    	word			; length of relative path
+    ;
+    ; The new geode's name, and its relative path within a GEOS installation
+    ;
+    TMH_destName	FileLongName		; user can change name
+SBCS <    TMH_userNotes	char	GFH_USER_NOTES_BUFFER_SIZE dup (?)	>
+DBCS <    TMH_userNotes	FileUserNotes					>
+    ;
+    TMH_unusedPath	PathName		; 
+    TMH_unused2		word			
+    ;
+    ; Release and Protocol of geode used to create latest localization file
+    ;
+    TMH_release		ReleaseNumber	
+    TMH_version		ProtocolNumber	
+    TMH_dosName		DosDotFileName		; geode's DOS name
+    TMH_copyrightGroup	word			; DB Group Handle of copyright string
+    TMH_copyrightItem	word			; DB Item Handle of copyright string
+    TMH_unused3		word
+TransMapHeader		ends
+
+ResourceMapData		struct
+    RMD_group		word			; group # of this resource
+    RMD_item		word			; item # of chunk namearray
+    RMD_number		word			; resource number
+    RMD_numChunks	word			; # of chunks for this resource
+    RMD_resourceType	ResourceType
+    RMD_unused		word
+    even
+SBCS <    RMD_name		label	char				>
+DBCS <    RMD_name		label	wchar				>
+ResourceMapData		ends
+
+ResourceMapElement		struct
+    RME_meta		NameArrayElement
+    RME_data		ResourceMapData
+ResourceMapElement		ends
+
+
+;
+; The resource's NameArray structure for all of its chunks
+;
+ResourceArrayHeader	struct
+    RAH_meta		NameArrayHeader
+    RAH_arrayType	ArrayType
+ResourceArrayHeader	ends
+
+ResourceArrayData	struct
+    RAD_number		word			; original chunk number
+    RAD_handle		word			; original chunk handle
+    RAD_transItem	word			; translation chunk item # 
+    RAD_origItem	word			; original chunk item # 
+    RAD_instItem	word			; instruction item #
+    RAD_minSize		word			; minimum size for data
+    RAD_maxSize		word			; max size for data
+;
+; The mnemonic fields keep track of the mnemonic for transItem
+; (starts as origItem's mnemonic), and are used to initialize mnemonic list.
+; Since a graphics item will never have a mnemonic, use the mnemonicType
+; field to show when a bitmap or gstring has been cut and is "empty".
+;
+    RAD_mnemonicType	byte			; VMO_* or offset
+SBCS< RAD_mnemonicChar	byte			; char if there is a mnemonic	>
+DBCS< RAD_mnemonicChar	word			; char if there is a mnemonic	>
+
+    RAD_chunkType	ChunkType		; type of chunk
+    RAD_chunkState	ChunkState		; chunk state after update
+
+; 1.0 documents used a TextStringArgs structure that was one byte,
+; 2.0 need a full word, so it was moved to an unused word below.
+;
+.assert (size TextStringArgs1 eq size byte)
+
+    RAD1_stringArgs	label	TextStringArgs1
+    RAD_unused		byte
+
+    RAD_instFlags 	word			; flags set in ESP 
+    RAD_kbdShortcut	KeyboardShortcut
+
+.assert (size TextStringArgs eq size word)
+
+; This word is unused in 1.0 documents, but is used for TextStringArgs in 2.0
+;
+    RAD1_unused		label	word
+    RAD_stringArgs	TextStringArgs		; number of string args
+    even					; word align for swat
+SBCS <    RAD_name		label	char		; chunk name	>
+DBCS <    RAD_name		label	wchar		; chunk name	>
+ResourceArrayData 	ends
+
+ResourceArrayElement	struct
+    RAE_meta		NameArrayElement
+    RAE_data		ResourceArrayData
+ResourceArrayElement	ends
+
+
+;----------------------------------------------------------------------------
+;			Instance Data
+;----------------------------------------------------------------------------
+    REDI_state			DocumentState	; clean, dirty, committed, etc.
+    REDI_handles		word		; handle of DocumentFilesStruct
+
+;
+; Height and width of original and translation views, and document height
+;
+    REDI_viewWidth		word		; 
+    REDI_viewHeight		word		; 
+    REDI_docHeight		word		; 
+
+    REDI_editText		optr 		; EditText object
+    REDI_posArray		hptr		; PosArray handle
+
+    REDI_stateFilter		ChunkState	; ChunkState filter
+    REDI_typeFilter		ChunkType	; ChunkType filter
+
+    REDI_totalResources		word		; total number of resources
+    REDI_mapResources		word		; # of resources in ResourceMap
+    REDI_numChunks		word		; # of chunks in this resource
+						;   which meet filter criteria
+    REDI_curResource		word		; element # of current resource
+    REDI_curChunk		word		; element # of current chunk
+    REDI_chunkType		ChunkType	; ChunkType of curChunk
+
+
+    REDI_resourceGroup  	word		; current resource group #
+    REDI_resArrayItem		word		; current ResourceArray item #
+    REDI_transItem 		word		; current translation item #
+    REDI_origItem	 	word		; current original item #
+    REDI_curTarget		SourceType	; who has target, trans or orig
+    REDI_newTarget		SourceType	; who wants target
+
+    REDI_oldMapGroup		word		; DBGroup of old TransMapHeader
+    REDI_oldMapItem		word		; DBItem of old TransMapHeader
+
+;
+; Fields used to describe the current state of the mnemonic list.
+;
+SBCS< REDI_mnemonicChar		byte		; current mnemonic char	>
+DBCS< REDI_mnemonicChar		word		; current mnemonic char	>
+						;  (if not ESC or NIL)
+    REDI_mnemonicType		byte		; VMT_mnemonicOffset for chunk
+						;  since last save
+    REDI_mnemonicCount		byte		; number of mnemonic chars
+    REDI_mnemonicPos		byte		; list position of current mnem
+
+    REDI_kbdShortcut		KeyboardShortcut
+
+
+;-----------------------------------------------------------------------------
+;		Variable instance data
+;-----------------------------------------------------------------------------
+
+TEMP_RESEDIT_DOCUMENT_WORD_COUNT_ARRAY			vardata optr
+TEMP_RESEDIT_DOCUMENT_PRINT_CONTROL_CHILD_BLOCK		vardata hptr
+
+ResEditDocumentClass 	endc
+
+
+ResEditGenDocumentControlClass	class	GenDocumentControlClass
+
+MSG_RESEDIT_GEN_DOCUMENT_CONTROL_OPEN_ASCII_IMPORT_SELECTED	message
+;
+; The user has selected an ASCII translation file and a 
+; localization file from ResEditImportInteraction.  This
+; message was sent from that interaction to begin the
+; import process.
+;
+; Pass:  nothing
+; Retn:  nothing
+; Destr: ax,cx,dx,bp
+
+MSG_RESEDIT_GEN_DOCUMENT_CONTROL_GET_IMPORT_FLAG	message
+MSG_RESEDIT_GEN_DOCUMENT_CONTROL_CLR_IMPORT_FLAG	message
+;
+; Pass:  nothing
+; Retn:  cl = flag value for _GET_
+; Destr: nothing
+
+MSG_RESEDIT_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG		message
+;
+; Just calls MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG, but delays
+; msg delivery a bit.  If msg not delayed, the dialog doesn't
+; come up.  See Tony's comments in cmainUIDocOperations.asm.
+;
+; Pass:	 nothing
+; Retn:  nothing
+; Destr: ax,cx,dx,bp
+
+
+;----------------------------------------------------------------------------
+;			Instance Data
+;----------------------------------------------------------------------------
+
+; Want to subclass MSG_GEN_DOCUMENT_CONTROL_INITIATE_IMPORT_DOC
+; so that I can handle import w/o using Impex library.
+; The REGDCI_import field is there so that the handler for initializing
+; a document will know if a regular document is being created
+; or if an ASCII import is taking place.
+
+	REGDCI_import		byte		; Flag: 1 if importing
+						;       0 if not
+
+ResEditGenDocumentControlClass	endc
+
+
+if	not DBCS_PCGEOS
+
+;*;; For import, the user must specity two files, the ASCII translation
+;*;; file (ATF) and a localization file.  We use the following
+;*;; FileSelector subclass for specifying these files.  When a file is 
+;*;; selected, the subclass copies the selected name into a text object
+;*;; based upon the FEFSI_state flag.  The text objects must be in 
+;*;; the same block as the file selector.
+
+ResEditFileSelectorClass	class	GenFileSelectorClass
+
+MSG_RESEDIT_FILE_SELECTOR_NOTIFY_TEXT			message
+;
+; Depending on state, tell set either text1 or text2 to
+; be the selected file name.  Change state so that next
+; call will change the other text.
+;
+; Pass: nothing
+; Retn: nothing
+; Destr: ax,cx,dx,bp
+
+;*;	REFSI_state		byte		; Flag for notifying
+;*;						; selection:
+;*;						;	0=>ATF
+;*;						;       1=>Loc
+;*;	REFSI_text1		optr
+;*;	REFSI_text2		optr
+ResEditFileSelectorClass	endc
+
+
+; We want to intercept MSG_GEN_TEXT_SET_MODIFIED_STATE
+; so that when text objects specifying the ATF or loc
+; file are modified, we can at that time set the path
+; of the text object to be the path of 
+; ImportAsciiFileSelector.  This way, the ATF and loc
+; files can be in different subdirectories, and we
+; can use just one file selector.
+
+ResEditImpTextClass		class	GenTextClass
+ResEditImpTextClass		endc
+
+endif	; not DBCS_PCGEOS

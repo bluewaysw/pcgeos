@@ -1,0 +1,342 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		CommonUI (code common to all specific UIs)
+FILE:		cGeode.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	2/89		Initial version
+
+DESCRIPTION:
+	This file contains common definitions for the Open Look library
+
+	$Id: cGeode.def,v 1.2 98/03/11 05:30:00 joon Exp $
+
+------------------------------------------------------------------------------@
+
+include geos.def
+include heap.def
+include geode.def
+
+ifdef FULL_EXECUTE_IN_PLACE
+include	Internal/xip.def		; must be include *before* resource.def
+endif
+
+include resource.def
+include ec.def
+include	assert.def
+include library.def
+
+include graphics.def
+include gstring.def
+include file.def
+include win.def
+
+include lmem.def
+include localize.def
+include timedate.def
+include	system.def
+
+include char.def
+include	input.def
+include	geoworks.def
+include	gcnlist.def			; for JMotif
+include	thread.def
+include product.def
+
+include Objects/metaC.def
+include Objects/processC.def
+include Objects/winC.def
+include Objects/inputC.def
+
+include Internal/im.def
+include Internal/threadIn.def
+
+include Internal/prodFeatures.def	; product specific feature flags
+
+UseDriver Internal/kbdDr.def
+
+;------------------------------------------------------------------------------
+;		Specific UI variables
+;------------------------------------------------------------------------------
+
+SAVE_UNDER_WORKS =	TRUE		; Set if save under is working in the
+					; kernel.
+
+REAL_ESTATE	=	FALSE		; True if this specific UI should make
+					; an attempt to support the real-estate
+					; focus model (Currently commented out
+					; as not completely debugged, & not
+					; a necessary feature for low-end --
+					; save bytes!
+
+
+;
+; Constants for RedMotif to continue to function, as we change over to using
+; a product-specific Motif, rather than RedMotif.    I'm not interested in
+; changing all the if _REDMOTIF's to ifidn PRODUCT, <REDWOOD>'s at this point.
+;
+; For some reason this wasn't completed, such that when making the redmotif
+; make file the "ifidn PRODUCT, <REDWOOD>" fails, and _REDMOTIF doesn't get
+; set.  Also, the local.mk doesn't define MOTIF, so everything is hosed when
+; it tries to make.  Until someone fixes this, I'm reverting it back to the 
+; old version, as it is still defining REDMOTIF in the local.mk, so I'm going
+; to make it set _MOTIF and _REDMOTIF to true.  dlitwin 10/17/94
+;
+if 0
+		_REDMOTIF	= FALSE
+endif
+
+
+
+; NOTE: "ifdef"  constants must be passed on assembly command line via -D
+; option, so that they will appear to be defined here, for the specific UI
+; you are trying to create.  This is normally done in local.mk for each
+; specific UI.  ifdef's SHOULD NOT BE USED in code, to provide conditional
+; assemblies.  Instead, use the _* constants, perferably the _*_style ones
+; -- Doug.
+
+;------------------------------------------------------
+
+_OPEN_LOOK	= FALSE
+
+;------------------------------------------------------
+
+ifdef MOTIF
+_MOTIF		= TRUE
+else
+_MOTIF		= FALSE
+endif
+
+;------------------------------------------------------
+
+ifdef COMMON_USER_ACCESS
+_CUA		= TRUE
+else
+_CUA		= FALSE
+endif
+
+;------------------------------------------------------
+
+ifdef MACINTOSH
+_MAC		= TRUE
+else
+_MAC		= FALSE
+endif
+
+;------------------------------------------------------
+
+_REDMOTIF	= FALSE
+
+;------------------------------------------------------
+
+_WIZARDBA	= FALSE
+
+;------------------------------------------------------
+
+ifdef ISUI
+_ISUI		= TRUE
+else
+_ISUI		= FALSE
+endif
+
+;------------------------------------------------------
+
+ifdef STYLUS
+_MOTIF		= TRUE	; set _MOTIF if STYLUS exists, as for now Stylus UI
+_STYLUS		= TRUE	;  is working from the Zoomer UI, which was Motif.
+else
+_STYLUS		= FALSE
+endif
+
+;------------------------------------------------------
+
+ifdef DUI
+_DUI		= TRUE	; STYLUS flag was set by local.mk
+else
+_DUI		= FALSE
+endif
+
+;------------------------------------------------------
+
+_NIKE		= FALSE
+
+ifdef NIKE_EUROPE
+_NIKE_EUROPE	= TRUE
+else
+_NIKE_EUROPE	= FALSE
+endif
+
+;------------------------------------------------------
+
+_PCV		= FALSE
+
+;------------------------------------------------------
+
+;
+; _GRAFFITI_UI sets up the pen input control to be just a simple graffiti
+; input box, no floating keyboards
+;
+; make sure equivalent flags are set in cGeode.uih
+;
+_JEDIMOTIF	= FALSE
+_FILE_TABLE	= FALSE
+_GRAFFITI_UI	= FALSE	; _GRAFFITI_UI not supported for STYLUS because of
+			; the way XXX_KEYBOARD constants are defined in
+			; cConstant.def
+_PRINT_SCREEN	 = FALSE
+SYNC_HWR_AND_KBD = FALSE	; always FALSE for non-JEDIMOTIF
+
+;------------------------------------------------------
+
+ifdef RUDYUI
+_MOTIF		= TRUE	;Set _MOTIF if RUDY exists
+_RUDY		= TRUE	; as well as _RUDY
+else
+_RUDY		= FALSE
+endif
+
+;------------------------------------------------------
+
+_ODIE		= FALSE
+
+;------------------------------------------------------
+
+_OL_STYLE	= _OPEN_LOOK
+_CUA_STYLE	= _CUA or _MOTIF or _MAC or _ISUI
+
+
+;------------------------------------------------------------------------------
+;		Resources that must be global
+;------------------------------------------------------------------------------
+
+Interface segment lmem
+Interface ends
+
+;
+;  I'd "if _GCM" this but it causes headaches in the .gp files
+;  of the various specific UI's.
+;
+GCMResource	segment	lmem
+GCMResource	ends
+
+StandardDialogUI	segment	lmem
+StandardDialogUI	ends
+
+;--------------------------------------------------------------
+
+if _OL_STYLE
+;These resources contain UI objects for this specific UI; see cspec***.ui.
+
+WindowMenuResource segment lmem
+WindowMenuResource ends
+
+PopupMenuResource segment lmem
+PopupMenuResource ends
+
+ExpressMenuResource segment lmem
+ExpressMenuResource ends
+
+endif						; end of if _OL_STYLE
+
+;--------------------------------------------------------------
+
+if _CUA_STYLE
+;These resources contain UI objects for this specific UI; see cspec***.ui.
+
+StandardWindowMenuResource segment lmem
+StandardWindowMenuResource ends
+
+DisplayWindowMenuResource segment lmem
+DisplayWindowMenuResource ends
+
+ExpressMenuResource segment lmem
+ExpressMenuResource ends
+
+StandardMonikers segment lmem
+StandardMonikers ends
+
+if _ISUI
+WindowListResource segment lmem
+WindowListResource ends
+endif
+
+endif						; end of if _CUA_STYLE
+
+;--------------------------------------------------------------
+
+
+;------------------------------------------------------------------------------
+;		Uses of CODE resources
+;------------------------------------------------------------------------------
+
+; Init		- Code used only when the UI is coming up for the first time
+; HighCommon	- general code for Sys, Field, Application & other high
+;		  level object code
+; AppAttach	- Routines needed to launch a new application.  Includes
+;		  MSG_META_ATTACH handlers, Init & SpecBuild for app object &
+;		  other high-level control objects that get specifically built
+;		  right away.
+; AppCommon	- General code which will encounter use while running a
+;		  typical app
+; AppDetach	- MSG_META_DETACH handlers
+; WinBuild	- Routines needed to build general windows, views, popups, etc.
+; WinCommon	- general code for CWin directory
+; WinMethods	- method handlers for CWin directory, moved here because
+;		  WinCommon has gotten TOO BIG
+; ViewBuild	- All Init & SpecBuild code for CView directory
+; ViewCommon	- general code for CView directory
+; ViewGeometry	- Geometry routines for CView directory
+; GadgetBuild	- Routines needed to build gadgets
+; GadgetCommon	- Any gadget related code which can possibly be pulled out
+;		  of CommonFunctional
+;
+; FileSelector	- ALL code needed to implement file selector
+;		  (Lumped here for easy removal)
+; DocumentInit, Document	- ALL code needed to implement file selector
+;		  (Lumped here for easy removal)
+; MDIInit, MDIAction, MDICommon	- ALL code needed to implement MDI (Includes
+;		  GenDisplay & Document control code)
+;		  (Lumped here for easy removal)
+; FieldBitmap	- ALL code needed to implement field bitmaps
+;		  (Lumped here for easy removal)
+;
+; Build		- Build routines which can't be put in any other build 
+;		  resource because of near call ties to common routines
+; CommonFunctional - Other general code which couldn't be placed into a more
+;		     specific resource.
+
+;------------------------------------------------------------------------------
+;		Libraries used
+;------------------------------------------------------------------------------
+
+INCLUDE_OLD_LIST_SYMBOLS = 1
+UseLib	ui.def
+UseLib	Objects/vTextC.def
+
+
+
+
+if _DUI
+UseLib	ark.def					; for Secret Mode
+endif
+
+; Include common spui definitions (also included by the generic UI)
+include Internal/specUI.def
+
+; Include global constants file
+include cConstant.def
+
+if EVENT_MENU
+UseLib		evnthdlr.def			; for Event Menu
+endif
+
+; Define the specific UI library, same for each spui...
+DefLib	Internal/SpecUI/spui.def
+
+UseLib	Internal/flowC.def		; include here AFTER UseLib ui.def
+

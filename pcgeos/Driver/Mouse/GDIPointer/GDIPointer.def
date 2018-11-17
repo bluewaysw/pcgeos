@@ -1,0 +1,209 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1996 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		GDIPoiter.def
+
+AUTHOR:		Mary Ann Joy, May  2, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	mjoy	5/ 2/96   	Initial revision
+
+
+DESCRIPTION:
+	Defines all the structures, constants and variables for the
+	GDI pointer driver
+		
+	$Id: GDIPointer.def,v 1.1 97/04/18 11:48:10 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;------------------------------------------------------------------------------
+;			CONSTANTS/DECLARATIONS
+;------------------------------------------------------------------------------
+
+DEBUG_COMBINE		=	FALSE
+;TODO
+;DISEMBODIED_PTR or HIDE_PTR_IF_NOT_ALWAYS_OF_SHOW_TYPE
+;don't meed to change anything, in code. prbably need to set this in
+;INI file
+
+MOUSE_DEVICE_CANNOT_BE_CALIBRATED	enum	Warnings
+
+; By default -- turn OFF all PtrFlags
+ MOUSE_PTR_FLAGS = PtrFlags shl 8
+
+;
+; State flags
+;
+MouseStratFlags	record	MOUSE_ON:1, MOUSE_SUSPENDING:1
+;flags used to figure out which value to constrain the x & y
+;coordinate to , i.e X_[MIN/MAX], Y_[MIN/MAX]
+gdiConstrainFlags	record
+	:12
+	CONSTRAIN_X_MIN:1
+	CONSTRAIN_X_MAX:1
+	CONSTRAIN_Y_MIN:1
+	CONSTRAIN_Y_MAX:1
+gdiConstrainFlags	end
+
+OFF_HARD_ICON	equ	000h
+ON_HARD_ICON	equ	0ffh
+NO_HARD_ICON_ENTRY	equ	-1
+;
+; These are the bits expected by MouseSendEvents for the current state of
+; the mouse buttons. A 1 implies the button is up. This record is in the
+; "wrong" order because of historical inertia.
+
+MouseButtonBits record MB_DELTA:1=1, MOUSE_B3:1=1, MOUSE_B0:1=1, MOUSE_B1:1=1, MOUSE_B2:1=1
+; use for a digitizer pen
+PEN_UP   equ (mask MOUSE_B0 or mask MOUSE_B1 or mask MOUSE_B2 or mask MOUSE_B3)
+PEN_DOWN equ (mask MOUSE_B1 or mask MOUSE_B2 or mask MOUSE_B3)
+
+ALREADY_INITIALIZED	enum	FatalErrors
+;Default scale and offset to be used for calibration if no entry found
+;in the INI file
+DEFAULT_SCALEX	equ	1
+DEFAULT_SCALEY	equ	1
+DEFAULT_OFFSETX	equ	0
+DEFAULT_OFFSETY	equ	0
+
+;------------------------------------------------------------------------------
+;			Variables
+;------------------------------------------------------------------------------
+idata		segment
+;TODO  MOUSE_FLAGS, DIGITIZER_X/Y_RES, MOUSE_NUM_BUTTONSshould be set based
+;on ini entry.
+
+;misc flags about mouse :- MDIF_KEYBOARD_ONLY, only used in KBMouse
+MOUSE_FLAGS equ 0		; If not specified, no flags.
+
+;
+; Driver information table. Mouse driver tables are followed by the number
+; of buttons supported by the mouse, and the digitizer resolution (or 0,0 if
+; the driver is for a mouse).	TODO
+;
+DIGITIZER_X_RES		=	98	;98 DPI
+DIGITIZER_Y_RES		=	98	;98 DPI
+
+MOUSE_NUM_BUTTONS	equ	1
+DriverTable	MouseDriverInfoStruct	<
+	<
+	    <
+	        MouseStrategy,
+		mask DA_HAS_EXTENDED_INFO,
+		DRIVER_TYPE_INPUT
+	    >,
+	    MouseExtendedInfoSeg	; Specify resource of extended info
+					;  for the driver
+	>,
+	MOUSE_NUM_BUTTONS,
+
+	DIGITIZER_X_RES,		;The resolution if driver is for
+	DIGITIZER_Y_RES,		; a digitizer
+	MOUSE_FLAGS
+>
+ForceRef	DriverTable
+
+mouseStratFlags	MouseStratFlags	<0>	; Flags for strategy routine
+mouseButtons	MouseButtonBits <>	; Assume all buttons up
+mouseAccelThreshold	word	5	; Pixels/report threshold
+mouseAccelMultiplier	word	1	; Multiplier past threshold
+					; (Default is 1:1, in case mouse
+					; itself does something...)
+		even
+ifndef MOUSE_DONT_ACCELERATE
+; Variables for handling acceleration for relative device drivers.
+; When accelerating, if current ptr event happens soon enough after the previous
+; ptr event, the new raw deltas are added to the previous raw deltas and the
+; result accelerated. The previous accelerated deltas are subtracted from
+; the result and the difference is sent as the IM_PTR_CHANGE event.
+; The timestamp is set to the new event, so continual motion all gets
+; accelerated, but it's *not* accelerated exponentially (though some might
+; like that, and it could be arranged...)
+mouseLastTime	word	0		; Time stamp of previous ptr event
+mouseRawDeltaX	word	0		; Change in X of previous ptr event
+mouseRawDeltaY	word	0		; Change in Y of previous ptr event
+mouseAccDeltaX	word	0		; Accelerated deltaX
+mouseAccDeltaY	word	0
+endif
+
+;used for calibration, taken from bulletpen
+offsetX		word	300
+offsetY		word	300
+Xscale		word	10240
+Yscale		word	6400
+
+;variables used to store last digitizer coords
+digiXPos	word	320  ; same value as INITIAL_X/Y_PTR_POSTION
+digiYPos	word	134  ; taken from L/User/User/userConstant.def
+
+; variables to store the last calibrated mouse position
+ptrXPos		word	320
+ptrYPos		word	134
+
+; variable to store the change(calibarated) in mouse positon
+deltaX		word	0
+deltaY		word	0
+
+;
+; Table of handler routines for use by MouseStrategy
+;
+mouseHandlers	nptr.near Resident:MouseInit		; DR_INIT
+		nptr.near Resident:MouseExit		; DR_EXIT
+		nptr.near Resident:MouseSuspend		; DR_SUSPEND
+		nptr.near Resident:MouseUnsuspend	; DR_UNSUSPEND
+		nptr.near Resident:MouseTestDevice
+		nptr.near Resident:MouseSetDevice
+;		nptr.near Resident:MouseSetRate		; DR_MOUSE_SET_RATE
+		nptr.near Resident:MouseGetRates	; DR_MOUSE_GET_RATES
+		nptr.near Resident:MouseSetAcceleration	; DR_MOUSE_SET_ACCELERATION
+		nptr.near Resident:MouseGetAcceleration	; DR_MOUSE_GET_ACCELERATION
+		nptr.near Resident:MouseSetCombineMode 	; DR_MOUSE_SET_COMBINE_MODE
+		nptr.near Resident:MouseGetCombineMode 	; DR_MOUSE_GET_COMBINE_MODE
+		nptr.near Resident:MouseGetCalibrationPoints
+		nptr.near Resident:MouseSetCalibrationPoints
+		nptr.near Resident:MouseGetRawCoordinate
+		nptr.near Resident:MouseChangeOutput	; only in BULLET on...
+		nptr.near Resident:MouseStartCalibration
+		nptr.near Resident:MouseStopCalibration
+
+;
+; Process to which events should be sent
+;
+mouseOutputHandle hptr	0
+
+mouseCombineMode	MouseCombineMode	MCM_COMBINE
+
+noStoreDeltasFlag		byte	0
+
+if	DEBUG_COMBINE
+combineCount		word
+noCombineCount		word
+endif
+
+;Are we processing a calibratation point ?
+calibrating	byte	
+idata		ends
+
+udata	segment
+;
+; used to store the values returned by GDIPointerInfo,
+; 
+hirTable	fptr
+hiaTable	fptr
+hiCount		word
+
+oldPtrFlags	PtrFlags
+hardIconPress	byte	; are we on an icon or on screen
+
+udata	ends

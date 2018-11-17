@@ -1,0 +1,315 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		System Mailbox -- Data Storage Driver Interface
+FILE:		mbDataDr.def
+
+AUTHOR:		Adam de Boor, Mar 28, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	3/28/94		Initial revision
+
+
+DESCRIPTION:
+	Interface for Mailbox Data Drivers.
+		
+	$Id: mbDataDr.def,v 1.1 97/04/04 14:14:13 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__MBDATADR
+
+MailboxDataCapabilities	record
+    :15
+    MBDC_CUSTOM_ERROR_STRING:1
+    ; Set if Mailbox library should call DR_MBDD_GET_CUSTOM_ERROR_STRING when
+    ; the driver is first encountered, and use that string whenver the driver
+    ; cannot be loaded. This is intended to allow specialized drivers that
+    ; reside on PCMCIA cards to give a helpful message (e.g. identifying the
+    ; card to be inserted, rather than the generic "Driver not found" string)
+MailboxDataCapabilities end
+
+MBDDInfo	struct
+    MBDDI_common	DriverInfoStruct <
+	,0,DRIVER_TYPE_MAILBOX_DATA
+    >
+
+    MBDDI_storage	MailboxStorage
+    ; 32-bit storage token indicating what the driver supports
+    
+    MBDDI_capabilities	MailboxDataCapabilities	0
+
+    MBDDI_mboxRefSize	word
+    ; Number of bytes needed to store a reference to the body when the message
+    ; is in the mailbox.  Because this number often cannot be exact, the 
+    ; Mailbox Library passes a resizable chunk to DR_MBDD_STORE_BODY for 
+    ; the driver to return the appropriate reference.  
+    
+    MBDDI_appRefSize	word
+    ; *Maximum* number of bytes needed to store a reference to the body 
+    ; when created by an application. This allows a transport driver to 
+    ; allocate enough room, before calling DR_MBDD_WRITE_COMPLETE for 
+    ; the driver to return the appropriate reference.
+MBDDInfo	ends
+
+MBDD_PROTO_MAJOR	equ	DRIVER_PROTO_MAJOR+1
+MBDD_PROTO_MINOR	equ	DRIVER_PROTO_MINOR+0
+
+MailboxDataDriverFunction	etype	word, DriverFunction, 2
+
+DR_MBDD_STORE_BODY			enum	MailboxDataDriverFunction
+;	Desc:	Called by the Mailbox library when a message is being
+;		registered. The driver is expected to copy the body data,
+;		if indicated by MMF_BODY_DATA_VOLATILE or desired by the
+;		driver, and initialize the mailbox body reference whose address
+;		is passed.
+;
+;		If the data are *not* volatile and the driver copies them
+;		anyway, the driver is responsible for freeing the data passed
+;		by the application.
+;
+;	Pass:	cx:dx	= pointer to MBDDBodyRefs
+;			  NOTE: MBDDBR_mboxRef.offset is actually a *chunk
+;			  handle*, not an offset. This allows the driver to
+;			  enlarge or shrink the buffer, as needed. 
+;			
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;		carry clear if ok:
+;			*cx:dx.MBDDBR_mboxRef sized as small as possible and
+;				filled in.  Note that MBDDBR_mboxRef.segment
+;				may have changed due to resizing of the chunk.
+;
+
+MBDDBodyRefs	struct
+    MBDDBR_appRef	fptr	; Reference passed by registrar of the message
+    MBDDBR_appRefLen	word	; Number of bytes pointed to by MBDDBR_appRef
+    MBDDBR_mboxRef	fptr	; Place for driver to store new reference to be
+				;  copied into the message descriptor.
+    MBDDBR_mboxRefLen	word	; Number of bytes at *MBDDBR_mboxRef. Mailbox
+				;  library sets this from MBDDI_mboxRefSize in
+				;  the driver's MBDDInfo structure.
+    MBDDBR_flags	MailboxMessageFlags
+MBDDBodyRefs	ends
+
+DR_MBDD_READ_INITIALIZE			enum	MailboxDataDriverFunction
+;	Desc:	This is the first call issued by the transport driver before
+;		beginning the transmission of a message. The driver is
+;		expected to locate the message body and allocate some state
+;		information to track the transaction.
+;
+;		The driver returns a suitable 16-bit token for the transport
+;		driver to identify the message body more efficiently on
+;		subsequent calls.
+;
+;		Note: The data driver must not be unloaded and reloaded in 
+;		between a DR_MBDD_READ_INITIALIZE and a DR_MBDD_READ_COMPLETE,
+;		because it keeps read state information.
+;
+;	Pass:	cx:dx	= pointer to mboxRef for the message body
+;	Return:	carry set if body could not be accessed:
+;			ax	= MailboxError
+;					ME_CANNOT_OPEN_MESSAGE_FILE
+;		carry clear if ok:
+;			si	= token to pass to subsequent calls
+;			bx	= number of blocks in the message
+;			cxdx	= number of bytes in the message body
+;
+
+DR_MBDD_READ_NEXT_BLOCK			enum	MailboxDataDriverFunction
+;	Desc:	Fetch the next block of data from the message body. The
+;		returned block will be freed by the caller.
+;
+;	Pass:	si	= token returned by DR_MBDD_READ_INITIALIZE
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;					ME_NOT_ENOUGH_MEMORY
+;		carry clear if ok:
+;			dx	= extra word to pass to data driver on
+;				  receiving machine
+;			cx	= number of bytes in the block
+;			bx	= handle of block holding the data (0 if
+;				  no more data in the body)
+;
+
+DR_MBDD_READ_COMPLETE			enum	 MailboxDataDriverFunction
+;	Desc:	Signals to the data driver that the transmission of the
+;		message body is complete. The driver may free the state
+;		information it allocated in DR_MBDD_READ_INITIALIZE.
+;
+;	Pass:	si	= token returned by DR_MBDD_READ_INITIALIZE
+;	Return:	nothing
+;
+    
+DR_MBDD_WRITE_INITIALIZE		enum	MailboxDataDriverFunction
+;	Desc:	This is the first call issued by the transport driver before
+;		receiving a message. It effectively passes to the receiving
+;		data driver the values that were returned from the sending
+;		data driver's DR_MBDD_READ_INITIALIZE function. As for
+;		reading, the driver is expected to allocate some state
+;		information to track the transaction.
+;
+;		The driver returns a suitable 16-bit token for the transport
+;		driver to identify the message body more efficiently on
+;		subsequent calls.
+;
+;		Note: The data driver must not be unloaded and reloaded in 
+;		between a DR_MBDD_WRITE_INITIALIZE and a DR_MBDD_WRITE_
+;		COMPLETE, because it keeps write state information.
+;
+;	Pass:	bx	= number of blocks in the message
+;		cxdx	= number of bytes in the message body
+;	Return:	carry set if body could not be accessed:
+;			ax	= MailboxError
+;					ME_CANNOT_CREATE_MESSAGE_FILE
+;		carry clear if ok:
+;			si	= token to pass to subsequent calls
+;
+
+DR_MBDD_WRITE_NEXT_BLOCK		enum	MailboxDataDriverFunction
+;	Desc:	Write the next block of data to the message body. The
+;		driver may either consume the data block, taking responsibility
+;		for it and its handle, or it may allow the caller to free the
+;		block on return.  Even if this function returns an error, the
+;		caller is still responsible for calling DR_MBDD_WRITE_CANCEL
+;		or DR_MBDD_WRITE_COMPLETE, so that the data driver can free
+;		its state information.
+;
+;	Pass:	si	= token returned by DR_MBDD_WRITE_INITIALIZE
+;		dx	= extra word returned by DR_MBDD_READ_NEXT_BLOCK on
+;			  sending machine
+;		cx	= number of bytes in the block
+;		bx	= handle of data block
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;		carry clear if ok:
+;			ax	= 0 if data block has been consumed. non-zero
+;				  if block should be freed by caller.
+;
+
+DR_MBDD_WRITE_COMPLETE			enum	 MailboxDataDriverFunction
+;	Desc:	Signals to the data driver that the reception of the
+;		message body is complete. The driver may free the state
+;		information it allocated in DR_MBDD_WRITE_INITIALIZE.
+;	  	If this function returns an error, it is *not* necessary to
+;		follow up with a DR_MBDD_WRITE_CANCEL.
+;
+;	Pass:	si	= token returned by DR_MBDD_WRITE_INITIALIZE
+;		cx:dx	= pointer to buffer for app-ref of body (size 
+;			  determined by MBDDI_appRefSize).
+;	Return:	carry set if message body couldn't be commited to
+;		disk:
+;			ax	= MailboxError
+;		carry clear if message body successfully committed.
+;			cx:dx	= filled with app-ref to the data.
+;
+
+DR_MBDD_DELETE_BODY			enum	MailboxDataDriverFunction
+;	Desc:	Instructs the driver to delete the message body whose mbox-ref
+;		is passed.
+;
+;	Pass:	cx:dx	= pointer to mbox-ref returned by DR_MBDD_STORE_BODY
+;	Return:	carry set if unable to delete the message. For example, the
+;		body is on a card that isn't in the machine (one might, for
+;		some strange reason, have two pager cards, allowing the data
+;		driver to be loaded, but the message is on the other pager 
+;		card)
+;
+
+DR_MBDD_GET_BODY			enum	MailboxDataDriverFunction
+;	Desc:	Fetch the body of a message, returning an app-ref to it.
+;
+;	Pass:	cx:dx	= pointer to MBDDBodyRefs. MBDDBR_flags is undefined
+;			  MBDDBR_mboxRef is an actual far pointer
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;		carry clear if successful:
+;			cx:dx.MBDDBR_appRef filled in
+;			cx:dx.MBDDBR_appRefLen updated to hold actual size
+;
+
+DR_MBDD_STEAL_BODY			enum	MailboxDataDriverFunction
+;	Desc:	Fetch the body of a message, returning an app-ref to it. The
+;		only difference between this and DR_MBDD_GET_BODY is the
+;		driver will *not* receive a DR_MBDD_DONE_WITH_BODY call: the
+;		caller is taking complete possession of the message body.
+;
+;	Pass:	cx:dx	= pointer to MBDDBodyRefs. MBDDBR_flags is undefined
+;			  MBDDBR_mboxRef is an actual far pointer
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;		carry clear if successful:
+;			cx:dx.MBDDBR_appRef filled in
+;			cx:dx.MBDDBR_appRefLen updated to hold actual size
+;
+
+DR_MBDD_DONE_WITH_BODY			enum	MailboxDataDriverFunction
+;	Desc:	The recipient of the message is done with the body that
+;		was returned by a previous DR_MBDD_GET_BODY or 
+;		DR_MBDD_WRITE_COMPLETE.  The driver may do whatever 
+;	 	cleanup or other work it deems appropriate.  
+;
+;	Pass:	cx:dx	= pointer to app-ref returned by DR_MBDD_GET_BODY
+;			  or DR_MBDD_WRITE_COMPLETE.  (not necessarily at 
+;			  the same address; just the contents are the same)
+;
+;	Return:	nothing
+;
+
+DR_MBDD_BODY_SIZE			enum 	MailboxDataDriverFunction
+;	Desc:	Fetch the number of bytes in a message body, for use
+;		in control panels and information dialogs and the like.
+;
+;	Pass:	cx:dx	= pointer to mbox-ref for the body
+;	Return:	carry clear if okay:
+;			dxax	= number of bytes in the body (-1 if info not
+;				  available)
+;		carry set if error:
+;			ax	= MailboxError
+;				ME_DATA_DRIVER_CANNOT_ACCESS_MESSAGE_BODY
+;
+
+DR_MBDD_WRITE_CANCEL			enum	 MailboxDataDriverFunction
+;	Desc:	Signals to the data driver that the reception of the
+;		message body has failed.  The driver should cleanup by
+;		freeing data blocks already received, and free the state
+;		information it allocated in DR_MBDD_WRITE_INITIALIZE.
+;
+;	Pass:	si	= token returned by DR_MBDD_WRITE_INITIALIZE
+;	Return:	nothing
+;
+
+DR_MBDD_DONE_WITH_BODY_AND_DELETE	enum	MailboxDataDriverFunction
+;	Desc:	Same as DR_MBDD_DONE_WITH_BODY, but the driver should 
+; 		also delete the body.  Should be called if there was an
+;		error when writing the message body, to allow the driver
+;		to cleanup the partially written message.
+;
+;	Pass:	cx:dx	= pointer to app-ref of message, likely returned
+;			  from DR_MBDD_WRITE_COMPLETE
+;	Return:	carry set if unable to delete the message. 
+;
+
+DR_MBDD_GET_CUSTOM_ERROR_STRING		enum	MailboxDataDriverFunction
+;	Desc:	Called only if MBDC_CUSTOM_ERROR_STRING set, this function
+;		returns the error string to use if, at a later time, the
+;		driver cannot be loaded because it cannot be found.
+;
+;	Pass:	nothing
+;	Return:	^lcx:dx	= optr of text string to use.
+;
+
+DR_MBDD_CHECK_INTEGRITY			enum	MailboxDataDriverFunction
+;	Desc:	Tells the driver to check the integrity of the message body.
+;
+;	Pass:	cx:dx	= pointer to mbox-ref for the body
+;	Return:	carry set if the message body is invalid
+;

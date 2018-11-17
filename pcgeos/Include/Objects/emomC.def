@@ -1,0 +1,394 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		EMOM.def
+
+AUTHOR:		Ian Porteous, May 23, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	IP	5/23/94   	Initial revision
+
+
+DESCRIPTION:
+	Definitions for ExpressMenuObjectManager, a simple object that
+	manages the interactions necessary to add things to every 
+	ExpressMenuControl object in the system.
+	
+	The premise of the object is this: you subclass it to handle the
+	initialization of the items that you indicate, via instance data, you
+	want created in every express menu, and the EMObjectManager takes care
+	of everything else.
+	
+	An EMOM can be either statically or dynamically instantiated. For an
+	application (or process-library), you're best off defining your EMOM
+	object in your .ui or .goc file and placing it on the MGCNLT_ACTIVE_LIST
+	Geoworks-defined GCN list for the application object. This will allow
+	it to get the MSG_META_ATTACH and MSG_META_DETACH messages it uses
+	to hook and release all the express menus.
+	
+	If you create the object with ObjInstantiate or ObjDuplicateResource,
+	as you'll have to do if you're a driver or a library that has no
+	application object, then you'll have to send it the MSG_META_ATTACH
+	by hand after having called MSG_EMOM_SETUP (if you created it with
+	ObjInstantiate) to specify the objects you want created in each menu.
+	In this case, you will want to be sure to set the 
+	EMOMA_DETACH_WITH_SYSTEM attribute so the manager gets a META_DETACH
+	from the UI when the UI is shutting the system down. This will allow
+	your library/driver to actually be unloaded.
+	
+	Detaching an EMOM requires special help from the objects it created.
+	This support is provided by the EMTrigger class. If you're creating
+	triggers to go in the express menu, you should subclass EMTrigger,
+	not GenTrigger (or use EMTrigger directly if you prefer to do all
+	the setup work in your EMOM subclass). The support required is simple:
+		- in MSG_META_FINAL_OBJ_FREE, you must send MSG_EMOM_ACK to
+		  the EMOM before transferring control to your superclass.
+	EMTrigger has a method that EMOM invokes to tell it where the EMOM is,
+	but you can locate the EMOM however you like, including using a global
+	variable to hold the optr, if you're a library or driver.	
+		
+	$Id: emomC.def,v 1.1 97/04/04 14:19:58 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __EMOMC
+
+StartLibrary	ui
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EMOMBeginClassArray
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Begins the specification of the classes for objects to be
+		created by the object manager. You follow it with one or more
+		invocations of the EMOMDefClass macro (see below)
+
+PASS:		num	= number of objects you want created in each express
+			  menu
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	9/16/94		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+EMOMBeginClassArray	macro num
+	ChunkArrayHeader <num, size CreateExpressMenuControlItemParams, 0, 
+			 size ChunkArrayHeader>
+	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EMOMDefClass
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	This macro can be used to declare
+		CreateExpressMenuControlItemParams(CEMCIP) struct
+		with an unrelocated far pointer for CEMCIP_class. It is
+		necessary to declare CEMCIP_classes with an unrelocate
+		far pointer to ClassStruct, if the CEMCIP struct
+		is declared in an object block that will later be
+		brought into memory using ObjDuplicateResource.
+
+PASS:		class	= 	far pointer to ClassStruct of class to
+				create
+
+		feature	= 	CreateExpressMenuControlItemFeature, feature
+				in the express menu in which to create the
+				object
+
+		prio	= 	CreateExpressMenuControlItemPriority
+				specifies the relative position of the
+				newly created item.  Lower number will
+				be added in front of higher numbers
+
+		respData = 	word of data to be passed in
+				MSG_EMOM_INITIALIZE_ITEM. allows
+				identification of which item was
+				created. MUST be unique with respect
+				to all other
+				CreateExpressMenuControlItemParams in
+				EMOMI_classes for a given EMOM object.
+
+PSEUDO CODE/STRATEGY:
+
+this code:
+
+	org $-size CreateExpressMenuControlItemParams+offset CEMCIP_class
+	UN_DD class
+	org $+size CreateExpressMenuControlItemParams-(offset CEMCIP_class+sizeCEMCIP_class)
+	
+Is necessary because UN_DD can not be used inside of a structure
+declaration.  Therefore, the unrelocated pointers for CEMCIP_class must be
+inserted using org.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	6/01/94		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+EMOMDefClass	macro	class, feature, prio, respData
+	CreateExpressMenuControlItemParams <
+		feature, 0, prio, MSG_EMOM_EXPRESS_MENU_OBJECT_CREATED,
+		0, respData, 0
+	>
+	; back to CEMCIP_class field
+	org $-size CreateExpressMenuControlItemParams+offset CEMCIP_class
+	UN_DD class
+	; now at CEMCIP_class+size CEMCIP_class, so skip forward beyond CEMCIP
+	org $+size CreateExpressMenuControlItemParams-(offset CEMCIP_class+size CEMCIP_class)
+endm
+
+
+
+EMObjectManagerClass	class	MetaClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+MSG_EMOM_EXPRESS_MENU_OBJECT_CREATED	message
+;
+;
+; Context:	   This message is sent to an EMObjectManager (EMOM) object
+; 		by an express menu contoller after it has serviced the EMOM's
+;		request to create an object in the express menu.
+;
+;		   (An Item is added to an ExpressMenu control by
+;		sending it MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM along
+;		with CreateExpressMenuControlItemParams. In these parameters,
+;		a return message is passed in CEMCIP_responseMessage along
+;		with an optr CEMCIP_responseDestination to send the message
+;		to.  After the object is created, the ExpressMenu controller
+;		sends CEMCIP_responseMessage back to CEMCIP_responseDestination
+;		object, along with CEMCIP_responseData.  The EMObjectManager  
+;		sets itself as CEMCIP_responseDestination and
+;		MSG_EMOM_EXPRESS_MENU_OBJECT_CREATED as CEMCIP_responseMessage.)
+;
+;		   When the EMObjectManager receives the message, if one does
+;		not already exist, it creates a new array element in
+;		EMOMI_expressMenus for the express menu which created the
+;		object. It then adds the object created to the 
+;		EMOMEM_createdObjects array for the express menu.
+;		
+; Source:	Express Menu Controller
+; Destination:  
+; Interception: This message should not be intercepted by a subclass.
+; 		MSG_EMOM_INITIALIZE_ITEM should be intercepted instead
+; 		to initialize the object that was created.
+;
+; Pass:		ss:bp	= CreateExpressMenuControlItemResponseParams
+;			
+; Return:	nothing
+;
+;	ax, cx, dx, bp 	- unchanged	
+;			- destroyed	
+;
+
+MSG_EMOM_INITIALIZE_ITEM	message
+;
+;
+; Context:	   This message should be subclassed to initialize the
+; 		new items created in the express menus.  Whenever the
+; 		EMObjectManager creates a new item in an ExpressMen controller,
+;		it sends itself this message along with an optr to the new
+;		object and the response data for the new object.
+;
+;		   A subclass of EMObjectManagerClass must intercept
+;		this message and initialize the item in ^lcx:dx
+;		to suit its own purposes.  The subclass can identify which
+;		object was created by the response data in bp, which will be
+;		the same value as the CEMCIP_responseData used to create the
+;		object.
+;
+;		The created object is *not usable* and must be set usable
+;		by the subclass when it thinks it should be.
+;
+; Source:	EMObjectManager
+; Destination:	EMObjectManager subclass  
+; Interception: must be intercepted to initialize the new object. There is no
+;		need to call the superclass. If this is not intercepted, the
+;		created object will never be seen by the user.
+;
+; Pass:		^lcx:dx = new item
+;		bp	= responseData
+;			
+; Return:	nothing
+;
+;			- unchanged	
+;	ax, cx, dx, bp 	- destroyed	
+;
+
+MSG_EMOM_SETUP	message
+;
+;
+; Context:	   Send this message along with ^lcx:dx = ChunkArray of
+;		CreateExpressMenuControlItemParams to initialize an
+;		instantiated (i.e. one not from a .ui file) EMObjectManager
+;		before you send it MSG_META_ATTACH.
+;
+;		   If an instance of EMObjectManager does not have
+;		EMOMI_classes set to anything when it is created,
+;		EMOMI_classes can be set by sending this message along
+;		with an optr to a ChunkArray of
+;		CreateExpressMenuControlItemParams.
+;
+;		   EMOMI_classes must point to a ChunkArray before
+;		MSG_META_ATTACH is sent to the object.
+; Source:	
+; Destination:  new EMObjectManager
+; Interception: Should not be intercepted
+;
+; Pass:		optr cx:dx	= ChunkArray of CreateExpressMenuControl-
+;				  ItemParams
+;			
+; Return:	carry set if error
+;
+;	bp	- unchanged	
+;	ax, cx	- destroyed	
+;
+
+MSG_EMOM_ACK	message
+;
+; Context:	Used in the EMOM detach sequence
+; 		
+;		This message is sent to the EMOM by an object that the EMOM
+;		object has created in an express menu control when the created
+;		object is freed.
+;
+; Source:	an object that the EMOM object has created in an
+; 		express menu control.
+; Destination:  An EMOM object
+; Interception: probably not, but must call superclass at some point if you
+;		do (probably at the end as a goto, so if the detach_complete
+;		is delivered as a result of receiving this message, there's no
+;		need to return to library code that may no longer be there)
+;
+; Pass:		nothing
+;			
+; Return:	nothing
+;
+;	ax, cx, dx, bp 	- unchanged
+;			- destroyed
+;
+
+MSG_EMOM_SET_ATTRS	message
+; Set the attributes that control our behaviour
+;
+; Context:	Sent by someone who has instantiated this object
+; Source:	?
+; Destination:  self
+; Interception: not
+;
+; Pass:
+;		cl - EMOMAttrs to set
+;		ch - EMOMAttrs to clear
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_EMOM_GET_ATTRS	message	
+; Get the attributes that control our behaviour
+;
+; Context:	?
+; Source:	?
+; Destination:  self
+; Interception: not
+;
+; Pass:
+;		nothing
+; Return:
+;		cl - EMOMAttrs
+;		- unchanged
+;		- destroyed
+;
+
+;
+; structure internal to EMObjectManagerClass, used to keep track of
+; all of the express menus, and the items managed in each express
+; menu.
+;
+EMOMExpressMenu	struct
+	EMOMEM_expressMenu	optr		; the express menu
+						; controller
+	EMOMEM_createdObject	label	optr
+						; table of objects
+						; created for each
+						; express menu, one
+						; for each element of
+						; EMOMI_classes 
+EMOMExpressMenu	ends
+
+EMOMAttrs	record
+    EMOMA_DETACHING:1
+    ; Set when MSG_META_DETACH is received. Do not set yourself. I mean it.
+    ; 
+    
+    EMOMA_DETACH_WITH_SYSTEM:1
+    ; This manager should stay around as long as the system is running, and
+    ; should detach when the UI is told to detach.
+    ;
+    ; The net result is the object is added, during MSG_META_ATTACH, to the UI
+    ; application's active list to receive the MSG_META_DETACH when that object
+    ; receives its MSG_META_DETACH.
+    ;
+    ; This is intended for use by stand-alone libraries and drivers that do not
+    ; have application threads of their own.
+    ; 
+    :6
+EMOMAttrs	end
+
+	EMOMI_expressMenus	lptr.ChunkArrayHeader
+	;
+	; Array of EMOMExpressMenu structures that track the express
+	; menus and the object(s) created for each one
+	;
+
+	EMOMI_classes		lptr.ChunkArrayHeader	
+	;
+	;    Array of CreateExpressMenuControlItemParams which describe
+	; the objects to be put into the express menu. The
+	; reponseDesitination field will be filled and does not need to be 
+	; passed in. 
+	;    The CEMCIP_responseData has to be unique for each entry.
+	;
+
+	EMOMI_numClasses	word
+	; The number of objects for each express menu being managed (calculated
+	; from size of chunk array)
+	;
+
+	EMOMI_attrs		EMOMAttrs	0
+	; Miscellaneous attributes that control our behaviour.
+	; 
+
+	EMOMI_objectCount	word
+	; number of object still in express menus.  This is used to
+	; make sure that all objects created in express menus are
+	; destoryed before we finish detaching.
+	
+EMObjectManagerClass	endc
+
+
+EndLibrary	ui
+

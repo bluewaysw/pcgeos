@@ -1,0 +1,350 @@
+/********************************************************************
+ * Copyright (C) 1996 Blue Marsh Softworks -- All Rights Reserved.
+ * Portions Copyright (c) Geoworks 1992 -- All Rights Reserved
+ * PROJECT:      Web Editor
+ * MODULE:       Process Methods
+ * FILE:         process.goc
+ * AUTHORS:      Clemens Kochinke
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       CK      10/15/95  Begin html editor
+ * DESCRIPTION:
+ *      These are the function definitions and method definitions
+ *      for the process object.
+ *******************************************************************/
+/********************************************************************
+ *                 Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    @include <objects/vltextc.goh> /* VisLargeText definitions */
+    #include <initfile.h>          /* GEOS.INI file routines */
+    @include "app.goh"             /* Includes classes and constants. */
+    @include "global.goh"          /* Must be after app.goh. Includes
+                                    * globals, objects, prototypes. */
+#include<file.h>                  /* For file selector */
+/********************************************************************
+ *                 Local Function Definitions
+ *******************************************************************/
+/********************************************************************
+ *                 Code for HTMProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *                 MSG_GEN_PROCESS_TOGGLE_TOOL_BAR
+ * Note: The following could go into into method and be switched
+ ********************************************************************
+ * SYNOPSIS:     Toggle the Tool Bar
+ *******************************************************************/
+@extern method HTMProcessClass, MSG_GEN_PROCESS_TOGGLE_TOOL_BAR {
+optr tools;     /* Pointer to the HTMButtonBar at bottom of screen */
+        tools =  /*GeodeGetOptrNS(*/@HTMToolbar/*)*/;
+        @send tools::MSG_GEN_INTERACTION_TOGGLE_POPOUT();
+}  /* MSG_GEN_PROCESS_TOGGLE_TOOL_BAR */
+/********************************************************************
+ *                 MSG_GEN_PROCESS_TOGGLE_BUTTON_BAR
+ ********************************************************************
+ * SYNOPSIS:     Toggle the Button Bar
+ *******************************************************************/
+@extern method HTMProcessClass, MSG_GEN_PROCESS_TOGGLE_BUTTON_BAR {
+optr buttons;   /* Pointer to the HTMButtonBar at bottom of screen */
+        buttons =  /*GeodeGetOptrNS(*/@HTMActionButtonGroup/*)*/;
+        @send buttons::MSG_GEN_INTERACTION_TOGGLE_POPOUT();
+} /* MSG_TOGGLE_BUTTON_BAR */
+
+@extern method HTMProcessClass, MSG_GEN_PROCESS_TOGGLE_SPEEDTAG_BAR {
+optr speedtags;   /* Pointer to the speed tag bar */
+        speedtags =  /*GeodeGetOptrNS(*/@SpeedBox/*)*/;
+        @send speedtags::MSG_GEN_INTERACTION_TOGGLE_POPOUT();
+} /* MSG_TOGGLE_BUTTON_BAR */
+
+/********************************************************************
+ *                 MSG_GEN_PROCESS_OPEN_APPLICATION
+ ********************************************************************
+ * SYNOPSIS:     This is sent by the UI when the app is being
+ *               loaded.
+ * PARAMETERS:   void ( AppAttachFlags attachFlags,
+ *                      MemHandle      launchBlock,
+ *                      MemHandle      extraState )
+ * SIDE EFFECTS: Changes pointSize_g
+ * STRATEGY:     Read saved point size from GEOS.INI file.
+ *******************************************************************/
+@extern method HTMProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+  word sizeOfData; /* Size of data read from INI file. */
+optr buttons;           /* Pointer to the HTMButtonBar at bottom of screen */
+optr primary;           /* Pointer to HTMPrimary  */
+optr htmlmenu;          /* Pointer to the HTMMenu */
+optr htmlmenu2;         /* Pointer to the HTMMenu */
+optr aboutbox;          /* Pointer to the HTMAboutBox */
+/*optr dummygroup;       Pointer to the HTMDummyGroup */
+optr filegroup;         /* Pointer to the HTMFileGroup */
+/* optr bbxicon;         Pointer to the BBXIcon in toolbar */
+optr diaboxes;          /* GenInter with dialog boxes */
+optr appl;
+optr textobj;
+optr speedtags;
+
+/*if ( !( attachFlags & AAF_RESTORING_FROM_STATE))
+        {*/
+		  primary = /*GeodeGetOptrNS(@HTMPrimary)*/@HTMPrimary;
+		  htmlmenu = /*GeodeGetOptrNS(@HTMLMenu)*/@HTMLMenu;
+		  htmlmenu2 = /*GeodeGetOptrNS(@HTMLMenu2)*/@HTMLMenu2;
+		  buttons =  /*GeodeGetOptrNS(@HTMActionButtonGroup)*/@HTMActionButtonGroup;
+		  aboutbox = /*GeodeGetOptrNS(@HTMAboutBox)*/@HTMAboutBox;
+/*      dummygroup = GeodeGetOptrNS(@HTMDummyGroup);*/
+		  filegroup = /*GeodeGetOptrNS(@HTMFileGroup)*/@HTMFileGroup;
+		  diaboxes = /*GeodeGetOptrNS(@DBoxes)*/@DBoxes;
+		  appl = /*GeodeGetOptrNS(@HTMApp)*/@HTMApp;
+	 speedtags = /*GeodeGetOptrNS(@SpeedBox)*/@SpeedBox;
+
+   @send primary::MSG_GEN_ADD_CHILD(htmlmenu, (CCF_MARK_DIRTY | 2 /* CCO_FIRST */ ));
+   @send primary::MSG_GEN_ADD_CHILD(htmlmenu2, (CCF_MARK_DIRTY | 3 /*CCO_FIRST */ ));
+  @send primary::MSG_GEN_ADD_CHILD(speedtags, (CCF_MARK_DIRTY | 5 /*CCO_FIRST */ ));
+   @send primary::MSG_GEN_ADD_CHILD(buttons, (CCF_MARK_DIRTY | CCO_LAST));
+ /*  @send primary::MSG_GEN_ADD_CHILD(dummygroup, (CCF_MARK_DIRTY | CCO_LAST));*/
+   @send filegroup::MSG_GEN_ADD_CHILD(aboutbox, (CCF_MARK_DIRTY | CCO_LAST));
+
+@send appl::MSG_GEN_ADD_CHILD(diaboxes, (CCF_MARK_DIRTY|CCO_LAST));
+
+/*  TRY SETTING MENU CHILDREN WITH CCO_LAST */
+
+        @call htmlmenu::MSG_GEN_SET_USABLE(VUM_NOW);
+        @call htmlmenu2::MSG_GEN_SET_USABLE(VUM_NOW);
+        @call buttons::MSG_GEN_SET_USABLE(VUM_NOW);
+/* Attempt to avoid crash on reopening by rem'ing these two: doesn't help !
+        @call dummygroup::MSG_GEN_SET_USABLE(VUM_NOW); */
+        @call aboutbox::MSG_GEN_SET_USABLE(VUM_NOW);
+  @call speedtags::MSG_GEN_SET_USABLE(VUM_NOW);
+
+        @call diaboxes::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+/*}*/
+//FileSetCurrentPath(SP_DOCUMENT, "Jupiter 2Web");
+  @callsuper();
+     /* From Nathan:
+	Read saved point size from GEOS.INI file.
+      * If there is an error, set size to default.
+      * Error indicates our category hasn't been added yet. */
+  sizeOfData = 0;
+  InitFileReadDataBuffer( INI_CATEGORY,INI_PTSZ_KEYWORD,
+                          &pointSize_g, sizeof( pointSize_g ),
+                          &sizeOfData );
+  if ( sizeOfData != sizeof( pointSize_g ) ) {
+    pointSize_g.WWF_int  = HTM_DEFAULT_PS;
+    pointSize_g.WWF_frac = 0;
+  }
+     /* Read saved font ID from GEOS.INI file.
+      * If there is an error, set font to default.
+      * Error indicates our category hasn't been added yet. */
+  sizeOfData = 0;
+  InitFileReadDataBuffer( INI_CATEGORY, INI_FONT_KEYWORD,
+                          &fontID_g, sizeof( fontID_g ),
+                          &sizeOfData );
+  if ( sizeOfData != sizeof( fontID_g ) ) {
+    fontID_g = 0;
+  }
+
+@ifndef ZOOMER
+     /* Set the undo context for the text object.
+      * Added for the OmniGo version.   */
+  @send process::MSG_GEN_PROCESS_UNDO_SET_CONTEXT( 1 );
+@endif
+} /* MSG_GEN_PROCESS_OPEN_APPLICATION */
+
+/********************************************************************
+ *                 MSG_META_SAVE_OPTIONS
+ ********************************************************************
+ * SYNOPSIS:     Tells application to save configuration.
+ * CALLED BY:    HTMSaveOptsTrigger
+ * PARAMETERS:   void ( void )
+ * AUTHOR:  	 Nathan Fiedler
+ * STRATEGY:     Save current point size to GEOS.INI file, then
+ *               call GenApplication to save it's options.
+ *******************************************************************/
+@extern method HTMProcessClass, MSG_META_SAVE_OPTIONS {
+     /* Save point size to GEOS.INI file. */
+  InitFileWriteData( INI_CATEGORY, INI_PTSZ_KEYWORD,
+                     &pointSize_g, sizeof( pointSize_g ) );
+
+     /* Save font ID to GEOS.INI file. */
+  InitFileWriteData( INI_CATEGORY, INI_FONT_KEYWORD,
+                     &fontID_g, sizeof( fontID_g ) );
+
+     /* Make sure other options are saved, too. */
+  @send application::MSG_META_SAVE_OPTIONS();
+} /* MSG_META_SAVE_OPTIONS */
+
+/********************************************************************
+ *                 MSG_GEN_PROCESS_CLOSE_APPLICATION
+ *******************************************************************/
+@extern method HTMProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
+MemHandle ReturnFromCallSuper;
+/* optr buttons;                 Pointer to the HTMButtonBar at bottom of screen */
+ optr primary;/*                  Pointer to HTMPrimary  */
+ optr htmlmenu;                 /* Pointer to the HTMMenu */
+ optr htmlmenu2;                /* Pointer to the HTMMenu2 */
+/* optr aboutbox;               / * Pointer to the HTMAboutBox */
+/* optr filegroup;              / * Pointer to the HTMFileGroup */
+optr speedtags;
+
+ReturnFromCallSuper = @callsuper();
+/* Remove children here */
+		  primary = /*GeodeGetOptrNS(*/@HTMPrimary/*)*/;
+		  htmlmenu = /*GeodeGetOptrNS(*/@HTMLMenu/*)*/;
+		  htmlmenu2 = /*GeodeGetOptrNS(*/@HTMLMenu2/*)*/;
+        speedtags = /*GeodeGetOptrNS(*/@SpeedBox/*)*/;
+/*      buttons =  GeodeGetOptrNS(@HTMActionButtonGroup);
+        aboutbox = GeodeGetOptrNS(@HTMAboutBox);
+        filegroup = GeodeGetOptrNS(@HTMFileGroup);
+*/
+        @call htmlmenu::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        @call htmlmenu2::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        @call speedtags::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+/*      @call buttons::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        @call aboutbox::MSG_GEN_SET_NOT_USABLE(VUM_NOW); */
+
+   @send primary::MSG_GEN_REMOVE_CHILD(htmlmenu, CCF_MARK_DIRTY);
+   @send primary::MSG_GEN_REMOVE_CHILD(htmlmenu2, (CCF_MARK_DIRTY));
+   @send primary::MSG_GEN_REMOVE_CHILD(speedtags, (CCF_MARK_DIRTY));
+/* @send primary::MSG_GEN_ADD_CHILD(buttons, (CCF_MARK_DIRTY));
+   @send filegroup::MSG_GEN_ADD_CHILD(aboutbox, (CCF_MARK_DIRTY));*/
+
+return(ReturnFromCallSuper);
+/* return (callsuper());*/
+}
+
+@extern method HTMProcessClass, MSG_GEN_PROCESS_OPEN_CWEB
+{
+GeodeToken      CalcToken = { "WMK3" , 16431 };
+GeodeHandle     BCalcHandle;
+MemHandle       HALBCalc;
+word            numServers;
+IACPConnection  iacpConnectionToken;
+EventHandle     hToTop, hDeMin;
+word            connectionFlags = 0;
+
+   /* check to see if calculator is running already */
+   BCalcHandle = GeodeFind("GPCBROW",7,0,0);
+   if(BCalcHandle == NullHandle) /* calc is not running */
+     {
+     /* set up a launch block for it */
+     HALBCalc = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+     /* start it */
+     iacpConnectionToken = IACPConnect(
+                 &CalcToken,
+                 IACPCF_OBEY_LAUNCH_MODEL||IACPSM_USER_INTERACTIBLE,
+                 HALBCalc,
+                 0,
+                 &numServers);
+     /* check to see if it got started */
+     if (numServers != 1)
+       {
+       /* it didn't so bail out... */
+          return;
+       }
+     /* and close the IACP connection */
+     IACPShutdown(iacpConnectionToken, NullOptr);
+     }  /* end of not running if */
+    else  /* it is already running */
+     {
+     /* connect to it */
+     iacpConnectionToken = IACPConnect(&CalcToken, connectionFlags,
+                   NULL, NullOptr, &numServers);
+     /* encapsulate a message telling calc de-minimize itself
+      * --- this has no effect if it is not minimized --- */
+     hDeMin = @record GenPrimaryClass::MSG_GEN_DISPLAY_SET_MAXIMIZED();
+     /* send our message to calc */
+     IACPSendMessage(
+            iacpConnectionToken, hDeMin,
+            TO_MODEL,  /* tried all the travel opt variants - no go */
+            NullHandle,  /* no return msg needed */
+            IACPS_CLIENT);
+     /* encapsulate a message telling calc to come to the top */
+     hToTop = @record GenApplicationClass::MSG_GEN_BRING_TO_TOP();
+     /* send our message to calc */
+     IACPSendMessage(
+            iacpConnectionToken, hToTop, TO_MODEL,
+            NullHandle,  /* no return msg needed */
+            IACPS_CLIENT);
+     /* close the connection */
+     IACPShutdown(iacpConnectionToken, NullOptr);
+     }  /* end of found it running else */
+}
+/********************************************************************
+ *                 MSG_HTMP_MORE_ABOUT_INITIATE
+ ********************************************************************
+ * SYNOPSIS:     This message is sent when the More trigger is
+ *               clicked from the About interaction.
+ * CALLED BY:    HTMAboutMoreTrigger
+ * PARAMETERS:   void ( void )
+ * AUTHOR:  	 Nathan Fiedler
+ * STRATEGY:     Send a wakeup-call to the More About interaction.
+ *******************************************************************/
+@extern method HTMProcessClass, MSG_HTMP_MORE_ABOUT_INITIATE {
+  optr aboutboxOD; /* Pointer to More About box. */
+  aboutboxOD = /*GeodeGetOptrNS(*/ @HTMMoreAboutBox /*)*/;
+  @send aboutboxOD::MSG_GEN_INTERACTION_INITIATE();
+} /* MSG_HTMP_MORE_ABOUT_INITIATE */
+
+/***********************************************/
+/***********************************************/
+@extern method HTMProcessClass, MSG_FL_FILE_SIZE
+/***********************************************/
+                /* Display text in text object */
+/***********************************************/
+{
+  char htmlFname[FILE_LONGNAME_BUFFER_SIZE];
+  char pathbuf[PATH_BUFFER_SIZE];
+  DiskHandle diskh;
+  FileHandle oldFile;
+  dword selFlags;
+/*  word *errorFlag;
+optr appObject;
+  */
+char oFSStr[11];
+dword oFSize; /* old file size */
+UtilHexToAsciiFlags flags = 0|UHTAF_NULL_TERMINATE; /* string must be 11 char
+                                        log for automatic null termination */
+char *oFSPtr;
+char sizeTextBuf[11];
+int strlen;
+
+optr liltext;
+ liltext = /*GeodeGetOptrNS(*/@TFSText/*)*/;
+/* ***** Begin Geoworks sample code and Lee Grant code - modified ***** */
+  selFlags = @call /*GeodeGetOptrNS(@*/TFSel/*)*/::MSG_GEN_FILE_SELECTOR_GET_SELECTION(htmlFname );
+  if(GFS_GET_ENTRY_TYPE(selFlags) == GFSET_FILE)
+  { @call /*GeodeGetOptrNS(@*/TFSel/*)*/::MSG_GEN_PATH_GET(pathbuf,sizeof(pathbuf));
+    diskh = @call /*GeodeGetOptrNS(@*/TFSel/*)*/::MSG_GEN_PATH_GET_DISK_HANDLE();
+    FilePushDir();
+    FileSetCurrentPath(diskh, pathbuf);
+
+/***********************************************/
+
+/* First test whether file is current file or GEOS.INI: Not done yet!! */
+    oldFile = FileOpen(htmlFname,(FILE_ACCESS_R | FILE_DENY_W
+		/* no effect: | FILE_NO_ERRORS*/ ));
+/***********************************************/
+/* New 5/10/97 by Ed to test GEOS.INI etc: */
+if (oldFile){
+/* ******Begin File Size Test by CK ****************/
+        oFSize = FileSize(oldFile);
+        *sizeTextBuf = NULL;
+        UtilHex32ToAscii( sizeTextBuf, oFSize, flags);
+        @call liltext::MSG_VIS_TEXT_REPLACE_ALL_PTR(sizeTextBuf,0);
+     FilePopDir();
+   }
+FileClose(oldFile, FALSE);
+oldFile = NullHandle; /* Should close it for good */
+	} /* end of test by Ed */
+}
+
+
+@extern method HTMProcessClass, MSG_FL_FS_GO
+{
+if (GFS_GET_ENTRY_FLAGS(entryFlags)==GFSEF_OPEN)
+        {if(GFS_GET_ENTRY_TYPE(entryFlags)==GFSET_FILE)
+        {@send, forceQueue process::MSG_FL_FILE_SIZE();}
+        }
+}
+
+

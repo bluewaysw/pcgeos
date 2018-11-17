@@ -1,0 +1,1190 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		gcnlist.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	5/91		Initial version
+
+DESCRIPTION:
+	This file contains the description of the general changed
+	notification routines and data structures.
+
+	$Id: gcnlist.def,v 1.1 97/04/04 14:23:49 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__GCNLIST
+
+include lmem.def		; for LMemBlockHeader
+include Objects/metaC.def	; for GCN structures common w/MetaClass
+include graphics.def		; for "Rectangle" definition
+include timedate.def		; for TimerDateAndTime
+
+StartKernel
+
+;-----------------------------------------------------------------------------
+;		Constants and Structures
+;-----------------------------------------------------------------------------
+
+; NOTE:  All constants & structures common to both the Kernel GCN routines
+; & MetaClass's META_GCN_* messages are defined in metaC.def
+
+
+;
+; Structure at beginning of kernel's GCN List block
+;
+GCNListBlockHeader	struct
+	GCNLBH_lmemHeader	LMemBlockHeader
+	GCNLBH_listOfLists	lptr.GCNListOfListsHeader
+GCNListBlockHeader	ends
+
+
+;-----------------------------------------------------------------------------
+;		Routines
+;-----------------------------------------------------------------------------
+
+global GCNListAdd:far
+;
+; Add optr to a particular system notification list.  If the list does not yet
+; exist, it is created.  Does nothing if item is already on the list.
+;
+; Pass:
+;	cx:dx - optr to add
+;	bx:ax - GCNListType
+;		bx - GCNLT_manuf
+;		ax - GCNLT_type
+; Return:
+;	carry set if optr added
+;	carry clear if optr is already there and not added
+; Destroyed:
+;	none
+
+global GCNListRemove:far
+;
+; Remove optr from a particular system notification list.
+;
+; Pass:
+;	cx:dx - optr to remove (dx = 0 to match any block handle)
+;	bx:ax - GCNListType
+;		bx - GCNLT_manuf
+;		ax - GCNLT_type
+; Return:
+;	carry set if optr found and removed
+;	carry clear if not found
+; Destroyed:
+;	none
+
+
+global GCNListSend:far
+;
+; Send message to each optr of a particular system notification list.
+;
+;	NOTE:  If Block w/reference count is passed in, its in-use
+;	       count should be incremented by one before the call
+;	       to this routine, as this routine decrements the count
+;	       by one upon completion (and destroys the block if
+;	       count reaches zero)
+;
+; Pass:
+;	bx:ax - GCNListType
+;		bx - GCNLT_manuf
+;		ax - GCNLT_type
+;	^hcx - recorded event to send
+;		destination is overridden, but all other recorded parameters
+;		are used.
+;	if sending extra data block:
+;		dx - handle of extra data block
+;			NOTE: handle is also stored in classed event
+;			      according to the parameters of the
+;			      message in the classed event
+;	else:
+;		dx - 0
+;	bp	- GCNListSendFlags	(defined in MetaClass)
+;
+; Return:
+;	cx	- number of objects notified, if GCNLSF_SET_STATUS not set
+;		  in bp.
+;		- message handle (preserved) if GCNLSF_SET_STATUS set
+;	(event freed, data block reference count decremented)
+; Destroyed:
+;	none
+
+global GCNListRecordAndSend:far
+;
+; A utility front-end to the above routine that sends a notification, without
+; an accompanying block of data, to all optrs on a system notification list.
+;
+; Pass:
+; 	bx:si	= GCNListType
+;		  bx = GCNLT_manuf
+;		  si = GCNLT_type
+;	ax	= message to send
+;	cx, dx, bp = data for message
+;	di	= GCNListSendFlags
+;
+; Return:
+;	cx	= number of objects notified
+;
+; Destroyed:
+;	ax, dx, bp, di, si
+;
+
+;-----------------------------------------------------------------------------
+;		Low-level Routines
+;-----------------------------------------------------------------------------
+
+global GCNListCreateBlock:far
+;
+; Create list of lists chunk in given block.
+;
+; Pass:
+;	ds - segment of block to contain GCN lists
+; Return:
+;	*ds:si - new list of lists block
+; Destroyed:
+;	none
+
+global GCNListAddToBlock:far
+;
+; Add optr to an existing or a new list managed by given list of lists.  Does
+; nothing if item is already there.
+;
+; Pass:
+;	cx:dx - optr to add
+;	bx:ax - GCNListType
+;		bx - GCNLT_manuf
+;		ax - GCNLT_type
+;	ds - segment of block containing GCN lists
+;	di - chunk handle of list of lists
+; Return:
+;	carry set if optr added
+;	carry clear if optr is already there and not added
+; Destroyed:
+;	none
+
+global GCNListRemoveFromBlock:far
+;
+; Remove optr from notify list managed by given list of lists.
+;
+; Pass:
+;	cx:dx - optr to remove (dx = 0 to match any block handle)
+;	bx:ax - GCNListType
+;		bx - GCNLT_manuf
+;		ax - GCNLT_type
+;	ds - segment of block containing GCN lists
+;	di - chunk handle of list of lists
+; Return:
+;	carry set if optr found and removed
+;	carry clear if not found
+; Destroyed:
+;	none
+
+global GCNListSendToBlock:far
+;
+; Send method to each optr of notify list managed by given list of lists.
+;
+;	NOTE:  If Block w/reference count is passed in, its in-use
+;	       count should be incremented by one before the call
+;	       to this routine, as this routine decrements the count
+;	       by one upon completion (and destroys the block if
+;	       count reaches zero)
+;
+; Pass:
+;	bx:ax - GCNListType
+;		bx - GCNLT_manuf
+;		ax - GCNLT_type
+;	^hcx - recorded event to send
+;		destination is overridden, but all other recorded parameters
+;		are used.
+;	if sending extra data block:
+;		dx - handle of extra data block
+;			NOTE: handle is also stored in classed event
+;			      according to the parameters of the
+;			      message in the classed event
+;	else:
+;		dx - 0
+;	bp	- GCNListSendFlags
+;	ds - segment of block containing GCN lists
+;	di - chunk handle of list of lists
+;
+; Return:
+;	cx	- number of objects notified, if GCNLSF_SET_STATUS not set
+;		  in bp.
+;		- message handle (preserved) if GCNLSF_SET_STATUS set
+;	(event freed, data block reference count decremented)
+; Destroyed:
+;	none
+
+global GCNListFindListInBlock:far
+;
+; Find appropriate general change notification list in list of
+; lists.  Creates new list, if necessary and desired.
+;
+; Pass:		*ds:di	- GCN list of lists chunk
+;		bx:ax - GCNListType
+;			bx - GCNLT_manuf
+;			ax - GCNLT_type
+;		carry set to create list, if not currently existant
+;		carry clear to not create list
+;
+; Return: 	carry - set if list found
+;			*ds:si - desired gcn list
+;		carry clear if list not found
+; Destroyed:
+;		none
+
+global GCNListDestroyBlock:far
+;
+; Completely destroys all GCN lists, cached events, & the list of lists
+; passed.  
+;
+; Pass:		*ds:di 	- GCN list of lists chunk
+; Return:	nothing
+; Destroyed:	nothing
+;
+
+global GCNListRelocateBlock:far
+;
+; Relocate general change notification lists in given block.
+;
+; Pass:		*ds:di	- GCN list of lists chunk
+;		dx	- handle of block containing relocation
+; Return:	nothing
+; Destroyed:	nothing
+;
+
+global GCNListUnRelocateBlock:far
+;
+; Unrelocate general change notification lists in given block.
+;
+; Pass:		*ds:di	- GCN list of lists chunk
+;		dx	- handle of block containing relocation
+; Return:	carry clear if list of lists has lists saved to state
+;		carry set if list of lists has no lists saved to state
+;			and is thus destroyed
+; Destroyed:	nothing
+;
+
+;------
+
+global GCNListCreateList:far
+;
+; Create new empty gcn list.
+;
+; Pass:
+;	ds - segment of block to create new gcn list in
+; Return:
+;	*ds:si - new gcn list chunk, with structure GCNListHeader
+; Destroyed:
+;	none
+
+global GCNListAddToList:far
+;
+; Add optr to given list.  Does nothing if item is already there.
+;
+; Pass:
+;	cx:dx - optr to add
+;	*ds:si - gcn list (header) to add to
+; Return:
+;	carry set if optr added
+;	carry clear if optr is already there and not added
+;	ds - updated to keep pointing to gcn list block, if moved
+; Destroyed:
+;	none
+
+global GCNListRemoveFromList:far
+;
+; Remove optr from notify list.
+;
+; Pass:
+;	cx:dx - optr to remove
+;	*ds:si - gcn list (header) to remove from
+; Return:
+;	carry set if optr found and removed
+;	carry clear if not found
+;	ds - updated to keep pointing to gcn list block, if moved
+; Destroyed:
+;	none
+
+global GCNListSendToList:far
+;
+; Send method to each optr of notify list.
+;
+;	NOTE:  If Block w/reference count is passed in, its in-use
+;	       count should be incremented by one before the call
+;	       to this routine, as this routine decrements the count
+;	       by one upon completion (and destroys the block if
+;	       count reaches zero)
+;
+;
+; Pass:
+;	*ds:si - gcn list (header) to send method to
+;	^hcx - recorded event to send
+;		destination is overridden, but all other recorded parameters
+;		are used.
+;	if sending extra data block:
+;		dx - handle of extra data block
+;			NOTE: handle is also stored in classed event
+;			      according to the parameters of the
+;			      message in the classed event
+;	else:
+;		dx - 0
+;	bp	- GCNListSendFlags
+;
+; Return:
+;	cx	- number of objects notified, if GCNLSF_SET_STATUS not set
+;		  in bp.
+;		- message handle (preserved) if GCNLSF_SET_STATUS set
+;	(event freed, data block reference count decremented)
+; Destroyed:
+;	none
+
+global GCNListFindItemInList:far
+;
+; Find optr in notify list.
+;
+; Pass:
+;	cx:dx - optr to find
+;	*ds:si - gcn list (header) to search
+; Return:
+;	carry set if optr found
+;	carry clear if not found
+;	ds - updated to keep pointing to gcn list block, if moved
+; Destroyed:
+;	none
+
+global GCNListDestroyList:far
+;
+; Completely destroys specified GCN list, cached event
+;
+; Pass:		*ds:si 	- GCNListHeader
+; Return:	nothing
+; Destroyed:	nothing
+;
+
+global GCNListRelocateList:far
+;
+; Relocate general change notification list.
+;
+; Pass:		*ds:si	- GCNListHeader
+;		dx	- handle of block containing relocation
+; Return:	nothing
+; Destroyed:	nothing
+;
+
+global GCNListUnRelocateList:far
+;
+; Unrelocate general change notification list.
+;
+; Pass:		*ds:si	- GCNListHeader
+;		dx	- handle of block containing relocation
+; Return:	nothing
+; Destroyed:	nothing
+;
+
+
+;-----------------------------------------------------------------------------
+;		Kernel GCNList Types
+;-----------------------------------------------------------------------------
+;
+; pre-defined list types and messages to send to them -- use with
+; MANUFACTURER_ID_GEOWORKS
+;
+GCNStandardListType	etype	word, 0, 2
+
+GCNSLT_FILE_SYSTEM		enum	GCNStandardListType
+
+;
+; sent out when the file system changes somehow
+;
+MSG_NOTIFY_FILE_CHANGE		method	MetaGCNMessages
+;
+; IMPORTANT!  Like MSG_META_NOTIFY_WITH_DATA_BLOCK, this message must eventually
+; reach the default MetaClass handler, so that the block can be freed 
+; when no longer referenced.
+;
+; pass:		^hbp - FileChangeNotificationData block
+; 		dx - FileChangeNotificationType
+;
+FileChangeNotificationType etype word
+FCNT_CREATE		enum FileChangeNotificationType
+	; File or directory created. FCND_id is the id of the containing
+	; directory. FCND_name is the name of the new file or directory.
+
+FCNT_RENAME		enum FileChangeNotificationType
+	; File or directory renamed. FCND_id is the identifier for the file or
+	; directory, and FCND_name is its new name.
+
+FCNT_OPEN		enum FileChangeNotificationType
+	; A file has been opened. FCND_id is the 32-bit identifier for the
+	; file. FCND_name is undefined and may not be present. This is
+	; generated only if someone has called FileEnableOpenCloseNotification.
+
+FCNT_DELETE		enum FileChangeNotificationType
+	; File or directory deleted. FCND_id is the 32-bit identifier for the
+	; file or directory that was deleted. FCND_name is undefined and
+	; may not be present.
+
+FCNT_CONTENTS		enum FileChangeNotificationType
+	; File contents changed. This is sent only when FileCommit or FileClose
+	; is called for a file and the file has been modified. FCND_id is the
+	; 32-bit identifier for the affected file. FCND_name is undefined and
+	; may not be present.
+
+FCNT_ATTRIBUTES		enum FileChangeNotificationType
+	; File attributes changed. This is sent once all changes have been
+	; made during a given FileSetAttributes, FileSetHandleExtAttributes,
+	; or FileSetPathExtAttributes call. FCND_id is the 32-bit identifier
+	; for the affected file. FCND_name is undefined and may not be present.
+
+FCNT_DISK_FORMAT	enum FileChangeNotificationType
+	; A disk has been formatted. FCND_id and FCND_name are undefined and
+	; may not be present.
+
+FCNT_CLOSE		enum FileChangeNotificationType
+	; A file has been closed. FCND_id is the 32-bit identifier for the
+	; file. FCND_name is undefined and may not be present. This is
+	; generated only if someone has called FileEnableOpenCloseNotification.
+
+FCNT_BATCH		enum FileChangeNotificationType
+	; The block is a FileChangeBatchNotificationData block, holding
+	; multiple notifications. Notifications are collected into a batch
+	; when a thread calls FileBatchChangeNotifications. All the
+	; notifications are sent when it calls FileFlushChangeNotifications.
+	; Any application performing a substantial number of changes to
+	; the filesystem (e.g. deleting a directory tree) should tell the
+	; system to batch its notifications and flush them when it's all done.
+	; This will reduce the number of handles required to alert all
+	; interested parties to the changes.
+
+FCNT_ADD_SP_DIRECTORY	enum FileChangeNotificationType
+	; A directory has been added as a StandardPath.  FCND_disk contains
+	; the StandardPath that was added.  This is generated if someone
+	; has called FileAddStandardPathDirectory.
+
+FCNT_DELETE_SP_DIRECTORY	enum FileChangeNotificationType
+	; A directory has been deleted as a StandardPath.  FCND_disk
+	; contains the StandardPath that was deleted.  This is generated
+	; if someone has called FileDeleteStandardPathDirectory.
+
+FCNT_FILE_UNREAD	enum FileChangeNotificationType
+	; A file has been marked unread. This is change when the GFHF_READ
+	; flag is cleared using FileSetHandleExtAttributes or
+	; FileSetPathExtAttributes.
+
+FCNT_FILE_READ	enum FileChangeNotificationType
+	; A file has been marked read.	This is change when the GFHF_READ
+	; flag is set using FileSetHandleExtAttributes or
+	; FileSetPathExtAttributes.
+		
+FileChangeNotificationData struct
+    FCND_disk   word            ; handle for disk on which the change
+                                ;  occurred
+    FCND_id	FileID       	; 32-bit identifier for the directory in 
+                                ;  which the change occurred, or for the
+				;  file to which the change occurred.
+    FCND_name	FileLongName	; For those notifications that require it,
+				;  the virtual name of the file or directory
+				;  to which the change occurred.
+FileChangeNotificationData ends
+
+FileChangeBatchNotificationItem	struct
+    FCBNI_type		FileChangeNotificationType
+    FCBNI_disk		word
+    FCBNI_id		FileID
+    FCBNI_name		label	FileLongName	; only present if required
+						;  by FCBNI_type
+FileChangeBatchNotificationItem ends
+
+FileChangeBatchNotificationData struct
+    FCBND_end		nptr		; ending offset of array of
+					;  FileChangeBatchNotificationItem
+					;  structures
+    FCBND_items		label FileChangeBatchNotificationItem
+FileChangeBatchNotificationData ends
+
+
+GCNDriveChangeNotificationType	etype	word
+GCNDCNT_CREATED		enum	GCNDriveChangeNotificationType
+GCNDCNT_DESTROYED	enum	GCNDriveChangeNotificationType
+
+MSG_NOTIFY_DRIVE_CHANGE		method	MetaGCNMessages
+;	This is sent to notify various system utilities that a drive has
+;	been created or destroyed or has changed ownership from one
+;	installable filesystem driver to another.
+;
+;	Note that during system intialization, the ownership of a drive
+;	may change several times as more-specialized drivers are loaded. This
+;	means the recipient should not be surprised if it's told a drive
+;	has been created that it thought already existed.
+;
+; Context:	Sent through the GCNSLT_FILE_SYSTEM GCNList.
+; Source:	The kernel issues this notification whenever a filesystem
+;		driver creates or destroys a drive it manages. This includes
+;		when a specialized filesystem driver takes control of an
+;		existing drive.
+; Destination:  Any object that has added itself to the GCNSLT_FILE_SYSTEM
+;		GCNList. It is intended for system objects, such as GeoManager
+;		and the GenFileSelector.
+; Interception:	Not applicable
+;
+; Pass:
+;	cx	= GCNDriveChangeNotificationType
+;	dx	= number of the affected drive
+;			
+; Return:
+;	Nothing
+;	ax, cx, dx, bp - destroyed
+
+GCNSLT_APPLICATION		enum	GCNStandardListType
+
+;
+; sent out when an application attaches to the UI
+;
+MSG_NOTIFY_APP_STARTED		method	MetaGCNMessages
+; pass:		dx - handle of application that was started
+;
+
+;
+; sent out when an application thread exits
+;
+MSG_NOTIFY_APP_EXITED		method	MetaGCNMessages
+;	pass:	dx - handle of application that exited
+;
+
+GCNSLT_DATE_TIME		enum	GCNStandardListType
+
+;
+; sent out when date/time is changed
+;
+MSG_NOTIFY_DATE_TIME_CHANGE	method	MetaGCNMessages
+;	pass:	nothing
+;
+
+GCNSLT_DICTIONARY		enum	GCNStandardListType
+
+;
+; sent out when the user dictionary changes
+;
+MSG_NOTIFY_USER_DICT_CHANGE	method	MetaGCNMessages
+;	pass:	dx - handle of SpellBox that sent out the notification
+;	     	bp - handle of user dictionary that changed
+;
+
+GCNSLT_KEYBOARD_OBJECTS	enum	GCNStandardListType
+
+;
+; Sent out when the user has chosen a different keyboard layout
+;
+MSG_NOTIFY_KEYBOARD_LAYOUT_CHANGE 	method MetaGCNMessages
+;
+;	pass:	nothing
+;
+;	NOTE: When passing this event to GCNListSend, you must be sure
+;	      to pass the GCNLSF_FORCE_QUEUE flag. Otherwise, if you have
+;	      a GenPenInputControl running on the same thread, it'll try
+;	      to remove itself from the list while you are sending it this
+;	      message, and it will deadlock.
+;
+
+;--------------------
+;
+; EXPRESS MENU STUFF
+;
+;--------------------
+GCNSLT_EXPRESS_MENU_CHANGE	enum	GCNStandardListType
+
+GCNExpressMenuNotificationType	etype	word
+GCNEMNT_CREATED			enum	GCNExpressMenuNotificationType
+GCNEMNT_DESTROYED		enum	GCNExpressMenuNotificationType
+
+MSG_NOTIFY_EXPRESS_MENU_CHANGE	method	MetaGCNMessages
+;
+;	This is sent to notify various system utilities that an express menu
+;	has been created or destroyed. The recipient receives the optr of
+;	the Express Menu Control.  This should be used in conjunction with the
+;	GCNSLT_EXPRESS_MENU_OBJECTS list.
+;
+; Context:	Sent through the GCNSLT_EXPRESS_MENU_CHANGE GCNList.
+; Source:	The UI issues this notification whenever a Express Menu Control
+;		object is created or destroyed.
+; Destination:  Any object that has added itself to the
+;		GCNSLT_EXPRESS_MENU_CHANGE GCNList. It is intended for system
+;		utilities, such as the print spooler or a task-switching
+;		driver, that need to add objects to each express menu in the
+;		system.
+; Interception:	Not applicable
+;
+; Pass:
+;	bp	= GCNExpressMenuNotificationType
+;	^lcx:dx	= optr of affected Express Menu Control
+;
+; Return:
+;	Nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+GCNSLT_INSTALLED_PRINTERS	enum	GCNStandardListType
+;
+; Sent out when a printer is either installed or removed. The recipient of
+; this message might want to call SpoolGetNumPrinters() to learn if any
+; printers or fax drivers are currently installed.
+;
+MSG_PRINTER_INSTALLED_REMOVED	method	MetaGCNMessages
+;	pass:	nothing
+;
+
+;--------------------
+;
+; Task-switch/shutdown control
+;
+;--------------------
+GCNSLT_SHUTDOWN_CONTROL		enum	GCNStandardListType
+
+GCNShutdownControlType	etype	word
+GCNSCT_SUSPEND		enum	GCNShutdownControlType
+; Task-switcher wishes to suspend the system.
+; 
+
+GCNSCT_SHUTDOWN		enum	GCNShutdownControlType
+; Task-switcher or other entity wishes to shut the system down to state.
+; 
+
+GCNSCT_UNSUSPEND	enum	GCNShutdownControlType
+; System has been unsuspended. No acknowledgement required.
+;
+
+MSG_META_CONFIRM_SHUTDOWN	method	MetaGCNMessages
+;
+; This is used to notify members of the GCNSLT_SHUTDOWN_CONTROL
+; club of a pending shutdown.
+;
+; If bp is GCNSCT_SUSPEND or GCNSCT_SHUTDOWN, the following applies:
+;
+;     Any object receiving this message *must* call SysShutdown, passing
+;     SST_START_CONFIRM before it puts up whatever query-box it uses to
+;     ensure the user knows what s/he is doing. If SysShutdown returns
+;     carry set, indicating something has already denied the shutdown
+;     request, the caller should *not* put up its confirmation box, nor
+;     need it call SysShutdown again.
+;     
+;     Once the object has received a response from the user, either
+;     affirmative or negative, it must call SysShutdown, passing
+;     SST_CONFIRM_ACK or SST_CONFIRM_DENY as appropriate. This will allow
+;     any other confirmations to happen, as well as sending the final
+;     result to the original caller of SysShutdown.
+;
+; If bp is GCNSCT_UNSUSPEND, the object need do nothing further.
+;
+; Context:	Sent through the GCNSLT_SHUTDOWN_CONTROL GCNList. All
+;		applications wishing to have some say in whether the system
+;		shuts down/suspends must add themselves to this list.
+; Source:	The task-switch driver issues this notification
+; Destination:	Usually a GenApplication object, but can be any object
+;		in the system.
+; Interception:	Not applicable. If both a class and one of its superclasses
+;		wish to be notified, they must work it out between the
+;		two of them what to send back to the message originator.
+; Pass:
+;	When broadcast through GCNSLT_SHUTDOWN_CONTROL:
+;		bp	= GCNShutdownControlType
+; Return:
+; 	Nothing
+; 	ax, cx, dx, bp - destroyed
+; 
+
+;--------------------
+;
+;	UI Transfer File
+;
+;--------------------
+
+GCNSLT_TRANSFER_NOTIFICATION		enum	GCNStandardListType
+
+;
+; Messages sent over this list:
+; 
+;MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+;MSG_META_CLIPBOARD_NOTIFY_TRANSFER_ITEM_FREED
+;
+
+GCNSLT_EXPRESS_MENU_OBJECTS		enum	GCNStandardListType
+;
+; This list contains all Express Menu Control objects in the system.  It
+; can be used to add a control panel item or a DOS task list item, etc. to
+; all such objects.  This is done by sending
+; MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM to this GCN list with GCNListSend.
+;
+; ExpressMenuControl objects automatically added themselves to this list.
+;
+
+
+;--------------------
+;
+;	Transparent detach
+;
+;--------------------
+
+GCNSLT_TRANSPARENT_DETACH			enum    GCNStandardListType
+;
+; List of app objects applications to be TRANSPARENT_DETACH'd, if the system
+; runs short on heap space, in LRU order.  Should only be used if transparent
+; launch mode is in use.
+;
+
+GCNSLT_TRANSPARENT_DETACH_DA	enum    GCNStandardListType
+;
+; Detachable desk accessories.  Should not be detached unless all detachable,
+; non-top full-screen apps have been detached.
+;
+
+;--------------------
+;
+;	Removable drive app and document control list
+;
+;--------------------
+
+GCNSLT_REMOVABLE_DISK		enum    GCNStandardListType
+;
+; List of all app and document control objects.   If the disk they originate
+; on is removed, they will be notified to shut themselves down via a 
+; MSG_META_DISK_REMOVED.
+;
+
+;--------------------
+;
+;	More transparent detach
+;
+;--------------------
+
+GCNSLT_TRANSPARENT_DETACH_IN_PROGRESS	enum    GCNStandardListType
+;
+; Transparent detach internal -- geodes kicked down to very 
+; low thread priority for transparent detaching.  Kept here so that we
+; can up their priority if another app GeodeLoad comes along.
+; (handle is geode, chunk is null)  Not really a notification
+; list, just a convenient place to stick this list.
+
+GCNSLT_TRANSPARENT_DETACH_FULL_SCREEN_EXCL	enum	GCNStandardListType
+;
+; Top full-screen app object, if transparently detachable.
+
+
+;--------------------
+;
+;       PDA Email
+;
+;--------------------
+
+GCNSLT_EMAIL_DATABASE_CHANGE	enum	GCNStandardListType
+;
+; Something has been changed in the mail database.
+;
+
+;--------------------
+;
+;       Fonts
+;
+;--------------------
+
+GCNSLT_FONT_CHANGES		enum	GCNStandardListType
+;
+; Used to notify text font controllers that they should update there
+; font lists, because the list of available fonts has changed
+
+;--------------------
+;
+;	Ink
+;
+;--------------------
+
+GCNSLT_INK			enum	GCNStandardListType
+;
+; Used to notify objects of a change in default ink parameters. e.g.
+; pen width
+MSG_NOTIFY_INK_REDISPLAY	method	MetaGCNMessages
+; 	context:sent through GCNSLT_INK to notify ink objects that
+; 		they should redraw 
+;	source:	something that wishes the ink refreshed. Most likely
+;		something that has changed the default values used to
+;		draw ink. 
+;	pass:	nothing
+;	return:	nothing
+;	destroyed: ax, cx, dx, bp
+;	
+
+
+;--------------------
+;
+;       Printing
+;
+;--------------------
+
+GCNSLT_PRINT_JOB_STATUS		enum	GCNStandardListType
+;
+; Printing GCN list.   Objects can add themselves to this list and be notified
+; of print jobs cancelled via the control panel.   Messages are currently
+; only sent out by the Redwood spooler.   Internal only.
+;
+
+MSG_PRINT_DIALOG_INITIALIZED		method	MetaGCNMessages
+;
+; Sent as notification that a print job is being initialized.
+; As implemented, this has limited benefits for non-Redwood users.
+;
+;	Pass:	nothing
+;
+MSG_PRINT_JOB_CANCELLED		method	MetaGCNMessages
+;
+; Sent as notification that a queued print job was cancelled by the user.
+; As implemented, this has limited benefits for non-Redwood users.
+;
+;	Pass:	nothing
+;
+
+;--------------------
+;
+;	Contact Management
+;
+;--------------------
+GCNSLT_FOAM_DB_CHANGES	enum	GCNStandardListType
+;
+; Changes to foam databases are sent to this list
+;		
+
+;----------------
+;
+; Lurker system
+;
+;----------------
+		
+GCNSLT_NOTIFY_SERIAL_LURKER	enum	GCNStandardListType
+;
+; List for telling the serial (modem) lurker that something has happened
+;
+
+;--------------------
+;
+;       Fax system
+;
+;--------------------
+
+GCNSLT_FAX_INFO_FILE_CHANGE	enum	GCNStandardListType
+;
+; Changes to the fax information file -- specifically, to the last destinations
+; list -- are reported to this list.  The GWNT_FAX_LAST_DESTINATIONS_CHANGE
+; notification is sent in this case.
+;
+
+;---------------------
+;  Jedi
+;--------------------
+
+GCNSLT_NOTIFY_INIT_FILE_CHANGE		enum	GCNStandardListType
+;
+; Changes to the INI-file.  A GWNT_INIT_FILE_CHANGE is sent to
+; this list by anyone who makes a change to the INI-file, along
+; with an InitFileEntry enumeration specifying which category/key
+; changed.
+;
+
+GCNSLT_NOTIFY_KEYBOARD_EVENT		enum	GCNStandardListType
+;
+; Used for notifications that the user has pressed a key.  Should
+; be used with care, as it can slow things down dramatically if
+; abused.  Currently used to allow specific UIs to display "sticky"
+; keys such as ALT, SHIFT and CAPS LOCK on devices that support
+; delayed operation of such keys.  Uses GWNT_KEYBOARD_EVENT.
+;
+	
+;--------------------
+;
+;	2.2+ Printing status message
+;
+;--------------------
+
+PrintStatusChangeType	etype	word
+    PSCT_NEW_PAGE	enum PrintStatusChangeType
+    PSCT_COMPLETE	enum PrintStatusChangeType
+    PSCT_CANCELED	enum PrintStatusChangeType
+    PSCT_ERROR		enum PrintStatusChangeType
+
+MSG_PRINT_STATUS_CHANGE		method	MetaGCNMessages
+;	Desc:	Sent out over GCNSLT_PRINT_JOB_STATUS by the spooler in GEOS 2.2
+;		and later. The message informs anyone who's interested what's
+;		happening to print jobs in the system.
+;
+;	Pass:	cx	= PrintStatusChangeType
+;		dx	= print job ID (as returned by SpoolAddJob)
+;		bp	= change-specific data:
+;			  PSCT_NEW_PAGE - current physical page number
+;			  PSCT_COMPLETE - undefined
+;			  PSCT_CANCELED - undefined?
+;			  PSCT_ERROR - undefined?
+;
+
+GCNSLT_NOTIFY_INDICATOR_EVENT	enum GCNStandardListType
+;
+; Used to notify the Indicator App, to change monikers and icons.
+;
+; Uses MSG_META_NOTIFY_WITH_DATA_BLOCK w/GWNT_INDICATOR_REPLACE_*_GLYPH
+;
+
+GCNSLT_CONTACT_LIST_SELECTION	enum GCNStandardListType
+;
+; This GCN list is for notifications of changes in the selection in
+; ContactList objects, so all the contact lists can have the same item
+; selected.
+;
+; Uses MSG_META_NOTIFY w/GWNT_CONTACT_LIST_CUR_SELECTION
+;
+
+GCNSLT_CONTACT_LOG_CHANGES	enum GCNStandardListType
+;
+; This is for notifications of additions and deletions to the contact
+; logs.
+;
+; Uses MSG_META_NOTIFY w/GWNT_CONTACT_LOG_*_CHANGE
+;
+
+; -------------------------
+;  RESPONDER NOTIFICAITONS
+; -------------------------
+		
+GCNSLT_RESPONDER_NOTIFICATIONS	enum GCNStandardListType
+;
+; Add yourself to this list to receive notifications for responder
+; hardware events such as:
+; RNT_LID_OPEN, RNT_LID_CLOSED, RNT_PHONE_ON, RNT_PHONE_OFF
+; See documentation for GWNT_RESPONDER_NOTIFICATION for details
+;
+
+; ----------------------------
+;  ACCESS POINT NOTIFICATIONS
+; ----------------------------
+
+GCNSLT_ACCESS_POINT_CHANGE	enum	GCNStandardListType
+;
+; Add yourself to this list to receive notifications when an access
+; point is changed.
+;
+; See GWNT_ACCESS_POINT_CHANGE
+;
+
+GCNSLT_PCMCIA_NOTIFY_CARD_CHANGE	enum	GCNStandardListType
+;
+; Notifications for pcmcia cards being inserted or removed.
+;
+; Uses MSG_META_NOTIFY w/GWNT_PCMCIA_CARD_CHANGE.
+;
+; Pass:	bp.high = PCMCardChangeFlags record (defined in pcmcia.def)
+; 	bp.low  = socket number (0-indexed) (-1 = socket independent)
+;		
+
+; --------------------------------
+;  SECURITY SETTINGS NOTIFICATIONS
+; --------------------------------
+
+GCNSLT_SECURITY_SETTINGS_NOTIFICATIONS	enum	GCNStandardListType
+;
+; Notifications about security settings which are changed
+; asynchronously.
+;
+; Uses MSG_META_NOTIFY with change specific notification type:
+;	
+; Pass:	dx = GWNT_SECURITY_PIN_CODE_REQUEST, 	bp = TRUE/FALSE (on/off)
+;	dx = GWNT_SECURITY_LOCK_TIME_OUT,	bp = time in minutes
+;	dx = GWNT_SECURITY_LEVEL		bp = TRUE/FALSE (on/off)
+;
+
+; -----------------------
+;  PENELOPE NOTIFICATIONS
+; -----------------------
+GCNSLT_PENELOPE_HARDWARE_NOTIFICATIONS	enum	GCNStandardListType
+;
+; Add yourself to this list to receive notifications for Penelope
+; hardware events such as:
+; PNT_LID_OPEN, PNT_LID_CLOSED, PNT_LUCILLE_ON, PNT_LUCILLE_OFF, etc.
+; See documentation for GWNT_PENELOPE_HARDWARE_NOTIFICATION or
+; Include/Internal/Penelope/peneGCN.def for more details.
+;
+
+; ------------------------------------
+;  PENELOPE RADIO STATUS NOTIFICATIONS
+; ------------------------------------
+GCNSLT_PENELOPE_RADIO_STATUS_NOTIFICATIONS enum	GCNStandardListType
+;
+; Notifications about the status of the radio transmitter for Penelope
+;
+; Uses MSG_META_NOTIFY with change specific notification type:
+;
+; Pass:	dx = GWNT_PENELOPE_RADIO_STATUS_NOTIFICATION, bp = PenelopeRadioStatus
+;
+
+; ------------------------------------
+;  PPP STATUS NOTIFICATIONS
+; ------------------------------------
+GCNSLT_PPP_STATUS_NOTIFICATIONS enum	GCNStandardListType
+;
+; Notifications about the status of the PPP
+;
+; Uses MSG_META_NOTIFY with change specific notification type:
+;
+; Pass:	dx = GWNT_PPP_STATUS_NOTIFICATION, bp = PPPStatus
+;
+
+; ------------------------------------
+;  FIELD CHANGE NOTIFICATION
+; ------------------------------------
+GCNSLT_FIELD_CHANGE_NOTIFICATIONS enum	GCNStandardListType
+;
+; Notification is sent here to request confirmation (similar to
+; the SysShutdown confirmation mechanism) when the field is about
+; to be changed.
+;
+; Note that notifications are sent to this list via
+; UserConfirmFieldChange by the application making the change.  It is
+; not done automatically by the UI or the Kernel.
+;
+; See the documentation in ui.def for UserConfirmFieldChange for more
+; details about the responsibilities of those who subscribe to this list.
+;
+; Pass:		dx = GWNT_CONFIRM_FIELD_CHANGE
+;
+
+; -------------------------
+;  PARENTAL CONTROL CHANGE
+; -------------------------
+GCNSLT_PARENTAL_CONTROL_CHANGE enum	GCNStandardListType
+;
+; Notification is sent here when parental control access state
+; changes.
+;
+; Pass:		dx = GWNT_PARENTAL_CONTROL_CHANGE
+;		bp = new parental control AccessFlags
+;
+
+; ------------------------------------
+;  SCREEN SAVER NOTIFICAITONS
+; ------------------------------------
+GCNSLT_SCREEN_SAVER_NOTIFICATIONS enum	GCNStandardListType
+;
+; Notifications about the status of the screen saver
+;
+; Uses MSG_META_NOTIFY with change specific notification type:
+;
+; Pass: dx = GWNT_SCREEN_SAVER_STATUS_NOTIFICATION, bp = ScrSaverState
+
+; -------------------------
+;  PARENTAL CONTROL CHANGE
+; -------------------------
+ParentalControlWebsiteListChangeType	etype	word
+	PCWLCT_DELETE	enum ParentalControlWebsiteListChangeType
+	PCWLCT_MODIFY	enum ParentalControlWebsiteListChangeType
+	PCWLCT_ADD	enum ParentalControlWebsiteListChangeType
+
+GCNSLT_PARENTAL_CONTROL_WEBSITE_LIST_CHANGES enum	GCNStandardListType
+;
+; Notification is sent here when parental control website list changes.
+;
+; Pass:		dx = GWNT_PARENTAL_CONTROL_CHANGE
+;		bp = ParentalControlWebsiteListChangeType
+;
+
+; -------------------------------------------
+;  INSTANT SUSPEND/RESUME NOTIFICATIONS
+; -------------------------------------------
+InstantSuspendResumeType	etype	word
+
+	ISRT_SUSPEND		enum	InstantSuspendResumeType
+
+	ISRT_RESUME		enum	InstantSuspendResumeType
+
+	ISRT_SUSPEND_REFUSED	enum	InstantSuspendResumeType
+	; The user wants to suspend the machine, but the power driver has
+	; refused to do so (e.g. because some peripheral device is still on).
+
+GCNSLT_INSTANT_SUSPEND_RESUME_NOTIFICATIONS	enum	GCNStandardListType
+;
+; Notifications that the system is about to be instantly suspended or it has
+; just been instantly resumed.  Usually, this refers to the suspend/resume
+; implemented in the power management driver, where suspend and resume
+; happens instantly by stopping the CPU without any lengthy shutdown process.
+; Contrast this to GCNSLT_SHUTDOWN_CONTROL usually used by task switcher
+; which usually suspends with a shutdown process.
+;
+; Unlike GCNSLT_SHUTDOWN_CONTROL, objects on this list have no say on whether
+; to allow or deny suspending.  Recipients of ISRT_SUSPEND notification must
+; complete any pre-suspend work before letting its thread become idle again,
+; as actual suspend can happen as soon as the system becomes idle.
+;
+; Pass:		dx	= GWNT_INSTANT_SUSPEND_RESUME_NOTIFICATION
+;		bp	= InstantSuspendResumeType
+;
+
+; ------------------------------------
+;  TCPIP STATUS CHANGES
+; ------------------------------------
+GCNSLT_TCPIP_STATUS_NOTIFICATIONS	enum	GCNStandardListType
+
+TcpipStatusNotificationType		etype	word
+	TSNT_CLOSED		enum	TcpipStatusNotificationType
+	TSNT_CLOSING		enum	TcpipStatusNotificationType
+	TSNT_OPENING		enum	TcpipStatusNotificationType
+	TSNT_OPEN		enum	TcpipStatusNotificationType
+
+TcpipDhcpStatusNotificationType		etype	word
+	TDSNT_CONFIGURATION	enum	TcpipDhcpStatusNotificationType
+	TDSNT_LEASE_RENEWED	enum	TcpipDhcpStatusNotificationType
+	TDSNT_LEASE_EXPIRED	enum	TcpipDhcpStatusNotificationType
+	TDSNT_REQUEST_FAILED	enum	TcpipDhcpStatusNotificationType	
+
+TcpipDhcpNotificationData	struct
+	TDND_status			TcpipDhcpStatusNotificationType
+	TDND_ipAddr			byte	4 dup (?)
+	TDND_netmask			byte	4 dup (?)
+	TDND_gateway			byte	4 dup (?)
+	TDND_dns1			byte	4 dup (?)
+	TDND_dns2			byte	4 dup (?)
+	TDND_dhcpServer			byte	4 dup (?)
+	TDND_leaseReceived		TimerDateAndTime
+	TDND_renewTime			TimerDateAndTime
+	TDND_rebindTime			TimerDateAndTime
+	TDND_expireTime			TimerDateAndTime
+	; Should be same size as MAX_IP_ADDR_STRING_LENGTH_ZT
+	; Not using that constant to avoid having to include socket headers
+	TDND_domainName			byte	256 dup (?)	
+TcpipDhcpNotificationData	ends
+		
+;-----------------------------------------------------------------------------
+;		C stub routines
+;-----------------------------------------------------------------------------
+
+global	GCNLISTADD:far
+global	GCNLISTREMOVE:far
+global	GCNLISTSEND:far
+
+global	GCNLISTCREATEBLOCK:far
+global	GCNLISTADDTOBLOCK:far
+global	GCNLISTREMOVEFROMBLOCK:far
+global	GCNLISTSENDTOBLOCK:far
+global	GCNLISTFINDLISTINBLOCK:far
+global	GCNLISTDESTROYBLOCK:far
+global	GCNLISTRELOCATEBLOCK:far
+global	GCNLISTUNRELOCATEBLOCK:far
+
+global	GCNLISTCREATELIST:far
+global	GCNLISTADDTOLIST:far
+global	GCNLISTREMOVEFROMLIST:far
+global	GCNLISTFINDITEMINLIST:far
+global	GCNLISTSENDTOLIST:far
+global	GCNLISTDESTROYLIST:far
+global	GCNLISTRELOCATELIST:far
+global	GCNLISTUNRELOCATELIST:far
+
+EndKernel

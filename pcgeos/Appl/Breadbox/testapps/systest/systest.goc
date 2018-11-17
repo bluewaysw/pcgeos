@@ -1,0 +1,130 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Test Applications
+ * MODULE:	System checker
+ * FILE:		systest.goc
+ * AUTHOR:	jfh  10/04
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <ansi/string.h>
+#include <sysstats.h>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+@class	TestProcessClass, GenProcessClass ;
+	@message void MSG_TEST_GET_STATUS();
+
+@endc
+
+@classdecl	TestProcessClass, neverSaved ;
+
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass TestApp = {
+	 GI_visMoniker = list { @TestTextMoniker }
+    GI_comp = @TestPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TestPrimary;
+}
+
+@visMoniker TestTextMoniker = "System Checker";
+
+@end	AppResource
+
+@start	Interface;
+
+@object GenPrimaryClass TestPrimary  = {
+	 GI_comp = @SysStatusWindow, @SysTrigger;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenTextClass SysStatusWindow = {
+	 GI_visMoniker = "The System Information:";
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTriggerClass SysTrigger = {
+	GI_visMoniker = "System";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_TEST_GET_STATUS;
+}
+
+@end Interface
+
+/*
+ ***************************************************************************
+ *		Code for TestProcessClass
+ ***************************************************************************
+ */
+
+  /***********************************************************************
+ *
+ * MESSAGE:	MSG_TEST_GET_STATUS for TestProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method TestProcessClass, MSG_TEST_GET_STATUS
+{
+ SysStats    *curStats;
+ char		buffer[25];
+ word		count;
+
+
+	SysStatistics(curStats);
+
+/*    value->CD_type        = TYPE_LONG;
+	 value->CD_data.LD_long    = (long)curStats->SS_idleCount;
+
+typedef struct {
+    dword			SS_idleCount;
+    SysSwapInfo			SS_swapOuts;
+    SysSwapInfo			SS_swapIns;
+    word			SS_contextSwitches;
+    word			SS_interrupts;
+    word			SS_runQueue;
+} SysStats;
+
+*/
+   count = (word)curStats->SS_idleCount;
+	UtilHex32ToAscii(buffer, (dword)count, UHTAF_NULL_TERMINATE);
+	@call SysStatusWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0);
+
+}
+
+
+
+
+

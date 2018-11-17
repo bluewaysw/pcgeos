@@ -1,0 +1,106 @@
+#!/bin/sh
+###############################################################################
+# 	Copyright (c) Geoworks 1999 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# FILE: 	tobit
+# AUTHOR: 	Gene
+# DESCRIPTION:
+#	Shell script to convert TIFF or MAC files to PC/GEOS background bitmaps
+#
+# USAGE:
+#	tobit [-c b|w] [-w #] [-h #] <file.xxx> <file.bit> <longname>
+#
+#	-c b - crop black edges
+#	-c w - crop white edges
+#
+#	-w # - clip width to #
+#	-h # - clip height to #
+#
+#	.mac - MacPaint files
+#	.tif - TIFF files
+#
+#	$Id: tobit,v 1.2 90/09/22 17:35:28 gene Exp $
+#
+###############################################################################
+
+#
+# Process arguments
+#
+crop=
+cwidth=
+cheight=
+while [ $# -gt 3 ]; do
+    case $1 in
+	-c*)	crop=`expr substr $2 1 1`
+		shift 2
+		;;
+	-w*)	cwidth=$2
+		shift 2
+		;;
+	-h*)	cheight=$2
+		shift 2
+		;;
+    esac
+done
+
+#
+# Convert from TIFF or MacPaint to PBM
+#
+case $1 in
+    *.tif)	file=`basename $1 .tif`
+		tifftopgm < $1 | pgmtopbm > /tmp/$file.pbm1
+		;;
+    *.mac) 	file=`basename $1 .mac`
+		macptopbm < $1 > /tmp/$file.pbm1
+		;;
+esac
+
+#
+# Crop if desired
+#
+if [ "$crop" ]; then
+    pnmcrop -$crop < /tmp/$file.pbm1 > /tmp/$file.pbm
+else
+    cp /tmp/$file.pbm1 /tmp/$file.pbm
+fi
+
+#
+# Convert to XBM to get the actual height and width
+#
+
+pbmtoxbm < /tmp/$file.pbm > /tmp/$file.xbm
+
+#
+# Set the width to the next lowest multiple of a byte, because
+# convBM pads to byte boundaries.
+#
+width=`xbmwidth < /tmp/$file.xbm`
+width=`xbmwidth < /tmp/$file.xbm`
+if [ "$cwidth" ]; then
+    if [ $cwidth -le $width ]; then
+	width=$cwidth;
+    fi
+fi
+width=`expr \( $width - 1 \) / 8 \* 8`
+
+#
+# Set the height to the minimum of the actual height and
+# the (optional) passed clip height.
+#
+height=`xbmheight < /tmp/$file.xbm`
+if [ "$cheight" ]; then
+    if [ $cheight -le $height ]; then
+	height=$cheight;
+    fi
+fi
+height=`expr $height - 1`
+
+#
+# Clip as desired and do the the final conversion to a .bit file
+#
+pnmcut 1 1 $width $height < /tmp/$file.pbm | pbmtoxbm | convBM $2 -o "$3"
+#
+# Clean up temporary files
+#
+rm -f /tmp/$file.pbm /tmp/$file.pbm1

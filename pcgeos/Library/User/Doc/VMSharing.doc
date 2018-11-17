@@ -1,0 +1,114 @@
+
+		Sharing and synchronization in the VM code
+		==========================================
+
+==========================================================================
+		OLD BEHAVIOR
+==========================================================================
+
+LOW LEVEL (VM code)
+===================
+The VM code has several levels of sharing and syncronization:
+
+File access flags
+-----------------
+VMOpen takes the standard file access flags, that allow a file to be
+opened read only or read/write and allow deny none, deny write or deny
+read/write to limit other access.
+
+Note that VM files opened read-only can be modified, the modifications
+are just not saved (although VMSaveAs can be used).
+
+There are some restrictions, such as "NOTE: A VM FILE OPENED READ-ONLY
+MUST ALSO BE OPENED DENY-WRITE OR EXCLUSIVE".
+
+Locally, shared memory is used for shared access to VM blocks.  Over a
+network it is not (obviously).
+
+Over a network there is no cache consistency between multiple users of
+a file.
+
+Temporary exclusive access
+--------------------------
+VMGrabExclusive/VMReleaseExclusive allow exclusive access to VM files
+that can normally be shared.
+
+Locally this has the limitation that VMGrabExclusive does not prevent
+threads that have already locked a VM block from accessing and
+modifying it.
+
+This is not transported over the network.
+
+Block level locking
+-------------------
+VMLock only allows one thread to access a block at a time.
+
+This is not transported over the network.
+
+
+Problems
+--------
+1) Opening files "deny read" on a network causes us not to be able to
+   read the file header.  (This can possibly be solved without
+   changing the deny mode).
+
+2) Behavior is different locally than over the network.
+
+
+==========================================================================
+		NEW BEHAVIOR
+==========================================================================
+
+VM files have two attributes that control the way that the VM file
+behaves.  These flags are stored in the GeodeFileHeaderFlags:
+
+GFHF_SHARED_MULTIPLE:
+	Indicates that the file can be opened for writing multiple
+	times.  Any access of the file must be within VMGrabExclusive
+	and VMReleaseExclusive.  All changes are flushed to the file by
+	VMReleaseExclusive.  Not all applications will support this
+	behavior.
+
+GFHF_SHARED_SINGLE:
+	Indicates that the file will primarily be viewed on the
+	network and therefore:
+	- the default for opening the file is read-only
+	- readers of the file should demand page, writers should do a
+	  special save-as so as not to alter the readers view of the file
+
+When a VM file is opened (via VMOpen), the following flags are passed:
+
+	; If neither VMAF_FORCE_READ_ONLY or VMAF_FORCE_READ_WRITE are passed,
+	; then the file is opened in the default mode based of the file
+	; attributes (GFHF_SHARED_MULTIPLE and GFHF_SHARED_SINGLE).
+
+VMAccessFlags	record
+    VMAF_FORCE_READ_ONLY:1
+	; If set then force the file to be opened read only, even if
+	; the default would be to open the file read/write.
+    VMAF_FORCE_READ_WRITE:1
+	; If set then force the file to be opened read-write, even if
+	; the default would be to open the file read-only
+    VMAF_FORCE_DENY_WRITE:1
+	; If set then open file deny write
+    VMAF_DISALLOW_SHARED_MULTIPLE:1
+	; If set then files with the SHARED_MULTIPLE attribute cannot be
+	; opened
+    VMAF_USE_BLOCK_LEVEL_SYNCHRONIZATION:1
+	; If set then block the block level syncronization of the VM
+	; code is assumed to be sufficient and the {Start/End}Exclusive
+	; mechanism is not used.  This is primarily intended for system
+	; software.
+    :3
+VMAccessFlags	end
+
+Value returned from VMOpen:
+
+VM_OPEN_OK_READ_ONLY			enum	VMStatus, 256
+VM_OPEN_OK_READ_WRITE_NOT_SHARED	enum	VMStatus
+VM_OPEN_OK_READ_WRITE_SINGLE		enum	VMStatus
+VM_OPEN_OK_READ_WRITE_MULTIPLE		enum	VMStatus
+VM_OPEN_OK_BLOCK_LEVEL			enum	VMStatus
+VM_CREATE_OK				enum	VMStatus
+
+

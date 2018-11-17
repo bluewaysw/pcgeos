@@ -1,0 +1,318 @@
+
+	File: GenControl
+	Description: This document describes GenControlClass
+	Author: Tony Requist
+	Date: 11/18/91
+
+	$Id: GenControl.doc,v 1.4.34.1 97/03/29 03:36:42 canavese Exp $
+
+
+Synopsis
+--------
+GenControlClass implements the common behavior of UI controller
+objects.  A UI controller is an object that generates a group of UI
+objects that both display the state of and modify the state of some
+object.
+
+UI controller objects are normally provided by the library that
+provides the data obejct to be controlled.  For example, the text
+library provides the text object and it provides a set of UI
+controller objects that display and modify text attributes.
+
+UI controller objects are intended to be "plug and play".  Thus if a
+programmer wants to add UI to allow modification of text styles (bold,
+italic, ...) she just adds a UITextStyleControl object and everything
+just works.
+
+Limitations
+-----------
+GenControlClass is oriented towards the common way that UI controllers
+work.  Some types of dynamic, complex controllers might want to
+implement things differently (such as the building of UI objects).
+
+Alternatives
+------------
+GenControlClass is built on top of the core generic objects, it uses
+no internal mechanisms.  Thus an application could build
+GenControlClass from scratch.
+
+Implementation Status
+---------------------
+GenControlClass is written and functional with these limitations:
+    - No C interface yet exists
+    - Dynamic spec build (as needed for a font list) is not yet well
+      supported
+    - The GCN stuff is not completed
+
+See Also
+--------
+	GenInteractionClass, ...
+	Samples: SDK_C/UICtrl, SDK_Asm/UICtrl
+
+;------------------------------------------------------------------------------
+;	Description
+;------------------------------------------------------------------------------
+
+Terminology
+-----------
+UI Controller:
+	Object subclassed off of GenControlClass that creates UI to
+	display and modify the state of the controlled data.
+
+Controlled data:
+	The data that a UI controller controls.  Examples: text
+	object, spreadsheet object, graphics object
+
+Relationships/Context
+---------------------
+Objects are generally not of GenControlClass, but of a subclass (the
+UI controller class).  GenControlClass is a subclass of
+GenInteractionClass.  UI controller objects can be put anywhere in a
+.goc file thaat a GenInteraction can.  Monikers and hints can be set
+for UI controllers.  All the normal GenClass mechanisms are also
+supported.
+
+The application programmer will place the UI controller object in the
+.goc file where the UI for the controller should go.
+
+Conceptual Overview
+-------------------
+A UI controller class will:
+
+    - handle MSG_GEN_CONTROL_GET_DUPLICATE_INFO, returning information
+      necessary to add the UI components for the controller into the
+      application.  These UI components are created by duplicating a
+      UI resource (for the normal visual representation) or by using
+      GenCopyTree (for the toolbox representation).
+
+    - respond to messages from the UI objects it creates (when the
+      user makes changes).  The UI controller sends messages to the
+      output field of the controller object to effect changes in the
+      controlled data.
+
+    - Respond to updates (via the GCN mechanism) that provide
+      notification of changes in the state of the controlled data.
+
+Creation and destruction of UI for controller objects
+-----------------------------------------------------
+The UI controller must handle MSG_GEN_CONTROL_GET_DUPLICATE_INFO and
+return three things:
+    - the handle of a UI resource to duplicate
+    - a list of children (in the resource to duplicate) to add as
+      children of the UI controller
+    - the number of children in the list
+
+A UI controller object must be IGNORE_DIRTY.  There is EC code to
+ensure this.  The duplicated resource is not saved to state.
+
+Notification mechanism
+----------------------
+
+Respnsibilities of the controlled data
+--------------------------------------
+Controlled data is responsible for sending notification of changes to
+GCN Lists of which they:
+
+	1) Have the exclusives required to be able to send messages to
+	   a particular GCN List, and
+	2) Are able to generate the notification types required by that 
+	   GCN List.
+
+See next section for info on how to do this correctly.
+
+When & how controlled data should update GenControl objects
+-----------------------------------------------------------
+GenControl objects can be updated via a direct message call, but are most
+commonly updated via GCNLists to provide isolation between data & its
+controllers.  Documentation for each subclassed GenControl should indicate
+what messages may be sent to it, directly or indirectly via GCNLists, to
+update it, and what GCNLists it places itself on by default.
+
+Most updates are currently being performed using the general purpose
+MSG_META_NOTIFY_WITH_DATA_BLOCK.  Notification types are enumerated, & the
+enumeration passed in this message.  The notification type also defines the
+format of the data to be passed in the data block.
+
+Current lists are generally of the APP_TARGET type, meaning that only objects
+that currently have the TARGET exclusive within the application are allowed
+to update the GCN List.  The only exception to this is the moment that the
+object loses the target, at which point it must clear any status event
+information it has set up in any GCNLists.
+
+To update APP_TARGET, or APP-anything, for that matter, GCNLists,
+"Data objects" such as text, spreadsheet, etc., should send the update
+information using MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST, which should be sent,
+as a normal message send (no MF_FORCE_QUEUE or MF_INSERT_AT_FRONT manipulations,
+pleaes) to the application's process.
+
+(If you're amused by nasty synchronization problems, do a tag on
+MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST to see a write-up on why a direct call to the
+application object with MSG_META_GNC_LIST_SEND is not a good idea.)
+
+When sending events to GCNLists, the bit GCNLSF_SET_STATUS of GCNListSendFlags
+should be set, so that the status will be cached in the GCNList, & thereby
+delivered to any controller that should add itself to the GCNList.  Whether
+this bit should be set or not is associated with the notification type. 
+Generally, it is set.  There are exceptions, however -- see "On-Demand
+Notification" below.
+
+Controlled data objects are responsible for sending notifications on the
+following conditions:	 
+
+	1) Gained target
+	2) Already have target, but status has changed
+	3) Just lost target (should send "null" status events, which
+	   is actually the same notification method, but with w/bp
+	   clear, to inform controller that there is no status to be
+	   displayed)  This last update should ALWAYS be performed 
+	   immediately on loss of target, & never delayed for later
+	   processing -- for instance, this should be done regardless of
+	   whether an object is "suspended" for visual updating.  The
+	   problem is that if the object waits for a later event to happen,
+	   the act of sending a "null" status event may wipe out the
+	   new, legitimate target's valid status.
+
+For case (3) above, GenApplication will optimize controllers
+updates, if requested, so that controller gadgets do not flicker
+because of being disabled & then enabled again when clicking between
+two different target objects or displays.  To request this
+optimization, set the GCNLSF_IGNORE_IF_STATUS_TRANSITIONING bit
+in GCNListSendFlags whenever sending "null" status.
+
+On-Demand Notification
+----------------------
+Notification types which involve a great deal of data, however, may be
+defined as "on-demand-only", meaning that data objects should not generate
+the notification unless requested to do so, via a message predefined for
+that purpose, and when doing so should leave GCNLSF_SET_STATUS of
+GCNListSend clear.  Controllers which require this type of notification will
+request the notification once they become visible to the user.  Updates may
+be done either of two ways:  The controller provides an "Update" button, which
+if the user clicks on to request an update notification, or the data object
+can send a data-less related message to the GCNList indicating only that a
+change has happened.  It is then up to the Controller to request an update
+to learn about that change.
+
+;------------------------------------------------------------------------------
+;	Implementation Notes
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;	Inheritance
+;------------------------------------------------------------------------------
+
+Same as for GenInteractionClass
+
+;------------------------------------------------------------------------------
+;	Frequently Asked Questions
+;------------------------------------------------------------------------------
+
+Q: Why do I get a UI_ERROR_CAN_NOT_ADD_OR_REMOVE_OBJECT_WHILE_USABLE
+   FatalError when I start up my application?  I *thought* I set up
+   the controller just fine.
+
+A: All template resource objects which will be duplicated and added as
+   children of the UI controller, or added to a toolbox, must be
+   initialized NOT_USABLE.  Here's an example of a controller's child
+   in GOC:
+
+    	@object GenShmeClass ShmeInstance = {
+    		...
+        	GI_states = @default & ~GS__USABLE;
+    		...
+    	}
+
+   And an example in Esp:
+
+    	ShmeInstance = GenShme {
+    		...
+    		genStates = default -usable;
+    		...
+    	}
+
+;------------------------------------------------------------------------------
+
+Q: How do I send a message to the GCN list from my application?
+   What structures do I need to define?
+
+A: Here's the list of things that must be done to send a message to
+   a GCN list:
+
+    	1) Any information that needs to be passed along with the
+    	   notification is known as a "data block."  It can be
+    	   anything, as long as it's pointed to by a MemHandle.
+    	   *** Important! GCNIncNotificationDataBlockInUseCount
+    	   *** must be called with the data block handle before the
+    	   *** next step!
+
+    	2) A MSG_META_NOTIFY or MSG_META_NOTIFY_WITH_DATA_BLOCK message now
+    	   needs to be encapsulated to inform the GCN list management
+    	   code whether or not data is being passed with the
+    	   notification.  The data block MemHandle is used here (if
+    	   necessary) along with the manufacturer ID and notification
+    	   type (NSNT_*).  Notification types are usually defined
+    	   in a manufacturer's main GCN header file (for example,
+    	   CInclude/geoworks.h).
+
+    	3) Finally, the list is sent off to the application's process
+    	   via MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST.  The manufacturer's ID and
+    	   notification type (GAGCNLT_*) is passed here, as is the
+    	   encapsulated MSG_META_NOTIFY* message.
+
+    	   Note: Data blocks are automatically discarded when the GCN
+    	   code is done with it.
+
+   That's all.  Here's an example in GOC:
+
+    ...
+    {
+    	/* Normally you'd define this in a header file somewhere... */
+    	typedef struct {
+    	    int	    count;
+    	    char    letterToLookFor;
+    	} MyDataStructure;
+
+    	MemHandle   	myDataBlock;
+    	MyDataStructure *myDataPtr;
+    	MessageHandle 	msg;
+
+    	/*
+    	 * Allocate and lock down a block for my data structure.  This
+    	 * will be passed along with the notification.
+    	 */
+    	myDataBlock = MemAlloc(sizeof(MyDataStructure), HF_DYNAMIC, HAF_STANDARD);
+    	myDataPtr   = MemLock(myDataBlock);
+
+    	/* Load up the structure with pertinent info. */
+    	myDataPtr->count = 255;
+    	myDataPtr->letterToLookFor = 'z';
+
+    	/* Unlock it and increment its InUseCount. */
+    	MemUnlock(myDataBlock);
+    	GCNIncNotificationDataBlockInUseCount(myDataBlock);
+
+    	/*
+    	 * Now encapsulate (record) a MSG_META_NOTIFY_WITH_DATA_BLOCK
+    	 * message.  Since it's just being recorded for no class in
+    	 * particular, use NullClass as its class type.
+    	 */
+    	msg = @record NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+    	    	    	MANUFACTURER_ID_GEOWORKS,	/* Manufacturer's ID */
+    	    	    	NSNT_SOME_PREDEFINED_STATUS_CHANGE,
+    	    	    	    	    		/* Manufacturer's list type */
+    	    	    	myDataBlock);		/* Handle of data block */
+
+    	/*
+    	 * Finally, send the message off to our process.  The
+    	 * GCNListSendFlags depend upon your situation.
+    	 */
+        @send MyProcessClass::MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST(
+    			(word) 0,		/* GCNListSendFlags */
+    			msg,	    		/* Handle to classed event */
+    			myDataBlock,		/* Handle of data block */
+    			MANUFACTURER_ID_GEOWORKS,	/* Manufacturer's ID */
+    			GAGCNLT_APP_TARGET_SOME_PREDEFINED_STATUS_CHANGE);
+    	    	    	    	    		/* Manufacturer's list type */
+    				
+    	/* All done!  myDataBlock will be MemFree()'d automatically. */
+    }

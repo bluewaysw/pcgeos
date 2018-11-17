@@ -1,0 +1,539 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		textline.def
+
+AUTHOR:		John Wedgwood, Nov 19, 1991
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jcw	11/19/91	Initial revision
+
+
+DESCRIPTION:
+	Definition file for stuff exported from the TextLine module.
+		
+	$Id: textline.def,v 1.1 97/04/07 11:19:09 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;			      Constants
+;-----------------------------------------------------------------------------
+
+DrawBorderFlags	record
+    DBF_NEGATIVE:1
+    DBF_SHADOW_FLAG:1
+    DBF_NO_SHADOW:1
+    DBF_SIDE_SHADOWED:1		;this side is shadowed wrt the anchor
+    DBF_DOUBLE:1		;double border
+    DBF_DONT_ADJUST_START:1
+    DBF_DONT_ADJUST_END:1
+    :1
+DrawBorderFlags	end
+
+;-----------------------------------------------------------------------------
+;			  Exported Routines
+;-----------------------------------------------------------------------------
+TextLineCalc	segment	resource
+	global TL_LineInsert:far
+	;
+	; Insert some number of lines.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Current line (-1 to append lines)
+	;		dx.ax	= Number of lines to insert
+	;	RETURN:	bx.di	= First new line
+	;
+
+	global TL_LineDelete:far
+	;
+	; Delete some number of lines.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Current line
+	;		dx.ax	= Number of lines to delete
+	;			= -1 to nuke to the very end
+	;	RETURN:	cx.dx.ax= Sum of heights of nuked lines
+	;
+
+	global TL_LineAdjustForReplacement:far
+	;
+	; Update line offsets after a replacement.
+	;	PASS:	*ds:si	= Instance ptr
+	;		ss:bp	= VisTextReplaceParameters
+	;	RETURN:	bx.di	= First line changed
+	;
+
+	global TL_LineCalculate:far
+	;
+	; Calculate a single line after a change.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line we want to calculate
+	;		cx	= LineFlags for line
+	;		ss:bp	= LICL_vars with among other things:
+	;				LICL_range.VTR_start = line start
+	;				Paragraph attributes set
+	;	RETURN:	LICL_range.VTR_start = start of next line
+	;		LICL_calcFlags updated
+	;		LICL_insertedSpace updated to account for the
+	;			changes in line height.
+	;
+
+	global TL_CommonLineCalculate:far
+	;
+	; Calculate a single line. This is currently intended only for
+	; VisTextCalcHeight() which needs to do calculations without actually
+	; having line or field data structures present.
+	;	PASS:	*ds:si	= Instance ptr
+	;		ss:bp	= LICL_vars with among other things:
+	;				LICL_range.VTR_start = line start
+	;				Paragraph attributes set
+	;		es:di	= Pointer to the line
+	;		cx	= Size of line/field data
+	;		ax	= LineFlags for current line
+	;	RETURN:	LICL_range.VTR_start = start of next line
+	;		LICL_calcFlags updated
+	;		Line pointed at by es:di set correctly
+	;
+
+	global TL_LineToExtPosition:far
+	;
+	; Get the extended position of the left edge of a line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line whose position we want
+	;	RETURN:	cx.bx	= 32 bit left edge of line
+	;		dx.ax	= 32 bit top of line
+	;
+
+	global TL_LineFromExtPosition:far
+	;
+	; Given an extended position, find the line it corresponds to.
+	;	PASS:	*ds:si	= Instance ptr
+	;		cx.bx	= 32 bit X event position
+	;		dx.ax	= 32 bit Y event position
+	;	RETURN:	bx.di	= Line
+	;		carry set if the position is below the last line
+	;
+
+	global TL_LineGetBottom:far
+	;
+	; Get the bottom of a line as an offset from the top of the region.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	dx.bl	= Bottom of the line.
+	;		bh is preserved
+	;
+
+	global TL_LineGetLeftEdge:far
+	;
+	; Get the offset of the left edge of the line from the left
+	; edge of the region containing the line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	ax	= Offset of left edge from left edge of region
+	;
+
+TextLineCalc	ends
+
+TextRegion segment resource
+	
+	global TL_LineSumAndMarkRange:far
+	;
+	; Sum the heights of a range of lines and mark them all as needing
+	; to be calculated and drawn.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Start of range
+	;		dx.ax	= End of range
+	;		cx	= Flags to set in the range
+	;	RETURN:	cx.dx.ax= Sum of the heights (DWFixed)
+	;	
+TextRegion ends
+
+TextFixed	segment
+	global TL_LineGetCount:far
+	;
+	; Get the number of lines in a text object.
+	;	PASS:	*ds:si	= Instance ptr
+	;	RETURN:	dx.ax	= Number of lines
+	;
+
+	global TL_LineNext:far
+	;
+	; Move to the next line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Current line
+	;	RETURN:	bx.di	= Next line
+	;		carry set if there is no next line
+	;
+
+	global TL_LinePrevious:far
+	;
+	; Move to the previous line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Current line
+	;	RETURN:	bx.di	= Previous line
+	;		carry set if there is no previous line
+	;
+	
+	global TL_LineGetCharCount:far
+	;
+	; Get the number of characters in a line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	dx.ax	= Number of characters
+	;
+	
+	global TL_LineAddCharCount:far
+	;
+	; Add the number of characters in a line to an offset.
+	;	PASS:	*ds:si	= instance
+	;		bx.di	= Line
+	;		dx.ax	= Offset
+	;	RETURN:	dx.ax	= Offset + lineCount
+	;
+
+	global TL_LineSubtractCharCount:far
+	;
+	; Subtract the number of characters in a line to an offset.
+	;	PASS:	*ds:si	= instance
+	;		bx.di	= Line
+	;		dx.ax	= Offset
+	;	RETURN:	dx.ax	= Offset - lineCount
+	;
+
+	global TL_LineToOffsetStart:far
+	;
+	; Given a line, get the offset of the start of the line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	dx.ax	= Offset to start of line
+	;
+
+	global TL_LineToOffsetStartFromRegion:far
+	;
+	; Given a line, get the offset of the start of the line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;		cx	= Region to start at
+	;	RETURN:	dx.ax	= Offset to start of line
+	;
+
+	global TL_LineToOffsetEnd:far
+	;
+	; Given a line, get the offset to the end of the line. If the line
+	; ends in a <cr> or a <page-break>, return the position before that
+	; character.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	dx.ax	= Offset to end of line
+	;
+
+	global TL_LineToOffsetVeryEnd:far
+	;
+	; Given a line, get the offset past the last character on the line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	dx.ax	= Offset to end of line
+	;		cx	= LineFlags for the line
+	;
+
+	global TL_LineGetHeight:far
+	;
+	; Get the height of a line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	dx.bl	= Line height (WBFixed)
+	;		bh is preserved
+	;
+
+	global TL_LineGetTop:far
+	;
+	; Get the top of a line as an offset from the top of the region.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	dx.bl	= Top of line (WBFixed)
+	;		bh is preserved
+	;
+
+	global TL_LineGetBLO:far
+	;
+	; Get the baseline-offset of a line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	dx.bl	= Baseline-offset (WBFixed)
+	;		bh is preserved
+	;
+
+	global TL_LineTextPosition:far
+	;
+	; Given a text offset into a line and a pixel offset, compute the
+	; nearest possible valid position where the event at the pixel
+	; position could occur, not to exceed the passed offset.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;		dx.ax	= Offset to calculate up to
+	;		bp	= Pixel offset from the left edge of the line
+	;	RETURN:	dx.ax	= Nearest character offset
+	;		bx	= Pixel offset from the left edge of the line
+	;		carry set if position is not on line
+	;
+
+	global TL_LineToPosition:far
+	;
+	; Get the position of the left edge of a line relative to the region
+	; containing the line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line whose position we want
+	;	RETURN:	cx	= 16 bit left edge of line
+	;		dx	= 16 bit top of line
+	;
+
+	global TL_LineFromPosition:far
+	;
+	; Given a position, find the line it corresponds to.
+	;	PASS:	*ds:si	= Instance ptr
+	;		ax	= 16 bit X event position
+	;		dx	= 16 bit Y event position
+	;		cx	= Region
+	;	RETURN:	bx.di	= Line
+	;		carry set if the position is below the last line
+	;
+
+	global TL_LineFromPositionGetBLOAndHeight:far
+	;
+	; Given a position, find the line it corresponds to and return the
+	; baseline and height of that line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		ax	= 16 bit X event position
+	;		dx	= 16 bit Y event position
+	;		cx	= Region
+	;	RETURN:	bx.al	= Baseline
+	;		dx.ah	= Line height
+	;
+
+	global TL_LineFromOffset:far
+	;
+	; Given an offset, get the line which contains that offset. For word-
+	; wrapped lines, a character offset can exist on both lines. The caller
+	; can choose whether it wants the first or second line in situations
+	; like this.
+	;	PASS:	*ds:si	= Instance ptr
+	;		dx.ax	= Offset
+	;		carry set if the caller wants the first line that
+	;			contains that offset. Carry clear otherwise.
+	;	RETURN:	bx.di	= Line
+	;
+
+	global TL_LineFromOffsetGetStart:far
+	;
+	; Given an offset, get the line which contains that offset. For word-
+	; wrapped lines, a character offset can exist on both lines. The caller
+	; can choose whether it wants the first or second line in situations
+	; like this.
+	;	PASS:	*ds:si	= Instance ptr
+	;		dx.ax	= Offset
+	;		carry set if the caller wants the first line that
+	;			contains that offset. Carry clear otherwise.
+	;	RETURN:	bx.di	= Line
+	;		dx.ax	= Start of that line
+	;
+
+	global TL_LineAlterFlags:far
+	;
+	; Alter the LineFlags associated with a given line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;		ax	= Bits to set
+	;		dx	= Bits to clear
+	;		if ax and dx contain the same bits, those bits are
+	;			toggled.
+	;
+
+	global TL_LineGetFlags:far
+	;
+	; Get the flags associated with a line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;	RETURN:	ax	= LineFlags
+	;
+
+	global TL_LineTestFlags:far
+	;
+	; Test for flags being set in the LineFlags associated with a line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;		ax	= LineFlags to test
+	;	RETURN:	Zero flag clear (non-zero) if any bits in ax are
+	;			set in the LineFlags for the line.
+	;
+
+	global TL_LineInvertRange:far
+	;
+	; Invert a range of text on a line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		ss:bp	= LICL_vars
+	;			  LICL_line = line to invert on
+	;			  LICL_range holds the range to invert
+	;			  VTR_start = 0 for line start
+	;			  VTR_end   = TEXT_ADDRESS_PAST_END for line end
+	;
+	
+	global CheckDrawControlChars:far
+	;
+	; Check to see if we are drawing control characters in this object
+	;	PASS:	*ds:si	= Instance
+	;	RETURN:	carry set if we are drawing control characters
+	;
+	;	NOTE:	This only works if a gstate has been created for the
+	;		object. If one hasn't been created, nasty death
+	;		will result.
+	;
+
+EC <	global	ECValidateSingleLineStructure:far			>
+	;
+	; Defined only in the EC version. Makes sure that all lines and fields
+	; are correctly defined.
+	;	PASS:	*ds:si	= Instance
+	;		bx.di	= Line structure to validate
+	;	RETURN:	nothing
+	;	DESTROYED: nothing (flags preserved)
+	;
+
+;
+; The following structure is inherited by the EC routines so that at any
+; point you can easily see the line, object, etc that may be causing a problem
+;
+ECLineValidationInfo	struct
+    ECLVI_object	optr		; OD of the text object
+    ECLVI_line		dword		; Line we are currently checking
+    ECLVI_linePtr	fptr		; Far ptr to current line
+    ECLVI_lineSize	word		; Size of line and field data
+    ECLVI_lineStart	dword		; Offset into text where line starts
+ECLineValidationInfo	ends
+
+TextFixed	ends
+
+
+TextInstance	segment	resource
+	global TL_LineStorageCreate:near
+	;
+	; Create new line storage.
+	;	PASS:	*ds:si	= Instance ptr
+	;
+
+	global TL_LineStorageDestroy:near
+	;
+	; Destroy the current line storage.
+	;	PASS:	*ds:si	= Instance ptr
+	;
+	
+	global TL_LineFindMaxWidth:far
+	;
+	; Figure the width of the widest line.
+	;	PASS:	*ds:si	= Instance
+	;	RETURN:	dx.al	= Width
+	;
+
+TextInstance	ends
+
+
+TextDrawCode	segment	resource
+	global TL_LineDraw:far
+	;
+	; Draw a line of text.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line to draw
+	;		ax	= TextClearBehindFlags
+	;		ss:bp	= LICL_vars w/ these set:
+	;				LICL_lineStart
+	;				LICL_paraAttrStart/End
+	;				LICL_theParaAttr (if start != -1)
+	; Note:
+	;   If the TCBF_PRINT bit is *clear* (not printing) then line is
+	;   marked as no longer needing to be drawn
+	;
+	
+	global TL_LineClearBehind:far
+	;
+	; Clear the area behind a line of text.
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.di	= Line
+	;		al	= TextClearBehindFlags
+	;		ss:bp	= LICL_vars structure with these set:
+	;				LICL_lineStart
+	;				LICL_theParaAttr
+	;				LICL_paraAttrStart
+	;				LICL_paraAttrEnd
+	;			    if paraAttr invalid
+	;				LICL_paraAttrStart = -1
+	;	RETURN:	Paragraph attributes set for this line
+	;
+	
+	global	TL_LineDrawLastNChars:far
+	;
+	; Draw the last <cx> characters of a line.
+	;	PASS:	*ds:si	= Instance ptr
+	;		ss:bx	= LICL_vars w/ LICL_firstLine* set
+	;		cx	= Number of characters to draw
+	;		ax	= TextClearBehindFlags
+	; Note:
+	;   If the TCBF_PRINT bit is *clear* (not printing) then line is
+	;   marked as no longer needing to be drawn
+	;
+	
+	global	TL_LineClearFromEnd:far
+	;
+	; Clear from the end of a line to the right edge of the region.
+	;	PASS:	*ds:si	= Instance ptr
+	;		ss:bx	= LICL_vars w/ LICL_firstLine* set
+	;
+
+TextDrawCode	ends
+
+TextObscure	segment	resource
+
+	global	TL_LineGetParaCount:far
+	;
+	; Get the paragraph count
+	;
+	;	Return:	dxax - paragraph count
+
+	global	VisTextGetLineInfo:far
+	global	VisTextGetLineFromOffset:far
+	global	VisTextGetLineOffsetAndFlags:far
+TextObscure	ends
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		TL_LineNextSkipCheck
+
+DESCRIPTION:	Advance to the next line when you know it exists.
+
+ASSUMES:	bx.di	= Line
+
+CAVEATS:
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+TL_LineNextSkipCheck	macro
+	incdw	bxdi
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		TL_LinePrevSkipCheck
+
+DESCRIPTION:	Move to the previous line when you know it exists.
+
+ASSUMES:	bx.di	= Line
+
+CAVEATS:
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+TL_LinePrevSkipCheck	macro
+	decdw	bxdi
+endm
+

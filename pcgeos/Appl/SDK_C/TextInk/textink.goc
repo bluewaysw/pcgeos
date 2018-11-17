@@ -1,0 +1,1088 @@
+/********************************************************************
+ *
+ *      Copyright (c) Geoworks 1996 -- All Rights Reserved.
+ *
+ * PROJECT:     TextInk Sample Application
+ * MODULE:      Static Objects and Methods
+ * FILE:        textink.goc
+ *
+ * AUTHOR:      Andrew Wilson
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      drew    6/12/91         Initial version
+ *      NF      9/23/96         Added EC code and cleaned up
+ *
+ * DESCRIPTION:
+ *	This application demonstrates simple use of a combined
+ *	ink and text object.
+ *
+ *	Note that because ink use is applicable only on pen-based
+ *	systems, this application neither displays its ink tools nor
+ *	accepts ink input when run on the desktop platform.
+ *
+ *	When a document is created, the document object duplicates a
+ *	template block that contains both an ink and a text object.
+ *
+ *	Depending upon the input mode the user currently has selected,
+ *	either the ink or text object is given the focus and target,
+ *	and the other object has its VA_DETECTABLE bit cleared, so it
+ *	can no longer receive ink or mouse input.
+ *
+ *	When the user types into the text object, we may need to
+ *      redraw the ink - to this end, we subclass the text object,
+ *      and when MSG_VIS_TEXT_SCREEN_UPDATE is sent out, we redraw
+ *      the ink as well. The only exception to this is that when the
+ *      user is backspacing, there may not necessarily be a
+ *      MSG_VIS_TEXT_SCREEN_UPDATE message sent out (when backspacing
+ *      at the end of a line), so we subclass MSG_META_KBD_CHAR, and
+ *      generate our own MSG_VIS_TEXT_SCREEN_UPDATE in this case.
+ *
+ * NOTE:
+ *      Small VisText objects have a maximum height of 32767, and no
+ *      provision is made here to reject pastes/text input that would
+ *      make the text object grow beyond that height.
+ *
+ * RCS STAMP:
+ *      $Id: textink.goc,v 1.1 97/04/04 16:39:51 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    @include <spool.goh>
+    @include <Objects/gViewCC.goh> /* GenViewControlClass */
+    @include <pen.goh>             /* InkClass */
+    @include <Objects/vTextC.goh>  /* VisTextClass */
+    @include <gstring.h>           /* Needed for next two headers. */
+    @include <Art/mkrInk.goh>      /* Artwork.. */
+    @include <Art/mkrText.goh>
+
+/********************************************************************
+ *              Constants
+ *******************************************************************/
+      /* Document protocol numbers. */
+    #define DOCUMENT_PROTOCOL_MAJOR 1
+    #define DOCUMENT_PROTOCOL_MINOR 0
+
+      /* Document size (8.5" x 11" scaled by half). */
+    #define DOCUMENT_WIDTH 72 * 17
+    #define MINIMUM_HEIGHT 72 * 22
+
+/********************************************************************
+ *              Data Types
+ *******************************************************************/
+    typedef struct {
+        optr TIMB_ink;
+        optr TIMB_text;
+    } TIMapBlock;
+
+    typedef enum {
+        TIM_INK,
+        TIM_TEXT
+    } TextInkMode;
+
+/********************************************************************
+ *              Class Definitions
+ *******************************************************************/
+      /*
+       * We subclass the InkClass object so we can substitute
+       * our own reloc handler to clear out various instance
+       * data fields when loading/saving the data to the
+       * file - this is only needed if the ink object is saved
+       * to a VM file.
+       */
+    @class TextInkInkClass, InkClass;
+    @endc;
+
+      /*
+       * We subclass the text object so we can tell the
+       * parent document to redraw the ink on
+       * MSG_VIS_TEXT_SCREEN_UPDATE.
+       */
+    @class TextInkTextClass, VisTextClass;
+    @endc;
+
+    @class TextInkProcessClass, GenProcessClass ;
+    @message (GEN_ITEM_GROUP_APPLY_MSG)MSG_TEXT_INK_SET_INPUT_MODE;
+      /*
+       * This message is sent out whenever the user changes
+       * input modes - it  sets the correct input mode on all
+       * the opened documents.
+       */
+    @endc;
+
+    @class TextInkDocumentClass, GenDocumentClass ;
+      /*
+       * Message sent out to tell the document which
+       * object should get the input currently.
+       */
+    @message void MSG_TEXT_INK_DOCUMENT_SET_INPUT_MODE(
+        TextInkMode mode );
+      /*
+       * Message sent when the text object has redrawn
+       * itself and now needs the ink object to redraw *itself*.
+       */
+    @message void MSG_TEXT_INK_DOCUMENT_REDRAW_INK ();
+      /*
+       * Message sent by the text object when it grows larger,
+       * so the document knows to make itself/its children
+       * larger as well.
+       */
+    @message void MSG_TEXT_INK_DOCUMENT_SET_HEIGHT( word height );
+    @endc;
+
+/********************************************************************
+ *              Class Declarations
+ *******************************************************************/
+    @classdecl TextInkProcessClass, neverSaved;
+    @classdecl TextInkDocumentClass;
+    @classdecl TextInkInkClass;
+    @classdecl TextInkTextClass;
+
+/********************************************************************
+ *              Static Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *              Application Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass TextInkApp = {
+    GI_visMoniker = list { @TextInkTextMoniker };
+    GI_comp = @TIPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @TIPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, MGCNLT_APP_STARTUP ) =
+        @TIUIDocumentControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST ) =
+        @TIUIDocumentControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS ) =
+        @TIUIDocumentControl,
+        @TIEditControl,
+        @TIInkControl;
+    ATTR_GEN_INIT_FILE_CATEGORY = "textink";
+}
+
+@visMoniker TextInkTextMoniker = "Text/Ink Hybrid";
+
+@end AppResource;
+
+/********************************************************************
+ *              Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass TIPrimary = {
+    GI_comp = @TIFileMenu,
+              @TIEditMenu,
+              @TIInkMenu,
+              @TIToolbar,
+              @TIDisplayGroup;
+    HINT_KEEP_INITIALLY_ONSCREEN;
+}
+
+@object GenInteractionClass TIFileMenu = {
+    GI_comp = @TIUIDocumentControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_FILE_MENU );
+}
+
+@object GenDocumentControlClass TIUIDocumentControl = {
+    GDCI_documentToken = { "SMPD", MANUFACTURER_ID_GEOWORKS };
+    GDCI_defaultFile = "C Text/Ink Default Document";
+    GDCI_templateDir = "TEXTINK";
+    GDCI_noNameText = "No Document";
+    GDCI_documentGroup = @TIDocumentGroup;
+}
+
+@object GenInteractionClass TIEditMenu = {
+    GI_comp = @TIEditControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_EDIT_MENU );
+}
+
+@object GenEditControlClass TIEditControl = {
+    GII_visibility = GIV_SUB_GROUP;
+    HINT_SAME_CATEGORY_AS_PARENT;
+}
+
+@object GenInteractionClass TIInkMenu = {
+    GI_visMoniker = 'I', "Ink";
+    GI_comp = @TIInkControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object InkControlClass TIInkControl = {
+    GII_visibility = GIV_SUB_GROUP;
+    ATTR_GEN_DESTINATION_CLASS = (ClassStruct*)&InkClass;
+}
+
+@object GenInteractionClass TIToolbar = {
+    GI_comp = @TIModeList,
+              @TIInkTools,
+              @TIEditTools;
+    HINT_TOOLBOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenItemGroupClass TIModeList = {
+    GI_comp = @TIInkMode,
+              @TITextMode;
+    GIGI_selection = TIM_INK;
+    GIGI_destination = @process;
+    GIGI_applyMsg = MSG_TEXT_INK_SET_INPUT_MODE;
+}
+
+@object GenItemClass TIInkMode = {
+    GI_visMoniker = list { @SketchInkMoniker };
+    GII_identifier = TIM_INK;
+}
+
+@object GenItemClass TITextMode = {
+    GI_visMoniker = list { @SketchTextMoniker };
+    GII_identifier = TIM_TEXT;
+}
+
+
+@object GenToolGroupClass TIInkTools = {
+    GTGI_controller = @TIInkControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass TIEditTools = {
+    GTGI_controller = @TIEditControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenDisplayGroupClass TIDisplayGroup = {
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_TARGET;
+    HINT_INITIAL_SIZE = {
+        SST_PCT_OF_FIELD_WIDTH | PCT_70,
+        SST_PCT_OF_FIELD_HEIGHT | PCT_55,
+        0
+    };
+}
+
+@end Interface
+
+/********************************************************************
+ *              DocGroup Resource
+ *******************************************************************/
+@start DocGroup;
+
+@object GenDocumentGroupClass TIDocumentGroup = {
+    GDGI_untitledName = "TI Untitled";
+    GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+    GDGI_documentClass = (ClassStruct*)&TextInkDocumentClass;
+    GDGI_documentControl = @TIUIDocumentControl;
+    GDGI_attrs = @default | GDGA_VM_FILE_CONTAINS_OBJECTS
+                          | GDGA_CONTENT_DOES_NOT_MANAGE_CHILDREN;
+    GDGI_genDisplayGroup = @TIDisplayGroup;
+    GDGI_genDisplay = @TIDisplay;
+    GDGI_genView = @TIView;
+}
+
+@end DocGroup;
+
+/********************************************************************
+ *              DisplayUI Resource
+ * This resource is duplicated by GenDocumentGroup when creating
+ * or opening new documents.
+ *******************************************************************/
+@start DisplayUI;
+
+@object GenDisplayClass TIDisplay = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @TIView;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_DEFAULT_TARGET;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenViewClass TIView = {
+      /*
+       * The ink type should be "GVIT_QUERY_OUTPUT",
+       * so the text object can set up its gesture callbacks.
+       */
+    GVI_inkType = GVIT_QUERY_OUTPUT;
+    GVI_attrs = @default;
+    GVI_scaleFactor = { { 0x8000, 0 }, { 0x8000, 0 } };
+      /*
+       * Set the scale factor to 50%, so the text object
+       * won't do any bit blitting when inserting/deleting
+       * lines, which would blit the ink data as well, and
+       * lead to screen glitches.
+       */
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs = @default | GVDA_SCROLLABLE
+                             | GVDA_NO_LARGER_THAN_CONTENT;
+      /*
+       * Add ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT so
+       * the view will not force a floating keyboard on screen.
+       * We will do this manually in the handler for
+       * MSG_TEXT_INK_DOCUMENT_SET_INPUT_MODE.
+       */
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    HINT_DEFAULT_TARGET;
+    HINT_DEFAULT_FOCUS;
+}
+
+@end DisplayUI;
+
+/********************************************************************
+ *      DocumentResource
+ * This resource will be duplicated by the GenDocumentGroup object
+ * and will actually be the document managed by the GenDocument.
+ * The resource contains the VisText and Ink objects.
+ * The resource is marked notDetachable as its duplicates will
+ * (and should) never be saved to the application state file if
+ * the system is shut down. Instead, they will be placed in the
+ * document files themselves. Marking it notDetachable prevents
+ * the system from creating a data structure to track the block
+ * for the purpose of putting it in the state file.
+ *******************************************************************/
+@start DocumentResource, notDetachable;
+
+  /* The VisText provides the main part of the application
+   * -- all the text input and display as well as the text
+   * formatting and storage. */
+@object TextInkTextClass TIText = {
+    VI_bounds = { 0, 0, DOCUMENT_WIDTH, MINIMUM_HEIGHT };
+      /* The optFlags determine what parts of the object need
+       * to be updated. Because this object isn't managed by the
+       * geometry manager, we must clear the VOF_GEOMETRY_INVALID and
+       * VOF_WINDOW_UPDATE_PATH flags. */
+    VI_optFlags = @default & ~( VOF_GEOMETRY_INVALID
+                              | VOF_WINDOW_UPDATE_PATH );
+      /*
+       * You must fill this in since the vTextC.goh file
+       * doesn't give VTI_text a default value.
+       */
+    VTI_text = "";
+      /* To allow full user interaction with this text object, it
+       * is set to be both editable and selectable.  To allow the
+       * controller objects to work with the text object, it is
+       * set to be targetable, too. */
+    VTI_state = @default | VTS_EDITABLE
+                         | VTS_SELECTABLE
+                         | VTS_TARGETABLE;
+    VTI_charAttrRuns = @TITCharAttrRuns;
+    VTI_storageFlags = VTSF_MULTIPLE_CHAR_ATTRS
+                     | VTSF_DEFAULT_PARA_ATTR;
+    VTI_features = @default | VTF_ALLOW_SMART_QUOTES
+                            | VTF_ALLOW_UNDO;
+}
+
+@CHAR_ATTR_ELEMENT_ARRAY_HEADER TITCharAttrElements = {
+    CHAR_ATTR_FONT_SIZE( FID_DTC_URW_SANS, 24 )
+};
+
+@RUN_ARRAY_HEADER( TITCharAttrElements ) TITCharAttrRuns = {
+    TRAE_ALL( 0 ),
+    TRAE_END
+};
+
+@object TextInkInkClass TIInk = {
+    VI_bounds = { 0, 0, DOCUMENT_WIDTH, MINIMUM_HEIGHT };
+      /*
+       * We need to invalidate erasures, because there
+       * may be text under the are we are trying to erase.
+       */
+    II_flags = @default | IF_CONTROLLED
+                        | IF_INVALIDATE_ERASURES;
+}
+
+@end DocumentResource;
+
+/********************************************************************
+ *              Function Definitions
+ *******************************************************************/
+
+/********************************************************************
+ *              GetInkOptr
+ ********************************************************************
+ * SYNOPSIS:     Returns the optr of the document's ink object.
+ * RETURNS:      ink object
+ * SIDE EFFECTS: Brings the ink object into memory if it isn't
+ *               already.
+ * STRATEGY:     Get the map block of the document and extract
+ *               the "optr" of the ink object. Turn this into a
+ *               real optr (memhandle:chunkhandle) and return that.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     3/31/94         Initial Revision
+ *******************************************************************/
+static optr
+GetInkOptr( optr obj )
+{
+      /*
+       * vmhMapBlock   - Map block vm handle.
+       * pMapBlock     - Pointer to map block.
+       * mhMapBlock    - Memory handle of ink object.
+       * inkOD         - Optr of ink object.
+       * pself         - Pointer to document instance data.
+       * docFileHandle - File handle of document.
+       */
+    VMBlockHandle             vmhMapBlock;
+    TIMapBlock *              pMapBlock;
+    optr    	              inkOD;
+    TextInkDocumentInstance * pself;
+    MemHandle                 mhMapBlock;
+    VMFileHandle              docFileHandle;
+
+      /*
+       * Get the map block of the VM file passed.  This is done
+       * with the kernel routine VMGetMapBlock().  Then lock
+       * the map block into memory with VMLock() so we can
+       * get the handle from it.
+       */
+    pself = ObjDerefGen( obj );
+EC( ECCheckBounds( pself ); )
+    docFileHandle = pself->GDI_fileHandle;
+EC( ECVMCheckVMFile( docFileHandle ); )
+    vmhMapBlock = VMGetMapBlock( docFileHandle );
+EC( ECVMCheckVMBlockHandle( docFileHandle, vmhMapBlock ); )
+    pMapBlock = VMLock( docFileHandle, vmhMapBlock, &mhMapBlock );
+EC( ECCheckMemHandle( mhMapBlock ); )
+EC( ECCheckBounds( pMapBlock ); )
+
+      /*
+       * Get the handle from the map block, then unlock the
+       * map block so the memory manager can swap it if necessary.
+       */
+    inkOD = pMapBlock->TIMB_ink;
+    VMUnlock( mhMapBlock );
+
+      /*
+       * Translate the VM handle just retrieved into its memory
+       * equivalent.  This will be the global handle portion of
+       * the ink object's optr (since it is the handle of the
+       * block containing the Ink object).
+       */
+    mhMapBlock = VMVMBlockToMemBlock( docFileHandle,
+                                      OptrToHandle( inkOD ) );
+EC( ECCheckMemHandle( mhMapBlock ); )
+
+      /*
+       * Return the entire optr of the VisText object in this
+       * document.  The optr is built with the macro
+       * ConstructOptr, which makes an optr out of a global
+       * handle and a chunk handle.  The chunk handle is retrieved
+       * with the macro OptrToChunk using the optr of the
+       * template VisText object.  The chunk handle of that
+       * object may be used because chunk handles are preserved
+       * by ObjDuplicateResource().
+       */
+    return( ConstructOptr( mhMapBlock, OptrToChunk( inkOD ) ) );
+} /* GetInkOptr */
+
+/********************************************************************
+ *              GetTextOptr
+ ********************************************************************
+ * SYNOPSIS:     Returns the optr of the document's text object.
+ * RETURNS:      text object
+ * SIDE EFFECTS: Brings the text object into memory if it isn't
+ *               already.
+ * STRATEGY:     Get the map block of the document and extract
+ *               the "optr" of the text object. Turn this into a
+ *               real optr (memhandle:chunkhandle) and return that.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     3/31/94         Initial Revision
+ *******************************************************************/
+static optr
+GetTextOptr( optr obj )
+{
+      /*
+       * vmhMapBlock   - Map block vm handle.
+       * pMapBlock     - Pointer to map block.
+       * mhMapBlock    - Memory handle of ink object.
+       * inkOD         - Optr of ink object.
+       * pself         - Pointer to document instance data.
+       * docFileHandle - File handle of document.
+       */
+    VMBlockHandle             vmhMapBlock;
+    TIMapBlock *              pMapBlock;
+    optr    	              textOD;
+    TextInkDocumentInstance * pself;
+    MemHandle                 mhMapBlock;
+    VMFileHandle              docFileHandle;
+
+      /*
+       * Get the map block of the VM file passed.  This is done
+       * with the kernel routine VMGetMapBlock().  Then lock
+       * the map block into memory with VMLock() so we can
+       * get the handle from it.
+       */
+    pself = ObjDerefGen( obj );
+EC( ECCheckBounds( pself ); )
+    docFileHandle = pself->GDI_fileHandle;
+EC( ECVMCheckVMFile( docFileHandle ); )
+    vmhMapBlock = VMGetMapBlock( docFileHandle );
+EC( ECVMCheckVMBlockHandle( docFileHandle, vmhMapBlock ); )
+    pMapBlock = VMLock( docFileHandle, vmhMapBlock, &mhMapBlock );
+EC( ECCheckMemHandle( mhMapBlock ); )
+EC( ECCheckBounds( pMapBlock ); )
+
+      /*
+       * Get the handle from the map block, then unlock the
+       * map block so the memory manager can swap it if necessary.
+       */
+    textOD = pMapBlock->TIMB_text;
+    VMUnlock( mhMapBlock );
+
+      /*
+       * Translate the VM handle just retrieved into its memory
+       * equivalent.  This will be the global handle portion of
+       * the text object's optr (since it is the handle of the
+       * block containing the VisText object).
+       */
+    mhMapBlock = VMVMBlockToMemBlock( docFileHandle,
+                                      OptrToHandle( textOD ) );
+EC( ECCheckMemHandle( mhMapBlock ); )
+
+      /*
+       * Return the entire optr of the VisText object in this
+       * document.  The optr is built with the macro
+       * ConstructOptr, which makes an optr out of a global
+       * handle and a chunk handle.  The chunk handle is retrieved
+       * with the macro OptrToChunk using the optr of the
+       * template VisText object.  The chunk handle of that
+       * object may be used because chunk handles are preserved
+       * by ObjDuplicateResource().
+       */
+    return( ConstructOptr( mhMapBlock, OptrToChunk( textOD ) ) );
+} /* GetTextOptr */
+
+/********************************************************************
+ *              Methods for TextInkDocumentClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+ ********************************************************************
+ * SYNOPSIS:     Initialize the document file (newly created).
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Duplicate the memory resource containing our ink
+ *               and text objects. Attach this duplicated resource
+ *               to the document file. Set up a map block for the
+ *               document file.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      6/26/92         Initial version
+ *******************************************************************/
+@method TextInkDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE {
+      /*
+       * vmhMapBlock - Map block vm handle.
+       * mhMapBlock  - Handle of locked map block.
+       * pMapBlock   - Pointer to map block.
+       * vmhObjects  - VM block containing text/ink objects.
+       * mhObjects   - Mem block containing text/ink objects.
+       */
+    VMBlockHandle vmhMapBlock;
+    MemHandle     mhMapBlock;
+    TIMapBlock *  pMapBlock;
+    VMBlockHandle vmhObjects;
+    MemHandle     mhObjects;
+
+
+      /*
+       * First, call the superclass to make sure default
+       * functionality is preserved.
+       */
+    @callsuper();
+
+      /*
+       * Duplicate the resource template and then attach it
+       * to the file stored in the GenDocument's instance data.
+       * ObjDuplicateResource() copies the entire specified
+       * resource, allocating a new memory block on the global
+       * heap for the duplicate and preserving the chunk handles.
+       */
+    pself = ObjDerefGen( oself );
+    mhObjects = ObjDuplicateResource( OptrToHandle( @TIText ), 0, 0 );
+EC( ECCheckMemHandle( mhObjects ); )
+    vmhObjects = VMAttach( pself->GDI_fileHandle, 0, mhObjects );
+EC( ECVMCheckVMBlockHandle( pself->GDI_fileHandle, vmhObjects ); )
+
+      /*
+       * Set the VM file to preserve the memory handle for the block
+       * holding the objects as long as the file is open.  This
+       * allows the block to be swapped or taken out of memory but
+       * the same handle to be used as long as the file is not closed.
+       * This is required, owing to the objects being in the
+       * visible tree (below the TIDocument object).
+       */
+    VMPreserveBlocksHandle( pself->GDI_fileHandle, vmhObjects );
+
+      /*
+       * Set the map block of the file (a special block set aside
+       * so you can always get the beginning of your data) to
+       * a new block in the file.  Allocate the VM block with
+       * VMAlloc(), then set it as the map block. The only thing we
+       * store in the map block is the VMBlockHandle of the block that
+       * holds the objects, so we use sizeof(VMBlockHandle) in the
+       * allocation request.
+       */
+    vmhMapBlock = VMAlloc( pself->GDI_fileHandle,
+                           sizeof( VMBlockHandle ), 0 );
+EC( ECVMCheckVMBlockHandle( pself->GDI_fileHandle, vmhMapBlock ); )
+    VMSetMapBlock( pself->GDI_fileHandle, vmhMapBlock );
+
+      /*
+       * Lock the map block into memory and store the new block's
+       * VM handle in it.  Then unlock the map block and return.
+       */
+    pMapBlock = VMLock( pself->GDI_fileHandle, vmhMapBlock,
+                        &mhMapBlock );
+EC( ECCheckMemHandle( mhMapBlock ); )
+EC( ECCheckBounds( pMapBlock ); )
+    pMapBlock->TIMB_ink = ConstructOptr( vmhObjects,
+                                         OptrToChunk( @TIInk ) );
+    pMapBlock->TIMB_text = ConstructOptr( vmhObjects,
+                                          OptrToChunk( @TIText ) );
+    VMDirty( mhMapBlock );
+    VMUnlock( mhMapBlock );
+    return( FALSE );
+} /* MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE */
+
+/********************************************************************
+ *              MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+ ********************************************************************
+ * SYNOPSIS:     Makes the ink object and text object children
+ *               of the document.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First add the text object as a non-discardable
+ *               VM child of the document. Then add the ink object.
+ *               Set the visual size of the document to that of
+ *               the ink object.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      6/26/92         Initial version
+ *******************************************************************/
+@method TextInkDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT {
+      /*
+       * size    -
+       * curMode -
+       * odInk   - Optr to ink object.
+       */
+    SizeAsDWord size;
+    TextInkMode curMode;
+    optr        odInk;
+
+      /*
+       * First, call the superclass to preserve all default
+       * functionality of the method.  Then dereference the
+       * pself pointer to the object's instance data.
+       */
+    @callsuper();
+
+      /*
+       * Add the text and ink objects to the document
+       * (we want the ink object to draw after the text
+       * object, so make it the last vis child).
+       */
+    @send self::MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD(
+        GetTextOptr( oself ), CCO_FIRST );
+    odInk = GetInkOptr( oself );
+EC( ECCheckLMemOD( odInk ); )
+    @send self::MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD( odInk, CCO_LAST );
+    size = @call odInk::MSG_VIS_GET_SIZE();
+
+      /*
+       * Set our document to be the same size as the children.
+       * Depending upon what mode the user is in (ink or text)
+       * set one of the objects editable.
+       */
+    @call self::MSG_VIS_SET_SIZE( DWORD_WIDTH( size ),
+                                  DWORD_HEIGHT( size ) );
+    curMode = @call TIModeList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    @call self::MSG_TEXT_INK_DOCUMENT_SET_INPUT_MODE( curMode );
+} /* MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT */
+
+/********************************************************************
+ *              MSG_TEXT_INK_DOCUMENT_SET_INPUT_MODE
+ ********************************************************************
+ * SYNOPSIS:     Sets the correct object editable.
+ * PARAMETERS:   TextInkMode mode
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     If we're in text mode then have the text object
+ *               become detectable and grab the target and focus.
+ *               Otherwise have the ink object become detectable
+ *               and grab the target and focus. Turn on or off
+ *               the floating keyboard option.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     3/31/94         Initial Revision
+ *******************************************************************/
+@method TextInkDocumentClass, MSG_TEXT_INK_DOCUMENT_SET_INPUT_MODE {
+    optr             odInk;
+    optr             odText;
+    KeyboardOverride override;
+    EventHandle      event;
+
+      /*
+       * Get the optrs of both the text and ink objects.
+       */
+    odInk = GetInkOptr( oself );
+EC( ECCheckLMemOD( odInk ); )
+    odText = GetTextOptr( oself );
+EC( ECCheckLMemOD( odText ); )
+
+    if ( TIM_TEXT == mode ) {
+          /*
+           * The user wants to edit the text object, so give
+           * the text object the focus, make it "detectable",
+           * make the ink object "not-detectable", and bring
+           * the floating kbd on-screen
+           */
+	@call odText::MSG_VIS_SET_ATTRS( VA_DETECTABLE, 0, VUM_NOW );
+	@call odInk::MSG_VIS_SET_ATTRS( 0, VA_DETECTABLE, VUM_NOW );
+
+          /*
+           * Give the target to the ink object, and make
+           * the text object release the focus
+           */
+	@call odText::MSG_META_GRAB_TARGET_EXCL();
+	@call odText::MSG_META_GRAB_FOCUS_EXCL();
+	override = KO_KEYBOARD_REQUIRED;
+    }
+    else {
+	/*
+	 * Make the ink object detectable, and the text
+         * object not detectable
+	 */
+	@call odInk::MSG_VIS_SET_ATTRS( VA_DETECTABLE, 0, VUM_NOW );
+	@call odText::MSG_VIS_SET_ATTRS( 0, VA_DETECTABLE, VUM_NOW );
+
+	/*
+	 * Give the target and focus to the ink object - the ink
+	 * object won't/can't do anything with the focus, but
+	 * at least this'll keep the text object from getting it.
+	 */
+	@call odInk::MSG_META_GRAB_TARGET_EXCL();
+	@call odInk::MSG_META_GRAB_FOCUS_EXCL();
+	override = KO_NO_KEYBOARD;
+    }
+
+      /*
+       * If we are in text mode, allow the floating
+       * keyboard to come onscreen.
+       * If in ink mode, don't let it onscreen.
+       */
+    event = @record GenClass::MSG_GEN_SET_KBD_OVERRIDE( override );
+EC( ECCheckEventHandle( event ); )
+    @send @visParent::MSG_VIS_VUP_CALL_WIN_GROUP( event );
+} /* MSG_TEXT_INK_DOCUMENT_SET_INPUT_MODE */
+
+/********************************************************************
+ *              MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+ ********************************************************************
+ * SYNOPSIS:     Destroys any objects that we've created for
+ *               this document.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Remove the ink and text objects from the document
+ *               object. Then call the superclass.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      6/29/92         Initial version
+ *******************************************************************/
+@method TextInkDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT {
+
+      /*
+       * Remove the text object and ink object from the vis tree...
+       */
+    @send GetInkOptr(oself)::MSG_VIS_REMOVE_NON_DISCARDABLE( VUM_MANUAL );
+    @send GetTextOptr(oself)::MSG_VIS_REMOVE_NON_DISCARDABLE( VUM_MANUAL );
+
+    @callsuper();
+
+} /* MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT */
+
+/********************************************************************
+ *              MSG_TEXT_INK_SET_INPUT_MODE
+ ********************************************************************
+ * SYNOPSIS:     Sends a MSG_TEXT_INK_DOCUMENT_SET_INPUT_MODE to
+ *               all the open documents.
+ * PARAMETERS:   word selection
+ *               word numSelections
+ *               byte stateFlags
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Record an event to ourselves to set the input
+ *               mode. Then send it to the DocumentGroup so it
+ *               will go to all the documents.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     3/31/94         Initial Revision
+ *******************************************************************/
+@method TextInkProcessClass, MSG_TEXT_INK_SET_INPUT_MODE {
+      /*
+       * event - Message being sent to document.
+       */
+    EventHandle event;
+
+      /*
+       * Record a message for all the open documents,
+       * to tell them to make the correct object editable.
+       */
+    event = @record TextInkDocumentClass::
+        MSG_TEXT_INK_DOCUMENT_SET_INPUT_MODE( selection );
+EC( ECCheckEventHandle( event ); )
+
+    /*
+     * Send that message to all the open documents
+     * (children of the GenDocumentGroup)
+     */
+    @send TIDocumentGroup::MSG_GEN_SEND_TO_CHILDREN( event );
+} /* MSG_TEXT_INK_SET_INPUT_MODE */
+
+/********************************************************************
+ *              TextInkInkReloc
+ ********************************************************************
+ * SYNOPSIS:     The relocation handler for the ink object.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     This fixes a bug that occurs if the ink object is
+ *               saved out to the VM file while in the middle of
+ *               displaying a selection - we zero out the flags that
+ *               denote that there is an active selection, and the
+ *               instance data fields that hold the gstate.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     4/1/94          Initial Revision
+ *******************************************************************/
+@method  TextInkInkClass, _reloc {
+
+    if ( ( VMRT_RELOCATE_AFTER_READ == vmRelocType ) ||
+	 ( VMRT_UNRELOCATE_BEFORE_WRITE == vmRelocType ) ) {
+	pself->II_flags &= ~( IF_MOUSE_FLAGS
+                            | IF_SELECTING
+                            | IF_HAS_TARGET
+                            | IF_HAS_SYS_TARGET );
+	pself->II_cachedGState = 0;
+	pself->II_antTimer = 0;
+	pself->II_selectBounds.R_left = 0;
+	pself->II_selectBounds.R_right = 0;
+	pself->II_selectBounds.R_top = 0;
+	pself->II_selectBounds.R_bottom = 0;
+    }
+    return( @callsuper() );
+} /* TextInkInkClass */
+
+/********************************************************************
+ *              MSG_VIS_TEXT_SCREEN_UPDATE
+ ********************************************************************
+ * SYNOPSIS:     Tells the parent document to redraw the ink.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass, then send a message
+ *               to the document parent tell it to redraw itself.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     4/1/94          Initial Revision
+ *******************************************************************/
+@method TextInkTextClass, MSG_VIS_TEXT_SCREEN_UPDATE {
+
+    @callsuper();
+    @send @visParent::MSG_TEXT_INK_DOCUMENT_REDRAW_INK();
+} /* MSG_VIS_TEXT_SCREEN_UPDATE */
+
+/********************************************************************
+ *              MSG_META_KBD_CHAR
+ ********************************************************************
+ * SYNOPSIS:     Checks for backspaces, and if there is one, queues
+ *               up a MSG_VIS_TEXT_SCREEN_UPDATE.
+ * PARAMETERS:   word character
+ *               word flags
+ *               word state
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Check to see if a backspace character was pressed.
+ *               If so send the screen update message to ourself.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     4/1/94          Initial Revision
+ *******************************************************************/
+@method TextInkTextClass, MSG_META_KBD_CHAR {
+
+    @callsuper();
+
+    if ( ( ( (word)( VC_ISCTRL << 8 ) | VC_BACKSPACE ) ==
+         character ) &&
+	 ( CF_RELEASE & flags ) ) {
+          /*
+           * It is a backspace, so queue up a
+           * MSG_VIS_TEXT_SCREEN_UPDATE (the backspace may
+           * have queued one up already, so check if
+           * there is already a message in the queue, and
+           * if so remove it and use this one instead).
+           */
+	@send, forceQueue, checkDuplicate, replace self::
+            MSG_VIS_TEXT_SCREEN_UPDATE();
+    }
+} /* MSG_META_KBD_CHAR */
+
+/********************************************************************
+ *              MSG_TEXT_INK_DOCUMENT_REDRAW_INK
+ ********************************************************************
+ * SYNOPSIS:     Redraws the ink object, after the text object has
+ *	    	 erased some portion of the screen.
+ * CALLED BY:	 MSG_VIS_TEXT_SCREEN_UPDATE
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Tell the ink object to redraw itself.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     4/1/94          Initial Revision
+ *******************************************************************/
+@method TextInkDocumentClass, MSG_TEXT_INK_DOCUMENT_REDRAW_INK {
+
+    @send GetInkOptr( oself )::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+} /* MSG_TEXT_INK_DOCUMENT_REDRAW_INK */
+
+/********************************************************************
+ *              MSG_META_CONTENT_NAVIGATION_QUERY
+ ********************************************************************
+ * SYNOPSIS:     We don't want the content to give the focus to any
+ *	    	 object - we handle assigning the focus ourselves,
+ *               based on what input mode the user has selected.
+ *               To this end, we intercept this message and ignore it.
+ * PARAMETERS:   optr          queryOrigin
+ *               NavigateFlags navFlags
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Do nothing at all.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     4/4/94          Initial Revision
+ *******************************************************************/
+@method TextInkDocumentClass, MSG_META_CONTENT_NAVIGATION_QUERY {
+
+    /*
+     * Do nothing here.
+     */
+} /* MSG_META_CONTENT_NAVIGATION_QUERY */
+
+/********************************************************************
+ *              MSG_VIS_TEXT_HEIGHT_NOTIFY
+ ********************************************************************
+ * SYNOPSIS:     The notification we receive when the text in the
+ *	    	 text object changes its height.
+ * PARAMETERS:   word newHeight
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     If the new height is less than the minimum, then
+ *               make it at least the minimum height. Then get the
+ *               size of the ink and see if the new height is more
+ *               than the current height. If so, resize the ink.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     4/4/94          Initial Revision
+ *******************************************************************/
+@method TextInkTextClass, MSG_VIS_TEXT_HEIGHT_NOTIFY {
+      /*
+       * widthHeight -
+       */
+    SizeAsDWord widthHeight;
+
+      /*
+       * "newHeight" is the desired size of the text object
+       * (the height of the text in the text object).
+       * If the desired height is less than the minimum,
+       * then set the height to be the minimum.
+       */
+    if ( newHeight < MINIMUM_HEIGHT ) {
+	newHeight = MINIMUM_HEIGHT;
+    }
+
+      /*
+       * See if the desired size is larger than our current
+       * size - if so, then change the height of the document.
+       */
+    widthHeight = @call self::MSG_VIS_GET_SIZE();
+    if ( newHeight > DWORD_HEIGHT( widthHeight ) ) {
+	@send @visParent::MSG_TEXT_INK_DOCUMENT_SET_HEIGHT( newHeight );
+    }
+} /* MSG_VIS_TEXT_HEIGHT_NOTIFY */
+
+/********************************************************************
+ *              MSG_TEXT_INK_DOCUMENT_SET_HEIGHT
+ ********************************************************************
+ * SYNOPSIS:     Sets the height of the document object and its
+ *               children.
+ * CALLED BY:    MSG_VIS_TEXT_HEIGHT_NOTIFY
+ * PARAMETERS:   word height
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Get the size of the ink object and set our size
+ *               using the old width and the new height. Then
+ *               send this message to our children. Mark ourself
+ *               invalid so we'll be redrawn.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     4/4/94          Initial Revision
+ *******************************************************************/
+@method TextInkDocumentClass, MSG_TEXT_INK_DOCUMENT_SET_HEIGHT {
+      /*
+       * curSize -
+       * event   -
+       */
+    SizeAsDWord curSize;
+    EventHandle event;
+
+      /*
+       * Get our current size, and set our size and the
+       * size of our children to be our current width
+       * and the new height.
+       */
+    curSize = @call self::MSG_VIS_GET_SIZE();
+    @call self::MSG_VIS_SET_SIZE( DWORD_WIDTH( curSize ), height );
+    event = @record VisClass::MSG_VIS_SET_SIZE(
+        DWORD_WIDTH( curSize ), height );
+EC( ECCheckEventHandle( event ); )
+    @call self::MSG_VIS_SEND_TO_CHILDREN( event );
+
+      /*
+       * Mark our image invalid so we redraw...
+       */
+    @call self::MSG_VIS_MARK_INVALID( VOF_GEOMETRY_INVALID, VUM_NOW );
+} /* MSG_TEXT_INK_DOCUMENT_SET_HEIGHT */
+

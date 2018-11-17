@@ -1,0 +1,694 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Text Library
+FILE:		texttext.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/91		Initial version
+
+DESCRIPTION:
+	This file contains global definitions for the Text module
+
+	$Id: texttext.def,v 1.1 97/04/07 11:19:20 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+;------------------------------------------------------------------------------
+;		Constants
+;------------------------------------------------------------------------------
+
+;
+; CalculateObject() returns the line to redraw (if there is only one line
+; that changed.
+;
+; When more than one line changed, it returns one of these constants.
+;
+FORCE_COMPLETE_UPDATE	=	-1
+;
+; Force a MSG_VIS_TEXT_SCREEN_UPDATE to be sent via the queue to update all
+; lines which are out of date.
+;
+
+NO_UPDATE_NEEDED	=	-2
+;
+; The recalculation didn't detect any changes. Don't update anything.
+;
+
+;------------------------------------------------------------------------------
+;		Structures
+;------------------------------------------------------------------------------
+
+CalcFlags	record
+    CF_SAVE_RESULTS:1	; Set if we want to save the results
+    CF_LINE_CHANGED:1	; Set after TL_LineCalculate if the line changed
+    CF_LINE_SHORTER:1	; Set if the line got shorter
+    CF_TEXT_LOCKED:1	; Set if any text was locked
+    CF_FORCE_CHANGED:1
+    CF_SKIP_FIRST_CALC:1
+
+    CF_HAVE_DRAWN:1			; Set if we have already drawn the
+					;  first of multiple lines to be drawn
+    CF_FORCED_DRAW_VIA_INTERACT_BELOW:1	; Set if current line was forced to
+					;  draw by LF_INTERACTS_BELOW
+CalcFlags	end
+
+LICL_vars	struct
+;-----------------------------------------------------------------------------
+;			     Calculation
+;-----------------------------------------------------------------------------
+    ;
+    ; object -
+    ;	Contains the segment/chunk of the text object. The style callbacks
+    ; need this so that they can get at the object and from there to the style
+    ; runs.
+    ;
+    LICL_object			dword
+    
+    ;
+    ; range -
+    ;	Holds the current line start and the end of the range to calculate over.
+    ;
+    LICL_range			VisTextRange
+    
+    ;
+    ; startPos -
+    ;	Holds the actual position of the original change.
+    ;
+    LICL_startPos		dword
+    
+    ;
+    ; calcFlags -
+    ;	Various calculation related flags.
+    ;
+    LICL_calcFlags		CalcFlags
+
+    ;
+    ; line -
+    ;	Used to hold the current line we are calculating
+    ;
+    LICL_line			dword
+    
+    ;
+    ; lineCount -
+    ;	Count of the total number of lines, used to cache this value in the
+    ; calculation code.
+    ;
+    LICL_lineCount		dword
+    
+    ;
+    ; regionTopLine -
+    ;	Cached value telling the top line of the current region. Used to cache
+    ; this value in the calculation code.
+    ;
+    LICL_regionTopLine		dword
+    
+    ;
+    ; nextRegionTopLine -
+    ;	Cached value telling the top line of the next region. Used to cache
+    ; this value in the calculation code.
+    ;
+    LICL_nextRegionTopLine	dword
+    
+    ;
+    ; regionTrueHeight -
+    ;	Cached value telling the height of the current region. Used to cache
+    ; this value in the calculation code.
+    ;
+    LICL_regionTrueHeight	WBFixed
+    
+    ;
+    ; lineStart -
+    ;	Start of the current line. Used only for a few things.
+    ;
+    LICL_lineStart		dword
+    
+    ;
+    ; lineStartChange -
+    ;	When a new charCount is set for a line, this value reflects the
+    ; amount that the line-count differs from the value that used to be
+    ; there. This allows us to figure out a line-start for a line that
+    ; hasn't been calculated by taking the end of the previously computed
+    ; line and adding this value to get the "real" line start.
+    ;
+    LICL_lineStartChange	dword
+    
+    ;
+    ; firstLine -
+    ;	Used to hold the first line we calculated
+    ;
+    LICL_firstLine		dword
+    
+    ;
+    ; firstLineStartOffset -
+    ;	Starting offset of the first line
+    ;
+    LICL_firstLineStartOffset	dword
+
+    ;
+    ; firstLineEndOffset -
+    ;	Ending offset of the first line
+    ;
+    LICL_firstLineEndOffset	dword
+
+    ;
+    ; firstLineFlags -
+    ;	Used to hold the flags for the first line we calculated
+    ;
+    LICL_firstLineFlags		LineFlags
+    
+    ;
+    ; firstLineOldFlags -
+    ;	Used to hold the old flags for the first line we calculated
+    ;
+    LICL_firstLineOldFlags	LineFlags
+    
+    ;
+    ; firstLineTop -
+    ;	Holds the top of the first line calculated
+    ;
+    LICL_firstLineTop		WBFixed
+    
+    ;
+    ; firstLineHeight -
+    ;	Height of the first line calculated.
+    ;
+    LICL_firstLineHeight	WBFixed
+    
+    ;
+    ; firstLineParaAttrs -
+    ;	Holds the paragraph-attributes for the first line we calculated
+    ;
+    LICL_firstLineParaAttrs	VisTextParaAttrAttributes
+    
+    ;
+    ; firstLineEnd -
+    ;	End of the first line
+    ;
+    LICL_firstLineEnd		word
+
+    ;
+    ; firstLineRegion -
+    ;	Region containing the first line
+    ;
+    LICL_firstLineRegion	word
+
+    ;
+    ; lastFieldTabType
+    ;	The type of the last tab on the current line.
+    ;
+    LICL_lastFieldTabType	TabType
+
+    ;
+    ; firstLineLastFieldTabType
+    ;	The type of the last tab on the first line computed.
+    ;
+    LICL_firstLineLastFieldTabType	TabType
+
+    ;
+    ; oldLineFlags -
+    ;	The old flags for most recently calculated line are stored here by
+    ; TL_LineCalculate before the new flags are written.
+    ;
+    LICL_oldLineFlags		LineFlags
+    
+    ;
+    ; lineFlags -
+    ;	Flags for most recently calculated line are stored here by
+    ; TL_LineCalculate.
+    ;
+    LICL_lineFlags		LineFlags
+    
+    ;
+    ; linesToDraw -
+    ;	The number of lines that need drawing after a recalc.
+    ;
+    LICL_linesToDraw		word
+
+    ;
+    ; delCount -
+    ;	The number of lines to delete. Used in InsertOrDeleteLine() only.
+    ;
+    LICL_delCount		dword
+    
+    ;
+    ; charDelCount -
+    ;	Number of characters which were deleted as part of the replace.
+    ;	Used by InsertOrDeleteLine.
+    ;
+    LICL_charDelCount		dword
+
+    ;
+    ; lastChangedLine -
+    ;	The last line that was calculated and changed as a result.
+    ;
+    LICL_lastChangedLine	dword
+    
+    ;
+    ; addFieldCallback -
+    ;	This is passed to the common recalculation code so that it can
+    ; add fields to a line in either the small or large text object.
+    ;
+    LICL_addFieldCallback	dword	; must be vfptr for XIP'ed geodes
+    
+    ;
+    ; truncateFieldsCallback -
+    ;	This is passed to the common recalculation code so that it can
+    ; truncate lines to remove extra fields that might fall at the end.
+    ;
+    LICL_truncateFieldsCallback	dword	; must be vfptr for XIP'ed geodes
+    
+    ;
+    ; dirtyLineCallback -
+    ;	This is passed to the common recalculation code so that it can
+    ; mark a line as dirty.
+    ;
+    LICL_dirtyLineCallback	dword	; must be vfptr for XIP'ed geodes
+    
+    ;
+    ; tabReference
+    ;	This is the tab-reference associated with the current field.
+    ;
+    LICL_tabReference		TabReference
+    
+    ;
+    ; insertedSpace -
+    ;	This is the amount of space that has been added when lines which
+    ; were calculated got taller. This is actually an accumulation that
+    ; reflects the net change in the position of the line that falls after
+    ; the lines in a region which changed as a result of calculation.
+    ;
+    LICL_insertedSpace		DWFixed
+    
+    ;
+    ; deletedSpace -
+    ;	This is the amount of space that has been removed when lines
+    ; were deleted from the end of a region as a result of rippling.
+    ;
+    LICL_deletedSpace		DWFixed
+    
+    ;
+    ; totalChange -
+    ;	This is the total amount that the current region has changed in height
+    ;
+    LICL_totalChange		DWFixed
+    
+    ;
+    ; bltChange -
+    ;	The amount of space inserted before the area to blt
+    ;
+    LICL_bltChange		DWFixed
+    
+    ;
+    ; linePtr -
+    ;	This is the pointer to the current line. It is used so that the
+    ; Tab callback routine doesn't need to dereference the line.
+    ;
+    LICL_linePtr	dword
+    
+    ;
+    ; fieldPtr -
+    ;	Same use as linePtr. It is assumed (reasonably) to be in the same
+    ; segment as the line (linePtr).
+    ;
+    LICL_fieldPtr	word
+    
+    ;
+    ; lastFieldJustWidth -
+    ;	Justification width of the last field on the line, rounded to a word
+    ; from a WBFixed.
+    ;
+    LICL_lastFieldJustWidth	word
+
+    ;
+    ; lineEnd -
+    ;	The end of the line as an offset from the lines left edge.
+    ; This position does not include a <cr> at the end of a line.
+    ;
+    LICL_lineEnd	word
+    
+    ;
+    ; lineJustEnd -
+    ;	The end of the last non white-space character on the line
+    ;
+    LICL_lineJustEnd	word
+    
+    ;
+    ; region -
+    ;	The current region we are computing.
+    ;
+    LICL_region		word
+    
+    ;
+    ; regionStart -
+    ;	The offset to the start of the current region (set by the
+    ; calculation code only)
+    ;
+    LICL_regionStart	dword
+
+    ;
+    ; lineHeight -
+    ;	The height of the last computed line.
+    ;
+    LICL_lineHeight	WBFixed
+
+    ;
+    ; oldLineHeight -
+    ;	The height of the last computed line before it was computed.
+    ;
+    LICL_oldLineHeight	WBFixed
+
+    ;
+    ; lineBottom -
+    ;	The bottom of the last computed line.
+    ;
+    LICL_lineBottom	WBFixed
+    
+    ;
+    ; rippleHeight -
+    ;	The height of the lines which have been rippled backwards as part
+    ; of calculation.
+    ;
+    LICL_rippleHeight	DWFixed
+    
+    ;
+    ; rippleCount -
+    ;	The number of lines that were rippled backwards into the current
+    ; region.
+    ;
+    LICL_rippleCount	dword
+    
+    ;
+    ; extStylePos -
+    ;	Position where an extended style is in the text
+    ;
+    LICL_extStylePos	word
+    
+;-----------------------------------------------------------------------------
+;			 Paragraph Attributes
+;-----------------------------------------------------------------------------
+    ;
+    ; theParaAttr -
+    ;	Paragraph attributes. This field is used to hold the ruler for a given
+    ; offset into the text. Usually the offset of the start of the current line
+    ; which is being processed.
+    ;
+    LICL_theParaAttr		VisTextMaxParaAttr
+    
+    ;
+    ; theRealRightMargin -
+    ;	Contains the more useful right margin. The normal right margin is an
+    ; offset from the right edge of the object. This field holds the right
+    ; margin as an offset from the left edge of the object. It is adjusted
+    ; to account for margins.
+    ;
+    LICL_theRealRightMargin	word
+
+    ;
+    ; theParaAttrStart/End -
+    ;	Contains the range of text for which the "theParaAttr" field is valid.
+    ; This allows us to avoid requesting paragraph attributes over and over
+    ; when the ones we have are still useful.
+    ;
+    ; If "theParaAttrStart" is -1 then that indicates that the paragraph
+    ; attributes have not been set yet.
+    ;
+    LICL_theParaAttrStart	dword
+    LICL_theParaAttrEnd		dword
+
+;-----------------------------------------------------------------------------
+;		       Border and other Drawing
+;-----------------------------------------------------------------------------
+    ;
+    ; prevLineStart -
+    ;	The start of the previous line, used in GetPrevBorder() when there 
+    ; are no line structures yet. This happens when we are computing the height
+    ; of an object in response to a MSG_VIS_TEXT_CALC_HEIGHT.
+    ;
+    LICL_prevLineStart		dword
+    
+    ;
+    ; prevLineFlags -
+    ;	The lineFlags from the last call to CalculateLine. Useful for when
+    ; we discover we need to ripple a line forward, we will have the flags for
+    ; the previous line around so we can update the region break flags.
+    ;
+    LICL_prevLineFlags		LineFlags
+
+    ;
+    ; theRect, mapRect -
+    ;	Used in the border drawing
+    ;
+    LICL_theRect		Rectangle
+    LICL_mapRect		Rectangle
+    
+    ;
+    ; prevLineBF, nextLineBF -
+    ;	Border flags for previous and next line
+    ;
+    LICL_prevLineBF		VisTextParaBorderFlags
+    LICL_nextLineBF		VisTextParaBorderFlags
+    
+    align	word
+LICL_vars	ends
+
+;
+; A bunch of equates which make code a little easier to understand.
+;
+LICL_paraAttr		equ	<ss:[bp].LICL_theParaAttr.VTMPA_paraAttr>
+LICL_realRightMargin	equ	<ss:[bp].LICL_theRealRightMargin>
+LICL_paraAttrStart	equ	<ss:[bp].LICL_theParaAttrStart>
+LICL_paraAttrEnd	equ	<ss:[bp].LICL_theParaAttrEnd>
+LICL_rect		equ	<ss:[bp].LICL_theRect>
+LICL_borderStart	equ	<ss:[bp].LICL_mapRect.R_left>
+LICL_borderSide		equ	<ss:[bp].LICL_mapRect.R_top>
+LICL_borderEnd		equ	<ss:[bp].LICL_mapRect.R_right>
+LICL_borderOpposite	equ	<ss:[bp].LICL_mapRect.R_bottom>
+LICL_prevLineBorder	equ	<ss:[bp].LICL_prevLineBF>
+LICL_nextLineBorder	equ	<ss:[bp].LICL_nextLineBF>
+
+;------------------------------------------------------------------------------
+;		Constants
+;------------------------------------------------------------------------------
+
+SetSSBufSize	macro	structure
+if (size structure gt SS_BUF_SIZE)
+SS_BUF_SIZE	= size structure
+endif
+endm
+
+SS_BUF_SIZE	= size VisTextRange
+SetSSBufSize	VisTextReplaceParameters
+SetSSBufSize	VisTextGenerateNotifyParams
+
+SetSSBufSize	VisTextSetCharAttrByDefaultParams
+SetSSBufSize	VisTextSetCharAttrParams
+SetSSBufSize	VisTextSetCharAttrByTokenParams
+SetSSBufSize	VisTextSetFontIDParams
+SetSSBufSize	VisTextSetFontWeightParams
+SetSSBufSize	VisTextSetFontWidthParams
+SetSSBufSize	VisTextSetPointSizeParams
+SetSSBufSize	VisTextSetSmallerPointSizeParams
+SetSSBufSize	VisTextSetLargerPointSizeParams
+SetSSBufSize	VisTextSetTextStyleParams
+SetSSBufSize	VisTextSetColorParams
+SetSSBufSize	VisTextSetGrayScreenParams
+SetSSBufSize	VisTextSetPatternParams
+SetSSBufSize	VisTextSetTrackKerningParams
+SetSSBufSize	VisTextSetParaAttrByDefaultParams
+SetSSBufSize	VisTextSetParaAttrParams
+SetSSBufSize	VisTextSetParaAttrByTokenParams
+SetSSBufSize	VisTextSetBorderBitsParams
+SetSSBufSize	VisTextSetBorderWidthParams
+SetSSBufSize	VisTextSetParaAttrAttributesParams
+SetSSBufSize	VisTextSetLineSpacingParams
+SetSSBufSize	VisTextSetDefaultTabsParams
+SetSSBufSize	VisTextSetMarginParams
+SetSSBufSize	VisTextSetSpaceOnTBParams
+SetSSBufSize	VisTextSetLeadingParams
+SetSSBufSize	VisTextSetTabParams
+SetSSBufSize	VisTextClearTabParams
+SetSSBufSize	VisTextMoveTabParams
+SetSSBufSize	VisTextClearAllTabsParams
+SetSSBufSize	VisTextSetPrependCharsParams
+SetSSBufSize	VisTextSetHyphenationPParams
+SetSSBufSize	VisTextSetDropCapPParams
+SetSSBufSize	VisTextSetKeepPParams
+SetSSBufSize	VisTextSetParagraphNumberParams
+SetSSBufSize	VisTextSetHyperlinkParams
+SetSSBufSize	VisTextSetContextParams
+
+;------------------------------------------------------------------------------
+;		Variables
+;------------------------------------------------------------------------------
+
+udata segment
+	global	uiSmartQuotes:byte
+	global	nameCount:word
+	global	hyphenateWordEntryPoint:dword
+	global	checkWordEntryPoint:dword
+	global	resetDoubleWordCheckEntryPoint:dword
+	global	getTextOffsetsEntryPoint:dword
+	global	getErrorFlagsEntryPoint:dword
+
+
+udata ends
+
+idata	segment
+if _CHAR_LIMIT
+	global	charLimit:word
+endif
+if _REGION_LIMIT
+	global	regionLimit:word
+endif
+
+
+idata	ends
+
+;------------------------------------------------------------------------------
+;		Routines
+;------------------------------------------------------------------------------
+TextBorder	segment	resource
+	global T_GetBorderInfo:far
+	global GetBorderInfo:far
+	global CalcBorderSpacing:far
+	global CalcRealBorder:far
+TextBorder	ends
+
+TextInstance	segment	resource
+	global TextInstance_DerefVis_DI:far
+	global T_GetSystemCharAttr:far
+	global TextGetSystemCharAttrRun:far
+	global SendSelectionContext:far
+	global SendPositionContext:far
+TextInstance	ends
+
+TextAttributes segment resource
+	global ReflectChange:far
+	global ReflectChangeUpdateGeneric:far
+	global SendGenericUpdate:far
+	global TextSuspend:far
+	global TextUnsuspend:far
+TextAttributes ends
+
+Text segment resource
+	global Text_GState_DI:near
+
+	global SwitchStackWithData:far
+
+	global T_GetSelectionFrame:near
+	global T_FarGetSelectionFrame:far
+
+	global VisTextSetSelection:far
+
+	global TextCallShowSelection:far
+	global TextCompleteRecalc:far
+
+	global Text_PushAll:near
+	global Text_PopAll_retf:far
+	global Text_PopAll:near
+	global Text_DerefVis_SI:near
+	global Text_DerefVis_DI:far
+	global Text_ObjCallInstanceNoLock:far
+
+EC <	global ECCheckTextEC:far					>
+EC <	global T_AssertIsVisText:far					>
+EC <	global T_AssertIsVisLargeText:far				>
+
+	;---
+
+	global ConvertToObjectCoords:far
+	global ConvertToWindowCoords:far
+	global TextNearestCoord:far
+	global TextInsertOrDelete:far
+	global ParagraphRecalc:far
+	global FarTextRecalc:far
+	global FarTextSendUpdate:far
+	global TextCheckCanCalcWithRange:far
+	global TextCheckCanCalcNoRange:far
+	global FarSendToTextOutput:far
+	global SendToTextOutputLow:far
+
+Text ends
+
+TextSetReplace segment resource
+	global TextMarkUserModified:far
+TextSetReplace ends
+
+TextFilter segment resource
+	global	TF_CheckIfCharFiltered:far
+TextFilter ends
+
+TextSelect segment resource
+	global VisTextVisLeave:far
+	global SendAbortSearchSpellNotification:far
+	global TextMakeFocusAndTarget:far
+	global AbortHWRMacro:far
+TextSelect ends
+
+TextFixed	segment
+	global T_CheckIfContextUpdateDesired:far	
+	global T_GetVMFile:far
+	global T_EnsureCorrectParaAttr:far
+	global T_GetNewParaAttr:far
+	global TextCheckCanDraw:far
+	global CheckNotEditable:far
+	global TextGStateCreate:far
+	global TextGStateDestroy:far
+	global TextInitModeAndBorder:far
+	global TextFixed_DerefVis_DI:near
+EC <	global AssertIsLargeObject:far					>
+ifdef	USE_FEP
+	global	FepCallBack:far
+endif
+	global CursorToggle:far
+	global TextCheckCanDrawEditable:far
+TextFixed	ends
+
+TextDrawCode	segment	resource
+	global TextDraw_DerefVis_DI:near
+TextDrawCode	ends
+
+TextRegion 	segment resource
+if _REGION_LIMIT or _CHAR_LIMIT
+	global	TR_GetTextLimits:far
+endif
+TextRegion	ends
+
+TextTransfer segment resource
+	global	TT_DoWarningDialog:far
+TextTransfer ends
+
+ifdef	USE_FEP
+TextFep		segment	resource
+	global	FepCallRoutine:far
+TextFep		ends
+endif	; USE_FEP
+
+
+;------------------------------------------------------------------------------
+;		Macros
+;------------------------------------------------------------------------------
+
+COMMENT @----------------------------------------------------------------------
+
+	Text_PopAll_ret
+
+	FUNCTION:
+		jump to either Text_PopAll_retf or text_PopAll_retn
+	ARGUMENTS:
+
+-------------------------------------------------------------------------------@
+Text_PopAll_ret	macro
+
+if	(TYPE @CurProc) eq -2
+	jmp	Text_PopAll_retf
+else
+	jmp	Text_PopAll_retn
+endif
+
+endm

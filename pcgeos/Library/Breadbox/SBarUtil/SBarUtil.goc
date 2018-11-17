@@ -1,0 +1,374 @@
+/***********************************************************************
+ *
+ * PROJECT:       Startbar Utitlies
+ * FILE:          sbarutil.goc
+ *
+ * AUTHOR:        Lysle Shields
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *        Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/sbarutil.goh>
+@include <Ansi/string.h>
+@include <initfile.h>
+
+Boolean G_gotColors = FALSE ;
+word G_lightColor = C_LIGHT_GRAY ;
+word G_darkColor = C_DARK_GRAY ;
+
+#define SetRightClickMenuColors(g)  GrSetLineColor(g, CF_INDEX, C_BLACK, 0, 0)
+
+@classdecl StartbarIconInteractionClass ;
+
+@method StartbarIconInteractionClass,  MSG_META_START_SELECT,
+                                       MSG_META_START_MOVE_COPY
+{
+    if (pself->SIII_rightClickMenu)  {
+        @call oself::MSG_STARTBAR_ICON_SHOW_MENU() ;
+    }
+
+    retVal->flags = MRF_PROCESSED ;
+}
+
+@method StartbarIconInteractionClass, MSG_META_PTR
+{
+    Rectangle rect ;
+    optr box ;
+    Boolean isMenuShowing ;
+
+    @callsuper() ;
+
+    pself = ObjDerefGen(oself) ;
+    isMenuShowing = @call oself::MSG_STARTBAR_ICON_IS_MENU_UP() ;
+    if ((pself->SIII_highlightBox) && (isMenuShowing == FALSE))  {
+        box = ConstructOptr(OptrToHandle(oself), pself->SIII_highlightBox) ;
+        if (box)  {
+            @call oself::MSG_VIS_GET_BOUNDS(&rect) ;
+
+            /* Are we inside or outside the box? */
+            if ((xPosition < rect.R_left) ||
+                (xPosition > rect.R_right) ||
+                (yPosition < rect.R_top) ||
+                (yPosition > rect.R_bottom))  {
+                /* Left the menu, close it. */
+                if (pself->SIII_highlightBoxShowing)  {
+                    @call oself::MSG_STARTBAR_ICON_HIDE_HIGHLIGHT() ;
+                }
+            } else {
+                if (!pself->SIII_highlightBoxShowing)  {
+                    @call oself::MSG_STARTBAR_ICON_SHOW_HIGHLIGHT_DELAYED() ;
+                }
+            }
+        }
+    }
+    retVal->flags = MRF_PROCESSED;
+}
+
+@method StartbarIconInteractionClass, MSG_STARTBAR_ICON_IS_MENU_UP
+{
+    Boolean isUp = FALSE ;
+    optr menu ;
+
+    if (pself->SIII_rightClickMenu)  {
+        menu = ConstructOptr(
+                   OptrToHandle(oself),
+                   pself->SIII_rightClickMenu) ;
+
+        isUp = @call menu::MSG_STARTBAR_RIGHT_CLICK_MENU_IS_SHOWING() ;
+    }
+
+    return isUp ;
+}
+
+@method StartbarIconInteractionClass, MSG_STARTBAR_ICON_STOP_HIGHLIGHT_TIMER
+{
+    /* Stop the timer if it is going */
+    if (pself->SIII_timerToShow)  {
+        TimerStop(pself->SIII_timerToShow, pself->SIII_timerToShowId) ;
+        pself->SIII_timerToShow = NullHandle ;
+    }
+}
+
+@method StartbarIconInteractionClass, MSG_STARTBAR_ICON_HIDE_HIGHLIGHT
+{
+    optr box ;
+
+    @call oself::MSG_STARTBAR_ICON_STOP_HIGHLIGHT_TIMER() ;
+    box = ConstructOptr(OptrToHandle(oself), pself->SIII_highlightBox) ;
+    if (pself->SIII_highlightBoxShowing)  {
+        @call box::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS) ;
+        pself->SIII_highlightBoxShowing = FALSE ;
+        @call oself::MSG_VIS_RELEASE_MOUSE() ;
+    }
+}
+
+@method StartbarIconInteractionClass, MSG_STARTBAR_ICON_SHOW_HIGHLIGHT
+{
+    optr box ;
+
+    box = ConstructOptr(OptrToHandle(oself), pself->SIII_highlightBox) ;
+    if (!pself->SIII_highlightBoxShowing)  {
+        pself->SIII_highlightBoxShowing = TRUE ;
+        @call oself::MSG_VIS_GRAB_MOUSE() ;
+        @call box::MSG_GEN_INTERACTION_INITIATE() ;
+    }
+}
+
+@method StartbarIconInteractionClass, MSG_META_FINAL_OBJ_FREE
+{
+    if (pself->SIII_timerToShow)  {
+        TimerStop(pself->SIII_timerToShow, pself->SIII_timerToShowId) ;
+        pself->SIII_timerToShow = NullHandle ;
+    }
+    @callsuper() ;
+}
+
+@method StartbarIconInteractionClass, MSG_STARTBAR_ICON_SHOW_HIGHLIGHT_DELAYED
+{
+    word numTicks = 0 ;
+
+    if (!pself->SIII_highlightBoxShowing)  {
+        InitFileReadInteger("startbar", "highlightTime", &numTicks) ;
+        numTicks *= 6 ;
+
+        @call oself::MSG_STARTBAR_ICON_STOP_HIGHLIGHT_TIMER() ;
+        pself->SIII_timerToShow =
+            TimerStart(
+                TIMER_EVENT_ONE_SHOT,
+                oself,
+                numTicks,
+                MSG_STARTBAR_ICON_SHOW_HIGHLIGHT_NOW,
+                numTicks,
+                &pself->SIII_timerToShowId) ;
+    }
+}
+
+@method StartbarIconInteractionClass, MSG_STARTBAR_ICON_SHOW_HIGHLIGHT_NOW
+{
+    pself->SIII_timerToShow = NullHandle ;
+    pself->SIII_timerToShowId = 0 ;
+    @call oself::MSG_STARTBAR_ICON_SHOW_HIGHLIGHT() ;
+}
+
+@method StartbarIconInteractionClass, MSG_STARTBAR_ICON_SHOW_MENU
+{
+    optr menu ;
+
+    if (pself->SIII_rightClickMenu)  {
+        /* Tear down the highlight */
+        if (pself->SIII_highlightBoxShowing)
+            @send ,forceQueue oself::MSG_STARTBAR_ICON_HIDE_HIGHLIGHT() ;
+        menu = ConstructOptr(
+                  OptrToHandle(oself),
+                  pself->SIII_rightClickMenu) ;
+        @send ,forceQueue menu::MSG_GEN_INTERACTION_INITIATE();
+        @send ,forceQueue menu::MSG_META_GRAB_FOCUS_EXCL() ;
+        @send ,forceQueue menu::MSG_META_GRAB_TARGET_EXCL() ;
+    }
+}
+
+@classdecl StartbarRightClickMenuClass ;
+
+
+void StartbarEnsureHint(optr object, VardataKey hint)
+{
+    void *p_varData ;
+
+    MemLock(OptrToHandle(object)) ;
+    p_varData = ObjVarFindData(object, hint) ;
+    if (!p_varData)  {
+/*
+        ObjVarAddData(object, hint, 0) ;
+*/
+        @call object::MSG_GEN_ADD_GEOMETRY_HINT(hint, 0, VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+    MemUnlock(OptrToHandle(object)) ;
+}
+
+@method StartbarRightClickMenuClass, MSG_GEN_INTERACTION_INITIATE
+{
+    pself->SRCMI_isShowing = TRUE ;
+    StartbarEnsureHint(oself, HINT_POSITION_WINDOW_AT_MOUSE) ;
+    StartbarEnsureHint(oself, HINT_INTERACTION_SINGLE_USAGE) ;
+    StartbarEnsureHint(oself, HINT_AVOID_MENU_BAR) ;
+    StartbarEnsureHint(oself, ATTR_GEN_WINDOW_CUSTOM_WINDOW) ;
+    StartbarEnsureHint(oself, HINT_KEEP_ENTIRELY_ONSCREEN_WITH_MARGIN) ;
+    @callsuper() ;
+}
+
+@method StartbarRightClickMenuClass, MSG_GEN_INTERACTION_ACTIVATE_COMMAND
+{
+    if (command == IC_DISMISS)
+        pself->SRCMI_isShowing = FALSE ;
+
+    @callsuper() ;
+}
+
+@method StartbarRightClickMenuClass, MSG_META_LOST_SYS_FOCUS_EXCL
+{
+    @callsuper() ;
+    @send ,forceQueue oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS) ;
+    pself->SRCMI_isShowing = FALSE ;
+}
+
+@method StartbarRightClickMenuClass, MSG_VIS_DRAW
+{
+    word width ;
+    word height ;
+    Rectangle rect ;
+    @callsuper() ;
+    if (!G_gotColors)  {
+        G_gotColors = TRUE ;
+        InitFileReadInteger("motif options", "darkColor", &G_darkColor) ;
+        InitFileReadInteger("motif options", "lightColor", &G_lightColor) ;
+    }
+
+    @call oself::MSG_VIS_GET_BOUNDS(&rect) ;
+    GrSaveState(gstate) ;
+    SetRightClickMenuColors(gstate) ;
+    width = rect.R_right - rect.R_left - 1 ;
+    height = rect.R_bottom - rect.R_top - 1 ;
+    GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+    GrDrawHLine(gstate, 0, 0, width) ;
+    GrDrawVLine(gstate, 0, 0, height-1) ;
+    GrSetLineColor(gstate, CF_INDEX, G_darkColor, 0, 0) ;
+    GrDrawHLine(gstate, 0, height, width) ;
+    GrDrawVLine(gstate, width, 1, height) ;
+    GrRestoreState(gstate) ;
+}
+
+@method StartbarRightClickMenuClass, MSG_STARTBAR_RIGHT_CLICK_MENU_IS_SHOWING
+{
+    return pself->SRCMI_isShowing ;
+}
+
+@classdecl StartbarHighlightBoxClass ;
+
+@method StartbarHighlightBoxClass, MSG_GEN_INTERACTION_INITIATE
+{
+    Rectangle boxBounds ;
+    Rectangle primaryBounds ;
+    optr primary ;
+
+    StartbarEnsureHint(oself, HINT_POSITION_WINDOW_AT_MOUSE) ;
+    StartbarEnsureHint(oself, HINT_WINDOW_NO_TITLE_BAR) ;
+    StartbarEnsureHint(oself, HINT_KEEP_ENTIRELY_ONSCREEN) ;
+    @callsuper() ;
+
+    @call oself::MSG_VIS_GET_BOUNDS(&boxBounds) ;
+    primary = @call oself::MSG_GEN_GUP_FIND_OBJECT_OF_CLASS(&GenDisplayClass) ;
+    @call primary::MSG_VIS_GET_BOUNDS(&primaryBounds) ;
+    @call oself::MSG_GEN_SET_WIN_POSITION(
+        GET_MM_AND_TYPE(VUM_DELAYED_VIA_UI_QUEUE, WPT_AT_SPECIFIC_POSITION),
+            primaryBounds.R_right,
+            primaryBounds.R_top-(boxBounds.R_bottom-boxBounds.R_top)+1) ;
+}
+
+@start TextRes, data;
+    /*---------------------------------------------------------------------*/
+    @chunk char LaunchError[] =
+                    "The program is not in World or System\\Sysappl "
+                    "and cannot be started.";
+    /*---------------------------------------------------------------------*/
+@end TextRes;
+
+/* Pass a GeodeToken token, char *appname */
+@method StartbarIconInteractionClass, MSG_STARTBAR_OPEN_APPLICATION
+{
+    return StartbarUtilLoadApplication(token, appname) ;
+}
+
+Boolean StartbarUtilLoadApplication(GeodeToken token, char *appname)
+{
+    GeodeToken      Token2Use ;
+    GeodeHandle     AppHandle;
+    MemHandle       HALBApp;
+    optr AppOptr, PrimPtr;
+    word            numServers;
+    IACPConnection  iacpConnectionToken;
+    EventHandle     hToTop, hDeMin;
+    word            connectionFlags = 0;
+    Boolean         didOpen = FALSE ;
+
+    AppHandle = GeodeFind(appname, strlen(appname), 0, 0) ;
+    memcpy(&Token2Use, &token, sizeof(Token2Use)) ;
+
+    if (AppHandle==NullHandle)  {
+        HALBApp = IACPCreateDefaultLaunchBlock(
+                      MSG_GEN_PROCESS_OPEN_APPLICATION);
+        iacpConnectionToken =
+            IACPConnect(
+                    &token,
+                    IACPCF_OBEY_LAUNCH_MODEL|IACPSM_USER_INTERACTIBLE,
+                    HALBApp,
+                    0,
+                    &numServers);
+
+        /* check to see if it got started */
+        if (iacpConnectionToken == IACP_NO_CONNECTION)  {
+            /* it didn't so bail out... */
+            MemLock(OptrToHandle(@LaunchError));
+            UserStandardDialogOptr(
+                     NullHandle,
+                     NullHandle,
+                     NullHandle,
+                     NullHandle,
+                     @LaunchError,
+                     (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |\
+                     (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+            MemUnlock (OptrToHandle(@LaunchError));
+        } else {
+            /* and close the IACP connection */
+            IACPShutdown(iacpConnectionToken, NullOptr);
+            didOpen = TRUE ;
+        }
+    } else {
+        /*  it is already running: connect to it */
+        iacpConnectionToken =
+            IACPConnect(
+                &Token2Use,
+                connectionFlags,
+                NULL,
+                NullOptr,
+                &numServers);
+        if (iacpConnectionToken != IACP_NO_CONNECTION)  {
+            hDeMin = @record GenPrimaryClass::MSG_GEN_DISPLAY_SET_MAXIMIZED();
+            IACPSendMessage(
+                   iacpConnectionToken,
+                   hDeMin,
+                   TO_MODEL,
+                   NullHandle,
+                   IACPS_CLIENT);
+            hToTop = @record GenApplicationClass::MSG_GEN_BRING_TO_TOP();
+            IACPSendMessage(iacpConnectionToken, hToTop, TO_MODEL,
+                   NullHandle, IACPS_CLIENT);
+            IACPShutdown(iacpConnectionToken, NullOptr);
+
+            AppOptr = GeodeGetAppObject(AppHandle); /* was AppGh */
+            PrimPtr = @call AppOptr::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+            @call PrimPtr::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+            @send AppOptr::MSG_GEN_BRING_TO_TOP();
+
+            didOpen = TRUE ;
+        } else {
+            /* it didn't so bail out... */
+            MemLock(OptrToHandle(@LaunchError));
+            UserStandardDialogOptr(
+                     NullHandle,
+                     NullHandle,
+                     NullHandle,
+                     NullHandle,
+                     @LaunchError,
+                     (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |\
+                     (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+            MemUnlock (OptrToHandle(@LaunchError));
+        }
+    }
+
+    return didOpen ;
+}
+

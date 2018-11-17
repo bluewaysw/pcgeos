@@ -1,0 +1,377 @@
+/*
+ **************************************************************************
+ *  FILE:			exp_mtds.goc
+ *  PROJECT:		Teacher's Aide
+ *  DESCRIPTION:	This file has methods for the export
+ *			     functions
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "taide.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * FUNCTION:	ExportFileWrite (char* buffer, FileHandle fh)
+ *
+ * CALLED BY:	MSG_EXPORT_TADATA
+ *      	
+ *
+ * STRATEGY:    returns FALSE for no error TRUE for error
+ *		
+ *
+ ***********************************************************************/
+Boolean ExportFileWrite (char* buffer, FileHandle fh)
+{
+word			length, fileCloseError;
+
+
+    /* now write the buffer to the .QIF file */
+    length = FileWrite(fh,
+			  buffer,
+			  strlen(buffer),
+			  FALSE);
+    /* check for write error */
+    if (length != strlen(buffer))  {
+	  /* show message and bail out */
+	  NotifyDBox(0, @ExpWriteErrMsg);
+	  fileCloseError = FileClose(fh, FALSE);
+	  if (fileCloseError) NotifyDBox(0, @ExpCloseErrMsg);
+	  FilePopDir();
+	  @send TAApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	  return (TRUE);
+	  }
+    else  return (FALSE);
+
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_EXPORT for TADocumentClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *                  is clicked
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_OPEN_EXPORT
+{
+ char	fileName[14];
+ byte	count;
+
+
+    /* start out in Document folder */
+    @call ExpFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+    /* set default name */
+	 MemLock (OptrToHandle(@DefaultExpFileName));
+	 @call ExpFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	 									LMemDeref(@DefaultExpFileName), 0);
+	 MemUnlock (OptrToHandle(@DefaultExpFileName));
+
+    /* Open the dialog box */
+    @call ExportDBox::MSG_GEN_INTERACTION_INITIATE();
+
+    /* select UNNAMED part of default name */
+    @call ExpFileName::MSG_VIS_TEXT_GET_ALL_PTR(fileName);
+    count = 0;
+    while (fileName[count] != '.')  count++;
+
+    @send ExpFileName::MSG_META_GRAB_FOCUS_EXCL();
+    @send ExpFileName::MSG_META_GRAB_TARGET_EXCL(); 
+    @send ExpFileName::MSG_VIS_TEXT_SELECT_RANGE_SMALL(0, count);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EXP_STU_SEL_BOOLEAN_STATUS for TADocumentClass
+ *
+ * DESCRIPTION:	Handles reports student selection boolean.
+ *
+ * PARAMETERS:  void (word selectedBooleans)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_EXP_STU_SEL_BOOLEAN_STATUS
+{
+
+	if (selectedBooleans)
+		@send ExpSelStuTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	else @send ExpSelStuTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EXPORT_TADATA for TADocumentClass
+ *
+ * DESCRIPTION:	 Creates the selected file and does the export
+ *              
+ *
+ *              
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_EXPORT_TADATA
+{
+ char		fileName[14], buffer[100], dataStr[NAME_SIZE], numStr[11];
+ char		TADPath[PATH_BUFFER_SIZE];
+ FileHandle	TADFileHandle;
+ DiskHandle	TADDiskhandle;
+ word		i, j, k, size, fileCloseError;
+/* BasicDBError		error; */
+ BasicDBFieldID	fieldID;
+ MemHandle		openStuRecMH, noteMH;
+ dword		curStuNumNotes;
+ VMBlockHandle	notesDBHan, notesIndexHan;
+ TimerDateAndTime	date;
+ char*			text;
+ BasicDBRecordHeader *	recordPtr;
+
+ Boolean			allStu, thisStu;
+ word			numSel, retSel, ss;
+ word			selList[50];
+
+
+    /* get the exp file name */
+    @call ExpFileName::MSG_VIS_TEXT_GET_ALL_PTR(fileName);
+
+    /* get the file's path and disk handle */
+    @call ExpFileSel::MSG_GEN_PATH_GET(TADPath, sizeof(TADPath));
+    TADDiskhandle = @call ExpFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+    /* save our TA file directory */
+    FilePushDir();
+
+    /* and set the TAD file dir  - FileSel doesn't do this */
+    FileSetCurrentPath(TADDiskhandle, TADPath);
+
+    /* and create the TAD file */
+    TADFileHandle = FileCreate(fileName,
+			       ((FILE_CREATE_ONLY | FCF_NATIVE)
+			       | (FILE_ACCESS_RW | FILE_DENY_RW)),
+			       0);
+    /* if TADFileHandle is NULL then there was an error */
+    if (!TADFileHandle)  {
+	  /* if file exists just tell user & wait for new name */
+       if (ThreadGetError() == ERROR_FILE_EXISTS)  {
+		NotifyDBox(0, @FileExistsErrMsg);
+		}
+	    /* for any other error - bail out */
+	    else  {
+		NotifyDBox(0, @ExpCreateErrMsg);
+		@send ExportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+		}
+	  FilePopDir();
+	  return;
+	  }
+
+    /* see if all or selected students */
+	 allStu = @call ExpStudentSelectGroup::
+						MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(RS_ALL);
+	 if(!allStu) {
+	  numSel = @call RSDBDList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	  retSel = @call RSDBDList::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(selList, numSel);
+	  }
+
+	 /* dismiss the file selector box now */
+	 @send ExportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+	 /* mark app busy */
+	 @send TAApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* init the file */
+    strcpy(buffer, "[TA-DATA-FILE-V1]\r\n");
+    if (ExportFileWrite (buffer, TADFileHandle)) return;
+
+    /* free up any previous record in memory */
+    if (pself->TADI_openStuRecMH) BasicDBDiscardRecord(pself->TADI_openStuRecMH);
+
+    /* OK - start exporting records */
+    for (i = 0; i < (word)(pself->TADI_numStudents); i++)  {
+		/* if not all stu selected do we want this student */
+		if (allStu) thisStu = TRUE;
+		else {
+		   thisStu = FALSE;
+		   for (ss = 0; ss < retSel; ss++) {
+			 if (i == selList[ss]) {
+			    thisStu = TRUE;
+			    ss = retSel;
+			    }
+			 }
+		   }
+	  if (thisStu) {
+	  /* grab the student record */
+	  BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   pself->TADI_stuDBHan,
+					   pself->TADI_curStuIndex,
+					   i,
+					   &openStuRecMH);
+	  /* init the record */
+	  strcpy(buffer, "[START-REC]\r\n");
+	  if (ExportFileWrite (buffer, TADFileHandle)) return;
+
+	  /* and now the fields */
+	  for (j = 0; j < STU_NUM_NOTES; j++)  {
+		/* get the field info */
+		fieldID = BasicDBGetFieldID(openStuRecMH, BDBFHE_CATEGORY, j, 1);
+		size = BasicDBGetFieldData(openStuRecMH,
+						    fieldID,
+						    dataStr,
+						    NAME_SIZE);
+						    
+		if (size) {
+		   strcpy(buffer, "[FIELD-");
+		   UtilHex32ToAscii(numStr, (dword) j, UHTAF_NULL_TERMINATE);
+		   strcat(buffer, numStr);
+		   strcat(buffer, "]\r\n");
+		   dataStr[size] = 0;
+		   strcat(buffer, dataStr);
+		   strcat(buffer, "\r\n");
+		   if (ExportFileWrite (buffer, TADFileHandle)) return;
+		   } /* end of data in the field if */
+
+		} /* end of loop thru fields for */
+
+	  /* and let's exp any notes */
+	  fieldID = BasicDBGetFieldID(openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NUM_NOTES,
+							1);
+	  BasicDBGetFieldData(openStuRecMH,
+						    fieldID,
+						    &curStuNumNotes,
+						    sizeof(dword));
+
+	  if(curStuNumNotes) {
+		/* export the number of notes */
+/*		strcpy(buffer, "[NUM-NOTES]\r\n");
+		UtilHex32ToAscii(numStr, curStuNumNotes, UHTAF_NULL_TERMINATE);
+		strcat(buffer, numStr);
+		strcat(buffer, "\r\n");
+		if (ExportFileWrite (buffer, TADFileHandle)) return;
+
+		/* get the current student's notes db */
+		fieldID = BasicDBGetFieldID(openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_DB,
+							1);
+		BasicDBGetFieldData(openStuRecMH,
+						    fieldID,
+						    &notesDBHan,
+						    sizeof(VMBlockHandle));
+		if (pself->TADI_curStuNoteSortPref == VFC_DATE)
+		   fieldID = BasicDBGetFieldID(openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_D_INDX,
+							1);
+		else
+		   fieldID = BasicDBGetFieldID(openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_S_INDX,
+							1);
+		BasicDBGetFieldData(openStuRecMH,
+						    fieldID,
+						    &notesIndexHan,
+						    sizeof(VMBlockHandle));
+
+		/* now each note */
+		for (j = 0; j < curStuNumNotes; j++)  {
+		   /* get the note record */
+		   BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   notesDBHan,
+					   notesIndexHan,
+					   j,
+					   &noteMH);
+
+		   /* get the subj field of that record */
+		   fieldID = BasicDBGetFieldID(noteMH,
+							BDBFHE_CATEGORY,
+							STU_NOTE_SUBJ,
+							1);
+		   size = BasicDBGetFieldData(noteMH,
+						    fieldID,
+						    dataStr,
+						    NAME_SIZE);
+		   if (size)  {
+			 strcpy(buffer, "[N-SUBJ]\r\n");
+			 dataStr[size] = 0;
+			 strcat(buffer, dataStr);
+			 strcat(buffer, "\r\n");
+			 if (ExportFileWrite (buffer, TADFileHandle)) return;
+			 }
+
+		   /* and the date field of that record */
+		   fieldID = BasicDBGetFieldID(noteMH,
+							BDBFHE_CATEGORY,
+							STU_NOTE_DATE,
+							1);
+		   size = BasicDBGetFieldData(noteMH,
+						    fieldID,
+						    &date,
+						    sizeof(TimerDateAndTime));
+		   LocalFormatDateTime(dataStr, DTF_SHORT, &date);
+		   if (size)  {
+			 strcpy(buffer, "[N-DATE]\r\n");
+			 strcat(buffer, dataStr);
+			 strcat(buffer, "\r\n");
+			 if (ExportFileWrite (buffer, TADFileHandle)) return;
+			 }
+
+		   /* and the text field of that record */
+		   fieldID = BasicDBGetFieldID(noteMH,
+							BDBFHE_CATEGORY,
+							STU_NOTE_TEXT,
+							1);
+		   recordPtr = MemLock(noteMH);
+		   size = BasicDBGetPtrToFieldData(recordPtr,
+						    fieldID,
+						    (byte*) &text);
+		   if (size)  {
+			 strcpy(buffer, "[N-BODY]\r\n");
+			 if (ExportFileWrite (buffer, TADFileHandle)) return;
+			 for (k = 0; k < size; k++) {
+			    buffer[0] = text[k];
+			    buffer[1] = 0;
+			    if (ExportFileWrite (buffer, TADFileHandle)) return;
+			    }
+			 strcpy(buffer, "\r\n");
+			 if (ExportFileWrite (buffer, TADFileHandle)) return;
+			 }
+             MemUnlock(noteMH);
+
+		   /* got the data - free the record */
+		   BasicDBDiscardRecord(noteMH);
+		   }  /* end of exporting notes for loop */
+
+		} /* end of export any notes if */
+
+	  BasicDBDiscardRecord(openStuRecMH);
+
+	  /* end the record */
+	  strcpy(buffer, "[END-REC]\r\n");
+	  if (ExportFileWrite (buffer, TADFileHandle)) return;
+	  } /* end of we want this student if */
+	  }  /* end of loop thru students for */
+
+    /* Done so close the file */
+    fileCloseError = FileClose(TADFileHandle, FALSE);
+    if (fileCloseError) NotifyDBox(0, @ExpCloseErrMsg);
+    FilePopDir();
+    @send TAApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+}

@@ -1,0 +1,184 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include
+FILE:		alb.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	doug	4/15/93		Pulled out from Objects/gProcC.def
+
+DESCRIPTION:
+	Definition for the "AppLaunchBlock" structure that must be passed
+	into applications on launch.
+
+	$Id: alb.def,v 1.1 97/04/04 14:25:18 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__ALB
+
+
+;
+; AppInstanceReference.  Holds enough info to be able to reload an instance
+; of an application.  Stored in the application object itself, & copied
+; into the field when the application is forcefully detached.
+;
+; DO NOT CHANGE THIS WITHOUT CHANGING "GENERIC.UIH"!!!
+;
+
+AppInstanceReference	struct
+if DBCS_PCGEOS
+	AIR_fileName	PathName
+else
+	AIR_fileName	char	PATH_BUFFER_SIZE dup (?)
+endif
+	; Application being launched.  Pathname is relative to application
+	; directory (Which, of course, may be overriden with a direct path
+	; to the app)
+
+if DBCS_PCGEOS
+	AIR_stateFile	FileLongName
+else
+	AIR_stateFile	char	FILE_LONGNAME_BUFFER_SIZE dup (?)
+endif
+	; State filename.  File is assumed to be in standard directory for
+	; PC/GEOS state files. If the first byte is "0", then there is no
+	; state file for this application. This structure is copied into the
+	; field as an aid in restarting applications, and if it comes across
+	; one with this byte as 0, it will not restart it.
+
+	AIR_diskHandle	word
+	; Disk handle for app (passed in) IF 0, use System disk, if -1,
+	; use AIR_diskName. In the field, if this is a placeholder structure,
+	; this word is the handle of the application object we are waiting to
+	; detach.
+
+	AIR_savedDiskData  byte	0
+	; Start of data stored by DiskSave when instance is saved to state.
+	; Must be a single byte for compatibility with C definition...
+	; 
+AppInstanceReference	ends
+
+;
+; AppLaunchFlags.  Holds additional info governing how application should
+; be run.
+;
+AppLaunchFlags	record
+	ALF_SEND_LAUNCH_REQUEST_TO_UI_TO_HANDLE:1
+	; If this bit is set, the application will not immediately
+	; be launched, but instead the UI will be sent a method which
+	; will cause it to do so.  Because of this, no error is returned.
+	; (NOT passed to application itself, is only used by
+	; UserLoadApplication)
+
+	ALF_OPEN_IN_BACK:1
+	; Set to open application behind other applications.
+	; It will also ensure that if an application has multiple GenPrimaries,
+	; (each with a different layer id), the GenPrimaries will be restored
+	; in the correct order (one behind the other).
+	; This flag is normally set when restoring from state.
+
+	ALF_DESK_ACCESSORY:1
+	; Set to open application as a "desk accessory", in a layer above
+	; normal applications.
+
+	ALF_DO_NOT_OPEN_ON_TOP:1
+	; Set to prevent application from opening on top with the focus.
+
+	ALF_OVERRIDE_MULTIPLE_INSTANCE:1
+	; Set to prevent application, when running in a UILM_MULTIPLE_INSTANCE
+	; field, from asking the user if s/he wishes to start another copy.
+	; Used especially by the express menu...
+	
+        ALF_OPEN_FOR_IACP_ONLY:1
+	; Used only for "MSG_GEN_PROCESS_OPEN_APPLICATION" mode connections.
+        ; Set if app is being launched via IACPConnect for a specific task
+	; only, & should close as an app once the task is complete, as
+	; indicated by the IACP connection closing (unless there is some
+	; other reason for the app to stay open, such as other app-mode
+	; IACP connections, or a previous or subsequential opening of the app
+	; for the user).  This bit should be clear whereever IACPConnect is
+	; being used to open an app with the intention that the app is to
+	; remain open after the IACP connection is closed.
+
+	ALF_NO_ACTIVATION_DIALOG:1
+	; Set to prevent the "Activating" dialog box from being displayed.
+
+	:1
+AppLaunchFlags	end
+
+
+;
+; Structure of block passed in MSG_META_ATTACH to any geode having a
+; process marked as GA_APPLICATION:
+;
+AppLaunchBlock	struct
+
+   ; PASSED STATE INFORMATION (preserved through state file)
+   ;
+	ALB_appRef	AppInstanceReference
+	; Instance reference.  Contains full pathname to application, 
+	; as referenced from app directory, plus the name of a state file.
+	; Is enough info to launch application again, restored.
+	; (State file need not be passed to GeodeLoad)
+	;NOTE: THIS MUST BE THE FIRST FIELD IN THE STRUCTURE!
+
+	ALB_appMode	word
+	; Application attach mode method, currently, one of:
+	;	  MSG_GEN_PROCESS_RESTORE_FROM_STATE
+	;		State file MUST be passed, no data file should be
+	;	  MSG_GEN_PROCESS_OPEN_APPLICATION
+	;		State file normally should NOT be passed, although
+	;		one could be to accomplish ui templates. A data
+	;		file may be passed into the application as well
+	;	  MSG_GEN_PROCESS_OPEN_ENGINE
+	;		State file normally should NOT be passed.
+	;		The data file on which the engine will operate
+	;		MUST be passed.  If 0, the default data file should
+	;		be used (Enforced by app, not GenProcessClass)
+
+	ALB_launchFlags	AppLaunchFlags
+	; Misc flags for clarifying desired type of launch for the application
+
+   ; PASSED LAUNCH INFORMATION (NOT preserved through state file)
+   ;
+	ALB_diskHandle	word
+	; Disk handle for data path.  (Set as app current path in
+	; MSG_META_ATTACH for process)
+
+	ALB_path	PathName
+	; Data path for application to use as initial path.
+	; (Usually dir of any data file passed)  (Set as app current path in
+	; MSG_META_ATTACH for process)
+
+	ALB_dataFile	FileLongName
+	; Name of data file passed in to be opened (0 if none)
+	; Pathname is relative to above path
+
+	ALB_genParent	optr
+	; Generic parent for new application (0 to put on default field)
+	; (Should be passed null to MSG_GEN_FIELD_LAUNCH_APPLICATION)
+
+	ALB_userLoadAckAD	ActionDescriptor
+	; AD to activate when the application has been launched (used in 
+	; conjunction with ALF_SEND_LAUNCH_REQUEST_TO_UI_TO_HANDLE)
+	; (Set to 0 if you don't want to send anything)
+	;
+	; Passes:	cx - geode handle (if successful)
+	;		dx - error (0 if no error)
+	;		bp - ID passed in ALB_userLoadAckID
+
+	ALB_userLoadAckID	word
+	; ID sent out via ActionDescriptor
+	;
+
+	ALB_extraData	word
+	; Extra data to be sent to process (possibly a handle to block 
+	; containing arguments).
+
+AppLaunchBlock	ends
+

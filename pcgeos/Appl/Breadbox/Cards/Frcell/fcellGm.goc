@@ -1,0 +1,1410 @@
+/***********************************************************************
+*     Copyright 1994-2002  Breadbox Computer Company LLC
+* PROJECT:	Anarchy
+* MODULE:	FreeCell  (porting from a previous ESP anarchy project using
+*                      Nate's cards.goh header file)
+* FILE:		fcellgm.goc
+*
+* AUTHOR:	jfh 12/02
+*
+*
+***********************************************************************/
+
+/* ----------------------------------------------------------------------------
+		Include files
+-----------------------------------------------------------------------------*/
+
+@include "frcell.goh"
+
+@extern object FreeCellView;
+@extern object MyPlayingTable;
+@extern object MyHand;
+@extern object NewGameTrigger;
+@extern object UndoTrigger;
+@extern object RedealTrigger;
+@extern object DragItemGroup;
+@extern object FreeCellColorSelector;
+@extern object FreeSpace1;
+@extern object FreeSpace2;
+@extern object FreeSpace3;
+@extern object FreeSpace4;
+@extern object Foundation1;
+@extern object Foundation2;
+@extern object Foundation3;
+@extern object Foundation4;
+@extern object WorkSpace1;
+@extern object WorkSpace2;
+@extern object WorkSpace3;
+@extern object WorkSpace4;
+@extern object WorkSpace5;
+@extern object WorkSpace6;
+@extern object WorkSpace7;
+@extern object WorkSpace8;
+@extern object GameButton;
+@extern visMoniker GameButtonNewMoniker;
+@extern visMoniker GameButtonAutoMoniker;
+@extern chunk ConfirmDealString;
+@extern chunk ConfirmRedealString;
+@extern object FinishBox;
+@extern object StatsBox;
+@extern object SessionWonText;
+@extern object SessionLostText;
+@extern object SessionPct;
+@extern object TotalWonText;
+@extern object TotalLostText;
+@extern object TotalPct;
+@extern object WinStreaksText;
+@extern object LoseStreaksText;
+@extern object CurrentStreakText;
+@extern chunk ConfirmClearStats;
+@extern chunk WinText;
+@extern chunk WinsText;
+@extern chunk LossText;
+@extern chunk LossesText;
+
+
+Boolean g_okToDropIntoSpace = TRUE;
+Boolean g_quittingOnWin = FALSE;
+Boolean g_gameInProgress = FALSE;
+//Boolean g_systemShutDown = FALSE;
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetCardRank
+ *
+ * CALLED BY:	various
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+word GetCardRank(optr deck, word card)
+{
+ CardAttrs		attrs;
+ word				rank;
+
+	/* get the card's attributes */
+	attrs = @call deck::MSG_DECK_GET_NTH_CARD_ATTRIBUTES(card);
+	/* and the card's rank from it's attrs */
+	rank = (attrs >> CA_RANK_OFFSET);
+	rank &= 15;
+	return(rank);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetCardColor
+ *
+ * CALLED BY:	various
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+word GetCardColor(optr deck, word card)
+{
+ CardAttrs		attrs;
+ word				suit, color;
+
+	/* get the card's attributes */
+	attrs = @call deck::MSG_DECK_GET_NTH_CARD_ATTRIBUTES(card);
+	/* and the card's color from it's attrs */
+	suit = (attrs >> CA_SUIT_OFFSET);
+	suit &= 3;
+	if (suit & 2)  /* hi bit => blackness */
+		color = C_BLACK;
+	else
+		color = C_RED;
+	return(color);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetCardSuit
+ *
+ * CALLED BY:	various
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+word GetCardSuit(optr deck, word card)
+{
+ CardAttrs		attrs;
+ word				suit;
+
+	/* get the card's attributes */
+	attrs = @call deck::MSG_DECK_GET_NTH_CARD_ATTRIBUTES(card);
+	/* and the card's color from it's attrs */
+	suit = (attrs >> CA_SUIT_OFFSET);
+	suit &= 3;
+	return(suit);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FreeCellUpdateStats
+ *
+ * CALLED BY:	various
+ *
+ * STRATEGY:   assumes that all keys have been initialized
+ *             - session key at app start
+ *             - others at app start if not previously there
+ *
+ ***********************************************************************/
+void FreeCellUpdateStats(Boolean isWin)
+{
+ word		value, streakType, lwin, llose;
+
+
+	if (isWin) {  /* the just ended game is a win */
+		InitFileReadInteger("FreeCell", "swins", &value);
+		InitFileWriteInteger("FreeCell", "swins", ++value);
+		InitFileReadInteger("FreeCell", "twins", &value);
+		InitFileWriteInteger("FreeCell", "twins", ++value);
+		InitFileReadInteger("FreeCell", "lwin", &lwin);
+		/* see if the current streak is a win */
+		InitFileReadInteger("FreeCell", "curworl", &streakType);
+		if (!streakType || (streakType == CUR_STREAK_WIN)) {
+			InitFileReadInteger("FreeCell", "lcur", &value);
+			InitFileWriteInteger("FreeCell", "lcur", ++value);
+			if (!streakType)
+				/* it is now a win streak */
+				InitFileWriteInteger("FreeCell", "curworl", CUR_STREAK_WIN);
+			/* is this the longest win streak? */
+			if (value > lwin)
+				InitFileWriteInteger("FreeCell", "lwin", value);
+			}
+		else  { /* current streak's a loss so start it over */
+			InitFileWriteInteger("FreeCell", "curworl", CUR_STREAK_WIN);
+			InitFileWriteInteger("FreeCell", "lcur", 1);
+			}
+			/* is this the longest win streak? */
+			if (1 > lwin)
+				InitFileWriteInteger("FreeCell", "lwin", 1);
+		}  /* end of won game if */
+
+	else {   /* the just ended game is a loss */
+		InitFileReadInteger("FreeCell", "slosses", &value);
+		InitFileWriteInteger("FreeCell", "slosses", ++value);
+		InitFileReadInteger("FreeCell", "tlosses", &value);
+		InitFileWriteInteger("FreeCell", "tlosses", ++value);
+		InitFileReadInteger("FreeCell", "llose", &llose);
+		/* see if the current streak is a loss */
+		InitFileReadInteger("FreeCell", "curworl", &streakType);
+		if (!streakType || (streakType == CUR_STREAK_LOSS)) {
+			InitFileReadInteger("FreeCell", "lcur", &value);
+			InitFileWriteInteger("FreeCell", "lcur", ++value);
+			if (!streakType)
+				/* it is now a lose streak */
+				InitFileWriteInteger("FreeCell", "curworl", CUR_STREAK_LOSS);
+			/* is this the longest lose streak? */
+			if (value > llose)
+				InitFileWriteInteger("FreeCell", "llose", value);
+			}
+		else  { /* current streak's a win so start it over */
+			InitFileWriteInteger("FreeCell", "curworl", CUR_STREAK_LOSS);
+			InitFileWriteInteger("FreeCell", "lcur", 1);
+			/* is this the longest lose streak? */
+			if (1 > llose)
+				InitFileWriteInteger("FreeCell", "llose", 1);
+			}
+		}  /* end of lost game else */
+
+}
+
+/* ----------------------------------------------------------------------------
+		FreeCellClass
+-----------------------------------------------------------------------------*/
+
+@classdecl	FreeCellClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_SETUP_STUFF for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	Intercept Game message to do some of our own
+ *                FreeCell setup
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_GAME_SETUP_STUFF
+{
+
+	@callsuper();
+
+	/* Set default spreads for all decks - which is really just the
+		WorkSpace decks since the FreeSpace decks can have only one card
+		each and we change the foundations to not spread just below */
+	@send self::MSG_GAME_SET_UP_SPREADS(0, 20);
+
+	/* Set Foundation deck offsets to 0,0 */
+	@send Foundation1::MSG_DECK_SET_UP_SPREADS(0,0);
+	@send Foundation2::MSG_DECK_SET_UP_SPREADS(0,0);
+	@send Foundation3::MSG_DECK_SET_UP_SPREADS(0,0);
+	@send Foundation4::MSG_DECK_SET_UP_SPREADS(0,0);
+
+	/* Create a hand of 52 standard cards */
+	@send MyHand::MSG_HAND_MAKE_FULL_HAND();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_SETUP_GEOMETRY for FreeCellClass
+ *
+ * DESCRIPTION:	Intercept Game message to do our table layout.
+ *     				This msg is called by MSG_GAME_SETUP_STUFF
+ *
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_GAME_SETUP_GEOMETRY
+{
+ word		xPos, yPos, cWidth, cHeight;
+
+
+	/* Store card width and card height. */
+	cWidth = pself->GI_cardWidth;
+	cHeight = pself->GI_cardHeight;
+
+	/* Hide MyHand deck at a negative coordinate so it won't show up. */
+	@send MyHand::MSG_VIS_SET_POSITION(MY_HAND_SPACING, MY_HAND_SPACING);
+	@send MyHand::MSG_VIS_INVALIDATE();
+
+	/* Display FreeSpace decks on upper left of table. */
+	xPos = FREE_SPACE_SPACING_LEFT;
+	yPos = FREE_SPACE_SPACING_TOP;
+	@send FreeSpace1::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send FreeSpace1::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send FreeSpace2::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send FreeSpace2::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send FreeSpace3::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send FreeSpace3::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send FreeSpace4::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send FreeSpace4::MSG_VIS_INVALIDATE();
+
+	/* Display Foundation decks on upper right of table */
+	xPos = FOUNDATION_SPACING_LEFT;
+	yPos = FOUNDATION_SPACING_TOP;
+	@send Foundation1::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send Foundation1::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send Foundation2::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send Foundation2::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send Foundation3::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send Foundation3::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send Foundation4::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send Foundation4::MSG_VIS_INVALIDATE();
+
+	/* Display WorkSpace decks in middle of table. */
+	xPos = WORK_SPACE_SPACING_LEFT;
+	yPos = WORK_SPACE_SPACING_TOP + cHeight;
+	@send WorkSpace1::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send WorkSpace1::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send WorkSpace2::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send WorkSpace2::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send WorkSpace3::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send WorkSpace3::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send WorkSpace4::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send WorkSpace4::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send WorkSpace5::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send WorkSpace5::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send WorkSpace6::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send WorkSpace6::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send WorkSpace7::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send WorkSpace7::MSG_VIS_INVALIDATE();
+
+	xPos += STANDARD_SPACING + cWidth;
+	@send WorkSpace8::MSG_VIS_SET_POSITION(xPos, yPos);
+	@send WorkSpace8::MSG_VIS_INVALIDATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_NEW_GAME_MENU_SELECT for FreeCellClass
+ *               (trigger)
+ * DESCRIPTION:	User selected New Game from Game menu or button
+ *                or Autofinish from button
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_NEW_GAME_MENU_SELECT
+{
+
+	if ((trigger == @GameButton) && (pself->FCI_autoFinish)) {
+      @send, forceQueue oself::MSG_FREECELL_DO_AUTO_FINISH();
+		}
+
+	else {
+		/* Unless we've just won a game show the confirmation dbox */
+		if (!(pself->GI_gameAttrs & GA_JUST_WON_A_GAME)) {
+			if ((UserStandardDialogOptr(0, 0, 0, 0,
+				 @ConfirmDealString,
+				 ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+				 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+				 ) != IC_YES))  return;
+			}
+
+		/* If 'Yes' was clicked, or game won, user wants to start another game, so
+			gather all the cards, and send NEW_GAME message.  */
+		if (!(pself->GI_gameAttrs & GA_JUST_WON_A_GAME))
+			/* add a loss to the stats */
+			FreeCellUpdateStats(FALSE);
+		@send self::MSG_GAME_COLLECT_ALL_CARDS();
+		@send self::MSG_FREECELL_NEW_GAME();
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_REDEAL_MENU_SELECT for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	User selected Redeal from Game menu
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_REDEAL_MENU_SELECT
+{
+
+	/* Display Standard dialog box, confirming the redeal.  The user
+		will have to option to click 'Yes' or 'No'. */
+	if ((UserStandardDialogOptr(0, 0, 0, 0,
+				 @ConfirmRedealString,
+				 ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+				 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+				 ) != IC_YES))  return;
+
+	/* If 'Yes' was clicked, user wants to start this game over.
+		Need to collect cards to MyHand, and send REDEAL message to
+		self.  */
+	/* add a loss to the stats */
+	FreeCellUpdateStats(FALSE);
+	@send self::MSG_GAME_COLLECT_ALL_CARDS();
+	@send self::MSG_FREECELL_REDEAL();
+
+	/* Make sure the window is marked as invalid, so we can start
+		playing. */
+	@send self::MSG_VIS_MARK_INVALID(
+						VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID,
+						VUM_NOW);
+
+	/* Disable the Undo trigger, since we're at the beginning of the
+		game, there can be nothing to undo. */
+	@send UndoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_NEW_GAME for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	We're starting a new game
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_NEW_GAME
+{
+ GameAttrs		attrs;
+ dword			state;
+
+	/* Clear the GA_JUST_WON_A_GAME flag  */
+	attrs = pself->GI_gameAttrs;
+	if (attrs | GA_JUST_WON_A_GAME)  {
+		attrs = attrs & !GA_JUST_WON_A_GAME;
+		pself->GI_gameAttrs = attrs;
+		}
+
+	/* reset the autofinish stuff */
+	pself->FCI_autoFinish = FALSE;
+	pself->FCI_autoFinishing = FALSE;
+	@send GameButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send GameButton::MSG_GEN_USE_VIS_MONIKER(
+									OptrToChunk(@GameButtonNewMoniker), VUM_NOW);
+	@send GameButton::MSG_GEN_TRIGGER_SET_ACTION_MSG(
+													  MSG_FREECELL_NEW_GAME_MENU_SELECT);
+
+	g_gameInProgress = FALSE;
+
+	/* Shuffle the hand  */
+	@send MyHand::MSG_HAND_SHUFFLE();
+
+	/* Save current state, in case we want to start this game over  */
+	state = @call self::MSG_GAME_SAVE_STATE();
+	/* store the handle and length of state. */
+	pself = ObjDerefGen(oself);
+	pself->FCI_savedStateHandle = GSS_GET_MEM_BLOCK(state);
+	pself->FCI_savedStateLength = GSS_GET_BYTES_WRITTEN(state);
+
+	/* Deal the cards from the hidden hand */
+	@send self::MSG_FREECELL_DEAL_CARDS();
+
+	/* Make sure the window is marked as invalid, so we can start
+		playing.  */
+	@send self::MSG_VIS_MARK_INVALID(
+						VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID,
+						VUM_NOW);
+
+	/* Disable the Undo trigger, since we're at the beginning of the
+		game, there can be nothing to undo. */
+	@send UndoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+	/* Enable the Redeal trigger (it is disabled if you've just won
+		a game. */
+	@send RedealTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_DEAL_CARDS for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	Deal the cards from the hidden hand to the
+ *                WorkSpace decks
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_DEAL_CARDS
+{
+ word		whichDeck, i;
+ optr		poppedCard;
+ optr		workDeckOptr[8] = {@WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+									 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8};
+
+
+	whichDeck = FIRST_WORKSPACE_DECK;
+
+	/* we initialized to 52 cards in setup */
+	for (i = 0; i < 52; i++) { 
+		/* get the top card from the hand */
+		poppedCard = @call MyHand::MSG_DECK_POP_CARD();
+		/* maybe an error message if no card popped? */
+		if (poppedCard)  {
+			@send poppedCard::MSG_CARD_TURN_FACE_UP();
+         /* deal it to the appropriate WorkSpace deck */
+			@send workDeckOptr[whichDeck]::MSG_DECK_GET_DEALT(poppedCard);
+			whichDeck++;
+			if (whichDeck > LAST_WORKSPACE_DECK) {
+				whichDeck = FIRST_WORKSPACE_DECK;
+				}
+			}
+		} /* end of dealing for loop */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_REDEAL for FreeCellClass
+ *
+ * DESCRIPTION:	Almost identical to DEAL_CARDS, except that attributes
+ *						are inserted from the saved state as each card is dealt.
+ *						Has the effect of restarting same game over (i.e. without
+ *						shuffling cards).
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_REDEAL
+{
+ word		i, whichDeck;
+ optr		poppedCard;
+ optr		workDeckOptr[8] = {@WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+									 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8};
+ MemHandle	stateHandle;
+ word		*cardSegment;
+ CardAttrs		attr;
+
+
+	/* Lock the memblock containing saved state data  */
+	stateHandle = pself->FCI_savedStateHandle;
+	if (stateHandle)
+		cardSegment = MemLock(stateHandle);
+	else return;
+
+	g_gameInProgress = FALSE;
+
+	whichDeck = FIRST_WORKSPACE_DECK;
+
+	for (i = 0; i < 52; i++) {
+		poppedCard = @call MyHand::MSG_DECK_POP_CARD();
+		/* maybe an error message if no card popped? */
+		if (poppedCard)  {
+			/*	Change the attributes of the card to the ones stored...  */
+			attr = *cardSegment;
+			@send poppedCard::MSG_CARD_SET_ATTRIBUTES(attr);
+         cardSegment++;
+
+			@send poppedCard::MSG_CARD_TURN_FACE_UP();
+			@send workDeckOptr[whichDeck]::MSG_DECK_GET_DEALT(poppedCard);
+			whichDeck++;
+			if (whichDeck > LAST_WORKSPACE_DECK) {
+				whichDeck = FIRST_WORKSPACE_DECK;
+				}
+			}
+		} /* end of dealing for loop */
+
+	/* unlock the memblock. */
+	MemUnlock(stateHandle);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_SAVE_STATE for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	Intercept the game message and store our current hand's
+ *                card attributes so that the same game can be replayed
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_GAME_SAVE_STATE
+{
+ MemHandle	mh;
+ word			*data;
+ word			i;
+ dword		retVal;
+ CardAttrs	attr;
+
+
+	/* Check to see if there is a pre-existing saved state block.
+		If there is, lock the block before continuing.  If there is
+		not, allocate a new block */
+	if (pself->FCI_savedStateHandle)  {
+		mh = pself->FCI_savedStateHandle;
+		data = (word*)MemLock(mh);
+		}
+	else {
+		/* Need to allocate 52 + 1 words -- last one indicates how many --
+			in the block. */
+		mh = MemAlloc(53*sizeof(word), HF_SWAPABLE, HAF_ZERO_INIT|HAF_LOCK);
+		data = MemDeref(mh);
+		}
+
+	/* store the cards' attributes */
+	for (i = 0; i < 52; i++)  {
+		attr = @call MyHand::MSG_DECK_GET_NTH_CARD_ATTRIBUTES(i);
+		*data = attr;
+		data ++;
+		}
+	/* and how many bytes of data */
+	*data = 52*2;
+
+	MemUnlock(mh);
+
+	/* return the handle (high word) and the # bytes written (low word) */
+	retVal = ((dword)mh << 16) + 52*2;
+   return (retVal);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_UNDO for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	Undo the last play
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_UNDO
+{
+
+
+	/* Make sure that the lastDoner field is not NULL -- if so, we
+		can't undo anything.  this also clears the lastDoner field. */
+	if (pself->GI_lastDonor) {
+		@send (pself->GI_lastDonor)::MSG_DECK_RETRIEVE_CARDS();
+		}
+
+	/* Disable the Undo trigger -- only one undo at a time. */
+	@send UndoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_REGISTER_DRAG for FreeCellClass
+ * 	PASS:		deck = dragging deck
+ *
+ * 	RETURN:		nothing
+ *
+ *
+ * DESCRIPTION:	A good place to check for a win
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_GAME_REGISTER_DRAG
+{
+
+	/* if this is the first drag set the game in prog flag */
+	if (!g_gameInProgress)  g_gameInProgress = TRUE;
+
+	@callsuper();
+
+	/* check for auto-finish */
+	if (!pself->FCI_autoFinish)
+		@send self::MSG_FREECELL_CHECK_FOR_AUTO_FINISH();
+
+	/* check for winner  */
+	if (!pself->FCI_autoFinishing) {
+		if (@call self::MSG_FREECELL_CHECK_FOR_WINNER())
+			@send, forceQueue self::MSG_FREECELL_DO_WINNER();
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_CHECK_FOR_AUTO_FINISH for FreeCellClass
+ *
+ *
+ * DESCRIPTION:   checks for workdecks descending
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_CHECK_FOR_AUTO_FINISH
+{
+ optr		wDeckOptr[8] = {@WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+								 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8};
+ word		i, j, numCards, rank, nextRank, color, nextColor;
+ Boolean	autoFin = TRUE;
+
+
+	/* check the work decks */
+	for (i = 0; i < 8; i++) {
+		numCards = @call wDeckOptr[i]::MSG_DECK_GET_N_CARDS();
+		if (numCards) {
+			for (j = 0; j < numCards; j++) {
+				if (j < numCards - 1)  {
+					rank = GetCardRank(wDeckOptr[i], j);
+					nextRank = GetCardRank(wDeckOptr[i], j + 1);
+					if (rank + 1 != nextRank) {
+						autoFin = FALSE;
+						 break;  /* the j loop */
+						}
+					else {
+						/* check alt color */
+						color = GetCardColor(wDeckOptr[i], j);
+						nextColor = GetCardColor(wDeckOptr[i], j + 1);
+						if (color == nextColor) {
+							autoFin = FALSE;
+							break; /* the j loop */
+							}
+						}
+					}
+				}  /* end of j (go thru cards) loop */
+			if (!autoFin)
+				break;  /* the i loop */
+			}
+		}
+
+	/* if we're auto finishable then change the button and set the global
+		so we don't check any more. */
+	if (autoFin)  {
+		pself->FCI_autoFinish = TRUE;
+		@send GameButton::MSG_GEN_USE_VIS_MONIKER(
+									OptrToChunk(@GameButtonAutoMoniker), VUM_NOW);
+		UserStandardSound(SST_NOTIFY);
+//		@send GameButton::MSG_GEN_TRIGGER_SET_ACTION_MSG(
+//													  MSG_FREECELL_DO_AUTO_FINISH);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_DO_AUTO_FINISH for FreeCellClass
+ *
+ *
+ * DESCRIPTION:   does the autofinish - checks for lowest card in the 4
+ *                foundations and then finds the next card and plays it
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_DO_AUTO_FINISH
+{
+ optr			deckOptr[12] = {@WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+									 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8,
+									 @FreeSpace1, @FreeSpace2, @FreeSpace3, @FreeSpace4};
+ optr			foundOptr[4] = {@Foundation1, @Foundation2, @Foundation3, @Foundation4};
+ optr			poppedCard;
+ word			i, rank, lowRank, lowDeck, testRank, fSuit, testSuit, deck;
+ word			width, height;
+ Boolean		notFinished, foundPlayer;
+ Rectangle	bRect, aRect;
+ WindowHandle 	win;
+ GStateHandle	gstate;
+
+
+	@send application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+	pself->FCI_autoFinishing = TRUE;
+	@send GameButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	width = @call MyPlayingTable::MSG_FREECELL_GET_CARD_WIDTH();
+	height = @call MyPlayingTable::MSG_FREECELL_GET_CARD_HEIGHT();
+	notFinished = TRUE;
+	while (notFinished) {
+
+		TimerSleep(3);
+
+		/* find the lowest card on the foundations */
+		foundPlayer = FALSE;
+		lowRank = 13;
+		for (i = 0; i < 4; i++) {
+			rank = GetCardRank(foundOptr[i], 0);
+			if (rank < lowRank) {
+				lowRank = rank;
+				lowDeck = i;
+				}
+			}
+		/* are we done? */
+		if (lowRank == 13) {
+			notFinished = FALSE;
+			break;
+			}
+
+		/* now get the lowFound's suit so that we can find the card to play */
+		fSuit = GetCardSuit(foundOptr[lowDeck], 0);
+
+		/* OK - go thru and find the card to play here */
+		for (i = 0; i < 12; i++)  {
+			if (@call deckOptr[i]::MSG_DECK_GET_N_CARDS()) {
+				/* check the top card */
+				testRank = GetCardRank(deckOptr[i], 0);
+				if (testRank == lowRank + 1)  {
+					testSuit = GetCardSuit(deckOptr[i], 0);
+					if (testSuit == fSuit)  {
+						deck = i;
+						foundPlayer = TRUE;
+						break;
+						}
+					}
+				}
+			}  /* end of decks check */
+
+		if (foundPlayer)  {
+
+			@call deckOptr[deck]::MSG_VIS_GET_BOUNDS(&bRect);
+
+			poppedCard = @call deckOptr[deck]::MSG_DECK_POP_CARD();
+			/* need to reset the card to its full bounds */
+			@send poppedCard::MSG_VIS_SET_SIZE(width, height);
+			@send foundOptr[lowDeck]::MSG_DECK_GET_DEALT(poppedCard);
+			win = @call FreeCellView::MSG_GEN_VIEW_GET_WINDOW();
+//			if (@call deckOptr[deck]::MSG_DECK_GET_N_CARDS())
+				@send deckOptr[deck]::MSG_DECK_REPAIR_SUCCESSFUL_TRANSFER();
+//			else {
+//				@send deckOptr[deck]::MSG_DECK_REPAIR_SUCCESSFUL_TRANSFER();
+				/* force a draw of an empty deck */
+//				gstate = GrCreateState(win);
+/*				GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+				GrSetAreaMaskSys(gstate, SDM_50);
+				GrSetMixMode(gstate, MM_COPY);
+				GrFillRoundRect(gstate, bRect.R_left, bRect.R_top,
+							bRect.R_right, bRect.R_bottom, 2);  */
+//				@send deckOptr[deck]::MSG_DECK_DRAW_MARKER(gstate);
+//				GrDestroyState(gstate);
+//				}
+
+			@call deckOptr[deck]::MSG_VIS_GET_BOUNDS(&aRect);
+
+			/* and this to redraw the table under any popped card */
+			gstate = GrCreateState(win);
+			GrBeginUpdate(gstate);
+			GrInvalRect(gstate, aRect.R_left, aRect.R_bottom,
+							bRect.R_right, bRect.R_bottom);
+			GrEndUpdate(gstate);
+			GrDestroyState(gstate);
+
+			}  /* end of foundPlayer if */
+
+		/* and there really isn't an else since we must find a playable card
+			each time through */
+
+		}  /* end of notFinished while */
+
+
+	/* OK - I give up... I can't make the blank decks show up as I pull the
+		last cards off them, so I'll just do this! */
+	@send FreeCellView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+	@send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	/* now do the winner stuff */
+	@send self::MSG_FREECELL_DO_WINNER();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_GET_CARD_WIDTH for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	Get the instance data
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_GET_CARD_WIDTH
+{
+
+	return pself->GI_cardWidth;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_GET_CARD_HEIGHT for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	Get the instance data
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_GET_CARD_HEIGHT
+{
+
+	return pself->GI_cardHeight;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_CHECK_FOR_WINNER for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	See if all the foundations are full
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_CHECK_FOR_WINNER
+{
+
+
+	/* Check each foundation deck to see if they all contain 13 cards */
+	if ((@call Foundation1::MSG_DECK_GET_N_CARDS() == FOUNDATION_FULL) &&
+		 (@call Foundation2::MSG_DECK_GET_N_CARDS() == FOUNDATION_FULL) &&
+		 (@call Foundation3::MSG_DECK_GET_N_CARDS() == FOUNDATION_FULL) &&
+		 (@call Foundation4::MSG_DECK_GET_N_CARDS() == FOUNDATION_FULL))  {
+		/* we have a winner! */
+		return(TRUE);
+      }
+	else return(FALSE);
+
+
+		/* Set flag that we have just won a game  */
+/*		pself = ObjDerefGen(oself);
+		pself->GI_gameAttrs = GA_JUST_WON_A_GAME;
+
+		/* Disable the Undo & Redeal triggers */
+/*		@send UndoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send RedealTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+		/* Put up the winner dialog box  */
+/*		if (UserDoDialog(@FinishBox) != IC_YES)
+			@send application::MSG_META_QUIT();
+		else
+			@send self::MSG_FREECELL_NEW_GAME_MENU_SELECT();
+		}
+*/
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_DO_WINNER for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	Does the winner stuff
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_DO_WINNER
+{
+
+
+	/* Check each foundation deck to see if they all contain 13 cards */
+/*	if ((@call Foundation1::MSG_DECK_GET_N_CARDS() == FOUNDATION_FULL) &&
+		 (@call Foundation2::MSG_DECK_GET_N_CARDS() == FOUNDATION_FULL) &&
+		 (@call Foundation3::MSG_DECK_GET_N_CARDS() == FOUNDATION_FULL) &&
+		 (@call Foundation4::MSG_DECK_GET_N_CARDS() == FOUNDATION_FULL))  {
+		/* we have a winner! */
+
+		/* Set flag that we have just won a game  */
+		pself = ObjDerefGen(oself);
+		pself->GI_gameAttrs = GA_JUST_WON_A_GAME;
+
+		/* Disable the Undo & Redeal triggers */
+		@send UndoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send RedealTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+		/* update the ststs */
+      FreeCellUpdateStats(TRUE);
+
+		/* Put up the winner dialog box  */
+		if (UserDoDialog(@FinishBox) != IC_YES) {
+         g_quittingOnWin = TRUE;
+//			@send application::MSG_META_DETACH();
+			@send application::MSG_META_QUIT();
+			}
+		else
+			@send self::MSG_FREECELL_NEW_GAME_MENU_SELECT(@NewGameTrigger);
+//		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_SET_DRAG for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	Set the instance data
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_SET_DRAG
+{
+
+
+	/* Insert into instance data */
+	pself->GI_dragType = @call
+							 DragItemGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	InitFileWriteInteger("FreeCell", "DragStatus", pself->GI_dragType);
+	InitFileCommit();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_SHUTDOWN for FreeCellClass
+ *
+ *
+ * DESCRIPTION:	let the game class do its thing
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_GAME_SHUTDOWN
+{
+
+
+	InitFileCommit();
+	@callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_DECK_SELECTED for FreeCellClass
+ *                    (optr deck,
+ *							  word cardNumber)
+ *
+ * DESCRIPTION:	1) See if a covered ace is selected.  If so draw the full
+ *                card for a short period of time.
+ *                2) Make sure multi-card drag is legit ie all cards
+ *                alternating color and enough spaces to do it
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_GAME_DECK_SELECTED
+{
+ word			rank, nextRank, cW, cH, wHoles, fHoles, tHoles;
+ sword		i;
+ optr			selCard;
+ optr			wDeckOptr[8] = {@WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+									 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8};
+ optr			fDeckOptr[4] = {@FreeSpace1, @FreeSpace2, @FreeSpace3, @FreeSpace4};
+ Boolean		canDrag = TRUE;
+
+
+ 	g_okToDropIntoSpace = TRUE;
+	/* if it's the top card, just go on... */
+	if (cardNumber)  {
+		/* it's covered, do the ace check */
+		rank = GetCardRank(deck, cardNumber);
+		if (rank == CR_ACE)  {
+			cW = pself->GI_cardWidth;
+			cH = pself->GI_cardHeight;
+			/* draw the full card */
+			selCard = @call deck::MSG_VIS_FIND_CHILD_AT_POSITION(cardNumber);
+         pself = ObjDerefVis(oself);
+			@send selCard::MSG_VIS_SET_SIZE(cW, cH);
+			@send selCard::MSG_CARD_NORMAL_REDRAW();
+			TimerSleep(45);
+			/* Now redraw the card and any of the ones on top of it */
+			for (i = cardNumber; i >= 0; i--) {
+				selCard = @call deck::MSG_VIS_FIND_CHILD_AT_POSITION(i);
+	 			@send selCard::MSG_VIS_INVALIDATE();
+				@send selCard::MSG_CARD_NORMAL_REDRAW();
+				}
+			/* since we've shown the ace we don't want to call the superclass */
+			canDrag = FALSE;
+			}  /* end of it's an Ace if */
+
+		else 	{
+			/* see if we can do a drag - first check for rank.  No need to
+				check for color since the deck settings do that already */
+			for (i = cardNumber; i > 0; i--) {
+				/* now get the next card's rank & color */
+				nextRank  = GetCardRank(deck, i-1);
+				/* and make sure they're in order */
+				if (nextRank == rank - 1)  {
+					/* ok, keep checking */
+					rank = nextRank;
+					}
+				else {
+					/* nope, bail out */
+					canDrag = FALSE;
+					break;
+					}
+				}  /* end of rank for */
+			if (canDrag) {
+				/* so far so good, see if there are enough holes... */
+				wHoles = 0;
+				fHoles = 0;
+				/* count the holes */
+				for (i = 0; i < 8; i++) {
+					if (!@call wDeckOptr[i]::MSG_DECK_GET_N_CARDS())
+						wHoles++;
+					}
+				for (i = 0; i < 4; i++) {
+					if (!@call fDeckOptr[i]::MSG_DECK_GET_N_CARDS())
+						fHoles++;
+					}
+				tHoles = fHoles + wHoles;
+				/* Now just compare the number of cards to drag vs the number
+					of holes.  BUT -- this works fine until the user drags the
+					stack of cards into one of the empty work holes.  So we
+					need an additional check when the user is dropping the
+					stack to see if it is being dropped into a work hole that
+					was counted as one of the spaces needed to work the move.
+					We do this by setting a file global flag 
+					and checking that flag on the potential drop. */
+				switch (cardNumber)  {
+					case 1:    /* moving 2 cards */
+						/* need just 1 hole in either place */
+						if (!tHoles)
+							canDrag = FALSE;
+						/* set the drop flag */
+						if (!fHoles && (wHoles == 1))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 2:    /* moving 3 cards */
+						/* need 2 holes anywhere */
+						if (tHoles < 2)
+							canDrag = FALSE;
+						/* set the drop flag */
+						if (((fHoles == 1) && (wHoles == 1)) ||
+							 ((!fHoles) && (wHoles == 2)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 3:    /* moving 4 cards */
+						/* need 2 holes, at least one of which is working, or any 3
+							holes */
+						if ((tHoles < 2) ||
+							 ((tHoles == 2) && !wHoles))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 2) ||
+							 ((tHoles == 3) && (wHoles < 2)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 4:    /* moving 5 cards */
+						/* need 3 holes, at least one of which is working, or any 4
+							holes */
+						if ((tHoles < 3) ||
+							 ((tHoles == 3) && !wHoles))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 3) ||
+							 ((tHoles == 4) && (wHoles < 2)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 5:    /* moving 6 cards */
+						/* need 3 or 4 holes, at least one of which is working, or
+							any 5 holes (which really means at least 1 working) */
+						if ((tHoles < 3) ||
+							 ((tHoles < 5) && !wHoles))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 3) ||
+							 ((tHoles == 4) && (wHoles < 2)) ||
+                      ((tHoles == 5) && (wHoles < 2)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 6:    /* moving 7 cards */
+						/* need 3 holes, at least 2 of which are working, or
+							4 holes, at least 1 of which is working, or
+							any 5 holes (which really means at least 1 working) */
+						if ((tHoles < 3) ||
+							 ((tHoles == 3) && (wHoles < 2)) ||
+							 ((tHoles == 4) && !wHoles))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 3) ||
+							 ((tHoles == 4) && (wHoles < 3)) ||
+							 ((tHoles == 5) && (wHoles < 2)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 7:    /* moving 8 cards */
+						/* need 4 holes, at least 1 of which are working, or
+							any 5 holes (which really means at least 1 working) */
+						if ((tHoles < 4) ||
+							 ((tHoles == 4) && !wHoles))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 3) ||
+							 ((tHoles == 4) && (wHoles < 3)) ||
+							 ((tHoles == 5) && (wHoles < 2)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 8:    /* moving 9 cards */
+						/* need 4 holes, at least 2 of which are working, or
+							any 5 holes (which really means at least 1 working) */
+						if ((tHoles < 4) ||
+							 ((tHoles == 4) && (wHoles < 2)))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 4) ||
+							 ((tHoles == 5) && (wHoles < 2)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 9:    /* moving 10 cards (same as 9 cards) */
+						/* need 4 holes, at least 2 of which are working, or
+							any 5 holes (which really means at least 1 working) */
+						if ((tHoles < 4) ||
+							 ((tHoles == 4) && (wHoles < 2)))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 4) ||
+							 ((tHoles == 5) && (wHoles < 2)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 10:    /* moving 11 cards */
+						/* need 5 holes, at least 2 of which are working, or
+							any 6 holes (which really means at least 2 working) */
+						if ((tHoles < 5) ||
+							 ((tHoles >= 5) && (wHoles < 2)))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 4) ||
+							 ((tHoles == 5) && (wHoles < 2)) ||
+							 ((tHoles == 6) && (wHoles < 3)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 11:    /* moving 12 cards (same as 11 cards) */
+						/* need 5 holes, at least 2 of which are working, or
+							any 6 holes (which really means at least 2 working) */
+						if ((tHoles < 5) ||
+							 ((tHoles >= 5) && (wHoles < 2)))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 4) ||
+							 ((tHoles == 5) && (wHoles < 2)) ||
+							 ((tHoles == 6) && (wHoles < 3)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					case 12:    /* moving 13 cards (same as 11 cards) */
+						/* need 5 holes, at least 2 of which are working, or
+							any 6 holes (which really means at least 2 working) */
+						if ((tHoles < 5) ||
+							 ((tHoles >= 5) && (wHoles < 2)))
+							canDrag = FALSE;
+						/* set the drop flag */
+						if ((tHoles <= 4) ||
+							 ((tHoles == 5) && (wHoles < 2)) ||
+							 ((tHoles == 6) && (wHoles < 3)))
+							g_okToDropIntoSpace = FALSE;
+						break;
+					} /* end of switch */
+				}  /* end of so far so good if */
+			}  /* end of can we drag else */
+
+		}  /* end of covered card if */
+
+
+	if(canDrag)  @callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_OPEN_STATS for FreeCellClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_OPEN_STATS
+{
+ word		wins, losses, pct, streak;
+ char		string[20];
+
+
+	/* session stats */
+	InitFileReadInteger("FreeCell", "swins", &wins);
+	UtilHex32ToAscii(string, (sdword)wins, UHTAF_NULL_TERMINATE);
+	@call SessionWonText::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+	InitFileReadInteger("FreeCell", "slosses", &losses);
+	UtilHex32ToAscii(string, (dword)losses, UHTAF_NULL_TERMINATE);
+	@call SessionLostText::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+	if (wins + losses)
+		pct = (100 * wins) / (wins + losses);
+	else
+   	pct = 0;
+	UtilHex32ToAscii(string, (dword)pct, UHTAF_NULL_TERMINATE);
+   strcat(string, "% ");
+	@call SessionPct::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+	/* overall stats */
+	InitFileReadInteger("FreeCell", "twins", &wins);
+	UtilHex32ToAscii(string, (sdword)wins, UHTAF_NULL_TERMINATE);
+	@call TotalWonText::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+	InitFileReadInteger("FreeCell", "tlosses", &losses);
+	UtilHex32ToAscii(string, (dword)losses, UHTAF_NULL_TERMINATE);
+	@call TotalLostText::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+	if (wins + losses)
+		pct = (100 * wins) / (wins + losses);
+	else
+   	pct = 0;
+	UtilHex32ToAscii(string, (dword)pct, UHTAF_NULL_TERMINATE);
+   strcat(string, "% ");
+	@call TotalPct::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+	/* streak stats */
+	InitFileReadInteger("FreeCell", "lwin", &wins);
+	UtilHex32ToAscii(string, (sdword)wins, UHTAF_NULL_TERMINATE);
+	@call WinStreaksText::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+	InitFileReadInteger("FreeCell", "llose", &losses);
+	UtilHex32ToAscii(string, (dword)losses, UHTAF_NULL_TERMINATE);
+	@call LoseStreaksText::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+	InitFileReadInteger("FreeCell", "lcur", &streak);
+	UtilHex32ToAscii(string, (dword)streak, UHTAF_NULL_TERMINATE);
+	InitFileReadInteger("FreeCell", "curworl", &pct);
+	MemLock(OptrToHandle(@WinText));
+	if (pct == CUR_STREAK_WIN) {
+		if (streak == 1)
+			strcat(string, LMemDeref(@WinText));
+		else
+			strcat(string, LMemDeref(@WinsText));
+		}
+	else if (pct == CUR_STREAK_LOSS) {
+		if (streak == 1)
+			strcat(string, LMemDeref(@LossText));
+		else
+			strcat(string, LMemDeref(@LossesText));
+		}
+	MemUnlock(OptrToHandle(@WinText));
+	@call CurrentStreakText::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+
+	/* Open the dialog box */
+	@call StatsBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FREECELL_OPEN_STATS for FreeCellClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method FreeCellClass, MSG_FREECELL_CLEAR_STATS
+{
+
+	if ((UserStandardDialogOptr(0, 0, 0, 0,
+				 @ConfirmClearStats,
+				 ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+				 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+				 ) != IC_YES))  return;
+
+	/* OK, clear 'em */
+	InitFileWriteInteger("FreeCell", "swins", 0);
+	InitFileWriteInteger("FreeCell", "slosses", 0);
+	InitFileWriteInteger("FreeCell", "twins", 0);
+	InitFileWriteInteger("FreeCell", "tlosses", 0);
+	InitFileWriteInteger("FreeCell", "lwin", 0);
+	InitFileWriteInteger("FreeCell", "llose", 0);
+	InitFileWriteInteger("FreeCell", "lcur", 0);
+	InitFileWriteInteger("FreeCell", "curworl", 0);
+	InitFileCommit();
+
+	/* dismiss the dbox */
+	@send StatsBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+}
+
+/* ----------------------------------------------------------------------------
+		WorkDeckClass
+-----------------------------------------------------------------------------*/
+
+@classdecl	WorkDeckClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DECK_TAKE_CARDS_IF_OK for WorkDeckClass
+ * 	PASS:		deck = dragging deck
+ * 			cardAttrs = CardAttrs of the drop card of the drag set
+ *
+ * 	RETURN:		TRUE if the deck takes the drag set,
+ * 			FALSE otherwise
+ *												 
+ *
+ * DESCRIPTION:	Do our empty deck drag check, if ok, we can then
+ *                callsuper - if not return false
+ *
+ ***********************************************************************/
+@method WorkDeckClass, MSG_DECK_TAKE_CARDS_IF_OK
+{
+ Boolean		ok = TRUE;
+
+	/* are we an empty deck? */
+	if (!(@call self::MSG_DECK_GET_N_CARDS())) {
+		/* yup - so check the flag */
+		if (!g_okToDropIntoSpace)
+			ok = FALSE;
+		}
+
+	/* let the super do the work in non empty deck & ok to drop */
+	if (ok) @callsuper();
+   else  return(FALSE);
+
+
+}
+
+

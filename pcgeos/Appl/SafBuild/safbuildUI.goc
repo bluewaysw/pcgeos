@@ -1,0 +1,949 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  GeoSafari Builder --- Now GeoExplorer Builder
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *		Include files
+ *************************************************************************/
+
+@include <stdapp.goh>
+@include <safari.goh>
+@include "safbuild.goh"
+@include "gbicons.goh"
+
+/*@start AppIcons, data;
+
+@visMoniker GBDocIconMonikerList = list {
+		@GBLCDocMoniker,
+		@GBTCDocMoniker
+		};
+
+@end AppIcons;*/
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object SafBuildAppClass SafBuildApp = {
+	 GI_visMoniker = list {
+		@SafBuildTextMoniker,
+		@GBLCAppMoniker,
+		@GBTCAppMoniker
+ 		}
+	 GI_comp =
+        @SafBuildPrimary,
+		  @VerifyDB,
+        @FileChooseDialog;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @SafBuildPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @SBDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @SBDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+	@SBDocumentControl;
+	ATTR_GEN_HELP_FILE = "gebld";
+
+}
+
+@visMoniker SafBuildTextMoniker = "GeoExplorer Builder";
+
+@end	AppResource;
+
+@start	Interface;
+
+@object GenPrimaryClass SafBuildPrimary  = {
+    GI_comp =
+        @FileMenu,
+        @EditMenu,
+      /*  @OptionsMenu,  */
+        @GameGroup;
+	 /*ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;*/
+    HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS|0};
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+	 /*HINT_PRIMARY_FULL_SCREEN;*/
+	 HINT_DISPLAY_MAXIMIZED_ON_STARTUP;
+	 HINT_DISPLAY_NOT_RESIZABLE;
+	 /*HINT_FIXED_SIZE =
+		{SST_PIXELS | 750, SST_PIXELS |550, 0};
+	 ATTR_GEN_DISPLAY_NOT_RESTORABLE;*/
+	 ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenInteractionClass FileMenu = {
+    GI_comp =
+        @SBDocumentControl,
+		  @VerifyTrigger,
+		  @GenerateLogoFileTrigger;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenTriggerClass VerifyTrigger = {
+    GI_visMoniker = 'V', "Verify";
+    GTI_destination = (TO_APP_MODEL);
+    GTI_actionMsg = MSG_SAFBUILD_DOCUMENT_VERIFY;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object SBDocumentControlClass SBDocumentControl = {
+	 GDCI_documentToken = { "GEDO", 16431 };
+	 GDCI_noNameText = "No Quiz";
+    GDCI_features = @default & ~(GDCF_SUPPORTS_TEMPLATES|GDCF_SUPPORTS_USER_SETTABLE_DEFAULT_DOCUMENT|GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT);
+    GDCI_templateDir = "GeoExplorer";
+    GDCI_documentGroup = SBDocumentGroup;
+    GDCI_enableDisableList = SBUIEnableList;
+}
+
+@chunk optr SBUIEnableList[] = {
+    @QuizDB,
+    @QuestionDB
+};
+
+@object GenInteractionClass EditMenu = {
+    GI_comp =
+        @QuizDB,
+        @QuestionDB;
+    GI_visMoniker = 'B', "Build";
+	 GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+}
+
+/*@object GenInteractionClass OptionsMenu = {
+    GI_comp =
+		  @ShowList,
+		  @ShowLEDGroup;
+		/*  @AddFontTrigger,
+		  @RemoveFontTrigger, */
+/*	 GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+}
+
+/*@object GenItemGroupClass ShowList = {
+    GI_comp =
+        @Show16Item,
+        @Show256Item;
+    GIGI_numSelections = 1;
+    GIGI_selection = DC_COLOR_8;
+    GIGI_destination = (TO_APP_MODEL);
+    GIGI_applyMsg = MSG_SAFBUILD_DOCUMENT_SHOW_BITMAP;
+}
+
+@object GenItemClass Show16Item = {
+    GI_visMoniker = "Show 16-color";
+    GII_identifier = DC_COLOR_4;
+}
+
+@object GenItemClass Show256Item = {
+    GI_visMoniker = "Show 256-color";
+    GII_identifier = DC_COLOR_8;
+} */
+
+/*@object GenInteractionClass ShowLEDGroup = {
+    GII_visibility = GIV_SUB_GROUP;
+    GI_comp =
+        @ShowOptionsList;
+}
+
+@object GenBooleanGroupClass ShowOptionsList = {
+    GI_comp =
+        @ShowLEDs;
+    GBGI_applyMsg = MSG_SAFBUILD_DOCUMENT_SET_OPTIONS;
+    GBGI_destination = (TO_APP_MODEL);
+}
+
+@object GenBooleanClass ShowLEDs = {
+    GI_visMoniker = "Show only used LEDs";
+    GBI_identifier = SO_SHOW_LEDS;
+}
+
+/*@object GenTriggerClass AddFontTrigger = {
+	 GI_visMoniker = "Add Fonts to Artist";
+    GTI_actionMsg = MSG_SAFBUILD_APP_ADD_FONT;
+    GTI_destination = @SafBuildApp;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass RemoveFontTrigger = {
+    GI_visMoniker = "Remove Fonts from Artist";
+    GTI_actionMsg = MSG_SAFBUILD_APP_REMOVE_FONT;
+    GTI_destination = @SafBuildApp;
+    GI_states = @default & ~GS_ENABLED;
+}*/
+
+@object GenTriggerClass GenerateLogoFileTrigger = {
+    GI_visMoniker = "Generate Logo File";
+    GTI_actionMsg = MSG_SAFBUILD_APP_GENERATE_LOGO_FILE;
+    GTI_destination = @SafBuildApp;
+}
+
+@object QuizDialogClass QuizDB = {
+    GI_visMoniker = 'z', "Quiz";
+    GII_visibility = GIV_DIALOG;
+    GI_comp =
+        @QuizHeaderGroup,
+        @QuizOptionsGroup,
+        @QuizFileGroup,
+        @QuizOK,
+        @QuizCancel;
+    ATTR_GEN_HELP_CONTEXT = "dbQuiz";
+}
+
+@object GenInteractionClass QuizFileGroup = {
+    GI_visMoniker = "Files";
+    GI_comp =
+		//  @QuizLogoFileGroup,
+      //  @Quiz16FileGroup,
+        @Quiz256FileGroup,
+        @QuizNextFileGroup;
+    HINT_DRAW_IN_BOX;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass QuizOK = {
+    GI_visMoniker = "OK";
+    GTI_actionMsg = MSG_SAFBUILD_DOCUMENT_SAVE_QUIZ;
+    GTI_destination = (TO_APP_MODEL);
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass QuizCancel = {
+    GI_visMoniker = "Cancel";
+    GTI_actionMsg = MSG_SAFBUILD_DOCUMENT_CANCEL_QUIZ;
+    GTI_destination = (TO_APP_MODEL);
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass QuizHeaderGroup = {
+    GI_comp =
+        @QuizNumber,
+        @QuizDescription;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenValueClass QuizNumber = {
+    GI_visMoniker = 'N', "Number:";
+    GVLI_minimum = MakeWWFixed(0);
+    GVLI_maximum = MakeWWFixed(9999);
+}
+
+@object GenTextClass QuizDescription = {
+    GI_visMoniker = 'D', "Description:";
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = SAFARI_MAX_DESCRIPTION_LENGTH;
+}
+
+@object GenInteractionClass QuizOptionsGroup = {
+    GI_visMoniker = "Options";
+    GI_comp =
+        @QuizOptionsList,
+        @QuizFilterGroup;
+    HINT_DRAW_IN_BOX;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenBooleanGroupClass QuizOptionsList = {
+    GI_comp =
+		  @QOLNoLEDs/*,
+		  @QOLQASounds,
+		  @QOLImbedGraphics*/;
+	 HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenBooleanClass QOLNoLEDs = {
+	 GI_visMoniker = "No LEDs";
+    GBI_identifier = SFO_NO_LEDS;
+}
+
+/*@object GenBooleanClass QOLQASounds = {
+    GI_visMoniker = "Question Sounds";
+	 GBI_identifier = SFO_QUESTION_SOUNDS;
+}
+
+@object GenBooleanClass QOLImbedGraphics = {
+	 GI_visMoniker = "Embed Graphics";
+	 GBI_identifier = SFO_IMBED_GRAPHICS;
+} */
+
+@object GenInteractionClass QuizFilterGroup = {
+    GI_visMoniker = 'A', "Answers:";
+    GI_comp =
+        @QuizFilterTypeList;
+	 /* jh need some separation from list to the left */
+	 HINT_DRAW_IN_BOX;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+
+	 HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenItemGroupClass QuizFilterTypeList = {
+    GI_comp =
+	  /*   @QFTLNormal, */
+        @QFTLAlphabetic,
+        @QFTLNumeric,
+        @QFTLNone,
+        @QFTLAnything;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+/*@object GenItemClass QFTLNormal = {
+    GI_visMoniker = "Normal";
+    GII_identifier = SFT_NORMAL;
+}  */
+
+@object GenItemClass QFTLAlphabetic = {
+    GI_visMoniker = "Alphabetic (A-D)";
+    GII_identifier = SFT_ALPHABETIC;
+}
+
+@object GenItemClass QFTLNumeric = {
+    GI_visMoniker = "Numeric (0-9 / .)";
+    GII_identifier = SFT_NUMERIC;
+}
+
+@object GenItemClass QFTLNone = {
+    GI_visMoniker = "None";
+    GII_identifier = SFT_NO_KEYBOARD;
+}
+
+@object GenItemClass QFTLAnything = {
+    GI_visMoniker = "Text";
+    GII_identifier = SFT_ANYTHING;
+}
+
+/****************************************************************************/
+/* This puppy is used for the quiz graphic and next quiz file sels in the
+	Quiz DB.  It used to be used for for playing a WAV file too. The
+	methods are in the safbuildquiz file  */
+
+@object SBFileChooseClass FileChooseDialog = {
+    GI_visMoniker = "Choose File";
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GI_comp =
+        @FileChooseSelector,
+        @FileChooseOK,
+		  /*@FileChoosePlay, */
+        @FileChooseCancel;
+    ATTR_GEN_HELP_CONTEXT = "dbChooseFile";
+}
+
+@object GenFileSelectorClass FileChooseSelector = {
+    GFSI_destination = @FileChooseDialog;
+	 GFSI_notificationMsg = MSG_SB_FILE_CHOOSE_CHANGE_FILE;
+    /* jh  let's start this guy out in Document folder */
+	 ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "GeoExplorer"};
+
+}
+
+@object GenTriggerClass FileChooseOK = {
+    GI_visMoniker = "OK";
+    GTI_destination = @FileChooseDialog;
+    GTI_actionMsg = MSG_SB_FILE_CHOOSE_CHANGE_FILE;
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_ACTION_THREE_WORDS = {0, 0, GFSEF_OPEN};
+}
+
+/*@object GenTriggerClass FileChoosePlay = {
+    GI_visMoniker = "Play";
+    GTI_destination = @FileChooseDialog;
+    GTI_actionMsg = MSG_SB_FILE_CHOOSE_PLAY_WAV;
+    HINT_SEEK_REPLY_BAR;
+} */
+
+@object GenTriggerClass FileChooseCancel = {
+    GI_visMoniker = "Cancel";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+/*@object GenInteractionClass QuizLogoFileGroup = {
+    GI_visMoniker = 'L', "Logo:";
+    GI_comp =
+        @LogoFileName,
+        @LogoFileChange;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass LogoFileChange = {
+    GI_visMoniker = " ";
+    GTI_destination = @FileChooseDialog;
+    GTI_actionMsg = MSG_SB_FILE_CHOOSE_SET_TYPE;
+	 ATTR_GEN_TRIGGER_ACTION_DATA = SBFT_LOGO;
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTextClass LogoFileName = {
+    GTXI_maxLength = DOS_DOT_FILE_NAME_LENGTH;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+} */
+
+/*@object GenInteractionClass Quiz16FileGroup = {
+    GI_visMoniker = '6', "16-color:";
+    GI_comp =
+        @Color16FileName,
+        @Color16FileChange;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass Color16FileName = {
+    GTXI_maxLength = DOS_DOT_FILE_NAME_LENGTH;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+}
+
+@object GenTriggerClass Color16FileChange = {
+    GI_visMoniker = " ";
+    GTI_destination = @FileChooseDialog;
+    GTI_actionMsg = MSG_SB_FILE_CHOOSE_SET_TYPE;
+    ATTR_GEN_TRIGGER_ACTION_DATA = SBFT_16COLOR;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}  */
+
+
+@object GenInteractionClass Quiz256FileGroup = {
+	 GI_visMoniker = /*'2', */"Quiz graphic:";
+    GI_comp =
+        @Color256FileName,
+        @Color256FileChange;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass Color256FileName = {
+    GTXI_maxLength = DOS_DOT_FILE_NAME_LENGTH;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+}
+
+@object GenTriggerClass Color256FileChange = {
+	 GI_visMoniker = "Browse";
+    GTI_destination = @FileChooseDialog;
+    GTI_actionMsg = MSG_SB_FILE_CHOOSE_SET_TYPE;
+    ATTR_GEN_TRIGGER_ACTION_DATA = SBFT_256COLOR;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+
+@object GenInteractionClass QuizNextFileGroup = {
+    GI_visMoniker = 'x', "Next Quiz:";
+    GI_comp =
+        @QuizNextFileName,
+        @QuizNextFileChange;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass QuizNextFileName = {
+    GTXI_maxLength = FILE_LONGNAME_LENGTH;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_TEXT_LEGAL_FILENAMES;
+}
+
+@object GenTriggerClass QuizNextFileChange = {
+	 GI_visMoniker = "Browse";
+    GTI_destination = @FileChooseDialog;
+    GTI_actionMsg = MSG_SB_FILE_CHOOSE_SET_TYPE;
+    ATTR_GEN_TRIGGER_ACTION_DATA = SBFT_NEXT_QUIZ;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+/****************************************************************************/
+
+@object QuestionDialogClass QuestionDB = {
+    GI_visMoniker = 'Q', "Question";
+    GII_visibility = GIV_DIALOG;
+	 GI_comp =
+        @QBounds,
+        @QOther,
+        @QApply,
+		  @QNew,
+		  @QInsert,
+        @QDelete,
+        @QClose;
+    ATTR_GEN_HELP_CONTEXT = "dbQuestion";
+  //  HINT_WINDOW_MINIMIZE_TITLE_BAR;
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {PCT_15, PCT_0};
+}
+
+@object GenValueClass QNumber = {
+    GI_visMoniker = "Question #";
+    GVLI_minimum = MakeWWFixed(1);
+    GVLI_value = MakeWWFixed(1);
+    GVLI_maximum = MakeWWFixed(SAFARI_MAX_QUESTIONS);
+    GVLI_destination = (TO_APP_MODEL);
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_SAFBUILD_DOCUMENT_CHANGE_QUESTION;
+}
+
+@object GenInteractionClass QOther = {
+    GI_comp =
+        @QQuestion,
+        @QAnswer,
+		/*  @QQSoundGroup,
+		  @QASoundGroup, */
+        @QIndicator;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenTextClass QQuestion = {
+    GI_visMoniker = "Question:";
+    GTXI_maxLength = SAFARI_QUESTION_MAX_LENGTH;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    GTXI_destination = @QuestionDB;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass QAnswer = {
+    GI_visMoniker = "Answer:";
+    GTXI_maxLength = SAFARI_QUESTION_MAX_LENGTH;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    GTXI_destination = @QuestionDB;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/*@object GenInteractionClass QQSoundGroup = {
+    GI_visMoniker = "Question Sound:";
+    GI_comp =
+        @QQSound,
+        @QQSoundButton;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass QQSound = {
+    GTXI_maxLength = DOS_DOT_FILE_NAME_LENGTH;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    GTXI_destination = @QuestionDB;
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+}
+
+@object GenTriggerClass QQSoundButton = {
+	 GI_visMoniker = "Browse";
+    GTI_destination = @FileChooseDialog;
+    GTI_actionMsg = MSG_SB_FILE_CHOOSE_SET_TYPE;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+    ATTR_GEN_TRIGGER_ACTION_DATA = SBFT_QUESTION_WAV;
+}
+
+@object GenInteractionClass QASoundGroup = {
+    GI_visMoniker = "Answer Sound:";
+    GI_comp =
+        @QASound,
+        @QASoundButton;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass QASound = {
+    GTXI_maxLength = DOS_DOT_FILE_NAME_LENGTH;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    GTXI_destination = @QuestionDB;
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+}
+
+@object GenTriggerClass QASoundButton = {
+	 GI_visMoniker = "Browse";
+    GTI_destination = @FileChooseDialog;
+    GTI_actionMsg = MSG_SB_FILE_CHOOSE_SET_TYPE;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+    ATTR_GEN_TRIGGER_ACTION_DATA = SBFT_ANSWER_WAV;
+} */
+
+
+@object GenValueClass QIndicator = {
+    GI_visMoniker = "Indicator:";
+    GVLI_minimum = MakeWWFixed(1);
+    GVLI_maximum = MakeWWFixed(SAFARI_MAX_QUESTIONS);
+    GVLI_destination = @QuestionDB;
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_QUESTION_DIALOG_SET_INDICATOR_GV;
+}
+
+@object GenInteractionClass QBounds = {
+    GI_comp =
+		//  @QBShowHide,
+        @QNumber,
+        @QBLeft,
+        @QBTop,
+        @QBRight,
+        @QBBottom;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+/*@object GenTriggerClass QBShowHide = {
+    GI_visMoniker = "<>";
+    GTI_actionMsg = MSG_QUESTION_DIALOG_SHOW_HIDE;
+    GTI_destination = QuestionDB;
+} */
+
+@object GenValueClass QBLeft = {
+    GI_visMoniker = "x:";
+    GVLI_maximum = MakeWWFixed(SAFARI_GAME_CARD_WIDTH-1);
+    GVLI_destination = @QuestionDB;
+    GVLI_applyMsg = MSG_QUESTION_DIALOG_CHANGE_SELECTION_LEFT;
+}
+
+@object GenValueClass QBTop = {
+    GI_visMoniker = "y:";
+    GVLI_maximum = MakeWWFixed(SAFARI_GAME_CARD_HEIGHT-1);
+    GVLI_destination = @QuestionDB;
+    GVLI_applyMsg = MSG_QUESTION_DIALOG_CHANGE_SELECTION_TOP;
+}
+
+@object GenValueClass QBRight = {
+    GI_visMoniker = "x:";
+    GVLI_maximum = MakeWWFixed(SAFARI_GAME_CARD_WIDTH-1);
+    GVLI_destination = @QuestionDB;
+    GVLI_applyMsg = MSG_QUESTION_DIALOG_CHANGE_SELECTION_RIGHT;
+}
+
+@object GenValueClass QBBottom = {
+    GI_visMoniker = "y:";
+    GVLI_maximum = MakeWWFixed(SAFARI_GAME_CARD_HEIGHT-1);
+    GVLI_destination = @QuestionDB;
+    GVLI_applyMsg = MSG_QUESTION_DIALOG_CHANGE_SELECTION_BOTTOM;
+}
+
+@object GenTriggerClass QNew = {
+	 GI_visMoniker = 'A', "Add";
+	 GTI_actionMsg = MSG_SAFBUILD_DOCUMENT_ADD_QUESTION;
+	 GTI_destination = (TO_APP_MODEL);
+	 ATTR_GEN_TRIGGER_ACTION_DATA = Q_ADD;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass QInsert = {
+	 GI_visMoniker = 'I', "Insert";
+	 GTI_actionMsg = MSG_SAFBUILD_DOCUMENT_ADD_QUESTION;
+	 GTI_destination = (TO_APP_MODEL);
+	 ATTR_GEN_TRIGGER_ACTION_DATA = Q_INS;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass QApply = {
+    GI_visMoniker = 'p', "Apply";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_SAFBUILD_DOCUMENT_SAVE_QUESTION;
+    GTI_destination = (TO_APP_MODEL);
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass QDelete = {
+    GI_visMoniker = 'D', "Delete";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_SAFBUILD_DOCUMENT_DELETE_QUESTION;
+    GTI_destination = (TO_APP_MODEL);
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass QClose = {
+    GI_visMoniker = "Close";
+    GTI_actionMsg = MSG_QUESTION_DIALOG_CLOSE;
+    GTI_destination = @QuestionDB;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass VerifyDB = {
+    GI_visMoniker = "Verify Quiz";
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    GI_comp =
+        @VerifyText,
+        @VerifyOK;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT = {SWSS_RATIO|PCT_65, SWSS_RATIO|PCT_50};
+    ATTR_GEN_HELP_CONTEXT = "dbVerify";
+}
+
+@object GenTriggerClass VerifyOK = {
+    GI_visMoniker = "OK";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTextClass VerifyText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = (@default | GTA_INIT_SCROLLING);
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    ATTR_GEN_TEXT_SELECTABLE;
+}
+
+/*****************************************************************************
+ *    Game UI
+ *****************************************************************************/
+
+@object GenInteractionClass GameGroup = {
+    GI_comp =
+        @LeftIndicators,
+        @TheGameCard,
+        @RightIndicators;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenInteractionClass LeftIndicators = {
+    GI_comp =
+        @Spacer1,
+        @LeftIndicatorGroup;
+}
+
+@object SpacerClass Spacer1 = {
+}
+
+@object IndicatorGroupClass LeftIndicatorGroup = {
+    IGI_startNum = 0;
+    IGI_nextGroup = @RightIndicatorGroup;
+    GI_comp =
+        @Indicator0,
+        @Indicator1,
+        @Indicator2,
+        @Indicator3,
+        @Indicator4,
+        @Indicator5,
+        @Indicator6,
+        @Indicator7,
+        @Indicator8,
+        @Indicator9,
+        @Indicator10,
+        @Indicator11,
+        @Indicator12;
+}
+
+@object SBIndicatorClass Indicator0 = {
+    SBII_number = 0;
+}
+@object SBIndicatorClass Indicator1 = {
+    SBII_number = 1;
+}
+@object SBIndicatorClass Indicator2 = {
+    SBII_number = 2;
+}
+@object SBIndicatorClass Indicator3 = {
+    SBII_number = 3;
+}
+@object SBIndicatorClass Indicator4 = {
+    SBII_number = 4;
+}
+@object SBIndicatorClass Indicator5 = {
+    SBII_number = 5;
+}
+@object SBIndicatorClass Indicator6 = {
+    SBII_number = 6;
+}
+@object SBIndicatorClass Indicator7 = {
+    SBII_number = 7;
+}
+@object SBIndicatorClass Indicator8 = {
+    SBII_number = 8;
+}
+@object SBIndicatorClass Indicator9 = {
+    SBII_number = 9;
+}
+@object SBIndicatorClass Indicator10 = {
+    SBII_number = 10;
+}
+@object SBIndicatorClass Indicator11 = {
+    SBII_number = 11;
+}
+@object SBIndicatorClass Indicator12 = {
+    SBII_number = 12;
+}
+
+@object SBGameCardClass TheGameCard = {
+}
+
+@object GenInteractionClass RightIndicators = {
+    GI_comp =
+        @Spacer2,
+        @RightIndicatorGroup;
+}
+
+@object SpacerClass Spacer2 = {
+}
+
+@object IndicatorGroupClass RightIndicatorGroup = {
+    IGI_startNum = 13;
+    GI_comp =
+        @Indicator13,
+        @Indicator14,
+        @Indicator15,
+        @Indicator16,
+        @Indicator17,
+        @Indicator18,
+        @Indicator19,
+        @Indicator20,
+        @Indicator21,
+        @Indicator22,
+        @Indicator23,
+        @Indicator24,
+        @Indicator25;
+}
+
+@object SBIndicatorClass Indicator13 = {
+    SBII_number = 13;
+}
+@object SBIndicatorClass Indicator14 = {
+    SBII_number = 14;
+}
+@object SBIndicatorClass Indicator15 = {
+    SBII_number = 15;
+}
+@object SBIndicatorClass Indicator16 = {
+    SBII_number = 16;
+}
+@object SBIndicatorClass Indicator17 = {
+    SBII_number = 17;
+}
+@object SBIndicatorClass Indicator18 = {
+    SBII_number = 18;
+}
+@object SBIndicatorClass Indicator19 = {
+    SBII_number = 19;
+}
+@object SBIndicatorClass Indicator20 = {
+    SBII_number = 20;
+}
+@object SBIndicatorClass Indicator21 = {
+    SBII_number = 21;
+}
+@object SBIndicatorClass Indicator22 = {
+    SBII_number = 22;
+}
+@object SBIndicatorClass Indicator23 = {
+    SBII_number = 23;
+}
+@object SBIndicatorClass Indicator24 = {
+    SBII_number = 24;
+}
+@object SBIndicatorClass Indicator25 = {
+    SBII_number = 25;
+}
+
+@end Interface;
+
+/*
+ *	Document Group
+ */
+
+@start DocumentUI;
+
+@object GenDocumentGroupClass SBDocumentGroup = {
+    GDGI_untitledName = "GeoExplorer Untitled";
+    GDGI_documentClass = &SafBuildDocumentClass;
+    GDGI_protocolMajor = SAFARI_DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = SAFARI_DOCUMENT_PROTOCOL_MINOR;
+    GDGI_documentControl = SBDocumentControl;
+}
+
+@end DocumentUI;
+
+@start Strings, data;
+
+
+@chunk byte selectPtr[] = {
+    16,
+    16,
+    7,
+    7,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+    0x0, 0x0,
+
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0xfe, 0xfe,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x1, 0x0,
+    0x0, 0x0
+};
+
+@chunk TCHAR fontExplainStr[] = "The University and Berkeley fonts have been added to Artist's font menu. They will be visible when you restart Artist. The standard fonts will still be accessible through the 'More Fonts' dialog. To return the font menu to normal, select 'Remove Fonts from NewDraw' and restart Artist.";
+@localize {"explanation when user selects 'Add Fonts to Artist'"};
+
+@chunk TCHAR vfyQuiz[] = "QUIZ:\r";
+
+@chunk TCHAR vfyDesc[] = "  (1) description";
+@chunk TCHAR vfyLogo[] = "  (2) logo file ";
+@chunk TCHAR vfy16Color[] = "  (3) 16-color file ";
+@chunk TCHAR vfy256Color[] = "  (2) graphic file ";
+
+@chunk TCHAR vfyQuestions[] = "\rQUESTIONS:\r";
+@chunk TCHAR vfyNum[] = "  (3) %d questions";
+@chunk TCHAR vfyOdd[] = "...ODD NUMBER\r";
+@chunk TCHAR vfyLEDs[] = "  (4) duplicate indicators...";
+@chunk TCHAR vfyDupLED[] =  "\r    LED #%d (questions #%d,#%d)";
+@chunk TCHAR vfyBounds[] = "  (5) (0,0,0,0) bounds...";
+@chunk TCHAR vfyZero[] = "\r    question #%d";
+@chunk TCHAR vfyText[] = "  (6) missing question or answer text...";
+@chunk TCHAR vfyWarning[] = "\r    warning: ";
+@chunk TCHAR vfyError[] = "\r    ERROR: ";
+@chunk TCHAR vfyEmptyQ[] = "questions ";
+@chunk TCHAR vfyEmptyA[] = "answers ";
+@chunk TCHAR vfyEmptyQA[] = "questions and answers ";
+@chunk TCHAR vfyEmptyAlphabetic[]  = "alphabetic answers required: ";
+@chunk TCHAR vfyEmptyNumeric[] = "numeric answers required: ";
+@chunk TCHAR vfyLEDs2[] = "  (7) question order...";
+@chunk TCHAR vfySeqLEDs1[] = "\rWarning!! Questions %d through %d";
+@chunk TCHAR vfySeqLEDs2[] = " have sequentially numbered indicators. While this may be correct, it is likely the questions have been encoded incorrectly and the question and answer numbers do not match. See help for more information.";
+@chunk TCHAR vfy256ColorWarning[] = "...not specified (16-color file will be used\r";
+@chunk TCHAR vfyNoQuestions[] = "...NO QUESTIONS SPECIFIED\r";
+
+@chunk TCHAR vfyLooksOK[] = "\r\rThere were no errors found in the quiz file. You should verify the game file is correct by playing it in GeoExplorer, using both the mouse and the keyboard.";
+@chunk TCHAR vfyWarnings1[] = "\r\rThere were %d warning(s).";
+@chunk TCHAR vfyWarnings2[] = " You should verify that the items listed are correct before playing the quiz in GeoExplorer.";
+@chunk TCHAR vfyErrors1[] = "\r\rThere were %d error(s).";
+@chunk TCHAR vfyErrors2[] = " You should correct these errors before playing the game in GeoExplorer.";
+
+@chunk TCHAR vfyMissing[] = "...MISSING\r";
+@localize {"common string used for missing elements"};
+@chunk TCHAR vfyOK[] = "...OK\r";
+@localize {"common string used for OK elements"};
+
+@chunk TCHAR graphicsErrStr[] = "Error: unable to open the graphics file \"\1\".";
+@localize {"error when opening a quiz with missing graphics file(s); @1 is the filename"};
+
+@end Strings;

@@ -1,0 +1,942 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		GeoFile/Main
+FILE:		mAppl.goc
+
+AUTHOR:		John D. Mitchell
+
+METHODS:
+
+Name					Description
+----					-----------
+MSG_META_ATTACH_OBJECT			Perform application object start up
+					functions.
+MSG_META_{LOAD,RESET}_OPTIONS		Handle User Interface Level changes.
+MSG_GEN_APPLICATION_UPDATE_APP_FEATURES	Update the application's features.
+MSG_GF_APPLICATION_SET_USER_LEVEL	Set/update the application's
+					user interface level.
+MSG_GF_APPLICATION_CHANGE_USER_LEVEL	Query the user for saving changes
+					to application's user level.
+MSG_GF_APPLICATION_CANCEL_USER_LEVEL	Cancel user level change.
+MSG_GF_APPLICATION_INITIATE_FINE_TUNE	Activate the fine tuning controls.
+MSG_GF_APPLICATION_FINE_TUNE		Update the application's user
+					interface level settings.
+
+FUNCTIONS:
+
+Scope	Name			Description
+-----	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.17	Initial version.
+
+DESCRIPTION:
+	This file contains all of the code for GeoFile's Application class.
+
+	$Id: mAppl.goc,v 1.1 97/04/04 15:53:59 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>			/* GEOS Standard Application.	*/
+
+#include <Ansi/stdlib.h>		/* Standard C.	*/
+
+#include <gstring.h>			/* GEOS Libraries.	*/
+#include <initfile.h>
+@include <Objects/gAppC.goh>
+@include <Objects/gBoolGC.goh>
+@include <Objects/gGlyphC.goh>
+
+@define	__GF_MAIN_APPLICATION_GOC	/* Don't over-define.	*/
+@include <geofile.goh>			/* GeoFile Application.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GeoFileApplicationClass Declaration
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * This class definition must be stored in memory at runtime, so that
+ * the PC/GEOS messaging system can examine it.
+ */
+
+@classdecl	GeoFileApplicationClass;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Global Static Data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifdef __HIGHC__
+_pragma_const_in_code;
+#define vfar
+#endif
+
+#ifdef __BORLANDC__
+#pragma option -zEMAPPL_TEXT -zFCODE
+#define vfar _far
+#endif
+
+/*
+ * featuresKey is the name of the system InitFile key for the user level
+ * features for this application.
+ */
+static const char vfar featuresKey [] = "features";
+
+/*
+ * settingsTable maps each user level feature set to the
+ * corresponding trigger bar states  and is used to map the current system
+ * default user level to the appropriate application specific features.
+ */
+static const LevelsSettingsEntry vfar settingsTable [] =
+{
+	{ @INTRODUCTORY_FEATURES	},
+	{ @BEGINNING_FEATURES		},
+	{ @INTERMEDIATE_FEATURES	},
+	{ @ADVANCED_FEATURES		}
+};
+
+/*
+ * The following lists map a given feature to the list of objects that
+ * should be appropriately (de-)activated.
+ *
+ * Note that many have nothing in them.  This is due to the fact that for a
+ * myriad of convoluted reasons GeoFile is 'special' and so handles most of
+ * the object (de)activating itself (see MSG_GF_SET_UI in mainModes.goc).
+ * The empty slots are just here because we need a spot in the
+ * usabilityTable corresponding to the feature.
+ *
+ * NOTE:
+ *	This relys on the fact that the low level code checks the optr for
+ *	NULL and correctly abstains from attempting to modify the object. 
+ */
+static const GenAppUsabilityTuple vfar DesignModeList [] =
+{
+	{ GAUTF_END_OF_LIST,	NullOptr	}
+};
+
+static const GenAppUsabilityTuple vfar GraphicsLayerList [] =
+{
+	{
+	GAUTF_END_OF_LIST | GAUC_RECALC_CONTROLLER,
+	@GFGrObjTools
+	}
+};
+
+static const GenAppUsabilityTuple vfar FieldOrganizerList [] =
+{
+	{ GAUTF_END_OF_LIST,	NullOptr	}
+};
+
+static const GenAppUsabilityTuple vfar MultiRecordList [] =
+{
+	{ GAUTF_END_OF_LIST,	NullOptr	}
+};
+
+static const GenAppUsabilityTuple vfar AdvancedFieldPropList [] =
+{
+	{
+	GAUC_RECALC_CONTROLLER,
+	@CreateNewFieldUIController
+	},
+	{
+	GAUTF_END_OF_LIST | GAUC_RECALC_CONTROLLER,
+	@FieldPropUIController
+	}
+};
+
+static const GenAppUsabilityTuple vfar FieldTabOrderList [] =
+{
+	{ GAUTF_END_OF_LIST,	NullOptr	}
+};
+
+static const GenAppUsabilityTuple vfar RecordOrderList [] =
+{
+	{ GAUTF_END_OF_LIST,	NullOptr	}
+};
+
+static const GenAppUsabilityTuple vfar MarkFeaturesList [] =
+{
+	{
+	GAUTF_END_OF_LIST | GAUC_RECALC_CONTROLLER,
+	@RCPController
+	}
+};
+
+static const GenAppUsabilityTuple vfar AdvancedSortList [] =
+{
+	{ GAUTF_END_OF_LIST,	NullOptr	}
+};
+
+static const GenAppUsabilityTuple vfar AdvancedMarkList [] =
+{
+	{ GAUTF_END_OF_LIST,	NullOptr	}
+};
+
+static const GenAppUsabilityTuple vfar AdvancedGraphicsList [] =
+{
+	{ 
+	GAUTF_END_OF_LIST | GAUC_RECALC_CONTROLLER,
+	@GFGrObjTools
+	}
+};
+
+/*
+ * usabilityTable maps each feature to the apppropriate list of objects
+ * (de-)activate.
+ */
+static const GenAppUsabilityTuple * const vfar usabilityTable [] =
+{
+	DesignModeList,
+	GraphicsLayerList,
+	FieldOrganizerList,
+	MultiRecordList,
+	AdvancedFieldPropList,
+	FieldTabOrderList,
+	RecordOrderList,
+	MarkFeaturesList,
+	AdvancedSortList,
+	AdvancedMarkList,
+	AdvancedGraphicsList
+};
+
+/*
+ * levelsTable contains all of the UI objects that must be
+ * notified/modified whenever the user interface level is changed.
+ */
+static const GenAppUsabilityTuple vfar levelsTable [] =
+{
+	{
+	GAUC_RESTART,
+	@GFSearchControl
+	},
+	{
+	GAUC_RECALC_CONTROLLER,
+	@RCPController
+	},
+	{
+	GAUC_RECALC_CONTROLLER,
+	@GeoFileDocumentControl
+	},
+	{
+	GAUC_RECALC_CONTROLLER,
+	@GFDisplayControl
+	},
+	{
+	GAUC_RECALC_CONTROLLER,
+	@CreateNewFieldUIController
+	},
+	{
+	GAUC_RECALC_CONTROLLER,
+	@FieldPropUIController
+	},
+	{
+	GAUTF_END_OF_LIST | GAUC_RECALC_CONTROLLER,
+	@GFViewControl
+	}
+};
+
+#ifdef __BORLANDC__
+#pragma option -zE* -zF*
+#endif
+
+#ifdef __HIGHC__
+_pragma_end_const_in_code;
+#endif
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Message Handlers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_META_ATTACH_OBJECT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Perform all of the necessary functions pertaining to
+		starting up GeoFile.
+
+PASS: 		MemHandle	appLaunchBlock	= Application startup
+						  information.
+		MemHandle	extraState	= Extra state information
+						  block (if any) that was
+						  given on last detach.
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Check for the existence of the options menu.
+	Set it not usable if it shouldn't appear (don't need to set it
+	usable because it's usable by default).
+	Call the superclass.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.05	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method GeoFileApplicationClass, MSG_META_ATTACH_OBJECT
+{
+    /*
+     * Set things that are solely dependent upon the UI state.
+     * Should there be an options menu?
+     */
+    if (! (UserGetInterfaceOptions () & UIIO_OPTIONS_MENU))
+	{
+	/* Nope.  Make sure that the options menu is not usable.	*/
+	@send GeodeGetOptrNS (@OptionsMenu)::MSG_GEN_SET_NOT_USABLE
+			(VUM_NOW);
+	}
+
+    /* Let the superclass do it's thing.	*/
+    @callsuper ();
+}	/* End of MSG_META_ATTACH_OBJECT.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_META_{LOAD,RESET}_OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Perform all of the necessary functions pertaining to
+		setting the UI level options.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Call the superclass.
+	If there are any user level settings for this application in the
+	   system initialization file then
+		The user level is set elsewhere.
+	Otherwise,
+		Get the current user default level setting.
+		Figure out what the feature states should be and set things
+		accordingly.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.05	Initial version.
+	JDM	92.10.28	Added proper handling of InitFile args.
+	JDM	92.12.12	Updated for GeoFile User Level handling.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method GeoFileApplicationClass, MSG_META_LOAD_OPTIONS,
+				 MSG_META_RESET_OPTIONS
+{
+    optr	userLevelListObject;
+    word	defaultUserLevel;
+    word	iniFeaturesValue	= 0;
+    GeoFileLevelsFeatures	tableFeaturesValue;
+    GeoFileLevelsFeatures	*featuresTable;
+    const char	*featuresIniKey;
+    char	category[INI_CATEGORY_BUFFER_SIZE];
+
+    /* First, let the superclass do its thing.	*/
+    @callsuper ();
+
+    /* Get ahold of the application's init. file features key.	*/
+    featuresIniKey = MemLockFixedOrMovable (featuresKey);
+
+    /* Get the category */
+    @send self::MSG_META_GET_INI_CATEGORY (category);
+
+    /* Any feature settings in the system initialization file?	*/
+    if (InitFileReadInteger (category,
+			      featuresIniKey,
+			      &iniFeaturesValue))
+	{
+	/* Nope.  Get the default user level.	*/
+	defaultUserLevel = UserGetDefaultLaunchLevel ();
+
+	/* Lock down the feature settings table.	*/
+	featuresTable = MemLockFixedOrMovable (settingsTable);
+
+	/* Extract the default features.	*/
+	tableFeaturesValue = featuresTable [defaultUserLevel];
+
+	/* Get the current user level list settings.	*/
+	userLevelListObject = GeodeGetOptrNS (@UserLevelList);
+	@send userLevelListObject::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(tableFeaturesValue, 0);
+
+	/* Mark the list modified and apply changes.	*/
+	@send userLevelListObject::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
+			(TRUE);
+	@send userLevelListObject::MSG_GEN_APPLY ();
+
+	/* Unlock the levels settings table.	*/
+	MemUnlockFixedOrMovable (settingsTable);
+
+    }	/* End of if Not InitFileReadInteger...	*/
+
+    /* Nuke the application's features init. file key.	*/
+    MemUnlockFixedOrMovable (featuresKey);
+}	/* End of MSG_META_{LOAD,RESET}_OPTIONS.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Update the application's features.
+
+PASS:		optr	unReparentObject	= Object to be unreparented.
+		optr	reparentObject		= Object to be reparented.
+		GenAppUsabilityTuple *levelTable
+						= Table of objects that
+						  must be updated when the
+						  user level changes.
+		word	tableLength		= Number of table entries.
+		GenAppUsabilityTuple *table	= Table mapping the various
+						  application features to
+						  objects that must be
+						  updated when that feature
+						  is modified.
+		word	appOpeningFlag		= Application starting?
+		UIInterfaceLevel oldLevel	= Current user level.
+		UIInterfaceLevel level		= New user level.
+		word	featuresChanged		= Modified features.
+		word	featuresOn		= Active features.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Use the myriad user level features tables to update the
+	application's current user level features.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.25	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method GeoFileApplicationClass, MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
+{
+    /* Use the tables to update the application's features.	*/
+    @call oself::MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE
+		(NullOptr,
+		 NullOptr,
+		 (GenAppUsabilityTuple *) levelsTable,
+		 sizeof (usabilityTable) / sizeof (usabilityTable [0]),
+		 usabilityTable,
+		 appOpeningFlag,
+		 oldLevel,
+		 level,
+		 featuresChanged,
+		 featuresOn);
+}	/* End of MSG_GEN_APPLICATION_UPDATE_APP_FEATURES.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_APPLICATION_SET_USER_LEVEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Set the application's user level.
+
+PASS: 		GeoFileLevelsFeatures	selection	= Active features.
+		word			numSelections	= ???
+		byte			stateFlags	= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	Assumes that the UIInterfaceLevel values are
+			ascending and contiguous from zero
+			(UIIL_INTRODUCTORY).
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Look for the feature set list that's closest (but not greater than)
+	the requested features.
+	Set the application's current user level to whatever was found.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:
+	Note:	The user level set here is expressed in terms of
+		features bits.
+
+	Note:	The algorithm used to compute closest (non-exact) level
+		match is based on the Levenshtein distance (obviously just
+		using substitutions :-) (that's basically the minimum
+		number of operations (e.g., substitutions) that it takes to
+		transform the current feature bits into the requested
+		bits).  Note that there's no bias or weighting of any
+		particular bits over any others.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.25	Initial version.
+	JDM	92.11.25	Updated for MSG_GF_SET_UI.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method GeoFileApplicationClass, MSG_GF_APPLICATION_SET_USER_LEVEL
+{
+    word	wLcv;
+    word	wLcvInner;
+    byte	bitCount;
+    byte	closestCount;
+    UIInterfaceLevel	closestLevel;
+    LevelsSettingsEntry	*featuresTable;
+    GeoFileLevelsFeatures	tableFeatures;
+    GeoFileLevelsFeatures	tempFeatures;
+    EventHandle	event;
+
+    /* First, lock down the block containing the tables.	*/
+    featuresTable = MemLockFixedOrMovable (settingsTable);
+
+    /*
+     * Figure out bar and level/features that correspond to the given
+     * user level.
+     * Note that 'closestCount' is initially set to the number of bits
+     * in 'GeoFileLevelsFeatures'.
+     */
+    for (wLcv = closestLevel = 0,
+	 closestCount = sizeof (GeoFileLevelsFeatures) * 8;
+	 wLcv < (sizeof (settingsTable) / sizeof (settingsTable [0]));
+	 wLcv++)
+	{
+	/* Exact match?	*/
+	tableFeatures = featuresTable [wLcv].GFLSE_features;
+	if (tableFeatures == selection)
+	    {
+	    closestLevel = wLcv;
+	    break;
+	    }
+
+	/*
+	 * Nope.  Figure out the bit difference between the requested
+	 * features and the current level's features.
+	 */
+	for (wLcvInner = bitCount = 0,
+	     tempFeatures = selection ^ tableFeatures;
+	     wLcvInner < (sizeof (GeoFileLevelsFeatures) * 8);
+	     wLcvInner++)
+	    {
+	    /* Bit set?	*/
+	    if (tempFeatures & 0x01)
+		bitCount++;
+
+	    tempFeatures >>= 1;		/* Next!	*/
+	    }
+
+	/*
+	 * Closest match so far?
+	 * Note that this will select the retain the first found
+	 * closest match at any given bit count.  If you want the last
+	 * one found then change the < to <=.
+	 */
+	if (bitCount < closestCount)
+	    {
+	    /* Yep.  Update the current closest match information.	*/
+	    closestCount = bitCount;
+	    closestLevel = wLcv;
+	    }
+	}	/* End of outermost for loop.	*/
+
+    /* Set the application features, level, and the bar state.	*/
+    @call oself::MSG_GEN_APPLICATION_SET_APP_FEATURES
+			(selection);
+    @call oself::MSG_GEN_APPLICATION_SET_APP_LEVEL (closestLevel);
+
+    /* Unlock the levels settings table.	*/
+    MemUnlockFixedOrMovable (settingsTable);
+
+    /*
+     * Instruct the process to update the application's UI appropriately
+     * for the new feature(s) and/or UI level.
+     */
+    event = @record GeoFileDocumentClass::MSG_GFD_SET_UI_FOR_DOCUMENT
+		(selection, closestLevel);
+						
+    @send self::MSG_META_SEND_CLASSED_EVENT (event, TO_APP_MODEL);
+}	/* End of MSG_GF_APPLICATION_SET_USER_LEVEL.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_APPLICATION_CHANGE_USER_LEVEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	User change to the user level.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Apply the requested changes.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method GeoFileApplicationClass, MSG_GF_APPLICATION_CHANGE_USER_LEVEL
+{
+    /* Do the apply.	*/
+    @send GeodeGetOptrNS (@SetUserLevelDialog)::
+		MSG_GEN_GUP_INTERACTION_COMMAND (IC_APPLY);
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_APPLICATION_CANCEL_USER_LEVEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Cancel user change to the user level.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Apply the requested changes.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method GeoFileApplicationClass, MSG_GF_APPLICATION_CANCEL_USER_LEVEL
+{
+    GeoFileLevelsFeatures	appFeatures;
+
+    /* Save the application's current feature settings. */
+    appFeatures = pself->GAI_appFeatures;
+
+    @send GeodeGetOptrNS (@UserLevelList)::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION (appFeatures, 0);
+
+    /* Do the cancel.	*/
+    @send GeodeGetOptrNS (@SetUserLevelDialog)::
+		MSG_GEN_GUP_INTERACTION_COMMAND (IC_DISMISS);
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_APPLICATION_QUERY_RESET_OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Make sure that the user wants to save options.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Query the user for saving the current user level options.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method GeoFileApplicationClass, MSG_GF_APPLICATION_QUERY_RESET_OPTIONS
+{
+    /* Ask the user if she wants to reset the options.	*/
+    MemLock(OptrToHandle(@ResetOptionsQueryString));
+
+    if (UserStandardDialog((TCHAR *) 0,
+			   (TCHAR *) 0,
+			   (TCHAR *) 0, (TCHAR *) 0,
+			   LMemDeref(@ResetOptionsQueryString),
+			   (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET) |
+			   (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET))
+	== IC_YES) {
+	@send self::MSG_META_RESET_OPTIONS();
+    }
+
+    MemUnlock(OptrToHandle(@ResetOptionsQueryString));
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_APPLICATION_USER_LEVEL_STATUS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Handle status change in user level list.
+
+PASS:		GeoFileLevelsFeatures	selection	= Active features.
+		word	numSelections			= ???
+		byte	stateFlags			= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Disable the Fine Tune trigger unless we're at the Advanced level.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@if 0
+@method GeoFileApplicationClass, MSG_GF_APPLICATION_USER_LEVEL_STATUS
+{
+    Message msg;
+
+    if (selection == @ADVANCED_FEATURES)
+	{
+	msg = MSG_GEN_SET_ENABLED;
+	}
+    else
+	{
+	msg = MSG_GEN_SET_NOT_ENABLED;
+	}
+    @send {MSG_GEN_SET_ENABLED} GeodeGetOptrNS (@FineTuneTrigger)
+		::msg (VUM_NOW);
+}
+@endif
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_APPLICATION_INITIATE_FINE_TUNE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Activate the application's Fine Tune features dialog box.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Get the current features from the user level features list.
+	Use those features to set the fine tune box's features list.
+	Activate the fine tune dialog box.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method GeoFileApplicationClass, MSG_GF_APPLICATION_INITIATE_FINE_TUNE
+{
+    GeoFileLevelsFeatures	fineTuneFeatures;
+    
+    /* Get the current fine tune selections from the user level list.	*/
+    fineTuneFeatures = @call GeodeGetOptrNS (@UserLevelList)::
+		MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+
+    /* Set the fine tune dialog box's feature list.	*/
+    @call GeodeGetOptrNS (@FeaturesList)::
+		MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+			(fineTuneFeatures, 0);
+
+    /* Initiate the fine tune dialog box.	*/
+    @call GeodeGetOptrNS (@FineTuneDialog)::MSG_GEN_INTERACTION_INITIATE ();
+}	/* End of MSG_GF_APPLICATION_INITIATE_FINE_TUNE.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_APPLICATION_FINE_TUNE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Set the application's Fine Tune dialog box's settings.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	If the current application feature settings are different from the
+	   actual features list feature settings then
+		Make the features list's settings the current settings.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method GeoFileApplicationClass, MSG_GF_APPLICATION_FINE_TUNE
+{
+    optr	userLevelList;
+    GeoFileLevelsFeatures	newFeatures;
+
+    /* Get the features list's current settings.	*/
+    newFeatures = @call GeodeGetOptrNS (@FeaturesList)::
+		MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS ();
+
+    /* Make the new features reality.	*/
+    userLevelList = GeodeGetOptrNS (@UserLevelList);
+    @send userLevelList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(newFeatures, 0);
+    @send userLevelList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
+			(TRUE);
+}	/* End of MSG_GF_APPLICATION_FINE_TUNE.	*/
+
+/***********************************************************************
+ * 		MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION
+ ***********************************************************************
+ * SYNOPSIS:
+ *
+ * PARAMETERS: 	
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ted	1/23/93		Initial Revision
+ *
+ ***********************************************************************/
+
+@method GeoFileApplicationClass, MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION
+{
+    MemHandle dataBlock;
+    ImpexMapFileInfoHeader *fieldInfo;
+    EventHandle msg;
+
+    if (opening) {
+
+        /* create a data block and mark it as a lmem block */
+
+        dataBlock = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(ImpexMapFileInfoHeader));
+        MemModifyFlags(dataBlock, HF_SHARABLE, (HeapFlags) 0);
+
+        /* lock this data block */
+
+        fieldInfo = MemLock(dataBlock);
+
+        /* initialize the header of lmem block */
+
+        fieldInfo->IMFIH_fieldChunk = (ChunkHandle) 0;
+        fieldInfo->IMFIH_numFields = 0; 
+        fieldInfo->IMFIH_flag = DFNU_FIELD;
+    
+        MemUnlock(dataBlock);
+    
+        /* initialize the reference count to one */
+    
+        MemInitRefCount(dataBlock, 1);
+    
+        /* create the classed event */
+    
+        msg = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+		          MANUFACTURER_ID_GEOWORKS,    /* Manufacturer's ID */
+    	    	          GWNT_MAP_APP_CHANGE, /* Manufacturer's list type */
+    	    	          dataBlock);  	      /* Handle of data block */
+    
+        /* send the event to GCN list */
+    
+        @call GeodeGetAppObject(0)::MSG_META_GCN_LIST_SEND(
+    		          (word) GCNLSF_SET_STATUS, /* GCNListSendFlags */
+    		          (EventHandle) msg,    /* Handle to classed event */
+    		          (MemHandle) dataBlock,  /* Handle of extra data block */
+    		          (word) GAGCNLT_APP_TARGET_NOTIFY_APP_CHANGE,
+    	    	    	    	    	          /* Manufacturer's list type */
+    		          (word) MANUFACTURER_ID_GEOWORKS);
+    	    	    	    	    	          /* Manufacturer's ID */
+    }
+}

@@ -1,0 +1,158 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC SDK
+MODULE:		Sample Library -- Mandelbrot Set Library
+FILE:		mset.def
+
+AUTHOR:		Paul DuBois, Aug  7, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	1/91		Initial version
+	dubois	8/ 7/93   	Modified for library
+
+DESCRIPTION:
+
+	Structures, enums, and constants for the calculation thread's use.
+
+	NOTE:
+	If any changes are made, make sure to update mset.goh!
+
+	$Id: mset.def,v 1.1 97/04/07 10:43:36 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+include geos.def
+include vm.def
+include ec.def
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;		Enumerated types
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ERROR_PARAMS_NOT_AT_OFFSET_ZERO		enum	FatalErrors
+; The MSetParameters block is not paragraph aligned; it must be,
+; because it is accessed directly off of a segment register.
+
+ERROR_PIXEL_WIDTH_ZERO			enum	FatalErrors
+; MSP_pixelWidth is zero, which violates an assumption in the
+; line-based calculation algorithm.
+
+ERROR_FIXNUMS_NOT_IN_SAME_SEGMENT	enum	FatalErrors
+; The FixNum routines must take pointers to FixNums that all reside
+; in the same segment.
+
+;
+; Floating-point is not currently supported.
+;
+MSetPrecision	etype	word
+    MSP_16BIT		enum	MSetPrecision, 04h
+    ; 16-bit fixed-point
+    MSP_48BIT		enum	MSetPrecision, 02h
+    ; 48-bit fixed-point
+    MSP_FLOATING	enum	MSetPrecision, 01h
+    ; FPU-supported floating-point
+
+;
+; This type is not used in any of the assembly routines; it is here
+; to appease the linker
+;
+MSetColor	etype	word
+
+;
+; These are the possible return conditions for the routine which calculates
+; the points of the MSet.  Call it "...Asm" because there is no C type that
+; glue (the linker) can reconcile with an asm "record" type -- the C ByteFlags
+; type is just a typedef for "char".
+;	
+MSetCalcReturnFlagsAsm	record
+    MSCRF_MESSAGE_WAITING:1	;The calculation routine returned because it
+				;noticed a message in the thread's queue.
+    MSCRF_BLOCK_DIRTIED:1	;The data block had new data written to it.
+    :6
+MSetCalcReturnFlagsAsm	end
+
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;		Structures
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+;
+; Fixed-point number used for calculation in both 16-bit and 48-bit mode.
+;	
+FixNum		struc
+    FN_high	word	?
+    FN_middle	word	?
+    FN_low	word	?
+FixNum		ends
+
+;
+; General purpose storage for a Mandelbrot "number", of varying precisions
+; Floating-point isn't supported yet.
+;
+MSetNum		union
+    MSN_16bit	word
+    MSN_48bit	FixNum
+;   MSN_Float	qword
+MSetNum		end
+
+;
+; The state structure is internal to the calculation routine.
+;
+MSetNumState	struc	; Precision-independant calculation state
+    MN_A	MSetNum		; Pixel's real part
+    MN_B	MSetNum		; Pixel's imaginary part
+    MN_X	MSetNum		; Current X
+    MN_Y	MSetNum		; Current Y
+    MN_x2	MSetNum		; X squared (for iteration)
+    MN_y2	MSetNum		; Y squared (for iteration)
+    MN_prod	MSetNum		; X * Y
+MSetNumState	ends
+
+;
+; For an explanation of the following structs and their usage, 
+; please see mset.goh
+;
+MSetParameters	struc
+				;can't use hptr because in C, handles
+    MSP_calcBlock	word	;are typedefed to words -- the linker
+    MSP_dataMapBlock	word	;doesn't treat words and hptrs as
+				;similar types.
+
+    MSP_colorScheme	MSetColor
+    MSP_precision	MSetPrecision
+    MSP_maxDwell	word
+    MSP_pixelWidth	word
+    MSP_pixelHeight	word
+    MSP_threadPriority	word
+    MSP_selectedX	sword
+    MSP_selectedY	sword
+    MSP_lastZoom	word
+    MSP_lastLine	sword
+MSetParameters	ends
+
+MSetCalcParameters	struc
+    MSCP_dataMapBlock	word
+    MSCP_pixelWidth	word
+    MSCP_pixelHeight	word
+    MSCP_left		FixNum
+    MSCP_top		FixNum
+    MSCP_hRes		FixNum
+    MSCP_vRes		FixNum
+    MSCP_maxDwell	word
+
+    MSCP_count		word
+    MSCP_vars		MSetNumState
+
+    MSCP_calcPointVec	nptr
+    MSCP_copyVec	nptr
+    MSCP_addVec		nptr
+    MSCP_subVec		nptr
+MSetCalcParameters	ends

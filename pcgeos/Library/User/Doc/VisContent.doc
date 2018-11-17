@@ -1,0 +1,769 @@
+COMMENT `CLASS DESCRIPTION-----------------------------------------------------
+
+			VisContentClass
+
+$Id: VisContent.doc,v 1.1.34.1 97/03/29 03:37:56 canavese Exp $
+
+Synopsis
+--------
+	
+VisContents are used for heading a visible tree of objects while running under
+a scrollable window other than a win group window.  This is used to allow 
+applications access to its own area of a window, usually to display some kind
+of user document.
+    
+    
+Limitations
+-----------
+	
+The VisContent object can run in the UI thread (the same thread as the view),
+or in a different thread from the view, typically an application thread.  If
+it is displaying a complicated object or document, it is generally not 
+desirable to have it slow down other UI tasks, and so you will likely want
+to have your VisContent run in the application thread.
+   
+A VisContent object cannot have generic children underneath it.  To have
+generic children, one should use the GenContent object, and really consider
+whether a content is needed at all, since hidden generic gadgetry (from a 
+scrollable GenView) does not lead to easy-to-use applications.
+   
+
+Alternatives
+------------
+	
+If an application just wants to create its own UI stuff in a window,
+and doesn't need the scrolling, scaling, or capabilities of a GenView,
+it may be simpler (and most likely more efficient) to use a GenGadget
+composite object.  A GenGadget composite is like creating your own
+VisCompClass object in the generic world, you can do whatever you wish
+with it.
+
+
+Implementation Status
+---------------------
+	Hopefully completed as of Oct 1991.
+
+See Also
+--------
+	VisClass (documentation in visClass.asm)
+		Superclass of VisCompClass; the base class for all 
+		objects in the visual world.
+		
+	VisCompClass (documentation in visComp.asm)
+		Subclass of visClass for handling visual children and
+		opening/closing windows.
+		
+	GenContentClass (documentation in genContent.asm)
+		A generic representation of a content object, its only use
+		is for keeping generic objects under a view.
+		
+	GenViewClass (documentation in genView.asm)
+		Contains documentation for the view, which runs a VisContent's 
+		window.
+	
+
+;------------------------------------------------------------------------------
+;	Description
+;------------------------------------------------------------------------------
+
+Terminology
+-----------
+	
+view --
+     	The object who creates a window for the content object and runs it,
+	sending and receiving messages as needed.  This is usually a GenView,
+	but another object *could* be set up to run the content instead,
+	provided it handled all the right messages.
+	
+
+Relationships/Context
+---------------------
+	
+Although it will appear to the VisContent and the tree underneath it that
+it is connected to the larger visible tree under the Screen object, it is
+not a visible child of any object in the large visible tree.  The view keeps
+a link to the object, and will communicate with it as necessary.  The 
+VisContent has an upward-only visual link to the view, however.  
+    
+
+Conceptual Overview
+-------------------
+	
+VisContents are exactly like any other VisComp object from the
+point of view of the children.  They have the default behavior necessary
+to receive messages from the view, do updates at the appropriate times, resize
+themselves according to the view if desired by the programmer, and tell the view
+the bounds of its scrollable area.  
+    
+
+Warnings
+--------
+
+A vis content object should not be attached to any visible object using
+MSG_VIS_ADD_CHILD.  It can only exist as a private link from some other object.
+	
+  
+  
+Usage:
+-----
+	
+The basic usage for a VisContent under a GenView is as follows:
+    
+	@object GenViewClass MyView = {
+	    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+	    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+	    GVI_content = MyContent;
+	}
+
+	@object VisContentClass MyContent = { 
+	    VI_bounds = {0, 0, 400, 800};	/* Fixed size */
+	}
+
+	
+This creates a blank content of fixed size 400 by 800 under the view, and makes
+the view scrollable in both directions.  To actually draw something under
+the view, you'll have to add visible objects to it, or subclass MSG_VIS_DRAW
+to draw something (like you might for a Vis object).
+     
+     
+
+In Depth: Sizing and positioning objects under the VisContent
+-------------------------------------------------------------
+	
+Sizing and positioning issues for a VisContent are almost the same as for
+a VisComp -- you can choose to use the geometry manager to position your
+children, or it can custom-position the children.   The only difference between
+the two is the content has to choose how it will be affected by the size of 
+the view:
+
+	a) Calculating any size for your children, regardless of the size
+	   of the view (as if the content were a free floating window and could
+	   be whatever size it wanted).  This is the default action for the
+	   content.  Usually the view will need to scrollable vertically and
+	   horizontally in this case.  (For an example, see: "In depth:
+	   Specifying bounds...")
+	   
+	b) Using the view's width as the starting width to use, and calculating
+	   geometry based on that.  The height can be any value under this
+	   formation, and often is directly related to what the width must be,
+	   ala the notepad, or a desktop folder window (where the number of 
+	   wrapping icons determines the height).  To get this behavior, set  
+	   the VCNA_SAME_WIDTH_AS_VIEW flag.  Usually the view will have
+	   to be at least vertically scrollable in this case.
+
+	   If as a result of geometry calculations, the VisContent may be 
+	   forced to be wider than the view, regardless of this flag.
+	   An example might be a horizontal non-wrapping group of five buttons,
+	   where the content cannot get smaller than the children need to fit.
+	   If you expect this may happen, you may wish to make the view
+	   horizontally scrollable.
+	   
+	   A similar, though seldom used, flag for using the view window's 
+	   height as the height of the content (and letting the width be 
+	   variable) is VCNA_SAME_HEIGHT_AS_VIEW.
+	   
+	c) Both the width and the height of the VisContent object are keyed
+	   to the view size.  To get this, set both VCNA_SAME_WIDTH_AS_
+	   SUBVIEW or VCNA_SAME_HEIGHT_AS_VIEW.  This would probably
+	   not be used for conventionally managed vis children, but for
+	   some resizable object or group of objects such as a clock.
+	   The view probably may not need to be scrollable at all in this case,
+	   unless the content has some minimum size that is larger than
+	   the view's minimum size.  (For an example, see "In Depth: Using the 
+	   Geometry Manager...").
+
+Other information for geometry combinations for the view and the content
+may be found in the GenView documentation.
+    
+    
+In depth: Specifying bounds of VisContent and children in a .goc or .asm file
+-----------------------------------------------------------------------------
+	
+You can specify a VisContent object in your source file to run under a 
+GenView, and have pre-initialized visible children.  Here is an example of 
+two Vis objects running under a fixed-size VisContent, their positions 
+preset in their .goc definitions:	
+
+	@object GenViewClass VisSamp2View = {
+	    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+	    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+	    GVI_content = VisSampContent;
+	}
+
+	@object VisContentClass VisSampContent = { 
+	    VCI_comp = MySampNumber1, MySampNumber2;  
+	    VCI_geoAttrs = VCGA_CUSTOM_MANAGE_CHILDREN;
+	    VI_bounds = {0, 0, 400, 800};	/* Fixed size */
+	}
+
+	@object VisClass MySampNumber1 = { 
+	    VI_bounds = {20, 20, 100, 60};	/* Fixed bounds */
+	}
+	
+	@object VisClass MySampNumber2 = { 
+	    VI_bounds = {70, 70, 150, 110};	/* Fixed bounds */
+	}
+	
+Obviously VisClass objects wouldn't draw or do anything; you'd want
+to subclass them.  This and other examples of visible trees under
+a content object can be seen in Appl/SDK_C/VisSamp[1,2,3,4].
+  
+The key item to getting the fixed size and bounds to work is the VCGA_CUSTOM_
+MANAGE_CHILDREN, which keeps the VisContent object from using the geometry
+manager to size and position itself and its children.  If you took that line
+out, you would see the View and VisContent briefly come up in the size you
+desire, then shrink after geometry gets done for the content.
+    
+    
+In Depth: What pointer events to send to the content
+----------------------------------------------------   
+
+Since messages sent to a VisContent object by the view will take time
+to do context switches, it is desirable to only have the view send the
+messages the VisContent will need.
+      
+	GVA_DONT_SEND_PTR_EVENTS
+		Optimization to avoid sending ptr releases to the
+		application, for cases where content won't need them.
+
+	GVA_DONT_SEND_KBD_RELEASES
+		Optimization to avoid sending keyboard releases to the
+		application.
+		NOTE:  No effect if GVA_SEND_ALL_KBD_CHARS set.
+
+	GVA_SEND_ALL_KBD_CHARS
+		This is provided for apps to force all key presses to go to the
+		content (if it has the focus), regardless of what they are.  
+		Usually the view will check first for mnemonics, accelerators,
+		or other special specific UI keys, and will not pass the key
+		press down it gets handled by the UI in one of these ways.
+		If applications set this flag, it is their responsibility
+		in their MSG_META_KBD_CHAR handler to return a MSG_FUP_KBD_CHAR
+		back to the view so it can finish the keyboard handling.
+		Also, applications (like geoWrite) that intermix keypresses
+		and other functions (such as changing the font or style)
+		may have problems getting these messages in the correct order
+		if the keypress has to go across threads to the content first,
+		then back to the UI to check for accelerators.  In general,
+		apps will probably not want to use this flag.
+		NOTE:  Overrides GVA_DONT_SEND_KBD_RELEASES.
+
+
+In depth: Using the geometry manager under the content
+------------------------------------------------------
+	
+You can also set up the VisContent object to manage its children using
+the geometry manager, just like a VisComp object.  For instance, here's
+an example of a VisContent that keys both its width and height to the view
+(hence the view is only scrollable if it can get very small), and
+full justifies its three children in the view horizontally, while centering the 
+children vertically.  The sizes of the three children are set in the .goc
+file through their VI_bounds:
+	 
+@object GenViewClass VisSamp3View = {
+    /* Make view scrollable in X and Y.
+     *
+     * Also, make sure the view can be any width, regardless of the width of the
+     * content, since the content will size itself to match the view
+     * afterwards (because of it setting VCNA_SAME_WIDTH_AS_VIEW)
+     */
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_DOC_SIZE_IS_NOT_MAX;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE | GVDA_DOC_SIZE_IS_NOT_MAX;
+
+    /*
+     * We'll have the view run a VisContent object, in the UI thread, same as
+     * the view. 
+     */
+    GVI_content = VisSampContent;
+
+    /* Choose a pretty color. The other arguments are used for RGB colors.
+     * we'll just choose on of the 16 standard EGA colors.
+     */
+    GVI_color = { C_CYAN, 0, 0, 0 };
+}
+
+@object VisSampContentClass VisSampContent = { 
+    /* We'll let the content choose its width according to the view.  We'll
+     * let the view be any width it wants.  Actually, if the content's child
+     * objects don't fit in the area passed, the content will get 
+     * wider or taller than the view as necessary, and become scrollable.
+     */
+    VCNI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW |
+                            VCNA_SAME_HEIGHT_AS_VIEW;
+
+    /* We'll full justify the children. We'll also expand our
+     * width to fill the width of the view, so the objects can be 
+     * full justified. (If we didn't set the expand-width-to-fit flag,
+     * the content would stay shrunk around the children.)  We'll
+     * also expand the height so we can center the children vertically.
+     */
+    VCI_geoDimensionAttrs = VCGDA_EXPAND_WIDTH_TO_FIT_PARENT |
+                            WJ_FULL_JUSTIFY_CHILDREN_HORIZONTALLY |
+
+                            VCGDA_EXPAND_HEIGHT_TO_FIT_PARENT |
+			    HJ_CENTER_CHILDREN_VERTICALLY;
+
+    /* We'll set this as well, a little variant on full justification which
+     * also apportions space in front of the first child and after the
+     * last child, as well as the spaces between child (ala the Apply/Cancel 
+     * bars in Motif).
+     */
+    VCI_geoAttrs = VCGA_INCLUDE_ENDS_IN_CHILD_SPACING;
+
+    VCI_comp = MySampNumber1, MySampNumber2, MySampNumber3;  
+}
+
+@object VisClass MySampNumber1 = { 
+    /* Hand size the object. The position will be set by the geometry
+     * manager.  If we wanted to custom size the object during geometry
+     * calculations, we'd subclass the object's MSG_VIS_RECALC_SIZE. 
+     */
+    VI_bounds = {0, 0, 80, 40};
+}
+@object VisClass MySampNumber2 = { 
+    VI_bounds = {0, 0, 80, 40};
+}
+@object VisClass MySampNumber3 = { 
+    VI_bounds = {0, 0, 80, 40};
+}
+
+	
+Like any other object, you can instantiate and add the children as the content 
+is opened using MSG_VIS_ADD_CHILD.
+	
+You can also attach a VisContent and its children to a view after
+the view has come up, using MSG_GEN_VIEW_SET_CONTENT.
+
+
+	     
+	     
+In Depth:  What the VisContent does with various view messages
+--------------------------------------------------------------
+	
+The view sends out a sequence of messages to the content as it comes up,
+changes size, origin, or scale factor, then comes down.  Here is what you
+can expect the default VisContent handlers will do:
+	
+	MSG_META_CONTENT_SET_VIEW -- Tells the content that it now will 
+		belong to this view. The VisContent uses this to set a 
+		pointer to the view in its instance data.
+	
+	MSG_META_CONTENT_VIEW_ORIGIN_CHANGED -- sent out when the view's
+		origin changes.  The VisContent will save this away in case
+		it needs to do mouse translations.
+	
+	MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED -- sent out when the 
+		view's scale factor changes.  The VisContent will save this
+		away in case it needs to do mouse translations.
+		
+	MSG_META_CONTENT_VIEW_WIN_OPENED -- tells when a new view window
+		has been created.  A VisContent visually updates its tree at 
+		this point, setting up geometry and sending MSG_VIS_OPEN's to
+		itself and its children.
+			
+	MSG_META_CONTENT_VIEW_OPENING -- tells when a view is getting
+		a MSG_VIS_OPEN.  A VisContent object will set an 
+		upward visual link to the view, and invalidates itself
+		in preparation for its own update.
+		
+	MSG_META_CONTENT_VIEW_SIZE_CHANGED -- sent out when the view's
+		size changes.  A VisContent will invalidate its
+		geometry and do an update on itself here.
+	
+	MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED -- sent out when the view's
+		size changes.  A VisContent will save the new scale factor,
+		in case it needs to do mouse translations.
+	
+	MSG_META_CONTENT_VIEW_ORIGIN_CHANGED -- sent out when the view's
+		size changes.  A VisContent will save the new origin,
+		in case it needs to do mouse translations.
+	
+	MSG_META_CONTENT_VIEW_CLOSING -- sent when the view receives
+		its MSG_VIS_CLOSE.  A VisContent will use this to
+		send MSG_VIS_CLOSEs to itself and its children.
+
+	MSG_META_CONTENT_VIEW_WIN_CLOSED - sent when the view has been
+		taken down, or is changing to a new content.  A VisContent will 
+		zero its copy of the window handle at this point so no further 
+		drawing to it can be done.
+			
+	MSG_META_CONTENT_SET_VIEW -- A null value will be passed here 
+		after a view is either going away, or no longer using
+		that content (the content has been changed).   The VisContent
+		will zero out its view pointer at this point.
+	
+	
+Other messages a VisContent can expect to receive:
+      
+	MSG_META_EXPOSED 
+	MSG_META_PTR
+	MSG_META_START_SELECT 
+	MSG_META_END_SELECT
+	MSG_META_DRAG_SELECT
+	MSG_META_START_MOVE_COPY
+	MSG_META_DRAG_MOVE_COPY
+	MSG_META_DRAG_FEATURES
+	MSG_META_START_OTHER
+	MSG_META_END_OTHER
+	MSG_META_DRAG_OTHER
+		These messages are sent out and handled just like any other
+		windowed VisCompClass object.
+	
+	
+	MSG_META_CONTENT_VIEW_LOST_GADGET_EXCL
+		Sent out when the view has lost the gadget exclusive.
+		The VisContent will take away the gadget exclusive from 
+		whatever object has it.
+	
+
+See Also
+--------
+	GenViewClass documentation (in genView.asm)
+		In depth discussions on what messages are sent to the content,
+		in what order, and why.
+
+;------------------------------------------------------------------------------
+;	Assembling & Debugging
+;------------------------------------------------------------------------------
+
+Sample Code/Programming Tips
+----------------------------
+	<useful code snippets, references to sample applications & a short
+	 description of them>
+
+Assembly Tips
+-------------
+
+Debugging Tools & Tips
+----------------------
+	
+Finding your content's GenView in the gentree and saying
+"pgen addr GVI_content" will give you the address of your content
+object, if you're looking for it.  Better yet, remember its label so
+you can type  "pobj *myapp::MyContent".
+
+See Also
+--------
+	
+Appl/SDK_C/VisSamp:
+ 	A general sample of vis objects running in a VisContent under a GenView.
+        It includes examples of:  geometry management in a visible tree,
+        a simple MSG_VIS_DRAW handler, basic mouse handling in a visible
+        object, setting an object visible/not visible, adding/removal of
+        objects, usage of VisMonikers, a simple MSG_VIS_RECALC_SIZE handler, 
+        custom positioning of objects, and marking an object invalid.
+
+Appl/SDK_C/VisSamp2:
+        This sample app has a VisContent attached to a GenView, and shows
+        how the size of the VisContent object and the bounds of its visible
+        children can be set in the object definitions without any geometry
+        management or messages being sent to the objects whatsoever.
+
+Appl/SDK_C/VisSamp3:
+        This sample app demonstrates how to run a few objects under the
+        content using the geometry manager.  The view sizes itself, the
+        content will use the view's size if possible, and full justifies
+        its three vis children horizontally, while centering horizontally.
+	
+Appl/SDK_C/VisSamp4:
+        This sample app gives an example of an entire vis tree being created 
+        and added to a GenView on the fly.  It also shows objects being
+        wrapped horizontally in a content.
+
+;------------------------------------------------------------------------------
+;	Implementation Notes
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;	Most frequently asked questions
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;	Inheritance
+;------------------------------------------------------------------------------
+	
+MetaClass
+---------
+	
+	@instance MetaBase	MI_base;
+
+    
+MSG_META_NULL			- per VisCompClass
+MSG_META_DUMMY			- per VisCompClass
+MSG_META_INITIALIZE		- Sets up default content vars.
+MSG_META_ATTACH			- per VisCompClass
+MSG_META_DETACH			- per VisCompClass
+MSG_META_DETACH_COMPLETE	- per VisCompClass
+MSG_META_FORCED_DETACH		- per VisCompClass
+MSG_META_DETACH_ABORT		- per VisCompClass
+MSG_META_ACK			- per VisCompClass
+MSG_META_GET_CLASS		- per VisCompClass
+MSG_META_IS_OBJECT_IN_CLASS	- per VisCompClass
+MSG_META_BLOCK_FREE		- per VisCompClass
+MSG_META_OBJ_FREE		- per VisCompClass
+MSG_META_FINAL_OBJ_FREE		- destroys various chunks used for grabs, etc.
+MSG_META_SET_FLAGS		- per VisCompClass
+MSG_META_GET_FLAGS		- per VisCompClass
+MSG_META_VM_FILE_DIRTY		- per VisCompClass
+MSG_META_QUIT			- per VisCompClass
+MSG_META_QUIT_ACK		- per VisCompClass
+MSG_META_DISPATCH_EVENT		- per VisCompClass
+MSG_META_SEND_CLASSED_EVENT  	- "TO_FOCUS" requests are sent on to object
+				  having the focus exclusive within the
+				  VisContent.  "TO_TARGET" requests are sent
+				  on to the object having the target exclusive
+				  within the VisContent
+MSG_META_GET_OPTR		- per VisCompClass
+MSG_GET_TARGET_AT_TARGET_LEVEL	- returns the target
+MSG_META_GET_OPTR		- per VisContentClass
+MSG_ADD_VAR_DATA_TYPE		- per MetaClass
+MSG_ADD_VAR_DATA_ENTRY		- per MetaClass
+MSG_META_DELETE_VAR_DATA	- per MetaClass
+
+VisClass
+--------
+	
+    @instance Rectangle	VI_bounds = {0, 0, 0, 0};
+    	;Used to send a MSG_GEN_VIEW_SET_DOC_BOUNDS to the view.  Currently,
+	;left and top must always be zero.
+	
+    @instance byte VI_typeFlags = 0;
+    	;VTF_IS_CONTENT, VTF_IS_WINDOW, VTF_IS_WIN_GROUP, VTF_IS_COMPOSITE 
+	;must always be set for this object.
+	
+    @instance byte VI_attrs =
+		(VA_MANAGED|VA_DRAWABLE|VA_DETECTABLE|VA_FULLY_ENABLED);
+    	;Treated just like a VisCompClass object.
+
+    @instance byte VI_optFlags = (VOF_GEOMETRY_INVALID|VOF_GEO_UPDATE_PATH|\
+				  VOF_IMAGE_INVALID|VOF_IMAGE_UPDATE_PATH);
+    	;Treated just like a VisCompClass object.
+	
+    @instance byte VI_geoAttrs = 0;
+    	;Treated just like a VisCompClass object.
+	
+    @instance byte VI_specAttrs = 0;
+    	;Treated just like a VisCompClass object.
+    
+    @instance @link VI_link;
+    	;This should always be an upward-only link to a view object (no object
+	;should have this object as a sibling or child).
+	
+	
+VisCompClass
+------------
+
+	@instance @composite VCI_comp = VI_link;
+		;Treated just like a vis comp object.
+		
+	@instance optr VCI_gadgetExcl = 0;
+		;Treated just like a vis comp object.
+		
+	@instance WindowHandle VCI_window = 0;
+		;Treated just like a vis comp object.  This, of course, should
+		;be the window the view created for us, and should match
+		;VCNI_window, if we're up onscreen.
+		
+	@instance byte VCI_geoAttrs = 0;
+		;Treated just like a vis comp object.
+		
+	@instance byte VCI_geoDimensionAttrs = 0;
+		;Treated just like a vis comp object.
+		
+
+MSG_VIS_ADD_BUTTON_POST_PASSIVE		- per Vis[Comp]Class
+MSG_VIS_ADD_BUTTON_PRE_PASSIVE		- per Vis[Comp]Class
+MSG_VIS_ADD_CHILD			- per Vis[Comp]Class
+MSG_VIS_CALL_PARENT			- per Vis[Comp]Class
+MSG_VIS_CALL_ROUTINE			- per Vis[Comp]Class
+MSG_VIS_CLOSE				- per Vis[Comp]Class
+MSG_VIS_CLOSE_WIN			- subclassed to invalidate the window
+					  and zero its gWin.  Composites 
+					  usually bring down the window (the
+					  view handles this for the content)
+					  Removes the implied win grab.
+MSG_VIS_COUNT_CHILDREN			- per Vis[Comp]Class
+MSG_VIS_DESTROY				- per Vis[Comp]Class
+MSG_VIS_DRAW				- if large document model, broadcasts
+					  method to all children
+MSG_VIS_DRAW_MONIKER			- per Vis[Comp]Class
+MSG_VIS_FIND_CHILD			- per Vis[Comp]Class
+MSG_VIS_FIND_MONIKER			- per Vis[Comp]Class
+MSG_VIS_FIND_PARENT			- per Vis[Comp]Class
+MSG_META_FORCE_GRAB_KBD			- per Vis[Comp]Class
+MSG_META_FORCE_GRAB_KBD			- message consumed with no action
+MSG_VIS_FORCE_GRAB_LARGE_MOUSE		- message consumed with no action
+MSG_VIS_FORCE_GRAB_MOUSE		- message consuemed with no action
+MSG_VIS_FUP_QUERY_FOCUS_EXCL		- returns focus excl
+MSG_VIS_GET_ATTRS			- per Vis[Comp]Class
+MSG_VIS_GET_BOUNDS			- per Vis[Comp]Class
+MSG_VIS_GET_CENTER			- per Vis[Comp]Class
+MSG_VIS_FIND_CHILD_AT_POSITION		- per Vis[Comp]Class
+MSG_SPEC_GET_EXTRA_SIZE			- per Vis[Comp]Class
+MSG_VIS_GET_GEO_ATTRS			- per Vis[Comp]Class
+MSG_VIS_GET_MONIKER_POS			- per Vis[Comp]Class
+MSG_VIS_GET_MONIKER_SIZE		- per Vis[Comp]Class
+MSG_VIS_GET_OPT_FLAGS			- per Vis[Comp]Class
+MSG_VIS_GET_POSITION			- per Vis[Comp]Class
+MSG_VIS_GET_SIZE			- per Vis[Comp]Class
+MSG_VIS_GET_TYPE_FLAGS			- per Vis[Comp]Class
+MSG_META_GRAB_KBD			- message consumed with no action
+MSG_VIS_GRAB_LARGE_MOUSE		- message consumed with no action
+MSG_VIS_GRAB_MOUSE			- message consumed with no action
+MSG_VIS_IGNORE_PTR_EVENTS		- per Vis[Comp]Class
+MSG_VIS_INITIALIZE_WORKING_VARS		- per Vis[Comp]Class
+MSG_VIS_INVALIDATE			- per Vis[Comp]Class
+MSG_VIS_LOST_GADGET_EXCL		- per Vis[Comp]Class
+MSG_VIS_MAKE_FOCUS			- per Vis[Comp]Class
+MSG_VIS_MAKE_NOT_FOCUS			- per Vis[Comp]Class
+MSG_VIS_MAKE_NOT_TARGET			- per Vis[Comp]Class
+MSG_VIS_MAKE_TARGET			- per Vis[Comp]Class
+MSG_VIS_MARK_INVALID			- per Vis[Comp]Class
+MSG_VIS_MOVE_CHILD			- per Vis[Comp]Class
+MSG_VIS_MOVE_RESIZE_WIN			- N/A
+MSG_VIS_NOTIFY_GEOMETRY_VALID		- per Vis[Comp]Class
+MSG_VIS_OPEN				- per Vis[Comp]Class
+MSG_VIS_OPEN_WIN			- sets up this object as the implied
+					  win grab.
+MSG_VIS_POSITION_AND_INVAL_IF_NEEDED	- per Vis[Comp]Class
+MSG_VIS_POSITION_BRANCH			- per Vis[Comp]Class
+MSG_VIS_RECALC_SIZE			- per Vis[Comp]Class
+MSG_VIS_RECALC_SIZE_AND_INVAL_IF_NEEDED	- per Vis[Comp]Class
+MSG_VIS_REDRAW_ENTIRE_OBJECT		- per Vis[Comp]Class
+MSG_VIS_RELEASE_GADGET_EXCL		- per Vis[Comp]Class
+MSG_META_RELEASE_KBD			- message consumed with no action
+MSG_VIS_RELEASE_MOUSE			- message consumed with no action
+MSG_VIS_REMOVE				- per Vis[Comp]Class
+MSG_VIS_REMOVE_BUTTON_POST_PASSIVE	- per Vis[Comp]Class
+MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE	- per Vis[Comp]Class
+MSG_VIS_REMOVE_CHILD			- per Vis[Comp]Class
+MSG_VIS_RESET_TO_INITIAL_SIZE		- per Vis[Comp]Class
+MSG_VIS_SEND_ALL_PTR_EVENTS		- per Vis[Comp]Class
+MSG_VIS_SEND_ENTER_LEAVE_PTR_EVENTS	- per Vis[Comp]Class
+MSG_VIS_SEND_TO_CHILDREN		- per Vis[Comp]Class
+MSG_VIS_SEND_TO_PARENT			- per Vis[Comp]Class
+MSG_VIS_SET_ATTRS			- per Vis[Comp]Class
+MSG_VIS_SET_GEO_ATTRS			- per Vis[Comp]Class
+MSG_VIS_SET_POSITION			- per Vis[Comp]Class
+MSG_VIS_SET_SIZE			- per Vis[Comp]Class
+MSG_VIS_SET_TYPE_FLAGS			- per Vis[Comp]Class
+MSG_VIS_TAKE_GADGET_EXCL		- per Vis[Comp]Class
+MSG_VIS_UPDATE_GEOMETRY			- will constrain itself to the size of
+					  the view window, if VCNA_SAME_WIDTH/
+					  HEIGHT_AS_SUBVIEW is set.
+MSG_VIS_UPDATE_WINDOWS_AND_IMAGE	- per Vis[Comp]Class
+MSG_VIS_UPDATE_WIN_GROUP		- per Vis[Comp]Class
+MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER	- sends a MSG_GEN_VIEW_ALLOW_GLOBAL-
+					  TRANSFER to the view.
+MSG_VIS_VUP_ALTER_INPUT_FLOW		- handles grab changes
+MSG_VIS_VUP_BUMP_MOUSE			- per Vis[Comp]Class
+MSG_VIS_VUP_CALL_OBJECT_OF_CLASS	- per Vis[Comp]Class
+MSG_VIS_VUP_CALL_WIN_GROUP		- per Vis[Comp]Class
+MSG_VIS_VUP_CREATE_GSTATE		- per Vis[Comp]Class
+MSG_VIS_VUP_FIND_OBJECT_OF_CLASS	- per Vis[Comp]Class
+MSG_VIS_VUP_GET_MOUSE_STATUS		- per Vis[Comp]Class
+MSG_VIS_VUP_GRAB_FOCUS_EXCL		- per Vis[Comp]Class
+MSG_VIS_VUP_GRAB_FOCUS_WIN_EXCL		- per Vis[Comp]Class
+MSG_VIS_VUP_GRAB_TARGET_EXCL		- per Vis[Comp]Class
+MSG_VIS_VUP_GRAB_TARGET_WIN_EXCL	- per Vis[Comp]Class
+MSG_VIS_VUP_QUERY			- per Vis[Comp]Class
+MSG_VIS_VUP_QUERY_FOCUS_EXCL		- per Vis[Comp]Class
+MSG_VIS_VUP_QUERY_GWIN			- per Vis[Comp]Class
+MSG_VIS_VUP_RELEASE_ALL_EXCLUSIVES	- per Vis[Comp]Class
+MSG_VIS_VUP_RELEASE_FOCUS_EXCL		- per Vis[Comp]Class
+MSG_VIS_VUP_RELEASE_FOCUS_WIN_EXCL	- per Vis[Comp]Class
+MSG_VIS_VUP_RELEASE_TARGET_EXCL		- per Vis[Comp]Class
+MSG_VIS_VUP_RELEASE_TARGET_WIN_EXCL	- per Vis[Comp]Class
+MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS	- per Vis[Comp]Class
+MSG_VIS_VUP_SEND_TO_WIN_GROUP		- per Vis[Comp]Class
+MSG_VIS_VUP_SET_MOUSE_INTERACTION_BOUNDS- this query stops here, so content can
+					  send off a MSG_GEN_VIEW_SET_DRAG_
+					  BOUNDS to the view, to contrain
+					  draw scrolling.
+MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION			
+					- per Vis[Comp]Class
+MSG_VIS_VUP_TEST_FOR_OBJECT_OF_CLASS	- per Vis[Comp]Class
+MSG_VIS_VUP_UPDATE_WIN_GROUP		- per Vis[Comp]Class
+MSG_VIS_WIN_ABOUT_TO_BE_CLOSED	- per Vis[Comp]Class
+
+Imported methods handled
+----------------------
+	
+MSG_META_KBD_CHAR			  - sends to object with keyboard 
+					    grab, or sends a MSG_VIS_CONTENT
+MSG_META_IMPLIED_WIN_CHANGE		  - forces a pointer method to be 
+					    generated, so window changes are
+					    noticed, even with no ptr reporting
+MSG_META_OBJ_FLUSH_INPUT_QUEUE		  - if holding up input, sends to 
+					    HoldUpInputQueue
+					    _UNWANTED_KBD_EVENT to self if none
+
+MSG_META_EXPOSED			  - per VisCompClass
+MSG_META_EXPOSED_FOR_PRINT		  - per VisCompClass
+MSG_META_INVAL_TREE			  - per VisCompClass
+	
+
+MSG_GET_FOCUS_EXCL			  - returns object having focus
+					    exclusive below this point
+MSG_GET_TARGET_EXCL			  - returns object having target
+					    exclusive below this point
+
+MSG_META_MUP_ALTER_FTVMC_EXCL		  - implements requests for changes
+					    to the focus & target exclusives,
+					    as the VisContent is a focus
+					    & target node.
+
+MSG_META_GAINED_FOCUS_EXCL		  - returns focus exclusive to the 
+					    object that previously had it
+MSG_META_LOST_FOCUS_EXCL		  - takes away focus from the object
+					    which has it
+MSG_META_GAINED_TARGET_EXCL		  - returns target exclusive to the 
+					    object that previously had it
+MSG_META_LOST_TARGET_EXCL		  - takes away target from the object
+					    which has it
+					  
+MSG_META_PTR				  - sends to grab if any, or calls super
+MSG_META_START_SELECT			  - sends to grab if any, or calls super
+MSG_META_END_SELECT			  - sends to grab if any, or calls super
+MSG_META_DRAG_SELECT			  - sends to grab if any, or calls super
+MSG_META_START_MOVE_COPY		  - sends to grab if any, or calls super
+MSG_META_END_MOVE_COPY			  - sends to grab if any, or calls super
+MSG_META_DRAG_MOVE_COPY			  - sends to grab if any, or calls super
+MSG_META_START_FEATURES			  - sends to grab if any, or calls super
+MSG_META_END_FEATURES			  - sends to grab if any, or calls super
+MSG_META_DRAG_FEATURES			  - sends to grab if any, or calls super
+MSG_META_START_OTHER			  - sends to grab if any, or calls super
+MSG_META_END_OTHER			  - sends to grab if any, or calls super
+MSG_META_DRAG_OTHER			  - sends to grab if any, or calls super
+
+MSG_META_LARGE_PTR			  - sent to first child
+MSG_META_LARGE_START_SELECT		  - sent to first child
+MSG_META_LARGE_START_MOVE_COPY		  - sent to first child
+MSG_META_LARGE_START_FEATURES		  - sent to first child
+MSG_META_LARGE_START_OTHER		  - sent to first child
+MSG_META_LARGE_DRAG_SELECT		  - sent to first child
+MSG_META_LARGE_DRAG_MOVE_COPY		  - sent to first child
+MSG_META_LARGE_DRAG_FEATURES		  - sent to first child
+MSG_META_LARGE_DRAG_OTHER		  - sent to first child
+MSG_META_LARGE_END_SELECT		  - sent to first child
+MSG_META_LARGE_END_MOVE_COPY		  - sent to first child
+MSG_META_LARGE_END_FEATURES		  - sent to first child
+MSG_META_LARGE_END_OTHER		  - sent to first child
+
+MSG_META_ENSURE_MOUSE_NOT_ACTIVELY_TRESPASSING -
+					  - per VisCompClass
+
+MSG_META_CONTENT_SET_VIEW		  - updates the view's target info
+MSG_META_CONTENT_VIEW_ORIGIN_CHANGED  	  - saves new origin
+MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED - saves new scale factor
+MSG_META_CONTENT_VIEW_WIN_OPENED 	  - per VisCompClass
+MSG_META_CONTENT_VIEW_OPENING 		  - per VisCompClass
+MSG_META_CONTENT_VIEW_SIZE_CHANGED 	  - saves new size, invalidates geometry
+MSG_META_CONTENT_VIEW_CLOSING 		  - per VisCompClass
+MSG_META_CONTENT_VIEW_WIN_CLOSED	  - per VisCompClass
+MSG_META_CONTENT_VIEW_LOST_GADGET_EXCL 	  - per VisCompClass
+MSG_META_CONTENT_TRACK_SCROLLING	  - sends on to object underneath it
+					    with the target exclusive
+					  
+
+------------------------------------------------------------------------------`

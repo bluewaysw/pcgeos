@@ -1,0 +1,495 @@
+# DO NOT DELETE THIS LINE
+cuiMain.rdef    : generic.uih shell.uih cuiRFSD.ui cuiIconArea.ui\
+                  CArt/cbmFiveInchDisk.ui CArt/cbmThreeInchDisk.ui\
+                  CArt/cmkrMessyWasteCan.ui CArt/cbmHardDisk.ui\
+                  CArt/cbmRamDisk.ui CArt/cbmCDRom.ui CArt/cbmNetDisk.ui\
+                  CArt/mkrRemove.ui CArt/cmkrDocDirButton.ui\
+                  CArt/cmkrWorldDirButton.ui CArt/cmkrMonoFolder.ui\
+                  CArt/cmkrMultiFolder.ui CArt/cbmPCMCIA.ui cuiTree.ui\
+                  cuiDisk.ui cuiFileOper.ui cuiFolderTemplate.ui cuiMisc.ui\
+                  cuiGetInfo.ui cuiMonikers.ui CArt/cmkrGenDoc.ui\
+                  CArt/cmkrGenAppl.ui cuiGMMonikers.ui\
+                  CArt/cmkrFileFolder.ui CArt/cmkrDosAppl.ui\
+                  CArt/cmkrDosData.ui CArt/cmkrTemplate.ui\
+                  CArt/cmkrFileMgr.ui CArt/cmkrFileMgrTiny.ui\
+                  CArt/cmkrConnectButton.ui CArt/cmkrDisconnectButton.ui\
+                  cuiStrings.ui cuiLauncher.ui
+cuiMonikers.rdef: CArt/cmkrGenDoc.ui CArt/cmkrGenAppl.ui
+cuiGMMonikers.rdef: CArt/cmkrFileFolder.ui
+View.eobj \
+View.obj        : Internal/gUtils.def Internal/im.def Internal/netDr.def\
+                  Internal/prodFeatures.def Internal/semInt.def\
+                  Internal/serialDr.def Internal/socketID.def\
+                  Internal/streamDr.def Internal/uProcC.def\
+                  Internal/vUtils.def Objects/Text/tCommon.def\
+                  Objects/clipbrd.def Objects/eMenuC.def\
+                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
+                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
+                  Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def char.def chunkarr.def color.def\
+                  cviewManager.asm dbase.def disk.def drive.def driver.def\
+                  ec.def file.def fmtool.def font.def fontID.def\
+                  gcnlist.def geode.def geos.def geoworks.def graphics.def\
+                  gstring.def heap.def hugearr.def hwr.def iacp.def\
+                  input.def lmem.def localize.def net.def netware.def\
+                  object.def print.def resource.def shell.def sllang.def\
+                  spool.def stdapp.def stylesh.def text.def timer.def\
+                  token.def uDialog.def ui.def vm.def win.def
+Util.eobj \
+Util.obj        : CFolder/cfolderConstant.def Internal/dos.def\
+                  Internal/driveInt.def Internal/fileInt.def\
+                  Internal/gUtils.def Internal/im.def Internal/netDr.def\
+                  Internal/prodFeatures.def Internal/semInt.def\
+                  Internal/serialDr.def Internal/socketID.def\
+                  Internal/streamDr.def Internal/uProcC.def\
+                  Internal/vUtils.def Objects/Text/tCommon.def\
+                  Objects/clipbrd.def Objects/eMenuC.def\
+                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
+                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
+                  Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def char.def chunkarr.def color.def\
+                  cutilCommon.asm cutilDummyObj.asm cutilEC.asm\
+                  cutilError.asm cutilFileOpHigh.asm cutilFileOpLow.asm\
+                  cutilFileOpMiddle.asm cutilManager.asm cutilUtil.asm\
+                  cutilVariable.def dbase.def disk.def drive.def driver.def\
+                  ec.def file.def fileEnum.def fmtool.def font.def\
+                  fontID.def gcnlist.def geode.def geos.def geoworks.def\
+                  graphics.def gstring.def heap.def hugearr.def hwr.def\
+                  iacp.def initfile.def input.def lmem.def localize.def\
+                  net.def netware.def object.def print.def resource.def\
+                  shell.def sllang.def spool.def stdapp.def stylesh.def\
+                  sysstats.def text.def timer.def token.def uDialog.def\
+                  ui.def vm.def win.def
+Folder.eobj \
+Folder.obj      : Internal/gUtils.def Internal/heapInt.def Internal/im.def\
+                  Internal/netDr.def Internal/prodFeatures.def\
+                  Internal/semInt.def Internal/serialDr.def\
+                  Internal/socketID.def Internal/streamDr.def\
+                  Internal/uProcC.def Internal/vUtils.def\
+                  Objects/Text/tCommon.def Objects/clipbrd.def\
+                  Objects/eMenuC.def Objects/emTrigC.def Objects/emomC.def\
+                  Objects/gAppC.def Objects/gBoolC.def Objects/gBoolGC.def\
+                  Objects/gContC.def Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def cfolderActionObscure.asm\
+                  cfolderButton.asm cfolderCode.asm cfolderConstant.def\
+                  cfolderCursor.asm cfolderDisplay.asm cfolderEC.asm\
+                  cfolderFileChange.asm cfolderIcon.asm cfolderKeyboard.asm\
+                  cfolderManager.asm cfolderMisc.asm cfolderOperations.asm\
+                  cfolderPlacement.asm cfolderPrint.asm cfolderRecord.asm\
+                  cfolderSelect.asm cfolderUtils.asm cfolderVariable.def\
+                  char.def chunkarr.def color.def dbase.def disk.def\
+                  drive.def driver.def ec.def file.def fileEnum.def\
+                  fmtool.def font.def fontID.def gcnlist.def geode.def\
+                  geos.def geoworks.def graphics.def gstring.def heap.def\
+                  hugearr.def hwr.def iacp.def initfile.def input.def\
+                  library.def lmem.def localize.def net.def netware.def\
+                  object.def print.def resource.def shell.def sllang.def\
+                  spool.def stdapp.def stylesh.def sysstats.def system.def\
+                  text.def thread.def timer.def token.def uDialog.def\
+                  ui.def vm.def win.def
+DeskDisplay.eobj \
+DeskDisplay.obj : Internal/gUtils.def Internal/grWinInt.def Internal/im.def\
+                  Internal/netDr.def Internal/prodFeatures.def\
+                  Internal/semInt.def Internal/serialDr.def\
+                  Internal/socketID.def Internal/streamDr.def\
+                  Internal/tmatrix.def Internal/uProcC.def\
+                  Internal/vUtils.def Internal/window.def\
+                  Objects/Text/tCommon.def Objects/clipbrd.def\
+                  Objects/eMenuC.def Objects/emTrigC.def Objects/emomC.def\
+                  Objects/gAppC.def Objects/gBoolC.def Objects/gBoolGC.def\
+                  Objects/gContC.def Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdeskdisplayApplication.asm cdeskdisplayClass.asm\
+                  cdeskdisplayConstant.def cdeskdisplayDirTool.asm\
+                  cdeskdisplayDriveLetter.asm cdeskdisplayDriveTool.asm\
+                  cdeskdisplayFileOp.asm cdeskdisplayManager.asm\
+                  cdeskdisplayPathname.asm cdeskdisplayTool.asm\
+                  cdeskdisplayToolArea.asm cdeskdisplayVariable.def\
+                  cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
+                  cdesktopMacro.def cdesktopToolManager.def char.def\
+                  chunkarr.def color.def dbase.def disk.def drive.def\
+                  driver.def ec.def file.def fmtool.def font.def fontID.def\
+                  gcnlist.def geode.def geos.def geoworks.def graphics.def\
+                  gstring.def heap.def hugearr.def hwr.def iacp.def\
+                  initfile.def input.def lmem.def localize.def net.def\
+                  netware.def object.def print.def resource.def shell.def\
+                  sllang.def spool.def stdapp.def stylesh.def system.def\
+                  text.def timer.def token.def uDialog.def ui.def vm.def\
+                  win.def
+DeskVis.eobj \
+DeskVis.obj     : Internal/gUtils.def Internal/im.def Internal/netDr.def\
+                  Internal/prodFeatures.def Internal/semInt.def\
+                  Internal/serialDr.def Internal/socketID.def\
+                  Internal/streamDr.def Internal/uProcC.def\
+                  Internal/vUtils.def Objects/Text/tCommon.def\
+                  Objects/clipbrd.def Objects/eMenuC.def\
+                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
+                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
+                  Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def cdeskvisClass.asm\
+                  cdeskvisConstant.def cdeskvisManager.asm\
+                  cdeskvisVariable.def char.def chunkarr.def color.def\
+                  dbase.def disk.def drive.def driver.def ec.def file.def\
+                  fmtool.def font.def fontID.def gcnlist.def geode.def\
+                  geos.def geoworks.def graphics.def gstring.def heap.def\
+                  hugearr.def hwr.def iacp.def input.def lmem.def\
+                  localize.def net.def netware.def object.def print.def\
+                  resource.def shell.def sllang.def spool.def stdapp.def\
+                  stylesh.def text.def timer.def token.def uDialog.def\
+                  ui.def vm.def win.def
+UI.eobj \
+UI.obj          : Internal/gUtils.def Internal/im.def Internal/netDr.def\
+                  Internal/prodFeatures.def Internal/semInt.def\
+                  Internal/serialDr.def Internal/socketID.def\
+                  Internal/streamDr.def Internal/uProcC.def\
+                  Internal/vUtils.def Objects/Text/tCommon.def\
+                  Objects/clipbrd.def Objects/eMenuC.def\
+                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
+                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
+                  Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def char.def chunkarr.def color.def\
+                  cuiConstant.def cuiManager.asm dbase.def disk.def\
+                  drive.def driver.def ec.def file.def fmtool.def font.def\
+                  fontID.def gcnlist.def geode.def geos.def geoworks.def\
+                  graphics.def gstring.def heap.def hugearr.def hwr.def\
+                  iacp.def input.def lmem.def localize.def net.def\
+                  netware.def object.def print.def resource.def shell.def\
+                  sllang.def spool.def stdapp.def stylesh.def text.def\
+                  timer.def token.def uDialog.def ui.def vm.def win.def
+UI.eobj \
+UI.obj:  cuiMain.rdef
+Main.eobj \
+Main.obj        : Internal/diskInt.def Internal/dos.def\
+                  Internal/driveInt.def Internal/fileInt.def\
+                  Internal/fsDriver.def Internal/fsd.def\
+                  Internal/gUtils.def Internal/geodeStr.def\
+                  Internal/heapInt.def Internal/im.def Internal/netDr.def\
+                  Internal/parallDr.def Internal/prodFeatures.def\
+                  Internal/rfsd.def Internal/semInt.def\
+                  Internal/serialDr.def Internal/socketID.def\
+                  Internal/streamDr.def Internal/uProcC.def\
+                  Internal/vUtils.def Objects/Text/tCommon.def\
+                  Objects/clipbrd.def Objects/eMenuC.def\
+                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
+                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
+                  Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def char.def chunkarr.def\
+                  cmainChangeDir.asm cmainConstant.def\
+                  cmainCreateLauncher.asm cmainDiskOps.asm cmainFileOps.asm\
+                  cmainFolder.asm cmainInit.asm cmainLauncher.asm\
+                  cmainLoadApp.asm cmainManager.asm cmainMonikers.asm\
+                  cmainOpenClose.asm cmainProcess.asm cmainVariable.def\
+                  cmainZoomer.asm color.def dbase.def disk.def drive.def\
+                  driver.def ec.def file.def fileEnum.def fmtool.def\
+                  font.def fontID.def gcnlist.def geode.def geos.def\
+                  geoworks.def graphics.def gstring.def heap.def\
+                  hugearr.def hwr.def iacp.def initfile.def input.def\
+                  lmem.def localize.def net.def netware.def object.def\
+                  print.def resource.def shell.def sllang.def spool.def\
+                  stdapp.def stylesh.def sysstats.def system.def text.def\
+                  timer.def token.def uDialog.def ui.def vm.def win.def
+ShObj.eobj \
+ShObj.obj       : Internal/gUtils.def Internal/im.def Internal/netDr.def\
+                  Internal/prodFeatures.def Internal/semInt.def\
+                  Internal/serialDr.def Internal/socketID.def\
+                  Internal/streamDr.def Internal/uProcC.def\
+                  Internal/vUtils.def Objects/Text/tCommon.def\
+                  Objects/clipbrd.def Objects/eMenuC.def\
+                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
+                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
+                  Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def char.def chunkarr.def color.def\
+                  cshobjConstant.def cshobjDelete.asm cshobjManager.asm\
+                  cshobjMoveCopy.asm cshobjReceive.asm cshobjUtils.asm\
+                  cshobjVariable.def dbase.def disk.def drive.def\
+                  driver.def ec.def file.def fmtool.def font.def fontID.def\
+                  gcnlist.def geode.def geos.def geoworks.def graphics.def\
+                  gstring.def heap.def hugearr.def hwr.def iacp.def\
+                  input.def lmem.def localize.def net.def netware.def\
+                  object.def print.def resource.def shell.def sllang.def\
+                  spool.def stdapp.def stylesh.def text.def timer.def\
+                  token.def uDialog.def ui.def vm.def win.def
+Launcher.eobj \
+Launcher.obj    : Internal/gUtils.def Internal/im.def Internal/netDr.def\
+                  Internal/prodFeatures.def Internal/semInt.def\
+                  Internal/serialDr.def Internal/socketID.def\
+                  Internal/streamDr.def Internal/uProcC.def\
+                  Internal/vUtils.def Objects/Text/tCommon.def\
+                  Objects/clipbrd.def Objects/eMenuC.def\
+                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
+                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
+                  Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def char.def chunkarr.def\
+                  clauncherManager.asm color.def cwFileSelectorClass.asm\
+                  dbase.def disk.def drive.def driver.def ec.def file.def\
+                  fileEnum.def fmtool.def font.def fontID.def gcnlist.def\
+                  geode.def geos.def geoworks.def graphics.def gstring.def\
+                  heap.def hugearr.def hwr.def iacp.def input.def lmem.def\
+                  localize.def net.def netware.def object.def print.def\
+                  resource.def shell.def sllang.def spool.def stdapp.def\
+                  stylesh.def text.def timer.def token.def uDialog.def\
+                  ui.def vm.def win.def
+Tree.eobj \
+Tree.obj        : Internal/gUtils.def Internal/im.def Internal/netDr.def\
+                  Internal/prodFeatures.def Internal/semInt.def\
+                  Internal/serialDr.def Internal/socketID.def\
+                  Internal/streamDr.def Internal/uProcC.def\
+                  Internal/vUtils.def Objects/Text/tCommon.def\
+                  Objects/clipbrd.def Objects/eMenuC.def\
+                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
+                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
+                  Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def char.def chunkarr.def color.def\
+                  ctreeClass.asm ctreeConstant.def ctreeManager.asm\
+                  ctreeOutline.asm ctreeScan.asm ctreeUtils.asm\
+                  ctreeVariable.def dbase.def disk.def drive.def driver.def\
+                  ec.def file.def fileEnum.def fmtool.def font.def\
+                  fontID.def gcnlist.def geode.def geos.def geoworks.def\
+                  graphics.def gstring.def heap.def hugearr.def hwr.def\
+                  iacp.def input.def lmem.def localize.def net.def\
+                  netware.def object.def print.def resource.def shell.def\
+                  sllang.def spool.def stdapp.def stylesh.def text.def\
+                  timer.def token.def uDialog.def ui.def vm.def win.def
+Tool.eobj \
+Tool.obj        : Internal/gUtils.def Internal/geodeStr.def Internal/im.def\
+                  Internal/netDr.def Internal/prodFeatures.def\
+                  Internal/semInt.def Internal/serialDr.def\
+                  Internal/socketID.def Internal/streamDr.def\
+                  Internal/uProcC.def Internal/vUtils.def\
+                  Objects/Text/tCommon.def Objects/clipbrd.def\
+                  Objects/eMenuC.def Objects/emTrigC.def Objects/emomC.def\
+                  Objects/gAppC.def Objects/gBoolC.def Objects/gBoolGC.def\
+                  Objects/gContC.def Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cdesktopConstant.def cdesktopGeode.def\
+                  cdesktopGlobal.def cdesktopMacro.def\
+                  cdesktopToolManager.def char.def chunkarr.def color.def\
+                  ctoolManager.asm ctoolProcess.asm ctoolToolMgr.asm\
+                  ctoolToolTrigger.asm ctoolToolTrigger.def\
+                  ctoolVariable.def dbase.def disk.def drive.def driver.def\
+                  ec.def file.def fileEnum.def fmtool.def font.def\
+                  fontID.def gcnlist.def geode.def geos.def geoworks.def\
+                  graphics.def gstring.def heap.def hugearr.def hwr.def\
+                  iacp.def input.def library.def lmem.def localize.def\
+                  net.def netware.def object.def print.def resource.def\
+                  shell.def sllang.def spool.def stdapp.def stylesh.def\
+                  text.def timer.def token.def uDialog.def ui.def vm.def\
+                  win.def
+Bitmap.eobj \
+Bitmap.obj      : Internal/gUtils.def Internal/im.def Internal/netDr.def\
+                  Internal/prodFeatures.def Internal/semInt.def\
+                  Internal/serialDr.def Internal/socketID.def\
+                  Internal/streamDr.def Internal/uProcC.def\
+                  Internal/vUtils.def Objects/Text/tCommon.def\
+                  Objects/clipbrd.def Objects/eMenuC.def\
+                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
+                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
+                  Objects/gCtrlC.def Objects/gDCtrlC.def\
+                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
+                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
+                  Objects/gEditCC.def Objects/gFSelC.def\
+                  Objects/gFieldC.def Objects/gGadgetC.def\
+                  Objects/gGlyphC.def Objects/gInterC.def\
+                  Objects/gItemC.def Objects/gItemGC.def\
+                  Objects/gPageCC.def Objects/gPenICC.def\
+                  Objects/gPrimC.def Objects/gProcC.def\
+                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
+                  Objects/gToolCC.def Objects/gToolGC.def\
+                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
+                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
+                  Objects/inputC.def Objects/metaC.def Objects/processC.def\
+                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
+                  Objects/vTextC.def Objects/visC.def Objects/winC.def\
+                  alb.def cbitmapGeneric.asm cbitmapManager.asm\
+                  cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
+                  cdesktopMacro.def cdesktopToolManager.def char.def\
+                  chunkarr.def color.def dbase.def disk.def drive.def\
+                  driver.def ec.def file.def fmtool.def font.def fontID.def\
+                  gcnlist.def geode.def geos.def geoworks.def graphics.def\
+                  gstring.def heap.def hugearr.def hwr.def iacp.def\
+                  input.def lmem.def localize.def net.def netware.def\
+                  object.def print.def resource.def shell.def sllang.def\
+                  spool.def stdapp.def stylesh.def text.def timer.def\
+                  token.def uDialog.def ui.def vm.def win.def
+managerec.geo manager.geo: geos.ldf ui.ldf shell.ldf

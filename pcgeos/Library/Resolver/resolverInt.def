@@ -1,0 +1,1083 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Serial/IR communication project
+MODULE:		Resolver
+FILE:		resolverInt.def
+
+AUTHOR:		Steve Jang, Dec 13, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	12/13/94   	Initial revision
+
+DESCRIPTION:
+	Resolver that provides services related to DNS.
+
+	$Id: resolverInt.def,v 1.23 98/06/16 18:12:46 jwu Exp $
+
+.INI ENTRIES:
+
+ex)
+
+[resolver]
+cacheSize	= 100		; number of cache entries allowed
+clientTimeout	= 1800		; number of ticks( 1/60 sec ) before client
+				; query expires - 30 sec in this case
+minQueryTimeout	= 240		; minimum number of ticks before a query to a
+				; name server expires - 4 sec in this case
+maxQueryTimeout = 600		; maximum number of ticks to wait for a reply
+				; from a name server - 10 sec in this case
+nsRetry		= 1		; how many times should we try the same name
+				; server in case we don't get any response
+				; until query times out
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+; Compiler Directives
+;-----------------------------------------------------------------------------
+
+; ENABLE_DELEGATION=0|-1 : when FALSE, resolver only uses name server provided
+;			   by accpnt library, when TRUE, resolver uses name
+;			   server addresses obtained from network.
+;			   This is here to avoid firewall problem, but
+;			   this should be set TRUE for the final version.
+;
+ENABLE_DELEGATION equ	-1
+
+if (ENABLE_DELEGATION eq 0)
+ PrintMessage <DO NOT SHIP THIS VERSION OF RESOLVER!!!!!>
+endif
+
+;-----------------------------------------------------------------------------
+; Constants
+;-----------------------------------------------------------------------------
+
+DOMAIN_NAME_SERVER_PORT		equ	53	; well-known port
+MAX_UDP_RESPONSE_LENGTH		equ	512
+RESOLVER_DOMAIN_NAME_SIZE	equ	6*(size TCHAR)	; "tcpip", 0
+
+RESOLVER_HUGELMEM_NUM_BLOCKS	equ	20
+RESOLVER_HUGELMEM_MIN_OPT_SIZE	equ	4000
+RESOLVER_HUGELMEM_MAX_OPT_SIZE	equ	8000
+RESOLVER_EVENT_Q_MIN_LEN	equ	10
+RESOLVER_EVENT_Q_MAX_LEN	equ	400
+RESOLVER_EVENT_THREAD_STACK	equ	2048
+RESOLVER_SERVER_THREAD_STACK	equ	1024
+RESOLVER_POLL_INTERVAL		equ	30	  ; 500 ms
+RESOLVER_DEFAULT_TIMEOUT	equ	60*30	  ; 30 sec
+RESOLVER_RETRY_NS_COUNT		equ	2	  ; try each NS twice
+RESOLVER_MIN_QUERY_TIMEOUT	equ	60*4	  ; 4 seconds
+RESOLVER_MAX_QUERY_TIMEOUT	equ	60*10	  ; 10 seconds
+RESOLVER_DETACH_DELAY		equ	3600*3	  ; 3 min
+
+RESOLVER_SERVER_THREAD_SLEEP_COUNT equ	3600*1
+; sleep 1 minutes if we can't get memory we want for incoming data
+
+RESOLVER_REQUEST_TTL		equ	RESOLVER_DEFAULT_TIMEOUT
+RESOLVER_PORT			equ	36101		; to jump over firewall
+RESOLVER_MAX_REQUEST_TREE_LEVEL	equ	5		;
+
+RESOLVER_DEFAULT_CACHE_SIZE	equ	100
+OPEN_DOMAIN_TIMEOUT		equ	1800	; 30 sec
+;
+; Number of resource records that our cache can hold
+;
+
+RESOLVER_REQUEST_WORK_ALLOWED	equ	100		; pts
+;
+; Unit for work amount:
+;  sending a query = 1 pts	    ; uses memory
+;  handling a response = 2 pts	    ; takes time and memory
+;  spawning a child request = 3 pts ; consumes memory and initiates new events
+;  ( so we can spawn maximum 50 child requests per initial request )
+;
+
+MAX_REQUEST_TREE_DEPTH		equ	RESOLVER_MAX_REQUEST_TREE_LEVEL
+;
+; Sometimes we recursively query addresses for name servers. If we reach this
+; depth, we will stop recursing and just query our default name server
+;
+
+MAX_ADDR_STRING_PROPERTY_SIZE	equ	18*(size TCHAR)
+;
+; AccessPointGetStringProperty returns an address string of format
+; "100.299.833.282",0. So its size should be less than 18.  This constant is
+; mainly used for allocating buffers.  I made it an even number so that we
+; allocate things on stack without confusion.
+;
+
+MAX_CACHE_ENTRY_LIFE		equ	7	; can be upto 31 but no more
+;
+; This is unit in days.  Any cache entry older than this number of days
+; will be deleted
+;
+
+MAX_CACHE_ENTRY_LIFE_IN_SEC	equ	MAX_CACHE_ENTRY_LIFE * 24 * 3600
+;
+; If an incoming resource record has TTL lager than this number,
+; its TTL will be converted to MAX_CACHE_ENTRY_LIFE
+;
+
+RESOLVER_FAILURE_ALLOWANCE	equ	3
+;
+; after this many number of failures, we assume that resolver cache is
+; trashed( or certain threads have gone into infinite loop ).
+;
+
+DAYS_IN_A_YEAR			equ	365
+SECONDS_IN_A_DAY		equ	24 * 60 * 60
+TICKS_IN_10MIN			equ	60 * 60 * 10
+DAY_DIV_10MIN			equ	24 * 60 / 6
+DATE_CHANGE_TIME		equ	1	; 00:01am
+TCPIP_ADDR_SIZE			equ	size dword + 5
+				; IP address size + link address size
+LINK_TOTAL_SIZE			equ	5	; total link portion of address
+LINK_DATA_SIZE			equ	3	; link type[b] + link ID[w]
+IP_ADDR_SIZE			equ	4	; 4 byte
+UNBLOCK				equ	-1	; see RequestExit
+DO_NOT_UNBLOCK			equ	0	;
+
+CLIENT_COUNT_MASK		equ	0000000000001111b ; can hold 16 numbers
+MAX_CLIENT_COUNT		equ	15
+; we can have upto 16 simultaneous queries.  This number is limited by
+; IdValidate routine algorithm, so if you need to increment this number,
+; you will have to rewrite IdValidate, IdInvalidate, IdCheck routines.
+						
+
+;-----------------------------------------------------------------------------
+; Enumerations
+;-----------------------------------------------------------------------------
+
+;
+; ResolverFatalErrors
+;
+
+RFE_TREE_CORRUPTED	enum	FatalErrors
+;
+; Tree structure is corrupted in memory or in cache file
+;
+
+RFE_RR_NOT_FOUND	enum	FatalErrors
+;
+; Called ConstructAnswer on a node that has no RR in the node
+;
+
+RFE_REQUEST_NOT_FOUND	enum	FatalErrors
+;
+; We could not find request node when it is suppoed to exist
+;
+
+RFE_GENERAL_FAILURE	enum	FatalErrors
+;
+; This-should-never-happen type of error
+;
+
+RFE_BAD_ARGUMENT	enum	FatalErrors
+;
+; Bad argument was passed into a routine
+;
+
+RFE_LMEM_CORRUPTED	enum	FatalErrors
+;
+; Lmem is corrupted
+;
+
+RFE_INFO_BLOCK_LOCKED	enum	FatalErrors
+;
+; This happens when an event handler left ResolverRequestBlock or
+; ResolverCacheBlock locked on its exit.  These blocks must remain
+; unlocked on entry to any event handler.
+;
+
+RFE_TREE_BUG		enum	FatalErrors
+;
+; Bug in tree manipulation
+;
+
+RFE_SAVE_ERROR		enum	FatalErrors
+;
+; Error in saving cache into a file in general
+;
+
+;
+; ResolverWarnings
+;
+
+RW_STRANGE_RESPONSE		enum	Warnings
+;
+; The packetwe received from a name server contains strange data
+;
+
+RW_VERY_STRANGE			enum	Warnings
+;
+; Something strange has happended.  Used in the following cases:
+;
+; In ResolverResolveAddress,
+;    answer chunk array doesn't contain answer when ResolverGetHostByName
+;    returned carry clr
+;
+
+RW_REQUEST_TREE_TOO_DEEP	enum	Warnings
+;
+; This means that the request tree for a particular client became
+; too deep(which means it generated too many generations of child
+; requests--this happens when address of a name server we are trying to query
+; is not available), and any further child request will not be spawned.
+;
+
+RW_MEMORY_ERROR			enum	Warnings
+;
+; Some sort of memory error; Most likely that we ran out of memory.
+;
+
+RW_REGISTER_TRASHED		enum	Warnings
+;
+; Register was trashed after calling a routine
+;
+
+RW_FILE_WRITE_ERROR		enum	Warnings
+;
+; Some error occured when trying to write to a file
+; ( this excludes out of disk space case )
+;
+
+RW_OUT_OF_DISK_SPACE		enum	Warnings
+;
+; An out-of-disk-space error was encountered while writing to a file
+;
+
+RW_BAD_IP_ADDRESS		enum	Warnings
+;
+; Part of IP address is corrupted, but we just proceed with
+; our speculation of what it meant
+;
+
+RW_CACHE_NOT_SAVED		enum	Warnings
+;
+; Cache was not saved into cache file for some reason
+; Cache is likely to have been cleaned up though
+;
+
+RW_SLIST_PROBLEM		enum	Warnings
+;
+; We could not compose a valid SLIST to query
+;
+
+RW_ERROR_LOCKING_BAD_BAD_BAD	enum	Warnings
+;
+; Error locking event queue.  This is real bad.  I put this in NEC version
+; to warn QAs.  On EC version I crash.
+;
+
+RW_FIXING_UP_TRUNCATION		enum	Warnings
+;
+; The response packet has fewer RRs than the header indicated, and we're
+; going to attempt to fixup the section counts to compensate.  After hours
+; of research I'm still not sure if the DNS server is supposed to fixup
+; the header fields of truncated responses.  I saw a packet once that
+; demonstrated this oddness, but then got a different response the next time.
+;
+
+;
+; ResourceRecord operations
+; : see DoRRData function
+;
+DoResourceRecordFunction	etype	word, 0, 2
+DRRF_SKIP		enum DoResourceRecordFunction
+DRRF_CONVERT		enum DoResourceRecordFunction
+
+;
+; TESTING TRACE
+;
+
+;
+; Test Indications
+;
+TEST_AT_CR_1		enum Warnings
+TEST_AT_CR_2		enum Warnings
+TEST_AT_ER_1		enum Warnings
+TEST_AT_QN_1		enum Warnings
+TEST_AT_QN_2		enum Warnings
+TEST_AT_QN_3		enum Warnings
+TEST_AT_QN_4		enum Warnings
+TEST_AT_SC_1		enum Warnings
+TEST_AT_SC_2		enum Warnings
+TEST_AT_SC_3		enum Warnings
+TEST_AT_RE_1		enum Warnings
+TEST_AT_RE_2		enum Warnings
+TEST_AT_RE_3		enum Warnings
+TEST_AT_RE_4_1		enum Warnings
+TEST_AT_RE_4_2		enum Warnings
+TEST_AT_RE_5		enum Warnings
+TEST_AT_RE_6		enum Warnings
+TEST_AT_RR_1		enum Warnings
+TEST_AT_DE_1		enum Warnings
+
+TEST_RE_QUERY_INFO		enum Warnings
+TEST_RE_QUERY_NAME		enum Warnings
+TEST_RE_SPAWN_CHILD_QUERY	enum Warnings
+TEST_RE_QUERY_NAME_SERVERS	enum Warnings
+TEST_RE_REQUEST_RESTART		enum Warnings
+TEST_RE_END_REQUEST		enum Warnings
+TEST_RE_RESPONSE		enum Warnings
+TEST_RE_QUERY_TIMEOUT		enum Warnings
+TEST_RE_DETACH			enum Warnings
+
+SOMETHING_CAME_IN		enum Warnings
+NO_REQUEST_FOUND_FOR_RESPONSE	enum Warnings
+RESPONSE_CONTAINS_DEFINED_ERROR enum Warnings
+RESPONSE_CORRUPTED		enum Warnings
+RESPONSE_NAME_MISMATCH		enum Warnings
+RESPONSE_CONTAINS_ALIAS		enum Warnings
+RESPONSE_CONTAINS_ANSWER	enum Warnings
+RESPONSE_CONTAINS_DELEGATION	enum Warnings
+
+;-----------------------------------------------------------------------------
+; Events
+;-----------------------------------------------------------------------------
+
+ResolverEvent		etype	word, 0, 2
+
+;
+; THING TO KEEP IN MIND WHEN DEFINING EVENT:
+;
+; 1. An event cannot have a return value.
+;
+; 2. ResolverRequestBlock and ResolverCacheBlock are assumed to be NOT locked
+;    when an event gets to its handler( any ES or DS that contains either of
+;    these two resource blocks will be converted to NULL_SEGMENT when it
+;    gets to the event handler ).
+;
+; 3. Whenever you lock a block inside an event handler try to unlock it
+;    before you exit the event handler.
+;    It is not advised to pass arguments in es or ds.
+;    ( but you can if you really need to as long as you are aware of 2.)
+;
+
+RE_QUERY_INFO		enum	ResolverEvent
+;
+; Send address query to a name server
+;
+; PASS:	  dx	  = request ID
+;	  di	  = semaphore to V when result was obtained
+;	  bp	  = ResolverQueryType
+;	  ^lbx:si = name of the host
+;	  ^lbx:cx = chunk array passed in by the caller
+;
+RE_QUERY_NAME		enum	ResolverEvent
+;
+; Send host name query to a name server
+;
+; PASS:   dx	  = request ID
+;	  di	  = semaphore to V to unblock client thread
+;	  ^lbx:cx = chunk array to use to return the result
+;
+RE_SPAWN_CHILD_QUERY	enum	ResolverEvent
+;
+; Spawn a child query request under a parent request
+;
+; PASS:	  cx	    = domain name nptr
+;	  dx	    = request id of parent
+;	  bp	    = parent request node handle
+;
+RE_QUERY_NAME_SERVERS	enum	ResolverEvent
+;
+; PASS:	  dx	    = request id
+;
+RE_REQUEST_RESTART	enum	ResolverEvent
+;
+; PASS:	  bx	    = RequestRestartReason
+;	  dx	    = request id
+;
+RE_END_REQUEST		enum	ResolverEvent
+;
+; Terminate a query request
+;
+; PASS:	  dx	  = request ID
+;
+RE_END_REQUEST_NO_V	enum	ResolverEvent
+;
+; Terminate a query request but do not V block sem
+; This happens if client is trying to clean up its request after timing out.
+; Since TimerP already timed out we cannot V it again.
+;
+; PASS:	  dx	  = request ID
+;
+RE_RESPONSE		enum	ResolverEvent
+;
+; Received a response from remote name server
+;
+; PASS:   ^lbx:bp = message received
+;
+RE_DETACH		enum	ResolverEvent
+;
+; PASS:   nothing
+;
+RE_REDUCE_CACHE		enum	ResolverEvent
+;
+; Delete half of the cache entries to reclaim heap space
+;
+; PASS:	  nothing
+;
+RE_UPDATE_CACHE		enum	ResolverEvent
+;
+; Delete all cache entries with TTL=0
+;
+; PASS:   nothing
+;
+RE_DELETE_CACHE		enum	ResolverEvent
+;
+; Delete all cache entries
+;
+; PASS:   nothing
+;
+RE_QUERY_TIMER_EXPIRED	enum	ResolverEvent
+;
+; Query timer expired for a name server
+;
+; PASS:	  dx = request ID( RN_id )
+;
+RE_INTERRUPT_QUERY	enum	ResolverEvent
+;
+; Interrupt every query requests for a certain domain string
+;
+; PASS:	  bx = block containing domain string
+;
+
+RequestRestartReason	etype	word
+RRR_SNAME_CHANGED		enum	RequestRestartReason
+RRR_CHILD_REQUEST_ANSWERED	enum	RequestRestartReason
+RRR_DELEGATION			enum	RequestRestartReason
+RRR_DHCP_EXPIRED		enum	RequestRestartReason
+
+;
+; Event structure
+;
+ResolverEventStruct struct
+	RES_ax	word	; event code
+	RES_bx	word
+	RES_cx	word
+	RES_dx	word
+	RES_bp	word
+	RES_si	word
+	RES_di	word
+	RES_ds	word
+	RES_es	word
+ResolverEventStruct ends
+
+;-----------------------------------------------------------------------------
+; Structures
+;-----------------------------------------------------------------------------
+;
+; Tree structure is used to store cache entries and request entries.
+; It's the general tree structure we learned in school that looks like this:
+;
+;      	       	       	*root
+;
+;                 /---[NodeA]<-\
+;          child/                \ next
+;             /        	           \
+;            L    next        next   \
+;         [NodeB]----->[NodeD]----->[NodeE]
+;     child|  ^	       	|  ^   	     | 	^
+;          |  |	        |  |   	     | 	|
+;          V  |next	----   	     ----
+;          [NodeC]        child	       child
+;      	    |  ^
+;	    |  |
+;	    ---- child
+;
+; To this I added NC_prev field to remember previous node.
+; Previous node is the one that the current node hangs from.
+; Previous node of NodeB is NodeA and not NodeC.
+; Previous node of NodeD is NodeB.
+;
+
+;
+; Tree nodes
+;
+NodeFlags	record
+	NF_ROOT:1
+	NF_LAST:1		; last sibling, NC_next points to parent
+	NF_HAS_CHILD:1		; if this is 0, NC_child point to itself
+	NF_INIT_REQUEST:1	; used in RequestNodeCommon
+	NF_RESERVED:8		; reserved for future use ( must be 0 )
+	NF_LEVEL:4		; max level = 15
+NodeFlags	end
+
+NodeCommon	  struct
+	NC_flags    NodeFlags
+	NC_prev     nptr	; prev sibling node or parent node
+	NC_next     nptr	; next sibling node or parent node
+	NC_child    nptr	; child node or itself
+NodeCommon	  ends
+;
+; Only root node has NC_prec, NC_next 0
+;
+
+;
+; Cache file structure
+;
+; When resolve exits it saves the current cache into a file.  The following is
+; the format of this file.
+;
+
+ResolverCacheFileHeader	struct
+	RCSF_timeStamp	word		; date converted into a number 1-365
+	RCSF_data	label byte	; cache entries
+ResolverCacheFileHeader	ends
+
+;
+; Data portion is basically the tree structure spread out as one long linked
+; list.  TreeFlags can be used to re-construct the tree from this data.
+;
+; The tree structure shown earlier in this file will look like the following
+; in a file(Let's say that NodeC, NodeD and NodeE had some resource records):
+;
+; [NodeA-root][NodeB][NodeC][RR][RR][NodeD][RR][NodeE][RR][RR]
+;
+; We can re-construct the tree using NC_flags information and pointer fields.
+;
+
+;
+; Request Trees
+; : Initial requests are the requests that clients made, and child requests
+;   are the requests that spawned off of Initial or other child requests.
+; RN_answer - for initial requests, this field contains optr to chunk array to
+;	      return the answer in.
+;	      for child requests, lower word of this field contains nptr to
+;	      the server name, so that when this request was fulfilled, it can
+;	      go back to the server it was trying to query.
+;
+
+RequestBlockHeader	struct
+	RBH_common	LMemBlockHeader
+	RBH_root	nptr
+	RBH_sbelt	nptr
+	RBH_curId	word
+	align word
+RequestBlockHeader	ends
+
+RequestNode	struct
+	RN_tree		NodeCommon
+	RN_id		word
+	RN_timeStamp	dword
+	RN_workAllowed	word
+	RN_stype	word
+	RN_sclass	word
+	RN_slist	nptr	; a chunk array for slist of NS
+	RN_nsQueried	nptr	; nptr to NS name currently being queried
+	RN_matchCount	word	; # of labels to match still
+	RN_answer	dword	; see ResponderAnswerHeader
+	RN_accessId	word	; see ResponderAnswerHeader
+	RN_blockSem	hptr	; only valid for initial request node
+	RN_queryTimeout	word	; timeout value for each query
+	RN_queryTimer	dword	; timer id:handle for query timer
+	RN_nameLen	word	; name length including null
+	RN_name		label byte
+	; variable sized
+RequestNode	ends
+
+;
+; Cached resource records(RR)
+; : cache is organized as a domain name tree
+;
+ResourceRecordNode	struct
+	RRN_tree	NodeCommon
+	RRN_resource	optr	   ; null if none
+	RRN_name	label byte ; null terminated label( 64 bytes max. )
+ResourceRecordNode	ends
+
+RRRootNode		struct
+	RRRN_common	ResourceRecordNode
+	RRRN_name	byte	0
+RRRootNode		ends
+
+ResourceRecordCommon	struct
+	RRC_type	ResourceRecordType
+	RRC_class	NetClass
+	RRC_ttl		dword ; time to live in day unit inside cache
+	RRC_dataLen	word
+ResourceRecordCommon	ends
+
+ResourceRecord struct
+	RR_next   optr.ResourceRecord
+	RR_common ResourceRecordCommon
+	RR_data   label byte
+	; variable sized
+ResourceRecord ends
+
+CacheBlockHeader	struct
+	CBH_common	LMemBlockHeader
+	CBH_tempNode	RRRootNode		; see CacheFileReadRecord
+	CBH_root	nptr			; root node chunk ptr
+	CBH_temp	nptr			; temp node used for removal
+	align word				; inside TreeEnum
+CacheBlockHeader	ends
+
+;
+; SLIST: a chunk array containing a number of SlistElements
+;
+ServerFlags	record
+	:15
+	SF_SEND_ERROR:1
+ServerFlags	end
+
+SlistElement	struct
+	SE_flags	ServerFlags
+	SE_address	dword   ; IP address ( 0 if none available )
+	SE_nameLen	word	; length of domain name string( null included )
+	SE_serverName	nptr	; handle to another chunk that contains name
+SlistElement	ends
+
+COMMENT @==================================================================
+
+Resolver message format(from rfc1035):
+                                    1  1  1  1  1  1
+      0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                      ID                       |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    QDCOUNT                    |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    ANCOUNT                    |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    NSCOUNT                    |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    ARCOUNT                    |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+The confusing notation in rfc1035.  Actually, bit 0 is the most significant
+bit in this diagram.
+
+===========================================================================@
+
+;
+; Message format( see RFC-1035 for detail )
+;
+ResolverOpcode		etype	word	; opcode
+RO_QUERY		enum ResolverOpcode, 00000000000000000b
+RO_IQUERY		enum ResolverOpcode, 00000000000000010b
+RO_STATUS		enum ResolverOpcode, 00000000000000100b
+
+;
+; We place the first byte in the lower byte of ResolverMessageFlags so that
+; we don't need to change the byte order when we receive them from Internet.
+; ( or when we send out )
+;
+ResolverMessageFlags	record
+	RMF_RA:1	; recursion available		.
+	RMF_Z:3		; reserved - must be zero	| 2nd byte transmitted
+	RMF_RCODE:4	; error code			. ( also 2nd received )
+	RMF_QR:1	; question(=0)/response(=1)	.
+	RMF_OPCODE:4	; query/inverse query/status	|
+	RMF_AA:1	; authorative answer		| 1st byte transmitted
+	RMF_TC:1	; truncation			| ( also 1st received )
+	RMF_RD:1	; recursion desired		.
+ResolverMessageFlags	end
+
+ResolverMessage		struct
+	RM_id		word	; id.high = child id; id.low = client id
+	RM_flags	ResolverMessageFlags
+	RM_qdCount	word	; # of questions
+	RM_anCount	word	; # of answers
+	RM_nsCount	word	; # of authority name servers
+	RM_arCount	word	; # of additional resource records
+	RM_data		label byte
+	; Question/Answer/Authority/Additional - all in RR format
+ResolverMessage		ends
+
+RESOLVER_MAX_QUERY_MSG_SIZE equ size ResolverMessage + MAX_HOST_NAME_SIZE + 4
+;
+; We will always use only one question
+;
+
+;
+; Word align MediumAndUnit so that we can allocate it on the stack
+;
+MediumAndUnitAligned	struct
+MUA_real	MediumAndUnit
+align word
+MediumAndUnitAligned	ends
+
+ResolverStatusFlag	record
+	RSF_SHUTTING_DOWN:1		; finally shutting down resolver
+	RSF_TIMER_STARTED:1		; detach timer started
+	:9
+	RSF_CACHE_AGE:5			; age of the cache in days
+ResolverStatusFlag	end
+
+;-----------------------------------------------------------------------------
+; Variables
+;-----------------------------------------------------------------------------
+
+udata	segment
+	refreshTimer	dword		; cache refresh timer
+	uiThreadHandle	hptr
+	validId		word		; bit mask for valid id
+					; see IdValidate routine
+udata	ends
+
+idata	segment
+	resolverStatus	ResolverStatusFlag	0 ; protected by mutex
+	registerCount	word	0
+	socketHandle	word	0
+	resolverPort	word	RESOLVER_PORT
+	;
+	; Socket address structure passed into SocketSend
+	socketAddress	SocketAddress < <DOMAIN_NAME_SERVER_PORT,\
+					 MANUFACTURER_ID_SOCKET_16BIT_PORT>,\
+					RESOLVER_DOMAIN_NAME_SIZE,\
+					0, TCPIP_ADDR_SIZE > ; 5 + size dword
+	  linkDataSize	word	3	; linkType[1 byte] + linkID[2 bytes]
+	  linkType	byte	LT_ID
+	  linkId	word	0
+	ipAddress	dword	0
+
+	nullTerminator	byte	0
+	socketDomain	TCHAR	"tcpip", 0
+	hugeLMem	hptr	0
+	eventQueue	nptr	0 ; this queue is in ResolverLMem always
+	queryMessage	hptr	0 ; a block allocated for our query data
+	detachTimer	dword	0
+	mutex		Semaphore <1,0>
+			; This semaphore protects critical sections among
+			; client threads, and our internal threads
+	exitSem		Semaphore <0,0>
+			; event thread waits on this semaphore until server
+			; thread exits
+	cacheSize	word	0
+			; number of resource record entries
+	cacheSizeAllowed word	RESOLVER_DEFAULT_CACHE_SIZE
+	deleteCount	word	0
+			; used in CacheDeallocate
+	cacheFileName	TCHAR	"rescache",0
+	clientTimeout	word	RESOLVER_DEFAULT_TIMEOUT
+	minQueryTimeout	word	RESOLVER_MIN_QUERY_TIMEOUT
+	maxQueryTimeout word	RESOLVER_MAX_QUERY_TIMEOUT
+	nsRetry		word	RESOLVER_RETRY_NS_COUNT
+	dhcpDns1	dword	; Declared dwords instead of IPAddr to make
+	dhcpDns2	dword	; manipulating easier
+idata	ends
+ForceRef nullTerminator
+ForceRef leadingZero
+ForceRef linkDataSize
+ForceRef linkType
+
+;-----------------------------------------------------------------------------
+; Macros
+;-----------------------------------------------------------------------------
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetDgroup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Puts dgroup in ds or es
+
+PASS:		seg = ds or es
+		trash = extra register to trash
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	11/24/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GetDgroup	macro	seg, trash
+if _FXIP
+   ifdif <trash>, <bx>
+		mov_tr	trash, bx
+   endif
+		mov	bx, handle dgroup
+   ifdif <seg>, <ds>
+      ifdif <seg>, <es>
+		PrintMessage <You may put dgroup only in ds or es>
+      else
+		call	MemDerefES
+      endif
+   else
+		call	MemDerefDS
+   endif
+   ifdif <trash>, <bx>
+		mov_tr	bx, trash
+   endif
+else
+		segmov	seg, dgroup, trash
+endif
+		endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ChunkPtrToLptr( bad? )
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Gets handle of a chunk from its chunk offset
+PASS:		seg, offset, result regs
+PSEUDO CODE/STRATEGY:
+		scan for offset in handle table( bad )
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	1/16/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ChunkPtrToLptr		macro	seg, pointer, result
+ifdif	<result>, <di>
+		push	di
+endif
+ifdif	<result>, <ax>
+		push	ax
+endif
+ifdif	<result>, <cx>
+		push	cx
+endif
+		mov	ax, pointer		; ax = word to search
+ifdif	<seg>, <es>
+		push	es
+		segmov	es, seg, di		; es = segment
+endif
+	;
+	; ax = nptr to search for
+	; es:di = offset to handle table
+	;
+		mov	di, seg:LMBH_offset
+		mov	cx, seg:LMBH_nHandles
+		repne	scasw
+EC <		ERROR_NE RFE_LMEM_CORRUPTED				>
+		sub	di, 2
+		mov	result, di
+
+ifdif	<seg>, <es>
+		pop	es
+endif
+ifdif	<result>, <cx>
+		pop	cx
+endif
+ifdif	<result>, <ax>
+		pop	ax
+endif
+ifdif	<result>, <di>
+		pop	di
+endif
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ConvertWordESDI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Convert little endian word to big endian word and
+		big endian word to little endian word
+
+		AND skips a word from ES:DI
+
+DESTROYS:	AX
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	1/27/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ConvertWordESDI	macro
+		mov	al, {byte}es:[di]
+		xchg	al, {byte}es:[di+1]
+		mov	{byte}es:[di], al
+		add	di, size word
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ConvertDwordESDI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Convert little endian dword to big endian dword and
+		big endian dword to little endian dword
+
+		AND skips a dword from ES:DI
+
+DESTROYS:	AX
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	1/27/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ConvertDwordESDI macro
+		ConvertWordESDI
+		mov	ax, {word}es:[di-2]
+		xchg	ax, {word}es:[di]
+		mov	{word}es:[di-2], ax
+		ConvertWordESDI
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SkipDomainNameESDI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Skip a domain name
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	1/27/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SkipDomainNameESDI	macro
+		push	cx, ax
+		clr	al
+		mov	cx, MAX_HOST_NAME_SIZE
+		repne scasb
+		pop	cx, ax
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		TEST
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	execute only if we are in TEST_TRACE mode.
+PASS:		line of instruction
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	1/18/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+TESTP		macro	line
+	if	TEST_TRACE
+		line
+	endif
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		TESTONLY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Include line only if TESTF is set
+
+PASS:		line
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	11/ 6/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+TESTONLY		macro	line
+		if	TESTF
+			line
+		endif		
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_inChunk
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Assert that a fptr is within the range of a chunk optr
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	RB	11/ 9/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_inChunk  macro   expr, chunk, seg
+                PreserveAndGetIntoReg   dx, expr
+                PreserveAndGetIntoReg   si, chunk
+                PreserveAndGetIntoReg   ds, seg
+                push    bx
+                mov     bx, ds:[si]             ; ds:bx = ChunkPtr
+                Assert_ae dx, bx
+                add     bx, ds:[bx].LMC_size
+                Assert_b dx, bx
+                pop     bx
+                RestoreReg      ds, seg
+                RestoreReg      si, chunk
+                RestoreReg      dx, expr
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CheckMovsbIntoChunk
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	check if we are movsb'ing to a correct chunk
+		This checks for writing out of chunk boundary
+
+PASS:		es:di buffer to write to
+		cx string length
+
+EXAMPLE:
+	Let's say you want to write to a chunk pointed by *es:ax
+	We do:
+
+	movdw	dssi, source
+	mov	cx, sourceLen
+	mov	di, ax
+	mov	di, es:di
+	add	di, offset S_data
+	CheckMovsbIntoChunk ax	; *es:ax should contain chunk
+	rep movsb
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	11/ 9/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CheckMovsbIntoChunk	macro	chunk
+		push	bx
+ifdif	<chunk>, <bx>
+		mov	bx, chunk
+endif
+EC <		call	ECCheckMovsbIntoChunk				>
+		pop	bx
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ResolverPostEvent_ESDSNull
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	call ResolverPostEvent with NULL_SEG value in ES and DS
+
+PASS:		nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	12/27/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ResolverPostEvent_NullESDS		macro
+EC <		push	ds, es						>
+EC <		push	ax						>
+EC <		mov	ax, NULL_SEGMENT				>
+EC <		mov	ds, ax						>
+EC <		mov	es, ax						>
+EC <		pop	ax						>
+		call	ResolverPostEvent
+EC <		pop	ds, es						>
+		endm
+

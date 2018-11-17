@@ -1,0 +1,226 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		bstartup.def
+
+AUTHOR:		Steve Yegge, Jul 15, 1993
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	stevey	7/15/93		Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: bstartup.def,v 1.1 97/04/04 16:52:59 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;		constants, etc.
+;-----------------------------------------------------------------------------
+
+RESTART_CALIBRATION_TIMEOUT	equ	60*5		; 5 seconds
+
+NUM_CALIBRATION_POINTS 	equ	4			; for the Bullet
+FLASH_INTERVAL		equ	6			; 6 ticks
+CROSSHAIR_LENGTH	equ	4
+CALIBRATION_FLASH_START	equ	6
+CALIBRATION_FLASH_END	equ	10
+
+SCREEN_WIDTH		equ	640
+SCREEN_FONT_SIZE	equ	12
+
+SCREEN_STRING1_TOP	equ	245
+SCREEN_STRING2_TOP	equ	260
+SCREEN_STRING3_TOP	equ	280
+SCREEN_STRING4_TOP	equ	295
+SCREEN_STRING4_BOTTOM	equ	309
+
+NUMBER_ARROW_PTS	equ	7
+ARROW_SLOW_FACTOR	equ	3
+
+WELCOME_STRING_TOP	equ	200
+TOUCH_SCREEN_STRING_TOP	equ	300
+
+CALIBRATION_POINT_COUNT	equ	3
+
+QUIT_BUTTON_LEFT	equ	290
+QUIT_BUTTON_TOP		equ	200
+QUIT_BUTTON_RIGHT	equ	330
+QUIT_BUTTON_BOTTOM	equ	220
+
+DoingSomething		etype	byte, 0, 1
+    DS_WELCOME		enum	DoingSomething
+    DS_CALIBRATION	enum	DoingSomething
+    DS_DATE_TIME	enum	DoingSomething
+
+
+;-----------------------------------------------------------------------------
+;		process class
+;-----------------------------------------------------------------------------
+
+BSProcessClass	class	GenProcessClass
+BSProcessClass	endc
+
+BSApplicationClass	class	GenApplicationClass
+BSApplicationClass	endc
+
+BSPrimaryClass	class	GenPrimaryClass
+
+MSG_BS_PRIMARY_COMING_UP				message
+;
+;  Sent to ourselves via the gen-visibility-notification mechanism.
+;  (puts up the welcome screen).
+;
+;  Pass:	nothing
+;  Return:	nothing
+;  Destroyed:	nothing
+;
+
+MSG_BS_PRIMARY_DO_CALIBRATION				message
+;
+;  Sent after the user dismisses the welcome screen.
+;
+;  Pass:	nothing
+;  Return:	nothing
+;  Destroyed:	nothing
+;
+
+MSG_BS_PRIMARY_DO_THE_TIME_DATE_THING			message
+;
+;  Sent when the user completes digitizer calibration.
+;
+;  Pass:	nothing
+;  Return:	nothing
+;  Destroyed:	nothing
+;
+
+MSG_BS_PRIMARY_DONE_DATE_TIME				message
+;
+;  We're ready to quit.
+;
+;  Pass:	nothing
+;  Return:	nothing
+;  Destroyed:	nothing
+;
+
+
+BSPrimaryClass	endc
+
+;-----------------------------------------------------------------------------
+;		WelcomeContentClass
+;-----------------------------------------------------------------------------
+
+WelcomeContentClass	class	VisContentClass
+
+WelcomeContentClass	endc
+
+;-----------------------------------------------------------------------------
+;		PrefTDDialogClass
+;-----------------------------------------------------------------------------
+
+BSTimeDateDialogClass	class	GenInteractionClass
+BSTimeDateDialogClass	endc
+
+
+;-----------------------------------------------------------------------------
+;		VisScreenContentClass
+;-----------------------------------------------------------------------------
+
+VisScreenContentClass	class	VisContentClass
+
+MSG_VIS_SCREEN_CONTENT_DISMISS_DIALOG			message
+;
+;  Tells the content to attempt to bring down the whole dialog.
+;
+;  Source:	VisScreen vis-object (a child of the content)
+;  Pass:	nothing
+;  Return:	nothing
+;
+
+VisScreenContentClass	endc
+
+;-----------------------------------------------------------------------------
+;		VisScreenClass
+;-----------------------------------------------------------------------------
+
+VisScreenClass	class	VisClass
+
+MSG_VIS_SCREEN_FLASH_CALIBRATION_POINT				message
+;
+;  Flash one of the calibration points
+;
+; Context:	Sent via a timer to flash the screen
+; Source:	BulletScreenControlClass object
+; Destination:	VisScreenClass object
+; Interception: Must pass on to superclass
+;
+; Pass:		nothing
+;
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_VIS_SCREEN_RESTART_CALIBRATION			message
+;
+;  Will restart calibration if currently calibrating.
+;
+; Context:	Sent out when user holds pen down for 5 seconds
+; Source:	VisScreenContentClass object
+; Destination:	VisScreenClass object
+; Interception: none
+;
+; Pass:		nothing
+;
+; Return	nothing
+;		AX, CX, DX, BP - destoryed
+;
+
+;-----------------------------------------------------------------------------
+;			instance data
+;-----------------------------------------------------------------------------
+
+VisScreenState		record
+    :10
+    VSS_IGNORE_NEXT_END_SELECT:1		; restarting calibration
+    VSS_SELECT:1				; button down
+    VSS_QUIT:1					; showing the quit button
+    VSS_CALIBRATE:1				; calibrate the pen/mouse
+    VSS_EMULATE:1				; we're emulating
+    VSS_ADVANCE:1				; advance to the next point
+VisScreenState		end
+
+
+    VSI_gstate		hptr.GState	; Gstate to draw through
+    VSI_driverStrategy	fptr		; strategy routine for CasioPen driver
+    VSI_timer		dword		; timer used for calibration point
+    VSI_pointBufferDoc	Point		NUM_CALIBRATION_POINTS dup (?)
+    VSI_pointBufferRaw	Point		NUM_CALIBRATION_POINTS dup (?)
+    VSI_pointCurrent	word		; current calibration point
+    VSI_pointState	word		; state of calibration point
+    VSI_calPoint	Point		; current calibration mouse position
+    VSI_calCount	word		; current count at above position
+    VSI_state		VisScreenState	; current state information
+    VSI_arrowColor	word		; current color for arrow
+    VSI_arrowSlowFactor	word		; data used to slow blinking down
+    VSI_timerHandle	word		; timer for restarting calibration
+    VSI_timerID		word		; timer for restarting calibration
+
+VisScreenClass	endc
+
+;-----------------------------------------------------------------------------
+;		global routines
+;-----------------------------------------------------------------------------
+
+CalibrateCode	segment	resource
+
+global	DrawCenteredString:far
+
+CalibrateCode	ends

@@ -1,0 +1,335 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/*
+ **************************************************************************
+ *  FILE:		exp_mtds.goc
+ *  PROJECT:		Breadbox NBase
+ *  DESCRIPTION:	This file has methods for exporting to .CSV
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include "gpcbase.goh"
+@include "externs.goh"
+
+
+/*
+ ***************************************************************************
+ *		Code for GPCBaseProcessClass   exporting to .CSV
+ ***************************************************************************
+ */
+ Boolean canxExport = FALSE;
+
+/***********************************************************************
+ *
+ * FUNCTION:	MakeDblQuote
+ *              (char* preString, char* postString)
+ * CALLED BY:	MSG_EXPORT_CSV
+ *
+ *
+ * STRATEGY:    Adds another quote to every quote before
+ *			exporting to csv
+ *
+ ***********************************************************************/
+
+void MakeDblQuote (char* preString, char* postString)
+{
+ word	i;
+ char	charBuffer[2];
+
+
+    /* initialize postString */
+    postString[0] = 0;
+
+    /* cycle through preString */
+    for (i = 0; i <= (strlen(preString)); i++) {
+       /* add the char to post string */
+       charBuffer[0] = preString[i];
+       charBuffer[1] = '\000';
+       strcat(postString, charBuffer);
+       /* if a " add another */
+       if (preString[i] == '"')  strcat(postString, "\"");  
+       }
+
+    return;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_EXPORT for GPCBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *              is clicked
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBaseProcessClass, MSG_OPEN_EXPORT
+{
+ char	dosName[13];
+ word	count;
+
+
+    /* check for changes in displayed data */
+    if (CheckForChanges()) return;
+
+    /* set default name */
+    MemLock (OptrToHandle(@DefaultCSV));
+    @call ExpFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@DefaultCSV), 0);
+    MemUnlock (OptrToHandle(@DefaultCSV));
+
+    /* Open the dialog box */
+    @call ExportDBox::MSG_GEN_INTERACTION_INITIATE();
+
+    /* select UNNAMED part of default name */
+    @call ExpFileName::MSG_VIS_TEXT_GET_ALL_PTR(dosName);
+    count = 0;
+    while (dosName[count] != '.')  count++;
+
+    @call ExpFileName::MSG_META_GRAB_FOCUS_EXCL();
+    @call ExpFileName::MSG_META_GRAB_TARGET_EXCL(); 
+    @call ExpFileName::MSG_VIS_TEXT_SELECT_RANGE_SMALL(0, count);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EXPORT_CSV for GPCBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	exports field names (if selected) and field data
+ *		  		to a csv dos file.  All exported info is enclosed
+ *				in quotes.  Any internal quotes are
+ *              	doubled.
+ *
+ ***********************************************************************/
+@extern method GPCBaseProcessClass, MSG_EXPORT_CSV
+{
+ char		CSVName[13];
+ char		CSVPath[PATH_BUFFER_SIZE];
+ char		CSVfieldBuffer[DATA_LEN + 10]; /* allow for extra "s */
+ char		statusMsg[25], numExpString[11];
+ FileHandle	CSVFileHandle;
+ DiskHandle	CSVDiskhandle;
+ word		fileCloseError, length, i;
+ RecordStruct	*record;
+ DBItem		recordItem;
+ DBGroup		groupGroup;
+ VMBlockHandle	vmbh;
+ VMMapStruct	*VMmapPtr;
+ MemHandle	mh;
+ word		j;
+ word		bufCount, fieldCount, numExpRecs;
+ char		fieldString[DATA_LEN], dateString[11];
+// char		strBuffer[(MAX_FIELDS * DATA_LEN)]; /* GPCBase data */
+ char		recordBuffer[(MAX_FIELDS * DATA_LEN + 40)]; /* csv data */
+ word		fieldSelect;
+
+
+    /* get the exp file name */
+    length = @call ExpFileName::MSG_VIS_TEXT_GET_ALL_PTR(CSVName);
+    if (length == 0) return;
+
+    /* get the file's path and disk handle */
+    @call ExpFileSel::MSG_GEN_PATH_GET(CSVPath, sizeof(CSVPath));
+    CSVDiskhandle = @call ExpFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+    /* save our GPCBase file directory */
+    FilePushDir();
+
+    /* and set the CSV file dir  - FileSel doesn't do this */
+    FileSetCurrentPath(CSVDiskhandle, CSVPath);
+
+    /* and create the CSV file */
+    CSVFileHandle = FileCreate(CSVName,
+			       ((FILE_CREATE_ONLY | FCF_NATIVE)
+			       | (FILE_ACCESS_RW | FILE_DENY_RW)),
+			       0);
+    /* if CSVFileHandle is NULL then there was an error */
+    if (CSVFileHandle == NullHandle)  {
+       /* if file exists just tell user & wait for new name */
+       if (ThreadGetError() == ERROR_FILE_EXISTS)  {
+		NotifyDBox(0, @FileExistsErrMsg);
+          }
+        /* for any other error - bail out */
+	   else  {
+		NotifyDBox(0, @ExpCreateErrMsg);
+          @send ExportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+		}
+	  return;
+       }
+
+    /* first see if user wants field names as the first record */
+    fieldSelect =
+	  @call ExpFieldSel::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+    /* dismiss the file selector box now */
+    @send ExportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    canxExport = FALSE;
+    numExpRecs = 0;
+    /* Open the progress dialog box */
+    @call ExpStatusDBox::MSG_GEN_INTERACTION_INITIATE();
+
+    /* initialize things */
+    strcpy(recordBuffer, "\"");
+
+    if (fieldSelect == E_FIELD) {
+	  /* OK do field names first */
+	  for (j = 0; j < numFields; j++)  {
+		/* buffer the field name */
+		vmbh = VMGetMapBlock(GPCBFile);
+		VMmapPtr = (VMMapStruct *) VMLock(GPCBFile, vmbh, &mh);
+		MakeDblQuote(VMmapPtr->VMS_fieldName[j], CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		VMUnlock(mh);
+
+		/* add comma or \r */
+		if (j == numFields - 1)  strcat (recordBuffer, "\"\r\n");
+		else strcat (recordBuffer, "\",\"");
+	     }  /* end of field name for loop */
+
+       /* now write the fields buffer to the .csv file */
+       length = FileWrite(CSVFileHandle,
+			  recordBuffer,
+			  strlen(recordBuffer),
+			  FALSE);
+       /* check for write error */
+       if (length != strlen(recordBuffer))  {
+          /* show message and bail out */
+          NotifyDBox(0, @ExpWriteErrMsg);
+          fileCloseError = FileClose(CSVFileHandle, FALSE);
+		if (fileCloseError) NotifyDBox(0, @ExpCloseErrMsg);
+		@send ExpStatusDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+		return;
+          }
+       /* re-init the buffer */
+	  strcpy(recordBuffer, "\"");
+
+	  } /* end of field name if */
+
+
+    /* OK - now lets read the records */
+    for (i = 0; i < numRecords; i++)  {
+	  /* get the record struct address */
+	  GetGroupAndItem (&groupGroup, &recordItem, i);
+	  record = DBLock(GPCBFile, groupGroup, recordItem);
+	  /* copy the record to the buffer */
+  //	  strcpy(strBuffer, record->RS_data);
+  //	  DBUnlock(record);
+
+	  /* now cycle the data into the recordBuffer */
+	  bufCount = 0;
+	  for (j = 0; j < numFields; j++)  {
+		for (fieldCount = 0; fieldCount < DATA_LEN; fieldCount++)  {
+		   if (record->RS_data[bufCount] != (char) FIELD_SEP)  {  /* fill fieldStr */
+			 fieldString[fieldCount] = record->RS_data[bufCount];
+			 bufCount++;
+			 }
+		    else  {   /* end of field */
+			 fieldString[fieldCount] = NULL;
+			 bufCount++;
+
+			 /* do we need to show a date? */
+			 vmbh = VMGetMapBlock(GPCBFile);
+			 VMmapPtr = VMLock(GPCBFile, vmbh, &mh);
+			 if ((VMmapPtr->VMS_fieldType[j] == T_DAT) && (strlen(fieldString))) {
+			    ConvFromDateNum (fieldString, dateString);
+			    /* use the date */
+			    MakeDblQuote(dateString, CSVfieldBuffer);
+			    }
+			 else
+			    /* collect the field data */
+			    MakeDblQuote(fieldString, CSVfieldBuffer);
+			 VMUnlock(mh);
+
+			 strcat (recordBuffer, CSVfieldBuffer);
+			 /* add " and comma or \r */
+			 if (j == numFields - 1)  strcat (recordBuffer, "\"\r\n");
+			 else strcat (recordBuffer, "\",\"");
+
+			 fieldCount = DATA_LEN; /* force exit loop */
+			 }  /* end field else */
+		   } /* end this field for */
+		} /* end cycle thru fields for */
+
+	  DBUnlock(record);
+	  /* now write the buffer to the .csv file */
+	  length = FileWrite(CSVFileHandle,
+			  recordBuffer,
+			  strlen(recordBuffer),
+			  FALSE);
+	  /* check for write error */
+	  if (length != strlen(recordBuffer))  {
+		/* show message and bail out */
+		NotifyDBox(0, @ExpWriteErrMsg);
+		fileCloseError = FileClose(CSVFileHandle, FALSE);
+		if (fileCloseError)  NotifyDBox(0, @ExpCloseErrMsg);
+		@send ExpStatusDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+		return;
+		}
+	  /* re-init the buffer */
+	  strcpy(recordBuffer,"\"");
+
+	  numExpRecs++;
+
+	  /* update the progress box */
+	  MemLock (OptrToHandle(@ExpStatusText));
+	  strcpy(statusMsg, LMemDeref(@ExpStatusText));
+	  MemUnlock (OptrToHandle(@ExpStatusText));
+	  UtilHex32ToAscii(numExpString,
+					  (sdword) numExpRecs,
+					  UHTAF_NULL_TERMINATE);
+	  strcat(statusMsg, numExpString);
+	  @call ExpStatGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+							  statusMsg, VUM_NOW);
+
+	  /* see if user canx & exit loop */
+	  if (canxExport)  {
+		/* bail out of loop */
+		i = numRecords;
+		}
+    } /* end of loop thru records for */
+
+
+    /* Done so close the CSV file */
+    fileCloseError = FileClose(CSVFileHandle, FALSE);
+    if (fileCloseError)  NotifyDBox(0, @ExpCloseErrMsg);
+    @send ExpStatusDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CANCEL_EXPORT for GPCBaseApplicationClass
+ *              
+ *
+ * DESCRIPTION:	sets the global canxExport flag
+ *              
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBaseApplicationClass, MSG_CANCEL_EXPORT
+{
+
+    canxExport = TRUE;
+
+}
+
+

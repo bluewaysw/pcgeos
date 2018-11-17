@@ -1,0 +1,58 @@
+//========================================================================
+//
+// Array.cc
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifdef __GNUC__
+#pragma implementation
+#endif
+
+@include "pdfvu.goh"
+@include "array.goh"
+@include "obj.goh"
+
+
+//------------------------------------------------------------------------
+// Array
+//------------------------------------------------------------------------
+
+void ArrayInit(Array *arr) {
+  arr->elems = NULL;
+  arr->size = arr->length = 0;
+  arr->ref = 1;
+}
+
+void ArrayFree(Array *arr) {
+  long i;
+
+  for (i = 0; i < arr->length; ++i)
+    ObjFree(&arr->elems[i]);
+  gfree(arr->elems);
+}
+
+void ArrayAdd(Array *arr, Obj *elem) {
+  if (arr->length + 1 > arr->size) {
+    arr->size += 8;
+    arr->elems = (Obj *)grealloc(arr->elems, arr->size * sizeof(Obj));
+  }
+  ObjCopy(&arr->elems[arr->length], elem);
+  ++arr->length;
+}
+
+void ArrayGet(Array *arr, long i, Obj *obj, XRef *xref) {
+  ObjFetch(obj, &arr->elems[i], xref);
+}
+
+void ArrayGetNF(Array *arr, long i, Obj *obj) {
+  ObjCopy(obj, &arr->elems[i]);
+}
+
+  // Reference counting.
+  long ArrayIncRef(Array *arr) { return ++arr->ref; }
+  long ArrayDecRef(Array *arr) { return --arr->ref; }
+
+  // Get number of elements.
+  long ArrayGetLength(Array *arr) { return arr->length; }

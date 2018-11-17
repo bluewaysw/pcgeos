@@ -1,0 +1,1320 @@
+/***********************************************************************
+ *
+ *	(c) Copyright Geoworks 1995 -- All Rights Reserved
+ *	GEOWORKS CONFIDENTIAL
+ *
+ * PROJECT:	  PC GEOS
+ * MODULE:	  Start up application
+ * FILE:	  rstartup.ui
+ *
+ * AUTHOR:  	  Jason Ho, Apr 14, 1995
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kho	4/14/95   	Initial version
+ *
+ * DESCRIPTION:
+ *	UI file for start up application
+ *
+ *
+ * 	$Id: rstartup.ui,v 1.1 97/04/04 16:52:40 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+#include "generic.uih"
+#include "foam.uih"
+#include "contdb.uih"
+#include "rstartup.uih"			/* for local class declaration */
+
+
+/*****************************************************************************
+ *			 RStartup Primary Display
+ *****************************************************************************/
+
+start AppResource;			      /* Application resource */
+
+RStartupApp =  RStartupApplication {
+	children = RStartupPrimary;
+
+	appOptFlags = default +multipleInitFileCategories;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+		RStartupPrimary;
+
+	moniker = list {		
+		RStartupTextMoniker,
+		RStartupBitmapMoniker
+	}
+}
+
+/*
+ * RStartupBitmapMoniker in mkrRStartupBitmap.ui
+ */
+visMoniker RStartupTextMoniker = "Start up";
+
+#include "Art/mkrRStartupBitmap.ui"
+
+end     AppResource;
+
+/*****************************************************************************
+		 The RStartup Display 
+ *****************************************************************************/
+
+start   Interface;
+
+RStartupPrimary = GenPrimary {
+	children =
+#if _RSTARTUP_DO_LANGUAGE	/*+++++++++++++++++++++++++++++++++++++++*/
+		   LanguageDialog,
+#endif				/*++++++++++ _RSTARTUP_DO_LANGUAGE ++++++*/
+
+		   HomeCountryDialog,
+		   KeyboardDialog,
+		   DateDialog,
+		   TimeDialog,
+		   UserDataIntroDialog,
+		   UserDataEditDialog,
+#if _DO_MEMORY_CHANGE		/*+++++++++++++++++++++++++++++++++++++++*/
+		   MemoryChangeDialog,
+#endif				/*++++++++++ _DO_MEMORY_CHANGE ++++++++++*/
+
+		   /* SIMMemoryDialog,
+		   SIMMemoryCopyingDialog, */
+		   ExitDialog;
+	hints = {
+		/* HINT_ORIENT_CHILDREN_HORIZONTALLY, */
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+	}
+}
+
+
+/*
+ * Language dialog box
+ */
+#if _RSTARTUP_DO_LANGUAGE	/*++++++++++++++++++++++++++++++++++++++*/
+
+LanguageDialog = GenInteraction {
+	type = organizational;
+	children = LanguageViewGroup,
+		   LanguageOKTrigger;
+	/* visibility = dialog; */
+	attributes = default +sysModal; /*, +notUserInitiatable; */
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			LayerPriority   RSTARTUP_DIALOG_LAYER_PRIORITY
+		}
+	}
+}
+
+chunk LanguageTextChunk = "Language";
+
+LanguageViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = LanguageText,
+		   LanguageList;
+	topText = "offset LanguageTextChunk";
+	iconBitmap = "offset LanguageTitleIcon";
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, FOAM_DEFAULT_COMPONENT_WIDTH>
+			SpecHeight <>
+		},
+		HINT_INDENT_CHILDREN,
+	}
+}
+
+#include "Art/mkrLanguageTitleIcon.ui"
+
+LanguageText = GenText {
+	text = "Select the language you want to use by pressing scroll \
+buttons on the left of the screen and then OK-button.\\r";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, FOAM_DEFAULT_COMPONENT_WIDTH>
+			SpecHeight <>
+		} 
+	}
+}		
+
+LanguageList = RStartupLangDynamicList {
+	destination = LanguageList;
+	queryMsg = MSG_RSLANG_LIST_QUERY_ITEM_MONIKER;
+	hints = {
+		HINT_INTERACTION_SINGLE_USAGE,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, LANGUAGE_LIST_WIDTH>
+			SpecHeight <>
+		}, 
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char "system", 0
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+			char "systemLanguage",0
+		},
+		ATTR_LANG_INIT_FILE_LIST_CATEGORY {
+			char "system", 0
+		},
+		ATTR_LANG_INIT_FILE_LIST_KEY {
+			char "availableSystemLanguages",0
+		},
+		ATTR_LANG_INIT_FILE_DESCRIPTION_KEY {
+			char "languageDescriptions",0
+		},
+	}
+}
+
+LanguageOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_OK";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_LANGUAGE_OK, process;   
+/*	action = MSG_RSTARTUP_PROCESS_EXIT_OK, process;   */
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		}
+	}
+}
+
+#endif				/*++++++++++ _RSTARTUP_DO_LANGUAGE ++++++*/
+
+
+/*
+ * By default, country dialog would show up. But in
+ * MSG_GEN_OPEN_APPLICATION we might choose to bring up DateDialog
+ * to cover CountryDialog. (if we chose keyboard already, 
+ * show DateDialog. 
+ */
+/*
+ * Home country dialog box
+ */
+HomeCountryDialog = GenInteraction {
+	type = organizational;
+	children = HomeCountryViewGroup,
+		   HomeCountryOKTrigger;
+	visibility = dialog;
+	attributes = default +sysModal, +notUserInitiatable;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			LayerPriority   RSTARTUP_DIALOG_LAYER_PRIORITY
+		}
+	}
+}
+
+chunk HomeCountryTextChunk = "Home country";
+	localize "The title of Home country dialog";
+
+HomeCountryViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = HomeCountryText,
+		   HomeCountryDynamicList;
+	topText = "offset HomeCountryTextChunk";
+	iconBitmap = "offset HomeCountryTitleIcon";
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, FOAM_DEFAULT_COMPONENT_WIDTH>
+			SpecHeight <>
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INDENT_CHILDREN,
+	}
+}
+
+#include "Art/mkrHomeCountryTitleIcon.ui"
+
+HomeCountryText = GenText {
+	text = "Select your home country from the list by pressing \
+scroll buttons on the left of the screen.";
+	localize "Instruction of home country dialog.";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, FOAM_DEFAULT_COMPONENT_WIDTH-25>
+			SpecHeight <>
+		}
+	}
+}		
+
+HomeCountryDynamicList = RStartupCountryList {
+	numItems = 0;
+	destination = HomeCountryDynamicList;
+	queryMsg = MSG_RSTART_COUNTRY_QUERY_ITEM_MONIKER;
+       	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, COUNTRY_LIST_WIDTH>
+			SpecHeight <>
+		}, 
+               	HINT_ITEM_GROUP_SCROLLABLE,
+               	HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+               	HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+HomeCountryOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_OK";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_COUNTRY_OK, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		},
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}
+}
+
+
+/*
+ * Keyboard type dialog box
+ */
+KeyboardDialog = GenInteraction {
+	type = organizational;
+	children = KeyboardViewGroup,
+		   KeyboardOKTrigger;
+	visibility = dialog;
+	attributes = default +sysModal, +notUserInitiatable;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			LayerPriority   RSTARTUP_DIALOG_LAYER_PRIORITY
+		}
+	}
+}
+
+chunk KeyboardTextChunk = "Keyboard type";
+	localize "The title of keyboard type dialog.";
+KeyboardViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = KeyboardText,
+		   KeyboardChoicesDummyInteraction;
+	topText = "offset KeyboardTextChunk";
+	iconBitmap = "offset KeyboardTitleIcon";
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, KEYBOARD_DIALOG_WIDTH>
+			SpecHeight <>
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INDENT_CHILDREN {
+			SpecWidth <SST_PIXELS, KEYBOARD_INDENT_AMOUNT>
+		}
+	}
+}
+
+#include "Art/mkrKeyboardTitleIcon.ui"
+
+KeyboardText = GenText {
+	text = KeyboardDescriptionChunk;
+	genAttributes = readOnly;
+	hints = {
+		/* HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, KEYBOARD_DIALOG_WIDTH-25>
+			SpecHeight <>
+		} */
+	}
+}		
+
+/*
+ * Don't even think about breaking up the wchar line below.. UIC will
+ * complain.  
+ */
+chunk KeyboardDescriptionChunk = data {
+#if DO_DBCS
+	wchar \
+	"Select keyboard type. \"", C_LATIN_CAPITAL_LETTER_O_DIAERESIS, "/", \
+ C_LATIN_CAPITAL_LETTER_O_SLASH, "\" and \"", \
+C_LATIN_SMALL_LETTER_A_DIAERESIS, "/", C_LATIN_SMALL_LETTER_A_E, \
+"\" keys generates ", C_LATIN_CAPITAL_LETTER_O_DIAERESIS, " and ", C_LATIN_SMALL_LETTER_A_DIAERESIS, " on Finnish/Swedish keyboard or ", C_LATIN_CAPITAL_LETTER_O_SLASH, " and ", C_LATIN_SMALL_LETTER_A_E, " on Danish/Norwegian keyboard. The other character printed on these keys is generated by pressing \"Chr\" and the key.", 0;
+#else
+	char \
+	"Select keyboard type. \"", C_UO_DIERESIS, "/", \
+ C_UO_SLASH, "\" and \"", C_UA_DIERESIS, "/", C_U_AE, \
+"\" keys generates ", C_UO_DIERESIS, " and ", C_UA_DIERESIS, " on Finnish/Swedish keyboard or ", C_UO_SLASH, " and ", C_U_AE, " on Danish/Norwegian keyboard. The other character printed on these keys is generated by pressing \"Chr\" and the key.", 0;
+
+#endif
+}
+
+KeyboardChoicesDummyInteraction = GenInteraction {
+	children = KeyboardChoices;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 2>
+		}
+	}
+}
+
+KeyboardChoices = GenItemGroup {
+	selection = RKT_FINLAND;
+	numSelections = 1;
+	children = KeyboardChoiceFinland,
+		   KeyboardChoiceDenmark;
+	hints = {
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_DEFAULT_FOCUS
+	}
+}
+
+/*
+ * if you change the next two monikers, change FinlandKeyboardName /
+ * DenmarkKeyboardName strings in StringsResource.
+ */
+KeyboardChoiceFinland = GenItem {
+	moniker = "Finnish/Swedish";
+	localize "The title of Finnish/Swedish item.";
+	identifier = RKT_FINLAND;
+}
+
+KeyboardChoiceDenmark = GenItem {
+	moniker = "Danish/Norwegian";
+	localize "The title of Danish/Norwegian item.";
+	identifier = RKT_DENMARK;
+}
+
+KeyboardOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_OK";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_KEYBOARD_OK, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		},
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}
+}
+
+
+/*
+ * Date dialog box
+ */
+DateDialog = GenInteraction {
+	type = organizational;
+	children = DateViewGroup,
+		   DateOKTrigger;
+	visibility = dialog;
+	attributes = default +sysModal, +notUserInitiatable;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			LayerPriority   RSTARTUP_DIALOG_LAYER_PRIORITY
+		}
+	}
+}
+
+chunk DateTextChunk = "Date";
+	localize "The title of date dialog.";
+
+DateViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = DateDescriptionText,
+		   DateTextInteraction,
+		   DateDescriptionText2;
+	topText = "offset DateTextChunk";
+	iconBitmap = "offset DateTitleIcon";
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, DATE_TIME_DIALOG_WIDTH>
+			SpecHeight <>
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INDENT_CHILDREN {
+			SpecWidth <SST_PIXELS, DATE_TIME_INDENT_AMOUNT>
+		}
+	}
+}
+
+#include "Art/mkrDateTitleIcon.ui"
+
+DateDescriptionText = GenText {
+	text = "Enter current date using\\rformat: dd.mm.yy\\r";
+	localize "The instruction in date dialog. Please note the two extra carriage returns.";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, DATE_TIME_DIALOG_WIDTH-25>
+			SpecHeight <>
+		}
+	}
+}		
+
+DateTextInteraction = GenInteraction {
+	children = DateTextGlyph, DateTextFrame;
+	hints = {
+		/* HINT_PLACE_MONIKER_TO_LEFT, */
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+/*
+ * if we make it the moniker of DateTextInteraction and don't separate
+ * this into a GenGlyph, Rudy will highlite it.
+ * -- kho, 7/11/95
+ */
+DateTextGlyph = GenGlyph {
+	moniker = "Date: ";
+	localize "The text that is placed before the date entry box.";
+}
+
+DateTextFrame = GreyFrame {
+	children = DateText;
+}
+
+DateText = GenText {
+	text = "??.??.??";
+	localize "??.??.?? will be replaced by current date when the dialog is shown.";
+	maxLength = DATE_TEXT_MAX_LENGTH;
+	hints = {
+		HINT_TEXT_CURSOR_AT_END,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 12>
+			SpecHeight <SST_LINES_OF_TEXT, 1>
+		},
+		ATTR_GEN_TEXT_DATE,	/* only allow date-related chars */
+		ATTR_GEN_TEXT_NO_SPACES,/* no space thank you */
+		/*
+		-- QA doesn't like it. -- kho, 1/9/95
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word	DEF_PARA_ATTR_CENTER
+		},
+		*/
+	}		
+}
+
+DateDescriptionText2 = GenText {
+	text = "       Date and date format can be changed later.\\r";
+	localize "The second instruction in the date dialog. Please note the extra spaces before the text, and extra carriage return after the text.";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 2>
+		},
+		/* ATTR_GEN_POSITION_X {
+			word 	DATE_TIME_BOTTOM_TEXT_X_OFFSET
+		}, */
+		HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT {
+			optr	DateViewGroup
+		}
+	}
+}		
+
+DateOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_OK";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_DATE_OK, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		},
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}
+}
+
+
+/*
+ * Time dialog box
+ */
+TimeDialog = GenInteraction {
+	type = organizational;
+	children = TimeViewGroup,
+		   TimeOKTrigger;
+	visibility = dialog;
+	attributes = default +sysModal, +notUserInitiatable;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			LayerPriority   RSTARTUP_DIALOG_LAYER_PRIORITY
+		}
+	}
+}
+
+chunk TimeTextChunk = "Time";
+	localize "The title of the time dialog.";
+
+TimeViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = TimeDescriptionText,
+		   TimeTextInteraction,
+		   TimeDescriptionText2;
+	topText = "offset TimeTextChunk";
+	iconBitmap = "offset TimeTitleIcon";
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, DATE_TIME_DIALOG_WIDTH>
+			SpecHeight <>
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INDENT_CHILDREN {
+			SpecWidth <SST_PIXELS, DATE_TIME_INDENT_AMOUNT>
+		}
+	}
+}
+
+#include "Art/mkrTimeTitleIcon.ui"
+
+TimeDescriptionText = GenText {
+	text = "Enter current time using 24 hour format\\r";
+	localize "The instruction in time dialog. Please note the two extra carriage returns.";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, DATE_TIME_DIALOG_WIDTH-25>
+			SpecHeight <>
+		}
+	}
+}		
+
+TimeTextInteraction = GenInteraction {
+	children = TimeTextGlyph, TimeTextFrame;
+	hints = {
+		/* HINT_PLACE_MONIKER_TO_LEFT */
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+/*
+ * if we make it the moniker of DateTextInteraction and don't separate
+ * this into a GenGlyph, Rudy will highlite it.
+ * -- kho, 7/11/95
+ */
+TimeTextGlyph = GenGlyph {
+	moniker = "Time: ";
+}
+
+TimeTextFrame = GreyFrame {
+	children = TimeText;
+}
+
+TimeText = GenText {
+	text = "??:??";
+	localize "??:?? will be replaced by current time when the dialog is shown.";
+	maxLength = TIME_TEXT_MAX_LENGTH;
+	hints = {
+		HINT_TEXT_CURSOR_AT_END,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 8>
+			SpecHeight <SST_LINES_OF_TEXT, 1>
+		},
+		ATTR_GEN_TEXT_TIME,	/* only allow time-related chars */
+		ATTR_GEN_TEXT_NO_SPACES,/* no space thank you */
+		/*
+		-- QA doesn't like it -- kho, 1/9/95
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word	DEF_PARA_ATTR_CENTER
+		},
+		*/
+	}
+}
+
+TimeDescriptionText2 = GenText {
+	text = "       Time and time format can be changed later.\\r";
+	localize "The second instruction in the time dialog. Please note the extra spaces before the text, and extra carriage return after the text.";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 2>
+		},
+		/* ATTR_GEN_POSITION_X {
+			word DATE_TIME_BOTTOM_TEXT_X_OFFSET
+		}, */
+		HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT {
+			optr	TimeViewGroup
+		}
+	}
+}		
+
+TimeOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_OK";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_TIME_OK, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		},
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}
+}
+
+
+
+/*
+ * User data intro dialog box
+ */
+UserDataIntroDialog = GenInteraction {
+	type = organizational;
+	children = UserDataIntroViewGroup,
+		   UserDataIntroOKTrigger;
+	visibility = dialog;
+	attributes = default +sysModal, +notUserInitiatable;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			LayerPriority   RSTARTUP_DIALOG_LAYER_PRIORITY
+		}
+	}
+}
+
+chunk UserDataTextChunk = "User data";
+	localize "The title of the user data information dialog.";
+UserDataIntroViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = UserDataIntroText1,
+		   UserDataIntroText2;
+	topText = "offset UserDataTextChunk";
+	iconBitmap = "offset UserDataTitleIcon";
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, UDATA_INTRO_DIALOG_WIDTH>
+			SpecHeight <>
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INDENT_CHILDREN {
+			SpecWidth <SST_PIXELS, UDATA_INTRO_INDENT_AMOUNT>
+		}
+	}
+}
+
+#include "Art/mkrUserDataTitleIcon.ui"
+
+UserDataIntroText1 = GenText {
+	text = "Enter your personal information on the next screen. It is \
+not necessary to fill in every field as the information can be modified \
+later in the System application.";
+	localize "The instruction in the user data information dialog.";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, UDATA_INTRO_DIALOG_WIDTH-25>
+			SpecHeight <>
+		}
+	}
+}		
+
+UserDataIntroText2 = GenText {
+	text = "Press OK to continue.\\r";
+	localize "The instruction in the user data information dialog at the bottom. Please note the extra carriage return.";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 2>
+		},
+		HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT {
+			optr	UserDataIntroViewGroup
+		}
+	}
+}		
+
+UserDataIntroOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_OK";
+	textStyle = bold;
+#if _DO_ECI_SIM_CARD_CHECK
+	action = MSG_RSTARTUP_PROCESS_CHECK_SIM_CARD_INFO, process;
+#else
+	action = MSG_RSTARTUP_PROCESS_SHOW_UINFO_EDITOR, process;
+#endif
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		},
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}
+}
+
+
+/*
+ * User data edit dialog box
+ */
+UserDataEditDialog = GenInteraction {
+	type = organizational;
+	children = UserDataEditViewGroup;
+	visibility = dialog;
+	attributes = default +sysModal, +notUserInitiatable;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT {
+			SpecWinSizePair< mask SWSS_RATIO or PCT_0, \
+					 mask SWSS_RATIO or PCT_0>
+		},
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			LayerPriority   RSTARTUP_DIALOG_LAYER_PRIORITY
+		}
+	}
+}
+
+UserDataEditViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = UserDataContactEditor,
+		   UserDataEditOKTrigger;
+	topText = "offset UserDataTextChunk";
+	iconBitmap = "offset UserDataTitleIcon";
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		/* no effect HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, FOAM_DEFAULT_COMPONENT_WIDTH>
+			SpecHeight <>
+		}, */
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+	}
+}
+
+UserDataContactEditor = RStartupContactEdit {
+	hints = {
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask CEF_MENU or mask CEF_SAVE or \
+				mask CEF_FIELDS or mask CEF_MARK_SECRET or \
+				mask CEF_SPECIAL_RINGING_TONE or \
+				mask CEF_SPEED_DIAL
+		},
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		/* HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, FOAM_DEFAULT_COMPONENT_WIDTH>
+			SpecHeight <SST_PIXELS, 160>
+		}, */
+	}
+}
+
+UserDataEditOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_OK";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_UINFO_OK, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		},
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}
+}
+
+
+/*
+ * Memory Change dialog box
+ */
+#if _DO_MEMORY_CHANGE		/*+++++++++++++++++++++++++++++++++++++++*/
+MemoryChangeDialog = GenInteraction {
+	type = organizational;
+	children = MemoryChangeViewGroup,
+		   MemoryChangeOKTrigger,
+		   MemoryChangeCancelTrigger;
+	visibility = dialog;
+	attributes = default +sysModal, +notUserInitiatable;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+chunk MemoryChangeTextChunk = "Memory change";
+
+MemoryChangeViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = MemoryChangeText;
+	topText = "offset MemoryChangeTextChunk";
+	iconBitmap = CMB_QUESTION_ICON;
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, FOAM_DEFAULT_COMPONENT_WIDTH>
+			SpecHeight <>
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INDENT_CHILDREN {
+			SpecWidth <SST_PIXELS, INDENT_CHILDREN_AMOUNT>
+		}
+	}
+}
+
+MemoryChangeText = GenText {
+	text = "Do you want to activate device memory instead of SIM memory?";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, FOAM_DEFAULT_COMPONENT_WIDTH-25>
+			SpecHeight <>
+		}
+	}
+}		
+
+MemoryChangeOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_OK";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_MEMORY_CHANGE_OK, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		}
+	}
+}
+
+MemoryChangeCancelTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_CANCEL";
+	textStyle = bold;
+	action = MSG_GEN_INTERACTION_INITIATE, ExitDialog;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	3
+		}
+	}
+}
+
+#endif				/*++++++++++ _DO_MEMORY_CHANGE ++++++++++*/
+
+
+/*
+ * SIM memory dialog box
+ */
+
+#if 0				/*++++++++++++++++++ 0 ++++++++++++++++++*/
+SIMMemoryDialog = GenInteraction {
+	type = organizational;
+	children = SIMMemoryViewGroup,
+		   SIMMemoryOKTrigger,
+		   SIMMemoryCancelTrigger;
+	visibility = dialog;
+	attributes = default +sysModal, +notUserInitiatable;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			LayerPriority   RSTARTUP_DIALOG_LAYER_PRIORITY
+		}
+	}
+}
+
+chunk SimMemoryTextChunk = "SIM memory";
+
+SIMMemoryViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = SIMMemoryText;
+	topText = "offset SimMemoryTextChunk";
+	iconBitmap = CMB_QUESTION_ICON;
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, SIM_MEMORY_DIALOG_WIDTH>
+			SpecHeight <>
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INDENT_CHILDREN {
+			SpecWidth <SST_PIXELS, SIM_MEMORY_INDENT_AMOUNT>
+		}
+	}
+}
+
+SIMMemoryText = GenText {
+	text = "Do you want to copy SIM memory contacts to Responder?";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, SIM_MEMORY_DIALOG_WIDTH-25>
+			SpecHeight <>
+		}
+	}
+}		
+
+SIMMemoryOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_YES";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_SIM_MEMORY_OK, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		}
+	}
+}
+
+SIMMemoryCancelTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_NO";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_SHOW_EXIT, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	3
+		}
+	}
+}
+
+/*
+ * Copying... dialog
+ */
+SIMMemoryCopyingDialog = GenInteraction {
+        type = command;
+        visibility = popup;
+        /* genStates = default -usable; */
+        attributes = default +sysModal; /* +notUserInitiatable, */
+	children = CopyingText,
+		   CancelCopyingButton;
+}
+
+CopyingText = GenText {
+        text = "Copying...";
+        genAttributes = default +readOnly;
+        hints = {
+                ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR {
+                    VisTextDefaultCharAttr <
+                        0, 1, 1,                /* underline, bold, italic */
+                        C_BLACK,                /* color */
+                        VTDS_18,                /* size */
+                        VTDF_URW_SANS           /* font */
+                    >
+                }
+        }
+}
+
+CancelCopyingButton = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_CANCEL";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_STOP_COPYING, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	3
+		}
+	}
+}
+
+#endif				/*++++++++++++++++++ 0 ++++++++++++++++++*/
+
+
+/*
+ * Exit dialog box
+ */
+ExitDialog = GenInteraction {
+	type = organizational;
+	children = ExitViewGroup;
+	visibility = dialog;
+	attributes = default +sysModal, +notUserInitiatable;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			LayerPriority   RSTARTUP_DIALOG_LAYER_PRIORITY
+		}
+	}
+}
+
+chunk ExitTextChunk = "Start";
+	localize "The title of the exit dialog.";
+
+ExitViewGroup = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	children = ExitText1,
+		   ExitText2,
+		   ExitOKTrigger;
+	topText = "offset ExitTextChunk";
+	iconBitmap = "offset StartTitleIcon";
+	textStyle = bold;
+	hints = {
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_DRAW_IN_BOX,
+		HINT_DRAW_SHADOW,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, EXIT_DIALOG_WIDTH>
+			SpecHeight <>
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INDENT_CHILDREN {
+			SpecWidth <SST_PIXELS, EXIT_INDENT_AMOUNT>
+		}
+	}
+}
+
+#include "Art/mkrStartTitleIcon.ui"
+
+ExitText1 = GenText {
+	text = "You have successfully completed start up.";
+	localize "The instruction in the exit dialog.";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, EXIT_DIALOG_WIDTH-25>
+			SpecHeight <>
+		}
+	}
+}		
+
+ExitText2 = GenText {
+	text = "Press OK to continue.\\r";
+	localize "The instruction in the exit dialog at the bottom. Please note the extra carriage return.";
+	genAttributes = readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 2>
+		},
+		HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT {
+			optr	ExitViewGroup
+		}
+	}
+}
+
+ExitOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = "CMT_OK";
+	textStyle = bold;
+	action = MSG_RSTARTUP_PROCESS_EXIT_OK, process;
+	hints	= {
+		HINT_SEEK_MENU_BAR,
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_SLOT {
+			word	0
+		},
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}
+}
+
+end Interface;
+
+#if 0
+start RStartupFlashNote;
+
+RStartupRebuildDatabase = GenInteraction {
+        genStates = default -usable;
+        attributes = default +notUserInitiatable, +sysModal;
+        visibility = dialog;
+        type = multipleResponse;
+        children = RebuildDatabaseNote;
+        hints = {
+                HINT_WINDOW_NO_TITLE_BAR,
+                HINT_DRAW_IN_BOX
+        }
+}
+
+RebuildDatabaseNote = GenGlyph {
+        moniker = "Reading database, please wait...";
+}
+
+end RStartupFlashNote;
+#endif
+
+
+
+/*
+ * Misc strings
+ */
+start StringsResource, data;
+
+#if _RSTARTUP_DO_LANGUAGE	/*+++++++++++++++++++++++++++++++++++++++*/
+
+chunk LanguageWarningTitle = "About language selection !";
+
+/*
+ * C_CTRL_A and C_CTRL_B will be replaced by other string in
+ * FoamStandardDialogOptr.
+ */
+chunk LanguageWarningText = data {
+	TCHAR "Selecting ",C_CTRL_A," as device language will \
+remove all other languages. Press Ok-buttom if you prefer ",C_CTRL_B,\
+". Press Cancel-button if you want to reselect.",0;
+}
+
+/*
+ * After a language is selected, we notify user that we will restart.
+ */
+chunk LanguageRebootWarning = "The system software will now shut \
+down and restart for the language selection to take effect. Press \
+Ok-button to restart the system.";
+
+#endif				/*++++++++++ _RSTARTUP_DO_LANGUAGE ++++++*/
+
+/*
+ * C_CTRL_A and C_CTRL_B will be replaced by other string in
+ * FoamStandardDialogOptr.
+ */
+chunk KeyboardWarningText = data {
+	TCHAR "About keyboard type!\r\rKeyboard type is a permanent \
+selection. Press OK to install ",C_CTRL_A, " keyboard or Cancel to reselect.", 0; 
+}
+
+/*
+ * strings to be used in dialog when user presses OK. If you change
+ * this, change the GenItems too.
+ */
+chunk FinlandKeyboardName = "Finnish/Swedish";
+	localize "Strings to be used in dialog when user presses \
+OK. If you change this, change KeyboardChoiceFinland.";
+chunk DenmarkKeyboardName = "Danish/Norwegian";
+	localize "Strings to be used in dialog when user presses \
+OK. If you change this, change KeyboardChoiceDenmark.";
+
+/*
+ * After a keyboard type is selected, we notify user that we will restart.
+ */
+chunk KeyboardRebootWarning = "System has to be rebooted in order to \
+install the keyboard type. Press OK to continue.";
+	localize "The text in the warning note before the system reboots.";
+
+/*
+ * Day first:  |ZD|.|ZM|.|SY|
+ *
+ * If you change this default format string, consider changing
+ * DateDescriptionText, sample text in DateTextBox, and
+ * DefaultDateString below. 
+ */
+chunk DefaultDateFormatString = data {
+	TCHAR	TOKEN_DELIMITER, TOKEN_ZERO_PADDED_DATE, TOKEN_DELIMITER, \
+	   '.', TOKEN_DELIMITER, TOKEN_ZERO_PADDED_MONTH, TOKEN_DELIMITER, \
+	   '.', TOKEN_DELIMITER, TOKEN_SHORT_YEAR, TOKEN_DELIMITER, 0;
+}
+
+/*
+ * We take this out of the GenTextObject because we want to reload the
+ * string in case the input string of user is illegal.
+ */
+/* 
+chunk DefaultDateString = "25.09.95";
+	localize "In case user puts in illegal date, this text is \
+loaded to the box after the warning note.";
+*/
+
+/*
+ * 24 hours:	|Zh|:|Zm|
+ *
+ * If you change this default format string, consider changing 
+ * TimeDescriptionText, sample text in DateTextBox, and
+ * DefaultTimeString below. 
+ */
+chunk DefaultTimeFormatString = data {
+	TCHAR	TOKEN_DELIMITER, TOKEN_ZERO_PADDED_24HOUR, TOKEN_DELIMITER, \
+	   ':', TOKEN_DELIMITER, TOKEN_ZERO_PADDED_MINUTE, TOKEN_DELIMITER, \
+	   0;
+}
+
+/*
+chunk DefaultTimeString = "15:00";
+	localize "In case user puts in illegal time, this text is \
+loaded to the box after the warning note.";
+*/
+
+/*
+ * Error messages
+ */
+chunk InvalidDateMsg = "Date format invalid - please retype!";
+	localize "The text that appears in a warning dialog when date text entered is not valid.";
+
+chunk InvalidTimeMsg = "Time format invalid - please retype!";
+	localize "The text that appears in a warning dialog when time text entered is not valid.";
+
+/*
+chunk AlarmDBCorruptedText = \
+"The database files are corrupted, the backup files will be copied over";
+
+chunk NotEnoughSpaceForBackup = \
+        "There is not enough space for the database files to be \
+restored. Remove some files and try again.";
+*/
+
+/* chunk PhoneNumberTooLongText = \
+"Tel(/Fax) number in SIM card is too long. It is truncated automatically.";
+*/
+
+end StringsResource;
+/* #include "rstartupBitmap.ui"  -- no need anymore */
+

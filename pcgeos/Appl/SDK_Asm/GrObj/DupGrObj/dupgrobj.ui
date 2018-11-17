@@ -1,0 +1,271 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	DupGrObj (Sample PC/GEOS application)
+ * File:	dupgrobj.ui
+ *
+ * Author:	Steve Scholl
+ *
+ *	This file contains the user Interface description for this
+ * application. This file is written in a language called ESPIRE, which is
+ * compiled by the UIC compiler. See Spec/User/uic.doc for info.
+ *
+ * IMPORTANT NOTE:
+ *	This sample application is primarily intended to demonstrate a
+ *	model for using the graphic object library. Basic parts of a 
+ *	PC/GEOS application are not documented heavily here.  
+ *	See the "Hello" sample application
+ *	for more detailed documentation on the standard parts of a PC/GEOS
+ *	application.
+ *
+ * RCS STAMP:
+ *	$Id: dupgrobj.ui,v 1.1 97/04/04 16:33:34 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+#include "generic.uih"
+#include "grobj.uih"
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+start	AppResource;
+
+DGApp = GenApplication {
+	children = DGPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = DGPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+				DGDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+				DGDocumentControl, DGDisplayControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+				DGDocumentControl, DGDisplayControl;
+	moniker = list {
+		DGTextMoniker
+	}
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+		char	"dgrobj", 0
+		}
+	}
+}
+
+visMoniker DGTextMoniker = "DupGrObj Sample Application";
+
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+start	Interface;		
+
+DGPrimary = GenPrimary {
+	children = FileMenu, WindowMenu, DGDisplayGroup;
+	hints = { 	ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, 
+			HINT_SIZE_WINDOW_AS_DESIRED,
+			HINT_DEFAULT_TARGET }
+}
+
+FileMenu = GenInteraction {
+	children = DGDocumentControl;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_FILE_MENU } }
+}
+
+WindowMenu = GenInteraction {
+	children = DGDisplayControl;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_WINDOW_MENU } }
+}
+
+DGDisplayControl = GenDisplayControl {
+}
+
+/* ----------------------------------------------------------------------------
+	 UI Document Control
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl should be put in the same resource as the
+ * GenPrimary (for efficiency).  The GenDocumentControl will build the
+ * file menu.
+ */
+
+DGDocumentControl = GenDocumentControl {
+	/*
+	 * Document file's token
+	 */
+	documentTokenChars = "'S', 'A', 'M', 'P'";
+	documentTokenID = "MANUFACTURER_ID_GEOWORKS";
+	/*
+	 * Text to display in the header area of the primary when no
+	 * document is open.
+	 */
+	noNameText = "No Document";
+	/*
+	 * Template directory
+	 */
+	templateDir = "SAMPLE";
+	/*
+	 * Special attributes: allow multiple open files, don't display
+	 * name on primary (this will be handled via the display control)
+	 */
+	dcAttributes = default +multipleOpenFiles;
+	features = default -displayNameOnPrimary;
+	/*
+	 * Pointer to the GenDocumentGroup
+	 */
+	appDC = DGDocumentGroup;
+}
+
+end Interface;
+
+/* ----------------------------------------------------------------------------
+	 Document Group
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread.
+ */
+
+start DocumentUI;
+
+DGDocumentGroup = GenDocumentGroup {
+	/*
+	 * Name for untitled documents
+	 */
+	defaultName = "DG Untitled";
+	/*
+	 * Class for document objects
+	 */
+	documentClass = "DGDocumentClass";
+	/*
+	 * GenDisplay to automatically duplicate, GenDisplayGroup to attach
+	 * duplicated displays to and GenView to attach documents to
+	 */
+	genDisplayGroup = DGDisplayGroup;
+	genDisplay = DGDisplay;
+	genView = DGView;
+	/*
+	 * Document protocol
+	 */
+	protocolMajor = "DOCUMENT_PROTOCOL_MAJOR";
+	protocolMinor = "DOCUMENT_PROTOCOL_MINOR";
+	/*
+	 * Pointer to the GenDocumentControl
+	 */
+	uiDC = DGDocumentControl;
+
+	attributes = default +vmFileContainsObjects;
+}
+
+end DocumentUI;
+
+/*-----------------------------------------------------------------------------
+	GenDisplayGroup object
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+DGDisplayGroup = GenDisplayGroup {
+	/*
+	 * Tell the display control to put the name of the target display
+	 * in the long term moniker of the primary
+	 */
+
+	hints = {
+		HINT_DEFAULT_FOCUS, HINT_DEFAULT_TARGET,
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_70>,
+			SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_55>,
+			0
+		}
+	}
+}
+
+end Interface;
+
+/*-----------------------------------------------------------------------------
+	Block to duplicate for each document
+-----------------------------------------------------------------------------*/
+
+start DisplayUI;
+
+DGDisplay = GenDisplay {
+	/*
+	 * The display starts not usable since it is not in the generic tree.
+	 * It will be set usable after being added to the display control.
+	 */
+	genStates = default -usable;
+	children = DGView;
+	hints = { ATTR_GEN_DISPLAY_NOT_MINIMIZABLE }
+}
+
+DGView = GenView {
+	docRight = "DOCUMENT_WIDTH";
+	docBottom = "DOCUMENT_HEIGHT";
+	horizAttributes = default +scrollable;
+	vertAttributes = default +scrollable;
+}
+
+end DisplayUI;
+
+
+/*
+ * BodyGOAMRuler is the resource to duplicate to get a GrObjBody,
+ * GrObjAttributeManager and Ruler. It is notDetachable because
+ * it is never written to state, it is only a template
+ */
+
+start	BodyGOAMRuler, notDetachable;
+
+DGrObjBody	= GrObjBody {
+
+	/* Set the bounds of the GrObjBody to an 8 1/2 x 11 document */
+
+	boundsRight = 612;	/* 8.5 inches */
+	boundsBottom = 792;	/* 11 inches */
+
+	/* Have GrObjBody automatically grab the target and focus */
+	/* when it gets a MSG_VIS_OPEN */
+
+	bodyFlags	= defaultTarget,defaultFocus;
+
+	/* Set the GrObjAttributeManager */
+
+	oam = DGOAM; 
+}
+
+/*
+ * NOTE: Only Bodies in the same block as the attribute manager may be
+ * initialized in the bodyList in the .ui file. Bodies in another block
+ * will not be relocated into the duplicate of the template.
+ *
+ */
+
+DGOAM	= GrObjAttributeManager {
+	bodyList = DGOAMBodyList;
+}
+
+chunk	DGOAMBodyList =  data {
+	GOAM_BODY_LIST_CHUNK_ARRAY_HEADER (1)
+	I_OPTR DGrObjBody
+
+}
+end	BodyGOAMRuler;
+
+
+start	Head;
+
+DGrObjHead = GrObjHead {
+	currentTool = RectClass;
+	initFloaterData = 0;
+}
+
+end	Head;

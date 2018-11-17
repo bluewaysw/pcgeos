@@ -1,0 +1,336 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		GeoFile/UI
+FILE:		uiMarked.goc
+
+AUTHOR:		John D. Mitchell
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.26	Initial version.
+	JDM	93.01.07	Updated after re-spec.
+
+DESCRIPTION:
+	This file contains all of the UI definitions for the Mark menu
+	tree of GeoFile.
+
+	$Id: uiMarked.goc,v 1.1 97/04/04 15:54:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>			/* GEOS Standard Applications.	*/
+#include <geoworks.h>
+
+#include <Ansi/string.h>		/* Standard C.	*/
+
+#include <char.h>			/* GEOS Libraries.	*/
+@include <gcnlist.goh>
+#include <graphics.h>
+@include <grobj.goh>
+#include <gstring.h>
+#include <Objects/FlatFile/ffExBld.h>
+@include <Objects/FlatFile/ffExBldC.goh>
+@include <Objects/gViewCC.goh>
+@include <Objects/Text/tCtrlC.goh>
+@include <Objects/FlatFile/ffFldEdg.goh>
+
+@define	__GF_UI_MARKED_GOC		/* Don't over-define.	*/
+@include <geofile.goh>			/* GeoFile Application.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Subsets/Marked Records
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	MarkInterface;
+
+@object	GenInteractionClass MarkMenu =
+{
+	GI_visMoniker	= 'M', "Mark";
+	GI_comp		= @MMQuickMarkTrigger,
+			  @MMFormulaTrigger,
+			  @MMMarkAll,
+			  @MMUnmarkAll,
+			  @MMInvertMarks,
+			  @MMDisplayGroup,
+			  @MMMarkOptions;
+	GI_states	= @default & ~GS_USABLE;
+	GII_visibility	= GIV_POPUP;
+}
+
+@end	MarkInterface;
+
+
+@start	MarkMenuUI;
+
+@object	GenTriggerClass MMQuickMarkTrigger =
+{
+	GI_visMoniker	= 'R',"Mark Records";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GTI_actionMsg	= MSG_GF_QUICK_MARK_DIALOG_INITIATE;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+
+@object	GenTriggerClass MMFormulaTrigger =
+{
+	GI_visMoniker	= 'F',"Mark by Formula";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GTI_actionMsg	= MSG_GF_SUBSET_FORMULA_INITIATE;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object FFExpressionBuilderClass SubsetExpressionBuilder =
+{
+	GI_states	= @default & ~GS_USABLE;
+	GII_attrs	= GIA_NOT_USER_INITIATABLE;
+	FFEB_context	= FFEBFC_SUBSETS;
+}
+
+@object	GenTriggerClass MMMarkAll =
+{
+	GI_visMoniker	= 'M',"Mark All";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GTI_actionMsg	= MSG_GF_SUBSET_MARK_ALL;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+}
+
+@object	GenTriggerClass MMUnmarkAll =
+{
+	GI_visMoniker	= 'U',"Unmark All";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GTI_actionMsg	= MSG_GF_SUBSET_UNMARK_ALL;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+}
+
+@object	GenTriggerClass MMInvertMarks =
+{
+	GI_visMoniker	= 'S',"Switch All Marks";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GTI_actionMsg	= MSG_GF_SUBSET_INVERT_MARKS;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+}
+
+@object	GenInteractionClass MMDisplayGroup =
+{
+	GI_comp		= @DGShowAll,
+			  @DGShowMarked;
+}
+
+@object	GenTriggerClass DGShowAll =
+{
+	GI_visMoniker	= 'A',"Show All";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GTI_actionMsg	= MSG_GF_SUBSET_DISPLAY_ALL;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+}
+
+@object	GenTriggerClass DGShowMarked =
+{
+	GI_visMoniker	= 'O',"Show Only Marked";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GTI_actionMsg	= MSG_GF_SUBSET_DISPLAY_MARKED;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+}
+
+@object	GenInteractionClass MMMarkOptions =
+{
+	GI_comp		= @MarkOptionsTrigger;
+}
+
+@object	GenTriggerClass MarkOptionsTrigger =
+{
+	GI_visMoniker	= 'p', "Mark Options";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GTI_actionMsg	= MSG_GF_SUBSET_OPTIONS_DIALOG_INITIATE;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@end	MarkMenuUI;
+@start	QuickMarkDialogUI, notDetachable;
+@object	GenInteractionClass QuickMarkDialog =
+{
+	GI_visMoniker	= "Mark Records";
+	GI_comp		= @QMFieldsGroup,
+			  @QMMatchText,
+			  @QMApplyTrigger,
+			  @QMCancelTrigger;
+	GI_link	    	= @GeoFilePrimary; /* One way upward link */	
+	GII_type	= GIT_COMMAND;
+	GII_attrs	= @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+	GII_visibility	= GIV_DIALOG;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_INTERACTION_DISCARD_WHEN_CLOSED;
+	ATTR_GEN_HELP_CONTEXT = "dbQuickMark";
+}
+
+@object	GenInteractionClass QMFieldsGroup =
+{
+	GI_comp		= @QMFGFieldsList,
+			  @QMFGButtonGroup;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object	GenDynamicListClass QMFGFieldsList =
+{
+	GI_visMoniker	= "Select Mark Field:";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GIGI_applyMsg	= MSG_GF_QUICK_MARK_FIELD_SELECTED;
+	GIGI_behaviorType	= GIGBT_EXCLUSIVE;
+	GIGI_numSelections	= 1;
+	GIGI_selection	= 0;
+	GIGI_destination	= process;
+	GDLI_queryMsg	= MSG_GF_QUICK_MARK_FIELDS_LIST_QUERY;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS	= 0;
+	HINT_FIXED_SIZE	= { SST_AVG_CHAR_WIDTHS | 25,
+			    SST_LINES_OF_TEXT | 6, 6 };
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object	GenBooleanGroupClass QMFGButtonGroup =
+{
+	GI_comp		= @FGBGIgnoreCaseEntry,
+			  @FGBGMatchHOLEntry;
+	GBGI_selectedBooleans	= GF_QUICK_MARK_DEFAULT_OPTIONS;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object	GenBooleanClass FGBGIgnoreCaseEntry =
+{
+	GI_visMoniker	= "Ignore Case";
+	GBI_identifier	= GF_QUICK_MARK_CASE_INSENSITIVITY_TOGGLE;
+}
+
+@object	GenBooleanClass FGBGMatchHOLEntry =
+{
+	GI_visMoniker	= "Match Only at Start of Field";
+	GBI_identifier	= GF_QUICK_MARK_HOL_ONLY_MATCH_TOGGLE;
+}
+
+@chunk	VisTextCustomFilterData QMMTFilterData[] =
+{
+#ifdef DO_DBCS
+	{ C_QUOTATION_MARK, C_QUOTATION_MARK }
+#else
+	{ C_QUOTE, C_QUOTE }
+#endif
+};
+
+@object GenTextClass QMMatchText =
+{
+	GI_visMoniker	= "Text to Match:";
+	GTXI_text	= "";
+	GTXI_attrs	= @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength	= GF_MAX_QUICK_MARK_MATCH_TEXT_LENGTH;
+	ATTR_GEN_TEXT_CUSTOM_FILTER = @QMMTFilterData;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FIXED_SIZE	= { SST_AVG_CHAR_WIDTHS | 30, 0, 0 };
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_DEFAULT_FOCUS;
+}
+
+@object	GenTriggerClass QMApplyTrigger =
+{
+	GI_visMoniker	= "Mark";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GI_states	= @default & ~GS_ENABLED;
+	GTI_actionMsg	= MSG_GF_QUICK_MARK_MARK;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object	GenTriggerClass QMCancelTrigger =
+{
+	GI_attrs	= @default |
+			  GA_INITIATES_INPUT_IGNORE |
+			  GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND	= { IC_DISMISS };
+	HINT_SEEK_REPLY_BAR;
+}
+
+@end	QuickMarkDialogUI;
+
+@start	MarkOptionsDialogUI, notDetachable;
+
+@object	GenInteractionClass MarkOptionsDialog =
+{
+	GI_visMoniker	= "Mark Options";
+	GI_comp		= @MODOptionsList,
+			  @MODCancelTrigger;
+	GI_link	    	= @GeoFilePrimary; /* One way upward link */	
+	GII_attrs	= @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+	GII_type	= GIT_PROPERTIES;
+	GII_visibility	= GIV_DIALOG;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_INTERACTION_DISCARD_WHEN_CLOSED;
+	ATTR_GEN_HELP_CONTEXT = "dbMarkOptions";
+}
+
+@object	GenBooleanGroupClass MODOptionsList =
+{
+	GI_comp			= @AutoApplyMarkButton,
+				  @ClearMarksFirstButton;
+	GBGI_applyMsg		= MSG_GF_SUBSET_OPTIONS_SELECTED;
+	GBGI_destination	= process;
+	GBGI_selectedBooleans	= GF_SUBSET_OPTIONS_DEFAULT;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object	GenBooleanClass AutoApplyMarkButton =
+{
+	GI_visMoniker	= 'A', "Automatically Mark and Unmark";
+	GBI_identifier	= GF_SUBSET_AUTO_APPLY_MARK;
+}
+
+@object	GenBooleanClass ClearMarksFirstButton =
+{
+	GI_visMoniker	= 'C', "Clear All Marks Before Re-Marking";
+	GBI_identifier	= GF_SUBSET_CLEAR_MARKS_FIRST;
+}
+
+@object	GenTriggerClass MODCancelTrigger =
+{
+	GI_attrs	= @default |
+			  GA_INITIATES_INPUT_IGNORE |
+			  GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg	= MSG_GF_SUBSET_OPTIONS_CANCEL;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND	= { IC_DISMISS };
+	HINT_SEEK_REPLY_BAR;
+}
+
+@end	MarkOptionsDialogUI;
+
+
+
+
+
+
+
+

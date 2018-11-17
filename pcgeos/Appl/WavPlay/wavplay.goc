@@ -1,0 +1,701 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GlobalPC 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  .WAV file Player Application
+ * MODULE:	  The entire application
+ * FILE:	  wavplay.goc
+ *
+ * AUTHOR:  	  Don Reeves: November 5, 1999
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	11/5/99   Don	    Initial version
+ *
+ * DESCRIPTION:
+ *
+ *	$Id: $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <geoMisc.h>
+#include <Ansi/string.h>
+#include <Ansi/ctype.h>
+@include <initfile.h>
+@include <wav.goh>
+
+@include "wavplay.goh"                        /* application header file */
+
+
+/*
+ ***************************************************************************
+ *		Artwork
+ ***************************************************************************
+ */
+@start AppMonikerResource, data ;
+
+@include "Art/mkrApp.goh"
+@include "Art/mkrAppTiny.goh"
+
+@end AppMonikerResource;
+
+
+/*
+ ***************************************************************************
+ *		Constants and structures
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *		Global variables
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+
+/*
+ *****************************************
+ *		Application Object
+ *****************************************
+ */
+
+@start	AppResource ;
+
+@object WavPlayApplicationClass WavPlayApp = {
+    GI_visMoniker = list { @AppMoniker,
+			   @AppTinyMoniker,
+			   @WavPlayMoniker };
+    GI_comp = @WavPlayPrimary, @WavPlaySaveDB;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @WavPlayPrimary;
+    ATTR_GEN_INIT_FILE_CATEGORY = "wavplay";
+    ATTR_GEN_HELP_FILE = "wavplay";
+}
+
+@visMoniker WavPlayMoniker = "WAV-file Player";
+
+@end	AppResource;
+
+/*
+ *****************************************
+ *		Primary & Main UI
+ *****************************************
+ */
+
+@start	Interface;
+
+@object GenPrimaryClass WavPlayPrimary  = {
+    GI_comp = 
+              @WavPlayFileSelector,
+              @WavPlayResponseGroup;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_PRIMARY_NO_FILE_MENU;
+    ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE;
+    HINT_DISPLAY_NOT_RESIZABLE;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+    HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenFileSelectorClass WavPlayFileSelector = {
+    GI_visMoniker = "Select a WAV file to play:";
+    /* Default configuration is for AUI */
+    GFSI_fileCriteria =
+              FSFC_DIRS |
+              FSFC_NON_GEOS_FILES |
+              FSFC_MASK_CASE_INSENSITIVE;
+    GFSI_attrs = 
+              FSA_HAS_FILE_LIST | 
+              FSA_ALLOW_CHANGE_DIRS |
+              FSA_HAS_CLOSE_DIR_BUTTON |
+              FSA_HAS_OPEN_DIR_BUTTON |
+              FSA_HAS_DOCUMENT_BUTTON |
+              FSA_HAS_CHANGE_DIRECTORY_LIST |
+@ifndef PRODUCT_NDO2000
+              FSA_USE_VIRTUAL_ROOT |
+@endif
+              FSA_HAS_CHANGE_DRIVE_LIST;
+    GFSI_destination = process;
+    GFSI_notificationMsg = MSG_WAVPLAY_FILE_SELECTED;
+    ATTR_GEN_PATH_DATA = { SP_DOCUMENT, _TEXT("") };
+@ifndef PRODUCT_NDO2000
+    ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = { SP_DOCUMENT, _TEXT("") };
+@endif
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK = _TEXT("*.WAV");
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+}
+
+@object GenInteractionClass WavPlayResponseGroup = 
+{
+    GI_comp = @WavPlayPlayTrigger,
+              @WavPlaySaveTrigger,
+              @WavPlayExitTrigger;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenTriggerClass WavPlayPlayTrigger = 
+{
+    GI_visMoniker = "Play File";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_WAVPLAY_PLAY_FILE;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass WavPlaySaveTrigger = 
+{
+    GI_visMoniker = "Save File";
+    GI_states = @default & ~GS_USABLE & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_WAVPLAY_SAVE_FILE;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass WavPlayExitTrigger = 
+{
+    GI_visMoniker = "Exit";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_WAVPLAY_QUIT_APP;
+}
+
+
+/*
+ * Save Dialog Box
+ */
+@object GenInteractionClass WavPlaySaveDB = 
+{
+    GI_visMoniker = "Save File";
+    GI_comp = @WavPlaySaveExplain,
+              @WavPlaySaveFileName,
+              @WavPlaySaveNowTrigger,
+              @WavPlaySaveNotTrigger;
+    GII_type = GIT_COMMAND;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+    ATTR_GEN_HELP_CONTEXT = "dbSave";
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass WavPlaySaveExplain = 
+{
+    GI_visMoniker = "Save the WAV file in your documents folder";
+}
+
+@object GenTextClass WavPlaySaveFileName = 
+{
+    GI_visMoniker = "File name:";
+    GTXI_maxLength = FILE_LONGNAME_LENGTH;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+}
+
+@object GenTriggerClass WavPlaySaveNowTrigger = 
+{
+    GI_visMoniker = "Save";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_WAVPLAY_SAVE_FILE_NOW;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass WavPlaySaveNotTrigger = 
+{
+@ifdef GPC_ONLY
+    GI_visMoniker = "Don't Save";
+@endif
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end Interface;
+
+
+@start Strings, data;
+
+@chunk TCHAR SaveFileExistsStr[] = _TEXT("The file already exists - please choose another name and click on Save again.");
+
+@chunk TCHAR SaveFileErrorStr[] = _TEXT("Unkown error in saving file - try again possibly with a different file name.");
+
+@chunk TCHAR SaveFileSuccessStr[] = _TEXT("The WAV file was saved!");
+
+@end Strings;
+
+
+/*
+ ***************************************************************************
+ *		Class declarations
+ ***************************************************************************
+ */
+@classdecl	WavPlayProcessClass, neverSaved;
+@classdecl	WavPlayApplicationClass;
+
+
+/*
+ ***************************************************************************
+ *		Source code
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_APPLICATION for WavPlayProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	   Initialize the application
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *              - configure UI for user-level
+ *              - determine if file has been passed in AppLaunchBlock
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Don	11/5/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method WavPlayProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    AppLaunchBlock *alb;
+    DiskHandle srcDisk;
+    DiskHandle docDisk;
+    UIInterfaceLevel uiLevel;
+    PathName srcPath;
+    PathName docPath;
+    PathName *srcPathPtr = srcPath;
+    PathName *docPathPtr = docPath;
+    FileSelectorAttrs attrs;
+    FileSelectorFileCriteria criteria;
+    Boolean debugMode = FALSE;
+
+    /* Determine if we are in debug mode or not */
+    InitFileReadBoolean("fileManager", "debug", &debugMode);
+
+    /* Configure the UI for our user level */
+    if ((uiLevel = UserGetDefaultUILevel()) == UIIL_INTRODUCTORY) {
+	attrs = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+	@call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+	    attrs & ~FSA_HAS_CHANGE_DIRECTORY_LIST);
+	criteria = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
+	@call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+	    criteria & ~FSFC_DIRS);
+    } else {
+	/* Configure UI if debug mode is set in the AUI */
+	if (debugMode == TRUE) {
+	    attrs = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+	    @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+		attrs & ~FSA_USE_VIRTUAL_ROOT);
+	}
+    }
+
+    /* If a data file was passed, play that file! */
+    if (attachFlags & AAF_DATA_FILE_PASSED) {
+	alb = MemLock(launchBlock);
+	/*
+	 * If the file is not in the document directory (or a sub-dir),
+	 * then we need to turn off the virtual root so the file can
+	 * be accessed. We also need to then turn off all path navigation
+	 * if we are not in "debug mode" or if we are in the CUI.
+	 */
+	srcDisk = FileConstructActualPath(&srcPathPtr, sizeof(srcPath),
+			        alb->ALB_diskHandle, alb->ALB_path, FALSE);
+	docDisk = FileConstructActualPath(&docPathPtr, sizeof(docPath),
+				SP_DOCUMENT, _TEXT(""), FALSE);
+	if ((FileComparePaths(docPath, docDisk,
+			      srcPath, srcDisk) > PCT_SUBDIR) &&
+	    !(DriveGetStatus(DiskGetDrive(srcDisk)) & DS_MEDIA_REMOVABLE))
+	{
+	    @call WavPlayPrimary::MSG_META_ADD_VAR_DATA(ATTR_GEN_HELP_CONTEXT,
+							11, "nonDocMode");
+	    @send WavPlaySaveTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+	    attrs = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+	    @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+		attrs & ~FSA_USE_VIRTUAL_ROOT);
+	    if (debugMode == FALSE || uiLevel == UIIL_INTRODUCTORY) {
+		attrs = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+		@call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+		    attrs & ~FSA_HAS_CHANGE_DIRECTORY_LIST
+		          & ~FSA_HAS_CHANGE_DRIVE_LIST
+		          & ~FSA_HAS_DOCUMENT_BUTTON);
+		criteria = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
+		@call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(criteria & ~FSFC_DIRS);
+	    }
+	}
+	/*
+	 * OK - time for a massive hack. The GenFileSelector spec-build
+	 * code cannot deal with setting a path not under a virtual root
+	 * if the vritual root feature has been turned on, which normally
+	 * would be a good thing *except* when one is trying to open
+	 * a file on another disk (which clearly is not under the
+	 * virtual root). So, if that attribute is set we clear it
+	 * and queue a message to set the attribute after the spec build
+	 * Lovely - eh? -Don 3/17/00
+	 */
+	attrs = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+	if (attrs & FSA_USE_VIRTUAL_ROOT) {
+	    @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+		attrs & ~FSA_USE_VIRTUAL_ROOT);
+	}
+	@call WavPlayFileSelector::MSG_GEN_PATH_SET(alb->ALB_path,
+						    alb->ALB_diskHandle);
+	@call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_SELECTION(alb->ALB_dataFile);
+	@send, forceQueue process::MSG_WAVPLAY_PLAY_FILE();
+	if (attrs & FSA_USE_VIRTUAL_ROOT) {
+	    /*
+	     * Send message to do the fixup later, after the FileSelector
+	     * has been spec-built. Tried to use MSG_META_DISPATCH_EVENT
+	     * to do this, but I couldn't track down a crash.
+	     */
+	    @send, forceQueue process::MSG_WAVPLAY_FIXUP_VIRTUAL_ROOT();
+	}
+	MemUnlock(launchBlock);
+    }
+
+    @callsuper();
+    return;
+} /* End of MSG_GEN_PROCESS_OPEN_APPLICATION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_ENGINE for WavPlayProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	   Initialize the application
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *              - configure UI for user-level
+ *              - determine if file has been passed in AppLaunchBlock
+ *              - determine if we should hide UI (for use by browser)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Don	11/5/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method WavPlayProcessClass, MSG_GEN_PROCESS_OPEN_ENGINE
+{
+    AppLaunchBlock *alb;
+
+    /* If a data file was passed, play that file! */
+    if (attachFlags & AAF_DATA_FILE_PASSED) {
+	alb = MemLock(launchBlock);
+	WavPlayFile(alb->ALB_diskHandle, alb->ALB_path, alb->ALB_dataFile);
+    }
+    @callsuper();
+
+    /* Remember to exit the application */
+    @send, forceQueue process::MSG_WAVPLAY_QUIT_APP();
+    return;
+} /* End of MSG_GEN_PROCESS_OPEN_ENGINE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_META_IACP_NEW_CONNECTION for WavPlayApplicationClass
+ ***********************************************************************
+ * SYNOPSIS:	   Deal with additional files being passe to this application
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Don	11/12/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method WavPlayApplicationClass, MSG_META_IACP_NEW_CONNECTION
+{
+    AppLaunchBlock *alb;
+
+    /* If *not* just launched and a data file was passed, play that file! */
+    if (!justLaunched && appLaunchBlock) {
+	alb = MemLock(appLaunchBlock);
+	@call WavPlayFileSelector::MSG_GEN_PATH_SET(alb->ALB_path,
+						    alb->ALB_diskHandle);
+	@call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_SELECTION(alb->ALB_dataFile);
+	/* Do it this way to ensure the Play trigger is animated
+	 * Also ensure the trigger is enabled, as that can be delayed
+	 * There are more elegant fixes for this problem, but this
+	 * is the simplest one. If for some reason the GFS is not able
+	 * to select the passed file, then the trigger will be disabled
+	 * via the subsequent receipt of MSG_WAVPLAY_FILE_SELECTED, so
+	 * the trigger won't be left in bad state. -Don 3/18/00 */
+	@send, forceQueue WavPlayPlayTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send, forceQueue WavPlayPlayTrigger::MSG_GEN_ACTIVATE();
+	MemUnlock(appLaunchBlock);
+    }
+    @callsuper();
+    return;
+} /* End of MSG_META_IACP_NEW_CONNECTION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_WAVPLAY_QUIT_APP for WavPlayProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Quit the application.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Don	11/5/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method WavPlayProcessClass, MSG_WAVPLAY_QUIT_APP
+{
+    @send, forceQueue WavPlayApp::MSG_META_QUIT();
+    return;
+} /* End of MSG_WAVPLAY_QUIT_APP.	*/
+
+
+
+/***********************************************************************
+ *		MSG_WAVPLAY_FIXUP_VIRTUAL_ROOT for WavPlayProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set the FSA_USE_VIRTUAL_ROOT flag
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Don	03/17/00   	Initial Revision
+ *
+ ***********************************************************************/
+@method WavPlayProcessClass, MSG_WAVPLAY_FIXUP_VIRTUAL_ROOT
+{
+    FileSelectorAttrs attrs;
+
+    attrs = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+    @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+	attrs | FSA_USE_VIRTUAL_ROOT);
+    return;
+} /* End of MSG_WAVPLAY_QUIT_APP.	*/
+
+
+
+/***********************************************************************
+ *		MSG_WAVPLAY_FILE_SELECTED for WavPlayProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Respond to file being selected by the user
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Don	11/5/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method WavPlayProcessClass, MSG_WAVPLAY_FILE_SELECTED
+{
+    /* If a file is selected enable the Play button, otherwise disable it */
+    if (GFS_GET_ENTRY_TYPE(entryFlags) != GFSET_FILE || entryNum == 0xffff) {
+	@send WavPlayPlayTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@call WavPlaySaveTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    } else {
+	@send WavPlayPlayTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call WavPlaySaveTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+
+    /* If the user double-clicked on a file, then play it now */
+    if (entryFlags & GFSEF_OPEN) {
+	@send WavPlayPlayTrigger::MSG_GEN_ACTIVATE();
+    }
+
+    return;
+} /* End of MSG_WAVPLAY_FILE_SELECTED.	*/
+
+
+
+/***********************************************************************
+ *		MSG_WAVPLAY_PLAY_FILE for WavPlayProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Play the selected WAV file
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Don	11/5/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method WavPlayProcessClass, MSG_WAVPLAY_PLAY_FILE
+{
+    FileLongName fileBuffer;
+    PathName     pathBuffer;
+    DiskHandle   diskHandle;
+    dword        retval;
+    
+    /* Simply grab the current file that is selected and play it */
+    retval = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&fileBuffer);
+    if (GFS_GET_ENTRY_TYPE(GFS_GET_ENTRY_FLAGS(retval)) == GFSET_FILE) {
+	@call WavPlayFileSelector::MSG_GEN_PATH_GET(&pathBuffer,
+						    sizeof(pathBuffer));
+	diskHandle = @call WavPlayFileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+	WavPlayFile(diskHandle, &pathBuffer, &fileBuffer);
+    }
+    return;
+} /* End of MSG_WAVPLAY_PLAY_FILE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_WAVPLAY_SAVE_FILE for WavPlayProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initiate the dialog box for saving the WAV file
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Don	11/5/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method WavPlayProcessClass, MSG_WAVPLAY_SAVE_FILE
+{
+    FileLongName fileBuffer;
+    dword        retval;
+    
+    /* Grab the current file's name and stuff it inot the text object */
+    retval = @call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&fileBuffer);
+    if (GFS_GET_ENTRY_TYPE(GFS_GET_ENTRY_FLAGS(retval)) == GFSET_FILE) {
+	@call WavPlaySaveFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(fileBuffer, 0);
+	@call WavPlaySaveDB::MSG_GEN_INTERACTION_INITIATE();
+    }
+    return;
+} /* End of MSG_WAVPLAY_SAVE_FILE.	*/
+
+
+
+/***********************************************************************
+ *		MSG_WAVPLAY_SAVE_FILE_NOW for WavPlayProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Save the selected WAV file
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *       Construct a filename with a .WAV at the end
+ *       Determine that the destination file does not exist
+ *       Copy the file to the destination
+ *       Bring down the dialog box
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Don	3/14/00   	Initial Revision
+ *
+ ***********************************************************************/
+@method WavPlayProcessClass, MSG_WAVPLAY_SAVE_FILE_NOW
+{
+    int          len, retval;
+    FileHandle   fileHandle;
+    DiskHandle   srcDisk;
+    DiskHandle   destDisk;
+    FileLongName srcFile;
+    FileLongName destFile;
+    PathName     srcPath;
+    PathName     src;
+    PathName     dest;
+    PathName     *srcPtr = src;
+    PathName     *destPtr = dest;
+    
+    /* Retrieve the filename and ensure it ends with ".wav" */
+    len = @call WavPlaySaveFileName::MSG_VIS_TEXT_GET_ALL_PTR(&destFile);
+    if (len<=4 || LocalCmpStringsNoCase(destFile+len-4, _TEXT(".WAV"), 0)) {
+	strcat(destFile, _TEXT(".WAV"));
+    }
+
+    /* Determine if the destination file exists by trying to open it */
+    FilePushDir();
+    FileSetCurrentPath(SP_DOCUMENT, _TEXT(""));
+    fileHandle = FileOpen(destFile, FILE_ACCESS_RW | FILE_DENY_RW);
+    if (fileHandle || (ThreadGetError() != ERROR_FILE_NOT_FOUND)) {
+	/* Display a dialog to the user */
+	if (fileHandle) {
+	    FileClose(fileHandle, TRUE);
+	    UserStandardDialogOptr(
+		(TCHAR *)NULL, (void *)NULL, NullOptr, NullOptr,
+		@SaveFileExistsStr,
+		((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		 (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	}
+    } else {
+	/* Mark aplication busy prior to copy */
+	@call WavPlayApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+	/* Calculate all of the path information */
+	@call WavPlayFileSelector::MSG_GEN_PATH_GET(&srcPath, sizeof(srcPath));
+	srcDisk = @call WavPlayFileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+	srcDisk = FileConstructActualPath(&srcPtr, sizeof(src),
+			        srcDisk, srcPath, FALSE);
+	destDisk = FileConstructActualPath(&destPtr, sizeof(dest),
+				SP_DOCUMENT, _TEXT(""), FALSE);
+	@call WavPlayFileSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&srcFile);
+	strcat(src, _TEXT("\\"));
+	strcat(src, srcFile);
+	strcat(dest, _TEXT("\\"));
+	strcat(dest, destFile);
+
+	/* Complete the copy */
+	retval = FileCopyLocal(src, dest, srcDisk, destDisk);
+	@call WavPlayApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	if (!retval) {
+	    @send WavPlaySaveDB::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	    UserStandardDialogOptr(
+		(TCHAR *)NULL, (void *)NULL, NullOptr, NullOptr,
+		@SaveFileSuccessStr,
+		((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+		 (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	} else {
+	    UserStandardDialogOptr(
+		(TCHAR *)NULL, (void *)NULL, NullOptr, NullOptr,
+		@SaveFileErrorStr,
+		((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		 (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	}
+    }
+    FilePopDir();
+    return;
+} /* End of MSG_WAVPLAY_SAVE_FILE_NOW.	*/
+

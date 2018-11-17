@@ -1,0 +1,412 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  GeoSafari
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+@include "safari2.goh"
+@include "global.goh"
+
+@classdecl  GameTimerClass;
+@classdecl  PlayerInputClass;
+/*@classdecl  SettingsButtonClass; jh - don't need */
+
+#ifdef __BORLANDC__
+#pragma codeseg UtilCode
+#endif
+
+
+/***********************************************************************
+ *		MSG_GAME_TIMER_START
+ ***********************************************************************
+ * SYNOPSIS:	    start the timer
+ * PASS:            resume - TRUE to resume from pause
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/14/99		Initial Revision
+ *
+ ***********************************************************************/
+@method GameTimerClass, MSG_GAME_TIMER_START
+{
+    /*
+     * stop any currently running timer
+     */
+    @call oself::MSG_GAME_TIMER_STOP();
+    ObjDerefGen(oself);
+    pself->GTI_state = STBS_RUNNING;
+    /*
+     * reset the countdown
+     */
+    if (!resume) {
+	if (@call CountdownList::MSG_GEN_ITEM_GROUP_GET_SELECTION()) {
+	    pself->GTI_maxCount = @call MaxTimeValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	    pself->GTI_countdown = pself->GTI_maxCount;
+	} else {
+	    pself->GTI_countdown = 0;
+	}
+    }
+    /*
+     * redraw ourselves
+     */
+    @call Timebar::MSG_SAFARI_TIMEBAR_SET_STATE(pself->GTI_countdown, pself->GTI_maxCount, pself->GTI_state);
+    @call oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+    /*
+     * start a new timer if desired
+     */
+    if (@call CountdownList::MSG_GEN_ITEM_GROUP_GET_SELECTION()) {
+	pself->GTI_timer = TimerStart(TIMER_EVENT_CONTINUAL,
+				      oself,
+				      0,
+				      MSG_GAME_TIMER_COUNTDOWN,
+				      60,
+				      &pself->GTI_timerID);
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_GAME_TIMER_STOP
+ ***********************************************************************
+ * SYNOPSIS:	    stop the timer
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/14/99		Initial Revision
+ *
+ ***********************************************************************/
+@method GameTimerClass, MSG_GAME_TIMER_STOP
+{
+    /*
+     * stop any currently running timer
+     */
+    if (pself->GTI_timer) {
+	TimerStop(pself->GTI_timer, pself->GTI_timerID);
+	pself->GTI_timer = 0;
+    }
+    pself->GTI_state = STBS_STOPPED;
+}
+
+
+/***********************************************************************
+ *		MSG_GAME_TIMER_COUNTDOWN
+ ***********************************************************************
+ * SYNOPSIS:	    one more tick of the timer
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/14/99		Initial Revision
+ *
+ ***********************************************************************/
+
+static const word clickSound[] = {
+    SSE_CHANGE, 0, IP_TIMPANI, IT_STANDARD_TABLE,
+    SSE_GENERAL, GE_SET_PRIORITY, SP_GAME,
+    SSDTT_TICKS, 4,
+    SSE_VOICE_ON, 0, LOW_C, DYNAMIC_FF,
+    SSDTT_TICKS, SIXTEENTH,
+    SSE_VOICE_OFF, 0,
+    SSE_GENERAL, GE_END_OF_SONG
+};
+    
+
+@method GameTimerClass, MSG_GAME_TIMER_COUNTDOWN
+{
+    pself->GTI_countdown--;
+    if (pself->GTI_countdown <= 0) {
+	/*
+	 * stop the timer
+	 */
+	@call oself::MSG_GAME_TIMER_STOP();
+	/*
+	 * time's up -- tell the game
+	 */
+	@send TheGameCard::MSG_SAF_GAME_CARD_WRONG_ANSWER(TRUE);
+    }
+    /*
+     * if time is running out, make a click
+     */
+    if (pself->GTI_countdown <= TIME_GETTING_LOW_TIME) {
+	PlaySound(&clickSound, sizeof(clickSound), NULL, 0, NULL);
+    }
+    /*
+     * redraw ourselves
+     */
+    @call Timebar::MSG_SAFARI_TIMEBAR_SET_STATE(pself->GTI_countdown, pself->GTI_maxCount, pself->GTI_state);
+    @call oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+}
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT
+ ***********************************************************************
+ * SYNOPSIS:	    Handle a mouse click
+ * PASS:            xPosition - x pos
+ *                  yPosition - y pos
+ *                  inputState
+ *                  retVal - ptr to MouseReturnParams
+ * RETURN:          retVal.flags - MRF_PROCESSED
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/14/99		Initial Revision
+ *
+ ***********************************************************************/
+@method GameTimerClass, MSG_META_START_SELECT
+{
+    retVal->flags = MRF_PROCESSED;
+
+    /*
+     * if running, stop ourselves, else vice-versa
+     */
+    if (pself->GTI_countdown) {
+	switch (pself->GTI_state) {
+	case STBS_RUNNING:
+	    @call oself::MSG_GAME_TIMER_PAUSE();
+	    break;
+	case STBS_PAUSED:
+	    @call oself::MSG_GAME_TIMER_START(TRUE);
+	    break;
+	default:
+	    pself->GTI_countdown--;
+	    if (!pself->GTI_countdown && (inputState & BI_DOUBLE_PRESS)) {
+		@call TheGameCard::MSG_SAF_GAME_CARD_PLAY_ANSWER_SOUND(NULL, 0, "GS_HEY.WAV");
+		@call CreditDialog::MSG_GEN_INTERACTION_INITIATE();
+	    }
+	    break;
+	}
+    }
+
+    /*
+     * redraw ourselves
+     */
+    @call Timebar::MSG_SAFARI_TIMEBAR_SET_STATE(pself->GTI_countdown, pself->GTI_maxCount, pself->GTI_state);
+    @call oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+}
+
+
+
+/***********************************************************************
+ *		MSG_GAME_TIMER_PAUSE
+ ***********************************************************************
+ * SYNOPSIS:	    Pause the timer
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/14/99		Initial Revision
+ *
+ ***********************************************************************/
+@method GameTimerClass, MSG_GAME_TIMER_PAUSE
+{
+    @call oself::MSG_GAME_TIMER_STOP();
+    ObjDerefGen(oself);
+    pself->GTI_state = STBS_PAUSED;
+}
+
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW
+ ***********************************************************************
+ * SYNOPSIS:	    Draw ourselves
+ * PASS:            gstate - handle of GState
+ *                  drawFlags - DrawFlags
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method GameTimerClass, MSG_VIS_DRAW
+{
+    Rectangle bounds;
+    TCHAR buf[4];
+
+    @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+    GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrFillRect(gstate,
+	       bounds.R_left+1, bounds.R_top+2,
+	       bounds.R_right-1, bounds.R_bottom-18);
+    /*
+     * draw the number
+     */
+    if (pself->GTI_countdown > 0) {
+	GrSetFont(gstate, 0, MakeWWFixed(9));
+	if (pself->GTI_countdown < 10) {
+	    sprintf(buf, " %d", pself->GTI_countdown);
+	} else {
+	    sprintf(buf, "%d", pself->GTI_countdown);
+	}
+	GrSetTextColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+	GrDrawText(gstate, bounds.R_left+3, bounds.R_top+4, buf, 0);
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_PLAYER_INPUT_GET_ANSWER
+ ***********************************************************************
+ * SYNOPSIS:	    get the answer the user has entered
+ * PASS:            none
+ * RETURN:          answer (-1 if no text)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/16/99		Initial Revision
+ *
+ ***********************************************************************/
+@method PlayerInputClass, MSG_PLAYER_INPUT_GET_ANSWER
+{
+    TCHAR buf[3];
+    word answer;
+
+    /*
+     * convert our text, if any, to a number
+     */
+    @call oself::MSG_VIS_TEXT_GET_ALL_PTR(buf);
+    if (strlen(buf)) {
+	UtilAsciiToHex32(buf, &answer);
+    } else {
+	answer = -1;
+    }
+    return(answer);
+}
+
+
+
+/***********************************************************************
+ *		MSG_META_KBD_CHAR
+ ***********************************************************************
+ * SYNOPSIS:	    get the answer the user has entered
+ * PASS:            character - character
+ *                  flags - CharFlags + ShiftState
+ *                  state - ToggleState + scan code
+ * RETURN:          TRUE if handled
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/16/99		Initial Revision
+ *
+ ***********************************************************************/
+@method PlayerInputClass, MSG_META_KBD_CHAR
+{
+    if (character == ((CS_CONTROL << 8) | C_ENTER)) {
+	/*
+	 * on CR press, send message
+	 * on CR release, do nothing
+	 */
+	if (!(flags & CF_RELEASE)) {
+	    @call TheGameCard::MSG_SAF_GAME_CARD_ANSWER_QUESTION();
+	}
+	return;
+    }
+    @callsuper();
+}
+
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE
+ ***********************************************************************
+ * SYNOPSIS:	    tell the world what size we want to be
+ * PASS:            width - RecalcSizeArgs for width
+ *                  height - RecalcSizeArgs height
+ * RETURN:          width+height
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/16/99		Initial Revision
+ *
+ ***********************************************************************/
+@method PlayerInputClass, MSG_VIS_RECALC_SIZE
+{
+    return(MAKE_SIZE_DWORD(pself->PII_width, 42));
+}
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW
+ ***********************************************************************
+ * SYNOPSIS:	    Handle a mouse click
+ * SYNOPSIS:	    Draw ourselves
+ * PASS:            gstate - handle of GState
+ *                  drawFlags - DrawFlags
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	5/2/99		Initial Revision
+ *
+ ***********************************************************************/
+ /* jh - don't need this any more */
+/* @method SettingsButtonClass, MSG_VIS_DRAW
+{
+    Rectangle bounds;
+
+    @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+    ObjLockObjBlock(OptrToHandle(@GToolMoniker));
+    GrDrawBitmap(gstate, bounds.R_left+3, bounds.R_top+3,
+		 LMemDeref(@GToolMoniker), 0);
+    MemUnlock(OptrToHandle(@GToolMoniker));
+}   */
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT
+ ***********************************************************************
+ * SYNOPSIS:	    Handle a mouse click
+ * PASS:            xPosition - x pos
+ *                  yPosition - y pos
+ *                  inputState
+ *                  retVal - ptr to MouseReturnParams
+ * RETURN:          retVal.flags - MRF_PROCESSED
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	5/2/99		Initial Revision
+ *
+ ***********************************************************************/
+ /* jh - don't need this any more */
+/*@method SettingsButtonClass, MSG_META_START_SELECT
+{
+    XYValueAsDWord pos;
+
+    retVal->flags = MRF_PROCESSED;
+
+    pos = @call oself::MSG_VIS_GET_POSITION();
+    xPosition -= DWORD_X(pos);
+    yPosition -= DWORD_Y(pos);
+
+    if (yPosition < 12) {
+	@send SafariPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+    } else {
+	@send TextGroup::MSG_GEN_INTERACTION_INITIATE();
+	@send ChooseDB::MSG_GEN_INTERACTION_INITIATE();
+    }
+} */
+

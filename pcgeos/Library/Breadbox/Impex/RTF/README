@@ -1,0 +1,79 @@
+RTF "TOOLS" PRODUCT CONSIDERATIONS
+Daniel Medeiros 1/17/2001
+----------------------------------
+
+It was necessary to create a "TOOLS" product of this RTF impex library so that hyperlink and context ranges would be saved during export, and re-inserted
+during import.  The following sincerely attempts to explain what these changes are and how they work.  Whether they're successful or not probably depends
+upon the person reading them.  NOTE: All TOOLS-product-only code should be excluded by #ifdef _DO_HELP statements.
+
+STORAGE OF CONTEXTS AND HYPERLINKS IN AN RTF FILE
+-------------------------------------------------
+
+The storage of contexts and hyperlinks in an .RTF file follows the standard of overloaded RTF controls defined by the Microsoft Help Compiler.
+Contexts are defined by a {\footnote} group immediately preceded by a pound, like this:
+
+	#{\footnote aContext}
+
+Footnotes NOT preceded by a # sign are not specially handled.
+
+Hyperlinks are defined by having the hyperlink text surrounded by either a \uldb or \ul control.  Immediately after the hyperlink text comes the end of
+the group or the hyperlink off token: \ul0 or \uldb0.  The target context for a hyperlink is specified by the hidden text attribute \v.  In all, a
+hyperlink definition looks like the following:
+
+	\ul Hyperlink Text\ul0\v aContext
+
+or, the following:
+
+	{\ul Hyperlink Text}{\v aContext}
+
+Either of the definitions above define a hyperlink with the text "Hyperlink Text" that will lead to the "aContext" context, defined elsewhere in the file.
+
+Hyperlinks linked to contexts in a seperate help file are formatted in this way:
+
+	contextName@fileName
+
+So, if you wanted "Hyperlink Text" to reference the context "outOfFile" in the supplementary help file "myFile", the definition might look something like
+this:
+
+	{\ul Hyperlink Text}{\v outOfFile@myFile}
+
+
+IMPLEMENTATION
+--------------
+
+In order for the help-interpretation code to work, the file MUST have a <<geoshelp>> token.  This is a plain text help token that is visible
+within a word processor such as MS Word.  The token will be stripped out by the tool when imported into GEOS.  For help files exported from GEOS, 
+this token is written immediately after the RTF header so that the file is readily identified as a GEOS help file in RTF format.  Please note, that
+the << and >> are NOT two less-than and two greater-than signs.  Rather, these are the ASCII characters 0171 and 0187 respectively.  All plain text
+tokens to be specially interpreted by the importer are surrounded by these two symbols.  This work is done in the function HandleReservedHelpTokens()
+in IMPORT.GOC.  If the token defined within these symbols are not recognized, then they are treated as plain text.
+
+Reserved help tokens are defined, just as any other token in an RTF file, in the table defined in CONTROL.TBL.  All reserved help tokens should have
+the flag CONTROL_GEOS_HELP within the CTE_extra member of the token's entry in the table.  For example, the geoshelp token entry in CONTROL.TBL looks 
+like this:
+
+	{ "geoshelp", CT_OTHER, EnableGeosHelpInterpretation, DM_SKIP, MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), CONTROL_GEOS_HELP }
+
+Most, if not all, of the reserved help tokens require such special functionality that a function in CTRLFUNC.GOC has been set aside for them.  For
+instance, the geoshelp token defined above will initiate a call to EnableGeosHelpInterpretation which sets a flag in the tool to enable interpretation
+of all other special reserved help tokens.
+
+For the TOOLS product only, an additional destination mode (defined in IMPDEFS.H) has been added, called DM_CONTEXT_ID.  This destination mode
+defines that text read from the file in this mode should be read in as a context definition.  See the StartingContextID function (the handler for the
+\footnote token) in CTRLFUNC.GOC, which changes the destination to DM_CONTEXT_ID.  When a \footnote token group is closed, the global flag 
+waitingForContextRangeStart is set TRUE.  This means that the importer is waiting for a <<startcontextrange>> reserved help token.
+
+Immediately after the context definition in the RTF file, the exporter writes a <<startcontextrange>> reserved help token.  This defines the beginning of
+the text range for the context just defined.  See the StartContextTypeRange in CTRLFUNC.GOC for more details as to how this works.  Essentially, this 
+routine performs the following steps:
+
+	1. Turns off the waitingForContextRangeStart flag.  This should be self-explanatory.
+	2. Dumps the text buffer.  This is necessary so that we get an accurate count from TextCurPos.
+	3. Saves the contextRangeStart from TextCurPos.
+
+When the importer runs into an <<endcontextrange>> token, the following steps are performed by the EndContextTypeRange function:
+
+	1. The text buffer is dumped.
+	2. The current text position is taken as the end of the context range.
+	3. The context is set with a call to MSG_VIS_TEXT_SET_CONTEXT on the Text optr.
+	4. The context ID buffer, which is the destination for text read in during DM_CONTEXT_ID mode, is reset.

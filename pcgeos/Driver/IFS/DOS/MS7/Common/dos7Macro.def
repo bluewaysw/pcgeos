@@ -1,0 +1,115 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		driMacro.def
+
+AUTHOR:		Adam de Boor, Mar  2, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	3/ 2/92		Initial revision
+
+
+DESCRIPTION:
+	Macros for use in this here driver.
+		
+	$Id: dos7Macro.def,v 1.1 97/04/10 11:55:31 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetIDFromDTA
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Extract the standard ID for a file from a FileFindDTA
+
+PASS:		dta	= address of the FileFindDTA
+		idH	= place to store the high word of the ID
+		idL	= place to store the low word of the ID
+
+DESTROYED:	dosPathBuffer
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	3/ 2/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+op_if_not	macro	op, reg, idH, idL
+    if <idH> ne <reg> and <idL> ne <reg>
+		op	reg
+    endif
+		endm
+
+GetIDFromDTA	macro	dta, idH, idL
+	local dtapref, actualIDL, notds
+	;
+	; Push things we abuse
+	; 
+    op_if_not push cx, <idL>, <idH>
+    op_if_not push dx, <idL>, <idH>
+    op_if_not push si, <idL>, <idH>
+    op_if_not push ax, <idL>, <idH>
+	;
+	; Figure ID for actual current dir.
+	; 
+		call	DOSFileChangeGetCurPathID
+	;
+	; Load ds:si with the segment:offset of the name in the DTA, coping
+	; with the DTA being referenced by some segment other than DS.
+	; 
+dtapref substr <dta>, 1, 2
+notds instr dtapref, <es ss cs>
+    if notds
+		push	ds
+		segmov	ds, dtapref
+    endif
+
+		lea	si, dta.FFD_name
+		call	DOSFileChangeCalculateIDLow
+
+    if notds
+		pop	ds
+    endif
+
+    	;
+	; Setup return registers
+	; 
+actualIDL equ <dx>
+
+    if <idH> ne <cx>
+	if <idH> ne <dx>
+		; idH isn't dx and isn't cx, so we can just move cx there
+		mov	idH, cx
+	else
+		; idH is dx, so swap cx and dx and record the new location of
+		; the low word (cx) for loading idL
+		xchg	cx, dx
+		actualIDL equ <cx>
+	endif
+    endif
+    ifdif <idL>,actualIDL
+    		mov	idL, actualIDL
+    endif
+
+    	;
+	; Recover abused registers.
+	; 
+    op_if_not pop ax, <idL>, <idH>
+    op_if_not pop si, <idL>, <idH>
+    op_if_not pop dx, <idL>, <idH>
+    op_if_not pop cx, <idL>, <idH>
+		endm
+
+
+

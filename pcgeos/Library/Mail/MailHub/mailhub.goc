@@ -1,0 +1,983 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1998.  All rights reserved.
+	GLOBALPC CONFIDENTIAL
+
+PROJECT:	GlobalPC Mail Library
+MODULE:		
+FILE:		mailhub.goc
+
+AUTHOR:		IanPorteous, Oct 30, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	        Date		Description
+	----	        ----		-----------
+	porteous	10/30/98   	Initial version.
+
+DESCRIPTION:
+
+MailHub contains functions that are common to the send and receive mail 
+libraries.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <mailhub.goh>
+@include <socket.goh>
+#include <sockmisc.h>
+#include <Ansi/string.h>
+
+@include "mailfatals.goh"
+
+#if ERROR_CHECK
+FatalErrors mailhubFatalErrors;
+Warnings    mailhubWarnings;
+#endif
+
+char TCPIP[] = "TCPIP";
+
+MailAccPntAddress address;
+
+Boolean _pascal
+MHDoesThisLibraryWork (void) {
+    return TRUE;
+}
+
+/* states used to parse header fields
+ */
+typedef enum {
+    FPS_SCAN,
+    FPS_GET_FIELD_NAME,
+    FPS_GET_FIELD,
+    FPS_SKIP_FIELD,
+    FPS_EAT_WS
+} FieldParseState;
+
+
+/***********************************************************************
+ *		HTSocketConnect
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Creat a socket and open a connection to the server using
+ *              the passed port.
+ * CALLED BY:	Anybody
+ * RETURN:	Return 
+ *                    SocketError == SE_NORMAL if connection succeeded
+ *                    sock set to the create socket.
+ *	
+ * STRATEGY:	
+ *              Assumes accpnt 1, TCPIP, to establish connection.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	porteous        11/1/98         
+ *	
+ ***********************************************************************/
+SocketError _pascal 
+MailSocketConnect (char *serverName, Socket *sock, SocketPort port, word accPntID) {
+
+    MediumAndUnit mau;
+    SocketAddress *sockAddressPtr;
+    MemHandle sockAddressHandle;
+    SocketError status;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    address.MAPA_address.TAPEA_linkSize = 3;
+    address.MAPA_address.TAPEA_linkType = LT_ID;
+    address.MAPA_address.TAPEA_accPntID = accPntID;
+    memcpy(&(address.MAPA_addressBuffer),serverName,strlen(serverName)+1);
+    sockAddressHandle = SocketCreateResolvedAddress(TCPIP,(byte *)&address, 
+	       sizeof(TcpAccPntExtendedAddress)+MAX_IP_ADDR_STRING_LENGTH_ZT);
+
+    if (sockAddressHandle) {
+	sockAddressPtr = MemLock(sockAddressHandle);
+	status = SocketGetAddressMedium(sockAddressPtr, &mau);
+	if (status == SE_NORMAL) {
+	    *sock = SocketCreate(SDT_STREAM);
+	    SocketSetIntSocketOption(*sock, SO_RECV_BUF, 8192);
+	    SocketSetIntSocketOption(*sock, SO_SEND_BUF, 8192);
+	    sockAddressPtr->SA_port = port;
+	    sockAddressPtr->SA_domain = TCPIP;
+	    sockAddressPtr->SA_domainSize = strlen(TCPIP);
+	    status = SocketConnect(*sock, sockAddressPtr, 3600);
+	}
+	MemUnlock(sockAddressHandle);
+	MemFree(sockAddressHandle);
+    } else {
+	status = ThreadGetError();
+    }
+
+    POPDS;
+    return status;
+}
+
+
+/***********************************************************************
+ *		MailGetReturnData
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Collect the response to the last command in a buffer
+ *              This routing should be used for relatively small 
+ *              responses.  
+ *              
+ * CALLED BY:	
+ * RETURN:	MemHandle to buffer containing response.
+ *              NULL if allocation failed
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/16/98   	Initial Revision
+ *
+ ***********************************************************************/
+#define RETURN_DATA_BUF_SZ 4096
+#define RETURN_DATA_MAX_BUF_SZ 32768
+/* Need to verify that the multi block allocation really works */
+MemHandle _pascal
+MailGetReturnData(Socket sock, int *count)
+{
+    MemHandle handleList[RETURN_DATA_MAX_BUF_SZ/RETURN_DATA_BUF_SZ];
+    byte *ptrList[RETURN_DATA_MAX_BUF_SZ/RETURN_DATA_BUF_SZ];
+    byte *bufferPtr;
+    MemHandle bufferHandle;
+    int numBytes = 0, i, j, bufferIndex = 0;
+
+    for (i=0; i<(RETURN_DATA_MAX_BUF_SZ/RETURN_DATA_BUF_SZ); ++i) {
+	handleList[i] = MemAlloc(RETURN_DATA_BUF_SZ, 
+				 HF_SWAPABLE | HF_SHARABLE, 
+				 HAF_LOCK );
+	if (!handleList[i])
+	    break;
+
+	ptrList[i] = MemDeref(handleList[i]);
+
+	j = SocketRecv(sock, ptrList[i], RETURN_DATA_BUF_SZ, 3600, 0,
+			      (SocketAddress *)0);
+
+	MemUnlock(handleList[i]);
+	numBytes += j;
+	if (j < RETURN_DATA_BUF_SZ) {
+	    break;
+	}
+    }
+
+    *count = numBytes;
+    if (numBytes != 0) {
+
+#if ERROR_CHECK    
+	if (i >= (RETURN_DATA_MAX_BUF_SZ/RETURN_DATA_BUF_SZ)) {
+	    EC_ERROR(MAILHUB_RETURN_TOO_LARGE);
+	}
+#endif
+
+	bufferHandle = MemAlloc(numBytes, HF_SWAPABLE | HF_SHARABLE, 
+				HAF_LOCK);
+	if (bufferHandle) {
+	    bufferPtr = MemDeref(bufferHandle);
+	}
+
+	for (i=0; numBytes > 0; ++i) {
+	    ptrList[i] = MemLock(handleList[i]);
+	    /* if the buffer was not allocated just free all 
+	     * of the allocated blocks
+	     */
+	    if (bufferHandle) { 
+		if (numBytes > (RETURN_DATA_BUF_SZ)) {
+		    memcpy((void *)&(bufferPtr[bufferIndex]),
+			   (void *)ptrList[i], RETURN_DATA_BUF_SZ);
+		    numBytes -= RETURN_DATA_BUF_SZ;
+		} else {
+		    memcpy((void *)&(bufferPtr[bufferIndex]),
+			   (void *)ptrList[i], numBytes);
+		    numBytes = 0;
+		}
+	    }	    
+	    MemUnlock(handleList[i]);
+	    MemFree(handleList[i]);	    
+	}    
+	
+	MemUnlock(bufferHandle);
+	return bufferHandle;
+    } else {
+	return NULL;
+    }
+
+}
+
+
+
+/***********************************************************************
+ *		MailMessageInit
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/12/98   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+MailMessageInit(MailMessage *msg)
+{
+
+    MemHandle memHan;
+
+    /* Allocate an LMemHeap to hold the strings for all of the fields 
+     */
+    memHan = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    msg->MM_storageBlock = memHan;
+
+    msg->MM_to = NULL;
+    msg->MM_cc = NULL;
+    msg->MM_bcc = NULL;
+    msg->MM_from = NULL;
+    msg->MM_subject = NULL;
+    msg->MM_attachment = NULL;
+    msg->MM_subjectEnc = ENCODE_NONE;
+    msg->MM_bodyFile = NULL;
+    msg->MM_bodyOffset = 0;
+    msg->MM_boundary = NULL;
+    msg->MM_header = NULL;
+    msg->MM_gotBody = FALSE;
+    msg->MM_progressRoutine = NULL;
+    msg->MM_size = 0;
+    msg->MM_remainingSize = 0;
+
+
+}
+
+
+/***********************************************************************
+ *		MailMessageClose
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	12/02/98   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+MailMessageClose(MailMessage *msg)
+{
+    if (msg->MM_storageBlock) {
+	MemFree(msg->MM_storageBlock);
+	msg->MM_storageBlock = NULL;
+    }
+    if (msg->MM_bodyFile) {
+	FileClose(msg->MM_bodyFile,FILE_NO_ERRORS);
+	msg->MM_bodyFile = NULL;
+    }
+    if (msg->MM_header) {
+	MemFree(msg->MM_header);
+	msg->MM_header = NULL;
+    }
+}
+
+
+
+/***********************************************************************
+ *	
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Search for a field int the message and return
+ *                  the string for that field
+ * PARAMETERS:	    char *fieldName = name of the field to search for
+ *                  char *fieldBuf  = buffer to return the data in
+ *                  int len         = length of buffer
+ *                  char *data      = message to seach
+ * CALLED BY:       Global
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY: This will search through the message for the passed field
+ *           name, when it finds the field name it will copy all of
+ *           the text to the buffer until it reaches a CR not
+ *           followed by white space.  It will remove CR followed by
+ *           white space, unfolding the data.
+ *          
+ * We need to parse the following message format from the email app
+ *
+ *  From:
+ *  Subject: 
+ *  To:
+ *  Date:
+ *  Cc:
+ *  X-Mailer: NewMail 1.0
+ *  X-Mail-Tools-Attachment:  ( if any )
+ *
+ *  .........(Message body) ........
+ *
+ *  We don't have to worry about header fields like Reply-path, 
+ *  etc. the email library and the SMTP server will take care 
+ *  of it.   
+ *
+ *           
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	porteous    	11/5/98   	Initial Revision
+ *	
+ ***********************************************************************/
+#define NEXT_CHAR  data++;length--
+void _pascal
+MailGetHdrValue(char *fieldName, char *fieldBuf, int len, char *data )
+{
+    register char c;
+    char c1;
+    char field[MAX_FIELD_NAME_LENGTH+1];
+    int length, fieldIndex, i;
+    int parseState;
+
+    length = strlen(data);
+    parseState = FPS_SCAN;    
+    fieldBuf[0] = 0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    while(length > 0) {
+	c = *data;
+	switch (parseState) {
+
+	case FPS_SCAN: 
+	    /* skip the white space until we get to the next field name */
+	{
+	    if ISWHITE(c) {
+		NEXT_CHAR;
+	    } else {
+		fieldIndex = 0;
+		parseState = FPS_GET_FIELD_NAME;
+	    }
+	    break;
+	}
+	case FPS_EAT_WS: 
+	    /*
+	     * skip the white space until we get to the data in this field
+	     * if we hit a CR before any data, the field is empty
+	     */
+	{
+	    if ((c != CR) && (ISWHITE(c))) {
+		NEXT_CHAR;
+	    } else {
+		fieldIndex = 0;
+		parseState = FPS_GET_FIELD;
+	    }
+	    break;
+	}
+	case FPS_GET_FIELD_NAME:
+	    if (c == ':') {
+		parseState = FPS_EAT_WS;
+		NEXT_CHAR;
+	    } else {
+		if (fieldIndex > MAX_FIELD_NAME_LENGTH) {
+		    /*
+		     * illegally long field name.
+		     * rather than overrun the buffer and trash
+		     * local variables, simply ignore this field
+		     */
+EC (		    EC_WARNING(MAILHUB_FIELD_NAME_BUFFER_OVERRUN);           )
+                    parseState = FPS_SKIP_FIELD;
+		} else {
+		    field[fieldIndex] = TOUPPER(c);
+		}
+		NEXT_CHAR;
+		++fieldIndex;
+	    }
+	    break;
+	case FPS_GET_FIELD:
+	    if ((!strncmp(field,fieldName,strlen(fieldName))) && length > 0){
+		/* now copy the line requested into the field buf 
+		 * with folding 
+		 */
+		/* 
+		 * need to change this if we convert text to crlf before 
+		 * this step
+		 */
+		i = 0;
+		while (i < len) {
+		    if (c == CR)  {
+			c1 = *(data+CR_SIZE);
+			if (ISWHITE(c1) && (c1 != CR)) {
+			    data += CR_SIZE; 
+			    length -= CR_SIZE;
+			    c = *data;
+			    fieldBuf[i]= c;
+			    i++;
+			} else  {
+			    fieldBuf[i] = 0;
+			    i++;
+			    length = 0; /* we are done now */
+			    break;
+			}
+		    } else {
+			fieldBuf[i] = c;
+			i++;
+			NEXT_CHAR;
+		    }
+		    c = *data;
+		}
+		parseState = FPS_SKIP_FIELD;		
+	    } else {
+		parseState = FPS_SKIP_FIELD;
+	    }
+	    break;
+	case FPS_SKIP_FIELD:
+	    if (c == CR)  {
+		c1 = *(data+CR_SIZE);
+		if (c1 != CR && ISWHITE(c1)) {
+		    data += CR_SIZE;
+		    length -= CR_SIZE;
+		} else  {
+		    /*
+		     * if reached CR+CR, end of headers
+		     */
+		    if (c1 == CR) {
+			length = 0; /* we are done */
+			break;
+		    }
+		    NEXT_CHAR;
+		    parseState = FPS_SCAN;
+		}
+	    } else {
+		NEXT_CHAR;
+	    }
+	    break;
+	default:
+	    /* warning */
+	    NEXT_CHAR;
+	}
+	    
+    }
+
+    POPDS;
+    
+}
+
+
+/***********************************************************************
+ *		HeaderLength
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Length until CRLFCRLF is encountered
+ * CALLED BY:	
+ * RETURN:	returns length, 0 if end is reached before length
+ *              is determined
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/29/98   	Initial Revision
+ *
+ ***********************************************************************/
+int _pascal
+GetHeaderLength (char *data)
+{
+    int len = 0, state = 0;
+
+    for (len = 0, state = 0;(*data != NULL) && (state != 4); ++data, ++len) {
+	if (*data == CR) {
+	    if (state == 0) {
+		++state;
+	    }else if (state == 2) {
+		++state;
+	    } else {
+		state = 0;
+	    }
+	} else if (*data == LF) {
+	    if (state == 1) {
+		++state;
+	    } else if (state == 3) {
+		++state;
+	    } else {
+		state = 0;
+	    }
+	} else {
+	    state = 0;
+	}
+    }
+    return len;
+}	/* End of HeaderLength.	*/
+
+
+/***********************************************************************
+ *		MailGetHdrValue822
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Very Similar to GetHdrValue, except this is for 
+ *              incoming messages and assumes compliance with rfc 822.
+ *              In Particular it expects CRLF instead of CR
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:    len = length of the fieldBuf
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/29/98   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+MailGetHdrValue822 (char *fieldName, char *fieldBuf, int len, char *data )
+{
+
+    char field[MAX_FIELD_NAME_LENGTH+1];
+    int length, fieldIndex, i=0;
+    int parseState;
+    word c1;
+    
+    length = GetHeaderLength(data);
+    parseState = FPS_SCAN;    
+    fieldBuf[0] = 0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    while(length > 0) {
+	switch (parseState) {
+	    
+	case FPS_SCAN: 
+	    /* skip the white space until we get to the next field name */
+	{
+	    if ISWHITE(*data) {
+		NEXT_CHAR;
+	    } else {
+		fieldIndex = 0;
+		parseState = FPS_GET_FIELD_NAME;
+	    }
+	    break;
+
+	}
+	case FPS_EAT_WS: 
+	    /* skip the white space until we get to the data in this field */
+	{
+	    if ISWHITE(*data) {
+		NEXT_CHAR;
+	    } else {
+		fieldIndex = 0;
+		parseState = FPS_GET_FIELD;
+	    }
+	    break;
+	}
+	case FPS_GET_FIELD_NAME:
+	    if ((char)*data == (char)':') {
+		parseState = FPS_EAT_WS;
+		NEXT_CHAR;
+	    } else {
+		if (fieldIndex > MAX_FIELD_NAME_LENGTH) {
+		    /*
+		     * illegally long field name.
+		     * rather than overrun the buffer and trash
+		     * local variables, simply ignore this field
+		     */
+EC (		    EC_WARNING(MAILHUB_FIELD_NAME_BUFFER_OVERRUN);           )
+                    parseState = FPS_SKIP_FIELD;
+		} else {
+		    field[fieldIndex] = TOUPPER(*data);
+		}
+		field[fieldIndex] = TOUPPER(*data);
+		NEXT_CHAR;
+		++fieldIndex;
+	    }
+	    break;
+	case FPS_GET_FIELD:
+	    if ((!strncmp(field,fieldName,strlen(fieldName))) && length > 0){
+		/* now copy the line requested into the field buf 
+		 * with folding 
+		 */
+		while (i < len) {
+		    if (*(word *)data == CRLF_WORD)  {
+			if (ISWHITE(*(data+CRLF_SIZE))) { 
+			    data += CRLF_SIZE; 
+			    length -= CRLF_SIZE;
+			    fieldBuf[i]=*data;
+			    fieldBuf[i+1]=*data;
+			    i+=CRLF_SIZE;
+			} else  {
+			    fieldBuf[i] = 0;
+			    i++;
+			    length = 0; /* we are done now */
+			    break;
+			}
+		    } else {
+			fieldBuf[i] = *data;
+			i++;
+			NEXT_CHAR;
+		    }
+		}
+		parseState = FPS_SKIP_FIELD;		
+	    } else {
+		parseState = FPS_SKIP_FIELD;
+	    }
+	    break;
+	case FPS_SKIP_FIELD:
+	    if (*(word *)data == CRLF_WORD)  {
+		c1 = *(data+CRLF_SIZE);
+		if (ISWHITE(c1) && (c1 != CRLF_WORD)) {
+		    data += CRLF_SIZE;
+		    length -= CRLF_SIZE;
+		} else  {
+		    if (c1 == CRLF_SIZE) {
+			length = 0; /* we are done */
+			break;
+		    }
+		    data += CRLF_SIZE;
+		    length -= CRLF_SIZE;
+		    parseState = FPS_SCAN;
+		}
+	    } else {
+		NEXT_CHAR;
+	    }
+	    break;
+	default:
+	    /* warning */
+	    NEXT_CHAR;
+	}
+	    
+    }
+
+    POPDS;
+
+}	/* End of GetHdrValue822.	*/
+
+
+/***********************************************************************
+ *		MailMessageGetHdrValue
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the text of the header 
+ * CALLED BY:	Global
+ * RETURN:	fieldBuf with retrieved field
+ *              fieldBuf[0] = NULL, if field did not exist.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ * msg:            Message to search for the field
+ * fieldName:      Name of the field to search for
+ * fieldBuf:       Buffer to store the retrieved field in
+ * len:            Length of the field buffer.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	12/03/98   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+MailMessageGetHdrValue (MailMessage *msg, char *fieldName, char *fieldBuf, int len)
+{
+    char *data;
+    
+    fieldBuf[0] = NULL;
+    data = MemLock(msg->MM_header);
+    if (data) {
+	MailGetHdrValue822 (fieldName, fieldBuf, len, data );
+    }
+    
+}	/* End of MessageGetHdrValue.	*/
+
+
+
+/***********************************************************************
+ *		IsAtomChar
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Return True if ch is an atom char according to RFC822
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/12/98   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+IsAtomChar(char ch)
+{
+    if (ISTSPECIAL(ch) ) {
+	return FALSE;
+    } else if ((ch <= 32) || (ch == 127)) {
+	return FALSE;
+    } else {
+	return TRUE;
+    }
+	
+}
+
+
+
+/***********************************************************************
+ *		MailParseAddressString
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Convert a string of addresses into a chunk array 
+ *              of address strings
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/12/98   	Initial Revision
+ *      gene            9/20/99         moved to mailhub, added name, return vl
+ *      gene            3/24/00         added support for (comment)
+ *
+ ***********************************************************************/
+#define PA_NEXT_CHAR  i++;
+
+enum {
+PAS_EAT_WS,
+PAS_EAT_WORD,
+PAS_EAT_ADDRESS,
+PAS_EAT_COMMENT
+};
+
+#define MPAS_ADDR_CHUNK  sizeof(LMemBlockHeader)
+#define MPAS_NAME_CHUNK  sizeof(LMemBlockHeader)+2
+#define MPAS_RESULT_CHUNK sizeof(LMemBlockHeader)+4
+
+void
+StoreString(MemHandle mem, ChunkHandle chk, TCHAR *data, sword start, sword end)
+{
+    TCHAR *arrayPtr;
+    sword len;
+
+    if (start != -1) {
+	/*
+	 * trim any trailing spaces or quotes
+	 */
+	while ((end > start) && (ISWHITE(data[end]) || data[end] == '"')) {
+	    end--;
+	}
+	/*
+	 * trim any leading quotes (space is gone)
+	 */
+	while ((start < end) && data[start] == '"') {
+	    start++;
+	}
+	len = end - start + 1;
+    } else {
+	len = 0;
+    }
+    arrayPtr = ChunkArrayAppendHandles(mem, chk, (len+1)*sizeof(TCHAR));
+    strncpy(arrayPtr, &data[start], len);
+    arrayPtr[len] = 0;
+}
+
+void StoreResult(MemHandle mem, MailParseAddressFlags flags)
+{
+    word *rp;
+
+    rp = ChunkArrayAppendHandles(mem, MPAS_RESULT_CHUNK,
+				 sizeof(MailParseAddressFlags));
+    *rp = flags;
+}
+
+MemHandle _pascal
+MailParseAddressString(TCHAR *data)
+{
+    word length, parseState, oldState, i;
+    sword addrStart, nameStart, nameEnd;
+    TCHAR ch;
+    MemHandle mem;
+    Boolean inQuote = FALSE;
+    MailParseAddressFlags flags = 0;
+
+    length = strlen(data);
+    parseState = PAS_EAT_WS;
+    i = 0;
+    addrStart = nameStart = nameEnd = -1;
+
+    mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    MemLock(mem);
+    ChunkArrayCreate(mem, 0, 0, 0); /* email addresses */
+    ChunkArrayCreate(mem, 0, 0, 0); /* names */
+    ChunkArrayCreate(mem, sizeof(MailParseAddressFlags), 0, 0); /* results */
+
+    while(i < length) {
+	ch = data[i];
+	switch(parseState) {
+	    
+	    /*
+	     * discard any white space or ','
+	     */
+	case PAS_EAT_WS:
+
+	    if (ISWHITE(ch) || (ch == ',') || (ch == '>')) {
+		PA_NEXT_CHAR;
+	    } else if (ch == '<') {
+		/*
+		 * if we see a '<' while parsing white space, it means
+		 * address is bracked with <> and there is no real name
+		 */
+		parseState = PAS_EAT_ADDRESS;
+		PA_NEXT_CHAR; /* do not save "<" */
+		addrStart = i;
+	    } else if (ch == '(') {
+		parseState = PAS_EAT_COMMENT;
+		oldState = PAS_EAT_WS;
+	    } else {
+		parseState = PAS_EAT_WORD;
+		addrStart = i;
+		nameStart = i;
+	    }
+	    break;
+
+	    /*
+	     * start saving the text, but we don't know if it is an 
+	     * address yet.
+	     */
+	case PAS_EAT_WORD:
+	    if (ch == '"') {
+		inQuote = !inQuote;
+		PA_NEXT_CHAR;
+	    } else if (ch == '@' && !inQuote) {
+		/*
+		 * if we see an '@' while parsing a word, it means there
+		 * is no real name. Switch to parsing the address
+		 */
+		flags |= (MPAR_HAS_AT);
+		nameStart = -1;
+		parseState = PAS_EAT_ADDRESS;
+		PA_NEXT_CHAR;
+	    } else if ( ch == '<') {
+		/*
+		 * if we see a '<' while parsing a word, it means there
+		 * is a real name, followed by a the bracketed address
+		 */
+		parseState = PAS_EAT_ADDRESS;
+		nameEnd = i-1;   /* do not save "<" */
+		PA_NEXT_CHAR;
+		addrStart = i; /* do not save "<" */
+	    } else if ( ch == ',' && !inQuote) {
+		/*
+		 * if we see a ',' while parsing a word, it means there
+		 * is an illegally formed addressed (no @domain.ext)
+		 * and no real name
+		 */
+	    } else if (ch == '(') {
+		parseState = PAS_EAT_COMMENT;
+		oldState = PAS_EAT_WORD;
+	    } else {
+		flags |= (MPAR_HAS_USER);
+		PA_NEXT_CHAR;
+	    }
+	    break;
+
+	case PAS_EAT_ADDRESS:
+	    /*
+	     * it's an address up until a comma or a non-atom
+	     * commas aren't atoms, so just check for an atom or '@'
+	     */
+	    if (IsAtomChar(ch)) {
+		/*
+		 * note if we've seen '.' after an '@'
+		 */
+		if (ch == '.') {
+		    if (flags & MPAR_HAS_AT) {
+			flags |= MPAR_HAS_DOT;
+		    }
+		} else if (ch == '(') {
+		    parseState = PAS_EAT_COMMENT;
+		    oldState = PAS_EAT_ADDRESS;
+		} else {
+		    /*
+		     * make note of what we've seen
+		     */
+		    switch (flags) {
+		    case (0):
+			flags |= MPAR_HAS_USER;
+			break;
+		    case (MPAR_HAS_USER|MPAR_HAS_AT):
+			flags |= MPAR_HAS_DOMAIN;
+			break;
+		    case (MPAR_HAS_USER|MPAR_HAS_AT|MPAR_HAS_DOMAIN|MPAR_HAS_DOT):
+			flags |= MPAR_HAS_EXT;
+			break;
+		    }
+		}
+		PA_NEXT_CHAR;
+	    } else if (ch == '@') {
+		/*
+		 * note if we've seen '@'
+		 */
+		flags |= MPAR_HAS_AT;
+		PA_NEXT_CHAR;
+	    } else {
+		/*
+		 * we have now found an address -- store it and the name,
+		 * if any, and the result
+		 */
+		StoreString(mem, MPAS_ADDR_CHUNK, data, addrStart, i-1);
+		StoreString(mem, MPAS_NAME_CHUNK, data, nameStart, nameEnd);
+		StoreResult(mem, flags);
+		/*
+		 * reset for more addresses, if any
+		 */
+		parseState = PAS_EAT_WS;
+		flags = 0;
+		nameStart = addrStart = nameEnd = -1;
+		PA_NEXT_CHAR;
+	    }
+	    break;
+	case PAS_EAT_COMMENT:
+	    if (ch == ')') {
+		parseState = oldState;
+	    }
+	    PA_NEXT_CHAR;
+	    break;
+	}
+    }
+    /*
+     * if there is still text left, add it as an address with no name
+     */
+    if (length > 0 && addrStart != -1) {
+	StoreString(mem, MPAS_ADDR_CHUNK, data, addrStart, length-1);
+	StoreString(mem, MPAS_NAME_CHUNK, data, -1, 0);
+	StoreResult(mem, flags);
+    }
+    /*
+     * EC: verify we have the same number of elements in each array
+     */
+    EC(i = ChunkArrayGetCountHandles(mem, MPAS_RESULT_CHUNK));
+    EC_ERROR_IF(i != ChunkArrayGetCountHandles(mem, MPAS_NAME_CHUNK), MAILHUB_ADDRESS_PARSE_ARRAY_INCONSISTENT);
+    EC_ERROR_IF(i != ChunkArrayGetCountHandles(mem, MPAS_ADDR_CHUNK), MAILHUB_ADDRESS_PARSE_ARRAY_INCONSISTENT);
+
+    MemUnlock(mem);
+    return(mem);
+}

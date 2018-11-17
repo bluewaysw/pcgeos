@@ -1,0 +1,265 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1999.  All rights reserved.
+	GLOBALPC CONFIDENTIAL
+
+PROJECT:	
+MODULE:		PDF Viewer
+FILE:		gstring.goc
+
+AUTHOR:		John Mevissen, Mar 31, 1999
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	mevissen	3/31/99   	Initial version.
+
+DESCRIPTION:
+
+	Port of Derek's "GString."
+
+	$Id$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+//========================================================================
+//
+// GString.cc
+//
+// Simple variable-length string type.
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifdef __GNUC__
+#pragma implementation
+#endif
+
+@include "pdfvu.goh"
+@include "gstr.goh"
+
+long size(long len) {
+  long delta;
+
+  delta = len < 256 ? 7 : 255;
+  return ((len + 1) + delta) & ~delta;
+}
+
+void resize(GooString *gstr, long length1) {
+//  char *s1;
+
+   if (!gstr->s) {
+    gstr->s = gmalloc( size(length1) );
+  } else if (size(length1) != size(gstr->length)) {
+    gstr->s = grealloc(gstr->s, size(length1) );
+  }
+}
+
+void GStrInit(GooString *gstr) {
+  gstr->s = NULL;
+  resize(gstr, (gstr->length = 0));
+  gstr->s[0] = '\0';
+}
+
+void GStrInitString(GooString *gstr, char *s1) {
+  long n = strlen(s1);
+
+  gstr->s = NULL;
+  resize(gstr, gstr->length = n);
+  memcpy(gstr->s, s1, n + 1);
+}
+
+void GStrInitStringN(GooString *gstr, char *s1, long length1) {
+  gstr->s = NULL;
+  resize(gstr, gstr->length = length1);
+  memcpy(gstr->s, s1, gstr->length * sizeof(char));
+  gstr->s[length1] = '\0';
+}
+
+void GStrInitGS(GooString *gstr, GooString *str) {
+  gstr->s = NULL;
+  resize(gstr, gstr->length = GStrGetLength(str));
+  memcpy(gstr->s, GStrGetCString(str), gstr->length + 1);
+}
+
+void GStrInitGSConcat(GooString *gstr, GooString *str1, GooString *str2) {
+  long n1 = GStrGetLength(str1);
+  long n2 = GStrGetLength(str2);
+
+  gstr->s = NULL;
+  resize(gstr, gstr->length = n1 + n2);
+  memcpy(gstr->s, GStrGetCString(str1), n1);
+  memcpy(gstr->s + n1, GStrGetCString(str2), n2 + 1);
+}
+
+void GStrFree(GooString *gstr) {
+  gfree(gstr->s);
+  gstr->s = NULL;
+  gstr->length = 0;
+}
+
+void GStrClear(GooString *gstr) {
+  gstr->s[gstr->length = 0] = '\0';
+  resize(gstr, 0);
+}
+
+void GStrAppendChar(GooString *gstr, char c) {
+  resize(gstr, gstr->length + 1);
+  gstr->s[gstr->length++] = c;
+  gstr->s[gstr->length] = '\0';
+}
+
+void GStrAppendGS(GooString *gstr, GooString *str) {
+  long n = GStrGetLength(str);
+
+  resize(gstr, gstr->length + n);
+  memcpy(gstr->s + gstr->length, GStrGetCString(str), n + 1);
+  gstr->length += n;
+}
+
+void GStrAppendString(GooString *gstr, char *str) {
+  long n = strlen(str);
+
+  resize(gstr, gstr->length + n);
+  memcpy(gstr->s + gstr->length, str, n + 1);
+  gstr->length += n;
+}
+
+void GStrAppendStringN(GooString *gstr, char *str, long length1) {
+  resize(gstr, gstr->length + length1);
+  memcpy(gstr->s + gstr->length, str, length1);
+  gstr->length += length1;
+  gstr->s[gstr->length] = '\0';
+}
+
+void GStrInsertChar(GooString *gstr, long i, char c) {
+  long j;
+
+  resize(gstr, gstr->length + 1);
+  for (j = gstr->length + 1; j > i; --j)
+    gstr->s[j] = gstr->s[j-1];
+  gstr->s[i] = c;
+  ++gstr->length;
+}
+
+void GStrInsertGS(GooString *gstr, long i, GooString *str) {
+  long n = GStrGetLength(str);
+  long j;
+
+  resize(gstr, gstr->length + n);
+  for (j = gstr->length; j >= i; --j)
+    gstr->s[j+n] = gstr->s[j];
+  memcpy(gstr->s+i, GStrGetCString(str), n);
+  gstr->length += n;
+}
+
+void GStrInsertString(GooString *gstr, long i, char *str) {
+  long n = strlen(str);
+  long j;
+
+  resize(gstr, gstr->length + n);
+  for (j = gstr->length; j >= i; --j)
+    gstr->s[j+n] = gstr->s[j];
+  memcpy(gstr->s+i, str, n);
+  gstr->length += n;
+}
+
+void GStrInsertStringN(GooString *gstr, long i, char *str, long length1) {
+  long j;
+
+  resize(gstr, gstr->length + length1);
+  for (j = gstr->length; j >= i; --j)
+    gstr->s[j+length1] = gstr->s[j];
+  memcpy(gstr->s+i, str, length1);
+  gstr->length += length1;
+}
+
+void GStrDel(GooString *gstr, long i, long n) {
+  long j;
+
+  if (n > 0) {
+    for (j = i; j <= gstr->length - n; ++j)
+      gstr->s[j] = gstr->s[j + n];
+    resize(gstr, gstr->length -= n);
+  }
+}
+
+void GStrUpperCase(GooString *gstr) {
+//  long i;
+
+  LocalUpcaseString(gstr->s, gstr->length);
+
+
+//  for (i = 0; i < gstr->length; ++i) {
+//    if (islower(s[i]))
+//      s[i] = toupper(s[i]);
+//  }
+}
+
+void GStrLowerCase(GooString *gstr) {
+//  long i;
+
+  LocalDowncaseString(gstr->s, gstr->length);
+
+//  for (i = 0; i < length; ++i) {
+//    if (isupper(s[i]))
+//      s[i] = tolower(s[i]);
+//  }
+}
+
+
+long GStrGetLength(GooString *gstr) {
+
+ return gstr->length; 
+}
+
+
+char *GStrGetCString(GooString *gstr) {
+
+	return gstr->s; 
+}
+
+
+  // Get <i>th character.
+char GStrGetChar(GooString *gstr, long i) {
+
+ return gstr->s[i]; 
+}
+
+
+  // Change <i>th character.
+void GStrSetChar(GooString *gstr, long i, char c) {
+
+ gstr->s[i] = c; 
+}
+
+
+  // Compare two strings:  -1:<  0:=  +1:>
+  // These functions assume the strings do not contain null characters.
+
+long GStrCmpGS(GooString *gstr, GooString *str) { 
+
+	return strcmp(gstr->s, GStrGetCString(str)); 
+}
+
+
+long GStrCmpGSN(GooString *gstr, GooString *str, long n) { 
+
+	return strncmp(gstr->s, GStrGetCString(str), n); 
+}
+
+
+long GStrCmpString(GooString *gstr, char *s1) { 
+
+	return strcmp(gstr->s, s1); 
+}
+
+
+long GStrCmpStringN(GooString *gstr, char *s1, long n) { 
+
+	return strncmp(gstr->s, s1, n); 
+}

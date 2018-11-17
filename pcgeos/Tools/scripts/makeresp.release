@@ -1,0 +1,1141 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Shell scripts
+# FILE: 	makeresp
+# AUTHOR: 	Andrew Wilson, 1995	
+#
+# DESCRIPTION:
+#
+#	Do all the cruft necessary to create a resp image for the 
+#	prototypes.
+#
+#
+# USAGE:
+# 	makeresp [noprompt] [nodelete] [testApps]
+#
+# 	noprompt: use same options as last time
+#	nodelete: don't delete the XIP image files in /tmp
+#	testapps: ship the test apps, even if we are making a non-PC image
+#
+# 	$Id: makeresp.release,v 1.3 96/08/09 16:24:16 reza Exp $
+#
+#
+
+#
+# parse any command line options
+#
+noprompt=""
+nodelete=""
+testapps=""
+
+for i in "$@"; do
+   case $i in
+	noprompt)   noprompt="yes"
+		    ;;
+	nodelete)   nodelete="yes"
+		    ;;
+	testapps)   testapps="yes"
+		    ;;
+   esac
+done
+
+#
+# userTree is used to decide where to grab the local versions of the geodes
+#
+userTree=${USER_TREE-/staff/pcgeos/$USER}
+
+makerespECDef=$HOME/.makeresp.ecdef
+
+if [ -f $HOME/.xiplocal ]; then
+	eval `awk '{dq = sprintf("%c", 34)} {if ( $1 ) print "echo Using local "$1" ;"} {if ( $2 ) print $1"Root="$2; else print $1"Root=$userTree"}{print "; geodeList="dq"$geodeList ",$1,dq}' $HOME/.xiplocal`
+
+fi
+if [ -f $makerespECDef ]; then
+    read fromSDK doEC makePC cmtVersion < $makerespECDef
+else
+    doEC="y"
+    makePC="n"
+    fromSDK="n"
+    cmtVersion="n"
+fi
+
+# We read the defaults from a different place depending on whether we are
+# making an EC or non-EC image, so find out what kind of image the user wants
+# to make
+#
+if [ ! "$noprompt" ]; then
+    echo -n "Make the image from the SDK build? (y/n), default = "$fromSDK": "
+    read r_fromSDK
+    fromSDK=${r_fromSDK:-$fromSDK}
+    case "$fromSDK" in 
+    	[Yy]*)
+		fromSDK="y"
+		;;
+	[Nn]*)
+		fromSDK="n"
+		;;
+	*)
+		echo You must answer "y" or "n"
+		exit 1
+		;;
+    esac
+    echo -n "Create an image that talks to the CMT module? (y/n), default = "$cmtVersion": "
+    read r_cmtVersion
+    cmtVersion=${r_cmtVersion:-$cmtVersion}
+    case "$cmtVersion" in 
+    	[Yy]*)
+		cmtVersion="y"
+		;;
+	[Nn]*)
+		cmtVersion="n"
+		;;
+	*)
+		echo You must answer "y" or "n"
+		exit 1
+		;;
+    esac
+
+    echo -n "Make an image for what platform? (pc/g2/final), default = "$makePC": "
+    read r_makePC
+    makePC=${r_makePC:-$makePC}
+
+    echo -n "Make an EC image? (y/n), default = "$doEC": "
+    read r_doEC
+    doEC=${r_doEC:-$doEC}
+fi
+
+echo $fromSDK $doEC $makePC $cmtVersion > $makerespECDef
+case "$doEC" in
+    [Yy]*)
+	    ec=ec
+	    _EC=_EC
+	    EC=EC
+	    respgfsflags=""
+	    makerespDefault=$HOME/.makeresp.ec
+	    optimizedImage="n"	
+	    makeNonFittingROMResourcesWritable="-w"
+	    ;;
+    *)
+	    ec=""
+    	    respgfsflags="-n"
+	    makeNonFittingROMResourcesWritable=""
+	    makerespDefault=$HOME/.makeresp.nec
+	    optimizedImage="y"
+	    ;;
+esac
+
+case "$makePC" in
+     [Pp]*)
+	makerespDefault=${makerespDefault}.pc
+	makeNonFittingROMResourcesWritable="-w"
+	platform=PC
+	_platform=pc
+	;;
+     [Gg]*)
+	makerespDefault=${makerespDefault}.g2
+     	platform=G2;
+     	_platform=g2;
+	;;
+     [Ff]*)
+	makerespDefault=${makerespDefault}.g4
+     	platform=G4;
+     	_platform=g4;
+	;;
+     *)
+	echo \"$makePC\" is not a valid platform \(please choose PC, G2, or FINAL\)
+	exit 1
+	;;
+
+esac
+
+#
+# See if we have any arguments
+#
+
+# Ask the user what to do.  See if settings have been
+# saved in the user's home directory from a previous run.
+
+
+if [ -f $makerespDefault ]; then
+    read mapBlock doROM romSource romFilename doGFS \
+	destDir doShip optimizedImage makeXIP pcKbd buildPath \
+	gfsDir newScan useDebugKernel < $makerespDefault
+else
+    buildPath="/n/resp/build/pcgeos"
+    gfsDir="/n/yb/respgfs"
+    doROM="n"
+    mapBlock="0xd0000"
+    if [ "$ISV" = "true" ]; then
+	romSource="."
+	romFilename="rom-pro.img"
+	splitMeg="y"
+	splitOddEven="n"
+    else
+        romSource="/n/resp/release/${_platform}dev${ec}"
+	romFilename="romdisk.img"
+	splitMeg="n"
+	splitOddEven="y"
+    fi
+    makeXIP="y"
+    doGFS="y"
+    doShip="y"
+    if [ "$fromSDK" = "y" ]; then
+            destDir="."
+    else
+        destDir="/n/users/$USER/${_platform}xip"
+    fi
+fi
+if [ ! "$noprompt" ]; then
+
+    #
+    # ISVs won't be remaking the rom image, the kernel, or doing a
+    # ship
+    #
+    if [ "$platform" = "PC" ]; then
+    	pcKbd=y
+	echo -n "Memory location of the map block (default = "$mapBlock") "
+	read r_mapBlock
+	mapBlock=${r_mapBlock:-$mapBlock}
+	if [ "$romWindows" = "" ]; then
+	    echo You must set the "romWindows" environment variable to make a PC image
+	    exit 1
+	fi
+	doROM="n"
+    else
+	if [ "$fromSDK" = "n" ]; then
+	    echo -n "Make the ROM disk? (y/n), default = "$doROM": "
+	    read r_doROM
+            doROM=${r_doROM:-$doROM}
+	else
+	    doROM="n"
+	fi    
+	echo -n "Directory where ROM disk lies (default = "$romSource") "
+	read r_romSource
+    fi
+    if [ "$platform" = "G4" ]; then
+        if [ "$ec" != "ec" ]; then
+		echo -n "Create an image for the G4 prototype? (y/n), default = "$useDebugKernel": "
+		read r_useDebugKernel
+		useDebugKernel=${r_useDebugKernel:-$useDebugKernel}
+	else
+		useDebugKernel="y"	
+	fi
+    fi
+    if [ "$fromSDK" = "n" ]; then
+        echo -n "Make the XIP image? (y/n), default = "$makeXIP": "
+        read r_makeXIP
+        makeXIP=${r_makeXIP:-$makeXIP}
+    else
+    	echo -n "Directory where geodes lie (default = "$buildPath") "
+	read r_buildPath
+	buildPath=${r_buildPath:-$buildPath}
+	echo -n "Directory where GFS lies (default = "$gfsDir") "
+	read r_gfsDir
+	gfsDir=${r_gfsDir:-$gfsDir}
+	makeXIP="y"
+    fi
+    case "$makeXIP" in
+    	[Yy]*)
+	    if [ "$fromSDK" = "n" ]; then
+    	        echo -n "Make an optimized image? (y/n), default = "$optimizedImage": "
+	        read r_optimizedImage
+		optimizedImage=${r_optimizedImage:-$optimizedImage}
+	    else
+		optimizedImage="y"
+	    fi
+	    if [ "$platform" != "PC" ]; then
+	    	echo -n "Use the PC kbd driver? (y/n), default = "$pcKbd": "
+		read r_pcKbd
+		pcKbd=${r_pcKbd:-$pcKbd}
+		if [ "$pcKbd" = "n" ]; then
+		    echo -n "Use new keyscan layout? (y/n), default = "$newScan": "
+		    read r_newScan
+		fi
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if [ "$fromSDK" = "n" ]; then
+        echo -n "Use a local GFS? (y/n), default = "$doGFS": "
+        read r_doGFS
+        doGFS=${r_doGFS:-$doGFS}
+    else
+	doGFS="y"
+    fi
+    case "$doGFS" in 
+    	[Nn]*)
+	    ;;
+        *)
+    	    echo -n "Create a local GFS? (y/n), default = "$doShip": "
+    	    read r_doShip
+	    ;;
+    esac
+    echo -n "Destination for image files (default = "$destDir") " 
+    read r_destDir
+
+else
+
+    if [ "$fromSDK" = "y" ]; then
+	makeXIP="y"
+	doROM="n"
+	doGFS="y"
+	optimizedImage="y";
+    fi
+fi
+
+
+
+#
+# Set the variables from the prompted-for values, if they exist:
+#
+romSource=${r_romSource:-$romSource}
+doShip=${r_doShip:-$doShip}
+if [ "$fromSDK" = "y" ]; then
+	doGFS=$doShip
+fi
+destDir=${r_destDir:-$destDir}
+newScan=${r_newScan:-$newScan}
+echo $mapBlock $doROM $romSource $romFilename $doGFS \
+	$destDir $doShip $optimizedImage $makeXIP $pcKbd $buildPath \
+	$gfsDir $newScan $useDebugKernel > $makerespDefault
+
+if [ "$platform" = "PC" ]; then
+    if [ "$romWindows" = "" ]; then
+	echo You must set the "romWindows" environment variable to make a PC image
+	exit 1
+    fi
+else
+    mapBlock="0xb4000"
+
+	# The final hardware uses a differently sized BIOS than the G2 and
+	# G4 with PS/2 keyboard images, so the fixed windows are a different
+	# size...
+
+    romWindows="-rf0xbc000 0x2d000"
+    if [ "$platform" = "G4" ]; then
+        case "$pcKbd" in
+	    [Yy]*)
+		makeNonFittingROMResourcesWritable="-w"
+	        ;;
+	    *)
+	        romWindows="-rf0xbc000 0x30400"
+	        ;;
+        esac
+    fi
+fi
+
+set -x
+
+######################################################################
+# Set some variables.
+#
+
+case "$optimizedImage" in
+    [Yy]*)
+	    xipOptFlag=""
+	    ;;
+    *)
+	    xipOptFlag="-u"
+	    ;;
+esac
+
+installed=/staff/pcgeos/ReleaseResponder/Installed
+
+
+if [ "$platform" = "PC" ]; then
+    xipDir=RESPDEMOXIP
+    #
+    # The PC XIP sdk demo renames some of the directories.
+    #
+    if [ "$fromSDK" = "n" ]; then
+	xipRenamedDir=RESPDEMOXIP
+    else
+	xipRenamedDir=rspdemox
+    fi
+    xipDebugRenamedDir=$xipRenamedDir
+    nonXIPDir=RESPDEMO
+elif [ "$platform" = "G2" ]; then
+    xipDir=RESPG2XIP
+    xipRenamedDir=$xipDir
+    xipDebugRenamedDir=$xipRenamedDir
+    nonXIPDir=RESPG2
+else
+    xipDir=RESPXIP
+    xipRenamedDir=$xipDir
+    if [ "$useDebugKernel" != "y" ]; then
+	xipDebugRenamedDir=$xipRenamedDir
+    else
+	xipDebugRenamedDir=RESPXIPDBG
+    fi
+    nonXIPDir=RESPONDER
+fi
+
+#
+# Figure out the shipDir and distDir directories
+#
+if [ "$fromSDK" = "n" ]; then
+	#
+	# Put ship and distribution stuff on user's machine
+	#
+	site=`cat /staff/pcgeos/.GINSTALL_SITE_NAME`
+	if [ $site = "berkeley" ]; then
+	    gfsDir=/n/pl/gfs
+	fi
+	if [ $site = "alameda" ]; then
+	    gfsDir=/n/ph/gfs
+        fi
+	if [ $site = "seattle" ]; then
+	    gfsDir=/n/yb/gfs
+	fi
+fi
+
+if [ ! -d $destDir ]; then
+	mkdir -p $destDir	
+fi
+
+
+
+
+######################################################################
+#
+# Remake the ROM image
+#
+	
+
+
+case "$doROM" in 
+    [Yy]*)
+    romdisk=$romSource/romdisk
+
+    #
+    # Copy the local.INI and net.INI to the romdisk directory, and
+    # then convert from unix to DOS (convert LFs to CR-LFs).
+    #
+    cd /staff/pcgeos/Installed/ProductFiles/Responder
+    makeIni xip${ec} geos.temp /tmp
+    /bin/unix2dos /tmp/geos${ec}.ini /tmp/net.ini 
+    if cmp -s /tmp/net.ini $romdisk/geoworks/net.ini; then
+    	: ini file is up-to-date
+    else
+	cp /tmp/net.ini $romdisk/geoworks/net.ini
+    fi
+
+    if cmp -s $installed/Loader/${xipDir}/loader${ec}.exe $romdisk/geoworks/loader${ec}.exe; then
+    	: loader is up to date
+    else
+	cp $installed/Loader/${xipDir}/loader${ec}.exe $romdisk/geoworks
+    fi    
+
+    set +x
+    echo To make the ROM image, you must go to a DOS machine logged
+    echo in to NOVELL, and CD to the \\${platform}DEV${EC} directory on drive I:
+    echo To make the rom disk image, type:
+    echo MKDEV${EC}
+    echo 
+    echo -n 'Press RETURN when finished. ' 
+    read foo
+    set -x
+    ;;
+  *)
+    ;;
+esac
+
+
+######################################################################
+# Make the kernel
+#
+
+xipArgs="-H -h3000 -m$mapBlock 32k $romWindows"
+if [ "$platform" = "PC" ]; then
+    xipArgs="$xipArgs -t0xa0000 -o$destDir/xipimage"
+else
+
+#Used to tell the merge and xip tools where the GFS and XIP images lie
+# in the image
+
+# offsets in the 4-meg ROM image file to put these pieces of the image
+
+    romBaseOffset="3c00000"	#The start of the 4-meg ROM image in the 
+    				# responder address space
+
+    gfsStart="0000"		#
+    firstNonResidentRangeStart="110000"
+    fixedXIPStart="2bc000"
+    romDiskStart="300000"
+    secondNonResidentRangeStart="333400"
+    sizeOfNokiaReservedSpace="400"
+
+#
+#
+# IMAGE FILE				      ACTUAL ROM 
+#   OFFSET					ADDRESS
+#
+# 400000	+----------------------------+	4000000		64 Meg	
+#		|  Reserved for Nokia  (1K)  |
+# 3FFC00	+----------------------------+	3FFFC00
+#		|			     |
+#		|			     |
+#		|  Upper non-resident range  |
+#		|			     |
+#		|			     |
+# 327000 	+----------------------------+  3F27000	
+#		|      Rom Disk (~80K)	     |
+# 300000	+----------------------------+  3F00000		63 Meg
+#		|     	BIOS and TFFS	     |
+#		+----------------------------+
+#		| 	   ROM-DOS	     |
+#		+----------------------------+
+#		|			     |
+#		|	Resident XIP	     |
+#		|			     |
+# 2BC000	+----------------------------+  3EBC000		
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |  
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |
+#		|  Lower non-resident range  |
+#		|			     |
+# 200000	|                            |  3E00000		62 Meg
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |
+# 130000	+----------------------------+  3D30000		
+# 		|			     |
+#		|			     |
+#		|			     |
+#		|	        	     |  3D00000		61 Meg
+#		|			     |
+#		|			     |
+#		|	     GFS	     |
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |
+#		|			     |
+# 000000	+----------------------------+  3C00000		60 Meg
+#
+#
+#
+#
+
+# the "real" image offsets - these are where this data lies in the actual
+# ROM image (which starts at 3c00000). So, the real offsets are 3c00000 + the
+# offset into the ROM image file
+
+    realGFSStart=`calc 0x$gfsStart+0x$romBaseOffset`
+    realGFSStart=`printf %x $realGFSStart`
+
+    realFixedXIPStart=`calc 0x$fixedXIPStart+0x$romBaseOffset`
+    realFixedXIPStart=`printf %x $realFixedXIPStart`
+
+    realFirstNonResidentRangeStart=`calc 0x$firstNonResidentRangeStart+0x$romBaseOffset`
+    realFirstNonResidentRangeStart=`printf %x $realFirstNonResidentRangeStart`
+    realFirstNonResidentRangeSize=`calc 0x$realFixedXIPStart-0x$realFirstNonResidentRangeStart`
+    realFirstNonResidentRangeSize=`printf %x $realFirstNonResidentRangeSize`
+
+    realSecondNonResidentRangeStart=`calc 0x$secondNonResidentRangeStart+0x$romBaseOffset`
+    realSecondNonResidentRangeStart=`printf %x $realSecondNonResidentRangeStart`
+    realSecondNonResidentRangeSize=`calc 0x4000000-0x$sizeOfNokiaReservedSpace-0x$realSecondNonResidentRangeStart`
+    realSecondNonResidentRangeSize=`printf %x $realSecondNonResidentRangeSize`
+    
+    xipArgs="$xipArgs -t0x9ec00 -f0x$realGFSStart -b0x$realFixedXIPStart -n0x$realFirstNonResidentRangeStart 0x$realFirstNonResidentRangeSize -n0x$realSecondNonResidentRangeStart 0x$realSecondNonResidentRangeSize -o/tmp/resident -O/tmp/nonres"
+fi
+
+if [ $fromSDK = "n" ]; then
+	instXIPPath=/staff/pcgeos/ReleaseResponder/Installed	#For geodes in Installed tree
+	srcXIPPath=/staff/pcgeos/ReleaseResponder	#For geodes in source tree
+else
+	if [ "$buildPath" = "" ]; then
+	    echo You must specify the path where the build is kept
+	    exit 1
+	else
+	    instXIPPath=$buildPath		#All geodes are in the same
+	    srcXIPPath=$buildPath		# tree...	
+	fi
+fi
+
+
+set +x
+
+
+    kbdRoot=${kbdRoot:-$instXIPPath}
+
+case "$pcKbd" in
+    [Yy]*)
+    	romFilename="pckbd.img"
+	kbd="${kbdRoot}/Driver/Keyboard/Respdemo/rdkbd.geo"
+	;;
+    *)
+	case "$newScan" in
+	    [Yy]*)
+    		romFilename="realkbd.img"
+    		kbd="${kbdRoot}/Driver/Keyboard/Responder/rkbd.geo"
+        	;;
+	    *)
+    		romFilename="realkbd.img"
+    		kbd="${kbdRoot}/Driver/Keyboard/Respold/rkbd.geo"
+        	;;
+	esac
+	;;	
+esac
+
+#
+# Geodes that have different versions on each hardware platform
+#
+    gfsRoot=${gfsRoot:-$instXIPPath}
+    netwareRoot=${netwareRoot:-$instXIPPath}
+    serialRoot=${serialRoot:-$instXIPPath}
+    swapRoot=${swapRoot:-$instXIPPath}
+
+if [ "$platform" = "PC" ]; then
+    gfs="${gfsRoot}/Driver/IFS/GEOS/MegaFile/XIP/megafile${ec}.geo"
+    netware="${netwareRoot}/Driver/IFS/DOS/NetWare/XIP/netware${ec}.geo"
+    serial="-D${serialRoot}/Driver/Stream/Serial/XIP/serial${ec}.geo"
+    swap="${swapRoot}/Driver/Swap/Disk/disk${ec}.geo"
+    swapPC="${swapRoot}/Driver/Swap/XMS/xms${ec}.geo"
+else
+    gfs="${gfsRoot}/Driver/IFS/GEOS/RespFS/${xipDir}/respfs${ec}.geo"
+    netware=""	#No netware driver on actual hardware
+    serial="-D${serialRoot}/Driver/Stream/Serial/${xipDir}/serial${ec}.geo"
+    swap="${swapRoot}/Driver/Swap/EMS/HWEMS/${nonXIPDir}/hwems${ec}.geo"
+    swapPC=""
+fi
+
+
+aboutRoot=${aboutRoot:-$instXIPPath}
+about="-D${aboutRoot}/Appl/FApps/SApps/About/about${ec}.geo"
+accpntRoot=${accpntRoot:-$instXIPPath}
+accpnt="-D${accpntRoot}/Library/AccPnt/RESPXIP/accpnt${ec}.geo"
+aixtractRoot=${aixtractRoot:-$srcXIPPath}
+if [ "$doEC" = "y" ]; then
+    aixtract="-D${aixtractRoot}/Library/Foam/OEM/aixtract/aixtrace.geo"
+else 
+    aixtract="-D${aixtractRoot}/Library/Foam/OEM/aixtract/aixtract.geo"
+fi
+appinsRoot=${appinsRoot:-$srcXIPPath}
+appins="-D${appinsRoot}/Appl/FApps/OEM/appins/appins${ec}.geo"
+ansicRoot=${ansicRoot:-$instXIPPath}
+ansic="-D${ansicRoot}/Library/AnsiC/XIP/ansic${ec}.geo"
+borlandcRoot=${borlandcRoot:-$instXIPPath}
+borlandc="-D${borlandcRoot}/Library/Math/Compiler/BorlandC/XIP/borlandc${ec}.geo"
+backrstRoot=${backrstRoot:-$instXIPPath}
+backrst="-D${backrstRoot}/Appl/FApps/SApps/Backrest/backrst${ec}.geo"
+bigcalcRoot=${bigcalcRoot:-$instXIPPath}
+bigcalc="-D${bigcalcRoot}/Appl/BigCalc/RESPXIP/bigcalc${ec}.geo"
+cellRoot=${cellRoot:-$instXIPPath}
+cell="-D${cellRoot}/Library/Cell/XIP/cell${ec}.geo"
+class1inRoot=${class1inRoot:-$instXIPPath}
+class1in="-D${class1inRoot}/Driver/Fax/Input/Class1In/RESPXIP/class1in${ec}.geo"
+clrfaxRoot=${clrfaxRoot:-$instXIPPath}
+clrfax="-D${clrfaxRoot}/Appl/FApps/ClrFax/XIP/clrfax${ec}.geo"
+cmgrRoot=${cmgrRoot:-$instXIPPath}
+cmgr="-D${cmgrRoot}/Appl/FApps/CMgr/cmgr${ec}.geo"
+colorRoot=${colorRoot:-$instXIPPath}
+color="${colorRoot}/Library/Color/RESPONDER/color${ec}.geo"
+compRoot=${compRoot:-$srcXIPPath}
+comp="-D${compRoot}/Appl/FApps/OEM/comp/comp${ec}.geo"	
+composeRoot=${composeRoot:-$srcXIPPath}
+if [ "$doEC" = "y" ]; then
+    compose="-D${composeRoot}/Library/Foam/OEM/compose/composee.geo"
+else
+    compose="-D${composeRoot}/Library/Foam/OEM/compose/compose.geo"
+fi
+configRoot=${configRoot:-$instXIPPath}
+config="-D${configRoot}/Library/Config/XIP/config${ec}.geo"
+
+connectRoot=${connectRoot:-$instXIPPath}
+connect="-D${connectRoot}/Library/Connect/RESPXIP/connect${ec}.geo"
+contaxRoot=${contaxRoot:-$instXIPPath}
+contax="-D${contaxRoot}/Appl/FApps/SApps/Contax/contax${ec}.geo"
+calxRoot=${calxRoot:-$instXIPPath}
+calx="-D${calxRoot}/Appl/FApps/SApps/CalX/calx${ec}.geo"
+contdbRoot=${contdbRoot:-$instXIPPath}
+contdb="-D${contdbRoot}/Library/Foam/Contdb/XIP/contdb${ec}.geo"
+contlogRoot=${contlogRoot:-$instXIPPath}
+contlog="-D${contlogRoot}/Library/Foam/ContLog/XIP/contlog${ec}.geo"
+datarecRoot=${datarecRoot:-$instXIPPath}
+datarec="-D${datarecRoot}/Appl/FApps/DataRec/datarec${ec}.geo"
+datarmRoot=${datarmRoot:-$instXIPPath}
+datarm="-D${datarmRoot}/Appl/FApps/SApps/Datarm/datarm${ec}.geo"
+dbRoot=${dbRoot:-$instXIPPath}
+db="${dbRoot}/Library/Foam/HPDB/db${ec}.geo"
+dhcpRoot=${dhcpRoot:-$instXIPPath}
+dhcp="-D${dhcpRoot}/Library/DHCP/XIP/dhcp${ec}.geo"
+diskspRoot=${diskspRoot:-$instXIPPath}
+disksp="-D${diskspRoot}/Appl/FApps/SApps/Disksp/disksp${ec}.geo"
+extrasRoot=${extrasRoot:-$instXIPPath}
+extras="-D${extrasRoot}/Appl/FApps/Extras/extras${ec}.geo"
+faxRoot=${faxRoot:-$instXIPPath}
+fax="-D${faxRoot}/Appl/FApps/Fax/XIP/fax${ec}.geo"
+faxfileRoot=${faxfileRoot:-$instXIPPath}
+faxfile="-D${faxfileRoot}/Library/Fax/File/RESPXIP/faxfile${ec}.geo"
+faxsendtdRoot=${faxsendtdRoot:-$instXIPPath}
+faxsendtd="-D${faxsendtdRoot}/Driver/Mailbox/Transport/FaxsendTD/RESPXIP/faxsendtd${ec}.geo"
+fileddRoot=${fileddRoot:-$instXIPPath}
+filedd="-D${fileddRoot}/Driver/Mailbox/Data/FileDD/filedd${ec}.geo"
+faxrecvRoot=${faxrecvRoot:-$instXIPPath}
+faxrecv="-D${faxrecvRoot}/Appl/Fax/Faxreceive/RESPXIP/faxreceive${ec}.geo"
+faxvwRoot=${faxvwRoot:-$instXIPPath}
+faxvw="-D${faxvwRoot}/Library/Foam/FaxVW/XIP/faxvw${ec}.geo"
+fclockRoot=${fclockRoot:-$instXIPPath}
+fclock="-D${fclockRoot}/Appl/FApps/FClock/fclock${ec}.geo"
+fmodemRoot=${fmodemRoot:-$srcXIPPath}
+fmodem="-D${fmodemRoot}/Appl/FApps/OEM/fmodem/fmodem${ec}.geo"
+foamRoot=${foamRoot:-$instXIPPath}
+foam="-D${foamRoot}/Library/Foam/Foam/XIP/foam${ec}.geo"
+foamdbRoot=${foamdbRoot:-$instXIPPath}
+foamdb="-D${foamdbRoot}/Library/Foam/DB/XIP/foamdb${ec}.geo"
+imagevRoot=${imagevRoot:-$srcXIPPath}
+imagev="-D${imagevRoot}/Library/Foam/OEM/imagev/imagev${ec}.geo"
+installRoot=${installRoot:-$instXIPPath}
+install="-D${installRoot}/Appl/FApps/SApps/Install/XIP/install${ec}.geo"
+ircommRoot=${ircommRoot:-$instXIPPath}
+ircomm="-D${ircommRoot}/Driver/Stream/IrCOMM/ircomm${ec}.geo"
+irlapRoot=${irlapRoot:-$instXIPPath}
+irlap="-D${irlapRoot}/Driver/Socket/IRLAP/RESPXIP/irlap${ec}.geo"
+irlmpRoot=${irlmpRoot:-$instXIPPath}
+irlmp="-D${irlmpRoot}/Library/Irlmp/XIP/irlmp${ec}.geo"
+irportRoot=${irportRoot:-$instXIPPath}
+irport="-D${irportRoot}/Driver/Stream/IRPort/irport${ec}.geo"
+kernelRoot=${kernelRoot:-$instXIPPath}
+kernel="${kernelRoot}/Library/Kernel/${xipDebugRenamedDir}/geos${ec}.geo"
+mailboxRoot=${mailboxRoot:-$instXIPPath}
+mailbox="${mailboxRoot}/Library/Mailbox/RESPXIP/mailbox${ec}.geo"
+mathRoot=${mathRoot:-$instXIPPath}
+math="-D${mathRoot}/Library/Math/XIP/math${ec}.geo"
+mledRoot=${mledRoot:-$srcXIPPath}
+mled="-D${mledRoot}/Library/Foam/OEM/mled/mled${ec}.geo"
+mlmiRoot=${mlmiRoot:-$srcXIPPath}
+mlmi="-D${mlmiRoot}/Library/Foam/OEM/mlmi/mlmi${ec}.geo"
+mlmpRoot=${mlmpRoot:-$srcXIPPath}
+mlmp="-D${mlmpRoot}/Library/Foam/OEM/mlmp/mlmp${ec}.geo"
+mlmsRoot=${mlmsRoot:-$srcXIPPath}
+mlms="-D${mlmsRoot}/Library/Foam/OEM/mlms/mlms${ec}.geo"
+mlplRoot=${mlplRoot:-$srcXIPPath}
+mlpl="-D${mlplRoot}/Library/Foam/OEM/mlpl/mlpl${ec}.geo"
+mlvwRoot=${mlvwRoot:-$srcXIPPath}
+mlvw="-D${mlvwRoot}/Library/Foam/OEM/mlvw/mlvw${ec}.geo"
+mlmnRoot=${mlmnRoot:-$srcXIPPath}
+mlmn="-D${mlmnRoot}/Appl/FApps/OEM/mlmn/mlmn${ec}.geo"
+mlraRoot=${mlraRoot:-$srcXIPPath}
+mlra="-D${mlraRoot}/Appl/FApps/OEM/mlra/mlra${ec}.geo"
+mltdRoot=${mltdRoot:-$srcXIPPath}
+mltd="-D${mltdRoot}/Driver/Mailbox/Transport/mltd/mltd${ec}.geo"
+modemRoot=${modemRoot:-$instXIPPath}
+modem="-D${modemRoot}/Driver/Modem/XIP/modem${ec}.geo"
+ms4Root=${ms4Root:-$instXIPPath}
+ms4="${ms4Root}/Driver/IFS/DOS/MS4/RESPXIP/ms4${ec}.geo"
+nbookRoot=${nbookRoot:-$instXIPPath}
+nbook="-D${nbookRoot}/Appl/FApps/Notebook/nbook${ec}.geo"
+neditRoot=${neditRoot:-$instXIPPath}
+nedit="-D${neditRoot}/Library/Foam/NotesEdit/nedit${ec}.geo"
+netutilsRoot=${netutilsRoot:-$instXIPPath}
+netutils="-D${netutilsRoot}/Library/NetUtils/XIP/netutils${ec}.geo"
+nimbusRoot=${nimbusRoot:-$instXIPPath}
+nimbus="${nimbusRoot}/Driver/Font/Nimbus/nimbus${ec}.geo"
+nontsRoot=${nontsRoot:-$instXIPPath}
+nonts="${nontsRoot}/Driver/Task/NonTS/nonts${ec}.geo"
+notesxlRoot=${notesxlRoot:-$instXIPPath}
+notesxl="-D${notesxlRoot}/Driver/Connect/Translate/NotesXL/notesxl${ec}.geo"
+outboxRoot=${outboxRoot:-$instXIPPath}
+outbox="-D${outboxRoot}/Library/Foam/Outbox/outbox${ec}.geo"
+parseRoot=${parseRoot:-$instXIPPath}
+parse="-D${parseRoot}/Library/Parse/XIP/parse${ec}.geo"
+pccomRoot=${pccomRoot:-$instXIPPath}
+pccom="-D${pccomRoot}/Library/PCCom/RESPXIP/pccom${ec}.geo"
+phoneRoot=${phoneRoot:-$srcXIPPath}
+phone="-D${phoneRoot}/Appl/FApps/OEM/phone/phone${ec}.geo"
+pppRoot=${pppRoot:-$instXIPPath}
+ppp="-D${pppRoot}/Driver/Socket/PPP/RESPXIP/ppp${ec}.geo"
+resolverRoot=${resolverRoot:-$instXIPPath}
+resolver="-D${resolverRoot}/Library/Resolver/XIP/resolver${ec}.geo"
+respondrRoot=${respondrRoot:-$instXIPPath}
+respondr="-D${respondrRoot}/Library/Respondr/${xipRenamedDir}/respondr${ec}.geo"
+rspwrRoot=${rspwrRoot:-$instXIPPath}
+rspwr="${rspwrRoot}/Driver/Power/Rspwr/${xipRenamedDir}/rspwr${ec}.geo"
+rstartupRoot=${rstartupRoot:-$instXIPPath}
+rstartup="-D${rstartupRoot}/Appl/Startup/RStartup/XIP/rstartup${ec}.geo"
+rtcmRoot=${rtcmRoot:-$instXIPPath}
+rtcm="-D${rtcmRoot}/Library/RTCM/XIP/rtcm${ec}.geo"
+rudyRoot=${rudyRoot:-$instXIPPath}
+rudy="${rudyRoot}/Library/SpecUI/Rudy/XIP/rudy${ec}.geo"
+rulerRoot=${rulerRoot:-$instXIPPath}
+ruler="-D${rulerRoot}/Library/Ruler/RESPXIP/ruler${ec}.geo"
+rwtimeRoot=${rwtimeRoot:-$instXIPPath}
+rwtime="-D${rwtimeRoot}/Library/Foam/RWTime/rwtime${ec}.geo"
+scmRoot=${scmRoot:-$srcXIPPath}
+scm="-D${scmRoot}/Library/Foam/OEM/scm/scm${ec}.geo"
+secrtyRoot=${secrtyRoot:-$instXIPPath}
+secrty="-D${secrtyRoot}/Appl/FApps/SApps/Secrty/secrty${ec}.geo"
+securityRoot=${securityRoot:-$instXIPPath}
+if [ $fromSDK = "y" ]; then
+    security="-D${securityRoot}/Library/Foam/Security/XIP/security.geo"
+else
+    security="-D${securityRoot}/Library/Foam/Security/XIP/security${ec}.geo"
+fi
+servicesRoot=${servicesRoot:-$instXIPPath}
+services="-D${servicesRoot}/Appl/FApps/Services/services${ec}.geo"
+siapRoot=${siapRoot:-$instXIPPath}
+siap="-D${siapRoot}/Appl/FApps/OEM/siap/siap${ec}.geo"
+smbcardRoot=${smbcardRoot:-$srcXIPPath}
+if [ "$doEC" = "y" ]; then
+    smbcard="-D${smbcardRoot}/Library/Foam/OEM/smbcard/smbcarde.geo"
+else
+    smbcard="-D${smbcardRoot}/Library/Foam/OEM/smbcard/smbcard.geo"
+fi
+
+smsRoot=${smsRoot:-$srcXIPPath}
+sms="-D${smsRoot}/Appl/FApps/OEM/sms/sms${ec}.geo"
+smsedRoot=${smsedRoot:-$srcXIPPath}
+smsed="-D${smsedRoot}/Library/Foam/OEM/smsed/smsed${ec}.geo"
+smsendRoot=${smsendRoot:-$srcXIPPath}
+smsend="-D${smsendRoot}/Library/Foam/OEM/smsend/smsend${ec}.geo"
+smsrcvRoot=${smsRoot:-$srcXIPPath}
+smsrcv="-D${smsrcvRoot}/Appl/FApps/OEM/smsrcv/smsrcv${ec}.geo"
+smtdRoot=${smtdRoot:-$instXIPPath}
+smtd="-D${smtdRoot}/Driver/Mailbox/Transport/SMTD/smtd${ec}.geo"
+socketRoot=${socketRoot:-$instXIPPath}
+socket="-D${socketRoot}/Library/Socket/XIP/socket${ec}.geo"
+soundRoot=${soundRoot:-$instXIPPath}
+sound="${soundRoot}/Library/Sound/RESPXIP/sound${ec}.geo"
+spoolRoot=${spoolRoot:-$instXIPPath}
+spool="${spoolRoot}/Library/Spool/RESPXIP/spool${ec}.geo"
+spooltdRoot=${spooltdRoot:-$instXIPPath}
+spooltd="-D${spooltdRoot}/Driver/Mailbox/Transport/SpoolTD/RESPXIP/spooltd${ec}.geo"
+sssetRoot=${sssetRoot:-$instXIPPath}
+ssset="-D${sssetRoot}/Library/Foam/OEM/ssset/ssset${ec}.geo"
+standardRoot=${standardRoot:-$instXIPPath}
+if [ $fromSDK = "y" ]; then
+	# sound driver *must* have dos name of standard.geo
+    standard="${standardRoot}/Driver/Sound/Standard/${nonXIPDir}/standard.geo"
+else
+    standard="${standardRoot}/Driver/Sound/Standard/${nonXIPDir}/standard${ec}.geo"
+fi
+streamRoot=${streamRoot:-$instXIPPath}
+stream="${streamRoot}/Driver/Stream/stream${ec}.geo"
+streamcRoot=${streamCRoot:-$instXIPPath}
+streamc="-D${streamcRoot}/Library/StreamC/streamc${ec}.geo"
+stylesRoot=${stylesRoot:-$instXIPPath}
+styles="${stylesRoot}/Library/Styles/RESPXIP/styles${ec}.geo"
+swapLibRoot=${swapLibRoot:-$instXIPPath}
+swapLib="${swapLibRoot}/Library/Swap/XIP/swap${ec}.geo"
+systemRoot=${systemRoot:-$instXIPPath}
+system="-D${systemRoot}/Appl/FApps/System/system${ec}.geo"
+tcpipRoot=${tcpipRoot:-$instXIPPath}
+tcpip="-D${tcpipRoot}/Driver/Socket/TCPIP/XIP/tcpip${ec}.geo"
+telnetRoot=${telnetRoot:-$instXIPPath}
+telnet="-D${telnetRoot}/Library/Telnet/RESPONDER/telnet${ec}.geo"
+textRoot=${textRoot:-$instXIPPath}
+text="${textRoot}/Library/Text/RESPXIP/text${ec}.geo"
+transfrRoot=${transfrRoot:-$instXIPPath}
+transfr="-D${transfrRoot}/Appl/FApps/SApps/Transfer/transfr${ec}.geo"
+uiRoot=${uiRoot:-$instXIPPath}
+ui="${uiRoot}/Library/User/RESPXIP/ui${ec}.geo"
+uinfoRoot=${uinfoRoot:-$instXIPPath}
+uinfo="-D${uinfoRoot}/Appl/FApps/SApps/Uinfo/uinfo${ec}.geo"
+viewerRoot=${viewerRoot:-$instXIPPath}
+viewer="-D${viewerRoot}/Library/Foam/Viewer/viewer${ec}.geo"
+vmtreeRoot=${vmtreeRoot:-$instXIPPath}
+vmtree="-D${vmtreeRoot}/Driver/Mailbox/Data/VMTree/vmtree${ec}.geo"
+wdbRoot="${wdbRoot:-$instXIPPath}"
+wdb="-D${wdbRoot}/Appl/FApps/Wdb/wdb${ec}.geo"
+w3plRoot=${w3plRoot:-$srcXIPPath}
+w3pl="-D${w3plRoot}/Library/Foam/OEM/w3pl/w3pl${ec}.geo"
+wwwRoot=${wwwRoot:-$srcXIPPath}
+www="-D${wwwRoot}/Appl/FApps/OEM/www/www${ec}.geo"
+
+
+
+
+#
+# Geodes that differ, depending upon whether or not there is a CMT module
+# or not.
+#
+class1outRoot=${class1outRoot:-$instXIPPath}
+rbusRoot=${rbusRoot:-$srcXIPPath}
+vpRoot=${vpRoot:-$srcXIPPath}
+vserRoot=${vserRoot:-$srcXIPPath}
+vsstbRoot=${vsstbRoot:-$srcXIPPath}
+
+indicatorRoot=${indicatorRoot:-$srcXIPPath}
+if [ "$doEC" = "y" ]; then
+    indicator="${indicatorRoot}/Appl/FApps/OEM/indicato/indicate.geo"
+else
+    indicator="${indicatorRoot}/Appl/FApps/OEM/indicato/indicato.geo"
+fi
+
+if [ "$cmtVersion" = "y" ]; then
+    class1out="-D${class1outRoot}/Driver/Fax/Output/Class1Out/GSMXIP/class1out${ec}.geo"
+    rbus="-D${rbusRoot}/Library/Foam/OEM/rbus/rbus${ec}.geo"
+    vp="${vpRoot}/Library/Foam/OEM/vp/vp${ec}.geo"
+    vser="${vserRoot}/Library/Foam/OEM/vser/vser${ec}.geo"
+    vsstb=""
+else
+    class1out="-D${class1outRoot}/Driver/Fax/Output/Class1Out/RESPXIP/class1out${ec}.geo"
+    rbus=""
+    vp="${vpRoot}/Library/Foam/OEM/vp_stb/vp${ec}.geo"
+    vser="${vserRoot}/Library/Foam/OEM/vser_stb/vser${ec}.geo"
+    vsstb="-D${vsstbRoot}/Library/Foam/OEM/Nokia_versions/VSStb/vsstb${ec}.geo"
+fi
+
+
+#
+# Make sure the user didn't misspell anything, by making sure that there
+# is a pathname attached to every geode name they specified
+#
+for i in $geodeList; do
+	eval "g=$`echo $i`"
+
+	if [ "$g" = "" ]; then
+	    echo Invalid geode name \"$i\" in .xiplocal file
+	    exit 1	    
+	fi
+done
+
+preXipFiles="${ms4} ${stream} ${color} ${text} ${styles} ${spool} \
+	  ${ui} ${sound} ${respondr} ${kbd} ${nonts} ${swap} ${standard} \
+	  ${nimbus} ${mailbox} ${rudy} ${hwems} ${math} ${ansic} ${ruler} \
+	  ${foam} ${contdb} ${contlog} ${foamdb} ${faxvw} ${nedit} ${swapPC} \
+	  ${security} ${faxfile} ${viewer} ${nbook} ${indicator} ${extras} \
+	  ${fax} ${system} ${about} ${datarm} ${disksp} ${uinfo} ${fmodem} \
+	  ${secrty} ${rtcm} ${fclock} ${rwtime} ${smtd} ${faxsendtd} \
+	  ${netutils} ${sms} ${socket} ${class1in} ${class1out} ${serial} \
+	  ${filedd} ${vmtree} ${db} ${wdb} ${smsed} ${smsend} ${cmgr} \
+	  ${parse} ${cell} ${swapLib} ${gfs} ${netware} ${kernel} \
+	  ${streamc} ${services} ${accpnt} ${vp} ${vser} ${vsstb} \
+	  ${outbox} ${faxrecv} ${notesxl} ${rspwr} ${borlandc} \
+	  ${modem} ${ppp} ${tcpip} ${datarec} ${resolver} ${rbus} ${telnet} \
+	  ${pccom} ${connect} ${backrst} ${contax} ${calx} ${install} ${transfr} \
+	  ${rstartup} ${ssset} ${dhcp} ${bigcalc} ${mlmn} ${mlra} ${phone} \
+	  ${smsrcv} ${www} ${smbcard} ${comp} ${mled} ${mlms} ${mlpl} \
+	  ${mlvw} ${scm} ${mltd} ${mlmi} ${mlmp} ${compose} ${w3pl} ${imagev} \
+	  ${config} ${irlap} ${irlmp} ${irport} ${spooltd} ${ircomm} \
+	  ${clrfax} ${appins} ${aixtract} ${siap}"
+
+
+dsfyArgs=${dsfyArgs:-dsfyArgs}
+if [ $fromSDK = "y" ]; then
+	xipFiles=`$dsfyArgs $preXipFiles`
+else
+	xipFiles=$preXipFiles
+fi
+echo $preXipFiles
+echo $xipFiles
+
+set -x
+if [ "$makeXIP" = "y" ]; then
+    fullxip=${fullxip:-fullxip}
+    if $fullxip -ds $makeNonFittingROMResourcesWritable $xipOptFlag $xipArgs $xipFiles ; then
+	: xip image created
+    else
+    	exit 1
+    fi
+fi
+
+
+######################################################################
+# Create the gfs file.
+#
+case "$doGFS" in 
+ [Nn]*)
+    ;;
+ *)
+    if [ "$fromSDK" = "n" ]; then
+    	gfsDir=/staff/$USER/../respgfs
+    fi
+
+    ######################################################################
+    # Potentially ship the stuff and create the image, too
+    #
+
+    case "$doShip" in 
+     [Nn]*)
+        ;;
+     *)
+        # Note -- the "pcs" script uses the PWD variable instead of
+        # `pwd` to get the current directory.  Don't ask me why --
+        # just make sure they match.
+
+	respgfs=${respgfs:-respgfs}
+	if [ "$fromSDK" = "y" ]; then
+	    if [ "$makePC" = "pc" ]; then
+	    	gfssubdir="pcresp"
+	    else
+	        gfssubdir="resp"
+	    fi
+	    cd $gfsDir/${gfssubdir}${ec}
+	    export PWD
+	    PWD=`pwd`
+            if [ "$makePC" = "pc" ]; then
+                $respgfs $respgfsflags $gfsDir/${gfssubdir}${ec}.gfs
+            else
+                $respgfs $respgfsflags -a $gfsDir/${gfssubdir}${ec}.gfs
+            fi
+	else
+            ship=${ship:-ship}
+            cd $installed
+            export PWD
+            PWD=`pwd`
+            if [ "$platform" = "PC" ]; then
+                $ship RESPONDER_PC_GFS_LOCAL${_EC}
+            elif [ "$testapps" = "yes" ]; then
+                $ship RESPONDER_GFS_LOCAL${_EC} responderTestApps
+	    else
+                $ship RESPONDER_GFS_LOCAL${_EC}
+            fi
+	fi
+        ;;
+    esac
+esac
+
+
+######################################################################
+# Create RESP.IMG
+
+if [ "$platform" = "PC" ]; then
+
+    #
+    # Make sure the .ini files are set up and up-to-date...
+    #
+    if [ -d /staff/pcgeos/Installed/ProductFiles/Responder ]; then
+        cd /staff/pcgeos/Installed/ProductFiles/Responder
+        makeIni pcxip${ec} geos.temp /tmp
+        /bin/unix2dos /tmp/geos${ec}.ini $destDir/net${ec}.ini
+        if [ ! -f $destDir/geos${ec}.ini ]; then
+	    /bin/unix2dos pcxip/geos${ec}.ini $destDir/geos${ec}.ini
+        fi
+        if [ ! -f $destDir/ss.bat ]; then
+    	    /bin/unix2dos pcxip/ss.bat $destDir/ss.bat
+        fi
+        if [ ! -f $destDir/rss.bat ]; then
+    	    /bin/unix2dos pcxip/rss.bat $destDir/rss.bat
+        fi
+        if [ ! -f $destDir/ns.bat ]; then
+    	    /bin/unix2dos pcxip/ns.bat $destDir/ns.bat
+        fi
+        if [ ! -f $destDir/PRODUCT ]; then
+    	    cp pcxip/PRODUCT $destDir/PRODUCT
+        fi
+        if cmp -s /staff/pcgeos/ReleaseResponder/Installed/Loader/EMMXIP/loader${ec}.exe $destDir/loader${ec}.exe; then
+            : loader up to date
+        else
+            cp /staff/pcgeos/ReleaseResponder/Installed/Loader/EMMXIP/loader${ec}.exe $destDir
+        fi
+    fi
+    gfsFile=$gfsDir/pcresp${ec}.gfs
+    if [ ! -f $gfsFile ]; then
+    	echo GFS does not exist
+	exit 1
+    fi
+    if cmp -s $gfsFile $destDir/resp.gfs; then
+    	: gfs up to date
+    else
+    	cp $gfsFile $destDir/resp.gfs
+    fi
+
+else
+
+    #
+    # Merge everything together into resp.img
+    #
+    if [ "$fromSDK" = "n" ]; then
+        outOfDate=`find $romSource/romdisk -type f -newer $romSource/$romFilename -print`
+        outOfDateIni=`find $romSource/romdisk -name net\*.ini \! \( -newer /staff/pcgeos/Installed/ProductFiles/Responder/geos.temp \) -print`
+        if [ "$outOfDateIni" != "" ]; then
+    	    set +x
+    	    echo ERROR - the .ini file on the ROM DISK is out of date
+	    echo "       You need to remake the rom image"
+    	    set -x
+    	    exit 1
+        fi
+        if	cmp -s $romSource/romdisk/geoworks/loader${ec}.exe /staff/pcgeos/ReleaseResponder/Installed/Loader/${xipDir}/loader${ec}.exe; then
+    	    : do nothing
+        else
+    	    set +x
+	    echo ERROR - the loader on the ROM DISK is out of date
+	    echo "       You need to remake the rom image"
+	    set -x
+	    exit 1
+        fi
+        if [ "$outOfDate" != "" ]; then
+	    set +x
+	    echo ERROR - the ROM DISK is out of date, and needs to be remade
+	    echo "       You need to remake the rom image"
+	    set -x
+	    exit 1
+        fi
+    fi
+
+    gfsFile=$gfsDir/resp${ec}.gfs
+    merge=${merge:-/usr/public/merge}
+    if [ "$platform" = "G2" ]; then
+	biosFile=noata.abs
+	biosStart=2f6c00
+	romdosStart=2e9000
+    else
+	case "$pcKbd" in
+	    [Yy]*)
+		biosStart=2f6000
+	    	biosFile=kbdnoata.bin
+		romdosStart=2e9000
+		;;
+	    *)
+		biosStart=2f7000
+		if [ "$useDebugKernel" != "y" ]; then
+		    biosFile=fbios.bin
+		else
+		    biosFile=g4biosd.bin
+		fi
+		romdosStart=2ec400
+	        ;;
+	esac
+    fi
+
+    if $merge -n $destDir/resp.img \
+        $gfsFile:$gfsStart \
+	/tmp/nonres1:$firstNonResidentRangeStart \
+        /tmp/resident:$fixedXIPStart \
+        $romSource/rom-dos.img:$romdosStart \
+	$romSource/$biosFile:$biosStart \
+	$romSource/$romFilename:$romDiskStart \
+	/tmp/nonres2:$secondNonResidentRangeStart \
+	$romSource/jmp.bin:3ffff0 ; then
+
+	: do nothing
+
+    else
+    	set +x
+    	echo ERROR in merge 
+	exit 1
+    	set -x
+    fi
+fi
+
+set +x
+
+if [ ! "$nodelete" ]; then
+    rm /tmp/resident /tmp/nonres1 /tmp/nonres2
+fi
+
+echo MAKERESP complete
+set -x
+ 
+######################################################################
+#
+

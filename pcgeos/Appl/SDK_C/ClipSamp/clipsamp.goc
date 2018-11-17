@@ -1,0 +1,1433 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-92 -- All Rights Reserved
+ *
+ * PROJECT:	  Sample Applications
+ * MODULE:	  Clipboard
+ * FILE:	  clipsamp.goc
+ *
+ * AUTHOR:  	  Brian Chin: July 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	7/91	  brianc    Initial version
+ *	9/24/96   NF        Added EC code
+ *
+ * DESCRIPTION:
+ *	This file contains source code for the ClipSamp application, which
+ *	demonstrates the use of the GEOS clipboard. It is processed by
+ *	GOC, compiled by your favorite C compiler, and linked by Glue to
+ *	produce a runnable .geo file.
+ *
+ *	(Throughout this file you will see references like this: [Con 7.2.1]
+ *	This is a reference to chapter 7, section 7.2.1 of the Concepts
+ *	manual. [Obj 7.2.1] is a reference to chapter 7, section 7.2.1 of the
+ *	Objects manual. You should use these references to locate further
+ *	information about the topic being discussed if anything is unclear.)
+ *
+ *	There are a variety of concepts at play in this application. The
+ *	most obvious is the clipboard itself. There's also a controller
+ *	(the GenEditControl, which gives us our Edit menu) and its
+ *	attendant notification, as well as how to initiate and respond to
+ *	quick-transfer requests the user might make.
+ *
+ *	You should understand about VM files [Con 19] and how
+ *	to manipulate them before reading on.
+ *
+ *			   The Clipboard [Con 7]
+ *
+ *	The clipboard itself is a VM file maintained by the Generic UI.
+ *	Its handle is returned by ClipboardGetClipboardFile(). You would use
+ *	this if you wanted to create a graphics string to put on the
+ *	clipboard, for example.
+ *
+ *	Data on the clipboard is stored in a "transfer item" [Con 7.2.1].
+ *	A single item can be rendered in a number of different "transfer
+ *	formats" [Con 7.2.2]. For example, a spreadsheet might place data
+ *	on the clipboard as spreadsheet cells, which it could paste in and
+ *	operate on, and as text, which a word processor could paste in as
+ * 	editable text.
+ *
+ *	A transfer item is described by a single VM block within the
+ *	clipboard file. This block holds the name of the item (for use by a
+ *	clipboard viewer or some such), the owner of it (an optr), the
+ *	number of formats in which it has been rendered, and an array of
+ *	structures, each of which describes one of the renderings.
+ *
+ *	While any number of threads could be creating transfer items within
+ *	the clipboard at any given time, there are but two items officially
+ *	known to the Generic UI: the "normal transfer item" and the "quick
+ *	transfer item." They have exactly the same format, but are
+ *	manipulated by the user in quite different manners.
+ *
+ *	The normal transfer item is what is altered when you send an object
+ *	MSG_META_CLIPBOARD_COPY or MSG_META_CLIPBOARD_CUT, and what is
+ *	pasted in when an object receives MSG_META_CLIPBOARD_PASTE. In
+ *	other words, the user manipulates it using the Edit menu for an
+ *	application.
+ *
+ *	The quick transfer item is manipulated (in Motif) via the right
+ *	mouse button when the user clicks it on a selected object (text or
+ *	graphics), drags the mouse, and drops the selection on another
+ *	object. The clicked-upon object copies its selection to the
+ *	clipboard exactly as if it had received a MSG_META_CLIPBOARD_COPY,
+ *	except it stores the data in the quick transfer item, not the
+ *	normal transfer item. Similarly, the dropped-upon object pastes
+ *	data exactly as if it had received a MSG_META_CLIPBOARD_PASTE,
+ *	except it fetches the data from the quick transfer item, not the
+ *	normal one.
+ *
+ *	For synchronization purposes, whenever you deal with one of the two
+ *	registered transfer items, you always call ClipboardQueryItem()
+ *	first to obtain the location of the particular transfer item. This
+ *	places a lock, of sorts, on the item so it cannot be freed. A new
+ *	item can be registered in its place, but it will remain in the
+ *	clipboard file until you call ClipboardDoneWithItem(). Thus, it is
+ *	vital that you always call ClipboardDoneWithItem() when you are done
+ *	with the item. 
+ *
+ *			   GenEditControl [Con 7.3.3]
+ *
+ *	You won't find the innards of the Edit menu anywhere in this file,
+ *	even though you can see them on-screen when you run the
+ *	application. The Edit menu is created by the GenEditControl object
+ *	that is a child of the GenPrimary (it's called "EditControl").
+ *
+ *	GenEditControl is one of a number of classes, called "controllers,"
+ *	[Obj 12] that exist simply to control other objects. These things
+ *	typically provide an interface to the user, in the form of either
+ *	a menu, a small tool, or both.
+ *
+ *	Controllers usually work by sending messages to the current target
+ *	object [Con 12.5]. The object being controlled, in turn, sends
+ *	out notification messages that keep the controller aprised of the
+ *	controlled object's state. In the case of the GenEditControl, it
+ *	needs to know whether there's any selection that can be put on the
+ *	clipboard, any selection that can be deleted, and whether the
+ *	current normal transfer item is suitable for pasting into the
+ *	controlled object.
+ *
+ *	Notification of controllers takes the form of broadcasting over a
+ *	particular "General Change Notification (GCN) list" [Con 9] stored
+ *	with the application object [Con 9.4]. For this sample application,
+ *	SendSelectNotify() takes care of notifying the GenEditControl (and
+ *	any other controller that might be interested in such information)
+ *	of the state of our selection, and whether we can paste the current
+ *	transfer item in.
+ *
+ *
+ *	You'll find other concepts and useful hints as you work your way
+ *	through this file.
+ *	
+ *	$Id: clipsamp.goc,v 1.1 97/04/04 16:36:07 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+@include <Objects/clipbrd.goh>
+#include <font.h>
+#include <vm.h>
+
+/*
+ ***************************************************************************
+ *	    	Useful Constants
+ ***************************************************************************
+ */
+/*
+ * This is the identifier for the text transfer format that the Geoworks
+ * text object creates. It's a 32-bit number, with MANUFACTURER_ID_GEOWORKS
+ * in the high word, and CIF_TEXT in the low.
+ *
+ * The FormatIDFromManufacturerAndType combines the two in the proper
+ * order, as you'd expect.
+ */
+#define TEXT_FORMAT FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, \
+						    CIF_TEXT)
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class	ClipSampProcessClass, GenProcessClass ;
+
+/*
+ * Note: instances of ClipSampProcessClass are actually hybrid objects.
+ * Instead of allocating a chunk in an Object Block to contain the instance data
+ * for this object, we use the application's DGROUP resource. This resource
+ * contains both idata and udata sections. Therefore, to create instance data
+ * for this object (such as textColor), we define a variable in idata,
+ * instead of defining an instance data field here.
+ */
+
+@endc   /* end of class definition */
+
+@classdecl	ClipSampProcessClass, neverSaved ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+@start AppResource ;
+
+@object GenApplicationClass ClipSampApp = {
+
+    GI_visMoniker = list { @TextMoniker }
+    GI_comp = @ClipSampPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @ClipSampPrimary;
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+	@EditControl;	/* The edit controller will load its own options from
+			 * the .ini file, but needs to be told if there's
+			 * any saving of options going on. Each controller
+			 * has  a set of GCN lists on which it should be
+			 * placed when defined in a .goc file. You should
+			 * refer to the .goh file for the particular
+			 * controller you're including to find them. */
+}
+
+@visMoniker TextMoniker = "C Clipboard Sample Application";
+
+@end AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+
+@start	Interface		/* this resource is for misc UI objects */ ;
+
+@object GenPrimaryClass ClipSampPrimary = {
+    GI_comp = @EditControl, @ClipSampView;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+}
+
+@object GenViewClass ClipSampView = {
+    /*
+     * Make the view targetable so we (the content, aka the process) get
+     * messages from the edit controller.
+     */
+    GI_attrs = @default | GA_TARGETABLE;
+
+    /* Make view scrollable in X and Y */
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+
+    /* Set some document bounds (we'll just use 8 1/2 by 11 inches) */
+    GVI_docBounds = {0, 0, 72*17/2, 11*72};
+
+    /* process thread handles all updates, etc. */
+    GVI_content = process;
+
+    /*
+     * Eliminate the default floating keyboard since the user will not
+     * be entering text.
+     */
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+
+    /*
+     * Make the view be the target when the primary comes up on-screen.
+     * Else the user would have to click in the view to be able to paste
+     * into it
+     */
+    HINT_DEFAULT_TARGET;
+}
+
+@object GenEditControlClass EditControl = {
+    /*
+     * Turn this controller into the standard Edit menu. The specific UI will
+     * choose the moniker appropriate to such a function.
+     */
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_EDIT_MENU;
+
+    /*
+     * We support neither selection nor undo, so ensure that neither is
+     * available as a tool or a menu item.
+     */
+    ATTR_GEN_CONTROL_PROHIBIT_UI = GECF_UNDO | GECF_SELECT_ALL;
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = GECTF_UNDO | GECTF_SELECT_ALL;
+
+    /*
+     * When the controller wants to notify someone, tell it to notify our
+     * process.
+     *
+     * XXX: this should be TO_APP_TARGET, but MSG_META_SEND_CLASSED_EVENT
+     * messes up with that and a non-lmem object.
+     */
+    GCI_output = (TO_PROCESS);
+}
+
+@end Interface;
+
+/*
+ ***************************************************************************
+ *		Utility Routines
+ ***************************************************************************
+ */
+
+WindowHandle	winHandle;  	    /* The handle of our View's window */
+MemHandle	textHandle; 	    /* The handle of the text we've been
+				     * given */
+
+
+/***********************************************************************
+ *				CheckPasteable
+ ***********************************************************************
+ * SYNOPSIS:	    See if the current transfer item of the indicated
+ *		    type is something we can handle.
+ * CALLED BY:	    (INTERNAL) SendSelectNotify,
+ *			       ClipSampProcess::MSG_META_PTR
+ * RETURN:	    TRUE if we can, FALSE if we can't
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    Look at the formats in which the indicated item
+ *		    has been stored and see if any one of them is
+ *	    	    MANUFACTURER_ID_GEOWORKS::CIF_TEXT
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	7/29/92		Initial Revision
+ *
+ ***********************************************************************/
+static Boolean
+CheckPasteable(ClipboardItemFlags transferFlags)	/* Item to check (0 or
+						 * CIF_QUICK) */
+{
+    ClipboardQueryArgs	query;	    	    	/* Results of query for transfer item */
+    Boolean 	pasteable = FALSE;
+
+    /*
+     * Fetch the info on the specified item.
+     */
+    ClipboardQueryItem(transferFlags, &query);
+    /*
+     * If it has at least one format, and one of them is the TEXT_FORMAT
+     * (defined above), we can paste it. Otherwise, not.
+     */
+    pasteable = (query.CQA_numFormats &&
+		 ClipboardTestItemFormat(query.CQA_header, TEXT_FORMAT));
+
+    /*
+     * Let the clipboard code know we're done with the item, so it can biff it
+     * if it was replaced while we were looking at it.
+     */
+    ClipboardDoneWithItem(query.CQA_header);
+
+    return (pasteable);
+}
+
+
+/***********************************************************************
+ *				SendSelectNotify
+ ***********************************************************************
+ * SYNOPSIS:	    Tell the world about our selection state: whether
+ *		    we can paste the current clipboard item, and whether
+ *		    we've got anything to copy to the clipboard, if asked.
+ * CALLED BY:	    (INTERNAL)	PasteCommon,
+ *				ClipSampProcess::MSG_META_DELETE,
+ *				ClipSampProcess::MSG_META_CLIPBOARD-
+ *				    NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED,
+ *				ClipSampProcess::MSG_META_GAINED_TARGET_EXCL
+ * RETURN:	    nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    Notification is a multi-stage process. The end result
+ *	    	    is that a recorded message is dispatched to every optr
+ *	    	    on a particular GCN list, but getting there requires
+ *	    	    several steps.
+ *
+ *	    	    There are three things that go into the notification we
+ *	    	    send out:
+ *	    	    	1) A block of memory in which we store a
+ *			   NotifySelectStateChange structure, telling
+ *			   everyone of the state of our selection and our
+ *			   ability to handle the current normal transfer
+ *			   item. This block has a reference count
+ *			   manipulated by MemInitRefCount, MemIncRefCount,
+ *			   and MemDecRefCount. When the reference count
+ *			   reaches 0, the block is automatically freed by
+ *			   the system.
+ *	    	    	2) the 32-bit identifier (manufacturer id and
+ *			   manufacturer-specific constant) of a GCN list
+ *			   stored in our application object, each element
+ *			   of which is interested in receiving this sort of
+ *			   notification.
+ *	    	    	3) A recorded message (MSG_META_NOTIFY_WITH_DATA_BLOCK)
+ *			   to be delivered to each member of the GCN list.
+ *			   This message contains the 32-bit identifier for
+ *			   the type of notification being delivered (again
+ *			   a manufacturer id and a manufacturer-specific
+ *			   constant), and the handle of the data block we
+ *			   allocated. The reference count for the data
+ *			   block is, as you'd expect, increased by one for
+ *			   each member to which this recorded message is
+ *			   sent. The recipient decreases the reference
+ *			   count when it has processed the notification.
+ *
+ *	    	    The final piece of the puzzle is what's known as the
+ *	    	    GCN list's "status message." This is a recorded message
+ *	    	    that is sent to any object when it joins the GCN list.
+ *	    	    It is usually the last message broadcast to the list,
+ *	    	    but it is possible to broadcast to a list without
+ *	    	    recording the message as the status message for the
+ *	    	    list. We have no need to do this, however.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	7/29/92		Initial Revision
+ *
+ ***********************************************************************/
+static void
+SendSelectNotify(void)
+{
+    MemHandle	data;	    	    	/* Extra data block sent along with the
+					 * notification. */
+    NotifySelectStateChange *nsscPtr;	/* The extra data block, locked */
+    EventHandle	notifyEvent;	    	/* Recorded notification event for
+					 * the GCN list */
+
+    /*
+     * Allocate the data block we'll be sending along and lock it down. It
+     * must be sharable, as it might be locked down by something other than
+     * the current application (there's no restriction on who can join an
+     * application's GCN lists). Because the block we're allocating is so
+     * tiny, it's safe to pass the HAF_NO_ERR flag.
+     */
+    data = MemAlloc(sizeof(NotifySelectStateChange), HF_DYNAMIC|HF_SHARABLE,
+		    HAF_STANDARD_NO_ERR);
+EC( ECCheckMemHandle( data ); )
+    nsscPtr = (NotifySelectStateChange *)MemLock(data);
+EC( ECCheckBounds( nsscPtr ); )
+
+    /*
+     * Tell the world that the current selection is text.
+     */
+    nsscPtr->NSSC_selectionType = SDT_TEXT;
+
+    /*
+     * We have a "clipboardable" and a deletable selection if we have any
+     * text at all. There's no need for the user to select it.
+     */
+    nsscPtr->NSSC_clipboardableSelection =
+	nsscPtr->NSSC_deleteableSelection = (textHandle != 0);
+
+    /*
+     * The user will not be allowed to "select all" of the text, as there is
+     * no selection.
+     */
+    nsscPtr->NSSC_selectAllAvailable = FALSE;
+
+    /*
+     * See if we can paste the normal transfer item.
+     */
+    nsscPtr->NSSC_pasteable = CheckPasteable(TIF_NORMAL);
+
+    /*
+     * Unlock the data block and prep it for use as a notification data block,
+     * setting its reference count to 1 (for the list on which it will be
+     * stored). Even if we weren't storing the message we're about to record
+     * as the status message, we'd set the count to 1, as the reference
+     * count needs to be initialized before we hand it to the GCN system.
+     * If the message isn't stored as the list's status message, the GCN
+     * system will decrement the reference count for the block once the
+     * message has been dispatched to all elements of the list (this
+     * prevents the block from going away during the broadcast should one
+     * of the recipients be on a higher-priority thread than the one
+     * performing the broadcast, causing it to handle the notification and
+     * decrement the reference count to 0 before the other recipients have
+     * been notified).
+     */
+    MemUnlock(data);
+    MemInitRefCount(data, 1);
+
+    /*
+     * Record the notification event that should be sent out to each member of
+     * MANUFACTURER_ID_GEOWORKS::GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE
+     * in the application object. They each get a standard
+     * MSG_META_NOTIFY_WITH_DATA_BLOCK with GWNT_SELECT_STATE_CHANGE as the
+     * notification type.
+     */
+    notifyEvent =
+	@record null::MSG_META_NOTIFY_WITH_DATA_BLOCK(MANUFACTURER_ID_GEOWORKS,
+						      GWNT_SELECT_STATE_CHANGE,
+						      data);
+EC( ECCheckEventHandle( notifyEvent ); )
+    /*
+     * Now send this recorded message to all the members of that list, recording
+     * the message as the status message (which any new member will be given
+     * when it enrolls in the list), by sending a MSG_META_GCN_LIST_SEND to
+     * our application object.
+     */
+    @call application::MSG_META_GCN_LIST_SEND
+	(GCNLSF_SET_STATUS,
+	 notifyEvent,
+	 data,
+	 GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE,
+	 MANUFACTURER_ID_GEOWORKS);
+
+}
+
+/***********************************************************************
+ *				ResetViewArea
+ ***********************************************************************
+ * SYNOPSIS:	    Force the entire view to redraw.
+ * CALLED BY:	    (INTERNAL) PasteCommon,
+ *			       ClipSampProcess::MSG_META_DELETE
+ * RETURN:	    nothing
+ * SIDE EFFECTS:    no further drawing will get through to the window
+ *		    until the MSG_META_EXPOSED-to-come is processed.
+ *
+ * STRATEGY:	    If we've got a window, create a gstate open to it
+ *		    and invalidate the biggest rectangle we can -- that
+ *		    should invalidate the entire window :)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+static void
+ResetViewArea(void)
+{
+    GStateHandle gstate;
+
+    if (winHandle) {
+        gstate = GrCreateState(winHandle);
+	GrInvalRect(gstate,
+		    0, 0,
+		    LARGEST_POSITIVE_COORDINATE, LARGEST_POSITIVE_COORDINATE);
+        GrDestroyState(gstate);
+    }
+}
+
+
+/***********************************************************************
+ *				BuildTextTransferItem
+ ***********************************************************************
+ * SYNOPSIS:	    Build a CIF_TEXT transfer item for storage in the
+ *		    clipboard.
+ * CALLED BY:	    (INTERNAL) CopyCommon
+ * RETURN:	    TransferBlockID of item to register with UI.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    The structure of a text transfer format is rather
+ *	    	    hairy, in its fullest form. Rather than deal with it,
+ *	    	    we make use of a facility provided by the text library
+ *	    	    expressly for this purpose.
+ *
+ *	    	    The premise is simple: a VisText object knows all about
+ *	    	    generating and importing text transfer formats, as
+ *	    	    it has to handle cut/copy/paste for GeoWrite and things
+ *	    	    of that ilk. Since it also knows how to store all its
+ *	    	    data in a VM file, and the clipboard is a VM file, all
+ *	    	    we need to do to simplify our life enormously is to
+ *	    	    create a text object that uses the clipboard file to
+ *	    	    store its data. This is what TextAllocClipboardObject()
+ *	    	    does.
+ *
+ *	    	    Our strategy: create a text object that stores its
+ *	    	    stuff in the clipboard file, tell it to replace its
+ *	    	    text with that we've got in our textHandle block. Once
+ *	    	    the text is there, another text library function,
+ *	    	    TextFinishWithClipboardObject(), converts it to a text
+ *	    	    transfer format (in case text is just one of a set of
+ *	    	    formats in which we're rendering some data), or a full
+ *	    	    transfer item, with a text transfer format as one of
+ *	    	    the renderings (this is what we use, of course).
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+static TransferBlockID
+BuildTextTransferItem(MemHandle textHandle)	/* Handle of block containing
+						 * multi-line, null-terminated
+						 * text */
+{
+    optr textObj;
+    VMFileHandle    transferFile;
+    VMBlockHandle   transferItem;
+
+    /*
+     * Create a temporary text object to build CIF_TEXT data block
+     */
+    transferFile = ClipboardGetClipboardFile();
+EC( ECVMCheckVMFile( transferFile ); )
+    textObj = TextAllocClipboardObject(transferFile, 0, 0);
+EC( ECCheckLMemOD( textObj ); )
+
+    /*
+     * Set the text in the text object (have null-terminated text in
+     * 'textHandle').
+     */
+    @call textObj::MSG_VIS_TEXT_REPLACE_ALL_BLOCK(textHandle, 0);
+
+    /*
+     * Tell the text object that we are done with it. It will destroy
+     * itself after it has converted all its text into a transfer item with
+     * just one format: MANUFACTURER_ID_GEOWORKS::CIF_TEXT. It returns us
+     * the VM block handle of the item.
+     */
+    transferItem =
+	TextFinishWithClipboardObject(textObj,
+				      TCO_RETURN_TRANSFER_ITEM,
+				      HandleToOptr(GeodeGetProcessHandle()),
+				      "Sample Scrap");
+EC( ECVMCheckVMBlockHandle( transferFile, transferItem ); )
+    /*
+     * While we've got the clipboard file so conveniently stored away,
+     * merge it with the VM block handle of the item to form the 32-bit
+     * ID ClipboardRegisterItem uses, returning that ID.
+     */
+    return (BlockIDFromFileAndBlock(transferFile, transferItem));
+}
+
+
+/***********************************************************************
+ *				CopyCommon
+ ***********************************************************************
+ * SYNOPSIS:	    Common code to store the current block of text
+ *	    	    in the clipboard, as either the normal transfer item
+ *		    or the quick transfer item.
+ * CALLED BY:	    (INTERNAL) ClipSampProcess::MSG_META_CLIPBOARD_COPY
+ *			       ClipSampProcess::MSG_META_START_MOVE_COPY
+ * RETURN:	    TRUE if successful
+ * SIDE EFFECTS:    The indicated transfer item is replaced with one
+ *		    manufactured from our text block, if we've got one.
+ *
+ * STRATEGY:	    Call BuildTextTransferItem to convert our text block
+ *		    to a transfer item in the clipboard, then register
+ *		    that item as the appropriate transfer item.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+static Boolean 
+CopyCommon(ClipboardItemFlags transferFlags) /* Which item should it become,
+					     * quick or normal? */
+{
+    if (textHandle) {
+	/*
+	 * Build us a transfer item from the text.
+	 */
+	TransferBlockID transferItem = BuildTextTransferItem(textHandle);
+	/*
+	 * Then place it as the designated item, returning the success or
+	 * failure of ClipboardRegisterItem.
+	 */
+	return( ClipboardRegisterItem(transferItem, transferFlags) );
+    } else {
+	return(FALSE);	/* no copy */
+    }
+}
+
+
+/***********************************************************************
+ *				PasteCommon
+ ***********************************************************************
+ * SYNOPSIS:	    Paste the normal or quick-transfer item as our
+ *	    	    text block
+ * CALLED BY:	    (INTERNAL) ClipSampProcess::MSG_META_CLIPBOARD_PASTE
+ *			       ClipSampProcess::MSG_META_END_MOVE_COPY
+ * RETURN:	    ClipboardQuickNotifyFlags for ClipboardEndQuickTransfer
+ * SIDE EFFECTS:    textHandle is replaced. existing text block is freed.
+ *
+ * STRATEGY:	    The strategy here is similar to that we employed in
+ *		    BuildTextTransferItem().
+ *
+ *	    	    First we make sure the indicated transfer item has
+ *		    a TEXT_FORMAT rendering.
+ *
+ *	    	    If it does, we fetch its address (VM block handle)
+ *		    in the clipboard file.
+ *
+ *	    	    We create a text object that stores its data in the
+ *		    clipboard (it's a convenient place to put it) and tell
+ *		    the object to replace all its text with that stored
+ *		    in the transfer format whose address we located.
+ *
+ *	    	    If there's not too much text in the object to fit
+ *		    in a block on the heap, we fetch it all into a block
+ *		    and store that as our textHandle.
+ *
+ *	    	    Finally, we destroy the object, telling it to just
+ *		    nuke any data it stored in the clipboard.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+static ClipboardQuickNotifyFlags
+PasteCommon(ClipboardItemFlags transferFlags)	/* From which item should we
+						 * paste, quick or normal? */
+{
+    ClipboardQueryArgs	    query;	/* Info on the indicated transfer item
+					 * returned here. */
+    ClipboardRequestArgs    request;    /* Address of requested format returned
+					 * here */
+    ClipboardQuickNotifyFlags retVal;
+
+    /*
+     * First, find out if the indicated clipboard item (normal or
+     * quick-transfer) supports the MANUFACTURER_ID_GEOWORKS::CIF_TEXT format.
+     */
+    ClipboardQueryItem(transferFlags, &query);
+    if (query.CQA_numFormats) {
+	if (ClipboardTestItemFormat(query.CQA_header, TEXT_FORMAT)) {
+	    /*
+	     * A clipboard item exists and does support CIF_TEXT, let's get it
+	     */
+	    optr    textObj;	/* Text object we use to do all the gross
+				 * work. */
+
+	    /*
+	     * Fetch the file/block handle of transfer format GEOWORKS::CIF_TEXT
+	     */
+	    ClipboardRequestItemFormat(TEXT_FORMAT, query.CQA_header, &request);
+
+	    /*
+	     * Create a text object in the clipboard file to which we can give
+	     * the transfer format we just got.
+	     */
+	    textObj = TextAllocClipboardObject(ClipboardGetClipboardFile(), 0, 0);
+EC(         ECCheckLMemOD( textObj ); )
+
+	    /*
+	     * Tell that object to replace all its text (from position 0 to
+	     * position TEXT_ADDRESS_PAST_END) with the transfer format we got
+	     * back from ClipboardRequestItemFormat. The parameters are passed
+	     * backwards from what you'd expect owing to peculiarities of
+	     * passing what is a structure (in assembly language) as separate
+	     * arguments.
+	     */
+	    @call textObj::MSG_VIS_TEXT_REPLACE_WITH_TEXT_TRANSFER_FORMAT(
+		    VMCHAIN_GET_VM_BLOCK(request.CRA_data),
+		    request.CRA_file,
+		    0,
+		    TEXT_ADDRESS_PAST_END,
+		    0);
+
+	    /*
+	     * Now see if the text just pasted into our text object is
+	     * smaller than will fit in a memory block. If not, we can't
+	     * paste it.
+	     */
+	    if (@call textObj::MSG_VIS_TEXT_GET_TEXT_SIZE() < 65536) {
+		/*
+		 * Fetch the text from the object into a block on the heap,
+		 * re-using the one we've got, if we've got one, or allocating
+		 * a new one if textHandle is 0.
+		 */
+		textHandle =
+		    @call textObj::MSG_VIS_TEXT_GET_ALL_BLOCK(textHandle);
+EC(             ECCheckMemHandle( textHandle ); )
+
+	        /*
+		 * Indicate that we've successfully copied the clipboard item
+		 */
+		retVal = CQNF_COPY;
+		/*
+		 * Tell the world we've got something we can put on the
+		 * clipboard.
+		 */
+		SendSelectNotify();
+		ResetViewArea();
+	    } else {
+		/*
+		 * Indicate we couldn't copy the item, as it was too big.
+		 */
+		retVal = CQNF_ERROR;
+	    }
+	    /*
+	     * Destroy the clipboard text object, throwing away its contents.
+	     */
+	    (void)TextFinishWithClipboardObject(textObj, TCO_RETURN_NOTHING,
+						0, 0);
+	}
+        else {
+	    /*
+	     * Indicate we couldn't do anything.
+	     */
+	    retVal = CQNF_NO_OPERATION;
+	}
+    }
+    else {
+	retVal = CQNF_NO_OPERATION;
+    }
+    /*
+     * Tell the clipboard we're done with this item, so it can throw away
+     * the data, if necessary.
+     */
+    ClipboardDoneWithItem(query.CQA_header);
+
+    /*
+     * Return whatever is appropriate for ClipboardEndQuickTransfer(), based on
+     * what we accomplished.
+     */
+    return(retVal);
+}
+
+/*
+ ***************************************************************************
+ *		Code for ClipSampProcessClass
+ ***************************************************************************
+ */
+
+/***************************************************************************
+ *
+ *			  RANDOM UTILITY METHODS
+ *
+ ***************************************************************************
+
+/***********************************************************************
+ *	MSG_GEN_PROCESS_OPEN_APPLICATION for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Perform operations necessary for operating as an
+ *		    interactible application.
+ * PARAMETERS:	    void (word attachFlags,
+ *			  MemHandle launchBlock,
+ *			  MemHandle extraState)
+ * SIDE EFFECTS:    textHandle is set non-zero, and notification of our
+ *		    ability to copy to the clipboard, if there was any
+ *		    text stored in the state file from last time.
+ *
+ * STRATEGY:	    When we shut down to state before, we saved our
+ *		    block of text to the state file. Its handle comes back
+ *		    to us as "extraState," which we merrily duplicate, if
+ *		    it's provided.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    /*
+     * Copy extra state block, if any, as text block
+     */
+    if (extraState != 0) {
+	int 	count;
+	
+	count = MemGetInfo(extraState, MGIT_SIZE);
+	textHandle = MemAlloc(count, HF_DYNAMIC, HAF_STANDARD_NO_ERR);
+EC(     ECCheckMemHandle( textHandle ); )
+
+	(void)memcpy(MemLock(textHandle),
+		     MemLock(extraState),
+		     count);
+
+	MemUnlock(textHandle);
+	MemUnlock(extraState);	/* (freed by system) */
+
+    }
+    else {
+	/*
+     	 * Set up a text block containing a default string. To get a
+     	 * different string in here, the user must copy something from
+     	 * another application and paste that into ClipSamp.
+     	 */
+	char *textText; 	    /* The start of the locked text block */
+	char *newText = "Cut it. Paste it. Oh what fun!";
+
+	textHandle = MemAlloc(strlen(newText), HF_DYNAMIC, HAF_STANDARD_NO_ERR);
+EC(     ECCheckMemHandle( textHandle ); )
+	textText = (char *) MemLock(textHandle);
+	(void) strcpy(textText, newText);
+	MemUnlock(textHandle);
+    }
+    /*
+     * Call superclass to perform standard processing
+     */
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *	MSG_GEN_PROCESS_CLOSE_APPLICATION for ClipSampProcessHandle
+ ***********************************************************************
+ * SYNOPSIS:	    Finish our life as an interactible application.
+ * PARAMETERS:	    MemHandle (void)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    just return our text block as the handle to save to
+ *		    the state file.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    /*
+     * Return text block as extra state block
+     */
+    return(textHandle);
+}
+
+
+/***********************************************************************
+ *		MSG_META_EXPOSED for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Redraw our document
+ * PARAMETERS:	    void (WindowHandle win)
+ * SIDE EFFECTS:    the invalid region for the window is cleared
+ *
+ * STRATEGY:	    Our block of text can consist of multiple lines of
+ *		    text, each (except the last) terminated by a carriage
+ *		    return character.
+ *
+ *	    	    After creating a graphics state and telling the
+ *		    system we're updating the invalid region of the
+ *		    window, loop through the lines of text, drawing each
+ *		    in turn to the window, working our way down the window.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;    /* Graphics state through which we draw our
+			     * text */
+    char *textText; 	    /* The start of the locked text block */
+    char *cp;	    	    /* Start of the line being drawn */
+    int count;	    	    /* Number of characters in the line */
+    sword yPos=0;   	    /* Y coordinate of top of this line of text */
+
+    winHandle = win;
+
+    gstate = GrCreateState(win);
+    GrBeginUpdate(gstate);
+
+    /*
+     * Loop, drawing each line of text.
+     */
+    if (textHandle) {
+	/*
+	 * Lock down the block of text.
+	 */
+	textText = (char *)MemLock(textHandle);
+EC(	ECCheckBounds( textText ); )
+	cp = textText;
+	do {
+	    /*
+	     * Find the end of this line.
+	     */
+	    char    *end = strchr(cp, '\r');
+
+	    if (end == 0) {
+		/*
+		 * No return, which means the thing is null-terminated, so
+		 * just draw it and clear out.
+		 */
+		GrDrawText(gstate, 0, yPos, cp, 0);
+		break;
+	    }
+            else {
+		/*
+		 * Figure the number of characters to draw.
+		 */
+		count = end - cp;
+
+		/*
+		 * Be careful of a blank line, which would cause us to
+		 * pass a count of 0, drawing the rest of the string here,
+		 * where it should not be.
+		 */
+		if (count != 0) {
+		    GrDrawText(gstate, 0, yPos, cp, count);
+		}
+		/*
+		 * Advance cp to the next line, skipping over the return.
+		 */
+		cp = end + 1;
+	    }
+	    /*
+	     * Advance Y position to the next text line.
+	     */
+	    yPos += GrFontMetrics(gstate, GFMI_HEIGHT_ROUNDED);
+        } while (*cp != '\0');
+	
+	MemUnlock(textHandle);
+    }
+
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}
+
+/***************************************************************************
+ *
+ *			EDIT-MENU CLIPBOARD METHODS
+ *
+ ***************************************************************************
+
+/***********************************************************************
+ *		MSG_META_CLIPBOARD_CUT for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Copy the selected text to the clipboard, then
+ *		    delete it from our own display.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the text block is freed and textHandle set to 0
+ *	    	    the view is forced to redraw
+ *
+ * STRATEGY:	    Just use MSG_META_CLIPBOARD_CUT and MSG_META_DELETE,
+ *		    sent to ourselves, to accomplish our task.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_CLIPBOARD_CUT
+{
+    /*
+     * First, copy text into clipboard
+     */
+    @call self::MSG_META_CLIPBOARD_COPY();
+
+    /*
+     * Then tell ourselves to delete the text.
+     */
+    @call self::MSG_META_DELETE();
+}
+
+
+/***********************************************************************
+ *		MSG_META_DELETE for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Delete all our text.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the text block is freed and textHandle set to 0
+ *		    the view is forced to redraw
+ *
+ * STRATEGY:	    If we've got a block of text, free it and set
+ *		    textHandle to 0, then send out notification that we
+ *		    no longer can copy things into the clipboard and
+ *		    redraw our view.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	7/29/92		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_DELETE
+{
+    /*
+     * Delete the text, if any
+     */
+    if (textHandle) {
+EC(	ECCheckMemHandle( textHandle ); )
+        MemFree(textHandle);
+        textHandle = NullHandle;
+	/*
+	 * We can no longer put things in the clipboard, so let everyone
+	 * know this.
+	 */
+	SendSelectNotify();
+	/*
+	 * Redraw our window
+	 */
+	ResetViewArea();
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_META_CLIPBOARD_COPY for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Copy the current text block to the clipboard.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the normal transfer item is replaced with our text
+ *
+ * STRATEGY:	    Call our common routine to copy our text to the
+ *		    normal item.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_CLIPBOARD_COPY
+{
+    CopyCommon(TIF_NORMAL);
+}
+
+
+/***********************************************************************
+ *		MSG_META_CLIPBOARD_PASTE for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Replace our current text with that stored in the
+ *		    normal transfer item in the clipboard.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    textHandle is set to the block of text imported
+ *		    from the clipboard.
+ *
+ * STRATEGY:	    Call our common routine to paste in the normal item.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_CLIPBOARD_PASTE
+{
+    PasteCommon(TIF_NORMAL);
+}
+
+
+/***********************************************************************
+ *	MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED for
+ *			   ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Push out a status message for the edit controller
+ *		    telling it if we can handle the current normal
+ *		    transfer item.
+ * PARAMETERS:	    void (ManufacturerID manufID, word changeID)
+ * SIDE EFFECTS:    Notification is sent to the application object
+ *
+ * STRATEGY:	    
+ *	    	    (MANUFACTURER_ID_GEOWORKS::GWNT_SELECT_STATE_CHANGE),
+ *	    	    provide it, else let our superclass have a shot at it.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	7/91		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass,
+	MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+{
+    /*
+     * Tell the world whether we can handle the new normal transfer item,
+     * etc.
+     */
+    SendSelectNotify();
+}
+
+
+/***********************************************************************
+ *		MSG_META_GAINED_TARGET_EXCL for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Take note that we are the target object and are
+ *		    thus responsible for notifying the GenEditControl
+ *		    of our status.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    process is added to the clipboard notification list
+ *
+ * STRATEGY:	    When we are the target object, it is our responsibility
+ *		    to keep any objects controlling us (in this app, the
+ *		    GenEditControl object) aprised of our status by sending
+ *		    notification to them whenever it changes. To do this,
+ *		    we must be on the clipboard notification list, so we
+ *		    can tell the controller(s) if we can paste the new
+ *		    normal transfer item, when it arrives.
+ *
+ *	    	    To the controllers, a change of target is simply a massive
+ *		    state change (of every aspect of the target object), so
+ *		    we send out all the notifications we're supposed to
+ *		    send, during the course of our life, whenever we gain
+ *		    the target.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	7/31/92		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_GAINED_TARGET_EXCL
+{
+    /*
+     * Add ourselves to the clipboard notification list. We can't just use
+     * oself, though it would be easier to do, as the low word of oself,
+     * when received by a process object, is random, as far we're concerned.
+     * It's the low word of the optr passed to ObjMessage, but there's
+     * no requirement that it be set to 0 by the caller. In fact, in some cases
+     * it's treated as a place to send an extra 16 bits of data.
+     *
+     * So we call GeodeGetProcessHandle() and convert that to an optr.
+     */
+    ClipboardAddToNotificationList(HandleToOptr(GeodeGetProcessHandle()));
+
+    /*
+     * Send our notifications.
+     */
+    SendSelectNotify();
+}
+
+
+/***********************************************************************
+ *		MSG_META_LOST_TARGET_EXCL for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Take note that we are no longer the target object
+ *		    and thus are no longer responsible for notifying
+ *		    the GenEditControl of our status.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    process is removed from the clipboard notification list.
+ *
+ * STRATEGY:	    Since we don't have to continually update the
+ *		    controller of our status, we no longer need to be kept
+ *		    aprised of the state of the clipboard, so we remove
+ *		    ourself from its notification list.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	7/31/92		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_LOST_TARGET_EXCL
+{
+    ClipboardRemoveFromNotificationList(HandleToOptr(GeodeGetProcessHandle()));
+}
+
+/******************************************************************************
+ *
+ *			  QUICK-TRANSFER METHODS
+ *
+ ******************************************************************************/
+
+
+/***********************************************************************
+ *		MSG_META_START_MOVE_COPY for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Begin a quick-transfer of our text.
+ * PARAMETERS:	    void (MouseReturnFlags *retVal,
+ *			  sword xPosition,
+ *			  sword yPosition,
+ *			  word inputState)
+ * SIDE EFFECTS:    The CIF_QUICK transfer item is replaced with our
+ *		    text, if we have any.
+ *
+ * STRATEGY:	    Contact the UI to initiate the quick-transfer. It'll
+ *		    tell us know if there's already one in progress (it's
+ *		    a pre-emptive multi-tasking system; anything's possible).
+ *
+ *	    	    If the UI gave us the green light, use our common
+ *		    routine to copy our text to the *quick* transfer item,
+ *	    	    not the normal one, then (if that succeeded) tell our
+ *	    	    view to allow the mouse to go outside the view on its
+ *		    global quick-transfer mission.
+ *
+ *	    	    Finally, tell our caller that we actually processed
+ *		    the mouse event, so it needn't try and give it to
+ *		    anyone else.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/92		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_START_MOVE_COPY
+{
+    /*
+     * Start the UI part of the quick-transfer. We don't support
+     * quick-move, so we pass CQTF_COPY_ONLY and an initial cursor of
+     * CQTF_COPY. We request notification only for example purposes, not because
+     * we have anything serious to do that requires notification.
+     */
+    if (ClipboardStartQuickTransfer(CQTF_COPY_ONLY | CQTF_NOTIFICATION, CQTF_COPY,
+			       0, 0, 0,	/* Mouse position + region structure
+					 * pointer need only be passed if
+					 * CQTF_USE_REGION */
+			       oself)) 	/* Notification OD */
+    {
+	/*
+	 * Create and register a quick-tranfser item
+	 */
+        if (CopyCommon(CIF_QUICK)) {
+	    /*
+	     * Quick-transfer successfully started, tell our view to allow the
+	     * mouse pointer to wander everywhere for feedback.
+	     */
+	    @send GeodeGetOptrNS(@ClipSampView)::MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();
+	}
+        else {
+	    /*
+	     * Couldn't actually copy the data to the clipboard, so abort the
+	     * quick transfer we told the UI was about to commence.
+	     */
+	    ClipboardAbortQuickTransfer();
+	}
+    }
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+
+/***********************************************************************
+ *		MSG_META_PTR for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Provide quick-transfer feedback, if necessary.
+ * PARAMETERS:	    void (MouseReturnFlags *retVal,
+ *			  sword xPosition,
+ *			  sword yPosition,
+ *			  word inputState)
+ * SIDE EFFECTS:    mouse cursor changed to reflect whether we can accept
+ *		    the transfer.
+ *
+ * STRATEGY:	    If the inputState indicates the user is performing
+ *		    quick-transfer and we need to see (and tell others)
+ *		    whether we're willing to accept the current quick
+ *		    transfer item.
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/92		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_PTR
+{
+    /*
+     * Check if doing quick-transfer. If not, there's nothing else we have
+     * to do.
+     */
+    if ((GET_UI_FUNCTIONS_ACTIVE(inputState) & UIFA_MOVE_COPY) &&
+	ClipboardGetQuickTransferStatus())
+    {
+	/*
+	 * Need to check the current quick-transfer item to see if it supports
+	 * the CIF_TEXT format. If it does, we always like to copy, not move,
+	 * the thing.
+	 */
+	ClipboardSetQuickTransferFeedback((CheckPasteable(CIF_QUICK) ?
+				    CQTF_COPY :
+				    CQTF_CLEAR),
+				   inputState);
+    }
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+
+/***********************************************************************
+ *		MSG_META_END_MOVE_COPY for ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Paste the current quick-transfer item if it's
+ *		    pasteable.
+ * PARAMETERS:	    void (MouseReturnFlags *retVal,
+ *			  sword xPosition,
+ *			  sword yPosition,
+ *			  word inputState)
+ * SIDE EFFECTS:    textHandle altered if paste occurs
+ *
+ * STRATEGY:	    The user has ended his/her quick-transfer on our
+ *		    humble view. Call our common paste routine to paste
+ *		    in the quick transfer item, then end the quick-transfer
+ *		    by calling ClipboardEndQuickTransfer, telling it what we did.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/92		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_END_MOVE_COPY
+{
+    /*
+     * paste the thing, PasteCommon returns ClipboardQuickNotifyFlags to pass to
+     * ClipboardEndQuickTransfer
+     */
+    ClipboardEndQuickTransfer(PasteCommon(CIF_QUICK));
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+
+/***********************************************************************
+ *		MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED for
+ *	    	    	    ClipSampProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Let the user know whether we were successful in our
+ *		    transfer attempt.
+ * PARAMETERS:	    void (ClipboardQuickNotifyFlags flags)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    This message is sent because we specified CQTF_NOTIFICATION
+ *		    and gave our address as the notification OD. It comes
+ *		    to us when the object that received the
+ *		    MSG_META_END_MOVE_COPY calls ClipboardEndQuickTransfer.
+ *
+ *	    	    There's nothing the system needs us to do here. The
+ *		    quick transfer item we registered remains in the
+ *		    clipboard until the next quick transfer, for example.
+ *
+ *	    	    What we do, however, is to alert the user to how the
+ *		    transfer went. If we're told the thing was copied, we
+ *		    flash the view. If it's anything else (it can't be a
+ *		    move because we specified CQTF_COPY_ONLY when we started
+ *	    	    the transfer), we beep.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/92		Initial Revision
+ *
+ ***********************************************************************/
+@method ClipSampProcessClass, MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED
+{
+    /*
+     * do some simple error indication
+     */
+    if (flags & CQNF_COPY) {
+	/*
+	 * Flash the view if the transfer was successful.
+	 * XXX: WHAT ABOUT MOVE?
+	 */
+	GStateHandle gs;
+	Rectangle bounds;
+	
+	gs = GrCreateState(winHandle);
+	GrGetWinBounds(gs, &bounds);
+	GrSetMixMode(gs, MM_INVERT);
+	GrFillRect(gs, bounds.R_left, bounds.R_top,
+			bounds.R_right, bounds.R_bottom);
+	GrFillRect(gs, bounds.R_left, bounds.R_top,
+			bounds.R_right, bounds.R_bottom);
+	GrDestroyState(gs);
+    }
+    else if (!(flags & CQNF_NO_OPERATION)) {
+	UserStandardSound(SST_ERROR);
+    }
+    else {
+	UserStandardSound(SST_WARNING);
+    }
+}
+

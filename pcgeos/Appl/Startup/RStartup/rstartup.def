@@ -1,0 +1,526 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1995 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	PC GEOS
+MODULE:		Start up application
+FILE:		rstartup.def
+
+AUTHOR:		Jason Ho, Apr  3, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kho	4/14/95   	Initial revision
+
+
+DESCRIPTION:
+	Definitions for startup app.
+		
+	$Id: rstartup.def,v 1.1 97/04/04 16:52:33 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;------------------------------------------------------------------------------
+;			   Constants
+;------------------------------------------------------------------------------
+
+; from Library/Config/configConstant.def
+MAX_STRING_SIZE		equ	40
+
+; We will not be doing language :-(
+RSTARTUP_DO_LANGUAGE	equ	0	; change rstartup.uih too!
+
+; and no more memory change dialog
+DO_MEMORY_CHANGE	equ	0
+
+; no more ECI stuffs
+DO_ECI_SIM_CARD_CHECK	equ	0
+
+
+if RSTARTUP_DO_LANGUAGE		;++++++++++++++++++++++++++++++++++++++++++
+LANGUAGE_COLUMN_WIDTH	equ	30
+LANGUAGE_LIST_WIDTH	equ	300
+endif				; ++++++++++++ RSTARTUP_DO_LANGUAGE ++++++++
+
+COUNTRY_LIST_WIDTH	equ	250
+SMALL_STRING_SIZE	equ	20		; for date/time string
+
+DATE_TIME_BOTTOM_TEXT_X_OFFSET equ	80
+
+DATE_TEXT_MAX_LENGTH	equ	8	; 8 chars for date text
+TIME_TEXT_MAX_LENGTH	equ	5	; 5 chars for time text
+
+;
+; Dialog width and HINT_INDENT_CHILDREN amounts
+;
+KEYBOARD_INDENT_AMOUNT	equ	34		; pixels
+KEYBOARD_DIALOG_WIDTH	equ	FOAM_DEFAULT_COMPONENT_WIDTH+25
+
+DATE_TIME_INDENT_AMOUNT	equ	34
+DATE_TIME_DIALOG_WIDTH	equ	FOAM_DEFAULT_COMPONENT_WIDTH
+
+UDATA_INTRO_INDENT_AMOUNT	equ	34
+UDATA_INTRO_DIALOG_WIDTH equ	FOAM_DEFAULT_COMPONENT_WIDTH
+
+SIM_MEMORY_INDENT_AMOUNT	equ	34
+SIM_MEMORY_DIALOG_WIDTH	equ	FOAM_DEFAULT_COMPONENT_WIDTH
+
+EXIT_INDENT_AMOUNT	equ	34
+EXIT_DIALOG_WIDTH	equ	FOAM_DEFAULT_COMPONENT_WIDTH
+
+;
+; rwtime library constants
+;
+RSTARTUP_CITY_SPACE_SIZE 	equ	19226
+RSTARTUP_COUNTRY_SPACE_SIZE	equ	10612
+
+if RSTARTUP_DO_LANGUAGE
+	; for GP file
+	GP_RSTARTUP_DO_LANGUAGE	equ	0
+endif
+
+;
+; priority for our usual dialogs, and the popup note/error dialog
+;
+RSTARTUP_DIALOG_LAYER_PRIORITY	equ	LAYER_PRIO_MODAL-1
+RSTARTUP_POPUP_LAYER_PRIORITY	equ	RSTARTUP_DIALOG_LAYER_PRIORITY-1
+
+RespKeyboardType	etype	word, 0, 2
+	RKT_FINLAND	enum	RespKeyboardType
+	RKT_DENMARK	enum	RespKeyboardType
+	
+;------------------------------------------------------------------------------
+;			   Fatal errors
+;-----------------------------------------------------------------------------
+
+if ERROR_CHECK
+
+if RSTARTUP_DO_LANGUAGE		;++++++++++++++++++++++++++++++++++++++++++
+NO_LANGUAGE_AVAILABLE_CHECK_INI_FILE		enum FatalErrors
+ODD_NUMBER_OF_LANGUAGE_ITEMS_CHECK_INI		enum FatalErrors
+endif				; ++++++++++++ RSTARTUP_DO_LANGUAGE ++++++++
+
+COUNTRY_GET_VIEWPT_RECORD_COUNT_PROBLEM		enum FatalErrors
+DATABASE_INIT_PROBLEM				enum FatalErrors
+DATABASE_SET_ALL_VIEWPT_PROBLEM			enum FatalErrors
+DATABASE_CLOSE_PROBLEM				enum FatalErrors
+DATABASE_GET_ABSOLUTE_RECORD_NUMBER_PROBLEM 	enum FatalErrors
+DATABASE_COUNTRY_READ_RECORD_PROBLEM		enum FatalErrors
+DATABASE_CAPITAL_CITY_SEARCH_ERROR		enum FatalErrors
+DATABASE_SET_HOME_CITY_ERROR			enum FatalErrors
+USER_INFO_SECRET_RECORD_DELETED			enum FatalErrors
+LANGUAGE_NAME_TOO_LONG_CHECK_INI_FILE		enum FatalErrors
+SEND_ECI_ERROR					enum FatalErrors
+
+endif 	; ERROR_CHECK
+
+;------------------------------------------------------------------------------
+;			   Warnings
+;-----------------------------------------------------------------------------
+
+if ERROR_CHECK
+
+;LAZARUS_RWTIME_LIBRARY_NOT_INITIALIZED		enum Warnings
+ECI_SIM_INFO_STATUS_NOT_SENT_MULTIPLE_TIMES	enum Warnings
+ECI_SIM_INFO_STATUS_NOT_EXPECTED		enum Warnings
+INSTALL_VP_CLIENT_FAILURE_NO_ECI_SENT		enum Warnings
+
+endif	; ERROR_CHECK
+
+;------------------------------------------------------------------------------
+;			   Table
+;-----------------------------------------------------------------------------
+CommonCode	segment resource
+
+keyboardNameStringTable word \
+	offset	FinlandKeyboardName,
+	offset	DenmarkKeyboardName
+
+CommonCode	ends
+
+;------------------------------------------------------------------------------
+;			   Flags for dealing with ECI message
+;------------------------------------------------------------------------------
+RStartupECIFlags		record
+	RSEF_SIM_INFO_STATUS_SENT:1	; is ECI_ECI_SIM_INFO_STATUS sent?
+	:7
+RStartupECIFlags		end
+
+;------------------------------------------------------------------------------
+;			   Flags for application class
+;------------------------------------------------------------------------------
+RStartupApplicationFlags	record
+	RSAF_ACCEPT_HARD_ICON: 1	; should hard icon goes through?
+	;   RSAF_KBD_TYPE_CHANGED: 1	; is the keyboard type change?
+					; if so, we need to reboot
+	:7
+RStartupApplicationFlags	end
+
+;------------------------------------------------------------------------------
+;			   Application Class
+;------------------------------------------------------------------------------
+
+RStartupApplicationClass	class	GenApplicationClass
+;------------------------------
+;       Messages
+;------------------------------
+	;
+	; obsolete
+	;
+	; MSG_RSTARTUP_APP_ACCEPT_APP_KEY	message
+	;
+	; Mark that we will accept application keys (hard icon)
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	nothing
+	;
+	; MSG_RSTARTUP_APP_KBD_TYPE_CHANGED message
+	;
+	; Mark that the kbd type is changed, so we should reboot
+	; later.
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	nothing
+	;
+
+	; MSG_RSTARTUP_APP_IS_KBD_TYPE_CHANGED message
+	;
+	; Return whether the kbd type is changed.
+	;
+	; Pass:		nothing
+	; Return:	cx	= TRUE or FALSE
+	; Destroy:	nothing
+	;
+
+	MSG_RSTARTUP_APP_SET_APP_FLAGS		message
+	;
+	; Set RSAI_miscFlags
+	;
+	; Pass:		cl 	= RStartupApplicationFlags record
+	; Return:	nothing
+	; Destroy:	nothing
+	;
+
+;------------------------------
+;       Var data
+;------------------------------
+; ATTR_RSTARTUP_APP_OPEN		vardata byte
+; indicates that the app has been started (to detech lazarus)
+
+;------------------------------
+;       Instance data
+;------------------------------
+	RSAI_miscFlags	RStartupApplicationFlags	; misc flags
+
+RStartupApplicationClass	endc
+
+;-----------------------------------------------------------------------------
+;			   RStartupCountryListClass
+;-----------------------------------------------------------------------------
+RStartupCountryListClass	class	GenDynamicListClass
+
+	MSG_RSTART_COUNTRY_QUERY_ITEM_MONIKER	message
+	;
+	; Query message to add the moniker of specified item to
+	; dynamic list.
+	;
+	; Pass:		^lcx:dx = the dynamic list requesting the moniker
+	;		bp = item #
+	; Return:	nothing
+	; Destroy:	ax, cx, dx
+	;
+
+RStartupCountryListClass	endc
+
+;------------------------------------------------------------------------------
+;			   Process Class
+;------------------------------------------------------------------------------
+
+if DO_ECI_SIM_CARD_CHECK
+RStartupProcessClass	class   VpClientClass
+else
+RStartupProcessClass	class   GenProcessClass
+endif
+;------------------------------
+;       Messages
+;------------------------------
+
+if RSTARTUP_DO_LANGUAGE		;++++++++++++++++++++++++++++++++++++++++++
+	MSG_RSTARTUP_PROCESS_SHOW_LANGUAGE	message
+	;
+	; Show the Language dialog box
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+	
+	MSG_RSTARTUP_PROCESS_LANGUAGE_OK	message
+	;
+	; User presses OK on Language dialog box 
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx
+	;
+endif				; ++++++++++++ RSTARTUP_DO_LANGUAGE ++++++++
+
+	MSG_RSTARTUP_PROCESS_SHOW_HOME_COUNTRY	message
+	;
+	; Show the Home country dialog box
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+	
+	MSG_RSTARTUP_PROCESS_COUNTRY_OK		message
+	;
+	; User presses OK on Home Country dialog box
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+	MSG_RSTARTUP_PROCESS_SHOW_KEYBOARD		message
+	;
+	; Show the Keyboard type dialog box
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+		
+	MSG_RSTARTUP_PROCESS_KEYBOARD_OK		message
+	;
+	; User presses OK on Keyboard dialog box
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+	MSG_RSTARTUP_PROCESS_SHOW_DATE		message
+	;
+	; Show the Date dialog box
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+	
+	MSG_RSTARTUP_PROCESS_DATE_OK		message
+	;
+	; User presses OK on Date dialog box
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+	
+	MSG_RSTARTUP_PROCESS_SHOW_TIME		message
+	;
+	; Show the Time dialog box
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+	MSG_RSTARTUP_PROCESS_TIME_OK		message
+	;
+	; User presses OK on Time dialog box
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+if DO_ECI_SIM_CARD_CHECK
+	MSG_RSTARTUP_PROCESS_CHECK_SIM_CARD_INFO	message
+	;
+	; check for sim card info, and if available, extract user data
+	; info to user data card before showing the editor
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+endif
+
+	MSG_RSTARTUP_PROCESS_SHOW_UINFO_EDITOR	message
+	;
+	; Show the user data editor dialog after initialization
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx
+	;
+
+	MSG_RSTARTUP_PROCESS_UINFO_OK		message
+	;
+	; User presses OK on User data dialog box
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+if DO_MEMORY_CHANGE		;++++++++++++++++++++++++++++++++++++++++++
+	MSG_RSTARTUP_PROCESS_MEMORY_CHANGE_OK	message
+	;
+	; User presses OK on Memory Change dialog box
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+endif				; ++++++++++++ DO_MEMORY_CHANGE +++++++++++
+
+	; MSG_RSTARTUP_PROCESS_SHOW_SIM_MEMORY	message
+	;
+	; Show the SimMemoryDialog.
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+	; MSG_RSTARTUP_PROCESS_SIM_MEMORY_OK	message
+	;
+	; User presses OK on SIM Memory dialog box
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+	; MSG_RSTARTUP_PROCESS_STOP_COPYING	message
+	;
+	; Stop contact copying, and bring up exit dialog
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+	MSG_RSTARTUP_PROCESS_SHOW_EXIT		message
+	;
+	; Show the Exit dialog box after changing the text, if
+	; necessary.
+	; 
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+	MSG_RSTARTUP_PROCESS_EXIT_OK		message
+	;
+	; User presses OK on "Ready to go" dialog box
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	?
+	;
+
+RStartupProcessClass	endc
+
+
+
+if RSTARTUP_DO_LANGUAGE		;++++++++++++++++++++++++++++++++++++++++++
+
+;-----------------------------------------------------------------------------
+;			   RStartupLangDynamicListClass
+;-----------------------------------------------------------------------------
+RStartupLangDynamicListClass	class	GenDynamicListClass
+
+;------------------------------
+;       Messages
+;------------------------------
+
+	MSG_RSLANG_DYNAMIC_LIST_BUILD_ARRAY	message
+	;
+	; Create the array of list entries from the .ini file.
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; Destroy:	ax, cx, dx, bp
+	;
+
+	MSG_RSLANG_LIST_QUERY_ITEM_MONIKER	message
+	;
+	; Query message to add the moniker of specified item to
+	; dynamic list.
+	;
+	; Pass:		^lcx:dx = the dynamic list requesting the moniker
+	;		bp = item #
+	; Return:	nothing
+	; Destroy:	ax, cx, dx
+	;
+
+	MSG_RSLANG_ADD_ITEM_MONIKER	message
+	;
+	; Get the moniker of one item, and put it into the dynamic list.
+	;
+	; Pass:		ss:bp	- GetItemMonikerParams
+	; Return:	nothing
+	; Destroy:	ax, cx, dx
+	;
+
+	MSG_RSLANG_GET_LANGUAGE_NAME	message
+	;
+	; Get the name of the language.
+	; Buffer size limit is assumed to be MAX_STRING_SIZE
+	;
+	; Pass:		bp	- item number
+	;		cx:dx	- string buffer
+	; Return:	nothing. Buffer filled unless string is too
+	; 		large for buffer.
+	; Destroy:	ax, cx, dx
+	;
+
+GetItemMonikerParams	struct
+	GIMP_identifier	word
+	; GIMP_bufferSize	word
+	; This field is taken away because it is OK for the field to
+	; be too long. It will be truncated by CreateVisMonikerLine
+SBCS <	GIMP_buffer	fptr.char					>
+DBCS <	GIMP_buffer	fptr.wchar					>
+GetItemMonikerParams	ends
+
+;------------------------------
+;       Vardata
+;------------------------------
+	ATTR_LANG_INIT_FILE_LIST_CATEGORY	vardata char
+	ATTR_LANG_INIT_FILE_LIST_KEY		vardata char
+		; The category and key of the .ini blob holding the
+		; entries for our list
+	ATTR_LANG_INIT_FILE_DESCRIPTION_KEY	vardata char
+		; This key holds the description
+
+;------------------------------
+;       Instance data
+;------------------------------
+	RSLDLI_nameArray	lptr.NameAndLabel ; block of an array
+						  ; of name structures
+
+RStartupLangDynamicListClass	endc
+
+endif				; ++++++++++++ RSTARTUP_DO_LANGUAGE ++++++++
+
+;------------------------------------------------------------------------------
+;			RStartup Contact Edit Control Class
+;------------------------------------------------------------------------------
+RStartupContactEditClass	class	ContactEditClass
+
+RStartupContactEditClass	endc
+

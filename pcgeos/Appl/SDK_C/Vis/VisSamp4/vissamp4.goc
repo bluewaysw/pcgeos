@@ -1,0 +1,792 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1992 -- All Rights Reserved
+
+PROJECT:	Sample Applications
+MODULE:		Vis object test app #4
+FILE:		vissamp4.goc
+
+AUTHOR:		Tom Manshreck, Nov  8, 1992
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	11/ 8/92   	Initial version.
+
+DESCRIPTION:
+	
+	This sample app demonstrates the dynamic creation and addition
+	of vis objects to a visible tree. It also demonstrates how
+	objects may be wrapped horizontally within a VisContent. 
+
+	For a more thorough treatment of Vis objects in general, see
+	the VisSamp sample application.
+
+	$Id: vissamp4.goc,v 1.1 97/04/04 16:37:44 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class	VisSamp4ProcessClass, GenProcessClass ;
+
+/* define methods for this class here. */
+
+@message void MSG_VIS_SAMP_SWITCH_CONTENTS();
+
+
+@endc   /* end of class definition */
+
+@classdecl	VisSamp4ProcessClass, neverSaved ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		VisSampContentClass 
+ ***************************************************************************
+ */
+
+/* 
+ * We'll subclass the content object here so we can add children
+ * dynamically if we want.
+ */
+@class VisSampContentClass, VisContentClass ;
+
+@message void MSG_VIS_SAMP_CONTENT_CREATE_CHILD();
+
+@endc
+@classdecl	VisSampContentClass ;
+
+/*
+ ***************************************************************************
+ *		VisSampNumberClass 
+ ***************************************************************************
+ */
+
+@class	VisSampNumberClass, VisClass ;
+
+/* 
+ * State flags. We have some mouse-handling code in this sample app
+ * that shows how visible objects can handle clicks within their
+ * bounds. (This input-handling is superfluous to the geometry stuff
+ * we're trying to show in this sample app.)
+ */
+#define VSNS_MOUSE_DOWN 0x80
+#define VSNS_SELECTED   0x40
+
+#define NUMBER_TEXT_HEIGHT 36.0
+
+@message void MSG_VIS_SAMP_NUMBER_SET_MONIKER(ChunkHandle moniker);
+
+	@instance @visMoniker VSNI_moniker;
+	@instance byte VSNI_state = 0;
+@endc
+@classdecl	VisSampNumberClass ;
+
+@start	AppResource ;
+
+@object GenApplicationClass VisSamp4App = {
+
+    GI_visMoniker = list { @VisSamp4TextMoniker }
+    GI_comp = @VisSamp4Primary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @VisSamp4Primary;
+}
+
+@visMoniker VisSamp4TextMoniker = "C VisSamp4 Sample Application";
+
+@end	AppResource
+
+@start	Interface		/* this resource is for misc UI objects */ ;
+
+@object GenPrimaryClass VisSamp4Primary  = {
+
+    GI_comp =	@AddTrigger, 
+		@SwitchContents, 
+		@VisSamp4View;		
+
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenViewClass VisSamp4View = {
+
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+
+    GVI_content = VisSampContent;
+
+    GVI_color = { C_CYAN, 0, 0, 0 };
+
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@object GenTriggerClass AddTrigger = {
+    GI_visMoniker = "Add button";
+    GTI_destination = VisSampContent;
+    GTI_actionMsg = MSG_VIS_SAMP_CONTENT_CREATE_CHILD;
+}
+
+@object GenTriggerClass SwitchContents = {
+    GI_visMoniker = "Switch contents";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_VIS_SAMP_SWITCH_CONTENTS;
+}
+
+@object VisContentClass VisSampAlternateContent = { 
+    VCI_comp = @AlternateContentButton;
+}
+
+@object VisSampNumberClass AlternateContentButton = {
+    VI_bounds = {0, 0, 200, 40};
+    VSNI_moniker = "Go Bears!"; 
+}
+
+@end	Interface		/* this resource is for misc UI objects */
+
+@start	AppRun		/* let's run the content in the app's thread */ ;
+
+@object VisSampContentClass VisSampContent = { 
+
+    /* 
+     * We'll let the view be any width it wants.  Actually, if the
+     * content's child objects don't fit in the area passed, the
+     * content will get wider or taller than the view as necessary,
+     * and become scrollable. 
+     */
+    VCNI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW;
+
+    /* 
+     * We'll have our content allow wrapping, if we ever get that many
+     * children. Also, we'll set an optimization flag which will allow  
+     * optimizations on any visual updates (i.e. if a visible child is
+     * added or removed, only that child will be redrawn.  By default
+     * we must assume that if the content's bounds change, everything
+     * needs to be redrawn because it could be drawing anywhere inside
+     * its bounds.)
+     */
+    VCI_geoAttrs = VCGA_ALLOW_CHILDREN_TO_WRAP | VCGA_ONLY_DRAWS_IN_MARGINS;
+}
+
+@end AppRun
+
+/***********************************************************************
+ *
+ * Handlers for VisSamp4ProcessClass
+ *
+ ***********************************************************************/
+
+/***********************************************************************
+ *		MSG_VIS_SAMP_SWITCH_CONTENTS for VisSamp4ProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	This message cycles the view's content object
+ *		between the VisSampContent, VisSampAlternateContent,
+ * 		and a null optr.     
+ * PARAMETERS:	
+ *	void()    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/26/92   	Initial Revision
+ *
+ ***********************************************************************/
+@method VisSamp4ProcessClass, MSG_VIS_SAMP_SWITCH_CONTENTS {
+    optr curContent;
+
+    /*
+     * Retrieve the optr of the current VisContent object
+     * communicating with this View object. You should use this
+     * message rather than retrieving the GVI_content instance data.
+     */
+    curContent = @call VisSamp4View::MSG_GEN_VIEW_GET_CONTENT();
+
+    if (curContent == @VisSampContent) {
+    	curContent = @VisSampAlternateContent;
+    } 
+    else { 
+	if (curContent == @VisSampAlternateContent) {
+    	    curContent = 0;
+  	}
+
+	/* 
+	 * There is no current content object, so set it to the
+	 * VisSampContent object. 
+	 */
+	else {
+    	    curContent = @VisSampContent;
+  	}
+    }
+
+    @send VisSamp4View::MSG_GEN_VIEW_SET_CONTENT(curContent);
+}
+
+/***********************************************************************
+ *
+ * Handlers for VisSampContentClass
+ *
+ ***********************************************************************/
+
+
+
+/***********************************************************************
+ *		MSG_VIS_OPEN for VisSampContentClass
+ ***********************************************************************
+ * SYNOPSIS:	This message creates a child below the VisContent
+ *		object when it first receives MSG_VIS_OPEN from the
+ *		system. This message opens graphics windows and
+ *		recurses down to bottom visual objects to let them
+ *		know they are becoming realized. 
+ * PARAMETERS:	    
+ * 	void(WindowHandle window)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/26/92   	Initial Revision
+ *
+ ***********************************************************************/
+@method VisSampContentClass, MSG_VIS_OPEN 
+{
+    /* Do default VisContentClass stuff */
+    @callsuper();  
+
+    /* Now, let's start by creating a child. */
+    @call self::MSG_VIS_SAMP_CONTENT_CREATE_CHILD();
+}
+
+
+/***********************************************************************
+ *		MSG_VIS_SAMP_CONTENT_CREATE_CHILD for VisSampContentClass
+ ***********************************************************************
+ * SYNOPSIS:	This message creates a child Vis object within a
+ *		VisSampContentClass object. The child added will be
+ *		created dynamically, with a visual moniker selected
+ *		based on its child position number below the
+ *		VisContent object. 
+ * PARAMETERS:
+ *	void()	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/26/92   	Initial Revision
+ *
+ ***********************************************************************/
+@method VisSampContentClass, MSG_VIS_SAMP_CONTENT_CREATE_CHILD 
+{
+    optr childOptr;
+    VisMonikerWithText *moniker;
+    ChunkHandle mkrChunk;
+    MemHandle ourBlock;
+    int childNum;
+
+    /* 
+     * Instantiate a new VisSampNumberClass object and keep its optr in
+     * childOptr.
+     */ 
+
+    ourBlock = OptrToHandle(oself);
+
+    childOptr = ConstructOptr(
+			ourBlock, 
+		  	ObjInstantiate(	OptrToHandle(oself), 
+					&VisSampNumberClass));
+
+    /* Set the new object drawable */
+
+    @call childOptr::MSG_VIS_SET_ATTRS(
+		VA_DRAWABLE, 0, VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* 
+     * Add the child to our visible tree, placing it after any other 
+     * children. 
+     */ 
+    @call self::MSG_VIS_ADD_CHILD(childOptr, CCO_LAST);
+
+    /* Set a size for the object. */
+    @call childOptr::MSG_VIS_SET_SIZE(80, 40);
+
+    /* 
+     * Set the object's window invalid. This will cause the object to
+     * be drawn during the next window update.
+     */
+    @call childOptr::MSG_VIS_MARK_INVALID
+		(VOF_WINDOW_INVALID, VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* Set ourselves invalid, so geometry gets calculated */
+    @call self::MSG_VIS_MARK_INVALID(
+		 VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID,
+		 VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* Retrieve the position number of the child. */
+    childNum = @call self::MSG_VIS_FIND_CHILD(childOptr);
+
+    /* Create a vis moniker for this object containing the number. */
+
+    /* 
+     * Allocate a chunk to hold the moniker and dereference the
+     * handles of that chunk.
+     */
+    mkrChunk = LMemAlloc(ourBlock, sizeof(VisMonikerWithText)+3);
+    moniker = LMemDerefHandles(ourBlock, mkrChunk);
+
+    /* 
+     * This moniker is not a gstring or a list; it's just a simple
+     * text string. We set the moniker type to 0.
+     */
+    moniker->VMWT_common.VM_type = 0;
+
+    /*
+     * Set the cached width of the moniker to zero so that it will be
+     * calculated by the system.
+     */
+    moniker->VMWT_common.VM_width = 0;
+
+    /* 
+     * We will not use a mnemonic. Set a mnemonic offset of -1 to
+     * signify this.
+     */ 
+    moniker-> VMWT_mnemonicOffset = -1;
+
+    if (childNum > 9) {
+	
+	/* 
+	 * Set the tens digit of the text moniker. We add the position
+	 * for an ASCII zero as an offset into the ASCII character
+	 * numeral set.
+	 */ 
+	((char *) moniker+VMWT_text)[0] = childNum/10 + '0';
+
+	/* Set the ones digit of the text moniker. */
+	((char *) moniker+VMWT_text)[1] = childNum%10 + '0';
+
+	/* Add a null-terminator. */
+	((char *) moniker+VMWT_text)[2] = '\0';
+    } 
+    else {
+
+	/* Set the ones digit. */
+	((char *) moniker+VMWT_text)[0] = childNum + '0';
+
+	/* Add a null-terminator. */
+	((char *) moniker+VMWT_text)[1] = '\0';
+    }
+  
+    /* Have our child use this moniker. */
+    @call childOptr::MSG_VIS_SAMP_NUMBER_SET_MONIKER(mkrChunk);
+}
+
+
+/***********************************************************************
+ *
+ * Handlers for VisSampNumberClass
+ *
+ ***********************************************************************/
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for VisSampNumberClass
+ ***********************************************************************
+ * SYNOPSIS:	This message draws each VisSampNumber object whenever
+ *		that object needs to be redrawn. 
+ *
+ * PARAMETERS:	
+ *	void(word drawFlags, GStateHandle gstate)
+ *    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * CAVEATS:	This method does not work in black & white systems.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/22/92		Initial Revision
+ *
+ ***********************************************************************/
+@method VisSampNumberClass, MSG_VIS_DRAW 
+{
+	VisMoniker *monikerPtr;
+	byte leftTopColor, rightBottomColor, fillColor;
+
+        GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(NUMBER_TEXT_HEIGHT));
+	GrSetTextColor (gstate, CF_INDEX, C_BLACK, 0, 0);
+
+	if (pself->VSNI_state & VSNS_SELECTED) {
+	  leftTopColor = C_BLACK;
+	  rightBottomColor = C_WHITE;
+	  fillColor = C_DARK_GREY;
+	} else {
+	  leftTopColor = C_WHITE;
+	  rightBottomColor = C_BLACK;
+	  fillColor = C_LIGHT_CYAN; 
+	}
+
+        GrSetAreaColor (gstate, CF_INDEX, fillColor, 0, 0);
+	GrFillRect (gstate, pself->VI_bounds.R_left,
+			   pself->VI_bounds.R_top,
+			   pself->VI_bounds.R_right-1,
+			   pself->VI_bounds.R_bottom-1);
+
+        /* Draw a rectangle, with a cute border around it. */
+        GrSetLineColor (gstate, CF_INDEX, leftTopColor, 0, 0);
+	GrDrawVLine (gstate, pself->VI_bounds.R_left,
+		             pself->VI_bounds.R_top,
+		             pself->VI_bounds.R_bottom-1);
+	GrDrawHLine (gstate, pself->VI_bounds.R_left,
+		             pself->VI_bounds.R_top,
+		             pself->VI_bounds.R_right-1);
+
+        GrSetLineColor (gstate, CF_INDEX, rightBottomColor, 0, 0);
+	GrDrawVLine (gstate, pself->VI_bounds.R_right-1,
+		             pself->VI_bounds.R_top,
+		             pself->VI_bounds.R_bottom-1);
+	GrDrawHLine (gstate, pself->VI_bounds.R_left+1,
+		             pself->VI_bounds.R_bottom-1,
+		             pself->VI_bounds.R_right-1);
+	GrDrawVLine (gstate, pself->VI_bounds.R_right-1,
+		             pself->VI_bounds.R_top+1,
+		             pself->VI_bounds.R_bottom-1);
+	GrDrawHLine (gstate, pself->VI_bounds.R_left+1,
+		             pself->VI_bounds.R_bottom-1,
+		             pself->VI_bounds.R_right-1);
+
+	/* 
+	 * Unfortunately, since we're using a non-system font, we have to
+	 * ignore hinted moniker width values generated by goc.
+	 *
+	 */
+	monikerPtr = LMemDerefHandles(OptrToHandle(oself),pself->VSNI_moniker);
+	if (monikerPtr->VM_width & VMCW_HINTED) {
+	    monikerPtr->VM_width = 0;
+	}
+
+	/* Draw the moniker center-justified. */
+
+	@call self::MSG_VIS_DRAW_MONIKER(
+	   (J_CENTER << DMF_Y_JUST_OFFSET) | (J_CENTER << DMF_X_JUST_OFFSET),
+	   pself->VSNI_moniker, 36, gstate, 0, 0, 0, 0);
+}
+
+
+/***********************************************************************
+ *				EnsureSelectedState
+ ***********************************************************************
+ * SYNOPSIS:	This routine checks whether a VisSampNumber object is
+ *		still currently selected; (the user has clicked and
+ *		held on the object).
+ *    
+ * CALLED BY:	Various message handlers for VisSampNumberClass
+ *		(MSG_META_START_SELECT, MSG_META_PTR, and
+ *		MSG_VIS_LOST_GADGET_EXCL)
+ *    
+ * RETURN:	-1		object is not selected 		
+ *		 0		object is selected    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/23/92		Initial Revision
+ *
+ ***********************************************************************/
+byte EnsureSelectedState(byte newState, byte *oldState) {
+    if (newState) {
+	if (!(*oldState & VSNS_SELECTED)) {
+      	    *oldState = *oldState | VSNS_SELECTED;
+      	    return (-1);
+    	} 
+	else {
+      	    return (0);
+    	}
+    } 
+    else {
+    	if (*oldState & VSNS_SELECTED) {
+      	    *oldState = *oldState & ~VSNS_SELECTED;
+      	    return (-1);
+    	} 
+	else {
+      	    return (0);
+	}
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for VisSampNumberClass
+ ***********************************************************************
+ * SYNOPSIS:	This message is sent to the VisSampNumber object
+ *		whenever the user initiates a select-click within its
+ *		visual bounds.     
+ * PARAMETERS:	
+ *	void (word xPosition, word yPosition, word inputState,
+ *					MouseReturnParams *retVal)
+ *    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/23/92		Initial Revision
+ *
+ ***********************************************************************/
+@method VisSampNumberClass, MSG_META_START_SELECT 
+{
+    pself->VSNI_state = pself->VSNI_state | VSNS_MOUSE_DOWN;
+
+    /* 
+     * Grab the mouse, and make sure we get pointer events. Also take
+     * the gadget exclusive. 
+     */
+    @call self::MSG_VIS_GRAB_MOUSE();
+    @call @visParent::MSG_VIS_TAKE_GADGET_EXCL(oself);
+
+    if (EnsureSelectedState(VSNS_SELECTED, &(pself->VSNI_state))) {
+    	@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+    }
+
+    /* 
+     * Say we handled this method, and we want to return to the
+     * default cursor in case someone else set a special cursor
+     * previously. 
+     */
+    retVal->flags = MRF_PROCESSED | MRF_CLEAR_POINTER_IMAGE;
+}
+
+
+/***********************************************************************
+ *		MSG_META_END_SELECT for VisSampNumberClass
+ ***********************************************************************
+ * SYNOPSIS:	This message is sent out when the user releases the
+ *		mouse from a previously selected VisSampNumberClass
+ *		object.     
+ * PARAMETERS:
+ *	void (word xPosition, word yPosition, word inputState,
+ *				MouseReturnParams *retVal)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/23/92		Initial Revision
+ *
+ ***********************************************************************/
+@method VisSampNumberClass, MSG_META_END_SELECT 
+{
+    /* 
+     * Release the gadget exclusive, which will cause a
+     * MSG_VIS_LOST_GADGET_EXCL to arrive at our object.
+     */
+    @call @visParent::MSG_VIS_RELEASE_GADGET_EXCL(oself);
+
+    /* 
+     * Say user has surrendered the mouse, and let some other object
+     * use the message if they want it.
+     */
+    retVal->flags = MRF_REPLAY;
+}
+
+
+/***********************************************************************
+ *		MSG_META_PTR for VisSampNumberClass
+ ***********************************************************************
+ * SYNOPSIS:	This message handles pointer events once the
+ *		VisSampNumber object has the mouse grab. This handler
+ *		determines if the mouse is still within the visible
+ *		bounds of the object or has roamed outside its bounds.
+ *     
+ * PARAMETERS:	
+ *	void (word xPosition, word yPosition, word inputState,
+ *					MouseReturnParams *retVal)
+ *    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/22/92		Initial Revision
+ *
+ ***********************************************************************/
+@method VisSampNumberClass, MSG_META_PTR 
+{
+    /* 
+     * If the user moves off the button, and it's currently selected,
+     * we'll deselect it.  If the user moves over the button, and it's
+     * currently not selected, we'll select it.
+     */
+    if (!(pself->VSNI_state & VSNS_MOUSE_DOWN)) {
+    	retVal->flags = MRF_REPLAY;
+    } 
+    else {
+    	if ((xPosition < pself->VI_bounds.R_left) ||
+      	    (xPosition > pself->VI_bounds.R_right) ||
+      	    (yPosition < pself->VI_bounds.R_top) ||
+      	    (yPosition > pself->VI_bounds.R_bottom)) {
+
+      	    /* Moved off of the button, make sure deselected */
+      	    if (EnsureSelectedState(0, &(pself->VSNI_state))) {
+        	@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+      	    }
+    
+    	} 
+	else {
+
+      	    /* Moved over button, make sure selected */
+      	    if (EnsureSelectedState(VSNS_SELECTED, &(pself->VSNI_state))) {
+        	@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+      	    }
+    	}
+   	/* 
+	 * Say we handled this method, and we want to return to the
+	 * default cursor in case someone else set a special cursor
+	 * previously. 
+	 */
+    	retVal->flags = MRF_PROCESSED | MRF_CLEAR_POINTER_IMAGE;
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_VIS_LOST_GADGET_EXCL for VisSampNumberClass
+ ***********************************************************************
+ * SYNOPSIS:	This message handles the case where the gadget
+ *		exclusive is removed from the object before its
+ *		release. This may be done by the specific UI in some
+ *		circumstances, and you should have a message handler
+ *		for those cases.
+ * 
+ * PARAMETERS:
+ *	void()	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/22/92		Initial Revision
+ *
+ ***********************************************************************/
+@method VisSampNumberClass, MSG_VIS_LOST_GADGET_EXCL {
+
+    if (pself->VSNI_state & VSNS_MOUSE_DOWN) {
+
+      	pself->VSNI_state = pself->VSNI_state & ~VSNS_MOUSE_DOWN;
+
+      	/* Release the mouse grab */
+      	@call self::MSG_VIS_RELEASE_MOUSE();
+
+      	if (EnsureSelectedState(0, &(pself->VSNI_state))) {
+	    /*
+             * Yes, the object was selected.  Let's redraw it and do
+	     * whatever our desired action should be.
+	     */
+            @call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+        }
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_VIS_SAMP_NUMBER_SET_MONIKER for VisSampNumberClass
+ ***********************************************************************
+ * SYNOPSIS:	This message ensures that a VisSampNumber object
+ *		redraws its moniker. We set the object to use the
+ *		passed moniker and mark the object invalid.   
+ * PARAMETERS:
+ *	void(ChunkHandle moniker)	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/26/92   	Initial Revision
+ *
+ ***********************************************************************/
+@method VisSampNumberClass, MSG_VIS_SAMP_NUMBER_SET_MONIKER {
+
+    /* 
+     * Set the object's visual moniker to the passed visual moniker.
+     */
+    pself->VSNI_moniker = moniker;
+
+    /* Mark teh object invalid so it gets redrawn. */
+    @call self::MSG_VIS_MARK_INVALID(
+		 VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID,
+		 VUM_DELAYED_VIA_APP_QUEUE);
+}
+
+
+/***********************************************************************
+ *		MSG_META_INITIALIZE for VisSampNumberClass
+ ***********************************************************************
+ * SYNOPSIS:	This message is sent out when the VisSampNumber object
+ *		is first being built out. We intercept it here so that
+ *		we can set the VA_FULLY_ENABLED bit.
+ *    
+ * PARAMETERS:
+ *	void()
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	For classes other than master classes, standard
+ *		procedure is to first call the superclass, then
+ *		perform any additional instance data initialization
+ *		necessary. 
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/26/92   	Initial Revision
+ *
+ ***********************************************************************/
+@method VisSampNumberClass, MSG_META_INITIALIZE {
+
+    /* Do normal VisClass initialization */
+    @callsuper();
+
+    /* 
+     * Set the VisAttributes to VA_FULLY_ENABLED, so the object will
+     * accept clicks. 
+     */ 
+    pself->VI_attrs |= VA_FULLY_ENABLED;
+}
+

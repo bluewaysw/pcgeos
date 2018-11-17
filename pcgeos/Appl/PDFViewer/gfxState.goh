@@ -1,0 +1,425 @@
+//========================================================================
+//
+// GfxState.h
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifndef GFXSTATE_H
+#define GFXSTATE_H
+
+#ifdef __GNUC__
+#pragma interface
+#endif
+
+@include "gtypes.goh"
+
+
+//------------------------------------------------------------------------
+// GfxColor
+//------------------------------------------------------------------------
+
+void GfxColorSetCMYK(GfxColor *this, short c, short m, short y, short k);
+void GfxColorSetGray(GfxColor *this, short gray);
+void GfxColorSetRGB(GfxColor *this, short r1, short g1, short b1);
+
+
+#if 0
+
+class GfxColor {
+public:
+
+  GfxColor(): r(0), g(0), b(0) {}
+
+  // Set color.
+  void setGray(double gray)
+    { r = g = b = gray; }
+  void setCMYK(double c, double m, double y, double k);
+  void setRGB(double r1, double g1, double b1)
+    { r = r1; g = g1; b = b1; }
+
+  // Accessors.
+  double getR() { return r; }
+  double getG() { return g; }
+  double getB() { return b; }
+  double getGray() { return 0.299 * r + 0.587 * g + 0.114 * b; }
+
+private:
+
+  double r, g, b;
+};
+
+#endif /* 0 */
+
+//------------------------------------------------------------------------
+// GfxColorSpace
+//------------------------------------------------------------------------
+
+void GfxColorSpaceInit(GfxColorSpace *this, Obj *colorSpace, XRef *xref);
+void GfxColorSpaceFree(GfxColorSpace *this);
+
+short GfxColorSpaceGetNumPixelComps(GfxColorSpace *this);
+
+#if 0
+
+enum GfxColorMode {
+  colorGray, colorCMYK, colorRGB
+};
+
+class GfxColorSpace {
+public:
+
+  // Construct a colorspace.
+  GfxColorSpace(Object *colorSpace);
+
+  // Construct a simple colorspace: DeviceGray, DeviceCMYK, or
+  // DeviceRGB.
+  GfxColorSpace(GfxColorMode mode1);
+
+  // Destructor.
+  ~GfxColorSpace();
+
+  // Copy.
+  GfxColorSpace *copy() { return new GfxColorSpace(this); }
+
+  // Is color space valid?
+  GBool isOk() { return ok; }
+
+  // Get the color mode.
+  GfxColorMode getMode() { return mode; }
+
+  // Get number of components in pixels of this colorspace.
+  int getNumPixelComps() { return indexed ? 1 : numComps; }
+
+  // Get number of components in colors of this colorspace.
+  int getNumColorComps() { return numComps; }
+
+  // Return true if colorspace is indexed.
+  GBool isIndexed() { return indexed; }
+
+  // Get lookup table (only for indexed colorspaces).
+  int getIndexHigh() { return indexHigh; }
+  Guchar *getLookupVal(int i) { return lookup[i]; }
+
+  // Convert a pixel to a color.
+  void getColor(double x[4], GfxColor *color);
+
+private:
+
+  Function *sepFunc;		// separation tint transform function
+  GfxColorMode mode;		// color mode
+  GBool indexed;		// set for indexed colorspaces
+  int numComps;			// number of components in colors
+  int indexHigh;		// max pixel for indexed colorspace
+  Guchar (*lookup)[4];		// lookup table (only for indexed
+				//   colorspaces)
+  GBool ok;			// is color space valid?
+
+  GfxColorSpace(GfxColorSpace *colorSpace);
+  void setMode(Object *colorSpace);
+};
+
+//------------------------------------------------------------------------
+// Function
+//------------------------------------------------------------------------
+
+class Function {
+public:
+
+  // Create a PDF function object.
+  Function(Object *funcObj);
+
+  ~Function();
+  
+  Function *copy() { return new Function(this); }
+
+  GBool isOk() { return ok; }
+
+  // Return size of input and output tuples.
+  int getInputSize() { return m; }
+  int getOutputSize() { return n; }
+
+  // Transform an input tuple into an output tuple.
+  void transform(double *in, double *out);
+
+private:
+
+  Function(Function *func);
+
+  int m, n;
+  double domain[1][2];
+  double range[4][2];
+  int sampleSize[1];
+  double encode[1][2];
+  double decode[4][2];
+  double *samples;
+  GBool ok;
+};
+
+#endif /* 0 */
+
+//------------------------------------------------------------------------
+// GfxImageColorMap
+//------------------------------------------------------------------------
+
+void GfxImageColorMapInit(GfxImageColorMap *this, short bits1, Obj *decode,
+				   GfxColorSpace *colorSpace1, XRef *xref);
+void GfxImageColorMapFree(GfxImageColorMap *this);
+
+short GfxImageColorMapGetNumPixelComps(GfxImageColorMap *this);
+short GfxImageColorMapGetBits(GfxImageColorMap *this);
+void GfxImageColorMapGetColor(GfxImageColorMap *this, Guchar x[4], GfxColor *color);
+
+
+#if 0
+
+class GfxImageColorMap {
+public:
+
+  // Constructor.
+  GfxImageColorMap(int bits1, Object *decode, GfxColorSpace *colorSpace1);
+
+  // Destructor.
+  ~GfxImageColorMap();
+
+  // Is color map valid?
+  GBool isOk() { return ok; }
+
+  // Get the color space.
+  GfxColorSpace *getColorSpace() { return colorSpace; }
+
+  // Get stream decoding info.
+  int getNumPixelComps() { return numComps; }
+  int getBits() { return bits; }
+
+  // Get decode table.
+  double getDecodeLow(int i) { return decodeLow[i]; }
+  double getDecodeHigh(int i) { return decodeLow[i] + decodeRange[i]; }
+
+  // Convert a pixel to a color.
+  void getColor(Guchar x[4], GfxColor *color);
+
+private:
+
+  GfxColorSpace *colorSpace;	// the image colorspace
+  int bits;			// bits per component
+  int numComps;			// number of components in a pixel
+  GBool indexed;		// set for indexed color space
+  GfxColorMode mode;		// color mode
+  double (*lookup)[4];		// lookup table
+  double decodeLow[4];		// minimum values for each component
+  double decodeRange[4];	// max - min value for each component
+  GBool ok;
+};
+
+//------------------------------------------------------------------------
+// GfxSubpath and GfxPath
+//------------------------------------------------------------------------
+
+class GfxSubpath {
+public:
+
+  // Constructor.
+  GfxSubpath(double x1, double y1);
+
+  // Destructor.
+  ~GfxSubpath();
+
+  // Copy.
+  GfxSubpath *copy() { return new GfxSubpath(this); }
+
+  // Get points.
+  int getNumPoints() { return n; }
+  double getX(int i) { return x[i]; }
+  double getY(int i) { return y[i]; }
+  GBool getCurve(int i) { return curve[i]; }
+
+  // Get last point.
+  double getLastX() { return x[n-1]; }
+  double getLastY() { return y[n-1]; }
+
+  // Add a line segment.
+  void lineTo(double x1, double y1);
+
+  // Add a Bezier curve.
+  void curveTo(double x1, double y1, double x2, double y2,
+	       double x3, double y3);
+
+  // Close the subpath.
+  void close()
+    { if (x[n-1] != x[0] || y[n-1] != y[0]) lineTo(x[0], y[0]); }
+
+private:
+
+  double *x, *y;		// points
+  GBool *curve;			// curve[i] => point i is a control point
+				//   for a Bezier curve
+  int n;			// number of points
+  int size;			// size of x/y arrays
+
+  GfxSubpath(GfxSubpath *subpath);
+};
+
+class GfxPath {
+public:
+
+  // Constructor.
+  GfxPath();
+
+  // Destructor.
+  ~GfxPath();
+
+  // Copy.
+  GfxPath *copy()
+    { return new GfxPath(justMoved, firstX, firstY, subpaths, n, size); }
+
+  // Is there a current point?
+  GBool isCurPt() { return n > 0 || justMoved; }
+
+  // Is the path non-empty, i.e., is there at least one segment?
+  GBool isPath() { return n > 0; }
+
+  // Get subpaths.
+  int getNumSubpaths() { return n; }
+  GfxSubpath *getSubpath(int i) { return subpaths[i]; }
+
+  // Get last point on last subpath.
+  double getLastX() { return subpaths[n-1]->getLastX(); }
+  double getLastY() { return subpaths[n-1]->getLastY(); }
+
+  // Move the current point.
+  void moveTo(double x, double y);
+
+  // Add a segment to the last subpath.
+  void lineTo(double x, double y);
+
+  // Add a Bezier curve to the last subpath
+  void curveTo(double x1, double y1, double x2, double y2,
+	       double x3, double y3);
+
+  // Close the last subpath.
+  void close() { subpaths[n-1]->close(); }
+
+private:
+
+  GBool justMoved;		// set if a new subpath was just started
+  double firstX, firstY;	// first point in new subpath
+  GfxSubpath **subpaths;	// subpaths
+  int n;			// number of subpaths
+  int size;			// size of subpaths array
+
+  GfxPath(GBool justMoved1, double firstX1, double firstY1,
+	  GfxSubpath **subpaths1, int n1, int size1);
+};
+
+#endif /* 0 */
+
+//------------------------------------------------------------------------
+// GfxState
+//------------------------------------------------------------------------
+
+
+  // Construct a default GfxState, for a device with resolution <dpi>,
+  // page box (<x1>,<y1>)-(<x2>,<y2>), page rotation <rotate>, and
+  // coordinate system specified by <upsideDown>.
+//  GfxState(int dpi, double px1a, double py1a, double px2a, double py2a,
+//	   int rotate, GBool upsideDown);
+
+extern
+void GfxStateInit(GfxState *state, Handle gstring);
+extern
+void GfxStateFree(GfxState *state);
+
+  // Copy.
+extern
+void GfxStateCopy(GfxState *dest, GfxState *state);
+extern
+void GfxStateSave(GfxState *state);
+extern
+void GfxStateRestore(GfxState *state);
+
+
+#if 0
+
+  void transform(double x1, double y1, double *x2, double *y2)
+    { *x2 = ctm[0] * x1 + ctm[2] * y1 + ctm[4];
+      *y2 = ctm[1] * x1 + ctm[3] * y1 + ctm[5]; }
+  void transformDelta(double x1, double y1, double *x2, double *y2)
+    { *x2 = ctm[0] * x1 + ctm[2] * y1;
+      *y2 = ctm[1] * x1 + ctm[3] * y1; }
+  double transformWidth(double w);
+  double getTransformedLineWidth()
+    { return transformWidth(lineWidth); }
+
+  double getTransformedFontSize();
+  void getFontTransMat(double *m11, double *m12, double *m21, double *m22);
+
+#endif /* 0 */
+
+  // Accessors.
+
+extern
+  GfxFont *GfxStateGetFont(GfxState *state);
+extern
+  gdouble GfxStateGetFontSize(GfxState *state);
+extern
+  gdouble *GfxStateGetTextMat(GfxState *state);
+extern
+  sdword GfxStateGetCharSpace(GfxState *state);
+extern
+  gdouble GfxStateGetWordSpace(GfxState *state);
+extern
+  sdword GfxStateGetHorizScaling(GfxState *state);
+extern
+  gdouble GfxStateGetLeading(GfxState *state);
+extern
+  sdword GfxStateGetRise(GfxState *state);
+extern
+  short GfxStateGetRender(GfxState *state);
+extern
+  gdouble GfxStateGetLineX(GfxState *state);
+extern
+  gdouble GfxStateGetLineY(GfxState *state);
+
+  // Transforms.
+extern
+  void textTransform(GfxState *state, gdouble x1, gdouble y1, gdouble *x2, gdouble *y2);
+extern
+  void textTransformDelta(GfxState *state, gdouble x1, gdouble y1, gdouble *x2, gdouble *y2);
+
+
+  // Change state parameters.
+extern
+void GfxStateSave(GfxState *state);
+extern
+void GfxStateRestore(GfxState *state);
+extern
+  void GfxStateSetFont(GfxState *state, GfxFont *font1, gdouble fontSize1);
+extern
+  void GfxStateSetTextMat(GfxState *state, gdouble a, gdouble b, gdouble c,
+		  gdouble d, gdouble e, gdouble f);
+extern
+  void GfxStateSetCharSpace(GfxState *state, gdouble space);
+extern
+  void GfxStateSetWordSpace(GfxState *state, gdouble space);
+extern
+  void GfxStateSetHorizScaling(GfxState *state, gdouble scale);
+extern
+  void GfxStateSetLeading(GfxState *state, gdouble leading1);
+extern
+  void GfxStateSetRise(GfxState *state, gdouble rise1);
+extern
+  void GfxStateSetRender(GfxState *state, short render1);
+
+  // Text position.
+extern
+  void GfxStateTextMoveTo(GfxState *state, gdouble tx, gdouble ty);
+extern
+void GfxStateTextShift(GfxState *state, gdouble tx);
+
+
+//  GBool hasSaves() { return saved != NULL; }
+
+
+#endif	/* gfxstate_h */

@@ -1,0 +1,645 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/**************************************************************************
+ *      Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <initfile.h>
+#include <fileEnum.h>
+#include <sysStats.h>
+#include <sem.h>
+
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <ansi\stdlib.h>
+#include <geomisc.h>
+
+@include <fixes.goh>
+@include "htmlview.goh"
+@ifdef COMPILE_OPTION_BOOKMARKS
+@include "bookmark.goh"
+@endif
+@ifdef COMPILE_OPTION_FAVORITES
+@include "favorite.goh"
+@endif
+@include "urlfetch.goh"
+@include "importg.goh"
+@include "expire.goh"
+@include "stattext.goh"
+
+@include <iapp.h>
+
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+@include <Objects/gSysC.goh>
+@extern object PCToggleOnDlg ;
+@extern object PCToggleOffDlg ;
+@extern object PCStatusLight ;
+@extern object PCStatusLightOnMoniker ;
+@extern object PCStatusLightOffMoniker ;
+@extern object PCToggleOff ;
+@extern object PCToggleOn ;
+@extern object PCToggle ;
+@extern object PCRoot ;
+@endif
+
+@ifdef COMPILE_OPTION_AUTO_BROWSE
+@extern object AutoBrowseOptions ;
+@endif
+
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+/* TRUE if we are using the progress indicator to show download status */
+extern Boolean G_progressStatus;
+@extern object ProgressIndicator ;
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+@extern object DownloadProgressDialog;
+@endif
+@endif
+
+
+@extern object CurrentURLText ;
+@extern object HTMLSettingsBoolGroup ;
+@extern object SimpleURLToolbar ;
+@extern object StatusBar ;
+@extern object HTMLVApp ;
+@extern object MsgBlank;
+@extern object HTMLVPrimary ;
+@extern object LinkStatus;
+@extern object StatusLineDone ;
+@extern object DocumentControl ;
+@extern object DownloadFileSel ;
+
+@ifdef COMPILE_OPTION_SEARCH_MENU
+@extern object Search1 ;
+@extern object Search2 ;
+@extern object Search3 ;
+@extern object Search4 ;
+@endif
+
+@ifdef DO_DBCS
+@extern object EncodingMenu;
+@extern object EncodingList;
+@extern object Encoding0;
+@extern object Encoding1;
+@extern object Encoding2;
+@extern object Encoding3;
+@extern object Encoding4;
+@extern object Encoding5;
+@endif
+
+@ifdef COMPILE_OPTION_FAVORITES
+@extern object FavoriteTriggerList ;
+@endif
+
+@ifdef CHECK_ISP
+extern Boolean CheckNoISP(void);
+@endif
+
+@ifdef REMOVE_RELOAD_ON_TV_CUI
+@extern object SimpleToolbarReload;
+@endif
+
+extern StatusTextID G_statusIds[];
+
+@ifdef COMPILE_OPTION_IGNORE_INPUT_DURING_LOADING
+/* allow ignore input during loading */
+extern Boolean G_ignoreInput = TRUE;
+@endif
+
+GeodeHandle G_Html4Par;
+
+@extern method HTMLVProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+     int i;
+@ifdef COMPILE_OPTION_SEARCH_MENU
+     TCHAR searchKey[20];
+     word searchSize;
+     optr searchItem[] = {@Search1, @Search2, @Search3, @Search4};
+@endif
+@ifdef COMPILE_OPTION_TOGGLE_BARS
+    word toggleBars;
+@endif
+@ifdef REMOVE_RELOAD_ON_TV_CUI
+    DisplayScheme ds;
+    DisplayAspectRatio dsr;
+@endif
+@ifdef DO_DBCS
+     TCHAR encodingKey[40];
+     DosCodePage cp = 0;
+     word nameSize;
+     optr encodingItem[] = {@Encoding0, @Encoding1, @Encoding2, @Encoding3, @Encoding4, @Encoding5};
+@endif
+
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+     /* build UI */
+     if ((@call application::MSG_GEN_FIND_CHILD(@DownloadProgressDialog)) == 0xffff) {
+	 @call application::MSG_GEN_ADD_CHILD(@DownloadProgressDialog, CCO_LAST);
+	 @call DownloadProgressDialog::MSG_GEN_SET_USABLE(VUM_NOW);
+     }
+@endif
+
+@ifdef COMPILE_OPTION_IGNORE_INPUT_DURING_LOADING
+     InitFileReadBoolean(HTMLVIEW_CATEGORY, "ignoreInput", &G_ignoreInput);
+@endif
+
+@ifndef GLOBAL_INTERNET_BUILD  /* always use Doc only -- brianc 10/21/99 */
+@ifndef PRODUCT_NDO2000
+    if(UserGetDefaultUILevel()!=UIIL_INTRODUCTORY)
+    {
+    @call DownloadFileSel::MSG_META_DELETE_VAR_DATA(ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT);
+    }
+@endif
+@else
+    /* limit CUI to Document, Archive and Floppy; AUI is anywhere under Doc */
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	FileSelectorFileCriteria fsfc;
+	FileSelectorAttrs fsa;
+	fsfc = @call DownloadFileSel::MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
+	fsa = @call DownloadFileSel::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+	@call DownloadFileSel::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+	    fsfc & ~FSFC_DIRS);
+	@call DownloadFileSel::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+	    fsa & ~(FSA_ALLOW_CHANGE_DIRS | FSA_HAS_CLOSE_DIR_BUTTON |
+		    FSA_HAS_OPEN_DIR_BUTTON | FSA_HAS_CHANGE_DIRECTORY_LIST));
+    }
+@endif
+
+@ifdef COMPILE_OPTION_TOGGLE_BARS
+     /* update bar states before calling superclass */
+     if (InitFileReadInteger(HTMLVIEW_CATEGORY,
+			     (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) ?
+			     "toggleBarsCUI" : "toggleBarsAUI",
+			     &toggleBars)) {
+	 /* not found in .ini file, set defaults, based on user level */
+	 if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	     /* CUI -- both off */
+	     toggleBars = 0;
+	 } else {
+	     /* AUI -- both on */
+	     toggleBars = TOGGLE_BARS_GOTO_ON | TOGGLE_BARS_STATUS_ON;
+	 }
+     }
+     UpdateToggleBars(toggleBars);
+@endif
+
+@ifdef REMOVE_RELOAD_ON_TV_CUI
+    /* before calling super */
+    @call application::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+    dsr = (ds.DS_displayType & DT_DISP_ASPECT_RATIO) >> DT_DISP_ASPECT_RATIO_OFFSET;
+    if (dsr == DAR_TV && UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	@send SimpleToolbarReload::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+@endif
+
+    /* before calling super */
+    G_Html4Par = GeodeFind("html4par", GEODE_NAME_SIZE, 0, 0);
+
+    @callsuper() ;
+
+    HWChecksumCheck() ;
+    /* Change the INI settings to what we think the defaults */
+    /* should be. */
+    EnsureINISettings(attachFlags) ;
+
+    /*
+     * History, cache file etc.
+     */
+    HWChecksumCheck() ;
+    InitNavigation();
+
+@ifdef COMPILE_OPTION_SEARCH_MENU
+     /* build search menu items (assumes at least one) */
+     for (i=0; i<4; i++) {
+@ifdef DO_DBCS
+	 sprintfsbcs((char *)searchKey, SEARCH_URL_TEMPLATE, i+1);
+@else
+	 sprintf(searchKey, SEARCH_URL_TEMPLATE, i+1);
+@endif
+	 if (InitFileReadStringBuffer(HTMLVIEW_CATEGORY, (char *)searchKey,
+				     searchKey, sizeof(searchKey)-1*sizeof(TCHAR),
+				     &searchSize)) {
+	     /* not found */
+	     @call searchItem[i]::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	 } else {
+	     /* found */
+	     @call searchItem[i]::MSG_GEN_SET_USABLE(VUM_NOW);
+	 }
+     }
+@endif
+
+@ifdef DO_DBCS
+     /* build encoding menu */
+     for (i = 0; i < 6; i++) {
+	 sprintfsbcs((char *)encodingKey, "cp-%d", i);
+	 if (InitFileReadInteger(HTMLVIEW_CATEGORY, (char *)encodingKey, &cp)) {
+	     /* not found */
+	     @call encodingItem[i]::MSG_GEN_ITEM_SET_IDENTIFIER(i);
+	     @call encodingItem[i]::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	 } else {
+	     /* found */
+	     @call encodingItem[i]::MSG_GEN_ITEM_SET_IDENTIFIER(cp);
+	     /* set name */
+	     sprintfsbcs((char *)encodingKey, "cp%uname", cp);
+	     if (InitFileReadStringBuffer(HTMLVIEW_CATEGORY, encodingKey,
+					  &encodingKey, sizeof(encodingKey),
+					  &nameSize)) {
+		 /* use generic name */
+		 sprintf(encodingKey, _TEXT("Code Page %d"), cp);
+	     }
+	     @call encodingItem[i]::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(encodingKey, VUM_NOW);
+	     @call encodingItem[i]::MSG_GEN_SET_USABLE(VUM_NOW);
+	 }
+     }
+     /* enable menu, if anything */
+     if (cp) {
+	 @call EncodingMenu::MSG_GEN_SET_USABLE(VUM_NOW);
+	 @call EncodingList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(G_codePage, 0);
+     } else {
+	 /* if nothing, remove menu */
+	 @call EncodingMenu::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+     }
+@endif
+
+@ifdef COMPILE_OPTION_BOOKMARKS
+    /* Start up the bookmarks access */
+    HWChecksumCheck() ;
+    BookmarksOpen() ;
+
+    /* Rebuild the bookmark menu */
+    HWChecksumCheck() ;
+    BookmarksBuildUIList(@BookmarkTriggerList) ;
+@endif
+
+@ifdef COMPILE_OPTION_FAVORITES
+    /* Start up the favorites access */
+    HWChecksumCheck() ;
+    FavoritesOpen() ;
+
+    /* Ensure the correct listing of bookmarks and the More... button */
+    /* correctly enabled/disabled. */
+    FDRebuildTriggerList(0) ;
+
+    /* Rebuild the favorites menu */
+    HWChecksumCheck() ;
+    FavoritesBuildUIList(@FavoriteTriggerList) ;
+@endif
+
+    /* Start the fetch engine */
+    HWChecksumCheck() ;
+    URLFetchEngineStart() ;
+
+    /* Start the import thread */
+    ImportThreadEngineStart() ;
+
+    @call LinkStatus::MSG_STATUS_TEXT_INITIALIZE() ;
+    /* lazarus fix */
+    for (i=0; i<HTML_STATUS_TYPE_UNKNOWN; i++) {
+	G_statusIds[i] = STATUS_TEXT_ID_BAD;
+    }
+    @CallStatusUpdateOptr(
+              @StatusLineDone,
+              HTML_STATUS_TYPE_DONE);
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+    @call process::MSG_HMLVP_LOCAL_PAGE_UPDATE();
+@endif
+
+    /*
+     * Cache - initialized after @callsuper() to make sure that
+     * user defined settings have been loaded.
+     */
+    InitCache();
+
+    /*
+     * Adapt UI to system configuration.
+     */
+    DisableInappropriateOptions();
+
+    /*
+     * Install token if not already there
+     */
+    @call HTMLVApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+     /* add to notification lists */
+     GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), 0),
+		MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_CHANGE);
+     GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), 0),
+		MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_WEBSITE_LIST_CHANGES);
+     G_pcAccess = ParentalControlGetAccessInfo();
+     /* if no access, ask for password */
+     if ((G_pcAccess & AF_WWWBROWSING) && !(G_pcAccess & AF_WWWLIMITED)) {
+	 G_startupPassword = TRUE;
+	 if (@call PCRoot::MSG_PC_CHECK_PASSWORD_DB(PC_WWW) == IC_OK) {
+	     /* allow one-time access */
+	     G_pcBypassed = TRUE;
+	 } else {
+	     @send, forceQueue HTMLVApp::MSG_META_QUIT();
+	 }
+	 G_startupPassword = FALSE;
+     }
+     /*
+      * display current PC status
+      */
+     PCIndicateStatus();
+     /* keep site file open until quit */
+     ParentalControlEnsureOpenData();
+@endif
+
+@if @COMPILE_OPTION_EXPIRE_ON
+    @call ExpireDialog::MSG_EXPIRE_DIALOG_CHECK_DATE(
+              @EXPIRE_DATE_MONTH,
+              @EXPIRE_DATE_DAY,
+              @EXPIRE_DATE_YEAR,
+              TRUE) ;
+@endif
+    HWChecksumCheck() ;
+}
+
+@extern method HTMLVProcessClass, MSG_GEN_PROCESS_TRANSITION_FROM_ENGINE_TO_APPLICATION_MODE
+{
+    @callsuper();
+    /* ensure we have a something */
+    /* this is only needed for the CUI, in the AUI, we'll get
+       MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG */
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY)
+	@send, forceQueue DocumentControl::MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC();
+}
+
+@extern method HTMLVApplicationClass, MSG_HMLVA_GET_LAUNCH_URL
+{
+    return (pself->HVAI_launchURL);
+}
+
+/***************************************************************************
+ *             Busy / Abort mangement in Application Class
+ ***************************************************************************/
+
+/* This code also implements deferring mechanisms for app::MSG_META_QUIT
+   resp. process::MSG_META_DETACH in case the system is busy downloading
+   a page when any of these messages arrives. The reason is that safe
+   termination of all threads can currently only be guaranteed in a "quiet"
+   state.
+   Eventually, this should be replaced by proper detach handlers sending
+   "ack" messages once they are done for the various asynchroneous threads.
+ */
+
+
+SemaphoreHandle connectionQuitSem = NullHandle;
+
+@extern method HTMLVApplicationClass, MSG_META_QUIT
+{
+    if(pself->HVAI_operationLevel)      /* still active loading a page? */
+    {
+      pself->HVAI_doomed = TRUE;        /* defer quitting */
+      @AbortOperation(FALSE, FALSE, 0);
+      @call self::MSG_GEN_APPLICATION_IGNORE_INPUT();
+      @call self::MSG_GEN_APPLICATION_MARK_BUSY();
+                                        /* abort operation, prevent new one */
+    }
+    else
+    {
+	/* don't let ourselves quit until our open-connection thread is done */
+	if (connectionQuitSem) {
+	    ThreadPSem(connectionQuitSem);
+	    ThreadFreeSem(connectionQuitSem);
+	    connectionQuitSem = NullHandle;
+	}
+	@callsuper();
+    }
+}
+
+/*
+   Note that we declare a PROCESS message here, but because of its similarity
+   to the other stuff we keep it around...
+ */
+@extern method HTMLVProcessClass, MSG_META_DETACH
+{
+    /* Ask application if we may detach now, possibly earmark for
+       later detaching... */
+    if(@call HTMLVApp::MSG_HMLVA_REQUEST_DETACH(callerID, caller))  {
+        @callsuper();
+    }
+}
+
+@extern method HTMLVProcessClass, MSG_HMLVP_OPEN_URL
+{
+    InternetAppBlock *urlDataP;
+    NameToken url;
+    EventHandle evt;
+
+    urlDataP = MemLock(urlData);
+    if (urlDataP && urlDataP->IAB_type == IADT_URL) {
+        url = NamePoolTokenize(namePool, (TCHAR *)&(urlDataP[1]), TRUE);
+        @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR((TCHAR*)&(urlDataP[1]), 0);
+        evt = @record URLDocumentClass::MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
+        @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+    }
+    MemFree(urlData);
+}
+
+MemHandle lazarusURL = 0;
+
+@extern method HTMLVApplicationClass, MSG_META_IACP_NEW_CONNECTION
+{
+ AppLaunchBlock *albP;
+ MemHandle extraData = NullHandle;
+ InternetAppBlock *urlDataP;
+ TCHAR urlBuf[PATH_BUFFER_SIZE], *urlBufP;
+ TCHAR curType[URL_MAX_TYPE];
+ TCHAR nullString[] = {_TEXT("")};
+ InternetAppDataType iadt;
+ Boolean newLaunch = FALSE;
+ Boolean noISP = FALSE;
+ ApplicationStates states;
+
+
+	states = @call self::MSG_GEN_APPLICATION_GET_STATE();
+	newLaunch = states & AS_ATTACHING;
+	noISP = CheckNoISP();
+	urlBuf[0] = C_NULL;
+	curType[0] = C_NULL;
+	albP = MemLock(appLaunchBlock);
+	if (albP) {
+		if (*(albP->ALB_dataFile)) {
+			urlBufP = urlBuf;
+			FileConstructFullPath(&urlBufP, PATH_BUFFER_SIZE, albP->ALB_diskHandle,
+				  albP->ALB_path, TRUE);
+			strcat(urlBuf, _TEXT("\\"));
+			strcat(urlBuf, albP->ALB_dataFile);
+			if (*urlBuf)
+				ToolsResolveRelativeURL(urlBuf, nullString);
+			}
+		extraData = albP->ALB_extraData;
+		MemUnlock(appLaunchBlock);
+		}
+
+	/* OK - we're gonna do a hack here.  The app crashes when the user dbl
+	 * clicks an HTM file (or selects it from the Express Doc menu) if the app
+	 * is already running.  To avoid this situation, if the app is already
+	 * running AND we have a datafile in the alb, we'll just pass the file's
+	 * path to the entry window and return - jfh 10/15/02  */
+	if ((!newLaunch) && (*urlBuf))  {
+		@call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(urlBuf, 0);
+		/* and send the text apply message simulating the user pressing Enter */
+		@send process::MSG_HMLVP_URL_CHANGED(GTSF_MODIFIED);
+      return;
+		}
+
+	@callsuper();
+	/* Only send OPEN_URL if the application is attaching or not quitting.
+		(Both flags are set during attach, but only the latter during quit.)
+		If the app was detaching, this IACP may force it to reattach, but the
+		headache of figuring out how to synchronize the OPEN_URL with the
+		OPEN_APPLICATION is not worth the effort. -dhunter 3/18/2000 */
+	if ((states & AS_ATTACHING) || !(states & AS_QUITTING))  {
+		if (extraData) {
+			urlDataP = MemLock(extraData);
+			iadt = urlDataP->IAB_type;
+			if (iadt == IADT_URL) {
+				strcpy(urlBuf, (TCHAR *)&urlDataP[1]);
+				if (*urlBuf) {
+					ToolsResolveRelativeURL(urlBuf, nullString);
+					}
+				}
+			MemUnlock(extraData);
+			if (iadt == IADT_URL) {
+				if (newLaunch) {
+					/* if newly launched, set launching flag so we don't
+						open home URL */
+					pself->HVAI_launchURL = TRUE;
+@ifdef CHECK_ISP
+					/* if newly launched, check ISP if not FILE URL */
+					ToolsParseURL(urlBuf, curType, NULL, NULL);
+					if (strcmp(curType, _TEXT("FILE")) != 0 && noISP) {
+						EventHandle evt;
+						/* no ISP info, let dialer report error, then we'll
+							exit ourselves */
+						connectionQuitSem = ThreadAllocSem(0);
+						OpenConnection(connectionQuitSem);
+						evt = @record HTMLVApp::MSG_META_QUIT();
+						@send, forceQueue HTMLVApp::MSG_META_OBJ_FLUSH_INPUT_QUEUE(
+								 evt, OFIQNS_SYSTEM_INPUT_OBJ, OptrToHandle(@HTMLVApp));
+						/* extra data not needed anymore */
+						MemFree(extraData);
+						return;
+						}
+@endif
+					}  /* end of newLaunch if */
+				/* if no problem, open URL */
+				@send, forceQueue process::MSG_HMLVP_OPEN_URL(extraData);
+				}  /* end od URL if */
+			else {
+				/* extraData not needed anymore */
+				MemFree(extraData);
+				}
+			}  /* end of extraData if */
+
+		/* if startup and not passed any file or URL to open, get home URL */
+		if (newLaunch && (*urlBuf == C_NULL)) {
+			word size;
+			/* read .ini ourselves since UI has started up yet */
+			InitFileReadStringBuffer("HTMLView", "home", urlBuf, sizeof(urlBuf),
+					  &size);
+			if (*urlBuf)
+				ToolsResolveRelativeURL(urlBuf, nullString);
+			}
+
+		/* if have URL, do stuff with it */
+		if (*urlBuf) {
+			Boolean isFile = FALSE;
+			ToolsParseURL(urlBuf, curType, NULL, NULL);
+			isFile = (strcmp(curType, _TEXT("FILE")) == 0);
+			/* if FILE or have ISP, update URL */
+			if (isFile || !noISP)
+				@call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(urlBuf, 0);
+			/* if not FILE and have ISP, open connection right away */
+@ifdef CACHE_ALL
+			if (!isFile && !noISP && !G_cacheAll)
+				OpenConnection(NullHandle);
+@else
+			if (!isFile && !noISP)
+				OpenConnection(NullHandle);
+@endif
+			}
+		}  /* end of AS_ATTATCHING if */
+
+	else if (states & AS_QUITTING) {
+		/* if quitting, just save URL for upcoming lazarus (URL used in
+			MSG_GEN_DOCUMENT_PHYSICAL_CREATE) */
+		if (extraData) {
+			urlDataP = MemLock(extraData);
+			if (urlDataP->IAB_type == IADT_URL) {
+				strcpy(urlBuf, (TCHAR *)&urlDataP[1]);
+				if (*urlBuf) {
+					ToolsResolveRelativeURL(urlBuf, nullString);
+					}
+				}
+			MemUnlock(extraData);
+			}
+		if (*urlBuf) {
+			if (lazarusURL) MemFree(lazarusURL);
+			lazarusURL = MemAlloc(PATH_BUFFER_SIZE, HF_DYNAMIC, HAF_STANDARD);
+			if (lazarusURL) {
+				strcpy(MemLock(lazarusURL), urlBuf);
+				MemUnlock(lazarusURL);
+				}
+			}
+		}  /* end of AS_QUITTING else */
+}
+
+@extern method HTMLVProcessClass, MSG_PROCESS_CREATE_UI_THREAD
+{
+    /* When creating the UI thread, make it bigger than the default */
+    /* so we definitely had enough space.  This is to counter a */
+    /* Out of stack space error that occured in the past */
+    stackSize = INTERFACE_THREAD_DEF_STACK_SIZE + 2000;
+    return @callsuper() ;
+}
+
+
+@ifdef EMAIL_ACCT_CMD
+
+/* if we don't get the exit notification before we exit, we'll just dump
+   this on exit */
+extern MemHandle G_pendingEmailDelete;
+extern void EmailAccountError(MailAccountError mae);
+
+@extern method HTMLVProcessClass, MSG_NOTIFY_APP_EXITED
+{
+    PendingEmailDeleteAcctData *deleteData;
+    MailAccountError mae;
+
+    if (G_pendingEmailDelete) {
+	deleteData = MemLock(G_pendingEmailDelete);
+	if (appExited == deleteData->geode) {
+	    mae = MailDeleteAccountWithPassword(deleteData->acctname,
+						deleteData->password);
+	    if (mae != MAE_NO_ERROR) {
+		EmailAccountError(mae);
+	    }
+	    MemFree(G_pendingEmailDelete);
+	    G_pendingEmailDelete = 0;
+	    GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
+			  MANUFACTURER_ID_GEOWORKS, GCNSLT_APPLICATION);
+	} else {
+	    MemUnlock(G_pendingEmailDelete);
+	}
+    }
+}
+
+@endif
+
+

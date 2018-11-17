@@ -1,0 +1,222 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		InkSupport
+
+DESCRIPTION:	This document describes the ink support built into PC/GEOS
+AUTHOR:		Andrew Wilson
+
+	$Id: InkSupport.doc,v 1.2.34.1 97/03/29 03:36:49 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+Synopsis
+--------
+
+There is a flag in the .ini file that tells the system whether or not it
+is pen based or not (applications should call SysGetPenMode() to check
+this flag).
+
+Ink/pen input is supported under PC/GEOS at a few levels. At the lowest level,
+individual vis objects can receive ink data (in much the same manner that
+they receive mouse data now), and the UI will collect it and send it off to
+them. There is some default functionality built into the VisText object to
+accept ink/pen input, and transform it into characters (via a HandWriting
+Recognition engine) that it can display.
+
+For applications that just want to collect raw ink data, there is a "pen"
+library that handles this two ways: It exports an ink object (subclassed
+from VisClass) that accepts/displays raw pen input and has hooks to save
+a compacted form of this data to DB items. The pen library also creates
+exports a "note" object, that provides all the tools and UI the user needs to
+input and save both text and pen input.
+
+
+How Ink flows through the system
+--------------------------------
+
+If PC/GEOS is running on a pen based system, mouse input is handled somewhat
+differently. The UI calls ImStartPenMode() - this causes the IM to load in a
+special pen code module, and to install an input monitor (at level ML_INK) to
+begin intercepting mouse events.
+
+When the user presses the pen to the screen, the input manager sends the
+associated MSG_META_BUTTON off to the UI's flow object. It also begins storing
+up the associated mouse events. The flow object determines if the press
+should be processed as ink or not (see "Determining if presses are ink"
+below), and passes this information off to ImInkReply(). If the press was not
+supposed to be ink, it treats the MSG_META_BUTTON as a normal mouse event. If the
+press *was* supposed to be ink, the flow object begins eating all mouse events
+until the input manager sends a MSG_META_NOTIFY_WITH_DATA_BLOCK with NSNT_INK to it.
+
+NOTE: This means that ink input is *not* passed on to the application as
+      mouse input - it is as if those mouse events never happened. 
+
+When the input manager is told that a press is ink, it begins collecting
+and drawing the user's mouse input until the user takes the mouse off the
+screen for a user-settable timeout period. It then sends all the ink off
+to the flow object via the input monitor chain using MSG_META_NOTIFY_WITH_DATA_BLOCK
+with a NSNT_INK ID. It may also generate expose events for some portions of
+the screen.
+
+NOTE: Geodes can intercept this ink data by inserting an input monitor beyond
+      the ML_INK level. If they don't want to pass the ink off, they can
+      free up the ink data block passed in BP, and pass 0 in its place.
+
+Determining if presses are ink
+------------------------------
+
+NOTE: Keep in mind that if your user-defined object does *not* want to
+      have any special ink support, you need do nothing - there is default
+      behavior built in to all the objects to handle ink methods.
+
+When the flow object receives a MSG_META_BUTTON that it believes should be
+interpreted as ink, it begins holding up input, adds the message to the
+hold-up-input queue, and sends a MSG_META_QUERY_IF_PRESS_IS_INK to whatever
+application the press is in. Depending upon various things (such as
+whether or not the application has the focus or not), the application may
+either decide that the press is definitely not ink, or it may choose to
+query the child under the press (usually the latter).
+
+If the application wants to query the children, it sends a
+MSG_META_QUERY_IF_PRESS_IS_INK to the children via the same mechanism that
+mouse events are sent. If an application's vis object wants presses on it
+to be turned into ink, it needs to subclass this method and return
+IRV_DESIRES_INK. If the vis object lies under a content running under the
+large document model, there is an analogous MSG_META_LARGE_QUERY_IF_PRESS_IS_INK
+whose return values are the same. The other exception is in the case where
+there is a GenView whose output is a process - in this case, the method
+handler should *not* return a value, but should instead send their reply
+to the application object using MSG_GEN_APP_INK_QUERY_REPLY.
+
+NOTE: If you have objects running under a VisContent connected to a View,
+      you should read the "Ink under a GenView" section below.
+
+Once the user has finished drawing ink, we need to determine which object
+should get the ink (it may not necessarily be the same object that the
+initial press is on). This is done via a method
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK. If your object wants to receive
+ink methods (MSG_META_NOTIFY_WITH_DATA_BLOCK with NSNT_INK), you should
+subclass this method to return that your object handles ink:
+
+
+(From visC.def):
+
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK	method	private
+;
+; If an object wants to receive ink methods, it needs to do the following:
+;
+; 1) Subclass this method.
+; 2) In the method handler, compare the data3 value in the passed stack frame
+;    with the top of the object.
+; 3) If the upper bound of the object is < the data3 value in the stack
+;    frame (or the value in data1 is 0), then the object should return its
+;    upper bound in VCCIBF_data3, and its OD in data1:data2.
+;
+;    Else, it should return cx,dx and the stack frame unmolested.	
+; 
+;
+;    A default handler that performs the above steps is provided:
+;	VisObjectHandlesInkReply(). If your object always wants ink, you can
+;	just add a line like this after your class declaration:
+;
+;	method VisObjectHandlesInkReply, YourClassNameHere,
+;					MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK
+;
+
+Ink under a GenView
+-------------------
+If your objects will be running in a VisContent attached to a GenView (or
+will have a process set as the output of the GenView), then you need to
+set flags on the GenView object to let it know that you want ink. There are
+4 GenViewInkTypes that you can choose from:
+
+GVIT_PRESSES_ARE_NOT_INK	- the default: the objects running under the
+				  view do not want ink
+
+GVIT_PRESSES_ARE_INK		- objects running under the view desire
+				  ink always
+
+GVIT_INK_WITH_STANDARD_OVERRIDE - objects running under the view want ink,
+				  but the user can force mouse events instead
+				  (see "Extensions and special cases" below)
+
+GVIT_QUERY_OUTPUT		- The output of the view only wants presses
+				  in the bounds of the view to be ink under
+				  certain conditions: MSG_META_QUERY_IF_PRESS_IS_INK
+				  is sent to the output.
+
+
+NOTE: If you set GVIT_QUERY_OUTPUT, you can get MSG_META_NOTIFY_WITH_DATA_BLOCK
+      with NSNT_INK without receiving a MSG_META_QUERY_IF_PRESS_IS_INK first, 
+      received, if the user starts drawing just outside of the view, but
+      then draws inside the view.
+
+The format of the Ink data
+---------------------------
+
+The format of the ink data is fairly straightforward:
+
+NSNT_INK			enum NotifyStandardNotificationTypes
+					; Data block holds InkHeader<>
+;
+;	This is a type sent out with the data it has collected as ink.
+;
+;	Pass: BP - handle of ink data (series of points)
+;		   if BP=0, we couldn't allocate memory to hold all the points,
+;		   or the MSG_INK was intercepted by an InputMonitor.
+;
+;		  NOTE: If a monitor intercepts MSG_INK, it must still pass it
+;			on, but may pass on BP=0 if it wants to consume the
+;			ink data itself.
+;
+;		   Format of data:
+;
+;			InkHeader <>
+;			Point<>
+;			Point<>
+;			  .		;The high bit of the x coord is set
+;			  .		; to denote the end of a line segment.
+;			  .
+;
+;	The points are all in screen coordinates
+;
+
+InkHeader	struct
+	IH_meta		NotificationDataBlockHeader<>
+
+	IH_count	word
+	; The # ink points collected
+	;
+
+	IH_bounds	Rectangle
+	; The bounds of the ink on the screen.
+	;
+
+	IH_data		label	Point
+InkHeader	ends
+
+The ink and the ink bounds are in screen coordinates - objects may want to
+convert them into their own coordinate system using WinUntransform.
+
+Extensions and special cases (the text object)
+----------------------------------------------
+
+There are some objects that want to accept both ink input and mouse input at
+the user's discretion - one of these is the text object, which needs to be able
+to accept both ink input for handwriting recognition, and mouse input for
+cursor movement and text selection. To this end, we have added a standard way
+for the user to override the default ink behavior and force mouse events in
+objects that desire this (quick clicks in objects are interpreted as
+mouse events, and click-and-holds are also interpreted as mouse events ; if
+the user clicks and drags, it is ink). To have this behavior in your object,
+return IRV_INK_WITH_STANDARD_OVERRIDE in your MSG_META_QUERY_IF_PRESS_IS_INK
+handler, or set GVIT_INK_WITH_STANDARD_OVERRIDE on the GenView object if your
+object is running under a view. If you have GVIT_QUERY_OUTPUT set on your
+GenView object, you can still return IRV_INK_WITH_STANDARD_OVERRIDE to the
+MSG_META_QUERY_IF_PRESS_IS_INK. If you are using this override, it is a
+good idea to change the cursor when you receive a MSG_META_START_SELECT so there
+is some feedback to the user when the ink override has been acknowledged.

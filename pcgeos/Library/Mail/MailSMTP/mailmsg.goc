@@ -1,0 +1,1321 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1998.  All rights reserved.
+	GLOBALPC CONFIDENTIAL
+
+PROJECT:	Email Application
+MODULE:		
+FILE:		message.goc
+
+AUTHOR:		Ian Porteous, Nov 10, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+        Name	        Date		Description
+	----	        ----		-----------
+	porteous	11/10/98   	Initial version.
+
+DESCRIPTION:
+
+	
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <mailhub.goh>
+@include <mailsmtp.goh>
+@include <socket.goh>
+#include <chunkarr.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <resource.h>
+
+@include "mailfatals.goh"
+
+
+/*
+ * Message headers, don't bother putting this in a string resource as we
+ * are porting this. The define lengths are here so we speed things up
+ * instead of using strlen, yikes!!
+ */
+#define       HDR_MIME_VERSION_LEN 17
+static char   HDR_MIME_VERSION[] = "MIME-Version: 1.0";
+
+#define       HDR_CONTENT_TYPE_TEXT_PLAIN_LEN 44
+static char   HDR_CONTENT_TYPE_TEXT_PLAIN[] = \
+    "Content-Type: text/plain; charset=iso-8859-1";
+
+#define       HDR_CONTENT_TYPE_APPLICATION_OCTET_STREAM_LEN 46
+static char   HDR_CONTENT_TYPE_APPLICATION_OCTET_STREAM[] = \
+    "Content-Type: application/octet-stream; name=\"";
+
+#define       HDR_CONTENT_TYPE_MULTIPART_MIXED_LEN 41
+static char   HDR_CONTENT_TYPE_MULTIPART_MIXED[] = \
+    "Content-Type: multipart/mixed; boundary=\"";
+
+#define       HDR_CONTENT_TRANSFER_ENCODING_LEN 27
+static char   HDR_CONTENT_TRANSFER_ENCODING[] = \
+    "Content-Transfer-Encoding: ";
+
+
+
+
+/***********************************************************************
+ *		UpdateProgressAttachment
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Update the progress
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	2/24/99   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean _pascal
+UpdateProgressAttachment (MailMessage *msg, char *attachmentName, dword *updateTime)
+{
+    int percent;
+    Boolean stop = FALSE;
+    dword now = TimerGetCount();
+
+    if (msg->MM_progressRoutine) {
+	percent = ((msg->MM_size - msg->MM_remainingSize) * 100) / 
+	    msg->MM_size;
+	if (percent == 100 || updateTime == 0 ||
+	    (now - (*updateTime) > 60L)) {
+	if (updateTime) *updateTime = now;
+	ProcCallFixedOrMovable_pascal(MakeWWFixed(percent), attachmentName, 
+				      &stop, msg->MM_progressRoutine);
+	}
+    }
+    return stop;
+}	/* End of UpdateProgressAttachment.	*/
+
+/***********************************************************************
+ *		MSMTPSendHeader
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Send from the beginning of the message to the beginning
+ *              of the message body.  Not including the empty line that
+ *              terminates the header.
+ * CALLED BY:	
+ * RETURN:	
+ *              
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	
+ *	
+ ***********************************************************************/
+
+#define SEND_HEADER_MAX_LEN 19
+#define SEND_HEADER_BUFFER_SIZE 24
+
+int _pascal
+MSMTPSendHeader (OUTBOX boxHandle, MailMessage *msg)
+{
+    Socket sock;
+    char *srcBuffer,destBuffer[SEND_HEADER_BUFFER_SIZE];
+    Boolean loop = TRUE, lineStart = TRUE, skipLine = FALSE;
+    int i, len = 0;
+    SocketError ret;
+    OutboxStruct *box;
+    TCHAR *attachStr;
+
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    srcBuffer = MemLock(msg->MM_header);
+    while (loop) {
+	for (i = 0; i < SEND_HEADER_MAX_LEN; ) {
+	    /*
+	     * don't send the X-Mail-Tools-Attachment header
+	     */
+	    if (lineStart) {
+		attachStr = MailLockStdString(MSS_ATTACH_FIELD_NAME);
+		if (!LocalCmpStringsNoCase(srcBuffer+len, attachStr, strlen(attachStr))) {
+		    skipLine = TRUE;
+		}
+		MailUnlockStdString(MSS_ATTACH_FIELD_NAME);
+	    }
+	    if ((srcBuffer[len] == 0) ||
+		((srcBuffer[len] == CR) && (srcBuffer[len+1] == CR)) ) {
+		if (!skipLine) {
+		    destBuffer[i] = CR;
+		    destBuffer[i+1] = LF;
+		    i += 2;
+		}
+		loop = FALSE;
+		break;
+	    } else if (srcBuffer[len] == CR) {
+		if (!skipLine) {
+		    destBuffer[i] = CR;
+		    destBuffer[i+1] = LF;
+		    i += 2;
+		}
+		len++;
+		lineStart = TRUE;
+		skipLine = FALSE;
+	    } else {
+		if (!skipLine) {
+		    destBuffer[i] = srcBuffer[len];
+		    i++;
+		}
+		len++;
+		lineStart = FALSE;
+	    }
+	}
+	ret = SocketSend(sock, destBuffer, i, 0, 0);
+	if (ret != SE_NORMAL) {
+	    len = 0;
+	    break;
+	}
+    }
+
+    MemUnlock(msg->MM_header);
+    return len;
+    
+}
+
+
+/***********************************************************************
+ *		DetermineContentType
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Add the content type that should be used for this file
+ *              to the buffer.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/15/98   	Initial Revision
+ *
+ ***********************************************************************/
+void
+DetermineContentType (char *destBuffer, char *fileName)
+{
+    /* in the future, might need to do something intelligent with the 
+     * file to determine the content type
+     */
+    strcpy(destBuffer, "application/octet-stream");    
+}	/* End of DetermineContentType.	*/
+
+
+
+/***********************************************************************
+ *		PutContentType
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/10/98   	Initial Revision
+ *
+ ***********************************************************************/
+SocketError
+PutContentType (OUTBOX boxHandle, MailMessage *msg, MemHandle value, 
+		int contentType )
+{
+    char *p;
+    Socket sock;
+    SocketError ret;
+    char contentName[CONTENT_TYPE_NAME_BUFFER];
+    OutboxStruct *box;
+
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    if (contentType == CONTENT_TYPE_TEXT_PLAIN) {
+	SocketSend(sock, (byte *)HDR_CONTENT_TYPE_TEXT_PLAIN,
+		   HDR_CONTENT_TYPE_TEXT_PLAIN_LEN, 0,
+		    0);
+
+	if (value) {
+	    SocketSend(sock, (byte *)"; name=\"", 8, 0,
+		        0);
+	    p = (char *) MemLock(value);
+	    SocketSend(sock, (byte *)p, strlen(p), 0, 0);
+	    MemUnlock(value);
+
+	    ret = SocketSend(sock, (byte *)QUOTECRLF, QUOTECRLF_LEN, 0,
+			     0);
+	    return ret;
+	} else {
+	    ret = SocketSend(sock, (byte *)CRLF, 2, 0, 0);
+	    return ret;
+	}
+
+    } else if (contentType == CONTENT_TYPE_APPLICATION_OCTET_STREAM) {
+	SocketSend(sock, (byte *)HDR_CONTENT_TYPE_APPLICATION_OCTET_STREAM,
+		   HDR_CONTENT_TYPE_APPLICATION_OCTET_STREAM_LEN, 0,
+		   0);
+
+	if (value) {
+	    p = (char *) MemLock(value);
+	    SocketSend(sock, (byte *)p, strlen(p), 0, 0);
+	    MemUnlock(value);
+	}
+
+	ret = SocketSend(sock, (byte *)QUOTECRLF, QUOTECRLF_LEN, 0,
+			 0);
+	return ret;
+
+    } else if (contentType == CONTENT_TYPE_MULTIPART_MIXED) {
+	SocketSend(sock, (byte *)HDR_CONTENT_TYPE_MULTIPART_MIXED,
+		 HDR_CONTENT_TYPE_MULTIPART_MIXED_LEN, 0,
+		   0);
+	
+	p = (char *) MemLock(value);
+	SocketSend(sock, (byte *)p, strlen(p), 0, 0);
+	MemUnlock(value);
+	
+	ret = SocketSend(sock, (byte *)QUOTECRLF, QUOTECRLF_LEN, 0, 0);
+	return ret;
+
+    } else {
+	ret = SocketSend(sock, (byte *)"Content-Type: ", 14, 0, 0);
+	if (value) {
+	    p = (char *) MemLock(value);
+	    /* use the filename to guess the content type */
+	    DetermineContentType(contentName, p);
+	    ret = SocketSend(sock, contentName, strlen(contentName), 0, 0);
+	    ret = SocketSend(sock, "; name=\"", 8, 0, 0);
+
+	    SocketSend(sock, (byte *)p, strlen(p), 0, 0);
+	    MemUnlock(value);
+	}
+	  
+	ret = SocketSend(sock, (byte *)QUOTECRLF, QUOTECRLF_LEN, 0, 0);
+	return ret;
+    }
+
+
+    
+}	/* End of PutContentType.	*/
+
+
+/***********************************************************************
+ *		PutTransferEncoding
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/10/98   	Initial Revision
+ *
+ ***********************************************************************/
+SocketError
+PutTransferEncoding (OUTBOX boxHandle, MailMessage *msg, SMTPEncodingType encode)
+{
+    Socket sock;
+    SocketError ret;
+    OutboxStruct *box;
+
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    SocketSend(sock, (byte *)HDR_CONTENT_TRANSFER_ENCODING,
+	     HDR_CONTENT_TRANSFER_ENCODING_LEN, 0, 0);
+
+    switch (encode) {
+    case ENCODE_QUOTED_PRINTABLE:
+	SocketSend(sock, (byte *)"quoted-printable", 16, 0, 0);
+	break;
+
+    case ENCODE_BASE64:
+	SocketSend(sock, (byte *)"base64", 6, 0, 0);
+	break;
+
+    default:
+	EC_ERROR(MSMTP_ENCODING_TYPE_NOT_HANDLED);
+	return SE_INTERNAL_ERROR;
+    }
+
+    ret= SocketSend(sock, (byte *)CRLF, 2, 0 , 0);
+    return ret;
+
+}	/* End of PutTransferEncoding.	*/
+
+
+
+/***********************************************************************
+ *		PutEncodedData
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:	Break data into lines of <= 76 (including the padding of
+ *              soft break '=', but does not include CRLF). 
+ *
+ *              We don't have to make sure that every line is as close to
+ *              76 chars as possible since that would complicate
+ *              processing as we would have to remember how many chars were
+ *              in the previous line. Ah! The wonderful Q encoding :)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/11/98   	Initial Revision
+ *
+ ***********************************************************************/
+
+/* handle RFC821 data transparency */
+SocketError SendTransparently(Socket sock, byte *data, word nbytes, byte *lastThree)
+{
+    Boolean foundEndData;
+    byte *p = data;
+    word len = nbytes;
+    SocketError ret = SE_NORMAL;
+    int i;
+
+    /* handle hanging CRLF and CRLF. */
+    if ((lastThree[1] == C_CR) && (lastThree[2] == C_LF) && (len >= 3) &&
+	(memcmp(data, (byte *)(ENDDATA+2), 3) == 0)) {
+	ret = SocketSend(sock, ".", 1, 0, 0);
+	if (ret != SE_NORMAL) return ret;
+    } else if ((lastThree[0] == C_CR) && (lastThree[1] == C_LF) &&
+	       (lastThree[2] == C_PERIOD) && (len >= 2) &&
+	       memcmp(data, (byte *)CRLF, 2) == 0) {
+	ret = SocketSend(sock, ".", 1, 0, 0);
+	if (ret != SE_NORMAL) return ret;
+    }
+    /* loop to send data, escaping ENDATA sequences */
+    while (len >= 5) {
+	/* find ENDDATA sequence */
+	foundEndData = FALSE;
+	for (i = 0; i <= len-5; i++) {
+	    if (memcmp(p+i, (byte *)ENDDATA, 5) == 0) {
+		foundEndData = TRUE;
+		break;
+	    }
+	}
+	if (foundEndData) {
+	    /* send stuff before ENDDATA sequence */
+	    if (i) {
+		ret = SocketSend(sock, p, i, 0, 0);
+		if (ret != SE_NORMAL) return ret;
+	    }
+	    /* send escaped ENDDATA sequence */
+	    ret = SocketSend(sock, (byte *)ENDDATAESCAPE, 4, 0, 0);
+	    len = len - i - 3;  /* leave trailing CRLF for next loop */
+	    p = p + i + 3;
+	} else {
+	    ret = SocketSend(sock, p, len, 0, 0);
+	    if (ret != SE_NORMAL) return ret;
+	    p = p + len;
+	    len = 0;
+	}
+    }
+    /* send anything left over */
+    if (len) {
+	ret = SocketSend(sock, p, len, 0, 0);
+	if (ret != SE_NORMAL) return ret;
+    }
+    /* save state of hanging CRLF and CRLF. for next time */
+    if (nbytes >= 3) {
+	lastThree[0] = data[nbytes-3];
+	lastThree[1] = data[nbytes-2];
+	lastThree[2] = data[nbytes-1];
+    } else if (nbytes >= 2) {
+	lastThree[0] = lastThree[2];
+	lastThree[1] = data[nbytes-2];
+	lastThree[2] = data[nbytes-1];
+    } else if (nbytes >= 1) {
+	lastThree[0] = lastThree[1];
+	lastThree[1] = lastThree[2];
+	lastThree[2] = data[nbytes-1];
+    }
+    return ret;
+}
+
+SocketError _pascal
+PutEncodedData (OUTBOX boxHandle, MailMessage *msg, const byte *data, word len, int *fold, byte *lastThree)
+{
+    int fit, ret, nbytes;
+    Socket sock;
+    OutboxStruct *box;
+
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    fit = 75 - *fold;
+    if (fit < 3) {
+	/* Must at least fit an encoded octet; i.e., three bytes */
+	/* If not, go to new line */
+	ret = SocketSend(sock, (byte*)EQCRLF, 3, 0, 0);
+	if (ret != SE_NORMAL) return ret;
+	*fold=0;
+	fit=75;
+	/* update last three bytes sent buffer */
+	memcpy(lastThree, (byte *)EQCRLF, 3);
+    }
+    while (len) {
+	if (len > fit) {
+	    /* 
+	     * Do not break a line in the middle of an encoded octet.
+	     */
+	    if (*(data+fit) == '=') {
+		len -= fit;
+		nbytes = fit;
+	    } else if (*(data+fit-1) == '=') {
+		len -= (fit-1);
+		nbytes = (fit-1);
+	    } else if (*(data+fit-2) == '=') {
+		len -= (fit-2);
+		nbytes = (fit-2);
+	    /* also, do not break CR-LF pair */
+	    } else if (*(data+fit-1) == C_CR) {
+		len -= (fit-1);
+		nbytes = (fit-1);
+	    } else {
+		/* 
+		 * If we did not encounter any encoding, then its
+		 * safe to send 75 bytes and attach a soft break
+		 * "=CRLF" to it.
+		 */
+		len -= fit;
+		nbytes = fit;
+	    }
+
+	} else {
+	    nbytes = len;
+	    len = 0;
+	}
+
+	if (nbytes) {
+	    /* avoid sending out an ENDDATA (CRLF.CRLF) command */
+	    ret = SendTransparently(sock, data, nbytes, lastThree);
+	    if (ret != SE_NORMAL) return ret;
+	    if (len) {
+		ret = SocketSend(sock, (byte*)EQCRLF, 3, 0, 0);
+		if (ret != SE_NORMAL) return ret;
+		fit=75;
+		*fold=0;
+		/* update last three bytes sent buffer */
+		memcpy(lastThree, (byte *)EQCRLF, 3);
+	    } else {
+		*fold += nbytes;
+	    }
+	}
+
+	data += nbytes;
+    }
+
+    return ret;
+    
+}	/* End of PutEncodedData.	*/
+
+SocketError _pascal
+PutUnencodedData (OUTBOX boxHandle, MailMessage *msg, const byte *data, word len, byte *lastThree)
+{
+    int ret, nbytes;
+    Socket sock;
+    OutboxStruct *box;
+
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    /* avoid sending out an ENDDATA (CRLF.CRLF) command */
+    ret = SendTransparently(sock, data, len, lastThree);
+    return ret;
+}	/* End of PutUnencodedData.	*/
+
+
+/***********************************************************************
+ *		ConvertCRtoCRLF
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Convert all CR to CRLF, temp is a scratch buffer
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *              temp is destroyed
+ *              data and buffer needs to be twice the size passed in len for 
+ *              the worst case where it is just a file of CR
+ *	
+ *              wlen is the number of characters so far since a wrap.
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	3/11/99   	Initial Revision
+ *
+ ***********************************************************************/
+void
+ConvertCRtoCRLF (OUTBOX boxHandle, char *data, char *temp, word *len, word *wlen)
+{
+    word i,j, wrapLen;
+    OutboxStruct *box;
+    Boolean seenSpace = FALSE;
+    
+    box = MemLock(boxHandle);
+    wrapLen = box->OB_wrapLength;
+    MemUnlock(boxHandle);
+
+    for(i=0,j=0; i<*len; ++i,++j,++*wlen) {
+	if ((data[i] == CR)&&(data[i+1]!=LF)) {
+	    temp[j] = CR;
+	    ++j;
+	    temp[j] = LF;
+	    *wlen = 0;
+	    seenSpace = FALSE;
+	} else { 
+	    temp[j] = data[i];
+	    if (data[i] == ' ') {
+		seenSpace = TRUE;
+	    }
+	    if (wrapLen != 0) {
+		if (*wlen >= wrapLen) {
+		    /*
+		     * wrap if:
+		     *   we're at a space
+		     *   we've gone more than 8 chars past our desired
+		     *   we've gone past our desired with no spaces
+		     * Not perfect, but better than a fixed column
+		     */
+		    if ((data[i] == ' ') || (*wlen > wrapLen+8) || ((*wlen > wrapLen) && !seenSpace)) {
+			++j;
+			temp[j] = CR;
+			++j;
+			temp[j] = LF;
+			*wlen = 0;
+			seenSpace = FALSE;
+		    }
+		}
+	    }
+	}
+    }
+    
+    for(i=0;i<j;++i) {
+	data[i] = temp[i];
+    }
+    
+    *len = j;
+    
+}	/* End of ConvertCRtoCRLF.	*/
+
+
+/***********************************************************************
+ *		CheckEncode
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Check the body of the message needs to be encoded.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:     RFC821 says any of 128 ASCII characters can be
+ *               transmitted, but we'll limit ourselves a bit more
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	brianc          7/2/00   	Initial Revision
+ *
+ ***********************************************************************/
+#ifndef DONT_CHECK_ENCODE
+Boolean
+CheckEncode(MailMessage *msg)
+{
+    MemHandle bufferHandle;
+    int nbytes, i;
+    byte *buffer, c;
+    Boolean ret = FALSE;
+    dword oldpos;
+
+    bufferHandle = MemAlloc(QP_BUFFER_SIZE, HF_SWAPABLE | HF_SHARABLE, 
+			    HAF_LOCK | HAF_NO_ERR);
+    buffer = MemDeref(bufferHandle);
+
+    /* save current file position */
+    oldpos = FilePos(msg->MM_bodyFile,0,FILE_POS_RELATIVE);
+    /* check file data for need to encode */
+    while((nbytes = FileRead(msg->MM_bodyFile,buffer,QP_BUFFER_SIZE,0))) {
+	/* must check CODE_PAGE_LATIN_1 chars */
+	LocalGeosToCodePage((char *)buffer, nbytes, CODE_PAGE_LATIN_1, '.');
+	/* check for non-ASCII, non-CR/LF/TAB data */
+	for (i = 0; i < nbytes; i++) {
+	    c = buffer[i];
+	    if ((c < 32 || c > 126) &&
+		(c != C_CR) && (c != C_LF) && (c != C_TAB)) {
+		ret = TRUE;  /* need to encode */
+		break;
+	    }
+	}
+    }
+    /* restore file position */
+    FilePos(msg->MM_bodyFile, oldpos, FILE_POS_START);
+    MemUnlock(bufferHandle);
+    MemFree(bufferHandle);
+    return ret;
+}	/* End of CheckEncode.	*/
+#endif
+
+
+/***********************************************************************
+ *		PutBody
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Send the body of the message.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/11/98   	Initial Revision
+ *
+ ***********************************************************************/
+
+SocketError FinishEncodedData(OUTBOX boxHandle, byte *lastThree)
+{
+    Socket sock;
+    OutboxStruct *box;
+    SocketError ret = SE_NORMAL;
+
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    /* if we end with CRLF., then escape the . with another . */
+    if (memcmp(lastThree, (byte *)(ENDDATA), 3) == 0) {
+	ret = SocketSend(sock, ".", 1, 0, 0);
+    }
+    return ret;
+}
+
+static SocketError _pascal
+PutBody (OUTBOX boxHandle, MailMessage *msg, Boolean needEncode)
+{
+    int fold = 0, wlen=0;
+    int nbytes, encodedLen;
+    MemHandle bufferHandle, encodeHandle;
+    byte *buffer, *data;
+    SocketError ret = SE_NORMAL;
+    dword pos = 0, oldpos;
+    Boolean stop = FALSE;
+    byte lastThree[3] = {0, C_CR, C_LF};  /* previously send CRLF */
+    dword updateTime = 0;
+
+    bufferHandle = MemAlloc(QP_BUFFER_SIZE, HF_SWAPABLE | HF_SHARABLE, 
+			    HAF_LOCK | HAF_NO_ERR);
+    buffer = MemDeref(bufferHandle);
+
+    encodeHandle = MemAlloc(QP_ENCODING_CHUNK, HF_SWAPABLE | HF_SHARABLE, 
+			    HAF_LOCK | HAF_NO_ERR);
+    data = MemDeref(encodeHandle);
+
+    /*  This is how it should work
+     *    FileGetHandleExtAttributes(msg->MM_bodyFile, FEA_SIZE, &(msg->MM_size), sizeof(dword));
+     *  since the OS2 fs driver does not support getting the size, we will use
+     *  FilePos since that works with all drivers, and speed is not an issue
+     */
+    oldpos = FilePos(msg->MM_bodyFile,pos,FILE_POS_RELATIVE);
+    msg->MM_size = FilePos(msg->MM_bodyFile, pos, FILE_POS_END);
+    FilePos(msg->MM_bodyFile, oldpos, FILE_POS_START);
+    msg->MM_remainingSize = msg->MM_size - oldpos;
+
+    while((!stop) && 
+	  (nbytes = FileRead(msg->MM_bodyFile,data,QP_ENCODING_CHUNK/2,0))) {
+
+	msg->MM_remainingSize -= nbytes;
+	stop = UpdateProgressAttachment(msg, NULL, &updateTime);
+	
+	ConvertCRtoCRLF(boxHandle,(char *)data,(char *)buffer,&nbytes,&wlen);
+	LocalGeosToCodePage((char *)data, nbytes, CODE_PAGE_LATIN_1, '.');
+	if (needEncode){
+	    encodedLen = MailQPEncodePtr(data, nbytes, buffer);
+	    ret = PutEncodedData(boxHandle, msg, buffer, encodedLen, &fold, &lastThree);
+	} else {
+	    ret = PutUnencodedData(boxHandle, msg, data, nbytes, &lastThree);
+	}
+	if (ret!=SE_NORMAL) break;
+    }	
+    if (ret == SE_NORMAL) {
+	ret = FinishEncodedData(boxHandle, &lastThree);
+    }
+    if ((stop) && (ret == SE_NORMAL)) {
+	ret = ME_USER_INTERRUPTED;
+    }
+    MemUnlock(encodeHandle);
+    MemFree(encodeHandle);
+    MemUnlock(bufferHandle);
+    MemFree(bufferHandle);
+    return ret;
+}	/* End of PutBody.	*/
+
+
+/***********************************************************************
+ *		RandomizeBoundary
+ ***********************************************************************
+ *
+ * SYNOPSIS:    Generate a secure and reliable boundary.
+ * CALLED BY:	
+ * RETURN:	HTMemHandle of a boundary.
+ *	
+ * STRATEGY:	The boundary is semi-random because we want to recognize
+ *              our boundary for debugging purposes. Some general 
+ *              guidelines for generating safe boundaries:
+ *              1. Include "=_" as this is quoted-printable safe.
+ *              2. Include "=====" as this is base64 safe. The padding 
+ *                 in base64 is max three '='.
+ *              3. See RFC1521 pg 33 on characters allowed in a boundary.
+ *
+ *                  bcharnospace := DIGIT / ALPHA / "'" / "(" / ")" /
+ *                                / "+" / "_" / "," / "-" / "." / "/"
+ *                                / ":" / "=" / "?"
+ *
+ *                  Correspond to the following character values;
+ *                      48-57, 65-90, 97-122, 39, 40, 41, 43, 95,
+ *                      44, 45, 46, 47, 58, 61, 63
+ *
+ *                  Order in the following ranges:
+ *                      ISDIGIT, ISALPHA, 39-41, 43-47, 58, 61, 63, 95.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	6/19/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static MemHandle _pascal
+RandomizeBoundary (void)
+{
+    /* Randomize a seed */
+    int boundarySeed = (int) TimerGetCount();
+    MemHandle ret;
+    int i;
+    char *b;
+    
+    ret = MemAlloc(42, HF_SWAPABLE | HF_SHARABLE, HAF_LOCK | HAF_NO_ERR);
+    b = (char *)MemDeref(ret);
+
+    strncpy(b, "---======_",10);
+    i = 10;  /* Continue at tail of b */
+    while (i<41) {
+	boundarySeed = (boundarySeed * 5821) % 65535;
+	if (boundarySeed < 0) boundarySeed *= -1;
+	b[i] = (char) ((boundarySeed*99999/65535) % 123);
+	if (ISDIGIT(b[i]) || ISALPHA(b[i]) || 
+	    (b[i] >= 39 && b[i] <= 41) ||
+	    (b[i] >= 43 && b[i] <= 47) ||
+	    b[i] == 58 || b[i] == 61 || b[i] == 63 || b[i] == 95)
+	    i++;  /* Acceptable character */
+    }
+    b[40]=0;  /* Null-terminate */
+    MemUnlock(ret);
+    return ret;
+}	/* End of RandomizeBoundary.	*/
+
+/***********************************************************************
+ *		PutBoundary
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: --<BOUNDARY>
+ * CALLED BY:	
+ * RETURN:	Return code from pushing data to client
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/12/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static SocketError _pascal
+PutBoundary (OUTBOX boxHandle, MailMessage *msg, MemHandle boundary)
+{
+    SocketError ret;
+    char *p = (char *) MemLock(boundary);
+    Socket sock;
+    OutboxStruct *box;
+    
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    SocketSend(sock, (byte *)"--", 2, 0, 0);
+    SocketSend(sock, (byte *)p, strlen(p), 0, 0);
+    ret = SocketSend(sock, (byte *)CRLF, 2, 0, 0);
+
+    MemUnlock(boundary);
+    return ret;
+}	/* End of PutBoundary.	*/
+
+
+
+/* states used to parse the attachment paths
+ */
+enum {
+PATS_EAT_WS,
+PATS_EAT_PATH
+};
+
+#define NEXT_CHAR data++;length--
+
+
+/***********************************************************************
+ *		ParseAttachmentString
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse the attachment string and return a chunk array of 
+ *              attachment file paths.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/12/98   	Initial Revision
+ *
+ ***********************************************************************/
+optr _pascal
+ParseAttachmentString (char *data)
+{
+    int length, parseState, attachmentIndex;
+    char attachmentBuffer[PATH_BUFFER_SIZE], ch;
+    char *arrayPtr;
+    MemHandle mem = NULL;
+    ChunkHandle chunk = NULL;
+
+    /* allocate a block to contain the chunk array of address lists */
+    mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    MemLock(mem);
+    chunk = ChunkArrayCreate(mem, 0, 0, 0);
+
+    length = strlen(data)+1;
+    parseState = PATS_EAT_WS;
+    attachmentIndex = 0;
+    while(length > 0)
+    {
+	ch = *data;
+	switch(parseState) {
+	    
+	    /* discard any white space
+	     */
+	case PATS_EAT_WS:
+
+	    if (ISWHITE(ch)) {
+		NEXT_CHAR;
+	    } else  {
+		parseState = PATS_EAT_PATH;
+	    }
+	    break;
+
+	    /* save the path
+	     */
+	case PATS_EAT_PATH:
+	    /* assume that there is no white space after the file name */
+	    if(!(ch == ';') && !(ch == NULL)) {
+		attachmentBuffer[attachmentIndex] = ch;
+		++attachmentIndex;
+		NEXT_CHAR;
+	    } else  {
+		attachmentBuffer[attachmentIndex] = ch;
+		NEXT_CHAR;
+
+		arrayPtr = ChunkArrayAppendHandles(mem,chunk,
+						   attachmentIndex+
+						   sizeof(TCHAR));
+		strncpy(arrayPtr,attachmentBuffer,attachmentIndex);
+
+		attachmentIndex = 0;
+		parseState = PATS_EAT_WS;
+	    }
+	    break;
+	default:
+	    /* warning */
+	    break;
+	}		
+    }
+
+    MemUnlock(mem);
+    return ConstructOptr(mem,chunk);
+    
+}	/* End of ParseAttachmentString.	*/
+
+
+/***********************************************************************
+ *		ParseAttachmentName
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Parse the attachment string and return a 
+ *              memory handle
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/12/98   	Initial Revision
+ *
+ ***********************************************************************/
+MemHandle _pascal
+ParseAttachmentName (char *data)
+{
+    int length, attachmentIndex;
+    char ch;
+    char *attachmentName;
+    MemHandle mem = NULL;
+
+    mem = MemAlloc(FILE_LONGNAME_BUFFER_SIZE, HF_SWAPABLE | HF_SHARABLE, 
+			    HAF_LOCK | HAF_NO_ERR);
+
+    attachmentName = MemDeref(mem);
+    length = strlen(data);
+    attachmentIndex = 0;
+    while(length > 0)
+    {
+	ch = *data;
+/*	if (!(ch == 0) && !(ISWHITE(ch)) && !(ch == '\\') && */
+	if ((ch != 0) && (ch != ';' ) && (ch != '\\') &&
+	    !(ch == ':')) {
+	    attachmentName[attachmentIndex] = ch;
+	    ++attachmentIndex;
+	    NEXT_CHAR;
+	} else {
+	    NEXT_CHAR;
+	    attachmentIndex = 0;
+	}
+    }
+    
+    /* Null terminate the string
+     */
+    attachmentName[attachmentIndex] = 0;
+    MemUnlock(mem);
+
+    return mem;
+    
+}	/* End of ParseAttachmentName.	*/
+
+
+/***********************************************************************
+ *		PutAttachments
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Send attachments using base64 encoding.  For now, assume
+ *              There is only one attachment.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/11/98   	Initial Revision
+ *
+ ***********************************************************************/
+SocketError _pascal
+PutAttachments (OUTBOX boxHandle, MailMessage *msg)
+{
+    SocketError ret = SE_INTERNAL_ERROR;
+    char *boundary, *data;
+    char fileName[PATH_BUFFER_SIZE];
+    FileHandle file;
+    Socket sock;
+    int lenBoundary,i;
+    optr attachmentList;
+    MemHandle name;
+    OutboxStruct *box;
+    MemHandle dosName = 0;
+    GeosFileType gft;
+
+@ifdef EFAX_SUPPORT
+     char* ext;
+@endif
+
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    /* Get the list of attachment file paths.
+     */
+    MemLock(msg->MM_storageBlock);
+    data = LMemDerefHandles(msg->MM_storageBlock,msg->MM_attachment);
+    attachmentList = ParseAttachmentString(data);
+    if (!attachmentList) {
+	MemUnlock(msg->MM_storageBlock);
+	return SE_INTERNAL_ERROR;
+    }
+    
+    MemLock(msg->MM_boundary);
+    boundary = MemDeref(msg->MM_boundary);
+    lenBoundary = strlen(boundary);
+
+    /* go through the list of attachments and send them one by one.
+     */
+    MemLock(OptrToHandle(attachmentList));
+    i = ChunkArrayGetCount(attachmentList);
+    for (--i; i>=0; --i) {
+
+	ChunkArrayGetElement(attachmentList, i, fileName);
+	FilePushDir();
+	FileSetStandardPath(SP_PRIVATE_DATA);
+	/* handle GEOS executable */
+	if (FileGetPathExtAttributes(fileName, FEA_FILE_TYPE, &gft, sizeof(gft)) == 0 && (gft & GFT_EXECUTABLE)) {
+	    /* just use longname buffer size */
+	    dosName = MemAlloc(FILE_LONGNAME_BUFFER_SIZE,
+			       HF_SWAPABLE | HF_SHARABLE,
+			       HAF_LOCK | HAF_NO_ERR);
+	    if (dosName) {
+		FileGetPathExtAttributes(fileName, FEA_DOS_NAME,
+					 MemDeref(dosName), FILE_LONGNAME_BUFFER_SIZE);
+		MemUnlock(dosName);
+	    }
+        }
+	file = FileOpen(fileName, 0x80 | FILE_DENY_RW | FILE_ACCESS_R);
+	FilePopDir();
+
+	if (file) {
+	    SocketSend(sock, "--", 2, 0, 0);
+	    SocketSend(sock, boundary, lenBoundary, 0, 0);
+	    SocketSend(sock, CRLF, 2, 0, 0);
+
+	    name = ParseAttachmentName(fileName);
+	    /* Update the progress dialog box with the attachment 
+	     * name
+	     */
+	    data = MemLock(name);
+	    msg->MM_size = 1;
+	    msg->MM_remainingSize = 1;
+	    UpdateProgressAttachment(msg,data, 0);  /* force update */
+	    MemUnlock(name);
+
+@ifdef EFAX_SUPPORT
+     if(dosName)
+	 data = MemLock(dosName);
+     else
+	 data = MemLock(name);
+
+     /* check to see if the filename ends in a .EFT extension */
+     if(ext = strstr(data, ".EFT")) {
+	 /* ok, change the extension to .TIF */
+	 *(ext+1) = 'T';
+	 *(ext+2) = 'I';
+	 *(ext+3) = 'F';
+     }
+     if(dosName)
+	 MemUnlock(dosName);
+     else
+	 MemUnlock(name);
+@endif
+
+	    PutContentType(boxHandle, msg, dosName ? dosName : name, CONTENT_TYPE_UNKNOWN);
+	    MemFree(name);
+
+	    PutTransferEncoding(boxHandle, msg, ENCODE_BASE64);
+	    ret =  SocketSend(sock, CRLF, 2, 0, 0);
+
+	    /* Send the attachment! 
+	     */
+	    ret = MailPutBase64Encoded(sock, file,
+				       msg->MM_progressRoutine,
+				       fileName);
+	    if (ret == SE_NORMAL) {
+		ret =  SocketSend(sock, CRLF, 2, 0, 0);
+	    }
+	    FileClose(file, FILE_NO_ERRORS);
+	} else { 
+	    ret = ME_FILE_ERROR;
+	}
+	if (dosName) MemFree(dosName);
+
+    }
+    
+    if (ret == SE_NORMAL) {
+	SocketSend(sock, "--", 2, 0, 0);
+	SocketSend(sock, boundary, lenBoundary, 0, 0);	
+	SocketSend(sock, "--", 2, 0, 0);
+	ret =  SocketSend(sock, CRLF, 2, 0, 0);
+    }
+
+
+
+    MemUnlock(msg->MM_storageBlock);
+    MemUnlock(OptrToHandle(attachmentList));
+    MemFree(OptrToHandle(attachmentList));
+    MemUnlock(msg->MM_boundary);    
+
+    return ret;
+    
+}	/* End of PutAttachments.	*/
+
+
+/***********************************************************************
+ *		MSMTPSendMsg
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put an RFC822 message to socket.
+ * CALLED BY:	
+ * RETURN:	
+ *              
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	porteous
+ *	
+ ***********************************************************************/
+SocketError _pascal
+MSMTPSendMsg (OUTBOX boxHandle, MailMessage *msg)
+{
+    Socket sock;
+    int len;
+    SocketError ret = SE_NORMAL;
+    OutboxStruct *box;
+    Boolean needEncode = TRUE;  /* in case DONT_CHECK_ENCODE */
+    
+    len = MSMTPSendHeader(boxHandle, msg);
+    if (!len) {
+	return SE_INTERNAL_ERROR;
+    } 
+
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    ret = SocketSend(sock, (byte *)HDR_MIME_VERSION, 
+		     HDR_MIME_VERSION_LEN, 0, 0);
+    ret = SocketSend(sock, CRLF, 2, 0, 0);
+
+#ifndef DONT_CHECK_ENCODE
+    needEncode = CheckEncode(msg);
+#endif
+
+    if (!msg->MM_attachment) { 
+	
+	ret = PutContentType(boxHandle, msg, (MemHandle)0, CONTENT_TYPE_TEXT_PLAIN  );
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+
+	if (needEncode) {
+	ret = PutTransferEncoding(boxHandle, msg, ENCODE_QUOTED_PRINTABLE);
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+	}
+
+	ret = SocketSend(sock, CRLF, 2, 0, 0);
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+
+	ret = PutBody(boxHandle, msg, needEncode);
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+
+
+    }  else { /* send body + attachments */
+	msg->MM_boundary = RandomizeBoundary();
+	ret = PutContentType(boxHandle, msg, msg->MM_boundary, 
+			     CONTENT_TYPE_MULTIPART_MIXED);
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+
+	ret = SocketSend(sock, CRLF, 2, 0, 0);
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+
+	ret = PutBoundary(boxHandle,msg,msg->MM_boundary);
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+
+        ret = PutContentType(boxHandle, msg, (MemHandle)0, CONTENT_TYPE_TEXT_PLAIN );
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+
+	if (needEncode) {
+	ret = PutTransferEncoding(boxHandle, msg, ENCODE_QUOTED_PRINTABLE);
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+	}
+
+	ret = SocketSend(sock, CRLF, 2, 0, 0);
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+	
+	ret = PutBody(boxHandle, msg, needEncode);
+
+	ret = SocketSend(sock, CRLF, 2, 0, 0);
+	if (ret != SE_NORMAL) {
+	    return ret;
+	}
+
+	ret = PutAttachments(boxHandle,msg);
+	MemFree(msg->MM_boundary);
+    }
+
+    return ret;
+}
+
+
+
+
+
+
+
+
+

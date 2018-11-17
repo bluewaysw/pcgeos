@@ -1,0 +1,918 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mailPrint.goc
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ * DESCRIPTION:
+ *	Handle printing and other large text shme
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+#include <sysstats.h>
+
+@classdecl MailLargeTextClass;
+@classdecl MailReadTextClass;
+@classdecl MailContentClass;
+
+/********************************************************************
+ *              MSG_META_CONTENT_VIEW_OPENING
+ ********************************************************************
+ * SYNOPSIS:     Initialize for large text
+ * CALLED BY:
+ * PASS:         optr view
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass. Then setup the content
+ *               object (ourself) so we don't use the geometry
+ *               manager (which will control the size of the content).
+ *******************************************************************/
+@method MailContentClass, MSG_META_CONTENT_VIEW_OPENING
+{
+    VisContentInstance *vself;
+
+    @callsuper();
+
+    /*
+     * Set up the geometry for the content so that the
+     * geometry manager is not used.
+     */
+    vself = ObjDerefVis( oself );
+    vself->VI_attrs &= ~VA_MANAGED;
+    vself->VI_optFlags &= ~( VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH );
+    vself->VCI_geoAttrs |= VCGA_CUSTOM_MANAGE_CHILDREN;
+}
+
+
+/********************************************************************
+ *              MSG_META_GAINED_FOCUS_EXCL
+ ********************************************************************
+ * SYNOPSIS:     Make sure our text gets the focus
+ * CALLED BY:
+ * PASS:         none
+ * RETURNS:      none
+ *******************************************************************/
+@method MailContentClass, MSG_META_GAINED_FOCUS_EXCL
+{
+    optr textObj;
+
+    @callsuper();
+    textObj = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(CCO_FIRST);
+    if (textObj) {
+	@call textObj::MSG_META_GRAB_FOCUS_EXCL();
+    }
+ }
+
+/********************************************************************
+ *              MSG_META_GAINED_TARGET_EXCL
+ ********************************************************************
+ * SYNOPSIS:     Make sure our text gets the target
+ * CALLED BY:
+ * PASS:         none
+ * RETURNS:      none
+ *******************************************************************/
+@method MailContentClass, MSG_META_GAINED_TARGET_EXCL
+{
+    optr textObj;
+
+    @callsuper();
+    textObj = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(CCO_FIRST);
+    if (textObj) {
+	@call textObj::MSG_META_GRAB_TARGET_EXCL();
+    }
+}
+
+@method MailLargeTextClass, MSG_META_GAINED_FOCUS_EXCL
+{
+    EventHandle eHan;
+
+    @callsuper();
+    @call oself::MSG_META_GRAB_TARGET_EXCL();
+    eHan = @record null::MSG_META_GRAB_TARGET_EXCL();
+    @call oself::MSG_GEN_SEND_TO_PARENT(eHan);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_PRINT_START_PRINTING
+ * PASS:            printCtrlOD - optr of PrintControl
+ *                  gstate - handle of GState to print to
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Print a mail message
+ *         Code taken from Appl/SDK_C/Print and modified
+ *         to use MSG_PRINT_CONTROL_CALC_DOC_DIMENSIONS()
+ ***************************************************************/
+
+@method MailLargeTextClass, MSG_PRINT_START_PRINTING
+{
+      /*
+       * curPage    - current page being printed
+       * numPages   - number of pages
+       * pageSize   - size of page from PrintControl
+       * pageWidth  - width of paper
+       * pageHeight - Height of print area in points.
+       * bContinue  - Indicates when to stop printing.
+       * textSize   - Image size of text.
+       * regPos     - Returned by MSG_VIS_LARGE_TEXT_GET_REGION_POS.
+       *              Used to find the size of the text regions.
+       */
+    word           curPage;
+    word           numPages;
+    PageSizeReport pageSize;
+    word           pageWidth;
+    dword          pageHeight;
+    Boolean        bContinue;
+    XYValueAsDWord textSize;
+    VisLargeTextGetRegionPosReturnStruct regPos;
+    TCHAR          *hdrText;
+    word           hdrWidth;
+    dword          yPos;
+
+    /*
+     * Get the paper size as set by the user and find the
+     * page width and height without margins. Then set the
+     * document size to reflect the current paper size.
+     */
+    @call printCtrlOD::MSG_PRINT_CONTROL_CALC_DOC_DIMENSIONS(&pageSize);
+    pageWidth  = pageSize.PSR_width;
+    pageHeight = pageSize.PSR_height;
+
+    /*
+     * Save text image size.
+     * Set text width to printer page width.
+     */
+    textSize = @call self::MSG_VIS_LARGE_TEXT_GET_DRAFT_REGION_SIZE( 0 );
+@ifdef PRINT_HEADERS
+    @call oself::MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(
+	pageWidth, pageHeight-PRINT_HEADER_HEIGHT );
+@else
+    @call oself::MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(
+	pageWidth, pageHeight );
+@endif
+
+    /*
+     * Set the number of pages to print by finding
+     * the number of regions in the VisLargeText.
+     */
+    numPages = @call self::MSG_VIS_LARGE_TEXT_GET_REGION_COUNT();
+    @call printCtrlOD::MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE(1, numPages);
+
+    /*
+     * This loop is from Concepts Code Display 23-1 on p809.
+     * It is the main printing loop. It translates the text up
+     * one page at a time while printing it. Actually, it
+     * translates it one page the first time, two pages the
+     * second time, three pages the third time, and so on.
+     */
+    for ( curPage = 0; curPage < numPages; curPage++ ) {
+	/*
+	 * Check if the user wants to cancel printing.
+	 * If so, break out of the loop before we print
+	 * the current page.
+	 */
+        bContinue = @call printCtrlOD::
+            MSG_PRINT_CONTROL_REPORT_PROGRESS( PCPT_PAGE, curPage+1 );
+        if ( FALSE == bContinue ) {
+            break;
+        }
+	/*
+	 * Get the start position of the top of
+	 * the current page. We'll use it for translating
+	 * the text object upwards in order to
+	 * print the page we want.
+	 */
+        GrSaveState( gstate );
+        @call self::MSG_VIS_LARGE_TEXT_GET_REGION_POS( &regPos, curPage );
+
+@ifdef PRINT_HEADERS
+	/*
+	 * draw the header
+	 */
+
+	ObjDerefVis(oself);
+	if (pself->MLTI_header) {
+	    GrSaveState(gstate);
+	    GrApplyTranslationDWord(gstate, 0, (dword)pageSize.PSR_margins.PCMP_top);
+	    GrSetLineWidth(gstate, (WWFixedAsDWord) 1.5*65536);
+	    GrDrawHLine(gstate, pageSize.PSR_margins.PCMP_left, PRINT_HEADER_SIZE+4, pageWidth-pageSize.PSR_margins.PCMP_right);
+	    GrSetFont(gstate, PRINT_HEADER_FONT,
+		      (WWFixedAsDWord) PRINT_HEADER_SIZE*65536);
+	    GrSetTextStyle(gstate, PRINT_HEADER_STYLE, 0);
+	    hdrText = MemLock(pself->MLTI_header);
+	    hdrWidth = GrTextWidth(gstate, hdrText, 0);
+	    GrDrawText(gstate, (pageWidth-hdrWidth)/2, 0, hdrText, 0);
+	    MemUnlock(pself->MLTI_header);
+	    GrRestoreState(gstate);
+	    /*
+	     * translate past the header
+	     */
+	    GrApplyTranslationDWord(gstate, 0, PRINT_HEADER_HEIGHT);
+	    GrInitDefaultTransform(gstate);
+	}
+@endif
+	/*
+	 * Set the clip region so we only include
+	 * exactly the height of this page. That is,
+	 * if the user has a page break in the text,
+	 * that will shorten the height of the page.
+	 * If we were to print more than the real height,
+	 * we'd get the text from the next page as well. Change
+	 * the sixth parameter to pageHeight to see what I mean.
+	 */
+        GrSetClipRect(gstate, PCT_REPLACE,
+		      pageSize.PSR_margins.PCMP_left,
+		      pageSize.PSR_margins.PCMP_top,
+		      pageSize.PSR_margins.PCMP_left + pageWidth,
+		      pageSize.PSR_margins.PCMP_top + regPos.VLTGRPRS_height);
+	/*
+	 * Shift text up curPage pages and draw text.
+	 * Have printer form feed the page.
+	 */
+	yPos = (regPos.VLTGRPRS_yPosition - pageSize.PSR_margins.PCMP_top);
+
+        GrApplyTranslationDWord(gstate,
+				pageSize.PSR_margins.PCMP_left,
+				-yPos);
+        GrInitDefaultTransform(gstate);
+	/*
+	 * draw the text object itself
+	 */
+
+        @call self::MSG_VIS_DRAW(DF_PRINT, gstate);
+        GrRestoreState(gstate);
+        GrNewPage( gstate, PEC_FORM_FEED );
+    }
+
+    /*
+     * Restore previous text width and height.
+     */
+    @send self::MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(
+        DWORD_X( textSize ), DWORD_Y( textSize ) );
+
+    /*
+     * Wrap up the printing (tell PrintControl if
+     * done printing or if user cancelled).
+     */
+    if ( FALSE == bContinue ) {
+        @send printCtrlOD::MSG_PRINT_CONTROL_PRINTING_CANCELLED();
+    }
+    else {
+        @send printCtrlOD::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+    }
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_PRINT_GET_DOC_NAME
+ * PASS:            printCtrlOD - optr of PrintControl
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Get document name for printing
+ *
+ ***************************************************************/
+
+@method MailLargeTextClass, MSG_PRINT_GET_DOC_NAME
+{
+    LockStrings();
+    @send printCtrlOD::MSG_PRINT_CONTROL_SET_DOC_NAME(LMemDeref(@printMessageName));
+    UnlockStrings();
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LARGE_TEXT_SET_HEADER
+ * PASS:            header - MemHandle of block with text
+ * RETURN:          none
+ * DESCRIPTION:
+ *         set the text for the header when printing
+ ***************************************************************/
+
+@method MailLargeTextClass, MSG_MAIL_LARGE_TEXT_SET_HEADER
+{
+    MemHandle hh = pself->MLTI_header;
+
+    /*
+     * free any old header and save the new one
+     */
+    if (hh) {
+	MemFree(hh);
+    }
+    pself->MLTI_header = header;
+}
+
+@ifdef PRETTY_MAIL_HEADERS
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LARGE_TEXT_RECALC_TAB_WIDTH
+ * DESCRIPTION:     recalculate the TAB width
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+void
+GetMaxHdrWidth(word *max, GStateHandle gs, optr str)
+{
+    word w;
+
+    w = GrTextWidth(gs, LMemDeref(str), 0)*8;
+    if (w > *max) {
+	*max = w;
+    }
+}
+
+@method MailLargeTextClass, MSG_MAIL_LARGE_TEXT_RECALC_TAB_WIDTH
+{
+    word max = 0;
+    GStateHandle gs;
+    VisTextCharAttr attrs;
+    VisTextCharAttrDiffs diffs;
+    Tab anchor;
+    word tabEnd = pself->MLTI_tabEnd;
+
+    /*
+     * get a GState and initialize it to the correct font and pointsize,
+     * and make sure it is bold
+     */
+    LockStrings();
+    gs = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    @call oself::MSG_VIS_TEXT_GET_CHAR_ATTR(0,
+					    &diffs,
+					    &attrs,
+					    0,
+					    0);
+    GrSetFont(gs, attrs.VTCA_fontID,
+	      MakeWWFixed(attrs.VTCA_pointSize.WBF_int));
+    GrSetTextStyle(gs, TS_BOLD, 0);
+    /*
+     * get the maximum width of To:, From: etc.
+     */
+    GetMaxHdrWidth(&max, gs, @toFieldStr);
+    GetMaxHdrWidth(&max, gs, @ccFieldStr);
+    GetMaxHdrWidth(&max, gs, @fromFieldStr);
+    GetMaxHdrWidth(&max, gs, @subjectFieldStr);
+    GetMaxHdrWidth(&max, gs, @dateFieldStr);
+    GrDestroyState(gs);
+    UnlockStrings();
+
+    /*
+     * update the anchored tab, clearing the old one first
+     */
+    @call oself::MSG_META_SUSPEND();
+    @call oself::MSG_VIS_TEXT_CLEAR_ALL_TABS(TEXT_ADDRESS_PAST_END, 0);
+    anchor.T_anchor = ':';
+    anchor.T_lineSpacing = 0;
+    anchor.T_lineWidth = 0;
+    anchor.T_position = max;
+    anchor.T_grayScreen = 0;
+    anchor.T_attr = (TL_NONE << TabLeader_OFFSET) | TT_ANCHORED;
+    @call oself::MSG_VIS_TEXT_SET_TAB(anchor, tabEnd, 0);
+    @call oself::MSG_VIS_TEXT_SET_LEFT_MARGIN(0, tabEnd, 0);
+    @call oself::MSG_VIS_TEXT_SET_PARA_MARGIN(0, tabEnd, 0);
+    @call oself::MSG_META_UNSUSPEND();
+    ObjDerefVis(oself);
+    pself->MLTI_tabWidth = max;
+}
+
+@endif
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        ReadMessage
+ * DESCRIPTION:     read a message from a file
+ *
+ * PASS:            hdrHan - handle of headers
+ *                  fileHan - handle of file
+ *                  textObj - optr of text object
+ * RETURN:          non-zero for error/not found
+ ***************************************************************/
+
+@method MailLargeTextClass, MSG_MAIL_LARGE_TEXT_READ_MESSAGE
+{
+    VisTextRange vtr;
+    MailReadOptions mro;
+@ifdef MAIL_STYLES_SUPPORT
+    ColorQuad blkColor;
+
+    blkColor.CQ_redOrIndex = C_BLACK;
+    blkColor.CQ_info = CF_INDEX;
+@endif
+
+    mro = @call ReadHeadersList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    /*
+     * clear any old text
+     */
+    @call oself::MSG_VIS_TEXT_DELETE_ALL();
+@ifdef MAIL_STYLES_SUPPORT
+    /*
+     * clear any old styles
+     */
+    @call oself::MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT((J_LEFT << VTDPA_JUSTIFICATION_OFFSET) | (VTDDT_INCH << VTDPA_DEFAULT_TABS_OFFSET), TEXT_ADDRESS_PAST_END, 0);
+    @call oself::MSG_VIS_TEXT_SET_COLOR(blkColor, TEXT_ADDRESS_PAST_END, 0);
+    @call oself::MSG_VIS_TEXT_DELETE_ALL_HYPERLINKS(0, VIS_TEXT_CURRENT_FILE_TOKEN, 0, TEXT_ADDRESS_PAST_END, 0);
+@endif
+
+@ifdef SHOW_RAW_MESSAGE
+    /*
+     * if showing the raw message data, just go do it
+     */
+     if (mro == MRO_RAW_MESSAGE) {
+	 MailReadRawMessage(fileHan, oself);
+	 return;
+     }
+@endif
+
+    /*
+     * read the headers
+     *
+     *  From: 1.
+     *  Subject: 2.
+     *  To: 3.
+     *  Date: 4.
+     *  Cc: 5.
+     */
+     /*
+      * add an anchored tab and matching hanging indent
+      */
+    ObjDerefVis(oself);
+    pself->MLTI_tabEnd = 0;
+    @call oself::MSG_MAIL_LARGE_TEXT_RECALC_TAB_WIDTH();
+
+    /*
+     * add a border for dividing line
+     */
+    @call oself::MSG_VIS_TEXT_SET_BORDER_BITS(0, VTPBF_BOTTOM,
+					      0,
+					      VIS_TEXT_RANGE_SELECTION);
+    ReadHeader(hdrHan, @fromFieldName, @fromFieldStr, oself);
+    ReadHeader(hdrHan, @subjectFieldName, @subjectFieldStr, oself);
+    if (mro == MRO_NORMAL_HEADERS) {
+	ReadHeader(hdrHan, @toFieldName, @toFieldStr, oself);
+	ReadDateHeader(hdrHan, oself);
+	ReadHeader(hdrHan, @ccFieldName, @ccFieldStr, oself);
+@ifdef BCC_SUPPORT
+        ReadHeader(hdrHan, @bccFieldName, @bccFieldStr, oself);
+@endif
+    }
+    /*
+     * finish the dividing line
+     * left margin > 0 for increased readability
+     */
+    @call oself::MSG_VIS_TEXT_SET_BORDER_BITS(VTPBF_BOTTOM, 0,
+					      0,
+					      VIS_TEXT_RANGE_SELECTION);
+    @call oself::MSG_VIS_TEXT_SET_LEFT_AND_PARA_MARGIN(2*8, 0,
+					      VIS_TEXT_RANGE_SELECTION);
+    @call oself::MSG_VIS_TEXT_GET_SELECTION_RANGE(&vtr);
+    ObjDerefVis(oself);
+    pself->MLTI_tabEnd = vtr.VTR_end;
+
+    /* reset tabs for rest of message */
+    @call oself::MSG_VIS_TEXT_CLEAR_ALL_TABS(TEXT_ADDRESS_PAST_END, vtr.VTR_start);
+
+    /*
+     * add a blank line, because that looks better
+     */
+    @call oself::MSG_VIS_TEXT_APPEND_PTR(rhCR, 0);
+    /*
+     * read the body
+     */
+    MailReadBody(fileHan, oself);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_VIS_TEXT_SET_...
+ * DESCRIPTION:     fix up the text range for the message text
+ * PASS:            rangeEnd - end of range
+ *                  rangeStart - start of range
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailLargeTextClass, MSG_VIS_TEXT_SET_FONT_ID
+{
+    @call oself::MSG_META_SUSPEND();
+
+    rangeStart = 0;
+    rangeEnd = TEXT_ADDRESS_PAST_END;
+    @callsuper();
+    /*
+     * recalculate the header width
+     */
+    @call oself::MSG_MAIL_LARGE_TEXT_RECALC_TAB_WIDTH();
+
+    @call oself::MSG_META_UNSUSPEND();
+}
+
+@method MailLargeTextClass, MSG_VIS_TEXT_SET_POINT_SIZE
+{
+    @call oself::MSG_META_SUSPEND();
+
+    rangeStart = 0;
+    rangeEnd = TEXT_ADDRESS_PAST_END;
+    @callsuper();
+    /*
+     * recalculate the header width
+     */
+    @call oself::MSG_MAIL_LARGE_TEXT_RECALC_TAB_WIDTH();
+
+    @call oself::MSG_META_UNSUSPEND();
+}
+
+@method MailLargeTextClass, MSG_VIS_TEXT_SET_LARGER_POINT_SIZE,
+                            MSG_VIS_TEXT_SET_SMALLER_POINT_SIZE
+{
+
+    @call oself::MSG_META_SUSPEND();
+
+    rangeStart = 0;
+    rangeEnd = TEXT_ADDRESS_PAST_END;
+    @callsuper();
+    /*
+     * recalculate the header width
+     */
+    @call oself::MSG_MAIL_LARGE_TEXT_RECALC_TAB_WIDTH();
+
+    @call oself::MSG_META_UNSUSPEND();
+
+}
+
+@method MailReadTextClass, MSG_VIS_TEXT_SET_FONT_ID
+{
+    @callsuper();
+    /*
+     * make note of the font for printing, too
+     */
+    @call PrintTextObject::MSG_VIS_TEXT_SET_FONT_ID(fid, rangeEnd,
+						    rangeStart);
+}
+
+@method MailReadTextClass, MSG_VIS_TEXT_SET_POINT_SIZE
+{
+    @callsuper();
+    /*
+     * make note of the pointsize for printing, too
+     */
+    @call PrintTextObject::MSG_VIS_TEXT_SET_POINT_SIZE(pointSize,
+						       rangeEnd,
+						       rangeStart);
+}
+
+
+@ifdef MAIL_STYLES_SUPPORT
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_META_LARGE_START_SELECT
+ * DESCRIPTION:     handle a start select for URLs
+ *
+ * PASS:            retVal - ptr to MouseReturnParams
+ *                  xPosition - x (word)
+ *                  yPosition - y (word)
+ *                  inputState - ButtonInfo + UIFunctionsActive
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailReadTextClass, MSG_META_LARGE_START_SELECT
+{
+    dword pos;
+    PointDWFixed pnt;
+    VisTextTypeDiffs diffs;
+    VisTextType t;
+    word token;
+    MemHandle iabh, naeh;
+    InternetAppBlock *iap;
+    VisTextNameArrayElement *nae;
+    word strSize, mailAddressSize;
+    TCHAR *s;
+    TCHAR *strPart;
+    TCHAR urlMailtoStart[] = "mailto:";
+    TCHAR *url;
+    MemHandle ih;
+
+    pnt.PDF_x.DWF_frac = 0;
+    pnt.PDF_x.DWF_int = (sdword) largeMouseDataStruct->LMD_location.PDF_x.DWF_int;
+    pnt.PDF_y.DWF_frac = 0;
+    pnt.PDF_y.DWF_int = (sdword) largeMouseDataStruct->LMD_location.PDF_y.DWF_int;
+
+    pos = @call oself::MSG_VIS_TEXT_GET_TEXT_POSITION_FROM_COORD(&pnt);
+    @call oself::MSG_VIS_TEXT_GET_TYPE(0, &diffs, &t, pos, pos);
+    retVal->flags = MRF_CLEAR_POINTER_IMAGE;
+    token = t.VTT_hyperlinkName;
+    if (token != 0xffff) {
+	/*
+	 * get the name, i.e., the URL
+	 */
+	naeh = MemAlloc(sizeof(NameArrayMaxElement), HF_DYNAMIC, HAF_STANDARD);
+	if (!naeh) {
+	    return;
+	}
+	nae = MemLock(naeh);
+	strSize = @call oself::MSG_VIS_TEXT_FIND_NAME_BY_TOKEN(token, nae) - sizeof(VisTextNameArrayElement);
+	
+	/* check to see if the url has mailto:....  If so, don't bother sending it to the
+	   browser, handle it ourselves! */
+	url = nae+1;	
+	strPart = memchr(url, urlMailtoStart[0], strSize);
+	if(strPart) {
+	    if(!memcmp(strPart, urlMailtoStart, strlen(urlMailtoStart))) {  /* scan for mailto: */	    
+		/* found mailto:.  Allocate an InternetAppBlock and copy the 
+		   email address to it */		    
+		strPart += strlen(urlMailtoStart);
+		if(strPart-url != strSize) {    /* make sure an email address follows */
+		    mailAddressSize = strSize-(strPart-url);
+		    ih = MemAlloc(mailAddressSize+sizeof(InternetAppBlock)+sizeof(TCHAR),
+				  HF_SWAPABLE, HAF_LOCK);
+		    iap = MemDeref(ih);
+		    iap->IAB_type = IADT_MAIL_TO;
+		    memcpy((TCHAR *)iap+sizeof(InternetAppBlock),
+			   strPart,
+			   mailAddressSize);
+		    
+		    /* null terminate */
+		    s = iap;
+		    s[mailAddressSize/sizeof(TCHAR)+sizeof(InternetAppBlock)] = 0;
+		    MemUnlock(ih);
+		    
+		    /* send it off to the process class to create a new email */		    
+		    @send process::MSG_MAIL_PROCESS_DO_MAIL(ih);
+		    MemFree(naeh);
+		    return;
+		}
+	    }
+	}
+
+	/*
+	 * allocate an InternetAppBlock to pass the URL in
+	 */
+	iabh = MemAllocSetOwner((GeodeHandle)SysGetInfo(SGIT_UI_PROCESS), 
+				strSize+sizeof(InternetAppBlock)+sizeof(TCHAR), 
+				HF_DYNAMIC, HAF_STANDARD);
+	if (!iabh) {
+	    MemFree(naeh);
+	    return;
+	}
+	iap = MemLock(iabh);
+	memcpy((TCHAR *)iap+sizeof(InternetAppBlock),
+	       url,
+	       strSize);
+	s = iap;
+	s[strSize/sizeof(TCHAR)+sizeof(InternetAppBlock)] = 0;
+	iap->IAB_type = IADT_URL;
+	MemUnlock(iabh);	    
+	
+	/*
+	 * try to launch the browser with it
+	 */
+	@send MailAppObj::MSG_MAIL_APP_LAUNCH_BROWSER(iabh);	
+	MemFree(naeh);	 
+    } else {
+	@callsuper();
+    }
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_META_LARGE_PTR
+ * DESCRIPTION:     handle a pointer even for URLs
+ *
+ * PASS:            retVal - ptr to MouseReturnParams
+ *                  xPosition - x (word)
+ *                  yPosition - y (word)
+ *                  inputState - ButtonInfo + UIFunctionsActive
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailReadTextClass, MSG_META_LARGE_PTR
+{
+    dword pos;
+    PointDWFixed pnt;
+    VisTextType t;
+    word token;
+    VisTextTypeDiffs diffs;
+
+    pnt.PDF_x.DWF_frac = 0;
+    pnt.PDF_x.DWF_int = (sdword) largeMouseDataStruct->LMD_location.PDF_x.DWF_int;
+    pnt.PDF_y.DWF_frac = 0;
+    pnt.PDF_y.DWF_int = (sdword) largeMouseDataStruct->LMD_location.PDF_y.DWF_int;
+
+    pos = @call oself::MSG_VIS_TEXT_GET_TEXT_POSITION_FROM_COORD(&pnt);
+    @call oself::MSG_VIS_TEXT_GET_TYPE(0, &diffs, &t, pos, pos);
+    token = t.VTT_hyperlinkName;
+    if (token != 0xffff) {
+	retVal->flags = MRF_PROCESSED | MRF_SET_POINTER_IMAGE;
+	retVal->ptrImage = @linkPtr;
+    } else {
+	retVal->flags = MRF_CLEAR_POINTER_IMAGE;
+	@callsuper();
+    }
+}
+
+@endif
+
+#ifdef __BORLANDC__
+#pragma codeseg InitCode
+#endif
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LARGE_TEXT_OPEN
+ * PASS:            content - optr of content, if any
+ *                  storage - VisTextStorageFlags for storage
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Initialize a VisLargeTextClass object for our uses
+ ***************************************************************/
+
+@method MailLargeTextClass, MSG_MAIL_LARGE_TEXT_OPEN
+{
+    FileHandle fileHan;
+
+    if (pself->VTI_vmFile) return;  /* already done */
+
+    fileHan = ClipboardGetClipboardFile();
+    @call oself::MSG_VIS_TEXT_SET_VM_FILE(fileHan);
+    @call oself::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+    @call oself::MSG_VIS_TEXT_CREATE_STORAGE(storage, TRUE);
+    @call oself::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+
+    /*
+     * if any content, add ourselves as a child
+     */
+    if (content) {
+	@call content::MSG_VIS_ADD_CHILD(oself, CCO_FIRST);
+    }
+
+    ObjDerefVis(oself);
+    pself->MLTI_tabEnd = 0;
+    /*
+     * load our options now that we have attributes to work with
+     */
+    @call oself::MSG_META_LOAD_OPTIONS();
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LARGE_TEXT_CLOSE
+ * PASS:            content - optr of content, if any
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Done with a VisLargeTextClass object
+ ***************************************************************/
+
+@method MailLargeTextClass, MSG_MAIL_LARGE_TEXT_CLOSE
+{
+    VisLargeTextInstance * vself;
+    MemHandle hh = pself->MLTI_header;
+
+    /*
+     * we save options here before our storage (and attibutes) go away
+     */
+    @call oself::MSG_META_SAVE_OPTIONS();
+
+    @call oself::MSG_VIS_TEXT_FREE_ALL_STORAGE( TRUE );
+    @call oself::MSG_VIS_TEXT_SET_VM_FILE( NullHandle );
+    /*
+     * mark ourselves small so we can make ourselves next time
+     * we restore from state
+     */
+    vself = ObjDerefVis( oself );
+    vself->VTI_storageFlags &= ~VTSF_LARGE;
+
+    /*
+     * free any header text
+     */
+    if (hh) {
+	MemFree(hh);
+    }
+    /*
+     * if any content, remove ourselves as a child
+     */
+    if (content) {
+	@call content::MSG_VIS_REMOVE_CHILD(oself, CCO_FIRST);
+    }
+}
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_SAVE_OPTIONS
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Save our options
+***************************************************************/
+
+@method MailLargeTextClass, MSG_META_SAVE_OPTIONS
+{
+    VisTextCharAttr attrs;
+    VisTextCharAttrDiffs diffs;
+    char catBuf[INI_CATEGORY_BUFFER_SIZE];
+    TCHAR *iniKey;
+
+    /*
+     * call our superclass to do most of the work
+     */
+    @callsuper();
+
+    ObjDerefVis(oself);
+    if (pself->MLTI_flags & MLTF_DO_NOT_SAVE_OPTIONS) {
+	return;
+    }
+    /*
+     * get our INI category
+     */
+    @call MailAppObj::MSG_META_GET_INI_CATEGORY(catBuf);
+    /*
+     * get the fonts and pointsizes and save them
+     */
+    @call oself::MSG_VIS_TEXT_GET_CHAR_ATTR(0,
+					    &diffs,
+					    &attrs,
+					    0,
+					    0);
+    iniKey = ObjVarFindData(oself, ATTR_MAIL_LARGE_TEXT_FONT_KEY);
+    if (iniKey) {
+	InitFileWriteInteger(catBuf, iniKey, attrs.VTCA_fontID);
+    }
+    iniKey = ObjVarFindData(oself, ATTR_MAIL_LARGE_TEXT_POINTSIZE_KEY);
+    if (iniKey) {
+	InitFileWriteInteger(catBuf, iniKey, attrs.VTCA_pointSize.WBF_int);
+    }
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_LOAD_OPTIONS
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Load options
+***************************************************************/
+
+void
+GetDefaultFontSize(FontID *fid, WWFixed *psize)
+{
+    GStateHandle uigs;
+    
+    uigs = @call MailAppObj::MSG_VIS_VUP_CREATE_GSTATE();
+    GrGetFont(uigs, psize);
+    GrDestroyState(uigs);
+
+    *fid = FID_DTC_URW_SANS;
+}
+
+@method MailLargeTextClass, MSG_META_LOAD_OPTIONS
+{
+    char catBuf[INI_CATEGORY_BUFFER_SIZE];
+    FontID fid;
+    WWFixed psize;
+    TCHAR *iniKey;
+
+    /*
+     * call our superclass to do most of the work
+     */
+    @callsuper();
+
+    /*
+     * get our INI category
+     */
+    @call MailAppObj::MSG_META_GET_INI_CATEGORY(catBuf);
+
+    /*
+     * get the font and pointsize and set them in the text objects
+     */
+    GetDefaultFontSize(&fid, &psize);
+
+    iniKey = ObjVarFindData(oself, ATTR_MAIL_LARGE_TEXT_FONT_KEY);
+    if (iniKey) {
+	InitFileReadInteger(catBuf, iniKey, &fid);
+    }
+    @call oself::MSG_VIS_TEXT_SET_FONT_ID(fid, TEXT_ADDRESS_PAST_END, 0);
+
+    iniKey = ObjVarFindData(oself, ATTR_MAIL_LARGE_TEXT_POINTSIZE_KEY);
+    if (iniKey) {
+	InitFileReadInteger(catBuf, iniKey, &psize.WWF_int);
+    }
+    @call oself::MSG_VIS_TEXT_SET_POINT_SIZE(psize, TEXT_ADDRESS_PAST_END, 0);
+}

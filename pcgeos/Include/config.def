@@ -1,0 +1,2080 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		config.def
+
+AUTHOR:		Chris Boyke
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CDB	3/24/92   	Initial version.
+
+DESCRIPTION:
+	Definition file for the config library
+
+	$Id: config.def,v 1.4 98/06/19 10:37:50 gene Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__CONFIG
+
+;==============================================================================
+;
+;		     Module Interface Definition
+;
+;==============================================================================
+
+;
+; Revision level of this interface. These constants must be *outside* of the
+; StartLibrary so they end up in the symbol table of the module, and can thus
+; be used by Glue to set the protocol number of the module.
+; 
+PREF_MODULE_PROTO_MAJOR	equ	2
+PREF_MODULE_PROTO_MINOR	equ	0
+
+StartLibrary	config
+
+include	ui.def
+include Objects/colorC.def
+ 
+PrefMgrFeatures	record
+	PMF_HARDWARE:1
+	; These settings are for a user who has permissions to
+	; actually change the configuration of the workstation.  In a
+	; network environment where users log in to different machines
+	; at different times, normal users would be prevented from
+	; changing the mouse & video drivers, etc.
+
+	PMF_SYSTEM:1
+	; These changes are more complex & potentially more damaging
+	; than the basic "user" changes, therefore, some users may be
+	; prevented from using these settings.
+
+	PMF_NETWORK:1
+	; Network settings -- generally only the system administrator
+	; will see these settings, as they will affect the entire network.
+
+	PMF_USER:1
+	; These settings are the most basic and least dangerous, and
+	; control things along the lines of user preferences (ie,
+	; background colors, screen saver type, etc).
+
+	PMF_OTHER:1
+	; This flag can be used to set up platform-specific configurations
+
+	PMF_INTERNAL_1:1
+	; This flag controls display of the "text" pref module.
+
+	PMF_INTERNAL_2:1
+	; This flag controls display of the "modem" pref module.
+
+	PMF_INTERNAL_3:1
+	; This flag controls display of the "printer" pref module.
+
+
+
+	:8
+PrefMgrFeatures	end
+
+
+PrefModuleEntryType	etype	word,0,1
+
+; Entry points for the Preferences Modules.  Each module (library)
+; MUST have the following routines exported in its .gp file, in the
+; following order, as the FIRST routines exported from that library.
+
+
+PMET_FETCH_UI	enum PrefModuleEntryType 
+;
+; Return the OD of the top-most object in the UI tree.
+; All UI *must* be in the same segment as this object.  The UI tree
+; will be duplicated by the application, and added to the app's
+; generic tree.
+;
+; Pass: nothing
+; Return: ^ldx:ax - OD of root of UI tree.
+; Destroy: nothing
+
+
+
+PMET_GET_MODULE_INFO	enum	PrefModuleEntryType
+; Return information about this module that will be used to determine
+; whether to display it on-screen, what it will look like, etc, etc. 
+;
+; Pass:	ds:si - pointer to a PrefModuleInfo buffer to be filled in
+; Return: -- buffer filled in
+; Destroy: ax, bx
+
+
+PrefModuleInfo	struct
+    PMI_requiredFeatures	PrefMgrFeatures	<>
+    ; Features that MUST be set for this module to appear in PrefMgr
+
+    PMI_prohibitedFeatures	PrefMgrFeatures	<>
+    ; Features that MUST NOT be set for this module to appear.
+
+    PMI_minLevel	UIInterfaceLevel	0
+    ; Minimum user level required for this module to appear.
+    ; Currently not implemented by PrefMgr -- should be set to zero by
+    ; module. 
+
+    PMI_maxLevel	UIInterfaceLevel	UIInterfaceLevel
+    ; Minimum user level required for this module to appear.
+    ; Currently not implemented by PrefMgr.  Should be set to
+    ; the maximum value by module.
+
+    PMI_monikerList	optr
+    ; Moniker list in a shared, lmem, read-only resource that will be
+    ; used as the module's trigger
+
+    PMI_monikerToken	GeodeToken
+    ; A unique GeodeToken that will be used to enter the module's
+    ; moniker list into the token database.  This is done so that the
+    ; module is only called with PMET_GET_MODULE_INFO the first time
+    ; it is encountered by PrefMgr -- all subsequent times, the
+    ; necessary information is cached.
+
+PrefModuleInfo	ends
+
+
+
+SetupMode			etype	word
+
+; This enumerated type is used by preferences and setup to communicate
+; with each-other via the .INI file.  It is intended for internal use
+; only.
+
+MODE_FULL_SETUP			enum SetupMode	; complete install
+MODE_AFTER_VIDEO_CHANGE		enum SetupMode	; video changed during
+						;  full install
+MODE_AFTER_PM_VIDEO_CHANGE 	enum SetupMode	; video changed in PM
+MODE_AFTER_PM_MOUSE_CHANGE	enum SetupMode	; mouse changed in PM
+MODE_AFTER_SETUP_VIDEO_CHANGE	enum SetupMode	; video changed by setup
+MODE_AFTER_SETUP_MOUSE_CHANGE	enum SetupMode
+MODE_AFTER_SETUP_UI_CHANGE	enum SetupMode	; SPUI change in setup
+MODE_UPGRADE_UI_CHANGE		enum SetupMode	; SPUI change for upgrade
+
+	
+
+
+;-----------------------------------------------------------------------------
+;	TOC FILE		
+;-----------------------------------------------------------------------------
+; The TOC file was originally intended to be used for selective
+; install of Geoworks Ensemble.  Since Ensemble in its original form
+; is no longer used, certain parts of this functionality are no longer
+; relevant.  The original plan was to have the DiskMaker utility build
+; the TOC file, storing the names of all the device drivers and
+; marking which disk they're on.  Then, for selective install, the
+; user would be prompted to insert the appropriate disks so that only
+; the necessary drivers would be installed.   The TOC file was then
+; generalized so that things such as impex drivers, templates, and
+; background files, could also be tracked here.
+;
+; In currently shipping products, the TOC file has assumed quite a
+; different role.   It is used primarily as a cache, so that things
+; like the Printer device list in preferences don't need to be rebuilt
+; every time preferences is run.  This is why the user will notice a
+; delay when the Printer list first comes up, but every time after
+; that, the list will come up quite quickly.  
+
+; FILE STRUCTURE:
+;
+; The TOC file is named "GEOS Device Driver List", and resides in the
+; PRIVDATA\PREF subdirectory.  It is composed of DB items (chunk
+; arrays) and huge arrays.  The map item is a TocMap structure, which
+; contains pointers to two chunk arrays, the "disks" array and the
+; "categories" array.  The "disks" array was to be used in selective
+; install to provide a descriptive name of each installation disk.  It
+; is currently unused in most products.  The "categories" array is a
+; chunk array of TocCategoryStruct structures.  A "category" is a list
+; of files that all share the same TokenChars.
+;
+; For Device Drivers, there are two arrays associated with a category
+; -- the array of files (drivers) , and the array of devices supported
+; by those files.  The array of devices is actually a huge array,
+; owing to the fact that a few drivers can support quite a large
+; number of devices (As of this date, our printer drivers support over
+; 600 printers, for example).
+;
+; A Category can be any list of files, however.  The "backgrounds"
+; list in the Background module of Preferences (for Ensemble) is one
+; such example.  PrefTocListClass uses this functionality, and so
+; presenting a list of files to the user, in alphabetical order, is
+; quite simple, with the added benefit that this list is cached
+; for quicker future visual updates.  Note that one could also use a
+; regular dynamic list and call FileEnum directly -- the PrefTocList
+; merely provides a shortcut in this case.
+;
+
+
+dbptr	struct
+	dbitem	word
+	dbgroup	word
+dbptr	ends
+
+
+
+TocMap	struct
+	TM_disks	dbptr		<>	; chunk array of
+						; TocDiskStruct
+
+	TM_categories	dbptr		<>	; chunk array of
+						; TocCategoryStruct 
+TocMap	ends
+
+TocDiskStruct	struct
+	TDSS_volumeName	VolumeName	<>
+	TDSS_mediaType	MediaType	<>
+SBCS < 	TDSS_name	label	char					>
+DBCS < 	TDSS_name	label	wchar					>
+TocDiskStruct	ends
+
+
+;-----------------------------------------------------------------------------
+;	UPDATING A CATEGORY		
+;-----------------------------------------------------------------------------
+; Certain operations (opening a device list, scanning for modules), cause a
+; category to be updated, which means that the files are scanned, and
+; the list is maintained, etc.  Each category in question is
+; identified by its token chars, which MUST be unique across all
+; categories.  Normally, a category consists of an array of FILES,
+; each element of which is of size TocFileStruct.  However, a custom
+; array may be created, in which elements are of the passed size.  If
+; a custom array is used, the caller must specify a callback routine
+; that gets called when a new element is added to the array.
+
+
+TocUpdateCategoryFlags	record
+	TUCF_EXTENDED_DEVICE_DRIVERS:1
+	; Files being enumerated are assumed to be extended device drivers.  
+
+	TUCF_CUSTOM_FILES:1
+	; The TUCP_fileArrayElementSize field will be
+	; used when creating the files array.  Otherwise, each element
+	; of the files array will be of size TocFileStruct.  NOTE:  If
+	; this flag is used, the data structure used for each file
+	; element MUST contain TocFileStruct as its first element.
+
+	TUCF_ADD_CALLBACK:1
+	; TUCP_addCallback contains a fptr to a callback
+	; routine that will be called when a file is added to the
+	; files array.
+
+	TUCF_DIRECTORY_NOT_FOUND:1
+	; Don't actually scan the directory, because it doesn't exist.
+	; Just create the category, and leave it empty.
+
+
+	:12
+TocUpdateCategoryFlags	end
+ 
+TocUpdateCategoryParams	struct
+	TUCP_flags			TocUpdateCategoryFlags
+	TUCP_tokenChars			TokenChars
+	TUCP_fileArrayElementSize	byte
+
+	TUCP_addCallback		fptr.far
+	; CALLBACK:
+	; 	PASS:	ds:si - filename to add
+	;		di - VM handle of SortedNameArray
+	;			(pass to TocSortedNameArrayAdd)
+	;
+	; 	RETURN: carry CLEAR if new element added,
+	;			ax - element number
+	;
+	;		carry SET if add aborted
+	;		
+	;	CAN DESTROY: bx,cx,dx
+	;
+
+	align	word
+TocUpdateCategoryParams	ends
+
+
+; This is the element structure for each element in the categories
+; array. 
+TocCategoryStruct	struct
+	TCS_tokenChars	TokenChars	<>
+	TCS_files	dbptr	<>	; file name array
+	TCS_devices	dbptr	<>	; device name array -- only if
+					; TCF_EXTENDED_DEVICE_DRIVERS
+					; is set.
+TocCategoryStruct	ends
+
+DT_UNKNOWN	equ	-1
+; Every TocFileStruct entry originally has a source disk of
+; DT_UNKNOWN.  For selective install, this field would be filled in
+; with the number of the installation diskette on which the file resides.
+
+TocFileStruct	struct
+	TFS_sourceDisk	word		; disk token
+	TFS_release	ReleaseNumber	<>
+SBCS <	TFS_name	label	char					>
+DBCS <	TFS_name	label	wchar					>
+TocFileStruct	ends
+
+TocDeviceStruct	struct
+	TDS_driver	word		; element # in the file array
+	TDS_info	word		; extra word of info (depends
+					; on device type)	
+
+SBCS <	TDS_name	label	char					>
+DBCS <	TDS_name	label	wchar					>
+TocDeviceStruct	ends
+
+TOC_NAME_MAX_LENGTH equ 64
+SBCS <TOC_ELEMENT_BUFFER_SIZE	equ (size TocDeviceStruct) + TOC_NAME_MAX_LENGTH>
+DBCS <TOC_ELEMENT_BUFFER_SIZE	equ (size TocDeviceStruct) + TOC_NAME_MAX_LENGTH*(size wchar)>
+
+
+
+
+
+;-----------------------------------------------------------------------------
+;	STRUCTURES		
+;-----------------------------------------------------------------------------
+
+if DBCS_PCGEOS
+PrefInitFileFlags	record
+
+	PIFF_USE_ITEM_STRINGS:1
+	; If set, then the item group's children must be of class
+	; PrefStringItemClass, and their strings will be used to
+	; interact with the init file.
+
+	PIFF_USE_ITEM_MONIKERS:1
+	; If set, then the monikers of the items are stored to /
+	; loaded from the init file 
+
+	PIFF_APPEND_TO_KEY:1
+	; If set, the strings in this list will be ADDED to strings
+	; that may already exist for this key
+
+	PIFF_ABSENT_KEY_OVERRIDES_DEFAULTS:1
+	; If set, an absent key for the item group will cause it to
+	; behave as if an empty key were in the ini file, effectively
+	; overriding any default values stored with the group when it was
+	; compiled. Used primarily by those groups where one subclasses
+	; MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY to determine the
+	; initial setting, rather than looking in the ini file.
+
+	PIFF_SUSPEND_ON_LOAD_OPTIONS:1
+	; Suspend the item group when loading options, to keep it from
+	; sending out status messages, etc.
+
+	PIFF_NUMERIC_MONIKERS:1
+	; Used with PIFF_USE_ITEM_MONIKERS to force item to be stored in
+	; init file as an integer rather than a string.  Only relevant for
+	; DBCS.  For this to work, PIFF_APPEND_TO_KEY and
+	; ATTR_PREF_ITEM_GROUP_EXTRA_STRING_SECTION mustn't be set, and
+	; the item group must be exclusive or exclusive-none, and the
+	; numeric moniker must be in the range 0-65535.
+
+	:2
+PrefInitFileFlags	end
+else
+PrefInitFileFlags	record
+
+	PIFF_USE_ITEM_STRINGS:1
+	; If set, then the item group's children must be of class
+	; PrefStringItemClass, and their strings will be used to
+	; interact with the init file.
+
+	PIFF_USE_ITEM_MONIKERS:1
+	; If set, then the monikers of the items are stored to /
+	; loaded from the init file 
+
+	PIFF_APPEND_TO_KEY:1
+	; If set, the strings in this list will be ADDED to strings
+	; that may already exist for this key
+
+	PIFF_ABSENT_KEY_OVERRIDES_DEFAULTS:1
+	; If set, an absent key for the item group will cause it to
+	; behave as if an empty key were in the ini file, effectively
+	; overriding any default values stored with the group when it was
+	; compiled. Used primarily by those groups where one subclasses
+	; MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY to determine the
+	; initial setting, rather than looking in the ini file.
+
+	PIFF_SUSPEND_ON_LOAD_OPTIONS:1
+	; Suspend the item group when loading options, to keep it from
+	; sending out status messages, etc.
+
+	:3
+PrefInitFileFlags	end
+endif
+
+
+
+
+PrefEnableFlags	record
+	PEF_DISABLE_IF_SELECTED:1
+	; if set, disable the object if the
+	; associated item is selected, otherwise do the opposite.
+
+	PEF_DISABLE_IF_NONE:1
+	; If this flag is set, then the PED_item field is ignored.
+	; Instead, the item group will disable the specified object if
+	; no items are selected -- or if there are no items in the list.
+	:6
+
+PrefEnableFlags	end
+
+	
+PrefEnableData	struct
+	PED_item	word
+	; Identifier of the item that controls enabling / disabling of
+	; object.  If the identifier is GIGS_NONE, then the action
+	; will be performed if no items are selected.
+
+
+	PED_lptr	lptr
+	; Object to be enabled/disabled
+
+
+	PED_flags	PrefEnableFlags
+PrefEnableData	ends
+
+
+;==============================================================================
+;
+;			      PrefClass
+;
+; PrefClass is unusual in that it's a variant master class.  What this
+; means is that all of its subclasses inherit behavior from it as well
+; as from a subclass of GenClass.  For example, PrefItemGroupClass
+; inherits PrefClass functionality as well as GenItemGroup
+; functionality.
+;
+; The primary motivation for creating PrefClass was to provide a
+; mechanism for having a group of objects load their settings when a
+; dialog box was brought on-screen, to remember those initial settings
+; and to restore them if the user hit RESET, and then to save new
+; settings to the .INI file if the user hit APPLY.
+;
+; INITIALIZATION:
+;
+; When a dialog box containing Pref objects is brought up, each object
+; will receive MSG_PREF_INIT.   For dynamic lists, this is a suitable
+; time to build the array of entries that will be displayed, etc.
+; PrefInteractionClass uses this message to decide which of its
+; children to set usable/not usable based on the UI level / features
+; of the application.  Developers can subclass MSG_PREF_INIT to
+; perform other basic initialization functions.
+;
+; LOADING OPTIONS:
+;
+; After each object receives MSG_PREF_INIT, it will receive
+; MSG_META_LOAD_OPTIONS.  The normal GenClass behavior for this
+; message is for an object to send itself MSG_GEN_LOAD_OPTIONS if the
+; object has an init file key (ATTR_GEN_INIT_FILE_KEY).   Pref
+; subclasses use this functionality, but provide additional
+; functionality in that they then save the original value to be
+; restored on a MSG_GEN_RESET.  Developers should note the difference
+; between the two load options messages when deciding which one to
+; subclass.  The first one will be received by EVERY object in the
+; object tree, and so can be used in cases where loading options
+; requires some function not associated with the init file.  The
+; second message is only meant to be used with the init file.
+;
+; Handling MSG_GEN_RESET:
+;
+; By default, GenClass and its subclasses have no handlers for
+; MSG_GEN_RESET.  This is because generic objects are used in a wide
+; variety of situations, and the concept of "original state" is
+; unclear.  For PrefClass, the original state is clearly defined as
+; that time when the dialog comes on-screen.   Therefore, PrefClass
+; data objects save the value loaded from MSG_META_LOAD_OPTIONS so
+; that it can be restored if a MSG_GEN_RESET is received.  This
+; completes the functionality of the RESET button of a complex
+; properties dialog box.   Note that, in some cases, it would be
+; sufficient to just have an object reload its options on
+; MSG_GEN_RESET.  This wouldn't work, however, in the case where an
+; object's settings didn't initially exist in the .INI file, but only
+; as the object's initial, compiled, value.  Developers who subclass
+; MSG_META_LOAD_OPTIONS should make sure they save the original value
+; so that it can be restored on MSG_GEN_RESET.
+;
+; SAVING OPTIONS:
+;
+; This is similar to loading options, in that each object receives
+; MSG_META_SAVE_OPTIONS, but only those objects that have the proper
+; init file vardata will send themselves MSG_GEN_SAVE_OPTIONS.  To
+; perform other functions, developers will want to subclass the
+; MSG_META_SAVE_OPTIONS.  For example, the item group in the "Sound"
+; module of Preferences (Ensemble) saves its options to the .INI file,
+; but then also makes a call to the UI library to have it update its
+; sound settings. 
+;
+;==============================================================================
+
+PrefClass	class	GenClass, master, variant
+
+MSG_PREF_SET_INIT_FILE_CATEGORY	message
+;
+; This utility message adds ATTR_GEN_INIT_FILE_CATEGORY to a Pref
+; object and sets the category with the passed text.  This message is
+; just a utility message, since similar functionality can be had by
+; calling MSG_META_ADD_VAR_DATA.
+;
+; Context:	part of load/save options mechanism
+; Source:	anywhere
+; Destination:  any PrefClass subclass
+; Interception: unnecessary, as PrefClass does the right thing.
+;
+; Pass:		cx:dx - fptr to null-terminated category string
+;				(this is a DBCS string for DBCS)
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing
+;
+
+MSG_PREF_HAS_STATE_CHANGED	message
+;
+; Determine whether this object, or any of its children, have changed
+; since the last LOAD_OPTIONS.  This is used in conjunction with the
+; PA_REBOOT_IF_CHANGED flag that can be set for an object -- this flag
+; signals that, if the object changes state, then GEOS should be
+; restarted for the change to go into effect.
+;
+; Context:	Part of APPLY/SAVE OPTIONS mechanism
+; Source:	PrefClass object sends this to itself when handling
+; 		MSG_PREF_GET_REBOOT_INFO.
+;
+; Destination:  self
+; Interception: New PrefClass subclasses will use this to compare the
+; 		object's current state against the original state that
+; 		was saved during MSG_META_LOAD_OPTIONS
+;
+; Pass:		nothing 
+;			
+; Return:	CARRY SET if anything changed
+;
+; Destroyed:	ax,cx,dx,bp
+;
+;
+
+MSG_PREF_GET_REBOOT_INFO	message
+;
+; When the user hits apply in a PrefDialog, the dialog object will
+; send this message to all of its children to see if any of them have
+; changed in such as way as to require a system reset.  If so, the
+; dialog will then notify the user of the reboot, and give the user a
+; chance to abort (since the system reset may be a lengthy process on
+; some systems). If possible, developers should try to avoid
+; situations where a system reset is necessary, and use mechanisms
+; such as the General Change Notification instead.
+;
+; See also: MSG_PREF_GET_REBOOT_STRING, ATTR_PREF_REBOOT_STRING
+;
+; Context:	APPLY mechanism in PrefMgr
+; Source:	PrefDialog sends this to all children on apply.
+; Destination: 	any "Pref" object
+; Interception: Pref subclasses will check the PA_REBOOT_IF_CHANGED
+; 		flag, and if it's set, compare the object's current
+; 		value against its original value.  If there's a
+;		mismatch, then the object should send itself
+;		MSG_PREF_GET_REBOOT_STRING, and return the optr of
+;		this string.
+;
+; Pass:		nothing
+;
+; Return:	If reboot needed:
+;
+;			^lcx:dx - OD of string to put up in ConfirmDialog
+;		ELSE
+;			cx - 0
+;
+; Destroyed:	ax,bp
+;
+
+MSG_PREF_GET_REBOOT_STRING	message
+;
+; Return the optr of a string in a sharable lmem resource that will be
+; displayed in the reboot dialog.  If this object doesn't have such a
+; string, it will call its gen parent (if the GenParent is a subclass
+; of PrefClass).  The default handler for this message returns the
+; value stored in ATTR_PREF_REBOOT_STRING, looking up the generic tree
+; for such an attribute if none exists on the object in question.   
+;
+; Context:	APPLY mechanism in PrefMgr
+; Source:	Pref object sends this to itself, and then up the
+; 		generic tree, if necessary
+; Destination: 	any "Pref" subclass
+; Interception: Not usually necessary.
+;
+; Pass:		nothing 
+;			
+; Return:	cx:dx - optr of string (cx = 0 if not found)
+;
+; Destroyed:	ax 
+;
+
+MSG_PREF_INIT			message
+;
+; Initialize this object.   Perform any setup that's required when the
+; object first comes on-screen.  Dynamic lists will build their
+; arrays, etc. when receiving this message.  PrefInteractionClass will
+; use this message to decide which children to set usable / not usable
+; based on the UI level and features of the application.
+;
+; Context:	Part of initialization mechanism
+; Source:	generic parent
+; Destination:  any PrefClass object
+; Interception: default behavior is to determine whether to make the
+; 		object usable based on UI level and features (or will
+; 		be, when implemented).  Subclass should call
+; 		superclass before handling, as subclass behavior may
+; 		be different if the object is not usable, etc.
+;
+; Pass:		cx - PrefMgrFeatures
+;		dx - UIInterfaceLevel
+;			
+; Return:	nothing 
+;
+; Destroyed:	ax,cx,dx,bp
+;
+;
+
+MSG_PREF_NOTIFY_DIALOG_CHANGE	message	
+; Message sent out over PDGCNLT_DIALOG_CHANGE list bound to PrefDialog object,
+; telling interested parties of a change in the box's state.
+;
+; Context:	Sent when the dialog box is being opened, closed, or destroyed.
+; Source:	PrefDialogClass
+; Destination:  Any Pref object registered on PDGCNLT_DIALOG_CHANGE
+; Interception: Must be intercepted to do anything (no default handler)
+;
+; Pass:		cx	= PrefDialogChangeType
+;		
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+PrefDialogChangeType	etype	word, 0
+    PDCT_OPEN		enum	PrefDialogChangeType
+    PDCT_CLOSE		enum	PrefDialogChangeType
+    PDCT_DESTROY	enum	PrefDialogChangeType
+    PDCT_RESTART	enum	PrefDialogChangeType
+    PDCT_SHUTDOWN	enum	PrefDialogChangeType
+
+MSG_PREF_SET_ORIGINAL_STATE		message
+;
+; Copy this object's current state to the "original" settings, which
+; will be restored on a MSG_GEN_RESET.
+;
+; Pass:  	nothing
+; Return: 	nothing
+; Destroyed:	nothing
+
+;-----------------------------------------------------------------------------
+;	INSTANCE DATA		
+;-----------------------------------------------------------------------------
+PrefAttributes	record
+	PA_REBOOT_IF_CHANGED:1
+	; This bit signals that changes in the state of this object
+	; require a system reboot to take effect.
+
+	PA_LOAD_IF_USABLE:1
+	; Load options only if this object is usable (this is ON by
+	; default).
+
+	PA_SAVE_IF_USABLE:1
+	; Save options only if this object is usable (this is ON by
+	; default) 
+
+	PA_SAVE_IF_ENABLED:1
+	; Save options only if this object is enabled
+
+	PA_SAVE_IF_CHANGED:1
+	; Save options only if this object has changed.
+
+
+	:3
+PrefAttributes	end
+
+	PI_attrs	PrefAttributes
+
+;-----------------------------------------------------------------------------
+;	VARIABLE DATA		
+;-----------------------------------------------------------------------------
+
+ATTR_PREF_REBOOT_STRING		vardata		optr
+; This is the string passed to MSG_PREF_MGR_DO_REBOOT_DIALOG -- the
+; string must be in a SHARABLE LMEM resource and is incorporated into the
+; middle of another sentence. In English, the sentence is "The system software
+; will shut down and restart to change the <reboot_string>. Do you wish
+; to proceed?"
+;
+; If an object has its PA_REBOOT_IF_CHANGED attribute set, it will scan for
+; this attribute, first in itself, then up the generic tree, until it
+; finds one.
+
+
+ATTR_PREF_REQUIRED_FEATURES	vardata		PrefMgrFeatures
+; features bits that MUST be set for this object to be usable.
+
+ATTR_PREF_PROHIBITED_FEATURES	vardata		PrefMgrFeatures
+; features bits that MUST NOT be set for this object to be usable.
+
+ATTR_PREF_MIN_LEVEL		vardata		UIInterfaceLevel
+; interface level below which this object will not be usable
+
+ATTR_PREF_MAX_LEVEL		vardata		UIInterfaceLevel
+; interface level above which this object will not be usable
+
+
+PrefClass	endc
+
+;==============================================================================
+;
+;			    PrefValueClass
+;
+; A subclass of GenValue to implement MSG_GEN_RESET automatically, as well
+; as the standard functionality implemented by all Pref objects.
+; Unlike GenValueClass, this class only deals with word-sized INTEGER
+; values. 
+;
+;==============================================================================
+
+
+PrefValueClass	class	PrefClass
+	uses	GenValueClass
+
+
+MSG_PREF_VALUE_SET_ORIGINAL_VALUE	message
+;
+; Set the original value of a PrefValue object -- also sets the value
+; of the superclass.
+;
+;
+; Context:	Part of LOAD OPTIONS mechanism.
+; Source:	anywhere
+; Destination: 	PrefValueClass
+; Interception: not likely
+;
+; Pass:		cx - original value
+; 		bp - non-zero if indeterminate
+;
+; Return:	nothing
+;
+; Destroyed:	ax
+;
+;
+;-----------------------------------------------------------------------------
+;		INSTANCE DATA
+;-----------------------------------------------------------------------------
+
+ATTR_PREF_VALUE_ORIG_IS_INDETERMINATE	vardata
+
+ATTR_PREF_VALUE_ROUND	vardata	word
+;
+; This piece of vardata is used to have the PrefValue "round off" to a
+; nearest whole number.  For instance, with a value of "10" here, the
+; value would always round off to the nearest 10.  Note that the user
+; can still type in an illegal value, but this value will be rounded
+; before saving to the .INI file, etc.
+;
+protominor AttrPrefValueWrap
+
+ATTR_PREF_VALUE_WRAP	vardata	word
+; If the value is incremented beyond its top value, it will "wrap
+; around" to its bottom value, and vice versa.
+
+protoreset
+
+PVI_originalValue	word
+
+PrefValueClass	endc
+
+;==============================================================================
+;
+;			    PrefValueZeroPadClass
+;
+; A subclass of PrefValueClass.  This is used in PrefTimeDateControl
+; objects in the Dove project for ensuring that 2-digit numbers
+; (e.g. months, dates, hours) will appear with a leading 0 if they're less
+; than 10.
+;
+;==============================================================================
+PrefValueZeroPadClass	class	PrefValueClass
+	uses	GenValueClass
+
+;-----------------------------------------------------------------------------
+;		INSTANCE DATA
+;-----------------------------------------------------------------------------
+
+; Boolean flag to indicate whether this is an hour field or not.  The hour
+; field may need to have AM/PM inserted depending on whether the
+; user's selected 24-hour or 12-hour mode.
+PVZPI_isHour		BooleanWord
+
+PrefValueZeroPadClass endc
+
+;==============================================================================
+;
+;			  PrefItemGroupClass
+;
+; This class extends upon the init file functionality provide by
+; GenItemGroupClass in that it can also be used to read/write strings
+; to the .INI file.  This class also provides the basis for some
+; functionality used by PrefDynamicListClass, and has a few other
+; weird features, such as updating text objects, enabling/disabling
+; objects based on item group settings, and providing an "override" for
+; non-exclusive item groups.
+;
+; LOADING/SAVING OPTIONS:
+;
+; If either PIFF_USE_ITEM_MONIKERS or PIFF_USE_ITEM_STRINGS is set for
+; the item group, then it will select its children based on the
+; strings stored in the .INI file.  Otherwise, the item group will
+; default to the GenItemGroupClass functionality, which uses the
+; identifier of the items as a basis for selection.
+;
+;==============================================================================
+
+PrefItemGroupClass	class	PrefClass
+	uses	GenItemGroupClass
+
+;-----------------------------------------------------------------------------
+;		MESSAGES		
+;-----------------------------------------------------------------------------
+
+MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION	message
+;
+; Set the "originalSelection" field of the item group.  Also, sends
+; MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION to superclass.  Note that
+; this message can only be used with exclusive item groups -- for
+; other types, use the GenItemGroup messages, and then send the object
+; MSG_PREF_SET_ORIGINAL_STATE.
+;
+;
+; Context:	part of load options mechanism.
+; Source:	anywhere
+; Destination:  an EXCLUSIVE prefItemGroup
+; Interception: not likely
+;
+; Pass:		cx - selection
+;			
+; Return:	nothing 
+;
+; Destroyed:	ax,cx,dx,bp
+;
+
+MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT	message
+;
+; Return the moniker of the selected item.
+;
+; Pass:		cx:dx - buffer to fill in
+;		bp - size of buffer
+;			
+; Return:	if an item is selected:
+;			buffer filled in
+;			bp - # of chars in buffer
+;		else
+;			bp - 0
+;
+; Destroyed:	ax 
+;
+
+
+MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER	message
+;
+; Get the moniker of one of the items of a PrefItemGroup.  NOTE:  All
+; subclasses of PrefDynamicList should make sure they support this
+; function!
+;
+; Pass:		ss:bp - GetItemMonikerParams
+;
+; Return:	bp - number of characters returned.
+;		Buffer should be filled in with a null-terminated
+;		string.  If the moniker is larger than the passed
+;		buffer, object should store nothing and return bp=0
+;
+; Destroyed: 	nothing
+
+GetItemMonikerParams	struct
+	GIMP_identifier	word
+	GIMP_bufferSize	word
+SBCS <	GIMP_buffer	fptr.char					>
+DBCS <	GIMP_buffer	fptr.wchar					>
+GetItemMonikerParams	ends
+
+
+MSG_PREF_ITEM_GROUP_UPDATE_TEXT		message
+;
+; Update the specified text object with text of the currently selected
+; item.   The PrefItemGroup sends this to itself in conjunction with
+; either  ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY or  
+; ATTR_PREF_ITEM_GROUP_STATUS_TEXT.   By default, this message will
+; also cause the text object to send out its status message.
+;
+; Source:	self
+; Destination:  self
+; Interception: default behavior is to fetch the moniker of the
+; 		current selection, and sent that to the text.
+; 		Subclasser can use different text, if desired
+;
+; Pass:		cx - chunk handle of text object 
+;			
+; Return:	nothing 
+;
+; Destroyed:	ax,cx,dx,bp
+;
+;
+;
+;
+
+
+
+PREF_ITEM_GROUP_STRING_BUFFER_SIZE	equ	256
+PREF_ITEM_GROUP_MAX_SELECTIONS equ	16
+
+PrefItemGroupStringVars	struct
+SBCS <	PIGSV_endPtr		nptr.char				>
+DBCS <	PIGSV_endPtr		nptr.wchar				>
+	PIGSV_selections	word PREF_ITEM_GROUP_MAX_SELECTIONS dup (?)
+	PIGSV_numSelections 	word
+SBCS <	PIGSV_buffer		char PREF_ITEM_GROUP_STRING_BUFFER_SIZE dup (?)>
+DBCS <	PIGSV_buffer		wchar PREF_ITEM_GROUP_STRING_BUFFER_SIZE dup (?)>
+PrefItemGroupStringVars	ends
+
+
+;-----------------------------------------------------------------------------
+;		INSTANCE DATA		
+;-----------------------------------------------------------------------------
+
+	PIGI_initFileFlags	PrefInitFileFlags
+	PIGI_originalSelection	word
+	PIGI_originalNumSelections word
+	PIGI_suspendCount	byte
+	; When suspend count is nonzero, item group won't update 
+	; text objects and enable/disable objects when the selection
+	; changes.
+
+;-----------------------------------------------------------------------------
+;		VARDATA		
+;-----------------------------------------------------------------------------
+
+	ATTR_PREF_ITEM_GROUP_ENABLE	vardata	PrefEnableData
+	;
+	; allows setting up an object to be enabled/disabled when
+	; selections are changed in the item group
+
+	ATTR_PREF_ITEM_GROUP_OVERRIDE	vardata	word
+	; 
+	; This attribute is used to specify an item which will act
+	; as an OVERRIDE for all other items (in a non-exclusive
+	; item group).
+	;
+	; When the specified item is SELECTED, then all other items
+	; are DE-SELECTED.
+	;
+	; When any other item is SELECTED, the override item is
+	; DE-SELECTED. 
+	; 
+	; If all items are DE-SELECTED, the override item becomes SELECTED
+
+	ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY vardata	lptr
+	; chunk handle of a GenText object that will be updated
+	; with the moniker of the currently selected item on APPLY /
+	; RESET. 
+
+	ATTR_PREF_ITEM_GROUP_STATUS_TEXT	vardata	lptr
+	; chunk handle of a GenText object that will be updated every
+	; time this object receives a
+	; MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG.  
+
+
+	ATTR_PREF_ITEM_GROUP_EXTRA_STRING_SECTION	vardata	TCHAR
+	; If a string is given -- the string will always be written
+	; out as the FIRST string section for the .INI file key.  For
+	; example, the "Memory" item group uses this to always insert
+	; "disk.geo" whenever writing out the memory types.  Note:
+	; this item is only written if the item group has either the
+	; PIFF_USE_ITEM_MONIKERS or PIFF_USE_ITEM_STRINGS set.
+
+
+PrefItemGroupClass	endc
+
+;==============================================================================
+;
+;			 PrefStringItemClass
+;
+; This GenItemClass subclass is used with PrefItemGroup, if the
+; "useItemStrings" flag is set.  Each item has a string that will be
+; written/read to the .INI file.  Note that if PIFF_USE_ITEM_MONIKERS
+; is used instead, then normal GenItemClass objects can be used.
+;
+
+;==============================================================================
+PrefStringItemClass	class	GenItemClass
+
+;-----------------------------------------------------------------------------
+;	MESSAGES		
+;-----------------------------------------------------------------------------
+ 
+MSG_PREF_STRING_ITEM_SET_INIT_FILE_STRING	message
+;
+; Set the string that's read/written to the init file.
+;
+; Context:	
+; Source:	anywhere
+; Destination:  any StringItemClass object
+; Interception: unlikely but possible.  Default behavior sets the
+; string and then checks again with the .INI file to make sure item
+; should be selected.
+;
+; Pass:		cx:dx - fptr to ASCIIZ string
+;			
+; Return:	nothing 
+;
+; Destroyed:	ax,cx,dx,bp
+;
+
+MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY	message
+;
+; Check the passed string to see if the string bound to this item is in one of
+; its pieces.
+;
+; Context:	Sent by PrefItemGroup with PIFF_USE_ITEM_STRINGS set when it
+;		is loading options.
+; Source:	PrefItemGroup
+; Destination:	PrefStringItem
+; Interception:	May be intercepted if the subclass needs to check other things
+;		to decide whether it should be selected. If you wish to also
+;		have the default behaviour, you may call the superclass either
+;		before or after you've made your own decision, as appropriate.
+;
+; Pass:		ss:bp	= inherited frame:
+; 			locals	local	PrefItemGroupStringVars
+; Return:	carry set if bound string is within the string stored in the
+;			local variable
+;		carry clear if not
+; 
+	PSII_initFileString	lptr
+
+PrefStringItemClass	endc
+
+;==============================================================================
+;
+;			PrefBooleanGroupClass
+;
+; This class is very similar to GenBooleanGroupClass, except that it
+; saves its original state and handles MSG_GEN_RESET appropriately. It
+; can also use item strings / monikers when loading/saving options.
+;
+;==============================================================================
+  
+PrefBooleanGroupClass	class	PrefClass
+	uses	GenBooleanGroupClass
+
+;-----------------------------------------------------------------------------
+;	MESSAGES
+;-----------------------------------------------------------------------------
+ 
+MSG_PREF_BOOLEAN_GROUP_SET_ORIGINAL_STATE	message
+;
+; Set the original state of the boolean group.
+;
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: 
+;
+; Pass:		cx - original state
+;			
+; Return:	nothing 
+;
+; Destroyed:	ax 
+
+;-----------------------------------------------------------------------------
+;	VARDATA		
+;-----------------------------------------------------------------------------
+
+ATTR_PREF_BOOLEAN_GROUP_SEPARATE_BOOLEAN_KEYS	vardata
+;
+; Similar to ATTR_GEN_BOOLEAN_GROUP_INIT_FILE_BOOLEAN, except it specifies
+; that each PrefBoolean child has its own key (and possibly category).
+;
+
+;-----------------------------------------------------------------------------
+;	INSTANCE DATA		
+;-----------------------------------------------------------------------------
+
+	PBGI_initFileFlags	PrefInitFileFlags
+	PBGI_originalState	word
+
+PrefBooleanGroupClass	endc
+
+;==============================================================================
+;
+;			 PrefDynamicListClass
+;
+; This class is designed to be used where the flexibility of a
+; GenDynamicList is required, along with the saving/loading options
+; functionality of other Pref subclasses.  Developers will generally
+; not use this class directly, but instead will subclass it and add
+; handlers for the following messages:
+; MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY,
+; MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER, and
+; MSG_PREF_DYNAMIC_LIST_FIND_ITEM.
+;
+; By handling these three messages, the developer will have a dynamic
+; list that can properly load and save its selection, and will scroll
+; to the correct item in response to keyboard input.  NOTE:  the
+; load/save mechanism is currently only figured dynamic lists that are
+; "exclusive" in behavior.
+
+;==============================================================================
+PrefDynamicListClass	class	PrefItemGroupClass
+	uses	GenDynamicListClass
+
+;-----------------------------------------------------------------------------
+;	MESSAGES		
+;-----------------------------------------------------------------------------
+MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY	message
+;
+; Unlike GenDynamicListClass, which uses a query message to ask
+; another object for the monikers of its items, PrefDynamicListClass
+; is meant to be self-contained -- which means keeping track of all
+; its data, including the item monikers.   The subclass will normally
+; create some sort of array, whether it's a ChunkArray, a FileEnum
+; buffer, a huge array, etc.  and then keep track of this array to
+; quickly get at the item monikers.
+;
+; Context:	The PrefDynamicList sends itself this message when it
+; 		receives MSG_PREF_INIT (normally sent when the dialog is
+;		initiated). 
+; Source:	PrefDynamicListClass
+; Destination:  SUBCLASS of PrefDynamicListClass
+; Interception: The subclass should create an array of strings 
+; 		-- sorted, ideally.
+;
+; Pass:		nothing 
+;			
+; Return:	nothing 
+;
+; Destroyed:	ax,cx,dx,bp
+;
+ 
+MSG_PREF_DYNAMIC_LIST_FIND_ITEM		message
+;
+; Find an item given a (possible) item moniker.  The dynamic list
+; sends this to itself in two cases --  when loading options, in
+; which case an exact match is desired, and when fielding
+; keyboard events, in which case the passed string may only be a few
+; characters, and may be of a different case than the desired item.
+;
+;
+; Context:	LOAD OPTIONS and keyboard handling
+; Source:	PrefDynamicList sends this to itself when loading
+; 		options, and when fielding keyboard events.
+;
+; Destination:  Any PrefDynamicList subclass
+; Interception: There is NO default behavior -- subclasser MUST handle
+; 		this. See PrefTocListClass and PrefNetQListClass
+;		for examples of how this is handled.
+;
+; Pass:		cx:dx - null-terminated ASCII string
+;		bp - nonzero to find best fit (ie, ignore case, and
+;			match up to the length of the passed string),
+;			zero to find an exact match (should match
+;			case, and make sure strings are the same length).
+;
+; Return:	if FOUND:
+;			carry clear
+;			ax - item #
+;		ELSE:
+;			carry set
+;			ax - first item AFTER requested item
+;
+; Destroyed:	cx,dx,bp
+;
+
+
+MSG_PREF_DYNAMIC_LIST_TIMER	message	private
+;
+; INTERNAL -- the pref dynamic list sends this message to itself
+; a few seconds after a key is pressed to flush the keyboard buffer.
+;
+; PASS:	nothing 
+; RETURN: nothing 
+;
+;
+;
+
+
+;-----------------------------------------------------------------------------
+;	VARDATA		
+;-----------------------------------------------------------------------------
+
+; The vardata here is for internal use only -- do not use.
+; PrefDynamicListClass has no vardata / instance data of its own that
+; developers will use -- all instance data will be in the subclass.
+ 
+PDL_CHAR_BUFFER_SIZE equ 32
+PDL_CHAR_MAX_COUNT equ (PDL_CHAR_BUFFER_SIZE -1)
+
+PDLKbdData	struct
+SBCS <	PDLKD_buffer	char (PDL_CHAR_BUFFER_SIZE) dup (?)		>
+DBCS <	PDLKD_buffer	wchar (PDL_CHAR_BUFFER_SIZE) dup (?)		>
+	PDLKD_count	word		
+	; # chars in buffer
+
+	PDLKD_timerHandle	hptr
+	PDLKD_timerID		word
+PDLKbdData	ends
+
+
+TEMP_PDL_KBD_DATA	vardata		PDLKbdData
+
+PrefDynamicListClass	endc
+
+
+;==============================================================================
+;
+;			   PrefIniDynamicListClass
+;
+; This class is a fully functional subclass of PrefDynamicListClass
+; (ie, it handles the three messages described above).  The entries in
+; the list are read in from a blob in the .ini file.  This is used by
+; the Preflang module.
+
+PrefIniDynamicListClass	class PrefDynamicListClass
+
+	PIDLI_array	hptr.NameAndLabel	; block of an array
+						; of name structures
+	ATTR_PREF_INI_INIT_FILE_LIST_CATEGORY	vardata char
+	ATTR_PREF_INI_INIT_FILE_LIST_KEY	vardata char
+		; The category and key of the .ini blob holding the
+		; entries for our list.
+
+PrefIniDynamicListClass	endc
+
+
+;==============================================================================
+;
+;			   PrefTocListClass
+;
+; This class is a fully functional subclass of PrefDynamicListClass
+; (ie, it handles the three messages described above).  It can be used
+; wherever a list of files is needed, as long as that list satisfies
+; the criteria described for a "category" in the TOC file (all files
+; must be in the same directory, and must have the same TokenChars).
+; PrefTocListClass is also used for listing the devices of the
+; extended device drivers -- the infamous "Printer List" is an object
+; of this class.
+;
+;==============================================================================
+ 
+PrefTocListClass	class	PrefDynamicListClass
+
+
+MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO	message
+;
+; Return the info word about the currently selected item.  This
+; message can only be used with PrefTocLists that have the
+; TCF_EXTENDED_DEVICE_DRIVERS FLAG set.
+;
+;
+; Pass:		nothing 
+;			
+; Return:	if found:
+;			carry clear
+;			ax - info
+;		else
+;			carry set
+;			
+; Destroyed:	nothing  
+;
+
+MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME	message
+;
+; Return the name of the driver for the selected device.  Can only be
+; called if TCF_EXTENDED_DEVICE_DRIVERS is set.
+;
+; Pass:		cx:dx - buffer for driver
+;		bp - size of buffer
+;			
+; Return:	IF BUFFER WAS BIG ENOUGH:
+;			cx:dx - data filled in
+;			bp - # chars returned
+;		ELSE
+;			bp - 0
+;
+; Destroyed:	ax 
+;
+
+MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH	message
+;
+; Return the absolute path of the selected driver/file/whatever.
+;
+; Pass:		nothing
+; Return:	cx:dx	= full path
+;		ax	= handle of same
+;		bp	= disk handle
+;
+
+MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE	message
+;
+; Load the driver for the selected device and see if it thinks the selected
+; device is present.
+;
+; Pass:		nothing
+; Return:	carry set if device is available
+; 			if driver is video driver, ax = DisplayType
+;		carry clear if device unavailable
+;			ax	= 0 if just not present
+;				= GeodeLoadError + 1 if couldn't load the
+;				  driver.
+; Destroyed:	cx, dx
+;
+
+MSG_PREF_TOC_LIST_SET_TOKEN_CHARS	message
+; Set the PTLI_tocInfo.TCS_tokenChars field.
+;
+; Pass:		ss:bp - pointer to TokenChars structure
+; Return:	nothing
+; Destroyed: 	nothing 
+
+protominor	NewForNDO2000
+
+MSG_PREF_TOC_LIST_GET_DOS_NAME			message
+;
+; Get the DOS name for the selected driver
+;
+; Pass:		cx:dx - buffer (at least DosDotFileName in size)
+; Return:	cx:dx - filled in
+; Destroyed:	nothing
+
+protoreset
+
+;-----------------------------------------------------------------------------
+;	INSTANCE DATA
+;-----------------------------------------------------------------------------
+	PTLI_flags	TocUpdateCategoryFlags
+	PTLI_tocInfo	TocCategoryStruct
+ 
+
+;-----------------------------------------------------------------------------
+;	VARIABLE DATA		
+;-----------------------------------------------------------------------------
+; A PrefTocListClass object can have "extra entries" --
+; entries at the top of the list that, for a list of devices, might be
+; something like "none" or "no idea".
+;
+; As of 3/26/98, you can specify as many "extra entries" as you like.
+; Just use EXTRA_ENTRY_1 as many times as needed -- it will be
+; processed in order.
+;
+
+PrefTocExtraEntry	struct
+SBCS <	PTEE_item	lptr.char					>
+DBCS <	PTEE_item	lptr.wchar					>
+	; lptr of item name.  For device lists, this is the device.
+	; For others, this is the filename
+
+SBCS <	PTEE_driver	lptr.char					>
+DBCS <	PTEE_driver	lptr.wchar					>
+	; Driver name (for device lists ONLY)
+
+	PTEE_info	word	0
+	; Extra word of information
+PrefTocExtraEntry	ends
+
+
+ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1	vardata	PrefTocExtraEntry 
+
+ATTR_PREF_TOC_LIST_EXTRA_ENTRY_2	vardata	PrefTocExtraEntry 
+
+
+ATTR_PREF_TOC_LIST_INFO_KEY	vardata	char		; always SBCS
+; This key is used to write the "info" word for device lists
+;
+
+ATTR_PREF_TOC_LIST_CONTAINER		vardata	optr
+; PrefContainer object to which we should send the absolute path of the
+; preferences VM file/library associated with the current selection when
+; the selection changes. The file selected is the one whose FEA_NOTICE
+; extended attribute is the same as the longname of the selected driver/library,
+; after removing any "EC " prefix Glue might have prepended to the name
+; originally specified by the programmer.
+
+protominor	NewForNDO2000
+
+ATTR_PREF_TOC_LIST_STORE_DOS_NAME	vardata
+;
+; normally PrefTocListClass will store the longname for drivers; in
+; the case of SpUIs and some other things, we want the DOS name stored
+; instead. The longname is still displayed, however.
+
+protoreset
+
+PrefTocListClass	endc
+
+;==============================================================================
+;
+;			   TitledGlyphClass
+;
+; This class, when spec-built, will use its moniker list and combine
+; the text and graphic so as to provide the glyph seen in the corner
+; of the Pref dialogs.  Developers will want to use this glyph to
+; provide dialogs that have a similar look and feel to existing dialogs.
+;
+;==============================================================================
+
+TitledGlyphClass	class	GenGlyphClass
+TitledGlyphClass	endc
+
+;==============================================================================
+;
+;			 PrefInteractionClass
+;
+; The primary function of this class is to propagate certain messages
+; down the generic tree to other Pref objects.
+; MSG_PREF_INIT, MSG_PREF_SET_ORIGINAL_STATE:
+; 	PrefInteractionClass will send these messages to every child that is
+; 	a subclass of PrefClass
+;
+; MSG_META_LOAD_OPTIONS:
+;	PrefInteractionClass will send this to each child that
+;	satisfies the appropriate criteria (based on the child's
+;	PA_LOAD_IF_USABLE flag).
+;
+; MSG_META_SAVE_OPTIONS:
+;	PrefInteractionClass will send this to each child that
+;	satisfies the appropriate criteria (based on the child's
+;	PA_SAVE_IF_CHANGED, PA_SAVE_IF_ENABLED, and PA_SAVE_IF_USABLE
+;	flags).
+;
+; MSG_PREF_HAS_STATE_CHANGED, MSG_PREF_GET_REBOOT_INFO:
+;	Propagates these messages to children, returning the value
+;	from the first child that returns a positive / non-null response.
+;
+;
+;==============================================================================
+PrefInteractionClass	class	PrefClass
+	uses	GenInteractionClass
+
+PrefInteractionAttrs record
+	PIA_LOAD_OPTIONS_ON_INITIATE:1
+	; If set, then the dialog will send MSG_PREF_INIT, followed by
+	; MSG_META_LOAD_OPTIONS to itself when it receives a
+	; MSG_GEN_INTERACTION_INITIATE
+
+	PIA_SAVE_OPTIONS_ON_APPLY:1
+	; This flag is normally OFF, to allow non-dialog
+	; prefInteraction objects to reside inside other interactions
+	; without duplicate SAVE_OPTIONS messages being sent.  This
+	; flag is normally ON for objects of PrefDialogClass
+
+	PIA_COMPLETE_INTERACTION_ON_APPLY:1
+	; Only complete (i.e. "close") this interaction if it receives
+	; a MSG_GEN_APPLY.  This allows one to handle
+	; MSG_GEN_PRE_APPLY and set the carry to abort closing the
+	; interaction.
+	:5
+PrefInteractionAttrs	end
+
+
+;-----------------------------------------------------------------------------
+;	INSTANCE DATA		
+;-----------------------------------------------------------------------------
+ 
+	PII_attrs	PrefInteractionAttrs
+
+
+PrefInteractionClass	endc
+
+
+
+;==============================================================================
+;
+;			  PrefContainerClass
+;
+; An interaction that manages a read-only VM file or sub-library containing
+; other Pref objects, usually used to specify preferences for device drivers
+; or similar things that one doesn't wish to have dependent on the config
+; library.
+;
+; INHERITANCE:
+;
+; MSG_GEN_PATH_SET - Treats final component of path as file name, which it
+;		     strips off before passing it to its superclass. This is
+;		     how you tell it what file it should open.
+;
+;==============================================================================
+EndLibrary	config
+
+PREFVM_DOC_PROTO_MAJOR	equ	2	; Protocol number for an acceptable
+PREFVM_DOC_PROTO_MINOR	equ	0	;  VM file (must be outside library
+					;  segment so it can be used
+
+StartLibrary	config
+
+PrefContainerClass	class	PrefInteractionClass
+
+MSG_PC_CLOSE_HANDLE					message
+; Close the VM file or unload the library containing the tree we were
+; managing.
+;
+; Context:	Sent by PrefContainer to itself using
+;		MSG_META_FLUSH_INPUT_QUEUES after having sent a
+;		MSG_META_BLOCK_FREE, if appropriate, to the tree it's
+;		been holding.
+; Source:	PrefContainerClass
+; Destination:	PrefContainerClass
+; Intercept:	Not intercepted.
+;
+; Pass:		cx	= handle of library/file to unload/close
+; 		dx	= non-zero if handle is for a library
+; Return:	nothing
+; 		ax, cx, dx, bp - destroyed
+; 
+
+PrefVMMapBlock	struct		; Map block for a VM file this object can
+				;  handle.
+    PVMMB_root	fptr			; Root of the object tree contained in
+					;  the VM file. Segment portion is VM
+					;  block handle
+PrefVMMapBlock	ends
+
+PREFVM_ATTRIBUTES	equ	VMA_OBJECT_ATTRS or mask VMA_SYNC_UPDATE
+					; VMAttributes such a file must have.
+
+    PCI_handle		hptr	0		; Handle of open VM file, or
+						;  handle of library
+		noreloc	PCI_handle
+    PCI_fileName	FileLongName	<>	; Name of open file.
+    PCI_templateMon	lptr.VisMoniker	0	; Template to use when
+						;  constructing our moniker.
+						;  \1 is replaced by the name
+						;  of the file whose objects
+						;  are being displayed. If 0,
+						;  no moniker is created.
+    PCI_dupRoot		optr			; Root of duplicated tree. If
+						;  handle is 0, PCI_handle is
+						;  a VM file.
+		noreloc	PCI_dupRoot
+PrefContainerClass	endc
+
+
+
+;==============================================================================
+;
+;			   PrefDialogClass
+;
+; PrefDialogClass is a PrefInteractionClass subclass that, by default,
+; is a GIT_PROPERTIES interaction, and has the
+; PIA_LOAD_OPTIONS_ON_INITIATE and PIA_SAVE_OPTIONS_ON_APPLY flags.
+;
+; The main functionality of this class is its handling of
+; MSG_GEN_APPLY, which is as follows:
+; 
+; On receiving MSG_GEN_APPLY, the dialog sends
+; MSG_PREF_GET_REBOOT_INFO to itself (which is propagated to all
+; children via PrefInteractionClass).  If any children require reboot,
+; then the dialog sends MSG_PREF_DIALOG_CONFIRM_REBOOT to itself,
+; which normally puts up a confirmation dialog box (this can be
+; subclassed to provide other behavior).  If user confirms reboot,
+; then the dialog will send MSG_PREF_DIALOG_REBOOT to itself, and
+; MSG_GEN_APPLY to its superclass to save the options (it being
+; assumed that the PIA_SAVE_OPTIONS_ON_APPLY flag is set).
+;
+;
+;==============================================================================
+ 
+PrefDialogClass	class	PrefInteractionClass
+
+
+MSG_PREF_DIALOG_REBOOT	message
+; Dismiss the interaction and cause PC/GEOS to restart.
+;
+; Pass:		nothing 
+; Return:	doesn't
+;
+
+MSG_PREF_DIALOG_CONFIRM_REBOOT	message
+; Put up a yes/no dialog box asking user if s/he wants to restart the
+; system to effect the change.
+;
+; Pass:		^lcx:dx - optr of string which will be inserted in a 
+; 		sentence of the form "The system software will
+; 		shut down and restart to change the XXX.
+;		Do you wish to proceed?'
+;
+; Return:	carry SET to confirm, carry CLEAR otherwise
+; Destroyed:	ax,cx,dx,bp
+;
+
+ MSG_PREF_DIALOG_RESTART_ACK	message	private
+; Internal message - sent by the kernel to the dialog object to
+; confirm that now is a good time to shutdown / restart.
+;
+; Pass:		cx - zero to deny shutdown, nonzero to allow shutdown
+; 		to continue
+; Return:	nothing
+; Destroyed:	ax,cx,dx,bp
+;
+
+
+;
+; GCN lists to which kids can add themselves.
+;
+GeoWorksPrefDialogGCNListType	etype	word, first PrefDialogMessages, 2
+    PDGCNLT_DIALOG_CHANGE	enum	GeoWorksPrefDialogGCNListType
+    ; MSG_PREF_NOTIFY_DIALOG_CHANGE sent out.
+
+;-----------------------------------------------------------------------------
+; VARDATA		
+;-----------------------------------------------------------------------------
+
+ATTR_PREF_DIALOG_SYS_SHUTDOWN_TYPE	vardata	word
+; Specifies a SysShutdownType to use instead of SST_RESTART
+
+PrefDialogClass	endc
+
+
+;==============================================================================
+;
+;			    PrefTextClass
+;
+; This class is very similar to GenTextClass, except that it will save
+; its original text after MSG_META_LOAD_OPTIONS, and use that original
+; value for handling of MSG_GEN_RESET and MSG_PREF_HAS_STATE_CHANGED.
+; 
+;==============================================================================
+
+PrefTextClass	class	PrefClass
+	uses	GenTextClass
+
+;-----------------------------------------------------------------------------
+;	INSTANCE DATA		
+;-----------------------------------------------------------------------------
+ 
+	PTI_originalText	lptr.TCHAR
+	; Text value immediately after LOAD_OPTIONS
+
+;-----------------------------------------------------------------------------
+;	VARDATA		
+;-----------------------------------------------------------------------------
+ 
+ATTR_PREF_TEXT_INIT_FILE_CATEGORY_TARGET	vardata	lptr
+; PrefTextClass has the wonderful ability that it can set another
+; object's init file category from its text.  Category gets updated
+; whenever the text object receives MSG_GEN_TEXT_SEND_STATUS_MSG or
+; MSG_GEN_APPLY 
+
+PrefTextClass	endc
+
+
+;=============================================================================
+;			PrefTriggerClass. 
+; This is not a "pref" class - it's just a normal old GenTrigger with
+; the added functionality that additional messages can be sent out.
+;============================================================================
+
+PrefTriggerClass class	GenTriggerClass
+;-----------------------------------------------------------------------------
+;	VARDATA		
+;-----------------------------------------------------------------------------
+PrefTriggerAction	struct
+	PTA_message	word
+	PTA_dest	optr
+PrefTriggerAction	ends
+
+ATTR_PREF_TRIGGER_ACTION 	vardata	PrefTriggerAction
+; Specifies an additional action to be performed.  There may be more
+; than one of these -- they'll be processed in order.
+
+PrefTriggerClass	endc
+
+
+;=============================================================================
+;			PrefControlClass 
+;
+; Subclass of PrefInteractionClass/GenControlClass that bypasses some
+; of GenControl's functionality.  This class is assumed not to be on
+; notification lists, and pass MSG_GEN_RESET to their children as
+; normal GenInteractionClass would.
+;=============================================================================
+PrefControlClass	class	PrefInteractionClass
+	uses	GenControlClass
+
+PrefControlClass	endc
+
+;=============================================================================
+;			PrefColorSelectorClass 
+;
+; Subclass of PrefClass/GenColorSelectorClass. This class contain the
+; functionality to change the system's color via a set of color tiggers.
+; See the ensamble Prefbg module for an example of the use of this controller.
+; The messages and instance data of this class are for internal use only.
+;
+;=============================================================================
+PrefColorSelectorClass	class	PrefClass
+	uses	GenColorSelectorClass
+
+PrefColorSelectorClass	endc
+
+
+;=============================================================================
+;			PrefTimeDateControlClass
+;
+; This class contains the functionality to allow a user to change the
+; system time & date via a set of PrefValue objects.  See the Ensemble
+; time & date preferences dialog for an example of the use of this
+; controller.  The messages and instance data of this class are for
+; 
+;=============================================================================
+ 
+PrefTimeDateControlClass	class	PrefControlClass
+
+; GenApplication GCN lists to be placed on:
+;	- none -
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+PrefTimeDateControlFeatures	record
+    PTDCF_DATE:1		; must *ALWAYS* be displayed - no support
+				; currently exists for prohibiting this
+				; feature.
+
+    PTDCF_TIME:1		; if this feature is turned off, do *NOT*
+				; send any messages to this object that
+				; get or set the time
+PrefTimeDateControlFeatures	end
+
+PTDC_DEFAULT_FEATURES		equ	mask PTDCF_DATE or mask PTDCF_TIME
+
+PrefTimeDateControlScreen	etype	word, 0, 2
+    PTDCS_TIME_DATE	enum	PrefTimeDateControlScreen
+
+;-----------------------------------------------------------------------------
+;		Internal messages
+;-----------------------------------------------------------------------------
+
+MSG_PTDC_TIMER_TICK						message
+;
+;  Update display based on new time/date
+;
+; Context:	Utility message
+; Source:	Interface gadget (GenTrigger)
+; Destination:	PrefControlClass object
+; Interception: Intercepted by controller
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PTDC_MONTH_CHANGE						message
+;
+;  The user has made a change to the month
+;
+; Context:	Utility message
+; Source:	Interface gadget (GenValue objects)
+; Destination:	PrefControlClass object
+; Interception: Intercepted by controller
+;
+; Pass:		DL	= new month
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PTDC_YEAR_CHANGE						message
+;
+;  The user has made a change to the year
+;
+; Context:	Utility message
+; Source:	Interface gadget (GenValue objects)
+; Destination:	PrefControlClass object
+; Interception: Intercepted by controller
+;
+; Pass:		DX	= new year
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PTDC_SET_TIME						message
+;
+;  Set the system time
+;
+; Context:	Utility message
+; Source:	Interface gadget (GenTrigger)
+; Destination:	PrefControlClass object
+; Interception: Intercepted by controller
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PTDC_SET_DATE						message
+;
+;  Set the system date
+;
+; Context:	Utility message
+; Source:	Interface gadget (GenTrigger)
+; Destination:	PrefControlClass object
+; Interception: Intercepted by controller
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+protominor	NewPTDCMessagesForDove
+
+MSG_PTDC_TOGGLE_24_HOURS			message
+;
+; Toggle between 12-hour and 24-hour representations
+;
+
+MSG_PTDC_SET_12_OR_24_HOURS			message
+;
+; Set time representation to 12 or 24 hours.
+;
+
+MSG_PTDC_ADJUST_HOUR_DISPLAY			message
+;
+; User has just changed, but not committed, the 12/24 mode.  We redisplay
+; the text in the TimeHours object accordingly.
+;
+
+MSG_PTDC_GET_MONTH_YEAR				message
+;
+; Get the month and year
+;
+; Return:
+;	ax - year
+;	cl - month (1-12)
+;
+
+protoreset
+
+protominor	NewPTDCMessagesForGPC
+
+MSG_PTDC_GET_DATE				message
+;
+; Get the date currently displayed by the object
+;
+; Return:
+;	cl - day   (1-31)
+;	ch - month (1-12)
+;	dx - year
+;
+
+MSG_PTDC_SET_TIMEZONE				message
+;
+; Set the timezone and DST info
+;
+; Pass:
+;	none
+; Return:
+;	none
+;
+
+MSG_PTDC_QUERY_TIMEZONE				message
+;
+; Get a string for the timezone list
+;
+; Pass:
+;	cx:dx - dyanmic list
+;	bp - item #
+; Return:
+;	none
+
+MSG_PTDC_TIMEZONE_SELECTED			message
+;
+; Update UI after a timezone was selected
+;
+; Pass:
+;	cx - item #
+;	bp - # of selections
+;	dl - GenItemGroupStateFlags
+; Return:
+;	none
+
+protoreset
+
+
+;-----------------------------------------------------------------------------
+;		Instance data
+;-----------------------------------------------------------------------------
+
+    PTDCI_timer		dword			; active timer
+    PTDCI_maxDays	byte			; maximum number of days
+    PTDCI_month		byte			; current month
+    PTDCI_year		word			; current year
+
+
+;-----------------------------------------------------------------------------
+;	VARIABLE DATA		
+;-----------------------------------------------------------------------------
+
+protominor	NewPTDCMessagesForGPC
+
+ATTR_PREF_TIME_DATE_CONTROL_MINIMUM_YEAR 	vardata	word
+; Specifies the minimum year displayed by this object (default is 1980).
+; Values less than 1904 or more than 2099 will be ignored.
+
+ATTR_PREF_TIME_DATE_CONTROL_MAXIMUM_YEAR 	vardata	word
+; Specifies the maximum year displayed by this object (default is 2050).
+; Values less than 1904 or more than 2099 will be ignored.
+
+protoreset
+
+PrefTimeDateControlClass	endc
+
+;=============================================================================
+;			PrefPortItemClass
+;
+; This class allows the user to select a serial or parallel port.
+; Objects of this class will automatically disable themselves if the
+; desired port is unavailable on a specific machine.
+;
+; INHERITANCE: 
+;	MSG_SPEC_BUILD - this object will query the driver to see if
+;the desired port is available.
+;=============================================================================
+PrefPortItemType	etype	byte
+    PPIT_SERIAL_MOUSE	enum	PrefPortItemType
+    PPIT_SERIAL		enum	PrefPortItemType
+    PPIT_PARALLEL	enum	PrefPortItemType
+
+PrefPortItemClass	class	PrefClass
+	uses	PrefStringItemClass
+
+;----------------------------------------------------------------------
+;	MESSAGES	
+;----------------------------------------------------------------------
+MSG_PREF_PORT_ITEM_GET_STATUS message
+; Determine whether this item should be ENABLED or DISABLED based on
+; the device map.  Can only be called after the item has been SPEC_BUILT.
+;
+;	Pass:	nothing
+;	Return:	ax = nonzero:  object should be ENABLED
+;		ax = zero:  object should be DISABLED
+;
+
+MSG_PREF_PORT_ITEM_FREE_DRIVER	message	private
+; Internal message -- object sends this to itself via the queue
+; to free the driver after querying for the device map.
+;
+ 
+;----------------------------------------------------------------------
+;	INSTANCE DATA	
+;----------------------------------------------------------------------
+
+    PPII_portMask	word
+    PPII_type		PrefPortItemType
+    PPII_status		byte
+    ; the enabled/disabled status is stored here after initialization,
+    ; primarily for the benefit of the "Printer" module, which checks
+    ; this thing every time the user selects a printer type
+PrefPortItemClass	endc
+
+;==============================================================================
+;
+;			PrefBooleanClass
+; This class exists to allow ATTR_PREF_BOOLEAN_GROUP_SEPARATE_BOOLEAN_KEYS.
+; Used for children of a PrefBooleanGroupClass object that uses it.
+; 
+;==============================================================================
+  
+PrefBooleanClass	class	PrefClass
+	uses	GenBooleanClass
+
+;-----------------------------------------------------------------------------
+;	MESSAGES
+;-----------------------------------------------------------------------------
+;-----------------------------------------------------------------------------
+;	VARDATA		
+;-----------------------------------------------------------------------------
+;-----------------------------------------------------------------------------
+;	INSTANCE DATA		
+;-----------------------------------------------------------------------------
+PrefBooleanClass	endc
+
+
+;-----------------------------------------------------------------------------
+;	EXPORTED ROUTINES		
+;-----------------------------------------------------------------------------
+
+global 	ConfigBuildTitledMoniker:far
+global 	CONFIGBUILDTITLEDMONIKER:far
+
+
+global 	PREFSAVEVIDEO:far
+global	PREFRESTOREVIDEO:far
+global	PREFDISCARDSAVEDVIDEO:far
+global	PrefTestVideoDevice:far
+
+PrefSaveVideo equ <PREFSAVEVIDEO>
+PrefRestoreVideo equ <PREFRESTOREVIDEO>
+PrefDiscardSavedVideo equ <PREFDISCARDSAVEDVIDEO>
+
+global	TocSortedNameArrayAdd:far
+global 	TOCSORTEDNAMEARRAYADD:far
+global	TocSortedNameArrayFind:far
+global  TOCSORTEDNAMEARRAYFIND:far
+
+SortedNameArrayFindFlags	record
+	SNAFF_IGNORE_CASE:1
+SortedNameArrayFindFlags	end
+
+global	TocFindCategory:far
+global	TOCFINDCATEGORY:far
+global	TocNameArrayFind:far
+global	TOCNAMEARRAYFIND:far
+global	TocNameArrayGetElement:far
+global	TOCNAMEARRAYGETELEMENT:far
+global	TocUpdateCategory:far
+global	TOCUPDATECATEGORY:far
+global  TocNameArrayAdd:far
+global	TOCNAMEARRAYADD:far
+global	TocDBLock:far
+global	TOCDBLOCK:far
+global	TOCDBLOCKGETREF:far
+global	TocGetFileHandle:far
+global	TOCGETFILEHANDLE:far
+
+global 	TocAddDisk:far
+global 	TOCADDDISK:far
+global	TocCreateNewFile:far
+global	TOCCREATENEWFILE:far
+global	ConfigBuildTitledMonikerUsingToken:far
+global	CONFIGBUILDTITLEDMONIKERUSINGTOKEN:far
+
+
+EndLibrary	config
+
+
+
+
+
+
+
+
+
+
+
+
+
+

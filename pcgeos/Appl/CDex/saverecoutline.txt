@@ -1,0 +1,38 @@
+	andnf	ds:[recStatus], not mask RSF_WARNING ; warning box was not on
+	test	ds:[recStatus], mask RSF_SORT_EMPTY ; index field empty?
+	jne	warningBox		; if so, put up a warning box
+
+	LONG je	notModified		; if not, check to see if created
+
+	je	newRecord		; if so, skip to handle it
+
+	jc	error			; if carry set, exit
+
+	jne	insert			; if so, skip to insert
+
+	LONG je	updateQuick		; if not, exit
+delete:
+	jmp	short	insert		; insert it back into quick table
+newRecord:
+	jc	error			; if carry set, exit
+insert:
+insert2:
+exit:
+	clc				; exit with carry clear
+error:
+	ret
+
+
+warningBox:
+	jne	error			; if so, exit (C clear)
+	jmp	short	error		; quit
+
+notModified:
+	jne	insert			; if so, insert it
+	jge	delete			; if so, delete and re-insert it
+	jmp	exit
+updateQuick:
+	jmp	insert2
+
+
+SaveCurRecord	endp

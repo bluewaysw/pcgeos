@@ -1,0 +1,225 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1991 -- All Rights Reserved
+
+PROJECT: 	PC/GEOS
+MODULE: 	User Interface
+FILE: 		APIDesignGuide		-- A guide for deciding on pass/return
+					   API for new routines & methods
+
+AUTHOR:		Doug Fults
+
+REVISION HISTORY:
+	Date	Name		Description
+	----	----		-----------
+	7/17/91	Doug		Inital version
+
+DESCRIPTION:
+
+	The purpose of this document is to define how the API for PC/GEOS
+	& libraries should be constructed with regards to the passing &
+	returning of various amounts of data.
+
+	$Id: APIDesignGuide.doc,v 1.2.34.1 97/03/29 03:37:17 canavese Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+------------------------------------------------------------------------------
+	Selecting an API for Pass Parameters to a routine/message
+------------------------------------------------------------------------------
+
+general
+-------
+To select an API for passing data to a routine or in a message, you must first
+look at the nature of the data.  Consider: 
+
+	* whether fixed or variable in size
+	* if fixed, size of data
+	* if variable, the maximium possible size of the data
+	* where the source data typically will reside:  in local stackframe?
+	  in local memory chunk/object block?  resource?  VM file?  Could it
+	  be in a an object block running under a different thread than the
+	  routine/method handler?
+	* the commonality of the new function you're writing -- will it be
+	  used often or infrequently?  (Might affect how many different API's
+	  you want to offer)
+
+... then choose one or more of the API approaches listed below.
+
+NOTE:  To avoid ugly casting problems in "C" programs, each pass parameter,
+if possible, should have only one allowed type.  for instance, stay away
+from dword "Destinations" that are either fptr or optr depending on the
+state of a flag, instead, offer two different routines/methods, one for
+fptr, one for optr, or only allow one or the other.
+
+
+registers/stackframe
+--------------------
+Good for when data is fixed in size and <= 128 bytes.
+
+NOTE: When passing a stackframe, ALL data should be passed in the stackframe,
+i.e. extra data should not passed in unused registers.  This will make the
+creation of a "C" stub for routine much easier, or the prototype for a message
+possible.
+
+
+fptr to data
+------------
+Data is fixed in size & > 128 bytes, or variable in size and generally < 8K.
+This is an extremely flexible technique, as the caller is free to pass a ptr to
+data in a stackframe, code segment, lmem block, or object block,
+as long as the block is kept locked until the call is complete.
+
+In the case of a message being remote called to another thread, this technique
+also has the benefit of allowing the passage of data in an object block that
+is not run by the same thread as the recipient object.  On the other hand,
+there is an implementation problem for the recipient object of a message
+in which an fptr is passed:  The case where the fptr points to data in the
+same block as the recipient object itself.  The problem is that if the
+recipient object resizes a chunk, or otherwise does anything that resizes
+or moves the block, the fptr is no longer valid.  Because of this, objects
+providing an fptr API will have to test for this case & deal with it somehow.
+One approach is to copy the data to a temporary memory block, & changing
+the fptr to be in the locked block before proceeding (The memory block, of
+course, will have to be freed before returning).
+
+
+optr to data
+------------
+Data is of variable size, but generally <8K.  This option is less flexible
+than the fptr approach, as it limits the source to being in a chunk.
+It also suffers from the problem that information stored in object blocks
+can only be accessed by one thread, hence such data can not be copied
+"across threads" using this API.  Nevertheless, for common functions
+which deal with data that naturally finds itself stored in chunks, you
+might wish to consider offering the API, for convenience sake, in addition
+to the fptr.
+
+Pass parameters for this options should be documented as requiring the
+optr to be to a chunk in either a sharable LMem block, or an object block
+run bythe same thread as the routine/object being called, under penalty
+of FATAL_ERROR.
+
+
+handle of VM block chain
+------------------------
+Useful for cases where data can potentially be >= 8K in size.  If data is
+commonly much smaller than this, you might want to provide one of the other
+API's mentioned above, as well as this one, so that the app writer doesn't
+always have to set the data from a VM block chain, which is many cases would
+be quite unwieldy & inefficient.
+
+
+
+------------------------------------------------------------------------------
+	Selecting an API for Return Parameters from a routine/message
+------------------------------------------------------------------------------
+
+general
+-------
+The "C" language has the limitation that any one function can only return
+one variable.  The variable, of course, may be ptr to a larger structure,
+but it is not possible to just return, say, multiple integers, or multiple ptrs
+as is possible in assembly language.  While it is possible to write a stub
+that deals with the problem by creating a structure to hold the multiple
+values, & then return a pointer to them, it is cleaner if the API is designed
+to return single variables in the first place.  Keep this in mind...
+
+registers
+---------
+If it fits, go for it.  (Recall the single-variable "C" issue, though...)
+
+stackframe
+----------
+Don't use.  Not possible in methods, & the use of fptr allows the caller the
+same capability without limiting flexibility.
+
+fptr to buffer
+--------------
+Good for fixed-sized data, or variable sized data with a maximum size of
+128 bytes or so.
+
+optr of chunk to put data in
+----------------------------
+Good for variable-sized data up to 8K or so.  Has the problem that data cannot
+be copied into a chunk in an object block run by a different thread than the
+routine/object attempting to do the copy, but the only other option for
+variable-sized data in the "VM file" approach below, so this one by comparison
+looks attractive for smaller pieces of data.
+
+Return parameters for this options should be documented as requiring the
+optr to be to a chunk in either a sharable LMem block, or an object block
+run by the same thread as the routine/object being called, under penalty
+of FATAL_ERROR.  If the caller can't guarantee this requirement, they should
+pass a newly created sharable LMem block & chunk, & then copy the data
+from that block to use locally.
+
+handle of VM file to create VM block chain in
+---------------------------------------------
+Useful for cases where data can potentially be >= 8K in size.  If data is
+commonly much smaller than this, you might want to provide one of the other
+API's mentioned above, for when the caller knows the data will not be emmense
+given its usage scenerio.
+
+
+==============================================================================
+Re: API guide
+
+Stack frame guidelines are different for a routine than for message.
+For a routine it is possible to have a stack frame and registers, for
+a message it is not.  Also, passing a far pointer to a structure is
+much better than passing ss:bp, where possible (note that this does
+not refer to messages where ss:bp is used to pass multiple paramters
+and not a structure).
+
+I can't think of any places where one would want to pass in an
+existing VM block.  I'm sure that there are places, but it seems like
+they are not common enough to justify special code in most
+circumstances.
+
+                                                        - tony
+
+This is how the current graphics string stuff works (you can only pass
+a VM block).  Same is true for chunks and graphics strings.  I could
+change it to always allocate the block, but I don't think that it
+would require that much code, perhaps something like:
+
+        tst     ax      ; see if block handle supplied
+        jz      haveBlock
+        mov     cx, SOME_DEFAULT_SIZE
+        call    VMAlloc
+haveBlock:
+
+I will go with whatever you guys think is right.  If the way that the
+current GString stuff works is not convenient for applications, then that
+is a good thing to know and I will change it for 2.0
+
+
+jim
+
+
+Re: API Design and VM blocks
+
+Do you allow VM block and offset, or if a VM block is passed do you
+just put the data at the beginning?
+
+If there are routines that are called many times to append elements or
+something, then VM block + offset seems useful.
+
+If the routine is returning a VM chain (or later a HugeArray), it
+seems cleaner to just return a VM block.
+
+                                                        - tony
+
+This is a good point.  When I wrote the GString stuff, I assumed that app
+writers would have specific VM blocks that they would want to stuff
+GStrings into.  Or, if they had VM block handles stored in other data
+structures, it might be useful to re-use the same block (so they wouldn't
+have to go update the block handle in other data structures).
+
+It does seem cleaner to just return a block handle, if that doesn't
+represent a problem to app writers.
+
+
+

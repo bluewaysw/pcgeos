@@ -1,0 +1,339 @@
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include "global.h"
+#include "vltinput.h"
+#include "output.h"
+#include "rtf.h"
+#include "scan.h"
+#include "groups.h"
+#include "prescan.h"
+#include "text.h"
+#include "warnings.h"
+#include "charset.h"
+#include "output.h"
+
+#define RTF_EXPORT_VERSION 1
+
+extern optr oVLTInput;
+extern VMFileHandle vmfhInput;
+extern VMBlockHandle vmbhTypeAttrs;
+extern OutputBufferStruct *pOutputBuffer;
+
+#if _DO_HELP
+extern Boolean boolHyperLinksEnabled;
+extern word wHyperlinkNeedsFinishingToken;
+extern word wHyperlinkNeedsFinishingFilenameToken;
+extern VMBlockHandle vmbhGraphicRuns;
+#endif
+
+void ExportResetCharAttrs(VisTextCharAttr* pAttr)
+	{
+#if _DO_HELP
+     if((pAttr->VTCA_extendedStyles & VTES_BUTTON) && pOutputBuffer != NULL) {
+	 RTFOutputAddChar(171);
+	 RTFOutputAddString("BUTTON0");
+	 RTFOutputAddChar(187);
+     }
+#endif
+	    memcpy(pAttr, &DefaultCharAttrs, sizeof(VisTextCharAttr));
+	}
+
+void ExportResetParaAttrs(VisTextParaAttr* pAttr)
+	{
+	memcpy(pAttr, &DefaultParaAttrs, sizeof(VisTextParaAttr));
+	}
+
+Boolean EmitRTFHeader(void)
+    {
+    if (!RTFOutputAddChar('{')
+      || !RTFOutputAddControlParameter("rtf", RTF_EXPORT_VERSION, FALSE)
+      || !RTFOutputAddControl("ansi", TRUE))
+    	return FALSE;
+
+	/* Emit font table. */
+	if (!RTFOutputAddControlParameter("deff", 0, FALSE)
+	  || !GroupFontTableEmitTable())
+		return FALSE;
+
+	/* Emit color table. */
+	if (!GroupColorTableEmitTable())
+		return FALSE;
+
+	/* Emit default properties. */
+	if (!RTFOutputAddControl("pard", FALSE) || !RTFOutputAddControl("plain", TRUE))
+		return FALSE;
+		
+	/* Emit document properties. */
+	if (!ScanEmitDocAttrs())
+		return FALSE;
+
+#if _DO_HELP
+	/* if we're exporting a document using hyperlinks, then
+	   emit the special \geoshelp token. This token needs to
+	   appear inside of hidden text, since Word will get rid of
+	   tags it doesn't recognize, and for our purposes, we need
+	   to preserve these tags. */
+	if(boolHyperLinksEnabled == TRUE) {
+	    if(!RTFOutputAddChar(171) ||
+	       !RTFOutputAddString("geoshelp") ||
+	       !RTFOutputAddChar(187))
+		return FALSE;		
+	}
+#endif
+
+	return TRUE;
+    }
+
+void EmitRTFFinale(void)
+    {
+    RTFOutputAddChar('}');
+    RTFOutputFlush();
+    }
+
+Boolean EmitCharDiff(VisTextCharAttr* pOld, word new)
+    {
+    Boolean bSuccess = TRUE;
+    MemHandle hArray = NullHandle;
+    VisTextCharAttr *pNew;
+    VisTextCharAttrDiffs diffs;
+    Boolean bEmitPlain = FALSE;
+#if _DO_HELP
+     word currHyperlinkToken = 0xffff;
+     word currHyperlinkFilenameToken = 0xffff;
+#endif
+
+    diffs.VTCAD_diffs = 0;
+    diffs.VTCAD_extendedStyles = 0;
+    diffs.VTCAD_textStyles = 0;
+
+    pNew = VLTInputGetCharAttrByToken(new, &hArray);
+    ScanFindCharAttrDiffs(pOld, pNew, &diffs);   
+	if (ScanTestUnresettableCharAttrs(pOld, &diffs, &bEmitPlain) && bEmitPlain)
+		{
+#if _DO_HELP
+     currHyperlinkToken = wHyperlinkNeedsFinishingToken;
+     currHyperlinkFilenameToken = wHyperlinkNeedsFinishingFilenameToken;
+     RTFOutputEndOfHyperlink();    
+#endif
+                bSuccess = RTFOutputAddControl("plain", TRUE);		
+                ExportResetCharAttrs(pOld);		
+		ScanFindCharAttrDiffs(pOld, pNew, &diffs);
+EC(		if (ScanTestUnresettableCharAttrs(pOld, &diffs, &bEmitPlain) && bEmitPlain)	)
+EC(			Warning(RTF_WARNING_UNRESETTABLE_CHAR_ATTRS_AFTER_RESET);				)
+		}
+	if (bSuccess) {
+#if _DO_HELP
+	    RTFOutputStartOfHyperlink(currHyperlinkToken, currHyperlinkFilenameToken);
+#endif
+	    bSuccess = ScanEmitCharDiffs(pNew, &diffs);
+	}
+	memcpy(pOld, pNew, sizeof(VisTextCharAttr));
+        VMUnlock(hArray);
+   	return bSuccess;
+    }    
+
+Boolean EmitParaDiff(VisTextParaAttr* pOld, word new)
+	{
+	Boolean bSuccess = TRUE;
+    MemHandle hArray = NullHandle;
+    VisTextParaAttr *pNew;
+    VisTextParaAttrDiffs diffs;
+
+	memset(&diffs, 0, sizeof(diffs));
+
+    pNew = VLTInputGetParaAttrByToken(new, &hArray);
+    ScanFindParaAttrDiffs(pOld, pNew, &diffs);
+    bSuccess = ScanEmitParaDiffs(pNew, &diffs);
+
+	memcpy(pOld, pNew, VISTEXTPARAATTRSIZE(pNew));
+    VMUnlock(hArray);
+    return bSuccess;
+	}
+
+#if _DO_HELP
+Boolean EmitTypeDiff(word newElementToken) {
+    Boolean bSuccess = TRUE;    
+    VisTextType* element;
+    MemHandle elementArrayHandle = NULL;
+    NameArrayMaxElement nameData;
+    TCHAR* str;
+
+    /* output \endrange token if this 
+       is a change from a context range */
+    RTFOutputEndOfContextRange();
+
+    /* get the type information for the passed token */
+    element = VLTInputGetTypeAttrByToken(newElementToken, &elementArrayHandle);
+    
+    if(element->VTT_context != 0xffff) {
+	/* this is a context */
+	/* get the string from the name array */
+	str = GetNameString(element->VTT_context, &nameData);      
+
+	/* output the context token (overloaded # footnote) */
+	RTFOutputAddString("#{");
+	RTFOutputAddControl("footnote", TRUE);
+	RTFOutputAddEncodedString(str);
+	RTFOutputAddString("} ");                        /* don't remove this space, 
+							    or Word will think that the 
+							    \startcontextrange token is part
+							    of the footnote, and this will cause
+							    problems when importing back into
+							    Writer. */
+    
+	/* output the \startrange token, to specify the start of this
+	   context range. */
+	RTFOutputStartOfContextRange();
+    }
+    RTFOutputEndOfHyperlink();
+    RTFOutputStartOfHyperlink(element->VTT_hyperlinkName, element->VTT_hyperlinkFile);
+    VMUnlock(elementArrayHandle);
+    return bSuccess;
+}
+
+Boolean EmitGraphicDiff(word token) 
+{
+    if(!RTFOutputAddChar(171) ||
+       !RTFOutputAddString("GRAPHIC") ||
+       !RTFOutputAddChar(187))
+	return FALSE;
+    
+    return TRUE;
+}
+
+#endif
+
+/*****************************************************************************/
+
+void UseImportDataBlock(RTFTransferData* data)
+    {
+    memcpy(&DefaultDocAttrs.RTFDA_pageInfo, &data->RTFTD_pageInfo, sizeof(PageSetupInfo));
+    }
+
+/*****************************************************************************/
+
+
+/***********************************************************************
+ * Export
+ *
+ * Write an RTF file from a VisText object.
+ *
+ * Pass: source - optr of *large* VisText to receive text
+ *       dest - file handle of RTF file
+ *       data - pointer to export info data block
+ *
+ * Returns: TransError
+ ***********************************************************************/
+
+TransError RTFExport (optr source, FileHandle dest, RTFTransferData* data)
+    {
+    char c;
+    Boolean noError = TRUE;
+    word nCharToken = CA_NULL_ELEMENT, nParaToken = CA_NULL_ELEMENT;
+    word nNewCharToken, nNewParaToken;
+    VisTextCharAttr charAttr;
+    VisTextMaxParaAttr paraAttr;
+
+#if _DO_HELP
+    word nTypeToken = CA_NULL_ELEMENT;
+    word nNewTypeToken;
+    word nGraphicToken = CA_NULL_ELEMENT;
+    word nNewGraphicToken;
+#endif
+
+    SetError(TE_NO_ERROR);
+
+	RTFSetCodePage(DEFAULT_CODEPAGE);
+	
+	DefaultAttrsInit();
+	ExportResetCharAttrs(&charAttr);
+	ExportResetParaAttrs(&paraAttr);
+	UseImportDataBlock(data);
+    /* Initialize groups and pre-scan text to build color and font tables. */
+	if (!GroupsInit() || !PrescanColorAndFontTables(source))
+		{
+		GroupsFree();
+		return RTFError;
+		}    
+
+    if (VLTInputInit(source) && RTFOutputInit(dest) && ScanInit())
+        {
+        /* Emit RTF header. */
+        noError = EmitRTFHeader();
+
+        while (noError && !VLTInputEOT() && GetError() == TE_NO_ERROR)
+            {
+            /* Get the next character (property tokens are set) */
+            c = VLTInputGetChar();
+            /* Check for and emit paragraph properties. */
+            nNewParaToken = VLTInputGetParaToken();
+            if (nParaToken != nNewParaToken)
+                {
+                /* 	Paragraph attribute change. First, attr reset control. */
+                noError = RTFOutputAddControl("pard", TRUE);
+           		/* Reset our states. */
+				ExportResetParaAttrs(&paraAttr);
+                /* Emit the differences. */
+                if (noError)
+	               	noError = EmitParaDiff(&paraAttr, nNewParaToken);
+                nParaToken = nNewParaToken;
+                }	  
+
+            /* Check for and emit character properties. */
+            nNewCharToken = VLTInputGetCharToken();
+            if (nCharToken != nNewCharToken)
+                {
+                nCharToken = nNewCharToken;
+                if (noError)
+		    noError = EmitCharDiff(&charAttr, nCharToken);
+                }
+	    
+#if _DO_HELP
+	    /* Check for and emit type properties. */
+	    if(boolHyperLinksEnabled == TRUE) {
+		nNewTypeToken = VLTInputGetTypeToken();
+		if (nTypeToken != nNewTypeToken)
+		{
+		    nTypeToken = nNewTypeToken;
+		    if(noError)
+			noError = EmitTypeDiff(nTypeToken);
+		}
+		/* check for a new graphic run */
+		if(vmbhGraphicRuns) {
+		    nNewGraphicToken = VLTInputGetGraphicToken();
+		    if(nGraphicToken != nNewGraphicToken) {
+			nGraphicToken = nNewGraphicToken;
+			if(noError)
+			    noError = EmitGraphicDiff(nGraphicToken);
+		    }
+		}
+	    }
+#endif
+
+            /* Convert and emit a character. */
+            if (noError)
+	            noError = ScanEmitChar(c);
+            }
+
+        /* Emit RTF finale. */
+        if (noError)
+        	{
+		    
+#if _DO_HELP
+     /* end a context if one exists */
+     RTFOutputEndOfContextRange();
+#endif
+            EmitRTFFinale();
+        	}
+        	
+        /* Release resources. */
+        RTFOutputFree();
+        VLTInputFree();
+        ScanFree();
+        GroupsFree();
+        }
+
+	RTFSetCodePage(SHUTDOWN_CODEPAGE);
+
+	return GetError();
+    };

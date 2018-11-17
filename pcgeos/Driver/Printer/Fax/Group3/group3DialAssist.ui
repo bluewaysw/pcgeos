@@ -1,0 +1,433 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994.  All rights reserved.
+ *	GEOWORKS CONFIDENTIAL
+ *
+ * PROJECT:	  Pasta
+ * MODULE:	  group3 printer driver
+ * FILE:	  group3DialAssist.ui
+ *
+ * AUTHOR:  	  Andy Chiu, Nov 10, 1993
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	11/10/93   	Initial version
+ *
+ * DESCRIPTION:
+ *
+ *	UI definition for dial assit dialog box
+ *
+ * 	$Id: group3DialAssist.ui,v 1.1 97/04/18 11:52:55 newdeal Exp $
+ *
+ ***********************************************************************/
+
+
+/************************************************************************/
+/*									*/
+/*			UI for dialing assistance			*/
+/*									*/
+/************************************************************************/
+DialAssistDialog = DialAssistInteraction {
+	moniker = "Dialing Options";
+	children = DialAssistInstructions,
+		   DialAssistAccessInteraction,
+#if !_NIKE_EUROPE
+		   DialAssistLongDistanceInteraction,
+		   DialAssistBillingCardInteraction,
+#endif
+		   DialAssistOKB,
+		   DialAssistCancelB;
+	type = notification;
+	visibility = dialog;
+	attributes = modal,notUserInitiatable;
+	hints = {
+		HINT_DISMISS_WHEN_DISABLED,
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbDialAssist",0
+		}
+	}
+		
+}
+
+DialAssistInstructions = GenText {
+#if _NIKE_EUROPE
+        text = "Choose whether an access code will be dialed when the fax is transmitted.";
+#else
+	text = "Choose whether an access code, long distance service number, and/or billing card number will be dialed when the fax is transmitted.";
+#endif
+	genAttributes = default +readOnly;
+	textDisplayAttributes = default -initScrolling;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+	}
+}
+
+
+/************************************************************************/
+/*									*/
+/*		UI for Access part of the dialog			*/
+/*									*/
+/************************************************************************/
+
+DialAssistAccessInteraction = GenInteraction {
+	children = DialAssistAccessItemGroup,
+		   DialAssistAccessTextList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		}
+}
+
+DialAssistAccessItemGroup = GenItemGroup {
+	children = DialAssistAccessItem;
+	behaviorType = nonExclusive;
+}
+
+DialAssistAccessItem = GenItem {
+	moniker = "Access:";
+	identifier = DAO_ACCESS;
+}
+
+
+DialAssistAccessTextList = GenInteraction {
+	children = DialAssistAccessList,
+		   DialAssistAccessTextInteraction;
+	hints = {
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_RIGHT_JUSTIFY_CHILDREN,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		}
+}
+
+chunk faxChunk = "FAX";
+chunk accessChunk = "accessList";
+chunk longDistChunk = "longDistList";
+
+DialAssistAccessList = QuickRetrieveList {
+	moniker = "Access";
+/*	children = AccessOptionOne,
+		   AccessOptionTwo,
+		   AccessOptionThree;
+*/
+	qTextObj = DialAssistAccessText;
+	category =  faxChunk;
+	key = accessChunk;
+	stringDefaults = AccessOptionsTable;
+	hints = {
+		HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_TOOLBOX,
+		}
+}	
+
+/************************************************************************/
+/*		UI grouping for Access test				*/
+/************************************************************************/
+DialAssistAccessTextInteraction = GenInteraction {
+
+#if _PEN_BASED
+	children = DialAssistAccessETrigger,
+		   DialAssistAccessText,
+		   DialAssistAccessBSTrigger;
+#else
+	children = DialAssistAccessText;
+#endif
+
+	hints = {
+		HINT_TOOLBOX,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		}
+}
+
+#if _PEN_BASED
+DialAssistAccessETrigger = GenTrigger {
+ 	moniker = list {ClearMoniker}
+	action = MSG_VIS_TEXT_DELETE_ALL, DialAssistAccessText;
+}
+#endif
+
+DialAssistAccessText = GenText {
+	textDisplayAttributes	= default +singleLineText;
+	maxLength = "FAXFILE_MAX_ACCESS_FIELD_LENGTH - 1";
+	hints = {
+		ATTR_GEN_TEXT_CUSTOM_FILTER {
+			word	offset	DialAssistTextFilter
+		}
+	}
+}
+
+#if _PEN_BASED
+DialAssistAccessBSTrigger = GenTrigger {
+	moniker = list {BackSpaceMoniker}
+	action = MSG_VIS_TEXT_DO_KEY_FUNCTION, DialAssistAccessText;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	VTKF_DELETE_BACKWARD_CHAR
+		},
+	}
+}
+#endif
+
+/************************************************************************/
+/*									*/
+/*		UI for long distance part of the dialog			*/
+/*									*/
+/************************************************************************/
+
+DialAssistLongDistanceInteraction = GenInteraction {
+	children = DialAssistLongDistanceItemGroup,
+		   DialAssistLongDistanceTextList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		}
+}
+
+DialAssistLongDistanceItemGroup = GenItemGroup {
+	children = DialAssistLongDistanceItem;
+	behaviorType = nonExclusive;
+}	
+	
+DialAssistLongDistanceItem = GenItem {
+	moniker = "Long Distance:";
+	identifier = DAO_LONG_DISTANCE;
+}
+
+DialAssistLongDistanceTextList = GenInteraction {
+	children = DialAssistLongDistanceList,
+		   DialAssistLongDistanceTextInteraction;
+	hints = {
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_RIGHT_JUSTIFY_CHILDREN,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+	}
+}
+
+DialAssistLongDistanceList = QuickRetrieveList {
+	moniker = "Long Distance";
+	qTextObj = DialAssistLongDistanceText;
+	category = faxChunk;
+	key = longDistChunk;
+	stringDefaults = LongDistOptionsTable;
+	hints = {
+		HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_TOOLBOX,
+		}
+}
+
+/************************************************************************/
+/*		UI for the text for the long distance			*/
+/************************************************************************/
+
+DialAssistLongDistanceTextInteraction = GenInteraction {
+
+#if _PEN_BASED
+	children = DialAssistLongDistanceETrigger,
+		   DialAssistLongDistanceText,
+		   DialAssistLongDistanceBSTrigger;
+#else
+	children = DialAssistLongDistanceText;
+#endif
+
+	hints = {
+		HINT_TOOLBOX,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		}
+}
+
+#if _PEN_BASED
+DialAssistLongDistanceETrigger = DeleteTrigger {
+ 	moniker = list {ClearMoniker}
+	action = MSG_VIS_TEXT_DELETE_ALL, DialAssistLongDistanceText;
+}
+#endif
+
+DialAssistLongDistanceText = GenText {
+	textDisplayAttributes	= default +singleLineText;
+	maxLength = "FAXFILE_LONG_DIST_BUFFER_SIZE - 1";
+	hints = {
+		ATTR_GEN_TEXT_CUSTOM_FILTER {
+			word	offset	DialAssistTextFilter
+		}
+	}
+}
+
+
+#if _PEN_BASED
+DialAssistLongDistanceBSTrigger = GenTrigger {
+	moniker = list {BackSpaceMoniker}
+	action = MSG_VIS_TEXT_DO_KEY_FUNCTION, DialAssistLongDistanceText;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	VTKF_DELETE_BACKWARD_CHAR
+		},
+	}
+}
+#endif
+
+/************************************************************************/
+/*									*/
+/*		UI for billing card part of the dialog			*/
+/*									*/
+/************************************************************************/
+
+DialAssistBillingCardInteraction = GenInteraction {
+	children = DialAssistBillingCardItemGroup,
+		   DialAssistBillingCardTextInteraction;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		}
+}
+
+DialAssistBillingCardItemGroup = GenItemGroup {
+	children = DialAssistBillingCardItem;
+	behaviorType = nonExclusive;
+}
+	
+DialAssistBillingCardItem = GenItem {
+	moniker = "Billing Card:";
+	identifier = DAO_BILLING_CARD;
+}
+
+/************************************************************************/
+/*		UI for the text for the long distance			*/
+/************************************************************************/
+
+DialAssistBillingCardTextInteraction = GenInteraction {
+
+#if _PEN_BASED
+	children = DialAssistBillingCardETrigger,
+		   DialAssistBillingCardText,
+		   DialAssistBillingCardBSTrigger;
+#else
+	children = DialAssistBillingCardText;
+#endif
+
+	hints = {
+		HINT_TOOLBOX,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		}
+}
+
+#if _PEN_BASED
+DialAssistBillingCardETrigger = DeleteTrigger {
+ 	moniker = list {ClearMoniker}
+	action = MSG_VIS_TEXT_DELETE_ALL, DialAssistBillingCardText;
+}
+#endif
+
+DialAssistBillingCardText = GenText {
+	textDisplayAttributes	= default +singleLineText;
+	maxLength = "FAXFILE_BILL_CARD_BUFFER_SIZE - 1";
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TEXT_CUSTOM_FILTER {
+			word	offset	DialAssistTextFilter
+		}
+	}
+}
+
+#if _PEN_BASED
+DialAssistBillingCardBSTrigger = GenTrigger {
+	moniker = list {BackSpaceMoniker}
+	action = MSG_VIS_TEXT_DO_KEY_FUNCTION, DialAssistBillingCardText;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	VTKF_DELETE_BACKWARD_CHAR
+		},
+	}
+}
+#endif
+
+DialAssistOKB = GenTrigger {
+	genAttributes 	= default +signalInteractionComplete;
+	action		= MSG_DIAL_ASSIST_SAVE_FIELDS, DialAssistDialog;
+	hints		= {
+				HINT_DEFAULT_DEFAULT_ACTION,
+				HINT_SEEK_REPLY_BAR,
+				ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+					word	IC_OK
+				},
+			}
+}
+
+DialAssistCancelB = GenTrigger {
+	genAttributes 	= default +signalInteractionComplete;
+	action		= MSG_DIAL_ASSIST_RESET_FIELDS, DialAssistDialog;
+	hints		= {
+				HINT_SEEK_REPLY_BAR,
+				ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+					word	IC_DISMISS
+				},
+			}
+}
+
+/***********************************************************************/
+/*   Tables to strings for each quick retrive list                     */
+/***********************************************************************/
+
+chunk	AccessOptionsTable	= data {
+	word	offset AccessOneString
+	word	offset AccessThreeString
+}
+
+
+chunk	AccessOneString = "9,";
+/*chunk	AccessTwoString = "1,";*/		/* removed after UI review */
+chunk	AccessThreeString = "1170,";
+
+chunk	LongDistOptionsTable	= data {
+	word	offset	LongDistStringOne
+	word	offset	LongDistStringTwo
+	word	offset	LongDistStringThree
+}
+
+#if 0
+chunk	LongDistStringOne	= "103330";		/* Sprint */
+chunk 	LongDistStringTwo	= "102220";		/* MCI	*/
+#endif
+
+chunk	LongDistStringOne	= "1-800-877-8000,";	/* Sprint */
+chunk	LongDistStringTwo	= "1-800-950-1022,";	/* MCI	*/
+chunk	LongDistStringThree	= "102880";		/* AT&T */
+
+
+/*  A filter set up to pass these characters:
+ *
+ *		0-9   W   *   #   !   @   ,   -
+ */
+
+chunk DialAssistTextFilter =  data {
+	VisTextCustomFilterData	<0, 31 >	/* null - US is gone	*/
+						/* space is included	*/
+						/* ! is included	*/
+	VisTextCustomFilterData <34, 34 >	/* " is gone		*/
+						/* include #		*/
+	VisTextCustomFilterData <36, 39 >	/* $ - ' is gone	*/
+						/* () is included	*/
+	VisTextCustomFilterData	<43, 43 >	/* + is gone		*/
+						/* , - - is included	*/
+	VisTextCustomFilterData	<46, 47 >	/* . - / is gone	*/
+						/* 0 - 9 is include	*/
+	VisTextCustomFilterData	<58, 63 >	/* nuke more crap	*/
+						/* include @		*/
+	VisTextCustomFilterData	<65, 86 >	/* nuke more crap	*/
+						/* include W		*/
+	VisTextCustomFilterData	<88, 118 >	/* nuke more crap	*/
+						/* include w		*/
+	VisTextCustomFilterData <120, 255>	/* don't need it	*/
+}
+

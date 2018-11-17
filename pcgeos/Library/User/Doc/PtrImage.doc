@@ -1,0 +1,181 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		PtrImage
+
+DESCRIPTION:	Ptr Image Mechanism
+
+	$Id: PtrImage.doc,v 1.2.34.1 97/03/29 03:36:59 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+About Ptr Images
+----------------
+PC/GEOS currently supports mouse pointer images consisting of 16x16
+black/white/clear/xor pixel values, with a "hot-spot" offset.
+The structure that holds this info is named "PointerDef".  For more
+info on this, see the video driver documentation.  (Note that applications
+should NOT set the ptr image directly via the video driver, but should
+use higher level interface outlined below)
+
+Applications may set mouse pointer images within the above constraints
+to give feedback both as the mouse moves over interactable areas, &
+when the user is interacting with an object.
+
+Arbitration betwen application desired images, the application busy & modal
+state mechanism, & other system ptr image needs, is handled automatically
+by the Input Manager, which will automatically displays the mouse ptr image
+requested having the highest priority.
+
+
+Storage of Ptr Images
+---------------------
+Pointer images must be in the form of a PointerDef, & stored in chunks within
+a sharable local memory block.  For example:
+
+PointerImages   segment lmem    LMEM_TYPE_GENERAL
+
+ptrCreate chunk
+	PointerDef <
+	7,				;PD_hotX
+	7,				;PD_hotY
+	<
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b,
+		00000000b, 00000000b
+	>,
+	<
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		11111110b, 11111110b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000001b, 00000000b,
+		00000000b, 00000000b
+	>
+>
+ptrCreate endc
+
+PointerImages   ends
+
+The above block's type would be declared in your ".gp" file as:
+
+resource PointerImages read-only shared lmem
+
+
+Ptr Images within a GenView
+---------------------------
+The background view cursor may be set by sending the following to any GenView:
+
+METHOD_GEN_VIEW_SET_PTR_IMAGE                   method
+;
+;       This method allows setting of window & gadget level pointer images
+; for use when the mouse is over the window area of a view, or grabbed by
+; the view.
+;
+;       Pass:   cx:dx   - optr to PointerDef in sharable memory block, OR
+;               cx = 0, and dx = 0 for no ptr image request for view, OR
+;                           dx = PtrImageValue (see Internal/im.def)
+;               bp      - PIL_GADGET, for feedback from individual gadgets, OR
+;                         PIL_WINDOW, to set the lower priority background
+;                                     cursor to use over the view.
+;               NOTE:  if cx = 0, dx = PIV_UPDATE, bp is not used.
+;
+;       Return: nothing
+
+
+Ptr Images for visible gadget feedback
+--------------------------------------
+Visible objects, inside of a view, or implementing custom UI gadgets, can 
+modify the PIL_GADGET level cursor by simply returning data from any
+of the PTR or START/DRAG/END button methods:
+
+; Return:
+;               ax      - MouseReturnFlags      (In this file)
+;                         mask MRF_PROCESSED - if event processed by gadget.
+;                                              See def. below.
+;
+;                         mask MRF_REPLAY    - causes a replay of the ptr
+;                                              to the modified implied/active
+;                                              grab.   See def. below.
+;
+;                         mask MRF_SET_POINTER_IMAGE - sets the PIL_GADGET
+;                         level cursor based on the value of cx:dx:
+;                         cx:dx - optr to PointerDef in sharable memory block,
+;                         OR cx = 0, and dx = PtrImageValue (Internal/im.def)
+;
+;                         mask MRF_CLEAR_POINTER_IMAGE - Causes the PIL_GADGET
+;                                               level cursor to be cleared
+
+
+Alternatively, the PIL_GADGET mouse image may be changed using WinSetPtrImage,
+passing the window that the gadget/visible object lies on (Can be gotten
+by calling VisQueryWindow):
+
+; FUNCTION:       WinSetPtrImage
+; DESCRIPTION:    Allows setting PtrImages within the range handled by windows.
+; CALLED BY:      EXTERNAL
+; PASS: bp      - PIL_GADGET or PIL_WINDOW.
+;       cx:dx   - optr to PointerDef in sharable memory block, OR
+;       cx = 0, and dx = PtrImageValue (see Internal/im.def)
+;       NOTE:  if cx = 0, dx = PIV_UPDATE, bp is not used.
+;       di - handle of graphics state, or window
+; 
+; RETURN:	nothing
+; DESTROYED:
+; 	nothing
+
+It is currently the visible object/gadget's responsibiliy to clear any
+ptr image that it sets once the object is not being interacted with.  Be
+sure to clear the ptr image on any METHOD_LOST_GADGET_EXCL.  If giving
+feedback as the mouse wanders over the gadget, grab the gadget exclusive
+& mouse grab when the mouse first enters the gadget, then release them,
+& clear the ptr image, when it leaves.
+(NOTE:  This is ugly & is scheduled for API cleanup -- doug)
+
+
+Ptr Images for Quick Transfer feedback
+--------------------------------------
+
+	< TO BE FILLED IN >
+
+Other
+-----
+You may notice that whenever the application is marked as busy, or when
+outside of a modal window, the mouse ptr image changes regardless of what
+you have set above.  This is because the UI is setting the PIL_APPLICATION
+level ptr image, which has priority above the PIL_GADGET & PIL_WINDOW.  The
+Input Manager automatically restores your mouse image once PIL_APPLICATION
+is cleared.
+
+See also:	ImSetPtrImage (Routine in Kernel/IM/imPtr.asm)
+		VidSetPtr     (Routine in Video/EGA/egaPtr.asm)
+
+		PtrImageLevel (Structure in Internal/im.def)
+
+

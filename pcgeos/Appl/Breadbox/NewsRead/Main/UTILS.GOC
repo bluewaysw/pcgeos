@@ -1,0 +1,435 @@
+@include <stdapp.goh>
+@include "utils.goh"
+#include <Ansi/string.h>
+@include <socket.goh>
+#include <sockmisc.h>
+@include "options.goh"
+
+
+/*************************************************************************/
+
+void _pascal 
+ErrorMessage(optr string) {
+
+    EC( ECCheckLMemHandle(OptrToHandle(string));                        )
+    
+    MemLock(OptrToHandle(string)) ;
+
+    EC( ECLMemExists(string) ;                                          )
+  
+    UserStandardDialog(
+        (char *)0, (char *)0, (char *)0, (char *)0,
+        LMemDeref(string),
+        (   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+            (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)  )   
+    ) ;
+
+    MemUnlock(OptrToHandle(string)) ;
+}
+
+/*************************************************************************/
+
+void _pascal 
+NotifyMessage(optr string) {
+
+    EC( ECCheckLMemHandle(OptrToHandle(string)) ;                       )
+    
+    MemLock(OptrToHandle(string)) ;
+
+    EC( ECLMemExists(string) ;                                          )
+  
+    UserStandardDialog(
+        (char *)0, (char *)0, (char *)0, (char *)0,
+        LMemDeref(string),
+        (   (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+            (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)  )
+    ) ;
+
+    MemUnlock(OptrToHandle(string)) ;
+}
+
+/*************************************************************************/
+
+void
+ParseDateField(char *p_string, TimerDateAndTime *dateTime) {
+
+    byte yearCount ;
+
+    dateTime->TDAT_year = 0;
+    dateTime->TDAT_month = 0;
+    dateTime->TDAT_day = 0;
+    dateTime->TDAT_dayOfWeek = 0;
+    dateTime->TDAT_hours = 0;
+    dateTime->TDAT_minutes = 0;
+    dateTime->TDAT_seconds = 0;
+
+    if(!p_string)
+        return ;
+
+    /* skip spaces */
+    while((*p_string) == 32)
+        p_string ++;
+
+    /* check for day */
+    if(strchr(p_string, ',')) {
+    
+        p_string = strchr(p_string, ',') ;
+   
+        p_string ++;
+
+        while((*p_string) == 32)
+            p_string ++;
+    }
+
+
+    if(isdigit(*p_string)) {
+
+        dateTime->TDAT_day = ((*p_string) - '0') ;
+    
+        p_string++ ;
+
+        if(isdigit(*p_string)) {
+
+            dateTime->TDAT_day *= 10 ;
+            dateTime->TDAT_day += ((*p_string) - '0') ;
+        
+            p_string++ ;
+        }
+
+        if((*p_string) != ' ')
+            return ;
+    }
+    else
+        return ;
+
+    /* get the month */
+    while((*p_string) == 32)
+        p_string ++;
+
+    if(strncmp(p_string, "Jan", 3) == 0) {
+
+        dateTime->TDAT_month = 1 ;
+
+    } else if(strncmp(p_string, "Feb", 3) == 0) {
+
+        dateTime->TDAT_month = 2 ;
+
+    } else if(strncmp(p_string, "Mar", 3) == 0) {
+
+        dateTime->TDAT_month = 3 ;
+
+    } else if(strncmp(p_string, "Apr", 3) == 0) {
+
+        dateTime->TDAT_month = 4 ;
+
+    } else if(strncmp(p_string, "May", 3) == 0) {
+
+        dateTime->TDAT_month = 5 ;
+
+    } else if(strncmp(p_string, "Jun", 3) == 0) {
+
+        dateTime->TDAT_month = 6 ;
+
+    } else if(strncmp(p_string, "Jul", 3) == 0) {
+
+        dateTime->TDAT_month = 7 ;
+
+    } else if(strncmp(p_string, "Aug", 3) == 0) {
+
+        dateTime->TDAT_month = 8 ;
+
+    } else if(strncmp(p_string, "Sep", 3) == 0) {
+
+        dateTime->TDAT_month = 9 ;
+
+    } else if(strncmp(p_string, "Oct", 3) == 0) {
+
+        dateTime->TDAT_month = 10 ;
+
+    } else if(strncmp(p_string, "Nov", 3) == 0) {
+
+        dateTime->TDAT_month = 11 ;
+
+    } else if(strncmp(p_string, "Dec", 3) == 0) {
+
+        dateTime->TDAT_month = 12 ;
+    } else
+        return ;
+
+    p_string += 3 ;
+
+    while((*p_string) == 32)
+        p_string ++;
+
+    /* get the year */
+    yearCount = 0 ;
+    while(isdigit(*p_string)) {
+        
+        dateTime->TDAT_year *= 10 ;
+        dateTime->TDAT_year += (*p_string) - '0' ;
+
+        p_string++ ;
+        yearCount++ ;
+    }
+
+    if(yearCount < 3) {
+        
+        if(dateTime->TDAT_year < 80)
+            dateTime->TDAT_year += 2000 ;
+        else
+            dateTime->TDAT_year += 1900 ;
+    }
+    
+    /* get the time */
+    while((*p_string) == 32)
+        p_string ++;
+
+    if(isdigit(*p_string)) {
+    
+        dateTime->TDAT_hours = (*p_string) - '0' ;
+        p_string++ ;        
+
+        if(isdigit(*p_string)) {
+
+            dateTime->TDAT_hours *= 10 ;
+            dateTime->TDAT_hours += (*p_string) - '0' ;
+            p_string++ ;        
+
+            while((*p_string) == 32)
+                p_string ++;
+
+            if((*p_string) != ':')
+                return ;
+
+            p_string++ ;
+
+            while((*p_string) == 32)
+                p_string ++;
+
+            if(!isdigit(*p_string)) 
+                return ;
+
+            dateTime->TDAT_minutes = (*p_string) - '0' ;
+            p_string++ ;            
+
+            if(!isdigit(*p_string)) 
+                return ;
+
+            dateTime->TDAT_minutes *= 10 ;
+            dateTime->TDAT_minutes += (*p_string) - '0' ;
+            p_string++ ;        
+        }
+        else
+            return ;
+    }
+}   
+
+/*************************************************************************/
+
+void
+ParseSenderName(char *p_string, NewsSenderName sender_name) {
+
+    char *name_start, *name_end, *temp_ptr ;
+    
+    /* search for '"' */
+	if((name_start = strchr(p_string, 34)) != 0) {
+
+        name_start++ ;
+        
+        if((name_end = strchr(name_start, 34)) != 0) {
+        
+            if((name_end - name_start) >= (sizeof(NewsSenderName) - 1)) {
+
+                strncpy(sender_name, name_start, sizeof(NewsSenderName) - 1);
+            
+                sender_name[sizeof(sender_name) - 1] = 0 ;
+
+            } else {
+
+                strncpy(sender_name, name_start, name_end - name_start);
+
+                sender_name[name_end - name_start] = 0 ;
+            }
+ 
+            return ;
+        }    
+    }
+
+	/* search for '<' */
+	if((name_start = strchr(p_string, '<')) != 0) {
+
+        temp_ptr = p_string ;
+
+        while(temp_ptr != name_start) {
+
+            if(*temp_ptr != 32) {
+            
+                if((name_start - temp_ptr) >= (sizeof(NewsSenderName) - 1)) {
+
+                    strncpy(sender_name, temp_ptr, sizeof(NewsSenderName) - 1);
+                
+                    sender_name[sizeof(sender_name) - 1] = 0 ;
+
+                } else {
+
+                    strncpy(sender_name, temp_ptr, name_start - temp_ptr);
+
+                    sender_name[name_start - temp_ptr] = 0 ;
+
+                }
+               
+                return ;
+            }
+        
+            temp_ptr ++;
+        }
+	} 
+
+	if((name_start = strchr(p_string, '(')) != 0) {
+
+        name_start++ ;
+        
+        if((name_end = strchr(name_start, ')')) != 0) {
+        
+            if((name_end - name_start) >= (sizeof(NewsSenderName) - 1)) {
+
+                strncpy(sender_name, name_start, sizeof(NewsSenderName) - 1);
+            
+                sender_name[sizeof(sender_name) - 1] = 0 ;
+
+            } else {
+
+                strncpy(sender_name, name_start, name_end - name_start);
+
+                sender_name[name_end - name_start] = 0 ;
+            }
+ 
+            return ;
+        }    
+    }
+
+	/* search for '@' */
+	if((name_start = strchr(p_string, '@')) != 0) {
+
+        temp_ptr = p_string ;
+
+        while(temp_ptr != name_start) {
+
+            if((*temp_ptr != 32) && (*temp_ptr != '<')){
+            
+                if((name_start - temp_ptr) >= (sizeof(NewsSenderName) - 1)) {
+
+                    strncpy(sender_name, temp_ptr, sizeof(NewsSenderName) - 1);
+                
+                    sender_name[sizeof(sender_name) - 1] = 0 ;
+
+                } else {
+
+                    strncpy(sender_name, temp_ptr, name_start - temp_ptr);
+
+                    sender_name[name_start - temp_ptr] = 0 ;
+
+                }
+               
+                return ;
+            }
+        
+            temp_ptr ++;
+        }
+	} 
+
+    /* get the hole string */
+    temp_ptr = &p_string[strlen(p_string)] ;
+
+    if((p_string - temp_ptr) >= (sizeof(NewsSenderName) - 1)) {
+
+        strncpy(sender_name, p_string, sizeof(NewsSenderName) - 1);
+    
+        sender_name[sizeof(sender_name) - 1] = 0 ;
+
+    } else {
+
+        strncpy(sender_name, p_string, temp_ptr - p_string);
+
+        sender_name[temp_ptr - p_string] = 0 ;
+
+    }
+
+    (*sender_name) = 0;
+}
+
+/*************************************************************************/
+
+void
+DrawTextLimited(GStateHandle gstate, sword x, sword y,
+                    char *text, word maxWidth, Boolean rightJustify) {
+
+    word extenderWidth = GrTextWidth(gstate, "...", 0) ; 
+    word charCount ;
+    word textWidth ;
+
+    charCount = strlen(text) ;
+
+    if((textWidth = GrTextWidth(gstate, text, 0)) <= maxWidth) {
+
+        if(rightJustify)
+            GrDrawText(gstate, x + maxWidth - textWidth, y, text, 0);
+        else    
+            GrDrawText(gstate, x, y, text, 0) ;
+
+    } else {
+
+        while(charCount && ((textWidth = (GrTextWidth(
+                    gstate, text, charCount) + extenderWidth)) > maxWidth))
+            charCount-- ;
+
+        if(charCount) {
+        
+            if(rightJustify)
+                GrDrawText(gstate, x + maxWidth - textWidth, y, text, charCount);
+            else
+                GrDrawText(gstate, x, y, text, charCount) ;
+
+            GrDrawTextAtCP(gstate, "...", 0);
+        }
+    }
+}
+
+/*************************************************************************/
+
+Boolean
+CheckIfConnected(void) {
+
+    struct Caveat {
+        /* Used to force the order of the following two items */
+        SocketAddress sa;
+        TcpAccPntResolvedAddress xa; /* Must follow SocketAddress */
+    };
+    struct Caveat ca;
+    word casize = sizeof(TcpAccPntResolvedAddress);
+    MediumAndUnit mau;
+    char tcpDomain[] = "TCPIP";
+    Boolean notConnected;
+
+    ca.sa.SA_port.SP_port = 80;
+    ca.sa.SA_port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    ca.sa.SA_domainSize = sizeof(tcpDomain)-1;
+    ca.sa.SA_domain = tcpDomain;
+    ca.sa.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+    ca.xa.TAPRA_linkSize = 3;
+    ca.xa.TAPRA_linkType = LT_ID;
+    ca.xa.TAPRA_accPntID = 1;
+    if (SocketGetAddressMedium(&ca, &mau)) {
+        notConnected = TRUE;
+    } else {
+        notConnected = SocketCheckMediumConnection(tcpDomain,
+                                              &(ca.xa),
+                                              &casize,
+                                              &mau);
+    }
+
+    return(!notConnected) ;
+}
+
+
+/*************************************************************************/

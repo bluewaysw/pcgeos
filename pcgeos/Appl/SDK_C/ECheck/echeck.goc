@@ -1,0 +1,1150 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks, Inc. 1996 -- All Rights Reserved.
+ *
+ * PROJECT:	Error-Checking Sample
+ * MODULE:	Main module
+ * FILE:	echeck.goc
+ *
+ * AUTHORS:	Lawrence Hosken
+ *              Nathan Fiedler
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial MyChart #4 sample
+ *	NF	8/9/96		Made into ECheck sample
+ *
+ * DESCRIPTION:
+ *      This application is based on the MyChart tutorial sample,
+ *      part 4. It demonstrates the use of the EC routines,
+ *      and how to add error-checking code to your app. It can
+ *      be a little over zealous at times, doing some needless
+ *      checking, but when it comes to catching errors, you can
+ *      never go too far. Besides, all of the EC won't be in
+ *      the non-EC version when it's recompiled.
+ *
+ *      To use error-checking code in your program, you can call
+ *      the GEOS EC routines. These routines check various
+ *      GEOS data types (handles, optrs, etc) as well as objects
+ *      and class structures.
+ *
+ *      You can use EC routines in both your EC and NC versions
+ *      of your app. This is true since non-EC GEOS has stubs for
+ *      the EC routines. The stubs don't do anything except do a
+ *      return. However, you don't want to waste space in
+ *      your program if you're compiling the non-EC version.
+ *      That's why the EC( ) macro is provided. If you surround
+ *      the calls to EC routines with EC( ) then the calls will
+ *      only be included in the EC version of your geode. We will
+ *      see many examples of this throughout the program.
+ *
+ *      You can also use #if ERROR_CHECK ... #endif to surround
+ *      a chunk of code that you want included in only the EC
+ *      version of your geode.
+ *
+ * $Id: echeck.goc,v 1.1 97/04/04 16:41:31 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+
+/********************************************************************
+ *		Constants
+ *******************************************************************/
+
+      /* Some item constants.
+       */
+    #define ECHK_MAX_ITEM_COUNT 9
+    #define ECHK_MAX_ITEM_VALUE 258
+
+      /* When drawing the pieces of the chart, we'll use
+       * the following constants to compute the coordinates
+       * at which to draw.
+       */
+    #define VIEW_RIGHT      360 /* Width of the Chart View */
+    #define VIEW_BOTTOM     288 /* Height of Chart View */
+    #define CHART_BOTTOM    268 /* y = 0 line of Chart */
+    #define CHART_LEFT      20  /* Left bound of Leftmost bar */
+    #define BAR_WIDTH       30  /* Width of each bar */
+    #define BAR_WIDTH_ALLOW 36  /* Distance between left edges of bars */
+    #define BORDER_MARGIN   10  /* Arbitrary margin width at edges */
+
+      /* The following constants are the document protocol.
+       * If we ever change our document format, we should
+       * increment either the major or minor protocol number.
+       */
+    #define ECHK_DOCUMENT_PROTOCOL_MAJOR 0
+    #define ECHK_DOCUMENT_PROTOCOL_MINOR 1
+
+/********************************************************************
+ *		Data Types
+ *******************************************************************/
+      /* This structure will hold information about our document,
+       * and will form the header of a block in our data file.
+       * The first item of this structure MUST be an LMemBlockHeader.
+       */
+    typedef struct {
+          /*
+           * DBH_standardHeader - Necessary for lmem routines.
+           * DBH_cNumItems      - Number of data items.
+           * DBH_listHead       - Head of linked list.
+           * DBH_vmhChart       - Block where EChkChart is stored.
+           */
+        LMemBlockHeader DBH_standardHeader;
+        word            DBH_cNumItems;
+        ChunkHandle     DBH_chaItems;
+        VMBlockHandle   DBH_vmhChart;
+    } DataBlockHeader;
+
+      /* Data point data type.
+       * Holds the value of each element. */
+    typedef word NodeData;
+
+      /* Define some of our own error constants.
+       * These will be displayed in Swat when an error
+       * occurs in the program. We will "fold" these
+       * into the GEOS error constants later by defining
+       * a global variable of type FatalErrors. */
+    typedef enum {
+        ECHK_ERR_ITEM_COUNT_PAST_MAXIMUM,
+        ECHK_ERR_DATA_VALUE_PAST_MAXIMUM
+    } FatalErrors;
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+      /*
+       * Nothing special here, just define it as usual.
+       */
+    @class EChkProcessClass, GenProcessClass;
+    @endc;
+
+      /*
+       * We're definitely going to add some functionality
+       * to the standard document class. Also add some
+       * of our own methods.
+       */
+    @class EChkDocumentClass, GenDocumentClass;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG)
+             MSG_ECHK_DOCUMENT_MONIKER_LIST_QUERY;
+    @message void MSG_ECHK_DOCUMENT_DELETE_DATA_ITEM();
+    @message void MSG_ECHK_DOCUMENT_INSERT_DATA_ITEM();
+    @message void MSG_ECHK_DOCUMENT_SET_DATA_ITEM();
+          /* Handle of map block, where we store a linked list. */
+        @instance VMBlockHandle ECDI_vmhData;
+          /* Handle of item array. */
+        @instance ChunkHandle ECDI_chaItems;
+          /* Object block holding our EChkChart object. */
+        @instance MemHandle ECDI_mhChart;
+          /* Number of items in chart. */
+        @instance word ECDI_cNumItems;
+    @endc;
+
+      /*
+       * This is a new class type, specifically for
+       * our chart object. It will represent the elements
+       * in a bar chart on the screen.
+       */
+    @class EChkChartClass, VisClass;
+    @message void MSG_ECHK_CHART_INSERT_BAR( word ordinal,
+                                             NodeData value );
+    @message void MSG_ECHK_CHART_DELETE_BAR( word ordinal );
+    @message void MSG_ECHK_CHART_RESIZE_BAR( word ordinal,
+                                             NodeData value );
+          /* The number of bars in the chart. Internal. */
+        @instance word ECCI_cNumBars = 0;
+          /* Chunk handle of array to hold bar info. */
+        @instance ChunkHandle ECCI_chaBars;
+    @endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    @classdecl EChkProcessClass, neverSaved;
+    @classdecl EChkChartClass;
+    @classdecl EChkDocumentClass;
+
+/********************************************************************
+ *		Global Variables
+ *******************************************************************/
+      /* Fold our error constants in with other GEOS
+       * error constants using GOC trick.
+       * (Define a global of type FatalErrors.) */
+    FatalErrors fatalErrors;
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		Application Resource
+ * Holds the application object, which the system communicates
+ * with when talking to our geode.
+ *******************************************************************/
+@start Application;
+
+@object GenApplicationClass EChkApp = {
+    GI_visMoniker = list { @EChkTextMoniker };
+    GI_comp = @EChkPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+             @EChkPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST ) =
+             @EChkDocumentControl,
+             @EChkDisplayControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, MGCNLT_APP_STARTUP ) =
+             @EChkDocumentControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS ) =
+             @EChkDocumentControl,
+             @EChkDisplayControl;
+}
+
+@visMoniker EChkTextMoniker = "Error Check";
+@localize { "Name of the application." };
+
+@end Application;
+
+/********************************************************************
+ *		Interface Resource
+ * This resource holds the bulk of our generic UI gadgetry.
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass EChkPrimary = {
+    GI_comp = @EChkFileGroup,
+              @EChkWindowGroup,
+              @EChkDisplayGroup;
+}
+
+@object GenInteractionClass EChkFileGroup = {
+    GI_comp = @EChkDocumentControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+}
+
+@object GenDocumentControlClass EChkDocumentControl = {
+    GDCI_documentToken = { "MCht", MANUFACTURER_ID_GEOWORKS } ;
+    GDCI_noNameText = "No Document";
+    @localize { "Name when no document is opened." };
+    GDCI_documentGroup = @EChkDocumentGroup;
+    GDCI_attrs = @default | GDCA_MULTIPLE_OPEN_FILES;
+    GDCI_features = @default
+                  & ~( GDCF_SUPPORTS_TEMPLATES
+                     | GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT
+                     | GDCF_SUPPORTS_USER_MAKING_SHARED_DOCUMENTS );
+}
+
+@object GenInteractionClass EChkWindowGroup = {
+    GI_comp = @EChkDisplayControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_WINDOW_MENU;
+}
+
+@object GenDisplayControlClass EChkDisplayControl = {
+}
+
+@object GenDisplayGroupClass EChkDisplayGroup = {
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct*)&EChkDocumentClass };
+    HINT_DEFAULT_TARGET;
+}
+
+@end Interface;
+
+/********************************************************************
+ *		DocGroup Resource
+ * This resource contains our GenDocumentGroup object, and
+ * will contain any GenDocument objects created by the
+ * GenDocumentGroup.
+ *******************************************************************/
+@start DocGroup;
+
+@object GenDocumentGroupClass EChkDocumentGroup = {
+    GDGI_attrs = @default | GDGA_VM_FILE_CONTAINS_OBJECTS;
+    GDGI_untitledName = "Untitled Chart";
+    @localize { "Name of a newly created document that hasn't been saved." };
+    GDGI_documentClass = (ClassStruct*)&EChkDocumentClass;
+    GDGI_documentControl = @EChkDocumentControl;
+    GDGI_genDisplayGroup = @EChkDisplayGroup;
+    GDGI_genDisplay = @EChkDisplay;
+    GDGI_genView = @EChkChartView;
+    GDGI_protocolMajor = ECHK_DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = ECHK_DOCUMENT_PROTOCOL_MINOR;
+}
+
+@end DocGroup;
+
+/********************************************************************
+ *		Display Resource
+ * This resource is a template which will be duplicated for
+ * each open document. It contains all generic UI associated
+ * with a document.
+ *******************************************************************/
+@start Display;
+
+@object GenDisplayClass EChkDisplay  = {
+    GI_comp = @EChkLeftClump,
+              @EChkChartView;
+    GI_states = @default & ~GS_USABLE;
+    GI_attrs = @default | GDA_USER_DISMISSABLE;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    ATTR_GEN_WINDOW_KBD_OVERRIDE = ( KO_NO_KEYBOARD );
+}
+
+@object GenInteractionClass EChkLeftClump = {
+    GI_comp = @EChkDataList,
+              @EChkInsertTrigger,
+              @EChkDeleteTrigger,
+              @EChkChangeTrigger,
+              @EChkValue;
+}
+
+@object GenDynamicListClass EChkDataList = {
+    GI_visMoniker = "Data:";
+    GIGI_applyMsg = 0;
+    GIGI_destination = ( TO_APP_MODEL );
+    GDLI_queryMsg = MSG_ECHK_DOCUMENT_MONIKER_LIST_QUERY;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenTriggerClass EChkInsertTrigger = {
+    GI_visMoniker = "Insert";
+    @localize { "Adds another data element." };
+    GTI_destination = ( TO_APP_MODEL );
+    GTI_actionMsg = MSG_ECHK_DOCUMENT_INSERT_DATA_ITEM;
+    ATTR_GEN_DESTINATION_CLASS = (ClassStruct*)&EChkDocumentClass;
+}
+
+@object GenTriggerClass EChkChangeTrigger = {
+    GI_visMoniker = "Change";
+    @localize { "Changes a data element value." };
+    GTI_destination = ( TO_APP_MODEL );
+    GTI_actionMsg = MSG_ECHK_DOCUMENT_SET_DATA_ITEM;
+    ATTR_GEN_DESTINATION_CLASS = (ClassStruct*)&EChkDocumentClass;
+}
+
+@object GenTriggerClass EChkDeleteTrigger = {
+    GI_visMoniker = "Delete";
+    @localize { "Deletes a data element." };
+    GTI_destination = ( TO_APP_MODEL );
+    GTI_actionMsg = MSG_ECHK_DOCUMENT_DELETE_DATA_ITEM;
+    ATTR_GEN_DESTINATION_CLASS = (ClassStruct*)&EChkDocumentClass;
+}
+
+
+@object GenValueClass EChkValue = {
+    GVLI_value = MakeWWFixed( 123 );
+    GVLI_maximum = MakeWWFixed( ECHK_MAX_ITEM_VALUE );
+}
+
+@object GenViewClass EChkChartView = {
+    GVI_horizAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT
+                             | GVDA_NO_LARGER_THAN_CONTENT;
+}
+
+@end Display;
+
+/********************************************************************
+ *		Content Resource
+ * This resource is a template, and a duplicate of this
+ * resource will be made for each newly created document.
+ * It contains the chart object which will represent our
+ * data values.
+ *******************************************************************/
+@start Content, notDetachable;
+
+@object EChkChartClass EChkChart = {
+    VI_bounds = { 0, 0, VIEW_RIGHT, VIEW_BOTTOM };
+    ECCI_chaBars = @EChkBarDataChunk;
+}
+
+  /* We'll have a maximum of 9 data elements.
+   * Keep this up-to-date if that number changes. */
+@chunk word EChkBarDataChunk[] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+@end Content;
+
+/********************************************************************
+ *		Strings Resource
+ * Localizable strings, mostly error messages.
+ *******************************************************************/
+@start Strings, data;
+
+@chunk char acrMaxItemsErrMsg[] = "Cannot add more items.";
+@localize { "Occurs when user tries to add too many data elements." };
+
+@end Strings;
+
+/********************************************************************
+ *		Functions
+ *******************************************************************/
+
+/********************************************************************
+ *	          ErrorMessage
+ ********************************************************************
+ * SYNOPSIS:     Display an error message, then return to caller.
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * CHECKS:       Ensures odMessage is valid. Doesn't check
+ *               return value from UserStandardDialog.
+ * STRATEGY:     First check the input, then lock down the memory
+ *               and call UserStandardDialog, passing the dereferenced
+ *               pointer to the message. Then unlock the memory.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *       NF     7/9/96          Initial version
+ *******************************************************************/
+void
+ErrorMessage( optr odMessage ) /* Message to display. (in) */
+{
+    char * acrMessage;
+
+EC( ECCheckLMemOD( odMessage ); )
+    MemLock( OptrToHandle( odMessage ) );
+    acrMessage = (char*)LMemDeref( odMessage );
+EC( ECCheckBounds( acrMessage ); )
+    UserStandardDialog( (char*)0, (char*)0, (char*)0, (char*)0,
+                        acrMessage,
+                        ( CDT_ERROR <<
+                          CDBF_DIALOG_TYPE_OFFSET ) |
+                        ( GIT_NOTIFICATION <<
+                          CDBF_INTERACTION_TYPE_OFFSET ) );
+    MemUnlock( OptrToHandle( odMessage ) );
+} /* ErrorMessage */
+
+/********************************************************************
+ *		Code for EChkDocumentClass
+ *******************************************************************/
+
+/********************************************************************
+ *		MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+ ********************************************************************
+ * SYNOPSIS:     Duplicate object blocks and create a blank header.
+ * CONTEXT:      Creating a new document.
+ * PARAMETERS:   void
+ * RETURNS:      Boolean - TRUE if error occurred.
+ * SIDE EFFECTS: none
+ * STRATEGY:     Duplicate the chart and attach it to the document.
+ *               Create and initilize the data block.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE {
+    VMBlockHandle     vmhChart;
+    MemHandle         mhData;
+    DataBlockHeader * pDataBlockHeader;
+
+      /*
+       * If superclass hits an error while trying to
+       * create the file, return immediately, signaling
+       * that we hit an error.
+       */
+    if ( @callsuper() ) {
+        return( TRUE );
+    }
+    else {
+        /*
+         * Create the block which will hold our chart object
+         * by duplicating the chart resource and attaching
+         * the duplicate to the VM document.
+         */
+EC(     ECCheckLMemOD( oself ); )
+        pself = ObjDerefGen( oself );
+EC(     ECCheckBounds( pself ); )
+        pself->ECDI_mhChart = ObjDuplicateResource(
+            OptrToHandle( @EChkChart ), 0, 0 );
+EC(     ECVMCheckVMFile( pself->GDI_fileHandle ); )
+        vmhChart = VMAttach( pself->GDI_fileHandle,
+                             0, pself->ECDI_mhChart );
+EC(     ECVMCheckVMBlockHandle( pself->GDI_fileHandle, vmhChart ); )
+        VMPreserveBlocksHandle( pself->GDI_fileHandle, vmhChart );
+
+          /*
+           * Create the block which will hold our linked list.
+           * Initialize it to some preset values. The data
+           * block will be the VM map block.
+           */
+        pself->ECDI_vmhData = VMAllocLMem(
+            pself->GDI_fileHandle, LMEM_TYPE_GENERAL,
+            sizeof( DataBlockHeader ) );
+        VMSetMapBlock( pself->GDI_fileHandle, pself->ECDI_vmhData );
+        pDataBlockHeader = VMLock( pself->GDI_fileHandle,
+                                   pself->ECDI_vmhData, &mhData );
+EC(     ECCheckMemHandle( mhData ); )
+EC(     ECCheckBounds( pDataBlockHeader ); )
+        pDataBlockHeader->DBH_chaItems = ChunkArrayCreate(
+            mhData, sizeof( NodeData ), 0, 0 );
+        pDataBlockHeader->DBH_cNumItems = 0;
+        pDataBlockHeader->DBH_vmhChart = vmhChart;
+        VMDirty( mhData );
+        VMUnlock( mhData );
+
+          /*
+           * Assume no error encountered since nothing
+           * ever goes wrong with VM routines.
+           */
+        return( FALSE );
+    }
+} /* MSG_GEN_DOCUMENT_INITALIZE_DOCUMENT_FILE */
+
+/********************************************************************
+ *		MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+ ********************************************************************
+ * SYNOPSIS:     Load in chart block, initialize data list gadget.
+ * CONTEXT:      Opening a file.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Get the data block handle from the document and
+ *               stuff it into a safe place. Get the chart object
+ *               from the document and add it to the document
+ *               object as a child. Set up the dynamic list gadget.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT {
+      /*
+       * mhData           - Data block as it exists in memory.
+       * pDataBlockHeader - Header information for data.
+       * odList           - Dynamic list gadget.
+       * odChart          - Chart object that represents data.
+       * vmhChart         - VM block chart lives in.
+       */
+    MemHandle         mhData;
+    DataBlockHeader * pDataBlockHeader;
+    optr              odList;
+    optr              odChart;
+    VMBlockHandle     vmhChart;
+
+    @callsuper();
+
+      /*
+       * Get the block that contains our linked list
+       * and header info.
+       */
+EC( ECCheckLMemOD( oself ); )
+    pself = ObjDerefGen( oself );
+EC( ECCheckBounds( pself ); )
+    pself->ECDI_vmhData = VMGetMapBlock( pself->GDI_fileHandle );
+EC( ECVMCheckVMFile( pself->GDI_fileHandle ); )
+EC( ECVMCheckVMBlockHandle( pself->GDI_fileHandle, pself->ECDI_vmhData ); )
+    pDataBlockHeader = VMLock( pself->GDI_fileHandle,
+                               pself->ECDI_vmhData, &mhData );
+EC( ECCheckMemHandle( mhData ); )
+
+      /*
+       * Extract the header info.
+       */
+    pself->ECDI_chaItems = pDataBlockHeader->DBH_chaItems;
+    pself->ECDI_cNumItems = pDataBlockHeader->DBH_cNumItems;
+EC_ERROR_IF( pself->ECDI_cNumItems > ECHK_MAX_ITEM_COUNT,
+             ECHK_ERR_ITEM_COUNT_PAST_MAXIMUM );
+    vmhChart = pDataBlockHeader->DBH_vmhChart;
+EC( ECVMCheckVMBlockHandle( pself->GDI_fileHandle, vmhChart ); )
+    VMUnlock( mhData );
+
+      /*
+       * Make the chart object a child of the document object.
+       * First take its VM block and turn it into a Mem block,
+       * then add it as a non-discardable VM child.
+       */
+    pself->ECDI_mhChart = VMVMBlockToMemBlock( pself->GDI_fileHandle,
+                                               vmhChart );
+    odChart = ConstructOptr( pself->ECDI_mhChart,
+                             OptrToChunk( @EChkChart ) );
+EC( ECCheckLMemOD( odChart ); )
+    @send self::MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD( odChart, CCO_FIRST );
+
+      /*
+       * Initialize the data list gadget.
+       */
+    odList = ConstructOptr( pself->GDI_display,
+                            OptrToChunk( @EChkDataList ) );
+EC( ECCheckLMemOD( odList ); )
+    @send odList::MSG_GEN_DYNAMIC_LIST_INITIALIZE( pself->ECDI_cNumItems );
+    @send odList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION( 0, FALSE );
+
+} /* MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT */
+
+/********************************************************************
+ *		MSG_ECHK_DOCUMENT_MONIKER_LIST_QUERY
+ ********************************************************************
+ * SYNOPSIS:     Set the moniker for one of our data list's items.
+ * CONTEXT:      The data list will send this message to the output
+ *               whenever it needs to display the moniker of a given
+ *               item.  We should respond with one of the
+ *               MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_... messages.
+ * PARAMETERS:   optr list
+ *               word item
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Look up the numerical value of the item and
+ *               turn it into a string. Then set the moniker of
+ *               the item to that string.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkDocumentClass, MSG_ECHK_DOCUMENT_MONIKER_LIST_QUERY {
+      /*
+       * mhData     - Block containing the data array.
+       * uData      - Copy of item in the array.
+       * acrMoniker - String representation of data.
+       */
+    MemHandle   mhData;
+    NodeData    uData;
+    char        acrMoniker[LOCAL_DISTANCE_BUFFER_SIZE];
+
+      /*
+       * Look up the numerical value of the
+       * item as stored in the array.
+       */
+EC_ERROR_IF( item > ECHK_MAX_ITEM_COUNT,
+             ECHK_ERR_ITEM_COUNT_PAST_MAXIMUM );
+EC( ECVMCheckVMFile( pself->GDI_fileHandle ); )
+EC( ECVMCheckVMBlockHandle( pself->GDI_fileHandle, pself->ECDI_vmhData ); )
+    VMLock( pself->GDI_fileHandle, pself->ECDI_vmhData, &mhData );
+EC( ECCheckMemHandle( mhData ); )
+    ChunkArrayGetElementHandles( mhData, pself->ECDI_chaItems,
+                                 item, &uData );
+EC_ERROR_IF( uData > ECHK_MAX_ITEM_VALUE,
+             ECHK_ERR_DATA_VALUE_PAST_MAXIMUM );
+    VMUnlock( mhData );
+
+      /*
+       * Set the moniker of the item using the
+       * string representation of the numerical value.
+       */
+    LocalFixedToAscii( acrMoniker, MakeWWFixed( uData ), 0 );
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                    item, acrMoniker );
+} /* MSG_ECHK_DOCUMENT_MONIKER_LIST_QUERY */
+
+/********************************************************************
+ *		MSG_ECHK_DOCUMENT_INSERT_DATA_ITEM
+ ********************************************************************
+ * SYNOPSIS:     Add a new number to our list of data.
+ * CONTEXT:      User wants to add a new piece of data.
+ * CALLED BY:    EChkInsertTrigger
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     See if we can insert more items or not. If so,
+ *               get the value of the item and insert it into
+ *               the data list. Also add it to the dynamic list
+ *               and the chart object.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkDocumentClass, MSG_ECHK_DOCUMENT_INSERT_DATA_ITEM {
+      /*
+       * mhData           - Block containing data array.
+       * pDataBlockHeader - Used to update the item count.
+       * count            - Number of items in dynamic list.
+       * pNewNode         - New item in the array.
+       * odList           - Dynamic list representing data items.
+       * ordinal          - Item currently selected in list.
+       * odValue          - GenValue object containing new value.
+       * value            - Value obtained from GenValue.
+       * odChart          - Chart object representing values.
+       * cElemSize        - Used in call to ChunkArrayElementToPtr.
+       */
+    MemHandle         mhData;
+    DataBlockHeader * pDataBlockHeader;
+    word              count;
+    NodeData *        pNewNode;
+    optr              odList;
+    word              ordinal;
+    optr              odValue;
+    WWFixedAsDWord    value;
+    optr              odChart;
+    word              cElemSize;
+
+      /*
+       * See how many items we have so far.
+       * If less than max, insert, otherwise error message.
+       * Query list and data objects to find out where
+       * to insert item and what value to insert there.
+       */
+    odList = ConstructOptr( pself->GDI_display,
+                            OptrToChunk( @EChkDataList ) );
+EC( ECCheckLMemOD( odList ); )
+    count = @call odList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+    if ( ECHK_MAX_ITEM_COUNT > count ) {
+        ordinal = @call odList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        if ( ordinal > count ) {
+            ordinal = 0;
+        }
+EC_ERROR_IF( ordinal > ECHK_MAX_ITEM_COUNT,
+             ECHK_ERR_ITEM_COUNT_PAST_MAXIMUM );
+        odValue = ConstructOptr( pself->GDI_display,
+                                 OptrToChunk( @EChkValue ) );
+EC(     ECCheckLMemOD( odValue ); )
+        value = @call odValue::MSG_GEN_VALUE_GET_VALUE();
+
+          /*
+           * Lock the data block so we can insert data into
+           * the array. Create a new array element and
+           * save the value to it.
+           */
+#if ERROR_CHECK
+        ECVMCheckVMFile( pself->GDI_fileHandle );
+        ECVMCheckVMBlockHandle( pself->GDI_fileHandle,
+                                pself->ECDI_vmhData );
+#endif
+        VMLock( pself->GDI_fileHandle, pself->ECDI_vmhData, &mhData );
+EC(     ECCheckMemHandle( mhData ); )
+        pNewNode = ChunkArrayElementToPtrHandles(
+            mhData, pself->ECDI_chaItems, ordinal, &cElemSize );
+EC(     ECCheckBounds( pNewNode ); )
+        pNewNode = ChunkArrayInsertAtHandle( pself->ECDI_chaItems,
+            pNewNode, 0 );
+        *pNewNode = WWFixedToInt( value );
+
+          /*
+           * Increment the number of items in the array.
+           * We've changed the data so before we unlock
+           * the block we mark it dirty.
+           */
+        pDataBlockHeader = MemDeref( mhData );
+EC(     ECCheckBounds( pDataBlockHeader ); )
+        pDataBlockHeader->DBH_cNumItems++;
+        pself->ECDI_cNumItems++;
+        VMDirty( mhData );
+        VMUnlock( mhData );
+
+          /*
+           * Update the data list gadget.
+           */
+        @send odList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS( ordinal, 1 );
+        @send odList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                          ordinal, FALSE );
+
+          /*
+           * Update the chart.
+           */
+        odChart = ConstructOptr( pself->ECDI_mhChart,
+                                 OptrToChunk( @EChkChart ) );
+EC(     ECCheckLMemOD( odChart ); )
+        @send odChart::MSG_ECHK_CHART_INSERT_BAR(
+                           ordinal, WWFixedToInt( value ) );
+    }
+      /*
+       * If we couldn't add the item up above,
+       * display the error message now.
+       */
+    else {
+        ErrorMessage( @acrMaxItemsErrMsg );
+    }
+} /* MSG_ECHK_DOCUMENT_INSERT_DATA_ITEM */
+
+/********************************************************************
+ *		MSG_ECHK_DOCUMENT_DELETE_DATA_ITEM
+ ********************************************************************
+ * SYNOPSIS:     Destroys one data item.
+ * CONTEXT:      User has just clicked on the "Delete" trigger.
+ * CALLED BY:    EChkDeleteTrigger
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Remove the corresponding element from the list
+ *               of elements. Update the Vmem block, the dynamic
+ *               list gadget, and the chart object.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkDocumentClass, MSG_ECHK_DOCUMENT_DELETE_DATA_ITEM {
+      /*
+       * pOldNode         - Item being deleted.
+       * mhData           - Block containing data array.
+       * odList           - Dynamic list representing items.
+       * ordinal          - Selected item in dynamic list.
+       * odChart          - Chart object representing values.
+       * pDataBlockHeader - Used to update item count.
+       * cElemSize        - Size of element in array.
+       */
+    NodeData *        pOldNode;
+    MemHandle         mhData;
+    optr              odList;
+    word              ordinal;
+    optr              odChart;
+    DataBlockHeader * pDataBlockHeader;
+    word              cElemSize;
+
+      /*
+       * Find out which element user wants to delete.
+       * If it's a valid item, we can go ahead
+       * and remove it from the list, dynamic list,
+       * and the chart object.
+       */
+    odList = ConstructOptr( pself->GDI_display,
+                            OptrToChunk( EChkDataList ) );
+EC( ECCheckLMemOD( odList ); )
+    ordinal = @call odList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if ( @call odList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS() > ordinal ) {
+EC_ERROR_IF( ordinal > ECHK_MAX_ITEM_COUNT,
+             ECHK_ERR_ITEM_COUNT_PAST_MAXIMUM );
+#if ERROR_CHECK
+        ECVMCheckVMFile( pself->GDI_fileHandle );
+        ECVMCheckVMBlockHandle( pself->GDI_fileHandle,
+                                pself->ECDI_vmhData );
+#endif
+        VMLock( pself->GDI_fileHandle, pself->ECDI_vmhData, &mhData );
+EC(     ECCheckMemHandle( mhData ); )
+
+          /*
+           * Delete the item from the chunk array.
+           */
+        pOldNode = ChunkArrayElementToPtrHandles( mhData,
+            pself->ECDI_chaItems, ordinal, &cElemSize );
+EC(     ECCheckBounds( pOldNode ); )
+        ChunkArrayDeleteHandle( pself->ECDI_chaItems, pOldNode );
+
+          /*
+           * Decrement the number of elements.
+           * Dirty the VMem block so it will be saved.
+           */
+        pDataBlockHeader = MemDeref( mhData );
+EC(     ECCheckBounds( pDataBlockHeader ); )
+        pDataBlockHeader->DBH_cNumItems--;
+        pself->ECDI_cNumItems--;
+        VMDirty( mhData );
+        VMUnlock( mhData );
+
+          /*
+           * Update the dynamic list gadget.
+           */
+        @send odList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS( ordinal, 1 );
+        @send odList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION( ordinal - 1,
+                                                               FALSE );
+
+          /*
+           * Tell the chart object to remove
+           * the bar from its graph.
+           */
+        odChart = ConstructOptr( pself->ECDI_mhChart,
+                                 OptrToChunk( @EChkChart ) );
+EC(     ECCheckLMemOD( odChart ); )
+        @send odChart::MSG_ECHK_CHART_DELETE_BAR( ordinal );
+    }
+} /* MSG_ECHK_DOCUMENT_DELETE_DATA_ITEM */
+
+/********************************************************************
+ *		MSG_ECHK_DOCUMENT_SET_DATA_ITEM
+ ********************************************************************
+ * SYNOPSIS:     Change the data number of one item in the data list.
+ * CONTEXT:      User has clicked the "Change" button.
+ * CALLED BY:    EChkChangeTrigger
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the corresponding item's value to the passed
+ *               input. Update the dynamic list and chart objects.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkDocumentClass, MSG_ECHK_DOCUMENT_SET_DATA_ITEM {
+      /*
+       * mhData     - Block containing data array.
+       * pTempNode  - Node being changed.
+       * odList     - Dynamic list representing the items.
+       * ordinal    - Selected item in the dynamic list.
+       * odValue    - GenValue containing new value for item.
+       * value      - Value from GenValue.
+       * acrMoniker - String representation of the value.
+       * odChart    - Chart object representing values.
+       * cElemSize  - Size of array element.
+       */
+    MemHandle      mhData;
+    NodeData *     pTempNode;
+    optr           odList;
+    int            ordinal;
+    optr           odValue;
+    WWFixedAsDWord value;
+    char           acrMoniker[LOCAL_DISTANCE_BUFFER_SIZE];
+    optr           odChart;
+    word           cElemSize;
+
+      /*
+       * Find out which item we're changing.
+       */
+    odList = ConstructOptr( pself->GDI_display,
+                            OptrToChunk( EChkDataList ) );
+EC( ECCheckLMemOD( odList ); )
+    ordinal = @call odList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+EC_ERROR_IF( ordinal > ECHK_MAX_ITEM_COUNT,
+             ECHK_ERR_ITEM_COUNT_PAST_MAXIMUM );
+    if ( @call odList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS() > ordinal ) {
+
+          /*
+           * Find out what the item's new value should be.
+           * Lock the data block so that we can change the data.
+           * Set the appropriate item to its new value.
+           */
+        odValue = ConstructOptr( pself->GDI_display,
+                                 OptrToChunk( EChkValue ) );
+EC(     ECCheckLMemOD( odValue ); )
+        value = @call odValue::MSG_GEN_VALUE_GET_VALUE();
+EC_ERROR_IF( WWFixedToInt( value ) > ECHK_MAX_ITEM_VALUE,
+             ECHK_ERR_DATA_VALUE_PAST_MAXIMUM );
+#if ERROR_CHECK
+        ECVMCheckVMFile( pself->GDI_fileHandle );
+        ECVMCheckVMBlockHandle( pself->GDI_fileHandle,
+                                pself->ECDI_vmhData );
+#endif
+        VMLock( pself->GDI_fileHandle, pself->ECDI_vmhData,
+                &mhData );
+        pTempNode = ChunkArrayElementToPtrHandles(
+            mhData, pself->ECDI_chaItems, ordinal, &cElemSize );
+        *pTempNode = WWFixedToInt( value );
+
+          /*
+           * We changed the data so mark it dirty before unlocking it.
+           * Update the dynamic list gadget.
+           * Update the bar chart.
+           */
+        VMDirty( mhData );
+        VMUnlock( mhData );
+        LocalFixedToAscii( acrMoniker, value, 0 );
+        @call odList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                          ordinal, acrMoniker );
+        odChart = ConstructOptr( pself->ECDI_mhChart,
+                                 OptrToChunk( @EChkChart ) );
+EC(     ECCheckLMemOD( odChart ); )
+        @send odChart::MSG_ECHK_CHART_RESIZE_BAR(
+                           ordinal, WWFixedToInt( value ) );
+    }
+} /* MSG_ECHK_DOCUMENT_SET_DATA_ITEM */
+
+/********************************************************************
+ *		MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+ ********************************************************************
+ * SYNOPSIS:     Remove the chart object and close down the
+ *               document UI.
+ * CONTEXT:      Closing the document.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Remove the chart object from ourselves, then
+ *               call the superclass.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT {
+    optr odChart;
+
+      /*
+       * Remove the chart from the document.
+       * Call the superclass to finish the detach.
+       */
+    odChart = ConstructOptr( pself->ECDI_mhChart,
+                             OptrToChunk( @EChkChart ) );
+EC( ECCheckLMemOD( odChart ); )
+    @call odChart::MSG_VIS_REMOVE_NON_DISCARDABLE( VUM_MANUAL );
+
+    @callsuper();
+} /* MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT */
+
+/********************************************************************
+ *		Code for EChkChartClass
+ ********************************************************************
+
+/********************************************************************
+ *		MSG_VIS_DRAW
+ ********************************************************************
+ * SYNOPSIS:     Draw the chart.
+ * CONTEXT:      System has asked the chart object to draw itself.
+ * PARAMETERS:   DrawFlags    drawFlags
+ *               GStateHandle gstate
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Draw the x and y axes, then draw each of the
+ *               bars using a simple for loop. The values for
+ *               the bars are stored in our instance data.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkChartClass, MSG_VIS_DRAW {
+    word   count;
+    word * pBarArray;
+    word   left;
+
+      /*
+       * Draw the x and y axis markers.
+       */
+/* This EC routine is broken in versions of GEOS prior to 8/9/96.
+EC( ECCheckGStateHandle( gstate ); )
+*/
+    GrDrawVLine( gstate, CHART_LEFT-BORDER_MARGIN,
+                 BORDER_MARGIN, CHART_BOTTOM );
+    GrDrawHLine( gstate, CHART_LEFT,
+                 CHART_BOTTOM+BORDER_MARGIN, VIEW_RIGHT - BORDER_MARGIN );
+    pBarArray = LMemDerefHandles( OptrToHandle( oself ),
+                                  pself->ECCI_chaBars );
+EC( ECCheckBounds( pBarArray ); )
+
+      /*
+       * Draw the bars.
+       */
+    for ( count = 0; count < pself->ECCI_cNumBars; count++ ) {
+        left = CHART_LEFT + ( count * BAR_WIDTH_ALLOW );
+        GrFillRect( gstate, left, CHART_BOTTOM - pBarArray[count],
+                    left + BAR_WIDTH, CHART_BOTTOM );
+    }
+} /* MSG_VIS_DRAW */
+
+/********************************************************************
+ *		MSG_ECHK_CHART_INSERT_BAR
+ ********************************************************************
+ * SYNOPSIS:     Add another bar to our bar chart.
+ * CONTEXT:      The user has added another data item to the list.
+ * PARAMETERS:   word     ordinal
+ *               NodeData value
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Walk through the bar array, then make a space
+ *               at the appropriate spot by shifting all other
+ *               bars to the right one slot. Then insert the new
+ *               bar in the space and increment the number of bars.
+ *               Don't forget to mark ourselves invalid.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkChartClass, MSG_ECHK_CHART_INSERT_BAR {
+    word   count;
+    word * pBarArray;
+
+      /*
+       * Insert new bar into array, shifting other bars over.
+       * Increment the number of bars.
+       */
+    pBarArray = LMemDerefHandles( OptrToHandle( oself ),
+                                  pself->ECCI_chaBars );
+EC( ECCheckBounds( pBarArray ); )
+    for ( count = pself->ECCI_cNumBars; count > ordinal; count-- ) {
+        pBarArray[count] = pBarArray[count-1];
+    }
+    pBarArray[ordinal] = value;
+    pself->ECCI_cNumBars++;
+
+      /*
+       * Mark ourself as in need of a redraw.
+       * Mark ourself as dirty so we'll be saved to VM file.
+       */
+    @call self::MSG_VIS_MARK_INVALID( VOF_IMAGE_INVALID,
+                                      VUM_DELAYED_VIA_APP_QUEUE );
+    ObjMarkDirty( oself );
+} /* MSG_ECHK_CHART_INSERT_BAR */
+
+/********************************************************************
+ *		MSG_ECHK_CHART_DELETE_BAR
+ ********************************************************************
+ * SYNOPSIS:     Remove a bar from the bar chart.
+ * CONTEXT:      User has deleted a data item from the list.
+ * PARAMETERS:   word ordinal
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Walk through the bar array until we find the bar
+ *               we want to remove. Then remove it by shifting all
+ *               other bars to the left one slot, thus overwriting
+ *               the bar in question. Decrement the number of
+ *               bars left.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkChartClass, MSG_ECHK_CHART_DELETE_BAR {
+    word   count;
+    word * pBarArray;
+
+      /*
+       * Update our instance data and data array.
+       */
+    pself->ECCI_cNumBars--;
+    pBarArray = LMemDerefHandles( OptrToHandle( oself ),
+                                 pself->ECCI_chaBars );
+EC( ECCheckBounds( pBarArray ); )
+    for ( count = ordinal; count < pself->ECCI_cNumBars; count++ ) {
+        pBarArray[count] = pBarArray[count+1];
+    }
+
+      /*
+       * Mark ourselves as in need of a redraw.
+       * Mark ourselves dirty so we'll be saved to file.
+       */
+    @call self::MSG_VIS_MARK_INVALID( VOF_IMAGE_INVALID,
+                                      VUM_DELAYED_VIA_APP_QUEUE );
+    ObjMarkDirty( oself );
+} /* MSG_ECHK_CHART_DELETE_BAR */
+
+/********************************************************************
+ *		MSG_ECHK_CHART_RESIZE_BAR
+ ********************************************************************
+ * SYNOPSIS:     Resize a bar.
+ * CONTEXT:      User has changed the value of a data item.
+ * PARAMETERS:   word     ordinal
+ *               NodeData value
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Simply change the value in the appropriate bar
+ *               array slot, and mark ourselves invalid.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LH	4/14/93       	Initial Revision
+ *	NF	8/9/96		Made into EC sample
+ *******************************************************************/
+@method EChkChartClass, MSG_ECHK_CHART_RESIZE_BAR {
+    word * pBarArray;
+
+      /*
+       * Update the array.
+       * Mark ourself as in need of a redraw.
+       * Mark ourself dirty so we'll be saved to file.
+       */
+    pBarArray = LMemDerefHandles( OptrToHandle( oself ),
+                                  pself->ECCI_chaBars );
+EC( ECCheckBounds( pBarArray ); )
+    pBarArray[ordinal] = value;
+    @call self::MSG_VIS_MARK_INVALID( VOF_IMAGE_INVALID,
+                                      VUM_DELAYED_VIA_APP_QUEUE );
+    ObjMarkDirty( oself );
+} /* MSG_ECHK_CHART_RESIZE_BAR */
+

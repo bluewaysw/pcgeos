@@ -1,0 +1,606 @@
+/*
+ * Project:	Studio
+ * File:	UI/uiMain.ui
+ *
+ * Author:	Jenny Greenwood   7 March 1994
+ *
+ *	This file contains the user interface description for the main
+ * part of the word processor.
+ *
+ *	$Id: uiMain.ui,v 1.1 97/04/04 14:40:25 newdeal Exp $
+ *
+ */
+
+#include "Art/mkrEditTextTool.ui"
+#include "Art/mkrBitmapPtrTool.ui"
+
+start 	AppSCMonikerResource, data;
+#include "Art/mkrStudio.ui"
+#include "Art/mkrTC.ui"
+end 	AppSCMonikerResource;
+
+start ApplicationUI;
+
+/* ----------------------------------------------------------------------------
+	Application object
+-----------------------------------------------------------------------------*/
+
+StudioApp = StudioApplication vardataReloc {
+	children = StudioPrimary;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+		StudioPrimary;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		StudioDocumentControl;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		StudioDocumentControl,
+		StudioDisplayControl,
+		StudioViewControl,
+
+			/* Text library */
+
+		StudioRulerShowControl,
+		StudioTextRulerControl, StudioTabControl;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		StudioToolControl,
+		ShowBarList, MiscSettingsList;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		StudioDocumentControl, StudioPrintControl,
+		StudioEditControl, StudioPageControl,
+		StudioHyperlinkControl,
+		StudioPageNameControl,
+		StudioDisplayControl, StudioViewControl,
+
+			/* Spell library */
+
+		StudioSpellControl, StudioThesaurusControl,
+
+			/* Text library */
+
+		StudioTextStyleSheetControl,
+		StudioSearchReplaceControl, StudioTextRulerControl,
+		StudioLineSpacingControl,
+		StudioJustificationControl, StudioParaSpacingControl,
+		StudioParaBGColorControl, StudioParaAttrControl,
+		StudioMarginControl, StudioTabControl, 
+		StudioDefaultTabsControl,
+		StudioBorderControl, StudioBorderColorControl,
+		/* StudioDropCapControl, */
+		StudioHyphenationControl,
+		StudioFontControl, StudioTextStyleControl, 
+		StudioPointSizeControl,
+		StudioCharFGColorControl, StudioCharBGColorControl,
+		StudioFontAttrControl, StudioTextCountControl,
+
+			/* GrObj library */
+
+		StudioGrObjToolControl, StudioGrObjBitmapToolControl,
+		StudioSplinePointControl,
+
+			/* Bitmap library */
+
+			/* Ruler library */
+
+		StudioRulerTypeControl, StudioGridSpacingControl,
+		StudioRulerGuideControl, StudioRulerShowControl,
+
+			/* Local Goodies */
+#ifdef DO_PIZZA
+		StudioFixedSpacingControl,	/* Pizza project */
+		StudioRowColumnDisplayControl,
+#endif
+			/* Impex Library */
+
+		StudioImportControl, StudioExportControl;
+
+	moniker = list {
+		StudioTextMoniker, 
+		StudioMoniker,
+      AppTCMoniker
+	}
+	hints = {
+		ATTR_GEN_APPLICATION_PRINT_CONTROL {
+			UN_OPTR StudioPrintControl
+		},
+		ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER {
+			UN_OPTR SaveOptionsTrigger
+		}
+	}
+}
+visMoniker StudioTextMoniker = "Bindery";
+
+end ApplicationUI;
+
+/* ----------------------------------------------------------------------------
+	Primary window
+-----------------------------------------------------------------------------*/
+
+start PrimaryUI;
+
+StudioPrimary = GenPrimary {
+	children = FileMenu, StudioEditControl, ViewMenu, OptionsMenu,
+		   ParagraphMenu,
+		   CharacterMenu,
+		   StudioPageNameControl,
+		   StudioHyperlinkControl, 
+		   StudioDisplayControl,
+		   GraphicsToolbar, FunctionToolbar, StyleToolbar, 
+		   DisplayGroup,
+		   GenerateContentFileDialog,
+		   StatusBarArea;
+
+	hints = {
+		HINT_PRIMARY_FULL_SCREEN,
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, 2>
+		},
+		ATTR_GEN_HELP_CONTEXT { char "TOC", 0 },
+
+	/*
+	 *	Added, because people kept whining about the kbd going away
+	 *	when we pulled down menus.
+	 */
+		ATTR_GEN_WINDOW_KBD_OVERRIDE {	
+			KeyboardOverride KO_KEYBOARD_REQUIRED
+		}
+	}
+}
+
+
+StudioHyperlinkControl = HyperlinkControl vardataReloc {
+	moniker = 'H', "Hyperlink";
+	visibility = popup;
+	output	= "TO_CUR_TEXT";
+	hints = {
+		ATTR_GEN_OUTPUT_TRAVEL_START {
+			UN_OPTR StudioDocGroup
+		}
+	}
+}
+
+
+/* ----------------------------------------------------------------------------
+	Always visible objects
+-----------------------------------------------------------------------------*/
+
+DisplayGroup = GenInteraction {
+	children = GrObjToolsToolbar, StudioDisplayGroup;
+	visibility = subGroup;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		  HINT_EXPAND_HEIGHT_TO_FIT_PARENT 
+	}
+}
+
+StudioDisplayGroup = GenDisplayGroup {
+	hints = {
+		HINT_DEFAULT_FOCUS, HINT_DEFAULT_TARGET,
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_70>,
+			SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_55>,
+			0
+		},
+		HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE
+	}
+}
+
+/* -----------------------
+	Drawing Tools Toolbar
+-------------------------- */
+
+GrObjToolsToolbar = GenInteraction {
+	children = GrObjDrawingTools, GrObjBitmapTools;
+	visibility = popout;
+	genAttributes = default +notifyVisibility;
+	hints = {
+		HINT_TOOLBOX,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_STUDIO_APPLICATION_TOOLBAR_VISIBILITY
+		},
+		ATTR_GEN_VISIBILITY_DATA {
+			word 0, mask SBS_SHOW_DRAWING_TOOLS or \
+				mask SBS_SHOW_BITMAP_TOOLS
+		}
+	}
+}
+
+StatusBarArea = GenInteraction {
+	children = PageNameStatusBar,
+		   BookNameStatusBarInteraction;
+	hints = {
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	}
+}
+
+PageNameStatusBar = GenToolGroup {
+	controller = StudioPageNameControl;
+	hints = {
+		HINT_TOOLBOX,
+	}
+}
+
+end PrimaryUI;
+
+start GraphicToolsUI;
+
+GrObjDrawingTools = GenToolGroup {
+	controller = StudioGrObjToolControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+EditTextTool = GrObjToolItem {
+	genStates = default -usable;
+	moniker = list {
+		EditTextToolTCMoniker,
+		EditTextToolTMMoniker,
+		EditTextToolTCGAMoniker
+	}
+	toolClass = "EditTextGuardianClass";
+	identifier = "-1";
+}
+
+GrObjBitmapTools = GenToolGroup {
+	genStates = default -usable;
+	controller = StudioGrObjBitmapToolControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+end GraphicToolsUI;
+
+/* -----------------------
+	Graphics Toolbar
+-------------------------- */
+
+start PrimaryUI;
+
+GraphicsToolbar = GenInteraction {
+	genStates = default -usable;
+	children = TextColorTools;
+	visibility = popout;
+	genAttributes = default +notifyVisibility;
+	hints = {
+		HINT_TOOLBOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_STUDIO_APPLICATION_TOOLBAR_VISIBILITY
+		},
+		ATTR_GEN_VISIBILITY_DATA {
+			word 0, mask SBS_SHOW_GRAPHIC_BAR
+		}
+	}
+}
+
+end PrimaryUI;
+
+start GraphicBarUI;
+
+TextColorTools = GenToolGroup {
+	controller = StudioCharFGColorControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+end GraphicBarUI;
+
+/* -----------------------
+	Function Toolbar
+-------------------------- */
+
+start PrimaryUI;
+
+FunctionToolbar = GenInteraction {
+	genStates = default -usable;
+	visibility = popout;
+	genAttributes = default +notifyVisibility;
+	children = DocumentTools, SearchReplaceTools, EditTools, ViewTools,
+#ifdef DO_PIZZA
+		   RowColumnDisplayTools,
+#endif
+		   HyphenationTools, LineSpacingTools;
+	hints = {
+		HINT_TOOLBOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_STUDIO_APPLICATION_TOOLBAR_VISIBILITY
+		},
+		ATTR_GEN_VISIBILITY_DATA {
+			word 0, mask SBS_SHOW_FUNCTION_BAR
+		}
+	}
+}
+
+end PrimaryUI;
+
+start FunctionBarUI;
+
+DocumentTools = GenToolGroup {
+	controller = StudioDocumentControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+SearchReplaceTools = GenToolGroup {
+	controller = StudioSearchReplaceControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+EditTools = GenToolGroup {
+	controller = StudioEditControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+ViewTools = GenToolGroup {
+	controller = StudioViewControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+HyphenationTools = GenToolGroup {
+	controller = StudioHyphenationControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+LineSpacingTools = GenToolGroup {
+	controller = StudioLineSpacingControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+#ifdef DO_PIZZA
+RowColumnDisplayTools = GenToolGroup {
+	controller = StudioRowColumnDisplayControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+#endif
+
+end FunctionBarUI;
+
+/* -----------------------
+	Style Toolbar
+-------------------------- */
+
+start PrimaryUI;
+
+StyleToolbar = GenInteraction {
+	children = PageTools, SpellTools, PrintTools,
+		   TextStyleSheetTools, JustificationTools,
+		   FontTools, PointSizeTools, TextStyleTools;
+	visibility = popout;
+	genAttributes = default +notifyVisibility;
+	hints = {
+		HINT_TOOLBOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_STUDIO_APPLICATION_TOOLBAR_VISIBILITY
+		},
+		ATTR_GEN_VISIBILITY_DATA {
+			word 0, mask SBS_SHOW_STYLE_BAR
+		}
+	}
+}
+
+end PrimaryUI;
+
+start StyleBarUI;
+
+PageTools = GenToolGroup {
+	controller = StudioPageControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+SpellTools = GenToolGroup {
+	controller = StudioSpellControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+PrintTools = GenToolGroup {
+	controller = StudioPrintControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+TextStyleSheetTools = GenToolGroup {
+	controller = StudioTextStyleSheetControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+JustificationTools = GenToolGroup {
+	controller = StudioJustificationControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+FontTools = GenToolGroup {
+	controller = StudioFontControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+PointSizeTools = GenToolGroup {
+	controller = StudioPointSizeControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+TextStyleTools = GenToolGroup {
+	controller = StudioTextStyleControl;
+	hints = {
+		HINT_SAME_ORIENTATION_AS_PARENT,
+		HINT_MINIMIZE_CHILD_SPACING
+	}
+}
+
+end StyleBarUI;
+
+/* ----------------------------------------------------------------------------
+	File menu
+-----------------------------------------------------------------------------*/
+
+start PrimaryUI;
+
+FileMenu = GenInteraction {
+	children = StudioDocumentControl, StudioImportControl,
+		   StudioExportControl, PrintSubGroup, ContentFileSubGroup,
+		   StudioGrObjToolControl, StudioGrObjBitmapToolControl;
+	visibility = popup;
+	hints = { 
+		ATTR_GEN_INTERACTION_GROUP_TYPE { 
+			GenInteractionGroupType GIGT_FILE_MENU 
+		} 
+	}
+}
+
+end PrimaryUI;
+
+start FileMenuUI;
+
+PrintSubGroup = GenInteraction {
+	children = StudioPrintControl,
+		   StudioPageSetupDialog, StudioPlatformDialog;
+	visibility = subGroup;
+}
+
+ContentFileSubGroup = GenInteraction {
+       children = BookFileSetupDialog,
+		  GenerateContentFileTrigger,
+                  GenerateHelpFileTrigger;
+	visibility = subGroup;
+}
+
+StudioGrObjToolControl = GrObjToolControl vardataReloc {
+	genStates = default -enabled;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_CONTROL_APP_TOOLBOX_UI {
+			UN_OPTR	EditTextTool
+		},
+		ATTR_GROBJ_TOOL_CONTROL_POSITION_FOR_ADDED_TOOLS {
+			word CCO_FIRST
+		},
+		ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI {
+			word 	mask GOTCF_PTR or \
+				mask GOTCF_RECT or \
+				mask GOTCF_POLYLINE
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+			word 	mask GOTCF_ZOOM or mask GOTCF_TEXT or \
+			     	mask GOTCF_LINE or mask GOTCF_ROUNDED_RECT or \
+				mask GOTCF_ARC or mask GOTCF_ELLIPSE or \
+				mask GOTCF_POLYCURVE or mask GOTCF_SPLINE or \
+				mask GOTCF_ROTATE_PTR
+		}
+
+	}
+
+	output = StudioHead;	/* Speeds things up if direct */
+}
+
+StudioGrObjBitmapToolControl = GrObjBitmapToolControl vardataReloc{
+	genStates = default -enabled;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+			word	mask VBTCF_DRAW_RECT or mask VBTCF_DRAW_ELLIPSE
+		},
+		ATTR_GEN_CONTROL_APP_TOOLBOX_UI {
+			UN_OPTR	BitmapPtrTool
+		},
+		ATTR_VIS_BITMAP_TOOL_CONTROL_POSITION_FOR_ADDED_TOOLS {
+			word CCO_FIRST
+		}
+	}
+
+	output = StudioHead;	/* Speeds things up if direct */
+}
+
+BitmapPtrTool = VisBitmapToolItem {
+	genStates = default -usable;
+	moniker = list {
+		BitmapPtrToolTCMoniker,
+		BitmapPtrToolTMMoniker,
+		BitmapPtrToolTCGAMoniker
+	}
+	toolClass = 0;
+	identifier = -1;
+}
+
+end FileMenuUI;
+
+/* ----------------------------------------------------------------------------
+	Window menu
+-----------------------------------------------------------------------------*/
+
+start PrimaryUI;
+
+StudioDisplayControl = GenDisplayControl {
+	visibility = popup;
+	hints = { 
+		ATTR_GEN_INTERACTION_GROUP_TYPE { 
+			GenInteractionGroupType GIGT_WINDOW_MENU 
+		},
+		HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE,
+	}
+}
+
+end PrimaryUI;

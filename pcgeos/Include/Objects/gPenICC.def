@@ -1,0 +1,284 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		Objects/gPenInputCC.def
+
+DECLARER:	UI
+
+DESCRIPTION:
+	This file defines GenPenInputControlClass
+
+	$Id: gPenICC.def,v 1.1 97/04/04 14:18:01 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__PENICC
+
+StartLibrary	ui
+
+UseLib hwr.def				;For HWRContext
+UseLib Objects/Text/tCommon.def		;For VisTextRange
+
+;
+; Message(s) sent out:
+; MSG_META_NOTIFY_WITH_DATA_BLOCK w/ GWNT_TEXT_REPLACE_WITH_HWR
+; MSG_META_DELETE_RANGE_OF_CHARS
+; 
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_OBJECT_HAS_FOCUS
+; MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CONTEXT (when HWREntry box is up)
+; MANUFACTURER_ID_GEOWORKS.GWNT_INK (when HWREntry box is up)
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+;
+GenPenInputControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+PenInputDisplayType	etype	word
+	PIDT_KEYBOARD			enum	PenInputDisplayType
+	PIDT_CHAR_TABLE			enum	PenInputDisplayType
+	PIDT_CHAR_TABLE_SYMBOLS		enum	PenInputDisplayType
+	PIDT_CHAR_TABLE_INTERNATIONAL	enum	PenInputDisplayType
+	PIDT_CHAR_TABLE_MATH		enum	PenInputDisplayType
+	PIDT_CHAR_TABLE_CUSTOM		enum	PenInputDisplayType
+	PIDT_HWR_ENTRY_AREA		enum	PenInputDisplayType
+	PIDT_BIG_KEYS			enum	PenInputDisplayType
+	PIDT_NUMBERS			enum	PenInputDisplayType
+	PIDT_PUNCTUATION		enum	PenInputDisplayType
+
+; the following are for NIKE project
+	PIDT_SYMBOLPS_BRACKET		enum	PenInputDisplayType
+	PIDT_SYMBOLPS_GREEK		enum	PenInputDisplayType
+	PIDT_SYMBOLPS_MATH		enum	PenInputDisplayType
+	PIDT_SYMBOLPS_OTHER		enum	PenInputDisplayType
+	PIDT_PINGPONG_POINTER		enum	PenInputDisplayType
+	PIDT_PINGPONG_NUMBER		enum	PenInputDisplayType
+	PIDT_PINGPONG_SYMBOL		enum	PenInputDisplayType
+	PIDT_PINGPONG_OTHER		enum	PenInputDisplayType
+
+; this type is for the JEDI project
+	PIDT_GRAFFITI			enum	PenInputDisplayType
+
+MSG_GEN_PEN_INPUT_CONTROL_SET_DISPLAY	message 
+;
+; Set the visible display to the passed type
+;
+; Pass:		cx - PenInputDisplayType
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+MSG_GEN_PEN_INPUT_CONTROL_GET_DISPLAY	message 
+;
+; Get the current keybaord display (need not be visisble)
+;
+; Pass:		nothing
+; Return: 	cx - PenInputDisplayType (or -1 if none)
+; Destroyed:	ax, dx, bp
+;
+
+MSG_GEN_PEN_INPUT_CONTROL_SET_TO_DEFAULT_POSITION	message
+;	Set the floating keyboard to its default position.
+;
+; Context:	Sent from the UI when bringing the keyboard up
+; Source:	The UI
+; Destination:  The GenPenInputControl
+; Interception: Each SPUI will adjust this accordingly
+;
+; Pass:		cx	= field width
+; Return:	nothing
+; Destroyed:	cx
+;
+
+MSG_GEN_PEN_INPUT_CONTROL_GET_MAIN_VIEW	message
+;	Get the main view associated with the PenInputControl, if there
+; is one.
+;
+; Context:	Requested when enabling/disabling the PenInputControl
+; Source:	GenPenInputControl (in the UI, not the SPUI)
+; Destination:  OLPenInputControl (the SPUI
+; Interception: Each SPUI will pass the appropriate optr back.
+;
+; Pass:		nothing
+; Return:	carry	= set if there is no main view
+;				^lcx:dx = null optr
+;			= clear if one exists:
+;				^lcx:dx	= optr of main view
+; Destroyed:	nothing
+;
+
+MSG_GEN_PEN_INPUT_CONTROL_RESET_CONSTRAIN	message
+;	In Motif we set up a WinConstrainType of "always on screen"
+; so when we position at the bottom of the screen it will be just where
+; we want it (i.e. not hanging off the screen).  Before we initiate it
+; again we need to remove this constrain, so it can once again be moved
+; off screen by the user.  Stylus doesn't use this because it is
+; permanently on screen.
+;
+; Context:	Sent when the PenInputControl is being enabled
+; Source:	Self
+; Destination:  Self
+; Interception: Non Stylus keyboards (keyboards that aren't permanently
+;		 on screen) subclass this to reset the WinConstrainType
+;		 to WCT_KEEP_PARTIALLY_VISIBLE.
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	nothing
+;
+
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+GPICFeatures	record
+	GPICF_KEYBOARD:1
+	GPICF_CHAR_TABLE:1
+	GPICF_CHAR_TABLE_SYMBOLS:1
+	GPICF_CHAR_TABLE_INTERNATIONAL:1
+	GPICF_CHAR_TABLE_MATH:1
+	GPICF_CHAR_TABLE_CUSTOM:1
+	GPICF_HWR_ENTRY_AREA:1
+GPICFeatures	end
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+
+GPICToolboxFeatures	record
+	GPICTF_INITIATE:1
+GPICToolboxFeatures	end
+
+
+
+
+
+GPIC_DEFAULT_FEATURES equ	mask GPICF_KEYBOARD or \
+				mask GPICF_CHAR_TABLE or \
+				mask GPICF_CHAR_TABLE_SYMBOLS or \
+				mask GPICF_CHAR_TABLE_INTERNATIONAL or \
+				mask GPICF_CHAR_TABLE_MATH or \
+				mask GPICF_HWR_ENTRY_AREA
+
+GPIC_DEFAULT_TOOLBOX_FEATURES  equ mask GPICTF_INITIATE
+
+; Notification structures
+
+CharTableData	struct
+	CTD_line1	optr
+	CTD_line2	optr
+	CTD_line3	optr
+	CTD_line4	optr
+	CTD_line5	optr
+CharTableData	ends
+
+ReplaceWithHWRData	struct
+	RWHWRD_range	VisTextRange<>
+	; Range to replace
+	; NOTE: This range may start beyond the end of the text. If so,
+	; spaces should be appended to the text.
+
+	RWHWRD_context	HWRContext<>
+	; The context in which the hwr stuff was added.
+ReplaceWithHWRData	ends
+
+ReplaceWithGestureData	struct
+	RWGD_gestureType	GestureType
+	; the type of gesture the data is comming from
+	;
+	RWGD_range	VisTextRange<>
+	; range to replace 
+	; NOTE: This range may start beyond the end of the text. If so,
+	; spaces should be appended to the text.
+
+	RWGD_data	label	word
+	; offset of data to be passed along
+	;	
+ReplaceWithGestureData	ends
+
+NotifyFocusWindowKbdStatus	struct
+	NFWKS_needsFloatingKbd	word
+	; If non-zero, the window needs a floating keyboard - otherwise, it
+	; already has a PenInputControl in its generic tree (this used
+	; to mean an embedded keyboard, but now these aren't supported, so
+	; it means a floating keyboard in the generic tree)
+
+	NFWKS_kbdPosition	Point<>
+	; The position at which to display the keyboard
+
+	NFWKS_focusWindow	optr
+	; The OD of the window with the focus. This is used by embedded
+	; keyboards, so they can enable themselves when their parent window
+	; has the focus.
+
+	NFWKS_sysModal		word
+	; Either 0 if window is not sys-modal or 0xffff if it is
+NotifyFocusWindowKbdStatus	ends
+
+ATTR_GEN_PEN_INPUT_CONTROL_CUSTOM_CHAR_TABLE_DATA	vardata	CharTableData
+
+CHAR_TABLE_SPACE_FILLER_CHAR	equ	C_CTRL_A
+;	If you put this character in the char table data, it will leave
+;	a blank space in the char table (this is used in the Math symbols
+;	area, and can also be used in the Custom area).
+;
+
+ATTR_GEN_PEN_INPUT_CONTROL_CUSTOM_CHAR_TABLE_MONIKER	vardata	optr
+;
+;	Contains a ptr to a moniker for the custom char table list item
+;
+
+ATTR_GEN_PEN_INPUT_CONTROL_STARTUP_DISPLAY_TYPE	vardata	PenInputDisplayType
+;
+;	Contains which display should be shown when the box is first
+;	brought up.
+;
+
+ATTR_GEN_PEN_INPUT_CONTROL_IS_FLOATING_KEYBOARD		vardata 
+;
+;	Tells the pen input control that it is (one of) the application's
+;	floating keyboard(s).
+;
+;	NOTE: If the keyboard is going to be a floating keyboard, it needs
+;	to be on the active list.
+;
+
+
+ATTR_GEN_PEN_INPUT_CONTROL_MAKE_VISIBLE_ON_ALL_SYSTEMS	vardata
+;
+;	Tells the pen input control that it should be visible on all 
+;	systems, not just systems w/o keyboards.
+;
+
+ATTR_GEN_PEN_INPUT_CONTROL_INITIATE_WHEN_ENABLED	vardata
+;
+; The Pen Input Control was taken down when it was disabled, so we
+; want to bring it back up when it gets re-enabled, or the user
+; will loose their floating keyboard everytime they go to ink.
+;
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+GenPenInputControlClass	endc
+
+EndLibrary	ui

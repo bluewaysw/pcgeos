@@ -1,0 +1,1055 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Socket
+MODULE:		GOC Demo Program
+FILE:		talk.goc
+
+AUTHOR:		Eric Weber, Jun 22, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EW	12/ 7/94   	Initial version.
+
+DESCRIPTION:
+
+        $Id: talk.goc,v 1.1 97/04/04 16:40:24 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifdef PRODUCT_RESPONDER
+@define DO_ENABLE MSG_GEN_SET_USABLE
+@define DO_DISABLE MSG_GEN_SET_NOT_USABLE
+@else
+@define DO_ENABLE MSG_GEN_SET_ENABLED
+@define DO_DISABLE MSG_GEN_SET_NOT_ENABLED
+@endif
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+
+@include <stdapp.goh>
+@include <socket.goh>
+@include <sac.goh>
+
+@ifdef PRODUCT_RESPONDER
+@include <foam.goh>
+@include <accpnt.goh>
+@endif
+
+#include <sockmisc.h>
+#include <medium.h>
+
+/*
+ ***************************************************************************
+ *		Global constants/variables
+ ***************************************************************************
+ */
+#define MAX_ADDRESS_SIZE 30
+#define RESOLVED_SIZE 30
+
+
+typedef struct {
+	SocketAddress			RSA_sock;
+	TcpAccPntResolvedAddress	RSA_ip;
+} ResolvedSocketAddress;
+
+typedef struct {
+	TcpAccPntExtendedAddress	UTA_link;
+	byte				UTA_ip[MAX_IP_ADDR_STRING_LENGTH];
+} UnresolvedTCPAddress;
+
+char tcpDomain[] = "TCPIP";
+char irlapDomain[] = "IRLAP";
+char loopbackDomain[] = "loopback";
+
+
+SocketAddress	theAddress = {
+    {7,MANUFACTURER_ID_SOCKET_16BIT_PORT},
+    (sizeof tcpDomain - 1),
+    tcpDomain,
+    0
+};
+
+TcpAccPntResolvedAddress addressBuffer;
+
+@ifdef PRODUCT_RESPONDER
+UnresolvedTCPAddress rawAddress;
+@endif
+
+StandardPath selfDisk = SP_APPLICATION;
+
+#if ERROR_CHECK
+
+@ifdef PRODUCT_RESPONDER
+char selfPath[] = "SVCAPPS\\EC Talk Demo";
+@else
+char selfPath[] = "C\\EC Talk Demo";
+@endif
+
+#else
+
+@ifdef PRODUCT_RESPONDER
+char selfPath[] = "SVCAPPS\\Talk Demo";
+@else
+char selfPath[] = "C\\Talk Demo";
+@endif
+
+#endif	    	/* ERROR_CHECK */
+
+ThreadHandle threadHandle;
+Socket listenSocket = 0;
+Socket dataSocket = 0;
+
+char recvBuf[16];
+
+char urgentOutput[] = "***";
+
+optr ctrlOb;
+
+MediumAndUnit theMedium;
+
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class TalkAddressClass, GenInteractionClass;
+@endc
+
+@class TalkThreadClass, ProcessClass;
+
+@message void MSG_CTT_LISTEN();
+@message void MSG_CTT_RECV();
+
+@endc
+
+
+@class	TalkProcessClass, GenProcessClass;
+
+/* define messages for this class here. */
+
+@message void MSG_CTP_CONNECT();
+
+@message void MSG_CTP_ACCEPT();
+
+@message void MSG_CTP_SEND();
+
+@message void MSG_CTP_URGENT();
+
+@message void MSG_CTP_CLOSE();
+
+@message void MSG_CTP_AUTOLOAD();
+
+@message void MSG_CTP_NOLOAD();
+
+@message void MSG_CTP_VALID(optr source = dx:bp, word valid = cx);
+
+@ifdef PRODUCT_RESPONDER
+@message void MSG_CTP_EXIT();
+
+@endif
+
+@endc
+
+@classdecl	TalkProcessClass, neverSaved;
+@classdecl      TalkThreadClass, neverSaved;
+@classdecl      TalkAddressClass;
+
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ *		Application Object
+ */
+
+@start	AppResource;
+
+
+@object GenApplicationClass TalkApp = {
+
+    /*
+     * While the application object isn't shown on the screen, it has a list
+     * of VisMonikers for three purposes:
+     *	1) the GenPrimary (see below) inherits the moniker when it comes up
+     *	   on screen.
+     *	2) when GeoManager needs to display an icon for the application, and
+     *	   there's none for it in the Token Database, it launches the app and
+     *	   sends a message to the application object to install its list of
+     *	   monikers in the token database under the application's token.
+     *	3) when the GenPrimary is minimized, it uses the most appropriate
+     *	   graphical moniker from this list for the application's icon.
+     *	   if there's an abbreviated-text moniker in the list, that's used
+     *	   as the icon title. else any regular-text moniker is used.
+     */
+    GI_visMoniker = list { @TalkTextMoniker };
+
+    GI_comp = @TalkPrimary;
+
+    /*
+     * The main window should appear on-screen when the application is
+     * launched, so place it on the GAGCNLT_WINDOWS GCN list. This causes
+     * the application object to bring it on-screen at the appropriate time.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TalkPrimary;
+}
+
+@ifdef PRODUCT_RESPONDER
+@visMoniker TalkTextMoniker = "Talk";
+@else
+@visMoniker TalkTextMoniker = "Talk Socket Demo";
+@endif
+
+@end	AppResource;
+
+
+/*
+ *		Primary window
+ *
+ * Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed.
+ */
+
+@start	Interface;		/* this resource is for misc UI objects */ ;
+
+@object GenPrimaryClass TalkPrimary  = {
+@ifdef PRODUCT_RESPONDER
+    GI_comp = @AddressDialog, @TalkInteraction, @ActionBar;
+@else
+    GI_comp = @AddressDialog, @InText, @OutText, @ActionBar;
+@endif
+}
+
+@ifdef PRODUCT_RESPONDER
+@chunk  TCHAR TalkTitle[] = "Talk Socket Demo";
+
+@object ComplexMonikerClass TalkInteraction = {
+
+    ComplexMoniker = GenInteractionClass;
+
+    GI_comp = @OutText, @InGroup;
+    CMI_topText = @TalkTitle;
+    CMI_iconBitmap = CMB_SERVICES_VIEW;
+
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_SHADOW;
+    HINT_PLACE_MONIKER_TO_LEFT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_FIXED_SIZE = {SST_PIXELS|FOAM_DEFAULT_COMPONENT_WIDTH, 0};
+    HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+    HINT_INDENT_CHILDREN = {0};
+    ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+}    
+
+@chunk char InputMoniker[] = "Input";
+@object ComplexMonikerClass InGroup = {
+    ComplexMoniker = GreyFrameClass;
+    CMI_topText = @InputMoniker;
+    CMI_textStyle = @default & ~TS_BOLD;
+    GI_comp = @InText;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CENTER_MONIKER;
+    ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+    HINT_PLACE_MONIKER_TO_RIGHT;
+    HINT_FIXED_SIZE = {SST_PIXELS|(FOAM_DEFAULT_COMPONENT_WIDTH-25),0};
+}
+@endif
+	
+@object GenTextClass InText = {
+@ifndef PRODUCT_RESPONDER
+    GI_visMoniker = "Input";
+@endif
+    GTXI_text = "";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass OutText = {
+@ifndef PRODUCT_RESPONDER
+    GI_visMoniker = "Output";
+@endif
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "";
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object TalkAddressClass AddressDialog = {
+    GI_visMoniker = "Address";
+@ifdef PRODUCT_RESPONDER
+    GI_comp = @AddressGroup, @AddressOKTrigger;
+    GII_type = GIT_PROPERTIES;
+@else
+    GI_comp = @AddressOKTrigger;
+    GII_type = GIT_COMMAND;
+@endif
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_INTERACTION_SINGLE_USAGE;
+@ifdef PRODUCT_RESPONDER
+    HINT_INTERACTION_UNRELATED_PROPERTIES;
+@endif
+}
+
+@ifdef PRODUCT_RESPONDER
+
+@chunk char AddressMoniker[] = "Address for connection";
+
+@object ComplexMonikerClass AddressGroup = {
+    ComplexMoniker = GenInteractionClass;
+    CMI_topText = @AddressMoniker;
+    CMI_iconBitmap = CMB_SETTINGS_TITLE_ICON;
+    GI_comp = @IPText, @AccpntGroup;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+    HINT_DRAW_SHADOW;
+    ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+    HINT_INDENT_CHILDREN = {0};
+}
+
+
+@object UnderlinedGenTextClass IPText = {
+    GI_visMoniker = "IP Address:";
+    GTXI_text = "";
+    GTXI_maxLength = MAX_IP_ADDR_STRING_LENGTH;
+    ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+    HINT_TEXT_CURSOR_AT_END;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ALIGN_WITH_CENTERED_MONIKERS;
+    HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT|1, 0};
+    HINT_INITIAL_SIZE = {0, SST_LINES_OF_TEXT|1, 0};
+}
+
+@object GenInteractionClass AccpntGroup = {
+    GI_visMoniker = "Access Point: ";
+    GI_comp = @AccpntControl;
+}
+
+@chunk char accpntMkr[] = "Access List";
+@object AccessPointControlClass AccpntControl = {
+    GI_states = GS_USABLE|GS_ENABLED;
+    HINT_ACCESS_POINT_CONTROL_MINIMIZE_SIZE;
+    ATTR_ACCESS_POINT_CONTROL_LIST_MONIKER = @accpntMkr;
+}
+
+@object ComplexMonikerClass AddressOKTrigger = {
+    ComplexMoniker = GenTriggerClass;
+    CMI_topText = CMT_CONNECT;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+    HINT_SEEK_REPLY_BAR;
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = {1};
+}
+
+@else
+
+@object GenTriggerClass AddressOKTrigger = {
+    GI_states = @default & ~GS_ENABLED;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@endif /* PRODUCT_RESPONDER */
+
+
+
+@object GenInteractionClass ActionBar = {
+@ifdef PRODUCT_RESPONDER
+    GI_comp = @OfflineGroup, 
+              @OnlineGroup;
+@else
+    GI_comp = @OfflineGroup, 
+              @OnlineGroup,
+              @OtherGroup;
+	HINT_MAKE_REPLY_BAR;
+@endif
+}
+
+@object GenInteractionClass OfflineGroup = {
+@ifdef PRODUCT_RESPONDER
+    GI_comp = @ConnectTrigger, @AcceptTrigger, @ExitTrigger;
+@else
+    GI_comp = @ConnectTrigger, @AcceptTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+@endif
+}
+
+@object GenInteractionClass OnlineGroup = {
+@ifdef PRODUCT_RESPONDER
+	GI_states = @default & ~GS_USABLE;
+@else
+	GI_states = @default & ~GS_ENABLED;
+@endif
+
+    GI_comp = @SendTrigger, @UrgentTrigger, @CloseTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@ifndef PRODUCT_RESPONDER
+@object GenInteractionClass OtherGroup = {
+    GI_comp = @AutoloadTrigger, @NoloadTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+@endif
+
+@object GenTriggerClass ConnectTrigger = {
+    GI_visMoniker = 'C',"Connect";
+    GTI_destination = @AddressDialog;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+@ifdef PRODUCT_RESPONDER
+	HINT_SEEK_REPLY_BAR;
+	HINT_SEEK_MENU_BAR;
+        HINT_SEEK_SLOT = {0};
+@endif
+}
+
+@object GenTriggerClass AcceptTrigger = {
+    GI_visMoniker = 'A',"Accept";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CTP_ACCEPT;
+@ifdef PRODUCT_RESPONDER
+	HINT_SEEK_REPLY_BAR;
+	HINT_SEEK_MENU_BAR;
+        HINT_SEEK_SLOT = {1};
+@endif
+}
+
+@ifdef PRODUCT_RESPONDER
+@object ComplexMonikerClass ExitTrigger = {
+    ComplexMoniker = GenTriggerClass;
+    CMI_topText = CMT_CLOSE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CTP_EXIT;
+    HINT_SEEK_REPLY_BAR;
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = {3};
+}
+@endif
+
+@object GenTriggerClass CloseTrigger = {
+    GI_visMoniker = 'C',"Close";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CTP_CLOSE;
+@ifdef PRODUCT_RESPONDER
+	HINT_SEEK_REPLY_BAR;
+	HINT_SEEK_MENU_BAR;
+        HINT_SEEK_SLOT = {3};
+@endif
+}
+
+
+@object GenTriggerClass SendTrigger = {
+    GI_visMoniker = 'S',"Send";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CTP_SEND;
+@ifdef PRODUCT_RESPONDER
+	HINT_SEEK_REPLY_BAR;
+	HINT_SEEK_MENU_BAR;
+        HINT_SEEK_SLOT = {0};
+@endif
+}
+
+@object GenTriggerClass UrgentTrigger = {
+    GI_visMoniker = 'U',"Urgent";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CTP_URGENT;
+@ifdef PRODUCT_RESPONDER
+	HINT_SEEK_REPLY_BAR;
+	HINT_SEEK_MENU_BAR;
+        HINT_SEEK_SLOT = {1};
+@endif
+}
+
+@ifndef PRODUCT_RESPONDER
+@object GenTriggerClass AutoloadTrigger = {
+    GI_visMoniker = 'L',"LoadOnMsg";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CTP_AUTOLOAD;
+}
+
+@object GenTriggerClass NoloadTrigger = {
+    GI_visMoniker = 'N',"Noload";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CTP_NOLOAD;
+}
+@endif
+
+@end	Interface;
+
+/*
+ ***************************************************************************
+ *		Routines and methods
+ ***************************************************************************
+ */
+
+
+
+/***********************************************************************
+ *		MSG_GEN_GUP_INTERACTION_COMMAND for TalkAddressClass
+ ***********************************************************************
+ * SYNOPSIS:	    Intercept IC_APPLY from the AddressOKTrigger
+ * PARAMETERS:	    (InteractionCommand command = cx);
+ * RETURNS:         Boolean
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	3/14/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkAddressClass, MSG_GEN_GUP_INTERACTION_COMMAND
+{
+@ifndef PRODUCT_RESPONDER
+    ChunkHandle adArray;
+    SACAddress *address1;
+@else
+    word point;
+    word alen;
+@endif
+    word rval;
+
+
+    if (command == IC_APPLY) {
+	@call GeodeGetOptrNS(@TalkApp)::MSG_GEN_APPLICATION_MARK_BUSY();
+@ifdef PRODUCT_RESPONDER
+	/* get the access point id */
+	point = @call GeodeGetOptrNS(@AccpntControl)::MSG_ACCESS_POINT_CONTROL_GET_SELECTION();
+
+	/* store link info into raw address buffer */
+	rawAddress.UTA_link.TAPEA_linkSize = 3;
+	rawAddress.UTA_link.TAPEA_linkType = LT_ID;
+	rawAddress.UTA_link.TAPEA_accPntID = point;
+
+	/* the text of the address follows the link info */
+	alen = @call GeodeGetOptrNS(@IPText)::MSG_VIS_TEXT_GET_ALL_PTR((char *)&(rawAddress.UTA_ip[0]));
+	if (alen > MAX_IP_ADDR_STRING_LENGTH)
+	    FatalError(0);  /* too much text for buffer */
+	
+	/* resolve the raw address into a SocketAddress */
+	theAddress.SA_addressSize = 
+	    SocketResolve(theAddress.SA_domain, 
+			  (byte *)(&rawAddress),
+			  sizeof(TcpAccPntExtendedAddress) + alen,
+			  (byte *)(&addressBuffer),
+			  MAX_ADDRESS_SIZE);
+	
+@else
+        /* get the address from the controller */
+	adArray = @call ctrlOb::MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES();
+
+	/* deref first opaque address */
+	address1 = ChunkArrayElementToPtrHandles(HandleOf(ctrlOb), 
+						 adArray, 
+						 0,0);
+	/* resolve the raw address into a SocketAddress */
+	theAddress.SA_addressSize = 
+	    SocketResolve(theAddress.SA_domain, 
+			  (byte *)&address1[1], 
+			  address1->SACA_opaqueSize,
+			  (byte *)&addressBuffer,
+			  MAX_ADDRESS_SIZE);
+
+
+	/* free the array */
+	LMemFreeHandles(HandleOf(ctrlOb), adArray);
+@endif
+				     
+	if (theAddress.SA_addressSize > RESOLVED_SIZE)
+	    FatalError(0);
+
+	/* if the address wasn't resolved, figure out why */
+	if (theAddress.SA_addressSize == 0) {
+	    rval = ThreadGetError();
+	}
+	else {
+	    /* notify the process if successful */
+	    @send process::MSG_CTP_CONNECT();
+	}
+
+	/* transform this into IC_DISMISS */
+	command = IC_DISMISS;
+    }
+
+    rval = rval;   /* force a reference to rval */
+
+    return @callsuper();
+} /* End of MSG_GEN_GUP_INTERACTION_COMMAND.	*/
+
+
+/***********************************************************************
+ *		GetAddressControl
+ ***********************************************************************
+ * SYNOPSIS:	Fetch and install the address controller
+ * CALLED BY:	
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	3/13/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GetAddressControl (void)
+{
+@ifndef PRODUCT_RESPONDER
+    ClassStruct *ctrlClass;
+
+    /* get the address controller class */
+    if ((ctrlClass = SocketGetAddressController(theAddress.SA_domain)) == 0)
+	FatalError(0);
+
+    /* instantiate it */
+    ctrlOb = ObjInstantiate(HandleOf(GeodeGetOptrNS(@AddressDialog)),ctrlClass);
+
+    /* initialize it */
+    @call ctrlOb::MSG_SOCKET_ADDRESS_CONTROL_SET_ACTION(ConstructOptr(0,TO_PROCESS), MSG_CTP_VALID);
+
+    /* add it to the dialog */
+    @call GeodeGetOptrNS(@AddressDialog)::MSG_GEN_ADD_CHILD(ctrlOb, CCO_FIRST);
+
+    /* set it usable */
+    @call ctrlOb::MSG_GEN_SET_USABLE(VUM_NOW);
+@endif
+} /* End of GetAddressControl.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_APPLICATION for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    @callsuper oself::TalkProcessClass::MSG_GEN_PROCESS_OPEN_APPLICATION(attachFlags, launchBlock, extraState);
+    @call oself::MSG_PROCESS_CREATE_EVENT_THREAD(&threadHandle, &TalkThreadClass, 1024);
+    GetAddressControl();
+} /* End of MSG_GEN_PROCESS_OPEN_APPLICATION.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    @send ConstructOptr(threadHandle,0)::MSG_META_DETACH(0, (optr)0);
+    if (ctrlOb) {
+	@call ctrlOb::MSG_GEN_DESTROY(VUM_NOW, CCF_MARK_DIRTY);
+	ctrlOb = 0;
+    }
+    return (MemHandle)0;
+} /* End of MSG_GEN_PROCESS_CLOSE_APPLICATION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_CTP_VALID for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    (optr source = dx:bp, word valid = cx)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	3/13/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_CTP_VALID
+{
+    if (valid)
+	@send GeodeGetOptrNS(@AddressOKTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    else
+	@send GeodeGetOptrNS(@AddressOKTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+} /* End of MSG_CTP_VALID.	*/
+
+
+
+/***********************************************************************
+ *		MSG_CTP_CONNECT for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_CTP_CONNECT
+{
+    int rval;
+
+    /* create a data socket */
+    if ((dataSocket = SocketCreate(SDT_STREAM)) == 0) {
+	rval = ThreadGetError();
+	FatalError(0);
+    }
+
+    /* connect to the requested address */
+    rval = SocketOpenDomainMedium((SocketAddress *) &theAddress, SOCKET_NO_TIMEOUT);
+    if (!rval || (rval == SE_NOT_IMPLEMENTED))
+	rval = SocketConnect(dataSocket, (SocketAddress *) &theAddress, SOCKET_NO_TIMEOUT);
+    if (!rval) {
+	/* mess with the UI */
+	@send ConstructOptr(threadHandle,0)::MSG_CTT_RECV();
+	@send GeodeGetOptrNS(@OfflineGroup)::@DO_DISABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	@send GeodeGetOptrNS(@OnlineGroup)::@DO_ENABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+
+    @send GeodeGetOptrNS(@TalkApp)::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+} /* End of MSG_CTP_CONNECT.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_CTP_ACCEPT for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_CTP_ACCEPT
+{
+    @call ConstructOptr(threadHandle,0)::MSG_CTT_LISTEN();
+    @send ConstructOptr(threadHandle,0)::MSG_CTT_RECV();
+} /* End of MSG_CTP_ACCEPT.	*/
+
+
+/***********************************************************************
+ *		MSG_CTP_SEND for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_CTP_SEND
+{
+    MemHandle textBlock;
+    char *textPtr;
+    int textSize;
+    int rval;
+
+    textBlock = @call GeodeGetOptrNS(@InText)::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    textPtr = MemLock(textBlock);
+    textSize = LocalStringSize(textPtr);
+    if ((rval = SocketSend(dataSocket, textPtr, textSize, 0, (SocketAddress *)0)) != 0)
+	FatalError(0);
+    MemFree(textBlock);
+    rval = rval;   /* force a reference to rval */
+} /* End of MSG_CTP_SEND.	*/
+
+
+/***********************************************************************
+ *		MSG_CTP_URGENT for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	6/16/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_CTP_URGENT
+{
+    static char urgent[4] = "abcd";
+    int rval;
+    
+    if ((rval = SocketSend(dataSocket, urgent, 1, SSF_URGENT, (SocketAddress *)0)) != 0)
+	FatalError(0);
+    rval = rval;   /* force a reference to rval */
+} /* End of MSG_CTP_URGENT.	*/
+
+
+/***********************************************************************
+ *		MSG_CTP_CLOSE for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_CTP_CLOSE
+{
+    int rval; 
+
+    if (listenSocket) {
+	if ((rval = SocketClose(listenSocket)) != 0)
+	    FatalError(0);
+	listenSocket = 0;
+    }
+    if (dataSocket) {
+	if ((rval = SocketCloseSend(dataSocket)) != 0)
+	    FatalError(0);
+    }
+    @send GeodeGetOptrNS(@OfflineGroup)::@DO_ENABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send GeodeGetOptrNS(@OnlineGroup)::@DO_DISABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    rval = rval;   /* force a reference to rval */
+} /* End of MSG_CTP_CLOSE.	*/
+
+
+/***********************************************************************
+ *		MSG_CTP_AUTOLOAD for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_CTP_AUTOLOAD
+{
+    int rval;
+
+    if ((rval = SocketAddLoadOnMsg(theAddress.SA_port, SLT_USER_LOAD_APPLICATION, selfDisk, selfPath)) != 0)
+	FatalError(0);
+    rval = rval;   /* force a reference to rval */
+} /* End of MSG_CTP_AUTOLOAD.	*/
+
+
+
+/***********************************************************************
+ *		MSG_CTP_NOLOAD for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_CTP_NOLOAD
+{
+    SocketRemoveLoadOnMsg(theAddress.SA_port);
+} /* End of MSG_CTP_NOLOAD.	*/
+
+@ifdef PRODUCT_RESPONDER
+
+/***********************************************************************
+ *		MSG_CTP_EXIT for TalkProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return to services
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    launches services
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	8/ 1/95   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkProcessClass, MSG_CTP_EXIT
+{
+    int rval;
+
+    if ((rval = SocketGetAddressMedium(&theAddress, &theMedium)) == 0) {
+	theAddress.SA_addressSize = MAX_ADDRESS_SIZE;
+	SocketCloseDomainMedium(tcpDomain, &theMedium, FALSE);
+    }
+    rval = rval;
+    FoamLaunchApplication(FA_SERVICES_APP);
+}	/* End of MSG_CTP_EXIT.	*/
+
+
+@endif
+
+
+/***********************************************************************
+ *		MSG_CTT_LISTEN for TalkThreadClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkThreadClass, MSG_CTT_LISTEN
+{
+    int rval;
+
+    if ((rval = (listenSocket = SocketCreate(SDT_STREAM)) == 0) != 0)
+	FatalError(0);
+    if ((rval = SocketBind(listenSocket, theAddress.SA_port, 0)) != 0)
+	FatalError(0);
+    if ((rval = SocketListen(listenSocket, 5)) != 0)
+	FatalError(0);
+    if ((dataSocket = SocketAccept(listenSocket, SOCKET_NO_TIMEOUT)) == 0) {
+	rval = ThreadGetError();
+	FatalError(0);
+    }
+    @send GeodeGetOptrNS(@OfflineGroup)::@DO_DISABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send GeodeGetOptrNS(@OnlineGroup)::@DO_ENABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    rval = rval;   /* force a reference to rval */
+} /* End of MSG_CTT_LISTEN.	*/
+
+
+
+/***********************************************************************
+ *		MSG_CTT_RECV for TalkThreadClass
+ ***********************************************************************
+ * SYNOPSIS:	    Read and display data until socket is closed
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    closes dataSocket and listenSocket when exiting
+ *                  enables and disables UI components when exiting
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	12/ 7/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method TalkThreadClass, MSG_CTT_RECV
+{
+    int datasize,rval;
+    
+    /* loop as long as there is data to read */
+    while (((datasize = SocketRecv(dataSocket, 
+				   recvBuf, 
+				   sizeof recvBuf, 
+				   SOCKET_NO_TIMEOUT, 
+				   0, 
+				   (SocketAddress *)0)) != 0) 
+	   || ((rval = ThreadGetError()) == SE_URGENT))
+	if (datasize > 0)
+	    /* if there is normal data, display it */
+	    @call GeodeGetOptrNS(@OutText)::MSG_VIS_TEXT_APPEND_PTR(recvBuf,datasize);
+	else {
+	    /* if there is no normal data, then we must have got SE_URGENT,
+	       so read some urgent data */
+	    datasize = SocketRecv(dataSocket, 
+				  recvBuf, 
+				  sizeof recvBuf, 
+				  0, 
+				  SRF_URGENT, 
+				  (SocketAddress *)0);
+	    /* display the urgent data, or die if there wasn't any */
+	    if (datasize > 0)
+		@call GeodeGetOptrNS(@OutText)::MSG_VIS_TEXT_APPEND_PTR(urgentOutput, 0);
+	    else
+		FatalError(0);
+	}
+
+    if (rval != SE_CONNECTION_CLOSED)
+	FatalError(0);
+    
+    if (listenSocket) {
+	if ((rval = SocketClose(listenSocket)) != 0)
+	    FatalError(0);
+	listenSocket = 0;
+    }
+    if ((rval = SocketClose(dataSocket)) != 0)
+	FatalError(0);
+
+    @send GeodeGetOptrNS(@OfflineGroup)::@DO_ENABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @send GeodeGetOptrNS(@OnlineGroup)::@DO_DISABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    rval = rval;   /* force a reference to rval */
+} /* End of MSG_CTT_RECV.	*/
+
+

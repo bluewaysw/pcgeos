@@ -1,0 +1,2031 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Test Applications
+ * MODULE:	Snake
+ * FILE:		snake.goc
+ * AUTHOR:	jfh  6/05
+ *
+ * DESCRIPTION:
+ *
+ *			       
+ *       XXX - win sound?
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+
+@include <stdapp.goh>
+@include <game.goh>
+@include "art\appicons.goh"
+#include <Ansi\string.h>
+#include <initfile.h>
+#include <sound.h>
+
+/*
+ ***************************************************************************
+ *		Defines & globals
+ ***************************************************************************
+ */
+
+/* WARNING!! DO NOT change game status or minimize status defines without
+	making appropriate changes in Primary MIN & MAX methods */
+/* game status */
+#define SGS_NONE			0
+#define SGS_IN_PROGRESS	1
+#define SGS_PAUSED		2
+
+/* minimize status */
+#define MIN_NOT				0
+#define MIN_FROM_NONE		1
+#define MIN_FROM_IN_PROG	2
+#define MIN_FROM_PAUSED		3
+
+/* dimensions */
+#define BOARD_WIDTH	330
+#define BOARD_HEIGHT	330
+#define GRID_WIDTH	30
+#define GRID_HEIGHT	30
+#define BLOCK_SIZE   11
+#define MAX_SNAKE		253		//Can anyone really get this long?
+
+/* directions */
+#define D_UP 1
+#define D_DOWN 2
+#define D_RIGHT 3
+#define D_LEFT 4
+
+/* game board defines */
+#define GB_OPEN	0
+#define GB_WALL	1
+#define GB_HEAD_UP	2
+#define GB_HEAD_RT	3
+#define GB_HEAD_LT	4
+#define GB_HEAD_DN	5
+#define GB_BODY_LR	6
+#define GB_BODY_UD	7
+#define GB_CORNER_UR	8
+#define GB_CORNER_RD	9
+#define GB_CORNER_DL	10
+#define GB_CORNER_LU	11
+#define GB_TAIL_UP	12
+#define GB_TAIL_RT	13
+#define GB_TAIL_LT	14
+#define GB_TAIL_DN	15
+#define GB_KILL		16
+#define GB_TARGET		17
+
+#define GAME_WIN	1
+#define GAME_DEAD	2
+
+#define S_VERY_SLOW		35
+#define S_SLOW		25
+#define S_MEDIUM	15
+#define S_FAST		10
+
+#define SOUND_ON 1
+#define SOUND_OFF 2
+#define SOUND_SYSTEM 3
+
+/* some sound stuff from LaserL */
+#define INDEX_NONE				0xFFFF
+#define MAX_SOUND_CHANNELS		2
+#define MAX_SOUND_SAMPLES		20
+#define SOUND_MOVE		0
+#define SOUND_TARGET		1
+#define SOUND_KILL		2
+/* Structure of a single sound */
+typedef struct {
+	word length;
+	word priority;
+	word samples[MAX_SOUND_SAMPLES];
+} T_simplePCSound;
+
+typedef struct {
+	 word soundNum;             /* Value of INDEX_NONE means no sound */
+	 word pos;             /* Position within sample list */
+	 word priority;             /* Level priority of sound */
+} T_soundState;
+
+/* Timer used to update sound */
+TimerHandle G_soundTimer = NullHandle;
+word G_soundTimerId;
+T_simplePCSound G_sounds[3];
+T_soundState G_channelArray[MAX_SOUND_CHANNELS];
+
+word	g_score = 0;
+word	g_gameStatus = SGS_NONE;
+word	g_minimized = MIN_NOT;
+word  g_sound = SOUND_SYSTEM;
+word  g_speed = S_MEDIUM;
+
+/***************************************************************************
+ *		Routine Prototypes:
+ ***************************************************************************/
+
+void LoadSounds(void);
+void PlayFrequency(word freq, word duration);
+void PlaySimpleSound(word soundId, word priority);
+void ResetSound(void);
+void SoundStart(void);
+void SoundStop(void);
+void SoundsWaitUntilDone(void);
+void UpdateSound(void);
+
+/*
+ ***************************************************************************
+ *		Class stuff
+ ***************************************************************************
+ */
+
+@class SnakeProcessClass, GenProcessClass;
+	@message void MSG_SNAKE_NEW_GAME();
+	@message void MSG_SNAKE_PAUSE_GAME();
+	@message void MSG_SNAKE_CONTINUE_GAME();
+	@message void MSG_SNAKE_GAME_OVER(word winOrDead);
+	@message void MSG_SNAKE_UPDATE_SOUND();
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SNAKE_SOUND_CHANGED;
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SNAKE_SPEED_CHANGED;
+@endc
+
+@class SnakeApplicationClass, GenApplicationClass;
+@endc
+
+@class SnakePrimaryClass, GenPrimaryClass;
+@endc
+
+@class SnakeBoardClass, VisContentClass;
+	@message void MSG_BOARD_INIT_BOARD();
+	@message void MSG_BOARD_CLEAR_BOARD();
+	@message void MSG_BOARD_SET_TARGET();
+	@message void MSG_BOARD_DRAW_TARGET();
+	@message void MSG_BOARD_DRAW_WALLS();
+	@message void MSG_BOARD_DRAW_SNAKE();
+	@message void MSG_BOARD_SNAKE_UP();
+	@message void MSG_BOARD_SNAKE_DOWN();
+	@message void MSG_BOARD_SNAKE_LEFT();
+	@message void MSG_BOARD_SNAKE_RIGHT();
+	@message void MSG_BOARD_SNAKE_NEW_TAIL();
+	@message void MSG_BOARD_KILL_SNAKE();
+	@message void MSG_BOARD_START_TIMER(Message msg);
+	@message void MSG_BOARD_STOP_TIMER();
+	@message void MSG_BOARD_GET_DIR_AND_START();
+	@message void MSG_BOARD_SET_TEXT(optr strOPtr);
+	@message void MSG_BOARD_DRAW_TEXT_BOX();
+	@message void MSG_BOARD_PUSH_GSTATE();
+	@message void MSG_BOARD_POP_GSTATE();
+
+	@instance word SBCI_board[GRID_WIDTH][GRID_HEIGHT] = {0};
+	@instance word SBCI_snake[MAX_SNAKE] = {0};
+	@instance GStateHandle SBCI_gstate = NullHandle;
+	@instance GStateHandle SBCI_cachedState= NullHandle;
+	@instance WindowHandle SBCI_viewWin = NullHandle;
+	@instance word SBCI_length = 0;
+	@instance word SBCI_dir = D_RIGHT;
+	@instance word SBCI_prevDir = D_RIGHT;
+	@instance sbyte SBCI_headX = 0;
+	@instance sbyte SBCI_headY = 0;
+	@instance byte SBCI_targetX = 0xff;
+	@instance byte SBCI_targetY = 0xff;
+	@instance Boolean SBCI_gotIt = FALSE;
+	@instance TimerHandle SBCI_timer = NullHandle;
+	@instance word SBCI_timerID = 0;
+	@instance optr SBCI_textOptr = 0;
+
+@endc
+
+@classdecl SnakeProcessClass, neverSaved;
+@classdecl SnakeApplicationClass;
+@classdecl SnakePrimaryClass;
+@classdecl SnakeBoardClass;
+
+/*
+ ***************************************************************************
+ *		User Interface
+ ***************************************************************************
+ */
+
+@start AppResource;
+
+@object SnakeApplicationClass SnakeApp = {
+	GI_visMoniker = list {@SnakeAppLCMoniker, @SnakeAppTCMoniker,
+								 @SnakeTextMoniker}
+	GI_comp = @SnakePrimary;
+	  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @SnakePrimary;
+	  gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = @HighScore;
+//	ATTR_GEN_HELP_FILE = "Snake";
+}
+
+@visMoniker SnakeTextMoniker = "Snake";
+
+@end AppResource
+
+
+@start Interface;
+
+@object SnakePrimaryClass SnakePrimary = {
+	GI_comp = @GameMenu, @OptionsMenu, @BoardInter;
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenInteractionClass BoardInter = {
+	GI_comp = @Score, @BoardView;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	HINT_MINIMUM_SIZE = {SST_PIXELS | BOARD_WIDTH + 5,
+										SST_PIXELS | BOARD_HEIGHT + 27, 0};
+	HINT_INITIAL_SIZE = {SST_PIXELS | BOARD_WIDTH + 5,
+										SST_PIXELS | BOARD_HEIGHT + 27, 0};
+}
+
+@object GenValueClass Score = {
+	GI_visMoniker = "Score: ";
+	GI_attrs = @default | GA_READ_ONLY;
+}
+
+@object GenViewClass BoardView = {
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	GVI_content = SnakeBoard;
+	GVI_docBounds = {0, 0, BOARD_WIDTH, BOARD_HEIGHT};
+	GVI_color = {C_WHITE, 0, 0, 0};
+	GVI_horizAttrs = GVDA_DONT_DISPLAY_SCROLLBAR |
+				 GVDA_NO_SMALLER_THAN_CONTENT |
+				 GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_vertAttrs =  GVDA_DONT_DISPLAY_SCROLLBAR |
+				 GVDA_NO_SMALLER_THAN_CONTENT |
+				 GVDA_NO_LARGER_THAN_CONTENT;
+}
+
+@object SnakeBoardClass SnakeBoard = {
+	VCNI_view = BoardView ;
+	VCNI_attrs = VCNA_SAME_WIDTH_AS_VIEW | VCNA_SAME_HEIGHT_AS_VIEW;
+}
+
+@object GenInteractionClass GameMenu = {
+	GI_visMoniker = 'G', "Game";
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	GI_comp = @NewTrigger, @PauseTrigger, @ContinueTrigger, @HighScore, @AboutGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_FILE_MENU );
+}
+
+@object GenTriggerClass NewTrigger = {
+	GI_visMoniker = 'S', "Start New Game";
+	GI_kbdAccelerator = control 's';
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_SNAKE_NEW_GAME;
+}
+
+@object GenTriggerClass PauseTrigger = {
+	GI_visMoniker = 'P', "Pause Game";
+	GI_kbdAccelerator = control 'p';
+	GI_attrs = @default | GA_TARGETABLE
+					 | GA_KBD_SEARCH_PATH;
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_SNAKE_PAUSE_GAME;
+}
+
+@object GenTriggerClass ContinueTrigger = {
+	GI_visMoniker = 'C', "Continue Game";
+	GI_kbdAccelerator = control 'c';
+	GI_attrs = @default | GA_TARGETABLE
+					 | GA_KBD_SEARCH_PATH;
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_SNAKE_CONTINUE_GAME;
+}
+
+@object HighScoreClass HighScore = {
+	HSI_fileName = @HighScoreFileName;
+	HSI_creator = {"SnkA", 16431};
+	HSI_highScoreLine1 = "Enter your name:";
+}
+
+@chunk char HighScoreFileName[] = "Snake High Score Table";
+
+@object GenInteractionClass AboutGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@include "art\bbxreg.goh"
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @AppName, @By, @BreadBoxLogo,
+				  @Visit, @Web, @AboutSpacer1,
+				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Snake";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 36, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "by";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+@object GenGlyphClass AboutSpacer1 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2005";
+}
+@object GenGlyphClass BBoxLLC = {
+  GI_visMoniker = "Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Rights = {
+  GI_visMoniker = "All Rights Reserved";
+}
+@object GenGlyphClass AboutSpacer2 = {
+  GI_visMoniker = "   ";
+}
+
+@object GenInteractionClass OptionsMenu = {
+	GI_visMoniker = 'O', "Options" ;
+	GI_comp = @SpeedOption, @SoundOption;
+	GII_visibility = GIV_POPUP ;
+}
+
+@object GenInteractionClass SoundOption = {
+	GI_visMoniker = 'S', "Sound" ;
+	GI_comp = @SoundGroup;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass SoundGroup = {
+	GI_comp = /*@SoundOn,*/ @SoundOff, @SystemPref ;
+	GIGI_selection = SOUND_SYSTEM ;
+	GIGI_destination = process ;
+	GIGI_applyMsg = MSG_SNAKE_SOUND_CHANGED ;
+}
+
+/*@object GenItemClass SoundOn = {
+	GI_visMoniker = 'S', "Sound On" ;
+	GII_identifier = SOUND_ON ;
+}*/
+
+@object GenItemClass SoundOff = {
+	GI_visMoniker = 'O', "Sound Off" ;
+	GII_identifier = SOUND_OFF ;
+}
+
+@object GenItemClass SystemPref = {
+	GI_visMoniker = 'P', "Use System Preference" ;
+	GII_identifier = SOUND_SYSTEM ;
+}
+
+@object GenInteractionClass SpeedOption = {
+	GI_visMoniker = 'p', "Speed" ;
+	GI_comp = @SpeedGroup;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass SpeedGroup = {
+	GI_comp = @VerySlow, @Slow, @Medium, @Fast ;
+	GIGI_selection = S_MEDIUM ;
+	GIGI_destination = process ;
+	GIGI_applyMsg = MSG_SNAKE_SPEED_CHANGED ;
+}
+
+@object GenItemClass VerySlow = {
+	GI_visMoniker = 'V', "Very Slow" ;
+	GII_identifier = S_VERY_SLOW ;
+}
+
+@object GenItemClass Slow = {
+	GI_visMoniker = 'S', "Slow" ;
+	GII_identifier = S_SLOW ;
+}
+
+@object GenItemClass Medium = {
+	GI_visMoniker = 'M', "Medium" ;
+	GII_identifier = S_MEDIUM ;
+}
+
+@object GenItemClass Fast = {
+	GI_visMoniker = 'F', "Fast" ;
+	GII_identifier = S_FAST ;
+}
+
+@end Interface
+
+@start StringsResource;
+
+@chunk char gameOverText[] = "Game Over";
+@chunk char gameWinText[] = "YOU WIN!!";
+@chunk char gamePausedText[] = "Game Paused";
+
+@end StringsResource;
+
+@start BitmapsResource, data;
+
+@include "art\snakeseg.goh"
+
+@end BitmapsResource;
+/*
+ ***************************************************************************
+ *		SnakeProcessClass methods
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for SnakeProcessClass
+ *               (AppAttachFlags	attachFlags,
+ *			  			MemHandle		launchBlock,
+ *			  			MemHandle 		extraState)
+ * DESCRIPTION:	 do some opening stuff
+ *
+ *
+ ***********************************************************************/
+@method SnakeProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+ Boolean		initError;
+
+
+	/* check for sound */
+	initError = InitFileReadInteger("Snake", "sound", &g_sound);
+	if (initError) g_sound = SOUND_SYSTEM;
+	@call SoundGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(g_sound, FALSE);
+
+	initError = InitFileReadInteger("Snake", "speed", &g_speed);
+	if (initError) g_speed = S_MEDIUM;
+	@call SpeedGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(g_speed, FALSE);
+	@callsuper();
+
+	LoadSounds();
+	SoundStart();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_CLOSE_APPLICATION for SnakeProcessClass
+ *
+ *
+ *
+ * DESCRIPTION:	 do some closing stuff
+ *
+ *
+ ***********************************************************************/
+@method SnakeProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+	InitFileWriteInteger("Snake", "sound", g_sound);
+	InitFileWriteInteger("Snake", "speed", g_speed);
+	InitFileCommit();
+
+	SoundStop();
+
+	return @callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SNAKE_NEW_GAME for SnakeProcessClass
+ *
+ *
+ * DESCRIPTION:	Reset some things for a new game
+ *
+ *
+ ***********************************************************************/
+@method SnakeProcessClass, MSG_SNAKE_NEW_GAME {
+
+	g_score = 0;
+	@send Score::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, FALSE);
+	g_gameStatus = SGS_IN_PROGRESS;
+
+	@send SnakeBoard::MSG_BOARD_CLEAR_BOARD();
+	@send SnakeBoard::MSG_BOARD_INIT_BOARD();
+
+	@call SnakeBoard::MSG_BOARD_DRAW_WALLS();
+	@call SnakeBoard::MSG_BOARD_DRAW_SNAKE();
+
+	@call SnakeBoard::MSG_BOARD_SET_TARGET();
+
+	@send ContinueTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send PauseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send SnakeBoard::MSG_BOARD_SET_TEXT(0);
+
+	@send SnakeBoard::MSG_BOARD_START_TIMER(MSG_BOARD_SNAKE_RIGHT);
+
+	SoundStart();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SNAKE_GAME_OVER for SnakeProcessClass
+ *            (word winOrDead)
+ *
+ * DESCRIPTION:	Do the end game stuff
+ *
+ *
+ ***********************************************************************/
+@method SnakeProcessClass, MSG_SNAKE_GAME_OVER {
+
+
+	g_gameStatus = SGS_NONE;
+	if(winOrDead == GAME_DEAD) {
+		PlaySimpleSound(SOUND_KILL, 5);
+		@send SnakeBoard::MSG_BOARD_KILL_SNAKE();
+		@send SnakeBoard::MSG_BOARD_SET_TEXT(@gameOverText);
+		}
+	else {
+		@send SnakeBoard::MSG_BOARD_SET_TEXT(@gameWinText);
+		}
+	@send SnakeBoard::MSG_BOARD_DRAW_TEXT_BOX();
+
+	@send ContinueTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send PauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+	if (g_score)
+		@send HighScore::MSG_HIGH_SCORE_ADD_SCORE(g_score, NullHandle);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SNAKE_PAUSE_GAME for SnakeProcessClass
+ *
+ *
+ * DESCRIPTION:	Do the pause stuff
+ *
+ *
+ ***********************************************************************/
+@method SnakeProcessClass, MSG_SNAKE_PAUSE_GAME {
+
+
+	g_gameStatus = SGS_PAUSED;
+	@call SnakeBoard::MSG_BOARD_STOP_TIMER();
+	@send SnakeBoard::MSG_BOARD_SET_TEXT(@gamePausedText);
+	@send SnakeBoard::MSG_BOARD_DRAW_TEXT_BOX();
+
+	@send ContinueTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send PauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SNAKE_CONTINUE_GAME for SnakeProcessClass
+ *
+ *
+ * DESCRIPTION:	Do the continue stuff
+ *
+ *
+ ***********************************************************************/
+@method SnakeProcessClass, MSG_SNAKE_CONTINUE_GAME {
+
+
+	if (g_gameStatus == SGS_PAUSED) {
+		g_gameStatus = SGS_IN_PROGRESS;
+
+		@send SnakeBoard::MSG_BOARD_SET_TEXT(0);
+		@send BoardView::MSG_GEN_VIEW_REDRAW_CONTENT();
+		@send ContinueTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send PauseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+		/* find out what direction we were going and start up */
+		@call SnakeBoard::MSG_BOARD_GET_DIR_AND_START();
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SNAKE_UPDATE_SOUND for SnakeProcessClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeProcessClass, MSG_SNAKE_UPDATE_SOUND
+{
+
+	UpdateSound();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SNAKE_SOUND_CHANGED for SnakeProcessClass
+ *             (word selection, numSelections, flags)
+ *
+ * DESCRIPTION:	Set the global
+ *
+ *
+ ***********************************************************************/
+@method SnakeProcessClass, MSG_SNAKE_SOUND_CHANGED
+{
+	 g_sound = selection ;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SNAKE_SPEED_CHANGED for SnakeProcessClass
+ *             (word selection, numSelections, flags)
+ *
+ * DESCRIPTION:	Set the global
+ *
+ *
+ ***********************************************************************/
+@method SnakeProcessClass, MSG_SNAKE_SPEED_CHANGED
+{
+	 g_speed = selection ;
+}
+
+/*
+ ***************************************************************************
+ *		SnakeBoardClass methods
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * FUNCTION:	DrawSnakeSeg
+ *
+ *
+ * DESCRIPTION:	Draws a snake piece (head, tail, body) in the proper
+ *                orientation
+ *
+ ***********************************************************************/
+void DrawSnakeSeg(GStateHandle gstate, word type, word x, word y) {
+
+
+	x *= BLOCK_SIZE;
+	y *= BLOCK_SIZE;
+
+	if (type == GB_OPEN) {
+		GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+		GrFillRect(gstate, x, y, x + BLOCK_SIZE, y + BLOCK_SIZE);
+		}
+	else {
+		MemLock(HandleOf(@HeadUp));
+		switch (type) {
+			case GB_HEAD_UP:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@HeadUp), NULL);
+			break;
+			case GB_HEAD_RT:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@HeadRight), NULL);
+			break;
+			case GB_HEAD_LT:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@HeadLeft), NULL);
+			break;
+			case GB_HEAD_DN:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@HeadDown), NULL);
+			break;
+			case GB_BODY_LR:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@BodyLeftRight), NULL);
+			break;
+			case GB_BODY_UD:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@BodyUpDown), NULL);
+			break;
+			case GB_CORNER_UR:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@CornerUpRight), NULL);
+			break;
+			case GB_CORNER_RD:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@CornerDownRight), NULL);
+			break;
+			case GB_CORNER_DL:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@CornerDownLeft), NULL);
+			break;
+			case GB_CORNER_LU:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@CornerUpLeft), NULL);
+			break;
+			case GB_TAIL_UP:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@TailUp), NULL);
+			break;
+			case GB_TAIL_RT:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@TailRight), NULL);
+			break;
+			case GB_TAIL_LT:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@TailLeft), NULL);
+			break;
+			case GB_TAIL_DN:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@TailDown), NULL);
+			break;
+			case GB_KILL:
+				GrDrawBitmap(gstate, x, y, LMemDeref(@Kill), NULL);
+			}
+		MemUnlock(HandleOf(@HeadUp));
+      }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_CLEAR_BOARD for SnakeBoardClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_CLEAR_BOARD {
+
+
+	@call oself::MSG_BOARD_PUSH_GSTATE();
+	GrSetAreaColor(pself->SBCI_gstate, CF_INDEX, C_WHITE, 0, 0);
+	GrFillRect(pself->SBCI_gstate, 0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+	@call oself::MSG_BOARD_POP_GSTATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_INIT_BOARD for SnakeBoardClass
+ *
+ * DESCRIPTION:	Sets the initial position of the walls & snake
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_INIT_BOARD {
+ word		x, y;
+
+
+	/* build a set of walls */
+	for (x = 0; x < GRID_WIDTH; x++) {
+		for (y = 0; y < GRID_HEIGHT; y++) {
+			pself->SBCI_board[x][y] = GB_OPEN;
+			}
+		}
+	for (x = 0; x < 12; x++)  pself->SBCI_board[x][0] = GB_WALL;
+	for (x = 18; x < 30; x++)  pself->SBCI_board[x][0] = GB_WALL;
+	for (x = 11; x < 19; x++)  pself->SBCI_board[x][8] = GB_WALL;
+	for (x = 0; x < 9; x++)  pself->SBCI_board[x][11] = GB_WALL;
+	for (x = 21; x < 30; x++)  pself->SBCI_board[x][11] = GB_WALL;
+	for (x = 0; x < 9; x++)  pself->SBCI_board[x][18] = GB_WALL;
+	for (x = 21; x < 30; x++)  pself->SBCI_board[x][18] = GB_WALL;
+	for (x = 0; x < 12; x++)  pself->SBCI_board[x][29] = GB_WALL;
+	for (x = 18; x < 30; x++)  pself->SBCI_board[x][29] = GB_WALL;
+
+	for (y = 0; y < 12; y++)  pself->SBCI_board[0][y] = GB_WALL;
+	for (y = 18; y < 30; y++)  pself->SBCI_board[0][y] = GB_WALL;
+	for (y = 11; y < 19; y++)  pself->SBCI_board[8][y] = GB_WALL;
+	for (y = 0; y < 9; y++)  pself->SBCI_board[11][y] = GB_WALL;
+	for (y = 21; y < 30; y++)  pself->SBCI_board[11][y] = GB_WALL;
+	for (y = 0; y < 9; y++)  pself->SBCI_board[18][y] = GB_WALL;
+	for (y = 21; y < 30; y++)  pself->SBCI_board[18][y] = GB_WALL;
+	for (y = 0; y < 12; y++)  pself->SBCI_board[29][y] = GB_WALL;
+	for (y = 18; y < 30; y++)  pself->SBCI_board[29][y] = GB_WALL;
+
+
+	/* the snake instance data */
+	pself->SBCI_length = 3;
+	pself->SBCI_dir = D_RIGHT;
+	pself->SBCI_prevDir = D_RIGHT;
+	pself->SBCI_headX = 4;
+	pself->SBCI_headY = 4;
+	/* its grid posit */
+	pself->SBCI_board[pself->SBCI_headX][pself->SBCI_headY] = GB_HEAD_RT;
+	pself->SBCI_board[pself->SBCI_headX - 1][pself->SBCI_headY] = GB_BODY_LR;
+	pself->SBCI_board[pself->SBCI_headX - 2][pself->SBCI_headY] = GB_TAIL_LT;
+	/* and its snake array */
+	pself->SBCI_snake[0] = (pself->SBCI_headX << 8) | pself->SBCI_headY;
+	pself->SBCI_snake[1] = ((pself->SBCI_headX - 1) << 8) | pself->SBCI_headY;
+	pself->SBCI_snake[2] = ((pself->SBCI_headX - 2) << 8) | pself->SBCI_headY;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_SET_TARGET for SnakeBoardClass
+ *
+ * DESCRIPTION:	Randomly set the target.  It can't go where there
+ *						is a wall or snake segment and it can't go within
+ *						5 squares of the snake's head.
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_SET_TARGET {
+ word		x, y;
+ Boolean	goodRand = FALSE, goodX = FALSE, goodY = FALSE;
+
+
+	while (!goodRand) {
+		x = GameRandom(GRID_WIDTH);
+		y = GameRandom(GRID_HEIGHT);
+		if (!pself->SBCI_board[x][y]) {
+			/* OK - it's an open square.  Is it too close to the snake's head? */
+			if (x > pself->SBCI_headX)  {
+				if ((x - pself->SBCI_headX) > 5) goodX = TRUE;
+				}
+			else  {
+				if ((pself->SBCI_headX - x) > 5) goodX = TRUE;
+				}
+			if (y > pself->SBCI_headY)  {
+				if ((y - pself->SBCI_headY) > 5) goodY = TRUE;
+				}
+			else  {
+				if ((pself->SBCI_headY - y) > 5) goodY = TRUE;
+				}
+         if (goodX && goodY) goodRand = TRUE;
+			}
+		}
+
+	/* its grid posit */
+	pself->SBCI_board[x][y] = GB_TARGET;
+	pself->SBCI_targetX = x;
+	pself->SBCI_targetY = y;
+	/* and draw it */
+	@call self::MSG_BOARD_DRAW_TARGET();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_DRAW_TARGET for SnakeBoardClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_DRAW_TARGET {
+
+
+	@call oself::MSG_BOARD_PUSH_GSTATE();
+	MemLock(HandleOf(@Target));
+
+	GrDrawBitmap(pself->SBCI_gstate, pself->SBCI_targetX*BLOCK_SIZE,
+						pself->SBCI_targetY*BLOCK_SIZE,
+						LMemDeref(@Target), NULL);
+
+	MemUnlock(HandleOf(@Target));
+	@call oself::MSG_BOARD_POP_GSTATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_DRAW_WALLS for SnakeBoardClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_DRAW_WALLS {
+ word 	x, y;
+
+
+	@call oself::MSG_BOARD_PUSH_GSTATE();
+	MemLock(HandleOf(@Wall));
+
+	for (x = 0; x < GRID_WIDTH; x++) {
+		for (y = 0; y < GRID_HEIGHT; y++) {
+			if (pself->SBCI_board[x][y] == GB_WALL) {
+				GrDrawBitmap(pself->SBCI_gstate, x*BLOCK_SIZE, y*BLOCK_SIZE,
+						LMemDeref(@Wall), NULL);
+				}
+			}
+		}
+
+	MemUnlock(HandleOf(@Wall));
+	@call oself::MSG_BOARD_POP_GSTATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_DRAW_SNAKE for SnakeBoardClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_DRAW_SNAKE {
+ word 	i, pos, type;
+ byte		x, y;
+
+
+	@call oself::MSG_BOARD_PUSH_GSTATE();
+	for (i = 0; i < pself->SBCI_length; i++)  {
+		/* get the grid coords */
+		pos = pself->SBCI_snake[i];
+		x = (pos & 0xff00) >> 8;
+		y = pos & 0x00ff;
+		/* and the segment type from the grid */
+		type = pself->SBCI_board[x][y];
+		/* and draw the segment */
+		DrawSnakeSeg(pself->SBCI_gstate, type, x, y);
+		}
+	@call oself::MSG_BOARD_POP_GSTATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_CONTENT_VIEW_WIN_OPENED for SnakeBoardClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_META_CONTENT_VIEW_WIN_OPENED {
+
+
+	pself->SBCI_viewWin = viewWindow;
+	@callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_CONTENT_VIEW_WIN_OPENED for SnakeBoardClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_META_CONTENT_VIEW_WIN_CLOSED {
+
+
+//	  @call process::MSG_SNAKE_PAUSE_GAME();
+	  @callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_DRAW for SnakeBoardClass
+ *				void (word drawFlags, GStateHandle gstate)
+ *
+ * DESCRIPTION:	Here we draw the whole magilla
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_VIS_DRAW {
+
+
+	@call self::MSG_BOARD_DRAW_WALLS();
+	@call self::MSG_BOARD_DRAW_SNAKE();
+	@call self::MSG_BOARD_DRAW_TARGET();
+	@call self::MSG_BOARD_DRAW_TEXT_BOX();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_START_TIMER for SnakeBoardClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_START_TIMER {
+
+	@call self::MSG_BOARD_STOP_TIMER();
+	pself->SBCI_timer = TimerStart(TIMER_EVENT_ONE_SHOT, oself,
+		g_speed, msg, 0, &pself->SBCI_timerID);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_STOP_TIMER for SnakeBoardClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_STOP_TIMER {
+
+	if (pself->SBCI_timer) {
+		TimerStop(pself->SBCI_timer, pself->SBCI_timerID);
+		pself->SBCI_timer = NullHandle;
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_SNAKE_NEW_TAIL for SnakeBoardClass
+ *
+ * DESCRIPTION:	This is a brute force thing the same for all four
+ *                directions
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_SNAKE_NEW_TAIL {
+ word		bodyType, tail, newTail, newTailType, oldTailType;
+ byte		x, y, ntx, nty;
+
+
+	/* erase the old tail */
+	tail = pself->SBCI_snake[pself->SBCI_length - 1];
+	x = (tail & 0xff00) >> 8;
+	y = tail & 0x00ff;
+	oldTailType = pself->SBCI_board[x][y];
+	DrawSnakeSeg(pself->SBCI_gstate, GB_OPEN, x, y);
+	pself->SBCI_board[x][y] = GB_OPEN;
+
+	/* and set the old next to last segment as the tail */
+	newTail = pself->SBCI_snake[pself->SBCI_length - 2];
+	ntx = (newTail & 0xff00) >> 8;
+	nty = newTail & 0x00ff;
+	bodyType = pself->SBCI_board[ntx][nty];
+	if (oldTailType == GB_TAIL_LT) {
+		if (bodyType == GB_BODY_LR)
+			newTailType = GB_TAIL_LT;
+		else if (bodyType == GB_CORNER_LU)
+			newTailType = GB_TAIL_DN;
+		else
+			newTailType = GB_TAIL_UP;
+		}
+	else if (oldTailType == GB_TAIL_RT) {
+		if (bodyType == GB_BODY_LR)
+			newTailType = GB_TAIL_RT;
+		else if (bodyType == GB_CORNER_UR)
+			newTailType = GB_TAIL_DN;
+		else
+			newTailType = GB_TAIL_UP;
+		}
+	else if (oldTailType == GB_TAIL_UP) {
+		if (bodyType == GB_BODY_UD)
+			newTailType = GB_TAIL_UP;
+		else if (bodyType == GB_CORNER_UR)
+			newTailType = GB_TAIL_LT;
+		else
+			newTailType = GB_TAIL_RT;
+		}
+	else if (oldTailType == GB_TAIL_DN) {
+		if (bodyType == GB_BODY_UD)
+			newTailType = GB_TAIL_DN;
+		else if (bodyType == GB_CORNER_RD)
+			newTailType = GB_TAIL_LT;
+		else
+			newTailType = GB_TAIL_RT;
+		}
+
+	DrawSnakeSeg(pself->SBCI_gstate, newTailType, ntx, nty);
+	pself->SBCI_board[ntx][nty] = newTailType;
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_SNAKE_DOWN for SnakeBoardClass
+ *
+ * DESCRIPTION:	Moves the snake head down one if it is a legal move
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_SNAKE_DOWN {
+ word		moveToType, bodyType, i;
+ word		oldY, newY;
+ Boolean	gameWon = FALSE;
+
+
+	oldY = pself->SBCI_headY;
+	if (oldY == GRID_HEIGHT - 1) newY = 0;
+	else newY = oldY + 1;
+
+	moveToType = pself->SBCI_board[pself->SBCI_headX][newY];
+	if ((moveToType == GB_OPEN) || moveToType == GB_TARGET){
+		/* it's a valid move into an open gridsquare or target */
+		@call oself::MSG_BOARD_PUSH_GSTATE();
+
+		/* first move the head down one... */
+		pself->SBCI_headY = newY;
+		pself->SBCI_prevDir = pself->SBCI_dir;
+		pself->SBCI_dir = D_DOWN;
+		pself->SBCI_board[pself->SBCI_headX][pself->SBCI_headY] = GB_HEAD_DN;
+		DrawSnakeSeg(pself->SBCI_gstate, GB_HEAD_DN, pself->SBCI_headX,
+						pself->SBCI_headY);
+
+		/* the second segment changes from a head to a body... */
+		if(pself->SBCI_prevDir == D_DOWN)
+			bodyType = GB_BODY_UD;
+		else if (pself->SBCI_prevDir == D_RIGHT)
+			bodyType = GB_CORNER_DL;
+		else
+			bodyType = GB_CORNER_RD;
+		pself->SBCI_board[pself->SBCI_headX][oldY] = bodyType;
+		DrawSnakeSeg(pself->SBCI_gstate, bodyType, pself->SBCI_headX, oldY);
+
+		if (!pself->SBCI_gotIt) {
+			/* adjust the tail */
+			@call self::MSG_BOARD_SNAKE_NEW_TAIL();
+
+			/* now reset the snake's array coordinates */
+			for (i = pself->SBCI_length - 1; i > 0; i--) {
+				pself->SBCI_snake[i] = pself->SBCI_snake[i - 1];   // body
+				}
+			pself->SBCI_snake[0] = (pself->SBCI_headX << 8) | pself->SBCI_headY;
+			}
+		else {  /* we got the target */
+			/* and reset the snake's array coordinates */
+			for (i = pself->SBCI_length; i > 0; i--) {
+				pself->SBCI_snake[i] = pself->SBCI_snake[i - 1];   // body
+				}
+			pself->SBCI_snake[0] = (pself->SBCI_headX << 8) | pself->SBCI_headY;
+			pself->SBCI_length++;
+			pself->SBCI_gotIt = FALSE;
+			if (pself->SBCI_length == MAX_SNAKE) gameWon = TRUE;
+			@call self::MSG_BOARD_SET_TARGET();
+			g_score++;
+			@send Score::MSG_GEN_VALUE_SET_INTEGER_VALUE(g_score, FALSE);
+			}
+
+		@call oself::MSG_BOARD_POP_GSTATE();
+		/* if we ate the target we'll set that flag so we can expand the snake
+			on the next move */
+		if (moveToType == GB_TARGET) {
+			pself->SBCI_gotIt = TRUE;
+			PlaySimpleSound(SOUND_TARGET, 5);
+			}
+		else {
+			PlaySimpleSound(SOUND_MOVE, 5);
+			}
+
+		if (gameWon) {
+			@call self::MSG_BOARD_STOP_TIMER();
+			@send process::MSG_SNAKE_GAME_OVER(GAME_WIN);
+			}
+		else
+			@call self::MSG_BOARD_START_TIMER(MSG_BOARD_SNAKE_DOWN);
+		}
+
+	else {
+		/* it's a wall or snake segment */
+		@call self::MSG_BOARD_STOP_TIMER();
+		@send process::MSG_SNAKE_GAME_OVER(GAME_DEAD);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_SNAKE_LEFT for SnakeBoardClass
+ *
+ * DESCRIPTION:	Moves the snake head left one if it is a legal move
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_SNAKE_LEFT {
+ word		moveToType, bodyType, i;
+ word		oldX, newX;
+ Boolean	gameWon = FALSE;
+
+
+	oldX = pself->SBCI_headX;
+	if (oldX == 0) newX = GRID_WIDTH - 1;
+	else newX = oldX - 1;
+
+	moveToType = pself->SBCI_board[newX][pself->SBCI_headY];
+	if ((moveToType == GB_OPEN) || moveToType == GB_TARGET){
+		/* it's a valid move into an open gridsquare or target */
+		@call oself::MSG_BOARD_PUSH_GSTATE();
+
+		/* first move the head left one... */
+		pself->SBCI_headX = newX;
+		pself->SBCI_prevDir = pself->SBCI_dir;
+		pself->SBCI_dir = D_LEFT;
+		pself->SBCI_board[pself->SBCI_headX][pself->SBCI_headY] = GB_HEAD_LT;
+		DrawSnakeSeg(pself->SBCI_gstate, GB_HEAD_LT, pself->SBCI_headX,
+						pself->SBCI_headY);
+
+		/* the second segment changes from a head to a body... */
+		if(pself->SBCI_prevDir == D_LEFT)
+			bodyType = GB_BODY_LR;
+		else if (pself->SBCI_prevDir == D_UP)
+			bodyType = GB_CORNER_DL;
+		else
+			bodyType = GB_CORNER_LU;
+		pself->SBCI_board[oldX][pself->SBCI_headY] = bodyType;
+		DrawSnakeSeg(pself->SBCI_gstate, bodyType, oldX, pself->SBCI_headY);
+
+		if (!pself->SBCI_gotIt) {
+			/* adjust the tail */
+			@call self::MSG_BOARD_SNAKE_NEW_TAIL();
+
+			/* now reset the snake's array coordinates */
+			for (i = pself->SBCI_length - 1; i > 0; i--) {
+				pself->SBCI_snake[i] = pself->SBCI_snake[i - 1];   // body
+				}
+			pself->SBCI_snake[0] = (pself->SBCI_headX << 8) | pself->SBCI_headY;
+			}
+		else {  /* we got the target */
+			/* and reset the snake's array coordinates */
+			for (i = pself->SBCI_length; i > 0; i--) {
+				pself->SBCI_snake[i] = pself->SBCI_snake[i - 1];   // body
+				}
+			pself->SBCI_snake[0] = (pself->SBCI_headX << 8) | pself->SBCI_headY;
+			pself->SBCI_length++;
+			pself->SBCI_gotIt = FALSE;
+			if (pself->SBCI_length == MAX_SNAKE) gameWon = TRUE;
+			@call self::MSG_BOARD_SET_TARGET();
+			g_score++;
+			@send Score::MSG_GEN_VALUE_SET_INTEGER_VALUE(g_score, FALSE);
+			}
+
+		@call oself::MSG_BOARD_POP_GSTATE();
+		/* if we ate the target we'll set that flag so we can expand the snake
+			on the next move */
+		if (moveToType == GB_TARGET) {
+			pself->SBCI_gotIt = TRUE;
+			PlaySimpleSound(SOUND_TARGET, 5);
+			}
+		else {
+			PlaySimpleSound(SOUND_MOVE, 5);
+			}
+
+		if (gameWon) {
+			@call self::MSG_BOARD_STOP_TIMER();
+			@send process::MSG_SNAKE_GAME_OVER(GAME_WIN);
+			}
+		else
+			@call self::MSG_BOARD_START_TIMER(MSG_BOARD_SNAKE_LEFT);
+		}
+
+	else {
+		@call self::MSG_BOARD_STOP_TIMER();
+		@send process::MSG_SNAKE_GAME_OVER(GAME_DEAD);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_SNAKE_RIGHT for SnakeBoardClass
+ *
+ * DESCRIPTION:	Moves the snake head right one if it is a legal move
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_SNAKE_RIGHT {
+ word		moveToType, bodyType, i;
+ word		oldX, newX;
+ Boolean	gameWon = FALSE;
+
+
+	oldX = pself->SBCI_headX;
+	if (oldX == GRID_WIDTH - 1) newX = 0;
+	else newX = oldX + 1;
+
+	moveToType = pself->SBCI_board[newX][pself->SBCI_headY];
+	if ((moveToType == GB_OPEN) || moveToType == GB_TARGET){
+		/* it's a valid move into an open gridsquare or target */
+		@call oself::MSG_BOARD_PUSH_GSTATE();
+
+		/* first move the head right one... */
+		pself->SBCI_headX = newX;
+		pself->SBCI_prevDir = pself->SBCI_dir;
+		pself->SBCI_dir = D_RIGHT;
+		pself->SBCI_board[pself->SBCI_headX][pself->SBCI_headY] = GB_HEAD_RT;
+		DrawSnakeSeg(pself->SBCI_gstate, GB_HEAD_RT, pself->SBCI_headX,
+						pself->SBCI_headY);
+
+		/* the second segment changes from a head to a body... */
+		if(pself->SBCI_prevDir == D_RIGHT)
+			bodyType = GB_BODY_LR;
+		else if (pself->SBCI_prevDir == D_UP)
+			bodyType = GB_CORNER_RD;
+		else
+			bodyType = GB_CORNER_UR;
+		pself->SBCI_board[oldX][pself->SBCI_headY] = bodyType;
+		DrawSnakeSeg(pself->SBCI_gstate, bodyType, oldX, pself->SBCI_headY);
+
+		if (!pself->SBCI_gotIt) {
+			/* adjust the tail */
+			@call self::MSG_BOARD_SNAKE_NEW_TAIL();
+
+			/* now reset the snake's array coordinates */
+			for (i = pself->SBCI_length - 1; i > 0; i--) {
+				pself->SBCI_snake[i] = pself->SBCI_snake[i - 1];   // body
+				}
+			pself->SBCI_snake[0] = (pself->SBCI_headX << 8) | pself->SBCI_headY;
+			}
+		else {  /* we got the target */
+			/* and reset the snake's array coordinates */
+			for (i = pself->SBCI_length; i > 0; i--) {
+				pself->SBCI_snake[i] = pself->SBCI_snake[i - 1];   // body
+				}
+			pself->SBCI_snake[0] = (pself->SBCI_headX << 8) | pself->SBCI_headY;
+			pself->SBCI_length++;
+			pself->SBCI_gotIt = FALSE;
+			if (pself->SBCI_length == MAX_SNAKE) gameWon = TRUE;
+			@call self::MSG_BOARD_SET_TARGET();
+			g_score++;
+			@send Score::MSG_GEN_VALUE_SET_INTEGER_VALUE(g_score, FALSE);
+			}
+
+		@call oself::MSG_BOARD_POP_GSTATE();
+		/* if we ate the target we'll set that flag so we can expand the snake
+			on the next move */
+		if (moveToType == GB_TARGET) {
+			pself->SBCI_gotIt = TRUE;
+			PlaySimpleSound(SOUND_TARGET, 5);
+			}
+		else {
+			PlaySimpleSound(SOUND_MOVE, 5);
+			}
+
+		if (gameWon) {
+			@call self::MSG_BOARD_STOP_TIMER();
+			@send process::MSG_SNAKE_GAME_OVER(GAME_WIN);
+			}
+		else
+			@call self::MSG_BOARD_START_TIMER(MSG_BOARD_SNAKE_RIGHT);
+		}
+
+	else {
+		@call self::MSG_BOARD_STOP_TIMER();
+		@send process::MSG_SNAKE_GAME_OVER(GAME_DEAD);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_SNAKE_UP for SnakeBoardClass
+ *
+ * DESCRIPTION:	Moves the snake head up one if it is a legal move
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_SNAKE_UP {
+ word		moveToType, bodyType, i;
+ word		oldY, newY;
+ Boolean	gameWon = FALSE;
+
+
+	oldY = pself->SBCI_headY;
+	if (oldY == 0) newY = GRID_HEIGHT - 1;
+	else newY = oldY - 1;
+
+	moveToType = pself->SBCI_board[pself->SBCI_headX][newY];
+	if ((moveToType == GB_OPEN) || moveToType == GB_TARGET){
+		/* it's a valid move into an open gridsquare or target */
+		@call oself::MSG_BOARD_PUSH_GSTATE();
+
+		/* first move the head up one... */
+		pself->SBCI_headY = newY;
+		pself->SBCI_prevDir = pself->SBCI_dir;
+		pself->SBCI_dir = D_UP;
+		pself->SBCI_board[pself->SBCI_headX][pself->SBCI_headY] = GB_HEAD_UP;
+		DrawSnakeSeg(pself->SBCI_gstate, GB_HEAD_UP, pself->SBCI_headX,
+						pself->SBCI_headY);
+
+		/* the second segment changes from a head to a body... */
+		if(pself->SBCI_prevDir == D_UP)
+			bodyType = GB_BODY_UD;
+		else if (pself->SBCI_prevDir == D_RIGHT)
+			bodyType = GB_CORNER_LU;
+		else
+			bodyType = GB_CORNER_UR;
+		pself->SBCI_board[pself->SBCI_headX][oldY] = bodyType;
+		DrawSnakeSeg(pself->SBCI_gstate, bodyType, pself->SBCI_headX, oldY);
+
+		if (!pself->SBCI_gotIt) {
+			/* adjust the tail */
+			@call self::MSG_BOARD_SNAKE_NEW_TAIL();
+
+			/* now reset the snake's array coordinates */
+			for (i = pself->SBCI_length - 1; i > 0; i--) {
+				pself->SBCI_snake[i] = pself->SBCI_snake[i - 1];   // body
+				}
+			pself->SBCI_snake[0] = (pself->SBCI_headX << 8) | pself->SBCI_headY;
+			}
+		else {  /* we got the target */
+			/* and reset the snake's array coordinates */
+			for (i = pself->SBCI_length; i > 0; i--) {
+				pself->SBCI_snake[i] = pself->SBCI_snake[i - 1];   // body
+				}
+			pself->SBCI_snake[0] = (pself->SBCI_headX << 8) | pself->SBCI_headY;
+			pself->SBCI_length++;
+			pself->SBCI_gotIt = FALSE;
+			if (pself->SBCI_length == MAX_SNAKE) gameWon = TRUE;
+			@call self::MSG_BOARD_SET_TARGET();
+			g_score++;
+			@send Score::MSG_GEN_VALUE_SET_INTEGER_VALUE(g_score, FALSE);
+			}
+
+		@call oself::MSG_BOARD_POP_GSTATE();
+		/* if we ate the target we'll set that flag so we can expand the snake
+			on the next move */
+		if (moveToType == GB_TARGET) {
+			pself->SBCI_gotIt = TRUE;
+			PlaySimpleSound(SOUND_TARGET, 5);
+			}
+		else {
+			PlaySimpleSound(SOUND_MOVE, 5);
+			}
+
+		if (gameWon) {
+			@call self::MSG_BOARD_STOP_TIMER();
+			@send process::MSG_SNAKE_GAME_OVER(GAME_WIN);
+			}
+		else
+			@call self::MSG_BOARD_START_TIMER(MSG_BOARD_SNAKE_UP);
+		}
+
+	else {
+		@call self::MSG_BOARD_STOP_TIMER();
+		@send process::MSG_SNAKE_GAME_OVER(GAME_DEAD);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_KILL_SNAKE for SnakeBoardClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_KILL_SNAKE {
+ word		seg, i;
+ byte		x, y;
+
+
+	@call oself::MSG_BOARD_PUSH_GSTATE();
+	for (i = 0; i < pself->SBCI_length; i++) {
+		seg = pself->SBCI_snake[i];
+		x = (seg & 0xff00) >> 8;
+		y = seg & 0x00ff;
+
+		DrawSnakeSeg(pself->SBCI_gstate, GB_KILL, x, y);
+		TimerSleep(10);
+		DrawSnakeSeg(pself->SBCI_gstate, GB_OPEN, x, y);
+		pself->SBCI_board[x][y] = GB_OPEN;
+		}
+	@call oself::MSG_BOARD_POP_GSTATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_KBD_CHAR for SnakeBoardClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_META_KBD_CHAR {
+
+	if (flags & CF_FIRST_PRESS || flags & CF_REPEAT_PRESS) {
+		if ((character >> 8) == CS_CONTROL) {
+			switch (character & 0xff) {
+				case VC_NUMPAD_4:
+				case VC_LEFT:
+					if ((pself->SBCI_dir == D_UP || pself->SBCI_dir == D_DOWN)
+							&& g_gameStatus == SGS_IN_PROGRESS) {
+						@send self::MSG_BOARD_STOP_TIMER();
+						@send self::MSG_BOARD_SNAKE_LEFT();
+						}
+					break;
+				case VC_NUMPAD_6:
+				case VC_RIGHT:
+					if ((pself->SBCI_dir == D_UP || pself->SBCI_dir == D_DOWN)
+							&& g_gameStatus == SGS_IN_PROGRESS) {
+						@send self::MSG_BOARD_STOP_TIMER();
+						@send self::MSG_BOARD_SNAKE_RIGHT();
+						}
+					break;
+				case VC_NUMPAD_8:
+				case VC_UP:
+					if ((pself->SBCI_dir == D_RIGHT || pself->SBCI_dir == D_LEFT)
+							&& g_gameStatus == SGS_IN_PROGRESS) {
+						@send self::MSG_BOARD_STOP_TIMER();
+						@send self::MSG_BOARD_SNAKE_UP();
+						}
+					break;
+				case VC_NUMPAD_2:
+				case VC_DOWN:
+					if ((pself->SBCI_dir == D_RIGHT || pself->SBCI_dir == D_LEFT)
+							&& g_gameStatus == SGS_IN_PROGRESS) {
+						@send self::MSG_BOARD_STOP_TIMER();
+						@send self::MSG_BOARD_SNAKE_DOWN();
+                  }
+					break;
+				default:
+					@callsuper();
+				} /* end of switch */
+			} /* end of control if */
+		else  /* not control */
+			@callsuper();
+      }
+	else /* end of flags if */
+		@callsuper();
+		
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_GET_DIR_AND_START for SnakeBoardClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_GET_DIR_AND_START
+{
+
+
+	switch (pself->SBCI_dir) {
+		case D_UP:
+			@send SnakeBoard::MSG_BOARD_START_TIMER(MSG_BOARD_SNAKE_UP);
+			break;
+		case D_DOWN:
+			@send SnakeBoard::MSG_BOARD_START_TIMER(MSG_BOARD_SNAKE_DOWN);
+			break;
+		case D_RIGHT:
+			@send SnakeBoard::MSG_BOARD_START_TIMER(MSG_BOARD_SNAKE_RIGHT);
+			break;
+		case D_LEFT:
+			@send SnakeBoard::MSG_BOARD_START_TIMER(MSG_BOARD_SNAKE_LEFT);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_SET_TEXT for SnakeBoardClass
+ *			(optr strOPtr)
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_SET_TEXT {
+
+	pself->SBCI_textOptr = strOPtr;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_DRAW_TEXT_BOX for SnakeBoardClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_DRAW_TEXT_BOX {
+ word		width;
+
+
+	if (pself->SBCI_textOptr) {
+		@call oself::MSG_BOARD_PUSH_GSTATE();
+		/* get length to center justify */
+		MemLock (OptrToHandle(pself->SBCI_textOptr));
+		width = GrTextWidth(pself->SBCI_gstate, LMemDeref(pself->SBCI_textOptr), 0);
+
+		GrSetLineWidth(pself->SBCI_gstate, MakeWWFixed(2));
+		GrSetTextColor(pself->SBCI_gstate, CF_INDEX, C_BLACK, 0, 0);
+		GrSetAreaColor(pself->SBCI_gstate, CF_INDEX, C_WHITE, 0, 0);
+		GrSetLineColor(pself->SBCI_gstate, CF_INDEX, C_BLACK, 0, 0);
+		GrFillRect(pself->SBCI_gstate, 105, 270, 225, 300);
+		GrDrawRect(pself->SBCI_gstate, 105, 270, 225, 300);
+		GrDrawText(pself->SBCI_gstate, 105 + (120 - width)/2, 280,
+										LMemDeref(pself->SBCI_textOptr), 0);
+		MemUnlock (OptrToHandle(pself->SBCI_textOptr));
+		@call oself::MSG_BOARD_POP_GSTATE();
+      }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_PUSH_GSTATE for SnakeBoardClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_PUSH_GSTATE
+{
+	  pself->SBCI_cachedState = pself->SBCI_gstate;
+	  pself->SBCI_gstate = GrCreateState(pself->SBCI_viewWin);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_BOARD_POP_GSTATE for SnakeBoardClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeBoardClass, MSG_BOARD_POP_GSTATE
+{
+	  GrDestroyState(pself->SBCI_gstate);
+	  pself->SBCI_gstate = pself->SBCI_cachedState;
+	  pself->SBCI_cachedState = NullHandle;
+}
+
+/*
+ ***************************************************************************
+ *		SnakePrimaryClass methods
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DISPLAY_SET_MINIMIZED for SnakePrimaryClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakePrimaryClass, MSG_GEN_DISPLAY_SET_MINIMIZED
+{
+
+
+   /* we need to check the min flag since the method gets called twice */
+	if (!g_minimized) {
+		g_minimized = g_gameStatus + 1;
+		if (g_gameStatus == SGS_IN_PROGRESS) {
+			g_gameStatus = SGS_PAUSED;
+			@call SnakeBoard::MSG_BOARD_STOP_TIMER();
+			}
+		}
+
+	@callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DISPLAY_SET_NOT_MINIMIZED for SnakePrimaryClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakePrimaryClass, MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
+{
+
+
+	if (g_minimized == MIN_FROM_IN_PROG) {
+		g_gameStatus = SGS_IN_PROGRESS;
+		/* find out what direction we were going and start back up */
+		@call SnakeBoard::MSG_BOARD_GET_DIR_AND_START();
+		}
+	else {
+      /* reset game status */
+		g_gameStatus = g_minimized - 1;
+		}
+	g_minimized = MIN_NOT;
+
+	@callsuper();
+
+}
+
+/*
+ ***************************************************************************
+ *		SnakeApplicationClass methods
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LOST_TARGET_EXCL for SnakeApplicationClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method SnakeApplicationClass, MSG_META_LOST_TARGET_EXCL
+{
+
+	if (g_gameStatus == SGS_IN_PROGRESS) {
+		@send process::MSG_SNAKE_PAUSE_GAME();
+      }
+	@callsuper();
+
+}
+
+/*
+ ***************************************************************************
+ *		the sound routines
+ ***************************************************************************
+ */
+
+/*-------------------------------------------------------------------------
+ | Routine:  LoadSounds
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Load the sounds to be played later.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |    jfh  06/23/05	Instead of loading from a file I'll just mash em in -
+ |                   but I did use sounds from LL.
+ *-----------------------------------------------------------------------*/
+void LoadSounds(void)
+{
+ word		i;
+ word		moveSound[3] = {0x00b0, 0x0070, 0x0040};
+ word		targetSound[4] = {0x06b0, 0x0340, 0x0500, 0x01b0};
+ word		killSound[19] = {0x0150, 0x01a0, 0x0230, 0x0170,
+								  0x02d0, 0x0110, 0x0060, 0x0030,
+								  0x0090, 0x0030, 0x00a0, 0x0030,
+								  0x0130, 0x0030, 0x0050, 0x0030,
+								  0x00d0, 0x0030, 0x0050};
+
+	ResetSound();
+	memset(G_sounds, 0, sizeof(G_sounds));
+
+	G_sounds[0].length = 0;
+	G_sounds[0].priority = 0;
+	for (i = 0; i < 3; i++)  {
+		G_sounds[0].samples[i] = moveSound[i];
+		}
+	G_sounds[1].length = 0;
+	G_sounds[1].priority = 0;
+	for (i = 0; i < 4; i++)  {
+		G_sounds[1].samples[i] = targetSound[i];
+		}
+	G_sounds[2].length = 0;
+	G_sounds[2].priority = 0;
+	for (i = 0; i < 19; i++)  {
+		G_sounds[2].samples[i] = killSound[i];
+		}
+
+
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PlayFrequency
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Play a frequency on the PC Speaker (with logical checks)
+ |
+ | Inputs:
+ |    word freq                   -- Frequency to use (per GEOS sound.h)
+ |    word duration               -- Length of time in 1/60ths of a second
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void PlayFrequency(word freq, word duration)
+{
+
+	if (g_sound == SOUND_SYSTEM)
+		/* this routine abides by syst sound setting */
+		UserStandardSound(SST_CUSTOM_NOTE, freq, duration) ;
+
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PlaySimpleSound
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Plays a banked sound out the PC speaker.  Actually just sets up
+ |    the sound for playing.
+ |
+ | Inputs:
+ |    word soundId                -- Index into G_sounds
+ |    word priority               -- 0-65535 priority level if the given
+ |                                   sound doesn't have a priority already.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void PlaySimpleSound(word soundId, word priority)
+{
+    T_simplePCSound *p_sound ;
+    word i ;
+    word best = INDEX_NONE ;
+    word bestPriority = 0xFFFF ;
+    T_soundState *p_channel ;
+
+    p_sound = G_sounds + soundId ;
+    if (p_sound->priority)
+        priority = p_sound->priority ;
+
+    /* Find the best free channel or one with a lower priority */
+    for (i=0, p_channel=G_channelArray;
+         i<MAX_SOUND_CHANNELS;
+         i++, p_channel++)  {
+        /* Take emty channels immediately */
+        if (p_channel->soundNum == INDEX_NONE)  {
+            best = i ;
+            bestPriority = 0xFFFF ;
+            break ;
+        }
+
+        /* Otherwise, look for the lowest priority sound */
+        if (p_channel->priority <= bestPriority)  {
+            best = i ;
+            bestPriority = p_channel->priority ;
+        }
+    }
+
+    /* Only process the sound if we found a channel */
+    /* and the lowest priority sound is lower or equal to what we */
+    /* want to play */
+    if ((best != INDEX_NONE) &&
+        ((bestPriority <= priority) || (bestPriority==0xFFFF)))  {
+        p_channel = G_channelArray + best ;
+        p_channel->soundNum = soundId ;
+        p_channel->pos = 0 ;
+        p_channel->priority = priority ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ResetSound
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Reset the sound effects
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void ResetSound(void)
+{
+    word i ;
+
+    for (i=0; i<MAX_SOUND_CHANNELS; i++)  {
+        G_channelArray[i].soundNum = INDEX_NONE ;
+        G_channelArray[i].pos = 0 ;
+        G_channelArray[i].priority = 0 ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SoundStart
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Start the sound system (mainly timer)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void SoundStart(void)
+{
+    if (!G_soundTimer)
+        G_soundTimer = TimerStart(
+                       TIMER_EVENT_CONTINUAL,
+                       ConstructOptr(GeodeGetCodeProcessHandle(), 0),
+                       1,
+							  MSG_SNAKE_UPDATE_SOUND,
+                       1,
+                       &G_soundTimerId) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SoundStop
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Stops the sound system (mainly timer)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void SoundStop(void)
+{
+    TimerStop(G_soundTimer, G_soundTimerId) ;
+    G_soundTimer = NullHandle ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SoundsWaitUntilDone
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Updates the sound effects until we are done.  Also stops the sound
+ |    system.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void SoundsWaitUntilDone(void)
+{
+    word i ;
+    Boolean isSoundPlaying ;
+
+    SoundStop() ;
+
+    do {
+        isSoundPlaying = FALSE ;
+        for (i=0; i<MAX_SOUND_CHANNELS; i++)  {
+            if (G_channelArray[i].soundNum != INDEX_NONE)  {
+                isSoundPlaying = TRUE ;
+                break ;
+            }
+        }
+
+        /* Stop if finally no sound is playing */
+        if (!isSoundPlaying)
+            break ;
+        UpdateSound() ;
+        TimerSleep(1) ;
+    } while (1) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  UpdateSound
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Update the sound effects using the current settings.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void UpdateSound(void)
+{
+    static word channel = 0 ;
+    T_soundState *p_state ;
+    T_simplePCSound *p_sound ;
+    word sample ;
+
+    p_state = G_channelArray + channel ;
+    if (p_state->soundNum != INDEX_NONE)  {
+        p_sound = G_sounds + p_state->soundNum ;
+        sample = p_sound->samples[p_state->pos] ;
+		  if (sample/* > SOUND_FREQ_CUTOFF*/)  {
+            /* Play that frequency */
+            PlayFrequency(sample, 1) ;
+            p_state->pos++ ;
+		  } else /*if (sample == 0) */ {
+            /* Sound is done.  Stop here */
+            p_state->soundNum = INDEX_NONE ;
+            p_state->priority = 0 ;
+            p_state->pos = 0 ;
+		  }/* else {
+            p_state->pos++ ;
+        }*/
+    }
+
+    /* Go to the next channel next time */
+    channel = ((channel+1)%MAX_SOUND_CHANNELS) ;
+}
+
+

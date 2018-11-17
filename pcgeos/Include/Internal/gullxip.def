@@ -1,0 +1,223 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Gulliver
+FILE:		gullxip.def
+
+AUTHOR:		Jim Guggemos, Mar  7, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	3/ 7/95   	Initial revision
+
+
+DESCRIPTION:
+	Definitions pertaining to full xip on the Gulliver device
+		
+	Just so it is on record -- this file started out neat and orderly
+	and is now quite obtrusive.. well, the Elan is a wacky CPU.
+		
+	$Id: gullxip.def,v 1.1 97/04/04 14:17:04 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __GULLXIP
+
+include Internal/elan.def
+
+.186				; Enable use of 80186 instructions
+				; We KNOW Gulliver can use these, so lets
+
+;=============================================================================
+;    	     Memory map of upper memory in 1 Mb Logical Address Space
+;=============================================================================
+
+TOP_ADDRESS			equ	10000h
+BIOS_BASE_ADDRESS		equ	0F400h
+BIOS_SIZE_SIZE_BYTES		equ	(TOP_ADDRESS - \
+					 BIOS_BASE_ADDRESS) * 16
+
+DOS_BASE_ADDRESS		equ	0E980h
+DOS_SIZE_BYTES			equ	(BIOS_BASE_ADDRESS - \
+					 DOS_BASE_ADDRESS) * 16
+						 
+; Note that the fixed xip area extends beywond the MMSA windows and into the
+; area selected by ROMCS.  So, when banking in the fixed area in the loader,
+; we don't need to worry about stuff above FIXED_XIP_TOP_WINDOW because it
+; is already there.
+FIXED_XIP_TOP_WINDOW		equ	0E000h
+
+FIXED_XIP_BASE_ADDRESS		equ	0C400h
+FIXED_XIP_SIZE_BYTES		equ	(DOS_BASE_ADDRESS - \
+					 FIXED_XIP_BASE_ADDRESS) * 16
+
+RAM_ROM_WINDOW_BASE_ADDRESS	equ	0C000h
+RAM_ROM_WINDOW_SIZE_BYTES	equ	(FIXED_XIP_BASE_ADDRESS - \
+					 RAM_ROM_WINDOW_BASE_ADDRESS) * 16
+					 
+VIDEO_BASE_ADDRESS		equ	0B800h
+VIDEO_SIZE_BYTES		equ	(RAM_ROM_WINDOW_BASE_ADDRESS - \
+					 VIDEO_BASE_ADDRESS) * 16
+
+EMPTY_BASE_ADDRESS		equ	0B000h
+EMPTY_SIZE_BYTES		equ	(VIDEO_BASE_ADDRESS - \
+					 EMPTY_BASE_ADDRESS) * 16
+					 
+PCMCIA_WINDOW_BASE_ADDRESS	equ	0A800h
+PCMCIA_WINDOW_SIZE_BYTES	equ	(EMPTY_BASE_ADDRESS - \
+					 PCMCIA_WINDOW_BASE_ADDRESS) * 16
+
+MOVABLE_XIP_WINDOW_BASE_ADDRESS	equ	0A000h
+MOVABLE_XIP_WINDOW_SIZE_BYTES	equ	(PCMCIA_WINDOW_BASE_ADDRESS - \
+					 MOVABLE_XIP_WINDOW_BASE_ADDRESS) * 16
+
+;=============================================================================
+;	Constants used for mapping the fixed XIP resources
+;=============================================================================
+
+  ; NOTE: the fixed XIP base in the MMSA bank of MMS windows.
+  
+FIXED_XIP_BASE_ROM_BANK		equ	31h
+
+; These are the ELAN registers that control the upper 3 bits of the page
+; numbers.  They will be zeroed out with the MASK's below.
+
+FIXED_XIP_A_23_REG		equ	ELAN_MMS_LINE_23
+				
+				;page	76543210
+FIXED_XIP_A_23_MASK		equ	11111110b
+
+
+FIXED_XIP_A_21_22_REG_1		equ	ELAN_MMS_LINE_21_22_PP_0_3
+FIXED_XIP_A_21_22_REG_2		equ	ELAN_MMS_LINE_21_22_PP_4_7
+
+				;page   3-2-1-0-
+FIXED_XIP_A_21_22_MASK_1	equ	11111100b
+				;page   7-6-5-4-
+FIXED_XIP_A_21_22_MASK_2	equ	11111111b
+
+
+; This is the first I/O address for the low 7 bits of the first Elan page.
+; The I/O address are numbered BASE, 2000h+BASE, 4000h+BASE, ... E000h+BASE.
+
+FIXED_XIP_FIRST_IO_ADDRESS	equ	(ELAN_BASE_REGISTER + 2000h)
+
+; This register selects the device type for our fixed windows.  We are
+; looking at ROMDOS memory, which is type 0, conveniently enough.
+    CheckHack <ELAN_SELECT_ROMDOS eq 0>
+FIXED_XIP_DEVICE_SELECT_REG_1	equ	ELAN_MMSA_DEVICE_SELECTION_1
+FIXED_XIP_DEVICE_SELECT_REG_2	equ	ELAN_MMSA_DEVICE_SELECTION_2
+				
+				;page	3-2-1-0-
+FIXED_XIP_DEVICE_SELECT_MASK_1	equ	11111100b
+				;page	7-6-5-4-
+FIXED_XIP_DEVICE_SELECT_MASK_2	equ	11111111b
+
+;=============================================================================
+;	Constants used for mapping the movable XIP resources
+;=============================================================================
+
+  ; NOTE: the movable XIP base in the MMSB bank of MMS windows.
+  
+MOVABLE_XIP_BASE_WINDOW		equ	0h
+MOVABLE_XIP_NEXT_WINDOW		equ	1h
+
+  ; The ELAN splits up the page number between three different registers.
+  ;   lowest 7 bits go to an I/O address
+  ;     next 2 bits go to part of a byte register
+  ;     next 1 bit goes to part of another byte register
+  ;
+  ; We only care about the first 8 bits. (4 Mb)
+
+MOVABLE_XIP_A_21_22_REG		equ	ELAN_MMS_LINE_21_22_PP_0_3
+
+MOVABLE_XIP_BASE_A_21_22_OFFSET	equ	(MOVABLE_XIP_BASE_WINDOW * 2)
+MOVABLE_XIP_BASE_A_21_22_MASK	equ	(3 shl MOVABLE_XIP_BASE_A_21_22_OFFSET)
+
+MOVABLE_XIP_NEXT_A_21_22_OFFSET	equ	(MOVABLE_XIP_NEXT_WINDOW * 2)
+MOVABLE_XIP_NEXT_A_21_22_MASK	equ	(3 shl MOVABLE_XIP_NEXT_A_21_22_OFFSET)
+
+; Bit 23 to be zeroed.
+MOVABLE_XIP_A_23_REG		equ	ELAN_MMS_LINE_23
+				
+				;page	76543210
+MOVABLE_XIP_A_23_MASK		equ	00000011b
+
+; This register selects the device type for our movable windows.  We are
+; looking at ROMDOS memory, which is type 0, conveniently enough.
+    CheckHack <ELAN_SELECT_ROMDOS eq 0>
+MOVABLE_XIP_DEVICE_SELECT_REG	equ	ELAN_MMSB_DEVICE_SELECTION
+				
+				;page	3-2-1-0-
+MOVABLE_XIP_DEVICE_SELECT_MASK	equ	00001111b
+
+;=============================================================================
+;	Important constants for ECCheckXIPPageNumber
+;	MAKE SURE THESE ARE UPDATED IF THE XIP IMAGE CHANGES LOCATION
+;	OR SIZE!!
+;
+;	Note: these are physical page numbers
+;=============================================================================
+XIP_PAGE_START_1		equ	031h
+XIP_PAGE_END_1			equ	03ah	; inclusive
+
+XIP_PAGE_START_2		equ	040h
+XIP_PAGE_END_2			equ	076h	; inclusive
+
+;=============================================================================
+;	Macro for loading XIP Header segment into a seg reg.
+;=============================================================================
+LoadXIPSeg	macro	segreg, trashreg
+		mov	trashreg, FIXED_XIP_BASE_ADDRESS
+		mov	segreg, trashreg
+endm
+
+;=============================================================================
+;	Macros for selecting MMSA/B banks
+;
+;	Destroyed: al
+;=============================================================================
+SelectMMSABank	macro
+		SelectMMSBank <or al, ELAN_MMSABSEL>
+endm
+
+SelectMMSBBank	macro
+		SelectMMSBank <and al, not ELAN_MMSABSEL>
+endm
+
+SelectMovableXIPBank	macro
+		SelectMMSBBank
+endm
+
+SelectFixedXIPBank	macro
+		SelectMMSABank
+endm
+
+SelectGFSXIPBank	macro
+		SelectMMSABank
+endm
+
+SelectMMSBank	macro	line
+		mov	al, ELAN_MMSB_CONTROL
+		out	ELAN_INDEX, al
+		in	al, ELAN_DATA
+		line
+		out	ELAN_DATA, al
+endm
+
+
+;=============================================================================
+;	Miscellaneous equates
+;=============================================================================
+PHYSICAL_PAGE_SIZE		equ	ELAN_BANK_SIZE
+MAPPING_PAGE_SIZE		equ	MOVABLE_XIP_WINDOW_SIZE_BYTES
+
+  ; Used by ELAN_SET_PAGE_REGISTER macro in elan.def
+ELAN_BASE_REGISTER		equ	208h

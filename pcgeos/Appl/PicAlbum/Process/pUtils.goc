@@ -1,0 +1,78 @@
+@include "PicAlbum.goh"
+
+word
+PADeleteTree(TCHAR *folderName) {
+
+	word err = 0;
+
+	/* delete contained files */
+	FilePushDir();
+	if(FileSetCurrentPath(0, folderName)) {
+	
+		/* loop until error or no file left */
+		do {
+
+			FileEnumParams params;
+			MemHandle listMem = 0;
+			word itemsRead, itemsLeft;
+			FEDosInfo *dosInfo ;
+
+			params.FEP_searchFlags =
+                FESF_GEOS_NON_EXECS | 
+                FESF_GEOS_EXECS | FESF_NON_GEOS | FESF_DIRS ;
+			params.FEP_returnAttrs = (FileExtAttrDesc *) FESRT_DOS_INFO;
+			params.FEP_returnSize = sizeof(FEDosInfo);
+			params.FEP_matchAttrs = 0;
+			params.FEP_bufSize = sizeof(FEDosInfo);
+			params.FEP_skipCount = 0;
+			params.FEP_callback = (void *) 0;
+			params.FEP_callbackAttrs = 0;
+			params.FEP_cbData1 = (dword) 0;
+			params.FEP_cbData2 = (dword) 0;
+			params.FEP_headerSize = 0;
+
+			/* get the file list */
+			itemsRead = FileEnum(&params, &listMem, &itemsLeft);
+
+			if(!listMem) {
+			
+				break;
+			}
+
+			if(!itemsRead) {
+        
+				MemFree(listMem);
+				break;
+			} 
+
+			/* delete file or directory */
+			dosInfo = MemLock(listMem);
+			if(dosInfo->DFIS_attributes & FA_SUBDIR) {
+			
+				err = PADeleteTree(dosInfo->DFIS_name);
+
+			} else {
+
+				if(LocalCmpStringsNoCase(dosInfo->DFIS_name, "@DIRNAME.000", 0)) {
+
+					err = FileDelete(dosInfo->DFIS_name);
+				}
+			}
+			MemFree(listMem);
+		
+		} while(!err);
+
+	} else {
+		
+		err = ERROR_PATH_NOT_FOUND;
+	}
+	FilePopDir();
+
+	/* delete folder itself */
+	if(!err) {
+
+		err = FileDeleteDir(folderName);
+	}
+
+	return err;
+}

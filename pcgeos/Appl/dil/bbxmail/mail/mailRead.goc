@@ -1,0 +1,502 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mailRead.goc
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ * DESCRIPTION:
+ *	MailReaderClass for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include <Objects/vLTextC.goh>    /* VisLargeText definitions */
+
+@classdecl MailReaderClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg ReadCode
+#endif
+
+/**************************************************************
+ *
+ * FUNCTION:        DecodeHeader
+ * DESCRIPTION:     decode any encoded characters in a header
+ *						  per	RFC2047
+ *
+ * PASS:            *encodedStr - string to decode
+ *                  *decodedStr - place to stow decoded string
+ *
+ * RETURN:          nada
+ *
+ *	jfh	3/19/04		Initial
+ *
+ ***************************************************************/
+#define TE_QUOTED_PRINTABLE 1
+#define TE_BASE64 2
+
+ void DecodeHeader(TCHAR *encodedStr, TCHAR *decodedStr)
+{
+// TransferEncoding te;  // TE_BASE64 or TE_QUOTED_PRINTABLE
+ word len, i, te;
+ char	dStr[100];			//max decode len is 75 per RFC so we'll go 100
+ char	eStr[250];			//and we'll make encoded str 250
+
+
+	len = strlen(encodedStr);
+	/* check for possible string overflows (the ISO part is 13 chars) */
+	if (len > (250 - 14)) {
+   	/* bail out - this isn't IAW the RFC */
+		strcpy (decodedStr, "***");
+		return;
+		}
+
+	/* is it Q or B coding */
+	i = 0;
+	while (i < len) {
+		if (encodedStr[i] == '?') {
+			if (encodedStr[i + 1] == 'Q' || encodedStr[i + 1] == 'q') {
+				te = TE_QUOTED_PRINTABLE;
+				break;
+				}
+			if (encodedStr[i + 1] == 'B' || encodedStr[i + 1] == 'b') {
+				te = TE_BASE64;
+				break;
+				}
+			else {
+				/* unknown type */
+				strcpy (decodedStr, "***");
+				return;
+				}
+			}
+		i++;
+		}
+
+	/* get the string to decode */
+	strcpy (eStr, &encodedStr[i + 3]);
+
+	/* use the decoders in the mime part of the email lib */
+	if (te == TE_QUOTED_PRINTABLE) {
+		len = MailQPDecodePtr((byte *)eStr, 0, (byte *)dStr);
+		dStr[len] = 0;
+		/* need to turn any underscores into spaces */
+		for (i = 0; i < len; i++) {
+			if (dStr[i] == '_') dStr[i] = ' ';
+			}
+		}
+	else {
+		len = MailB64DecodePtr((byte *)eStr, strlen(eStr), (byte *)dStr, 76);
+		dStr[len] = 0;
+		}
+
+	/* convert the decoded string to Geos from the code page */
+	LocalCodePageToGeos(dStr, len, CODE_PAGE_LATIN_1, '.');
+	strcpy(decodedStr, dStr);
+
+   return;
+
+}
+
+/**************************************************************
+ *
+ * FUNCTION:        CheckIfDecodeReqd
+ * DESCRIPTION:     Parse the passed string and see if it needs
+ *						  to be decoded.  If so, decode it using RFC2047
+ *						  and let the caller know.  Caller needs to free
+ *						  the decoded mem!
+ *
+ * PASS:            *checkStr - string to check
+ *
+ * RETURN:          MemHandle of decoded string if decoded, else 0
+ *
+ *	jfh	3/23/04		Initial
+ *
+ ***************************************************************/
+ MemHandle CheckIfDecodeReqd(TCHAR *checkStr)
+{
+ MemHandle	dmh = 0, esmh, dsmh;
+ TCHAR		*decodedText, *encodedStr, *decodedStr;
+ word			len, i, start, end, qMarks, next;
+ Boolean		foundCode = FALSE;
+
+
+	len = strlen(checkStr);
+	start = 0;
+	qMarks = 0;
+	next = 0;
+	for (i = 0; i < len; i++) {
+		/* look for start of encoding */
+		if ((checkStr[i] == '=') && !start)  {
+			if (checkStr[i + 1] == '?') {
+				start = i + 2;
+				qMarks++;
+				i++;
+				}
+			}
+		if (start && (i > start)) {
+			/* now find the end */
+			if (checkStr[i] == '?') {
+				qMarks++;
+				if (qMarks == 4) {
+					end = i - 1;
+					if (!dmh) {
+						/* allocate a buffer to work with */
+						dmh = MemAlloc((FIELD_BUFFER_BLOCK_SIZE+1)*sizeof(TCHAR),
+										HF_DYNAMIC, HAF_STANDARD);
+						decodedText = MemLock(dmh);
+						strcpy(decodedText, checkStr);
+						foundCode = TRUE;
+						}
+					else {
+						next = strlen(decodedText);
+						strcat(decodedText, checkStr);
+						}
+					/* extract the string to decode */
+					esmh = MemAlloc((FIELD_BUFFER_BLOCK_SIZE+1)*sizeof(TCHAR),
+										HF_DYNAMIC, HAF_STANDARD);
+					encodedStr = MemLock(esmh);
+					strcpy(encodedStr, decodedText);
+					encodedStr[next + end + 1] = 0;
+					encodedStr = &encodedStr[next + start];
+
+					/* send it off to get decoded */
+					dsmh = MemAlloc((FIELD_BUFFER_BLOCK_SIZE+1)*sizeof(TCHAR),
+										HF_DYNAMIC, HAF_STANDARD);
+					decodedStr = MemLock(dsmh);
+					DecodeHeader(encodedStr, decodedStr);
+					MemFree(esmh);
+
+					/* substitute for the encoded string */
+					decodedText[next + start - 2] = 0;
+					strcat(decodedText, decodedStr);
+					MemFree(dsmh);
+               /* and reset so we can look for more encoded stuff */
+					checkStr = &checkStr[end + 3];
+					/* Strip any CR LF that might be trailing the encoded str -
+						well, that's what I wanted to do.  But Gene turns them into
+						spaces in the MailGetHeader routines, so I'll make an
+						assumption that if I have the end of an encode followed by
+						two spaces and the beginning of another encode that the
+						two spaces were CR/LF and should be discarded. */
+					//while (*checkStr == 0x0d || *checkStr == 0x0a) {
+					if (checkStr[0] == ' ' && checkStr[1] == ' '
+							&& checkStr[2] == '=' && checkStr[3] == '?') {
+						checkStr += 2;
+						}
+					len = strlen(checkStr);
+					i = 0xffff;
+					start = 0;
+					qMarks = 0;
+					}
+				}
+			}
+		}
+
+	if (foundCode) {
+		/* add any remaining un-encoded text */
+		if (len) strcat(decodedText, checkStr);
+		return (dmh);
+		}
+	else {
+      return (0);
+		}
+
+}
+
+/**************************************************************
+ *
+ * FUNCTION:        ReadHeader
+ * DESCRIPTION:     read a header from the file and append it to the text
+ *
+ * PASS:            hdrHan - handle of headers
+ *                  findHeader - optr of header to find (e.g., "FROM")
+ *                  dispHeader - optr of header to display (e.g., "From: ")
+ *                  textObj - optr of text object to append to
+ * RETURN:          non-zero for error/not found
+ ***************************************************************/
+
+TCHAR rhCR[] = "\r";
+TCHAR rhTab[] = "\t";
+
+void
+ReadFormatHeader(TCHAR *hdrText, optr dispHeader, optr textObj)
+{
+@ifdef PRETTY_MAIL_HEADERS
+     /*
+      * add a tab so our anchored tab does something
+      */
+     @call textObj::MSG_VIS_TEXT_APPEND_PTR(rhTab, 0);
+@endif
+     /*
+      * add the header text in bold text
+      */
+     @call textObj::MSG_VIS_TEXT_SET_TEXT_STYLE(0, 0, 0, TS_BOLD,
+						0,
+						VIS_TEXT_RANGE_SELECTION);
+     @call textObj::MSG_VIS_TEXT_APPEND_OPTR(dispHeader, 0);
+     /*
+      * add the contents in plain text
+      */
+     @call textObj::MSG_VIS_TEXT_SET_TEXT_STYLE(0, 0, TS_BOLD, 0,
+						0,
+						VIS_TEXT_RANGE_SELECTION);
+     @call textObj::MSG_VIS_TEXT_APPEND_PTR(hdrText, 0);
+     @call textObj::MSG_VIS_TEXT_APPEND_PTR(rhCR, 0);
+}
+
+word
+ReadHeader(MemHandle hdrHan, optr findHeader, optr dispHeader, optr textObj)
+{
+ MemHandle	mh, dmh;
+ TCHAR		*hdrText, *decodedText;
+
+
+	LockStrings();
+
+	/*
+	 * get the header
+	 */
+	mh = MailGetHeader(hdrHan, LMemDeref(findHeader));
+	if (!mh) {
+		UnlockStrings();
+		return(-1);
+		}
+
+	hdrText = MemLock(mh);
+
+	/* jfh - in here we need to parse the header text to check for
+		special characters - RFC2047 */
+	dmh = CheckIfDecodeReqd(hdrText);
+
+	if (dmh) {
+		/* we need to use the decoded string */
+		decodedText = MemLock(dmh);
+		ReadFormatHeader(decodedText, dispHeader, textObj);
+		MemFree(dmh);
+		}
+	else {
+		/* even if there wasn't any encoding, the odds are that the header
+			line is in the Win latin1 code page.  So lets convert it to Geos */
+		LocalCodePageToGeos(hdrText, strlen(hdrText), CODE_PAGE_LATIN_1, '.');
+		ReadFormatHeader(hdrText, dispHeader, textObj);
+		}
+
+	MemFree(mh);
+	UnlockStrings();
+
+	return(0);
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        ReadDateHeader
+ * DESCRIPTION:     read date header from the file and append it to the text
+ *
+ * PASS:            hdrHan - handle of headers
+ *                  textObj - optr of text object to append to
+ * RETURN:          non-zero for error/not found
+ ***************************************************************/
+
+word
+ReadDateHeader(MemHandle hdrHan, optr textObj)
+{
+    MemHandle mh;
+    MailTime mt;
+    word i;
+    TCHAR *hdrText;
+
+    LockStrings();
+    /*
+     * get the date header if it exists
+     */
+    mh = MailGetHeader(hdrHan, LMemDeref(@dateFieldName));
+    if (!mh) {
+	UnlockStrings();
+	return(-1);
+    }
+    hdrText = MemLock(mh);
+    /*
+     * parse it if possible and reformat it in the user's desired format
+     */
+    if (ParseDateTimeWithTimezone(hdrText, &mt) == -1) {
+	LocalFormatDateTime(hdrText, DTF_LONG_CONDENSED, &mt);
+	strcat(hdrText, " ");
+	i = strlen(hdrText);
+	LocalFormatDateTime(hdrText+i, DTF_HMS, &mt);
+	i = strlen(hdrText);
+	FormatTimezoneStr(hdrText+i, mt.MT_timezone);
+    }
+
+    ReadFormatHeader(hdrText, @dateFieldStr, textObj);
+
+    MemFree(mh);
+    UnlockStrings();
+    return(0);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_READER_READ_MESSAGE
+ * DESCRIPTION:     read the specified message
+ *
+ * PASS:            fileName - handle of block w/ file name
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailReaderClass, MSG_MAIL_READER_READ_MESSAGE
+{
+	 FileHandle fileHan;
+	 MemHandle mh, hdrHan, dmh;
+	 TCHAR	*hdrText;
+	 word nb;
+
+	 EC ( ECCheckMemHandle(fileName) );
+	 fileHan = OpenMessageFile(fileName);
+	 if (!fileHan) {
+	ReportError(@unableToOpenMessageErr, NULL);
+	return;
+	 }
+	 @call ReadBodyText::MSG_META_SUSPEND();
+
+	 hdrHan = MailReadHeaders(fileHan);
+
+
+	 /*
+	  * if not already, mark the message as read
+	  */
+	 LockStrings();
+	 mh = MailGetHeader(hdrHan, LMemDeref(@xreadFieldName));
+	 if (!mh) {
+	/*
+	 * add X-Read: header
+	 */
+	nb = strlen(LMemDeref(@xreadFieldOut));
+	MailFileInsertSpace(fileHan, nb);
+	FilePos(fileHan, 0, FILE_POS_START);
+	FileWrite(fileHan, LMemDeref(@xreadFieldOut), nb, FALSE);
+	/*
+	 * rebuild the message list to show the new icon
+	 */
+	@send, forceQueue TheMessageList::MSG_MAIL_LIST_RESCAN();
+	 } else {
+	MemFree(mh);
+	 }
+	 UnlockStrings();
+	 /*
+	  * read the headers and body
+	  */
+	 @call ReadBodyText::MSG_MAIL_LARGE_TEXT_READ_MESSAGE(hdrHan, fileHan);
+	 /*
+	  * set the selection to the message start so the user
+	  * sees the beginning first
+	  */
+	 @call ReadBodyText::MSG_VIS_TEXT_SELECT_START();
+
+	 /*
+	  * handle any attachments
+	  */
+	 @call ReadAttachList::MSG_ATTACH_LIST_READ_ATTACHMENTS(fileHan);
+
+	 /*
+	  * set the window moniker
+	  */
+	 if (hdrHan) {
+		LockStrings();
+		mh = MailGetHeader(hdrHan, LMemDeref(@subjectFieldName));
+		UnlockStrings();
+
+		if (mh) {
+			hdrText = MemLock(mh);
+
+			/* jfh - in here we need to parse the subj text to check for
+				special characters - RFC2047 */
+			dmh = CheckIfDecodeReqd(hdrText);
+
+			if (dmh) {
+				/* we need to use the decoded string */
+				@call oself::MSG_MAIL_PRIMARY_UPDATE_LONG_TERM_MONIKER(dmh);
+				//MemFree(dmh);
+				}
+			else {
+				/* even if there wasn't any encoding, the odds are that the header
+					line is in the Win latin1 code page.  So lets convert it to Geos */
+				LocalCodePageToGeos(hdrText, strlen(hdrText), CODE_PAGE_LATIN_1, '.');
+				@call oself::MSG_MAIL_PRIMARY_UPDATE_LONG_TERM_MONIKER(mh);
+				}
+
+			}
+		else {
+			mh = 0;
+			@call oself::MSG_MAIL_PRIMARY_UPDATE_LONG_TERM_MONIKER(mh);
+			}
+		}
+	 else {
+		/* no subject */
+		@call oself::MSG_MAIL_PRIMARY_UPDATE_LONG_TERM_MONIKER(mh);
+		}
+
+    MemFree(hdrHan);
+
+    /*
+     * close the file
+     */
+    FileClose(fileHan, FALSE);
+
+    /*
+     * bring ourselves on screen
+     */
+    @call ReadBodyText::MSG_META_UNSUSPEND();
+    @call oself::MSG_MAIL_PRIMARY_OPEN();
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_READER_DELETE_MESSAGE
+ * DESCRIPTION:     throw away the current message or recover from Trash
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method MailReaderClass, MSG_MAIL_READER_DELETE_MESSAGE,
+                         MSG_MAIL_READER_RECOVER_MESSAGE
+{
+    word selection, numItems;
+
+    /* only delete/recover message being read */
+    selection = @call TheMessageList::MSG_MAIL_LIST_GET_LAST_SELECTION();
+    @call TheMessageList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, 0);
+
+    /*
+     * close the window
+     */
+    @call oself::MSG_GEN_DISPLAY_CLOSE();
+    /*
+     * throw away/recover the message
+     */
+    if (message == MSG_MAIL_READER_DELETE_MESSAGE) {
+	@call TheMessageList::MSG_MAIL_LIST_DELETE_MESSAGE();
+    } else {
+	@call TheMessageList::MSG_MAIL_LIST_RECOVER_MESSAGE();
+    }
+
+    /* select next item (or keep at last item) after deletion/recover */
+    numItems = @call TheMessageList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+    if (numItems) {
+	if (selection >= numItems) {
+	    selection = numItems-1;
+	}
+	@call TheMessageList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, 0);
+    }
+}

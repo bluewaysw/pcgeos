@@ -1,0 +1,391 @@
+#include <geos.h>
+#include <heap.h>
+#include <object.h>
+#include <chunkarr.h>
+#include <ec.h>
+#include <gstring.h>
+@include <simptree.goh>
+
+@classdecl GenSimpleTreeListClass;
+
+typedef struct
+{
+    Boolean LS_open;        // TRUE if level displays all sublevel children
+    word    LS_count;       // Number of sublevel children
+} LevelStruct;
+
+word SimpleTreeListLevelsToPos(optr array, word levelOne, word levelTwo)
+{
+    word idx, dummy, pos = 0;
+    LevelStruct *pls;
+
+    /* Count our way to the level before levelOne. */
+    EC_ERROR_IF(levelOne >= ChunkArrayGetCount(array), -1);
+    for (idx = 0; idx < levelOne; idx ++)
+    {
+        pls = ChunkArrayElementToPtr(array, idx, &dummy);
+        pos ++;
+        if (pls->LS_open)
+            pos += pls->LS_count;
+    }
+
+    if (levelTwo)
+    {    
+        /* Add levelTwo if the levelOne level is opened. */
+        pls = ChunkArrayElementToPtr(array, levelOne, &dummy);
+        if (pls->LS_open)
+            pos += levelTwo;
+        else
+            pos = GSTLAL_LAST;
+    }
+
+    return pos;
+}
+
+void SimpleTreeListPosToLevels(optr array, word identifier, word *pLevelOne,
+                               word *pLevelTwo)
+{
+    word dummy, count, arraylen;
+    LevelStruct *pls;
+    
+    /* Determine the first level in which the identifier is contained. */
+
+    count = 0;
+    arraylen = ChunkArrayGetCount(array);
+    for (*pLevelOne = 0; *pLevelOne < arraylen &&
+      count < identifier; (*pLevelOne)++)
+    {
+        /* Bump for displayed level two items. */
+        pls = ChunkArrayElementToPtr(array, *pLevelOne, &dummy);
+        if (pls->LS_open)
+        {
+            if (count + 1 + pls->LS_count <= identifier)
+                count += 1 + pls->LS_count;
+            else
+                break;
+        }
+        else
+            count ++;
+    }
+
+    *pLevelTwo = identifier - count;
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_INITIALIZE
+{
+    ChunkHandle array;
+    
+    /* Destroy the current level array. */
+    if (pself->GSTLI_levelArray != NullChunk)
+        LMemFreeHandles(HandleOf(oself), pself->GSTLI_levelArray);
+
+    /* Construct a new level array. */
+    array = ChunkArrayCreate(HandleOf(oself), sizeof(LevelStruct), 0, 0);
+
+    pself = ObjDerefGen(oself);
+    pself->GSTLI_levelArray = array;
+    pself->GSTLI_levelCount = 0;
+
+    /* Initialize the dynamic list. */
+    @send self::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_ADD_LEVEL
+{
+    word dummy, pos;
+    LevelStruct *pls;
+    optr array = ConstructOptr(HandleOf(oself), pself->GSTLI_levelArray);
+    
+    /* Limit level one index if necessary. */
+    if (levelOne > pself->GSTLI_levelCount)
+        levelOne = pself->GSTLI_levelCount;
+
+    /* Test for level one or level two insertion. */
+    if (levelTwo == 0)
+    {
+        /* Doing level one insertion. */
+
+        /* Increment the level one child count. */
+        /* Insert a new LevelStruct at the target location. */
+        if (levelOne == pself->GSTLI_levelCount ++)
+            pls = ChunkArrayAppend(array, 0);
+        else
+        {
+            pls = ChunkArrayElementToPtr(array, levelOne, &dummy);
+            pls = ChunkArrayInsertAt(array, pls, 0);
+        }
+
+        /* Initialize the structure. */
+        pls->LS_open = bOpened;
+        pls->LS_count = 0;
+
+    }
+    else
+    {
+        /* Doing level two insertion. */
+
+        /* Limit level two index if necessary. */
+        pls = ChunkArrayElementToPtr(array, levelOne, &dummy);
+        if (levelTwo > pls->LS_count + 1)
+            levelTwo = pls->LS_count + 1;
+
+        /* Increment the child count for the levelOne level. */
+        pls->LS_count ++;
+    }
+
+    /* Find target position in dynlist and insert. */
+    pos = SimpleTreeListLevelsToPos(array, levelOne, levelTwo);
+    if (pos != GSTLAL_LAST)
+        @call self::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(pos, 1);
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_REMOVE_LEVEL
+{
+    word pos = GSTLAL_LAST, dummy, count = 1;
+    LevelStruct *pls;
+    optr array = ConstructOptr(HandleOf(oself), pself->GSTLI_levelArray);
+
+    if (pself->GSTLI_levelCount == 0)
+        return;
+    
+    /* Limit level one index if necessary. */
+    if (levelOne >= pself->GSTLI_levelCount)
+        levelOne = pself->GSTLI_levelCount - 1;
+
+    /* Test for level one or level two removal. */
+    if (levelTwo == 0)
+    {
+        /* Doing level one removal. */
+        if (pself->GSTLI_levelCount)
+        {
+            /* Get the starting position in the dynlist. */
+            pos = SimpleTreeListLevelsToPos(array, levelOne, 0);
+
+            /* Decrement the level one child count. */
+            pself->GSTLI_levelCount --;
+
+            /* Get the number of items to remove from the dynlist. */
+            pls = ChunkArrayElementToPtr(array, levelOne, &dummy);
+            if (pls->LS_open)
+                count += pls->LS_count; /* Count level two items. */
+
+            /* Remove the LevelStruct at the target location. */
+            ChunkArrayDelete(array, pls);
+        }
+    }
+    else
+    {
+        /* Doing level two removal. */
+        pls = ChunkArrayElementToPtr(array, levelOne, &dummy);
+
+        if (pls->LS_count)
+        {
+            /* Limit level two index if necessary. */
+            if (levelTwo > pls->LS_count)
+                levelTwo = pls->LS_count;
+
+            /* Only remove items if the top level is open. */
+            if (pls->LS_open)
+                /* Get the starting position in the dynlist. */
+                pos = SimpleTreeListLevelsToPos(array, levelOne, levelTwo);
+
+            /* Decrement the child count for the levelOne level. */
+            pls->LS_count --;
+        }
+    }
+
+    if (pos != GSTLAL_LAST)
+        /* Remove from target position in dynlist. */
+        @call self::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(pos, count);
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER
+{
+    word levelOne, levelTwo;
+    Message msg = pself->GDLI_queryMsg;
+
+    SimpleTreeListPosToLevels(ConstructOptr(HandleOf(oself),
+      pself->GSTLI_levelArray), item, &levelOne, &levelTwo);
+
+    @send pself->GIGI_destination::{GEN_SIMPLE_TREE_LIST_QUERY_MSG}
+      msg(oself, levelOne, levelTwo);
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_GET_SELECTION
+{
+    word identifier;
+    dword retval;
+    word levelOne, levelTwo;
+
+    identifier = @call self::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    
+    if (identifier == GIGS_NONE)
+        retval = (dword)identifier << 16;
+    else
+    {
+        SimpleTreeListPosToLevels(ConstructOptr(HandleOf(oself),
+          pself->GSTLI_levelArray), identifier, &levelOne, &levelTwo);
+
+        retval = ((dword)levelOne << 16) | levelTwo;
+    }
+
+    return retval;
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_REPLACE_ITEM_MONIKER
+{
+    word item = SimpleTreeListLevelsToPos(ConstructOptr(HandleOf(oself),
+          pself->GSTLI_levelArray), levelOne, levelTwo);
+
+    if (item != GSTLAL_LAST)
+        @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item, flags, height,
+          width, length, dataType, sourceType, source);
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_REPLACE_ITEM_MONIKER_OPTR
+{
+    word item = SimpleTreeListLevelsToPos(ConstructOptr(HandleOf(oself),
+          pself->GSTLI_levelArray), levelOne, levelTwo);
+
+    if (item != GSTLAL_LAST)
+        @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, moniker);
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_REPLACE_ITEM_TEXT
+{
+    word item = SimpleTreeListLevelsToPos(ConstructOptr(HandleOf(oself),
+          pself->GSTLI_levelArray), levelOne, levelTwo);
+
+    if (item != GSTLAL_LAST)
+        @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, text);
+}
+
+@method GenSimpleTreeListClass,
+  MSG_GEN_SIMPLE_TREE_LIST_REPLACE_ITEM_BITMAP_AND_TEXT
+{
+    ChunkHandle     chunk;
+    MemHandle       mem;
+    GStateHandle    gstate = NullHandle;
+    word            bitmapY;
+    Bitmap          *pBitmap;
+
+    if ((mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0)) != NullHandle)
+    {
+        gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+
+        if (gstate != NullHandle)
+        {
+            /* Draw the bitmap if we have one. */
+            if (bitmap != NullHandle)
+            {
+                pBitmap = MemLock(HandleOf(bitmap));
+
+                /* Calculate the bitmap x draw origin. */
+                if ((signed int)(bitmapY = (GrFontMetrics(gstate,
+                  GFMI_HEIGHT_ROUNDED) - pBitmap->B_height + 1) / 2 + 1) < 0)
+                    bitmapY = 0;
+
+                /* Draw the bitmap. */
+                GrDrawBitmap(gstate, bitmapX, bitmapY, LMemDeref(bitmap), NULL);
+        
+                MemUnlock(HandleOf(bitmap));
+            }
+
+            /* Draw the text. */
+            if (flags & GSTLRIF_DRAW_TEXT_GRAYED)
+                GrSetTextMaskSys(gstate, SDM_50);
+                
+            GrDrawText(gstate, textX, 1, text, 0);
+            GrEndGString(gstate);
+
+            /* Replace the list moniker. */
+            @call self::MSG_GEN_SIMPLE_TREE_LIST_REPLACE_ITEM_MONIKER(
+                                 levelOne, levelTwo,
+                                 0,
+                                 0,               /* height */
+                                 0,               /* width */
+                                 0,
+                                 VMDT_GSTRING,
+                                 VMST_OPTR,
+                                 ConstructOptr(mem, chunk));
+
+            /* and 86 the gstate and mem */
+            GrDestroyGString(gstate, gstate, GSKT_KILL_DATA);
+        }
+        MemFree(mem);
+    }
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_IS_LEVEL_OPENED
+{
+    word dummy;
+    LevelStruct *pls;
+    
+    /* Limit level one index if necessary. */
+    if (levelOne >= pself->GSTLI_levelCount)
+        levelOne = pself->GSTLI_levelCount - 1;
+
+    pls = ChunkArrayElementToPtr(ConstructOptr(HandleOf(oself),
+      pself->GSTLI_levelArray), levelOne, &dummy);
+    return pls->LS_open;
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_TOGGLE_LEVEL
+{
+    word dummy;
+    LevelStruct *pls;
+    Message msg;
+    optr array = ConstructOptr(HandleOf(oself), pself->GSTLI_levelArray);
+    
+    if (levelOne < pself->GSTLI_levelCount)
+    {
+        /* Toggle the opened state of the level. */
+        pls = ChunkArrayElementToPtr(array, levelOne, &dummy);
+        if (pls->LS_open)
+            /* Level is open, close it. */
+            msg = MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS;
+        else
+            /* Level is closed, open it. */
+            msg = MSG_GEN_DYNAMIC_LIST_ADD_ITEMS;
+
+        pls->LS_open = !pls->LS_open;
+
+        /* Make the call only if the level has any children. */
+        if (pls->LS_count)
+        {
+            /* Get the starting position in the dynlist of this level. */
+            /* Get the number of children in the level. */
+            /* Add this level's children to the dynlist. */
+            @call self::{MSG_GEN_DYNAMIC_LIST_ADD_ITEMS} msg(
+              SimpleTreeListLevelsToPos(array, levelOne, 0) + 1,
+              pls->LS_count);
+        }
+
+        /* Force an update for the level one item. */
+        pself = ObjDerefGen(oself);
+        msg = pself->GDLI_queryMsg;
+        @send pself->GIGI_destination::{GEN_SIMPLE_TREE_LIST_QUERY_MSG}
+          msg(oself, levelOne, 0);
+    }
+}
+
+@method GenSimpleTreeListClass, MSG_GEN_SIMPLE_TREE_LIST_MAKE_ITEM_VISIBLE
+{
+    word item;
+    
+    if (levelOne < pself->GSTLI_levelCount)
+    {
+        item = SimpleTreeListLevelsToPos(ConstructOptr(HandleOf(oself),
+          pself->GSTLI_levelArray), levelOne, levelTwo);
+    
+        if (item == GSTLAL_LAST)
+        {
+            @call self::MSG_GEN_SIMPLE_TREE_LIST_TOGGLE_LEVEL(levelOne);
+            item = SimpleTreeListLevelsToPos(ConstructOptr(HandleOf(oself),
+              pself->GSTLI_levelArray), levelOne, levelTwo);
+        }
+
+        @call self::MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE(item);
+    }
+}
+

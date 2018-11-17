@@ -1,0 +1,146 @@
+/***********************************************************************
+*      Copyright 1994-2002  Breadbox Computer Company LLC
+* PROJECT:	Anarchy
+* MODULE:	Spider
+*
+* FILE:		spider.goh
+*
+* AUTHOR:	jfh 12/02
+*
+*
+***********************************************************************/
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <ansi/string.h>
+#include <ansi/stdlib.h>
+#include <initfile.h>
+@include <cards.goh>
+@include <objects/colorc.goh>
+#include <sound.h>
+
+/*------------------------------
+	Constants
+ -------------------------------*/
+
+/* Spacing constants are used to position the decks on the playing table */
+#define WORK_HORIZ_SPACING		2
+#define DDECK_HORIZ_SPACING	10
+
+#define MY_HAND_POS			-100
+
+#define WORK_DECK_LEFT		5
+#define WORK_DECK_TOP		5
+#define WORK_UP_SPREADY		20
+#define WORK_DOWN_SPREADY	5
+
+#define DEAL_DECK_LEFT		663
+#define DEAL_DECK_TOP		350
+
+#define DONE_DECK_LEFT		5
+#define DONE_DECK_TOP		350
+
+/* Playing table dimensions
+	- card width is 71 and height is 100 for the desktop displayScheme */
+#define TABLE_WIDTH		(WORK_DECK_LEFT*2) + (WORK_HORIZ_SPACING*9) + (10*71)
+#define TABLE_HEIGHT    (WORK_DECK_TOP*2) + DONE_DECK_TOP + 100
+
+/* deck number constants are used to determine which deck to
+	deal the next card to.  
+*/
+#define FIRST_DECK					0
+#define LAST_WORKSPACE_DECK		9
+#define DEAL_DECK_CARDS				9
+
+#define D_EASY		1
+#define D_MED		2
+#define D_DIFF		3
+
+#define SOUND_ON 1
+#define SOUND_OFF 2
+#define SOUND_SYSTEM 3
+
+/* ----------------------------------------------------------------------------
+		global variables
+-----------------------------------------------------------------------------*/
+
+extern byte		g_topDeck;
+extern byte		g_doneDeck;
+extern optr		g_runDeckOptr;
+extern word		g_sound;
+extern MemHandle	g_dealSound, g_winSound;
+
+/* ----------------------------------------------------------------------------
+		Prototypes
+-----------------------------------------------------------------------------*/
+
+void SpiderPlaySound(MemHandle soundHandle);
+
+/*------------------------------------------------------------------------------
+				 Process Class
+------------------------------------------------------------------------------*/
+@class  SpiderProcessClass, GenProcessClass;
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SPIDER_SOUND_CHANGED;
+
+@endc
+
+/*------------------------------------------------------------------------------
+*			      Spider Class
+*------------------------------------------------------------------------------*/
+@class  SpiderClass, GameClass;
+
+	@message void MSG_SPIDER_NEW_GAME();
+		/* Clears preceding game (if any) and starts a new game */
+	@message void MSG_SPIDER_DEAL_CARDS();
+		/* Distributes the cards from the Hand to the WorkSpace Decks */
+	@message void MSG_SPIDER_NEW_GAME_MENU_SELECT();
+		/* Called when New Game is selected from the menu */
+	@message void MSG_SPIDER_UNDO();
+		/* Menu item to undo last move */
+	@message void MSG_SPIDER_DO_WINNER();
+		/* Does the winner stuff when all done decks are full */
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SPIDER_SET_DRAG;
+		/* Sets the Drag instance data, according to whether the user
+			wants to drag outline or the full card. */
+	@message word MSG_SPIDER_GET_CARD_WIDTH();
+	@message word MSG_SPIDER_GET_CARD_HEIGHT();
+		/* Returns a card width or height */
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SPIDER_SET_DIFFICULTY;
+		/* Sets the difficulty level */
+	@message void MSG_SPIDER_SET_GAME_IN_PROGRESS();
+
+	@instance word SI_difficulty = D_EASY;
+	@instance Boolean	SI_gameInProgress = FALSE;
+	@instance Boolean	SI_flipped = FALSE;
+
+@endc
+
+/*------------------------------------------------------------------------------
+*			      DealDeck Class
+*------------------------------------------------------------------------------*/
+@class  DealDeckClass, DeckClass;
+
+
+@endc
+
+/*------------------------------------------------------------------------------
+*			      DoneDeck Class
+*------------------------------------------------------------------------------*/
+@class  DoneDeckClass, DeckClass;
+
+
+@endc
+
+/*------------------------------------------------------------------------------
+*			      WorkDeck Class
+*------------------------------------------------------------------------------*/
+@class  WorkDeckClass, DeckClass;
+	@message void MSG_SPIDER_MOVE_TO_DONE();
+//	@message word MSG_SPIDER_CHECK_ON_SPREAD();
+
+@endc
+

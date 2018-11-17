@@ -1,0 +1,487 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Tiramisu
+MODULE:		Preferences
+FILE:		preffax2.def
+
+AUTHOR:		Peter Trinh, Jan 16, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	1/16/95   	Initial revision
+
+
+DESCRIPTION:
+	Contains definitions of data-structure for the Fax Preferences
+	module. 
+		
+	$Id: preffax2.def,v 1.1 97/04/05 01:43:20 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;	Data types
+;-----------------------------------------------------------------------------
+
+ELEMENT_NOT_IN_ARRAY		enum FatalErrors
+; Trying to index into the given array specified by ds:si with a bad
+; index value, ax. 
+
+CHUNK_ARRAY_ENUM_PREMATURE_TERMINATION		enum	FatalErrors
+; Not expecting the enumeration to terminate prematurely (without
+; having gone through all the items in the chunk arrays), ie. the
+; callback routine terminated with the CARRY flag set.
+
+PREF_DIALING_CODE_LIST_ENUM_PREMATURE_TERMINATION	enum	FatalErrors
+; Not expecting the enumeration to terminate prematurely, ie. the
+; callback routine terminated with the CARRY flag set.
+
+PREF_ITEM_GROUP_SPECIAL_CATEGORY_ERROR		enum	FatalErrors
+; The category string in the instance data field doesn't match that of
+; the assertions.  Make sure to have 
+;		categoryOne = FAX_INI_FAXIN_CATEGORY
+;		categoryTwo = FAX_INI_FAXOUT_CATEGORY
+; if you want to write the class information.
+
+;-----------------------------------------------------------------------------
+;	CONSTANTS		
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;	STRUCTURES
+;-----------------------------------------------------------------------------
+PrefFaxMesgStruct	struct
+	PFMS_msgNumber	word		; will be stored in reg ax
+	PFMS_cx_data	word		; passed in cx
+	PFMS_dx_data	word		; 	    dx
+	PFMS_bp_data	word		;    	    bp
+PrefFaxMesgStruct	ends
+
+;-----------------------------------------------------------------------------
+;	CLASSES		
+;-----------------------------------------------------------------------------
+
+PrefFaxDialogClass	class	PrefDialogClass
+
+MSG_PREF_FAX_DIALOG_SEND_MSG_TO_SELECTED_LIST	message
+;
+; Will send the "encapsulated" message and parameters (given on the
+; stack) to the list selected by the list selector.  Eg. if the Access
+; list is chosen, then the message and parameters on the passed
+; structure will be sent to the Access list.
+;
+; For now, the list selector is hard-coded to be DialingCodeSelector,
+; but can be expanded later on to support any various selectors.
+;
+; Context:	Forwarding message mechanism.
+; Source:	Global
+; Destination:  PrefDialogClass
+; Interception: not usually
+;
+; Pass:		PrefFaxMesgStruct - on the stack
+;			
+; Return:	nothing
+;		nothing - destroyed
+;
+
+MSG_PREF_FAX_DIALOG_SELECT_DIALING_CODE_LIST	message
+;
+; Sent when the user clicks on one of the items of the
+; DialingCodeSelector.  Will determine which list is selected, and
+; "ACTIVATE" that list while "DEACTIVATING" the other list(s)
+; NOT_USABLE.  
+;
+; Context:	Mechanism to visually select PrefDialingCodeLists
+; Source:	PrefItemGroupClass
+; Destination:  PrefDialogClass
+; Interception: not usually
+;
+; Pass:		cx	= current selection
+;		bp	= number of selections
+;		dl	= GenItemGroupStateFlags
+;			
+; Return:	nothing
+;		nothing - destroyed
+;
+
+
+;-----------------------------------------------------------------------------
+;	Instance data
+;-----------------------------------------------------------------------------
+
+PrefFaxDialogClass	endc
+
+PrefInteractionSpecialClass	class	PrefInteractionClass
+;-----------------------------------------------------------------------------
+;	Instance data
+;-----------------------------------------------------------------------------
+
+PrefInteractionSpecialClass	endc
+
+
+PrefItemGroupSpecialClass	class	PrefItemGroupClass
+;
+; Allows saving the same option information to two different category.  
+;
+; To do this, we're intercepting the MSG_GEN_SAVE_OPTION message and
+; copying our own key string into the buffer and then call the super
+; class to actually write it out.
+;
+; Note: Will ignore the category that is given in the vardata
+; ATTR_GEN_INIT_FILE_CATEGORY when saving; however, you will still
+; need to indicate the category and key using
+; ATTR_GEN_INIT_FILE_CATEGORY/KEY for proper loading behavior.
+;
+
+MSG_PREF_ITEM_GROUP_SPECIAL_CHECK_PORT	message
+;
+; Checks the selected port to see if a viable faxmodem is connected.
+; If not, then display a warning dialog box.
+;
+; Context:	sent out when user selects a port number item
+; Source:	GenItemGroupClass object
+; Destination:  Any PrefItemGroupSpecialClass object
+; Interception: not usually
+;
+; Pass:	cx 	= current selection, or first selection in item group,
+; 		  if more than one selection, or GIGS_NONE if no
+; 		  selection (selection interpreted as port numbers) 
+;	bp 	= number of selections
+;	dl	= GenItemGroupStateFlags
+;		  GIGSF_MODIFIED will be set if a user activation has
+;		  just changed the status of the group.  Will be clear
+;		  if a redundant user activation has occurred, such as
+;		  the re-selection of the singly selected exclusive
+;		  item.  If message is a result of
+;		  MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG being sent, then
+;		  this bit will hold the value passed in that message. 
+;			
+; Return:	nothing
+;		nothing - destroyed
+;
+
+;-----------------------------------------------------------------------------
+;	Data types
+;-----------------------------------------------------------------------------
+PrefItemGroupSpecialFlags	record
+	PIGSF_FAX_CLASS:1	; It's a fax class item selector, so
+				; need to write out the driver name
+				; and capabilities as well.
+	:7
+PrefItemGroupSpecialFlags	end
+
+;-----------------------------------------------------------------------------
+;	Instance data
+;-----------------------------------------------------------------------------
+PIGSI_categoryOne		lptr.char
+	; First category string
+
+PIGSI_categoryTwo		lptr.char
+	; Second category string where saved information should be
+	; written to. 
+
+PIGSI_itemGroupSpecialflags	PrefItemGroupSpecialFlags
+	; To mark other things that needs to be written out to the ini
+	; file. 
+
+PrefItemGroupSpecialClass	endc
+
+
+PrefDialingCodeListClass	class	PrefDynamicListClass
+;
+; Adds on to the functionality of the PrefDynamicListClass by allowing
+; the management of not only one "list" of items, but three "lists" of
+; items that have their values stored in the ini file.  It also sends
+; the outputs of the selected list items to the "attached" text
+; objects.
+;
+; Upon receiving MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY, it will build out
+; 1-3 chunk arrays depending on the number of ini keys that are
+; initialized.
+;
+; Then upon receiving MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER, it will
+; search the "notes" chunk array and return the appropriate text item.
+; (THUS: the notesKey should be initialized or else the object will
+; not be initialized at all.)
+;
+; Upon receiving MSG_PREF_DYNAMIC_LIST_FIND_ITEM, it will find the
+; item in the "notes" chunk array given the item moniker.
+;
+
+MSG_PREF_DIALING_CODE_LIST_SELECT_ITEM	message
+;
+; When an item in the list is selected, this message will be sent to
+; the PrefDialingCodeListClass.  When this message is received, it
+; will output the corresponding information in it's arrays to the
+; attached text object.
+;
+; Context:	When item in the list is selected
+; Source:	PrefDialingCodeListClass object
+; Destination:  PrefDialingCodeListClass object
+; Interception: not usually
+;
+; Pass:		cx -- current selection, or first selection in item 
+;		      group, if more than one selection, or GIGS_NONE 
+;		      of no selection
+;		bp -- number of selections
+;		dl -- GenItemGroupStateFlags
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+MSG_PREF_DIALING_CODE_LIST_DELETE_SELECTED_ITEM		message
+;
+; Will delete the currently selected item.  This is done by removing
+; all the corresponding elements in the chunk arrays as well as
+; removing the item from the list itself.  When removing the elements
+; from the arrays, we will free the allocated lptr.
+;
+; Side effect: will clear out all attached text objects.
+;
+; Context:	Mechanism to change the list.
+; Source:	Global
+; Destination:  PrefDialingCodeListClass object
+; Interception: not usually
+;
+; Pass:		nothing
+; Return:	nothing
+;		nothing	- destroyed
+;
+
+MSG_PREF_DIALING_CODE_LIST_INSERT_ITEM	message
+;
+; Will insert an item into the list.  The item will be sorted by it's
+; notes data string and will be inserted accordingly.  The data
+; strings will be grabbed from the attached text objects.
+;
+; Context:	Mechanism to change the list.
+; Source:	Global
+; Destination:  PrefDialingCodeListClass object
+; Interception: not usually
+;
+; Pass:		nothing
+; Return:	nothing
+;		nothing	- destroyed
+;
+
+MSG_PREF_DIALING_CODE_LIST_MODIFY_SELECTED_ITEM	message
+;
+; Will allow the modification of the selected item's information, ie.
+; note string, dialing code, billing code, etc.
+;
+; Context:	Mechanism to change the list.
+; Source:	Global
+; Destination:  PrefDialingCodeListClass object
+; Interception: not usually
+;
+; Pass:		nothing
+; Return:	nothing
+;		nothing	- destroyed
+;
+
+MSG_PREF_DIALING_CODE_LIST_DESTROY_ARRAYS	message
+;
+; Will "destroy" the arrays, by freeing up memory that is associated
+; to the chunk arrays and the arrays themselves.
+;
+; Context:	Mechanism to clean up.
+; Source:	Global
+; Destination:  PrefDialingCodeListClass object
+; Interception: not usually
+;
+; Pass:		nothing
+; Return:	nothing
+;		nothing	- destroyed
+;
+
+MSG_PREF_DIALING_CODE_LIST_ACTIVATE	message
+;
+; Make the list USABLE and all the linked text objects USABLE as well.
+;
+; Context:	Mechanism to select between lists
+; Source:	Global
+; Destination:  PrefDialingCodeListClass object
+; Interception: not usually
+;
+; Pass:		nothing
+; Return:	nothing
+;		nothing	- destroyed
+;
+
+MSG_PREF_DIALING_CODE_LIST_DEACTIVATE	message
+;
+; Make the list NOT_USABLE and all the linked text objects NOT_USABLE as
+; well. 
+;
+; Context:	Mechanism to select between lists
+; Source:	Global
+; Destination:  PrefDialingCodeListClass object
+; Interception: not usually
+;
+; Pass:		nothing
+; Return:	nothing
+;		nothing	- destroyed
+;
+
+
+
+;-----------------------------------------------------------------------------
+;	Data types
+;-----------------------------------------------------------------------------
+
+;
+; Identifiers for the various ini keys
+;
+PrefDialingCodeKey	etype	word
+PDCK_NOTE		enum	PrefDialingCodeKey	; Note ini-key
+PDCK_CODE1		enum	PrefDialingCodeKey	; Code1 ini-key
+PDCK_CODE2		enum	PrefDialingCodeKey	; Code2 ini-key
+
+;
+; Data-structure of the info stored in the array
+;
+PrefDCLArrayInfo	struct
+	PDCLAI_length	word	; Length of the stored string
+	PDCLAI_strLptr	lptr.char	; lptr to str chunk
+PrefDCLArrayInfo	ends
+
+PrefDialingCodeListFlags	record
+	PDCLIF_ABORT:1		; a transaction was aborted so don't
+				; commit to the ini file
+	PDCLIF_INITIALIZED:1	; the list has already been initialized
+	PDCLIF_DIRTIED:1	; the list has been modified so needs
+				; saving
+	:5
+PrefDialingCodeListFlags	end
+
+;-----------------------------------------------------------------------------
+;	Instance data
+;-----------------------------------------------------------------------------
+
+PDCLI_category		lptr.char
+	; Ini category where all of the following keys are located. 
+	;
+PDCLI_notesKey		lptr.char
+	; The ini key indicating where the "notes" are stored.  (NOTE:
+	; these "notes" will also serve as the moniker of the items in
+	; the list.)
+	;
+PDCLI_codeOneKey	lptr.char
+	; The ini key indicating where the first set of "code" are
+	; stored.
+	;
+PDCLI_codeTwoKey	lptr.char
+	; The ini key indicating where the second set of "code" are
+	; stored.
+	; 
+PDCLI_notesArray	lptr.char
+	; Pointer to the chunk array that will store all the "notes"
+	; while the Dialing Code dialog box in on screen.
+	;
+PDCLI_codeOneArray	lptr.char
+	; Pointer to the chunk array that will store all of the first
+	; set of "code" while the Dialing Code dialog box in on
+	; screen. 
+	;
+PDCLI_codeTwoArray	lptr.char
+	; Pointer to the chunk array that will store all of the second
+	; set of "code" while the Dialing Code dialog box in on
+	; screen. 
+	;
+PDCLI_notesTextObj	optr
+	; This text object will receive the output of the selected
+	; item from the "notes" list.
+	;
+PDCLI_codeOneTextObj	optr
+	; This text object will receive the output of the selected
+	; item from the "codeOne" list.
+	;
+PDCLI_codeTwoTextObj	optr
+	; This text object will receive the output of the selected
+	; item from the "codeTwo" list.
+	;
+PDCLI_statusFlags	PrefDialingCodeListFlags
+	; Indicates errors and other warnings.
+	;
+
+PrefItemGroupSpecialClass	endc
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DerefInstanceDataDSDI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Gets the instance data from the given object by
+		dereferencing the object and adding the appropriate
+		offset. 
+
+PASS:		*ds:si	- ObjectClass
+		classOffset - eg. CwordBoard_offset
+
+RETURN:		ds:di	- ptr to intance data
+
+DESTROYED:	Nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/24/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DerefInstanceDataDSDI		macro	classOffset
+ifb <classOffset>
+	ErrMessage	< DerefInstanceDataDSDI expects the class offset as an argument. >
+endif
+	mov	di, ds:[si]
+	add	di, ds:[di].&classOffset
+		endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DerefInstanceDataDSBX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Gets the instance data from the given object by
+		dereferencing the object and adding the appropriate
+		offset. 
+
+PASS:		*ds:si	- ObjectClass
+		classOffset - eg. CwordBoard_offset
+
+RETURN:		ds:bx	- ptr to intance data
+
+DESTROYED:	Nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	7/25/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DerefInstanceDataDSBX		macro	classOffset
+ifb <classOffset>
+	ErrMessage	< DerefInstanceDataDSBX expects the class offset as an argument. >
+endif
+	mov	bx, ds:[si]
+	add	bx, ds:[bx].&classOffset
+		endm
+
+

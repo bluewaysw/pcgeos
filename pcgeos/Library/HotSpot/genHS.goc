@@ -1,0 +1,1179 @@
+/****************************************************************************
+ *
+ *              Copyright (c)   GeoWorks 1994   -- All Rights Reserved
+ *
+ *  PROJECT:            GEOS
+ *  FILE:               genHS.goc
+ *  AUTHOR:             Edwin Yu
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      Edwin  4/13/94         Initial version.
+ *
+ *  DESCRIPTION:    This file contains code for GenHotSpotClass
+ *      
+ *      $Id: genHS.goc,v 1.1 97/04/04 18:09:07 newdeal Exp $
+ *
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <hotspot.goh>
+#include <object.h>
+#include "hserrors.h"
+
+@classdecl      GenHotSpotClass ;
+
+/* -------------------------------------------------------------------------
+		Internal routines for GenHotSpot subclasses
+---------------------------------------------------------------------------*/
+void GetTextNBody(optr HotSpot, optr *Text, optr *GBody);
+void GetText(optr HotSpot, optr *Text);
+
+void CreateStayInGraphic(PointDWFixed *mousePos, RectDWFixed *grapihcBound,
+			GrObjResizeMouseData *resizeMouseData, 
+			sdword HS_x, sdword HS_y);
+
+void ResizeStayInGraphic(GrObjHandleSpecification handleFlag, 
+			PointDWFixed *mousePos,
+			RectDWFixed *graphicBound,
+			GrObjResizeMouseData *resizeMouseData, 
+			ObjectTransform *transformN);
+
+void MoveStayInGraphic(PointDWFixed *currentPos, ObjectTransform *transformN,
+			RectDWFixed *graphicBound, GrObjMouseData *mouseData);
+
+void SpecialResizeConstrain(RectDWFixed *graphicBound,
+		     	    ObjectTransform *transform);
+
+/* -------------------------------------------------------------------------
+		    Methods for GenHotSpotClass
+---------------------------------------------------------------------------*/
+
+/****************************************************************************
+ *      MSG_GO_PTR_RESIZE, MSG_GO_END_RESIZE
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept the messages and see if the new proposed size of
+ *              a HotSpot is within a graphic.  If not, re-calculate the 
+ *              delta x and delta y in resizeMouseData before callsuper.
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS: MouseReturnFlags (GrObjResizeMouseData *resizeMouseData)
+ *  SIDE EFFECTS:
+ *  STRATEGY:   Before intercepting the message and doing all the 
+ *              calculations, initially:
+ *              In CREATE mode, the x and y in resizeMouseData are the 
+ *                  width and height of the grobj.
+ *              In RESIZE mode, the x and y in reiszeMouseData are the 
+ *                  distance offset from the orignal position of the grobj
+ *              Thus in my code, I modify the x and y according to which mode 
+ *              I am in. 
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   4/25/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GO_PTR_RESIZE, MSG_GO_END_RESIZE
+{
+    MyGrObj             *mgrobj;
+    GrObjActionModes    actionFlag;
+    MouseReturnFlags    flag;
+    GrObjHandleSpecification handleFlag = resizeMouseData->GORSMD_grabbed;
+    PointDWFixed        dummyPos, currentPos;  
+    optr                Text, GBody, Handle = OptrToHandle(oself);
+    word                token, *varToken;
+    sdword               HS_x, HS_y;
+    ObjectTransform     *transformN; 
+    ChunkHandle         Chunk;
+    RectDWFixed         graphicBound, dummy;
+
+    /* 
+     * initialize mgrobj, actionFlag, transformN=normalTransform,Text,GBody
+     */
+    mgrobj      = (MyGrObj *)ObjDeref1(oself);
+    actionFlag  = mgrobj->GOI_actionModes;
+    Chunk       = mgrobj->GOI_normalTransform;
+    transformN  = LMemDeref(ConstructOptr(Handle, Chunk));
+    GetTextNBody(oself, &Text, &GBody);
+
+    varToken = (word *)ObjVarFindData(GBody,
+		ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN);
+    EC_ERROR_IF(varToken == (word *)NULL,
+			ERROR_ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN_NOT_FOUND);
+    @call GBody::MSG_HOT_SPOT_MANAGER_GET_LAST_POINTER_EVENT(&currentPos);
+    token = @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(currentPos, &dummy); 
+    /* 
+     *  varToken   - token of graphic at which the mouse initially clicks
+     *  currentPos - the current mouse position
+     *  token      - token of graphic which the mouse is currently over 
+     *
+     *  If the current mouse stays in the same graphic, don't need to modify
+     *  resizeMouseData.
+     */
+    if(token != *varToken) {
+     /*  
+      *  To get the graphic's bounds, I use the dummy variable, dummyPos,
+      *  for getting the job done.  Remeber, normalTransform->OT_center
+      *  in CREATE mode is the upper left corner of the hotspot, and in
+      *  RESIZE mode, it is the real center. 
+      */
+      dummyPos.PDF_x.DWF_int = HS_x = transformN->OT_center.PDF_x.DWF_int;
+      dummyPos.PDF_y.DWF_int = HS_y = transformN->OT_center.PDF_y.DWF_int;
+      @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(dummyPos, &graphicBound);
+
+      if (actionFlag & GOAM_CREATE)     
+	  /* 
+       * (HS_x, HS_y) is the position of the upper left corner of grobj
+       */
+       CreateStayInGraphic(&currentPos, &graphicBound, resizeMouseData,
+	    HS_x, HS_y);
+      else        
+      /* 
+       * We are in resize mode, i.e. we're editing an existing grobj
+       */
+       ResizeStayInGraphic(handleFlag, &currentPos, &graphicBound, 
+	    resizeMouseData, transformN);
+    }
+    /*
+     *  Since we don't want the normalTransform to have fractional part, we
+     *  need to make the GORSMD_point even.
+     */
+    MakeIntegerEven(&(resizeMouseData->GORSMD_point));
+    flag = @callsuper();
+    if (message != MSG_GO_END_RESIZE) 
+	    return flag;
+    if (!ObjIsObjectInClass(oself, &HotSpotGroupClass))
+	@call self::MSG_GHS_NOTIFY_TEXT_RESIZE();
+    return flag;        
+}
+
+
+/****************************************************************************
+ *          	MSG_GO_SPECIAL_RESIZE_CONSTRAIN
+ **************************************************************************** 
+ *  SYNOPSIS:   Check if the special resize needs to be constrained so
+ *              that it does not extend beyond the graphic's boundaries.
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS: void (GrObjHandleSpecification grObjHandleSpec)
+ *  SIDE EFFECTS:
+ *  STRATEGY:   
+ *
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Cassie  9/12/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GO_SPECIAL_RESIZE_CONSTRAIN
+{
+    MyGrObj             *mgrobj;
+    PointDWFixed        dummyPos;
+    optr                Text, Handle = OptrToHandle(oself);
+    word                token;
+    ObjectTransform     *transform; 
+    ChunkHandle         Chunk;
+    RectDWFixed         graphicBound;
+
+    /* 
+     * initialize mgrobj, actionFlag, transform, Text, GBody
+     */
+    mgrobj      = (MyGrObj *)ObjDeref1(oself);
+    Chunk       = mgrobj->GOI_normalTransform;
+    transform   = LMemDeref(ConstructOptr(Handle, Chunk));
+    GetText(oself, &Text);
+
+    /*  
+     *  To get the graphic's bounds, use the center of the normal
+     *  transform (hotspot's center before resize)
+     */
+    dummyPos.PDF_x.DWF_int = transform->OT_center.PDF_x.DWF_int;
+    dummyPos.PDF_y.DWF_int = transform->OT_center.PDF_y.DWF_int;
+    token = @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(dummyPos, 
+							   &graphicBound);
+    EC_ERROR_IF(token == NULL_HOT_SPOT_TOKEN, ERROR_CANT_CREATE_A_HOTSPOT);
+
+    /* Now constrain the resize of the sprite transform */
+    mgrobj      = (MyGrObj *)ObjDeref1(oself);
+    Chunk   	= mgrobj->GOI_spriteTransform;
+    transform 	= LMemDeref(ConstructOptr(Handle, Chunk));
+    SpecialResizeConstrain(&graphicBound, transform);
+}
+
+
+/****************************************************************************
+ *          MSG_GO_PTR_MOVE, MSG_GO_END_MOVE
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept the messages and see if the proposed new position 
+ *              of the HotSpot is within a graphic.  If not, re-calculate the 
+ *              delta x and delta y in mouseData before callsuper.
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     MouseRetrunFlags (GrObjMouseData *mouseData)
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   4/25/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GO_PTR_MOVE, MSG_GO_END_MOVE
+{
+    word                newGraphicToken, *varToken;
+    MyGrObj             *mgrobj;
+    ChunkHandle         Chunk;
+    optr                GBody, Text, Handle = OptrToHandle(oself);
+    RectDWFixed         graphicBound, grobjTmpBound;
+    ObjectTransform     *transformN;
+    PointDWFixed        currentPos;
+    MouseReturnFlags    flag;
+    CallBackMessageData cbData;
+
+    /* 
+     * initialize mygrobj, transformN = OT_normalTransform
+     * GBody, Text, and grobjBound 
+     */
+    mgrobj = (MyGrObj *)ObjDeref1(oself);
+    Chunk = mgrobj->GOI_normalTransform;
+    transformN = LMemDeref(ConstructOptr(Handle, Chunk));
+    GetTextNBody(oself, &Text, &GBody);
+    /* 
+     * Get the current mouse position.  
+     * grobjTmpBound = the proposed bounds of the HotSpot in document 
+     * coordinates, with its center at the current mouse position.  This is 
+     * used to see if the HotSpot can fit in another graphic which the mouse is
+     * currently over.
+     */
+    @call GBody::MSG_HOT_SPOT_MANAGER_GET_LAST_POINTER_EVENT(&currentPos);
+    grobjTmpBound.RDWF_left.DWF_frac = grobjTmpBound.RDWF_right.DWF_frac = 
+	grobjTmpBound.RDWF_top.DWF_frac =
+	grobjTmpBound.RDWF_bottom.DWF_frac = 0;
+    grobjTmpBound.RDWF_left.DWF_int  = 
+        currentPos.PDF_x.DWF_int - (int)transformN->OT_parentWidth.WWF_int/2;
+    grobjTmpBound.RDWF_right.DWF_int = 
+	currentPos.PDF_x.DWF_int + (int)transformN->OT_parentWidth.WWF_int/2;
+    grobjTmpBound.RDWF_top.DWF_int   = 
+	currentPos.PDF_y.DWF_int - (int)transformN->OT_parentHeight.WWF_int/2;
+    grobjTmpBound.RDWF_bottom.DWF_int = 
+	currentPos.PDF_y.DWF_int + (int)transformN->OT_parentHeight.WWF_int/2;
+
+    /*
+     * newGraphicToken = the token of the graphic which the mouse position 
+     * is currently over.  If the mouse position is not in any graphic, 
+     * newGraphicToken = NULL_HOT_SPOT_TOKEN.
+     */
+    newGraphicToken = @call GBody::MSG_HOT_SPOT_MANAGER_CHECK_CORNERS(
+							&grobjTmpBound);
+    if (newGraphicToken == NULL_HOT_SPOT_TOKEN) {
+	/*
+	 *  That is, the grobj has been moved outside the boundaries
+	 *  of ANY graphics.  So now modify mouseData.
+	 *  To get the graphicBound, I need a valid point inside the 
+	 *  graphic which the hotspot was last over.
+	 */
+    	varToken = (word *)ObjVarFindData(oself,
+		    ATTR_GEN_HOT_SPOT_GRAPHIC_TOKEN);
+	if (varToken == (word *)NULL) {
+	    varToken=(word *)ObjVarFindData(GBody, 
+				    ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN);
+	    EC_ERROR_IF(varToken == (word *)NULL,
+			ERROR_ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN_NOT_FOUND);
+	}
+	@call Text::MSG_HSTEXT_GET_GRAPHIC_BOUNDS(*varToken, &graphicBound);
+	newGraphicToken = *varToken;
+	/*
+	 * Now make sure the hot spot moves only within the boundaries 
+	 * of the graphic which the hotspot was last over.
+	 */
+	MoveStayInGraphic(&currentPos, transformN, &graphicBound, mouseData);
+    }
+    else {
+	/* 
+	 * The hotspot may have moved to a new graphic.
+	 * Save the token of that graphic now.
+	 */
+    	varToken = (word *)ObjVarAddData(oself,
+		    ATTR_GEN_HOT_SPOT_GRAPHIC_TOKEN, sizeof(word));
+	*varToken = newGraphicToken;
+    }
+
+    flag = @callsuper();
+
+    if (message != MSG_GO_END_MOVE)
+	    return flag;
+
+    varToken=(word *)ObjVarFindData(GBody, 
+				    ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN);
+    EC_ERROR_IF(varToken == (word *)NULL,
+	ERROR_ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN_NOT_FOUND);
+
+    if (ObjIsObjectInClass(oself, &HotSpotGroupClass)) { 
+	if (*varToken != newGraphicToken) {
+	/*
+	 *  The group of hotspots has been moved to a different graphic. 
+	 *  Thus each hotspot in the group must notify the text to 
+	 *  delete the hotspot's C_GRAPHIC for the old graphic and 
+	 *  recreate a C_GRAPHIC for the new graphic.
+	 *  Note: the normalTransform of the hotspot in the group 
+	 *  contains the offsets from the center of the group object.  
+	 *  Thus, the instance data used to notify the text does not 
+	 *  have correct hotspot location.  It's ok because when we 
+	 *  ungroup the group object, each hotspot will notify the text 
+	 *  again with the correct location.
+	 */
+	cbData.CBMD_callBackOD = GBody;
+	cbData.CBMD_callBackMessage = MSG_HOT_SPOT_MANAGER_HS_IN_GROUP_MOVE;
+	cbData.CBMD_groupOD = cbData.CBMD_childOD = NULL;
+	cbData.CBMD_extraData1 = newGraphicToken;
+	@call self::
+	    MSG_GROUP_PROCESS_ALL_GROBJS_SEND_CALL_BACK_MESSAGE(&cbData);
+	}
+    }
+    else
+	@call self::MSG_GHS_NOTIFY_TEXT_MOVE(newGraphicToken);
+ 
+    return flag;
+}
+
+
+/****************************************************************************
+ *              MSG_GO_END_CREATE
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept the messages and if a hot spot has been created, 
+ *              notify HotSpotTextClass
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     EndCreateReturnFlags (EndCreatePassFlags flags);
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   5/11/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GO_END_CREATE
+{
+    EndCreateReturnFlags flag;
+    PointDWFixed        upperLeft;
+    MemHandle           data;
+    optr                Text, GBody;
+    word                token, *varToken;
+
+    flag = @callsuper();
+
+    GetTextNBody(oself, &Text, &GBody);
+
+    if (!(flag & ECRF_DESTROYED)) {
+	@call self::MSG_GHS_GET_UPPERLEFT_CORNER(&upperLeft);
+	varToken = (word *)ObjVarFindData(GBody, 
+				ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN);
+	EC_ERROR_IF(varToken == (word*)NULL, 
+		    ERROR_ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN_NOT_FOUND);
+	data = @call self::MSG_GHS_GET_INSTANCE_DATA();
+	token = @call Text::MSG_HSTEXT_CREATE_HOT_SPOT(*varToken, data, 
+						       upperLeft);
+	EC_ERROR_IF(token == NULL_HOT_SPOT_TOKEN, ERROR_CANT_CREATE_A_HOTSPOT);
+	@call self::MSG_GHS_SET_TOKEN(token);
+    }
+    return flag;
+}
+
+
+/****************************************************************************
+ *    MSG_GHS_GET_DWF_SPRITE_TRANSFORM_PARENT_BOUNDS
+ **************************************************************************** 
+ *  SYNOPSIS:   Transform the grobj's GOI_spriteTransform into 
+ *              RectDWFixed format
+ *                                      
+ *  CALLED BY:  MSG_HOT_SPOT_MANAGER_CHECK_CORNERS()
+ *  PARAMETERS: void (RectDWFixed *bounds)
+ *      Pass:   empty RectDWFixed struture
+ *      Return: nothing (RectDWFixed struture's data are set)
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                Description
+ *      ----    ----                -----------
+ *      Edwin   4/18/94         Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GHS_GET_DWF_SPRITE_TRANSFORM_PARENT_BOUNDS
+{
+    ObjectTransform *transform;
+    ChunkHandle     chunk;
+    optr            handle = OptrToHandle(oself);
+    PointDWFixed    center;
+    MyGrObj         *mgrobj;
+
+    mgrobj = (MyGrObj *)ObjDeref1(oself);
+    chunk = mgrobj->GOI_spriteTransform;
+    ObjLockObjBlock(handle);
+
+    transform = LMemDeref(ConstructOptr(handle, chunk));
+    center  = transform->OT_center;
+    bounds->RDWF_left.DWF_frac = center.PDF_x.DWF_frac-
+			(transform->OT_parentWidth.WWF_frac)/2;
+    bounds->RDWF_left.DWF_int = center.PDF_x.DWF_int -
+			(transform->OT_parentWidth.WWF_int)/2;
+    bounds->RDWF_right.DWF_frac = center.PDF_x.DWF_frac+
+			(transform->OT_parentWidth.WWF_frac)/2;
+    bounds->RDWF_right.DWF_int = center.PDF_x.DWF_int +
+			(transform->OT_parentWidth.WWF_int)/2;
+
+    bounds->RDWF_top.DWF_frac = center.PDF_y.DWF_frac-
+			    (transform->OT_parentHeight.WWF_frac)/2;
+    bounds->RDWF_top.DWF_int = center.PDF_y.DWF_int -
+			    (transform->OT_parentHeight.WWF_int)/2;
+    bounds->RDWF_bottom.DWF_frac = center.PDF_y.DWF_frac+
+			    (transform->OT_parentHeight.WWF_frac)/2;
+    bounds->RDWF_bottom.DWF_int = center.PDF_y.DWF_int +
+			    (transform->OT_parentHeight.WWF_int)/2;
+
+    MemUnlock(handle);
+}
+
+
+/****************************************************************************
+ *              MSG_GHS_GET_TOKEN
+ **************************************************************************** 
+ *  SYNOPSIS:   Return the HotSpot's token
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS: word ()
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      Edwin   4/19/94         Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GHS_GET_TOKEN
+{
+    *token = pself->GHSI_token;
+    return;
+}
+
+
+/****************************************************************************
+ *              MSG_GHS_SET_TOKEN 
+ **************************************************************************** 
+ *  SYNOPSIS:   Associate the HotSpot with the graphic run token of the 
+ *              graphic that contains the HotSpot.
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS: void(word token)
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      Edwin   4/19/94         Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GHS_SET_TOKEN
+{
+    pself->GHSI_token = token;
+}
+
+
+/***************************************************************************
+ *              MSG_GHS_SET_POSITION
+ *************************************************************************** 
+ *  SYNOPSIS:   Set the HotSpot to a new position
+ *                                      
+ *  CALLED BY:  MSG_HOT_SPOT_MANAGER_MOVE_HOT_SPOT()
+ *  PARAMETERS: void 
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      Edwin   4/21/94         Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GHS_SET_POSITION
+{
+    MyGrObj         *mgrobj;
+    ObjectTransform *transform;
+    optr            Text, handle = OptrToHandle(oself);
+    ChunkHandle     chunk;
+    PointDWFixed    point;
+    PointDWFixed    upperleft;
+
+    /* 
+     * get the hotspot's new position based on its text position
+     */
+    GetText(oself, &Text);
+    @call Text::MSG_HSTEXT_GET_HOT_SPOT_POSITION(pself->GHSI_token, 
+						 &upperleft);
+
+    mgrobj = (MyGrObj *)ObjDeref1(oself);
+    chunk = mgrobj->GOI_normalTransform;
+    transform = LMemDeref(ConstructOptr(handle, chunk));
+
+    /* get the hotspot's current position */
+    @call self::MSG_GHS_GET_UPPERLEFT_CORNER(&point);
+
+    /*
+     * if the hotspot's current upperleft differs from what the text
+     * thinks it should be, reposition the thing
+     */
+    if (point.PDF_x.DWF_int != upperleft.PDF_x.DWF_int ||
+	point.PDF_y.DWF_int != upperleft.PDF_y.DWF_int) {
+
+	@call self::MSG_GO_INVALIDATE();
+	@call self::MSG_GO_UNDRAW_HANDLES(0);
+	
+	transform->OT_center.PDF_x.DWF_int += upperleft.PDF_x.DWF_int - 
+		point.PDF_x.DWF_int;
+	transform->OT_center.PDF_x.DWF_frac = 0;
+
+	transform->OT_center.PDF_y.DWF_int += upperleft.PDF_y.DWF_int -
+		point.PDF_y.DWF_int;
+	transform->OT_center.PDF_y.DWF_frac = 0;
+
+	@call self::MSG_GO_COMPLETE_TRANSFORM(GOANT_MOVED);
+    }
+}
+
+
+/****************************************************************************
+ *              MSG_GHS_DELETE_HOT_SPOT
+ **************************************************************************** 
+ *  SYNOPSIS:   Delete the HotSpot(grobj) from HotSpotManager
+ *                                      
+ *  CALLED BY:  MSG_HOT_SPOT_MANAGER_DESTROY_HOT_SPOT()
+ *  PARAMETERS: void
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   5/4/94                  Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GHS_DELETE_HOT_SPOT
+{
+    @call self::MSG_GO_CLEAR_SANS_UNDO();
+}
+
+/****************************************************************************
+ *              MSG_GHS_GET_INSTANCE_DATA
+ **************************************************************************** 
+ *  SYNOPSIS:   Get Instance Data of the hotspot object
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS: MemHandle ();
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   5/11/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GHS_GET_INSTANCE_DATA
+{
+    MemHandle           dataBlock;
+    byte                *Source_ptr, *Dest_ptr;
+    ChunkHandle         chunk;
+    word                arraySize = 0, i;
+    ObjectTransform     *transformN;
+    optr                ward, ptsArray, Handle = OptrToHandle(oself);
+    MyGrObj             *mgrobj;
+    GenHotSpotDataStruct *HSParams;
+
+    mgrobj = (MyGrObj *)ObjDeref1(oself);
+    chunk = mgrobj->GOI_normalTransform;
+    transformN = LMemDeref(ConstructOptr(Handle, chunk));
+
+    if (ObjIsObjectInClass(oself, &HotSpotSplineGuardianClass)) {
+	/*
+	 * Prepare to copy the spline points
+	 */
+	    ward = @call self::MSG_GOVG_GET_VIS_WARD_OD();
+	ptsArray = @call ward::MSG_SPLINE_GET_POINTS();
+	ObjLockObjBlock(OptrToHandle(ptsArray));
+	Source_ptr = (byte *)LMemDeref(ptsArray);
+	arraySize = LMemGetChunkSize(ptsArray);
+    }
+
+    /*
+     * Allocate a block of memory big enough to hold all the instance
+     * data.  If we are dealing with a spline, arraySize is the size
+     * of the chunk containing SplinePointStruct array.  Otherwise,
+     * arraySize is 0.
+     */
+    dataBlock = MemAlloc(sizeof(GenHotSpotDataStruct) + arraySize, 
+	    HF_DYNAMIC, ( HAF_LOCK | HAF_NO_ERR ));
+
+    HSParams = (GenHotSpotDataStruct *)MemDeref(dataBlock);
+    HSParams->GHSDS_size = sizeof(GenHotSpotDataStruct) + arraySize;
+
+    if (ObjIsObjectInClass(oself, &HotSpotRectClass))
+	    HSParams->GHSDS_type = HST_RECT;
+    else {
+	/*
+	 * Now copy the spline points
+	 */
+	    HSParams->GHSDS_type = HST_SPLINE;
+	Dest_ptr = (byte *)HSParams + sizeof(GenHotSpotDataStruct);
+	for (i = 0; i != arraySize; i++, Dest_ptr++, Source_ptr++)
+		*Dest_ptr = *Source_ptr;
+	MemUnlock(OptrToHandle(ptsArray)); 
+    }
+
+    /*
+     * Store the grobj's center, height, width, & traform matrix.
+     */
+    HSParams->GHSDS_instData.BI_center.PDF_x.DWF_int = 
+		 transformN->OT_center.PDF_x.DWF_int;
+    HSParams->GHSDS_instData.BI_center.PDF_x.DWF_frac = 
+		 transformN->OT_center.PDF_x.DWF_frac;
+    HSParams->GHSDS_instData.BI_center.PDF_y.DWF_int = 
+		 transformN->OT_center.PDF_y.DWF_int;
+    HSParams->GHSDS_instData.BI_center.PDF_y.DWF_frac = 
+		 transformN->OT_center.PDF_y.DWF_frac;
+    HSParams->GHSDS_instData.BI_width.WWF_int = 
+		 transformN->OT_width.WWF_int;
+    HSParams->GHSDS_instData.BI_width.WWF_frac = 
+		 transformN->OT_width.WWF_frac;
+    HSParams->GHSDS_instData.BI_height.WWF_int = 
+		 transformN->OT_height.WWF_int;
+    HSParams->GHSDS_instData.BI_height.WWF_frac = 
+		 transformN->OT_height.WWF_frac;
+
+    HSParams->GHSDS_parentWidth.WWF_int = 
+		 transformN->OT_parentWidth.WWF_int;
+    HSParams->GHSDS_parentWidth.WWF_frac = 
+		 transformN->OT_parentWidth.WWF_frac;
+    HSParams->GHSDS_parentHeight.WWF_int = 
+		 transformN->OT_parentHeight.WWF_int;
+    HSParams->GHSDS_parentHeight.WWF_frac = 
+		 transformN->OT_parentHeight.WWF_frac;
+
+    HSParams->GHSDS_instData.BI_transform.GTM_e11.WWF_int =
+		 transformN->OT_transform.GTM_e11.WWF_int;
+    HSParams->GHSDS_instData.BI_transform.GTM_e11.WWF_frac= 
+		 transformN->OT_transform.GTM_e11.WWF_frac;
+    HSParams->GHSDS_instData.BI_transform.GTM_e12.WWF_int =
+		 transformN->OT_transform.GTM_e12.WWF_int; 
+    HSParams->GHSDS_instData.BI_transform.GTM_e12.WWF_frac=
+		 transformN->OT_transform.GTM_e12.WWF_frac;
+    HSParams->GHSDS_instData.BI_transform.GTM_e21.WWF_int = 
+		 transformN->OT_transform.GTM_e21.WWF_int; 
+    HSParams->GHSDS_instData.BI_transform.GTM_e21.WWF_frac=
+		 transformN->OT_transform.GTM_e21.WWF_frac;
+    HSParams->GHSDS_instData.BI_transform.GTM_e22.WWF_int =
+		 transformN->OT_transform.GTM_e22.WWF_int; 
+    HSParams->GHSDS_instData.BI_transform.GTM_e22.WWF_frac=
+		 transformN->OT_transform.GTM_e22.WWF_frac;
+
+    MemUnlock(dataBlock);
+    return dataBlock;
+}
+
+/****************************************************************************
+ *          MSG_GHS_GET_UPPERLEFT_CORNER
+ **************************************************************************** 
+ *  SYNOPSIS:   Calculate the upperleft corner of hotspot object
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     void (PointDWFixed *upperLeft)
+ *                      Pass:   empty PointDWFixed
+ *                      Return: PointDWFixed filled
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   5/17/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GHS_GET_UPPERLEFT_CORNER
+{
+    RectDWFixed     rect;
+
+    @call self::MSG_GO_GET_DWF_PARENT_BOUNDS(&rect);
+
+    upperLeft->PDF_x.DWF_int  = rect.RDWF_left.DWF_int;
+    upperLeft->PDF_x.DWF_frac = rect.RDWF_left.DWF_frac;
+    upperLeft->PDF_y.DWF_int  = rect.RDWF_top.DWF_int;
+    upperLeft->PDF_y.DWF_frac = rect.RDWF_top.DWF_frac;
+    RoundOffFractionalPart(upperLeft);
+    return;
+}
+
+/****************************************************************************
+ *      MSG_GHS_NOTIFY_TEXT_MOVE
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept the messages and notify HotSpotText that the hotspot
+ *              has been deleted.
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     void (word newToken=cx)
+ *                  pass:   newToken - the token of the graphic where the 
+ *                                  hotspot has been moved to
+ *                  return: nothing
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   6/13/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GHS_NOTIFY_TEXT_MOVE
+{
+    MemHandle       data;
+    word            *varToken, token;
+    optr            Text, GBody;
+    PointDWFixed    position;
+
+    /*
+     * Now, send messages to HotSpotTextClass about the changes to hotspot's 
+     * position
+     */
+    GetTextNBody(oself, &Text, &GBody);
+    varToken = (word *)ObjVarFindData(GBody, 
+				      ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN);
+    EC_ERROR_IF(varToken == (word *)NULL,
+		ERROR_ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN_NOT_FOUND);
+
+    @call self::MSG_GHS_GET_TOKEN(&token);
+    data = @call self::MSG_GHS_GET_INSTANCE_DATA();
+    @call self::MSG_GHS_GET_UPPERLEFT_CORNER(&position);
+
+    if (*varToken != newToken && newToken != NULL_HOT_SPOT_TOKEN) {
+	/* 
+	 * Oh no, the HotSpot has been moved from one graphic to another one!!!
+	 * oldToken = token of graphic which the hotspot originally belongs to
+	 * newToken  = token of graphic which the mouse is currently over
+	 */
+	 @call Text::MSG_HSTEXT_DELETE_HOT_SPOT(token);
+	 token = @call Text::MSG_HSTEXT_CREATE_HOT_SPOT(newToken, 
+		      data, position);
+	 EC_ERROR_IF(token == NULL_HOT_SPOT_TOKEN, 
+		     ERROR_CANT_CREATE_A_HOTSPOT);
+	 @call self::MSG_GHS_SET_TOKEN(token);
+	 @call process::MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS();
+    }
+    else if (*varToken == newToken) 
+	/*
+	 * OK, the hotspot has been moved around within the same graphic.
+	 */
+	 @call Text::MSG_HSTEXT_UPDATE_HOT_SPOT(token, data, position);
+    return;
+}
+
+
+/****************************************************************************
+ *    	    	MSG_GHS_NOTIFY_TEXT_RESIZE
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept the messages and notify HotSpotText that the hotspot
+ *              has been deleted.
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     void ()
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   6/16/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_GHS_NOTIFY_TEXT_RESIZE
+{
+    word    	    token = pself->GHSI_token;
+    MemHandle       data;
+    PointDWFixed    position;
+    optr            Text;
+
+    GetText(oself, &Text);
+    data = @call self::MSG_GHS_GET_INSTANCE_DATA();
+    @call self::MSG_GHS_GET_UPPERLEFT_CORNER(&position);
+    @call Text::MSG_HSTEXT_UPDATE_HOT_SPOT(token, data, position); 
+    return;
+}
+
+
+/****************************************************************************
+ *                  MSG_META_TEXT_SET_HYPERLINK
+ **************************************************************************** 
+ *  SYNOPSIS:       Apply the hyperlink to the hotspot
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:	    void (VisTextSetContextFlags flags, word file,
+ *			  word context, dword rangeEnd, dword rangeStart);
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   6/8/94                  Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_META_TEXT_SET_HYPERLINK 
+{
+    optr Text;
+
+    /* 
+     * Undraw the handles before the text object wipes the text
+     * background to reflect the type run change on this line. If this
+     * is not done, when the hotspot is invalidated, it believes that
+     * the portions of the handles outside the grobject are still
+     * visible, when in fact they are not, and it only draws those parts
+     * of the handles which are inside the grobj.
+     */
+    @call self::MSG_GO_UNDRAW_HANDLES(0);
+    /*
+     * Tell HotSpotText to set the hyperlink on the hotspot's C_GRAPHIC char
+     */
+    GetText(oself, &Text);
+    @call Text::MSG_HSTEXT_SET_HYPERLINK_ON_HOTSPOT(file, context,
+						    pself->GHSI_token, flags);
+    /*
+     * Redraw the handles, but wait until after the hotspot has
+     * redrawn itself.
+     */
+    @send, forceQueue self::MSG_GO_DRAW_HANDLES(0);
+}
+
+
+/****************************************************************************
+ * 	    	MSG_META_TEXT_FOLLOW_HYPERLINK
+ **************************************************************************** 
+ *  SYNOPSIS:   Sent to have the range of the C_GRAPHIC character 
+ *		associated with the currently selected embedded object, 
+ *		sent to the passed object.
+ *                                      
+ *  CALLED BY:  
+ *  PARAMETERS: 
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/28/94                 Initial Revision
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_META_TEXT_FOLLOW_HYPERLINK
+{
+    optr    Text;
+
+    GetText(oself, &Text);
+    @call Text::MSG_HSTEXT_FOLLOW_HYPERLINK_ON_HOTSPOT(pself->GHSI_token);
+}
+
+
+/****************************************************************************
+ * 	    	MSG_META_INITIALIZE
+ **************************************************************************** 
+ *  SYNOPSIS:   Set the special resize constrain flag.
+ *                                      
+ *  CALLED BY:  
+ *  PARAMETERS: 
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Cassie  9/12/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method GenHotSpotClass, MSG_META_INITIALIZE
+{
+    MyGrObj             *mgrobj;
+
+    @callsuper();
+    mgrobj = (MyGrObj *)ObjDeref1(oself);
+    mgrobj->GOI_msgOptFlags |= GOMOF_SPECIAL_RESIZE_CONSTRAIN;
+    pself->GHSI_token = NULL_HOT_SPOT_TOKEN;
+    return;
+}
+
+
+/* --------------------------------------------------------------------------
+		    routines for HotSpot subclasses
+----------------------------------------------------------------------------*/
+
+/****************************************************************************
+ *                  CreateStayInGraphic
+ **************************************************************************** 
+ *  SYNOPSIS:   
+ *          For the CREATE mode.
+ *          If the current mouse position is outside the graphic, set 
+ *          *resizeMouseData to have the maximum possible x and y values.  
+ *          Remember, the PDF_x and PDF_y in resizeMouseData in CREATE 
+ *          mode is the width and height of the grobj 
+ *  CALLED BY:  MSG_GO_PTR_RESIZE, MSG_GO_END_RESIZE for GenHotSpotClass
+ *  PARAMETERS: Pass:   
+ *                  Return: 
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   6/20/94                 Initial Revision
+ ***************************************************************************/
+void CreateStayInGraphic(PointDWFixed *mousePos, RectDWFixed *graphicBound,
+			GrObjResizeMouseData *resizeMouseData, 
+			sdword HS_x, sdword HS_y)
+{
+    if (mousePos->PDF_x.DWF_int > graphicBound->RDWF_right.DWF_int)
+	resizeMouseData->GORSMD_point.PDF_x.DWF_int =  
+	    graphicBound->RDWF_right.DWF_int - HS_x;
+    else if (mousePos->PDF_x.DWF_int < graphicBound->RDWF_left.DWF_int)
+	resizeMouseData->GORSMD_point.PDF_x.DWF_int = 
+	    graphicBound->RDWF_left.DWF_int - HS_x;
+    
+    if (mousePos->PDF_y.DWF_int > graphicBound->RDWF_bottom.DWF_int)
+	resizeMouseData->GORSMD_point.PDF_y.DWF_int = 
+	    graphicBound->RDWF_bottom.DWF_int - HS_y;
+    else if (mousePos->PDF_y.DWF_int < graphicBound->RDWF_top.DWF_int)
+	resizeMouseData->GORSMD_point.PDF_y.DWF_int = 
+	    graphicBound->RDWF_top.DWF_int - HS_y;
+}
+
+
+/****************************************************************************
+ *                  ResizeStayInGraphic
+ **************************************************************************** 
+ *  SYNOPSIS:   
+ *          For the RESIZE mode.
+ *          If the current mouse position is outside the graphic, set 
+ *          *resizeMouseData to have the maximum possible x and y values.  
+ *          Remember, the PDF_x and PDF_y in resizeMouseData in RESIZE mode 
+ *          is the offset from the ogrinal position(normalTransform)
+ *
+ *  CALLED BY:  MSG_GO_PTR_RESIZE, MSG_GO_END_RESIZE for GenHotSpotClass
+ *  PARAMETERS: Pass:   
+ *                  Return: 
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   6/20/94                 Initial Revision
+ ***************************************************************************/
+void ResizeStayInGraphic(GrObjHandleSpecification handleFlag,
+			PointDWFixed *mousePos, 
+			RectDWFixed *graphicBound,
+			GrObjResizeMouseData *resizeMouseData, 
+			ObjectTransform *transformN)
+{
+    sdword *graphic_x, *graphic_y, HS_x, HS_y, signX, signY;
+
+    if ((mousePos->PDF_x.DWF_int > graphicBound->RDWF_right.DWF_int) || 
+	(mousePos->PDF_x.DWF_int < graphicBound->RDWF_left.DWF_int)) {
+
+	if ((int)transformN->OT_width.WWF_int < 0) 
+	    signX = -1;
+	else signX = 1;
+
+	if (handleFlag & GOHS_HANDLE_RIGHT) {
+	    if (resizeMouseData->GORSMD_point.PDF_x.DWF_int >= 0) {
+		graphic_x = &(graphicBound->RDWF_right.DWF_int);
+		HS_x = transformN->OT_center.PDF_x.DWF_int + 
+		    ((int)transformN->OT_parentWidth.WWF_int/2) * signX;
+	    }                   
+	    else {
+		graphic_x = &(graphicBound->RDWF_left.DWF_int);
+		HS_x = transformN->OT_center.PDF_x.DWF_int + 
+		    ((int)transformN->OT_parentWidth.WWF_int/2) * signX;
+		}
+	}
+	else if (handleFlag & GOHS_HANDLE_LEFT) {
+	    if (resizeMouseData->GORSMD_point.PDF_x.DWF_int < 0) {
+		graphic_x = &(graphicBound->RDWF_left.DWF_int);
+		HS_x = transformN->OT_center.PDF_x.DWF_int - 
+		    ((int)transformN->OT_parentWidth.WWF_int/2) * signX;
+		}                                              
+	    else {
+		graphic_x = &(graphicBound->RDWF_right.DWF_int);
+		HS_x = transformN->OT_center.PDF_x.DWF_int - 
+		    ((int)transformN->OT_parentWidth.WWF_int/2) * signX;
+	    }
+	}
+	resizeMouseData->GORSMD_point.PDF_x.DWF_int = *graphic_x - HS_x;
+    }
+
+
+    if ((mousePos->PDF_y.DWF_int > graphicBound->RDWF_bottom.DWF_int) ||
+	(mousePos->PDF_y.DWF_int < graphicBound->RDWF_top.DWF_int)) {
+
+	if ((int)transformN->OT_height.WWF_int < 0) 
+	    signY = -1;
+	else signY = 1;
+
+	if (handleFlag & GOHS_HANDLE_BOTTOM) {
+	    if (resizeMouseData->GORSMD_point.PDF_y.DWF_int >= 0) { 
+		graphic_y = &(graphicBound->RDWF_bottom.DWF_int);
+		HS_y = transformN->OT_center.PDF_y.DWF_int + 
+		    ((int)transformN->OT_parentHeight.WWF_int/2) * signY;
+	    }
+	    else {
+		graphic_y = &(graphicBound->RDWF_top.DWF_int);
+		HS_y = transformN->OT_center.PDF_y.DWF_int + 
+		    ((int)transformN->OT_parentHeight.WWF_int/2) * signY;
+	    }
+	}
+	else if (handleFlag & GOHS_HANDLE_TOP) {
+		if (resizeMouseData->GORSMD_point.PDF_y.DWF_int < 0) { 
+			graphic_y = &(graphicBound->RDWF_top.DWF_int);
+		HS_y = transformN->OT_center.PDF_y.DWF_int - 
+		    ((int)transformN->OT_parentHeight.WWF_int/2) * signY;
+	    }
+	    else {
+		graphic_y = &(graphicBound->RDWF_bottom.DWF_int);
+		HS_y = transformN->OT_center.PDF_y.DWF_int - 
+		    ((int)transformN->OT_parentHeight.WWF_int/2) * signY;
+	    }
+	}
+	resizeMouseData->GORSMD_point.PDF_y.DWF_int = *graphic_y - HS_y;
+    }
+}
+
+
+/****************************************************************************
+ *                  MoveStayInGraphic
+ **************************************************************************** 
+ *  SYNOPSIS:   
+ *          For the EDIT mode,
+ *          Since the current mouse position is outside of ANY graphic, set 
+ *          *mouseData to have the maximum possible x and y values within 
+ *          the graphic which the hotspot originally belongs to.  
+ *
+ *  CALLED BY:  MSG_GO_PTR_MOVE, MSG_GO_END_MOVE for GenHotSpotClass
+ *  PARAMETERS: Pass:   
+ *                  Return: 
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   6/20/94                 Initial Revision
+ ***************************************************************************/
+void MoveStayInGraphic(PointDWFixed *currentPos, ObjectTransform *transformN,
+    RectDWFixed *graphicBound, GrObjMouseData *mouseData)
+{
+    if (currentPos->PDF_x.DWF_int + 
+	ABS(((int)transformN->OT_parentWidth.WWF_int)/2) > 
+	graphicBound->RDWF_right.DWF_int) 
+	    mouseData->GOMD_point.PDF_x.DWF_int = 
+		    graphicBound->RDWF_right.DWF_int - 
+		    transformN->OT_center.PDF_x.DWF_int - 
+		    ABS(((int)transformN->OT_parentWidth.WWF_int)/2);
+    else if (currentPos->PDF_x.DWF_int - 
+	     ABS(((int)transformN->OT_parentWidth.WWF_int)/2) <
+	     graphicBound->RDWF_left.DWF_int) 
+	    mouseData->GOMD_point.PDF_x.DWF_int = 
+		    graphicBound->RDWF_left.DWF_int -
+		    transformN->OT_center.PDF_x.DWF_int + 
+		    ABS(((int)transformN->OT_parentWidth.WWF_int)/2);
+    if (currentPos->PDF_y.DWF_int + 
+	ABS(((int)transformN->OT_parentHeight.WWF_int)/2) >
+	graphicBound->RDWF_bottom.DWF_int) 
+	    mouseData->GOMD_point.PDF_y.DWF_int = 
+		    graphicBound->RDWF_bottom.DWF_int -
+		    transformN->OT_center.PDF_y.DWF_int - 
+		    ABS(((int)transformN->OT_parentHeight.WWF_int)/2);
+    else if (currentPos->PDF_y.DWF_int - 
+	     ABS(((int)transformN->OT_parentHeight.WWF_int)/2) <
+	     graphicBound->RDWF_top.DWF_int) 
+	    mouseData->GOMD_point.PDF_y.DWF_int = 
+		    graphicBound->RDWF_top.DWF_int -
+		    transformN->OT_center.PDF_y.DWF_int +
+		    ABS(((int)transformN->OT_parentHeight.WWF_int)/2);
+}
+
+
+/****************************************************************************
+ *                  SpecialResizeConstrain
+ **************************************************************************** 
+ *  SYNOPSIS:   
+ *  CALLED BY:  MSG_GO_PTR_MOVE, MSG_GO_END_MOVE for GenHotSpotClass
+ *  PARAMETERS: Pass:   
+ *                  Return: 
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Cassie  9/12/94                 Initial Revision
+ *
+ ***************************************************************************/
+void SpecialResizeConstrain(RectDWFixed *graphicBound,
+		     	    ObjectTransform *transform)
+{
+    int	sign;
+
+    /* modify height and width if they are larger than graphic itself */
+    if (ABS(transform->OT_width.WWF_int) > 
+	graphicBound->RDWF_right.DWF_int - graphicBound->RDWF_left.DWF_int) {
+	sign = (transform->OT_width.WWF_int < 0 ? -1 : 1);
+	transform->OT_width.WWF_int = (graphicBound->RDWF_right.DWF_int - 
+	    graphicBound->RDWF_left.DWF_int) * sign;;
+        transform->OT_width.WWF_frac = 0;
+    }
+    if (ABS(transform->OT_height.WWF_int) > 
+	graphicBound->RDWF_bottom.DWF_int - graphicBound->RDWF_top.DWF_int) {
+	sign = (transform->OT_width.WWF_int < 0 ? -1 : 1);
+	transform->OT_height.WWF_int = (graphicBound->RDWF_bottom.DWF_int - 
+	    graphicBound->RDWF_top.DWF_int) * sign;
+        transform->OT_height.WWF_frac = 0;
+    }
+
+    /* now modify position if necessary */
+    if (transform->OT_center.PDF_x.DWF_int +
+	ABS((int)transform->OT_width.WWF_int/2) >
+	graphicBound->RDWF_right.DWF_int) 
+	    transform->OT_center.PDF_x.DWF_int = 
+		    graphicBound->RDWF_right.DWF_int - 
+		    ABS(((int)transform->OT_width.WWF_int)/2);
+    if (transform->OT_center.PDF_x.DWF_int -
+	ABS((int)transform->OT_width.WWF_int/2) <
+	graphicBound->RDWF_left.DWF_int) 
+	    transform->OT_center.PDF_x.DWF_int =
+		    graphicBound->RDWF_left.DWF_int +
+		    ABS(((int)transform->OT_width.WWF_int)/2);
+    if (transform->OT_center.PDF_y.DWF_int + 
+	ABS((int)transform->OT_height.WWF_int/2) >
+	graphicBound->RDWF_bottom.DWF_int) 
+	    transform->OT_center.PDF_y.DWF_int = 
+		    graphicBound->RDWF_bottom.DWF_int - 
+		    ABS(((int)transform->OT_height.WWF_int)/2);
+    if (transform->OT_center.PDF_y.DWF_int -
+	ABS((int)transform->OT_height.WWF_int/2) <
+	graphicBound->RDWF_top.DWF_int) 
+	    transform->OT_center.PDF_y.DWF_int =
+		    graphicBound->RDWF_top.DWF_int +
+		    ABS(((int)transform->OT_height.WWF_int)/2);
+}
+
+
+void GetTextNBody(optr HotSpot, optr *Text, optr *GBody) 
+{
+    *GBody = @call HotSpot::MSG_META_GET_OBJ_BLOCK_OUTPUT();
+    *Text  = @call *GBody::MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(&HotSpotTextClass); 
+}
+
+void GetText(optr HotSpot, optr *Text)
+{
+    optr    GBody;
+    GetTextNBody(HotSpot, Text, &GBody);
+}
+
+
+@start ControlStrings, data;
+
+@chunk char DeleteHotSpotString[] = "Delete";
+
+@end ControlStrings;

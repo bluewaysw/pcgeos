@@ -1,0 +1,714 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		FontID definitions
+FILE:		fontID.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	5/15/90		Initial revision
+
+
+DESCRIPTION:
+	This file contains the definitions of all the fontIDs for the 
+	system.  It was moved from graphics.def.
+		
+	$Id: fontID.def,v 1.1 97/04/04 14:22:02 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__FONTID
+
+StartKernel
+
+FID_MAKER_DIVISIONS	=	0x1000
+FID_FAMILY_DIVISIONS	=	0x0200
+
+FontMaker 	etype word, 0, FID_MAKER_DIVISIONS
+FM_BITMAP		enum FontMaker
+FM_NIMBUSQ 		enum FontMaker
+FM_ADOBE 		enum FontMaker
+FM_BITSTREAM		enum FontMaker
+FM_AGFA		enum FontMaker
+FM_PUBLIC	enum FontMaker, 0xc000
+FM_ATECH		enum FontMaker, 0xd000
+FM_MICROLOGIC	enum FontMaker, 0xe000
+FM_PRINTER 		enum FontMaker, 0xf000
+
+;--------------------------------------------------------------------------
+;		Constants for font families and groups
+;--------------------------------------------------------------------------
+
+	; Font Family
+	; 
+FontFamily 		etype byte
+FF_SERIF		enum FontFamily
+FF_SANS_SERIF		enum FontFamily
+FF_SCRIPT		enum FontFamily
+FF_ORNAMENT		enum FontFamily
+FF_SYMBOL		enum FontFamily
+FF_MONO			enum FontFamily
+FF_SPECIAL		enum FontFamily
+FF_NON_PORTABLE		enum FontFamily
+
+	; Font Groups
+	; This is used for mapping a font to similar font
+	; in the event the requested font is not available.
+	; See also the FontFamily (in font.def)
+FontGroup	etype word, 0, FID_FAMILY_DIVISIONS
+FG_SERIF		enum FontGroup, FF_SERIF	*FID_FAMILY_DIVISIONS
+FG_SANS_SERIF		enum FontGroup, FF_SANS_SERIF	*FID_FAMILY_DIVISIONS
+FG_SCRIPT		enum FontGroup, FF_SCRIPT	*FID_FAMILY_DIVISIONS
+FG_ORNAMENT		enum FontGroup, FF_ORNAMENT	*FID_FAMILY_DIVISIONS
+FG_SYMBOL		enum FontGroup, FF_SYMBOL	*FID_FAMILY_DIVISIONS
+FG_MONO			enum FontGroup, FF_MONO		*FID_FAMILY_DIVISIONS
+FG_SPECIAL		enum FontGroup, FF_SPECIAL	*FID_FAMILY_DIVISIONS
+FG_NON_PORTABLE		enum FontGroup, FF_NON_PORTABLE	*FID_FAMILY_DIVISIONS
+
+;--------------------------------------------------------------------------
+;		Constants for distinguishing faces within a group
+;--------------------------------------------------------------------------
+
+; Sub-family distinctions
+; These are used to distinguish between faces that belong to the same family.
+; They will be used by a fontID mapping algorithm that will be used to
+; determine a "closest match" fontID, if the desired font is not available.
+; These are byte values, and the defined gradations are somewhat subjective.
+; For the Serif group, the four classes represent four of the traditional 
+; sub-groups within the faces with serifs.  There is some room between the
+; values, and this should be used to group fontIDs even further.  For 
+; example, one would prefer to map TIMES_NEW_ROMAN to TIMES_ROMAN, and not
+; to AMERICANA, even though they are all Transitional Serif Faces.  In this
+; case, the TIMES fonts would be assigned the same value (say, SF_TRANS) while
+; AMERICANA could be assigned a separate value (say, SF_TRANS+1).
+
+; FG_SERIF
+SerifFace	etype 	byte, 0
+SF_OLD		enum	SerifFace, 0		; Old Style
+						;  Characterized by axes of
+						;  curves inclined to left,
+						;  smooth transitions to serifs,
+						;  little contrast between hair-
+						;  lines and main strokes.
+SF_TRANS	enum	SerifFace, 0x40	; Transitional
+						;  Characterized by axes of
+						;  round chars barely inclined,
+						;  serifs are flat, contrast 
+						;  between hairlines and main 
+						;  strokes is more accentuated.
+SF_MODERN	enum	SerifFace, 0x80	; Modern
+						;  Characterized by axes of
+						;  round chars are vertical,
+						;  serifs are horizontal and
+						;  unbracketed, extremely high
+						;  contrast between hairlines 
+						;  and main strokes.
+SF_SLAB		enum	SerifFace, 0xc0	; Slab Serif
+						;  all strokes appear to have
+						;  the same thickness, serifs 
+						;  are usually unbracketed
+
+; FG_SANS_SERIF
+; There is not much to distinguish between these typefaces.  We've decided to
+; use the style of the lower case "a" character -- that is, whether it is 
+; "closed" (looks like a modified "o" character) or "open" (has a smaller closed
+;  portion at the bottom, and an extra stem on top).
+SansFace	etype	byte
+SF_A_OPEN	enum	SansFace, 0		; see description, above
+SF_A_CLOSED	enum	SansFace, 0x80		; see description, above
+
+; FG_SCRIPT
+ScriptFace	etype	byte
+SF_CALLIGRAPHIC	enum	ScriptFace, 0		; variable thickness stroke
+SF_CURSIVE	enum	ScriptFace, 0x80	; single thickness stroke
+
+;------------------------------------------------------------------------
+;	F O N T   M A P P I N G
+;------------------------------------------------------------------------
+
+; The function CalcFontDiff returns a magic number that represents the 
+; "difference" between two fontIDs.  It uses a few enums, as follows:
+; The FM_EXACT code is returned if the two fontIDs passed represent the 
+; exact same face.  FM_DONT_USE is returned if you should not substitute either
+; of the passed IDs for the other.
+
+FontMap	etype	byte, 0
+FM_EXACT	enum	FontMap, 0
+FM_DONT_USE	enum	FontMap, 0xff
+
+;------------------------------------------------------------------------
+;	F O N T   I D      	
+;------------------------------------------------------------------------
+
+; This is what is passed to GrSetFont
+FontID 	etype word
+FID_INVALID		enum FontID, 0x0000	; invalid font ID
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefineFace
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Macro to define fontIDs
+
+ARGS:   fname		- this should be in all caps, and should represent
+			  the name of the typeface family
+	family		- this is one of the FamilyGroup enums (defined above)
+			  (this is optional -- if none is supplied, then the
+			   family from the last invocation of DefineFace is 
+			   used)
+	forceval	- use this to ensure that the face maps to a 
+			  particular value.  An assembly error will occur
+			  if there is some problem.
+			  (this is used for fonts shipped with Ensemble 1.0)
+
+DESCRIPTION:
+	This macro is used to define a set of fontIDs for a particular face.
+	The method of assigning IDs is as follows:
+	
+	For a particular face, the lower twelve bits will be the same between 
+	font makers, so this macro essentially defines up to 16 enums, one 
+	for each maker.  
+
+	For example, to define the URW_ROMAN face, use:
+
+		DefineFace	URW_ROMAN, FG_SERIF
+
+	This creates a FontID enum called FID_DTC_URW_ROMAN, and sets its value to
+	FG_SERIF (since it is the first in that group).
+
+REVISION HISTORY:
+		Name	Date		Description
+		----	----		-----------
+		Jim	04/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+curFaceEnum	= 0			; define a value
+FM_TEMP_COUNT = 0
+
+DefineFace	macro	fname, style, family
+
+ifnb <family>
+    	curFaceEnum	=	family
+else
+	curFaceEnum	=	curFaceEnum + 1
+endif
+
+;; if we're being included in the font name mapping library, then allocate
+;; a table element for the font mapping algorithm.
+
+ifdef	FID_MAPPING_CODE
+
+FontMapping	segment	resource
+
+ifnb	<family>
+    ifidn	<&family>, <FG_SERIF>
+    	serifTable	label	byte
+    endif
+    ifidn	<&family>, <FG_SANS_SERIF>
+	NUM_AFTER_SERIF	=	FM_TEMP_COUNT
+    	sansTable	label	byte
+    endif
+    ifidn	<&family>, <FG_SCRIPT>
+	NUM_AFTER_SANS	=	FM_TEMP_COUNT
+    	scriptTable	label	byte
+    endif
+    ifidn	<&family>, <FG_ORNAMENT>
+	NUM_AFTER_SCRIPT =	FM_TEMP_COUNT
+    endif
+endif
+
+;;	put an entry in the table, if something is defined
+ifnb	<style>
+byte	style
+FM_TEMP_COUNT	= FM_TEMP_COUNT + 1
+endif
+
+FontMapping	ends
+
+endif		;; ifdef FID_MAPPING_CODE
+
+;; for each maker, create a different fontID
+
+;;------------NIMBUSQ--------------
+
+;; do DTC.  
+
+fntname	CATSTR <FID_DTC_>, <&fname>
+fntname		enum	FontID, FM_NIMBUSQ+curFaceEnum
+
+;;------------ADOBE--------------
+
+;; do Adobe
+fntname	CATSTR	<FID_PS_>, <&fname>
+ifidn <&fname>, <URW_ROMAN>
+	fntname	CATSTR <FID_PS_>, <TIMES_ROMAN>
+endif 
+ifidn <&fname>, <URW_SYMBOLPS>
+	fntname	CATSTR <FID_PS_>, <SYMBOL>
+endif 
+ifidn <&fname>, <URW_MONO>
+	fntname	CATSTR <FID_PS_>, <COURIER>
+endif 
+fntname		enum	FontID, FM_ADOBE+curFaceEnum
+
+;;------------BITSTREAM--------------
+
+;; do Bitstream
+fntname	CATSTR	<FID_BITSTREAM_>, <&fname>
+fntname		enum	FontID, FM_BITSTREAM+curFaceEnum
+
+endm
+
+;------------------------------------------------------------------------
+;	B I T M A P   F O N T S			range: 0x0001 thru 0x0fff
+;------------------------------------------------------------------------
+
+	; Bitmap FontID
+FID_ROMA			enum FontID, FM_BITMAP+FG_SERIF+1
+FID_CHICAGO			enum FontID, FM_BITMAP+FG_SANS_SERIF
+FID_UNIVERSITY			enum FontID
+FID_BERKELEY			enum FontID
+FID_PMSYSTEM			enum FontID
+FID_LED				enum FontID, FM_BITMAP+FG_ORNAMENT
+FID_BISON			enum FontID, FM_BITMAP+FG_MONO
+FID_WINDOWS			enum FontID
+FID_JSYS			enum FontID
+FID_CALENDAR			enum FontID
+FID_NOTEPAD			enum FontID
+FID_RESPONDER			enum FontID
+FID_TERMINAL			enum FontID
+FID_TERMINAL_GRAPHIC		enum FontID
+FID_PENELOPE			enum FontID
+FID_ESQUIRE			enum FontID, 555
+
+;------------------------------------------------------------------------
+;	S P E C I A L  F O N T S
+;------------------------------------------------------------------------
+FID_PIZZA_KANJI			enum FontID, FM_BITMAP+FG_SPECIAL
+FID_PCV_KANJI			enum FontID
+FID_NEC_KANJI			enum FontID
+FID_BERKELEY_SJIS		enum FontID
+FID_BERKELEY_GB			enum FontID
+
+;------------------------------------------------------------------------
+;	F O N T   I D s			makers: NIMBUSQ, ADOBE, BITSTREAM
+;------------------------------------------------------------------------
+
+;		face name		face type	family
+;		---------		------------	------
+DefineFace	URW_ROMAN,		SF_TRANS,	FG_SERIF
+DefineFace	CENTURY_SCHOOLBOOK, 	SF_MODERN
+DefineFace	BODONI,			SF_MODERN+1 
+DefineFace	GLYPHA,			SF_SLAB
+DefineFace	GARAMOND,		SF_OLD
+DefineFace	BEMBO,			SF_OLD
+DefineFace	UNIVERSITY_ROMAN,	SF_TRANS+1
+DefineFace	ARSIS,			SF_MODERN
+DefineFace	BERKELEY_OLD_STYLE,	SF_OLD
+DefineFace	GOUDY_OLD_STYLE,	SF_OLD
+DefineFace	PALATINO,		SF_OLD
+DefineFace	ACCOLADE,		SF_MODERN
+DefineFace	ALBERTUS,		SF_OLD
+DefineFace	COCHIN,			SF_TRANS
+DefineFace	NICOLAS_COCHIN,		SF_TRANS+1
+DefineFace	AACHEN,			SF_SLAB
+DefineFace	AMERICANA,		SF_TRANS+1
+DefineFace	ASTER,			SF_OLD
+DefineFace	NEW_ASTER,		SF_MODERN
+DefineFace	AUREALIA,		SF_OLD
+DefineFace	BARBEDOR,		SF_OLD
+DefineFace	BASILIA,		SF_MODERN
+DefineFace	BASKERVILLE,		SF_TRANS
+DefineFace	BASKERVILLE_HANDCUT,	SF_TRANS
+DefineFace	BOOKMAN,		SF_TRANS
+DefineFace	CANDIDA,		SF_SLAB
+DefineFace	CASLON,			SF_TRANS
+DefineFace	ADOBE_CASLON,		SF_TRANS
+DefineFace	CAXTON,			SF_OLD
+DefineFace	CENTENNIAL,		SF_MODERN
+DefineFace	CENTURY,		SF_TRANS
+DefineFace	CENTURY_OLD_STYLE,	SF_TRANS
+DefineFace	CHELTENHAM,		SF_TRANS
+DefineFace	CLARENDON,		SF_SLAB
+DefineFace	CLEARFACE,		SF_TRANS
+DefineFace	CONCORDE,		SF_TRANS
+DefineFace	CONCORDE_NOVA,		SF_MODERN
+DefineFace	CONGRESS,		SF_SLAB
+DefineFace	CORONA,			SF_SLAB
+DefineFace	CUSHING,		SF_SLAB
+DefineFace	DEMOS,			SF_TRANS
+DefineFace	DIGI_ANTIQUA,		SF_TRANS
+DefineFace	EDISON,			SF_TRANS
+DefineFace	EDWARDIAN,		SF_OLD
+DefineFace	EGIZIO,			SF_MODERN
+DefineFace	EGYPTIENNE,		SF_SLAB
+DefineFace	ELAN,			SF_MODERN
+DefineFace	ESPRIT,			SF_TRANS
+DefineFace	EXCELSIOR,		SF_SLAB
+DefineFace	FENICE,			SF_MODERN
+DefineFace	FRIZ_QUADRATA,		SF_MODERN
+DefineFace	GALLIARD,		SF_OLD
+DefineFace	GAMMA,			SF_MODERN
+DefineFace	GOUDY,			SF_OLD
+DefineFace	HAWTHORN,		SF_MODERN
+DefineFace	HIROSHIGE,		SF_TRANS
+DefineFace	HOLLANDER,		SF_TRANS
+DefineFace	IMPRESSUM,		SF_TRANS
+DefineFace	ITALIA,			SF_SLAB
+DefineFace	JAMILLE,		SF_MODERN
+DefineFace	JANSON,			SF_TRANS
+DefineFace	JENSON_OLD_STYLE,	SF_OLD
+DefineFace	KORINNA,		SF_MODERN
+DefineFace	LEAWOOD,		SF_TRANS+1
+DefineFace	LIFE,			SF_TRANS
+DefineFace	LUBALIN_GRAPH,		SF_SLAB
+DefineFace	LUCIDA,			SF_SLAB
+DefineFace	MADISON,		SF_MODERN
+DefineFace	MAGNA,			SF_TRANS
+DefineFace	MAGNUS,			SF_SLAB
+DefineFace	MARCONI,		SF_MODERN
+DefineFace	MELIOR,			SF_MODERN
+DefineFace	MEMPHIS,		SF_SLAB
+DefineFace	MERIDIEN,		SF_TRANS
+DefineFace	MESSIDOR,		SF_TRANS+1
+DefineFace	MINISTER,		SF_TRANS
+DefineFace	MODERN,			SF_MODERN
+DefineFace	MODERN_NO_216,		SF_MODERN
+DefineFace	NAPOLEAN,		SF_SLAB
+DefineFace	NIKIS,			SF_TRANS
+DefineFace	NIMROD,			SF_MODERN
+DefineFace	NOVARESE,		SF_TRANS+1
+DefineFace	PACELLA,		SF_TRANS
+DefineFace	PERPETUA,		SF_TRANS+1
+DefineFace	PLANTIN,		SF_OLD
+DefineFace	PROTEUS,		SF_MODERN
+DefineFace	QUORUM,			SF_MODERN
+DefineFace	RALEIGH,		SF_TRANS+1
+DefineFace	RENAULT,		SF_MODERN
+DefineFace	ROCKWELL,		SF_SLAB
+DefineFace	ROMANA,			SF_MODERN
+DefineFace	SABON,			SF_TRANS
+DefineFace	SABON_ANTIQUA,		SF_TRANS
+DefineFace	SERIFA,			SF_SLAB
+DefineFace	SLIMBACH,		SF_MODERN
+DefineFace	SOUVENIR,		SF_TRANS+1
+DefineFace	STEMPEL_SCHNEIDLER,	SF_OLD
+DefineFace	STONE_INFORMAL,		SF_SLAB
+DefineFace	STONE_SERIF,		SF_TRANS+1
+DefineFace	STRATFORD,		SF_TRANS
+DefineFace	STYMIE,			SF_SLAB
+DefineFace	SWIFT,			SF_TRANS+1
+DefineFace	TIEPOLO,		SF_TRANS+1
+DefineFace	TIFFANY,		SF_MODERN
+DefineFace	TIMELESS,		SF_TRANS
+DefineFace	TIMES_NEW_ROMAN,	SF_TRANS
+DefineFace	URW_ANTIQUA,		SF_TRANS
+DefineFace	USHERWOOD,		SF_TRANS
+DefineFace	ADOBE_UTOPIA,		SF_OLD
+DefineFace	VELJOVIC,		SF_TRANS+1
+DefineFace	VENDOME,		SF_TRANS
+DefineFace	VOLTA,			SF_MODERN
+DefineFace	WALBAUM,		SF_MODERN
+DefineFace	WEIDEMANN,		SF_TRANS+1
+DefineFace	WEISS,			SF_OLD
+DefineFace	WINDSOR,		SF_TRANS
+DefineFace	WORCESTER_ROUND,	SF_OLD
+DefineFace	ZAPF_BOOK,		SF_TRANS+1
+DefineFace	ZAPF_INTERNATIONAL,	SF_TRANS+1
+DefineFace	ADOBE_GARAMOND,		SF_OLD
+DefineFace	TRAJAN,			SF_TRANS
+DefineFace	CHARLEMAGNE,		SF_TRANS
+DefineFace	BELWE,			SF_TRANS
+DefineFace	BAUER_BODONI,		SF_MODERN+1 
+DefineFace	GARTH_GRAPHIC,		SF_TRANS
+DefineFace	GRANJON,		SF_TRANS
+DefineFace	GALLIARD_ROMAN_ITALIC,	SF_OLD
+
+;		face name		face type	family
+;		---------		------------	------
+DefineFace	URW_SANS,		SF_A_OPEN,	FG_SANS_SERIF
+DefineFace	FRUTIGER,		SF_A_OPEN+1
+DefineFace	EUROSTILE,		SF_A_OPEN+1
+DefineFace	ANGRO,			SF_A_OPEN+1
+DefineFace	FRANKLIN_GOTHIC,	SF_A_OPEN+1
+DefineFace	UNIVERS,		SF_A_OPEN+1
+DefineFace	AVENIR,			SF_A_OPEN+1
+DefineFace	AKZIDENZ_GROTESK,	SF_A_OPEN+1
+DefineFace	AKZIDENZ_GROTESK_BUCH,	SF_A_OPEN+1
+DefineFace	ALTERNATE_GOTHIC,	SF_A_OPEN+1
+DefineFace	ANTIQUE_OLIVE,		SF_A_OPEN+1
+DefineFace	ANZEIGEN_GROTESK,	SF_A_OPEN+1
+DefineFace	AVANTE_GARDE,		SF_A_CLOSED
+DefineFace	BENGUIAT_GOTHIC,	SF_A_OPEN+1
+DefineFace	BERLINER_GROTESK,	SF_A_OPEN+1
+DefineFace	BRITANNIC,		SF_A_OPEN+1
+DefineFace	CASTLE,			SF_A_OPEN+1
+DefineFace	CHELMSFORD,		SF_A_OPEN+1
+DefineFace	OPTIMA,			SF_A_OPEN+1
+DefineFace	CLEARFACE_GOTHIC,	SF_A_OPEN+1
+DefineFace	COMPACTA,		SF_A_OPEN+1
+DefineFace	CORINTHIAN,		SF_A_OPEN+1
+DefineFace	DIGI_GROTESK,		SF_A_OPEN+1
+DefineFace	ERAS,			SF_A_OPEN+1
+DefineFace	FETTE_ENGSCHRIFT,	SF_A_OPEN+1
+DefineFace	FETTE_MIDSCHRIFT,	SF_A_OPEN+1
+DefineFace	FLYER,			SF_A_OPEN+1
+DefineFace	FOLIO,			SF_A_OPEN+1
+DefineFace	FUTURA,			SF_A_CLOSED
+DefineFace	GILL,			SF_A_OPEN+1
+DefineFace	GILL_SANS,		SF_A_OPEN+1
+DefineFace	GOTHIC,			SF_A_OPEN+1
+DefineFace	GOUDY_SANS,		SF_A_OPEN+1
+DefineFace	HAAS_UNICA,		SF_A_OPEN+1
+DefineFace	HELVETICA,		SF_A_OPEN
+DefineFace	NEUE_HELVETICA,		SF_A_OPEN
+DefineFace	HELVETICA_INSERAT,	SF_A_OPEN
+DefineFace	HOLSATIA,		SF_A_OPEN+1
+DefineFace	KABEL,			SF_A_OPEN+1
+DefineFace	LITERA,			SF_A_CLOSED
+DefineFace	LUCIDA_SANS,		SF_A_CLOSED
+DefineFace	MAXIMA,			SF_A_OPEN+1
+DefineFace	MIXAGE,			SF_A_OPEN+1
+DefineFace	NEUZEIT_GROTESK,	SF_A_OPEN+1
+DefineFace	NEWS_GOTHIC,		SF_A_OPEN+1
+DefineFace	NEWTEXT,		SF_A_OPEN+1
+DefineFace	OCR_A,			SF_A_OPEN+2
+DefineFace	OCR_B,			SF_A_OPEN+2
+DefineFace	PANACHE,		SF_A_OPEN+1
+DefineFace	PRAXIS,			SF_A_OPEN+1
+DefineFace	PRIMUS,			SF_A_OPEN+1
+DefineFace	PRIMUS_ANTIQUA,		SF_A_OPEN+1
+DefineFace	SERIF_GOTHIC,		SF_A_OPEN+1
+DefineFace	STONE_SANS,		SF_A_OPEN+1
+DefineFace	SYNTAX,			SF_A_OPEN+1
+DefineFace	TEMPO,			SF_A_OPEN+1
+DefineFace	GROTESK,		SF_A_OPEN+1
+DefineFace	AKZINDENZ_GROTESK,	SF_A_OPEN+1
+DefineFace	DORIC_BOLD,		SF_A_OPEN+1
+DefineFace	INDUSTRIA,		SF_A_OPEN+1
+DefineFace	INSIGNIA,		SF_A_OPEN+1
+DefineFace	AVANTE_GARDE_CONDENSED,	SF_A_CLOSED
+DefineFace	KANJI_SQUARE_GOTHIC,	SF_A_OPEN
+
+DefineFace	ZAPF_CHANCERY,		SF_CALLIGRAPHIC,	FG_SCRIPT
+DefineFace	VIVALDI,		SF_CALLIGRAPHIC
+DefineFace	BRUSH_SCRIPT,		SF_CURSIVE
+DefineFace	PARK_AVENUE,		SF_CALLIGRAPHIC
+DefineFace	KAUFMANN,		SF_CURSIVE
+DefineFace	COMMERCIAL_SCRIPT,	SF_CURSIVE
+DefineFace	BALMORAL,		SF_CURSIVE
+DefineFace	MISTRAL,		SF_CALLIGRAPHIC
+DefineFace	ANGLIA,			SF_CURSIVE
+DefineFace	ARISTON,		SF_CURSIVE
+DefineFace	BIBLE_SCRIPT,		SF_CALLIGRAPHIC
+DefineFace	BRODY,			SF_CURSIVE
+DefineFace	BRONX,			SF_CALLIGRAPHIC
+DefineFace	CANDICE,		SF_CURSIVE
+DefineFace	DEMIAN,			SF_CALLIGRAPHIC
+DefineFace	ENGLISCHE_SCHREIBSCHRIFT, SF_CURSIVE
+DefineFace	FREESTYLE_SCRIPT,	SF_CALLIGRAPHIC
+DefineFace	GILLIES_GOTHIC,		SF_CURSIVE
+DefineFace	GLASTONBURY,		SF_CURSIVE
+DefineFace	HARLOW,			SF_CURSIVE
+DefineFace	HOGARTH_SCRIPT,		SF_CURSIVE
+DefineFace	ISADORA,		SF_CURSIVE
+DefineFace	ISBELL,			SF_CURSIVE
+DefineFace	JULIA_SCRIPT,		SF_CURSIVE
+DefineFace	KUNSTLERSCHREIBSCHRIFT,	SF_CURSIVE
+DefineFace	LE_GRIFFE,		SF_CALLIGRAPHIC
+DefineFace	LINDSAY,		SF_CALLIGRAPHIC
+DefineFace	LINOSCRIPT,		SF_CURSIVE
+DefineFace	HILL,			SF_CURSIVE
+DefineFace	NEVISON_CASUAL,		SF_CURSIVE
+DefineFace	PALACE_SCRIPT,		SF_CURSIVE
+DefineFace	PALETTE,		SF_CALLIGRAPHIC
+DefineFace	PENDRY_SCRIPT,		SF_CALLIGRAPHIC
+DefineFace	PEPITA,			SF_CALLIGRAPHIC
+DefineFace	PHYLLIS,		SF_CALLIGRAPHIC
+DefineFace	PHYLLIS_INITIALS,	SF_CALLIGRAPHIC
+DefineFace	PRESENT_SCRIPT,		SF_CALLIGRAPHIC
+DefineFace	RAGE,			SF_CALLIGRAPHIC
+DefineFace	ROMAN_SCRIPT,		SF_CURSIVE
+DefineFace	SHAMROCK,		SF_CALLIGRAPHIC
+DefineFace	SLOGAN,			SF_CALLIGRAPHIC
+DefineFace	VAN_DIJK,		SF_CALLIGRAPHIC
+DefineFace	VLADIMIR_SCRIPT,	SF_CURSIVE
+DefineFace	TEKTON,			SF_CALLIGRAPHIC
+DefineFace	LITHOS,			SF_CALLIGRAPHIC
+DefineFace	CASCADE_SCRIPT,		SF_CALLIGRAPHIC
+DefineFace	CHARME,			SF_CURSIVE
+DefineFace	MEDICI_SCRIPT,		SF_CALLIGRAPHIC
+DefineFace	NUPITAL_SCRIPT,		SF_CURSIVE
+DefineFace	KANJI_HON_MINCHO,	SF_CALLIGRAPHIC
+
+DefineFace	BROADWAY,			,	FG_ORNAMENT
+DefineFace	OLD_ENGLISH
+DefineFace	STENCIL
+DefineFace	COPPERPLATE
+DefineFace	COOPER_C_BLACK
+DefineFace	BLIPPO_C_BLACK
+DefineFace	BALLOON
+DefineFace	LCD
+DefineFace	DATA_70
+DefineFace	GOUDY_HEAVYFACE
+DefineFace	HOBO
+DefineFace	OLD_TOWN
+DefineFace	MARIAGE
+DefineFace	PUMP
+DefineFace	ALGERIAN
+DefineFace	ARNOLD_BOCKLIN
+DefineFace	ULTE_SCHWABACHER
+DefineFace	AMERICAN_UNCIAL
+DefineFace	AUGUSTEA_OPEN
+DefineFace	BAUHAUS
+DefineFace	BARCELONA
+DefineFace	BELSHAW
+DefineFace	BERNHARD_ANTIQUE
+DefineFace	BINNER
+DefineFace	BLOCK
+DefineFace	BOTTLENECK
+DefineFace	BUSTER
+DefineFace	BUXOM
+DefineFace	CABARET
+DefineFace	CAMELLIA
+DefineFace	CAROUSEL
+DefineFace	CHESTERFIELD
+DefineFace	CHISEL
+DefineFace	CHOC
+DefineFace	CHROMIUM_ONE
+DefineFace	CHURCHWARD_BRUSH
+DefineFace	CIRKULUS
+DefineFace	CITY
+DefineFace	COLUMNA_SOLID
+DefineFace	COMPANY
+DefineFace	CONFERENCE
+DefineFace	CORTEZ
+DefineFace	COUNTDOWN
+DefineFace	CRILLEE
+DefineFace	CROISSANT
+DefineFace	DAVIDA
+DefineFace	DOM_CASUAL
+DefineFace	DYNAMO
+DefineFace	ECKMANN
+DefineFace	EINHORN
+DefineFace	ENVIRO
+DefineFace	FETTE_FRAKTUR
+DefineFace	FETTE_GOTILCH
+DefineFace	FLAMENCO
+DefineFace	FLASH
+DefineFace	FLANGE
+DefineFace	FLORA
+DefineFace	FRANKFURTER
+DefineFace	FUTURA_C_BLACK
+DefineFace	FUTURA_DISPLAY
+DefineFace	GALADRIEL
+DefineFace	GILL_KAYO
+DefineFace	GLASER_STENCIL
+DefineFace	HADFIELD
+DefineFace	HIGHLIGHT
+DefineFace	HORATIO
+DefineFace	HORNDON
+DefineFace	ICONE
+DefineFace	ICE_AGE
+DefineFace	KALLIGRAPHIA
+DefineFace	KAPITELLIA
+DefineFace	KNIGHTSBRIDGE
+DefineFace	LATIN_WIDE
+DefineFace	LAZYBONES
+DefineFace	LIBERTY
+DefineFace	LINOTEXT
+DefineFace	MACHINE
+DefineFace	MICROGRAMMA
+DefineFace	MOTTER_FEMINA
+DefineFace	OCTOPUSS
+DefineFace	ODIN
+DefineFace	OKAY
+DefineFace	PADDINGTION
+DefineFace	PAPYRUS
+DefineFace	PEIGNOT
+DefineFace	PICCADILLY
+DefineFace	PLAYBILL
+DefineFace	PLAZA
+DefineFace	POST_ANTIQUA
+DefineFace	PREMIER
+DefineFace	PRESIDENT
+DefineFace	PRINCETOWN
+DefineFace	PRO_ARTE
+DefineFace	QUENTIN
+DefineFace	REVUE
+DefineFace	RIALTO
+DefineFace	ROMIC
+DefineFace	RUBBER_STAMP
+DefineFace	SERPENTINE
+DefineFace	SHELLEY
+DefineFace	SINALOA
+DefineFace	SLIPSTREAM
+DefineFace	SPRINGFIELD
+DefineFace	SQUIRE
+DefineFace	STENTOR
+DefineFace	STILLA
+DefineFace	STILLA_CAPS
+DefineFace	STOP
+DefineFace	SUPERSTAR
+DefineFace	SYNCHRO
+DefineFace	TANGO
+DefineFace	TARRAGON
+DefineFace	THOROWGOOD
+DefineFace	THUNDERBIRD
+DefineFace	TIME_SCRIPT
+DefineFace	TITUS
+DefineFace	TRAJANUS
+DefineFace	VAG_RUNDSCHRIFT
+DefineFace	VARIO
+DefineFace	VEGAS
+DefineFace	VICTORIAN
+DefineFace	WASHINGTON
+DefineFace	WEIFZ_RUNDGOTIFCH
+DefineFace	ZIPPER
+DefineFace	ARCADIA
+DefineFace	BANCO
+DefineFace	COTTONWOOD		; don't know what this looks like yet
+DefineFace	JUNIPER			; don't know what this looks like yet
+
+DefineFace	URW_SYMBOLPS,		,	FG_SYMBOL
+DefineFace	DINGBATS
+DefineFace	ZAPF_DINGBATS
+DefineFace	MICR
+DefineFace	CARTA
+DefineFace	SONATA
+DefineFace	ACE_I
+DefineFace	U_NEWS_COMM_PI
+DefineFace	U_GREEK_MATH_PI
+DefineFace	BUNDESBAHN_PI_1
+DefineFace	BUNDESBAHN_PI_2
+DefineFace	BUNDESBAHN_PI_3
+DefineFace	CHEQ			; a chess font
+DefineFace	FUN_DINGBATS		; a PC/GEOS dingbats font
+
+DefineFace	URW_MONO,		,	FG_MONO
+DefineFace	AMERICAN_TYPEWRITER
+DefineFace	PRESTIGE_ELITE
+DefineFace	LETTER_GOTHIC
+
+;------------------------------------------------------------------------
+;	P R I N T E R     F O N T S		range: 0xf000 thru 0xffff
+;------------------------------------------------------------------------
+
+	; Printer-specific bitmap FontID
+FID_PRINTER_PROP_SERIF		enum FontID,	FM_PRINTER+FG_SERIF
+FID_PRINTER_PROP_SANS		enum FontID,	FM_PRINTER+FG_SANS_SERIF
+FID_PRINTER_10CPI		enum FontID,	FM_PRINTER+FG_MONO
+FID_PRINTER_12CPI		enum FontID
+FID_PRINTER_15CPI		enum FontID
+FID_PRINTER_16CPI		enum FontID
+FID_PRINTER_17CPI		enum FontID
+FID_PRINTER_20CPI		enum FontID
+FID_PRINTER_24CPI		enum FontID
+
+EndKernel

@@ -1,0 +1,1110 @@
+/***********************************************************************
+*     Copyright 1994-2002  Breadbox Computer Company LLC
+* PROJECT:	Anarchy
+* MODULE:	Spider
+*
+* FILE:		spgame.goc
+*
+* AUTHOR:	jfh 12/02
+*
+*
+***********************************************************************/
+
+/* ----------------------------------------------------------------------------
+		Include files
+-----------------------------------------------------------------------------*/
+
+@include "spider.goh"
+
+@extern object SpiderView;
+@extern object MyPlayingTable;
+@extern object MyHand;
+@extern object UndoTrigger;
+@extern object DragItemGroup;
+@extern object DifficultyDBox;
+@extern object DifficultyGroup;
+
+@extern object WorkSpace1;
+@extern object WorkSpace2;
+@extern object WorkSpace3;
+@extern object WorkSpace4;
+@extern object WorkSpace5;
+@extern object WorkSpace6;
+@extern object WorkSpace7;
+@extern object WorkSpace8;
+@extern object WorkSpace9;
+@extern object WorkSpace10;
+@extern object DDeck1;
+@extern object DDeck2;
+@extern object DDeck3;
+@extern object DDeck4;
+@extern object DDeck5;
+@extern object DoneSpace1;
+@extern object DoneSpace2;
+@extern object DoneSpace3;
+@extern object DoneSpace4;
+@extern object DoneSpace5;
+@extern object DoneSpace6;
+@extern object DoneSpace7;
+@extern object DoneSpace8;
+
+@extern object ConfirmDealString;
+@extern object ConfirmChangeDiffString;
+@extern object EmptyWorkDeckString;
+@extern object LostGameString;
+@extern object FinishBox;
+@extern object FinishGlyph2E;
+@extern object FinishGlyph2E1;
+@extern object FinishGlyph2M;
+@extern object FinishGlyph2M1;
+@extern object FinishGlyph2D;
+@extern object FinishGlyph2D1;
+
+byte	g_topDeck = 0;
+byte	g_doneDeck = 0xff;
+optr  g_runDeckOptr = 0;
+word	g_sound = SOUND_SYSTEM;
+MemHandle	g_dealSound = 0;
+MemHandle	g_winSound = 0;
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetCardRank
+ *
+ * CALLED BY:	various
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+word GetCardRank(optr deck, word card)
+{
+ CardAttrs		attrs;
+ word				rank;
+
+	/* get the card's attributes */
+	attrs = @call deck::MSG_DECK_GET_NTH_CARD_ATTRIBUTES(card);
+	/* and the card's rank from it's attrs */
+	rank = (attrs >> 3);
+	rank &= 15;
+	return(rank);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetCardSuit
+ *
+ * CALLED BY:	various
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+word GetCardSuit(optr deck, word card)
+{
+ CardAttrs		attrs;
+ word				suit;
+
+	/* get the card's attributes */
+	attrs = @call deck::MSG_DECK_GET_NTH_CARD_ATTRIBUTES(card);
+	/* and the card's suit from it's attrs */
+	suit = (attrs >> 1);
+	suit &= 3;
+	return(suit);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetNumUpCards
+ *
+ * CALLED BY:	various
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+word GetNumUpCards(optr deck, word numCards)
+{
+ CardAttrs		attrs;
+ word				i, numUp;
+
+
+	numUp = 0;
+	for (i = 0; i < numCards; i++)  {
+		/* get the card's attributes */
+		attrs = @call deck::MSG_DECK_GET_NTH_CARD_ATTRIBUTES(i);
+		/* and the card's upness from it's attrs */
+		if (attrs & CA_FACE_UP)  numUp++;
+		else break;
+		}
+	return(numUp);
+
+}
+
+/* ----------------------------------------------------------------------------
+		SpiderClass
+-----------------------------------------------------------------------------*/
+@classdecl	SpiderClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_SETUP_STUFF for SpiderClass
+ *
+ *
+ * DESCRIPTION:	Intercept Game message to do some of our own
+ *                Spider setup
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_GAME_SETUP_STUFF
+{
+ optr		dDeckOptr[10] = {@DDeck1, @DDeck2, @DDeck3, @DDeck4, @DDeck5};
+ optr		dSpaceOptr[8] = {@DoneSpace1, @DoneSpace2, @DoneSpace3, @DoneSpace4,
+								  @DoneSpace5, @DoneSpace6, @DoneSpace7, @DoneSpace8};
+ word		i;
+ Boolean			initError;
+
+
+	@callsuper();
+
+	initError = InitFileReadInteger("Spider", "DragStatus", &i);
+	if (!initError) {
+		@send DragItemGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(i, FALSE);
+		@send self::MSG_SPIDER_SET_DRAG(i, 1, 0);
+		}
+
+	initError = InitFileReadInteger("Spider", "Difficulty", &i);
+	if (!initError) {
+		@send DifficultyGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(i, FALSE);
+		pself->SI_difficulty = i;
+		}
+
+	initError = InitFileReadInteger("Spider", "CardBack", &i);
+	if (!initError)  @send self::MSG_GAME_SET_WHICH_BACK(i);
+	else  @send self::MSG_GAME_SET_WHICH_BACK(10);
+
+	/* Set default spreads for all decks - which is really just the
+		WorkSpace decks since we change the others just below
+		NOTE- it seems that the spreads set in the ui file don't
+		get picked up since the game lib setup routine looks like
+		it gets spread data from the card decks */
+	@send self::MSG_GAME_SET_UP_SPREADS(0, WORK_UP_SPREADY);
+	@send self::MSG_GAME_SET_DOWN_SPREADS(0, WORK_DOWN_SPREADY);
+
+	for (i = 0; i < 5; i++)  {
+		@send dDeckOptr[i]::MSG_DECK_SET_DOWN_SPREADS(0,0);
+		}
+
+	for (i = 0; i < 8; i++)  {
+		@send dSpaceOptr[i]::MSG_DECK_SET_UP_SPREADS(0,0);
+		}
+
+	/* Create a hand of two standard decks -  we'll change the suits
+		as necessary as they're dealt */
+	@send MyHand::MSG_HAND_MAKE_FULL_HAND();
+	@send MyHand::MSG_HAND_MAKE_FULL_HAND();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_SETUP_GEOMETRY for SpiderClass
+ *
+ * DESCRIPTION:	Intercept Game message to do our table layout.
+ *     				This msg is called by MSG_GAME_SETUP_STUFF
+ *
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_GAME_SETUP_GEOMETRY
+{
+ word		i, xPos, yPos, cWidth;
+ optr		workDeckOptr[10] = {@WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+									 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8,
+									 @WorkSpace9, @WorkSpace10};
+ optr		dDeckOptr[5] = {@DDeck1, @DDeck2, @DDeck3, @DDeck4, @DDeck5};
+ optr		dSpaceOptr[8] = {@DoneSpace1, @DoneSpace2, @DoneSpace3, @DoneSpace4,
+								  @DoneSpace5, @DoneSpace6, @DoneSpace7, @DoneSpace8};
+
+
+	/* save the card width */
+	cWidth = pself->GI_cardWidth;
+
+	/* Hide MyHand deck at a negative coordinate so it won't show up. */
+	@send MyHand::MSG_VIS_SET_POSITION(MY_HAND_POS, MY_HAND_POS);
+
+	/* Display work decks... */
+	xPos = WORK_DECK_LEFT;
+	yPos = WORK_DECK_TOP;
+	for (i = 0; i < 10; i++) {
+		if (i) xPos += WORK_HORIZ_SPACING + cWidth;
+		@send workDeckOptr[i]::MSG_VIS_SET_POSITION(xPos, yPos);
+		}
+
+	/* Display deal decks at lower right... */
+	xPos = DEAL_DECK_LEFT - 10;
+	yPos = DEAL_DECK_TOP;
+	for (i = 0; i < 5; i++) {
+		if (i) xPos -= DDECK_HORIZ_SPACING;
+		@send dDeckOptr[i]::MSG_VIS_SET_POSITION(xPos, yPos);
+		}
+
+	/* and done decks at lower left... */
+	xPos = DONE_DECK_LEFT + 10;
+	yPos = DONE_DECK_TOP;
+	for (i = 0; i < 8; i++) {
+		if (i) xPos += DDECK_HORIZ_SPACING;
+		@send dSpaceOptr[i]::MSG_VIS_SET_POSITION(xPos, yPos);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_NEW_GAME_MENU_SELECT for SpiderClass
+ *
+ * DESCRIPTION:	User selected New Game from Game menu
+ *
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_NEW_GAME_MENU_SELECT
+{
+ optr		dDeckOptr[5] = {@DDeck1, @DDeck2, @DDeck3, @DDeck4, @DDeck5};
+ byte		i;
+
+
+	/* Unless we've just won a game show the confirmation dbox */
+	if (!(pself->GI_gameAttrs & GA_JUST_WON_A_GAME)) {
+		if (g_topDeck == 0xff) {
+			/* we've used up our deal decks so we'll assume that there
+				are no more plays and that the game is lost */
+			UserStandardDialogOptr(0, 0, 0, 0,
+				@LostGameString,
+				((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+				(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+			}
+		else if ((UserStandardDialogOptr(0, 0, 0, 0,
+				 @ConfirmDealString,
+				 ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+				 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+				 ) != IC_YES))  return;
+		}
+
+	/* If 'Yes' was clicked, or game won, user wants to start another game... */
+
+	/* First add back any deal decks that were removed during the
+		previous game */
+	for (i = g_topDeck + 1; i < 5; i++)  {
+		@send MyPlayingTable::MSG_VIS_ADD_CHILD(dDeckOptr[i], CCO_LAST);
+		@send dDeckOptr[i]::MSG_VIS_MARK_INVALID(
+						VOF_WINDOW_INVALID,
+						VUM_NOW);
+		}
+
+	/* gather all the cards, and send NEW_GAME message.  */
+	@send self::MSG_GAME_COLLECT_ALL_CARDS();
+	@send self::MSG_SPIDER_NEW_GAME();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_NEW_GAME for SpiderClass
+ *
+ *
+ * DESCRIPTION:	We're starting a new game
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_NEW_GAME
+{
+ GameAttrs		attrs;
+ word		i;
+ optr		workDeckOptr[10] = {@WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+									 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8,
+									 @WorkSpace9, @WorkSpace10};
+
+
+	/* Clear the GA_JUST_WON_A_GAME flag  */
+	attrs = pself->GI_gameAttrs;
+	if (attrs & GA_JUST_WON_A_GAME)  {
+		attrs -= GA_JUST_WON_A_GAME;
+		pself->GI_gameAttrs = attrs;
+		}
+	/* the winner card back flag may still be set */
+
+	pself->SI_gameInProgress = FALSE;
+
+	g_topDeck = 4;
+
+	/* Shuffle the hand  */
+	@send MyHand::MSG_HAND_SHUFFLE();
+
+	/* reset the spreads */
+	for (i = 0; i < 9; i++)  {
+		@send workDeckOptr[i]::MSG_DECK_SET_UP_SPREADS(0, WORK_UP_SPREADY);
+		}
+
+	/* Deal the cards from the hidden hand - forceQueue'ing this
+		makes the cards show up more or less individually */
+	@send, forceQueue self::MSG_SPIDER_DEAL_CARDS();
+
+	/* Make sure the window is marked as invalid, so we can start
+		playing.  */
+	@send self::MSG_VIS_MARK_INVALID(
+						VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID,
+						VUM_NOW);
+
+	g_doneDeck = 0xff;
+
+	/* Disable the Undo trigger, since we're at the beginning of the
+		game, there can be nothing to undo. */
+	@send MyPlayingTable::MSG_GAME_DISABLE_UNDO();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_DEAL_CARDS for SpiderClass
+ *
+ *
+ * DESCRIPTION:	Deal the cards from the hidden hand to the
+ *                WorkSpace decks
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_DEAL_CARDS
+{
+ word		whichDeck, i, count, level;
+ optr		poppedCard;
+ CardAttrs		attr;
+ optr		workDeckOptr[10] = {@WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+									 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8,
+									 @WorkSpace9, @WorkSpace10};
+ optr		dDeckOptr[5] = {@DDeck1, @DDeck2, @DDeck3, @DDeck4, @DDeck5};
+ GameAttrs		attrs;
+
+
+	whichDeck = FIRST_DECK;
+	level = pself->SI_difficulty;
+
+	/* we initialized to 104 cards in setup*/
+	for (i = 0; i < 104; i++) {
+		/* get the top card from the hand */
+		poppedCard = @call MyHand::MSG_DECK_POP_CARD();
+		/* maybe an error message if no card popped? */
+		if (poppedCard)  {
+			/* change the suits depending on difficulty level */
+			if (level == D_EASY) {
+				/* if the suit isn't spades, make it spades */
+				attr = @call poppedCard::MSG_CARD_GET_ATTRIBUTES();
+				/* the suit is stored in the 2 & 4 bits of the attr word and
+					CA_SPADES is ...xxx11x which is decimal 6. */
+				if ((attr & 6) != 6) {
+					/* it's not a spade... */
+					/* since CA_SPADES = bin 11x, we can just or any suit with
+						11x to make it a spade... */
+					attr |= 6;
+					@send poppedCard::MSG_CARD_SET_ATTRIBUTES(attr);
+					}
+				} /* end of easy level */
+			else if (level == D_MED) {
+				/* if the suit isn't spades, make it spades */
+				attr = @call poppedCard::MSG_CARD_GET_ATTRIBUTES();
+				/* the color is stored in the 4 bit of the attr word...
+					a 1 denotes black.  We'll make all black cards spades (...11x)
+					and all red cards hearts (...01x). */
+				if (!(attr & 2)) {
+					/* It's a club or diamond so ORing with the low bit
+						of the suit will ensure spades & hearts */
+					attr |= 2;
+					@send poppedCard::MSG_CARD_SET_ATTRIBUTES(attr);
+					}
+				} /* end of medium level */
+			/* and we don't need to mess with suits if it's the difficult level */
+
+			/* put the first 44 cards in the work decks face down */
+			if (i < 44) {
+				@send workDeckOptr[whichDeck]::MSG_DECK_GET_DEALT(poppedCard);
+				SpiderPlaySound(g_dealSound);
+				TimerSleep(2);
+				whichDeck++;
+				if (whichDeck > LAST_WORKSPACE_DECK)  whichDeck = FIRST_DECK;
+				}
+			/* put the next 10 cards in the work decks face up */
+			else if (i < 54) {
+				@send poppedCard::MSG_CARD_TURN_FACE_UP();
+				@send workDeckOptr[whichDeck]::MSG_DECK_GET_DEALT(poppedCard);
+				whichDeck++;
+				if (whichDeck > LAST_WORKSPACE_DECK)  whichDeck = FIRST_DECK;
+				}
+			/* put the last 50 cards in the 5 deal decks face down */
+			else {
+				if (i == 54) {
+					whichDeck = FIRST_DECK;
+					count = 0;
+					}
+				@send dDeckOptr[whichDeck]::MSG_DECK_GET_DEALT(poppedCard);
+				count++;
+				if (count > DEAL_DECK_CARDS) {
+					whichDeck++;
+					count = 0;
+               }
+				}
+			}  /* end of poppedCard if */
+		} /* end of dealing for loop */
+
+	/* the winner card back flag may still be set */
+	pself = ObjDerefGen(oself);
+	attrs = pself->GI_gameAttrs;
+	if (attrs & GA_USE_WIN_BACK)  {
+		attrs -= GA_USE_WIN_BACK;
+		pself->GI_gameAttrs = attrs;
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_UNDO for SpiderClass
+ *
+ *
+ * DESCRIPTION:	Undo the last play
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_UNDO
+{
+
+
+	/* Make sure that the lastDoner field is not NULL -- if so, we
+		can't undo anything.  this also clears the lastDoner field. */
+	if (pself->GI_lastDonor) {
+		/* check to see if we need to un-flip a card */
+		if (pself->SI_flipped)  {
+			@send pself->GI_lastDonor::MSG_CARD_FLIP_CARD();
+			}
+		@send (pself->GI_lastDonor)::MSG_DECK_RETRIEVE_CARDS();
+		}
+
+	/* Disable the Undo trigger -- only one undo at a time. */
+	@send MyPlayingTable::MSG_GAME_DISABLE_UNDO();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_DECK_SELECTED for SpiderClass
+ *                    (optr deck,
+ *							  word cardNumber)
+ *
+ * DESCRIPTION:	- Intercept this to see if we can do the drag.  All cards
+ *                down from this one must be in order & of the same suit.
+ *                - See if a covered ace is selected.  If so draw the full
+ *                card for a short period of time. (highest difficulty only)
+ ***********************************************************************/
+@method SpiderClass, MSG_GAME_DECK_SELECTED
+{
+ word				rank, i, nextRank, suit, nextSuit, cW, cH;
+ sword			j;
+ Boolean			canDrag = TRUE;
+ optr				selCard;
+
+
+	/* if it's the top card we don't need to check any further */
+	if (cardNumber)  {
+		/* if it's not the top card we need to do a few checks... */
+		/* get the selected card's rank & suit */
+		rank = GetCardRank(deck, cardNumber);
+		suit = GetCardSuit(deck, cardNumber);
+		/* first - do the ace check */
+		if ((rank == CR_ACE) && (pself->SI_difficulty == D_DIFF))  {
+			cW = pself->GI_cardWidth;
+			cH = pself->GI_cardHeight;
+			/* draw the full card */
+			selCard = @call deck::MSG_VIS_FIND_CHILD_AT_POSITION(cardNumber);
+         pself = ObjDerefVis(oself);
+			@send selCard::MSG_VIS_SET_SIZE(cW, cH);
+			@send selCard::MSG_CARD_NORMAL_REDRAW();
+			TimerSleep(45);
+			/* Now redraw the card and any of the ones on top of it */
+			for (j = cardNumber; j >= 0; j--) {
+				selCard = @call deck::MSG_VIS_FIND_CHILD_AT_POSITION(j);
+	 			@send selCard::MSG_VIS_INVALIDATE();
+				@send selCard::MSG_CARD_NORMAL_REDRAW();
+				}
+			/* since we've shown the ace we don't want to call the superclass */
+//			canDrag = FALSE;
+			return;
+			}  /* end of it's an Ace if */
+		for (i = cardNumber; i > 0; i--) {
+			/* now get the next card's rank & suit */
+			nextRank  = GetCardRank(deck, i-1);
+			nextSuit  = GetCardSuit(deck, i-1);
+			/* and make sure they're in order */
+			if ((nextRank == rank - 1) && (nextSuit == suit)) {
+				/* ok, keep checking */
+				rank = nextRank;
+				}
+			else {
+				/* nope, bail out */
+				canDrag = FALSE;
+				break;
+				}
+			}
+		}
+
+	/* if it's ok to drag, do it... */
+	if (canDrag) @callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_REGISTER_DRAG for SpiderClass
+ *                    (optr deck) deck drag is from (according to the .goh
+ *                                but it isn't!)
+ * DESCRIPTION:	Intercept this to see if the deck we just dragged from
+ *                has any more face up cards.  If not turn over the top
+ *                card (if any).
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_GAME_REGISTER_DRAG
+{
+ word		cards/*, newSpread*/;
+ optr		topCard, checkDeck;
+ CardAttrs		attr;
+
+
+	/* first let the game stuff do its thang */
+	@callsuper();
+
+	/* if this is the first drag set the game in prog flag */
+	if (!pself->SI_gameInProgress)  pself->SI_gameInProgress = TRUE;
+
+	checkDeck = pself->GI_lastDonor;
+	pself->SI_flipped = FALSE;
+	/* don't even bother if there are no cards */
+	cards = @call checkDeck::MSG_DECK_GET_N_CARDS();
+	if (cards)  {
+      /* check the top card to see if it is face up */
+		topCard = @call checkDeck::MSG_VIS_FIND_CHILD_AT_POSITION(0);
+		attr = @call topCard::MSG_CARD_GET_ATTRIBUTES();
+		if (!(attr & CA_FACE_UP)) {
+			@send checkDeck::MSG_CARD_FLIP_CARD();
+			/* this ^^^ msg appears to be of Card class but it isn't. */
+			pself->SI_flipped = TRUE;
+			}
+		}
+
+	if (g_runDeckOptr)
+		@send, forceQueue g_runDeckOptr::MSG_SPIDER_MOVE_TO_DONE();
+
+
+/*	newSpread = @call g_receiveDeck::MSG_SPIDER_CHECK_ON_SPREAD();
+	if (newSpread) {
+		@send, forceQueue g_receiveDeck::MSG_DECK_SET_UP_SPREADS(0, newSpread);
+		@send, forceQueue g_receiveDeck::MSG_DECK_REDRAW();
+		}
+*/
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_DO_WINNER for SpiderClass
+ *
+ *
+ * DESCRIPTION:	do the we have a winner stuff
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_DO_WINNER
+{
+ word		difficulty;
+
+
+	difficulty = pself->SI_difficulty;
+
+	/* Set flags that we have just won a game  */
+	pself->GI_gameAttrs |= GA_JUST_WON_A_GAME;
+	pself->GI_gameAttrs |= GA_USE_WIN_BACK;
+
+	/* Disable the Undo & Redeal triggers */
+	@send MyPlayingTable::MSG_GAME_DISABLE_UNDO();
+
+
+	/* set up the winner dbox */
+	if (difficulty == D_EASY) {
+		@send FinishGlyph2E::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2E1::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2M::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2M1::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2D::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2D1::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else if (difficulty == D_MED) {
+		@send FinishGlyph2E::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2E1::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2M::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2M1::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2D::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2D1::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else {
+		@send FinishGlyph2E::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2E1::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2M::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2M1::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2D::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FinishGlyph2D1::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	/* Put up the winner dialog box  */
+	SpiderPlaySound(g_winSound);
+	if (UserDoDialog(@FinishBox) != IC_YES)
+		@send application::MSG_META_QUIT();
+	else
+		@send self::MSG_SPIDER_NEW_GAME_MENU_SELECT();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_SET_DRAG for SpiderClass
+ *             (word selection, numSelections, flags)
+ *
+ * DESCRIPTION:	Set the instance data
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_SET_DRAG
+{
+
+
+	/* Insert into instance data */
+	pself->GI_dragType = selection;
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_GET_CARD_WIDTH for SpiderClass
+ *
+ *
+ * DESCRIPTION:	Get the instance data
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_GET_CARD_WIDTH
+{
+
+	return pself->GI_cardWidth;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_GET_CARD_HEIGHT for SpiderClass
+ *
+ *
+ * DESCRIPTION:	Get the instance data
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_GET_CARD_HEIGHT
+{
+
+	return pself->GI_cardHeight;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GAME_SHUTDOWN for SpiderClass
+ *
+ *
+ * DESCRIPTION:	save options & let the game class do its thing
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_GAME_SHUTDOWN
+{
+
+	InitFileWriteInteger("Spider", "DragStatus", pself->GI_dragType);
+	InitFileWriteInteger("Spider", "CardBack", pself->GI_whichBack);
+	InitFileWriteInteger("Spider", "Difficulty", pself->SI_difficulty);
+	InitFileCommit();
+
+	@callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_SET_DIFFICULTY for SpiderClass
+ *            (word selection, numSelections, flags)
+ *
+ * DESCRIPTION:	Set the instance data
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_SET_DIFFICULTY
+{
+ word		level, i;
+ optr		card;
+
+
+	level = pself->SI_difficulty;
+	/* do nothing if the level hasn't changed */
+	if (level == selection) return;
+
+	/* confirm level change & new game */
+	if (pself->SI_gameInProgress) {
+		if ((UserStandardDialogOptr(0, 0, 0, 0,
+				 @ConfirmChangeDiffString,
+				 ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+				 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+				 ) != IC_YES))  return;
+		}
+
+	/* change the level */
+	pself->SI_difficulty = selection;
+	/* reset the flag so that the new deal confirm dbox won't get called */
+	pself->GI_gameAttrs |= GA_JUST_WON_A_GAME;
+
+	/* since the cards attrs don't change when they're gathered from the
+		back into the hand for a redeal we'll need to 86 all the old cards
+      and generate new ones */
+	@send self::MSG_GAME_COLLECT_ALL_CARDS();
+	/* we know we have all 104 cards now */
+	for (i = 0; i < 104; i++) {
+		card = @call MyHand::MSG_VIS_FIND_CHILD_AT_POSITION(0);
+		@send card::MSG_VIS_REMOVE(VUM_NOW);
+		}
+	@send MyHand::MSG_HAND_MAKE_FULL_HAND();
+	@send MyHand::MSG_HAND_MAKE_FULL_HAND();
+
+	/* kill the difficulty dbox */
+	@send DifficultyDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+	/* and start the new game */
+	@send self::MSG_SPIDER_NEW_GAME_MENU_SELECT();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_SET_GAME_IN_PROGRESS for SpiderClass
+ *            
+ *
+ * DESCRIPTION:	Set the instance data
+ *
+ *
+ ***********************************************************************/
+@method SpiderClass, MSG_SPIDER_SET_GAME_IN_PROGRESS
+{
+
+	pself->SI_gameInProgress = TRUE;
+}
+
+/* ----------------------------------------------------------------------------
+		DealDeckClass
+-----------------------------------------------------------------------------*/
+@classdecl	DealDeckClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DECK_DOWN_CARD_SELECTED for DealDeckClass
+ *                  ( word card = bp )
+ *
+ * DESCRIPTION:	When the user clicks on a deal deck (any one) we
+ *                deal out the top deck's 10 cards to the workspace decks.
+ *                First make sure that there are no open work spaces.
+ *
+ ***********************************************************************/
+@method DealDeckClass, MSG_DECK_DOWN_CARD_SELECTED
+{
+ word		i, cards, width, height;
+ optr		dDeckOptr[5] = {@DDeck1, @DDeck2, @DDeck3, @DDeck4, @DDeck5};
+ optr		workDeckOptr[10] = {@WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+									 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8,
+									 @WorkSpace9, @WorkSpace10};
+ optr		poppedCard;
+
+
+   /* First make sure that there are no open work spaces */
+	for (i = 0; i < 10; i++)  {
+		cards = @call workDeckOptr[i]::MSG_DECK_GET_N_CARDS();
+		if (!cards)  {
+			UserStandardDialogOptr(0, 0, 0, 0,
+				@EmptyWorkDeckString,
+				((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+				(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+			return;
+         }
+		}
+
+	@send application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+	/* set the game in prog flag if necessary */
+   @send MyPlayingTable::MSG_SPIDER_SET_GAME_IN_PROGRESS();
+
+	for (i = 0; i < 10; i++)  {
+		/* grab the top card from the top deck */
+		poppedCard = @call dDeckOptr[g_topDeck]::MSG_DECK_POP_CARD();
+
+		/* the second and subsequent cards in the deck have VI_bounds with
+			the R,B coords the same as L,T.  This makes the card zero size
+			and it doesn't get drawn.  So in here I'm adding card width
+			and height to see that the card gets drawn correctly. */
+		width = @call MyPlayingTable::MSG_SPIDER_GET_CARD_WIDTH();
+		height = @call MyPlayingTable::MSG_SPIDER_GET_CARD_HEIGHT();
+		@send poppedCard::MSG_VIS_SET_SIZE(width, height);
+
+		/* and plop it on a work deck */
+		@send poppedCard::MSG_CARD_TURN_FACE_UP();
+		@send workDeckOptr[i]::MSG_DECK_GET_DEALT(poppedCard);
+		SpiderPlaySound(g_dealSound);
+		if (i != 9) TimerSleep(5);
+		}
+
+	/* and get rid of the deck we just dealt from */
+	@send dDeckOptr[g_topDeck]::MSG_VIS_REMOVE(VUM_NOW);
+	@send MyPlayingTable::MSG_VIS_MARK_INVALID(
+						VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID,
+						VUM_NOW);
+
+	/* set up for next deck deal */
+	g_topDeck--;
+
+   /* can't undo from a deal */
+	@send MyPlayingTable::MSG_GAME_DISABLE_UNDO();
+
+	@send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+	/* if we completed a run on the deal... */
+	if (g_runDeckOptr)
+		@send, forceQueue g_runDeckOptr::MSG_SPIDER_MOVE_TO_DONE();
+
+}
+
+/* ----------------------------------------------------------------------------
+		WorkDeckClass
+-----------------------------------------------------------------------------*/
+@classdecl	WorkDeckClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DECK_PUSH_CARD for WorkDeckClass
+ *          MSG_DECK_GET_DEALT
+ *
+ * DESCRIPTION:	Intercept to see if we have a complete A-K run and if
+ *                so move it to the next done deck
+ *
+ *                MSG_DECK_GET_DEALT is also intercepted in case we
+ *						get an Ace dealt onto a K-2 stack during the deal
+ *						(hey, it could happen)
+ *
+ ***********************************************************************/
+@method WorkDeckClass, MSG_DECK_PUSH_CARD, MSG_DECK_GET_DEALT
+{
+ word				rank, i, suit, nextSuit, numUp;
+ Boolean			gotSuit = TRUE;
+
+
+	/* let DeckClass do its thing... */
+	@callsuper();
+
+//	g_receiveDeck = oself;
+
+	numUp = GetNumUpCards(oself, pself->DI_nCards);
+
+	/* make sure there are at least 13 up cards in the deck */
+	if (numUp >= 13) {
+		/* the top card on the deck has to be an Ace and on down to the king */
+		suit = GetCardSuit(oself, 0);
+		for (i = 0; i < 13; i++)  {
+			rank = GetCardRank(oself, i);
+			nextSuit = GetCardSuit(oself, i);
+			if ((rank != i + CR_ACE) || (nextSuit != suit)){
+				gotSuit = FALSE;
+				break;
+				}
+			}
+		if(gotSuit)  {
+			/* set our flag so that after the drag/deal is done we can do the move */
+			g_runDeckOptr = oself;
+			}
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_CHECK_ON_SPREAD for WorkDeckClass
+ *
+ *
+ * DESCRIPTION:
+ *          returns new spread if change needed else zero
+ *
+ *
+ ***********************************************************************/
+/*@method WorkDeckClass, MSG_SPIDER_CHECK_ON_SPREAD
+{
+ word			oldSpread, newSpread, height, bottomUpCardTop, room;
+ word			numUp;
+
+
+ //	if (oself == @WorkSpace1 || oself == @WorkSpace2 ||
+//		 oself == @WorkSpace9 || oself == @WorkSpace10) {
+		numUp = GetNumUpCards(oself, pself->DI_nCards);
+		height = @call MyPlayingTable::MSG_SPIDER_GET_CARD_HEIGHT();
+		pself = ObjDerefGen(oself);
+		oldSpread = pself->DI_offsetFromUpCardY;
+		if (((pself->DI_topCardTop) + height) > DONE_DECK_TOP) {
+			/* ok - gotta condense things */
+/*			bottomUpCardTop = (pself->DI_topCardTop) - ((numUp - 1) * oldSpread);
+			room = DONE_DECK_TOP - height - bottomUpCardTop;
+			newSpread = room / (numUp - 1);
+			if (newSpread == 0)  newSpread = 2;
+//			@send oself::MSG_DECK_SET_UP_SPREADS(0, newSpread);
+			}
+		else newSpread = 0;
+
+//		}
+
+	return (newSpread);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SPIDER_MOVE_TO_DONE for WorkDeckClass
+ *
+ *
+ * DESCRIPTION:	we have a complete A-K run
+ *                so move it to the next done deck
+ *                ...And check for winner
+ *
+ ***********************************************************************/
+@method WorkDeckClass, MSG_SPIDER_MOVE_TO_DONE
+{
+ word				i, width, height;
+ optr		dSpaceOptr[8] = {@DoneSpace1, @DoneSpace2, @DoneSpace3, @DoneSpace4,
+								  @DoneSpace5, @DoneSpace6, @DoneSpace7, @DoneSpace8};
+ optr		poppedCard;
+ Rectangle		bigDeck, smallDeck;
+ CardAttrs		attr;
+ GStateHandle	gstate;
+
+
+	@send application::MSG_GEN_APPLICATION_MARK_BUSY();
+	g_runDeckOptr = 0;
+	g_doneDeck++;
+	/* get a card width & height */
+	width = @call MyPlayingTable::MSG_SPIDER_GET_CARD_WIDTH();
+	height = @call MyPlayingTable::MSG_SPIDER_GET_CARD_HEIGHT();
+
+	/* move the 13 card run to the next done deck
+		one card at a time (for the effect) */
+	for (i = 0; i < 13; i++)  {
+		TimerSleep(5);
+		/* we have to do this manipulation of saving the pre-pop deck
+			size to get rid of artifacts */
+		@call self::MSG_VIS_GET_BOUNDS(&bigDeck);
+		/* grab the top card from the work deck */
+		poppedCard = @call self::MSG_DECK_POP_CARD();
+		/* set its size */
+		@send poppedCard::MSG_VIS_SET_SIZE(width, height);
+
+		/* the top card in the deck accepting the drag is inverted, so we
+			need to check and uninvert it */
+		attr = @call poppedCard::MSG_CARD_GET_ATTRIBUTES();
+		if (attr & CA_INVERTED)  {
+			attr -= CA_INVERTED;
+			@send poppedCard::MSG_CARD_SET_ATTRIBUTES(attr);
+			}
+		/* and plop it on a done deck */
+		@send dSpaceOptr[g_doneDeck]::MSG_DECK_GET_DEALT(poppedCard);
+		/* now fixup the work deck */
+		@send self::MSG_DECK_REPAIR_SUCCESSFUL_TRANSFER();
+		/* and here we save the post-pop size set the deck to the pre-pop
+			size, inval, and restore post-pop size */
+		@call self::MSG_VIS_GET_BOUNDS(&smallDeck);
+		/* and this to redraw the table under any popped card */
+		gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+		GrBeginUpdate(gstate);
+		GrInvalRect(gstate, smallDeck.R_left, smallDeck.R_bottom,
+							bigDeck.R_right, bigDeck.R_bottom);
+		GrEndUpdate(gstate);
+		GrDestroyState(gstate);
+		SpiderPlaySound(g_dealSound);
+		}
+
+	/* check to see if we need to turn over the new top card */
+	pself = ObjDerefGen(oself);
+	if (pself->DI_nCards)  {
+		/* check the top card to see if it is face up */
+		poppedCard = @call self::MSG_VIS_FIND_CHILD_AT_POSITION(0);
+		attr = @call poppedCard::MSG_CARD_GET_ATTRIBUTES();
+		if (!(attr & CA_FACE_UP))
+			@send self::MSG_CARD_FLIP_CARD();
+		}
+
+	@send MyPlayingTable::MSG_GAME_DISABLE_UNDO();
+	@send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+	/* clean up a bit */
+	@send SpiderView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+	/* do we have a winner? */
+	if (g_doneDeck == 7) {
+		/* clean up a bit */
+		@send MyPlayingTable::MSG_SPIDER_DO_WINNER();
+		}
+
+}
+
+/* ----------------------------------------------------------------------------
+		DoneDeckClass
+-----------------------------------------------------------------------------*/
+@classdecl	DoneDeckClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_DRAW for DoneDeckClass
+ *
+ *
+ * DESCRIPTION:	Let it draw if deck has cards otherwise don't draw the
+ *                blanks
+ *
+ *
+ ***********************************************************************/
+@method DoneDeckClass, MSG_VIS_DRAW
+{
+
+	if (pself->DI_nCards)  @callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DECK_TEST_ACCEPT_CARDS for DoneDeckClass
+ *
+ *
+ * DESCRIPTION:	Prevents a card from being dragged onto a done deck
+ *
+ *
+ ***********************************************************************/
+@method DoneDeckClass, MSG_DECK_TEST_ACCEPT_CARDS
+{
+
+	return FALSE;
+
+}
+
+

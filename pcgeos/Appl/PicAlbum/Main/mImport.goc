@@ -1,0 +1,277 @@
+@include "PicAlbum.goh"
+#include <Ansi/string.h>
+@include <htmldrv.h>
+#include <Library.h>
+#include <resource.h>
+#include <geode.h>
+#include <awatcher.h>
+
+
+typedef struct {
+
+	DiskHandle		paIH_disk;
+	PathName		paIH_path;
+	FileLongName	paIH_name;
+	VMFileHandle	paIH_vmFile;
+	GeodeHandle		paIH_impGraph;	
+	optr			paIH_statDest;
+	Message			paIH_statMsg;
+
+	MimeStatus		*paIH_mimeStatusPtr;
+
+	Boolean			paIH_stop;
+	Boolean			paIH_finished;
+
+} paImportHandle;
+
+#if ERROR_CHECK
+void animationDummy(void)
+{
+}
+#endif
+
+word paImport(PAImportHandle aHandle)
+{
+	paImportHandle *p_handle;
+	optr notify_obj;
+	Message notify_msg;
+	entry_MimeDrvGraphic *entry;
+	VMFileHandle vmf;
+	MimeStatus mimeStatus = {0};
+	ImageAdditionalData iad;
+	VMBlockHandle vmb = 0;
+	FileLongName fname;
+	GeodeHandle impGraphGeode;
+	GeodeLoadError gle;
+
+	p_handle = MemLockExcl(aHandle);
+	vmf = p_handle->paIH_vmFile;
+	strcpy(fname, p_handle->paIH_name);
+	notify_obj = p_handle->paIH_statDest;
+	notify_msg = p_handle->paIH_statMsg;
+	p_handle->paIH_mimeStatusPtr = &mimeStatus;
+	impGraphGeode = p_handle->paIH_impGraph;
+
+	MemUnlockExcl(aHandle);
+
+	FilePushDir();
+	FileSetStandardPath(SP_IMPORT_EXPORT_DRIVERS);
+
+#if ERROR_CHECK
+//	impGraphGeode = GeodeUseLibrary("EC Graphics Import Library", MIME_DRV_PROTOMAJOR, MIME_DRV_PROTOMINOR, &gle);
+#else
+//	impGraphGeode = GeodeUseLibrary("Graphics Import Library", MIME_DRV_PROTOMAJOR, MIME_DRV_PROTOMINOR, &gle);
+#endif
+	FilePopDir();
+
+	if(impGraphGeode) {
+
+		/* create importing thread */
+		entry = ProcGetLibraryEntry(impGraphGeode, MIME_ENTRY_GRAPHIC_EX);
+
+		if(entry) {
+			
+			dword usedMem;
+			dword availMem;
+			AllocWatcherHandle allocWatcher;
+			DiskHandle thisDisk;
+
+			FilePushDir();
+			p_handle = MemLockExcl(aHandle);
+			thisDisk = FileSetCurrentPath(p_handle->paIH_disk, p_handle->paIH_path);
+			MemUnlockExcl(aHandle);
+			if(thisDisk) {
+
+				availMem = 0x8000000 ;  /* 4 megs unless told otherwise */
+				allocWatcher = AllocWatcherCreate(availMem) ;
+
+				vmb = ((pcfm_MimeDrvGraphicEx*) ProcCallFixedOrMovable_pascal)(
+			
+					"",		//char *mimeType, \
+					fname,		//char *file, \
+					vmf,				//VMFileHandle vmf, \
+					&iad,				//ImageAdditionalData *iad, \
+					MIME_RES_UNKNOWN,	//MimeRes resolution, \
+					allocWatcher,		//AllocWatcherHandle watcher, \
+					&usedMem,			//dword *usedMem, \
+					&mimeStatus,		//MimeStatus *mimeStatus, \
+					0,					//_ImportProgressParams_,
+					MIME_GREX_NO_ANIMATIONS|MIME_GREX_NO_SCANLINE_COMPRESS,
+					entry
+				);
+			}
+					
+			FilePopDir();
+			AllocWatcherDestroy(allocWatcher);
+
+			if(vmb) {
+
+				if(iad.IAD_type == IAD_TYPE_ANIMATION) {
+
+					VMBlockHandle firstFrame;
+					MemHandle mem;
+					AnimationHeader *p_header ;	
+					VMChain *p_chain;
+					VMBlockHandle newBlock;
+
+					EC(animationDummy());
+
+					p_header = VMLock(vmf, vmb, &mem) ;
+					p_chain = (VMChain*)(((byte *)p_header) + p_header->AH_tree.VMCT_offset) ;
+					firstFrame = VMCHAIN_GET_VM_BLOCK(*(p_chain++));
+					VMUnlock(mem);
+
+					newBlock = VMCHAIN_GET_VM_BLOCK(VMCopyVMChain(vmf, VMCHAIN_MAKE_FROM_VM_BLOCK(firstFrame), vmf));
+
+					if(vmb) {
+
+						VMFreeVMChain(
+								vmf, 
+								VMCHAIN_MAKE_FROM_VM_BLOCK(vmb));
+					}
+				
+					vmb = newBlock;
+
+				} else if(iad.IAD_type != IAD_TYPE_BITMAP) {
+				
+					/* if wrong format */
+					VMFreeVMChain(
+							vmf, 
+							VMCHAIN_MAKE_FROM_VM_BLOCK(vmb));
+					vmb = 0;			
+				} 	
+			}
+		}
+
+//		GeodeFreeLibrary(impGraphGeode);
+	}
+
+    p_handle = MemLockExcl(aHandle);
+	if(!p_handle->paIH_stop) {
+
+		@send notify_obj::{PA_IMPORT_STATUS_MSG}(notify_msg)(vmb, TRUE, vmb ? TRUE : FALSE);
+    
+	} else {
+
+		if(vmb) {
+			
+			VMFreeVMChain(
+					vmf, 
+					VMCHAIN_MAKE_FROM_VM_BLOCK(vmb));
+		}
+	}
+	p_handle->paIH_finished = TRUE;
+    MemUnlockExcl(aHandle);
+
+    /* now no block access allowed */
+
+	return 0;
+}
+
+
+/*
+ *  This function start importing the named file. The file is expected at
+ *  the current path.
+ */
+
+PAImportHandle
+PAImportStart(
+	DiskHandle		aDisk,
+	TCHAR			*aPath,
+	TCHAR			*aName,
+	VMFileHandle	aVMFile,
+	GeodeHandle		aImpGraph,
+	optr			aStatDest,
+	Message			aStatMsg
+) 
+{
+	typedef word (*startRoutine)(PAImportHandle aHandle);
+	PAImportHandle handle;
+
+	/* create the handle */
+	handle = MemAllocSetOwner(GeodeGetProcessHandle(), sizeof(paImportHandle), HF_SWAPABLE, HAF_LOCK);
+
+	if(handle) {
+
+		paImportHandle *p_handle;
+
+		p_handle = MemDeref(handle);
+
+		/* init the handle */
+		p_handle->paIH_disk = aDisk;
+		strcpy(p_handle->paIH_path, aPath);
+		strcpy(p_handle->paIH_name, aName);
+		p_handle->paIH_vmFile = aVMFile;
+		p_handle->paIH_impGraph = aImpGraph;	
+		p_handle->paIH_statDest = aStatDest;
+		p_handle->paIH_statMsg = aStatMsg;
+		p_handle->paIH_stop = FALSE;
+		p_handle->paIH_finished = FALSE;
+		p_handle->paIH_mimeStatusPtr = 0;
+	
+		MemUnlock(handle);
+
+        if(!ThreadCreate(
+            PRIORITY_STANDARD,		/* base priority */
+	        (PAImportHandle) handle,
+            (startRoutine) paImport,
+            3 * 1024,
+            GeodeGetProcessHandle())) {
+		
+			MemFree(handle);
+			handle = 0;
+		}
+	}
+
+	/* start the importing thread */
+	return handle;
+}
+
+Boolean
+PAImportStop(
+	PAImportHandle aHandle
+)
+{
+	paImportHandle *p_handle;
+	Boolean stopped;
+	Boolean retValue = FALSE;
+
+	/* signal stop */
+    p_handle = MemLockExcl(aHandle);
+    p_handle->paIH_stop = TRUE;
+	if(!p_handle->paIH_finished) {
+	
+		retValue = TRUE;
+	}
+	
+	if(p_handle->paIH_mimeStatusPtr) {
+		
+		p_handle->paIH_mimeStatusPtr->MS_mimeFlags |= MIME_STATUS_ABORT;
+	}
+	MemUnlockExcl(aHandle);
+
+	/* wait until stopped */
+	stopped = FALSE;
+	while(!stopped)
+	{
+		TimerSleep(10);
+		p_handle = MemLockExcl(aHandle);
+		stopped = p_handle->paIH_finished;
+		MemUnlockExcl(aHandle);
+	}
+
+	return retValue;
+}
+
+Boolean
+PAImportDestroy(
+	PAImportHandle aHandle
+)
+{
+	Boolean stopped;
+
+	stopped = PAImportStop(aHandle);
+	MemFree(aHandle);
+
+	return stopped;
+}

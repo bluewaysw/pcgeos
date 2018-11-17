@@ -1,0 +1,236 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	Perf (Performance Meter Application)
+ * File:	help.ui
+ *
+ * Author:	Andrew Wilson, Eric E. Del Sesto
+ *
+ * RCS STAMP:
+ *	$Id: help.ui,v 1.1 97/04/04 16:26:56 newdeal Exp $
+ *
+ *	This file contains a description for a standard GCM help box.
+ *
+ *	It requires two #defines:
+ *
+ *	HELP_TITLE  - A brief slice of text to title the box e.g. "help";
+ *	HELP_TEXT   - The actual help text.  In order to allow for multiple
+ *		      styles within the text, it is necessary to use the form:
+ *				#define HELP_TEXT = \
+ *				startBold label	char \
+ *					char	"BOLD FOO" \
+ *				endBold	label	char \
+ *					char	"regular text"
+ *	HELP_STYLE_RUNS	- Use the RAE macro to specify the style changes 
+ *			  embedded in the text.  In order to designate bolded
+ *			  text, you need to turn the bolding on at the beginning
+ *			  of the word/string and then return the style to plain
+ *			  afterwards.  e.g.
+ *				#define HELP_STYLE_RUNS = \
+ *					RAE(start0,Bold), RAE(end0,Plain), \
+ *					RAE(start1,Bold), RAE(end1,Plain)
+ *	HELP_TEXT_CLASS - If you need to subclass the GenText in your
+ *			  application, then define this constant.  Otherwise,
+ *			  it will default to GenText.
+ *
+ *	And one #include: /staff/pcgeos/Appl/Art/mkrHelp.ui
+ *
+ *	Just send METHOD_GEN_INITATE_INTERACTION to HelpBox to bring the box up
+ *
+ * Revision History:
+ *	?	original work by Andrew
+ *	5/91	Eric added Italic type style, and made text field scrollable.
+ *
+ */
+
+#ifndef HELP_TEXT_CLASS
+#define	HELP_TEXT_CLASS GenText
+#endif
+
+HelpBox = GenInteraction {
+	moniker = "Help for Perf";
+	attributes = default +independentlyDisplayable, +notUserInitiatable;
+	children = /* HelpTitleGroup, */ HelpText, HelpReplyBar;
+	/******
+	hints = {
+	    HINT_SET_WIN_POS_SIZE_ATTR {
+	     dw	mask WPSF_SIZE_TYPE
+	     dw	(WST_AS_RATIO_OF_FIELD shl offset WPSF_SIZE_TYPE)
+	     SpecWinSizePair <	mask SWSS_RATIO or SS_PERCENT50, \
+				mask SWSS_RATIO or SS_PERCENT75	 >
+	    }
+	}
+	*******/
+}
+
+HelpTitleGroup = GenInteraction {
+	attributes = notIndependentlyDisplayable;
+	children = HelpTitlePic, HelpTitleText;
+	hints = {
+		 HINT_ORIENT_HORIZONTALLY,
+		 HINT_EXPAND_TO_FIT,
+		 HINT_CENTER_VERTICALLY,
+		 HINT_CENTER_HORIZONTALLY
+		}
+}
+HelpTitlePic = GenGlyphDisplay {
+	moniker = list {
+		HelpSCMoniker,
+		HelpSMMoniker,
+		HelpSCGAMoniker
+	}
+}
+HelpTitleText = GenGlyphDisplay {
+	moniker = HELP_TITLE
+}
+
+HelpText = HELP_TEXT_CLASS {
+	text = data {
+helpTextBase	label	char
+	char	"\r" 
+	    HELP_TEXT
+	char	"\r" 
+startDelta	label	char 
+	char	C_U_DELTA
+endDelta	label	char
+	char	"\r\r\r", 0
+	}
+	desiredHeight = 10;		/* 7 */
+	desiredWidth = "6*72";
+	genFont = noGenMapping;
+	textDisplayAttributes = default +desiredHeightIsViewMin, +initScrolling, -dontScrollToChanges, +selectable;
+	type = default -defaultStyle, +multipleStyles;
+	styleRuns = HelpStyleRuns;
+	hints = {
+		HINT_WASH_COLOR {
+		    SetColorParams <
+			SCP_index <		;SCP_index.
+			    WHITE,		;    SCPI_index
+			    <			;    SCPI_info.
+				0,		;	VTCMM_COLOR_FLAG
+				VTGS_100,	;	VTCMM_GRAY_SCREEN
+				0,		;	VTCMM_TRANSPARENT
+				0,		;	VTCMM_ON_BLACK
+				COLOR_MAP_SOLID	;	VTCMM_COLOR_MAP_MODE
+			    >,
+			    0			;    SCPI_unused
+			>
+		    >
+    	    	}
+	}
+}
+
+#define RAE(label,type) <label-helpTextBase,HSE_##type-HSE_base>
+#define RAE_noBase(label,type) <label,HSE_##type-HSE_base>
+
+chunk HelpStyleRuns = data {
+    RunArray <
+	HelpStyleElements,	;RA_elementArrayChunk
+	0,			;RA_elementArrayHandle (will be stuffed)
+	0,			;RA_nameArrayChunk
+	0,			;RA_nameArrayHandle (will be stuffed)
+	0			;RA_last
+    >
+    RunArrayElement HELP_STYLE_RUNS, \
+		RAE(startDelta, Bold), RAE(endDelta, Bold), \
+		<TEXT_ADDRESS_PAST_END, 0>
+}
+
+
+chunk HelpStyleElements = data {
+HSE_base	label	byte
+    ElementArray <
+	3,				;EA_count
+	0,				;EA_freePtrOrCounter (free ptr)
+	0				;EA_insertionToken
+    >
+HSE_Plain	label	byte
+    VisTextStyle <
+	<				;VTS_meta.
+	    2,				;    E_refCount
+	    0				;    E_id
+	>,
+	FONT_URW_SANS,	;VTS_font
+	<0, 14>,			;VTS_pointSize (WBFixed)
+	<>,				;VTS_textStyle
+	<SCP_index <			;VTS_color.SCP_index.
+	    BLACK,			;    SCPI_index
+	    <				;    SCPI_info.
+		0,			;	VTCMM_COLOR_FLAG
+		VTGS_100,		;	VTCMM_GRAY_SCREEN
+		0,			;	VTCMM_TRANSPARENT
+		0,			;	VTCMM_ON_BLACK
+		COLOR_MAP_SOLID		;	VTCMM_COLOR_MAP_MODE
+	    >,
+	    0				;    SCPI_unused
+	>>,
+	0,				;VTS_trackKerning (sword)
+	<0, 0>				;VTS_reserved
+    >
+HSE_Bold	label	byte
+    VisTextStyle <
+	<				;VTS_meta.
+	    2,				;    E_refCount
+	    0				;    E_id
+	>,
+	FONT_URW_SANS,	;VTS_font
+	<0, 14>,			;VTS_pointSize (WBFixed)
+	mask ST_BOLD,			;VTS_textStyle
+	<SCP_index <			;VTS_color.SCP_index.
+	    BLACK,			;    SCPI_index
+	    <				;    SCPI_info.
+		0,			;	VTCMM_COLOR_FLAG
+		VTGS_100,		;	VTCMM_GRAY_SCREEN
+		0,			;	VTCMM_TRANSPARENT
+		0,			;	VTCMM_ON_BLACK
+		COLOR_MAP_SOLID		;	VTCMM_COLOR_MAP_MODE
+	    >,
+	    0				;    SCPI_unused
+	>>,
+	0,				;VTS_trackKerning (sword)
+	<0, 0>				;VTS_reserved
+    >
+HSE_Italic	label	byte
+    VisTextStyle <
+	<				;VTS_meta.
+	    2,				;    E_refCount
+	    0				;    E_id
+	>,
+	FONT_URW_SANS,	;VTS_font
+	<0, 14>,			;VTS_pointSize (WBFixed)
+	mask ST_ITALIC,			;VTS_textStyle
+	<SCP_index <			;VTS_color.SCP_index.
+	    BLACK,			;    SCPI_index
+	    <				;    SCPI_info.
+		0,			;	VTCMM_COLOR_FLAG
+		VTGS_100,		;	VTCMM_GRAY_SCREEN
+		0,			;	VTCMM_TRANSPARENT
+		0,			;	VTCMM_ON_BLACK
+		COLOR_MAP_SOLID		;	VTCMM_COLOR_MAP_MODE
+	    >,
+	    0				;    SCPI_unused
+	>>,
+	0,				;VTS_trackKerning (sword)
+	<0, 0>				;VTS_reserved
+    >
+}
+
+HelpReplyBar = GenInteraction {
+	attributes = default +notIndependentlyDisplayable;
+	hints = {
+		 HINT_MAKE_REPLY_BAR
+		}
+	children = HelpPageUp, HelpPageDown, HelpClose;
+}
+HelpClose = GenTrigger {
+	CLOSE_TRIGGER_VALUES
+	genAttributes = default + completesInteraction;
+}
+HelpPageUp = GenTrigger {
+	moniker = 'U',"Page Up";
+	action = METHOD_TEXT_SCROLL_PAGE_UP, HelpText;
+}
+HelpPageDown = GenTrigger {
+	moniker = 'D',"Page Down";
+	action = METHOD_TEXT_SCROLL_PAGE_DOWN, HelpText;
+}
+

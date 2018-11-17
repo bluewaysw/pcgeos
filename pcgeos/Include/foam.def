@@ -1,0 +1,2574 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Foam Library
+FILE:		foam.def
+
+AUTHOR:		Skarpi Hedinsson, Oct 18, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	10/18/94   	Initial revision
+
+
+DESCRIPTION:
+	This file contains the definitions for the library.  It is included
+both by the library and by users of the library.  When included by the library,
+the symbol "_DECLARER_" must be true.
+		
+	$Id: foam.def,v 1.1 97/04/04 14:22:05 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetDef __FOAM
+
+include Objects/vTextC.def
+include Objects/gInterC.def	;So we can tack on some InteractionCommands 
+include Internal/rspcolor.def	;So apps can access the responder color palette
+include win.def			;So we can define useful constants for
+				;Rudy's extended LayerPriority 
+
+StartLibrary	foam
+
+
+;----------------------------------------------------------------------------
+;  Constants
+;----------------------------------------------------------------------------
+
+;
+; Useful
+;	
+
+;
+; Mailbox format ID's specific to Lizzy.  To be used along with
+; MANUFACTURER_ID_NOKIA in the MailboxDataFormat structure.
+;
+
+LizzyMailboxDataFormatID	etype	word, 0
+    LMDFID_INVALID		enum	LizzyMailboxDataFormatID
+    LMDFID_WYSWYG_FOAM_FILE	enum	LizzyMailboxDataFormatID	; FILE
+
+
+
+;
+; Additions to InteractionCommand.  Used internally by Rudy; left here in
+; case apps need to access it.
+;
+IC_CHANGE		equ	IC_INTERNAL_1
+IC_CANCEL_POPUP_LIST	equ	IC_INTERNAL_2
+
+;
+; Used by disk space routines.
+;
+FoamDiskSpaceStatus	etype	word, 0, 2
+FDSS_NOT_FULL				enum	FoamDiskSpaceStatus
+FDSS_NEARLY_FULL			enum	FoamDiskSpaceStatus
+FDSS_FULL				enum	FoamDiskSpaceStatus
+
+FoamSaveAction		etype	word, 0, 2
+FSA_SAVE_DATA				enum	FoamSaveAction
+FSA_THROW_AWAY_CHANGES			enum	FoamSaveAction
+FSA_DO_NOTHING				enum	FoamSaveAction
+
+;
+; Used by FoamDocSet/GetDocumentDir functions to set and get a threads current
+; path.  Corresponds to the appDocPaths in the Init file.
+;
+; For Lizzy changes please read README below.
+;
+FDocumentDir	etype word, -2, 1
+	FDD_PRIVATE			enum	FDocumentDir
+	FDD_DOCUMENT			enum	FDocumentDir
+	FDD_NONE			enum	FDocumentDir
+	FDD_CREATED_TEXTS		enum	FDocumentDir
+	FDD_RECEIVED_FAXES		enum	FDocumentDir
+	FDD_RECEIVED_SM			enum	FDocumentDir
+	FDD_RECEIVED_MAIL		enum	FDocumentDir
+	FDD_MESSAGE_TEMPLATES		enum	FDocumentDir
+	FDD_BUSINESS_CARDS		enum	FDocumentDir
+	FDD_DOWNLOADED_FILES		enum	FDocumentDir
+	FDD_WWW_HOTLIST			enum	FDocumentDir
+	FDD_BROADCAST_MESSAGES		enum	FDocumentDir
+	FDD_INTERNET			enum	FDocumentDir
+	FDD_TONES			enum	FDocumentDir
+
+CONSTANT_MAX_FDD	equ	0100h
+;
+; Any FDocumentDir value must be below CONSTANT_MAX_FDD because FoamPathHandles
+; use values above this.
+;
+; With Lizzy project, we introduced sub-folders that spawn off from
+; FDocumentDir folders.  These sub-folders are created by the user,
+; which means that we cannot expect all user accessible directories to be
+; one of FDocumentDir's anymore.  So, we defined FoamPathHandle type.
+; These handles are completely interchangeable with FDocumentDir constants.
+; See header comment of document.asm for functions to call.
+;
+
+FoamPathHandle		type	word
+NULL_PATH_HANDLE	equ	-3	; well, 0 happens to be FDD_NONE
+
+;
+;   Rules:
+;
+;   1. Once a foam path handle is allocated, it will never be deallocated
+;
+;   2. There is only one unique FoamPathHandle for each sub folder. These
+;      handles will only be allocated if needed.
+;      - when FoamPathMake{SP} is called
+;
+;   3. If you delete a sub folder, FoamPathHandle for that folder( if existed )
+;      will remain in the table.  But will not contain a valid string for the
+;      path, because you deleted a folder in the path.
+;      - To prevent this, you can use FoamPathLock/Unlock/CheckLock
+;
+;   4. Renaming a folder is okay as long as you call FoamPathRename to update
+;      folder name stored with the corresponding FoamPathHandle.
+;
+
+;
+; Passed to FoamDocOpen to specify the file access.
+;
+FDocAccess	etype word, 0, 2
+	FDA_READ_WRITE			enum	FDocAccess
+	FDA_READ_ONLY			enum	FDocAccess
+	FDA_READ_ONLY_DENY_NONE		enum	FDocAccess
+;
+; Init file keys that store the actual names of the FDocumentDir's.
+;
+FOAM_INI_APP_DOC_PATHS		equ "appDocPaths"
+FOAM_INI_LAST_DOC_PATH		equ "lastDocPath"
+FOAM_INI_DOC_PATH		equ "docPath"
+FOAM_INI_PATH_TABLE_SIZE	equ "pathTableSize"
+
+;
+; FoamPathError types: returned by FoamPathAlloc or FoamSetDocumentDir, etc...
+;
+FoamPathError		etype	word, 0
+FPE_NO_ERROR		enum	FoamPathError	; everything is peachy
+FPE_MEMORY_SHORTAGE	enum	FoamPathError	; can't get memory
+FPE_PATH_NOT_FOUND	enum	FoamPathError	; someone deleted the directory
+FPE_PATH_TABLE_FULL	enum	FoamPathError	; someone forgets to free...
+FPE_HAS_NO_PARENT	enum	FoamPathError	;
+FPE_BUFFER_TOO_SMALL	enum	FoamPathError	;
+
+;
+; Default settings for the notes editor (set in notebook).
+;
+NOTES_EDITOR_INIT_CATAGORY		equ "notesEditor"
+NOTES_EDITOR_DEFAULT_FONT_ID_KEY	equ "defaultFont"
+NOTES_EDITOR_DEFAULT_FONT_SIZE_KEY	equ "defaultFontSize"
+NOTES_EDITOR_DEFAULT_TOP_MARGIN_KEY	equ "defaultTopMargin"
+NOTES_EDITOR_DEFAULT_BOTTOM_MARGIN_KEY	equ "defaultBottomMargin"
+NOTES_EDITOR_DEFAULT_LEFT_MARGIN_KEY	equ "defaultLeftMargin"
+NOTES_EDITOR_DEFAULT_RIGHT_MARGIN_KEY	equ "defaultRightMargin"
+
+;
+; Token and protocol numbers of a Foam notebook document.  All geodes using
+; the ViewerControlClass must use the same major protocol number has the
+; notes files.  ViewerControlClass checks the major protocol, if applications
+; need to do their own protocol varification they can use the minor protocol.
+;
+
+;
+; FEA_CREATOR token for all responder documents.
+;
+DOCUMENT_CREATOR_TOKEN		equ 'RDOC'
+
+;
+; FEA_CREATOR token for viewer loader documents ("Document outbox" and
+; "Remote mailbox".
+;
+VIEWER_LIBRARY_LOADER_DOCUMENT_CREATOR_TOKEN	equ 'VLLD'
+
+;
+; Token and protocol numbers of a notebook document.
+;
+NOTES_FILE_TOKEN		equ 'NOTE'
+NOTES_FILE_MAJOR_PROTOCOL	equ 2
+NOTES_FILE_MINOR_PROTOCOL	equ 0
+
+;
+; Token and protocol numbers of a Foam sms document.
+;
+SMS_FILE_TOKEN			equ 'SMSF'
+SMS_FILE_MAJOR_PROTOCOL		equ NOTES_FILE_MAJOR_PROTOCOL
+SMS_FILE_MINOR_PROTOCOL		equ 0
+
+;
+; Token and protocol numbers of a memo document.
+;
+MEMO_FILE_TOKEN			equ 'MEMO'
+MEMO_FILE_MAJOR_PROTOCOL	equ NOTES_FILE_MAJOR_PROTOCOL
+MEMO_FILE_MINOR_PROTOCOL	equ 0
+
+;
+; Token and protocol numbers of a fax note documents.
+;
+FAX_NOTE_FILE_TOKEN		equ 'FAXN'
+FAX_NOTE_FILE_MAJOR_PROTOCOL	equ NOTES_FILE_MAJOR_PROTOCOL
+FAX_NOTE_FILE_MINOR_PROTOCOL	equ 0
+
+;
+; The following are defined in faxfile.def.
+;
+; FAXFILE_TOKEN			equ 'FXFL'
+; FAXFILE_MAJOR_PROTOCOL	equ 2
+; FAXFILE_MINOR_PROTOCOL	equ 2
+
+;
+; Token for the special Document outbox file that doesn't actually ever
+; get opened...
+;
+OUTBOX_FILE_TOKEN		equ 'OUTB'
+
+;
+; Token for the special "Remote mailbox" file that is used to launch the
+; remote mailbox view.  Use this token with ATTR_FILE_OPEN_EXCLUDE_FILE
+; if you don't want the remote mailbox in your FileOpenControl.
+;
+REMOTE_MAILBOX_FILE_TOKEN	equ 'RMMB'
+
+;
+; Token for the special "Delivery Reports" file that is used by the
+; Mail app.
+;
+DELIVERY_REPORTS_FILE_TOKEN	equ 'SMSC'
+
+;
+; Max length of a foam sms message.
+;
+FOAM_MAX_SMS_TEXT_SIZE			equ 160
+
+;
+; Maximum text length of DocumentPrefix
+;
+FOAM_DOCUMENT_PREFIX_TEXT_SIZE		equ 26
+	
+;
+; Default width of a foam file selector, in characters.
+;
+FOAM_FILE_SELECTOR_WIDTH		equ 54
+
+;
+; Default width of a UI component pos
+;
+FOAM_DEFAULT_COMPONENT_WIDTH		equ 416
+FOAM_DEFAULT_BUBBLE_WIDTH		equ 250
+
+;
+; Width of the Icon portion of a main screen's ComplexMoniker (plus space).
+; Children should be indented by this amount in order to be left-
+; justified with the text portion of the moniker.
+;
+FOAM_HEADER_ICON_WIDTH			equ 37
+
+;
+; Default font sizes
+;
+FOAM_LARGE_FONT_SIZE	equ	20		;titles, reply triggers (20!)
+FOAM_NORMAL_FONT_SIZE	equ	18		;normal text
+FOAM_LIGHT_FONT_SIZE	equ	17		;light 18 pt text
+FOAM_SMALL_FONT_SIZE	equ	16		;contact log data, e.g. (16!)
+
+;
+; Font sizes to use with VisTextDefaultCharAttr
+;
+VTDS_FOAM_NORMAL	equ	VTDS_18		
+VTDS_FOAM_SMALL		equ	VTDS_12		;will get tweaked to 16
+
+VTDF_RESPONDER		equ	VTDF_BERKELEY	;we reuse the Berkeley slot
+
+;
+; Default font size of a bubble title.
+;
+FOAM_BUBBLE_TITLE_FONT_SIZE		equ FOAM_LARGE_FONT_SIZE
+FOAM_TITLE_FONT_SIZE			equ FOAM_LARGE_FONT_SIZE
+
+;
+; Critical levels of free disk space
+;
+FOAM_DISK_SPACE_NEARLY_FULL_LEVEL	equ	50*1024	; 50K
+FOAM_DISK_SPACE_FULL_LEVEL		equ	25*1024	; 25K
+
+;
+; Names of directories under world used to store various applications.
+;
+SYSAPPS_DIR_NAME	equ	"SYSAPPS"
+SERVICES_DIR_NAME	equ	"SVCAPPS"
+EXTRAS_DIR_NAME		equ	"EXTRAPPS"
+
+;
+; Maximum width of Complex*Moniker in pixels
+;
+; (Original comment said: Width more important than height... ???)
+;
+;    Set this to be the default component width minus some amount for
+;    borders.  We don't want this too small because certain titles won't
+;    fit, but we'd still like to prevent large monikers from expanding
+;    objects too much.  --JimG 7/12/95
+;
+MAX_COMPLEX_MONIKER_WIDTH	equ	(FOAM_DEFAULT_COMPONENT_WIDTH-20)
+MAX_COMPLEX_MONIKER_HEIGHT	equ	200
+
+;
+; Application enum's used with FoamLaunchApplication.  These must match the
+; order of apps in the [hardIconBar] catagory of the net(ec).ini file.
+;
+FApplication	etype word, 0
+	FA_PHONE_APP		enum	FApplication
+	FA_FAX_APP		enum	FApplication
+	FA_SMS_APP		enum	FApplication
+	FA_SERVICES_APP		enum	FApplication
+	FA_CONTACT_APP		enum	FApplication
+	FA_NOTEBOOK_APP		enum	FApplication
+	FA_CALENDAR_APP		enum	FApplication
+	FA_SYSTEM_APP		enum	FApplication
+	FA_EXTRAS_APP		enum	FApplication
+	FA_CALCULATOR_APP	enum	FApplication
+	FA_CLOCK_APP		enum	FApplication
+	FA_USER_DATA_APP	enum	FApplication
+	FA_WWW_INSTALL_APP	enum	FApplication
+
+;
+; Flashing notes
+;
+FLASHING_NOTE_DEFAULT_DURATION		equ	3*60	; 3 seconds
+FLASHING_NOTE_DEFAULT_MINIMUM_DURATION	equ	1*60	; 1 second
+					; otherwise known as the "dead zone"
+;
+; width of indicator for Rudy to decide whether indicator should float
+; up or sink when a window comes up
+;
+FOAM_INDICATOR_WIDTH			equ	80
+
+;
+; sound key click type, to be included by user library
+;
+SoundKeyClickAlarmType	etype	word, 0, 2
+	;
+	; key clicks
+	;
+	SKCAT_CLICK_OFF		enum	SoundKeyClickAlarmType
+	SKCAT_CLICK_QUIET	enum	SoundKeyClickAlarmType
+	SKCAT_CLICK_LOUD	enum	SoundKeyClickAlarmType
+	;
+	; alarms
+	;
+	SKCAT_ALARM_SOUND_1	enum	SoundKeyClickAlarmType
+	SKCAT_ALARM_SOUND_2	enum	SoundKeyClickAlarmType
+	SKCAT_ALARM_SOUND_3	enum	SoundKeyClickAlarmType
+
+FOAM_NUM_SPECIAL_SOUNDS		equ	6	; the six things above
+
+;
+; default values to be used in user library
+;
+FOAM_KEY_CLICK_DEFAULT		equ	SKCAT_CLICK_QUIET
+FOAM_ALARM_SOUND_DEFAULT	equ	SKCAT_ALARM_SOUND_1
+
+;
+; one special sound type for clock alarm
+;
+FOAM_FCLOCK_ALARM_SOUND		equ	-1
+
+;
+; volume levels and warning tones
+;
+FoamVolumeLevel		etype	word, 1, 1
+	FVL_1		enum	FoamVolumeLevel
+	FVL_2		enum	FoamVolumeLevel
+	FVL_3		enum	FoamVolumeLevel
+	FVL_4		enum	FoamVolumeLevel
+	FVL_5		enum	FoamVolumeLevel
+
+FOAM_VOLUME_LEVEL_DEFAULT	equ	FVL_5
+
+FoamWarningToneState	etype	word, 0, 1
+	FWTS_OFF	enum	FoamWarningToneState
+	FWTS_ON		enum	FoamWarningToneState
+
+FOAM_WARNING_TONE_DEFAULT	equ	FWTS_ON
+
+;
+; Margin values used in Notebook and NotesEdit.
+;
+MIN_PAGE_MARGIN equ 36			; 1/2"
+MAX_PAGE_MARGIN equ 216			; 3"
+DEFAULT_PAGE_MARGIN equ 72		; 1"
+PAGE_MARGIN_INCREMENT equ 18		; 1/4"
+
+;
+; help character. This is provided merely for convenience; read: rudy
+; does not know about this constant.
+;
+SBCS<RUDY_HELP_CHAR		equ	VC_INS or (CS_CONTROL shl 8)	>
+DBCS<RUDY_HELP_CHAR		equ	C_SYS_INS			>
+
+;
+; Backlight stuff
+;
+DEFAULT_BACKLIGHT_LEVEL		equ	0	; level, not actual time
+MINIMUM_BACKLIGHT_LEVEL		equ	0
+MAXIMUM_BACKLIGHT_LEVEL		equ	8
+
+;----------------------------------------------------------------------------
+;  Structures
+;----------------------------------------------------------------------------
+
+;
+; DocumentInfo stores the name and directory of a document file.  This
+; structure is used by FoamDoc functions.
+;
+DocumentInfo	struct
+	DI_docName	FileLongName
+	; the document name
+	DI_docDir	FDocumentDir
+	; document directory
+DocumentInfo	ends
+
+;
+; The prefix added to a foam document name. Ex.: "NOTE 12.12.94 12:12 PM"
+;
+DocumentPrefix	type	FOAM_DOCUMENT_PREFIX_TEXT_SIZE+1 dup (TCHAR)
+
+;
+; File handle returned by FoamDocOpen.
+;
+DocumentHandle	type	hptr
+
+;
+; FileAttrInfo stores the token and protocol number of a file.  The
+; structure is used in FoamDocCreate, FoamDocSetProtocol and
+; FoamDocCheckProtocol.
+;
+FileAttrInfo	struct
+	FAI_token	GeodeToken
+	; token of file
+	FAI_protocol	ProtocolNumber
+	; protocol number of file
+FileAttrInfo	ends
+
+;
+; FoamDocHeader stores various information about the document, like margins.
+;
+FoamDocSettings	struct
+    FDS_leftMargin	word		;points*8
+    FDS_topMargin	word		;points*8
+    FDS_rightMargin	word		;points*8
+    FDS_bottomMargin	word		;points*8
+FoamDocSettings	ends
+
+;
+; FoamDocMapBlock is the structure stored in the mapblock of a Foam
+; document file.
+;
+FoamDocMapBlock	struct
+	FDMB_textTrItem		word
+	FDMB_addressInfo	word
+	FDMB_handle1		word
+	FDMB_handle2		word
+	FDMB_handle3		word
+	FDMB_handle4		word
+	FDMB_handle5		word
+	FDMB_docSettings	FoamDocSettings
+FoamDocMapBlock	ends
+
+;
+; By passing a FoamDocHeader enum to FoamDocGetHeaderData you can get
+; at the data in the FoamDocMapBlock.
+;
+FoamDocHeader	etype	word
+FDH_TEXT_TR_ITEM	enum	FoamDocHeader, offset FDMB_textTrItem
+FDH_ADDRESS_INFO	enum	FoamDocHeader, offset FDMB_addressInfo
+FDH_HANDLE1		enum	FoamDocHeader, offset FDMB_handle1
+FDH_HANDLE2		enum	FoamDocHeader, offset FDMB_handle2
+FDH_HANDLE3		enum	FoamDocHeader, offset FDMB_handle3
+FDH_HANDLE4		enum	FoamDocHeader, offset FDMB_handle4
+FDH_HANDLE5		enum	FoamDocHeader, offset FDMB_handle5
+
+;
+; Passed to FoamDocTextSetFormatted to mark the document as containing
+; formatted or not formatted text.
+;
+FoamDocTextFormatted	etype	word, 0
+FDTF_NOT_FORMATTED	enum	FoamDocTextFormatted
+FDTF_FORMATTED		enum	FoamDocTextFormatted
+
+;
+; Extension of GenInteractionType to indicate the note should flash onto
+; the screen and go away of its own accord.
+;
+GIT_FLASHING		enum	GenInteractionType
+
+;
+; This is passed to UserStandardDialog if a custom dialog box is desired.
+;
+FoamCustomDialogBoxFlags	record
+	FCDBF_SYSTEM_MODAL:1
+	FCDBF_DIALOG_TYPE		CustomDialogType:2
+	FCDBF_INTERACTION_TYPE		GenInteractionType:4
+
+	FCDBF_DESTRUCTIVE_ACTION:1=0
+	; This flag signals that the affirmative response to this dialog
+	; denotes a destructive action, and shouldn't be given the
+	; interaction default.  a HINT_TRIGGER_DESTRUCTIVE_ACTION will be
+	; placed on the trigger having an IC_YES interaction command.
+	; This flag can only be used on a GIT_MULTIPLE_RESPONSE dialog.
+
+	; *** all alarm functionality is moved out of StandardDialogClass
+
+	:8
+FoamCustomDialogBoxFlags	end
+
+;
+; These are the parameters passed to FoamStandardDialogOptr
+;
+FoamStandardDialogOptrParams	struct
+	FSDOP_titleIconBitmap		optr
+	FSDOP_titleText			optr
+		;
+		; The above go into the title bar
+		;
+	FSDOP_bodyText			optr
+		;
+		; The main string/text in the dialog
+		;
+    	FSDOP_customFlags		FoamCustomDialogBoxFlags
+		;
+		; Type of dialog box header, and standard triggers to
+		; use. Only CDBF_DIALOG_TYPE and CDBF_INTERACTION_TYPE
+		; is used. All others ignored.
+		;	
+	FSDOP_stringArg1		fptr.TCHAR
+	FSDOP_stringArg2		fptr.TCHAR
+		;
+		; Arguments to substitute in FSDOP_bodyText
+		;
+    	FSDOP_triggerTopText		optr
+		; 
+		; Custom trigger text in place of "Ok"
+		;
+        FSDOP_acceptTriggerDestination  optr
+        FSDOP_acceptTriggerMessage      word
+		; 
+		; Used by FoamStandardDialogOptrNoBlock only!
+		;
+		; Custom trigger destination, and message to send when
+		; a "accept" trigger is pressed (IC_OK, IC_YES, IC_APPLY).
+		;
+        FSDOP_rejectTriggerDestination  optr
+        FSDOP_rejectTriggerMessage      word
+		; 
+		; Used by FoamStandardDialogOptrNoBlock only!
+		;
+		; Custom trigger destination, and message to send when
+		; a "reject" trigger is pressed (IC_DISMISS, IC_STOP, IC_NO).
+		;
+	FSDOP_layerPriority		LayerPriority
+		;
+		; Custom layer priority, if 0, then no layer priority
+		; hint will be added to the dialog.
+		;
+	even
+	FSDOP_helpContext		fptr
+	FSDOP_helpFile			fptr
+		; 
+		; Help context & help file.
+		;
+FoamStandardDialogOptrParams	ends
+;
+; NOTE: Effects of GenInteractionType in CustomDialogBoxFlags
+;
+; 	Type			Standard Triggers	InteractionCommand
+;				   and moniker		     returned
+;
+; GIT_ORGANIZATIONAL			defaults to GIT_COMMAND
+;	(invalid)
+;
+; GIT_PROPERTIES		Ok (or custom)		IC_APPLY
+;				Cancel			IC_DISMISS
+;
+; GIT_PROGRESS			Stop			IC_STOP
+;
+; GIT_COMMAND			Cancel			IC_DISMISS
+;
+; GIT_NOTIFICATION		Ok (or custom)		IC_OK
+;
+; GIT_AFFIRMATION		Yes			IC_YES
+;				No			IC_NO
+;	
+; GIT_MULTIPLE_RESPONSE			defaults to GIT_COMMAND
+;	(invalid)
+;
+
+;
+; Structure to be used in CreateVisMoniker.
+; The structure defines the string to be used in creating
+; VisMonikers. A few attributes can be defined for each string in any
+; column.
+;
+ColumnBorder	record
+	CB_LEFT:1
+	CB_RIGHT:1
+	:6
+ColumnBorder	end
+
+VisMonikerColumn	struct
+
+	VMC_width	byte		; 0 if FMC_ptr is a bitmap
+	VMC_ptr		fptr		; Points to string or bitmap
+	VMC_just	Justification	; Justification on strings only
+	VMC_style	TextStyle	; text style bits
+	VMC_border	ColumnBorder	; Draw vertical borders
+
+VisMonikerColumn	ends
+
+;
+; Placed in vardata by flashing note
+;
+FlashingNoteTimerData	struct
+	FNTD_timerID		word
+	FNTD_timerHandle	word
+FlashingNoteTimerData	ends
+
+;
+; Returned by FoamDocIsTextFormatted
+;
+DocumentFontInfo	struct
+	DFI_font	FontID
+	DFI_pointSize	word
+DocumentFontInfo	ends
+
+;
+; These correspond to [readerApps] in the .ini file. Sample .ini file
+; entry:
+;	[readerApps]
+;	app0 = SMSA0		; SMS App (TokenChar w/ ManufacturerID)
+;	app0_dir = 3		; FDD_RECEIVED_SM
+;	app2 = MAIL11		; Mail App
+;	app2_dir = 4		; FDD_RECEIVED_MAIL
+;
+FoamReaderAppType	etype	word, 0
+	FRAT_SMS	enum 	FoamReaderAppType
+	FRAT_FAX	enum	FoamReaderAppType
+	FRAT_MAIL	enum	FoamReaderAppType
+	FRAT_OUTBOX	enum	FoamReaderAppType
+	FRAT_MISSED_CALLS enum	FoamReaderAppType
+
+;----------------------------------------------------------------------------
+; Records
+;----------------------------------------------------------------------------
+
+;
+; IconsShown
+;	Used by IndicatorClass, to keep track of whether it has icons
+;	on the left and right inside itself.
+;
+IconsShown	record
+	IS_ICON_LEFT:1
+	IS_ICON_RIGHT:1
+	:6
+IconsShown	end
+
+;----------------------------------------------------------------------------
+;  FFileSelector class
+;----------------------------------------------------------------------------
+FFileSelectorClass	class	GenFileSelectorClass
+
+MSG_FFS_SET_PATH		message
+;
+; Set the open directory.
+;
+; Pass:		cx -- FDocumentDir
+; Return:	nothing
+;		ax, dx, bp -- destroyed
+;
+
+MSG_FFS_GET_PATH		message
+;
+; Get the current path.
+;
+; Pass:		nothing
+; Return:	cx -- FDocumentDir
+;		ax, dx -- destroyed
+;
+
+MSG_FFS_OPEN			message
+;
+; Sent when ever the user presses the "ENTER" key.
+;
+; Pass: 	nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+; 
+
+ATTR_FFS_DOCUMENT_DIR		vardata	FDocumentDir
+; Default document directory for the file selector.
+
+FFileSelectorClass	endc
+
+;----------------------------------------------------------------------------
+;  ExtendedFileSelector class (only availible in Communicator products
+;			       shipped in April 1997 or later)
+;----------------------------------------------------------------------------
+;
+
+ExtendedFileSelectorClass	class	GenFileSelectorClass, master, variant
+
+ExtendedFileSelectorAttrs	record
+	EFSA_NON_EXCLUSIVE:1
+		; When set, file selector allows multiple files to be
+		; selected.  Note the change in parameters &
+		; semantics of GFSI_notificationMsg below, and that
+		; the following GenFileSelectorClass messages
+		; are prohibited:
+		;
+		;	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH
+		;	MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH
+		;	MSG_GEN_FILE_SELECTOR_DELETE_SELECTION
+		;
+		; The following messages have different semantics
+		; when in non-exclusive mode, documented below.
+		;
+		;	MSG_GEN_FILE_SELECTOR_GET_SELECTION_TOKEN
+		;	MSG_GEN_FILE_SELECTOR_GET_SELECTION
+		;
+
+	EFSA_SEARCHABLE:1
+		; When set, a search box will be provided, permitting
+		; the user to narrow the list of files to those that
+		; match the text typed into the search box.
+
+	:14
+ExtendedFileSelectorAttrs	end
+
+ExtendedFileSelectorEntry	struct
+	EFSE_id		word			; file selector entry #
+	EFSE_flags	GenFileSelectorEntryFlags  ; Flags of file
+	EFSE_file	GenFileSelectorSelection   ; filename of file
+ExtendedFileSelectorEntry	ends
+
+MSG_EFS_GET_MULTIPLE_SELECTIONS		message
+;
+; Returns the current array of selections
+;
+; Pass:		cx:dx -- fptr to ExtendedFileSelectorEntry array.
+;		bp    -- # of entries in cx:dx
+; Return:	cx:dx -- array filled with as many of the current
+;			 selections as will fit.
+;		ax    -- # of entries
+;		bp    -- unchanged
+
+; MSG_GEN_FILE_SELECTOR_GET_SELECTION
+;
+; Takes and returns same values as GenFileSelectorClass, except that
+; if used when there are multiple selections, returns one of them
+; at random.  Because of this unpredictable behavior,
+; MSG_EFS_GET_MULTIPLE_SELECTIONS should be used instead.
+
+
+; MSG_GEN_FILE_SELECTOR_GET_SELECTION_TOKEN message
+;
+; Context:	Returns the GeodeToken of the selected file.  If the file is
+;               a DOS file the dos extension (including the dot) is returned.
+;
+;		If multiple files are selected, then the token of one of
+;		those files (at random) is returned.  Therefore, for this
+;		message to be useful, you should only call it when
+;		you know there is exactly one selection.
+;
+;		If no files are selected, then the passed GeodeToken
+;		buffer will be unchanged.
+;
+; Source:	Anyone
+; Destination:	GenFileSelector object
+;
+; Pass:		cx:dx - address to copy GeodeToken to
+;			(should be at least the size of GeodeToken)
+; Return:	cx:dx - filled with selection's GeodeToken (fptr preserved)
+;			(or contents preserved, if no files selected)
+;
+
+MSG_EFS_GET_ATTRS			message
+;
+; Returns the current value of EFSI_attrs
+;
+; Pass:		nothing
+; Return:	cx    -- ExtendedFileSelectorAttrs
+; Destroyed:	nothing
+
+MSG_EFS_SET_ATTRS			message
+;
+; Changes the current EFSI_attrs.  Currently, only the EFSA_SEARCHABLE
+; flag may be altered.
+;
+; Pass:		cx    -- Attrs to set
+;		dx    -- Attrs to clear
+; Returns:	nothing
+; Destroyed:	ax, cx, dx, bp
+
+MSG_EFS_GET_NUM_SELECTIONS		message
+;
+; Returns the current number of selections for this file selector.
+; Returns zero if there's no selection.
+;
+; Pass:		nothing
+; Return:	ax -- number of selections
+; Destroyed:	nothing
+;
+
+MSG_EFS_GET_MULTIPLE_SELECTIONS_BLOCK	message
+;
+; Returns the current array of selections in a block.
+;
+; Pass:		nothing
+; Return:	^hcx	-- block handle of the array of
+; 			   ExtendedFileSelectorEntry items
+;			-- 0 if nothing selected
+;		ax    	-- # of entries
+;		dx, bp  -- unchanged
+
+MSG_EFS_RESET_SEARCH			message
+;
+; If a searchable file selector, clears the search and restores all
+; entries.
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+MSG_EFS_GET_SELECTION_INFO		message
+;
+; Retrieve information about selections without getting the selections.
+; Return parameters are identical to the notification message parameters.
+;
+; Pass:		nothing
+; Return:	cx	= # of selections
+;		dx	= mask of GenFileSelectorEntryFlags of selected files
+;			  for the entry flags that are the same for all
+;			  of the selected files
+;		bp	= GenFileSelectorEntryFlags for which the
+;			  corresponding flags in dx is set
+; Destroyed:	nothing
+;
+
+HINT_EFS_SHORT_SEARCH_MONIKER	vardata
+; Uses a smaller moniker for the Search input box, instead
+; of the full Icon + Text
+
+	EFSI_attrs	ExtendedFileSelectorAttrs
+		; Features which the ExtendedFileSelector should
+		; provide
+
+	EFSI_selections	lptr.ExtendedFileSelectorEntry
+		; Chunk containing the array of currently selected
+		; files.  Number of entries can be inferred from
+		; size of chunk.
+
+	; GFSI_notificationMsg	word
+		; message to send to GFSI_destination when the user
+		; changes the selection.  Message gets the following
+		; paramters:
+		;
+		; Pass:		cx -- # of selections
+		;		dx -- mask of GenFileSelectorEntryFlags
+		;			for the entry flags that are the
+		;			same for all of the selected files
+		;		bp -- GenFileSelectorEntryFlags for which
+		;			the corresponding flag in dx is set
+
+
+ExtendedFileSelectorClass	endc
+
+
+;----------------------------------------------------------------------------
+;  ComplexMonikerClass
+;----------------------------------------------------------------------------
+;
+; To use this class in your *.uih file:
+; 	SomeObject = ComplexMoniker {
+;		ComplexMoniker = <actual object class>;
+;		topText = ....
+;	}
+;
+ComplexMonikerClass	class	GenClass, master, variant
+
+;
+; Maximum lengths of top and bottom text (i.e. text before a CR should
+; be less than or equal to 100 characters, text after a CR should be
+; less than or equal to 50). 
+;
+COMPLEX_MONIKER_MAX_TOP_TEXT_LENGTH		equ	100
+COMPLEX_MONIKER_MAX_BOTTOM_TEXT_LENGTH		equ	50
+
+;
+; ComplexMonikerText enums can be used in place of text chunks -- 
+; they will be expanded to the standard text on startup.
+;
+ComplexMonikerText	etype	word, 1, 2
+	CMT_NULL			enum 	ComplexMonikerText,0
+	CMT_OK				enum	ComplexMonikerText,1
+	CMT_CLOSE			enum	ComplexMonikerText
+	CMT_CHANGE			enum	ComplexMonikerText
+	CMT_CANCEL			enum	ComplexMonikerText
+	CMT_CLEAR			enum	ComplexMonikerText
+	CMT_CALL			enum	ComplexMonikerText
+	CMT_CLEAR_ALL			enum	ComplexMonikerText
+	CMT_YES				enum	ComplexMonikerText
+	CMT_NO				enum	ComplexMonikerText
+	CMT_RENAME			enum	ComplexMonikerText
+	CMT_COPY			enum	ComplexMonikerText
+	CMT_SETTINGS			enum	ComplexMonikerText
+	CMT_OPEN			enum	ComplexMonikerText
+	CMT_CREATE_NEW			enum	ComplexMonikerText
+	CMT_SEND			enum	ComplexMonikerText
+	CMT_DELETE			enum	ComplexMonikerText
+	CMT_ROTATE			enum	ComplexMonikerText
+	CMT_ZOOM			enum	ComplexMonikerText
+	CMT_ZOOM_IN			enum	ComplexMonikerText
+	CMT_ZOOM_OUT			enum	ComplexMonikerText
+	CMT_VIEWING_TOOLS		enum	ComplexMonikerText
+	CMT_SEND_OPTIONS		enum	ComplexMonikerText
+	CMT_OPTIONS			enum	ComplexMonikerText
+	CMT_FORWARD			enum	ComplexMonikerText
+	CMT_REPLY			enum	ComplexMonikerText
+	CMT_SELECT			enum	ComplexMonikerText
+	CMT_START			enum	ComplexMonikerText
+	CMT_CONNECT			enum	ComplexMonikerText
+	CMT_GO				enum	ComplexMonikerText
+	CMT_INSTALL			enum	ComplexMonikerText
+	CMT_DEINSTALL			enum	ComplexMonikerText
+	CMT_NEXT			enum	ComplexMonikerText
+	CMT_PREVIOUS			enum	ComplexMonikerText
+	CMT_RECENT_CALLS		enum	ComplexMonikerText
+	CMT_RECENT_FAXES		enum	ComplexMonikerText
+	CMT_RECENT_MESSAGES		enum	ComplexMonikerText
+	CMT_USER_DEFINED		enum	ComplexMonikerText
+	CMT_CLEAR_LIST			enum	ComplexMonikerText
+	CMT_CALLS			enum	ComplexMonikerText
+	CMT_FAXES			enum	ComplexMonikerText
+	CMT_DATA_CALLS			enum	ComplexMonikerText
+	CMT_MESSAGES			enum	ComplexMonikerText
+	CMT_NO_CONTACT_INFORMATION	enum	ComplexMonikerText
+	CMT_CONTACT_CARD		enum	ComplexMonikerText
+	CMT_NONE			enum	ComplexMonikerText
+	CMT_CALL_LOWERCASE		enum	ComplexMonikerText
+	CMT_CLEAR_ALL_COMMAND		enum	ComplexMonikerText
+	CMT_TO_COLON			enum	ComplexMonikerText
+	CMT_FROM_COLON			enum	ComplexMonikerText
+	CMT_ACCEPT			enum	ComplexMonikerText
+	CMT_RESET			enum	ComplexMonikerText
+	CMT_STOP			enum	ComplexMonikerText
+	CMT_RECEIVED_CALLS		enum	ComplexMonikerText
+	CMT_RECEIVED_FAXES		enum	ComplexMonikerText
+	CMT_RECEIVED_MESSAGES		enum	ComplexMonikerText
+	CMT_MISSED_CALLS		enum	ComplexMonikerText
+	CMT_LAST_DIALED_CALLS		enum	ComplexMonikerText
+	CMT_ACTIVATE			enum	ComplexMonikerText
+	CMT_DISABLE			enum	ComplexMonikerText
+	CMT_HELP			enum	ComplexMonikerText
+	CMT_BACK			enum	ComplexMonikerText
+	CMT_SELECT_RECEIVER		enum	ComplexMonikerText
+	CMT_SPECIAL_KEYS_COMMAND	enum	ComplexMonikerText
+	CMT_SPECIAL_KEYS		enum	ComplexMonikerText
+	CMT_TEXT			enum	ComplexMonikerText
+	CMT_TEXTS			enum	ComplexMonikerText
+	CMT_ZOOM_PLUS			enum	ComplexMonikerText
+	CMT_ZOOM_MINUS			enum	ComplexMonikerText
+	CMT_HANGUP			enum	ComplexMonikerText
+	CMT_CAPTURE			enum	ComplexMonikerText
+	CMT_INSERT			enum	ComplexMonikerText
+	CMT_PHONE			enum	ComplexMonikerText
+	CMT_OFF				enum	ComplexMonikerText
+	CMT_ON				enum	ComplexMonikerText
+	CMT_TEXT_SEND			enum	ComplexMonikerText
+	CMT_TEXT_CAPTURE		enum	ComplexMonikerText
+	CMT_STOP_CAPTURE		enum	ComplexMonikerText
+	CMT_FORWARD_FAX			enum	ComplexMonikerText
+	CMT_MENU			enum	ComplexMonikerText
+	CMT_SEARCH			enum	ComplexMonikerText
+
+			;When adding things here, also
+			;add them to foam.goh, strings in Library/Foam/Foam/
+			;UI/uiStrings.ui.
+
+ComplexMonikerBitmap		etype	word, 1, 2
+	CMB_LEFT_FINGER			enum	ComplexMonikerBitmap
+	CMB_RIGHT_FINGER		enum	ComplexMonikerBitmap
+	CMB_CONTACT_CARD		enum	ComplexMonikerBitmap
+	CMB_CONTACT_LIST		enum	ComplexMonikerBitmap
+	CMB_SPEED_DIAL			enum	ComplexMonikerBitmap
+	CMB_SETTINGS_TITLE_ICON		enum	ComplexMonikerBitmap
+	CMB_SERVICES_VIEW		enum	ComplexMonikerBitmap
+	CMB_SERVICES_DEFINE		enum	ComplexMonikerBitmap
+	CMB_QUESTION_ICON		enum	ComplexMonikerBitmap
+	CMB_OPEN_FOLDER			enum	ComplexMonikerBitmap
+	CMB_DRAWER			enum	ComplexMonikerBitmap
+	CMB_RENAME_COPY			enum	ComplexMonikerBitmap
+	CMB_FOLDER			enum	ComplexMonikerBitmap
+	CMB_SECURITY_SUCCESS		enum	ComplexMonikerBitmap
+	CMB_SECURITY_ERROR		enum	ComplexMonikerBitmap
+	CMB_PC_ICON			enum	ComplexMonikerBitmap
+	CMB_INPUT_TITLE_ICON		enum	ComplexMonikerBitmap
+	CMB_WARNING_TITLE_ICON		enum	ComplexMonikerBitmap
+	CMB_SMS_CARD_ICON		enum	ComplexMonikerBitmap
+	CMB_SEARCH			enum	ComplexMonikerBitmap
+
+;
+; Source type information passed to MSG_COMPLEX_MONIKER_REPLACE_MONIKER
+;
+ComplexMonikerSourceType	etype	word, 1, 1
+	CMST_FPTR	enum	ComplexMonikerSourceType
+	; Indicates source is referenced by a fptr.
+	CMST_OPTR	enum	ComplexMonikerSourceType
+	; Indicates source is referenced by a optr.
+	CMST_HPTR	enum	ComplexMonikerSourceType
+	; Indicates source is referenced by a hptr and offset.
+	CMST_LPTR	enum	ComplexMonikerSourceType
+	; Indicates source is referenced by a local memory chunk and thus
+	; does not have to copy the source into the object block.
+	CMST_CMT	enum	ComplexMonikerSourceType
+	; Indicates source is referenced by a ComplexMonikerText enumerated
+	; type.
+	CMST_CMB	enum	ComplexMonikerSourceType
+	; Indicates source is referenced by ComplexMonikerBitmap enumerated
+	; type.
+	CMST_KEEP	enum	ComplexMonikerSourceType
+	; Indicates that you want to keep the current chunk in the new
+	; complex moniker.
+
+RCMOverwrite	record
+	RCMO_TOP_TEXT:1
+	; Indicates that you want to overwrite the topText if set.
+	RCMO_ICON_BITMAP:1
+	; Indicates that you want to overwrite the iconBitmap if set.
+	:14
+RCMOverwrite	end
+
+	
+ReplaceComplexMoniker	struct
+	RCM_textStyleSet		TextStyle
+	; TextStyle to set
+	RCM_textStyleClear		TextStyle
+	; TextStyle to clear
+	RCM_fontSize			word
+	; Size of text. (0 for no change)
+	RCM_topTextSource		dword
+	; Top text source.
+	RCM_iconBitmapSource		dword
+	; Icon bitmap source
+	RCM_topTextSourceType		ComplexMonikerSourceType
+	; Top text source type
+	RCM_iconBitmapSourceType	ComplexMonikerSourceType
+	; Icon bitmap source type
+	RCM_iconBitmapSize		word
+	; Size of icon bitmap
+	RCM_overwrite			RCMOverwrite
+	; Set TRUE if you want to overwrite existing complex moniker chunks.
+ReplaceComplexMoniker	ends
+
+GetComplexMoniker	struct
+	GCM_textStyle		TextStyle
+	; TextStyle of moniker
+	GCM_fontSize		byte
+	; size of moniker text
+	GCM_topText		ComplexMonikerText
+	; top text id or chunk handle
+	GCM_iconBitmap		ComplexMonikerBitmap
+	; icon bitmap id or chunk handle
+GetComplexMoniker	ends
+
+
+MSG_COMPLEX_MONIKER_REPLACE_MONIKER	message
+;
+; Replace the complex moniker with the newly specified elements. And
+; rebuilds itself onscreen.
+;
+; 	PASS:	dx:bp 	- ReplaceComplexMoniker
+;	RETURN:	ax	- ChunkHandle of topText 
+;		dx	- ChunkHandle of iconBitmapSource
+;
+;	Destroyed: bp, es, di
+;
+
+MSG_COMPLEX_MONIKER_GET_MONIKER		message
+;
+; Fetch information about a complex moniker, including it's text and
+; bitmap chunks.
+;
+;	PASS:   dx:bp	- GetComplexMoniker
+;	RETURN: dx:bp	- filled in with data (registers unchanged)
+;
+;	Destroyed: ax, cx
+;
+
+	ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT	vardata
+	; If present will draw the bitmap (if any) on the left side of text.
+
+	ATTR_COMPLEX_MONIKER_SEPARATOR_START_POINT	vardata	Point
+    	; Contains the x,y coordinate (with respect to the origin of the
+	; visMoniker's gstring) of the left edge of the separator line.
+	; Used by the Rudy SPUI to draw the separator, if necessary.
+
+    	HINT_COMPLEX_MONIKER_DRAW_SEPARATOR		vardata
+	; Override all logic and force the separator to be drawn.  NOTE that
+	; the object MUST build out to an OLCtrlClass (or subclass thereof)
+	; in order for the line to be drawn.
+	
+	HINT_COMPLEX_MONIKER_DONT_DRAW_SEPARATOR	vardata
+	; Override all logic and force the separator NOT to be drawn.
+
+	HINT_COMPLEX_MONIKER_CENTER_TEXT_HORIZONTALLY	vardata
+	; If present, will center the top & bottom text horizontally.
+
+	HINT_COMPLEX_MONIKER_MINIMIZE_ICON_SPACING	vardata
+	; If present, minimizes spacing between the text and icons.
+
+        CMI_textStyle   TextStyle
+	; Text style to use on the text.
+
+        CMI_topText     ComplexMonikerText
+	; chunk handle of null-terminated text, or ComplexMonikerText enum.
+
+        CMI_iconBitmap  ComplexMonikerBitmap
+	; chunk handle of bitmap or ComplexMonikerBitmap enum.
+
+	CMI_fontSize	byte
+	; if 0, then use default system size
+
+ComplexMonikerClass      endc
+
+
+
+;----------------------------------------------------------------------------
+; TwoLevelTrigger and classes
+;----------------------------------------------------------------------------
+;
+; To use this class, all the triggers in the first level should be part of
+; one interaction/primary and the triggers in the second level should be
+; part of a separate interaction.
+;
+TwoLevelTriggerClass	class	ComplexMonikerClass
+	uses	GenTriggerClass
+
+MSG_TLT_ACTIVATE_OTHER_LEVEL		message
+;
+; Set the triggers in this own trigger's group not usable, and the
+; triggers in the other group usable.
+;
+	TLTI_other_parent	optr
+
+	ATTR_TLT_IS_BACK_TRIGGER	vardata
+	;If present, the trigger will supply the standard "back" moniker
+	; for itself
+
+TwoLevelTriggerClass	endc
+
+
+GreyFrameClass	class	GenInteractionClass
+; A GenInteraction that draws a grey beveled box around its contents.
+GreyFrameClass	endc
+
+
+SYSTEM_FONT_ID	equ	FID_RESPONDER
+
+UnderlinedGenTextClass	class 	GenTextClass
+; A GenText that draws dotted underlines
+UnderlinedGenTextClass	endc
+
+UnderlinedVisTextClass	class 	VisTextClass
+; A VisText that draws dotted underlines
+
+MSG_UVT_DRAW_UNDERLINE		message
+; Internal message to redraw the underline.
+;
+; Pass: 	nothing
+; Destoryed: 	nothing
+;
+
+MSG_UVT_MOVE_TO_END_IF_NOT_FOCUSED	message
+; Internal message queued up when we lose the focus - if we've
+; *really* lost the focus (as opposed to merely had it momentarily
+; usurped by the charset dialog), then move cursor to the end.
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+ATTR_UNDERLINED_VIS_TEXT_NO_UNDERLINES	vardata
+; Turn off the underline functionality, act as a normal VisText object.
+
+UnderlinedVisTextClass	endc
+
+GenValueWithListClass	class	GenValueClass
+; A GenValue object that will pass navigation characters along to
+; an associated list
+	GVWLC_listObj	optr
+
+ATTR_GEN_VALUE_WITH_LIST_DO_NOT_ALLOW_NAVIGATION	vardata
+; Do not allow navigation to this object - it will only take the focus
+; if explicitly given to it via MSG_GEN_MAKE_FOCUS
+
+ATTR_GEN_VALUE_WITH_LIST_MAX_TEXT_LEN	vardata	word
+; Specify the maximum number of characters the GenValue allows the user
+; to enter.
+
+GenValueWithListClass	endc
+
+UnderlinedTextWithListClass	class	UnderlinedGenTextClass
+; An UnderlinedGenText object that will pass navigation characters along to
+; an associated list
+	UTWLC_listObj	optr
+
+ATTR_UNDERLINED_TEXT_WITH_LIST_DO_NOT_ALLOW_NAVIGATION	vardata
+; Do not allow navigation to this object - it will only take the focus
+; if explicitly given to it via MSG_GEN_MAKE_FOCUS
+UnderlinedTextWithListClass	endc
+
+TextWithListClass	class	GenTextClass
+; A GenText object that will pass navigation characters along to an associated
+; list
+	TWLC_listObj	optr
+
+ATTR_TEXT_WITH_LIST_DO_NOT_ALLOW_NAVIGATION	vardata
+; Do not allow navigation to this object - it will only take the focus
+; if explicitly given to it via MSG_GEN_MAKE_FOCUS
+
+TextWithListClass	endc
+.warn -private
+.assert	offset TWLC_listObj eq offset UTWLC_listObj
+.warn @private
+
+;----------------------------------------------------------------------------
+;  FilterListClass	(only availible in Communicator products
+;			 shipped in April 1997 or later)
+;----------------------------------------------------------------------------
+;
+; FilterList acts just like a GenDynamicList, but instead
+; of referring to the items by their order in the list, it allows
+; an application to supply an array of the identifiers (the
+; filter) that should be displayed in the item group.  The list
+; object internally maps back and forth between the physical item
+; number and the application item identifer when communicating
+; with the application.
+;
+; In addition, the app may supply monikers to be displayed when
+; there are no items in the list, or there are no items in the filter.
+;
+; Possible uses for FilterList:
+;	- Displaying results of a narrowing database search
+;	- re-ordering the display of a list
+;	- displaying an item multiple times
+;
+; Any GenItemGroupClass or GenDynamicListClass message that deals
+; with item identifiers has a corresponding like-named message in
+; FilterListClass.  The application must use the FilterListClass
+; version of the message instead of the GenItemGroup or
+; GenDynamicListClass messages to query and set item state.  The
+; semantics and parameters of each message are the same as the
+; GenItemGroup/GenDynamicList counterpart, except where noted.
+; The word "identifier", in the message descriptions, means
+; application identifer, except where noted.
+;
+
+FilterListClass	class GenDynamicListClass
+
+MSG_FILTER_LIST_MAP_PHYSICAL_TO_APP		message
+;
+; Returns the application item ID that corresponds to the passed
+; physical item ID in the current filter.
+;
+; Source:	can be called at any time, but shouldn't be necessary,
+;		as rest of FilterList API handles this automatically.
+;
+; Pass:		cx	= physical item identifier
+; Return:	cx	= corresponding application ID, or GIGS_NONE
+;			    if current filter doesn't contain the item.
+; Destroyed:	nothing
+;
+
+MSG_FILTER_LIST_MAP_APP_TO_PHYSICAL		message
+;
+; Returns the physical item ID that corresponds to the passed
+; application item ID in the current filter.
+;
+; Source:	can be called at any time, but shouldn't be necessary,
+;		as rest of FilterList API handles this automatically.
+;
+; Pass:		cx	= application item identifier
+; Return:	cx	= corresponding application ID, or GIGS_NONE
+;			    if current filter doesn't contain the item.
+; Destroyed:	nothing
+;
+
+MSG_FILTER_LIST_SET_SINGLE_SELECTION		message
+;
+; Pass:		cx -- identifier of the item to select
+;		dx -- non-zero if indeterminate
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_FILTER_LIST_SET_MULTIPLE_SELECTIONS 	message
+;
+; Pass: 	cx:dx   - buffer with the selections.
+;		bp	- number of selections
+; Return:	nothing
+;
+; Destroyed:	ax, cx, dx, bp, and the contents of the passed buffer
+;
+
+MSG_FILTER_LIST_GET_SELECTION	   		message
+;
+; Pass:		nothing
+; Return:	ax -- current selection, or GIGS_NONE if no selections,
+;		      or the first selection in the item group if there are 
+; 		      multiple selections in a non-exclusive or extended-
+; 		      selection-exclusive item group.
+;		carry set if none selected
+;		cx, dx, bp -- destroyed
+;
+
+MSG_FILTER_LIST_GET_MULTIPLE_SELECTIONS 	message
+;
+; Pass:		cx:dx -- Buffer to hold the selections.
+;		bp    -- Max number of selections to place in buffer
+; Return:	cx:dx -- preserved, filled in with the identifiers of the
+;			 selections (the list will not be null-terminated).
+;		ax    -- Number of selections.
+;		bp    -- destroyed
+;
+
+MSG_FILTER_LIST_GET_ITEM_OPTR	   		message
+;
+; Pass:		cx -- identifier to look for
+; Return:	carry set if item found
+;		^lcx:dx -- optr of item, or null if none found
+;		ax, bp -- destroyed
+
+MSG_FILTER_LIST_SET_ITEM_STATE		   	message
+;
+; Pass:		cx -- identifier of item to select
+;		dx -- non-zero if item should be selected, zero if not
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+MSG_FILTER_LIST_IS_ITEM_SELECTED	   	message
+;
+; Pass:		cx -- identifier of item to check on
+; Return:	carry set if item is selected
+;		ax, cx, dx, bp -- destroyed
+
+MSG_FILTER_LIST_MAKE_ITEM_VISIBLE	   	message
+;
+; Pass:		cx -- identifier of item to ensure visible
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+MSG_FILTER_LIST_REPLACE_ITEM_MONIKER	  	message
+;
+; Pass:		ss:bp -- ReplaceItemMonikerFrame
+;		dx    -- size ReplaceItemMonikerFrame
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+MSG_FILTER_LIST_REPLACE_ITEM_MONIKER_OPTR	message
+;
+; Pass:		^lcx:dx - source VisMoniker
+;		bp - item
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_FILTER_LIST_REPLACE_ITEM_TEXT		message
+;
+; Pass:		cx:dx - far pointer to source null-terminated text string
+;		bp - item
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_FILTER_LIST_GET_FOCUS_ITEM			message
+;
+; Pass:		nothing
+; Return:	ax -- item identifier of current focus exclusive,
+;		      or GIGS_NONE if none, or not spec built.
+;		carry set if no user exclusive or not spec built.
+;		cx, dx, bp -- destroyed
+
+MSG_FILTER_LIST_SET_FOCUS_ITEM			message
+;
+; Pass:		cx -- identifier of the item to move the focus exclusive to
+;			GIGS_NONE if no exclusive is desired
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+MSG_FILTER_LIST_INITIALIZE			message
+; 
+; Notifies the dynamic list to display a new list of items.
+; If the list is already usable, invalidates all the current
+; items and re-requests all the monikers.  All items will be
+; deselected.  The list will not scroll back to the top
+; explicitly -- send a MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE
+; to get back to the top of the list.
+;
+; NOTE: the application should use this message, not
+; MSG_GEN_DYNAMIC_LIST_INITIALIZE to set the number of items in the list.
+;
+; Context:	Can be called any time.
+; Source:	No restrictions
+; Destination:	Any GenDynamicList object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cx -- new number of displayed items
+;		dx:bp -- new filter for list.  The filter is
+;			array of application item identifiers
+;			to display in the list.
+;			If NULL, then physical ID's and application ID's
+;				are the same, and no mapping between
+;				them takes place.
+;			If not null, and cx=0, then there are no matching
+;				items, and FLI_noMatchMoniker will be
+;				displayed.
+; Return:	nothing
+; Destroys:	nothing
+;
+
+;
+; Data type for ATTR_FILTER_LIST_CUSTOM_IDENTIFIERS
+;
+FilterListCustomIdentifiers	struct
+	FLCI_noItems	word
+	FLCI_noMatch	word
+FilterListCustomIdentifiers	ends
+
+ATTR_FILTER_LIST_CUSTOM_IDENTIFIERS	vardata FilterListCustomIdentifiers
+	; Normally, when the list is displaying "no items" or "no
+	; matches", the list uses the identifier GIGS_NONE,
+	; making these states transparent to the application.
+	; This ATTR allows the application to supply alternate
+	; identifiers for these states, should the application
+	; need to distinguish them from GIGS_NONE.
+
+FLI_noItemsMoniker	lptr.VisMoniker
+	; A chunk containing the item moniker to display
+	; when the item count is 0, and there is no filter.
+
+FLI_noMatchMoniker	lptr.VisMoniker
+	; A chunk containing the item moniker to display
+	; when the item count is 0, and the filter has zero length.
+
+FLI_currentNoneMoniker	lptr.VisMoniker
+	; INTERNAL: points to either FLI_noItemsMoniker,
+	; FLI_noMatchMoniker, or NULL
+
+FLI_filterItems		lptr.word
+	; INTERNAL: if non-zero, chunk is an array of application ID's
+	; to display.  if the array is of zero length, then
+	; there are no items which match, and
+	; FLI_noMatchText is displayed.
+
+FilterListClass	endc
+
+;----------------------------------------------------------------------------
+;  FilterTextClass		(only availible in Communicator products
+;			         shipped in April 1997 or later)
+;----------------------------------------------------------------------------
+;
+; This is the class of object used to enter the text that will
+; limit the items displayed in a corresponding FilterListClass
+; object.
+;
+
+FilterTextClass		class	TextWithListClass
+
+MSG_FILTER_TEXT_SEND_FILTER_MSG		message
+;
+; Causes the filter timeout to be reset, and to send the
+; FTI_filterMsg.  Sent internally by timeout, or by
+; application to cause an immediate filter
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+MSG_FILTER_TEXT_RESET		message
+;
+; Clears the current search text, and immediately sends out
+; FTI_filterMsg, causing the destination to clear the search.
+; This is the equivalent of MSG_VIS_TEXT_DELETE_ALL followed by
+; MSG_FILTER_TEXT_SEND_FILTER_MSG
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+
+MSG_FILTER_TEXT_RESET_TEXT_IF_NOT_FOCUSED	message
+;
+; Message queued up when we lose the focus - if we've *really* lost the
+; focus, then nuke the text.
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+FTI_filterTimeout	word	30
+	;
+	; Time delay (in ticks) after text is modified that the
+	; FTI_filterMsg should be sent.
+	;
+
+FTI_filterMsg		word
+	;
+	; Message to send out to the GTXI_destination to initiate
+	; a filter search.  The actual text to filter on may be obtained
+	; with MSG_VIS_TEXT_GET_ALL_xxx. The message takes the following
+	; form:
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	; may destroy:	ax, cx, dx, bp
+
+FTI_timerID		word
+FTI_timerHandle		hptr
+	;
+	; Internal: handle/ID of timer used to determine when to start a
+	; search.
+	;
+
+FilterTextClass		endc
+
+
+
+RepeatingGenGlyphClass 	class GenGlyphClass
+; This class is for continued animation of a series of glyphs.
+
+MSG_RGG_STOP_ANIMATION					message
+;
+; Explicitly stop the changing of glyphs, leaving the last one on screen.
+;
+; Pass: nothing
+; Returns: nothing
+;
+
+MSG_RGG_START_ANIMATION					message
+;
+; Explicitly start a previously stopped RepeatingGenGlyph object.
+;
+; Pass: nothing
+; Returns: nothing
+;
+
+MSG_RGG_CHANGE_MONIKER					message
+;
+; Internal: Sent to ourselves to change the moniker
+;
+	RGGI_currentItem	word
+	RGGI_timerHandle	word	0
+	RGGI_timerID		word
+	RGGI_delayTime		word
+	RGGI_monikerList	lptr
+
+RepeatingGenGlyphClass 	endc
+
+ListWithUserDefinedClass	class	GenItemGroupClass
+; A special list with "User defined" item. 
+; This list which has an associated (Underlined)TextWithList object.
+; It handles the giving/taking of focus from the text object, when we
+; move to/from the specified item in the list.
+
+MSG_LWUD_SET_SINGLE_SELECTION_OR_USER_DEFINED		message
+;
+; Works like MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION the difference being
+; if the identifier you are trying to set is not found in a GenItem then the
+; user defined GenItem is selected.
+;
+; Pass:		cx -- identifier of the item to select
+;		dx -- non-zero if indeterminate
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+
+ATTR_LIST_WITH_USER_DEFINED_TEXT_OBJECT_SELECTED	vardata
+; If present, the text object is currently selected.
+
+	LWUDI_textObj	optr
+	LWUDI_textID	word		; identifier of GenItem which
+					; activates the focus of the
+					; specified text object.
+
+ListWithUserDefinedClass	endc
+
+;----------------------------------------------------------------------------
+; Indicator Library classes
+;----------------------------------------------------------------------------
+;
+; These are low-level objects used by the Indicator App
+; High-level control of the Indicator control should be done in
+; the main Indicator App.
+;
+
+GreyGenInteractionClass class	GenPrimaryClass
+; A GenPrimary which draws it's background in a dark grey color
+GreyGenInteractionClass endc
+
+IndicatorClass 	class	GenGlyphClass
+; A GenGlyph which knows how to draw an etched outline, based on
+; either 0 or more icons inside.
+	II_numIcons	IconsShown
+IndicatorClass 	endc
+
+IconIndicatorClass	class	IndicatorClass
+; A glyph which knows whether to draw either 0, 1, or 2 icons inside.
+
+MSG_II_SET_LEFT_ICON	message
+;
+; Sets the left icon to be displayed in the indicator slot.
+; 	PASS:	cx	= # of icon from icon list
+;			  cx = 0 means clear the currently showing
+;			  icon (if any)
+;	RETURN:	nothing
+;
+
+MSG_II_SET_RIGHT_ICON	message
+;
+; Sets the right icon to be displayed in the indicator slot.
+; 	PASS:	cx	= # of icon from icon list
+;			  cx = 0 means clear the currently showing
+;			  icon (if any)
+;	RETURN:	nothing
+;
+	III_leftIconList	lptr	; list of bitmaps
+	III_rightIconList	lptr	; list of bitmaps
+	III_leftIcon		word	; which icon to draw in list
+	III_rightIcon		word	;    "     "       "
+IconIndicatorClass	endc
+
+LevelIndicatorClass	class	IndicatorClass
+; A glyph which knows how to draw a bitmap, and many levels.
+;
+
+MSG_LI_REPLACE_TYPE_BITMAP	message
+;
+; Replace the tiny bitmap on the left, and redraws itself.
+;
+; 	PASS:	cx	= lptr to new bitmap OR 
+;			0 to not draw a bitmap and not draw the levels
+;			(setting to 0 will NOT erase the old bitmap lptr).
+;	RETURN:	nothing
+;
+
+MSG_LI_SET_LEVEL		message
+;
+; Sets the new indicator level, and redraws itself
+; 	PASS:	cx	= level
+;	RETURN:	nothing
+;
+
+	LII_currLevel		word
+	LII_typeBitmap		lptr
+	LII_levelBitmapList	lptr	; list of bitmaps for each level
+LevelIndicatorClass	endc
+
+IndicatorInteractionClass	class GenInteractionClass
+; A GenInteraction which knows how to draw a border around itself,
+; while maintaining a minimum height.
+IndicatorInteractionClass	endc
+
+;----------------------------------------------------------------------------
+; AppLaunchClass
+;----------------------------------------------------------------------------
+
+AppLaunchClass	class	GenFileSelectorClass
+
+MSG_AL_LAUNCH_SELECTED_APP	message
+;
+; Launches the selected app.   Usually sent as a result of the user pressing
+; on the "select" trigger.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_AL_APP_SELECTED		message
+;
+; Message sent out when an app is selected in the file selector.
+;
+; Pass: cx - entry # of selection
+;	bp - GenFileSelectorEntryFlags
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+ALI_launcherApp		FApplication <FA_EXTRAS_APP>	;default launcher app
+ALI_triggerObj		optr			; trigger object to
+						; disable if there are
+						; no documents in list
+
+AppLaunchClass	endc
+
+;----------------------------------------------------------------------------
+; FoamHelpControlClass
+;----------------------------------------------------------------------------
+
+FoamHelpControlClass	class	HelpControlClass
+
+TEMP_FOAM_HELP_CONTROL_UI	vardata	hptr
+;
+; Holds handle of duplicate UI.
+;
+
+FoamHelpControlClass	endc
+
+
+
+;******************************************************************************
+;		FoamTextStyleControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_VIS_TEXT_SET_TEXT_STYLE (a MetaTextMessage)
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+; MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_STYLE_CHANGE: NotifyTextStyleChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+FoamTextStyleControlClass	class	GenControlClass
+
+MSG_FTSC_PLAIN_TEXT_CHANGE	message
+;
+; Sent from "Plain" list entry on any change
+;
+; Pass:
+;	nothing
+
+MSG_FTSC_STYLE_CHANGE	message
+;
+; Sent from non-exclusive "Style" list on any change
+;
+; Pass:
+;	cx - new state of style list
+;	bp - changed bits in style list
+
+MSG_FTSC_EXTENDED_STYLE_CHANGE	message
+;
+; Sent from non-exclusive "Style" list on any change
+;
+; Pass:
+;	cx - new state of style list
+;	bp - changed bits in style list
+
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+FTSCFeatures	record
+    FTSCF_PLAIN:1
+    FTSCF_BOLD:1
+    FTSCF_ITALIC:1
+    FTSCF_UNDERLINE:1
+    FTSCF_STRIKE_THRU:1
+    FTSCF_SUBSCRIPT:1
+    FTSCF_SUPERSCRIPT:1
+    FTSCF_BOXED:1
+    FTSCF_BUTTON:1
+    FTSCF_INDEX:1
+    FTSCF_ALL_CAP:1
+    FTSCF_SMALL_CAP:1
+FTSCFeatures	end
+
+
+FTSC_DEFAULT_FEATURES equ mask FTSCF_PLAIN or mask FTSCF_BOLD \
+			or mask FTSCF_ITALIC or mask FTSCF_UNDERLINE \
+			or mask FTSCF_SUBSCRIPT or mask FTSCF_SUPERSCRIPT \
+			or mask FTSCF_STRIKE_THRU \
+			or mask FTSCF_BOXED or mask FTSCF_BUTTON \
+			or mask FTSCF_INDEX or mask FTSCF_ALL_CAP \
+			or mask FTSCF_SMALL_CAP
+
+; Notification structure
+
+FoamNotifyTextStyleChange	struct
+    FNTSC_styles		TextStyle
+    FNTSC_indeterminates	TextStyle
+FoamNotifyTextStyleChange	ends
+
+FoamTextStyleControlClass	endc
+
+
+;******************************************************************************
+;		FoamFontControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_VIS_TEXT_SET_FONT_ID (a MetaTextMessage)
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+; MANUFACTURER_ID_GEOWORKS.GWNT_FONT_CHANGE: FoamNotifyFontChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+FoamFontControlClass	class	GenControlClass
+
+MSG_FFC_SET_FONT	message
+;
+; Handle a font set via the short list
+;
+; Pass:
+;	cx - font ID
+
+ATTR_FOAM_FONT_CONTROL_SHORT_LIST_FONT_TYPE	vardata	FontEnumFlags
+;
+; This attribute sets the legal font types for the short font list
+
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+;
+; the original name is FFCFeatures (Foam Font Ctrl Feature) but
+; math.def has a struct with same name already... -- kho, 7/11/95
+;
+FFCCFeatures	record
+    FFCCF_SHORT_LIST:1
+FFCCFeatures	end
+
+FFCC_DEFAULT_FEATURES equ mask FFCCF_SHORT_LIST
+
+; Notification structure
+
+FoamNotifyFontChange	struct
+    FNFC_fontID		FontID
+    FNFC_diffs		byte
+FoamNotifyFontChange	ends
+
+FoamFontControlClass	endc
+
+
+;******************************************************************************
+;		FoamPointSizeControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_VIS_TEXT_SET_POINT_SIZE (a MetaTextMessage)
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+; MANUFACTURER_ID_GEOWORKS.GWNT_POINT_SIZE_CHANGE: FoamNotifyPointSizeChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+FoamPointSizeControlClass	class	GenControlClass
+
+MSG_FPSC_SET_POINT_SIZE	message
+;
+; Pass:
+;	dx.cx - size
+
+MSG_FPSC_SET_POINT_SIZE_FROM_LIST message
+;
+; Pass:	cx - size
+;
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+FPSCFeatures	record
+    FPSCF_10:1
+    FPSCF_12:1
+    FPSCF_14:1
+    FPSCF_18:1
+    FPSCF_24:1
+    FPSCF_36:1
+    FPSCF_54:1
+    FPSCF_USER_DEFINED:1
+FPSCFeatures	end
+
+FPSC_DEFAULT_FEATURES equ  mask FPSCF_10 or mask FPSCF_12 or \
+			  mask FPSCF_14 or mask FPSCF_18 or mask FPSCF_24 or \
+			  mask FPSCF_36 or mask FPSCF_54 or \
+			  mask FPSCF_USER_DEFINED
+
+SIZE_USER_DEFINED equ 0
+
+; Notification structure
+
+FoamNotifyPointSizeChange	struct
+    FNPSC_fontSize	WWFixed
+    FNPSC_diffs		byte
+FoamNotifyPointSizeChange	ends
+
+FoamPointSizeControlClass	endc
+
+
+;******************************************************************************
+;		FoamJustificationControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_VIS_TEXT_SET_PARA_ATTRIBUTES (a MetaTextMessage)
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+; MANUFACTURER_ID_GEOWORKS.GWNT_JUSTIFICATION_CHANGE:
+; 				FoamNotifyJustificationChange 
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+FoamJustificationControlClass	class	GenControlClass
+
+MSG_FJC_SET_JUSTIFICATION	message
+;
+; Pass:		cx - Justification shl offset VTPAA_JUSTIFICATION
+; Return:	nothing
+; Destroyed:	bx, si, di, ds, es
+
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+FJCFeatures	record
+    FJCF_FULL_CHAR:1			;DBCS only
+    FJCF_LEFT:1
+    FJCF_RIGHT:1
+    FJCF_CENTER:1
+    FJCF_FULL:1
+FJCFeatures	end
+
+FJC_DEFAULT_FEATURES equ mask FJCF_LEFT or mask FJCF_RIGHT \
+			or mask FJCF_CENTER or mask FJCF_FULL
+
+; Notification structure
+
+FoamNotifyJustificationChange	struct
+    FNJC_justification	Justification
+    FNJC_diffs		byte
+    FNJC_useGeneral	byte	;if non-zero then use "general" in place
+				;of "full"
+FoamNotifyJustificationChange	ends
+
+FoamJustificationControlClass	endc
+
+
+;----------------------------------------------------------------------------
+; ClockContentClass
+;----------------------------------------------------------------------------
+ClockContentClass	class VisContentClass
+        CAI_curClock            optr
+        CAI_interval            word            ; current clock's interval
+ClockContentClass endc
+
+;----------------------------------------------------------------------------
+; VisClockClass
+;----------------------------------------------------------------------------
+
+VisClockClass	class	VisCompClass, master
+
+MSG_VC_REMOVE_ME			message
+;	remove this message as soon as the major protocol increases.
+
+MSG_VC_CLOCK_TICK			message
+;
+;	The timer has ticked again, so update the display. VisClock will
+;	field this, create a GState and send itself a MSG_VIS_DRAW, but
+;	subclasses may field this themselves if, for example, they have
+;	a GState cached.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+MSG_VC_START_TIMER			message
+;
+;	Start the timer for the clock
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+MSG_VC_STOP_TIMER			message
+;
+;	Stop the timer for the clock
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+VC_CLOCK	equ	1	;constant used in outputs of TemplateColorGroup
+				; to signal a message should go to the clock
+				; doing the building.
+VisClockContinue	etype	byte, 0, 1
+    VCC_CONTINUE	enum VisClockContinue
+    VCC_DONT_CONTINUE	enum VisClockContinue
+
+
+VisClockFlags	record
+    VCF_MOVING:1		; set if currently moving the clock around
+				;  on the screen
+    VCF_RESTORED:1		; set if restored from the state file.
+    :6
+VisClockFlags	end
+
+    ;
+    ; Internal instance variables active only while clock is on-screen.
+    ; 
+    VCI_timer		hptr		; handle of timer that's telling us
+					;  what to do
+    		noreloc	VCI_timer
+    VCI_timerID		word		; ID to give when we tell it what to do
+
+    VCI_timerContinue	VisClockContinue; flag to continue sending the tick
+					;  event
+    ;
+    ; Persistent state variables.
+    ; 
+    VCI_region		lptr.Region 0	; Chunk holding the parameterized
+					;  region for the window to be
+					;  displayed.
+    VCI_interval	word		; Interval for timer, in ticks. If
+					;  > 60, then no seconds should be
+					;  displayed.
+
+VisClockClass	endc
+
+;----------------------------------------------------------------------------
+; VisAnalogClockClass
+;----------------------------------------------------------------------------
+
+VisAnalogClockClass	class	VisClockClass
+
+;
+; The gstring-with-bounding-box used for most things here, to allow proper
+; scaling of the result based on the current clock size.
+; 
+BoundedGString	struct
+    BGS_bounds	Rectangle
+    BGS_gstring	label	byte
+BoundedGString	ends
+
+    VACI_pattern	lptr.BoundedGString	; gstring giving the pattern
+						;  for the clock's window
+;
+; Bounded GStrings for the various hands. All of these should be drawn as if
+; they were to be at 12 o'clock, with the origin in the center of the clock
+; (e.g. the Y coordinate of the outer edge of the hand will be negative)
+; 
+    VACI_hourHand	lptr.BoundedGString	; gstring for the hour hand,
+    VACI_minuteHand	lptr.BoundedGString	; gstring for the minute hand,
+    VACI_secondHand	lptr.BoundedGString	; gstring for the second hand,
+
+VisAnalogClockColor	etype	byte, 0, 1
+    VACC_BACKGROUND	enum VisAnalogClockColor
+    VACC_HOUR_HAND	enum VisAnalogClockColor
+    VACC_MINUTE_HAND	enum VisAnalogClockColor
+    VACC_SECOND_HAND	enum VisAnalogClockColor
+
+DrawAmPmFlag		etype	word, 0, 1
+	DAPF_AM		enum	DrawAmPmFlag
+	DAPF_PM		enum	DrawAmPmFlag
+
+GR_CLOCK_COLOR_ESCAPE	equ GR_FIRST_GEOWORKS_ESCAPE
+;
+;	This is an escape you can put into a gstring, with a byte of data, to
+;	set all the colors (area, line and text) to be the one whose index
+;	is the byte of data. This indexes the VACI_colors array to allow the
+;	user to affect the colors used in the gstrings.
+;	
+
+
+;	.assert	length VACI_colors eq VisAnalogClockColor
+
+
+    ;
+    ; These scale factors are determined each time the window moves or is
+    ; resized and are based on the ration between the bounds of the
+    ; pattern gstring and the object itself.
+    ; 
+    VACI_xScale		WWFixed	<1, 0>		; current x scale factor
+    VACI_yScale		WWFixed <1, 0>		; current y scale factor
+    
+    VACI_aspectRatio	WWFixed <1, 0>		; ratio of vertical to
+						;  horizontal, for dealing
+						;  with displays that aren't
+						;  square. It is applied in
+						;  the Y direction in addition
+						;  to VACI_yScale
+
+    VACI_lastHourAngle	word			; angle of hour hand at last
+						;  draw
+    VACI_lastMinuteAngle word			; angle of minute hand at last
+						;  draw.
+    VACI_lastSecondAngle word			; angle of second hand at last
+						;  draw.
+
+    VACI_diameter	word			; Diameter of the clock, in
+						;  points*8
+	ATTR_ANALOG_CLOCK_SHOW_AM_PM	vardata Point
+	;
+	; if set then show am and pm designation
+	;
+VisAnalogClockClass	endc
+
+;----------------------------------------------------------------------------
+;  FlashingNoteClass
+;----------------------------------------------------------------------------
+FlashingNoteClass	class	GenInteractionClass
+;
+; The recommended usage of a FlashingNote object is to place it as the
+; root of an unattached tree in it's own UI block. If you then use
+; PutUpDialogViaUIThread to initiate it, and you don't manually
+; destroy the dialog later, you should use
+; HINT_FLASHING_NOTE_DESTROY_SELF_AFTER_DISMISS
+;
+; E.g., 
+; ErrorBox = FlashingNote {
+;	genStates = default -usable;
+;	children = ErrorBoxInteraction;
+;	hints = {
+;		HINT_WINDOW_NO_TITLE_BAR,
+;		HINT_DRAW_IN_BOX,
+;		HINT_FLASHING_NOTE_DESTROY_SELF_AFTER_DISMISS
+;	}
+; }
+;
+
+MSG_FLASHING_NOTE_SET_DURATION		message
+;
+; Sets how long the dialog will stay up, before dimissing itself.
+; (default = 3 seconds)
+;
+; Pass:	cx	= number of ticks (if 0, then the dialog box will
+;		never be dismissed, and any keystrokes will be ignored).
+; Return: nothing
+;
+
+; 
+; Internal messages:
+;
+MSG_FLASHING_NOTE_ACCEPT_USER_ACTION	message
+;
+; Sent to ourselves (by timer) when the dead zone is over,
+; and we can start accepting keystrokes.
+;
+; Pass: bp	= timer ID
+; Return: nothing
+;
+
+MSG_FLASHING_NOTE_DISMISS_DIALOG	message
+; 
+; Sent to ourselves (by timer) when we want to be taken down.
+;
+; Pass: nothing
+; Return: nothing
+;
+
+;
+; Vardata:
+;
+HINT_FLASHING_NOTE_DESTROY_SELF_AFTER_DISMISS	vardata
+;
+; Calls UserDestroyDialog on itself after dismissing the dialog.
+; Suitable for routines which don't care when the dialog is taken
+; down, and don't want to manually destroy it.
+;
+
+ATTR_FLASHING_NOTE_MINIMUM_DURATION	vardata	word
+;
+; How long, in # of ticks, the dialog will ignore keystrokes before
+; allowing the user to bring down the dialog with a keystroke. Also,
+; during this time, any IC_DISMISS sent to our object will be delayed
+; till minimum duration is over.
+; If not present, the default is 1 second.
+;
+
+TEMP_FLASHING_NOTE_TIMER_DATA		vardata	FlashingNoteTimerData
+;
+; Used to temporarily store the timer ID & timer handle.
+;
+
+TEMP_FLASHING_NOTE_DISMISS_ACTION_OK	vardata
+;
+; If present, user can dismiss dialog box with keystroke, or
+; programmer can dismiss dialog.
+;
+
+TEMP_FLASHING_NOTE_TRIED_DISMISS	vardata
+;
+; If present, programmer tried to dismiss dialog before dead zone
+; timer expired.
+;
+
+TEMP_FLASHING_NOTE_ALT_MARGINS		vardata
+;
+; Used internally when smaller margins are needed to accomodate larger
+; flashing note contents.
+;
+
+;
+; Instance data:
+;
+	FNI_duration			word
+	;
+	; # of ticks to stay up
+	;
+
+FlashingNoteClass	endc
+
+SelfDestroyingDialogClass	class	GenInteractionClass
+; A dialog which knows how to destroy itself after being closed.
+;
+; This is used by FoamStandardDialogOptr's UI.
+; The recommended usage of this object is to place it as the
+; root of an unattached tree in it's own UI block.
+;
+; Never call UserDestroyDialog directly on this object, instead use
+; MSG_GEN_GUP_INTERACTION_COMMAND to send IC_DISMISS.
+;
+SelfDestroyingDialogClass	endc
+
+
+FoamProgressDialogClass	class	GenControlClass
+; A standard dialog which provides the cancellation animation
+;
+; Will contain:
+;	description text to say what's going on
+;	standard cancellation animation
+;	status text for progress updates if desired
+;	cancellation trigger
+;
+
+MSG_FOAM_PROGRESS_DIALOG_SET_DESCRIPTION_TEXT_OPTR	message
+; 
+; Set the description text.
+;
+; Pass: ^lcx:dx = optr to description text
+; Return: nothing
+;
+
+MSG_FOAM_PROGRESS_DIALOG_SET_STATUS_TEXT	message
+;
+; Set the status text.
+;
+; Pass: cx:dx = fptr to status text
+; Return: nothing
+;
+
+MSG_FOAM_PROGRESS_DIALOG_SET_CANCEL_ACTION	message
+;
+; Set the cancel action.
+;
+; Pass: ^lcx:dx = optr to destination
+;	bp 	= cancellation msg message
+; Return: nothing
+;
+
+MSG_FOAM_PROGRESS_DIALOG_SET_STATUS_TEXT_OPTR	message
+;
+; Set the status text.
+;
+; Pass: ^lcx:dx = optr to status text
+; Return: nothing
+;
+
+MSG_FOAM_PROGRESS_DIALOG_APPEND_STATUS_TEXT	message
+;
+; Append text to the current status text.
+;
+; Pass: cx:dx = fptr to status text to append 
+;		to current status text
+; Return: nothing
+;
+
+MSG_FOAM_PROGRESS_DIALOG_SET_DESCRIPTION_TEXT	message
+; 
+; Set the description text.
+;
+; Pass: cx:dx = fptr to description text
+; Return: nothing
+;
+
+MSG_FOAM_PROGRESS_DIALOG_APPEND_DESCRIPTION_TEXT message
+;
+; Append text to the current description text.
+;
+; Pass: cx:dx = fptr to description text to append 
+;		to current description text
+; Return: nothing
+;
+
+MSG_FOAM_PROGRESS_DIALOG_CANCEL_TRIGGERED	message
+;
+; Internal: Sent to us by our Cancel trigger when pressed.
+;
+; Pass: nothing
+; Return: nothing
+;
+
+HINT_FOAM_PROGRESS_DIALOG_DESTROY_SELF_AFTER_DISMISS	vardata
+;
+; Calls UserDestroyDialog on itself after dismissing the dialog.
+; Suitable for routines which don't care when the dialog is taken
+; down, and don't want to manually destroy it.
+;
+; Do not use this hint if you are using TakeDownDialogViaUIThread to
+; remove the dialog.
+
+ATTR_FOAM_PROGRESS_DIALOG_DONT_DISMISS_ON_CANCEL	vardata
+;
+; Specifies that the dialog should not be dismissed when the
+; cancel trigger is activated.  The application is responsible for
+; dismissing the dialog.
+;
+
+	FoamProgressDialogFeatures	record
+
+		FPDF_CANCEL:1
+		; whether there is a cancel trigger
+
+	FoamProgressDialogFeatures	end
+
+	FPD_DEFAULT_FEATURES	equ	mask FPDF_CANCEL
+
+	FPDI_descriptionText	lptr.TCHAR
+	FPDI_statusText		lptr.TCHAR
+	FPDI_cancelDestination	optr
+	FPDI_cancelActionMsg	word
+
+FoamProgressDialogClass	endc
+
+
+;----------------------------------------------------------------------------
+;  FoamSubProcessClass
+;----------------------------------------------------------------------------
+
+FoamSubApplicationClass	class	GenApplicationClass
+;
+; This class should be used for any application that must exist under the
+; systems, extras, or services application.    It provides needed default
+; behavior for sub-applications, and a method handler to call when the
+; user clicks on the "Close" button.
+;
+
+	FSAI_launcherApp	FApplication
+		;The name of the application that should launch this app.
+		;Needed for proper open and close behavior for the sub-app.
+
+	HINT_FOAM_SUB_APP_NOT_DEFAULT_LAUNCHABLE	vardata
+	; Used internally by FoamSubApplicationClass to determine
+	; when the app may be launched in place of the default launcher.
+
+
+MSG_FSA_RETURN_TO_LAUNCHER	message
+;
+; Provided for sub-apps to have an easy way to return to their parent app.
+; Usually called as a result of the user pressing "Close" in the sub-app.
+;
+
+FoamSubApplicationClass	endc
+
+;----------------------------------------------------------------------------
+;  Exported functions
+;----------------------------------------------------------------------------
+global	FoamSetDocumentDir:far
+global	FoamGetDocumentDir:far
+global	FoamGetDocumentDirName:far
+global	FoamDisplayDeleteWarning:far
+global	FoamDisplayDeleteWarningNoBlock:far
+global	FoamDisplayWarning:far
+global	FoamDisplayQuestion:far
+global	FoamDisplayError:far
+global	FoamDisplayOkCancelWarning:far
+global	FoamDocSetAttrInfo:far
+global	FoamDocCheckProtocol:far
+global	FoamDocCreate:far
+global	FoamDocOpen:far
+global	FoamDocClose:far
+global	FoamDocDelete:far
+global	FoamDocSetBlockHandle:far
+global	FoamDocSetHeaderData:far
+global	FoamDocGetHeaderData:far
+global	FoamDocSetTextLength:far
+global	FoamDocGetTextLength:far
+global	FoamDocGetTextLengthFromField:far
+global	FoamDocGetDosTextSmall:far
+global	FoamDocStoreDosTextSmall:far
+global	FoamDocConvertFromDosInit:far
+global	FoamDocConvertFromDosAppend:far
+global	FoamDocConvertFromDosDone:far
+global	FoamDocConvertToDosInit:far
+global	FoamDocConvertToDosRange:far
+global	FoamDocConvertToDosDone:far
+global	FoamDocIsTextFormatted:far
+global	FoamDocSetTextFormatted:far
+global	FoamIsTextFormatted:far
+FoamCheckIfOutOfSpace		equ	FOAMCHECKIFOUTOFSPACE
+global	FoamWarnIfOutOfSpace:far
+global	FoamWarnForSaving:far
+global	FoamCancelIfNoFreeSpace:far
+global	FoamWarnIfNotEnoughSpace:far
+FoamGetFreeDiskSpace		equ	FOAMGETFREEDISKSPACE
+FoamWarnSpaceAfterOperation	equ	FOAMWARNSPACEAFTEROPERATION
+global	FoamRoundUpAsMultipleOfClusterSize:far
+global  FoamLaunchApplication:far
+FoamStandardDialogOptr		equ	FOAMSTANDARDDIALOGOPTR
+FoamStandardDialogOptrNoBlock	equ	FOAMSTANDARDDIALOGOPTRNOBLOCK
+
+global 	PutUpDialogViaUIThread:far
+global 	TakeDownDialogViaUIThread:far
+global	CreateVisMonikerLine:		far
+global	CreateVisMonikerLineAdaptableColumns:far
+global 	FoamDisplayNote:far
+global	FoamDisplayNoteNoBlock:far
+global	FoamDisplayWarningNoBlock:far
+global	FoamDisplayErrorNoBlock:far
+global	FoamGetFileType:far
+global	FoamGetHandleFileType:far
+global	FoamStartSoundSequence:far
+global	FoamStopSoundSequence:far
+
+global  FoamGetLexicalOrder:far
+;
+; Gets the "lexical order" of a character, for use in optimized
+; case and accent-insensitive searching (all versions of a character,
+; accented, unaccented, upper and lower case will have the same lexical
+; order).
+;
+; Pass: al - char
+; Return: al - Lex1stOrder (see Internal/lexical.def)
+;
+
+global	FoamGenerateUniqueFilename:far
+global	FoamECIToMailboxError:far
+global	FoamDocStoreTextAsVMChain:far
+
+global	FoamPathMakeSP:far
+global	FoamPathMake:far
+global	FoamPathGetFullPath:far
+global	FoamPathFolderName:far
+global	FoamPathParent:far
+global	FoamPathLock:far
+global	FoamPathUnlock:far
+global	FoamPathCheckLock:far
+global	FoamPathRename:far
+global	FoamPathIsFDD:far
+global	FoamLaunchReaderApp:far
+global	FoamSetBacklightTimeout:far
+FoamGetBacklightTimeout		equ	FOAMGETBACKLIGHTTIMEOUT
+global	FoamGetDocumentOutboxName:far
+
+global FoamAdjustTimeForward:far
+global FoamAdjustTimeBackward:far
+global FoamGetMinutesBetweenTimes:far
+global FoamGetCompressedDateTime:far
+
+;----------------------------------------------------------------------------
+;  C Versions
+;----------------------------------------------------------------------------
+global	FOAMSETDOCUMENTDIR:far
+global	FOAMGETDOCUMENTDIR:far
+global	FOAMGETDOCUMENTDIRNAME:far
+global	FOAMDISPLAYDELETEWARNING:far
+global	FOAMDISPLAYWARNING:far
+global	FOAMDISPLAYQUESTION:far
+global	FOAMDISPLAYERROR:far
+global	FOAMDISPLAYOKCANCELWARNING:far
+global	FOAMDOCSETATTRINFO:far
+global	FOAMDOCCHECKPROTOCOL:far
+global	FOAMDOCCREATE:far
+global	FOAMDOCOPEN:far
+global	FOAMDOCCLOSE:far
+global	FOAMDOCDELETE:far
+global	FOAMDOCSETBLOCKHANDLE:far
+global	FOAMDOCSETHEADERDATA:far
+global	FOAMDOCGETHEADERDATA:far
+global	FOAMDOCSETTEXTLENGTH:far
+global	FOAMDOCGETTEXTLENGTH:far
+global	FOAMDOCGETTEXTLENGTHFROMFIELD:far
+global	FOAMDOCGETDOSTEXTSMALL:far
+global	FOAMDOCSTOREDOSTEXTSMALL:far
+global	FOAMDOCCONVERTFROMDOSINIT:far
+global	FOAMDOCCONVERTFROMDOSAPPEND:far
+global	FOAMDOCCONVERTFROMDOSDONE:far
+global	FOAMDOCCONVERTTODOSINIT:far
+global	FOAMDOCCONVERTTODOSRANGE:far
+global	FOAMDOCCONVERTTODOSDONE:far
+global	FOAMDOCISTEXTFORMATTED:far
+global	FOAMDOCSETTEXTFORMATTED:far
+global	FOAMISTEXTFORMATTED:far
+global	FOAMCHECKIFOUTOFSPACE:far
+global	FOAMWARNIFOUTOFSPACE:far
+global	FOAMWARNFORSAVING:far
+global	FOAMCANCELIFNOFREESPACE:far
+global	FOAMWARNIFNOTENOUGHSPACE:far
+global	FOAMWARNSPACEAFTEROPERATION:far
+global	FOAMGETFREEDISKSPACE:far
+global	FOAMROUNDUPASMULTIPLEOFCLUSTERSIZE:far
+global  FOAMLAUNCHAPPLICATION:far
+global	FOAMSTANDARDDIALOGOPTR:far
+global	FOAMSTANDARDDIALOGOPTRNOBLOCK:far
+global 	PUTUPDIALOGVIAUITHREAD:far
+global 	TAKEDOWNDIALOGVIAUITHREAD:far
+global  CREATEVISMONIKERLINE:far
+global	CREATEVISMONIKERLINEADAPTABLECOLUMNS:far
+global	FOAMDISPLAYNOTE:far
+global	FOAMDISPLAYNOTENOBLOCK:far
+global	FOAMDISPLAYWARNINGNOBLOCK:far
+global	FOAMDISPLAYERRORNOBLOCK:far
+global	FOAMGETFILETYPE:far
+global	FOAMGETHANDLEFILETYPE:far
+global	FOAMSTOPALARMSOUND:far
+
+global	UpdateHelpContext:far
+global	UPDATEHELPCONTEXT:far
+global	FoamUTOffset:far
+global	FOAMUTOFFSET:far
+
+global	FOAMGETLEXICALORDER:far
+global	FOAMGENERATEUNIQUEFILENAME:far
+global	FOAMECITOMAILBOXERROR:far
+global	FOAMDOCSTORETEXTASVMCHAIN:far
+global	FOAMDISPLAYDELETEWARNINGNOBLOCK:far
+
+global	FoamSetLowSoundFlag:far
+global	FOAMSETLOWSOUNDFLAG:far
+global	FoamGetLowSoundFlag:far
+global	FOAMGETLOWSOUNDFLAG:far
+
+global FOAMPATHMAKESP:far
+global FOAMPATHMAKE:far
+global FOAMPATHGETFULLPATH:far
+global FOAMPATHFOLDERNAME:far
+global FOAMPATHPARENT:far
+global FOAMPATHLOCK:far
+global FOAMPATHUNLOCK:far
+global FOAMPATHCHECKLOCK:far
+global FOAMPATHRENAME:far
+global FOAMPATHISFDD:far
+
+global FOAMLAUNCHREADERAPP:far
+global FOAMSETBACKLIGHTTIMEOUT:far
+global FOAMGETBACKLIGHTTIMEOUT:far
+global FOAMGETDOCUMENTOUTBOXNAME:far
+
+global FOAMADJUSTTIMEFORWARD:far
+global FOAMADJUSTTIMEBACKWARD:far
+global FOAMGETMINUTESBETWEENTIMES:far
+global FOAMGETCOMPRESSEDDATETIME:far
+
+EndLibrary	foam
+
+

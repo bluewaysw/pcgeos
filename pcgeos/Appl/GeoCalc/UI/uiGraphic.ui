@@ -1,0 +1,533 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	PCGEOS
+ * MODULE:	uiGraphic.ui
+ * FILE:	uiGraphic.ui
+ *
+ * AUTHOR:  	Gene Anderson: May 15, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	5/15/92	  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	Graphics layer related objects
+ *
+ * 	$Id: uiGraphic.ui,v 1.1 97/04/04 15:48:44 newdeal Exp $ Locker: don $
+ *
+ ***********************************************************************/
+
+/******************************************************************************
+ *
+ *	Graphics Tools
+ *
+ ******************************************************************************/
+
+#if _CHARTS
+#include "Art/mkrBitmapPtrTool.ui"
+#endif
+
+start GrObjToolUI;
+
+#if _CHARTS
+GCGrObjToolControl = GrObjToolControl {
+	output = GCGrObjHead;
+	hints = {
+		HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		     GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+			UIIL_INTRODUCTORY,
+			    0>,
+		     <GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+			UIIL_BEGINNING,
+			    mask GOTCF_PTR or \
+			    mask GOTCF_TEXT or \
+			    mask GOTCF_LINE or \
+			    mask GOTCF_ROTATE_PTR or \
+			    mask GOTCF_RECT or \
+			    mask GOTCF_ROUNDED_RECT>,
+		     <GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+			UIIL_ADVANCED,
+			    GOTC_DEFAULT_TOOLBOX_FEATURES>}
+	}
+}
+
+#if _BITMAP_EDITING
+GCGrObjBitmapToolControl = GrObjBitmapToolControl vardataReloc{
+       hints = {
+               HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+			word	mask VBTCF_DRAW_RECT or mask VBTCF_DRAW_ELLIPSE
+		},
+               ATTR_GEN_CONTROL_APP_TOOLBOX_UI {
+                       UN_OPTR BitmapPtrTool
+               },
+               ATTR_VIS_BITMAP_TOOL_CONTROL_POSITION_FOR_ADDED_TOOLS {
+                       word CCO_FIRST
+               }
+       }
+}
+#endif
+
+
+BitmapPtrTool = VisBitmapToolItem {
+	genStates = default -usable;
+	moniker = list {
+		BitmapPtrToolTCMoniker,
+		BitmapPtrToolTMMoniker,
+		BitmapPtrToolTCGAMoniker
+	}
+       toolClass = 0;
+       identifier = -1;
+       hints = { ATTR_GEN_FOCUS_HELP { optr BitmapPtrHelpString } }
+}
+
+chunk BitmapPtrHelpString = "Bitmap Pointer";
+#endif
+
+end GrObjToolUI;
+
+/******************************************************************************
+ *
+ *	Graphics Menu
+ *
+ ******************************************************************************/
+
+start Interface;
+
+#if _CHARTS
+GraphicsMenu = GenInteraction {
+	moniker = 'G', "Graphic";
+#if _BITMAP_EDITING
+	children = GCGrObjToolControl,GCGrObjBitmapToolControl, 
+#else
+	children = GCGrObjToolControl,
+#endif
+		   GrAttrGroup, GrEditPopup, 
+		   GrOptionsPopup,
+		   TransformPopup, ArrangePopup, AttributesPopup;
+	visibility = popup;
+}
+#endif
+
+end Interface;
+
+start GraphicUI;
+
+#if _CHARTS
+GrAttrGroup = GenInteraction {
+	children =
+		AreaAttrDialog,
+		LineAttrDialog;
+/* removed for Wizard
+		GCGrObjObscureAttrControl;
+*/
+}
+
+/***/
+
+AreaAttrDialog = GenInteraction {
+	moniker = 'A', "Area Attributes";
+	type = properties;
+	visibility = dialog;
+#if DO_PIZZA
+	children = GCAreaColorControl;
+#else
+	children = GCAreaColorControl,GCAreaAttrControl;
+#endif
+	hints = {
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbAreaAttr", 0
+		}
+	}
+}
+
+GCAreaColorControl = GrObjAreaColorSelector vardataReloc {
+	hints = {
+#if DO_PIZZA
+		HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE
+#else
+		HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE,
+		ATTR_COLOR_SELECTOR_DISABLE_OBJECT {
+			UN_OPTR GCAreaAttrControl
+		}
+#endif
+	}
+}
+
+#if DO_PIZZA
+#else
+GCAreaAttrControl = GrObjAreaAttrControl {
+	hints = {
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask GOAACF_TRANSPARENCY
+		}
+	}
+}
+#endif
+
+/***/
+
+LineAttrDialog = GenInteraction {
+	moniker = 'L', "Line Attributes";
+	type = properties;
+	visibility = dialog;
+	children = GCLineColorControl, GCLineAttrControl;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbLineAttr", 0
+		}
+	}
+}
+
+GCLineColorControl = GrObjLineColorSelector vardataReloc {
+	hints = {
+		HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE,
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask CSF_PATTERN
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+			word	mask CSTF_PATTERN
+		},
+		ATTR_COLOR_SELECTOR_DISABLE_OBJECT {
+			UN_OPTR GCLineAttrControl
+		}
+	}
+}
+
+GCLineAttrControl = GrObjLineAttrControl {
+}
+#endif
+
+/***/
+
+/* removed for Wizard
+GCGrObjObscureAttrControl = GrObjObscureAttrControl {
+	moniker = 'M', "Move/Resize Options";
+	visibility = popup;
+	hints = {
+	    ATTR_GEN_CONTROL_PROHIBIT_UI {
+		word not (mask GOOACF_INSERT_OR_DELETE_MOVE or \
+			mask GOOACF_INSERT_OR_DELETE_RESIZE or \
+			mask GOOACF_INSERT_OR_DELETE_DELETE)
+	    }
+	}
+}
+
+*/
+
+/***/
+
+#if _CHARTS
+GrEditPopup = GenInteraction {
+	moniker = 'E', "Edit";
+	children = DuplicatePopup, PasteInsidePopup,
+		   GCHideShowControl, CreatePopup;
+	visibility = popup;
+}
+
+CreatePopup = GenInteraction {
+	moniker = 'C', "Create";
+	children = GCGrObjCreateControl, GCCustomShapeControl;
+	visibility = popup;
+}
+
+GCGrObjCreateControl = GrObjCreateControl {
+}
+
+GCCustomShapeControl = GrObjCustomShapeControl {
+}
+
+
+/***/
+
+TransformPopup = GenInteraction {
+	moniker = 'T', "Transform";
+	children = GCFlipControl, GCScaleControl, GCRotateControl,
+		   GCSkewControl, GCTransformControl, PolylinePopup,
+		   GCConvertControl;
+	visibility = popup;
+}
+
+
+GCFlipControl = GrObjFlipControl {
+        moniker = 'F', "Flip";
+        visibility = popup;
+}
+
+GCScaleControl = GrObjScaleControl {
+        moniker = 'S', "Scale";
+        visibility = popup;
+}
+
+GCRotateControl = GrObjRotateControl {
+        moniker = 'R', "Rotate";
+        visibility = popup;
+}
+
+GCSkewControl = GrObjSkewControl {
+        moniker = 'k', "Skew";
+        visibility = popup;
+}
+
+GCTransformControl = GrObjTransformControl {
+}
+
+PolylinePopup = GenInteraction {
+	moniker = 'P', "Polyline";
+	children =
+		GCSplinePointControl, GCSplineOpenCloseControl,
+		GCSplineSmoothnessControl;
+	visibility = popup;
+}
+
+GCSplinePointControl = SplinePointControl {
+	visibility = subGroup;
+}
+
+GCSplineOpenCloseControl = SplineOpenCloseControl {
+	visibility = subGroup;
+}
+
+GCSplineSmoothnessControl = SplineSmoothnessControl {
+	moniker = 'P', "Control Points";
+	visibility = popup;
+}
+
+GCConvertControl = GrObjConvertControl {
+	moniker = 'C', "Convert";
+	visibility = popup;
+}
+
+/***/
+
+ArrangePopup = GenInteraction {
+	moniker = 'g', "Arrange";
+	children = GCDepthControl, GCNudgeControl,
+		   GCAlignDistributeControl, GCGroupControl;
+	visibility = popup;
+}
+
+GCDepthControl = GrObjDepthControl {
+/*	moniker = 'D', "Depth";
+	visibility = popup; */
+}
+
+GCNudgeControl = GrObjNudgeControl {
+	moniker = 'M', "Move";
+	visibility = popup;
+}
+
+GCAlignDistributeControl = GrObjAlignDistributeControl {
+	moniker = 'D', "Align/Distribute";
+}
+
+GCGroupControl = GrObjGroupControl {
+}
+#endif
+
+/***/
+#if _CHARTS
+AttributesPopup = GenInteraction {
+	moniker = 'r', "Attributes";
+
+	children = GCBackgroundColorDialog, GCGrObjStyleSheetControl,
+		   GradientDialog, GCArcControl,
+#if _BITMAP_EDITING
+		   GCBitmapFormatControl,
+#endif
+		   ExtAttrDialog, GCDefaultAttributesControl;
+	visibility = popup;
+}
+#endif
+
+#if _CHARTS
+GCBackgroundColorDialog = GenInteraction {
+	moniker = 'B', "Background Color";
+	type = properties;
+	visibility = dialog;
+	children = GCBackgroundColorControl, GCBackgroundAttrControl;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbBGColor", 0
+		}
+	}
+}
+
+GCBackgroundColorControl = GrObjBackgroundColorSelector {
+}
+
+GCBackgroundAttrControl = GrObjAreaAttrControl {
+	hints = {
+		HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE,
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask GOAACFeatures and not mask GOAACF_TRANSPARENCY
+		}
+	}
+}
+
+GCGrObjStyleSheetControl = GrObjStyleSheetControl {
+	moniker = 'S', "Graphic Style Sheets";
+	visibility = popup;
+	hints = {
+	    ATTR_GEN_CONTROL_PROHIBIT_UI {
+		word	mask SSCF_LOAD
+	    }
+	}
+}
+
+GradientDialog = GenInteraction {
+	moniker = 'G', "Gradient Fill";
+	type = properties;
+	visibility = dialog;
+	children = GCStartingGradientColorControl,
+		   GCEndingGradientColorControl,
+		   GCGradientFillControl;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbGradient", 0
+		}
+	}
+}
+
+GCStartingGradientColorControl = GrObjStartingGradientColorSelector {
+	moniker = "Start Color";
+	hints = {
+		HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE,
+			HINT_DRAW_IN_BOX,
+			HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+GCEndingGradientColorControl = GrObjEndingGradientColorSelector {
+	moniker = "End Color";
+	hints = {
+			HINT_DRAW_IN_BOX,
+			HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+GCGradientFillControl = GrObjGradientFillControl {
+}
+
+GCArcControl = GrObjArcControl {
+	moniker = 'A', "Arcs";
+	type = properties;
+	visibility = dialog;
+}
+
+
+#if _BITMAP_EDITING
+GCBitmapFormatControl = VisBitmapFormatControl {
+	moniker = 'F', "Bitmap Format";
+	visibility = dialog;
+	type = properties;
+}
+#endif
+
+
+ExtAttrDialog = GenInteraction {
+	moniker = 'E', "Extended Attributes";
+	children = GCGrObjObscureAttrControl2, GCGrObjLocksControl;
+	visibility = dialog;
+	type = properties;
+	hints = {
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbExtAttr", 0
+		}
+	}
+}
+
+GCGrObjObscureAttrControl2 = GrObjObscureAttrControl {
+	hints = {
+	    HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE,
+	    ATTR_GEN_CONTROL_PROHIBIT_UI {
+		word	mask GrObjObscureAttrControlFeatures and \
+				not mask GOOACF_INSTRUCTIONS
+	    }
+	}
+}
+
+GCGrObjLocksControl = GrObjLocksControl {
+	moniker = "Locks";
+	hints = { HINT_DRAW_IN_BOX }
+}
+
+GCDefaultAttributesControl = GrObjDefaultAttributesControl {
+}
+
+
+/***/
+
+DuplicatePopup = GenInteraction {
+	children = GCDuplicateControl,
+		   GCMultiDuplicateControl,
+		   GCCustomDuplicateControl;
+	moniker = 'D', "Duplicate";
+	visibility = popup;
+}
+
+PasteInsidePopup = GenInteraction {
+	moniker = 'P', "Paste Inside";
+	children = GCPasteInsideControl,
+		   GCMoveInsideControl;
+	visibility = popup;
+}
+/* This should stay with NIKE for its tool bar */
+/* #ifndef	PRODUCT_NIKE */
+GCDuplicateControl = GrObjDuplicateControl {
+}
+/* #endif */
+
+GCPasteInsideControl = GrObjPasteInsideControl {
+}
+
+GCMoveInsideControl = GrObjMoveInsideControl {
+	moniker = 'N', "Nudge Inside";
+	visibility = popup;
+}
+GCMultiDuplicateControl = GrObjCustomDuplicateControl {
+	moniker = 'M', "Multi-Duplicate";
+	visibility = dialog;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbMultiDup", 0
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask GOCDCF_SCALE or mask GOCDCF_SKEW
+		}
+	}
+}
+
+GCCustomDuplicateControl = GrObjCustomDuplicateControl {
+	moniker = 'C', "Custom Duplicate";
+	visibility = dialog;
+}
+
+/***/
+GrOptionsPopup = GenInteraction {
+	moniker = 'O', "Options";
+	children = GCHandleControl,
+		   GCDraftModeControl;
+	visibility = popup;
+}
+
+GCHandleControl = GrObjHandleControl {
+	moniker = 'a', "Handles";
+	visibility = popup;
+}
+
+GCHideShowControl = GrObjHideShowControl {
+	moniker = 'H', "Hide";
+	visibility = popup;
+}
+
+GCDraftModeControl = GrObjDraftModeControl {
+}
+#endif	/* _CHART */
+end	GraphicUI;
+
+

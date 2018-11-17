@@ -1,0 +1,1415 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks 1996 -- All Rights Reserved.
+ *
+ * PROJECT:	Sample Applications
+ * MODULE:	GenInteraction sample application
+ * FILE:	geninter.goc
+ *
+ * AUTHOR:	Brian Chin: Feb, 1992
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      brianc  2/92            Initial version
+ *	TM	9/29/92		Added methods and UpdateFile
+ *	Joon	10/24/93   	Added MSG_GIP_CREATE_DIALOG
+ *      NF      9/27/96         Added EC code, cleaned up
+ *
+ * DESCRIPTION:
+ *	This sample application demonstrates the many uses of the
+ *	GenInteraction UI object [Obj 7]. The GenInteraction is
+ *	a multi-purpose grouping object.  Its main role is to manage
+ *	other UI objects: triggers, lists, text, values, etc.
+ *	Interactions may and even contain other	interactions, and
+ *	often do. GenInteractions may appear within the UI in many
+ *	visual forms, such as a menu, as a dialog box, or as a popout
+ *	menu.
+ *
+ *	(Throughout this file you will see references like this:
+ *      [Con 7.2.1]. This is a reference to chapter 7, section 7.2.1
+ *      of the Concepts manual. [Obj 7.2.1] is a reference to chapter 7,
+ *      section 7.2.1 of the Objects manual. You should use these
+ *      references to locate further information about the topic
+ *      being discussed if anything is unclear.)
+ *
+ *	This file demonstrates the various types of interactions and
+ *	the various ways to control their usage. In many cases
+ *	throughout this application, objects are used merely to
+ *	illustrate the look and feel of the UI. These objects are
+ *	marked as being ornamental; they provide no functionality.
+ *
+ *	**NOTE** that on Zoomer, GIV_POPOUT GenInteractions are not
+ *      allowed; they simply appear as subgroups which do not pop out.
+ *
+ * RCS STAMP:
+ *	$Id: geninter.goc,v 1.1 97/04/04 16:37:47 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include files
+ *******************************************************************/
+    @include <stdapp.goh>
+    #include <Ansi/string.h>
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    @class GenInterProcessClass, GenProcessClass;
+    @message void MSG_GIP_FILE_NEW();
+    @message void MSG_GIP_FILE_OPEN();
+    @message void MSG_GIP_FILE_USE_TEMPLATE();
+    @message void MSG_GIP_FILE_CLOSE();
+    @message void MSG_GIP_FILE_SAVE();
+    @message void MSG_GIP_CREATE_DIALOG();
+    @message (GEN_ITEM_GROUP_APPLY_MSG)MSG_GIP_MOVE_CONTROL_GROUP;
+    @endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    @classdecl GenInterProcessClass, neverSaved;
+
+/********************************************************************
+ *		Constants
+ *******************************************************************/
+      /*
+       * These identifiers are used in the item group within
+       * GenInterOptionsMenu.
+       */
+    #define CONTROL_IN_MENU    1
+    #define CONTROL_IN_PRIMARY 2
+
+      /*
+       * These are custom-defined response values for the response
+       * triggers passed to UserStandardDialog(). They must be based
+       * on IC_CUSTOM_START to avoid conflicting with the predefined
+       * InteractionCommands.
+       */
+    #define SAVE_FILE_YES_RESPONSE IC_CUSTOM_START + 0
+    #define SAVE_FILE_NO_RESPONSE  IC_CUSTOM_START + 1
+
+/********************************************************************
+ *		Global Variables
+ *******************************************************************/
+      /*
+       * fileContents reflects the text shown within GenInterText.
+       * This text will be altered throughout this application to
+       * show various states.
+       */
+    char fileContents[100] = "No file.";
+
+/********************************************************************
+ *		Static Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass GenInterApp = {
+    GI_visMoniker = list { @GenInterTextMoniker };
+    GI_comp = @GenInterPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @GenInterPrimary;
+}
+
+@visMoniker GenInterTextMoniker = "C GenInter Sample Application";
+
+@end AppResource;
+
+/********************************************************************
+ *		Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass GenInterPrimary  = {
+    GI_comp = @GenInterFileMenu,
+              @GenInterOptionsMenu,
+              @GenInterPopoutMenu,
+              @GenInterText,
+              @GenInterIconBar,
+              @GenInterDialogs;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+  /*
+   * If several non user-initiable GenInteractions are placed below a
+   * GenPrimary, it is usually convenient to have a single
+   * GIT_ORGANIZATIONAL dialog box to hold them. Instead of marking all
+   * of the dialog boxes GIA_NOT_USER_INITIATABLE, only the 'holding'
+   * Interaction need be marked as such. When the application starts up,
+   * the Specific UI only needs to check this single Interaction when
+   * searching down the generic tree building objects.
+   */
+@object GenInteractionClass GenInterDialogs = {
+
+    /*
+     * This organizational Interaction only contains one child, for
+     * illustrative purposes.
+     */
+    GI_comp = @GenInterFileNewDialog;
+    GII_type = GIT_ORGANIZATIONAL;
+    /*
+     * Dialog boxes that are not user-initiable will not have a
+     * trigger built into the UI to bring these dialogs on-screen.
+     * Instead, your code must bring the dialog on screen with
+     * MSG_GEN_INTERACTION_INITIATE.
+     */
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+  /*
+   * This is an example of a menu in the primary's main menu bar. Menus
+   * within the main menu bar should be direct children of the
+   * GenPrimary. This menu will function as the GenPrimary's File Menu
+   * (and therefore supercede the creation of a default file menu).
+   * This is done by adding the attribute ATTR_GEN_INTERACTION_GROUP_TYPE =
+   * (GIGT_FILE_MENU) in the object's instance data.
+   */
+@object GenInteractionClass GenInterFileMenu = {
+    /*
+     * A menu's children may be GenTriggers, GenItemGroups,
+     * GenBooleanGroups, or other GenInteractions.
+     */
+    GI_comp =
+
+	/*
+	 * These menu items are simple GenTriggers.
+	 */
+	@GenInterFileNew,
+	@GenInterFileOpen,
+	@GenInterFileUseTemplate,
+	@GenInterFileClose,
+
+	/*
+	 * This menu item is a subgroup GenInteraction. Subgroup
+	 * Interactions are normally set apart from their siblings
+	 * when placed within a menu. In most specific UI's this is
+	 * done with horizontal line seperators. You can override this
+	 * behavior by including HINT_SAME_CATEGORY_AS_PARENT in the
+	 * subgroup's instance data.
+	 */
+	@GenInterFileSaveGroup,
+
+	/*
+	 * This menu item is a dialog GenInteraction. The activation
+	 * trigger to initiate this GenInteraction will appear within
+	 * the menu as a menu item. The specific UI may create a
+	 * visual cue to show that this trigger opens a windowed
+	 * object (such as an ellipsis after the menu item's visual
+	 * moniker).
+	 */
+	@GenInterFileRevert,
+
+	/*
+	 * This menu item is another menu GenInteraction. Menus within
+	 * menus create sub-menus. The specific UI may create a visual
+	 * cue to show that this menu item opens another menu (such as
+	 * an arrow after the item's visual moniker).
+	 */
+	@GenInterFileFeaturesSubMenu,
+
+	/* This menu item is another subgroup. */
+	@GenInterFilePrintGroup,
+
+	/*
+	 * This menu item triggers the creation of a new dialog from a
+	 * template through the use of UserCreateDialog/UserDestroyDialog.
+	 */
+	@GenInterCreateDialog,
+
+	/*
+	 * These menu items are independent screen-floating
+	 * interactions.
+	 */
+	@GenInterOnScreen1,
+	@GenInterOnScreen2,
+
+	/* Finally, this menu item is another dialog box. */
+	@GenInterFileExit;
+
+    /*
+     * The GII_visibility for this Interaction is GIV_POPUP. This
+     * creates menus under most specific UIs.
+     */
+    GII_visibility = GIV_POPUP;
+
+    /*
+     * The default GII_type (GIT_ORGANIZATIONAL) is suitable for most
+     * menus, so there is no need to set a new GenInteractionType.
+     */
+
+    /*
+     * An ATTR_GEN_INTERACTION_GROUP_TYPE of GIGT_FILE_MENU indicates
+     * to the Specific UI that this menu acts as the "File"
+     * menu for this application. The specific UI will provide an
+     * appropriate moniker, if the moniker is left blank as it is in
+     * this object.
+     */
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+  /*
+   * These are GenTriggers under the main menu (GenInterFileMenu).
+   */
+@object GenTriggerClass GenInterFileNew = {
+    GI_visMoniker = "New";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GIP_FILE_NEW;
+}
+
+@object GenTriggerClass GenInterFileOpen = {
+    GI_visMoniker = "Open";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GIP_FILE_OPEN;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass GenInterFileUseTemplate = {
+    GI_visMoniker = "Use Template";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GIP_FILE_USE_TEMPLATE;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass GenInterFileClose = {
+    GI_visMoniker = "Close";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GIP_FILE_CLOSE;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+  /*
+   * This is a subgroup under the main menu for the purposes of
+   * disabling and enabling.  It has HINT_SAME_CATEGORY_AS_PARENT
+   * to prevent the drawing of seperator lines.
+   */
+@object GenInteractionClass GenInterFileSaveGroup = {
+
+    /* A moniker is not appropriate for sub-groups. */
+    GI_comp = 	@GenInterFileSave,	/* A "Save" trigger. */
+		@GenInterFileSaveAs;	/* A "Save As..." trigger. */
+
+    /* GIT_ORGANIZATIONAL and GIV_SUB_GROUP are the default settings
+     * so there is no need to set these instance fields. */
+
+    /* Usually subgroups within menus are distinguished from their
+     * siblings by seperator lines. This hint prevents these menu item
+     * seperator lines. */
+    HINT_SAME_CATEGORY_AS_PARENT;
+}
+
+  /*
+   * These triggers still act as menu items of the main menu
+   * (GenInterFileMenu) even though they are direct children of an
+   * interceding subgroup Interaction (GenInterFileSaveGroup).
+   */
+@object GenTriggerClass GenInterFileSave = {
+    GI_visMoniker = "Save";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GIP_FILE_SAVE;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+  /*
+   * This trigger is ornamental.
+   */
+@object GenTriggerClass GenInterFileSaveAs = {
+    GI_visMoniker = "Save As";
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+  /*
+   * A dialog GenInteraction may be placed directly within a menu.  It
+   * will create a menu item (trigger) that brings up the dialog when
+   * activated.
+   */
+@object GenInteractionClass GenInterFileRevert = {
+    /* The moniker is used both for the menu item (activation trigger)
+     * and the dialog box's title bar.
+     */
+    GI_visMoniker = "Revert";
+    GI_comp = @GenInterFileSaveRevertText;
+
+    /*
+     * A GIT_NOTIFICATION dialog is used to notify the user. By
+     * default, this type of dialog creates an 'OK' trigger to dismiss
+     * the dialog after the user has finished being notified.
+     */
+    GII_type = GIT_NOTIFICATION;
+
+    /*
+     * The GenInteractionVisibility GIV_DIALOG creates this
+     * Interaction as a dialog box.
+     */
+    GII_visibility  = GIV_DIALOG;
+
+    /*
+     * We make the dialog modal, to force the user to acknowledge this
+     * dialog.  We use HINT_INTERACTION_MODAL here instead of
+     * GIA_MODAL because the application does not require the dialog to
+     * be modal to function correctly. Modality in this case is used
+     * to prevent user confusion.
+     */
+    HINT_INTERACTION_MODAL;
+}
+
+  /*
+   * This text object is ornamental.
+   */
+@object GenTextClass GenInterFileSaveRevertText = {
+    GI_attrs = GA_READ_ONLY;
+    GTXI_text = "Unsupported feature.";
+}
+
+  /*
+   * A submenu is created when a GIV_POPUP Interaction is
+   * placed within another GIV_POPUP.
+   */
+@object GenInteractionClass GenInterFileFeaturesSubMenu = {
+
+    /*
+     * The moniker of a sub-menu is used for the menu item that brings
+     * up the sub-menu. It may also appear in the menu title of the
+     * sub-menu if it is pinned.
+     */
+    GI_visMoniker = 'F', "Features";
+
+    GI_comp =	@GenInterFileFeaturesEditUserNotes,
+		@GenInterFileFeaturesSaveAsTemplate,
+		@GenInterFileFeaturesSaveAsDefault,
+		@GenInterFileFeaturesSaveAsPublic,
+		@GenInterFileFeaturesResetDefault;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_POPUP;
+}
+
+  /*
+   * Dialog GenInteractions may be nested to any level
+   * within menus and sub-menus.
+   */
+@object GenInteractionClass GenInterFileFeaturesEditUserNotes = {
+    GI_visMoniker = "Edit User Notes";
+
+    /*
+     * This is a simple command dialog, with a single command. By
+     * default, the specific UI creates a trigger that just closes
+     * command dialogs.
+     */
+    GII_type = GIT_COMMAND;
+    GII_visibility = GIV_DIALOG;
+
+    /*
+     * Among the children of this command dialog is the command trigger.
+     */
+    GI_comp = 	@GenInterFileFeaturesEditUserNotesField,
+		@GenInterFileFeaturesEditUserNotesSave;
+
+    /*
+     * HINT_INTERACTION_MAKE_RESIZABLE allows the dialog to be
+     * resized.
+     */
+    HINT_INTERACTION_MAKE_RESIZABLE;
+
+    /*
+     * HINT_INTERACTION_SINGLE_USAGE indicates that this dialog is
+     * infrequently used.  When the command trigger is activated, the
+     * dialog will be dismissed. The default behavior for
+     * a GIT_COMMAND dialog is for the dialog to remain on-screen when
+     * a command trigger has been activated, to allow the user to use
+     * the command as many times as necessary.  In these case, the
+     * command dialog may be dismissed with specific-UI provided
+     * "Close"/"Cancel" triggers or with the dialog's system menu's
+     * "Close" menu item (for non-modal dialogs).
+     */
+    HINT_INTERACTION_SINGLE_USAGE;
+}
+
+  /*
+   * This text object is ornamental.
+   */
+@object GenTextClass GenInterFileFeaturesEditUserNotesField = {
+}
+
+  /*
+   * This is a supplied command trigger.  It doesn't need
+   * ATTR_GEN_TRIGGER_INTERACTION_COMMAND as it isn't replacing a
+   * standard response trigger.  However, it has HINT_SEEK_REPLY_BAR
+   * to place it in the dialog reply bar.
+   */
+@object GenTriggerClass GenInterFileFeaturesEditUserNotesSave = {
+    GI_visMoniker = "Save User Notes";
+
+    /*
+     * This indicates that when the user activates this trigger,
+     * interaction with this dialog is finished. The specific UI is
+     * allowed to dismiss the dialog if it desires.  In this case, we
+     * have HINT_INTERACTION_SINGLE_USAGE for the dialog, so it will
+     * dismiss it.
+     */
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+
+    HINT_SEEK_REPLY_BAR;
+}
+
+  /*
+   * The following four triggers are ornamental.
+   */
+@object GenTriggerClass GenInterFileFeaturesSaveAsTemplate = {
+    GI_visMoniker = "Save As Template Document";
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass GenInterFileFeaturesSaveAsDefault = {
+    GI_visMoniker = "Save As Default Empty Document";
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass GenInterFileFeaturesSaveAsPublic = {
+    GI_visMoniker = "Save As Public Document";
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass GenInterFileFeaturesResetDefault = {
+    GI_visMoniker = "Reset Default Empty Document";
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+  /*
+   * This is a subgroup under the main menu. This subgroup does not
+   * contain HINT_SAME_CATEGORY_AS_PARENT; it will contain horizontal
+   * line seperators to distinguish the menu items it contains from
+   * their other siblings within the menu.
+   */
+@object GenInteractionClass GenInterFilePrintGroup = {
+    /* A moniker is not appropriate for subgroups. */
+    GI_comp = 	@GenInterFilePrintPrint,
+		@GenInterFilePrintPageSetup;
+    /* GIT_ORGANIZATIONAL and GIV_SUB_GROUP are the defaults. */
+}
+
+  /*
+   * The next two triggers are ornamental.
+   */
+@object GenTriggerClass GenInterFilePrintPrint = {
+    GI_visMoniker = "Print";
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass GenInterFilePrintPageSetup = {
+    GI_visMoniker = "Page Setup";
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+  /*
+   * A dialog GenInteraction may be created, initiated, and
+   * destroyed through the use of UserCreateDialog/UserDoDialog/
+   * UserDestroyDialog.
+   */
+@object GenTriggerClass GenInterCreateDialog = {
+    GI_visMoniker = "Create Dialog";
+    GTI_actionMsg = MSG_GIP_CREATE_DIALOG;
+    GTI_destination = process;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+  /*
+   * A dialog GenInteraction may be placed directly within a menu.  It
+   * will create a menu item (trigger) that brings up the dialog when
+   * activated.
+   */
+@object GenInteractionClass GenInterFileExit = {
+    GI_visMoniker = "Exit Options";
+
+    /*
+     * A GIT_AFFIRMATION dialog is used to ask the user a Yes/No
+     * question. The dialog box will create both 'Yes' and 'No'
+     * triggers. (These triggers send out the Interaction commands
+     * IC_YES and IC_NO, respectively.) No other triggers are provided
+     * by the Specific UI. (The user is forced to respond either Yes
+     * or No to the Affirmation dialog request).
+     */
+    GII_type = GIT_AFFIRMATION;
+    GII_visibility  = GIV_DIALOG;
+
+    /*
+     * A replacement IC_YES trigger is among the children of this
+     * dialog. (See GenInterFileExitYes object below.) This allows us
+     * to perform some action when that trigger is activated. The
+     * specific UI supplied IC_NO trigger will just dimiss the dialog.
+     */
+    GI_comp = 	@GenInterFileExitText,
+		@GenInterFileExitYes,
+		@GenInterApp2,
+		@GenInterSys1;
+
+    /*
+     * We make the dialog modal, to force the user to respond to this
+     * dialog.  We use GIA_MODAL here instead of
+     * HINT_INTERACTION_MODAL because the application requires the
+     * dialog to be modal to function correctly. (The user must
+     * respond yes or no to proceed.)
+     */
+    GII_attrs = @default | GIA_MODAL;
+}
+
+  /*
+   * This text object is ornamental.
+   */
+@object GenTextClass GenInterFileExitText = {
+    GI_attrs = GA_READ_ONLY;
+    GTXI_text = "Are you sure you want to exit?";
+}
+
+  /*
+   * This is a replacement IC_YES trigger for the GIT_AFFIRMATION
+   * dialog.  We provide the trigger so that we can have a custom action
+   * when the 'Yes' trigger is activated by the user.
+   */
+@object GenTriggerClass GenInterFileExitYes = {
+    /*
+     * We let the specific UI set the moniker; it does so if we do not
+     * specify one.
+     *
+     * Selecting 'Yes' quits the application. To do this we send
+     * MSG_META_QUIT to the top application object.
+     */
+    GTI_destination = @GenInterApp;
+    GTI_actionMsg = MSG_META_QUIT;
+
+    /*
+     * GA_SIGNAL_INTERACTION_COMPLETE indicates that when the user
+     * activates this trigger, user interaction with this dialog is
+     * finished. The specific UI is allowed to dismiss the dialog if
+     * it desires. In this case, the dialog is modal, so it will
+     * dismiss it.
+     */
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+
+    /*
+     * This trigger will replace the otherwise specific UI-supplied
+     * IC_YES trigger.
+     */
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_YES};
+
+    /*
+     * HINT_SEEK_REPLY_BAR places this trigger in the dialog reply
+     * bar. This is necessary for replacing specific UI-supplied
+     * triggers.
+     */
+    HINT_SEEK_REPLY_BAR;
+
+    /* HINT_DEFAULT_DEFAULT_ACTION makes the IC_YES trigger the
+     * default, as the specific UI would do if it provided the
+     * trigger.
+     */
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+  /*
+   * GenInteraction dialog boxes are windowed objects.
+   * You may alter the windowing behavior of a dialog box by
+   * using the attributes shown in this object.
+   */
+@object GenInteractionClass GenInterOnScreen1 = {
+    GI_visMoniker = "On top Dialog 1";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility  = GIV_DIALOG;
+
+    /*
+     * ATTR_GEN_WINDOW_CUSTOM_LAYER_ID sets a unique layer identifier
+     * for this windowed object. All objects with a common identifier
+     * are considered part of the same window layer. These window
+     * layers can then be manipulated as a unit. By convention, these
+     * IDs are usually set to handles owned by the application to
+     * avoid collisions with other application window layer IDs. If a
+     * layer ID of NULL is specified, the handle of the block the
+     * object lies in will be selected as the layer ID; in this case,
+     * that would be the handle of resource block "Interface."
+     */
+    ATTR_GEN_WINDOW_CUSTOM_LAYER_ID = {0};
+    /*
+     * This window has a layer priority on top of all other
+     * window layers. Since this window has a layer priority greater than
+     * the base priority, its window will always appear on top of
+     * windows at the base priority.
+     *
+     * All windowed objects with the same layer ID must have matching
+     * layer priorities. Note that this means that whenever you
+     * specify a layer priority other than LAYER_PRIO_STD, you must
+     * specify a layer ID for that object also.
+     */
+    ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY = {LAYER_PRIO_ON_TOP};
+    /*
+     * A window's window priority sets its priority among objects of
+     * the same layer. In this case, this object should have 'on top'
+     * behavior among all objects with a layer ID set above. The only
+     * other object with the same layer ID is GenInterOnScreen2.
+     */
+    ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY = {WIN_PRIO_ON_TOP};
+    /*
+     *
+     */
+    ATTR_GEN_WINDOW_CUSTOM_PARENT = {0};
+}
+
+@object GenInteractionClass GenInterOnScreen2 = {
+    GI_visMoniker = "On top Dialog 2";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility  = GIV_DIALOG;
+
+    /*
+     * This windowed dialog exhibits on-top behavior identical to
+     * GenInterOnScreem1 above.
+     */
+    ATTR_GEN_WINDOW_CUSTOM_LAYER_ID = {0};
+    ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY = {LAYER_PRIO_ON_TOP};
+    ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY = {WIN_PRIO_ON_TOP};
+    ATTR_GEN_WINDOW_CUSTOM_PARENT = {0};
+}
+
+
+
+@object GenInteractionClass GenInterApp2 = {
+    GI_visMoniker = "App modal dialog -- 2nd level";
+
+    /*
+     * A GIT_AFFIRMATION dialog is used to ask the user a Yes/No
+     * question. Because this dialog is modal, the user must respond
+     * to the GIT_AFFIMRATION dialog before continuing.
+     */
+    GII_type = GIT_AFFIRMATION;
+    GII_visibility  = GIV_DIALOG;
+
+    /*
+     * GIA_MODAL sets the dialog box application-modal. All other
+     * input to other parts of the application will be blocked until
+     * the user responds to the request. The user may still interact
+     * with other parts of the system, however, such as other
+     * applications.
+     *
+     * The parent (GenInterFileExit) of this dialog Interaction is
+     * also application-modal. Modal dialogs may be nested in this
+     * manner. In this case, the current second level of modality
+     * overrides the first level of modality of GenInterFileExit; the
+     * user must respond to this dialog's request before it can fall
+     * back into the first modal dialog box.
+     */
+    GII_attrs = @default | GIA_MODAL;
+}
+
+@object GenInteractionClass GenInterSys1 = {
+    GI_visMoniker = "System modal dialog";
+    GI_comp = @GenInterSys2;
+    GII_type = GIT_AFFIRMATION;
+    GII_visibility  = GIV_DIALOG;
+
+    /*
+     * This dialog is system-modal. Not only will input to the
+     * current application be blocked, all interaction with the rest
+     * of the system will be blocked until the user responds to the
+     * Yes/No question of this dialog box. It contains one child -
+     * another system modal dialog box.
+     */
+    GII_attrs = @default | GIA_SYS_MODAL;
+}
+
+@object GenInteractionClass GenInterSys2 = {
+    GI_visMoniker = "System modal dialog -- 2nd level";
+    GII_type = GIT_AFFIRMATION;
+    GII_visibility  = GIV_DIALOG;
+
+    /*
+     * This dialog is a second level system-modal dialog. System modal
+     * dialogs may also be nested. The user must respond to both this
+     * dialog and then its parent before allowing the user to interact
+     * with the rest of the system.
+     *
+     */
+    GII_attrs = @default | GIA_SYS_MODAL;
+}
+
+  /*
+   * This menu appears directly below the GenPrimary in the main menu
+   * bar. This menu contains a GenItemGroup (list Object) that allows
+   * the user to select the placement of GenInterControlGroup within the
+   * UI. Because GenInterControlGroup is of visibility type
+   * GIV_CONTROL_GROUP, it may appear differently at different locations
+   * within the UI.
+   */
+@object GenInteractionClass GenInterOptionsMenu = {
+    GI_comp = @GenInterOptionsList, @GenInterControlGroup;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+}
+
+  /*
+   * When the user selects an item in this list, it sends
+   * MSG_GIP_MOVE_CONTROL_GROUP to the process. Initially, this list
+   * is set to mark the control group in the menu, its initial place of
+   * residence.
+   */
+@object GenItemGroupClass GenInterOptionsList = {
+    GI_comp = @GenInterOptionsInMenu, @GenInterOptionsInPrimary;
+    GIGI_applyMsg = MSG_GIP_MOVE_CONTROL_GROUP;
+    GIGI_destination = process;
+    GIGI_selection = CONTROL_IN_MENU;
+}
+
+  /*
+   * Selecting this item moves the ControlGroup into the menu.
+   */
+@object GenItemClass GenInterOptionsInMenu = {
+    GI_visMoniker = "Control Group In Menu";
+    GII_identifier = CONTROL_IN_MENU;
+}
+
+  /*
+   * Selecting this item moves the ControlGroup to be a
+   * direct child of the Primary.
+   */
+@object GenItemClass GenInterOptionsInPrimary = {
+    GI_visMoniker = "Control Group In Primary";
+    GII_identifier = CONTROL_IN_PRIMARY;
+}
+
+  /*
+   * This is a GIV_CONTROL_GROUP GenInteraction because it contains a
+   * GenRange object.  In Motif, if this GenInteraction is in a menu, it
+   * will appear as a dialog because it is inappropriate for a GenRange
+   * to appear in a menu.  If this GenInteraction is, however, placed
+   * directly within the primary or a dialog, it will appear as a
+   * subgroup of the primary or dialog.
+   */
+@object GenInteractionClass GenInterControlGroup = {
+    GI_visMoniker = "Control Group";
+    GI_comp = @GenInteractionControlGroupRange;
+    GII_visibility = GIV_CONTROL_GROUP;
+}
+
+  /*
+   * This GenValue object is ornamental.
+   */
+@object GenValueClass GenInteractionControlGroupRange = {
+}
+
+  /*
+   * This dialog box is not a direct child of any object in the UI. It is
+   * displayed with UserDoDialog() when the main menu item File:New is
+   * activated. UserDoDialog() blocks the calling thread (frequently the
+   * application thread) until the user responds. As such, they must
+   * be modal.
+   */
+@object GenInteractionClass GenInterFileNewDialog = {
+    GI_comp = @GenInterFileNewText;
+
+    /* This dialog box is an affirmation dialog.  It will return
+     * IC_YES or IC_NO (or IC_NULL if the system, and not the user,
+     * dismiss the dialog for some reason).
+     */ 
+    GII_type = GIT_AFFIRMATION;
+    GII_visibility = GIV_DIALOG;
+
+    /* Dialogs initiated by UserDoDialog() must have
+     * GIA_INITIATED_VIA_USER_DO_DIALOG and GIA_MODAL set in their
+     * GII_attrs. (It is not possible to have a non-modal dialog box
+     * initiated by UserDoDialog() since that routine blocks the
+     * calling thread.) 
+     */
+    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+}
+
+  /*
+   * This text object is ornamental.
+   */
+@object GenTextClass GenInterFileNewText = {
+    GI_attrs = GA_READ_ONLY;
+    GTXI_text = "Create new file?";
+}
+
+  /*
+   * This text object is ornamental.
+   */
+@object GenTextClass GenInterText = {
+    GI_attrs = GA_READ_ONLY;
+}
+
+  /*
+   * This menu contains items to interact with the GenInterIconBar
+   * GIV_POPOUT GenInteraction.  A GIV_POPOUT GenInteraction initially
+   * appears as a subgroup, but can be 'popped out' into a dialog box,
+   * usually double-clicking on the subgroup. If a GIV_POPOUT is in the
+   * form of a dialog box, it can be popped back into a sub-group, or
+   * dismissed entirely. If a GIV_POPOUT dialog is dismissed, it is up
+   * to the application to restore it.
+   *
+   * This menu provides the means to pop out and pop in the GIV_POPOUT
+   * Interaction GenInterIconBar.
+   *
+   * **NOTE** that on Zoomer, GIV_POPOUT GenInteractions are not allowed;
+   * they simply appear as subgroups which do not pop out.
+   */
+@object GenInteractionClass GenInterPopoutMenu = {
+    GI_visMoniker = "Popout";
+    GI_comp = @GenInterPopoutPopOut,
+              @GenInterPopoutPopIn,
+              @GenInterPopoutToggle;
+    GII_visibility = GIV_POPUP;
+}
+
+  /*
+   * MSG_GEN_INTERACTION_POP_OUT pops the interaction out from
+   * the GenPrimary into a dialog box.
+   */
+@object GenTriggerClass GenInterPopoutPopOut = {
+    GI_visMoniker = "Pop Out";
+    GTI_actionMsg = MSG_GEN_INTERACTION_POP_OUT;
+    GTI_destination = @GenInterIconBar;
+}
+
+  /*
+   * MSG_GEN_INTERACTION_POP_IN pops the interaction from the dialog box
+   * back into the GenPrimary, and removes the dialog.
+   */
+@object GenTriggerClass GenInterPopoutPopIn = {
+    GI_visMoniker = "Pop In";
+    GTI_actionMsg = MSG_GEN_INTERACTION_POP_IN;
+    GTI_destination = @GenInterIconBar;
+}
+
+  /*
+   * MSG_GEN_INTERACTION_TOGGLE_POPOUT will pop the interaction into a
+   * dialog box if it is currently popped in.  If currently popped out,
+   * it alternately hides and shows the dialog box.
+   */
+@object GenTriggerClass GenInterPopoutToggle = {
+    GI_visMoniker = "Toggle";
+    GTI_actionMsg = MSG_GEN_INTERACTION_TOGGLE_POPOUT;
+    GTI_destination = @GenInterIconBar;
+}
+
+@object GenInteractionClass GenInterIconBar = {
+    GI_visMoniker = "This is a GIV_POPOUT.  Try it.";
+    GII_visibility = GIV_POPOUT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_INTERACTION_POPPED_OUT;
+}
+
+  /*
+   * These monikers will be used for UserStandardDialog()'s custom
+   * response triggers. These monikers must reside in an object
+   * resource. We add these to the Interface resource block.
+   */
+@visMoniker UseTempYesMoniker = 'Y', "Yes, Use Template";
+@visMoniker UseTempNoMoniker = 'N', "No";
+
+  /*
+   * This moniker will be used for UserStandardDialog()'s custom
+   * response trigger. This moniker must reside in an object
+   * resource; we add this moniker to the Interface resource block.
+   */
+@visMoniker CloseYesMoniker = 'Y', "Yes, Close File";
+
+  /* Monikers to use with the UserStandardDialog() in this method. */
+@visMoniker SaveYesMoniker = 'Y', "Yes, Save File";
+@visMoniker SaveNoMoniker = 'C', "Cancel";
+
+@end Interface;
+
+/********************************************************************
+ *		UserCreateDialogUI Resource
+ * Place dialog to be created using UserCreateDialog in its
+ * own resource block.
+ *******************************************************************/
+@start UserCreateDialogUI, notDetachable;
+
+@object GenInteractionClass GenInterUserCreateDialog = {
+    GI_visMoniker = "Created Dialog";
+      /* The dialog must be set not USABLE. */
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @GenInterUserCreateDialogGlyph;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+      /* The dialog will be brought up using UserDoDialog. */
+    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG
+                         | GIA_MODAL;
+}
+
+@object GenGlyphClass GenInterUserCreateDialogGlyph = {
+    GI_visMoniker = "This dialog was created using UserCreateDialog.";
+}
+
+@end UserCreateDialogUI;
+
+/********************************************************************
+ *		Function Definitions
+ *******************************************************************/
+
+/********************************************************************
+ *		UpdateFile
+ ********************************************************************
+ * SYNOPSIS:	 Replaces the text in GenInterText with the new
+ *               text of fileContents.
+ * RETURNS:      void
+ * SIDE EFFECTS: Updates the text display GenInterText.
+ * STRATEGY:     Simply replace the contents of the text object
+ *               with that text stored in fileContents using the
+ *               MSG_VIS_TEXT_REPLACE_ALL_PTR message.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	9/29/92		Initial version
+ *******************************************************************/
+void
+UpdateFile( void )
+{
+
+    @call GenInterText::MSG_VIS_TEXT_REPLACE_ALL_PTR( fileContents, 0 );
+} /* UpdateFile */
+
+/********************************************************************
+ *		Code for GenInterProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *		MSG_GIP_FILE_NEW
+ ********************************************************************
+ * SYNOPSIS:	 This message is sent by the File:New trigger.
+ *               It initiates a dialog box with UserDoDialog(),
+ *               blocking the calling thread (this one) until the
+ *               user responds. Depending on the user response, this
+ *               message alters the global variable fileContent.
+ * PARAMETERS:	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: Updates the text display GenInterText.
+ * STRATEGY:     See if the user wants to create a new file. If
+ *               so call UpdateFile with the "New File" string.
+ *               Else pass the "No New File" string.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	9/29/92		Initial version
+ *******************************************************************/
+@method GenInterProcessClass, MSG_GIP_FILE_NEW {
+
+      /*
+       * UserDoDialog displays the dialog, blocking until the
+       * user responds. Since the dialog is a GIT_AFFIRMATION,
+       * we know that the response types are IC_YES or IC_NO
+       * (or IC_NULL if the system (and not the user) dismisses
+       * the dialog for some reason).  It is always a good idea to
+       * check only for the case when some action is going to be
+       * taken (such as IC_YES, in this case) to automatically deal
+       * with the IC_NULL, which we want to treat as IC_NO.
+       */
+    if ( IC_YES == UserDoDialog( @GenInterFileNewDialog ) ) {
+	strcpy( fileContents, "New File" );
+    }
+    else {
+	strcpy( fileContents, "No New File" );
+    }
+
+      /*
+       * Update the contents of the text display.
+       */
+    UpdateFile();
+} /* MSG_GIP_FILE_NEW */
+
+/********************************************************************
+ *	 	MSG_GIP_MOVE_CONTROL_GROUP
+ ********************************************************************
+ * SYNOPSIS:	 This is sent by the Options:(Control Group in Menu) and
+ *		 Options:(Control Group in Primary) list items.  It
+ *		 moves the control group to the Options menu or to the
+ *		 GenPrimary, demonstrating the effect of a
+ *		 GIV_CONTROL_GROUP.
+ * PARAMETERS:	 word selection
+ *               word numSelections
+ *               byte stateFlags
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     See if the Control menu is in the primary window.
+ *               If so, move it to the Options menu. Else, move
+ *               it to the primary window.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	9/29/92		Initial version
+ *******************************************************************/
+@method GenInterProcessClass, MSG_GIP_MOVE_CONTROL_GROUP {
+
+    if ( CONTROL_IN_MENU == selection ) {
+          /*
+           * Check to see if the control group is already within the
+           * menu. If it is, do nothing.
+           */
+        if ( (word)(-1) == @call GenInterOptionsMenu::MSG_GEN_FIND_CHILD(
+                 @GenInterControlGroup ) ) {
+	    @call GenInterControlGroup::MSG_GEN_SET_NOT_USABLE( VUM_NOW );
+	    @call GenInterPrimary::MSG_GEN_REMOVE_CHILD(
+                @GenInterControlGroup, CCF_DIRTY );
+	    @call GenInterOptionsMenu::MSG_GEN_ADD_CHILD(
+                @GenInterControlGroup, CCF_DIRTY | CCO_LAST );
+	    @call GenInterControlGroup::MSG_GEN_SET_USABLE( VUM_NOW );
+        }
+    }
+      /*
+       * Selection is CONTROL_IN_PRIMARY.
+       */
+    else {
+          /*
+           * Check to see if the control group is already a child of the
+           * Primary. If it is, do nothing.
+           */
+        if ( (word)(-1) == @call GenInterPrimary::MSG_GEN_FIND_CHILD(
+                 @GenInterControlGroup ) ) {
+	    @call GenInterControlGroup::MSG_GEN_SET_NOT_USABLE( VUM_NOW );
+	    @call GenInterOptionsMenu::MSG_GEN_REMOVE_CHILD(
+                @GenInterControlGroup, CCF_DIRTY );
+	    @call GenInterPrimary::MSG_GEN_ADD_CHILD(
+                @GenInterControlGroup, CCF_DIRTY | CCO_LAST );
+	    @call GenInterControlGroup::MSG_GEN_SET_USABLE( VUM_NOW );
+        }
+    }
+} /* MSG_GIP_MOVE_CONTROL_GROUP */
+
+/********************************************************************
+ *		MSG_GIP_FILE_OPEN
+ ********************************************************************
+ * SYNOPSIS:	 This is sent by the File:Open trigger.  It
+ *		 demonstrates how UserStandardDialog() can be used to
+ *		 put up a simple dialog box, blocking this thread until
+ *		 the user responds.
+ * PARAMETERS:	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Call UserStandardDialog using a GenInteractionType
+ *               of GIT_AFFIRMATION, which has Yes/No triggers by
+ *               default.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	9/30/92		Initial version
+ *******************************************************************/
+@method GenInterProcessClass, MSG_GIP_FILE_OPEN {
+
+      /*
+       * UserStandardDialog() dynamically creates a dialog box, blocks
+       * the calling thread, and waits for the user to respond to the
+       * dialog request.
+       *
+       * This GIT_AFFIRMATION dialog box may return one of two values,
+       * IC_YES or IC_NO (or IC_NULL if the system - and not the user -
+       * dismisses the dialog for some reason).  It is always a good
+       * idea to check only for the case when some action is going to be
+       * taken (such as  IC_YES, in this case) to automatically deal
+       * with the IC_NULL, which we want to treat as IC_NO.
+       *
+       * If the user responds 'Yes' change the text display to mimic
+       * that a file has been opened. Otherwise, change the display
+       * to show that a file was not opened.
+       */
+    if ( IC_YES == UserStandardDialog( (char*)0, (char*)0, (char*)0,
+             (char*)0, "Are you sure you want to open file?",
+             ( CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET ) |
+             ( GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET ) ) ) {
+	strcpy( fileContents,"File Opened" );
+    }
+    else {
+	strcpy( fileContents,"File Not Opened" );
+    }
+
+      /*
+       * Update the contents of the text display.
+       */
+    UpdateFile();
+} /* MSG_GIP_FILE_OPEN */
+
+/********************************************************************
+ *		MSG_GIP_FILE_USE_TEMPLATE
+ ********************************************************************
+ * SYNOPSIS:	 This message is sent by the File:Use Template trigger.
+ *		 It demonstrates the use of UserStandardDialog() with
+ *		 custom response triggers.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Call UserStandardDialog with two specific triggers.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	9/30/92		Initial version
+ *******************************************************************/
+@method GenInterProcessClass, MSG_GIP_FILE_USE_TEMPLATE {
+      /*
+       * This UserStandardDialog() displays a multiple-response dialog,
+       * blocking the calling thread until the user responds. Because
+       * this dialog is GIT_MULTIPLE_RESPONSE, you must supply custom
+       * triggers.
+       *
+       * To supply a UserStandardDialog() dialog box with custom
+       * triggers, we set up a StandardDialog2ResponseTriggerTable with
+       * two triggers. The supplied monikers must be defined in an
+       * object resource.
+       */
+    StandardDialog2ResponseTriggerTable useTemplateResponseTriggerTable =
+    {
+	/* number of triggers in this table (SD2RTT_numTriggers). */
+	2,
+	/*
+	 * A StandardDialogResponseTriggerEntry then follows for each
+	 * trigger. These entries contain two pieces of data - the
+	 * optr of the visual moniker to use with this trigger and the
+	 * response value to return from the routine.
+	 *
+	 * In this case, our two custom triggers return the
+	 * Interaction commands IC_YES and IC_NO.
+	 */
+	{ (optr)&UseTempYesMoniker, IC_YES }, /* SD2RTT_trigger1 */
+	{ (optr)&UseTempNoMoniker, IC_NO }    /* SD2RTT_trigger2 */
+    };
+
+    if ( IC_YES == UserStandardDialog(
+		(char *)0,
+		/*
+		 * Since we are using custom response triggers, we
+		 * must pass a pointer to the
+		 * StandardDialog2ResponseTriggerTable above.
+		 */
+		(char *)&useTemplateResponseTriggerTable,
+		/*
+		 * We need no string arguments. The monikers for the
+		 * custom response triggers contain the entire string.
+		 */
+		(char *)0, (char *)0,
+		/* Include the dialog string. */
+		"Are you sure you want to use template file?",
+		/*
+		 * This dialog type is a question. An appropriate
+		 * graphic glyph will appear.
+		 */
+		(CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		/*
+		 * Because we supplied custom response triggers, this
+		 * interaction type should be GIT_MULTIPLE_RESPONSE.
+		 */
+	        (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)
+	) )
+    /*
+     * If the user responds yes, display the text "Using Template
+     * File."  Otherwise, the user has responded 'No' or the system
+     * is shutting down, in which case, we display the text "Not Using
+     * Template File"
+     */
+    {
+	strcpy( fileContents, "Using Template File" );
+    }
+    else {
+	strcpy( fileContents, "Not Using Template File" );
+    }
+
+      /*
+       * Update the contents of the text display.
+       */
+    UpdateFile();
+} /* MSG_GIP_FILE_USE_TEMPLATE */
+
+/********************************************************************
+ *		MSG_GIP_FILE_CLOSE
+ ********************************************************************
+ * SYNOPSIS:	 This message is sent by the File:Close trigger. It
+ *		 demonstrates how you can use UserStandardDialog()
+ * 		 with application-supplied triggers. One of these
+ *		 custom triggers is setup with no moniker, to allow
+ *		 the specific UI to fill in an appropriate moniker.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Call UserStandardDialog with two specific triggers.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/1/92         Initial version
+ *******************************************************************/
+@method GenInterProcessClass, MSG_GIP_FILE_CLOSE {
+      /*
+       * This UserStandardDialog() displays a multiple-response dialog,
+       * blocking the calling thread until the user responds. Because
+       * this dialog is GIT_MULTIPLE_RESPONSE, you must supply custom
+       * triggers.
+       *
+       * To supply a UserStandardDialog() dialog box with two custom
+       * triggers, we set up a StandardDialog2ResponseTriggerTable with
+       * two triggers. The supplied monikers must be defined in an
+       * object resource. If we do not supply a moniker, the specific UI
+       * will select one based on the InteractionCommand used.
+       */
+    StandardDialog2ResponseTriggerTable closeResponseTriggerTable =
+    {
+	/* number of triggers in this table (SD2RTT_numTriggers). */
+	2,
+	/*
+	 * A StandardDialogResponseTriggerEntry then follows for each
+	 * trigger. These entries contain two pieces of data - the
+	 * optr of the visual moniker to use with this trigger and the
+	 * response value to return from the routine.
+	 *
+	 * In this case, our two custom triggers return the
+	 * Interaction commands IC_YES and IC_NO. The second moniker,
+	 * (IC_NO) has a null entry for its moniker. In this case, the
+	 * specific UI will select one by its response value
+	 * (InteractionCommand).
+	 */
+	{(optr)&CloseYesMoniker, IC_YES},	/* SD2RTT_trigger1 */
+
+	{NullOptr, IC_NO}			/* SD2RTT_trigger2 */
+    };
+
+    if ( IC_YES == UserStandardDialog(
+		(char *)0,
+		/*
+		 * Pass the pointer to the custom response trigger
+		 * table.
+		 */
+		(char *)&closeResponseTriggerTable,
+		/* No string arguments */
+		(char *)0, (char *)0,
+		/* Include the dialog string. */
+		"Are you sure you want to close file?",
+		/*
+		 * This dialog type is a question. An appropriate
+		 * graphic glyph will appear.
+		 */
+		(CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		/*
+		 * Because we supplied custom response triggers, this
+		 * interaction type should be GIT_MULTIPLE_RESPONSE.
+		 */
+	        (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)
+	) )
+    /*
+     * If the user responds yes, display the text "File Closed."
+     * Otherwise, the user has responded 'No' or the system
+     * is shutting down, in which case, we display the text "File Not
+     * Closed."
+     */
+    {
+        strcpy( fileContents, "File Closed" );
+    }
+    else {
+	strcpy( fileContents, "File Not Closed" );
+    }
+
+      /*
+       * Update the contents of the text display.
+       */
+    UpdateFile();
+} /* MSG_GIP_FILE_CLOSE */
+
+/********************************************************************
+ *		MSG_GIP_FILE_SAVE
+ ********************************************************************
+ * SYNOPSIS:	 This message is sent by the File:Save trigger.  It
+ *		 demonstrates how UserStandardDialog() can be used to
+ *		 put up a dialog box with custom application-defined
+ *		 triggers.  These triggers return custom response
+ *		 values, instead of predefined InteractionCommands.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Call UserStandardDialog with some custom triggers.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/1/92         Initial version
+ *******************************************************************/
+@method GenInterProcessClass, MSG_GIP_FILE_SAVE {
+    StandardDialog2ResponseTriggerTable saveResponseTriggerTable = {
+	2,
+	/*
+	 * Instead of InteractionCommands within the custom trigger
+	 * entries, we use our defined responses.
+	 */
+	{ (optr)&SaveYesMoniker, SAVE_FILE_YES_RESPONSE },
+	{ (optr)&SaveNoMoniker, SAVE_FILE_NO_RESPONSE }
+    };
+
+    if ( SAVE_FILE_YES_RESPONSE == UserStandardDialog(
+		(char *)0,
+		/* Pointer to the response trigger table. */
+		(char *)&saveResponseTriggerTable,
+		/* no string arguments */
+		(char *)0, (char *)0,
+		/* Include the dialog string. */
+		"Are you sure you want to save file?",
+		/*
+		 * This dialog type is a question. Use an appropriate
+		 * graphic glyph.
+		 */
+		(CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		/*
+		 * We used custom triggers so the interaction type
+		 * should be GIT_MULTIPLE_RESPONSE.
+		 */
+	        (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)
+	) )
+    /*
+     * If the user responds to the trigger with the defined value
+     * SAVE_FILE_YES_REPSONSE, display the text "File Saved."
+     * Otherwise, the user has made a negative response or the system
+     * is shutting down, in which case, we display the text "File Not
+     * Saved."
+     */
+    {
+	strcpy( fileContents, "File Saved" );
+    }
+    else {
+	strcpy( fileContents, "File Not Saved" );
+    }
+
+      /*
+       * Update the contents of the text display.
+       */
+    UpdateFile();
+} /* MSG_GIP_FILE_SAVE */
+
+/********************************************************************
+ *		MSG_GIP_CREATE_DIALOG
+ ********************************************************************
+ * SYNOPSIS:	 This message is sent by the File:CreateDialog
+ *               trigger. It demonstrates how UserCreateDialog(),
+ *               UserDoDialog(), and UserDestoryDialog() can be used
+ *               to put up a dialog box.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Create the template dialog object, display it,
+ *               then destroy it after the user has closed it.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Joon	10/24/93   	Initial revision
+ *      NF      9/26/96         Added EC code
+ *******************************************************************/
+@method GenInterProcessClass, MSG_GIP_CREATE_DIALOG {
+      /*
+       * newDialog - Temporarily hold the optr of the new dialog.
+       */
+    optr newDialog;
+
+      /*
+       * First create a new dialog from the
+       * GenInterUserCreateDialog template.
+       * Put up the dialog.
+       * Destroy the dialog now that we're done using it.
+       */
+    newDialog = UserCreateDialog( @GenInterUserCreateDialog );
+EC( ECCheckLMemOD( newDialog ); )
+    UserDoDialog( newDialog );
+    UserDestroyDialog( newDialog );
+} /* MSG_GIP_CREATE_DIALOG */
+

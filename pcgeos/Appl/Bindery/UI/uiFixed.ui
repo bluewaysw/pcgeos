@@ -1,0 +1,156 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	Studio/pizza
+ * File:	uiFixed.ui
+ *
+ * Author:	Jenny Greenwood   7 March 1994
+ *
+ *	This file contains the user Interface description for this
+ * application. This file is written in a language called ESPIRE, which is
+ * compiled by the UIC compiler. See Spec/User/uic.doc for info.
+ *
+ *
+ * IMPORTANT NOTE:
+ *    This is just a controller, meant to be linked into a larger application.
+ *
+ * MISC NOTES:	
+ *  - The dialog has two related parts: the chars/line and lines/page, and
+ *    the font family and size.  Changing values in one half can affect the
+ *    range of values in the other half.  Therefore all GenValues are immediate
+ *    so we can alert the user of out-of-range conditions.
+ *
+ * RCS STAMP:
+ *	$Id: uiFixed.ui,v 1.1 97/04/04 14:39:56 newdeal Exp $
+ *
+ */
+
+
+/* ----------------------------------------------------------------------------
+	Included Information
+-----------------------------------------------------------------------------*/
+
+
+
+class FixedCharLinePageControl = GenControl
+{
+	/*****************
+	MSG_FCLPC_STATUS_LINESPAGE message(DwordWW, GenValueStateFlags);
+	MSG_FCLPC_STATUS_CHARSLINE message(DWordWW, GenValueStateFlags);
+
+	*****************/
+
+
+	/**  Portion of the region that is usable for text  **/
+	FCLPI_heightRegion  = typeComp "WWFixed" : "" ;
+	FCLPI_widthRegion   = typeComp "WWFixed" : "" ;
+
+	/**  Character Attributes:  **/
+	FCLPI_fontID = wordComp : 0;
+	FCLPI_pointSize = typeComp "WBFixed" : "" ;
+	FCLPI_textStyles = typeComp "TextStyle" : "" ;
+	/*  Order MUST match class definition in this order  */
+}
+
+
+
+
+/*______________________________________________________________________*/
+/*									*/
+/*		Fixed layout size controller				*/
+/*______________________________________________________________________*/
+
+
+/*  Define the features resource.  This resouce contains objects that
+ *  can be placed in a menu.
+ */
+start FixedSpacingControlUI, notDetachable;
+
+
+
+CharsLinesPageGroup = GenInteraction {	/*  <--  Controller Feature  */
+
+	genStates = default -usable;
+	children = CharsPerLineValue, LinesPerPageValue;
+
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_ON_MONIKERS
+	}
+}
+
+
+/*  The current value for these spinners will be reduced to a sensible
+ *  maximum once we start receiving GCN notices and adjust the actual
+ *  maximum possible value of the spinner.
+ */
+CharsPerLineValue = GenValue {
+	moniker = "Chars per Line" ;
+	value	= "MAX_FIXED_CHARS_PER_LINE" ; 
+	minimum = "MIN_FIXED_CHARS_PER_LINE" ;
+	maximum = "MAX_FIXED_CHARS_PER_LINE" ;
+
+	applyMsg = MSG_FCLPC_STATUS_LINESPAGE ;
+	destination = "TO_OBJ_BLOCK_OUTPUT" ;
+}
+
+
+LinesPerPageValue = GenValue {
+	moniker = "Lines per Page" ;
+	value	= "MAX_FIXED_LINES_PER_PAGE" ;
+	minimum = "MIN_FIXED_LINES_PER_PAGE" ;
+	maximum = "MAX_FIXED_LINES_PER_PAGE" ;
+
+	applyMsg = MSG_FCLPC_STATUS_LINESPAGE ;
+	destination = "TO_OBJ_BLOCK_OUTPUT" ;
+}
+
+
+/* - - - - - - - - - - - */
+
+
+FontSelectGroup = GenInteraction {	/*  <--  Controller Feature  */
+
+	genStates = default -usable;
+	children = FontingFamily, FontingSize;
+
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ALLOW_CHILDREN_TO_WRAP
+	}
+}
+
+
+FontingFamily = GenText {
+	genAttributes = readOnly;
+	textDisplayAttributes = singleLineText, noWordWrapping;
+
+	moniker = " Font: " ;
+	hints = {
+		HINT_MINIMUM_SIZE { SpecWidth< SST_AVG_CHAR_WIDTHS, 12 > }
+	}
+}
+
+
+FontingSize = GenValue
+{
+	genAttributes = readOnly;
+	displayFormat = points;
+}
+
+
+end FixedSpacingControlUI;
+
+
+/* --------------------------  String Data Constants  --------------------- */
+
+
+start  ControlStringUI, data;
+
+chunk	FCLPCName		= "Fixed Spacing" ;
+chunk	VisFixedSpacingName	= "Fixed Char/Line/Page Spacing" ;
+chunk	VisFontSelectName	= "Font name and size" ;
+
+end   ControlStringUI;
+

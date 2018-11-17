@@ -1,0 +1,387 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Objects
+FILE:		gDListC.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	chris	1/92		Initial version
+
+DESCRIPTION:
+	Object definitions for GenDynamicListClass.   
+
+	$Id: gDListC.def,v 1.1 97/04/04 14:18:03 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	_GDLISTC
+
+StartLibrary	ui
+		
+include ui.def
+
+		
+GenDynamicListClass	class	GenItemGroupClass
+
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER		message
+; 
+; Sends a moniker to use for a particular list item.  Usually sent in
+; response to a moniker query by the dynamic list, but can also be used to
+; change an item's moniker, to guarantee that it is updated if currently 
+; visible.   Doesn't affect the state, except that the RIMF_NOT_ENABLED in 
+; RIMF_itemFlags will ensure the item will be disabled while visible.
+; This is the general message that allows all sort of different sources of
+; a moniker (visual moniker, moniker list, text string, graphics string, or
+; token.db token), much in the manner of MSG_GEN_REPLACE_VIS_MONIKER.  See that
+; message for more details.  Simpler messages are provided for the usual cases:
+; MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR for passing a VisMoniker in
+; ^lcx:dx, and MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_NULL_TERM_TEXT_FPTR
+; for passing an fptr to null-terminated text.
+;
+; Context:	Usually called in response to a moniker query, but can be
+;		called at any time.
+; Source:	No restrictions
+; Destination:	Any GenDynamicList object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		ss:bp -- ReplaceItemMonikerFrame
+;		dx    -- size ReplaceItemMonikerFrame
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+ReplaceItemMonikerFlags	record
+	RIMF_NOT_ENABLED:1,
+		;Ensure that the item we are setting the moniker for will be
+		;disabled while visible.
+	:15
+ReplaceItemMonikerFlags	end
+
+ReplaceItemMonikerFrame	struct
+    RIMF_source	dword
+			; an optr, hptr, or fptr, depending on RIMF_sourceType
+
+    RIMF_sourceType	VisMonikerSourceType
+			;RIMF_source is optr, hptr, or fptr
+
+    even		; word align for C
+
+    RIMF_dataType	VisMonikerDataType
+			; source is VisMoniker, text string, graphics string,
+			; or GeodeToken
+
+    even		; word align for C
+
+    RIMF_length		word
+			; byte-size of source; not used for VMST_OPTR; if
+			; VMDT_TEXT and RIMF_length is 0, text is
+			; assumed to be null-terminated; if VMDT_GSTRING
+			; and RIMF_length is 0, length of gstring is computed
+			; by scanning gstring
+
+    RIMF_width		word
+			; for VMDT_GSTRING, width of graphics string; if 0,
+			; width of gstring is computed by scanning gstring
+
+    RIMF_height		word
+			; for VMDT_GSTRING, height of graphics string; if 0,
+			; height of gstring is computed by scanning gstring
+
+    RIMF_itemFlags	ReplaceItemMonikerFlags
+    			;Item flags for the function.
+
+    RIMF_item		word		
+			;Position of item whose moniker you're setting
+ReplaceItemMonikerFrame	ends
+
+.assert (offset RIMF_source eq offset RVMF_source)
+.assert (offset RIMF_sourceType eq offset RVMF_sourceType)
+.assert (offset RIMF_dataType eq offset RVMF_dataType)
+.assert (offset RIMF_length eq offset RVMF_length)
+.assert (offset RIMF_width eq offset RVMF_width)
+.assert (offset RIMF_height eq offset RVMF_height)
+.assert (offset RIMF_itemFlags eq offset RVMF_updateMode)
+
+
+
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR		message
+;
+; Like MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER, sends the dynamic list a new
+; moniker for a particular, item.  This is the simplified version that takes
+; a VisMoniker optr.   See the more flexible MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_-
+; MONIKER for more complicated cases.
+;
+; Context:	Simplified messages for replacing an item's current visual
+;		moniker.
+; Source:	Anyone
+; Destination:	Any GenDynamicListClass object
+; Interception: No need to intercept.  Uses MSG_GEN_DYNAMIC_LIST_REPLACE_VIS_-
+;		MONIKER, so intercepting that is sufficient.
+;
+; Pass:		^lcx:dx - source VisMoniker
+;		bp - item
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT	message
+;
+; Like MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER, sends the dynamic list a new
+; moniker for a particular, item.  This is the simplified version that takes
+; an fptr to a null-terminated text string.   See the more flexible MSG_GEN_-
+; DYNAMIC_LIST_REPLACE_ITEM_MONIKER for more complicated cases.
+;
+; Context:	Simplified messages for replacing an item's current visual
+;		moniker.
+; Source:	Anyone
+; Destination:	Any GenDynamicListClass object
+; Interception: No need to intercept.  Uses MSG_GEN_DYNAMIC_LIST_REPLACE_VIS_-
+;		MONIKER, so intercepting that is sufficient.
+;
+;
+; Pass:		cx:dx - far pointer to source null-terminated text string
+;		bp - item
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_DYNAMIC_LIST_INITIALIZE		message
+; 
+; Notifies the dynamic list to display a new list of items.  If the list is 
+; already usable, invalidates all the current items and re-requests all the 
+; monikers.   All items will be deselected.  The list will not scroll back to
+; the top explicitly -- send a MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE to get back
+; to the top of the list.
+;
+; Context:	Can be called any time.
+; Source:	No restrictions
+; Destination:	Any GenDynamicList object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cx -- new number of items, or GDLI_NO_CHANGE 
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+GDLI_NO_CHANGE	equ	-1	;pass this for no change in number of items
+
+
+
+MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS		message
+; 
+; Returns the current number of items.  If no items, returns zero.  Enabled
+; status of items is ignored.
+;
+; Context:	Can be called any times.
+; Source:	No restrictions
+; Destination:	Any GenDynamicList object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	cx -- number of items
+;		ax, dx, bp -- destroyed
+;
+
+
+MSG_GEN_DYNAMIC_LIST_ADD_ITEMS		message
+; 
+; Adds a specified number of items to an existing dynamic list, at the position
+; shown.  All items that previously appeared at or after the position specified
+; will have their positions incremented and moved downward visually to make room
+; for the new items.  The moniker for the new items will be requested
+; when it is made visible.  The number of items is adjusted.  The state
+; of the list will be adjusted as necessary to reflect the new positions of
+; the entries (e.g. when adding an item at position 3 when items 2 and
+; 5 are selected, the selection list will be updated to be items 2 and 6.)
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenDynamicList object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cx -- position to give the new entry, or
+;			GDLP_LAST to add at end
+;			GDLP_FIRST to add at beginning
+;		dx -- number of items to add
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+GenDynamicListPosition	etype	word
+  GDLP_FIRST	enum GenDynamicListPosition, 00000h
+  GDLP_LAST	enum GenDynamicListPosition, 0ffffh
+
+
+MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS		message
+; 
+; Removes existing items in a dynamic list, beginning at the position shown.  
+; All items that previously appeared after the items specified will have 
+; their positions decremented and will be visually moved up.   The number of 
+; items is adjusted accordingly.  The state of the dynamic list will be 
+; adjusted to reflect the new positions of the entries and to remove the 
+; selection from the deleted item, if necessary.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenDynamicList object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cx -- position of first entry to remove
+;			GDLP_LAST to remove at end
+;			GDLP_FIRST to remove at beginning
+;		dx -- number of items to remove
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+
+MSG_GEN_DYNAMIC_LIST_REMOVE_ITEM_LIST		message
+;
+; Removes a list of items.   The item positions should refer to their positions
+; before any items have been removed.  Updates other item positions 
+; appropriately, visually moving them up.  The number of items is updated.
+; The selection will be removed item(s), if necessary.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenDynamicList object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cx:dx -- buffer containing list of item positions
+;		bp    -- number of items being removed
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+;------------------------------------------------------------------------------
+;	Internal messages.
+;------------------------------------------------------------------------------
+
+MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER		message
+;
+; The dynamic list will send this to itself to query for an item's moniker.
+; The default action is to send the message specified in GDLI_queryMsg to
+; GIGI_destination.  This can be subclassed, however, to send the message 
+; elsewhere or to have the dynamic list supply monikers for itself (i.e. be
+; self-contained).
+;
+; Context:	Called when a moniker is needed for an item
+; Source:	A usable GenDynamicList object
+; Destination:	Itself
+; Interception:	Intercepted to provide the moniker by some means other than by
+; 		querying the destination.
+;
+; Pass:		^lcx:dx -- the dynamic list requesting the moniker
+;		bp      -- the position of the item requested
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_DYNAMIC_LIST_GET_ITEM_CLASS		message
+;
+; The dynamic list will send this to itself to query for the class to use for
+; an item.  Applications needing subclass GenItem to provide some special 
+; behavior (special moniker handling or something) can get their GenItem 
+; subclass used for dynamic list items by subclassing this message.  
+; 
+; Context:	Called to get the class for an item.
+; Source:	A usable GenDynamicList object
+; Destination:	Itself
+; Interception:	Intercepted to provide some item subclass other than GenItem
+;		class.
+;
+; Pass:		nothing
+; Return:	cx:dx -- class to use for item
+;		ax, bp -- destroyed
+;
+
+
+MSG_GEN_DYNAMIC_LIST_TOP_ITEM_CHANGED		message
+;
+; A scrollable GenDynamicList sends this to itself when its origin changes, in 
+; case any updating needs to be done.
+;
+; Context:	Called in response to an origin change in a scrolling list.
+; Source:	A usable GenDynamicList object
+; Destination:	Itself
+; Interception:	Not normally intercepted.
+;
+; Pass:		cx -- identifier of new top item
+;		dx -- identifier of previous top item
+;		bp -- number of items that can be visible at once
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_DYNAMIC_LIST_NUM_VISIBLE_ITEMS_CHANGED		message
+;
+; A dynamic GenItemGroup sends this to itself when its size changes, so the
+; GenDynamicList can provide sufficient items.  Apps should not send this
+; message -- use MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE to scroll a dynamic
+; list.
+;
+; Context:	Called in response to an origin change in a dynamic list
+; Source:	A usable GenDynamicList object, only.
+; Destination:	Itself
+; Interception:	Not normally intercepted.
+;
+; Pass:		cx -- number of items that can now be visible at one time
+;		dx -- if TRUE then do not validate any item that are
+;		      created.  This allows the sender to validate 
+;		      the items for itself.
+;		bp -- current top item, if scrollable
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_DYNAMIC_LIST_NUM_ITEMS_CHANGED	message
+;
+; A GenDynamicList will send this to itself when the number of items changes.
+; In a scrolling GenDynamicList, this will reserve space for the appropriate
+; number of items.   Apps should not send this message -- use MSG_GEN_DYNAMIC-
+; LIST_INITIALIZE to set a new number of items.
+;
+; Context:	Can be called at any time.  
+; Source:	A usable GenDynamicList object, only.
+; Destination:	Itself
+; Interception:	Not normally intercepted.
+;
+; Pass:		cx -- new number of items
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+;------------------------------------------------------------------------------
+;       Instance data
+;------------------------------------------------------------------------------
+
+    GDLI_numItems	word	0
+	;The number of items in a dynamic list.  If zero, nothing will be
+	;drawn.  Is may be set dynamically via MSG_GEN_DYNAMIC_LIST_INITIALIZE
+	;or adjusted using MSG_GEN_DYNAMIC_LIST_ADD/REMOVE_ITEMS.  The current
+	;value may be obtained using MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS.
+
+    GDLI_queryMsg	word	0
+	;The message to use in querying for the list item monikers.  The
+	;query's parameters are as follows:
+	;
+	;Pass:		^lcx:dx -- the dynamic list requesting the moniker
+	;		bp      -- the position of the item requested
+	;Return:	nothing
+	;		ax, cx, dx, bp -- destroyed
+	;
+	;The message will be sent to the destination for the list.  The handler
+	;is expected to reply by sending a MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_-
+	;MONIKER back to the list.
+	;
+	
+GenDynamicListClass	endc
+
+EndLibrary	ui
+
+
+

@@ -1,0 +1,187 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PCGEOS	
+MODULE:		
+FILE:		xms.def
+
+AUTHOR:		Ian Porteous, Oct 24, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	IP	10/24/94   	Initial revision
+
+
+DESCRIPTION:
+	Contains definitions for the xms manager
+		
+	$Id: xms.def,v 1.1 97/04/04 14:13:33 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+SetDef __XMS
+
+;------------------------------------------------------------------------------
+;		XMS Manager Declarations
+;
+; The Extended Memory Specification divides extended memory into three pieces:
+;	- Upper Memory Blocks (UMBs) located between 640K and 1Mb
+;	- High Memory Area (HMA) is the 64K-16 bytes at 1Mb reachable
+;	  in real mode by enabling address bit 20
+;	- Extended Memory Blocks (EMBs) located above 1088K
+;
+;------------------------------------------------------------------------------
+;
+; Command codes
+;
+XMSCommands	etype	byte
+XMS_GET_VERSION		enum XMSCommands
+
+XMS_ALLOC_HMA		enum XMSCommands
+;	Pass:	dx	= space needed by the caller (bytes)
+;	Return:	ax	= 1 if successful, 0 if not
+
+XMS_FREE_HMA		enum XMSCommands
+;	Pass:	nothing
+;	Return:	ax	= 1 if HMA released, 0 if not
+;
+
+XMS_GLOBAL_ENABLE_A20	enum XMSCommands
+;	Pass:	nothing
+;	Return:	ax	= 1 if A20 enabled, 0 if not
+
+XMS_GLOBAL_DISABLE_A20	enum XMSCommands
+;	Pass:	nothing
+;	Return:	ax	= 1 if A20 disabled, 0 if not
+
+XMS_LOCAL_ENABLE_A20	enum XMSCommands
+;	Pass:	nothing
+;	Return:	ax	= 1 if A20 enabled, 0 if not
+
+XMS_LOCAL_DISABLE_A20	enum XMSCommands
+;	Pass:	nothing
+;	Return:	ax	= 1 if A20 disabled, 0 if not
+
+XMS_QUERY_A20_STATE	enum XMSCommands
+;	Pass:	nothing
+;	Return:	ax	= 1 if A20 is currently enabled, 0 if not
+
+XMS_QUERY_FREE_EMB	enum XMSCommands
+;	Pass: 	nothing
+;	Return:	ax	= largest free block (Kb)
+;		dx	= total extended memory size (Kb)
+;
+XMS_ALLOC_EMB		enum XMSCommands
+;	Pass:	dx	= Kb to allocate
+;	Return:	dx	= handle
+;		ax	= 1 if successful, 0 if not
+
+XMS_FREE_EMB		enum XMSCommands
+;	Pass:	dx	= handle to free
+;	Return:	ax	= 1 if successful, 0 if not
+
+XMS_MOVE_EMB		enum XMSCommands
+;	Pass:	ds:si	= address of XMSMoveParams
+;	Return:	ax	= 1 if successful, 0 if not
+
+XMS_LOCK_EMB		enum XMSCommands
+;	Pass:	dx	= handle
+;	Return:	ax	= 1 if successful, 0 if not
+;		dxbx	= 32-bit linear address of locked block
+
+XMS_UNLOCK_EMB		enum XMSCommands
+;	Pass:	dx	= handle
+;	Return:	ax	= 1 if successful, 0 if not
+
+XMS_INFO_EMB		enum XMSCommands
+;	Pass:	dx	= handle
+;	Return:	ax	= 1 if successful, 0 if not
+;		bh	= lock count
+;		bl	= number of free handles
+;		dx	= size of block in Kbytes
+
+XMS_RESIZE_EMB		enum XMSCommands
+;	Pass:	bx	= new size for the extended memory block in Kbytes.
+;		dx	= unlocked extended memory block handle to
+;			  reallocate.
+;	Return:	ax	= 1 if successful, 0 if not
+
+XMS_ALLOC_UMB		enum XMSCommands
+;	Pass:	dx	= size of requested memory block (paragraphs)
+;	Return:	ax	= 1 if successful, 0 if not
+;		bx	= segment of allocated block
+;		dx	= size of allocated block, if successful, or
+;			  size of largest available UMB, if not (paragraphs)
+
+XMS_FREE_UMB		enum XMSCommands
+;	Pass:	dx	= segment of block
+;	Return:	ax	= 1 if successful, 0 if not
+
+
+;------------------------------------------------------------------------------
+;		XMS PARAMETERS AND RETURN CODES
+;------------------------------------------------------------------------------
+;
+; Structure of an address used in move-block call
+;
+XMSAddr	struct
+    XMSA_handle	word	; Block handle. If 0, then address refers to
+			;  conventional memory and XMSA_offset is a standard
+			;  fptr.
+    XMSA_offset	dword	; Offset into block/fptr to conventional memory.
+XMSAddr	ends
+
+;
+; Parameter block given to move-block function
+;
+XMSMoveParams 	struct
+    XMSMP_count		dword	; Number of bytes to move (must be even)
+    XMSMP_source	XMSAddr
+    XMSMP_dest		XMSAddr
+XMSMoveParams	ends
+
+XMSErrors	etype	byte		; returned in BL
+XMS_UNIMP	        enum	XMSErrors, 0x80	; Unimplemented function
+XMS_VDISK	        enum	XMSErrors, 0x81	; VDISK detected, so it's hosed
+XMS_A20_ERR	        enum	XMSErrors, 0x82	; Couldn't gate/ground A20
+XMS_ERROR	        enum	XMSErrors, 0x8e	; General driver error
+XMS_FATAL_ERROR	        enum	XMSErrors, 0x8f	; Fatal driver error
+XMS_NO_HMA	        enum	XMSErrors, 0x90	; HMA doesn't exist
+XMS_HMA_IN_USE	        enum	XMSErrors, 0x91	; HMA already in-use
+XMS_REQUEST_TOO_SMALL	enum	XMSErrors, 0x92	; HMA request below /HMAMIN
+XMS_HMA_NOT_IN_USE        enum	XMSErrors, 0x93	; HMA can't be freed b/c it's
+						;  not in-use
+XMS_MEMORY_FULL	        enum	XMSErrors, 0xa0	; All EMBs allocated
+XMS_NO_HANDLE_AVAIL     enum	XMSErrors, 0xa1	; All memory handles in-use
+XMS_BAD_HANDLE	        enum	XMSErrors, 0xa2	; Memory handle invalid
+XMS_BAD_SRC_HANDLE      enum	XMSErrors, 0xa3	; Source handle for move bad
+XMS_BAD_SRC_OFFSET      enum	XMSErrors, 0xa4	; Source offset for move bad
+XMS_BAD_DEST_HANDLE	enum	XMSErrors, 0xa5	; Destination handle for move
+						;  is bad
+XMS_BAD_DEST_OFFSET     enum	XMSErrors, 0xa6	; Destination offset for move
+						;  is bad
+XMS_BAD_LENGTH	        enum	XMSErrors, 0xa7	; Length for move is bad
+XMS_INVALID_OVERLAP     enum	XMSErrors, 0xa8	; Source and destination
+						;  regions overlapped illegally
+XMS_PARITY_ERROR        enum	XMSErrors, 0xa9	; Parity error occurred during
+						;  the move
+XMS_NOT_LOCKED	        enum	XMSErrors, 0xaa	; Block not locked (really?)
+XMS_LOCKED	        enum	XMSErrors, 0xab	; Block *is* locked (gosh!)
+XMS_TOO_MANY_LOCKS      enum	XMSErrors, 0xac	; Guess what?
+XMS_LOCK_FAILED	        enum	XMSErrors, 0xad	; ...
+XMS_SMALLER_UMB_AROUND  enum	XMSErrors, 0xb0	; ..
+XMS_NO_UMB_AVAIL        enum	XMSErrors, 0xb1	; All UMBs allocated
+XMS_UMB_SEGMENT_INVALID enum	XMSErrors, 0xb2	; Oh, please!
+
+
+XMSExtendedMemoryBlock	struct
+    XMSEMB_handle	word	0	; allocated handle (0 => none yet)
+    XMSEMB_pages	word		; number of pages the handle covers
+XMSExtendedMemoryBlock	ends

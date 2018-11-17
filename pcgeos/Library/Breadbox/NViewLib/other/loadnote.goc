@@ -1,0 +1,101 @@
+/*
+ *      LOADNOTE.GOC - view/save files in Note format
+ *
+ *      by Marcus Groeber, mgroeber@compuserve.com
+ *
+ */
+
+@include <stdapp.goh>
+@include <foam.goh>
+
+#include <ansi\stdio.h>
+#include <ansi\string.h>
+
+@include <nview.goh>
+
+NViewStatus LoadNoteDoc(FDocumentDir dir, char *file, optr text,
+  PageSetupInfo *page)
+{
+    NViewStatus ret;
+    VMFileHandle vmf;
+    VMBlockHandle mapHandle, item;
+    FoamDocMapBlock *map;
+    TextTransferBlockHeader *ttbh;
+    MemHandle mh;
+
+    FilePushDir();
+    FoamSetDocumentDir(dir);
+    vmf = VMOpen(file, 0, VMO_OPEN, 0);
+
+    if(vmf)                             /* source file can be opened? */
+    {
+      mapHandle = VMGetMapBlock(vmf);   /* access map block of file */
+      map = VMLock(vmf, mapHandle, &mh);
+      item = map->FDMB_textTrItem;      /* initial handle of text content */
+      page->PSI_leftMargin = map->FDMB_docSettings.FDS_leftMargin;
+      page->PSI_topMargin = map->FDMB_docSettings.FDS_topMargin;
+      page->PSI_rightMargin = map->FDMB_docSettings.FDS_rightMargin;
+      page->PSI_bottomMargin = map->FDMB_docSettings.FDS_bottomMargin;
+      VMUnlock(mh);
+
+      while(item)                       /* walk chain of transfer items */
+      {
+        /* append item to contents of text object */
+        @call text::MSG_VIS_TEXT_REPLACE_WITH_TEXT_TRANSFER_FORMAT(
+          item, vmf, 0, TEXT_ADDRESS_PAST_END, TEXT_ADDRESS_PAST_END);
+
+        ttbh = VMLock(vmf, item, &mh);  /* header of transfer item */
+        item = VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_reservedVM[0]);
+                                        /* go to next item */
+        VMUnlock(mh);
+      }
+
+      VMClose(vmf, FILE_NO_ERRORS);
+      ret = NVS_NO_ERROR;
+    }
+    else
+      ret = NVS_CANNOT_OPEN_FILE;
+
+    FilePopDir();
+    return ret;
+}
+
+NViewStatus SaveNoteDoc(optr text, PageSetupInfo *page, FDocumentDir dir,
+  char *file)
+{
+    DocumentInfo info;
+    FileAttrInfo fileAttr = {{NOTES_FILE_TOKEN, 0},
+                             NOTES_FILE_MAJOR_PROTOCOL,
+                             NOTES_FILE_MINOR_PROTOCOL};
+    DocumentHandle handle;
+    VMBlockHandle mapHandle;
+    FoamDocMapBlock *map;
+    MemHandle mh;
+
+    info.DI_docDir = dir;               /* destination directory */
+    *info.DI_docName = 0;               /* actual name is returned here */
+
+    FoamDocCreate(&info, &fileAttr, file);
+
+    handle = FoamDocOpen(&info, FDA_READ_WRITE);
+    if(handle)
+    {
+      FoamDocStoreTextAsVMChain(handle, text);
+
+      /* Store page layout info in the header block. This assumes that the
+         DocumentHandle of an open foam document is identical to the VM file
+         handle to the file holding it. */
+
+      mapHandle = VMGetMapBlock(handle);/* access map block of file */
+      map = VMLock(handle, mapHandle, &mh);
+      map->FDMB_docSettings.FDS_leftMargin = page->PSI_leftMargin;
+      map->FDMB_docSettings.FDS_topMargin = page->PSI_topMargin;
+      map->FDMB_docSettings.FDS_rightMargin = page->PSI_rightMargin;
+      map->FDMB_docSettings.FDS_bottomMargin = page->PSI_bottomMargin;
+      VMUnlock(mh);
+
+      FoamDocClose(handle);
+    }
+
+    return NVS_NO_ERROR;
+}

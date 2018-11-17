@@ -1,0 +1,572 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		GeoFile/UI
+FILE:		uiModify.goc
+
+AUTHOR:		John D. Mitchell
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.06.15	Initial version.
+
+DESCRIPTION:
+	This file contains all of the UI definitions for the Modify-menu
+	tree of GeoFile.
+
+	$Id: uiModify.goc,v 1.1 97/04/04 15:54:19 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>		/* PC/GEOS Standard Applications.	*/
+#include <geoworks.h>
+
+#include <Ansi/string.h>	/* Standard C.	*/
+
+@include <gcnlist.goh>		/* PC/GEOS Libraries.	*/
+#include <graphics.h>
+@include <grobj.goh>
+#include <gstring.h>
+@include <Objects/splineC.goh>
+@include <math.goh>
+@include <Objects/gViewCC.goh>
+@include <Objects/Text/tCtrlC.goh>
+@include <Objects/FlatFile/ffFldEdg.goh>
+
+@define	__GF_UI_MODIFY_GOC	/* Don't over-define.	*/
+@include <geofile.goh>		/* GeoFile Application.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Modify Menu
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	ModifyInterface ;
+
+@object GenInteractionClass GraphicsMenu = {
+    GI_visMoniker = 'G',"Graphics";
+    GI_comp = @GFAreaAndLineAttributesSubmenu,
+	      @GFEditPopup,
+	      @GFGraphicOptionsMenu,
+	      @GFTransformMenu,
+	      @GFArrangeMenu,
+	      @GFAttributesMenu;
+    GI_states = @default & ~GS_USABLE;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass PropertiesMenu = {
+    GI_visMoniker = 'P', "Properties";
+    GI_comp = @GFFontControl,
+    	      @GFTextSizeControl,
+    	      @GFStyleControl,
+	      @GFTextColorControl,
+    	      @GFTextBackgroundColorControl,
+	      @GFTextAttributesControl,
+    	      @GFTextParagraphSubmenu;
+    GI_states = @default & ~GS_USABLE;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass GFTextParagraphSubmenu = {
+    GI_comp = @GFTextJustificationControl,
+	      @GFNumberFormatControl,
+    	      @GFFieldEdges,
+    	      @GFParagraphSubmenu;
+    GII_visibility = GIV_SUB_GROUP;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@end	ModifyInterface;
+
+@start	ModifyMenuUI;
+
+/**********************************************************************
+		     Graphics/Create sub-menu
+ **********************************************************************/
+
+@object GenInteractionClass GFEditPopup = {
+    GI_visMoniker = 'E',"Edit";
+    GI_comp = @DuplicatePopup, @PasteInsidePopup,
+		@GFHideShowControl, @CreatePopup;
+    GII_visibility = GIV_POPUP;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object GenInteractionClass CreatePopup = {
+    GI_visMoniker = 'C',"Create";
+    GI_comp = @GFCreateControl, @GFCustomShapeControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjCreateControlClass GFCreateControl = {
+}
+
+@object GrObjCustomShapeControlClass GFCustomShapeControl = {
+}
+
+/**********************************************************************
+		     Graphics/Edit Special sub-menu
+ **********************************************************************/
+
+@object GenInteractionClass DuplicatePopup = {
+    GI_visMoniker = 'D',"Duplicate";
+    GI_comp = @GFDuplicateControl,
+    	      @GFMultiDuplicateControl,
+    	      @GFCustomDuplicateControl;
+    GII_visibility = GIV_POPUP;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object GenInteractionClass PasteInsidePopup = {
+    GI_visMoniker = 'P',"Paste Inside";
+    GI_comp = @GFPasteInsideControl,
+    	      @GFMoveInsideControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjDuplicateControlClass GFDuplicateControl = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object GrObjPasteInsideControlClass GFPasteInsideControl = {
+}
+
+@object GrObjMoveInsideControlClass GFMoveInsideControl = {
+    GI_visMoniker = 'N',"Nudge Inside";
+    GII_visibility = GIV_POPUP;
+}
+    
+@object GrObjCustomDuplicateControlClass GFMultiDuplicateControl = {
+    GI_visMoniker = 'M',"Multi-Duplicate";
+    GII_visibility = GIV_DIALOG;
+    ATTR_GEN_CONTROL_PROHIBIT_UI = (GOCDCF_SCALE | GOCDCF_SKEW);
+    ATTR_GEN_HELP_CONTEXT = "dbMultiDup";
+}
+
+@object GrObjCustomDuplicateControlClass GFCustomDuplicateControl = {
+    GI_visMoniker = 'C',"Custom Duplicate";
+    GII_visibility = GIV_DIALOG;
+}
+
+/**********************************************************************
+		     Graphics/Options sub-menu
+ **********************************************************************/
+
+@object GenInteractionClass GFGraphicOptionsMenu = {
+    GI_visMoniker = 'O',"Options";
+    GI_comp = @GFHandleControl,
+    	      @GFDraftModeControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjHandleControlClass GFHandleControl = {
+    GI_visMoniker = 'a',"Handles";
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjHideShowControlClass GFHideShowControl = {
+    GI_visMoniker = 'H',"Hide";
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjDraftModeControlClass GFDraftModeControl = {
+}
+
+/**********************************************************************
+		     Graphics/Transform sub-menu
+ **********************************************************************/
+
+@object GenInteractionClass GFTransformMenu = {
+    GI_visMoniker = 'T',"Transform";
+    GI_comp = @GFFlipControl,
+    	      @GFScaleControl,
+    	      @GFRotateControl,
+    	      @GFSkewControl,
+	      @GFTransformControl,
+    	      @GFPolylineMenu,
+    	      @GFConvertControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjFlipControlClass GFFlipControl = {
+    GI_visMoniker = 'F', "Flip";
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjScaleControlClass GFScaleControl = {
+    GI_visMoniker = 'S',"Scale";
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjRotateControlClass GFRotateControl = {
+    GI_visMoniker = 'R',"Rotate";
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjSkewControlClass GFSkewControl = {
+    GI_visMoniker = 'k',"Skew";
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjTransformControlClass GFTransformControl = {
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenInteractionClass GFPolylineMenu = {
+    GI_visMoniker = 'P',"Polyline";
+    GI_comp = @GFSplinePointControl,
+	      @GFSplineOpenCloseControl,
+    	      @GFSplineSmoothnessControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object SplinePointControlClass GFSplinePointControl = {
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+@object SplineOpenCloseControlClass GFSplineOpenCloseControl = {
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+@object SplineSmoothnessControlClass GFSplineSmoothnessControl = {
+    GI_visMoniker = 'P',"Control Points";
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjConvertControlClass GFConvertControl = {
+    GI_visMoniker = 'C',"Convert";
+    GII_visibility = GIV_POPUP;
+}
+
+/**********************************************************************
+		     Graphics/Arrange sub-menu
+ **********************************************************************/
+
+@object GenInteractionClass GFArrangeMenu = {
+    GI_visMoniker = 'g',"Arrange";
+    GI_comp = @GFDepthControl,
+    	      @GFNudgeControl,
+    	      @GFAlignDistributeControl,
+    	      @GFGroupControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjDepthControlClass GFDepthControl = {
+}
+
+@object GrObjNudgeControlClass GFNudgeControl = {
+    GI_visMoniker = 'M',"Move";
+    GII_visibility = GIV_POPUP;
+}
+
+@object GrObjAlignDistributeControlClass GFAlignDistributeControl = {
+    GI_visMoniker = 'D',"Align/Distribute";
+}
+
+@object GrObjGroupControlClass GFGroupControl = {
+}
+
+/**********************************************************************
+		     Graphics/Attributes sub-menu
+ **********************************************************************/
+
+@object GenInteractionClass GFAttributesMenu = {
+    GI_visMoniker = 'r',"Attributes";
+    GI_comp = @GFBackgroundAttributes,
+    	      @GFGrObjStyleSheetControl,
+    	      @GFGradientAttributes,
+    	      @GFArcsControl,
+    	      @GFExtAttrDialog,
+    	      @GFDefaultAttributesControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass GFBackgroundAttributes = {
+    GI_visMoniker = 'B',"Background Color";
+    GI_comp = @GFBackgroundColorSelector, @GFBackgroundAttributesControl;
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+    ATTR_GEN_HELP_CONTEXT = "dbBackColor";
+}
+
+@object GrObjBackgroundColorSelectorClass GFBackgroundColorSelector = {
+}
+
+@object GrObjAreaAttrControlClass GFBackgroundAttributesControl = {
+    ATTR_GEN_CONTROL_PROHIBIT_UI = (GOAACF_MM_COPY | GOAACF_MM_NOP | \
+				GOAACF_MM_INVERT | GOAACF_MM_XOR | \
+				GOAACF_MM_AND | GOAACF_MM_OR | \
+				GOAACF_MM_CLEAR | GOAACF_MM_SET);
+    HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE;    
+}
+
+@object GrObjStyleSheetControlClass GFGrObjStyleSheetControl = {
+    GI_visMoniker = 'S',"Graphic Style Sheets";
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_CONTROL_PROHIBIT_UI = SSCF_LOAD;
+}
+
+@object GenInteractionClass GFGradientAttributes = {
+    GI_visMoniker = 'G', "Gradient Fill";
+    GI_comp = @GFStartingGradientColorSelector,
+    	      @GFEndingGradientColorSelector,
+    	      @GFGradientFillControl;
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+
+    ATTR_GEN_HELP_CONTEXT = "dbGradAttrs";
+}
+
+@object GrObjStartingGradientColorSelectorClass
+    GFStartingGradientColorSelector = {
+    GI_visMoniker = "Start Color";
+    HINT_DRAW_IN_BOX;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GrObjEndingGradientColorSelectorClass GFEndingGradientColorSelector = {
+    GI_visMoniker = "End Color";
+    HINT_DRAW_IN_BOX;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GrObjGradientFillControlClass GFGradientFillControl = {
+    HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE;
+}
+
+@object GrObjArcControlClass GFArcsControl = {
+    GI_visMoniker = 'A', "Arcs";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+}    
+
+@object GenInteractionClass GFExtAttrDialog = {
+    GI_visMoniker = 'E',"Extended Attributes";
+    GI_comp = @GFGrObjObscureAttrControl,
+    	      @GFGrObjLocksControl;
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    ATTR_GEN_HELP_CONTEXT = "dbExtAttrs";
+}
+
+@object GrObjObscureAttrControlClass GFGrObjObscureAttrControl = {
+    HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE;    
+    ATTR_GEN_CONTROL_PROHIBIT_UI = (GOOACF_INSERT_OR_DELETE_MOVE |
+				    GOOACF_INSERT_OR_DELETE_RESIZE |
+				    GOOACF_INSERT_OR_DELETE_DELETE |
+				    GOOACF_DONT_WRAP |
+				    GOOACF_WRAP_INSIDE |
+				    GOOACF_WRAP_AROUND_RECT |
+				    GOOACF_WRAP_TIGHTLY);
+}
+
+@object GrObjLocksControlClass GFGrObjLocksControl = {
+    GI_visMoniker = "Locks";
+    HINT_DRAW_IN_BOX;
+}
+
+@object GrObjDefaultAttributesControlClass GFDefaultAttributesControl = {
+}
+
+/**********************************************************************
+		     Graphics/Area & Line Attributes sub-menu
+ **********************************************************************/
+
+@object GenInteractionClass GFAreaAndLineAttributesSubmenu = {
+    GI_comp = @GFAreaAttributes,
+    	      @GFLineAttributes;
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenInteractionClass GFAreaAttributes = {
+    GI_visMoniker = 'A',"Area Attributes";
+@ifdef DO_PIZZA
+    GI_comp = @GFAreaColorSelector;
+@else
+    GI_comp = @GFAreaColorSelector, @GFAreaAttributesControl;
+@endif
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+    ATTR_GEN_HELP_CONTEXT = "dbAreaAttrs";
+}
+
+@object GrObjAreaColorSelectorClass GFAreaColorSelector = {
+}
+
+@ifdef DO_PIZZA
+@else
+@object GrObjAreaAttrControlClass GFAreaAttributesControl = {
+    HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE;    
+    ATTR_GEN_CONTROL_PROHIBIT_UI = GOAACF_TRANSPARENCY;
+}
+@endif
+
+@object GenInteractionClass GFLineAttributes = {
+    GI_visMoniker = 'L',"Line Attributes";
+    GI_comp = @GFLineColorSelector, @GFLineAttributesControl;
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+    ATTR_GEN_HELP_CONTEXT = "dbLineAttrs";
+}
+
+@object GrObjLineColorSelectorClass GFLineColorSelector = {
+    ATTR_COLOR_SELECTOR_DISABLE_OBJECT = @GFLineAttributesControl;
+}
+
+@object GrObjLineAttrControlClass GFLineAttributesControl = {
+    HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE;    
+}
+
+
+/**********************************************************************
+		      Properties sub-menu
+ **********************************************************************/
+
+@object FontControlClass GFFontControl = {
+    GI_visMoniker = 'n',"Fonts";
+    GII_visibility = GIV_POPUP;
+}
+    
+@object TextStyleControlClass GFStyleControl = {
+    GI_visMoniker = 'S',"Styles";
+    GII_visibility = GIV_POPUP;
+@ifdef DO_PIZZA
+    ATTR_GEN_CONTROL_PROHIBIT_UI = TSCF_INDEX | TSCF_ALL_CAP | TSCF_SMALL_CAP |
+	    	    	    	    TSCF_BOXED;
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = TSCTF_INDEX | TSCTF_ALL_CAP |
+					   TSCTF_SMALL_CAP | TSCTF_BOXED;
+@else
+    ATTR_GEN_CONTROL_PROHIBIT_UI = TSCF_INDEX | TSCF_ALL_CAP | TSCF_SMALL_CAP;
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = TSCTF_INDEX | TSCTF_ALL_CAP |
+					   TSCTF_SMALL_CAP;
+@endif
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object PointSizeControlClass GFTextSizeControl = {
+    GI_visMoniker = 'z',"Sizes";
+    GII_visibility = GIV_POPUP;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object CharFGColorControlClass GFTextColorControl = {
+    GI_visMoniker = 'T',"Text Color";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+    ATTR_GEN_CONTROL_PROHIBIT_UI = CSF_PATTERN;
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = CSTF_PATTERN;
+}
+
+@object CharBGColorControlClass GFTextBackgroundColorControl = {
+    GI_visMoniker = 'B',"Text Background Color";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+}
+
+@object FontAttrControlClass GFTextAttributesControl = {
+    GI_visMoniker = 'A',"Character Attributes";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+    HINT_CENTER_WINDOW;
+}
+
+@object JustificationControlClass GFTextJustificationControl = {
+    GI_visMoniker = 'J',"Justification";
+    GII_visibility = GIV_POPUP;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object FloatFormatClass GFNumberFormatControl = {
+    GI_visMoniker = 'F',"Field Number Format";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+    HINT_CENTER_WINDOW;
+}
+
+@object GenInteractionClass GFFieldEdges = {
+    GI_visMoniker = 'E',"Field Edges";
+    GI_comp = @GFFieldEdgeControl;
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_POPUP;
+    HINT_SAME_CATEGORY_AS_PARENT;
+}
+
+@object FFEdgeControllerClass GFFieldEdgeControl = {
+}
+
+/**********************************************************************
+		      Properties/Paragraph sub-menu
+ **********************************************************************/
+
+@object GenInteractionClass GFParagraphSubmenu = {
+    GI_visMoniker = 'P',"Paragraph";
+    GI_comp = @GFLineSpacingControl,
+    	      @GFParaSpacingControl,
+    	      @GFParaBGColorControl,
+    	      @GFTextStyleSheetControl,
+    	      @GFMarginControl,
+    	      @GFTabControl,
+    	      @GFDefaultTabsControl,
+    	      @GFBorderControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object LineSpacingControlClass GFLineSpacingControl = {
+    GI_visMoniker = 'L',"Line Spacing";
+    GII_visibility = GIV_POPUP;
+}
+
+@object ParaSpacingControlClass GFParaSpacingControl = {
+    GI_visMoniker = 'c',"Paragraph Spacing";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+}
+
+@object ParaBGColorControlClass GFParaBGColorControl = {
+    GI_visMoniker = 'P',"Paragraph Color";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+}
+
+@object TextStyleSheetControlClass GFTextStyleSheetControl = {
+    GI_visMoniker = 'S',"Text Style Sheets";
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_CONTROL_PROHIBIT_UI = SSCF_LOAD;
+}
+
+@object MarginControlClass GFMarginControl = {
+    GI_visMoniker = 'I',"Indents";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+}
+
+@object TabControlClass GFTabControl = {
+    GI_visMoniker = 'T',"Tabs";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+}
+
+@object DefaultTabsControlClass GFDefaultTabsControl = {
+    GI_visMoniker = 'D',"Default Tabs";
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+}
+
+@object BorderControlClass GFBorderControl = {
+    GI_visMoniker = 'B',"Borders";
+    GII_visibility = GIV_POPUP;
+}
+
+@end	ModifyMenuUI

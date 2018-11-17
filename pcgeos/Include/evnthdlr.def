@@ -1,0 +1,346 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+
+PROJECT:	Event Handler Library
+MODULE:		
+FILE:		evnthdlr.def
+
+AUTHOR:		Brian Chin, Oct 11, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	10/11/96   	Initial revision
+
+DESCRIPTION:
+	This file contains definitions for the Event Handler Library.
+	
+		
+	$Id: evnthdlr.def,v 1.1 97/04/04 14:22:14 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __EVNTHDLR
+
+StartLibrary	evnthdlr
+
+include	timer.def
+
+PGCNStandardListType	etype	word, 0, 2
+
+PGCNSLT_EVENT_LIST	enum	PGCNStandardListType
+;
+; A list for event menu objects, which need to know when event list changes
+; occur.
+;
+; Notification types:	EHNT_EVENT_LIST_CHANGED
+;
+
+;----------------------------------------------------------------------------
+;  EventHandlerControlClass
+;----------------------------------------------------------------------------
+
+;
+; notification types handled by EventHandlerControlClass, via MSG_META_NOTIFY
+;
+EHNotificationType	etype	word, 0, 1
+
+;
+EHNT_EVENT_LIST_CHANGED		enum	EHNotificationType
+;
+; Sent when event list changes to PGCNSLT_EVENT_LIST system GCN list when
+; event list changes.
+;
+; Pass:		nothing
+;
+
+EventHandlerControlClass	class	GenControlClass
+
+MSG_EH_UPDATE_EVENT_LIST				message
+;
+; Sent to update event list when event is added or removed.
+;
+
+MSG_EH_SHOW_EVENT_SUMMARY				message
+;
+; Bring up event summary dialog for current occurred event.
+;
+; Pass:		^lcx:dx = initiating button
+; Return:	nothing
+;
+
+MSG_EH_SHOW_EVENT_LIST_ITEM				message
+;
+; Show event summary dialog for desired event list item.
+;
+; Pass:		cx = selection
+;		bp = number of selections
+;		dl = GenItemGroupStateFlags
+; Return:	nothing
+;
+
+MSG_EH_EVENT_LIST_QUERY_MSG				message
+;
+; Dynamic list query msg for event list.
+;
+; Pass:		^lcx:dx = dynamic list
+;		bp = item number
+; Return:	nothing
+;
+
+MSG_EH_EVENT_ACKNOWLEDGE				message
+;
+; Acknowledge button in event summary dialog has been activated.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_EH_EVENT_ACTION					message
+;
+; Action button in event summary dialog has been activated.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_EH_MODIFY_EVENT_MENU				message
+;
+; Allows adding hints to event menu
+;
+; Pass:		^lcx:dx = event menu
+;		bp = SpecBuildFlags
+; Return:	nothing
+;
+
+SelectedEventInfo	struct
+	SEI_eraToken		GeodeToken	; GeodeToken of ERA
+	SEI_eraEventID		word		; ERA-specific event ID
+	SEI_acknowledgeMessage	word		; message to send on ack
+	SEI_eventActionMessage	word		; message to send on action
+SelectedEventInfo	ends
+
+TEMP_EH_SELECTED_EVENT_INFO		vardata		SelectedEventInfo
+;
+; temporarily holds information about event shown in event summary dialog
+;
+
+EventHandlerControlClass	endc
+
+;----------------------------------------------------------------------------
+;  Routine parameters
+;----------------------------------------------------------------------------
+
+;
+; Event flags
+;
+EventHandlerEventFlags	record
+	EHEF_ALARM:1			; indicates this is an alarm event
+	EHEF_PHONE_ICON:1		; indicates that phone side can display
+					;	icon for this event
+	:14
+EventHandlerEventFlags	end
+
+;
+; parameters for EventHandlerRegisterOustandingEvent
+;
+EHRegisterOutstandingParams	struct
+	EHROP_flags			EventHandlerEventFlags
+		; flags for event
+
+	EHROP_dueDate			TimerCompressedDate
+		; date for event
+
+	EHROP_dueTime			word
+		; high byte = hour, low byte = minute
+
+	EHROP_eraToken			vfptr.GeodeToken
+		; GeodeToken for event raising application
+
+	EHROP_eraEventID		word
+		; ERA-specific event ID
+
+	EHROP_eventTitle		vfptr.TCHAR
+		; title of event to appear in event list
+
+	EHROP_eventBitmap		vfptr.Bitmap
+		; bitmap for event to appear in event list and in title bar
+
+	EHROP_eventBitmapSize		word
+		; size of EHROP_bitmap
+
+	EHROP_summaryText		vfptr.TCHAR
+		; summary of event to appear in event summary dialog
+
+	EHROP_summaryTitle		vfptr.TCHAR
+		; title for event summary dialog
+
+	EHROP_summaryBitmap		vfptr.Bitmap
+		; bitmap of event to appear in event summary dialog
+
+	EHROP_summaryBitmapSize		word
+		; size of EHROP_summaryBitmap
+
+	EHROP_eventActionName		vfptr.TCHAR
+		; name for event action button in event summary dialog
+		; (can pass null fptr for no action button)
+
+	EHROP_messageAcknowledge	word
+		; message to be sent to ERA process when event occurs and
+		; user acknowledges event summary dialog
+		; (sent with EHROP_eraEventID in CX)
+
+	EHROP_messageEventAction	word
+		; message to be sent to ERA process when event occurs and
+		; user activates event action button in event summary dialog
+		; (sent with EHROP_eraEventID in CX)
+
+	EHROP_messageOccurs		word
+		; message to be sent to ERA process when event occurs
+		; (sent with EHROP_eraEventID in CX)
+
+EHRegisterOutstandingParams	ends
+
+;
+; parameters for EventHandlerRegisterOccurredEvent
+;
+EHRegisterOccurredParams	struct
+	EHROcP_flags			EventHandlerEventFlags
+		; flags for event
+
+	EHROcP_eraToken			vfptr.GeodeToken
+		; GeodeToken for event raising application
+
+	EHROcP_eraEventID		word
+		; ERA-specific event ID
+
+	EHROcP_eventTitle		vfptr.TCHAR
+		; title of event to appear in event list
+
+	EHROcP_eventBitmap		vfptr.Bitmap
+		; bitmap for event to appear in event list and in title bar
+
+	EHROcP_eventBitmapSize		word
+		; size of EHROP_bitmap
+
+	EHROcP_summaryText		vfptr.TCHAR
+		; summary of event to appear in event summary dialog
+
+	EHROcP_summaryTitle		vfptr.TCHAR
+		; title for event summary dialog
+
+	EHROcP_summaryBitmap		vfptr.Bitmap
+		; bitmap of event to appear in event summary dialog
+
+	EHROcP_summaryBitmapSize		word
+		; size of EHROP_summaryBitmap
+
+	EHROcP_eventActionName		vfptr.TCHAR
+		; name for event action button in event summary dialog
+		; (can pass null fptr for no action button)
+
+	EHROcP_messageAcknowledge	word
+		; message to be sent to ERA when event occurs and user
+		; acknowledges event summary dialog
+		; (sent with EHROP_eraEventID)
+
+	EHROcP_messageEventAction	word
+		; message to be sent to ERA when event occurs and user
+		; activates event action button in event summary dialog
+		; (sent with EHROP_eraEventID)
+
+EHRegisterOccurredParams	ends
+
+;
+; Return values for register/remove event routines
+;
+EHRError	etype	word, 0, 1
+	EHRE_NO_ERROR		enum	EHRError
+		; event registered successfully
+
+	EHRE_FILE_ERROR		enum	EHRError
+		; error opening events file
+
+	EHRE_INVALID_EVENT	enum	EHRError
+		; date/time for outstanding event is earlier or equal to
+		; the current system date/time
+
+	EHRE_RTCM_ERROR		enum	EHRError
+		; other problem with registering outstanding event
+
+	EHRE_EVENT_NOT_FOUND	enum	EHRError
+		; tried to remove occurred or outstanding event that doesn't
+		; exist
+
+;----------------------------------------------------------------------------
+;  Exported functions
+;----------------------------------------------------------------------------
+
+global	EventHandlerRegisterOutstandingEvent:far
+;
+; Add outstanding event.
+;
+; Pass:		ss:bp = EHRegisterOutstandingParams
+; Return:	carry clear if successful
+;		carry set if error
+;			ax = EHRError
+;				EHRE_FILE_ERROR
+;				EHRE_INVALID_EVENT
+;				EHRE_RTCM_ERROR
+; Destroyed:	nothing
+;
+
+global	EventHandlerRegisterOccurredEvent:far
+;
+; Add occurred event.
+;
+; Pass:		ss:bp = EHRegisterOccurredParams
+; Return:	carry clear if successful
+;		carry set if error
+;			ax = EHRError
+;				EHRE_FILE_ERROR
+; Destroyed:	nothing
+;
+
+global	EventHandlerRemoveOutstandingEvent:far
+;
+; Remove outstanding event.
+;
+; Pass:		ax = ERA-specific event ID passed to register routine
+;		dx:bp = vfptr to GeodeToken or ERA
+; Return:	carry clear if successful
+;		carry set if error
+;			ax = EHRError
+;				EHRE_FILE_ERROR
+;				EHRE_EVENT_NOT_FOUND
+; Destroyed:	nothing
+;
+
+global	EventHandlerRemoveOccurredEvent:far
+;
+; Remove occurred event.
+;
+; Pass:		ax = ERA-specific event ID passed to register routine
+;		dx:bp = vfptr to GeodeToken of ERA
+; Return:	carry clear if successful
+;		carry set if error
+;			ax = EHRError
+;				EHRE_FILE_ERROR
+;				EHRE_EVENT_NOT_FOUND
+; Destroyed:	nothing
+;
+
+global	EVENTHANDLERREGISTEROUTSTANDINGEVENT:far
+global	EVENTHANDLERREGISTEROCCURREDEVENT:far
+global	EVENTHANDLERREMOVEOUTSTANDINGEVENT:far
+global	EVENTHANDLERREMOVEOCCURREDEVENT:far
+
+EndLibrary	evnthdlr
+
+
+

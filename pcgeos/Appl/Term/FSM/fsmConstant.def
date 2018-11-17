@@ -1,0 +1,226 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		FSM
+FILE:		fsmConstant.def
+
+AUTHOR:		Dennis Chow, September 8, 1989
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dc       9/ 8/89        Initial revision.
+
+DESCRIPTION:
+	Constants for this module.
+
+	$Id: fsmConstant.def,v 1.1 97/04/04 16:56:34 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;	INTERNAL function	-
+;		call (AD_function)
+;		nextState = curState
+;
+;	EXTERNAL function	-
+;		call screen object
+;	nextState = groundState
+;
+;	CASE	function
+;		AD_function is address of two tables :
+;		table of chars and table of actions.
+;		arguments to be used to select which function to call
+;		find function
+;		call (function)
+;		nextState = groundState
+
+;
+; Structure of a single argument desceriptor
+;
+SingleArgDescStruct	struct
+	SADS_argNum	byte	0		;arg # to store in AX
+	SADS_argAdjust	byte	0 		;adjust arg by this number
+SingleArgDescStruct	ends
+
+ArgDescStruct		type	MAX_EMULATION_ARG dup (SingleArgDescStruct)
+	
+FuncDescStruct	struct	
+	FD_internalFunc	dw	(?)		;function to call, like
+						;CalcNumber 
+	FD_externalFunc	dw	(?)		;method to send, real
+						;function for an escape code
+	FD_nextState	dw	(?)		;next state to go to
+FuncDescStruct	ends
+
+ActionDescStruct	struct
+	AD_functionDesc	FuncDescStruct (<>)	;function to call
+	AD_argumentDesc	ArgDescStruct  (<>)	;arguments to pass
+ActionDescStruct	ends
+
+;------------------------------------
+; 	Structure of a state
+;------------------------------------
+; <StateHeader>
+; <Character table>
+; <Action table corresponding to character table entries>
+;
+
+;
+; Header of a state
+;
+StateHeader	struct
+	SH_numEntries			byte	; #entries in table
+	SH_maxEntries			byte	; #max entries can hold in
+						; table
+	SH_wildcardDigitAction		nptr	; offset to action table when
+						; encountering wildcard digit
+StateHeader	ends
+
+;------------------------------------
+; 	Structure of saved states
+;------------------------------------
+;
+; <SavedStateHeader>
+; <array of SavedStateDesc>
+;
+
+;
+; Descriptor of each saved state. It stores information of a state and
+; currently processed character so that when the search does not find a
+; match, it can pop off the saved state (backtrack) to search in another
+; path.
+;
+SavedStateDesc	struct
+	SSD_state	lptr		; the state this char refers to
+	SSD_char	char		; the character itself
+	SSD_searchChar	byte		; # chars left to be search from
+					; character of the corresponding state
+SavedStateDesc	ends
+	
+;
+; Header of saved state block
+;
+SavedStateHeader	struct
+	SSH_numEntries	byte		; # states saved
+	SSH_maxEntries	byte		; max # saved states it can hold
+	SSH_retryEntry	byte		; entry # that next backtrack should
+					; try. The number of zero based. 
+	SSH_states	label SavedStateDesc
+					; an array of SavedStateDesc following
+SavedStateHeader	ends
+
+NULL_ACTION		equ	-1	; null action to perform
+
+INIT_NUM_SAVED_STATES	equ	8	; # saved states to allocate initially
+					; It also means the max number
+					; characters to remember once
+;
+; FSM parsing status
+;
+FSMStatusFlags		record
+	FSMSF_SAVE_STATE:1		; in state saving mode?
+	:7
+FSMStatusFlags		end
+
+FSMBlockHeader	 struct
+	FSM_LMemHdr		LMemBlockHeader <>
+	FSM_curHandle		lptr	(?)	;LMemHandle of current state
+	FSM_groundHandle	lptr	(?)	;LMemHandle of ground state
+	FSM_actionHandle	lptr	(?)	;LMemHandle of block with action
+						;	descriptors
+	FSM_error		db	(?)	;how to handle parsing errors
+	FSM_savedStateHandle	lptr	(?)	;LMemHandle of block storing
+						;pushed states for backtracking
+	FSM_status		FSMStatusFlags	;general status of FSM
+FSMBlockHeader	 ends
+
+;
+; character constants - used in CheckToken
+;
+FUNC_DESC_SIZE		equ	size FuncDescStruct
+ARG_DESC_SIZE		equ	size ArgDescStruct
+ACTION_DESC_SIZE	equ	size ActionDescStruct
+
+END_OF_SEQ		equ	CHAR_TAB
+CHAR_WILD		equ	'*'		;wildcard symbol
+
+INIT_FSM_SIZE		equ	800
+INIT_FSM_STATES		equ	50
+INIT_NUM_ADS		equ	30
+ACTION_BLOCK_SIZE	equ	ACTION_DESC_SIZE * INIT_NUM_ADS
+
+INIT_TABLE_ENTRIES	equ	10		;inital # of table entries
+ADD_TABLE_ENTRIES	equ	10		;additional # to eadd
+
+;
+; Each entry for a character: 1 byte for char and 2 bytes for action
+;
+TABLE_ENTRY_SIZE	equ	3
+
+INIT_LOCAL_STATE_SIZE	equ	(INIT_TABLE_ENTRIES * TABLE_ENTRY_SIZE) + \
+				(size StateHeader)
+
+EXPAND_STATE_SIZE	equ	(ADD_TABLE_ENTRIES * TABLE_ENTRY_SIZE) + \
+				(size StateHeader)
+
+;
+; initial Size of chunk storing saved state info
+;
+INIT_SAVED_STATE_SIZE	equ	(size SavedStateHeader) + \
+				(INIT_NUM_SAVED_STATES * (size SavedStateDesc))
+
+ADD_ACTION_ENTRIES	equ	5		;additional ADs# to eadd
+EXPAND_ACTION_SIZE	equ	ADD_ACTION_ENTRIES * ACTION_DESC_SIZE
+
+ARG_NOT_USED		equ	0ffh		;flag for unused register
+CLEAR_AD_FLAG		equ	0fffeh		;clear last bit
+AD_FLAG			equ	1		;set last bit if action word is
+						; ptr to action descriptor
+NO_ADJUST		equ	0		;constant which to adjust argument
+NEG_ONE			equ	0ffh		;decrement by one
+
+
+CHAR_TABLE_OFFSET	equ	size StateHeader
+;each state table has the following format
+; offset 0	    # of entries
+; offset 1	max # of entries
+; offset 2	beginning of valid char table 
+; offset 2	action for wildcard digit 
+; offset 4	beginning of valid char table 
+
+;
+; Error Flag
+;
+NO_FUNC			equ	0ffffh		;flag if no func defined
+NIL			equ	0ffh
+;
+; function table constants
+SEGMENT_OFFSET		equ	0		;offset into entry to get func seg
+FUNC_OFFSET		equ	2		;offset into entry to get offset
+
+; finite state machine structures
+;
+FuncType etype byte
+INTERNAL enum FuncType
+EXTERNAL enum FuncType
+CASE enum FuncType
+
+; Boolean flag constants
+;
+START_FLAG		equ	':'		;use ':' to start boolean flag
+FLAG_SIZE		equ	2		;flags are two chars long
+
+;---------------------------------------------------------------------------
+;			Warnings and FatalErrors
+;---------------------------------------------------------------------------
+	
+TERM_TERMCAP_PARSE_ERROR			enum	FatalErrors
+TERM_MAX_EMULATION_ARGUMENT_EXCEEDED		enum	FatalErrors
+; The max number of arguments for an emulation code has exceeded the limit.
+
+TERM_AMBIGUOUS_TERMCAP_CODE			enum	FatalErrors
+; Emulation code in termcap is ambiguous.
+

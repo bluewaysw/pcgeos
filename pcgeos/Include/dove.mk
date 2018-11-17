@@ -1,0 +1,8 @@
+#
+# Definitions for compiling DOVE geodes
+#	$Id: dove.mk,v 1.1 97/04/04 14:26:02 newdeal Exp $
+
+ASMFLAGS	+= -2 -DDO_DBCS -DDO_DOVE -DPRODUCT=DOVE
+LINKFLAGS	:= -2 -DDO_DBCS -DDO_DOVE -L$(DEVEL_DIR)/Include/DOVE -L$(LOBJ_DIR)/DOVE -L$(DEVEL_DIR)/Include/DBCS -L$(LOBJ_DIR)/DBCS $(LINKFLAGS)
+UICFLAGS	+= -2 -DDO_DBCS -DDO_DOVE -DPRODUCT=DOVE
+LOCFLAGS	+= -2

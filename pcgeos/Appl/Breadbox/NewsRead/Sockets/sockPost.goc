@@ -1,0 +1,311 @@
+@include <stdapp.goh>
+@include <socket.goh>
+
+@include "utils.goh"
+#include <ansi/string.h>
+#include <ansi/stdlib.h>
+#include <ansi/stdio.h>
+#include <sockmisc.h>
+
+@include "newsread.goh"
+@include "extern.goh"
+@include "Localize/strings.goh"
+@include "UIClass/statdiag.goh"
+@include "options.goh"
+#include "news.h"
+#include "newssock.h"
+@include "newsdata.goh"
+
+/**********************************************************************
+ * Globals                                                            *
+ **********************************************************************/
+
+extern Socket NewsSocket;
+extern MemHandle G_socketData ;
+#define NEWS_SOCKET_BUFFER_SIZE         4000
+extern word G_socketDataPos ;
+extern word G_socketDataLen ;
+extern char TCPDomain[] ;
+#define TCP_DOMAIN_LEN  5
+/* FR */
+#define SGETC_LONG_TIMEOUT  (60*60)
+#define QUICK_TIMEOUT       (0)
+extern word sgetc(void) ;
+extern ResolvedTCPAddress   G_hostaddr ;
+extern void sputs(char *line);
+
+
+/**********************************************************************
+ * Internal Functions                                                 *
+ **********************************************************************/
+
+Boolean
+ICheckForAuthorizationRequest(TCHAR *buf);
+
+Boolean 
+ISendAuthorization(char *lineBuf);
+
+/*-------------------------------------------------------------------------
+ | Routine:  PostMessage
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Send out a message to the newsgroup
+ |
+ | Outputs:
+ |    MemHandle groupsMH          -- List of newsgroups to post to
+ |                                   (comma deliminted)
+ |    MemHandle subjectMH         -- Subject of posting
+ |    VMBlockHandle textVMH       -- Text to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean PostMessage(
+            MemHandle groupsMH,
+            MemHandle subjectMH,
+            MemHandle reference,
+            VMBlockHandle textVMH)
+{
+    char lineBuf[1024] ;
+    MemHandle bufferMH;
+    dword hval, size, pos, count;
+    char *recv, *buffer;
+    char retnumbuf[4];
+    word retval;
+
+//    FileHandle  dumpfile ;
+
+//    FilePushDir() ;
+//    FileSetCurrentPath(SP_DOCUMENT, ".") ;
+//    dumpfile = FileCreate("POSTDUMP.BIN",
+//                        (   (FILE_CREATE_TRUNCATE | FCF_NATIVE) |
+//                            (FILE_ACCESS_RW | FILE_DENY_RW) ), 0) ;
+//    FilePopDir() ;
+
+@ifdef COMPILE_OPTION_ALWAYS_USE_AUTH_OPTION
+    /*
+     * if "always send user name and password" is selected, do so
+     */
+    if (@call ServerOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & SERVER_OPTS_USE_AUTH) {
+	ISendAuthorization(lineBuf);
+    }
+@endif
+
+    /* Start with a clear buffer */
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("Sending POST command...\r", 0);
+#endif
+  
+    /* Start a POST request */
+    sputs("POST\r\n");
+
+    recv = sgets(lineBuf);
+    
+    if(!recv) {
+
+        NotifyMessage(@ErrorConnectionLost);
+        return(TRUE);
+    }
+
+    strncpy(retnumbuf, recv, 3);
+    retnumbuf[3] = 0 ;
+    retval = atoi(retnumbuf);
+  
+    if (retval != 340) {
+        
+        /* Report an error if not allowed to post */
+        NotifyMessage(@PostRequestRefused);
+        
+        return(TRUE);
+    }
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("Post allowed.\r", 0);
+#endif
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("From...\r", 0);
+#endif
+
+    /* Tell who this is from (based on our Email address and real name */
+    sputs("From: ");
+    bufferMH = @call EmailRealName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    buffer = MemLock(bufferMH);
+    sputs(buffer);
+    MemFree(bufferMH);
+    sputs(" <");
+    bufferMH = @call EmailAddress::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    buffer = MemLock(bufferMH);
+    sputs(buffer);
+    MemFree(bufferMH);
+    sputs(">\r\n");
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("Groups...\r", 0);
+#endif
+
+    /* Tell what newsgroups to use */
+    buffer = MemLock(groupsMH);
+    if(*buffer) {
+        sputs("Newsgroups: ");
+        sputs(buffer);
+    }
+    MemUnlock(groupsMH);
+    sputs("\r\n");
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("Subject...\r", 0);
+#endif
+
+  /* Present the subject line */
+  sputs("Subject: ");
+  buffer = MemLock(subjectMH);
+  sputs(buffer);
+  MemUnlock(subjectMH);
+  sputs("\r\n");
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+  @call DebugText::MSG_VIS_TEXT_APPEND_PTR("Message-ID...\r", 0);
+#endif
+
+  /* Give a message id based on the data and newsgroup */
+  sputs("Message-ID: ");
+  GenerateMsgID(lineBuf);
+  sputs(lineBuf);
+  sputs("\r\n");
+
+  /* Present the organization (if any) */
+  bufferMH = @call EmailOrganization::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+  buffer = MemLock(bufferMH);
+  if (strlen(buffer)) {
+    sputs("Organization: ");
+    sputs(buffer);
+    sputs("\r\n");
+  }
+  MemFree(bufferMH);
+
+    if(reference)
+    {
+        char *p_ref ;
+
+        p_ref = MemLock(reference) ;
+        sputs("References: ") ;
+        sputs(p_ref) ;
+        sputs("\r\n") ;
+    
+        MemUnlock(reference);
+//      MemFree(reference) ;    // Freeing is the caller's responsibility
+    }
+
+    sputs("\r\n");
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("Bodyf...\r", 0);
+#endif
+
+    /* And finally, output the body of text */
+    pos = 0;
+    count = HugeArrayGetCount(G_databaseVMFH, textVMH);
+
+    if(count > 0) {
+
+        /* don't send the closing 0 */
+        count-- ;
+    }
+
+    while (pos < count) {
+        
+        hval = HugeArrayLock(G_databaseVMFH, textVMH, pos, &buffer, &size);
+
+        LocalGeosToCodePage(buffer, HAL_COUNT(hval), CODE_PAGE_LATIN_1, '.');        
+
+        SocketSend(NewsSocket, buffer, HAL_COUNT(hval), 0, (SocketAddress *)0);
+//        FileWrite(dumpfile, buffer, HAL_COUNT(hval), FILE_NO_ERRORS) ;
+        HugeArrayUnlock(buffer);
+        
+        pos += HAL_COUNT(hval);
+    }
+//    FileClose(dumpfile, FILE_NO_ERRORS) ;
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("Finishing...\r", 0);
+#endif
+
+    /* Period at end to finish the post. */
+    sputs("\r\n.\r\n");
+
+    /* Now wait for a response */
+    recv = sgets(lineBuf);
+    if(!recv) {
+
+        NotifyMessage(@ErrorConnectionLost);
+
+        return(TRUE);
+    }
+
+    strncpy(retnumbuf, recv, 3);
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("Server response: ", 0);
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR(recv, 0);
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("\r", 0);
+#endif
+  
+    retnumbuf[3] = 0 ;
+    retval = atoi(retnumbuf);
+    
+    if (retval != 240) {
+        /* Report any posting errors */
+        NotifyMessage(@PostNotAccepted);
+        return(TRUE);
+    }
+
+    /* Got here, the post must of been accepted.  Tell the user. */
+    MemLock(OptrToHandle(@StatusPostAccepted));
+    MemUnlock(OptrToHandle(@StatusPostAccepted));
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("Post accepted.\r", 0);
+#endif
+
+    return(FALSE);
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  GenerageMsgID
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Create a message id based on the date and server name
+ |
+ | Outputs:
+ |    char *                      -- newly malloc'd string
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void GenerateMsgID(char *lineBuf)
+{
+  TimerDateAndTime dat;
+  char server[MAX_IP_ADDR_STRING_LENGTH_ZT];
+
+  TimerGetDateAndTime(&dat);
+
+  /* Start by getting the server name */
+  @call NewsServerName::MSG_VIS_TEXT_GET_ALL_PTR(server);
+
+  /* Create a lengthy string with an appropriate previous, date, and */
+  /* server name */
+  MemLock(OptrToHandle(@MessageIDString));
+  sprintf(lineBuf, LMemDeref(@MessageIDString),
+    dat.TDAT_year, dat.TDAT_month, dat.TDAT_day, dat.TDAT_dayOfWeek,
+    dat.TDAT_hours, dat.TDAT_minutes, dat.TDAT_seconds,
+    GeodeGetProcessHandle(), server);
+  MemUnlock(OptrToHandle(@MessageIDString));
+}

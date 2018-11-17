@@ -1,0 +1,114 @@
+***************************************************************************
+
+	Copyright (c) Berkeley Softworks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Script
+FILE:		script.doc
+
+AUTHOR:		Dennis Chow, January 31, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dc      01/31/90        Initial revision.
+
+DESCRIPTION:
+	
+
+	$Id: script.doc,v 1.2.40.1 97/03/29 09:44:42 canavese Exp $
+
+****************************************************************************
+scriptContents:
+
+scriptGoals	- Goals for the script module.
+scriptRoutines	- Routines accessible outside of this module.
+scriptInternal	- Routines available only inside this module.
+
+*******************************************************************************
+scriptGoals:
+see also [ scriptContents ]
+
+The script module provides routines which allow the user to write scripts
+using macro primatives which will allow the user to automate his logon
+process when using commercial information services.
+
+*******************************************************************************
+scriptRoutines:
+see also [ scriptContents ]
+
+*******************************************************************************
+scriptInternal:
+see also [ scriptContents ]
+
+Primatives needed are
+
+;Lines starting with a ';' are comment lines.
+:LABEL					- lines starting with ':' are labels
+
+BELL					- make a 'beep' sound
+
+COMM				- set communication settings
+		<BAUD-DATABITS-PARITY-STOPBITS-DUPLEX>
+		COMM	1200-8-N-1-FULL
+
+DIAL 		<str exp>		- tone dial this number	
+		DIAL	6420071		- 	automatically prepends the
+						ATD(T,P) prefix as well as 
+						appends the CR.
+
+END					- stop interpreting script
+
+GOTO		<label> 		- goto to this label
+
+MATCH		<str exp> 		- look for this string
+						(add string to match table)
+PAUSE		<num_con>		- pause this amount of time
+
+PULSE 					- pulse dial	
+
+PORT		<num_con>		- what com port to use
+
+PRINT		<str_exp>		- print to the screen
+
+PROMPT		<num_con>		- max time to wait for match strings
+					
+SEND		<str exp>		- send out this string
+	.	SEND	FOO,CR 		- sends string followed by CR
+	.	SEND	FOO,^M 		- sends string followed by CR
+
+TERM		<str_exp>		- terminal type to emulate
+		<TTY, VT52, VT100...>	
+
+*******************************************************************************
+scriptNotes:
+
+ScriptRunFile
+	FileRead (script file)
+	Switch input to go to ScriptInput routine
+	InterpretScript (file buffer) 
+
+InterpretScript
+	Get token (data separated by whitespace)
+	if first char of token is ";"
+		this is comment line, ignore it
+		skip to next line
+	if first char of token is ":"
+		this is label, ignore it
+		skip to next line;
+	DoCommand (ds:si -> token)
+	Set Script state/current command
+		search Macro table for token
+		if token found (pass ptr to rest of line to command)
+
+Each command does its own thing
+	each command interprets the line and checks for correct # of arguments
+	(returns file ptr to start of next line)
+
+Commands broken into two types, immediate and delayed.
+
+Immediate commands can be completed immediately
+	PORT, COMM, TTY, DIAL, TYPE, GOTO, PAUSE, BELL
+
+Delayed commands need tables to be set up and state to be saved.
+	PROMPT, MATCH

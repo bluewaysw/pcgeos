@@ -1,0 +1,599 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	FreeCell
+ * File:	freecell.ui
+ *
+ * Author:	Mark Hirayama
+ *
+ *	This file contains the user Interface description for this
+ * application.
+ *
+ * RCS STAMP:
+ *	$Id: freecell.ui,v 1.1 97/04/04 15:03:01 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+		Include files
+-----------------------------------------------------------------------------*/
+
+/* first, read pre-defined class definitions. See the file
+ * /staff/pcgeos/Include/generic.uih. */
+
+#include "generic.uih"
+#include "cards.uih"
+
+/*---------------------------------------------------------------------------
+		Class Definitions
+---------------------------------------------------------------------------*/
+
+/* FreeCellClass is a sublcass of GameClass, which we need to declare new
+ * messages and include some instance variables.
+ */
+
+class	FreeCell = Game {
+
+	savedStateHandle = wordComp : 0;	/* handle to saved state */
+	savedStateLength = wordComp : 0;	/* length of saved state */
+	soundMode        = wordComp : 0;	/* whether sound on      */
+}
+
+
+
+/*----------------------------------------------------------------------------
+		Application Object
+-----------------------------------------------------------------------------*/
+/* The very top-level generic object of an application MUST be a GenApplication
+ * object. The vobj.gp file contains "appobj" statement which indicates
+ * that this "VObjApp" object is in fact the top-level UI object.
+ * This object should be in its own resource so that GeoManager can load it
+ * quickly to grab the icon for this application. GeoManager will store this
+ * icon in its "Token Database", so that the icon image can be reused quickly.*/
+
+start	AppResource;
+
+FreeCellApp = GenApplication {
+	children = FreeCellPrimary;	/* The GenApplication object only
+					 * has one child: the main application
+					 * window. */
+
+	/*
+	 * GCN lists (General Change Notification lists) are the systems
+	 * way of communicating information to people who are interested
+	 * in it. If an object has an interest in certain notifications
+	 * it adds itself to the appropriate list and the system will deliver
+	 * notifications to the items on that list when it is appropriate.
+	 *
+	 * GAGCNLT_WINDOWS is the place for windowed objects that you want
+	 * to appear when your application starts up.
+	 */
+
+	/* MKH - I don't know what this is for.  I'm going to leave it in
+         *       for now.
+	 */
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = FreeCellPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
+			SoundItemGroup,
+			DragItemGroup;
+
+
+	moniker = list {		/* The application object has a list
+					 * of visual monikers */
+		FreeCellTextMoniker	/* Used in the express menu and in
+					 * the header for the primary window */
+	}
+}
+
+visMoniker FreeCellTextMoniker = "FreeCell";
+
+end	AppResource;
+
+
+
+ 
+/* ----------------------------------------------------------------------------
+		Primary window.
+-----------------------------------------------------------------------------*/
+/* Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed. */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+FreeCellPrimary = GenPrimary {
+	children =	GameMenu,
+			OptionsMenu, 
+			FreeCellView,
+			FinishBox;
+
+	hints = {	
+		HINT_PRIMARY_FULL_SCREEN,
+/*		HINT_PRIMARY_NO_FILE_MENU,   */
+		ATTR_GEN_HELP_CONTEXT {
+			char	"TOC",0
+		},
+		ATTR_GEN_WINDOW_KBD_OVERRIDE {
+			word	KO_NO_KEYBOARD
+		},
+		HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP,
+		ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT	
+	}
+}
+
+end Interface;
+
+ 
+/*-----------------------------------------------------------------------------
+			 Interface Definitions
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+
+/*****  Game Menu  *****/
+
+GameMenu = GenInteraction {
+	moniker = 'G', "Game";
+	children = UndoInteraction, NewGameTrigger, RedealTrigger
+		   /* QuitInteraction */;
+	visibility = popup;
+	hints =	{
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+NewGameTrigger = GenTrigger {
+	moniker = 'N', "New Game";
+	kbdAccelerator = ctrl 'N';
+	action = MSG_FREECELL_NEW_GAME_MENU_SELECT, MyPlayingTable;
+}
+
+RedealTrigger = GenTrigger {
+	moniker = 'R', "Redeal";
+	kbdAccelerator = ctrl 'R';
+	action = MSG_FREECELL_REDEAL_MENU_SELECT, MyPlayingTable;
+}
+
+UndoInteraction = GenInteraction {
+	children = UndoTrigger;
+}
+
+UndoTrigger = GenTrigger {
+	moniker = 'U', "Undo";
+	kbdAccelerator = ctrl 'U';
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_FREECELL_UNDO, MyPlayingTable;
+}
+
+
+/*****  Options Menu  *****/
+OptionsMenu = GenInteraction {
+	moniker = 'O', "Options";
+	children = SoundInteraction, DragInteraction, SaveOptionsTrigger;
+	visibility = popup;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+SoundInteraction = GenInteraction {
+	children = SoundItemGroup;
+}
+
+SoundItemGroup = GenItemGroup {
+	children = SoundOnItem, SoundOffItem;
+	selection = FALSE;
+	numSelections = 1;
+	destination = MyPlayingTable;
+	applyMsg = MSG_FREECELL_SET_SOUND;
+	hints = {
+		ATTR_GEN_ITEM_GROUP_INIT_FILE_BOOLEAN,
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"SoundStatus",0
+		}
+	}	
+}
+
+SoundOnItem = GenItem {
+	moniker = "Sound On";
+	identifier = TRUE;
+}
+
+SoundOffItem = GenItem {
+	moniker = "Sound Off";
+	identifier = FALSE;
+}
+
+
+DragInteraction = GenInteraction {
+	children = DragItemGroup;
+}
+
+
+DragItemGroup = GenItemGroup {
+	children = DragOutlineItem, DragFullItem;
+	selection = DRAG_OUTLINE;
+	numSelections = 1;
+	destination = MyPlayingTable;
+	applyMsg = MSG_FREECELL_SET_DRAG;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"DragStatus",0
+		}
+	}
+}
+
+DragOutlineItem = GenItem {
+	moniker = "Outline Drag";
+	identifier = DRAG_OUTLINE;
+}
+
+DragFullItem = GenItem {
+	moniker = "Full Drag";
+	identifier = DRAG_FULL;
+}
+
+
+/*****  FreeCellView  *****/
+
+FreeCellView = GenView {
+	output	= MyPlayingTable;
+	backColorR = C_GREEN;
+	hints = {
+		HINT_DEFAULT_TARGET
+	}	
+}
+
+
+SaveOptionsTrigger = GenTrigger {
+	moniker = 'S', "Save Options";
+	kbdAccelerator = ctrl 'S';
+	action = MSG_META_SAVE_OPTIONS, FreeCellApp;
+}
+
+
+end Interface;
+
+
+/*----------------------------------------------------------------------------
+		Dialog box definitions
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+FinishBox = GenInteraction {
+	visibility = dialog;
+	type = notification;
+	attributes = default +notUserInitiatable,
+			     +initiatedViaUserDoDialog,
+			     +modal;
+	children = FinishGlyph;
+	hints = {
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+FinishGlyph = GenGlyph {
+	moniker = "    Congratulations!    ";
+}
+
+
+end Interface;
+
+/*----------------------------------------------------------------------------
+		TableResource
+-----------------------------------------------------------------------------*/
+
+start TableResource;
+
+MyPlayingTable = FreeCell {
+	view =		FreeCellView;
+
+
+	children =	Foundation1,
+			Foundation2,
+			Foundation3,
+			Foundation4,
+		 	FreeSpace1,
+			FreeSpace2,
+			FreeSpace3,
+			FreeSpace4,
+			WorkSpace1,
+			WorkSpace2,
+			WorkSpace3,
+			WorkSpace4,
+			WorkSpace5,
+			WorkSpace6,
+			WorkSpace7,
+			WorkSpace8,	
+			MyHand;
+
+	hand = MyHand;
+
+	visCompGeoAttrs = default +customManageChildren;
+
+	initialFadeMask = SDM_100;      /* no fading */
+
+	undoTrigger = UndoTrigger;
+
+	contentAttrs = default +sameWidthAsSubview, +sameHeightAsSubview;
+
+	userMode = intermediate;
+}
+
+MyHand = Hand {
+}
+
+
+/*-----------  FreeSpace Deck Declarations ----------------*/
+
+/*
+ *  Characteristics of the FreeSpace decks are:
+ *	1) empty:	- accept one card at a time
+ *			- this card can be any suite
+ *			- this card can be any rank
+ *	2) not empty:	- deck will not accept anymore cards if not empty
+ *	3) removing:	- can only take the top card
+ */
+
+
+FreeSpace1 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	markerColor = C_WHITE;
+	noCardAcceptanceConditions =	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank   wild;
+
+	upCardAcceptanceConditions = 	rankConditions absolute,
+					absoluteRank none;
+}
+
+FreeSpace2 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	markerColor = C_WHITE;
+	noCardAcceptanceConditions =	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank   wild;
+
+	upCardAcceptanceConditions = 	rankConditions absolute,
+					absoluteRank none;
+}
+
+FreeSpace3 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	markerColor = C_WHITE;
+	noCardAcceptanceConditions =	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank   wild;
+
+	upCardAcceptanceConditions = 	rankConditions absolute,
+					absoluteRank none;
+}
+
+FreeSpace4 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	markerColor = C_WHITE;
+	noCardAcceptanceConditions =	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank   wild;
+
+	upCardAcceptanceConditions = 	rankConditions absolute,
+					absoluteRank none
+;
+}
+
+
+/*-----------  Foundation Deck Declarations ----------------*/
+
+/*
+ *  Characteristics of the Foundation decks are:
+ *	1) empty:	- accept one card at a time
+ *			- this card can be any suite
+ *			- this card must be an ace
+ *	2) not empty:	- accept one card at a time
+ *			- this card must be of the same suite as previous card
+ *			- this card must be one greater than previous card
+ *	3) removing:	- can't take any card
+ */
+
+Foundation1 = Deck {
+	deckAttrs = dragWhichCards none, ignoreDoubleClicks;
+	markerColor = C_CYAN;
+	noCardAcceptanceConditions =	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank ace;
+
+	upCardAcceptanceConditions =	singleCardOnly,
+					suitConditions sameSuit,
+					rankConditions oneGreater;
+
+	offsetFromUpCardY = 0;
+}
+
+Foundation2 = Deck {
+	deckAttrs = dragWhichCards none, ignoreDoubleClicks;
+	markerColor = C_CYAN;
+	noCardAcceptanceConditions =	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank ace;
+
+	upCardAcceptanceConditions =	singleCardOnly,
+					suitConditions sameSuit,
+					rankConditions oneGreater;
+
+	offsetFromUpCardY = 0;
+}
+
+Foundation3 = Deck {
+	deckAttrs = dragWhichCards none, ignoreDoubleClicks;
+	markerColor = C_CYAN;
+	noCardAcceptanceConditions =	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank ace;
+
+	upCardAcceptanceConditions =	singleCardOnly,
+					suitConditions sameSuit,
+					rankConditions oneGreater;
+
+	offsetFromUpCardY = 0;
+}
+
+Foundation4 = Deck {
+	deckAttrs = dragWhichCards none, ignoreDoubleClicks;
+	markerColor = C_CYAN;
+	noCardAcceptanceConditions =	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank ace;
+
+	upCardAcceptanceConditions =	singleCardOnly,
+					suitConditions sameSuit,
+					rankConditions oneGreater;
+
+	offsetFromUpCardY = 0;
+}
+
+
+/*-------------- WorkSpace Deck Declarations -----------------*/
+
+/*
+ *  Characteristics of the WorkSpace decks are:
+ *	1) empty:	- accept one card at a time
+ *			- this card can be any suite
+ *			- this card can be any rank
+ *	2) not empty:	- accept one card at a time
+ *			- this card must be of opposite suit as previous card
+ *			- this card must be one less than previous card
+ *	3) removing:	- can only take the top card
+ */
+
+WorkSpace1 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	noCardAcceptanceConditions = 	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank wild;
+
+	/* upCardAcceptanceConditions are defaults */
+
+}
+
+WorkSpace2 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	noCardAcceptanceConditions = 	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank wild;
+
+	/* upCardAcceptanceConditions are defaults */
+
+}
+
+WorkSpace3 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	noCardAcceptanceConditions = 	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank wild;
+
+	/* upCardAcceptanceConditions are defaults */
+
+}
+
+WorkSpace4 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	noCardAcceptanceConditions = 	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank wild;
+
+	/* upCardAcceptanceConditions are defaults */
+
+}
+
+WorkSpace5 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	noCardAcceptanceConditions = 	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank wild;
+
+	/* upCardAcceptanceConditions are defaults */
+
+}
+
+WorkSpace6 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	noCardAcceptanceConditions = 	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank wild;
+
+	/* upCardAcceptanceConditions are defaults */
+
+}
+
+WorkSpace7 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	noCardAcceptanceConditions = 	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank wild;
+
+	/* upCardAcceptanceConditions are defaults */
+
+}
+
+WorkSpace8 = Deck {
+	deckAttrs = dragWhichCards topOnly, ignoreExpressDrag;
+	noCardAcceptanceConditions = 	singleCardOnly,
+					suitConditions anySuit,
+					rankConditions absolute,
+					absoluteRank wild;
+
+	/* upCardAcceptanceConditions are defaults */
+
+}
+
+end TableResource;
+
+/*----------------------------------------------------------------------------
+		StringBlock
+-----------------------------------------------------------------------------*/
+start	StringBlock, data;
+
+chunk	ConfirmString	= "Are you sure you want to forfeit this game?";
+
+end	StringBlock;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,1430 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Socket
+MODULE:		PPP Driver
+FILE:		pppLog.goc
+
+AUTHOR:		Jennifer Wu, Aug 31, 1996
+
+ROUTINES:
+	Name	  	    Description
+	----	  	    -----------
+
+	OpenLogFile
+ 	LogTimestamp
+ 	new_state   	    Log some state info
+ 	log_state   	    
+ 	elapsed_time	    Logs elapsed time since last printing of stats
+ 	print_acct  	    Log PPP statistics
+ 	asyncmap_name	    Create ascii string for ACCM
+ 	time_rates  	    Compute received and transmission bps
+ 	log_idle    	    Log number of idle seconds
+
+	log 	    	    Write some data to the log file
+	log2	    	    Same as log but uses an optr to format string
+	log3	    	    Same as log but uses index into table of format
+	    	    	    	strings
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	jwu		8/31/96   	Initial version.
+
+DESCRIPTION:
+	Logging strings & some logging routines for PPP.
+
+	$Id: pppLog.goc,v 1.9 98/06/15 13:58:27 jwu Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifdef LOGGING_ENABLED
+
+@include <stdapp.goh>
+#include <stdarg.h>
+#include <ppp.h>
+
+@ifdef PRODUCT_RESPONDER
+@include <foam.goh>
+@endif
+
+@ifdef DO_DBCS
+#include <Ansi/sbcs.h>
+@endif
+
+#ifdef __HIGHC__
+#pragma Code("PPPLOGCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg PPPLOGCODE
+#endif
+
+/*----------------------------------------------------------------------
+
+  	    	    	Log Strings
+
+  Strings listed in alphabetical order by string name.
+  All strings end in "LogString".  Makes strings easier to search for.
+
+----------------------------------------------------------------------*/
+
+@start PPPLogStrings, data;
+@chunk char ackLogString[] = " (Ack)\n";
+	@localize not;
+@chunk char allStationsLogString[] = "Missed ALLSTATIONS, frame flushed\n";
+	@localize not;
+
+@chunk char badFCSLogString[] = "Bad FCS rcvd (asyncmap discarded %s)\n";
+	@localize not;
+@chunk char badFCS2LogString[] = "Bad FCS rcvd\n";
+	@localize not;
+@chunk char badRestartLogString[] = "Bad restart sequence: event %s occurred in state %s\n";
+	@localize not;
+@chunk char beginLogString[] = "Geoworks PPP -- Begin\n";
+	@localize not;
+@chunk char bytesReadLogString[] = "%d bytes read from device:\n";
+	@localize not;
+
+@chunk char ccpBadLogString[] = "CCP: Rcvd bad Conf-%s\n";
+	@localize not;
+@chunk char ccpCantDoStacLogString[] = "CCP: Can't negotiate Stac\n";
+	@localize not;
+@chunk char ccpGiveUpLogString[] = "Too many CCP Naks rcvd -- give up\n";
+	@localize not;
+@chunk char ccpGotOptLogString[] = "CCP: Rcvd %s";
+	@localize not;
+@chunk char ccpHistoryCheckLogString[] = " History-Count=%d, Check-Mode=%d";
+	@localize not;
+@chunk char ccpMPPCBitsLogString[] = " ,Supported Bits=%d";
+        @localize not;
+@chunk char ccpNakHCLogString[] = " (Nak %d, %d)\n";
+	@localize not;
+@chunk char ccpNakMPPCBitsLogString[] = "Nak 0x1\n";
+        @localize not;
+@chunk char ccpNoMemWarnLogString[] = "No memory, dropping CCP Conf-Req\n";
+	@localize not;
+@chunk char ccpPeerNakMPPCLogString[] = "CCP: Rcvd Nak for MPPC\n";
+        @localize not;
+@chunk char ccpPeerNoMPPCLogString[] = "CCP: Peer won't negotiate MPPC";
+        @localize not;
+@chunk char ccpPeerNakPred1LogString[] = "CCP: Rcvd Nak for Pred-1\n";
+	@localize not;
+@chunk char ccpPeerNoPred1LogString[] = "CCP: Peer won't negotiate Pred-1";
+	@localize not;
+@chunk char ccpPeerNakStacLogString[] = "CCP: Rcvd Nak for Stac History-Count=%d, Check-Mode=%d\n";
+	@localize not;
+@chunk char ccpPeerNakStacSimpleLogString[] = "CCP: Rcvd Nak for Stac\n";
+	@localize not;
+@chunk char ccpPeerNoStacLogString[] = "CCP: Peer won't negotiate Stac";
+	@localize not;
+@chunk char ccpPeerRejMPPCLogString[] = "CCP: Peer rejected MPPC\n";
+        @localize not;
+@chunk char ccpPeerRejPred1LogString[] = "CCP: Peer rejected Pred-1\n";
+	@localize not;
+@chunk char ccpPeerRejStacLogString[] = "CCP: Peer rejected Stac\n";
+	@localize not;
+@chunk char ccpRejWrongLogString[] = "CCP: Rcvd Conf-Rej has wrong %s (%d should be %d)\n";
+	@localize not;
+@chunk char ccpReplyLogString[] = "CCP: Replying with %s\n";
+	@localize not;
+@chunk char ccpSendMPPCLogString[] = "CCP: Send MPPC, Supported bits=1\n";
+        @localize not;
+@chunk char ccpSendPred1LogString[] = "CCP: Send Pred-1\n";
+	@localize not;
+@chunk char ccpSendStacLogString[] = "CCP: Send Stac, History-Count=%d, Check-Mode=%d\n";
+	@localize not;
+@chunk char ccpUnknownNakLogString[] = "CCP: Rcvd Nak for unknown option %d\n";
+	@localize not;
+@chunk char ccpUnknownOptionLogString[] = "CCP: Rcvd unknown option %d";
+	@localize not;
+
+@chunk char chapFailedLogString[] = "CHAP: Authentication failed\n";
+	@localize not;
+@chunk char chapLowerNotUpLogString[] = "chap_authpeer: lower layer not up\n";
+	@localize not;
+@chunk char chapMismatchedLenLogString[] = "Rcvd CHAP msg with mismatched length field\n";
+	@localize not;
+@chunk char chapNoNameLogString[] = "CHAP: Missing username\n";
+	@localize not;
+@chunk char chapPeerLogString[] = "CHAP: Peer authenticated as `";
+	@localize not;
+@chunk char chapRcvdLogString[] = "Rcvd CHAP %s, ID %d\n";
+	@localize not;
+@chunk char chapSendingLogString[] = "Send CHAP %s, ID %d\n";
+	@localize not;
+@chunk char chapShortChallengeLogString[] = "CHAP: Rcvd too short Challenge\n";
+	@localize not;
+@chunk char chapShortHdrLogString[] = "Rcvd CHAP msg with short header\n";
+	@localize not;
+@chunk char chapShortLenLogString[] = "Rcvd CHAP msg with short length field\n";
+	@localize not;
+@chunk char chapShortResponseLogString[] = "CHAP: Rcvd too short Response\n";
+	@localize not;
+@chunk char chapUnexpectedLogString[] = "CHAP: Unexpected %s packet rcvd\n";
+	@localize not;
+
+
+@chunk char clientTimerLogString[] = "LCP: Client timer expired.\n";
+	@localize not;
+@chunk char colonLogString[] = " : ";
+	@localize not;
+@chunk char connectedLogString[] = "PPP connected\n";
+	@localize not;
+@chunk char closedLogString[] = "PPP physical connection closed\n";
+	@localize not;
+@chunk char crossedLogString[] = "Connection may be crossed: event %s occurred in state %s\n";
+	@localize not;
+
+@chunk char discardReqLogString[] = "Unexpected Discard Request rcvd.\n";
+	@localize not;
+@chunk char disconnectedLogString[] = "PPP disconnected%s%s%s\n";
+	@localize not;
+@chunk char dotAddrsLogString[] = "%lu.%lu.%lu.%lu : %lu.%lu.%lu.%lu %s\n";
+	@localize not;
+@chunk char downLogString[] = "Set interface down\n";
+	@localize not;
+@chunk char droppingLogString[] = "LCP not OPEN, dropped non-LCP packet\n";
+	@localize not;
+
+@chunk char echoReplyLogString[] = "Unexpected Echo Reply rcvd.\n";
+	@localize not;
+@chunk char echoReqLogString[] = "Unexpected Echo Request rcvd.\n";
+	@localize not;
+@chunk char elapsedTimeLogString[] = "elapsed time %s oct %lu/%lu pkt %lu/%lu err %lu/%s ";
+	@localize not;
+@chunk char endLogString[] = "Geoworks PPP -- End\n";
+	@localize not;
+@chunk char eventLogString[] = "%s event %s, state %s\n";
+	@localize not;
+@chunk char exceedMruLogString[] = "Send packet exceeding peer's MRU.\n";
+	@localize not;
+
+@chunk char formatCharLogString[] = "%c";
+	@localize not;
+@chunk char formatDecLogString[] = " %d";
+	@localize not;
+@chunk char formatHexLogString[] = " %04xh";
+	@localize not;
+@chunk char formatLongLogString[] = " %lxh";
+	@localize not;
+@chunk char formatMixedLogString[] = " %xh%s, length %d";
+	@localize not;
+@chunk char formatStringLogString[] = " (%s)";
+	@localize not;
+@chunk char frameRecvdLogString[] = "%d-byte PPP frame rcvd:\n";
+	@localize not;
+
+@chunk char ipcpAddNakAddrLogString[] = "IPCP: Adding Nak for IP-Address %lu.%lu.%lu.%lu\n";
+	@localize not;
+@chunk char ipcpAddNakAddrsLogString[] = "IPCP: Adding Nak for IP-Addresses %lu.%lu.%lu.%lu : %lu.%lu.%lu.%lu\n";
+	@localize not;
+@chunk char ipcpAddrLogString[] = ", %lu.%lu.%lu.%lu";
+	@localize not;
+@chunk char ipcpAddrsLogString[] = " %lu.%lu.%lu.%lu : %lu.%lu.%lu.%lu";
+	@localize not;
+@chunk char ipcpAddrPeerLogString[] = " Peer: : %lu.%lu.%lu%lu)\n";
+	@localize not;
+@chunk char ipcpAddrPeer2LogString[] = " Peer: %lu.%lu.%lu.%lu :)\n";
+	@localize not;
+@chunk char ipcpAddrsPeerLogString[] = " Peer: %lu.%lu.%lu.%lu : %lu.%lu.%lu.%lu)\n";
+	@localize not;
+@chunk char ipcpAddrsUsLogString[] = " (Us: %lu.%lu.%lu.%lu : %lu.%lu.%lu.%lu";
+	@localize not;
+@chunk char ipcpBadLogString[] = "IPCP: Rcvd bad Conf-%s\n";
+	@localize not;
+@chunk char ipcpDnsAddrLogString[] = "IPCP: %lu.%lu.%lu.%lu\n";
+	@localize not;
+@chunk char ipcpEmptyLogString[] = "Rcvd empty IPCP Conf-Req\n";
+	@localize not;
+@chunk char ipcpGiveUpLogString[] = "Too many IPCP Naks rcvd -- give up\n";
+	@localize not;
+@chunk char ipcpGiveUpAddrLogString[] = "IPCP: Can't negotiate IP-Addresses -- give up ";
+	@localize not;
+@chunk char ipcpGiveUpAddrNewLogString[] = "Can't negotiate IP-Address -- give up (Us: %lu.%lu.%lu.%lu : %lu.%lu.%lu.%lu";
+	@localize not;
+@chunk char ipcpGiveUpCompLogString[] = "IPCP: Can't negotiate IP-Comp-Protocol -- give up\n";
+	@localize not;
+@chunk char ipcpNakAddrLogString[] = "IPCP: Rcvd Nak for IP-Address";
+	@localize not;
+@chunk char ipcpNakAddrsLogString[] = "IPCP: Rcvd Nak for IP-Addresses %lu.%lu.%lu.%lu : %lu.%lu.%lu.%lu\n";
+	@localize not;
+@chunk char ipcpNakAddrsSimpleLogString[] = "IPCP: Rcvd Nak for IP-Addresses\n";
+	@localize not;
+@chunk char ipcpNakCompLogString[] = "IPCP: Rcvd Nak for IP-Comp-Protocol 002dh,%d,%d\n";
+	@localize not;
+@chunk char ipcpNakCompSimpleLogString[] = "IPCP: Rcvd Nak for IP-Comp-Protocol\n";
+	@localize not;
+@chunk char ipcpNakDNSLogString[] = "IPCP: Rcvd Nak for %s DNS address";
+	@localize not;
+@chunk char ipcpNoAddrLogString[] = "IPCP: Peer won't negotiate IP-Address";
+	@localize not;
+@chunk char ipcpNoAddrsLogString[] = "IPCP: Peer won't negotiate IP-Addresses";
+	@localize not;
+@chunk char ipcpNoCompLogString[] = "IPCP: Peer won't negotiate IP-Comp-Protocol\n";
+	@localize not;
+@chunk char ipcpRecvAddrLogString[] = "IPCP: Rcvd IP-Address";
+	@localize not;
+@chunk char ipcpRecvAddrsLogString[] = "IPCP: Rcvd IP-Addresses";
+	@localize not;
+@chunk char ipcpRecvCompLogString[] = "IPCP: Rcvd IP-Compression-Protocol";
+	@localize not;
+@chunk char ipcpRecvDNSLogString[] = "IPCP: Rcvd %s DNS address";
+	@localize not;
+@chunk char ipcpRejAddrLogString[] = "IPCP: Peer rejects IP-Address\n";
+	@localize not;
+@chunk char ipcpRejAddrsLogString[] = "IPCP: Peer rejects IP-Addresses\n";
+	@localize not;
+@chunk char ipcpRejCompLogString[] = "IPCP: Peer rejects Comp-Type\n";
+	@localize not;
+@chunk char ipcpRejDNSLogString[] = "IPCP: Peer rejects %s DNS option\n";
+	@localize not;
+
+@chunk char ipcpReplyLogString[] = "IPCP: Replying with %s\n";
+	@localize not;
+@chunk char ipcpRevertingLogString[] = "IPCP: Reverting to deprecated IP-Addresses\n";
+	@localize not;
+@chunk char ipcpSendAddrLogString[] = "IPCP: Send IP-Address %lu.%lu.%lu.%lu\n";
+	@localize not;
+@chunk char ipcpSendAddrsLogString[] = "IPCP: Send IP-Addresses %lu.%lu.%lu.%lu : %lu.%lu.%lu.%lu\n";
+	@localize not;
+@chunk char ipcpSendCompLogString[] = "IPCP: Send IP-Comp-Protocol 002dh";
+	@localize not;
+@chunk char ipcpSendDNSLogString[] = "IPCP: Send DNS address %lu.%lu.%lu.%lu";
+	@localize not;
+@chunk char ipcpSlotIDLogString[] = ", %s-Slot-ID %d";
+	@localize not;
+@chunk char ipcpSlotsLogString[] = ", Max-Slot-ID %d, Comp-Slot-ID %d\n";
+	@localize not;
+@chunk char ipcpTooShortLogString[] = ": too short (%d bytes)";
+	@localize not;
+@chunk char ipcpUnknownNakLogString[] = "IPCP: Rcvd Nak for unknown option %d\n";
+	@localize not;
+@chunk char ipcpUnknownOptLogString[] = "IPCP: Rcvd unknown option %d";
+	@localize not;
+@chunk char ipcpWrongAddrLogString[] = "IPCP: Rcvd Conf-Rej with wrong %sIP-Address (%lu.%lu.%lu.%lu should be %lu.%lu.%lu.%lu)\n";
+	@localize not;
+@chunk char ipcpWrongCompTypeLogString[] = "IPCP: Rcvd Conf-Rej with wrong Compression-Type (%04xh should be 002dh)\n";
+	@localize not;
+@chunk char ipcpWrongSlotLogString[] = "IPCP: Rcvd Conf-Rej with wrong %s-Slot-ID (%d should be %d)\n";
+	@localize not;
+@chunk char ipNotOKLogString[] = "IP traffic not allowed. Packet dropped.\n";
+	@localize not;
+
+@chunk char lcpACompNakLogString[] = "LCP: Rcvd Nak for ACFC\n";
+	@localize not;
+@chunk char lcpACompRejLogString[] = "LCP: Peer rejected ACFC\n";
+	@localize not;
+@chunk char lcpAMapNakLogString[] = "LCP: Rcvd Nak for Async-Map %lxh\n";
+	@localize not;
+@chunk char lcpAMapNakSimpleLogString[] = "LCP: Rcvd Nak for Async-Map\n";
+	@localize not;
+@chunk char lcpAMapRejLogString[] = "LCP: Peer rejected Async-Map\n";
+	@localize not;
+@chunk char lcpAuthNakLogString[] = "LCP: Rcvd Nak for Auth-Protocol %s\n";
+	@localize not;
+@chunk char lcpAuthNakHexLogString[] = "LCP: Rcvd Nak for Auth-Protocol %xh\n";
+	@localize not;
+@chunk char lcpAuthRejLogString[] = "LCP: Peer rejected Auth-Protocol\n";
+	@localize not;
+@chunk char lcpBadLogString[] = "LCP: Rcvd bad Conf-%s\n";
+	@localize not;
+@chunk char lcpCantAuthLogString[] = "LCP: Can't negotiate Auth-Protocol\n";
+	@localize not;
+@chunk char lcpCantMagicLogString[] = "LCP: Can't negotiate Magic-Number (line may be looped back)\n";
+	@localize not;
+@chunk char lcpCantMRULogString[] = "LCP: Can't negotiate MRU\n";
+	@localize not;
+@chunk char lcpEmptyLogString[] = "Rcvd empty LCP Conf-Req\n";
+	@localize not;
+@chunk char lcpGiveUpLogString[] = "Too many LCP Naks rcvd -- give up\n";
+	@localize not;
+@chunk char lcpGiveUpAuthLogString[] = "LCP: Peer refused to authenticate -- give up\n";
+	@localize not;
+@chunk char lcpLQMNakLogString[] = "LCP: Rcvd Nak for LQM, %d.%02d\n";
+	@localize not;
+@chunk char lcpLQMNakHexLogString[] = "LCP: Rcvd Nak for Quality-Protocol %xh\n";
+	@localize not;
+@chunk char lcpLQMNakSimpleLogString[] = "LCP: Rcvd Nak for LQM\n";
+	@localize not;
+@chunk char lcpLQMRejLogString[] = "LCP: Peer rejected LQM\n";
+	@localize not;
+@chunk char lcpMagicNakLogString[] = "LCP: Rcvd Nak for Magic-Number %xh\n";
+	@localize not;
+
+@chunk char lcpMagicNakSimpleLogString[] = "LCP: Rcvd Nak for Magic-Number\n";
+	@localize not;
+@chunk char lcpMagicRejLogString[] = "LCP: Peer rejected Magic-Number\n";
+	@localize not;
+@chunk char lcpMRUNakLogString[] = "LCP: Rcvd Nak for MRU %d\n";
+	@localize not;
+@chunk char lcpMRUNakSimpleLogString[] = "LCP: Rcvd Nak for MRU\n";
+	@localize not;
+@chunk char lcpMRURejLogString[] = "LCP: Peer rejected MRU\n";
+	@localize not;
+@chunk char lcpNakChapLogString[] = " (Nak CHAP, MD5)\n";
+	@localize not;
+@chunk char lcpNakLQMLogString[] = " (Nak LQM)\n";
+	@localize not;
+@chunk char lcpNakPapLogString[] = " (Nak PAP)\n";
+	@localize not;
+@chunk char lcpNoAMapLogString[] = "LCP: Peer refuses to negotiate Async-Map\n";
+	@localize not;
+@chunk char lcpNoAuthLogString[] = "LCP: Peer refuses to authenticate\n";
+	@localize not;
+@chunk char lcpNoLQMLogString[] = "LCP: Peer refuses to negotiate LQM\n";
+	@localize not;
+@chunk char lcpNoMRULogString[] = "LCP: Peer refuses to negotiate MRU (I want %d, peer wants %d)\n";
+	@localize not;
+@chunk char lcpPCompNakLogString[] = "LCP: Rcvd Nak for PFC\n";
+	@localize not;
+@chunk char lcpPCompRejLogString[] = "LCP: Peer rejected PFC\n";
+	@localize not;
+@chunk char lcpRecvACompLogString[] = "LCP: Rcvd ACFC";
+	@localize not;
+@chunk char lcpRecvAMapLogString[] = "LCP: Rcvd Async-Map";
+	@localize not;
+@chunk char lcpRecvAuthLogString[] = "LCP: Rcvd Auth-Protocol";
+	@localize not;
+@chunk char lcpRecvLQMLogString[] = "LCP: Rcvd Quality-Protocol";
+	@localize not;
+@chunk char lcpRecvMagicLogString[] = "LCP: Rcvd Magic-Number";
+	@localize not;
+@chunk char lcpRecvMRULogString[] = "LCP: Rcvd MRU";
+	@localize not;
+@chunk char lcpRecvPCompLogString[] = "LCP: Rcvd PFC";
+	@localize not;
+@chunk char lcpRejLogString[] = "lcp_protrej: Rcvd Proto-Reject for LCP\n";
+	@localize not;
+@chunk char lcpReplyLogString[] = "LCP: Replying with %s\n";
+	@localize not;
+@chunk char lcpSendACompLogString[]= "LCP: Send ACFC\n";
+	@localize not;
+@chunk char lcpSendAMapLogString[] = "LCP: Send Async-Map %lxh";
+	@localize not;
+@chunk char lcpSendAuthLogString[] = "LCP: Send Auth-Protocol %s\n";
+	@localize not;
+@chunk char lcpSendLQMLogString[] = "LCP: Send LQM";
+	@localize not;
+@chunk char lcpSendMagicLogString[] = "LCP: Send Magic-Number %lxh\n";
+	@localize not;
+@chunk char lcpSendMruLogString[] = "LCP: Send MRU %d\n";
+	@localize not;
+@chunk char lcpSendPCompLogString[] = "LCP: Send PFC\n";
+	@localize not;
+@chunk char lcpTruncRejLogString[] ="LCP: Truncating rejected protocol packet.\n";
+	@localize not;
+@chunk char lcpUnknownNakLogString[] = "LCP: Rcvd Nak for unknown option %d\n";
+	@localize not;
+@chunk char lcpUnknownOptLogString[] = "LCP: Rcvd unknown option %d";
+	@localize not;
+
+@chunk char lqmEchoLogString[] = "LQM: Echo-Replies: %s\n";
+	@localize not;
+@chunk char lqmLastOutLogString[] = "  LastOutPkts  %7lu  LastOutOctets %7lu\n";
+	@localize not;
+@chunk char lqmLostEchoLogString[] = "LQM: Too many Echo packets lost\n";
+	@localize not;
+@chunk char lqmLostLogString[] = "LQM: Too many LQRs lost\n";
+	@localize not;
+@chunk char lqmLQRLogString[] = "LQM: LQRs: %s\n";
+	@localize not;
+@chunk char lqmMagicLogString[] = "  Magic-Number %08lxh  LastOutLQRs   %7lu\n";
+	@localize not;
+@chunk char lqmPacketLogString[] = "LQM: Pkt: %s Oct: %s%s%s%s\n";
+	@localize not;
+@chunk char lqmPeerChangedLogString[] = "LQM: Magic number mismatch; peer may have changed\n";
+	@localize not;
+@chunk char lqmPeerInLogString[] = "  PeerInLQRs      %7lu  PeerInPkts %7lu\n";
+	@localize not;
+@chunk char lqmPeerIn2LogString[] = "  PeerInDiscards  %7lu  PeerInErrors  %7lu\n";
+	@localize not;
+@chunk char lqmPeerIn3LogString[] = "  PeerInOctets    %7lu  PeerOutLQRs   %7lu\n";
+	@localize not;
+@chunk char lqmPeerOutLogString[] = "  PeerOutPkts  %7lu  PeerOutOctets %7lu\n";
+	@localize not;
+@chunk char lqmRecvingLogString[] = "Rcvd LQM LQR:\n";
+	@localize not;
+@chunk char lqmRejLogString[] = "LQM: Rcvd Proto-Reject, using Echo-Request instead\n";
+	@localize not;
+@chunk char lqmSaveInLogString[] = " [SaveInLQRs      %7lu  SaveInPkts %7lu\n";
+	@localize not;
+@chunk char lqmSaveIn2LogString[] = "  SaveInDiscards  %7lu  SaveInErrors  %7lu\n";
+	@localize not;
+@chunk char lqmSaveIn3LogString[] = "  SaveInOctets    %7lu]\n";
+	@localize not;
+@chunk char lqmSendingLogString[] = "Send LQM LQR:\n";
+	@localize not;
+@chunk char lqmWarnLoopLogString[] = "LQM: line may be looped back\n";
+	@localize not;
+
+@chunk char longFrameLogString[] = "Frame too long, frame flushed\n";
+	@localize not;
+
+@chunk char mismatchedLenLogString[] = "Rcvd %s %s msg with mismatched length field\n";
+	@localize not;
+@chunk char missedUILogString[] = "Missed UI, frame flushed\n";
+	@localize not;
+
+@chunk char mppcAllocFailedLogString[] = "mppc_%s: buffer alloc failed\n";
+	@localize not;
+@chunk char mppcDecompBadCountLogString[] = "mppc_decomp: bad count\n";
+        @localize not;
+@chunk char mppcDecompFailedLogString[] = "mppc_decomp: decomp failed\n";
+	@localize not;        
+@chunk char mppcDecompFlushedLogString[] = "mppc_decomp: flushed\n";
+        @localize not;
+@chunk char mppcDecompHistoryRestartedLogString[] = "mppc_decomp: history restarted\n";
+        @localize not;
+@chunk char mppcDownLogString[] = "mppc_down\n";
+        @localize not;
+@chunk char mppcExpandedLogString[] = "mppc_comp - data expanded\n";
+	@localize not;        
+@chunk char mppcNoMemLogString[] = "MPPC - no memory for %s\n";
+	@localize not;
+@chunk char mppcResetCompLogString[] = "mppc_resetcomp\n";
+        @localize not;
+@chunk char mppcResetDecompLogString[] = "mppc_resetdecomp\n";
+        @localize not;
+@chunk char mppcRestartHistoryLogString[] = "mppc_comp: restart history\n";
+        @localize not;
+@chunk char mppcUncompressedLogString[] = "mppc_decomp: rcvd uncompressed data\n";
+	@localize not;	    
+
+@chunk char nakHexLogString[]= " (Nak %xh)\n";
+	@localize not;
+@chunk char nakValueLogString[] = " (Nak %d)\n";
+	@localize not;
+@chunk char newlineLogString[] = "\n";
+	@localize not;
+@chunk char newlineQuotedLogString[] = "'\n";
+	@localize not;
+@chunk char newlineStringLogstring[] = " (%s)\n";
+	@localize not;
+@chunk char newStateLogString[] = "new_state %s\n";
+	@localize not;
+@chunk char noMemCompLogString[] = "No memory for compression data\n";
+	@localize not;
+@chunk char noMemLogString[] = "No memory, dropping data\n";
+	@localize not;
+@chunk char notEscapingLogString[] = "%02xh %s is in asyncmap -- not escaping %02xh\n";
+	@localize not;
+
+@chunk char offRSlotsLogString[] = "Set VJ Comp rcving off, ";
+	@localize not;
+@chunk char onRSlotsLogString[] = "Set VJ Comp rcving on (%d slots), ";
+	@localize not;
+@chunk char onSSlotsLogString[] = "sending on (%d slots)\n";
+	@localize not;
+@chunk char offSSlotsLogString[] = "sending off\n";
+	@localize not;
+
+@chunk char papBadLogString[] = "Rcvd PAP Auth-%s is malformed\n";
+	@localize not;
+@chunk char papFailedLogString[] = "PAP: Authentication failed\n";
+	@localize not;
+@chunk char papMismatchedLenLogString[] = "Rcvd PAP msg with mismatched length field\n";
+	@localize not;
+@chunk char papNoMemLogString[] = "No memory for PAP processing\n";
+	@localize not;
+@chunk char papNoNameLogString[] = "PAP: Missing username or password.\n";
+	@localize not;
+@chunk char papNoUsernameLogString[] = "PAP: Missing username\n";
+	@localize not;
+@chunk char papPeerIsLogString[] = "PAP: Peer authenticated as `";
+	@localize not;
+@chunk char papRecvAuthLogString[] = "Rcvd PAP Auth-%s, ID %d\n";
+	@localize not;
+@chunk char papSendingLogString[] = "Send PAP Auth-%s, ID %d\n";
+	@localize not;
+@chunk char papShortLogString[] = "Rcvd PAP Auth-%s packet too short\n";
+	@localize not;
+@chunk char papShortHdrLogString[] = "Rcvd PAP msg with short header\n";
+	@localize not;
+@chunk char papShortLenLogString[] = "Rcvd PAP msg with short length field\n";
+	@localize not;
+@chunk char papUnexpectedLogString[] = "PAP: Unexpected Auth-Req rcvd\n";
+	@localize not;
+@chunk char papUnexpectedShortLogString[] = "Rcvd PAP too short Auth-Req packet\n";
+	@localize not;
+@chunk char papWrongIDLogString[] = "PAP: Rcvd unexpected Auth-Req with wrong ID\n";
+	@localize not;
+
+@chunk char pred1CompAllocLogString[] = "pred1_comp: buffer alloc failed\n";
+	@localize not;
+@chunk char pred1CompBufExpandedLogString[] = "pred1_comp: buffer expanded\n";
+	@localize not;
+@chunk char pred1DecompAllocLogString[] = "pred1_decomp: buffer alloc failed\n";
+	@localize not;
+@chunk char pred1DecompBadLenLogString[] = "pred1_decomp: bad length %d\n";
+	@localize not;
+@chunk char pred1DecompBadFCSLogString[] = "pred1_decomp: bad FCS (comp=0x%x)\n";
+	@localize not;
+@chunk char pred1DecompFCSLogString[] = "pred1_decomp: %d bytes of FCS too few (comp=0x%x)\n";
+	@localize not;
+@chunk char pred1DecompTooShortLogString[] = "pred1_decomp: packet too short (comp=0x%x)\n";
+	@localize not;
+@chunk char protoRejLogString[] = "Proto-Reject rcvd for unknown protocol %04xh\n";
+	@localize not;
+@chunk char protoRej2LogString[] = "Rcvd %s Proto-Rej packet outside of LCP\n";
+	@localize not;
+
+@chunk char recvedLogString[] = "Rcvd %s %s, ID %d, state %s\n";
+	@localize not;
+@chunk char rejLogString[] = " (Rej)\n";
+	@localize not;
+@chunk char reportPeriodLogString[] = ", Reporting-Period %d.%02ds";
+	@localize not;
+@chunk char resetackLogString[] = "Ignoring rcvd Reset-Ack.\n";
+	@localize not;
+@chunk char responseOnlyLogString[] = ", Response Only";
+	@localize not;
+
+@chunk char sendingLogString[] = "Send %s %s, ID %d, state %s\n";
+	@localize not;
+@chunk char sendingFrameLogString[] = "Send %d-byte PPP frame:\n";
+	@localize not;
+@chunk char setACCLogString[] = "Set ACFC %s\n";
+	@localize not;
+@chunk char setAsyncLogString[] = "Set interface Async-Map to %lxh %s\n";
+	@localize not;
+@chunk char setMtuLogString[] = "Set interface MRU to %d\n";
+	@localize not;
+@chunk char setPCLogString[] = "Set PFC %s\n";
+	@localize not;
+@chunk char shortFrameLogString[] = "Short frame rcvd (%d bytes)\n";
+	@localize not;
+@chunk char shortHdrLogString[] = "Rcvd %s msg with short header\n";
+	@localize not;
+@chunk char shortLenLogString[] = "Rcvd %s %s msg with too-short length field\n";
+	@localize not;
+@chunk char stacAllocFailedLogString[] = "stac_%s: buffer alloc failed\n";
+	@localize not;
+@chunk char stacDecompFailedLogString[] = "stac_decomp: decomp failed\n";
+	@localize not;
+@chunk char stacDecompBadLogString[] = "stac_decomp: bad %s\n";
+	@localize not;
+@chunk char stacExpandedLogString[] = "stac_comp - data expanded\n";
+	@localize not;
+@chunk char stacNoMemLogString[] = "stac - no memory for %s\n";
+	@localize not;
+@chunk char stacUncompressedLogString[] = "stac_decomp: rcvd uncompressed data\n";
+	@localize not;
+@chunk char stacSendNativeLogString[] = "stac_comp - send native packet\n";
+	@localize not;
+@chunk char stateErrorLogString[] = "FSM error: %s event %s occurred in state %s\n";
+	@localize not;
+@chunk char stateError2LogString[] = "FSM error: Bad %s event (%s, state %s, code %s)\n";
+	@localize not;
+
+@chunk char tooLongLogString[] = "Too-long packet rcvd\n";
+	@localize not;
+
+@chunk char unknownProtoLogString[] = "Unknown protocol %xh rcvd\n";
+	@localize not;
+@chunk char upLogString[] = "Set interface up\n";
+	@localize not;
+@chunk char usingLongPacketLogString[] = "Using too-long packet anyways\n";
+        @localize not;        
+
+@chunk char vjDecompFailedLogString[] = "VJ Decomp failed (%s)\n";
+	@localize not;
+@chunk char vjUnexpectedLogString[] = "Unexpected VJ TCP %s msg rcvd\n";
+	@localize not;
+
+@chunk char warnLoopLogString[] = "LCP: line may be looped back\n";
+	@localize not;
+
+
+@end PPPLogStrings;
+
+/*----------------------------------------------------------------------
+
+  	    	    Table of Optrs to Log Strings
+
+Enums for logStringTableIndex are defined in pppLog.h.  The order of 
+the strings in this table must match the enums.  
+
+----------------------------------------------------------------------*/
+
+optr logStringTable [] = {    
+    /* general strings */
+    @ackLogString,
+    @clientTimerLogString,
+    @colonLogString,
+    @connectedLogString,
+    @closedLogString,
+    @disconnectedLogString,
+    @downLogString,
+    @formatCharLogString,
+    @formatDecLogString,
+    @formatHexLogString,
+    @formatLongLogString,
+    @formatMixedLogString,
+    @formatStringLogString,
+    @nakHexLogString,
+    @nakValueLogString,
+    @newlineLogString,
+    @newlineQuotedLogString,
+    @newlineStringLogstring,
+    @noMemCompLogString,
+    @rejLogString,
+    @reportPeriodLogString,
+    @responseOnlyLogString,
+    @upLogString,
+    @warnLoopLogString,
+
+    /* lcp strings */
+    @lcpACompNakLogString,
+    @lcpACompRejLogString,
+    @lcpAMapNakLogString,
+    @lcpAMapNakSimpleLogString,
+    @lcpAMapRejLogString,
+    @lcpAuthNakLogString,
+    @lcpAuthNakHexLogString,
+    @lcpAuthRejLogString,
+    @lcpBadLogString,
+    @lcpCantAuthLogString,
+    @lcpCantMagicLogString,
+    @lcpCantMRULogString,
+    @lcpEmptyLogString,
+    @lcpGiveUpLogString,
+    @lcpGiveUpAuthLogString,
+    @lcpLQMNakLogString,
+    @lcpLQMNakHexLogString,
+    @lcpLQMNakSimpleLogString,
+    @lcpLQMRejLogString,
+    @lcpMagicNakLogString,
+    @lcpMagicNakSimpleLogString,
+    @lcpMagicRejLogString,
+    @lcpMRUNakLogString,
+    @lcpMRUNakSimpleLogString,
+    @lcpMRURejLogString,
+    @lcpNakChapLogString,
+    @lcpNakLQMLogString,
+    @lcpNakPapLogString,
+    @lcpNoAMapLogString,
+    @lcpNoAuthLogString,
+    @lcpNoLQMLogString,
+    @lcpNoMRULogString,
+    @lcpPCompNakLogString,
+    @lcpPCompRejLogString,
+    @lcpRecvACompLogString,
+    @lcpRecvAMapLogString,
+    @lcpRecvAuthLogString,
+    @lcpRecvLQMLogString,
+    @lcpRecvMagicLogString,
+    @lcpRecvMRULogString,
+    @lcpRecvPCompLogString,
+    @lcpRejLogString,
+    @lcpReplyLogString,
+    @lcpSendACompLogString,
+    @lcpSendAMapLogString,
+    @lcpSendAuthLogString,
+    @lcpSendLQMLogString,
+    @lcpSendMagicLogString,
+    @lcpSendMruLogString,
+    @lcpSendPCompLogString,
+    @lcpTruncRejLogString,
+    @lcpUnknownNakLogString,
+    @lcpUnknownOptLogString,
+
+    /* ipcp strings */
+    @ipcpAddNakAddrLogString,
+    @ipcpAddNakAddrsLogString,
+    @ipcpAddrLogString,
+    @ipcpAddrsLogString,
+    @ipcpAddrPeerLogString,
+    @ipcpAddrPeer2LogString,
+    @ipcpAddrsPeerLogString,
+    @ipcpAddrsUsLogString,
+    @ipcpBadLogString,
+    @ipcpDnsAddrLogString,
+    @ipcpEmptyLogString,
+    @ipcpGiveUpLogString,
+    @ipcpGiveUpAddrLogString,
+    @ipcpGiveUpAddrNewLogString,
+    @ipcpGiveUpCompLogString,
+    @ipcpNakAddrLogString,
+    @ipcpNakAddrsLogString,
+    @ipcpNakAddrsSimpleLogString,
+    @ipcpNakCompLogString,
+    @ipcpNakCompSimpleLogString,
+    @ipcpNakDNSLogString,
+    @ipcpNoAddrLogString,
+    @ipcpNoAddrsLogString,
+    @ipcpNoCompLogString,
+    @ipcpRecvAddrLogString,
+    @ipcpRecvAddrsLogString,
+    @ipcpRecvCompLogString,
+    @ipcpRecvDNSLogString,
+
+    @ipcpRejAddrLogString,
+    @ipcpRejAddrsLogString,
+    @ipcpRejCompLogString,
+    @ipcpRejDNSLogString,
+    @ipcpRevertingLogString,
+    @ipcpReplyLogString,
+    @ipcpSendAddrLogString,
+    @ipcpSendAddrsLogString,
+    @ipcpSendCompLogString,
+    @ipcpSendDNSLogString,
+    @ipcpSlotIDLogString,
+    @ipcpSlotsLogString,
+    @ipcpTooShortLogString,
+    @ipcpUnknownNakLogString,
+    @ipcpUnknownOptLogString,
+    @ipcpWrongAddrLogString,
+    @ipcpWrongCompTypeLogString,
+    @ipcpWrongSlotLogString,
+
+    /* ip strings */
+    @ipNotOKLogString,
+    @vjDecompFailedLogString,
+    @vjUnexpectedLogString,
+
+    /* chap strings */
+    @chapFailedLogString,
+    @chapLowerNotUpLogString,
+    @chapMismatchedLenLogString,
+    @chapNoNameLogString,
+    @chapPeerLogString,
+    @chapRcvdLogString,
+    @chapSendingLogString,
+    @chapShortChallengeLogString,
+    @chapShortHdrLogString,
+    @chapShortLenLogString,
+    @chapShortResponseLogString,
+    @chapUnexpectedLogString,
+
+    /* pap strings */
+    @papBadLogString,
+    @papFailedLogString,
+    @papMismatchedLenLogString,
+    @papNoMemLogString,
+    @papNoNameLogString,
+    @papNoUsernameLogString,
+    @papPeerIsLogString,
+    @papRecvAuthLogString,
+    @papSendingLogString,
+    @papShortLogString,
+    @papShortHdrLogString,
+    @papShortLenLogString,
+    @papUnexpectedLogString,
+    @papUnexpectedShortLogString,
+    @papWrongIDLogString,
+
+    /* lqm strings */
+    @lqmEchoLogString,
+    @lqmLastOutLogString,
+    @lqmLostLogString,
+    @lqmLostEchoLogString,
+    @lqmLQRLogString,
+    @lqmMagicLogString,
+    @lqmPacketLogString,
+    @lqmPeerChangedLogString,
+    @lqmPeerInLogString,
+    @lqmPeerIn2LogString,
+    @lqmPeerIn3LogString,
+    @lqmPeerOutLogString,
+    @lqmRecvingLogString,
+    @lqmRejLogString,
+    @lqmSaveInLogString,
+    @lqmSaveIn2LogString,
+    @lqmSaveIn3LogString,
+    @lqmSendingLogString,
+    @lqmWarnLoopLogString,
+
+    /* ccp strings */
+    @ccpBadLogString,
+    @ccpCantDoStacLogString,
+    @ccpGiveUpLogString,
+    @ccpGotOptLogString,
+    @ccpHistoryCheckLogString,
+    @ccpMPPCBitsLogString,
+    @ccpNakHCLogString,
+    @ccpNakMPPCBitsLogString,
+    @ccpNoMemWarnLogString,
+    @ccpPeerNakMPPCLogString,
+    @ccpPeerNoMPPCLogString,
+    @ccpPeerNakPred1LogString,
+    @ccpPeerNoPred1LogString,
+    @ccpPeerNakStacLogString,
+    @ccpPeerNakStacSimpleLogString,
+    @ccpPeerNoStacLogString,
+    @ccpPeerRejMPPCLogString,
+    @ccpPeerRejPred1LogString,
+    @ccpPeerRejStacLogString,
+    @ccpRejWrongLogString,
+    @ccpReplyLogString,
+    @ccpSendMPPCLogString,
+    @ccpSendPred1LogString,
+    @ccpSendStacLogString,
+    @ccpUnknownNakLogString,
+    @ccpUnknownOptionLogString,
+
+    /* stac strings */
+    @stacAllocFailedLogString,
+    @stacDecompFailedLogString,
+    @stacDecompBadLogString,
+    @stacExpandedLogString,
+    @stacNoMemLogString,
+    @stacUncompressedLogString,
+    @stacSendNativeLogString,
+
+    /* pred1 strings */
+    @pred1CompAllocLogString,
+    @pred1CompBufExpandedLogString,
+    @pred1DecompAllocLogString,
+    @pred1DecompBadLenLogString,
+    @pred1DecompBadFCSLogString,
+    @pred1DecompFCSLogString,
+    @pred1DecompTooShortLogString,
+
+    /* mppc strings */
+    @mppcAllocFailedLogString,
+    @mppcDecompBadCountLogString,
+    @mppcDecompFailedLogString,
+    @mppcDecompFlushedLogString,
+    @mppcDecompHistoryRestartedLogString,
+    @mppcDownLogString,
+    @mppcExpandedLogString,
+    @mppcNoMemLogString,
+    @mppcResetCompLogString,
+    @mppcResetDecompLogString,
+    @mppcRestartHistoryLogString,
+    @mppcUncompressedLogString,
+};
+
+
+
+
+/*----------------------------------------------------------------------
+
+ 	    	    Logging Routines
+
+----------------------------------------------------------------------*/
+
+
+
+/***********************************************************************
+ *				OpenLogFile
+ ***********************************************************************
+ * SYNOPSIS:	Open the log file.
+ * CALLED BY:	PPPSetup
+ * RETURN:	nothing
+ *
+ * SIDE EFFECTS: global variable "logfile" will contain the file handle
+ *	    	 or be set to zero if file could not be opened
+ *
+ * STRATEGY:	Create a file "ppp.log" in the DOCUMENT directory,
+ * 	    	appending to the old file if the file already exists.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *	jwu 	2/ 1/96	     	Only create file if debug != 0
+ ***********************************************************************/
+void OpenLogFile (void)
+{
+    if (debug) {
+      
+	/*
+     	* Open file in document directory.
+	*/
+	FilePushDir();
+
+@ifdef PRODUCT_RESPONDER
+    	FoamSetDocumentDir(FDD_CREATED_TEXTS);
+@else
+    	FileSetStandardPath(SP_DOCUMENT);
+@endif
+
+    	logfile = FileCreate(_TEXT("ppp.log"), 
+	      FCF_NATIVE | FILE_CREATE_NO_TRUNCATE | FILE_ACCESS_W | FILE_DENY_W,
+			     FILE_ATTR_NORMAL);
+	FilePopDir();
+
+	/*
+	 * If file opened, make sure PPP driver owns it.  Append data at 
+	 * end.
+	 */
+	if (logfile) {
+	    HandleModifyOwner(logfile, GeodeGetCodeProcessHandle());
+	    FilePos(logfile, 0, FILE_POS_END);
+	}
+    }
+}
+
+
+/***********************************************************************
+ *			LogTimestamp
+ ***********************************************************************
+ * SYNOPSIS:	Print current time of day to the log file.
+ * CALLED BY:	log
+ * RETURN:	nothing
+ *
+ * STRATEGY:	If the log file exists, write a timestamp to it.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void LogTimestamp (void)
+{
+    if (logfile) {
+	char logbuf[SHORT_STR_LEN]; 	
+	TimerDateAndTime t;
+	word cnt;
+
+	TimerGetDateAndTime(&t);
+	cnt = sprintf(logbuf, "%d/%d-%02d:%02d:%02d ", 
+		      t.TDAT_month, t.TDAT_day, 
+		      t.TDAT_hours, t.TDAT_minutes, t.TDAT_seconds);
+	FileWrite(logfile, logbuf, cnt, FALSE);
+    }
+}
+
+
+/***********************************************************************
+ *				new_state
+ ***********************************************************************
+ * SYNOPSIS:	Print logging information about the current state of 
+ *	    	the PPP driver.
+ * CALLED BY:	log_state
+ *	    	time_rates
+ *	    	log_idle
+ * RETURN:	nothing
+ *
+ * STRATEGY:	Only do this if log file was opened.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void new_state (void)
+{
+    char logbufC1[SHORT_STR_LEN], *p;
+    int len;
+
+    len = sprintf(logbufC1, "[%s", current_state);
+    
+    /*
+     * Log the bit rate.
+     */
+    if (rx_bps || tx_bps)
+	len += sprintf(&logbufC1[len], ", %d/%d bps", rx_bps, tx_bps);
+
+    /*
+     * Log percentage of received and transmitted packets if not perfect.
+     */
+    if (lcp_fsm[0].state == OPENED && (rx_percent != 100 || tx_percent != 100))
+	len += sprintf(&logbufC1[len], ", %d%%/%d%%", rx_percent, tx_percent);
+
+    /*
+     * Log number of idle seconds if idle.
+     */
+    if (idle_seconds)
+	len += sprintf(&logbufC1[len], ", idle %u", idle_seconds);
+
+    len += sprintf(&logbufC1[len], "]");
+
+#if ERROR_CHECK
+    /*
+     * Make sure we didn't overflow the buffer.  If we ever get here,
+     * use a bigger value for MAX_STR_LEN.
+     */
+    if (len > MAX_STR_LEN) {
+	EC_ERROR(-1);	   
+    }
+#endif /* ERROR_CHECK */
+
+    LOG2(LOG_TIMER, (@newStateLogString, logbufC1));
+}
+
+
+/***********************************************************************
+ *				log_state
+ ***********************************************************************
+ * SYNOPSIS:	Set current state to new state and resets idle seconds.
+ * CALLED BY:	ipcp_up
+ *	    	lcp_closed
+ *	    	PPPSetup
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void log_state (char *state)
+{
+    if (strcmp(state, current_state)) {
+	idle_seconds = 0;
+	current_state = state;
+	new_state();
+    }
+}
+
+
+/***********************************************************************
+ *				elapsed_time
+ ***********************************************************************
+ * SYNOPSIS:	Computes elapsed time since session started and write
+ *	    	formatted string into passed buffer.
+ * CALLED BY:	print_acct
+ * RETURN:	nothing
+ * SIDE EFFECTS: buffer filled
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void elapsed_time (char *buffer)
+{
+    unsigned long days, hours, minutes, seconds;
+    int len = 0;
+    
+    seconds = (TimerGetCount() - sess_start)/60L;
+    minutes = seconds / 60L; seconds -= (60L * minutes);
+    hours = minutes / 60L;   minutes -= (60L * hours);
+    days = hours / 24L;	     hours -= (24L * days);
+
+    if (days)
+	len = sprintf(buffer, "%lu+", days);
+
+    (void)sprintf(&buffer[len], "%02lu:%02lu:%02lu",
+		  hours, minutes, seconds);
+}
+
+
+
+/***********************************************************************
+ *				print_acct
+ ***********************************************************************
+ * SYNOPSIS:	Print accounting information to the log file.
+ * CALLED BY:	lcp_closed
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void print_acct (void)
+{
+    char oerrbuf[20], auth_id[SHORT_STR_LEN], timebuf[SHORT_STR_LEN];
+    int i = 0;
+
+    if (sess_used_lqm)
+	sprintf(oerrbuf, "%lu", sess_tx_errors);
+    else
+	strcpy(oerrbuf, "?");
+
+    /*
+     * Get peer's username (chap) or peer id (pap). 
+     * Chap's peer username is already locked.
+     */
+    if (chap[0].us_hername) {
+	i = sprintf(auth_id, " %s", MemDeref(chap[0].us_hername));
+    }
+    else if (pap[0].us_peerid) {
+	MemLock(pap[0].us_peerid);
+	i = sprintf(auth_id, " %s", MemDeref(pap[0].us_peerid));
+	MemUnlock(pap[0].us_peerid);
+    }
+    else
+	strcpy(auth_id, "");
+
+#if ERROR_CHECK
+    /*
+     * If we ever get in here, then we need a bigger buffer size for
+     * auth_id.
+     */
+    if (i > SHORT_STR_LEN)
+	EC_ERROR(-1);
+#endif /* ERROR_CHECK */
+
+    elapsed_time(timebuf);
+    log2(@elapsedTimeLogString, timebuf,
+	lqm[0].InGoodOctets - sess_rx_octets,
+	lqm[0].ifOutOctets - sess_tx_octets,
+	lqm[0].ifInUniPackets - sess_rx_packets,
+	lqm[0].ifOutUniPackets - sess_tx_packets,
+	lqm[0].ifInErrors - sess_rx_errors,
+	oerrbuf);
+    log2(@dotAddrsLogString, BREAKDOWN_ADDR(ipcp_gotoptions[0].ouraddr),
+	BREAKDOWN_ADDR(ipcp_heroptions[0].heraddr), auth_id);
+}
+
+
+
+/***********************************************************************
+ *				asyncmap_name
+ ***********************************************************************
+ * SYNOPSIS:	Converts the ACCM into a printable string.
+ * CALLED BY:	SetEscapeMap
+ *	    	PPPProcessInput
+ *	    	lcp_addci
+ * RETURN:	nothing
+ *
+ * STRATEGY: 	Only convert to a string if the map is not zero nor
+ *	    	are all characters escaped.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void asyncmap_name (char *buffer, unsigned long a)
+{
+    char *s = buffer;
+    int i;
+
+    if (a != 0 && a != 0xffffffff) {
+	*s = '(';
+	for (i = 31; i >= 0; --i) 
+	    if (a & ((unsigned long)1 << i)) {
+		if (s != buffer)
+		    *++s = ',';
+		
+		*++s = '^';
+		*++s = '@' + i;
+	    }
+	*++s = ')';
+	*++s = '\0';
+    }
+    else 
+	*s = '\0';
+
+}
+
+
+/***********************************************************************
+ *				time_rates
+ ***********************************************************************
+ * SYNOPSIS:	Compute the received and transmitted bps so far.
+ * CALLED BY:	PPPHandleTimeout
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void time_rates (void)
+{
+    if (ip_connected) {
+	long t;
+	int elapsed;
+	t = TimerGetCount();
+
+	if (rate_date == 0L)
+	    rx_bps = tx_bps = rx_pps = tx_pps = 0;
+	else if ((elapsed = (t - rate_date) / 60L) > 0) {
+		rx_bps = (rx_bits + 4) / elapsed;
+		tx_bps = (tx_bits + 4) / elapsed;
+		rx_pps = (rx_pkts + 4) / elapsed;
+		tx_pps = (tx_pkts + 4) / elapsed;	    
+	}
+
+	rx_bits = tx_bits = rx_pkts = tx_pkts = 0;
+	rate_date = t;
+	new_state();
+    }
+    else {
+	rx_bits = tx_bits = rx_bps = tx_bps = rx_pps = tx_pps = 0;
+	rate_date = 0L;
+    }
+}  /* End Of time_rates */
+
+
+/***********************************************************************
+ *				log_idle
+ ***********************************************************************
+ * SYNOPSIS:	Log the additional number of idle seconds.
+ * CALLED BY:	PPPHandleTimeout
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void log_idle (int change)
+{
+    idle_seconds += change;
+    new_state();
+}
+
+
+/***********************************************************************
+ *		write_to_file
+ ***********************************************************************
+ * SYNOPSIS:	Insert timestamps when writing to the log file.
+ *
+ * CALLED BY:	log, log2, log3
+ * RETURN:	nothing
+ *	
+ * STRATEGY:	When writing a new line, insert a timestamp.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	8/31/96   	Initial Revision
+ *
+ ***********************************************************************/
+void write_to_file (int len, char *s)
+{
+
+	/* Gain exclusive access to the log file */
+	HandleP(logfile);
+
+#if ERROR_CHECK
+	/*
+	 * Make sure we didn't overflow the buffer.  If we ever get here,
+	 * use a bigger value for MAX_STR_LEN.
+	 */
+	if (len > MAX_STR_LEN) {
+	    EC_ERROR(-1);	   
+	}
+#endif /* ERROR_CHECK */    
+
+	/* 
+	 * Insert timestamps when writing to log file.
+	 */
+	for (; *s; ++s) {
+	    if (need_time) {
+		LogTimestamp();
+		need_time = 0;
+	    }
+	    
+	    if (*s == '\n') {
+		need_time = 1;
+		FileWrite(logfile, "\r", 1, FALSE);
+	    }
+
+	    FileWrite(logfile, s, 1, FALSE);
+	}
+
+	HandleV(logfile);
+
+}	/* End of write_to_file.	*/
+
+
+
+/***********************************************************************
+ *			    log/log2/log3
+ ***********************************************************************
+ * SYNOPSIS:	Write a formatted string to the log file, adding a 
+ * 	    	timestamp as needed. (log)
+ *
+ *	    	log2 takes an optr to the format string.
+ *
+ *	    	log3 takes an index into the table of format strings
+ *
+ * CALLED BY:	GLOBAL (wherever logging is used)
+ * RETURN:	nothing
+ *
+ * STRATEGY: 	Only do this if log file was opened.
+ *	    	Add a timestamp at the head of every line.
+ *
+ * N0TES: 	Must be _cdecl.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *	ardeb	10/10/95    	Switch to using variable args
+ *
+ ***********************************************************************/
+/* VARARGS */
+int _cdecl log3 (word entry, ...)
+{
+    if (logfile) {
+	int len;
+	static char logbufC2[MAX_STR_LEN];
+	va_list args;
+	optr format;
+	char *s;
+
+	va_start(args, entry);
+
+	format = logStringTable[entry];	    	/* get optr of log string */
+
+	MemLock(OptrToHandle(format));
+	s = (char *)LMemDeref(format);
+
+	len = vsprintf(logbufC2, s, args);    	/* build actual string */
+
+	MemUnlock(OptrToHandle(format));
+
+	write_to_file(len, logbufC2); 	    	
+
+	va_end(args);
+    }
+    return (1);
+
+}
+
+/* VARARGS */
+int _cdecl log2 (optr format, ...)
+{
+    if (logfile) {
+	int len;
+	static char logbufC3[MAX_STR_LEN];
+	va_list args;
+	char *s;
+	
+	va_start(args, format);
+
+	MemLock(OptrToHandle(format));
+	s = (char *)LMemDeref(format);
+
+	len = vsprintf(logbufC3, s, args);    	/* build actual string */
+
+	MemUnlock(OptrToHandle(format));
+
+	write_to_file(len, logbufC3); 	    	
+
+	va_end(args);
+    }
+    return (1);
+}
+
+
+/* VARARGS */
+int _cdecl log (const char *format, ...)
+{
+    if (logfile) {
+	int len;
+	static char logbufC4[MAX_STR_LEN];
+	va_list	args;
+
+	va_start(args, format);
+
+	len = vsprintf(logbufC4, format, args);	    /* build actual string */
+
+	write_to_file(len, logbufC4);
+
+	va_end(args);
+    }
+
+    return (1);
+}
+
+@endif /* LOGGING_ENABLED */
+
+

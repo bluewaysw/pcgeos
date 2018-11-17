@@ -1,0 +1,273 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS
+ * FILE:	Objects/clipbrd.goh
+ * AUTHOR:	Tony Requist: February 14, 1991
+ *
+ * DECLARER:	UI
+ *
+ * DESCRIPTION:
+ *	This file defines clipboard stuff
+ *
+ *	$Id: clipbrd.goh,v 1.1 97/04/04 15:51:38 newdeal Exp $
+ *
+ ***********************************************************************/
+
+
+@optimize
+@deflib ui
+
+#include <geoworks.h>
+#include <geode.h>
+#include <graphics.h>
+@include <Objects/metaC.goh>
+@include <Objects/uiInputC.goh>
+
+/*
+ *	Messages used for transfers
+ */
+
+typedef WordFlags ClipboardQuickNotifyFlags;
+#define CQNF_ERROR		0x8000
+#define CQNF_SOURCE_EQUAL_DEST	0x4000
+#define CQNF_MOVE		0x2000
+#define CQNF_COPY		0x1000
+#define CQNF_NO_OPERATION	0x0800
+#define CQNF_UNUSED		0x04ff
+
+/*
+ *	Constants and structures used for transfers
+ */
+
+#define CLIPBOARD_MAX_FORMATS	10
+
+typedef dword ClipboardItemFormatID;
+
+#define FormatIDFromManufacturerAndType(m,t) 	((((dword)(t)) << 16) | (m) )
+#define ManufacturerFromFormatID(id) 		((word) (id))
+#define TypeFromFormatID(id) 			((word) ((id) >> 16))
+
+typedef dword TransferBlockID;
+
+#define BlockIDFromFileAndBlock(f,b) 	(((dword)(f) << 16) | (b))
+#define FileFromTransferBlockID(id) 	((VMFileHandle) ((id) >> 16))
+#define BlockFromTransferBlockID(id) 	((VMBlockHandle) (id))
+
+typedef WordFlags ClipboardItemFlags;
+#define CIF_UNUSED1	0x8000
+#define CIF_QUICK	0x4000
+#define TIF_NORMAL	0x0000
+#define CIF_UNUSED2	0x2fff
+
+#if DBCS_GEOS
+#define CLIPBOARD_ITEM_NAME_LENGTH	15
+#else
+#define CLIPBOARD_ITEM_NAME_LENGTH	32
+#endif
+
+typedef TCHAR ClipboardItemNameBuffer[CLIPBOARD_ITEM_NAME_LENGTH+1];
+
+typedef struct {
+    ClipboardItemFormatID	CIFI_format;
+    word		CIFI_extra1;
+    word		CIFI_extra2;
+    VMChain		CIFI_vmChain;
+    GeodeToken		CIFI_renderer;
+} ClipboardItemFormatInfo;
+
+typedef ClipboardItemFormatInfo	FormatArray[CLIPBOARD_MAX_FORMATS];
+
+typedef struct {
+    optr			CIH_owner;
+    ClipboardItemFlags		CIH_flags;
+    ClipboardItemNameBuffer	CIH_name;
+#if DBCS_GEOS
+    char			CIH_pad0DBCS;
+#endif
+    word			CIH_formatCount;
+    optr			CIH_sourceID;
+    FormatArray			CIH_formats;
+    dword			CIH_reserved;
+} ClipboardItemHeader;
+
+
+/*
+ *	Routines used for transfers
+ */
+
+extern Boolean
+    _pascal ClipboardRegisterItem(TransferBlockID header, ClipboardItemFlags flags);
+
+extern void	/* XXX */
+    _pascal ClipboardUnregisterItem(optr owner);
+
+typedef struct {
+    word		CQA_numFormats;
+    optr		CQA_owner;
+    TransferBlockID	CQA_header;
+} ClipboardQueryArgs;
+
+extern void
+    _pascal ClipboardQueryItem(word ClipboardItemFlags, ClipboardQueryArgs *retValues);
+
+extern Boolean
+    _pascal ClipboardTestItemFormat(TransferBlockID header, ClipboardItemFormatID format);
+
+extern word _pascal	/* XXX */
+    ClipboardEnumItemFormats(TransferBlockID header,
+			     word maxNumFormats,
+			     ClipboardItemFormatID *buffer);
+
+extern dword		/* XXX */
+    _pascal ClipboardGetItemInfo(TransferBlockID header);
+
+typedef struct {
+    VMFileHandle    	CRA_file;
+    VMChain 		CRA_data;
+    word		CRA_extra1;
+    word		CRA_extra2;
+} ClipboardRequestArgs;
+
+extern void		/* XXX */
+	_pascal ClipboardRequestItemFormat(ClipboardItemFormatID format,
+					   TransferBlockID header,
+					   ClipboardRequestArgs *retValue);
+extern void		/* XXX */
+    _pascal ClipboardDoneWithItem(TransferBlockID header);
+
+extern TransferBlockID	/* XXX */
+    _pascal ClipboardGetNormalItemInfo(void);
+
+extern TransferBlockID	/* XXX */
+    _pascal ClipboardGetQuickItemInfo(void);
+
+extern TransferBlockID	/* XXX */
+    _pascal ClipboardGetUndoItemInfo(void);
+
+extern VMFileHandle	/* XXX */
+    _pascal ClipboardGetClipboardFile(void);
+
+/* ClipboardOpenClipboardFile will return 0 on success or a VMStatus
+   error code if it could not open the clipboard file.
+*/
+extern word		/* XXX */
+    _pascal ClipboardOpenClipboardFile(void);
+
+extern void
+    _pascal ClipboardCloseClipboardFile(void);
+
+extern void		/* XXX */
+    _pascal ClipboardAddToNotificationList(optr notificationOD);
+
+extern Boolean		/* XXX */
+    _pascal ClipboardRemoveFromNotificationList(optr notificationOD);
+
+extern Boolean		/* XXX */
+    _pascal ClipboardRemoteSend(void);
+extern Boolean		/* XXX */
+    _pascal ClipboardRemoteReceive(void);
+
+/*
+ * Constants and structures for quick transfers
+ */
+
+typedef WordFlags ClipboardQuickTransferFlags;
+#define CQTF_IN_PROGRESS	0x8000
+#define CQTF_COPY_ONLY		0x4000
+#define CQTF_USE_REGION		0x2000
+#define CQTF_NOTIFICATION	0x1000
+
+typedef struct {
+    word	CQTRI_paramAX;
+    word	CQTRI_paramBX;
+    word	CQTRI_paramCX;
+    word	CQTRI_paramDX;
+    Point	CQTRI_regionPos;
+    dword	CQTRI_strategy;
+    dword	CQTRI_region;
+} ClipboardQuickTransferRegionInfo;
+
+typedef enum {
+    CQTF_SET_DEFAULT,
+    CQTF_CLEAR_DEFAULT,
+    CQTF_MOVE,
+    CQTF_COPY,
+    CQTF_CLEAR
+} ClipboardQuickTransferFeedback;
+
+
+/*
+ *	Routines used for quick-transfers
+ */
+
+extern Boolean	/* XXX */
+    _pascal ClipboardStartQuickTransfer(ClipboardQuickTransferFlags flags,
+			   ClipboardQuickTransferFeedback initialCursor, 
+			   word mouseXPos,
+			   word mouseYPos, 
+			   ClipboardQuickTransferRegionInfo *regionParams,
+			   optr notificationOD);
+
+extern Boolean 	/* XXX */
+    _pascal ClipboardGetQuickTransferStatus(void);
+
+extern void	/* XXX */
+    _pascal ClipboardSetQuickTransferFeedback(
+			ClipboardQuickTransferFeedback cursor, 
+			UIFunctionsActive buttonFlags);
+
+extern void	/* XXX */
+    _pascal ClipboardEndQuickTransfer(ClipboardQuickNotifyFlags flags);
+
+extern void	/* XXX */
+    _pascal ClipboardAbortQuickTransfer(void);
+
+extern void
+    _pascal ClipboardClearQuickTransferNotification(optr notificationOD);
+
+extern dword _pascal	/* XXX */
+    ClipboardHandleEndMoveCopy(word activeGrab,
+			       word uifa,
+			       Boolean checkQTInProgress);
+
+/* ClipboardHandleEndMoveCopy returns method and UIFunctionsActive flags: */
+
+#define UIFAFromClipboardHandleEndMoveCopy(retValue) \
+    ((word) ((retValue) >> 16))
+#define MethodFromClipboardHandleEndMoveCopy(retValue) \
+    ((word) (retValue))
+
+/***/
+
+#ifdef __HIGHC__
+pragma Alias(ClipboardRegisterItem, "CLIPBOARDREGISTERITEM");
+pragma Alias(ClipboardUnregisterItem, "CLIPBOARDUNREGISTERITEM");
+pragma Alias(ClipboardQueryItem, "CLIPBOARDQUERYITEM");
+pragma Alias(ClipboardTestItemFormat, "CLIPBOARDTESTITEMFORMAT");
+pragma Alias(ClipboardEnumItemFormats, "CLIPBOARDENUMITEMFORMATS");
+pragma Alias(ClipboardGetItemInfo, "CLIPBOARDGETITEMINFO");
+pragma Alias(ClipboardRequestItemFormat, "CLIPBOARDREQUESTITEMFORMAT");
+pragma Alias(ClipboardDoneWithItem, "CLIPBOARDDONEWITHITEM");
+pragma Alias(ClipboardGetNormalItemInfo, "CLIPBOARDGETNORMALITEMINFO");
+pragma Alias(ClipboardGetQuickItemInfo, "CLIPBOARDGETQUICKITEMINFO");
+pragma Alias(ClipboardGetUndoItemInfo, "CLIPBOARDGETUNDOITEMINFO");
+pragma Alias(ClipboardGetClipboardFile, "CLIPBOARDGETCLIPBOARDFILE");
+pragma Alias(ClipboardOpenClipboardFile, "CLIPBOARDOPENCLIPBOARDFILE");
+pragma Alias(ClipboardCloseClipboardFile, "CLIPBOARDCLOSECLIPBOARDFILE");
+pragma Alias(ClipboardAddToNotificationList, "CLIPBOARDADDTONOTIFICATIONLIST");
+pragma Alias(ClipboardRemoveFromNotificationList, "CLIPBOARDREMOVEFROMNOTIFICATIONLIST");
+pragma Alias(ClipboardStartQuickTransfer, "CLIPBOARDSTARTQUICKTRANSFER");
+pragma Alias(ClipboardGetQuickTransferStatus, "CLIPBOARDGETQUICKTRANSFERSTATUS");
+pragma Alias(ClipboardSetQuickTransferFeedback, "CLIPBOARDSETQUICKTRANSFERFEEDBACK");
+pragma Alias(ClipboardEndQuickTransfer, "CLIPBOARDENDQUICKTRANSFER");
+pragma Alias(ClipboardAbortQuickTransfer, "CLIPBOARDABORTQUICKTRANSFER");
+pragma Alias(ClipboardClearQuickTransferNotification, "CLIPBOARDCLEARQUICKTRANSFERNOTIFICATION");
+pragma Alias(ClipboardHandleEndMoveCopy, "CLIPBOARDHANDLEENDMOVECOPY");
+pragma Alias(ClipboardRemoteSend, "CLIPBOARDREMOTESEND");
+pragma Alias(ClipboardRemoteReceive, "CLIPBOARDREMOTERECEIVE");
+#endif
+
+@endlib
+

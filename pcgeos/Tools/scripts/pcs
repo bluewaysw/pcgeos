@@ -1,0 +1,863 @@
+#!/bin/sh -
+###############################################################################
+# 	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Tools/scripts -- Crap
+# FILE: 	pcs
+# AUTHOR: 	Tony, Oct 18, 1989
+# DESCRIPTION:
+#	Shell script to send a file to the pc to the correct directory
+#
+# USAGE:
+#	pcs [-n|-g][-c] [-1|-2] [-u] [-D] [-d<destdir>] (<directory> | <file>)*
+#	
+#	pcs				- sends ec files, else non-ec files
+#	pcs -n				- sends non-ec files, if any
+#	pcs -c				- compresses files
+#	pcs -g				- sends gcm versions, if any
+#	pcs -l				- lists files without sending
+#	pcs -1				- force 1.X directory structure
+#	pcs -2				- force 2.0 directory structure
+#	pcs -u				- send file to Unix directory, 
+#						instead of downloading.
+#	pcs -v				- send .vm file also
+#	pcs -D				- ignore PWD variable, always use `pwd`
+#	pcs -d<destdir>			- destination dir on PC/novell net.
+#	pcs <directory>			- sends contents of named directories
+#	pcs <file>			- sends named files
+#
+# ENVIRONMENT VARIABLES:
+#	PWD			holds the absolute current working directory,
+#				unless -D is given.
+#	PCSDIR			holds the absolute destination of the send
+#				if -u is given, but -d isn't.
+#
+# FILES:
+#	$HOME/.pcslocal		if it exists, it is an sh script fragment
+#				executed after the default file destination
+#				has been chosen, that can be used to
+#				override that default destination.
+#				Should take the same form as the
+#					"case $src in ..." clauses below.
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	tony	1/5/90		Initial Revision
+#	gene	1/6/90		Added -n flag
+#	gene	1/7/90		Re-wrote, added directory option
+#
+# IMPORTANT: There is only one copy of pcs. There is a symbolic link from
+#		/usr/public to it. Do not edit pcs on a branch, just the trunk.
+#
+#
+# IMPLEMENTATION NOTES:
+#	the expression "${pcsend-pcsend}" allows me to override the
+#	version of pcsend used in this script. If the environment variable
+#	"pcsend" is set to something, it'll use that, else it'll just
+#	execute "pcsend", searching the path etc.
+#
+#	$Id: pcs,v 1.217 98/05/14 10:16:38 kho Exp $
+#
+###############################################################################
+
+###############################################################################
+#
+# Some variables:
+#    cwd	- current directory
+#    ec		- set to 'ec' if sending error-checking versions
+#    gcm	- set to 'gcm' if sending General Consumer Mode versions
+#    args	- list of arguments from the command line
+#    src	- source directory to send files from
+#    dest	- directory on the PC to send files to
+#    suffix	- suffix of files in
+#    files	- list of file(s) to send
+#    isdir	- TRUE if argument is a directory
+# Other variables:
+#    i		- current argument
+#    error	- set to TRUE if an error occurs
+#    non	- string for non-error checking mesasage
+#    p	    	- condensed, absolute path to current argument
+#
+###############################################################################
+
+case "$-" in
+    *x*) x=x ;;
+esac
+
+#
+# ec is set to NULL if -n flag is passed
+# gcm is set to "gcm" if -g flag is pased
+# compress is set to "-c" if -c flag is passed
+#
+ec=ec
+gcm=
+compress=
+filter="sed -e '/\*/d'"
+non=
+dir=-d.
+novell=""
+ignorepwd=0
+sendvm=0
+list=0
+#
+# Set some variables for directory names.  If these variables are
+# already set by the parent script (ie, "ship"), then use those values
+# instead. 
+#
+d_world=world
+d_productivity=${d_productivity-world/producti.000}
+d_deskacc=${d_deskacc-world/desk_acc.000}
+d_utilities=${d_utilities-world/utilitie.000}
+d_feputils=${d_feputils-world/fep_util.000}
+d_games=${d_games-world/games}
+d_demos=${d_demos-world/demos}
+d_other=${d_other-world/other}
+#
+# Process all the arguments, dealing with flags now, saving targets in $args
+# for later.
+#
+args=""
+usedir=""
+flags=""
+product=""
+while [ $# -ne 0 ]; do
+    case $1 in
+	-n) 	ec=
+		non="non-ec"
+	    	filter="$filter -e '/ec\./d' -e '/gcm\./d'";;
+	-g)	gcm="gcm"
+		ec=;;
+	-1 | -2) ;;
+	-c)	compress="-c"
+		echo "files being compressed";;
+	-u)	novell="-n";;
+	-D)	ignorepwd=1 ;;
+	-v)	sendvm=1 ;;
+	-d*)	dir=$1;;
+	-l)	list=1 ;;
+	-X)	x=x
+		set -x
+		;;
+	-*) 	flags="$flags $1";;
+	*)	usedir=$1
+		args="$args $1";;
+    esac
+    shift
+done
+#
+# Get the current working directory
+#
+if [ $ignorepwd -eq 1 ]; then
+    cwd=`pwd`
+else
+    cwd=${PWD-`pwd`}
+fi
+#
+# If no arguments, use the current directory
+#
+if [ ! "$args" ]; then
+    args=$cwd
+fi
+
+
+#
+# Don't let dummies send files from Installed executable tree to .
+# Also, use the value of PCSDIR as the default destination of an NFS send.
+#
+
+if [ x"$novell" = x"-n" -a x"$dir" = x"-d." ]; then
+    dir=-d${PCSDIR?"must specify destination directory when using -u argument to send $args"}
+fi
+targdir=`expr x"$dir" : 'x-d\(.*\)$'`
+
+if [ x"$novell" = x"-n" -a -f $targdir/PRODUCT ]; then
+    read product < $targdir/PRODUCT
+fi
+
+#
+# For each argument...
+#
+for i in $args; do
+    error=0
+    suffix=
+    files=""
+    
+    #
+    # If the thing is a relative path (doesn't begin with a slash), tack the
+    # current directory onto the front.
+    #
+    case $i in
+    	/*) : do nothing ;;
+	*) i=$cwd/$i;;
+    esac
+
+    #
+    # Now compress out . and .. components
+    #
+    p=""
+    IFS="/"; set -$x $i; IFS=" 	"
+    while [ $# -ne 0 ]; do
+    	if [ "$2" = ".." ]; then
+    	    # nuke $1 and $2
+	    shift
+	elif [ "$1" != "." ]; then
+	    p="$p/$1"
+	fi
+	shift
+    done
+
+    #
+    # See if the argument is a directory. Set $src to the absolute path. isdir
+    # is set to 1 if the argument is a directory.
+    #
+    if [ -d $p ]; then
+	isdir=1
+	src=$p/
+    elif [ -f $p ]; then
+	isdir=0
+	src=`expr "$p" : '\(.*/\)[^/]*$'`
+    else
+	#
+	# It's a file or directory that doesn't exist
+	#
+	echo $i: no such file or directory
+	error=1
+    fi
+    dest=
+    #######################################################################
+    #			FOR V2.0
+    #######################################################################
+    #
+    # Figure out where to send the file based on the directory.
+    #
+    case $src in
+	#
+	# Special
+	#
+	*/DOSAppl/|*/DOSAppl/*)
+	    suffix=".*"
+	    dest="."
+	    ;;
+	#
+	# Library
+	#
+	*/Library/HWR/*/Data/)
+	    suffix=".*"
+	    dest="privdata/hwr"
+	    ;;
+	*/Library/Spell/Dicts/*)
+	    suffix=".*"
+	    dest="userdata/dicts"
+	    ;;
+	*/Library/Saver/)
+	    suffix=".geo"
+	    dest="system"
+	    ;;
+	*/Library/Pref/*)
+	    suffix=".geo"
+	    dest="system/pref"
+	    ;;
+	*/Library/Translation/Graphics/Bitmap/Dib/* | \
+	*/Library/Translation/Graphics/Vector/Wmf/ | \
+	*/Library/Translation/Text/MSMFile/)
+	    suffix=".geo"
+	    dest="system"
+	    ;;
+	*/Library/Translation/*)
+	    suffix=".geo"
+	    dest="system/impex"
+	    ;;
+	*/Library/FMTools/*)
+	    suffix=".geo"
+	    dest="system/filemgr"
+	    ;;
+	*/Library/Foam/OEM/irtr/*)
+	    suffix=".geo"
+	    dest="system/irtr"
+	    ;;
+	*/Library/*)
+	    suffix=".geo"
+	    dest="system"
+	    ;;
+	#
+	# Driver
+	#
+	*/Driver/IFS/GEOS/PGFS/*)
+	    suffix=".geo"
+	    dest="system/pcmcia"
+	    ;;
+	*/Driver/IFS/* | \
+	*/Driver/FS/*)
+	    suffix=".geo"
+	    dest="system/fs"
+	    ;;
+	*/Driver/Fep/*)
+	    suffix=".geo"
+	    dest="system/fep"
+	    ;;
+	*/Driver/NewsCard/*)
+	    suffix=".geo"
+	    dest="system/pager"
+	    ;;
+	*/Driver/Net/*)
+	    suffix=".geo"
+	    dest="system/net"
+	    ;;
+	*/Driver/Fax/*)
+	    suffix=".geo"
+	    dest="system/fax"
+	    ;;
+	*/Driver/Task/*/*Pref/)
+	    suffix=".vm"
+	    dest="system/task"
+	    ;;
+	*/Driver/Task/*)
+	    suffix=".geo"
+	    dest="system/task"
+	    ;;
+	*/Driver/Font/*)
+	    suffix=".geo"
+	    dest="system/font"
+	    ;;
+	*/Driver/Keyboard/*)
+	    suffix=".geo"
+	    dest="system/kbd"
+	    ;;
+	*/Driver/Mouse/*)
+	    suffix=".geo"
+	    dest="system/mouse"
+	    ;;
+	*/Driver/Printer/*)
+	    suffix=".geo"
+	    dest="system/printer"
+	    ;;
+	*/Driver/Swap/*)
+	    suffix=".geo"
+	    dest="system/swap"
+	    ;;
+	*/Driver/Video/*)
+	    suffix=".geo"
+	    dest="system/video"
+	    ;;
+	*/Driver/Power/*)
+	    suffix=".geo"
+	    dest="system/power"
+	    ;;
+	*/Driver/Sound/*)
+	    suffix=".geo"
+	    dest="system/sound"
+	    ;;
+	*/Driver/DMA/*)
+	    suffix=".geo"
+	    dest="system/dma"
+	    ;;
+	*/Driver/Pager/*)
+	    suffix=".geo"
+	    dest="system/pager"
+	    ;;
+	*/Driver/PCMCIA/*)
+	    suffix=".geo"
+	    dest="system/pcmcia"
+	    ;;
+	*/Driver/Mailbox/Transport/*)
+	    suffix=".geo"
+	    dest="system/mbtrans"
+	    ;;
+	*/Driver/Mailbox/Data/*)
+	    suffix=".geo"
+	    dest="system/mbdata"
+	    ;;
+	*/Driver/Sim/SimDlink/*)
+	    suffix=".geo"
+	    dest="system/socket"
+	    ;;
+	*/Driver/Socket/*)
+	    suffix=".geo"
+	    dest="system/socket"
+	    ;;
+	*/Driver/Connect/Translate/*)
+	    suffix=".geo"
+	    dest="system/ctrnslat"
+	    ;;
+	*/Driver/Connect/Transfer/*)
+	    suffix=".geo"
+	    dest="system/ctrnsfer"
+	    ;;
+
+	# 
+	# If we can't figure out where else to put it, put it in SYSTEM
+	#
+	*/Driver/*)
+	    suffix=".geo"
+	    dest="system"
+	    ;;
+	#
+	# Applications
+	#
+	    #
+	    # Screen savers
+	    #
+	    */Appl/Saver/* |\
+	    */Appl/*/Saver/* )
+		suffix=".geo"
+		dest="system/savers"
+		;;
+	    #
+	    # Email engine mode apps (must be before Productivity)
+	    #
+	    */Appl/Email/Classifier/* |\
+	    */Appl/Email/Services/*)
+		suffix=".geo"
+		dest="system/sysappl"
+		;;	   
+	    #
+	    # Productivity
+	    #
+	    */Appl/Email/* |\
+	    */Appl/GeoWrite/* |\
+	    */Appl/GeoCalc/* |\
+	    */Appl/GeoDraw/* |\
+	    */Appl/GeoFile/* |\
+	    */Appl/Calendar/RESPONDER/* |\
+	    */Appl/Calendar/RESPONDERTHAI/* |\
+	    */Appl/GPInfo/*)
+		suffix=".geo"
+		dest=$d_world
+		;;
+	    #
+	    # Special Responder Apps (must do these before Calendar and Term
+	    # below)
+	    #
+	    */Appl/DriverTest/*/RESPONDER/* |\
+	    */Appl/BigCalc/RESPONDER/* |\
+            */Appl/Tools/*/RESPONDER/* |\
+	    */Appl/FApps/Convert/* |\
+	    */Appl/FApps/FClock/* |\
+	    */Appl/FApps/LogFac/* |\
+	    */Appl/FApps/Test/*/* |\
+	    */Appl/FApps/Utils/*/* |\
+	    */Appl/FApps/OEM/comp/* |\
+	    */Appl/FApps/OEM/sstest/* |\
+	    */Appl/FtKnox/* |\
+	    */Appl/Test/Responder/*/*/*)
+		suffix=".geo"
+		dest=$d_world/extrapps
+		;;
+
+	    */Appl/FApps/WWW/* |\
+	    */Appl/FApps/OEM/www/* |\
+	    */Appl/FApps/OEM/mlmn/* |\
+	    */Appl/FApps/OEM/netgate/* |\
+	    */Appl/Socket/GTelnet/RESPONDERTHAI/* |\
+	    */Appl/Term/RESPONDERTHAI/* |\
+	    */Appl/Socket/GTelnet/RESPONDER/* |\
+	    */Appl/Term/RESPONDER/*)
+		suffix=".geo"
+		dest=$d_world/svcapps
+		;;
+
+	    */Appl/FApps/SApps/* |\
+	    */Appl/FApps/OEM/imgtrans/* |\
+	    */Appl/FApps/OEM/fmodem/*)
+		suffix=".geo"
+		dest=$d_world/sysapps
+		;;
+
+	    */Appl/FApps/DataRec/*)
+		suffix=".geo"
+		dest="system/sysappl"
+		;;
+
+	    */Appl/SDK_C/Talk/RESPONDER/*)
+		suffix=".geo"
+		dest=$d_world/svcapps
+		;;
+
+	    #
+	    # Desk Accessories
+	    #
+	    */Appl/Calendar/* |\
+	    */Appl/GeoDex/* |\
+	    */Appl/RedDex/* |\
+	    */Appl/NTaker/* |\
+	    */Appl/BigCalc/* |\
+	    */Appl/ScrapBk/* |\
+	    */Appl/SerialInput/*)
+		suffix=".geo"
+		dest=$d_deskacc
+		;;
+	    #
+	    # Special case for GeoComm (must do this before the Utilities
+	    # section below.)
+	    #
+	    */Appl/Term/Macros/*)
+		suffix=".mac"
+		dest="userdata/commacro"
+		;;
+	    */Appl/Term/Termcap/*)
+		suffix=".tc"
+		dest="userdata/termcap"
+		;;
+	    #
+	    # Utilities
+	    #
+	    */ATOKLaunchers/*)
+		suffix=".txt"
+		dest=$d_feputils
+		;;
+	    */ATOKLaunchers/*)
+		suffix=".000"
+		dest=$d_feputils
+		;;
+	    */Appl/Util/FepConfig/*)
+		suffix=".geo"
+		dest=$d_feputils
+		;;
+
+	    */Appl/Tools/FaxServ/)
+	    	suffix=".geo"
+		dest="system/sysappl"
+		;;
+		
+	    */Appl/Preferences/PrefMgr/* |\
+	    */Appl/Emailadmin/* |\
+	    */Appl/Banner/* |\
+	    */Appl/TEdit/* |\
+	    */Appl/Term/* |\
+	    */Appl/Perf/* |\
+	    */Appl/Icon/* |\
+	    */Appl/Dump/* |\
+	    */Appl/Clock/* |\
+	    */Appl/Tools/* |\
+	    */Appl/Net/Netmsg/* |\
+	    */Appl/NInFnt/*)
+		suffix=".geo"
+		dest=$d_utilities
+		;;
+
+	    #
+	    # Special-case Jedi games.  Has to come
+	    # before that nasty Appl/Games/* below.
+	    #
+	    */Appl/Games/Solitaire/JEDI/* |\
+	    */Appl/Games/Solitaire/JediXIP/*)
+		suffix=".geo"
+		dest=$d_world
+		;;
+
+	    #
+	    # Games
+	    #
+	    */Appl/Roach/* |\
+	    */Appl/Coop/Ghost/* |\
+	    */Appl/Games/* |\
+	    */Appl/Coop/Trader/* |\
+	    */Appl/Coop/Life/* |\
+	    */Appl/Coop/3DMaze/* |\
+	    */Appl/Coop/Blockout/*)
+		suffix=".geo"
+		dest=$d_games
+		;;
+	    #
+	    # Demos
+	    #
+	    */Appl/Bounce/* |\
+	    */Appl/FontRotate/* |\
+	    */Appl/Rotate/* |\
+	    */Appl/Spintext/*)
+		suffix=".geo"
+		dest=$d_demos
+		;;
+	    #
+	    # Launchers
+	    #
+	    */Appl/Launcher/*)
+		suffix=".geo"
+		dest="privdata"
+		;;
+	    
+	    #
+	    # Special Artwork
+	    #
+	    */Appl/Iclas/Mouse/MouseArt/*)
+		suffix=".bin"
+		dest="privdata/mousetut"
+		;;
+	    #
+	    # Special cases for Zoomer
+	    #
+	    */Appl/FileMgrs/ZManager/* |\
+	    */Appl/Preferences/ZPrefMgr/*)
+		suffix=".geo"
+		dest=$d_utilities
+		;;
+	    #
+	    # System (SYSAPPL)
+	    #
+	    */Appl/LOL/* | \
+	    */Appl/Startup/* |\
+	    */Appl/Iclas/* |\
+	    */Appl/Fax/Spool/ |\
+	    */Appl/Fax/MLurker/ |\
+	    */Appl/SLurker/ |\
+	    */Appl/FileMgrs/* |\
+	    */Appl/FileMgrs/GeoManager/* |\
+	    */Appl/Preferences/ZSetup/* |\
+	    */Appl/Preferences/EPrefMgr/* |\
+	    */Appl/Preferences/Setup/* |\
+	    */Appl/GPNotice/* |\
+	    */Appl/Regis/* |\
+	    */Appl/Watcher/Pager/*)
+		suffix=".geo"
+		dest="system/sysappl"
+		;;
+
+	    #
+	    # Special cases for Jedi
+	    #
+	    */Appl/Jedi/HomeScreen/* |\
+	    */Appl/Jedi/JApp/* |\
+	    */Appl/Startup/JStartup/* |\
+	    */Appl/Jedi/ScreenDump/*)
+		suffix=".geo"
+		dest="system/sysappl"
+		;;
+
+	    #
+	    # Put the Alarm application in sysappl because it is run at
+	    # startup.
+	    #
+	    */Appl/Palm/Alarm/*)
+		suffix=".geo"
+		dest="system/sysappl"
+		;;
+
+	    #
+	    # Main... currently for Gulliver, until we think of a better
+	    # place to put the palm pims
+	    #
+	    */Appl/Palm/*)
+		suffix=".geo"
+		dest=$d_world"/main"
+		;;
+	    
+	    #
+	    # Other gulliver specials
+	    #
+	    */Appl/Gulliver/HomePage/*)
+		suffix=".geo"
+		dest="system/sysappl"
+		;;
+
+	    #
+	    # Special cases for Nike
+	    #
+	    */Appl/Nike/Typewriter/*)
+		suffix=".geo"
+		dest=$d_deskacc
+		;;
+
+	    #
+	    # Test
+	    #
+	    */Appl/CTest/* | \
+	    */Appl/SDK_C/*)
+		suffix=".geo"
+		dest="world/c"
+		;;
+	    */Appl/Test/Socket/*/RESPONDER/*)
+		suffix=".geo"
+		dest="world/svcapps"
+		;;
+	    */Appl/Test/* | \
+	    */Appl/TestUI/* | \
+	    */Appl/SDK_Asm/*)
+		suffix=".geo"
+		dest="world/asm"
+		;;
+	    */Appl/Art/Decks/*)
+		suffix=".vm"
+		dest="userdata/deck"
+		;;
+
+	    #
+	    # Special
+	    #
+	    */Loader/*)
+		suffix=".exe"
+		dest="."
+		;;
+	    */Quantum/DB/*|*/Quantum/Help/*|*/Quantum/Pic/*)
+		suffix=".vm"
+		dest="privdata/pcao"
+		;;
+	    */Bitmaps/*)
+		suffix=".bit"
+		dest="userdata/backgrnd"
+		;;
+	    */FontData/*)
+		suffix=".fnt"
+		dest="userdata/font"
+		;;
+	    */Document/*)
+		suffix=".*"
+		dest="document"
+		;;
+	    */Tools/swat/Stub/*)
+		suffix=".exe"
+		dest="."
+		;;
+	    */Tools/com43/*)
+		suffix=".com"
+		dest="."
+		;;
+	    */Tools/pctrans/*)
+		suffix=".com"
+		dest="."
+		;;
+	    */help/*)
+		suffix=".00?"
+		dest="userdata/help"
+		;;
+	    */Appl/Demo/MiniField/Phone/*)
+		suffix=".vm"
+		dest="document"
+		;;
+	    */Appl/*)
+		suffix=".geo"
+		dest=$d_world
+		;;
+	    *)
+		;;
+	esac
+    #
+    # Figure out where to send the file based on the extension.
+    #
+    case $p in
+	*/Appl/*/*gcm.geo)
+	    dest="system/sysappl"
+	    ;;
+	*.fnt)
+	    dest="userdata/font"
+	    ;;
+	*.exe)
+	    if [ ! "$dest" ]; then
+		dest=".";
+	    fi
+	    ;;
+	geos.str | */geos.str | \
+	*.ini)
+	    dest="."
+	    ;;
+	*.bit)
+	    dest="userdata/backgrnd"
+	    ;;		    
+	*)
+	    ;;
+    esac
+
+    #
+    # Let user override our choice
+    #
+    if [ -f $HOME/.pcslocal ] ; then
+	. $HOME/.pcslocal
+    fi
+
+    #
+    # We couldn't figure out where to send the thing...bummer
+    #
+    if [ ! "$dest" -a $error -eq 0 ]; then
+    	if [ $isdir -eq 0 -a -t 0 ]; then
+	    echo -n "$p: path unrecognized -- send to .?[yn](y) "
+	    read ans
+	    case "$ans" in
+		[Nn]*) error=1;;
+		*) dest="." ;;
+    	    esac
+    	else
+    	    echo "$p: path unrecognized -- not sent"
+	    error=1
+    	fi
+    fi
+    #
+    # If we know where to send stuff, see what it is
+    #
+    if [ $error -eq 0 ]; then
+	#
+	# If argument is a directory, expand the files in it
+	#
+	if [ $isdir -eq 1 ]; then
+    	    #
+	    # If target is product-specific and we have a directory, see
+	    # if there's a product-specific directory under the source and
+	    # use that for the search instead.
+	    #
+	    if [ "$product" -a -d "$src$product" ]; then
+	    	src=$src$product/
+    	    fi
+	    #
+	    # if not error-checking, get only non-ec files, else get ec files
+	    #
+    	    files=`echo $src*$ec$suffix | tr ' ' '\012' | eval $filter`
+
+	    #
+    	    # if no files matched our stringent criteria and we were looking
+	    # for ec files, try looking for non-ec before we give up...
+	    #
+    	    # if still no files to send, tell the user (politely) they're fucked
+	    #
+    	    if [ ! "$files" -a "$ec" ]; then
+	    	files="`echo $src*$suffix | tr ' ' '\012' | eval $filter`"
+    	    fi
+	    if [ ! "$files" ]; then
+		echo no $non $gcm $suffix files in $src
+		error=1
+	    fi
+	    files="`echo \"$files\" | tr '\012' ' '`"
+	#
+	# Argument wasn't a directory, it's a file
+	#
+	else
+	    files=$p
+	fi
+	#
+	# If we actually found some files, send them
+	#
+	if [ $error -eq 0 ]; then
+	    for f in $files; do
+	    	if [ "$product" ]; then
+    	    	    _fd=`expr $f : '\(.*\)/[^/]*$'`
+		    _f=`basename $f ""`
+		    if [ -f $_fd/$product/$_f ]; then
+    	    	    	echo "Using product-specific version of $_f"
+			f=$_fd/$product/$_f
+    	    	    fi
+    	    	fi
+
+		echo "sending ${f} to $dir/$dest"
+		#
+		# Make sure the destination directory exists if sending
+		# via NFS
+		#
+		if [ $list -eq 0 ]; then
+		    if [ x"$novell" = "x-n" -a ! -d $targdir/$dest ]; then
+			mkdir -p $targdir/$dest
+		    fi
+		    ${pcsend-pcsend} $flags $novell $compress $dir/$dest $f
+		fi
+		if [ $sendvm -eq 1 ]; then
+		    v=`echo $f | sed -e 's/ec.geo$/.vm/' -e 's/.geo$/.vm/'`
+		    if [ "$v" != "$f" ]; then
+			if [ $list -eq 0 ]; then
+			    ${pcsend-pcsend} $flags $novell $compress $dir/$dest $v
+			else
+			    echo "sending ${v} to $dir/$dest"
+			fi
+		    fi
+		fi
+	    done
+	fi
+    fi
+done

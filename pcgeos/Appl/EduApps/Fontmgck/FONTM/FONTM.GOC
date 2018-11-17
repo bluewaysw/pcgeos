@@ -1,0 +1,1532 @@
+/***********************************************************************
+ *
+ * PROJECT:       FontMagick
+ * FILE:          fontm.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ ***********************************************************************/
+
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <Objects/clipbrd.goh>
+@include <Objects/gviewcc.goh>
+@include <Objects/text/tctrlc.goh>
+#include <graphics.h>
+#include <gstring.h>
+#include <vm.h>
+#include <ansi/string.h>
+#include <ansi/stdio.h>
+#include <file.h>
+#include <system.h>
+
+@include "CharSet.goh"
+#include "fontmagi.h"                   /* global definitions */
+#include "gsol.h"                       /* graphics string owner link */
+
+/*
+@define ADD_RULERS
+@define ADD_INFOTEXT
+*/
+
+#define WRITE_METAFILE
+
+#define GRAPH_FORMAT FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS,\
+                                                     CIF_GRAPHICS_STRING)
+
+#define MY_TOKEN "FMGK",16431   /* breadbox FontMagick */
+
+#if 1
+#define VIEW_MARGIN 18          /* margin around image in view (in pt) */
+#else
+#define VIEW_MARGIN 0           /* no margin for precision testing purposes */
+#endif
+
+#define REDRAW_TICKS 90         /* 1/60s intervals before text is redrawn */
+#define RULER_WIDTH 20          /* thickness of rulers on screen */
+#define ENTRY_SIZE 24           /* size of text in entry field */
+
+#define INIT_FID FID_DTC_URW_ROMAN      /* initial font is URW Roman */
+#define INIT_SIZE 72                    /* initial size is 72 pt */
+#define INIT_STYLE 0                    /* initial style is plain */
+
+#define SETTINGS_LOADDEFAULTS   0x0001
+#define SETTINGS_NOREDRAW       0x0002
+#define SETTINGS_GSOLENABLE     0x0008
+#define SETTINGS_MIXEDCOLORS    0x0010
+
+#define HELP_FILENAME "FontMagick Help File"
+
+char CLIPBOARD_NAME[]="Effect created by FontMagick";
+
+#pragma pack(1)
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+@class  FontMProcessClass, GenProcessClass;
+@endc
+
+@class FontMApplicationClass GenApplicationClass;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FontM_EFFECT_CHANGED;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FontM_SHADOW_DIR_CHANGED;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FontM_COLITEM_CHANGED;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FontM_DISTORTION_CHANGED;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FontM_DIST_PERS_CHANGED;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FontM_GRID_CHANGED;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FontM_GRID_EXP_CHANGED;
+    @message (GEN_TEXT_APPLY_MSG) MSG_FontM_TEXT_CHANGED;
+    @message (GEN_VALUE_APPLY_MSG) MSG_FontM_SHADOW_DEPTH_CHANGED;
+    @message (GEN_VALUE_APPLY_MSG) MSG_FontM_OUTLINE1_THCKN_CHANGED;
+    @message (GEN_VALUE_APPLY_MSG) MSG_FontM_OUTLINE2_THCKN_CHANGED;
+    @message (GEN_VALUE_APPLY_MSG) MSG_FontM_SQUISH_RATIO_CHANGED;
+    @message (GEN_VALUE_APPLY_MSG) MSG_FontM_SKEW_ANGLE_CHANGED;
+    @message (GEN_VALUE_APPLY_MSG) MSG_FontM_ANGLE_CHANGED;
+    @message (GEN_VALUE_APPLY_MSG) MSG_FontM_WAVE_NUMBER_CHANGED;
+    @message (GEN_VALUE_APPLY_MSG) MSG_FontM_SIZE_FACTOR_CHANGED;
+    @message (GEN_VALUE_APPLY_MSG) MSG_FontM_PERSPECTIVE_FACTOR_CHANGED;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FontM_VREF_CHANGED;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FontM_UPDOWN_CHANGED;
+    @message void MSG_FontM_LOAD_DEFAULT();
+    @message void MSG_FontM_LOAD_STARTUP();
+    @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_FontM_SHADOW_PROPS_CHANGED;
+    @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_FontM_OUTLINE_PROPS_CHANGED;
+@ifdef ADD_RULERS
+    @message (RULER_SHOW_CONTROL_NOTIFY) MSG_FontM_UPDATE_RULERS;
+@endif
+    @message (MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION)
+               MSG_FontM_COLOR_VISIBLE;
+    @alias   (MSG_VIS_TEXT_SET_TRACK_KERNING)
+               void MSG_FontM_SET_TRACK_KERNING(@stack
+                                                BBFixedAsWord trackKerning,
+                                                dword rangeEnd,
+                                                dword rangeStart);
+    @alias   (MSG_VIS_TEXT_SET_FONT_WEIGHT)
+               void MSG_FontM_SET_FONT_WEIGHT(@stack
+                                              FontWeight fontWeight,
+                                              dword rangeEnd,
+                                              dword rangeStart);
+    @alias   (MSG_VIS_TEXT_SET_FONT_WIDTH)
+               void MSG_FontM_SET_FONT_WIDTH(@stack
+                                             FontWidth fontWidth,
+                                             dword rangeEnd,
+                                             dword rangeStart);
+    @message void MSG_FontM_REDRAW_DELAY_EXPIRED();
+    @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_FontM_SETTINGS_CHANGED;
+    @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_FontM_EMBED_CHANGED;
+    @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_FontM_MIXMODE_CHANGED;
+@endc
+
+@classdecl      FontMProcessClass, neverSaved;
+@classdecl      FontMApplicationClass;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+@include "fontm/font_ui.goh"            /* User interface, App object */
+
+@start  AppResource;
+  @visMoniker FontMTextMoniker = "FontMagick";
+@end    AppResource;
+
+@start  Interface;
+  /*
+   * Various data chunks
+   */
+  @chunk VisTextCharAttr InitialCharAttr =
+      CHAR_ATTR_FONT_SIZE_STYLE(INIT_FID, ENTRY_SIZE, INIT_STYLE);
+
+  @chunk char ErrorNoGSOL[] =
+    "Clipboard data did not contain valid FontMagick GSOL info.";
+  @chunk char ErrorBadGSOLVersion[] =
+    "Clipboard data is not compatible with this version of FontMagick.";
+
+  @visMoniker DMCompressed = "Compressed";
+  @visMoniker DMCompressedEast = "Compressed/East";
+  @visMoniker DMCompressedWest = "Compressed/West";
+  @visMoniker DMEast = "East";
+  @visMoniker DMExpanded = "Expanded";
+  @visMoniker DMExpandedEast = "Expanded/East";
+  @visMoniker DMExpandedWest = "Expanded/West";
+  @visMoniker DMHorCompressed = "Hor.Compressed";
+  @visMoniker DMHorExpanded = "Hor.Expanded";
+  @visMoniker DMNorth = "North";
+  @visMoniker DMNorthCompressed = "North/Compressed";
+  @visMoniker DMNortheast = "Northeast";
+  @visMoniker DMNorthExpanded = "North/Expanded";
+  @visMoniker DMNorthwest = "Northwest";
+  @visMoniker DMSouth = "South";
+  @visMoniker DMSouthCompressed = "South/Compressed";
+  @visMoniker DMSoutheast = "Southeast";
+  @visMoniker DMSouthExpanded = "South/Expanded";
+  @visMoniker DMSouthwest = "Southwest";
+  @visMoniker DMVertCompressed = "Vert.Compressed";
+  @visMoniker DMVertCompressedHorExpanded = "Vert.Compressed/Hor.Expanded";
+  @visMoniker DMVertExpanded = "Vert.Expanded";
+  @visMoniker DMVertExpandedHorCompressed = "Vert.Expanded/Hor.Compressed";
+  @visMoniker DMWest = "West";
+@end    Interface;
+
+@include "breadbox.goh"                 /* breadbox logo */
+
+@start FontMagickMonikerResource, data;
+  @include "art/appicon.goh"            /* iconic monikers */
+  @include "art/monikers.goh"           /* monikers converted from scrapbook */
+@end   FontMagickMonikerResource;
+
+/***********************************************************************
+ *                  Global variables affecting the effect
+ ***********************************************************************/
+struct State_struct Effect;
+
+unsigned colitem;               /* current item to which coloring applies */
+TimerHandle redraw_th;
+word redraw_tid;
+sword redraw_running;
+
+/* sequence in which pointsizes are applied by larger/smaller triggers */
+word PointsizeSequence[]={4,6,8,9,10,12,14,18,24,36,54,72,144,180,216};
+#define N_PSSEQ (sizeof(PointsizeSequence)/sizeof(PointsizeSequence[0]))
+
+RectDWord contentBounds;                /* bounds of current image */
+
+/***********************************************************************
+ *          "Dials" describing parameters affecting the effects
+ ***********************************************************************/
+#define DIAL_VPERS            0x1
+#define DIAL_HPERS            0x2
+#define DIAL_STH              0x10
+#define DIAL_SFORM            0x20
+#define DIAL_OUTLSHAD         0x40
+#define DIAL_SDIR             0x80
+#define DIAL_C_TEXT           0x100
+#define DIAL_C_SHADOW         0x200
+#define DIAL_C_SHADOW2        0x400
+#define DIAL_C_SHADOW_BACK    0x1000
+
+#define DIAL_D_ANGLE          0x1
+#define DIAL_D_WAVENUM        0x2
+#define DIAL_D_SIZE           0x4
+#define DIAL_D_VREF           0x8
+#define DIAL_D_BEND           0x10
+
+
+word ShadowDials[]={            /* indexed by EFFECT_* value - 1 */
+      DIAL_C_TEXT,
+      DIAL_C_TEXT | DIAL_STH | DIAL_SDIR | DIAL_VPERS | DIAL_HPERS | DIAL_OUTLSHAD | DIAL_C_SHADOW | DIAL_C_SHADOW_BACK,
+      DIAL_C_TEXT | DIAL_STH | DIAL_SDIR | DIAL_VPERS | DIAL_HPERS | DIAL_OUTLSHAD | DIAL_C_SHADOW | DIAL_C_SHADOW_BACK,
+      DIAL_C_TEXT | DIAL_STH | DIAL_SDIR | DIAL_OUTLSHAD | DIAL_SFORM | DIAL_VPERS | DIAL_HPERS | DIAL_C_SHADOW | DIAL_C_SHADOW_BACK,
+      DIAL_C_TEXT | DIAL_STH | DIAL_SDIR | DIAL_OUTLSHAD | DIAL_C_SHADOW | DIAL_C_SHADOW2 | DIAL_C_SHADOW_BACK,
+      DIAL_C_TEXT | DIAL_STH | DIAL_SDIR | DIAL_VPERS | DIAL_HPERS | DIAL_OUTLSHAD | DIAL_C_SHADOW | DIAL_C_SHADOW_BACK,
+      0,
+  };
+
+word DistortionDials[]={        /* indexed by DIST_* value  */
+      0,
+      DIAL_D_SIZE | DIAL_D_VREF,
+      DIAL_D_SIZE | DIAL_D_VREF,
+      DIAL_D_SIZE | DIAL_D_BEND,
+      DIAL_D_SIZE | DIAL_D_BEND,
+      DIAL_D_WAVENUM | DIAL_D_SIZE | DIAL_D_BEND,
+      DIAL_D_ANGLE | DIAL_D_BEND,
+  };
+
+/***********************************************************************
+ *                  Defaults for the various effects
+ ***********************************************************************/
+
+@start EffectDefaultResource,data;
+  @chunk struct Effect_struct DefaultEffect[]=
+  {
+    EFFECT_PLAIN, 1, 0, 0, 1, 1,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_LIGHT_GRAY,CF_INDEX,0,0, SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+      0,
+    EFFECT_FOG, 10, 0, 0, 1, 1,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_LIGHT_GRAY,CF_INDEX,0,0, SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+      EFFECT_VPERS | EFFECT_HPERS,
+    EFFECT_3D, 7, 0, 0, 1, 1,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_LIGHT_GRAY,CF_INDEX,0,0, SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+      EFFECT_HPERS,
+    EFFECT_SHADOW, 5, 0, 0, 1, 1,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_LIGHT_GRAY,CF_INDEX,0,0, SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_50,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_0,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+      EFFECT_HPERS,
+    EFFECT_DOUBLE, 1, 0, 0, 1, 1,
+            C_LIGHT_GRAY,CF_INDEX,0,0, SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_LIGHT_GRAY,CF_INDEX,0,0, SDM_100,
+            C_DARK_GRAY,CF_INDEX,0,0,  SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_0,
+            C_LIGHT_GRAY,CF_INDEX,0,0, SDM_100,
+      0,
+    EFFECT_SOLID, 2, 0, 0, 1, 1,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_LIGHT_GRAY,CF_INDEX,0,0, SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+      0,
+    EFFECT_OUTLINE, 1, 0, 0, 1, 1,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_LIGHT_GRAY,CF_INDEX,0,0, SDM_100,
+            C_BLACK,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+            C_WHITE,CF_INDEX,0,0,      SDM_100,
+      0,
+  };
+@end EffectDefaultResource;
+
+/*
+ *  Get data for shadow type indicated by "type" into structure at *e.
+ */
+void GetDefaultEffect(struct Effect_struct *e,word type)
+{
+    struct Effect_struct *de;
+
+    MemLock(OptrToHandle(@DefaultEffect));
+
+    de=LMemDeref(@DefaultEffect);
+    memcpy(e,&de[type-1],sizeof(struct Effect_struct));
+
+    MemUnlock(OptrToHandle(@DefaultEffect));
+}
+
+/*
+ *  Load startup default effect without affecting currently selected text
+ */
+void GetStartupState(struct State_struct *s)
+{
+    char text[MAX_TEXT+1];
+
+    memcpy(text,s->text,MAX_TEXT+1);    /* save current text */
+
+    GetDefaultEffect(&s->e,EFFECT_PLAIN);
+                                        /* initialize to "plain" shadow */
+    s->fid=INIT_FID;
+    s->size=MakeWWFixed(INIT_SIZE);
+    s->style=INIT_STYLE;
+    s->fontWeight = s->fontWidth = 100;
+    s->trackKerning = 0;                /* default character spacing */
+    s->squish_ratio = 100;              /* default squish ratio */
+    s->skew_angle = 0;                  /* no skewing */
+    s->embedFonts = FALSE;              /* do not create embedded fonts */
+    s->mixedColors = FALSE;             /* use system draw masks */
+    s->drawGrid = GRID_BOTH;            /* draw grid outline and font */
+    s->exportGrid = GRID_CHARONLY;      /* export characters only */
+    s->gsolEnable = TRUE;               /* enable GSOL */
+    s->dist.distortion = s->dist.dist_pers = DIST_NONE;
+                                        /* no distortion */
+    s->dist.angle = 180;
+    s->dist.waveNumber = 1;
+    s->dist.sizeFactor = 150;
+    s->dist.options = (VREF_CENTER<<OPT_VREF_OFFSET);
+    s->dist.perspectiveFactor = 200;
+
+    memcpy(s->text,text,MAX_TEXT+1);    /* restore current text */
+}
+
+/***********************************************************************
+ *                             SysNotifyWithData
+ ***********************************************************************
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	7/29/92		Initial Revision
+ *      marcusg                 Generic GCN notification routine...
+ *
+ ***********************************************************************/
+static void
+SysNotifyWithData(void *Ptr,word size,word notificationType, word listType)
+{
+    MemHandle data;                     /* Extra data block sent along with the
+					 * notification. */
+    void *dataPtr;                      /* The extra data block, locked */
+    EventHandle	notifyEvent;	    	/* Recorded notification event for
+					 * the GCN list */
+
+    data = MemAlloc(size, HF_DYNAMIC|HF_SHARABLE, 0);
+                                        /* allocate space for data item */
+
+    dataPtr = (void *)MemLock(data);
+    memcpy(dataPtr,Ptr,size);           /* transfer data into shared memory */
+    MemUnlock(data);
+
+    MemInitRefCount(data, 1);
+
+    notifyEvent = @record null::MSG_META_NOTIFY_WITH_DATA_BLOCK
+                        (MANUFACTURER_ID_GEOWORKS,notificationType,
+                         data);
+    @call application::MSG_META_GCN_LIST_SEND
+	(GCNLSF_SET_STATUS,
+	 notifyEvent,
+	 data,
+         listType,
+	 MANUFACTURER_ID_GEOWORKS);
+}
+
+/***********************************************************************
+ *                              UpdateGCNs
+ ***********************************************************************/
+static void UpdateGCNs(struct State_struct *Effect)
+{
+    NotifyPointSizeChange npsc;
+    NotifyFontChange nfc;
+    NotifyTextStyleChange ntsc;
+    NotifyFontAttrChange nfac;
+    RulerTypeNotificationBlock rtnb;
+
+    /* pass around info about current font size */
+    npsc.NPSC_pointSize = Effect->size;
+    npsc.NPSC_diffs = 0;
+    SysNotifyWithData(&npsc,sizeof(npsc),
+                      GWNT_POINT_SIZE_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_POINT_SIZE_CHANGE);
+
+    /* pass around info about current font */
+    nfc.NFC_fontID = Effect->fid;
+    nfc.NFC_diffs = 0;
+    SysNotifyWithData(&nfc,sizeof(nfc),
+                      GWNT_FONT_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_FONT_CHANGE);
+
+    /* pass around info about current style */
+    ntsc.NTSC_styles = Effect->style;
+    ntsc.NTSC_indeterminates = 0;
+    SysNotifyWithData(&ntsc,sizeof(ntsc),
+                      GWNT_TEXT_STYLE_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_TEXT_STYLE_CHANGE);
+
+    /* and not forget the font attributes... */
+    nfac.NFAC_fontWeight = Effect->fontWeight;
+    nfac.NFAC_fontWidth = Effect->fontWidth;
+    nfac.NFAC_trackKerning = Effect->trackKerning;
+    nfac.NFAC_fontWeightDiffs = nfac.NFAC_fontWidthDiffs =
+        nfac.NFAC_trackKerningDiffs = 0;
+    SysNotifyWithData(&nfac,sizeof(nfac),
+                      GWNT_FONT_ATTR_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_FONT_ATTR_CHANGE);
+
+    /* notify about current ruler type... */
+@ifdef ADD_RULERS
+    rtnb.RTNB_type = @call VRuleVis::MSG_VIS_RULER_GET_TYPE();
+                                        /* get current ruler type */
+    SysNotifyWithData(&rtnb,sizeof(rtnb),
+                      GWNT_RULER_TYPE_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_RULER_TYPE_CHANGE);
+@endif
+}
+
+/***********************************************************************
+ *                              UpdateOptions
+ ***********************************************************************/
+static void
+UpdateOptions(struct State_struct *Effect)
+{
+    word flags;
+
+    UpdateGCNs(Effect);                 /* update controller settings */
+
+/*** update values in argument controls ***/
+    @send ShadowDepth::MSG_GEN_VALUE_SET_VALUE
+        (MakeWWFixed(Effect->e.shad_thickness),FALSE);
+    @send OutlineThickness1::MSG_GEN_VALUE_SET_VALUE
+        (MakeWWFixed(Effect->e.outl1_thickness),FALSE);
+    @send OutlineThickness2::MSG_GEN_VALUE_SET_VALUE
+        (MakeWWFixed(Effect->e.outl2_thickness),FALSE);
+    @send SkewAngle::MSG_GEN_VALUE_SET_VALUE
+        (MakeWWFixed(Effect->skew_angle),FALSE);
+    @send SquishRatio::MSG_GEN_VALUE_SET_VALUE
+        (MakeWWFixed(Effect->squish_ratio),FALSE);
+
+    @send Angle::MSG_GEN_VALUE_SET_VALUE
+        (MakeWWFixed(Effect->dist.angle),FALSE);
+    @send WaveNumber::MSG_GEN_VALUE_SET_VALUE
+        (MakeWWFixed(Effect->dist.waveNumber),FALSE);
+    @send SizeFactor::MSG_GEN_VALUE_SET_VALUE
+        (MakeWWFixed(Effect->dist.sizeFactor),FALSE);
+    @send VRefLineList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+        ((Effect->dist.options & OPT_VREF)>>OPT_VREF_OFFSET,FALSE);
+    @send UpDownList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+        ((Effect->dist.options & OPT_BEND_UP),FALSE);
+    @send PerspFactor::MSG_GEN_VALUE_SET_VALUE
+        (MakeWWFixed(Effect->dist.perspectiveFactor),FALSE);
+
+    @send WhichItem::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+        (colitem,FALSE);
+    @send EffectList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+        (Effect->e.type,FALSE);
+    @send DirectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+        ((Effect->e.xdir+1)+3*(Effect->e.ydir+1),FALSE);
+
+    @send ShadowProperties::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+        ((Effect->e.ShadowProperties) & SHAD_PROPS,0);
+    @send OutlineProperties::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+        ((Effect->e.ShadowProperties) & OUTL_PROPS,0);
+
+    @send DistortionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+        (Effect->dist.distortion,FALSE);
+    @send DistPersList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+        (Effect->dist.dist_pers,FALSE);
+    @send GridDrawList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+        (Effect->drawGrid,FALSE);
+    @send GridExportList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+        (Effect->exportGrid,FALSE);
+
+    flags = @call
+      SettingsBoolGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    flags = (flags & ~SETTINGS_GSOLENABLE)
+      | (Effect->gsolEnable? SETTINGS_GSOLENABLE:0);
+    @call SettingsBoolGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(flags,0);
+
+    @call EmbedBoolGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+      (Effect->embedFonts?1:0),0);
+    @call MixedBoolGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+      (Effect->mixedColors?1:0),0);
+}
+
+/***********************************************************************
+ *                            ColorItemChanged
+ ***********************************************************************/
+static void
+ColorItemChanged(struct State_struct *Effect)
+{
+    /* set currently selected item */
+    @send WhichItem::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION (colitem, FALSE);
+
+    /* set current item's color and mask in color control field */
+    @send ColorControl::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ColorControl::MSG_COLOR_SELECTOR_SET_COLOR
+        (Effect->e.item[colitem].col, FALSE);
+    @send ColorControl::MSG_COLOR_SELECTOR_SET_DRAW_MASK
+        (Effect->e.item[colitem].mask, FALSE);
+}
+
+/***********************************************************************
+ *                             RedrawContent
+ ***********************************************************************/
+void CheckClipboardType(void);          /* forward... */
+
+/***********************************************************************
+ *                            ParametersChanged
+ ***********************************************************************/
+static void
+ParametersChanged(struct State_struct *Effect)
+{
+    int i;
+    optr *ShList;
+
+    optr dirlist[8]={
+      @ShDir0,@ShDir1,@ShDir2,@ShDir3,@ShDir5,@ShDir6,@ShDir7,@ShDir8
+    };
+    optr ShList__[8]={
+      @DMNorthwest,
+      @DMNorth,
+      @DMNortheast,
+      @DMWest,
+      @DMEast,
+      @DMSouthwest,
+      @DMSouth,
+      @DMSoutheast
+    };
+    optr ShListH_[8]={
+      @DMNorthExpanded,
+      @DMNorth,
+      @DMNorthCompressed,
+      @DMExpanded,
+      @DMCompressed,
+      @DMSouthExpanded,
+      @DMSouth,
+      @DMSouthCompressed
+    };
+    optr ShList_V[8]={
+      @DMExpandedWest,
+      @DMExpanded,
+      @DMExpandedEast,
+      @DMWest,
+      @DMEast,
+      @DMCompressedWest,
+      @DMCompressed,
+      @DMCompressedEast
+    };
+    optr ShListHV[8]={
+      @DMExpanded,
+      @DMVertExpanded,
+      @DMVertExpandedHorCompressed,
+      @DMHorExpanded,
+      @DMHorCompressed,
+      @DMVertCompressedHorExpanded,
+      @DMVertCompressed,
+      @DMCompressed
+    };
+
+
+@define CONDITIONAL_ENABLE(obj,dial)\
+    if(ShadowDials[Effect->e.type-1] & dial)\
+      @send obj::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);\
+    else\
+      @send obj::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE)
+
+@define CONDITIONAL_ENABLE_DIST(obj,dial)\
+    if(DistortionDials[Effect->dist.distortion] & dial)\
+      @send obj::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);\
+    else\
+      @send obj::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE)
+
+@define CONDITIONAL_USABLE(obj,dial)\
+    if(ShadowDials[Effect->e.type-1] & dial)\
+      @send obj::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);\
+    else\
+      @send obj::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE)
+
+
+    /*
+     * update font/style in entry field. This has the side effect of
+     * causing the text to USER_MODIFIED and sending out the appropriate
+     * message - the automatic redraw mechanism depends on this behavior.
+     */
+    @send EffectTextField::MSG_VIS_TEXT_SET_TEXT_STYLE
+        (0x0000,0x0000,~Effect->style,Effect->style,MAX_TEXT-1,0);
+    @send EffectTextField::MSG_VIS_TEXT_SET_FONT_ID
+        (Effect->fid,MAX_TEXT-1,0);
+
+    redraw_running = 255;               /* pretend text length has "changed" as
+                                           USER_MODFIED msg is only sent out
+                                           on first change */
+
+    /* update font in character table */
+    @send CharTable::MSG_CHARSET_SET_FONT(Effect->fid);
+
+    /*
+     * Enable/disable various controls
+     */
+    @CONDITIONAL_ENABLE(ShadowDepth,DIAL_STH);
+    @CONDITIONAL_ENABLE(SquishRatio,DIAL_SFORM);
+    @CONDITIONAL_ENABLE(SkewAngle,DIAL_SFORM);
+
+    if(Effect->e.outl1_thickness || Effect->e.outl2_thickness) {
+      @CONDITIONAL_ENABLE(OutlShadow,DIAL_OUTLSHAD);
+      @send RoundedOutl::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+    else {
+      @send OutlShadow::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @send RoundedOutl::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+
+    if(Effect->e.outl1_thickness) {
+      @send Item_Outl1::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+    else {
+      @send Item_Outl1::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+
+    if(Effect->e.outl2_thickness)
+    {
+      @send Item_Outl2a::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+
+      /* "2nd Outline 2" color depends on outline type, not on the effect */
+      if(Effect->e.ShadowProperties & EFFECT_EMBOSSED && !Effect->embedFonts)
+        @send Item_Outl2b::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+      else
+        @send Item_Outl2b::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+
+      if(!Effect->embedFonts)
+        @send EmbossedOutl::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      else
+        @send EmbossedOutl::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+    else
+    {
+      @send Item_Outl2a::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+      @send Item_Outl2b::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+      @send EmbossedOutl::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+
+    @CONDITIONAL_ENABLE(VPerspective,DIAL_VPERS);
+    @CONDITIONAL_ENABLE(HPerspective,DIAL_HPERS);
+    @CONDITIONAL_USABLE(Item_Text,DIAL_C_TEXT);
+    @CONDITIONAL_USABLE(Item_Text_Back,DIAL_C_TEXT);
+    @CONDITIONAL_USABLE(Item_Shadow,DIAL_C_SHADOW);
+    @CONDITIONAL_USABLE(Item_Shadow2,DIAL_C_SHADOW2);
+    @CONDITIONAL_USABLE(Item_Shadow_Back,DIAL_C_SHADOW_BACK);
+    @CONDITIONAL_ENABLE(ShadowDir,DIAL_SDIR);
+
+    /*
+     * Conditionally enable distortion dials
+     */
+    @CONDITIONAL_ENABLE_DIST(Angle,DIAL_D_ANGLE);
+    @CONDITIONAL_ENABLE_DIST(WaveNumber,DIAL_D_WAVENUM);
+    @CONDITIONAL_ENABLE_DIST(SizeFactor,DIAL_D_SIZE);
+    @CONDITIONAL_ENABLE_DIST(VrefLine,DIAL_D_VREF);
+    @CONDITIONAL_ENABLE_DIST(UpDownList,DIAL_D_BEND);
+
+    /*
+     * Conditionally enable perspective distortion dials
+     */
+    if(Effect->dist.dist_pers)
+      @send PerspFactor::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    else
+      @send PerspFactor::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+    /*
+     * Distortion and outline only available for embedded fonts
+     */
+    if( Effect->embedFonts )
+    {
+      @send Distortion::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @send EffectOutline::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+    else
+    {
+      @send Distortion::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @send EffectOutline::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+
+    /*
+     * Set/modify shadow direction/form submenu
+     */
+    @send DirectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+      ((Effect->e.xdir+1)+3*(Effect->e.ydir+1),FALSE);
+
+    switch(Effect->e.ShadowProperties & (EFFECT_HPERS | EFFECT_VPERS))
+    {
+      case 0:                             ShList=ShList__; break;
+      case EFFECT_HPERS:                  ShList=ShListH_; break;
+      case EFFECT_VPERS:                  ShList=ShList_V; break;
+      case (EFFECT_HPERS | EFFECT_VPERS): ShList=ShListHV; break;
+    }
+    for(i=0; i<8; i++)
+      @call dirlist[i]::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(ShList[i],
+        VUM_DELAYED_VIA_UI_QUEUE);
+}
+
+/***********************************************************************
+ *                               CopyCommon
+ ***********************************************************************/
+static void CopyCommon(struct State_struct *Effect,ClipboardItemFlags flags)
+{
+    VMFileHandle      transferVMFile;  /* VM file handle of Transfer VM File */
+    VMBlockHandle     dataVMBlock;     /* VM handle of attached data block */
+    VMBlockHandle     headerVMBlock;   /* VM handle of attached header block */
+    ClipboardItemHeader *headerMem;    /* ClipboardItemHeader for the VM file */
+    MemHandle         headerMemHandle; /* handle of ClipboardItemHeader block */
+    GStateHandle      gstate;          /* graphics state for gstring */
+    RectDWord         bounds;          /* bounding rectangle of gstring */
+    GeodeToken        token = {MY_TOKEN};
+
+
+    /* See if recalculation is necessary. */
+    FontRecalc(Effect,&contentBounds);
+
+    /* Now get the transfer VM file. */
+    transferVMFile = ClipboardGetClipboardFile();
+
+    /* create graphics string */
+    gstate = GrCreateGString(transferVMFile, GST_VMEM, &dataVMBlock);
+    GrSetGStringBounds(gstate,
+      (sword)contentBounds.RD_left, (sword)contentBounds.RD_top,
+      (sword)contentBounds.RD_right, (sword)contentBounds.RD_bottom);
+
+    /*
+     * if enabled: mark gstring with owner tag
+     */
+    if(Effect->gsolEnable)
+    {
+      GSOLMarkGStringStart(gstate,&token,PROTO_MAJOR,PROTO_MINOR);
+      Effect->magic=MAGIC_FMGK;         /* mark state structure as "ours" */
+      GrComment(gstate,Effect,sizeof(*Effect));
+                                        /* insert state structure as comment */
+    }
+
+    FontDraw(gstate,TRUE);              /* redraw for export */
+
+    /*
+     * if enabled: end gstring with owner tag
+     */
+    if(Effect->gsolEnable)
+      GSOLMarkGStringEnd(gstate,&token,PROTO_MAJOR,PROTO_MINOR);
+
+    GrEndGString(gstate);
+    GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
+
+    /* Now, allocate and fill in the transfer item header block. */
+
+    headerVMBlock = VMAlloc(transferVMFile, sizeof(ClipboardItemHeader), 1111);
+    headerMem = (ClipboardItemHeader *)VMLock(transferVMFile, headerVMBlock,
+							&headerMemHandle);
+    headerMem->CIH_owner = (optr) (((dword)GeodeGetProcessHandle()<<16) | 0);
+    headerMem->CIH_flags = 0;           /* Normal transfer; no flags. */
+    strcpy(headerMem->CIH_name, CLIPBOARD_NAME);
+    headerMem->CIH_sourceID = 0;
+
+    headerMem->CIH_formatCount = 1;     /* only one format */
+
+    /* describe format */
+    headerMem->CIH_formats[0].CIFI_format =
+      FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS,
+        CIF_GRAPHICS_STRING);
+    headerMem->CIH_formats[0].CIFI_vmChain =
+      VMCHAIN_MAKE_FROM_VM_BLOCK(dataVMBlock);
+    headerMem->CIH_formats[0].CIFI_extra1 =
+      (sword)(contentBounds.RD_right-contentBounds.RD_left);
+    headerMem->CIH_formats[0].CIFI_extra2 =
+      (sword)(contentBounds.RD_bottom-contentBounds.RD_top);
+    VMUnlock(headerMemHandle);
+
+    /* Now register the transfer item with the Clipboard. This will actually
+     * put the transfer item and its header into the Clipboard. */
+
+    ClipboardRegisterItem(BlockIDFromFileAndBlock(
+                            transferVMFile, headerVMBlock),
+                          flags);
+}
+
+/***********************************************************************
+ *              Routines and methods to interact with Clipboard
+ ***********************************************************************/
+static Boolean
+CheckPasteable(ClipboardItemFlags transferFlags)
+{
+    ClipboardQueryArgs  query;
+    Boolean 	pasteable = FALSE;
+
+    /*
+     * Fetch the info on the specified item.
+     */
+    ClipboardQueryItem(transferFlags, &query);
+    /*
+     * If it has at least one format, and one of them is the TEXT_FORMAT
+     * (defined above), we can paste it. Otherwise, not.
+     */
+    pasteable = (query.CQA_numFormats &&
+                 ClipboardTestItemFormat(query.CQA_header, GRAPH_FORMAT));
+
+    /*
+     * Let the clipboard code know we're done with the item, so it can biff it
+     * if it was replaced while we were looking at it.
+     */
+    ClipboardDoneWithItem(query.CQA_header);
+
+    return pasteable;
+}
+
+void CheckClipboardType(void)
+{
+    NotifySelectStateChange nssc;
+
+    /* inform the world if we have a graphics item waiting for "Cut" */
+    nssc.NSSC_selectionType = SDT_GRAPHICS;
+    nssc.NSSC_clipboardableSelection = Effect.text[0] ? TRUE:FALSE;
+    nssc.NSSC_deleteableSelection = FALSE;
+    nssc.NSSC_selectAllAvailable = FALSE;
+    nssc.NSSC_pasteable = CheckPasteable(TIF_NORMAL);
+    SysNotifyWithData(&nssc,sizeof(nssc),
+                      GWNT_SELECT_STATE_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE);
+}
+
+static ClipboardQuickNotifyFlags
+PasteCommon(ClipboardItemFlags transferFlags)
+{
+    GStateHandle            gs;         /* Handle to GString in clipboard */
+    ClipboardQueryArgs      q;          /* Info on the indicated transfer item
+                                         * returned here. */
+    ClipboardRequestArgs    request;    /* Address of requested format returned
+                                         * here */
+    ClipboardQuickNotifyFlags ret;
+    GeodeToken              token = {MY_TOKEN};
+    ProtocolNumber          prot;
+
+    struct {
+      byte                  cmd;
+      word                  dsize;
+      struct State_struct   state;
+    } appdata;
+
+    /*
+     * First, find out if the indicated clipboard item (normal or
+     * quick-transfer) supports the gstring format.
+     */
+    ClipboardQueryItem(transferFlags, &q);
+
+    ret = CQNF_NO_OPERATION;            /* default: couldn't do anything */
+
+    if(q.CQA_numFormats && ClipboardTestItemFormat(q.CQA_header,GRAPH_FORMAT))
+    {
+
+      /*
+       * Fetch the file/block handle of transfer format
+       */
+      ClipboardRequestItemFormat(GRAPH_FORMAT, q.CQA_header, &request);
+
+      /*
+       * Open GString for working with it
+       */
+      gs = GrLoadGString(request.CRA_file,GST_VMEM,
+                         VMCHAIN_GET_VM_BLOCK(request.CRA_data));
+
+      if( GSOLCheckGString(gs,&token,&prot,&appdata,sizeof(appdata))==0 )
+      {                                 /* see if gstring contains GSOL info */
+        if(prot.PN_major!=PROTO_MAJOR ||
+           prot.PN_minor!=PROTO_MINOR)  /* compatible version? */
+          UserStandardDialogOptr(       /* notify user */
+             NULL, NULL, NULL, NULL, @ErrorBadGSOLVersion,
+             (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+             (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+        else
+        {
+          Effect=appdata.state;         /* set new effect from app data */
+          ret = CQNF_COPY;              /* we copied data from clipboard */
+        }
+      }
+      else
+        UserStandardDialogOptr(         /* notify user */
+           NULL, NULL, NULL, NULL, @ErrorNoGSOL,
+           (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+           (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+      /*
+       * Kill GString leaving intact the data on the clipboard
+       */
+      GrDestroyGString(gs,NULL,GSKT_LEAVE_DATA);
+    }
+
+    /*
+     * Tell the clipboard we're done with this item, so it can throw away
+     * the data, if necessary.
+     */
+    ClipboardDoneWithItem(q.CQA_header);
+
+    if(ret==CQNF_COPY)                  /* data has been taken from clipboard */
+    {
+      @call EffectTextField::MSG_VIS_TEXT_REPLACE_ALL_PTR(Effect.text,0);
+      UpdateOptions(&Effect);           /* change "dials" to reflect state */
+      ParametersChanged(&Effect);       /* set parameters for new effect */
+      @send EffectTextField::MSG_GEN_APPLY();
+                                        /* force a redraw */
+    }
+    return ret;
+}
+
+/***********************************************************************
+ *              MSG_META_PTR for FontMProcessClass
+ ***********************************************************************/
+@method FontMProcessClass, MSG_META_PTR
+{
+    /*
+     * Check if doing quick-transfer. If not, there's nothing else we have
+     * to do.
+     */
+    if ((GET_UI_FUNCTIONS_ACTIVE(inputState) & UIFA_MOVE_COPY) &&
+	ClipboardGetQuickTransferStatus())
+    {
+        ClipboardSetQuickTransferFeedback((CheckPasteable(CIF_QUICK) ?
+				    CQTF_COPY :
+				    CQTF_CLEAR),
+				   inputState);
+    }
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+/***********************************************************************
+ *              MSG_META_END_MOVE_COPY for FontMProcessClass
+ ***********************************************************************/
+@method FontMProcessClass, MSG_META_END_MOVE_COPY
+{
+    /*
+     * paste the thing, PasteCommon returns ClipboardQuickNotifyFlags to pass to
+     * ClipboardEndQuickTransfer
+     */
+    ClipboardEndQuickTransfer(PasteCommon(CIF_QUICK));
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+/***********************************************************************
+ *              MSG_META_CLIPBOARD_PASTE for FontMProcessClass
+ ***********************************************************************/
+@method FontMProcessClass, MSG_META_CLIPBOARD_PASTE
+{
+    PasteCommon(TIF_NORMAL);
+}
+
+/***********************************************************************
+ *	MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED for
+ *                         FontMProcessClass
+ ***********************************************************************/
+@method FontMProcessClass,
+        MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+{
+    CheckClipboardType();               /* see if we can use the current item */
+}
+
+/***********************************************************************
+ *                Open/Close methods for FontMProcessClass
+ ***********************************************************************/
+@method FontMProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    @callsuper();                       /* !!! */
+
+    if(!extraState)                     /*** "fresh" start, no saved state */
+    {
+      GetStartupState(&Effect);         /* load default effect & settings */
+      *Effect.text='\0';                /* no text yet */
+    }
+    else {                              /*** started from saved state */
+      struct State_struct *eff;
+
+      /* copy saved data from extra block */
+      eff = (struct State_struct *)MemLock(extraState);
+      Effect = *eff;
+      MemUnlock(extraState);
+    }
+
+    FontInit();                         /* initialize drawing subsystem */
+
+    colitem = COLITEM_TEXT;             /* choose which color item to change */
+    redraw_running = -1;                /* do not expect a timed redraw event */
+
+    ColorItemChanged(&Effect);          /* initialize color control */
+    UpdateOptions(&Effect);             /* change "dials" to reflect state */
+    ParametersChanged(&Effect);         /* initialize effect display */
+    @send EffectTextField::MSG_GEN_APPLY();
+                                        /* force a redraw */
+    /*
+     * Add ourselves to the clipboard notification list.
+     */
+    ClipboardAddToNotificationList(HandleToOptr(GeodeGetProcessHandle()));
+    CheckClipboardType();               /* see if we can use the current item */
+}
+
+@method FontMProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    struct State_struct *state;
+    MemHandle bl;
+
+    /*
+     * Remove ourselves from the clipboard notification list.
+     */
+    ClipboardRemoveFromNotificationList(HandleToOptr(GeodeGetProcessHandle()));
+
+    FontExit();                         /* free storage of drawing subsystem */
+
+    @callsuper();                       /* !!! */
+
+    bl = MemAlloc(sizeof(struct State_struct), HF_DYNAMIC|HF_SHARABLE, 0);
+    state = (struct State_struct *)MemLock(bl);
+    *state = Effect;
+    MemUnlock(bl);
+
+    return bl;
+}
+
+/***********************************************************************
+ *              MSG_META_EXPOSED for FontMProcessClass
+ ***********************************************************************/
+@method FontMProcessClass,MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    if( FontRecalc(&Effect,&contentBounds) )
+    {                                   /* recalc effect if necessary */
+      @send FontMView::MSG_GEN_VIEW_SET_DOC_BOUNDS(
+        contentBounds.RD_bottom+VIEW_MARGIN,contentBounds.RD_right+VIEW_MARGIN,
+        contentBounds.RD_top-VIEW_MARGIN,contentBounds.RD_left-VIEW_MARGIN);
+    }
+
+    gstate = GrCreateState(win);
+    GrBeginUpdate(gstate);
+
+    /* set defined line styles for outlines with "unspecified" style */
+    GrSetLineColor(gstate,CF_INDEX,C_LIGHT_GRAY,0,0);
+    GrSetLineMaskSys(gstate,SDM_100);
+    GrSetLineStyle(gstate,LS_SOLID,0,NULL,0);
+    GrSetLineWidth(gstate,1);
+    GrSetLineEnd(gstate,LE_SQUARECAP);
+    GrSetLineJoin(gstate,LJ_MITERED);
+    GrSetAreaColorMap(gstate,CMT_DITHER);
+    GrSetLineColorMap(gstate,CMT_DITHER);
+    GrSetTextColorMap(gstate,CMT_DITHER);
+    FontDraw(gstate,FALSE);
+
+@ifdef ADD_INFOTEXT
+    {
+      char buf[80];
+
+      sprintf(buf,"Ascent: %lx - Descent: %lx - Baseline: %lx - Height: %lx",
+        GrFontMetrics(contentGS,GFMI_ASCENT),
+        GrFontMetrics(contentGS,GFMI_DESCENT),
+        GrFontMetrics(contentGS,GFMI_BASELINE),
+        GrFontMetrics(contentGS,GFMI_HEIGHT)
+      );
+      @call InfoText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf,0);
+    }
+@endif
+
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}
+
+/***********************************************************************
+ *              MSG_META_CLIPBOARD_COPY for FontMProcessClass
+ ***********************************************************************/
+@method FontMProcessClass,MSG_META_CLIPBOARD_COPY
+{
+    CopyCommon(&Effect,TIF_NORMAL);     /* copy object to clipboard */
+}
+
+/***********************************************************************
+ *           MSG_META_START_MOVE_COPY for FontMProcessClass
+ ***********************************************************************/
+@method FontMProcessClass,MSG_META_START_MOVE_COPY
+{
+    if( ClipboardStartQuickTransfer(CQTF_COPY_ONLY,CQTF_COPY,0,0,0,oself) )
+    {
+      @send FontMApp::MSG_GEN_APPLICATION_MARK_BUSY();
+      CopyCommon(&Effect,CIF_QUICK);    /* create transfer object */
+      @send FontMApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+      @send FontMView::MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();
+    }
+    retVal->flags = MRF_PROCESSED;      /* even was processed */
+}
+
+/*
+ ***************************************************************************
+ *              Code for FontMApplicationClass
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *           Various "apply" messages for FontMApplicationClass
+ ***********************************************************************/
+@method FontMApplicationClass, MSG_FontM_TEXT_CHANGED
+{
+    if(redraw_running>-1) {             /* Is there a redraw pending? */
+      TimerStop(redraw_th,redraw_tid);  /* Kill old timer, start a new one */
+      redraw_running = -1;              /* No redraw is required */
+    }
+    @call EffectTextField::MSG_VIS_TEXT_GET_ALL_PTR(Effect.text);
+                                        /* get new text into buffer */
+
+    @send RedrawTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send RedrawTrigger2::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send RedrawTrigger3::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send RedrawTrigger4::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send RedrawTrigger5::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send RedrawTrigger6::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /*
+     * Set background color of view
+     */
+    @send FontMView::MSG_GEN_VIEW_SET_COLOR(
+        Effect.e.item[COLITEM_VIEW].col.CQ_redOrIndex,
+        Effect.e.item[COLITEM_VIEW].col.CQ_info,
+        Effect.e.item[COLITEM_VIEW].col.CQ_green*256
+          +Effect.e.item[COLITEM_VIEW].col.CQ_blue);
+@ifdef ADD_RULERS
+    @send HRuleView::MSG_GEN_VIEW_SET_COLOR(C_LIGHT_GRAY,0,0);
+    @send VRuleView::MSG_GEN_VIEW_SET_COLOR(C_LIGHT_GRAY,0,0);
+@endif
+
+    @send FontMView::MSG_META_GRAB_TARGET_EXCL();
+                                        /* workaround: update view controller */
+    @send FontMView::MSG_GEN_VIEW_REDRAW_CONTENT();
+    CheckClipboardType();               /* see if we can use the current item */
+}
+
+@method FontMApplicationClass, MSG_FontM_EFFECT_CHANGED
+{
+    if( (@call SettingsBoolGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS())
+          & SETTINGS_LOADDEFAULTS) {    /* auto-load defaults? */
+      GetDefaultEffect(&Effect.e,selection);
+                                        /* yes: choose effect & get defaults */
+    }
+    else                                /* no: only set effect-related things */
+      Effect.e.type = selection;
+    colitem = COLITEM_TEXT;             /* always enable text item */
+    ColorItemChanged(&Effect);          /* initialize color control */
+    UpdateOptions(&Effect);             /* change "dials" to reflect state */
+    ParametersChanged(&Effect);         /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_SHADOW_DIR_CHANGED
+{
+    Effect.e.xdir = ((sword)selection)%3-1;
+    Effect.e.ydir = ((sword)selection)/3-1;
+                                        /* get direction signs from index */
+    ParametersChanged(&Effect);         /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_DISTORTION_CHANGED
+{
+    Effect.dist.distortion = (word)selection;/* get distortion */
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_DIST_PERS_CHANGED
+{
+    Effect.dist.dist_pers = (word)selection;   /* get distortion */
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_GRID_CHANGED
+{
+    Effect.drawGrid = (word)selection;         /* get grid setting */
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_GRID_EXP_CHANGED
+{
+    Effect.exportGrid = (word)selection;       /* get grid setting */
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_SHADOW_DEPTH_CHANGED
+{
+    Effect.e.shad_thickness=IntegerOf(value);
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_OUTLINE1_THCKN_CHANGED
+{
+    Effect.e.outl1_thickness=IntegerOf(value);
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_OUTLINE2_THCKN_CHANGED
+{
+    Effect.e.outl2_thickness=IntegerOf(value);
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_SQUISH_RATIO_CHANGED
+{
+    Effect.squish_ratio=IntegerOf(value);
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_SKEW_ANGLE_CHANGED
+{
+    Effect.skew_angle=IntegerOf(value);
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_ANGLE_CHANGED
+{
+    Effect.dist.angle=IntegerOf(value);
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_WAVE_NUMBER_CHANGED
+{
+    Effect.dist.waveNumber=IntegerOf(value);
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_SIZE_FACTOR_CHANGED
+{
+    Effect.dist.sizeFactor=IntegerOf(value);
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_VREF_CHANGED
+{
+    Effect.dist.options = (Effect.dist.options & ~OPT_VREF) |
+      ((word)selection)<<OPT_VREF_OFFSET;       /* get vref setting */
+    ParametersChanged(&Effect);                 /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_UPDOWN_CHANGED
+{
+    Effect.dist.options = (Effect.dist.options & ~OPT_BEND_UP) | selection;
+                                                /* get up/down setting */
+    ParametersChanged(&Effect);                 /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_PERSPECTIVE_FACTOR_CHANGED
+{
+    Effect.dist.perspectiveFactor=IntegerOf(value);
+    ParametersChanged(&Effect);                /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_VIS_TEXT_SET_POINT_SIZE
+{
+    memcpy(&Effect.size,&pointSize,sizeof(WWFixed));
+                                        /* choose font size */
+    ParametersChanged(&Effect);                /* force a redraw */
+    UpdateGCNs(&Effect);                /* update controller settings */
+}
+
+@method FontMApplicationClass, MSG_VIS_TEXT_SET_SMALLER_POINT_SIZE
+{
+    word i;
+
+    if(IntegerOf(Effect.size) >= PointsizeSequence[N_PSSEQ-1]+72) {
+      Effect.size -= 72*65536L;         /* decrease large ones by 72 pt */
+    }
+    else {                              /* use table for "small" sizes */
+      for(i=N_PSSEQ-1;i>0 && PointsizeSequence[i] >= IntegerOf(Effect.size);i--)
+        ;                               /* find largest pointsize in list
+                                           that is smaller than current one*/
+      Effect.size = MakeWWFixed(PointsizeSequence[i]);
+                                        /* set new size from list */
+    }
+    ParametersChanged(&Effect);         /* force a redraw */
+    UpdateOptions(&Effect);             /* change "dials" to reflect state */
+}
+
+@method FontMApplicationClass, MSG_VIS_TEXT_SET_LARGER_POINT_SIZE
+{
+    word i;
+
+    if(IntegerOf(Effect.size) == 792) return;
+                                        /* can't go beyond 792 pt fonts */
+    if(IntegerOf(Effect.size) >= PointsizeSequence[N_PSSEQ-1]) {
+      Effect.size += 72*65536L;         /* increase large ones by 72 pt */
+    }
+    else {                              /* use table for "small" sizes */
+      for(i=0;i<N_PSSEQ-1 && PointsizeSequence[i] <= IntegerOf(Effect.size);i++)
+        ;                               /* find smallest pointsize in list
+                                           that is larger than current one*/
+      Effect.size = MakeWWFixed(PointsizeSequence[i]);
+                                        /* set new size from list */
+    }
+    ParametersChanged(&Effect);         /* force a redraw */
+    UpdateOptions(&Effect);             /* change "dials" to reflect state */
+}
+
+@method FontMApplicationClass, MSG_VIS_TEXT_SET_FONT_ID
+{
+    Effect.fid = fid;                   /* choose font */
+    ParametersChanged(&Effect);         /* force a redraw */
+    UpdateGCNs(&Effect);                /* update controller settings */
+}
+
+@method FontMApplicationClass, MSG_VIS_TEXT_SET_TEXT_STYLE
+{
+    Effect.style = (Effect.style & ~styleBitsToClear) | styleBitsToSet;
+    ParametersChanged(&Effect);         /* force a redraw */
+    UpdateGCNs(&Effect);                /* update controller settings */
+}
+
+@method FontMApplicationClass, MSG_FontM_LOAD_DEFAULT
+{
+    GetDefaultEffect(&Effect.e,Effect.e.type);
+    ColorItemChanged(&Effect);          /* initialize color control */
+    ParametersChanged(&Effect);         /* draw new effect */
+    UpdateOptions(&Effect);             /* change "dials" to reflect state */
+}
+
+@method FontMApplicationClass, MSG_FontM_LOAD_STARTUP
+{
+    GetStartupState(&Effect);           /* reset all (except text) to startup */
+    colitem = COLITEM_TEXT;             /* choose which color item to change */
+    ColorItemChanged(&Effect);          /* initialize color control */
+    ParametersChanged(&Effect);         /* draw new effect */
+    UpdateOptions(&Effect);             /* change "dials" to reflect state */
+}
+
+@method FontMApplicationClass, MSG_FontM_SHADOW_PROPS_CHANGED
+{
+    Effect.e.ShadowProperties = (Effect.e.ShadowProperties & ~SHAD_PROPS)
+      | selectedBooleans;
+    ParametersChanged(&Effect);         /* draw new effect */
+}
+
+@method FontMApplicationClass, MSG_FontM_OUTLINE_PROPS_CHANGED
+{
+    Effect.e.ShadowProperties = (Effect.e.ShadowProperties & ~OUTL_PROPS)
+      | selectedBooleans;
+    ParametersChanged(&Effect);         /* draw new effect */
+}
+
+@method FontMApplicationClass, MSG_FontM_SET_TRACK_KERNING
+{
+    Effect.trackKerning = trackKerning;
+    ParametersChanged(&Effect);         /* draw new effect */
+}
+
+@method FontMApplicationClass, MSG_FontM_SET_FONT_WEIGHT
+{
+    Effect.fontWeight = fontWeight;
+    ParametersChanged(&Effect);         /* draw new effect */
+}
+
+@method FontMApplicationClass, MSG_FontM_SET_FONT_WIDTH
+{
+    Effect.fontWidth = fontWidth;
+    ParametersChanged(&Effect);         /* draw new effect */
+}
+
+@method FontMApplicationClass, MSG_FontM_SETTINGS_CHANGED
+{
+    Effect.gsolEnable = (selectedBooleans & SETTINGS_GSOLENABLE)?TRUE:FALSE;
+
+    if( (modifiedBooleans & SETTINGS_NOREDRAW) &&
+       !(selectedBooleans & SETTINGS_NOREDRAW))
+                                        /* Auto-redraw enabled? */
+      @send EffectTextField::MSG_GEN_TEXT_SET_MODIFIED_STATE(0);
+                                        /* Notify of modifications soon... */
+}
+
+@method FontMApplicationClass, MSG_FontM_EMBED_CHANGED
+{
+    Effect.embedFonts = (selectedBooleans & 1)?TRUE:FALSE;
+    ParametersChanged(&Effect);         /* force redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_MIXMODE_CHANGED
+{
+    Effect.mixedColors = (selectedBooleans & 1)?TRUE:FALSE;
+    ParametersChanged(&Effect);         /* force redraw */
+}
+
+@method FontMApplicationClass, MSG_FontM_COLITEM_CHANGED
+{
+    colitem = selection;                /* choose new item to colorize */
+    ColorItemChanged(&Effect);          /* update color selector */
+}
+
+@method FontMApplicationClass, MSG_META_COLORED_OBJECT_SET_COLOR
+{
+    Effect.e.item[colitem].col=colorQuad; /* store new color */
+    ParametersChanged(&Effect);         /* force a redraw */
+}
+
+@method FontMApplicationClass, MSG_META_COLORED_OBJECT_SET_DRAW_MASK
+{
+    Effect.e.item[colitem].mask=drawMask; /* store mask item */
+    ParametersChanged(&Effect);         /* force a redraw */
+}
+
+/***********************************************************************
+ *           MSG_FontM_COLOR_VISIBLE for FontMApplicationClass
+ ***********************************************************************
+ *
+ * The following handler fixes an apparent problem with the
+ * ColorSelectorClass: The controls settings are not updated while it is
+ * not visible. Therefore, the values are explicitly updated.
+ *
+ */
+@method FontMApplicationClass, MSG_FontM_COLOR_VISIBLE
+{
+    if(opening) ColorItemChanged(&Effect);     /*** workaround: update ui ***/
+}
+
+@ifdef ADD_RULERS
+/* this code is taken from the Ruler Object section of the SDK documentation */
+@method FontMApplicationClass, MSG_FontM_UPDATE_RULERS
+{
+    if (attrs & RSCA_SHOW_VERTICAL)
+      @call VRuleView::MSG_GEN_SET_USABLE(VUM_NOW);
+    else
+      @call VRuleView::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    if (attrs & RSCA_SHOW_HORIZONTAL)
+      @call HRuleView::MSG_GEN_SET_USABLE(VUM_NOW);
+    else
+      @call HRuleView::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    if ((attrs & RSCA_SHOW_HORIZONTAL) && (attrs & RSCA_SHOW_VERTICAL))
+      @call CornerView::MSG_GEN_SET_USABLE(VUM_NOW);
+    else
+      @call CornerView::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+}
+@endif
+
+@method FontMApplicationClass, MSG_META_TEXT_USER_MODIFIED
+{
+    char buf[MAX_TEXT];
+
+    if(redraw_running>-1) {             /* Is there a redraw pending? */
+      TimerStop(redraw_th,redraw_tid);  /* Kill old timer, start a new one */
+      redraw_running = -1;              /* Redraw killed */
+    }
+
+    @send RedrawTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send RedrawTrigger2::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send RedrawTrigger3::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send RedrawTrigger4::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send RedrawTrigger5::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send RedrawTrigger6::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    if( !((@call SettingsBoolGroup::
+      MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS()) & SETTINGS_NOREDRAW) )
+    {                                   /* auto-redraw disabled? */
+      redraw_th = TimerStart(TIMER_EVENT_ONE_SHOT,oself,REDRAW_TICKS,
+                             MSG_FontM_REDRAW_DELAY_EXPIRED,0,&redraw_tid);
+                                        /* Wait a short time then redraw */
+      @call EffectTextField::MSG_VIS_TEXT_GET_ALL_PTR(buf);
+      redraw_running = strlen(buf);     /* Timer going - store text length */
+    }
+}
+
+@method FontMApplicationClass, MSG_FontM_REDRAW_DELAY_EXPIRED
+{
+    char buf[MAX_TEXT];
+    sword len;
+
+    @call EffectTextField::MSG_VIS_TEXT_GET_ALL_PTR(buf);
+    if(redraw_running != (len=strlen(buf)))
+    {                                   /* Text length has changed? */
+      redraw_th = TimerStart(TIMER_EVENT_ONE_SHOT,oself,REDRAW_TICKS,
+                             MSG_FontM_REDRAW_DELAY_EXPIRED,0,&redraw_tid);
+                                        /* Schedule another redraw attempt */
+      redraw_running = len;             /* Store new length */
+    }
+    else
+    {                                   /* Size unchanged, probably text, too */
+      @send EffectTextField::MSG_GEN_APPLY();
+                                        /* Force text to initiate a redraw */
+      redraw_running = -1;              /* No redraw timer running any more */
+    }
+}

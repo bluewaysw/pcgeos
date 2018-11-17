@@ -1,0 +1,237 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		convert.def
+
+AUTHOR:		Adam de Boor, Aug 31, 1992
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	8/31/92		Initial revision
+
+
+DESCRIPTION:
+	Definition of routines provided by 1.X -> 2.0 file conversion library.
+	
+	To use this library, you should use GeodeUseLibrary to load it when
+	you need it, rather than loading it automatically whenever your
+	application is loaded. You should also add this line to your .gp file:
+
+	library convert noload
+	
+	This tells Glue to fetch the entry-point numbers for the library,
+	without actually telling the kernel to load the library when the
+	application is loaded.
+
+	To call a routine in the library, use a sequence like the following:
+	
+		mov	bx, ds:[convertLibHandle]
+		mov	ax, enum ConvertVMFile
+		call	ProcGetLibraryEntry
+		call	ProcCallFixedOrMovable
+
+	where convertLibHandle is the variable in which you stored the handle
+	GeodeUseLibrary returned, and ConvertVMFile is the name of a routine
+	defined in this file. The "library convert noload" line in the .gp file
+	allows you to use "enum <routine>" to get the entry-point number for
+	a routine by name.
+		
+	$Id: convert.def,v 1.1 97/04/04 14:16:11 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__CONVERT
+
+StartLibrary	convert
+
+CONVERT_PROTO_MAJOR	equ	1
+CONVERT_PROTO_MINOR	equ	0
+
+;
+; Parameters to pass to GeodeUseLibrary. You must first call FileSetCurrentPath
+; passing CONVERT_LIB_DISK_HANDLE and a variable initialized with
+; CONVERT_LIB_DIR, then call GeodeUseLibrary passing the address  of a variable
+; initialized with CONVERT_LIB_PATH, like this:
+;
+; convertLibDir		char	CONVERT_LIB_DIR
+; convertLibPath	char	CONVERT_LIB_PATH
+;
+; Pass a protocol number of CONVERT_PROTO_MAJOR and CONVERT_PROTO_MINOR.
+; 
+CONVERT_LIB_DISK_HANDLE	equ	SP_SYSTEM
+CONVERT_LIB_DIR		equ	<'\\\\', 0>
+
+if ERROR_CHECK
+CONVERT_LIB_PATH	equ	<'EC 1.X Document Converter', 0>
+else
+CONVERT_LIB_PATH	equ	<'1.X Document Converter', 0>
+endif
+
+
+global	ConvertVMFile:far
+;
+;	Desc:	Converts a 1.X VM file to a 2.0 VM file IN PLACE.
+;
+;	Pass:	ds:dx	= path of file to convert
+;		cx	= disk handle on which path sits. If 0, path is
+;			  relative to current directory.
+;	Return:	carry set on failure:
+;			ax	= FileError
+;		carry clear if successful
+;
+;	Destroyed:	bx
+;
+
+global	ConvertDrawDocument:far
+;
+;	Desc:	Converts a 1.X GeoDraw document file to a 2.0
+;		GeoDraw document IN PLACE.
+;
+;	Pass:	*ds:si	= DrawDocument object
+;		cx	= GrObjBody chunk within 2.0 GeoDraw document
+;
+;	Return:	carry set on failure
+;
+;	Destroyed:	nothing
+;
+
+global	ConvertGString:far
+;
+;	Desc:	Converts a 1.X VM-based graphics string to a 2.0
+;		HugeArray-based graphics string.  Upon completion, the
+;		blocks containing the 1.X GString are freed.
+;
+;	Pass:	cx:di	= VM file/block handle of GString to convert
+;			  (VM file is assumed to have already been converted
+;			   to 2.0)
+;		dx	= VM file handle to store new 2.0 GString. 
+;			  (can be the same as cx)
+;		si	= ConvertGSOptions record
+;
+;	Return:	carry	= set on error
+;		ax	= GSConvertStatus
+;
+;		if carry clear:
+;		dx:di	= VM file/block handle of 2.0 GString 
+;					  (HugeArray based)
+;	Destroyed:	nothing
+;
+
+GSConvertOptions	record
+    :15,
+    GSCO_FREE_ORIG_GSTRING:1		; set to destroy original 1.2 GString
+GSConvertOptions	end
+
+GSConvertStatus		etype	word
+GSCS_NO_ERROR		enum	GSConvertStatus
+GSCS_UNSUPPORTED_OPCODE enum	GSConvertStatus
+GSCS_DAMAGED_GSTRING	enum	GSConvertStatus
+
+
+global ConvertGetVMBlockList:far
+;
+; Get a list of blocks in a VM file and save it in a block of memory
+;
+; Pass:
+;	si - VM file handle
+; Return:
+;	ax - memory handle
+; Destroyed:
+;	none
+
+global ConvertDeleteViaBlockList:far
+;
+; Delete blocks in a VM file
+;
+; Pass:
+;	si - VM file handle
+;	cx - memory handle
+; Return:
+;	none
+; Destroyed:
+;	none
+
+global ConvertOldGeoWriteDocument:far
+;
+; Convert a 1.X GeoWrite document
+;
+; Pass:
+;	si - VM file handle
+;	cx - 1.2 map block
+;	ss:di - PageSetupInfo structure to fill in
+;	ss:bp - ConvertOldGWParams
+; Return:
+;	none
+; Destroyed:
+;	none
+
+ConvertOldGWParams	struct
+    COGWP_mainObj	optr	;Main 2.0 text object to add text to
+    COGWP_headerObj	optr	;Header 2.0 text object to add text to
+    COGWP_footerObj	optr	;Footer 2.0 text object to add text to
+    COGWP_mainStyle	word	;style for main object
+    COGWP_headerStyle	word	;style for header
+    COGWP_footerStyle	word	;style for footer
+ConvertOldGWParams	ends
+
+global ConvertOldTextObject:far
+;
+; Convert a 1.X text object
+;
+; Pass:
+;	*ds:si - 1.X text object to convert
+;	cxdx - 2.0 text object to append text to
+;	di - style for text to be based on (CA_NULL_ELEMENT if the destination
+;	     has no styles)
+;	bp - VM file handle
+; Return:
+;	none
+; Destroyed:
+;	none
+
+global ConvertOldTextTransfer:far
+;
+; Convert a 1.X text transfer format
+;
+; Pass:
+;	si - VM file handle
+;	cx - text transfer format
+;	dx - non-zero to free old 1.2 transfer format
+;
+; Return:
+;	ax - 2.0 text transfer format
+;
+; Destroyed:
+;	none
+
+global ConvertOldScrapbookDocument:far
+;
+; Convert a 1.X Scrapbook document
+;
+; Pass:
+;	bp - VM file handle
+; Return:
+;	none
+; Destroyed:
+;	none
+
+global ConvertOldGeoDexDocument:far
+;
+; Convert a 1.X GeoDex document
+;
+; Pass:
+;	bp - VM file handle
+; Return:
+;	none
+; Destroyed:
+;	none
+
+EndLibrary	convert

@@ -1,0 +1,547 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	GEOS
+ * MODULE:	FSelSamp (Sample GEOS application)
+ * FILE:	fselsamp.goc
+ *
+ * AUTHOR:	Tony Requist: April 1, 1991
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    4/1/91          Initial version
+ *
+ * DESCRIPTION:
+ *	This file source code for the FSelSamp application. This code will
+ *	be compiled by goc and then linked by the GLUE linker to produce
+ *	a runnable .geo application file.
+ *
+ * RCS STAMP:
+ *	$Id: fselsamp.goc,v 1.1 97/04/04 16:36:04 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/*
+ * Here we define "FSelSampProcessClass" as a subclass of the system provided
+ * "GenProcessClass". As this application is launched, an instance of this class
+ * will be created, and will handle all application-related events (messages).
+ * The application thread will be responsible for running this object,
+ * meaning that whenever this object handles a method, we will be executing
+ * in the application thread.
+ */
+
+@class	FSelSampProcessClass, GenProcessClass ;
+
+/*
+ * Note: instances of FSelSampProcessClass are actually hybrid objects.
+ * Instead of allocating a chunk in an Object Block to contain the instance data
+ * for this object, we use the application's DGROUP resource. This resource
+ * contains both idata and udata sections. Therefore, to create instance data
+ * for this object (such as textColor), we define a variable in idata,
+ * instead of defining an instance data field here.
+ */
+
+@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_FILEBROW_SELECTOR_ACTION;
+@message (GEN_TEXT_APPLY_MSG) MSG_FILEBROW_FILENAME_ACTION;
+@message void MSG_FILEBROW_VIEW();
+@message void MSG_FILEBROW_VIEW_TYPES();
+@message void MSG_FILEBROW_APPLY();
+@message void MSG_FILEBROW_OPEN();
+
+@endc   /* end of class definition */
+
+/*
+ * This class definition must be stored in memory at runtime, so that
+ * the GEOS messaging system can examine it.
+ *
+ * The neverSaved flag is necessary because ProcessClass objects are
+ * hybrid objects.
+ */
+
+@classdecl	FSelSampProcessClass, neverSaved ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+/* The very top-level generic object of an application MUST be a GenApplication
+ * object. The clipsamp.gp file contains "appobj" statement which indicates
+ * that this "FSelSampApp" object is in fact the top-level UI object.
+ * This object should be in its own resource so that GeoManager can load it
+ * quickly to grab the icon for this application. GeoManager will store this
+ * icon in its "Token Database", so that the icon image can be reused quickly.*/
+
+@start AppResource ;
+
+@object GenApplicationClass FSelSampApp = {
+    /* The geoManager uses this token information to store this
+     * application's icon in a database. */
+
+    GI_visMoniker = list { @TextMoniker }
+
+					/* four letters used as index to
+					 * refer to this application in the
+					 * token database. */
+
+					/* manufacturer ID number. Also used
+					 * for accessing database, to ensure
+					 * uniqueness. */
+
+    GI_comp = @FSelSampPrimary;		/* The GenApplication object only
+					 * has one child: the main application
+					 * window. */
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @FSelSampPrimary;
+					/* The main window should appear
+					 * on-screen when the application
+					 * is launched. */
+}
+
+					/* this title will appear at the top
+					 * of the window. */
+@visMoniker TextMoniker = "C File Selector Sample Application";
+
+@end AppResource
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+/* Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed. */
+
+@start	Interface		/* this resource is for misc UI objects */ ;
+
+@object GenPrimaryClass FSelSampPrimary = {
+    GI_visMoniker = "C File Selector Sample Application";
+    GI_comp = @OptionsMenu, @FSelSampFileSelectorGroup, @OptionsBox;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenInteractionClass FSelSampFileSelectorGroup = {
+    GI_comp = @FSelSampFileSelector, @FSelSampFileName , @FSelSampReplyBar;
+}
+
+@object GenFileSelectorClass FSelSampFileSelector = {
+    GFSI_destination = process;
+    GFSI_notificationMsg = MSG_FILEBROW_SELECTOR_ACTION;
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTextClass FSelSampFileName = {
+    GI_visMoniker = "Selection:";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = FILE_LONGNAME_BUFFER_SIZE+PATH_BUFFER_SIZE;
+    GTXI_destination = process;
+    GTXI_applyMsg = MSG_FILEBROW_FILENAME_ACTION;
+}
+
+@object GenInteractionClass FSelSampReplyBar = {
+    GI_comp = @FSelSampOpenTrigger, @FSelSampCloseTrigger;
+    HINT_MAKE_REPLY_BAR;
+}
+
+@object GenTriggerClass FSelSampOpenTrigger = {
+    GI_visMoniker = "Open Folder";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_FILEBROW_OPEN;
+}
+
+@object GenTriggerClass FSelSampCloseTrigger = {
+    GI_visMoniker = "Close Folder";
+    GTI_destination = FSelSampFileSelector;
+    GTI_actionMsg = MSG_GEN_FILE_SELECTOR_UP_DIRECTORY;
+}
+
+@end Interface
+
+/* --------- */
+
+@start MenuResource ;
+
+@object GenInteractionClass OptionsMenu = {
+    GI_comp = @OptionsView;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+}
+
+@object GenTriggerClass OptionsView = {
+    GI_visMoniker = 'V', "View";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_FILEBROW_VIEW;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass OptionsBox = {
+    GI_visMoniker = "View";
+    GI_comp = @TypeList, @MaskEntry, @DosAttrSetList, @DosAttrUnsetList, @ReplyApply;
+    GII_type = GIT_COMMAND;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+@object GenBooleanGroupClass TypeList = {
+    GI_visMoniker = "File Types:";
+    GI_comp = @TypeDir, @TypeDOS, @TypeGeosExec, @TypeGeosNonExec;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_FILEBROW_VIEW_TYPES;
+    GBGI_selectedBooleans = FSFC_DIRS | FSFC_NON_GEOS_FILES | FSFC_GEOS_EXECUTABLES | FSFC_GEOS_NON_EXECUTABLES;
+    HINT_DRAW_IN_BOX;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenBooleanClass TypeDir = {
+    GI_visMoniker = "Folders";
+    GBI_identifier = FSFC_DIRS;
+}
+@object GenBooleanClass TypeDOS = {
+    GI_visMoniker = "DOS files";
+    GBI_identifier = FSFC_NON_GEOS_FILES;
+}
+@object GenBooleanClass TypeGeosExec = {
+    GI_visMoniker = "GEOS Executables";
+    GBI_identifier = FSFC_GEOS_EXECUTABLES;
+}
+@object GenBooleanClass TypeGeosNonExec = {
+    GI_visMoniker = "Geos Non-Executables";
+    GBI_identifier = FSFC_GEOS_NON_EXECUTABLES;
+}
+
+@object GenTextClass MaskEntry = {
+    GI_visMoniker = "DOS Filemask:";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = VOLUME_NAME_LENGTH;
+}
+
+@object GenBooleanGroupClass DosAttrSetList = {
+    GI_visMoniker = "DOS Attributes Set";
+    GI_comp = @DosAttrSetRO, @DosAttrSetSys, @DosAttrSetHidden;
+    HINT_DRAW_IN_BOX;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenBooleanClass DosAttrSetRO = {
+    GI_visMoniker = "Read Only";
+    GBI_identifier = FA_RDONLY;
+}
+@object GenBooleanClass DosAttrSetSys = {
+    GI_visMoniker = "System";
+    GBI_identifier = FA_SYSTEM;
+}
+@object GenBooleanClass DosAttrSetHidden = {
+    GI_visMoniker = "Hidden";
+    GBI_identifier = FA_HIDDEN;
+}
+
+@object GenBooleanGroupClass DosAttrUnsetList = {
+    GI_visMoniker = "DOS Attributes Not Set";
+    GI_comp = @DosAttrUnsetRO, @DosAttrUnsetSys, @DosAttrUnsetHidden;
+    HINT_DRAW_IN_BOX;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenBooleanClass DosAttrUnsetRO = {
+    GI_visMoniker = "Read Only";
+    GBI_identifier = FA_RDONLY;
+}
+@object GenBooleanClass DosAttrUnsetSys = {
+    GI_visMoniker = "System";
+    GBI_identifier = FA_SYSTEM;
+}
+@object GenBooleanClass DosAttrUnsetHidden = {
+    GI_visMoniker = "Hidden";
+    GBI_identifier = FA_HIDDEN;
+}
+
+@object GenTriggerClass ReplyApply = {
+    GI_visMoniker = "Apply";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_FILEBROW_APPLY;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end MenuResource
+
+/*
+ ***************************************************************************
+ *		Code for FSelSampProcessClass
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FILEBROW_SELECTOR_ACTION for FSelSampProcessClass
+ *
+ * DESCRIPTION:	Handle notification from File Selector that user has selected
+ *		an entry in the file list - display complete pathname of
+ *		current selection
+ *		redraw a portion of the document in the View area.
+ *
+ * RETURN:	none
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ * PARAMTERS:
+ *	void (word entryNum, word entryFlags)
+ *
+ ***********************************************************************/
+@method FSelSampProcessClass, MSG_FILEBROW_SELECTOR_ACTION
+{
+    char fname[PATH_BUFFER_SIZE+FILE_LONGNAME_BUFFER_SIZE];
+
+    /*
+     * Get full selection pathname from file selector (discard returned disk
+     * handle)
+     */
+    (void) @call FSelSampFileSelector::
+			MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(fname);
+    /*
+     * Set the text object to the full path -- use @call so that the
+     * action is completed before returning (since we don't want to
+     * exit this function and deallocate the string before the method
+     * is handled).
+     */
+    @call FSelSampFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(fname, strlen(fname));
+    /*
+     * If the selection is a directory, enable the "Open" button, else disable
+     */
+    if ( (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_SUBDIR) &&
+				(!(entryFlags & GFSEF_PARENT_DIR)) ) {
+	@call FSelSampOpenTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+	@call FSelSampOpenTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FILEBROW_FILENAME_ACTION for FSelSampProcessClass
+ *
+ * DESCRIPTION:	Handle <CR> in filename entry field - switch to corresponding
+ *		path and select corresponding item in file selector
+ *
+ * RETURN:	none
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ * PARAMTERS:
+ *	void (optr obj)
+ *
+ ***********************************************************************/
+@method FSelSampProcessClass, MSG_FILEBROW_FILENAME_ACTION
+{
+    char fname[PATH_BUFFER_SIZE+FILE_LONGNAME_BUFFER_SIZE];
+    word fnlen;
+
+    /*
+     * Get text from text object into buffer
+     */
+    fnlen = @call FSelSampFileName::MSG_VIS_TEXT_GET_ALL_PTR(fname);
+    /*
+     * a drive letter + colon is not supported by
+     * MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH, so if we find such a
+     * thing, just exit
+     */
+    if ( (fnlen) && (strchr(fname, ':') == NULL) ) {
+	(void) @call FSelSampFileSelector::
+			MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(fname, 0);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FILEBROW_OPEN for FSelSampProcessClass
+ *
+ * DESCRIPTION:	Handle "Open" trigger - if selection is volume or directory,
+ *	    	tell FileSelector to open it, else, beep
+ *
+ * RETURN:	none
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ * PARAMTERS:
+ *	void ()
+ *
+ ***********************************************************************/
+@method FSelSampProcessClass, MSG_FILEBROW_OPEN
+{
+    dword temp;
+
+    /*
+     * Just get flags and entry #
+     */
+    temp = @call FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(NULL);
+    if (GFS_GET_ENTRY_FLAGS(temp) & GFSEF_NO_ENTRIES) {
+	/* UserStandardSound(SST_ERROR); */
+    } else {
+	/*
+	 * let the FileSelector determine the file type, and open only if
+	 * the selection is a directory
+	 */
+	if (@call FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
+					     GFS_GET_ENTRY_NUMBER(temp))) {
+	    /* UserStandardSound(SST_ERROR); */
+	}
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FILEBROW_SELECTOR_VIEW for FSelSampProcessClass
+ *
+ * DESCRIPTION:	Bring up View options dialog box - set gadgets in dialog
+ *	    	box to reflect current file selector settings
+ *
+ * RETURN:	none
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ * PARAMTERS:
+ *	void ()
+ *
+ ***********************************************************************/
+@method FSelSampProcessClass, MSG_FILEBROW_VIEW
+{
+    word types;
+    word attrs;
+    char buf[VOLUME_NAME_LENGTH+1];
+
+    /*
+     * Set GenBooleanGroup to reflect the correct file types
+     */
+    types = @call FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
+    @send TypeList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(types, 0);
+
+    /*
+     * Set GenBooleanGroup to reflect the correct DOS attrs
+     */
+    attrs = @call FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS();
+    @send DosAttrSetList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(GET_MATCH_FILE_ATTRS(attrs), 0);
+    @send DosAttrUnsetList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(GET_MISMATCH_FILE_ATTRS(attrs), 0);
+
+    @call FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_GET_MASK(buf);
+    @call MaskEntry::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, strlen(buf));
+
+    @send OptionsBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FILEBROW_APPLY for FSelSampProcessClass
+ *
+ * DESCRIPTION:	Handle "Apply" button in "View" dialog box - set selected
+ *	    	attributes in File Selector
+ *		an entry in the file list - display complete pathname of
+ *		current selection
+ *		redraw a portion of the document in the View area.
+ *
+ * RETURN:	none
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ * PARAMTERS:
+ *	void ()
+ *
+ ***********************************************************************/
+@method FSelSampProcessClass, MSG_FILEBROW_APPLY
+{
+    word set, unset;
+    char buf[VOLUME_NAME_LENGTH+2];
+    /*
+     * Suspend rescanning so that we can make multiple changes without
+     * seeing multiple rescans
+     */
+    @call FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_SUSPEND();
+    /*
+     * Get selected file classes and set them
+     */
+    set = @call TypeList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    @send FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(set);
+    /*
+     * Get selected DOS file attributes and set them
+     */
+    set = @call DosAttrSetList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    unset = @call DosAttrUnsetList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    @send FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS(set, unset);
+    /*
+     * Get file mask and set it, or delete it if no mask given.
+     */
+    if (@call MaskEntry::MSG_VIS_TEXT_GET_ALL_PTR(buf) == 0) {	
+	@call FSelSampFileSelector::MSG_META_DELETE_VAR_DATA(ATTR_GEN_FILE_SELECTOR_NAME_MASK);
+    } else {
+	@call FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_SET_MASK(buf);
+    }
+
+    /*
+     * Unsuspend the file selector and rescan files (rescan done
+     * automatically by MSG_GEN_FILE_SELECTOR_END_SUSPEND)
+     */
+    @send FSelSampFileSelector::MSG_GEN_FILE_SELECTOR_END_SUSPEND();
+}

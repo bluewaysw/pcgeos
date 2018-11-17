@@ -1,0 +1,202 @@
+/***********************************************************************
+*      Copyright 1994-2002  Breadbox Computer Company LLC
+* PROJECT:	Anarchy
+* MODULE:	FreeCell  (porting from a previous ESP anarchy project using
+*                      Nate's cards.goh header file)
+* FILE:		fcellproc.goc
+*
+* AUTHOR:	jfh 12/02
+*
+*
+***********************************************************************/
+
+/* ----------------------------------------------------------------------------
+		Include files
+-----------------------------------------------------------------------------*/
+
+@include "frcell.goh"
+
+@extern object MyPlayingTable;
+@extern object FreeCellView;
+@extern object FreeCellColorSelector;
+@extern object DragItemGroup;
+@extern chunk ConfirmDealString;
+
+@classdecl	FreeCellProcessClass, neverSaved;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for FreeCellProcessClass
+ *               (AppAttachFlags	attachFlags,
+ *			  			MemHandle		launchBlock,
+ *			  			MemHandle 		extraState)
+ * DESCRIPTION:	 do some opening stuff
+ *
+ ***********************************************************************/
+@method FreeCellProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ Boolean		initError;
+ word			value;
+ ColorQuad	tableColor;
+
+
+	@callsuper();
+	/* Do the game setup stuff  */
+	@send MyPlayingTable::MSG_GAME_SETUP_STUFF();
+
+	/* I'm having problems restoring from state, so we'll just not do it
+		but we have to @callsuper() & MSG_GAME_SETUP_STUFF before we send
+		QUIT */
+	if (attachFlags & AAF_RESTORING_FROM_STATE)   {
+		@send application::MSG_META_QUIT();
+		}
+
+	else { /* an clean start */
+		initError = InitFileReadInteger("FreeCell", "DragStatus", &value);
+		if (!initError) {
+			@send DragItemGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(value, FALSE);
+			@send MyPlayingTable::MSG_FREECELL_SET_DRAG();
+			}
+
+		initError = InitFileReadDataBuffer("FreeCell", "tableColor", &tableColor,
+												  sizeof(ColorQuad), 0);
+		if (!initError) {
+			@send FreeCellColorSelector::MSG_COLOR_SELECTOR_SET_COLOR(tableColor, FALSE);
+			@send self::MSG_META_COLORED_OBJECT_SET_COLOR(tableColor);
+			}
+
+		/* zero out the session stats */
+		InitFileWriteInteger("FreeCell", "swins", 0);
+		InitFileWriteInteger("FreeCell", "slosses", 0);
+
+		/* and make sure we have the other keys */
+		if (InitFileReadInteger("FreeCell", "twins", &value))
+			InitFileWriteInteger("FreeCell", "twins", 0);
+		if (InitFileReadInteger("FreeCell", "tlosses", &value))
+			InitFileWriteInteger("FreeCell", "tlosses", 0);
+		if (InitFileReadInteger("FreeCell", "lwin", &value))
+			InitFileWriteInteger("FreeCell", "lwin", 0);
+		if (InitFileReadInteger("FreeCell", "llose", &value))
+			InitFileWriteInteger("FreeCell", "llose", 0);
+		if (InitFileReadInteger("FreeCell", "lcur", &value))
+			InitFileWriteInteger("FreeCell", "lcur", 0);
+		if (InitFileReadInteger("FreeCell", "curworl", &value))
+			InitFileWriteInteger("FreeCell", "curworl", 0);
+
+		g_quittingOnWin = FALSE;
+//		g_systemShutDown = FALSE;
+
+//		@callsuper();
+
+
+		/* gotta enable the color selector */
+		@send FreeCellColorSelector::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+		/* Do the game setup stuff  */
+//		@send MyPlayingTable::MSG_GAME_SETUP_STUFF();
+
+		/* and start a new game */
+		@send MyPlayingTable::MSG_FREECELL_NEW_GAME();
+
+   	} /* end of clean start else */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_CLOSE_APPLICATION for FreeCellProcessClass
+ *
+ * DESCRIPTION:	 do some closing stuff
+ *
+ *
+ ***********************************************************************/
+@method FreeCellProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+	/* Do the game closing stuff */
+	@call MyPlayingTable::MSG_GAME_SHUTDOWN();
+
+	@callsuper();
+
+	return (0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_COLORED_OBJECT_SET_COLOR for FreeCellProcessClass
+ *                     (ColorQuad colorQuad)
+ *
+ * DESCRIPTION:	 set the table's (the GenView) color
+ *
+ *
+ ***********************************************************************/
+@method FreeCellProcessClass, MSG_META_COLORED_OBJECT_SET_COLOR
+{
+
+
+
+	@send FreeCellView::MSG_GEN_VIEW_SET_COLOR(
+						colorQuad.CQ_redOrIndex, colorQuad.CQ_info,
+						((word)(((word)colorQuad.CQ_blue)<<8)|
+						((word)colorQuad.CQ_green)));
+
+	InitFileWriteData("FreeCell", "tableColor", &colorQuad, sizeof(ColorQuad));
+	InitFileCommit();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_CONFIRM_SHUTDOWN for FreeCellProcessClass
+ *              (GCNShutdownControlType 	type)
+ *
+ *
+ * DESCRIPTION:	If system is shutting down don't update the stats
+ *
+ *
+ ***********************************************************************/
+/*@method FreeCellProcessClass, MSG_META_CONFIRM_SHUTDOWN
+{
+
+
+	if (!SysShutdown(SST_CONFIRM_START)){
+		g_systemShutDown = TRUE;
+		SysShutdown(SST_CONFIRM_END,TRUE);
+		}
+
+}
+
+/* ----------------------------------------------------------------------------
+		FreeCellApplicationClass
+-----------------------------------------------------------------------------*/
+
+@classdecl	FreeCellApplicationClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_QUIT for FreeCellApplicationClass
+ *                     
+ *
+ * DESCRIPTION:	We'll let the app quit w/o changing stats if the
+ *                player just won, and if a game hasn't yet started
+ *                (and if it's a system shutdown - not any more)
+ *
+ ***********************************************************************/
+@method FreeCellApplicationClass, MSG_META_QUIT
+{
+
+	if (!g_quittingOnWin && g_gameInProgress/* && !g_systemShutDown*/)  {
+		if ((UserStandardDialogOptr(0, 0, 0, 0,
+				@ConfirmDealString,
+				 ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+				 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+				 ) != IC_YES))  return;
+
+		/* add a loss to the stats */
+		FreeCellUpdateStats(FALSE);
+      } 
+
+	@callsuper();
+
+}
+

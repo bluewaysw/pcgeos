@@ -1,0 +1,460 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1994 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	GEOS
+MODULE:		Contact Log
+FILE:		contlog.goh
+
+AUTHOR:		Vivek Narasayya, Dec 20, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	VN	12/20/94   	Initial version.
+
+DESCRIPTION:
+	Header file for the contact log and recent contacts lists.
+
+	$Id: contlog.goh,v 1.1 97/04/04 15:56:34 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@optimize
+@deflib	contlog
+
+/* -------------------------------------------------------------------------
+ *   Constants
+ * ------------------------------------------------------------------------*/
+
+#define NAMENUMBER_LENGTH	31
+#define TYPE_STRING_LENGTH	16
+#define DIRECTION_STRING_LENGTH	16
+#define DATETIME_STRING_LENGTH	18
+#define DURATION_BUFFER_SIZE	30
+
+#define CONTACT_LOG_FILE_NAME		"ContactLog 11/27/96"
+#define RECENT_CONTACTS_FILE_NAME	"RecentContacts 11/27/96"
+
+/*
+ *  maximum # of entries in the general contact log
+ */
+#define MAX_CONTACT_LOG_ENTRIES		5000
+
+/*
+ *  maximum number of entries in each recent contacts stack
+ */
+#define MAX_RECENT_CONTACTS_ENTRIES	20
+
+/* --------------------------------------------------------------------------
+ *   Enumerated types
+ * ------------------------------------------------------------------------*/
+
+typedef ByteEnum LogEntryDirection;
+#define LED_SENT	0x0
+#define LED_RECEIVED	0x2
+#define LED_MISSED	0x4
+#define LED_ANY		0x6
+
+typedef ByteEnum LogEntryType;
+#define LET_CALL		0x0
+#define LET_FAX			0x2
+#define LET_SMS			0x4
+#define LET_DATA_MAILBOX	0x6
+#define LET_DATA_WWW		0x8
+#define LET_DATA_TELNET		0xa
+#define LET_DATA_ANY		0xc		/*  used in views */
+
+#define	LET_DATA		LET_DATA_MAILBOX
+
+typedef enum {
+    RC_SENT_CALLS 	= 0x0,
+    RC_RECEIVED_CALLS 	= 0x2,
+    RC_MISSED_CALLS 	= 0x4,
+    RC_SENT_FAXES 	= 0x6,
+    RC_RECEIVED_FAXES 	= 0x8,
+    RC_SENT_SMS 	= 0xa,
+    RC_RECEIVED_SMS 	= 0xc
+} RecentContactsType;
+
+/*
+ * When operating on the log, this type can be used to specify which field
+ * is to be used to find matching entries.
+ */
+typedef ByteEnum LogFieldType;
+#define LFT_ALL		0x0        		/*  all entries */
+#define LFT_NUMBER	0x2
+#define LFT_TYPE	0x4
+#define LFT_DIRECTION	0x6
+#define LFT_DATETIME	0x8
+#define LFT_CONTACT_ID	0xa
+#define LFT_CONTACT_AND_DATETIME 0xc 		/* person logs used in
+						   trimming */
+#define LFT_MANUALLY_ORIG_CALLS	0xe		/* for finding manually
+						   originated calls */
+
+
+/* --------------------------------------------------------------------------
+ *   Structures
+ * ------------------------------------------------------------------------*/
+
+typedef struct {
+    word	DAT_year;
+    byte	DAT_month;
+    byte	DAT_day;
+    byte	DAT_hour;
+    byte	DAT_minute;
+} DateAndTime;
+
+typedef	TCHAR NameOrNumber[NAMENUMBER_LENGTH];
+
+typedef ByteFlags LogEntryFlags; 	/* Internally used flags 
+					   when processing entries
+					   NOTE: must be cleared 
+					   out when calling
+					   LogAddEntry for
+					   start of call */
+
+#define LEF_SHOW_COMPANY_NAME	(0x80)	/* if set, we show
+					   company name when multiple 
+					   number matches are found */
+#define LEF_START_LOGGED        (0x40)	/* set after start of call,
+					   clear after end of call */
+#define LEF_WILDCARD_NUMBER     (0x20)  /* if set, will match any end
+					   call log with the same
+					   direction, type & datetime */
+/* 5 bits unused */
+
+typedef	struct {
+    NameOrNumber	LE_number;
+    dword               LE_contactID;
+    LogEntryType	LE_type;
+    LogEntryDirection	LE_direction;
+    dword		LE_duration;
+    DateAndTime		LE_datetime;
+    LogEntryFlags	LE_flags; 	/* Internally used flags 
+					   when processing entries
+					   NOTE: must be cleared 
+					   out when calling
+					   LogAddEntry for
+					   start of call */
+} LogEntry;
+
+#define LECI_INVALID_CONTACT_ID 0xffffffff
+
+typedef struct {
+    dword               RCD_contactID;
+    NameOrNumber        RCD_number;
+} RecentContactsData;
+
+/*--------------------------------------------------------------------------
+ * 	Class declarations
+ *--------------------------------------------------------------------------*/
+
+typedef WordFlags LogLengthControlFeatures;
+/* 15 bits unused */
+#define LLCF_LOG_UI	(0x0001)
+
+#define	LLC_DEFAULT_FEATURES	LLCF_LOG_UI
+
+@class  LogLengthControlClass, GenControlClass;
+@message void  	MSG_LOG_LENGTH_CONTROL_INITIATE_DIALOG();
+@message void  	MSG_LOG_LENGTH_CONTROL_LIST_ITEM_SELECTED();
+@instance optr 	LLCI_dialogs;
+@endc
+
+
+@class  LogGenControlClass, GenControlClass;
+@message void   MSG_LOG_GEN_CONTROL_LIST_ENTRY_QUERY();
+@message void   MSG_LOG_GEN_CONTROL_SET_FIELD_SPACING();
+@message void   MSG_LOG_GEN_CONTROL_DRAW_LIST_MONIKER();
+@message void   MSG_LOG_GEN_CONTROL_SET_LIST_VISIBILITY();
+@message void   MSG_LOG_GEN_CONTROL_DRAW_FIELD_LINES();
+
+@instance word 	LGCI_hugeArrayHandle;
+@instance byte 	LGCI_listType;
+@instance byte 	LGCI_spacingSet;
+@instance word 	LGCI_nameNumberLineOffset;
+@instance word 	LGCI_typeLineOffset;
+@instance word 	LGCI_directionLineOffset;
+@instance word 	LGCI_datetimeLineOffset;
+@instance word 	LGCI_durationLineOffset;
+@endc
+
+typedef WordFlags LogControlFeatures;
+/* 15 bits unused */
+#define LCF_LOG_UI	(0x0001)
+
+#define	LC_DEFAULT_FEATURES	LCF_LOG_UI
+
+@class	LogControlClass, LogGenControlClass;
+@message void	MSG_LOG_CONTROL_AFFIRM_DELETE();
+@message void	MSG_LOG_CONTROL_DISPLAY_LOG();
+@message void	MSG_LOG_CONTROL_VIEW_EVENTS_SEARCH_SUBSET();
+@message void	MSG_LOG_CONTROL_TRIM_LOG();
+@message void   MSG_LOG_CONTROL_SELECTION_CHANGED();
+@message void   MSG_LOG_CONTROL_SELECT_CURRENT_ENTRY();
+
+@prototype void LOG_CONTROL_NOTIFY_ENTRY_SELECTED_MSG();
+
+@vardata Message ATTR_LOG_CONTROL_NOTIFY_ENTRY_SELECTED_MSG;
+
+@default GI_states = (@default | GS_ENABLED);
+@default LGCI_listType = 0;
+@endc
+
+typedef WordFlags PersonContactsControlFeatures;
+/* 15 bits unused */
+#define PCCF_LOG_UI	(0x0001)
+
+#define PCC_DEFAULT_FEATURES	PCCF_LOG_UI
+
+@class	PersonContactsControlClass, LogGenControlClass;
+@message void   MSG_PERSON_CONTACTS_CONTROL_DISPLAY_LOG();
+@message void	MSG_PERSON_CONTACTS_CONTROL_PERSON_CONTACTS_SEARCH_SUBSET();
+@message void   MSG_PERSON_CONTACTS_CONTROL_PERSON_CONTACTS_AFFIRM_DELETE();
+@default GI_states = (@default | GS_ENABLED);
+@default LGCI_listType = 1;
+
+@instance dword PCCI_currentContactID;
+@endc
+
+@class	RecentContactsControlClass, LogGenControlClass;
+@message void	MSG_RECENT_CONTACTS_CONTROL_RETRIEVE_LIST();
+@message void	MSG_RECENT_CONTACTS_CONTROL_OPEN_LIST();
+@message void	MSG_RECENT_CONTACTS_CONTROL_LIST_QUERY();
+@message void	MSG_RECENT_CONTACTS_CONTROL_CLEAR_ALL();
+@message void   MSG_RECENT_CONTACTS_CONTROL_SELECT_CURRENT_ENTRY();
+
+@message void	MSG_RECENT_CONTACTS_CONTROL_ERASE_STACK();
+/* Internal */
+@message void   MSG_RECENT_CONTACTS_CONTROL_ERASE_STACK_CANCELED();
+/* Internal */
+
+/* ---------------------------------------------------------------------------
+ *  Messages available only in Communicator products after Feb 1997:
+ * --------------------------------------------------------------------------*/
+
+@message void   MSG_RECENT_CONTACTS_CONTROL_COPY_NUMBER();
+/* Internal */
+@message void   MSG_RECENT_CONTACTS_CONTROL_CLEAR_ALL_LISTS();
+/* Internal: Sent by the Clear lists trigger. */
+@message void   MSG_RECENT_CONTACTS_CONTROL_CLEAR_ALL_LISTS_OK();
+/* Internal: Sent when user has accepted clearing the lists from the */
+/*           main view */
+@message void   MSG_RECENT_CONTACTS_CONTROL_SELECTION_CHANGED();
+/* Internal: Sent when a selection has changed in the number list
+ */
+@message void   MSG_RECENT_CONTACTS_CONTROL_OPEN_GIVEN_LIST(RecentContactsType
+						rct = cx);
+/* Open the passed list type for viewing.
+ */
+
+@prototype void CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG(
+					RecentContactsData *data = ss:bp);
+
+@prototype void CONTACTS_CONTROL_NOTIFY_MULTIPLE_ENTRIES_SELECTED_MSG(
+			MemHandle block = cx, word count = dx);
+/*
+ * block = contains RecentContactsData entries
+ * count = # of RecentContactsData entries in block
+ */
+
+@vardata Message ATTR_RECENT_CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG;
+@vardata optr    TEMP_RECENT_CONTACTS_CONTROL_CONFIRM_DIALOG;
+/* Internal */
+
+/* --------------------------------------------------------------------
+ *  Vardata available only in Communicator products after Feb 1997:
+ * --------------------------------------------------------------------*/
+
+@vardata Message ATTR_RECENT_CONTACTS_CONTROL_NOTIFY_MULTIPLE_ENTRIES_SELECTED_MSG;
+/*
+ *  The message sent out when the user selects entries
+ *  from the list, and either RCFCF_MULTIPLE_SELECTION or
+ *  RCMCF_MULTIPLE_SELECTION is set.
+ * 
+ *  Use callback message CONTACTS_CONTROL_NOTIFY_MULTIPLE_ENTRIES_SELECTED_MSG.
+ */
+
+@default LGCI_listType = 2;
+@instance word RCCI_listGroupOffset;
+@endc
+
+typedef WordFlags RecentContactsPhoneControlFeatures;
+/* 15 bits unused */
+#define RCPCF_LOG_UI	(0x0001)
+
+#define	RCPC_DEFAULT_FEATURES	RCPCF_LOG_UI
+
+@class	RecentContactsPhoneControlClass, RecentContactsControlClass;
+@default GI_states = (@default | GS_ENABLED);
+@prototype void CONTACTS_PHONE_CONTROL_NOTIFY_MISSED_CALLS_LIST_OPENED_MSG();
+@vardata Message \
+    ATTR_RECENT_CONTACTS_PHONE_CONTROL_NOTIFY_MISSED_CALLS_LIST_OPENED_MSG;
+@endc
+
+typedef WordFlags RecentContactsFaxControlFeatures;
+/* 14 bits unused */
+#define RCFCF_LOG_UI	(0x0001)
+#define RCFCF_MULTIPLE_SELECTION (0x0002)
+
+#define	RCFC_DEFAULT_FEATURES	RCFCF_LOG_UI
+
+@class	RecentContactsFaxControlClass, RecentContactsControlClass;
+@default GI_states = (@default | GS_ENABLED);
+@endc
+
+typedef WordFlags RecentContactsSMSControlFeatures;
+/* 14 bits unused */
+#define RCMCF_LOG_UI	(0x0001)
+#define RCMCF_MULTIPLE_SELECTION (0x0002)
+
+#define	RCMC_DEFAULT_FEATURES	RCMCF_LOG_UI
+
+@class	RecentContactsSMSControlClass, RecentContactsControlClass;
+@default GI_states = (@default | GS_ENABLED);
+@endc
+
+/* ---------------------------------------------------------------------------
+ *   Exported functions
+ * ------------------------------------------------------------------------*/
+/*
+ *  This should be called to add log entries. The following situations
+ *  are examples of when to use LogAddEntry, and it's effects on the
+ *  general and recent contacts:
+ * 
+ * 	1.	At start of call, with duration ZERO.
+ * 			entry will have it's duration marked as "unknown".
+ * 
+ * 	2.	At start of call, with duration ZERO, and later again at end
+ * 		of call with duration filled in.
+ * 			standard way of usage.
+ * 
+ * 	3.	At end of call with duration filled in.
+ * 			assumes you forgot to log entry at beginning
+ * 			of call. 
+ *
+ *		When calling LogAddEntry at start of call, set LE_flags = 0,
+ *		or LEF_WILDCARD_NUMBER if you want matching at the end
+ *		of the call to this log entry not be based on the phone number.
+ * 
+ *  In any case, the recent contacts log will reflect the log entry the
+ *  first time it is called.
+ *
+ * 	Returns:	True if error (could be too little diskspace)
+ * 			False otherwise, and
+ * 				LE_contactID filled in if it was
+ * 				initially = LECI_INVALID_CONTACT_ID 
+ * 				(pass this same LogEntry with duration
+ * 				filled in at end of call).
+ */
+extern	Boolean _far _pascal \
+        LogAddEntry(LogEntry *logEntry);
+extern	void _far _pascal \
+        LogDeleteAllEntries();
+extern	void _far _pascal \
+        LogDestroy();
+extern  word _far _pascal \
+        RecentContactsGetCount(RecentContactsType rcType);
+extern  word _far _pascal \
+        RecentContactsGetEntry(RecentContactsType rcType, int item, \
+			LogEntry *buffer);
+extern	word _far _pascal \
+	RecentContactsGetNewCount(RecentContactsType rcType);
+extern	void _far _pascal \
+	RecentContactsResetNewCount(RecentContactsType rcType);
+extern	Boolean _far _pascal \
+        RecentContactsEraseStack(RecentContactsType rcType);
+extern	void _far _pascal \
+        RecentContactsResetMissedCallsTotalCount();
+extern	int _far _pascal \
+        RecentContactsGetMissedCallsTotalCount();
+
+extern  word _far _pascal \
+	LogGetCount();
+/*
+ *  Returns the # of items in the Contact Log.
+ */
+
+extern	Boolean _far _pascal \
+	LogGetEntry(int item, LogEntry *buffer);
+/*
+ *  Retrieves the specified entry from the Contact Log.
+ * 
+ * 	Pass:	item - item #
+ * 		buffer - LogEntry buffer to be filled
+ * 	Return:	TRUE if error
+ * 		FALSE otherwise and buffer filled
+ */
+
+extern	Boolean _far _pascal \
+	LogFindMatchingType(LogFieldType lft, optr logEntry,
+			    VMFileHandle hugeArray);
+
+/*
+ * Returns all the entries which match the given criteria.
+ * 
+ *      Pass:   lft - LogFieldType to determine which fields to use.
+ *              logEntry - LogEntry filled in with the appropiate
+ *                         fields (not used with LFT_ALL).
+ *              hugeArray - HugeArray handle in clipboard to return results.
+ *
+ *  The following fields will be considered for matching:
+ * 
+ *  LogFieldType			Fields
+ *  -------------------------------------------------------------------------
+ *  LFT_ALL			none, all entries matched
+ *  LFT_NUMBER			LE_number
+ *  LFT_TYPE			LE_type
+ *  LFT_DIRECTION		LE_direction
+ *  LFT_DATETIME		LE_datetime, entries older than the passed
+ *  				date/time will be matched
+ *  LFT_CONTACT_ID		LE_contactID
+ *  LFT_CONTACT_AND_DATETIME 	LE_contactID & LE_datetime, entries
+ *  				older than the passed date/time will
+ *  				be matched 
+ *  LFT_MANUALLY_ORIG_CALLS	LE_contactID & LE_direction, LE_type
+ *  				must be different
+ * 				Note: this is most useful when filled
+ * 				with LE_contactID = LECI_INVALID_CONTACT_ID
+ * 				     LE_direction = LED_SENT
+ * 				     LE_type = LET_DATA_ANY
+ */
+
+extern	Boolean _far _pascal \
+	LogDeleteMatchingType(LogFieldType lft, optr logEntry);
+/*
+ * Deletes matching entries based on the given criteria.
+ * 
+ *      Pass:   lft - LogFieldType to determine which fields to use.
+ *              logEntry - LogEntry filled in with the appropiate
+ *                         fields (not used with LFT_ALL).
+ *
+ * See LogFindMatchingType for matching rules.
+ */
+
+#ifdef __HIGHC__
+pragma	Alias(LogAddEntry, "LOGADDENTRY");
+pragma	Alias(LogDeleteAllEntries, "LOGDELETEALLENTRIES");
+pragma	Alias(LogDestroy, "LOGDESTROY");
+pragma  Alias(RecentContactsGetCount, "RECENTCONTACTSGETCOUNT");
+pragma	Alias(RecentContactsGetEntry, "RECENTCONTACTSGETENTRY");
+pragma  Alias(RecentContactsGetNewCount, "RECENTCONTACTSGETNEWCOUNT");
+pragma  Alias(RecentContactsResetNewCount, "RECENTCONTACTSRESETNEWCOUNT");
+pragma  Alias(RecentContactsEraseStack, "RECENTCONTACTSERASESTACK");
+pragma  Alias(RecentContactsResetMissedCallsTotalCount, \
+	      "RECENTCONTACTSRESETMISSEDCALLSTOTALCOUNT");
+pragma  Alias(RecentContactsGetMissedCallsTotalCount, \
+	      "RECENTCONTACTSGETMISSEDCALLSTOTALCOUNT");
+pragma 	Alias(LogGetCount, "LOGGETCOUNT");
+pragma	Alias(LogGetEntry, "LOGGETENTRY");
+pragma  Alias(LogFindMatchingType, "LOGFINDMATCHINGTYPE");
+pragma  Alias(LogDeleteMatchingType, "LOGDELETEMATCHINGTYPE");
+#endif
+
+@endlib

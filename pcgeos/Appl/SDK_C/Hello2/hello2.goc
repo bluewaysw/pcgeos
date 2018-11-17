@@ -1,0 +1,809 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-96 -- All Rights Reserved.
+ *
+ * PROJECT:	  Sample Applications
+ * MODULE:	  Hello2
+ * FILE:	  hello2.goc
+ *
+ * AUTHOR:	  Doug Fults, 2/3/91
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      doug    2/3/91          Initial version
+ *      NF      10/4/96         Clean up a little
+ *
+ * DESCRIPTION:
+ *	This file implements a Hello World-type application for GEOS.
+ *	It is processed by GOC, compiled by your favorite C compiler,
+ *	and linked by Glue to produce a runnable .geo file.
+ *
+ * RCS STAMP:
+ *	$Id: hello2.goc,v 1.1 97/04/04 16:37:50 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include files
+ *******************************************************************/
+    @include <stdapp.goh>
+
+/********************************************************************
+ *		Constants
+ *******************************************************************/
+    #define DOC_WIDTH  1000 /* Width of document within view */
+    #define DOC_HEIGHT 1000 /* Height of document within view */
+
+    #define MAX_TEXT_LENGTH 100   /* Max # of chars to draw */
+    #define TEXT_POINT_SIZE  48.0 /* point size */
+    #define TEXT_X_POSITION  50	  /* x position, in document coords. */
+    #define TEXT_Y_POSITION  80	  /* y position, in document coords. */
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    /*
+     * Here we define "Hello2ProcessClass" as a subclass of the
+     * system provided "GenProcessClass". As this application is
+     * launched, an instance of this class will be created, and
+     * will handle all application-related events (messages).
+     * The application thread will be responsible for running this
+     * object, meaning that whenever this object handles a message,
+     * we will be executing in the application thread.
+     *
+     * You will find no object in this file declared to be of this
+     * class. Instead, it is specified as the class for the application
+     * thread in "hello.gp".
+     */
+    @class Hello2ProcessClass, GenProcessClass;
+
+    /* define messages for this class here. */
+
+    /* General purpose message to invalidate the whole view,
+     * to cause it to redraw. */
+    @message void MSG_HELLO2_INVALIDATE_VIEW();
+
+    /* Sent from "Rotate" menu item in "Options" menu to request
+     * 10 degree rotation of text */
+    @message void MSG_HELLO2_ROTATE_10_DEGREES();
+
+    /* Sent from list of color choices to request color change */
+    @message void MSG_HELLO2_CHANGE_COLOR(byte color = cl);
+
+    /* Sent when "Change Text..." trigger in "Options" menu is pressed */
+    @message void MSG_HELLO2_BRING_UP_CHANGE_TEXT_DIALOG();
+
+    @endc;   /* end of class definition */
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    /*
+     * Each object class requires that a "class record" be stored
+     * in fixed memory for it. The class record is used by the GEOS
+     * message system for the delivery of messages sent to an object
+     * of the class. The class record needs to be defined in the file
+     * where the objects of that class are defined. The @classdecl
+     * GOC directive tells GOC to create the class record here.
+     *
+     * The neverSaved flag is necessary because ProcessClass objects
+     * are hybrid objects. It tells the system that no object of this
+     * class will ever be loaded from or stored to a file.
+     */
+    @classdecl Hello2ProcessClass, neverSaved;
+
+/********************************************************************
+ *		Global Variables
+ *******************************************************************/
+    /* Angle for text (degrees). */
+    short rotationAngle = -20;
+    /* Color in which to draw text the current text itself. */
+    byte  textColor = C_LIGHT_BLUE;
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+/*
+ *		Application Object
+ *
+ * The very top-level generic object of an application MUST be a
+ * GenApplication object. The hello.gp file contains "appobj"
+ * statement which indicates that this "HelloApp" object is in
+ * fact the top-level UI object.
+ *
+ * This object should be in its own resource, as it is all that
+ * need be in memory when the application is iconified. As such,
+ * its resource should be as small as possible.
+ */
+@object GenApplicationClass Hello2App = {
+
+    /*
+     * While the application object isn't shown on the screen,
+     * it has a list of VisMonikers for three purposes:
+     *	1) the GenPrimary (see below) inherits the moniker when
+     *	   it comes up on screen.
+     *	2) when GeoManager needs to display an icon for the
+     *     application, and there's none for it in the Token
+     *     Database, it launches the app and sends a message to
+     *     the application object to install its list of monikers
+     *     in the token database under the application's token.
+     *	3) when the GenPrimary is minimized, it uses the most
+     *     appropriate graphical moniker from this list for the
+     *     application's icon. If there's an abbreviated-text
+     *     moniker in the list, that's used as the icon title.
+     *     Else any regular-text moniker is used.
+     */
+    GI_visMoniker = list { @Hello2TextMoniker };
+
+    /*
+     * The GenApplication object has two children:
+     * first, the main application window, a GenPrimary object,
+     * and second, the UI definition for a modal dialog that we
+     * can bring up anytime it is needed.
+     */
+    GI_comp = @Hello2Primary,
+              @Hello2ChangeTextDialog;
+
+    /*
+     * The main window should appear on-screen when the application
+     * is launched, so place it on the GAGCNLT_WINDOWS GCN list.
+     * This causes the application object to bring it on-screen at
+     * the appropriate time.
+     */
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @Hello2Primary;
+}
+
+@visMoniker Hello2TextMoniker = "C Hello2 Sample Application";
+
+@end AppResource;
+
+/********************************************************************
+ *		Interface Resource
+ * This resource is for miscellaneous UI objects.
+ *******************************************************************/
+@start Interface;
+
+/*
+ *		Primary window
+ *
+ * Every application has at least one GenPrimary object.
+ * This object serves as the main window of the application.
+ * Inside this window, various UI components, such as menus
+ * or lists, can be placed.
+ */
+@object GenPrimaryClass Hello2Primary  = {
+
+    /*
+     * This window has three children:
+     * an "Options" menu, a "Color" menu,
+     * and the GenView object (see below).
+     */
+    GI_comp = @Hello2OptionsMenu,
+              @Hello2ColorMenu,
+              @Hello2View;
+
+    /*
+     * The window may not be iconified.
+     */
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+}
+
+/*
+ *		Options menu
+ *
+ * This is an example of a main menu placed on the primary
+ * window of the application.
+ */
+@object GenInteractionClass Hello2OptionsMenu = {
+    /*
+     * This indicates that this a menu, the default GII_type is
+     * GIT_ORGANIZATIONAL, which is appropriate for most menus.
+     */
+    GII_visibility = GIV_POPUP;
+
+    /*
+     * The children may be GenTriggers, GenItemGroups,
+     * GenBooleanGroups, and other GenInteractions.
+     */
+    GI_comp =
+	/*
+	 * Menu item to request rotation of 10 degress.
+	 */
+	@Hello2RotateTrigger,
+	/*
+	 * Menu item to request dialog box for changing text.
+	 */
+	@Hello2ChangeTextTrigger;
+
+    /*
+     * Tell Specific UI that this is the "Options" menu.
+     * It will automatically provide a moniker for the menu,
+     * if we leave it blank.
+     */
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_OPTIONS_MENU );
+}
+
+/*
+ *		Rotate menu item
+ *
+ * This is an example of a GenTrigger, which, when placed in a
+ * menu as this one has been, becomes a simple menu item.
+ * When clicked in, the message MSG_HELLO2_ROTATE_10_DEGREES
+ * will be sent to the process.  We'll provide a handler to
+ * change the rotation factor in our process class.
+ */
+@object GenTriggerClass Hello2RotateTrigger = {
+    GI_visMoniker = "Rotate 10 degrees";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_HELLO2_ROTATE_10_DEGREES;
+}
+
+/*
+ *		Change Text menu item
+ *
+ * This is an example of a trigger used to notify the process
+ * that it's time to bring up a dialog box.  When clicked in,
+ * the message MSG_HELLO2_BRING_UP_CHANGE_TEXT_DIALOG will be
+ * sent to the process. We'll provide a handler in our process
+ * class to then bring up a dialog box to let the user change
+ * the text. We could just have the dialog box here as a
+ * GenInteraction object, except we need to set the initial
+ * text for the user to edit before the box comes up on screen.
+ */
+@object GenTriggerClass Hello2ChangeTextTrigger = {
+    GI_visMoniker = "Change Text";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_HELLO2_BRING_UP_CHANGE_TEXT_DIALOG;
+
+    /*
+     * Let specific UI know our intentions.
+     * Motif will add "..." to the end of the text.
+     */
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+/*
+ *		Color menu
+ *
+ * The second main menu for Hello2. This one will let the user
+ * pick from a number of different colors for the text in the display.
+ *
+ */
+@object GenInteractionClass Hello2ColorMenu = {
+    /*
+     * The moniker is used in the main menu bar. 'C' tells the
+     * specific UI which character in the moniker should be used
+     * as the mnemonic, if the UI supports keyboard navigation.
+     * Motif will place an underscore under the initial C in "Color".
+     */
+    GI_visMoniker = 'C', "Color";
+
+    /*
+     * The children may be GenTriggers, GenItemGroups,
+     * GenBooleanGroups, and other GenInteractions.
+     */
+    GI_comp =
+	/*
+	 * For this menu, we'll just have a single list of colors
+         * that the user can choose between.  This can be
+         * accomplished with a GenItemGroup, whose children become
+         * checked menu items.
+	 */
+	@Hello2ColorList;
+
+    /*
+     * This indicates that this a menu, the default GII_type is
+     * GIT_ORGANIZATIONAL, which is appropriate for most menus.
+     */
+    GII_visibility = GIV_POPUP;
+}
+
+/*
+ *		Color list
+ *
+ * Here we ask for gadgetry to let the user choose one color
+ * from a selection of particular colors.
+ */
+@object GenItemGroupClass Hello2ColorList = {
+    /*
+     * Only one item from the group may be selected at a time.
+     */
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    /*
+     * Default to blue text as the current selection.
+     * GIGI_selection is set to the GII_identifier field of
+     * the child that is to be selected when the group first
+     * comes on-screen.
+     */
+    GIGI_selection = C_LIGHT_BLUE;
+    GIGI_numSelections = 1;
+
+    /*
+     * The members of the group.
+     */
+    GI_comp =
+	@Hello2Red,
+	@Hello2Green,
+	@Hello2Blue,
+	@Hello2Yellow;
+    /*
+     * Send this message to our application thread when a
+     * different item is selected by the user.
+     */
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_HELLO2_CHANGE_COLOR;
+}
+
+@object GenItemClass Hello2Red = {
+    GI_visMoniker = 'R', "Red";
+    GII_identifier = C_LIGHT_RED;
+}
+
+@object GenItemClass Hello2Green = {
+    GI_visMoniker = 'G', "Green";
+    GII_identifier = C_LIGHT_GREEN;
+}
+
+@object GenItemClass Hello2Blue = {
+    GI_visMoniker = 'B', "Blue";
+    GII_identifier = C_LIGHT_BLUE;
+}
+
+@object GenItemClass Hello2Yellow = {
+    GI_visMoniker = 'Y', "Yellow";
+    GII_identifier = C_YELLOW;
+}
+
+/*
+ *		GenView object
+ *
+ * This GenView object creates a window where the application
+ * can display portions of the document as necessary. As we
+ * want this window to be scrollable, the specific UI (Motif)
+ * will create scroll bars which the user can interact with.
+ * Whenever a portion of the window needs to be redrawn, the
+ * GenView object will invalidate a portion of the window,
+ * causing a MSG_META_EXPOSED to be sent to the application.
+ * The application will draw the document into the window as
+ * requested. The window keeps track of a mask, which is used
+ * to clip the application's drawing operations, so that only
+ * the invalid portion of the window is drawn to.
+ */
+@object GenViewClass Hello2View = {
+    /*
+     * Make view scrollable in X and Y and ensure that it never
+     * gets larger than the thing being displayed within it.
+     */
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+
+    /*
+     * Specify the dimensions of the document being displayed
+     * within the view.
+     */
+    GVI_docBounds = { 0, 0, DOC_WIDTH, DOC_HEIGHT };
+
+    /*
+     * When the contents of this view (i.e. the document) must
+     * be updated, the UI should send a MSG_META_EXPOSED to the
+     * Hello2ProcessClass object.
+     */
+    GVI_content = process;
+
+    /*
+     * Make sure when the view opens initially at least part of
+     * the rotated text is visible. This does not affect whether
+     * the user can resize the primary that contains the view;
+     * only the initial size. The size itself is specified in
+     * pixels (which are really points) based on the origin
+     * for drawing the text string.
+     */
+    HINT_INITIAL_SIZE = {
+	( SST_PIXELS << SSS_TYPE_OFFSET ) |
+        ( TEXT_X_POSITION + 30 ),
+	( SST_PIXELS << SSS_TYPE_OFFSET ) |
+        ( TEXT_Y_POSITION + 30 ),
+	0
+    };
+
+    /*
+     * Since the user will not be typing into the view, we do
+     * not want a floating keyboard to come up.
+     */
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@end Interface;
+
+/***********************************************************************
+ *		ChangeTextDialog Resource
+ * We place the "Change Text" dialog in its own resource so that
+ * it won't be loaded in until needed.
+ **********************************************************************/
+@start ChangeTextDialog;
+
+/*
+ *		Change Text dialog
+ *
+ * This is an example of a modal properties dialog box.  As it is modal,
+ * it needn't be updated to show current state until it is about to be
+ * brought up on screen.
+ */
+@object GenInteractionClass Hello2ChangeTextDialog = {
+
+    /*
+     * The moniker is used for any title bar or similar
+     * thing the specific UI may see fit to put on the box.
+     */
+    GI_visMoniker = "Change Text";
+
+    /*
+     * Children of the dialog -- a text edit area (GenText),
+     * and the "OK" button.
+     */
+    GI_comp = @Hello2Text,
+              @Hello2ApplyTrigger;
+
+    /*
+     * This is a properties dialog, meaning that the dialog
+     * shows the user properties of his/her data, & allows
+     * him/her to alter the properties of that data.
+     */
+    GII_type = GIT_PROPERTIES;
+    GII_visibility = GIV_DIALOG;
+
+    /*
+     * Dialogs may optionally be dropped right into a menu, in
+     * which case a button appears, with the name of the dialog
+     * (in this case "Change Text...".  If the user clicks on
+     * that button, MSG_GEN_INTERACTION_INTIATE is automatically
+     * sent to the dialog.  In our example, we've chosen to have
+     * the app bring the dialog up itself, so we turn off the
+     * default behavior by setting GIA_NOT_USER_INITIATABLE.
+     *
+     * This is also where we request modal behavior from user's
+     * perspective.
+     */
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+                         | GIA_MODAL;
+
+}
+
+@object GenTextClass Hello2Text = {
+    GTXI_text = "The quick brown fox jumped over the lazy dog.";
+    GTXI_maxLength = MAX_TEXT_LENGTH;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@object GenTriggerClass Hello2ApplyTrigger = {
+    /*
+     * Instead of giving this trigger a name, just let the UI know
+     * that this is the standard "Apply" trigger for this properties
+     * dialog. It will label it correctly, which for MOTIF is "Apply"
+     * if non-modal, and "OK" if modal.
+     */
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+    /*
+     * Send this message to our process when the trigger is clicked:
+     * since the text is updated, update the entire view.
+     */
+    GTI_destination = process;
+    GTI_actionMsg = MSG_HELLO2_INVALIDATE_VIEW;
+    /*
+     * This indicates that when the user activates this trigger,
+     * interaction with this dialog is finished.  The specific is
+     * allowed to dismiss the dialog if it desires.  In this case,
+     * the dialog is modal, so it will dismiss it.
+     */
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    /*
+     * Place visually in the reply bar area,
+     * if the specific UI does such things.
+     */
+    HINT_SEEK_REPLY_BAR;
+    /*
+     * Make this the interaction default, so "CR" will activate it
+     */
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@end ChangeTextDialog;
+
+/********************************************************************
+ *		Function Definitions
+ *******************************************************************/
+
+/********************************************************************
+ *              Hello2DrawText
+ ********************************************************************
+ * SYNOPSIS:	 Redraws the entire document, given a graphics state
+ *		 through which to draw.
+ * CALLED BY:	 Hello2Process::MSG_META_EXPOSED
+ *		 Hello2Process::MSG_HELLO2_CHANGE_COLOR
+ * RETURNS:      void
+ * SIDE EFFECTS: Various aspects of the gstate are altered.
+ * STRATEGY:     Set the font and point size of the text for this
+ *               gstate. Set the text color, too. Then apply the
+ *               rotation given the angle in the global variable.
+ *               Finish off by drawing the text string stored in
+ *               the Hello2Text object.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	3/91		Initial Revision
+ *	doug	2/92		Modified to fetch params from UI gadgetry
+ *	ppc	10/94		Modified to fetch text from Hello2Text obj
+ *******************************************************************/
+void
+Hello2DrawText( GStateHandle gstate )
+  /*
+   * gstate - GState to draw to.
+   */
+{
+    /*
+     * str - Used to retrieve text from Hello2Text object.
+     */
+    char str[MAX_TEXT_LENGTH+2];
+
+    /*
+     * First change some of the default GState values, such as font
+     * Set the text color according to our textColor variable
+     */
+    GrSetFont( gstate, FID_DTC_URW_SANS, MakeWWFixed( TEXT_POINT_SIZE ) );
+    GrSetTextColor( gstate, CF_INDEX, textColor, 0, 0 );
+
+    /*
+     * Translate, that is, shift the image into the middle of the view,
+     * before rotating.
+     * Apply a rotation to the transformation matrix, so the text
+     * will be drawn at an angle.
+     */
+    GrApplyTranslation( gstate, MakeWWFixed( TEXT_X_POSITION ),
+				MakeWWFixed( TEXT_Y_POSITION ) );
+    GrApplyRotation( gstate, MakeWWFixed( rotationAngle ) );
+
+    /*
+     * Get the text from the Hello2Text object's instance data
+     * Draw the text onto the document
+     */
+    @call Hello2Text::MSG_VIS_TEXT_GET_ALL_PTR( str );
+    GrDrawText( gstate, 0, 0, str, 0 );
+} /* Hello2DrawText */
+
+/********************************************************************
+ *		Code for Hello2ProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *		MSG_META_EXPOSED
+ ********************************************************************
+ * SYNOPSIS:	 Redraw the recently-exposed portion of the view.
+ * PARAMETERS:	 WindowHandle win
+ * RETURNS:      void
+ * SIDE EFFECTS: The invalid region of the window is cleared out.
+ * STRATEGY:	 This message is sent by the windowing system when a
+ *	    	 portion of the GenView has become invalid, either
+ *	    	 because a window that was obscuring it has been moved,
+ *	    	 or because some called GrInvalRect.
+ *	    	 We redraw the entire document, after telling the
+ *		 graphics system we're drawing to the invalid portion
+ *		 of the window.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *******************************************************************/
+@method Hello2ProcessClass, MSG_META_EXPOSED
+{
+    /*
+     * gstate - Graphics state to draw to.
+     */
+    GStateHandle gstate;
+
+    /*
+     * Get a default graphics state that we can use while drawing.
+     */
+    gstate = GrCreateState( win );
+
+    /*
+     * Start a window update. This tells the windowing system that
+     * we are in the process of drawing to the invalid portion of
+     * this window. GrBeginUpdate/GrEndUpdate are necessary only
+     * when handling MSG_META_EXPOSED. For drawing at other times,
+     * all you need do is create a graphics state and draw through it.
+     */
+    GrBeginUpdate( gstate );
+
+    /*
+     * If we had background graphics to draw, we would call the
+     * apropriate graphics routines now.
+     */
+
+    /*
+     * Draw the text into the window (pass the GState)
+     */
+    Hello2DrawText( gstate );
+
+    /*
+     * Now indicate that we are done drawing to the invalid area
+     * and free the gstate.
+     */
+    GrEndUpdate( gstate );
+    GrDestroyState( gstate );
+} /* MSG_META_EXPOSED */
+
+/********************************************************************
+ *		MSG_HELLO2_INVALIDATE_VIEW
+ ********************************************************************
+ * SYNOPSIS:	 Force the entire view area to redraw.
+ * PARAMETERS:	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: The entire document area is marked invalid, meaning
+ *		 no drawing to it will have any effect until the
+ *		 MSG_META_EXPOSED we've generated has been processed.
+ * STRATEGY:	 Create a graphics state and invalidate a rectangle
+ *		 that is our entire document area.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Doug	2/92		Initial Revision
+ *******************************************************************/
+@method Hello2ProcessClass, MSG_HELLO2_INVALIDATE_VIEW
+{
+    /*
+     * win    - Window to draw to.
+     * gstate - Graphics state to draw to.
+     */
+    WindowHandle win;
+    GStateHandle gstate;
+
+    /*
+     * Get the view's window handle.
+     * Get a default graphics state to use for drawing.
+     */
+    win = @call Hello2View::MSG_GEN_VIEW_GET_WINDOW();
+    gstate = GrCreateState( win );
+
+    /*
+     * Invalidate the entire document area within the window.
+     */
+    GrInvalRect( gstate, 0, 0, DOC_WIDTH, DOC_HEIGHT );
+
+    /*
+     * Now free up the gstate.
+     */
+    GrDestroyState( gstate );
+} /* MSG_HELLO2_INVALIDATE_VIEW */
+
+/********************************************************************
+ *		MSG_HELLO2_ROTATE_10_DEGREES
+ ********************************************************************
+ * SYNOPSIS:	 Rotate the text we display on the document another
+ *		 10 degrees. This is the message sent when the user
+ *		 clicks the "Rotate 10 Degrees" trigger.
+ * PARAMETERS:	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: The view is invalidated; rotationAngle is increased
+ *		 by 10.
+ * STRATEGY:	 Adjust rotationAngle, wrapping it at 360 degrees.
+ *	    	 Tell ourselves to invalidate the view.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Doug	2/92		Initial Revision
+ *******************************************************************/
+@method Hello2ProcessClass, MSG_HELLO2_ROTATE_10_DEGREES
+{
+
+    /*
+     * Bump rotation angle stored in global variable.
+     */
+    rotationAngle += 10;
+    if ( rotationAngle > 360 ) {
+	rotationAngle -= 360;
+    }
+
+    /*
+     * Call message on ourself to force redraw.
+     */
+    @call self::MSG_HELLO2_INVALIDATE_VIEW();
+} /* MSG_HELLO2_ROTATE_10_DEGREES */
+
+
+/********************************************************************
+ *		MSG_HELLO2_CHANGE_COLOR
+ ********************************************************************
+ * SYNOPSIS:	 Change the color of the text we display on the
+ *		 document. This message is sent when the user chooses
+ *	    	 one of the entries in Hello2ColorList.
+ * PARAMETERS:	 byte colorIndex
+ * RETURNS:      void
+ * SIDE EFFECTS: TextColor is set to the new color and the document
+ *		 is redrawn.
+ * STRATEGY:	 We could call MSG_HELLO2_INVALIDATE_VIEW on ourselves
+ *		 after changing the global variable, but it's more
+ *		 instructive to redraw the view outside a MSG_META_EXPOSED
+ *		 handler here.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Doug	2/92		Initial Revision
+ *******************************************************************/
+@method Hello2ProcessClass, MSG_HELLO2_CHANGE_COLOR
+{
+    /*
+     * win    - Window to draw to.
+     * gstate - Graphics state to draw to.
+     */
+    WindowHandle win;
+    GStateHandle gstate;
+
+    /*
+     * Store new color in global variable for later use
+     */
+    textColor = color;
+
+    /*
+     * Get the view's window handle
+     * Get a default graphics state to use for drawing
+     */
+    win = @call Hello2View::MSG_GEN_VIEW_GET_WINDOW();
+    gstate = GrCreateState( win );
+
+    /*
+     * Draw the text into the window (pass the GState)
+     */
+    Hello2DrawText( gstate );
+
+    /*
+     * Now free up the gstate
+     */
+    GrDestroyState( gstate );
+} /* MSG_HELLO2_CHANGE_COLOR */
+
+/********************************************************************
+ *	        MSG_HELLO2_BRING_UP_CHANGE_TEXT_DIALOG
+ ********************************************************************
+ * SYNOPSIS:	 Bring the Change Text dialog box up on screen after
+ *		 setting it up properly. This message is sent when
+ *		 the user clicks the Hello2ChangeTextTrigger.
+ * PARAMETERS:	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: The Hello2ChangeTextDialog is initiated.
+ * STRATEGY:	 Copy the current text into the GenText object in
+ *		 the Hello2ChangeTextDialog, then send the dialog a
+ *		 MSG_GEN_INTERACTION_INITIATE to bring it on screen.
+ *	    	 Hello2ChangeTextDialog is a modal box, but there's
+ *		 no particular reason it couldn't be non-modal, as
+ *	    	 there's no question of having to keep the GenText
+ *	    	 object up-to-date (the only way to change the text
+ *	    	 is through this dialog, after all).
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Doug	2/92		Initial Revision
+ *******************************************************************/
+@method Hello2ProcessClass, MSG_HELLO2_BRING_UP_CHANGE_TEXT_DIALOG
+{
+
+    /*
+     * Bring dialog box up on screen.  It will come up modal,
+     * meaning that the user won't be able to interact with
+     * anything else in the application until doing something
+     * with the dialog.  Our process, on the other hand, may
+     * continue to do whatever it wants.
+     */
+    @call Hello2ChangeTextDialog::MSG_GEN_INTERACTION_INITIATE();
+} /* MSG_HELLO2_BRING_UP_CHANGE_TEXT_DIALOG */
+

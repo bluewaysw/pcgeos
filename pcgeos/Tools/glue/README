@@ -1,0 +1,326 @@
+*******************************************************************************
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		System specification
+FILE:		README
+
+AUTHOR:		Adam de Boor, May 26, 1993
+
+REVISION HISTORY:
+	Name	Date	Description
+	----	----	-----------
+	ardeb	5/26/93	Initial revision
+
+
+DESCRIPTION:
+	This is an attempt at a roadmap of Glue. 
+		
+
+	$Id$
+
+*******************************************************************************
+
+readmeContents:
+see also [ contents ]
+    entryOne	 	- synopsis
+    entryTwo	    	- synopsis
+
+****************************************************************************
+			     Introduction
+****************************************************************************
+readmeIntro:
+see also [ contents readmeContents ]
+
+Glue is a 2-pass linker that is capable of handling four different types of
+input: 
+	* Esp (VM-based) object files
+	* Esp (VM-based) library files
+	* Microsoft object files
+	* Microsoft library files
+
+In addition, for the Microsoft formats, two types of debugging information are
+supported:
+	* CodeView style (all information is in special $$TYPES and $$SYMBOLS
+	  segments)
+	* Borland style (all information is in special comment records)
+
+Regardless of the format for the debugging information on input, it is always
+translated to the format used by Esp object files in a .sym file on output.
+
+As output, it can produce 6 types of executable or data file:
+	* PC/GEOS executables (.geo)
+	* DOS segmented executables (.exe)
+	* PC/GEOS 1.x kernels (.exe, but with special layout requirements)
+	* DOS non-segmented executables (.com)
+	* PC/GEOS virtual memory files (.vm) with or without DB items
+	* PC/GEOS font files/raw data files (used for stream-based graphics
+	  strings, for example)
+
+As the name implies, a 2-pass linker works by running over the input files
+twice. During the first pass, it reads in all the symbols, determines the
+sizes of the various segments, relocates symbols according to where their
+piece of a segment will be placed during the second pass, etc. The second pass
+consists of merging the various pieces of each segment into a single block and
+writing it to the output file, resolving whatever external references the
+assembler or compiler has marked in the object file.
+
+Glue also has a fairly large function, called InterPass, that consolidates the
+knowledge gained during pass 1 and produces various data structures for Swat
+that it would otherwise have to build on its own.
+
+
+****************************************************************************
+			      Source Code Layout
+****************************************************************************
+readmeFiles:
+see also [ contents readmeContents ]
+
+The files that make up Glue can be broken down into four categories:
+	* object-file readers
+	* Microsoft object-file symbol information parsers
+	* output-file producers
+	* general utilities
+
+By the category, then, these are the files:
+
+* object-file readers
+	* msl.c			Finds individual microsoft object files, packed
+				into a microsoft library, that contain at least
+				one symbol that is still undefined, then
+				passes that object file off to the regular
+				microsoft object file reader to link in.
+	* pass1ms.c		First-pass processing of microsoft object files.
+	* pass1vm.c		First-pass processing of Esp object files
+	* pass2ms.c		Second-pass processing of microsoft object
+				files.
+	* pass2vm.c		Second-pass process of Esp object files
+
+* Microsoft object-file symbol information parsers
+	* borland.c		Translation of Borland symbolic information
+				into Esp information. All the work happens on
+				the first pass.
+	* borland.h		Definition of what Borland symbolic
+				information consists.
+	* codeview.c		Translation of CodeView symbolic information
+				into Esp information. Again, most of the work
+				happens on the first pass.
+	* codeview.h		Definition of the CodeView-specific parts of a
+				microsoft object file.
+
+* output-file producers
+	* com.c			Non-segmented DOS executables
+	* exe.c			Segmented DOS executables
+	* font.c		PC/GEOS font/graphics string/raw data files
+	* geo.c			PC/GEOS executables
+	* geo.h			Definitions for same, shared by various other
+				modules (e.g. library.c and parse.y)
+	* kernel.c		PC/GEOS 1.x kernel
+	* vm.c			PC/GEOS VM data files
+
+* general utilities
+	* glue.h		Definitions shared among *all* modules of Glue.
+	* library.c		Code to both produce and locate .ldf files
+				when making a PC/GEOS executable.
+	* main.c		Entry point and driving routines for Glue. If
+				you see a function with no recognizable
+				prefix, chances are very good you'll find it
+				in here.
+	* msobj.c		Utility routines for reading microsoft object
+				files. Used by both the object file readers
+				and the symbol information parsers.
+	* msobj.h		Definition of a microsoft object file, as well
+				as the routines provided by msobj.c
+	* obj.c			Utility routines common to object file readers.
+	* obj.h			Definition of routines provided by obj.c
+	* output.c		Utility routines for actually producing the
+				output file.
+	* output.h		Definition of routines provided by output.c
+	* parse.y		Parser to interpret .gp files when creating a
+				PC/GEOS executable.
+	* segattrs.gperf	Definition of the various tokens allowable as
+				arguments to the "load" command in .gp files.
+				This is processed by the "gperf" utility to
+				produce two functions that implement a perfect
+				hash table, allowing for quick recognition of
+				the keywords with one string comparison.
+	* segattrs.h		File produced from segattrs.gperf
+	* segment.c		Routines to keep track of and order segments
+				and groups.
+	* sym.c			Routines to manage the symbol table maintained
+				for each segment. They also perform
+				cross-checks of symbol types between object
+				files and track all undefined symbols.
+	* sym.h			Definition of routines provided by sym.c
+	* tokens.gperf		Definition of the various tokens that are
+				always valid in a .gp file.
+	* tokens.h		File produced from tokens.gperf
+	* vector.c		Routines that provide the "Vector" type, which
+				is sort of an expandable array. It is used in
+				many places, most notably when processing
+				microsoft object files.
+	* vector.h		Definition of routines provided by vector.c
+
+****************************************************************************
+		      Management of Output File Formats
+****************************************************************************
+readmeOutputFormats:
+see also [ contents readmeContents ]
+
+Each output format is described by a structure that gives various pieces of
+information about that format, including several procedure vectors for
+functions required by the other parts of Glue.
+
+The structure is defined as follows:
+
+typedef struct {
+    /*
+     * Prepare output file. Arg is name of parameter file (if any). Returns
+     * size of final output file.
+     */
+    PrepareProc	    *prepare;
+    /*
+     * Function to call to map an object relocation to a runtime relocation.
+     */
+    int	    	    rtrelsize; 	    /* Size (bytes) of a run-time
+				     * relocation. rbuf will always
+				     * point to a buffer at least this big
+				     */
+    RelMapProc	    *maprel;
+    /*
+     * All other operations done. Now write executable header to the output
+     * file.
+     */
+    WriteProc       *write;
+    /*
+     * Make sure the target of a relocation lies in fixed memory.
+     */
+    IsFixedProc	    *checkFixed;
+    /*
+     * Set the entry point for the executable.
+     */
+    SetEntryProc    *setEntry;
+    /*
+     * Various flags
+     */
+    int	    	    flags;
+#define FILE_NOCALL 	    	1   	/* CALL relocations not handled at
+					 * runtime */
+#define FILE_NEEDPARAM	    	2   	/* Need extra parameter file */
+#define FILE_NOENTRYPTS	    	4   	/* Don't allow ENTRY relocations */
+#define FILE_BIGGROUPS	    	8   	/* Allow groups larger than 64K */
+#define FILE_USES_GEODE_PARAMS 	16  	/* Format uses a geode parameters file,
+					 * so its libraries should be loaded
+					 * by Parse_GeodeParams before pass 1 */
+#define FILE_AUTO_LINK_LIBS 	32  	/* If any library segment has undefined
+					 * symbols, call Library_Link for it
+					 * automatically */
+    /*
+     * Default suffix to place on output file.
+     */
+    char    	    *suffix;
+    /*
+     * Any extra command-line options Glue supports in this mode.
+     */
+    FileOption	    *options;
+} FileOps;
+
+The individual procedure types, and the arguments they take, are defined in
+output.h. You can look there for details.
+
+The type of output file is selected via one of Glue's -Ox arguments. Once
+selected, the pointer to that output format's FileOps structure is placed in
+the global variable "fileOps" for use by all parts of Glue.
+
+****************************************************************************
+			     General Control Flow
+****************************************************************************
+readmeControlFlow:
+see also [ contents readmeContents ]
+
+At the highest level, execution runs something like this:
+
+main()
+	parse arguments
+	open symbol file
+	if creating .geo file, parse .gp file to link in .ldf files
+	foreach object/library file:
+		open it
+		call the pass1 handler for that type of file
+		close it
+	call InterPass()
+	open the output file
+	call the output-type-specific preparation routine
+	foreach object/library file:
+		open it
+		call the pass2 handler for that type of file
+		close it
+	call the output-type-specific write routine to finish the output file
+	close the output file
+		
+Control flow for reading Esp object files is straight-forward:
+
+	pass 1:
+
+	enter all segments
+	enter all groups
+	for each segment:
+	    reloc = segment's current size in output file
+	    relocate all line number records by reloc and transfer them to
+		the symbol file
+	    relocate all the address-bearing symbols by reloc and transfer
+		them to the symbol file, adding them to the segment's symbol
+		table, as appropriate
+	    merge all non-address-bearing symbols into the symbol table for
+	    	the segment, cross-checking type definitions with any already
+		existing.
+
+	pass 2:
+
+	foreach segment:
+	    locate the descriptor for the segment
+	    lock down the data for the segment.
+	    perform relocations
+	    write data block to the output file
+	    write any runtime relocations generated by the above to the
+	        output file
+
+	if object file specifies the executable's entry point, relocate it
+	    and call fileOps->setEntry to record it.
+
+
+Owing to the need to not only cope with a more awkward (though
+space-efficient) input format, but also with two different ways of specifying
+symbolic information, both of which require extensive translation to a format
+that Swat understands, the processing of Microsoft object files is
+considerably more complex, though simple to describe:
+
+	pass 1:
+
+	foreach record:
+	    call msobjCheck vector, passing the record along. If it says
+		it processed the record, throw it away
+	    perform action appropriate to record type, defining segments,
+		groups, etc., as they are encountered
+
+	call msobjFinish vector to perform whatever post-processing the
+	    symbol format requires
+
+	pass 2:
+
+	foreach record
+	    call msobjCheck vector, passing the record along. If it says
+		it processed the record, throw it away
+	    if record is LEDATA or LIDATA, relocate it and transfer it to
+		the output file, along with any runtime relocations generated
+		by the record.
+
+	call msobjFinish vector to perform whatever post-processing the
+	    symbol format requires
+
+
+The default function for the msobjCheck vector simply looks for COMENT records
+that indicate the type of symbolic information provided in the file, at which
+point it sets msobjCheck and msobjFinish appropriately and passes the record
+on to the symbolic format's handler.

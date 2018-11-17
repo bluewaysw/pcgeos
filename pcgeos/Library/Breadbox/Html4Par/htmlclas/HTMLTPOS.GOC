@@ -1,0 +1,910 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLTPOS.GOC -- Post processing for tables
+ *
+ * AUTHOR:        Lysle Shields
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi\string.h>
+#include <Ansi\stdio.h>
+#include <Ansi\stdlib.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+
+#include "regiont.h"
+#include "internal.h"
+#include "errors.h"
+#include "tableint.h"
+
+void fprintf(FileHandle file, char *fmt, ...) ;
+void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray) ;
+word IFastCellGetNextIndex(HTMLTextInstance *pself, word cellIndex) ;
+
+/**************************************************************************
+ * Routine:  ICalculateVerticalOffset
+ **************************************************************************
+ *
+ * Description:
+ *     This routine determines how much a cell needs its contents shifted
+ *     down based on whether or not it is bottom aligned, top aligned, or
+ *     center aligned vertically.  It also calculates this information
+ *     as related to its parents position.  It is assumed that a single
+ *     pass is made through all the cells and this added value will
+ *     be from all cells top aligned.  (See IAdjustRegions for more
+ *     details).
+ *
+ * Inputs:
+ *     HTMLTextInstance *pself    -- Text object being used
+ *     word cellIndex             -- Cell to determine offset
+ *     dword *offset2             -- Pointer to first offset size.
+ *
+ * Outputs:
+ *     dword                      -- Offset to add to current position
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/09/07  Created.
+ *
+ **************************************************************************/
+dword ICalculateVerticalOffset(
+          HTMLTextInstance *pself,
+          word cellIndex,
+          dword *offset2)
+{
+    dword totalOffset = 0 ;
+    dword offset ;
+    HTMLtableData *p_table ;
+    HTMLcellData *p_cell;
+    word topCell ;
+    word nextTopCell ;
+    T_cellArrayHandle cellArray = pself->HTI_cellArray;
+    T_tableArrayHandle tableArray = pself->HTI_tableArray;
+    Boolean first = TRUE ;
+    word size ;
+    word firstCell ;
+
+    *offset2 = 0 ;
+
+    /* Go up the tree adding up offsets as they are calculated */
+    while (cellIndex != 0)  {
+        CellLock(cellArray, cellIndex, &p_cell, &size);
+        TableLock(tableArray, p_cell->HCD_table, &p_table, &size) ;
+        firstCell = p_table->HTD_firstCell ;
+        TableUnlock(p_table) ;
+
+        /* If this is a continue cell, find the correct cell it is under */
+        if (p_cell->HCD_flags & HTML_CELL_CONTINUE)  {
+            topCell = firstCell ;
+            while (topCell < cellIndex)  {
+                nextTopCell = IFastCellGetNextIndex(pself, topCell) ;
+                if (nextTopCell > cellIndex)
+                    break ;
+                topCell = nextTopCell ;
+            }
+
+            /* Get the final cell */
+            CellUnlock(p_cell) ;
+            CellLock(cellArray, topCell, &p_cell, &size);
+        }
+
+        /* Go to the correct Y with the appropriate offset */
+        /* for this cell */
+        switch(p_cell->HCD_flags & HTML_CELL_VALIGN_MASK)  {
+            case HTML_CELL_VALIGN_TOP:
+            default:
+                /* Top is normal. */
+                offset = 0 ;
+                break ;
+            case HTML_CELL_VALIGN_BOTTOM:
+                /* Move to the very bottom of the cell */
+                offset = p_cell->HCD_slackHeight ;
+                break ;
+            case HTML_CELL_VALIGN_CENTER:
+                /* Add in half the difference of the real height */
+                /* and the calculated height */
+                offset = p_cell->HCD_slackHeight>>1 ;
+                break ;
+        }
+        if (first)   {
+            first = FALSE ;
+            *offset2 = offset ;
+        }
+
+        CellUnlock(p_cell) ;
+
+        totalOffset += offset ;
+
+        /* Now go up the tree one (cell containing this table) */
+        /* until we hit the master cell */
+        if (firstCell==0)
+            break ;
+        cellIndex = p_table->HTD_firstCell-1 ;
+    }
+
+//    ProfPoint("ICalculateVerticalOffset") ;
+    return totalOffset ;
+}
+
+/**************************************************************************
+ * Routine:  IAdjustRegionHeights
+ **************************************************************************
+ *
+ * Description:
+ *     AdjustRegionHeights determines where regions containing text
+ *     should be placed in reference to the cells they are in.
+ *     However, the cell Y positions are not totally accurate at this
+ *     point and when cells are center vertically, they shift down an
+ *     amount recursively determined by ICalculateTableOffset.
+ *
+ * Inputs:
+ *     optr oself                 -- Text object optr
+ *     HTMLTextInstance *pself    -- Pointer to text object
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/08  Created.
+ *     LES  98/09/07  Now uses ICalculateVerticalOffsets to correctly
+ *                    determine the vertical alignment of cells.
+ *
+ **************************************************************************/
+void IAdjustRegions(
+         optr oself, 
+         HTMLTextInstance *pself, 
+         word firstCell, 
+         word lastCell)
+{
+    T_regionArrayHandle regArray ;
+    T_cellArrayHandle cellArray = pself->HTI_cellArray;
+    T_tableArrayHandle tableArray = pself->HTI_tableArray;
+    VisLargeTextRegionArrayElement *p_region;
+    HTMLtableData *p_table ;
+    HTMLcellData *p_cell;
+    word region, numRegions;
+    word cell ;
+    dword offset, offset2 ;
+    word inset ;
+    dword totalY ;
+    word size ;
+    word lastRegion ;
+    word numCells ;
+    sword smallAdjustment ;
+
+EC( ECCheckStack(); )
+
+    RegionPurgeCache(oself) ;
+    regArray = RegionArrayConstruct(oself, pself) ;
+    numRegions = RegionArrayGetCount(regArray);
+    region = 0;
+
+    CellArrayStartAccess(cellArray) ;
+    TableArrayStartAccess(tableArray) ;
+
+    /* Determine which region to start with */
+    numCells = CellArrayGetCount(cellArray) ;
+    if (firstCell < numCells)  {
+        CellLock(cellArray, firstCell, &p_cell, &size) ;
+        if (p_cell->HCD_region != 0xFFFF)
+             region = p_cell->HCD_region ;
+        CellUnlock(p_cell) ;
+    }
+
+    /* Determine the last last region (exclusive) to calculate */
+    lastRegion = numRegions;
+    if (lastCell < numCells)  {
+        CellLock(cellArray, lastCell, &p_cell, &size) ;
+        if (p_cell->HCD_region != 0xFFFF)
+            lastRegion = p_cell->HCD_region ;
+        CellUnlock(p_cell) ;
+    }
+
+    /* Go through all the regions and map regions to cells */
+    while(region < lastRegion)
+    {
+        RegionLock(regArray, region, &p_region, &size) ;
+
+        /* The section number is the cell number */
+        cell = p_region->VLTRAE_section;
+        CellLock(cellArray, cell, &p_cell, &size);
+        TableLock(tableArray, p_cell->HCD_table, &p_table, &size) ;
+
+        /* All cell regions are next to each other */
+        totalY = 0 ;
+        while (p_region->VLTRAE_section == cell)
+        {
+            /* Determine if we have a one pixel border */
+            if (TABLE_GET_BORDER(p_table->HTD_flags))
+                inset = 1 ;
+            else
+                inset = 0 ;
+
+            /* Go to the correct X. */
+            /* (shift left a pixel if we right justified.  This is so we stay a pixel */
+            /* wider) */
+            p_region->VLTRAE_spatialPosition.PD_x = 
+                inset + 
+                p_cell->HCD_x + 
+                p_table->HTD_cellpadding ;
+
+            /* Adjust one pixel left if we are right justifying (since the region is a tad */
+            /* wider all the time and right justify goes to that right edge). */
+            /* Of course, if we are at the very left edge, we'll just fail and using negative */
+            /* sizes are just not allowed since an upper bit is used to know if its off the */
+            /* screen. */
+            /* Yes, its a hack.  -- lshields 03/20/00 */
+            if ((p_cell->HCD_flags2 & HTML_CELL_JUSTIFY_MASK) == (J_RIGHT<<HTML_CELL_JUSTIFY_OFFSET))
+                p_region->VLTRAE_spatialPosition.PD_x-- ;
+
+            /* Determine the amount of space to shift for vertical alignment */
+            offset = ICalculateVerticalOffset(pself, cell, &offset2) ;
+
+            if ((p_cell->HCD_minHeight) && (p_cell->HCD_minHeight < 4))
+                smallAdjustment = 4 - p_cell->HCD_minHeight ;
+            else
+                smallAdjustment = 0 ;
+
+            p_region->VLTRAE_spatialPosition.PD_y = inset + p_cell->HCD_topY + p_table->HTD_cellpadding + offset + totalY ;
+            if (p_region->VLTRAE_spatialPosition.PD_y > smallAdjustment)
+                p_region->VLTRAE_spatialPosition.PD_y -= smallAdjustment ;
+
+            p_cell->HCD_y = p_cell->HCD_topY + offset - offset2 ;
+
+            /* If it is dirty or not formatted yet, just throw it out of bounds */
+            if ((p_cell->HCD_flags2 & HTML_CELL_DIRTY_LAYOUT_MASK) || 
+                   (cell >= pself->HTI_numFormattedCells))
+                p_region->VLTRAE_spatialPosition.PD_y |= HTML_TEXT_REGION_HIDDEN_Y ;
+
+#ifdef NO_TOP_SPACE
+            p_region->VLTRAE_size.XYS_height =
+                (region == 0 && EmptyTopRegion(p_region, oself)) ? 2 : p_region->VLTRAE_calcHeight.WBF_int ;
+#else
+            p_region->VLTRAE_size.XYS_height =
+                p_region->VLTRAE_calcHeight.WBF_int ;
+#endif
+            p_region->VLTRAE_size.XYS_height += 
+                RegionGetPathTopBound(
+                     pself->VTI_vmFile, 
+                     p_region->VLTRAE_region) ;
+            totalY += p_region->VLTRAE_size.XYS_height ;
+            if (p_region->VLTRAE_size.XYS_height < 2)
+                p_region->VLTRAE_size.XYS_height = 2 ;
+            RegionDirty(p_region) ;
+
+            /* Go to the next region, or stop */
+            if(++region < numRegions)  {
+                RegionUnlock(p_region) ;
+                RegionLock(regArray, region, &p_region, &size) ;
+            } else {
+                break;
+            }
+        }
+        RegionUnlock(p_region) ;
+        TableUnlock(p_table) ;
+        CellDirty(p_cell) ;
+        CellUnlock(p_cell) ;
+    }
+    TableArrayEndAccess(tableArray) ;
+    CellArrayEndAccess(cellArray) ;
+    ProfPoint("IAdjustRegions") ;
+}
+
+/**************************************************************************
+ * Routine:  ICalculateRegionBoundaries
+ **************************************************************************
+ *
+ * Description:
+ *     Calculate the absolute boundaries for the HTML text object for
+ *     the current text regions declared within it.  This routine is used
+ *     to ensure that the scroll bars work exactly right.
+ *
+ * Inputs:
+ *     optr oself                 -- Text object optr
+ *     RectDWord *p_rect          -- Returned boundaries
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/12/04  Created.
+ *
+ **************************************************************************/
+void ICalculateRegionBoundries(optr oself, RectDWord *p_rect)
+{
+    T_regionArrayHandle regArray ;
+    HTMLTextInstance *pself ;
+    sdword left, right, top, bottom ;
+    VisLargeTextRegionArrayElement *p_region ;
+    sdword bound ;
+    word i, n ;
+    word size ;
+
+    RegionPurgeCache(oself) ;
+    pself = ObjDerefVis(oself) ;
+    regArray = RegionArrayConstruct(oself, pself) ;
+    RegionArrayStartAccess(regArray) ;
+
+    /* Clear the rectangle */
+    memset(p_rect, 0, sizeof(*p_rect)) ;
+
+    /* How many regions? */
+    /* Only bother if we have regions */
+    n = RegionArrayGetCount(regArray);
+    if (n)  {
+        i = 0;
+
+        /* Go through all the regions and find the furtherest bounds. */
+        left = top = 0x7FFFFFFF ;
+        bottom = right = -0x7FFFFFFF ;
+        while (i<n)  {
+            RegionLock(regArray, i, &p_region, &size) ;
+
+            /* Stop at the last formatted Cell */
+            if (p_region->VLTRAE_section >= pself->HTI_numFormattedCells)  {
+                RegionUnlock(p_region) ;
+                break ;
+            }
+            /* If the region is hidden, don't consider it's location */
+            if (!(p_region->VLTRAE_spatialPosition.PD_y & HTML_TEXT_REGION_HIDDEN_Y)) {
+                /* Further left? */
+                bound = p_region->VLTRAE_spatialPosition.PD_x ;
+                if (bound < left)
+                    left = bound ;
+
+                /* Further right? */
+                if (p_region->VLTRAE_size.XYS_width)  {
+                    /* Note:  we subtract one because all regions are always 1 pixel wider */
+                    /* than they should be by the low level rules of formatting.  Because of */
+                    /* this, we have to take it out here or else we might be one pixel too */
+                    /* wide and get a scrollbar when we don't want it (and in rarer cases */
+                    /* get a situation where scrollbars appear and disappear). */
+                    /*   -- lshields 05/05/00 */
+                    bound += p_region->VLTRAE_size.XYS_width-1 ;
+                }
+                if (bound > right)
+                    right = bound ;
+
+                /* Further above? */
+                bound = p_region->VLTRAE_spatialPosition.PD_y ;
+                if (bound < top)
+                    top = bound ;
+
+                /* Further below? */
+                bound += p_region->VLTRAE_size.XYS_height ;
+                if (bound > bottom)
+                    bottom = bound ;
+            }
+
+            RegionUnlock(p_region) ;
+
+            i++ ;
+        }
+    }
+
+    RegionArrayEndAccess(regArray) ;
+
+    /* Did we get anything? */
+    if (left != 0x7FFFFFFF)  {
+        /* Setup return values */
+        p_rect->RD_left = left ;
+        p_rect->RD_right = right ;
+        p_rect->RD_top = top ;
+        p_rect->RD_bottom = bottom ;
+    }
+    ProfPoint("ICalculateRegionBoundries") ;
+}
+
+/**************************************************************************
+ * Method: HTMLTextClass::MSG_HTML_TEXT_CALCULATE_LAYOUT
+ **************************************************************************
+ *
+ * Description:
+ *     This method finishes out the table layout.  At this point, all
+ *     the text and regions have been added the html text object and now
+ *     we just need a good recalculation of all the parts.
+ *
+ *     NOTE:  Make sure the text object is not suspended at this step.
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/08  Created.
+ *
+ **************************************************************************/
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_CALCULATE_LAYOUT
+{
+    optr regArray ;
+    T_cellArrayHandle cellArray = pself->HTI_cellArray;
+    Boolean allowDrawing = TRUE ;
+    word viewWidth ;
+    dword maxViewHeight ;
+
+EC( ECCheckStack(); )
+
+    regArray = RegionArrayConstruct(oself, pself) ;
+
+    /* If we are already calculating a layout, try to restart it */
+    if (pself->HTI_layoutState & HTS_CALCULATING_LAYOUT)  {
+        viewWidth = ICalculateViewSize(pself->HTI_myView, &maxViewHeight) ;
+        if (viewWidth)  {
+            if ((pself->HTI_layoutState & HTS_LAYOUT_DIRTY) || (pself->HTI_formattedWidth != viewWidth))  {
+                pself->HTI_formattedWidth = viewWidth ;
+                pself->HTI_layoutState |= HTS_LAYOUT_RESTART_REQUESTED ;
+            }
+        }
+    }
+
+    /* Only process if we are NOT suspended, have region data, and */
+    /* have cell data. */
+    /* Don't process if we are already calculating a layout, either */
+    if ((!(pself->VTI_intFlags & VTIF_SUSPENDED)) &&
+        (pself->VLTI_regionArray) &&
+        (pself->HTI_cellArray) &&
+        (!(pself->HTI_layoutState & HTS_CALCULATING_LAYOUT)))
+    {
+        viewWidth = ICalculateViewSize(pself->HTI_myView, &maxViewHeight) ;
+
+		/* Only calculate again if we have a width change OR we have a dirty layout */
+        if (((viewWidth != pself->HTI_formattedWidth) || 
+                (pself->HTI_layoutState & HTS_LAYOUT_DIRTY)) 
+                && (maxViewHeight))  {
+            /* Record these settings and we'll go from here */
+            pself->HTI_formattedWidth = viewWidth ;
+@ifdef COMPILE_OPTION_VERTICAL_SCROLLBARS_ON
+            /* Always show scroll bars */
+            pself->HTI_maxViewHeight = HTML_UNLIMITED_VIEW_HEIGHT ;
+@else
+            if (pself->HTI_maxViewHeight != HTML_UNLIMITED_VIEW_HEIGHT)
+                pself->HTI_maxViewHeight = maxViewHeight ;
+@endif
+
+            ECDumpHTMLText(pself, "PreLayout") ;
+            /* Go through and determine the Longest lines for cells/regions */
+            /* buffer starting the iterative process. */
+            CellArrayStartAccess(cellArray) ;
+            RegionPurgeCache(oself) ;
+            ISetupRegionLinks(pself->HTI_cellArray, regArray) ;
+            RegionPurgeCache(oself) ;
+            CalculateCellArrayLongestLines(regArray, cellArray, oself, 0, 0xFFFF) ;
+            CellArrayEndAccess(cellArray) ;
+
+            IAdjustRegions(oself, pself, 0, 0xFFFF) ;
+            pself->HTI_lastStatusReported = 0 ;
+            @call oself::MSG_HTML_TEXT_LAYOUT_START() ;
+            allowDrawing = TRUE ;
+        }
+    }
+
+    if (allowDrawing)  {
+        /* Turn back on the drawing here */
+        if (pself->HTI_layoutState & HTS_NEED_TO_REACTIVE_DRAWING)  {
+            @call oself::MSG_HTML_TEXT_DRAWING_ON_OFF(TRUE) ;
+            pself->HTI_layoutState &= (~HTS_NEED_TO_REACTIVE_DRAWING) ;
+        }
+    }
+    if (pself->HTI_layoutState & HTS_NEED_BOUNDARY_CALCULATION)  {
+        @call oself::MSG_HTML_TEXT_CALCULATE_BOUNDARIES() ;
+    }
+    ProfPoint("MSG_HTML_TEXT_CALCULATE_LAYOUT") ;
+}
+
+/**************************************************************************
+ * Method: HTMLTextClass::MSG_HTML_TEXT_CALCULATE_BOUNDARIES
+ **************************************************************************
+ *
+ * Description:
+ *     CALCULATE_BOUNDARIES is called internally to determine the view's
+ *     boundaries and force the content to adjust.
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  00/01/18  Pulled this code piece out of LAYOUT_FINISH so
+ *                    that FINISH can be skipped but the boundaries
+ *                    determined.
+ *
+ **************************************************************************/
+@extern method HTMLTextClass, MSG_HTML_TEXT_CALCULATE_BOUNDARIES
+{
+    RectDWord bounds ;
+    optr content ;
+    dword viewHeight ;
+
+    /* Only bother if we have something to see */
+    if ((pself->HTI_numFormattedCells) && 
+	    (pself->HTI_layoutState & HTS_NEED_BOUNDARY_CALCULATION))  {
+        ICalculateViewSize(pself->HTI_myView, &viewHeight) ;
+
+        ICalculateRegionBoundries(oself, &bounds) ;
+        pself->VLTI_displayModeWidth = bounds.RD_right ;
+
+        pself->VLTI_totalHeight = bounds.RD_bottom ;
+
+        if (pself->HTI_maxViewHeight == HTML_UNLIMITED_VIEW_HEIGHT)  {
+            if (pself->VLTI_totalHeight < viewHeight)
+                pself->VLTI_totalHeight = viewHeight ;
+        }
+
+        content = @call (pself->HTI_myView)::MSG_GEN_VIEW_GET_CONTENT() ;
+
+        @call content::MSG_VIS_CONTENT_SET_DOC_BOUNDS(
+                  pself->VLTI_totalHeight,
+                  pself->VLTI_displayModeWidth,
+                  0,
+                  0) ;
+	pself->HTI_layoutState &= (~HTS_NEED_BOUNDARY_CALCULATION) ;
+    }
+    ProfPoint("MSG_HTML_TEXT_CALCULATE_BOUNDARIES") ;
+}
+
+void fprintf(FileHandle file, char *fmt, ...)
+{
+     char buf[512];
+     va_list arg;
+
+     va_start(arg, fmt);
+     VSPRINTFSB(buf, fmt, arg);
+     va_end(arg);
+
+     FileWrite(file, buf, STRLENSB(buf), FALSE) ;
+}
+
+#ifdef COMPILE_OPTION_OUTPUT_LAYOUT_LOG
+void fputs(char *buf, FileHandle file)
+{
+     FileWrite(file, buf, STRLENSB(buf), FALSE) ;
+}
+
+void ECDumpMultiLength(FileHandle file, HTMLmultiLength len)
+{
+    word value ;
+
+    value = HTML_LEN_GET_VALUE(len) ;
+    switch (HTML_LEN_GET_UNIT(len))  {
+        case HTML_LEN_PIXEL:
+            fprintf(file, "%d pixels", value) ;
+            break ;
+        case HTML_LEN_PERCENT:
+            fprintf(file, "%d%%", value) ;
+            break ;
+        case HTML_LEN_PROPORTION:
+            fprintf(file, "%d portions", value) ;
+            break ;
+        case HTML_LEN_VARIABLE:
+            fprintf(file, "%d variable", value) ;
+            break ;
+    }
+}
+
+void Indent(FileHandle file, word num)
+{
+    word i ;
+
+    for (i=0; i<num; i++)
+        fputs("  ", file) ;
+}
+
+void ECDumpTableLayout(HTMLTextInstance *pself, FileHandle file)
+{
+    static int count = 1 ;
+    T_cellArrayHandle cellArray = pself->HTI_cellArray;
+    T_tableArrayHandle tableArray = pself->HTI_tableArray;
+    HTMLcellData *p_cell ;
+    HTMLtableData *p_table ;
+    word i, num ;
+    word indent = 2 ;
+    word lastTableLevel ;
+    word level;
+    word size ;
+
+    CellArrayStartAccess(cellArray) ;
+    TableArrayStartAccess(tableArray) ;
+
+    fprintf(file, "\n\n\nTable Layout Dump \x23%d\n", count++) ;
+    fputs("----------------------\n\n", file) ;
+
+
+    /* Dump out a list of all the cells */
+    num = CellArrayGetCount(cellArray) ;
+    fprintf(file, "Cell information: (%d cells)\n", num) ;
+    for (i=0; i<num; i++)  {
+        CellLock(cellArray, i, &p_cell, &size);
+        fprintf(file, "  Cell \x23%d (Table %d (row: %d, col: %d)):\n",
+            i,
+            p_cell->HCD_table,
+            p_cell->HCD_row,
+            p_cell->HCD_col) ;
+        fputs("    flags = { ", file) ;
+        switch (p_cell->HCD_flags & HTML_CELL_VALIGN_MASK)  {
+            case HTML_CELL_VALIGN_TOP:
+                fputs("TOP ", file) ;
+                break ;
+            case HTML_CELL_VALIGN_BOTTOM:
+                fputs("BOTTOM ", file) ;
+                break ;
+            case HTML_CELL_VALIGN_CENTER:
+                fputs("CENTER ", file) ;
+                break ;
+        }
+        if (p_cell->HCD_flags & HTML_CELL_BACK_COLOR)
+            fputs("BACK_COLOR ", file) ;
+        if (p_cell->HCD_flags & HTML_CELL_CONTINUE)
+            fputs("CONTINUE ", file) ;
+        if (p_cell->HCD_flags & HTML_CELL_NOT_EMPTY)
+            fputs("NOT_EMPTY ", file) ;
+        if (p_cell->HCD_flags & HTML_CELL_PRE_TABLE)
+            fputs("PRE_TABLE ", file) ;
+        fputs("}\n", file) ;
+        fprintf(file, "    span=(row: %d, col: %d)\n", p_cell->HCD_rowspan, p_cell->HCD_colspan) ;
+        fprintf(file, "    width=", file) ;
+        ECDumpMultiLength(file, p_cell->HCD_width) ;
+        fputs("\n", file) ;
+        fprintf(file, "    height=", file) ;
+        ECDumpMultiLength(file, p_cell->HCD_height) ;
+        fputs("\n", file) ;
+        if (p_cell->HCD_flags & HTML_CELL_BACK_COLOR)
+            fprintf(file, "    color = { flag:%d, r:%d, g:%d, b:%d }\n",
+                p_cell->HCD_backColor.CQ_info,
+                p_cell->HCD_backColor.CQ_redOrIndex,
+                p_cell->HCD_backColor.CQ_green,
+                p_cell->HCD_backColor.CQ_blue) ;
+        fprintf(file, "    minWidth = %d", p_cell->HCD_minWidth) ;
+        fprintf(file, "    hardMinWidth = %d", p_cell->HCD_hardMinWidth) ;
+        fprintf(file, "    minHeight = %ld\n", p_cell->HCD_minHeight) ;
+        fprintf(file, "    longestLine = %d\n", p_cell->HCD_longestLine) ;
+        fprintf(file, "    x, y = (%d, %d)\n", p_cell->HCD_x, p_cell->HCD_y) ;
+        fprintf(file, "    calc = (width:%d, height:%ld, slack:%d)\n",
+            p_cell->HCD_calcWidth,
+            p_cell->HCD_calcHeight,
+            p_cell->HCD_slackHeight) ;
+        fprintf(file, "    nextCell = %d\n", p_cell->HCD_nextCellInTable) ;
+        CellUnlock(p_cell) ;
+    }
+
+    /* Dump out a table/cell layout outline */
+    num = CellArrayGetCount(cellArray) ;
+    fprintf(file, "Table/Cell outline: (%d cells)\n", num) ;
+    lastTableLevel = 0 ;
+    Indent(file, indent);
+    fprintf(file, "Master Cell (Table 0)\n") ;
+    for (i=0; i<num; i++)  {
+        CellLock(cellArray, i, &p_cell, &size);
+        TableLock(tableArray, p_cell->HCD_table, &p_table, &size);
+        level = TABLE_GET_LEVEL(p_table->HTD_flags) ;
+
+        if (level > lastTableLevel)  {
+            /* Going into a table level */
+            indent += level - lastTableLevel ;
+            lastTableLevel = level ;
+
+            /* Beginning of a table */
+            Indent(file, indent) ;
+            fprintf(file, "Table %d (firstcell=%d)\n", p_cell->HCD_table, p_table->HTD_firstCell) ;
+        } else if (level < lastTableLevel)  {
+            Indent(file, indent) ;
+            fprintf(file, "---\n") ;
+
+            /* Coming out of a table level */
+            indent -= lastTableLevel - level ;
+            lastTableLevel = level ;
+        }
+
+        Indent(file, indent) ;
+        fprintf(file, "Cell %d (min: %d, max: %d, row: %d, col: %d) {%d, %ld, %d, %ld}%s%s\n",
+            i,
+            p_cell->HCD_minWidth,
+            p_cell->HCD_longestLine,
+            p_cell->HCD_row,
+            p_cell->HCD_col,
+            p_cell->HCD_x,
+            p_cell->HCD_y,
+            p_cell->HCD_calcWidth,
+            p_cell->HCD_calcHeight,
+            (p_cell->HCD_flags & HTML_CELL_PRE_TABLE)?" pre":"",
+            (p_cell->HCD_flags & HTML_CELL_CONTINUE)?" continue":"") ;
+        TableUnlock(p_table) ;
+        CellUnlock(p_cell) ;
+    }
+
+    TableArrayEndAccess(tableArray) ;
+    CellArrayEndAccess(cellArray) ;
+}
+
+FileHandle OpenLayoutLog(void)
+{
+    FileHandle file ;
+
+    file = FileCreate(_TEXT("htmltext.txt"), FILE_CREATE_NO_TRUNCATE|FCF_NATIVE|(FILE_DENY_NONE|FILE_ACCESS_W), FILE_ATTR_NORMAL) ;
+    FilePos(file, 0, FILE_POS_END);
+
+    return file ;
+}
+
+void CloseLayoutLog(FileHandle file)
+{
+    FileClose(file, FALSE) ;
+}
+
+void ECDumpHTMLText(HTMLTextInstance *pself, char *comment)
+{
+    FileHandle file ;
+
+    file = OpenLayoutLog() ;
+    fputs("\n\n\n+-----------------------------------------------------------\n", file) ;
+    fprintf(file, "| HTMLText Dump:  %s\n", comment) ;
+    fputs("+-----------------------------------------------------------\n", file) ;
+    if (file)  {
+        ECDumpTableLayout(pself, file) ;
+    }
+    CloseLayoutLog(file) ;
+}
+
+void ECDumpSizesArray(char *comment, word num, T_columnSizing *p_sizing, word id)
+{
+    FileHandle file ;
+    word i;
+
+    file = OpenLayoutLog() ;
+    fputs("------------------------------------------------------------------\n", file) ;
+    fprintf(file, "%s [%d]\n", comment, id) ;
+    fputs("   MIN:  MAX:  PRO:  PER:  PIX:\n", file) ;
+    for (i=0; i<num; i++, p_sizing++)  {
+        fprintf(file, "  %5ld %5ld %5ld %5ld %5ld\n",
+            p_sizing->min,
+            p_sizing->max,
+            p_sizing->proportion,
+            p_sizing->percent,
+            p_sizing->pixel) ;
+    }
+    CloseLayoutLog(file) ;
+}
+
+#endif
+
+/* Create a new edge to the edge stack, overwriting any smaller ones */
+void IEdgeAdd(
+         T_boundaryEdgeStack *p_edges,
+         dword height,
+         word width,
+         HTMLAlignment align)
+{
+    T_boundaryEdgeStackSide *p_side ;
+    T_boundaryEdge *p_edge ;
+    word i ;
+
+    /* Only add an edge if this is NOT a NONE alignment */
+    if (align)  {
+        /* Point to the right side */
+        p_side = p_edges->BES_sides + (align - HTML_ALIGN_LEFT) ;
+
+        /* Add in the existing width (if any) */
+        if (p_side->BESS_count)
+            width += p_side->BESS_edgeArray[p_side->BESS_count-1].BE_width ;
+
+        /* Determine where to place it in the list.  If we are */
+        /* taller than a previous one, we'll be going there */
+        p_edge = p_side->BESS_edgeArray ;
+        for (i=0; i<p_side->BESS_count; i++, p_edge++)  {
+            if (height >= p_edge->BE_height)
+                break ;
+        }
+
+        /* Only add the edge if we are not past the limit */
+        if (i < MAX_BOUNDARIES_PER_CELL)  {
+            /* Store the new edge and put the count one past */
+            p_edge->BE_height = height ;
+            p_edge->BE_width = width ;
+            p_side->BESS_count = i+1 ;
+        }
+    }
+    ProfPoint("IEdgeAdd") ;
+}
+
+/* Determine the left and right point along the top edge for a given width */
+word IEdgeGetTopLeftAndRight(
+         T_boundaryEdgeStack *p_edges,
+         word fullWidth,
+         word *p_left)
+{
+    word left, right ;
+    word count ;
+    T_boundaryEdgeStackSide *p_side ;
+
+    p_side = p_edges->BES_sides+BOUNDARY_EDGE_LEFT ;
+    count = p_side->BESS_count ;
+    if (count)
+        left = p_side->BESS_edgeArray[count-1].BE_width ;
+    else
+        left = 0 ;
+
+    p_side = p_edges->BES_sides+BOUNDARY_EDGE_RIGHT ;
+    count = p_side->BESS_count ;
+    if (count)
+        right = fullWidth - p_side->BESS_edgeArray[count-1].BE_width ;
+    else
+        right = fullWidth ;
+
+    *p_left = left ;
+
+    ProfPoint("IEdgeGetTopLeftAndRight") ;
+    return right ;
+}
+
+/**************************************************************************
+ * Routine:  ISetupRegionLinks
+ **************************************************************************
+ *
+ * Description:
+ *     Go throuh all the regions and cells and link cells to their
+ *     matching regions.  This makes searching MUCH faster in pages
+ *     with lots of table cells.
+ *     Cells that have no regions are given a 0xFFFF link.
+ * 
+ * Inputs:
+ *     T_cellArrayHandle cellArray     -- Cell array to walk
+ *     T_regionArrayHandle regionArray -- Region array to walk
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  04/10/00  Created.
+ *
+ **************************************************************************/
+void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray)
+{
+    word lastCell = 0xFFFF ;
+    VisLargeTextRegionArrayElement *p_region ;
+    word size ;
+    word numRegions ;
+    HTMLcellData *p_cell ;
+    word regionIndex = 0 ;
+    word cellIndex ;
+    word numCells ;
+
+    numCells = CellArrayGetCount(cellArray) ;
+    for (cellIndex=0; cellIndex<numCells; cellIndex++)  {
+        CellLock(cellArray, cellIndex, &p_cell, &size) ;
+        p_cell->HCD_region = 0xFFFF ;
+        CellDirty(p_cell) ;
+        CellUnlock(p_cell) ;
+    }
+    numRegions = RegionArrayGetCount(regionArray) ;
+    if (numRegions)  {
+        RegionLock(regionArray, 0, &p_region, &size) ;
+        while (regionIndex < numRegions)  {
+            /* Have we passed into a new cell (we usually do) */
+            if (p_region->VLTRAE_section != lastCell)  {
+                /* Mark this cell */
+                CellLock(cellArray, p_region->VLTRAE_section, &p_cell, &size) ;
+                p_cell->HCD_region = regionIndex ;
+                CellDirty(p_cell) ;
+                CellUnlock(p_cell) ;
+
+                lastCell = p_region->VLTRAE_section ;
+            }
+            RegionNext(&p_region, &size) ;
+            regionIndex++ ;
+        }
+        RegionUnlock(p_region) ;
+    }
+    ProfPoint("ISetupRegionLinks") ;
+}
+
+
+

@@ -1,0 +1,823 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		file.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines file structures and routines.
+
+	$Id: file.def,v 1.2 98/05/01 17:28:22 martin Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__FILE
+
+StartKernel
+
+global FileCreateDir:far
+global FileCreateDirWithNativeShortName:far
+global FileDeleteDir:far
+global FileGetCurrentPath:far
+global FileSetCurrentPath:far
+global FileSetCurrentPathRaw:far
+global FileGetCurrentPathIDs:far
+
+global FileOpen:far
+global FileCreate:far
+global FileClose:appfar
+global FileCommit:far
+global FileCreateTempFile:far
+global FileDelete:far
+global FileRename:far
+
+global FileRead:appfar
+global FileWrite:appfar
+global FilePos:appfar
+global FileTruncate:far
+global FileSize:far
+global FileGetDateAndTime:far
+global FileSetDateAndTime:far
+global FileDuplicateHandle:far
+global FileLockRecord:far
+global FileUnlockRecord:far
+global FileGetDiskHandle:far
+
+global FileGetAttributes:far
+global FileSetAttributes:far
+
+global FileSetStandardPath:far
+global FileSetRootPath:far
+
+global FileParseStandardPath:far
+global FileStdPathCheckIfSubDir:far
+global FileConstructFullPath:far
+global FileConstructActualPath:far
+global FileResolveStandardPath:far
+
+global FileGetHandleExtAttributes:far
+global FileGetHandleAllExtAttributes:far
+global FileSetHandleExtAttributes:far
+global FileGetPathExtAttributes:far
+global FileSetPathExtAttributes:far
+global FileCopyExtAttributes:far
+global FileCopyPathExtAttributes:far
+
+global FileCopy:far
+global FileCopyLocal:far
+global FileMove:far
+global FileMoveLocal:far
+
+global FileCreateLink:far
+global FileReadLink:far
+
+global FileSetLinkExtraData:far
+global FileGetLinkExtraData:far
+
+global FileComparePaths:far
+global FileOpenAndRead:far
+
+FileEnableOpenCloseNotification equ FILEENABLEOPENCLOSENOTIFICATION
+FileDisableOpenCloseNotification equ FILEDISABLEOPENCLOSENOTIFICATION
+
+FileBatchChangeNotifications equ FILEBATCHCHANGENOTIFICATIONS
+FileFlushChangeNotifications equ FILEFLUSHCHANGENOTIFICATIONS
+
+FilePushDir	equ	FILEPUSHDIR
+FilePopDir	equ	FILEPOPDIR
+
+;--
+
+global FILEPUSHDIR:far
+global FILEPOPDIR:far
+global FILECREATEDIR:far
+global FILECREATEDIRWITHNATIVESHORTNAME:far
+global FILEDELETEDIR:far
+global FILEGETCURRENTPATH:far
+global FILESETCURRENTPATH:far
+global FILESETCURRENTPATHRAW:far
+global FILEGETCURRENTPATHID:far
+global FILEOPEN:far
+global FILECREATE:far
+global FILECLOSE:far
+global FILECOMMIT:far
+global FILECREATETEMPFILE:far
+global FILEDELETE:far
+global FILERENAME:far
+global FILEREAD:far
+global FILEWRITE:far
+global FILEPOS:far
+global FILETRUNCATE:far
+global FILESIZE:far
+global FILEGETDATEANDTIME:far
+global FILESETDATEANDTIME:far
+global FILEDUPLICATEHANDLE:far
+global FILELOCKRECORD:far
+global FILEUNLOCKRECORD:far
+global FILEGETDISKHANDLE:far
+global FILEGETATTRIBUTES:far
+global FILESETATTRIBUTES:far
+global FILESETSTANDARDPATH:far
+global FILECOPY:far
+global FILECOPYLOCAL:far
+global FILEMOVE:far
+global FILEMOVELOCAL:far
+global FILEPARSESTANDARDPATH:far
+global FILECONSTRUCTFULLPATH:far
+global FILECONSTRUCTACTUALPATH:far
+global FILEGETPATHEXTATTRIBUTES:far
+global FILEGETHANDLEEXTATTRIBUTES:far
+global FILEGETHANDLEALLEXTATTRIBUTES:far
+global FILESETPATHEXTATTRIBUTES:far
+global FILESETHANDLEEXTATTRIBUTES:far
+global FILERESOLVESTANDARDPATH:far
+
+global FILECREATELINK:far
+global FILEREADLINK:far
+global FILEGETLINKEXTRADATA:far
+global FILESETLINKEXTRADATA:far
+
+global FILECOMPAREPATHS:far
+global FILECOPYPATHEXTATTRIBUTES:far
+
+global FILEENABLEOPENCLOSENOTIFICATION:far
+global FILEDISABLEOPENCLOSENOTIFICATION:far
+
+global FILEBATCHCHANGENOTIFICATIONS:far
+global FILEFLUSHCHANGENOTIFICATIONS:far
+global FILEGETCURRENTPATHIDS:far
+global FILEOPENANDREAD:far
+
+global FileAddStandardPathDirectory:far
+global FileDeleteStandardPathDirectory:far
+
+;--------------------------------------------------------------------------
+
+if DBCS_PCGEOS
+FILE_LONGNAME_LENGTH =	16	; Length of full PC/GEOS filename
+else
+FILE_LONGNAME_LENGTH =	32	; Length of full PC/GEOS filename
+endif
+
+					; Size buffer needed (null termination)
+					;	(longword aligned)
+FILE_LONGNAME_BUFFER_SIZE = 36
+
+DRIVE_NAME_MAX_LENGTH	equ	32	; The longest a drive name can be
+					;  in PC/GEOS
+
+;DOS_DRIVE_REF_LENGTH	= 3		; Drive designator  (B:\)
+DOS_STD_PATH_LENGTH	= 64		; DOS path
+
+DOS_FILE_NAME_CORE_LENGTH	=	8
+DOS_FILE_NAME_EXT_LENGTH	=	3
+
+	; Size of item without null termination
+
+DOS_NO_DOT_FILE_NAME_LENGTH =	DOS_FILE_NAME_CORE_LENGTH + DOS_FILE_NAME_EXT_LENGTH
+DOS_DOT_FILE_NAME_LENGTH =	DOS_NO_DOT_FILE_NAME_LENGTH + 1
+VOLUME_NAME_LENGTH	=	DOS_FILE_NAME_CORE_LENGTH + DOS_FILE_NAME_EXT_LENGTH
+
+; this is based on DOS filesystem limits, currently, where a 32-character
+; pc/geos longname maps to a 12-character DOS name, which, with backslash
+; separators, means 5 components can be fit into a path (5 * 13 = 65), usually
+PATH_LENGTH		=	DRIVE_NAME_MAX_LENGTH + \
+				5 * (FILE_LONGNAME_LENGTH+1)
+
+	; Size of strings with null termination
+
+DOS_NO_DOT_FILE_NAME_LENGTH_ZT	=	DOS_NO_DOT_FILE_NAME_LENGTH + 1
+DOS_DOT_FILE_NAME_LENGTH_ZT	=	DOS_DOT_FILE_NAME_LENGTH + 1
+VOLUME_NAME_LENGTH_ZT		=	VOLUME_NAME_LENGTH + 1
+PATH_LENGTH_ZT			=	PATH_LENGTH + 1
+
+	; Size to make buffers (null termination, rounded up to word size to
+	; allow for movsw's)
+
+DOS_NO_DOT_FILE_NAME_SIZE =	(DOS_NO_DOT_FILE_NAME_LENGTH_ZT + 1) and 0xfffe
+DOS_DOT_FILE_NAME_SIZE	=	(DOS_DOT_FILE_NAME_LENGTH_ZT + 1) and 0xfffe
+VOLUME_BUFFER_SIZE	=	(VOLUME_NAME_LENGTH_ZT + 1) and 0xfffe
+
+if DBCS_PCGEOS
+PATH_BUFFER_SIZE	=	((PATH_LENGTH_ZT + 1) and 0xfffe)*2
+else
+PATH_BUFFER_SIZE	=	(PATH_LENGTH_ZT + 1) and 0xfffe
+endif
+
+	; Common types
+
+if DBCS_PCGEOS
+
+DosNoDotFileName	type	DOS_NO_DOT_FILE_NAME_SIZE dup (wchar)
+DosDotFileName		type	DOS_DOT_FILE_NAME_SIZE dup (wchar)
+FileLongName		type	FILE_LONGNAME_BUFFER_SIZE/2 dup (wchar)
+PathName		type	PATH_BUFFER_SIZE/2 dup (wchar)
+VolumeName		type	VOLUME_BUFFER_SIZE dup (wchar)
+
+else
+
+DosNoDotFileName	type	DOS_NO_DOT_FILE_NAME_SIZE dup (char)
+DosDotFileName		type	DOS_DOT_FILE_NAME_SIZE dup (char)
+FileLongName		type	FILE_LONGNAME_BUFFER_SIZE dup (char)
+PathName		type	PATH_BUFFER_SIZE dup (char)
+VolumeName		type	VOLUME_BUFFER_SIZE dup (char)
+
+endif
+
+;--------------------------------------------------------------------------
+;			Constants for file system routines
+;--------------------------------------------------------------------------
+
+FileID			type	dword	; Identifier for a file. In all
+					;  probability it's unique on its
+					;  disk, but there's a slight chance
+					;  it's not.
+
+FILE_NO_ID		equ	0	; Value used if ID not known.
+
+FilePathID	struct		; element of array returned by
+				;  FileGetCurrentPathIDs
+    FPID_disk	word			; disk handle
+    FPID_id	FileID			; id for path on that disk.
+FilePathID	ends
+
+FileExclude 		etype byte, 0
+FE_COMPAT		enum FileExclude
+FE_EXCLUSIVE 		enum FileExclude
+FE_DENY_WRITE 		enum FileExclude
+FE_DENY_READ 		enum FileExclude
+FE_NONE 		enum FileExclude
+
+FileAccess 		etype byte, 0
+FA_READ_ONLY 		enum FileAccess
+FA_WRITE_ONLY 		enum FileAccess
+FA_READ_WRITE 		enum FileAccess
+
+FileAccessFlags	record
+    :1=0,			; Must be 0
+    FAF_EXCLUDE FileExclude:3,	; What others may not do
+    :2=0,			; Must be 0
+    FAF_MODE FileAccess:2,	; What caller wants to do
+FileAccessFlags	end
+
+FILE_DENY_RW		equ	(FE_EXCLUSIVE shl offset FAF_EXCLUDE)
+FILE_DENY_W		equ	(FE_DENY_WRITE shl offset FAF_EXCLUDE)
+FILE_DENY_R		equ	(FE_DENY_READ shl offset FAF_EXCLUDE)
+FILE_DENY_NONE		equ	(FE_NONE shl offset FAF_EXCLUDE)
+
+FILE_ACCESS_R		equ	(FA_READ_ONLY shl offset FAF_MODE)
+FILE_ACCESS_W		equ	(FA_WRITE_ONLY shl offset FAF_MODE)
+FILE_ACCESS_RW		equ	(FA_READ_WRITE shl offset FAF_MODE)
+
+FILE_NO_ERRORS		equ	10000000b
+
+FileAttrs	record
+    :1=0
+    FA_LINK:1		; File is a link
+    FA_ARCHIVE:1	; File requires backup (modified since FA_ARCHIVE
+			;  last cleared)
+    FA_SUBDIR:1		; File is actually a subdirectory
+    FA_VOLUME:1		; File is actually a volume label
+    FA_SYSTEM:1		; File is for the system (kernel, e.g.)
+    FA_HIDDEN:1		; File should not be seen by regular searches.
+    FA_RDONLY:1		; File may not be written
+FileAttrs	end
+
+FILE_ATTR_NORMAL	=	0
+FILE_ATTR_READ_ONLY	=	mask FA_RDONLY
+FILE_ATTR_HIDDEN	=	mask FA_HIDDEN
+FILE_ATTR_SYSTEM	=	mask FA_SYSTEM
+FILE_ATTR_VOLUME_LABEL	=	mask FA_VOLUME
+
+FileCreateMode	etype	byte, 0
+    FILE_CREATE_TRUNCATE	enum	FileCreateMode
+    FILE_CREATE_NO_TRUNCATE	enum	FileCreateMode
+    FILE_CREATE_ONLY		enum	FileCreateMode
+
+FileCreateFlags record
+    FCF_NATIVE:1		; Create file to be compatible with the
+				;  filesystem on which it resides. This may
+				;  mean that most extended attributes are
+				;  not supported for the file, unless the
+				;  filesystem itself supports them (which
+				;  DOS filesystems do not)
+    FCF_NATIVE_WITH_EXT_ATTRS:1	; Create file with a name compatible with the
+				;  filesystem on which it resides, but support
+				;  extended attributes. The driver may place
+				;  restrictions on what sort of name may
+				;  be used, and will return ERROR_INVALID_NAME
+				;  if the name passed falls beyond the pale.
+    :4
+    FCF_MODE FileCreateMode:2	; How the file should be created.
+FileCreateFlags	end
+
+FilePosMode	etype	byte, 0
+    FILE_POS_START	enum	FilePosMode
+    FILE_POS_RELATIVE	enum	FilePosMode
+    FILE_POS_END	enum	FilePosMode
+
+FileTime	record
+    FT_HOUR:5,	; hour (24-hour clock)
+    FT_MIN:6,	; minute
+    FT_2SEC:5,	; 2-second (0-29 giving 0-58 seconds, even seconds only)
+FileTime	end
+
+FileDate	record
+    FD_YEAR:7,	; year since 1980	
+    FD_MONTH:4,	; month (1-12)
+    FD_DAY:5,	; day of the month (1-31)
+FileDate	end
+
+FILE_BASE_YEAR	equ	1980	; Base year for FD_YEAR
+
+FileDateAndTime	struct
+    FDAT_date	FileDate
+    FDAT_time	FileTime
+FileDateAndTime	ends
+
+
+FileAddStandardPathFlags	record
+    :16
+FileAddStandardPathFlags	end
+
+FileOpenAndReadFlags		record
+    ; These three flags are processed in order:
+
+    FOARF_ADD_CRLF:1
+    ; Append a CR/LF to the buffer, unless the buffer already ends
+    ; with a CR/LF.
+
+    FOARF_ADD_EOF:1
+    ; Append an MSDOS_TEXT_FILE_EOF to the buffer.
+
+    FOARF_NULL_TERMINATE:1
+    ; null-terminate the buffer.
+
+    :6
+
+    FOARF_ACCESS FileAccessFlags:7
+
+FileOpenAndReadFlags		end
+
+
+
+;--------------------------------------------------------------------------
+;			File system errors
+;--------------------------------------------------------------------------
+
+FileError		etype	word
+ERROR_UNSUPPORTED_FUNCTION enum FileError, 1	;MS-DOS error
+ERROR_FILE_NOT_FOUND	enum	FileError, 2	;MS-DOS error
+ERROR_PATH_NOT_FOUND	enum	FileError, 3	;MS-DOS error
+ERROR_TOO_MANY_OPEN_FILES enum	FileError, 4	;MS-DOS error
+ERROR_ACCESS_DENIED	enum	FileError, 5	;MS-DOS error
+ERROR_INSUFFICIENT_MEMORY enum	FileError, 8	;MS-DOS & FileEnum error
+ERROR_INVALID_DRIVE	enum	FileError, 15	;MS-DOS error
+ERROR_IS_CURRENT_DIRECTORY enum	FileError, 16	;MS-DOS error
+ERROR_DIFFERENT_DEVICE	enum	FileError, 17	;MS-DOS error
+ERROR_NO_MORE_FILES	enum	FileError, 18	;MS-DOS error
+
+ERROR_WRITE_PROTECTED	enum	FileError, 19	;MS-DOS critical error
+ERROR_UNKNOWN_VOLUME	enum	FileError, 20	;MS-DOS critical error
+ERROR_DRIVE_NOT_READY	enum	FileError, 21	;MS-DOS critical error
+ERROR_CRC_ERROR		enum	FileError, 23	;MS-DOS critical error
+ERROR_SEEK_ERROR	enum	FileError, 25	;MS-DOS critical error
+ERROR_UNKNOWN_MEDIA	enum	FileError, 26	;MS-DOS critical error
+ERROR_SECTOR_NOT_FOUND	enum	FileError, 27	;MS-DOS critical error
+ERROR_WRITE_FAULT	enum	FileError, 29	;MS-DOS critical error
+ERROR_READ_FAULT	enum	FileError, 30	;MS-DOS critical error
+ERROR_GENERAL_FAILURE	enum	FileError, 31	;MS-DOS critical error
+
+ERROR_SHARING_VIOLATION	enum	FileError, 32	;
+ERROR_ALREADY_LOCKED	enum	FileError, 33	;'share.exe' error
+ERROR_SHARING_OVERFLOW	enum	FileError, 36	;'share.exe' error
+
+ERROR_NETWORK_CONNECTION_BROKEN	enum FileError, 55
+ERROR_NETWORK_ACCESS_DENIED	enum FileError, 65
+ERROR_NETWORK_NOT_LOGGED_IN	enum FileError, 78
+
+ERROR_SHORT_READ_WRITE	enum	FileError, 128	;PC GEOS error
+ERROR_INVALID_NAME	enum	FileError, 129	;PC GEOS error
+ERROR_FILE_EXISTS	enum	FileError, 130
+ERROR_DOS_EXEC_IN_PROGRESS enum	FileError, 131; DosExec
+ERROR_FILE_IN_USE	enum	FileError, 132
+ERROR_ARGS_TOO_LONG	enum	FileError, 133	;DosExec
+ERROR_DISK_UNAVAILABLE	enum	FileError, 134	;Validation of disk in drive
+						; aborted by user.
+ERROR_DISK_STALE	enum	FileError, 135	;Drive disk was on has been
+						; removed.
+ERROR_FILE_FORMAT_MISMATCH enum FileError, 136	;Attempted to create a file
+						; with FILE_CREATE_TRUNCATE or
+						; FILE_CREATE_NO_TRUNCATE and
+						; its current state doesn't
+						; match that desired by the
+						; FCF_NATIVE flag.
+ERROR_CANNOT_MAP_NAME	enum	FileError, 137	;Filesystem driver was unable
+						; to map the virtual 32-char
+						; name to a suitable name
+						; appropriate to the
+						; filesystem
+ERROR_DIRECTORY_NOT_EMPTY enum	FileError, 138	;Attempted to delete a directory
+						; that still contained files.
+ERROR_ATTR_NOT_SUPPORTED enum 	FileError, 139	;Requested an extended attribute
+						; that is not supported by the
+						; filesystem or the file.
+ERROR_ATTR_NOT_FOUND	enum	FileError, 140	;Requested an extended attribute
+						; that is not present for the
+						; file
+ERROR_ATTR_SIZE_MISMATCH enum	FileError, 141	;Requested an attribute without
+						; providing the correct amount
+						; of space/data to get/set it
+ERROR_ATTR_CANNOT_BE_SET enum	FileError, 142	;Attempted to set an extended
+						; attribute that cannot be
+						; set:
+						;     FEA_SIZE
+						;     FEA_NAME
+						;     FEA_DOS_NAME
+						;     FEA_GEODE_ATTRS
+						;     FEA_PATH_INFO
+						;     FEA_FILE_ID
+ERROR_CANNOT_MOVE_DIRECTORY enum FileError, 143;Filesystem doesn't support
+						; moving of directories in
+						; FileMove, and PC/GEOS doesn't
+						; provide the functionality
+						; itself.
+ERROR_PATH_TOO_LONG	enum FileError, 144	;Attempted to create a directory
+						; that would be unreachable,
+						; owing to path-length
+						; restrictions of the filesystem
+ERROR_ARGS_INVALID	enum FileError, 145	;DosExec: argument string
+						; contained a character that
+						; could not be mapped to the
+						; current DOS character set.
+ERROR_CANNOT_FIND_COMMAND_INTERPRETER enum FileError, 146
+						;DosExec: program to run is a
+						; batch file, but system was
+						; unable to locate the command
+						; interpreter (COMMAND.COM) to
+						; run the command.
+ERROR_NO_TASK_DRIVER_LOADED enum FileError, 147	;DosExec: cannot run a DOS
+						; program as no task-switching
+						; driver was loaded.
+
+ERROR_LINK_ENCOUNTERED enum FileError, 148
+						; A link was
+						; encountered and needs
+						; to be traversed
+
+ERROR_NOT_A_LINK	enum	FileError, 149	; A link function was
+						; called on a file
+						; that's not a link.
+
+ERROR_TOO_MANY_LINKS	enum	FileError, 150  ; A path contains too
+						; many links.  Most
+						; likely, one of the
+						; elements of the path
+						; is a link to itself.
+
+;---------------------------------------------------------------------------
+;		Standard Paths
+;
+; All the constants are odd so we can always distinguish between a
+; standard path constant and a disk handle.
+;---------------------------------------------------------------------------
+
+StandardPath	etype word, 1, 2
+SP_NOT_STANDARD_PATH	enum StandardPath,0	; NO STANDARD PATH
+SP_TOP			enum StandardPath,1	; top level directory
+						;	GEOS.EXE
+						;	GEOS.INI
+						; Generally c:/GEOWORKS
+SP_APPLICATION		enum StandardPath	; application directory
+						;	all applications
+						; Default -- WORLD
+SP_DOCUMENT		enum StandardPath	; document directory
+						;	application datafiles
+						; Default -- DOCUMENT
+SP_SYSTEM		enum StandardPath	; system directory
+						;	drivers
+						;	libraries
+						;	TOKEN.DB
+						; Default -- SYSTEM
+SP_PRIVATE_DATA		enum StandardPath	; private data
+						; Default -- PRIVDATA
+SP_STATE		enum StandardPath	; state directory
+						;	state files
+						; Default -- PRIVDATA/STATE
+SP_FONT			enum StandardPath	; font directory
+						;	all fonts
+						; Default -- USERDATA/FONT
+SP_SPOOL		enum StandardPath	; spool directory
+						;	application spool files
+						; Default -- PRIVDATA/SPOOL
+SP_SYS_APPLICATION	enum StandardPath	; secondary application
+						; directory
+						;	GCM apps, welcome,
+						;	applications that
+						; 	should not be launched
+						;	by the user.
+						; Default -- SYSTEM/SYSAPPL
+SP_USER_DATA		enum StandardPath	; public data
+						; Default -- USERDATA
+SP_MOUSE_DRIVERS	enum StandardPath	; mouse drivers
+						; Default -- SYSTEM/MOUSE
+SP_PRINTER_DRIVERS	enum StandardPath	; printer drivers
+						; Default -- SYSTEM/PRINTER
+SP_FILE_SYSTEM_DRIVERS	enum StandardPath	; file system drivers
+						; Default -- SYSTEM/FS
+SP_VIDEO_DRIVERS	enum StandardPath	; video drivers
+						; Default -- SYSTEM/VIDEO
+SP_SWAP_DRIVERS		enum StandardPath	; swap drivers
+						; Default -- SYSTEM/SWAP
+SP_KEYBOARD_DRIVERS	enum StandardPath	; keyboard drivers
+						; Default -- SYSTEM/KBD
+SP_FONT_DRIVERS		enum StandardPath	; font drivers
+						; Default -- SYSTEM/FONT
+SP_IMPORT_EXPORT_DRIVERS enum StandardPath	; import/export libraries
+						; Default -- SYSTEM/IMPEX
+SP_TASK_SWITCH_DRIVERS	enum StandardPath	; task-switching drivers
+						; Default -- SYSTEM/TASK
+SP_HELP_FILES		enum StandardPath	; help files
+						; Default -- USERDATA/HELP
+SP_TEMPLATE		enum StandardPath	; Template files
+						; Default -- USERDATA/TEMPLATE
+SP_POWER_DRIVERS	enum StandardPath	; power-management drivers
+						; Default -- SYSTEM/POWER
+SP_DOS_ROOM		enum StandardPath	; where DOS Launchers default
+						; to and where Welcome looks
+						; to give user a list of buttons
+						; Default -- DOSROOM
+SP_HWR			enum StandardPath	; HandWritingRecognition drivers
+						; Default -- SYSTEM/HWR
+SP_WASTE_BASKET		enum StandardPath	; This is where thrown away
+						; files go.
+						; Default -- PRIVDATA/WASTE
+SP_BACKUP		enum StandardPath	; This is where backup files go
+						; Default -- PRIVDATA/BACKUP
+SP_PAGER_DRIVERS	enum StandardPath	; pager drivers
+						; Default -- SYSTEM/PAGER
+protominor      	BasicComponentDir
+SP_COMPONENT		enum StandardPath	; NewBASIC component
+						; libraries
+						; Default -- SYSTEM/COMP
+protoreset
+;
+; to add new entry:
+;
+; 1) Add the entry at the END of the StandardPath enum above (otherwise the
+;    StandardPathStrings table in Kernel/File/fileVariable.def must be
+;    re-synched)
+;
+; 2) Add the entry to the corresponding enum in CInclude/file.h
+;
+; 3) Add an entry at the end of the StandardPathStrings table in
+;    Kernel/File/fileVariable.def
+;
+; 4) Add an entry to the stdPathUpwardTree and alteredStdPathUpwardTree tables
+;    in Kernel/File/filePath.asm.
+;
+; 5) Add an entry (and update the rest if needed) to the stdPathTree and
+;    alteredStdPathTree tables in Kernel/File/filePath.asm.
+;
+; 6) Add an entry to the stdPathKeys table in Loader/path.asm
+
+
+; The names of some standard paths have changed. For backwards
+; compatibility, the old names are defined as equal to the new ones:
+
+SP_TEMP_FILES		equ SP_WASTE_BASKET
+SP_PUBLIC_DATA		equ SP_USER_DATA
+
+; for places you don't actually need the full word (high byte is always
+; 0, after all)
+	CheckHack <(StandardPath and 0xff00) eq 0>
+StandardPathByte	record	SPB_SP StandardPath:8
+
+;
+; Args for FileResolveStandardPath
+; 
+FRSPFlags	record
+    :14
+    FRSPF_ADD_DRIVE_NAME:1		; set if should prepend name of the
+					;  drive in which the file/dir was
+					;  found.
+    FRSPF_RETURN_FIRST_DIR:1		; set if shouldn't check to see whether
+					;  the passed path actually exists, but
+					;  just assume it exists in the first
+					;  existing directory along the standard
+					;  path.
+FRSPFlags	end
+
+;------------------------------------------------------------------------------
+;		    Extended Attribute Definitions
+;------------------------------------------------------------------------------
+FileExtendedAttribute	etype	word, 0
+    FEA_MODIFICATION	enum	FileExtendedAttribute	; FileDateAndTime
+    FEA_FILE_ATTR	enum	FileExtendedAttribute	; FileAttrs
+    FEA_SIZE		enum	FileExtendedAttribute	; dword
+    FEA_FILE_TYPE	enum	FileExtendedAttribute	; GeosFileType
+    FEA_FLAGS		enum	FileExtendedAttribute	; GeosFileHeaderFlags
+    FEA_RELEASE		enum	FileExtendedAttribute	; ReleaseNumber
+    FEA_PROTOCOL	enum	FileExtendedAttribute	; ProtocolNumber
+    FEA_TOKEN		enum	FileExtendedAttribute	; GeodeToken
+    FEA_CREATOR		enum	FileExtendedAttribute	; GeodeToken
+    FEA_USER_NOTES	enum	FileExtendedAttribute	; char array
+							;  FileUserNotes
+    FEA_NOTICE		enum	FileExtendedAttribute	; char array
+							;  FileCopyrightNotice
+    FEA_CREATION	enum	FileExtendedAttribute	; FileDateAndTime
+    FEA_PASSWORD	enum	FileExtendedAttribute	; char array
+							;  FilePassword
+    FEA_CUSTOM		enum	FileExtendedAttribute	; ?
+    FEA_NAME		enum	FileExtendedAttribute	; char array
+							;  (FileLongName)
+    FEA_GEODE_ATTR	enum	FileExtendedAttribute	; GeodeAttrs. a hack
+							;  for FileEnum...
+    FEA_PATH_INFO	enum	FileExtendedAttribute	; DirPathInfo. a hack
+							;  for FileEnum...
+    FEA_FILE_ID		enum	FileExtendedAttribute	; 32-bit ID of
+							;  file
+    FEA_DESKTOP_INFO	enum	FileExtendedAttribute	; FileDesktopInfo
+    FEA_DRIVE_STATUS	enum	FileExtendedAttribute	; DriveExtendedStatus
+    FEA_DISK		enum	FileExtendedAttribute	; Disk handle
+    ;
+    ; these next are supported only by some filesystems and are intended for
+    ; specialized use (e.g. a desktop program) not for most applications.
+    ;
+    FEA_DOS_NAME	enum	FileExtendedAttribute	; actual DOS name of
+							;  the file, if it's
+							;  on a DOS filesystem.
+							;  8.3. name in DOS
+							;  character set
+    FEA_OWNER		enum	FileExtendedAttribute	; null-terminated name
+							;  of owner of the file.
+							;  FileOwnerName
+    FEA_RIGHTS		enum	FileExtendedAttribute	; null-terminated
+							;  description of access
+							;  rights to the file.
+							;  FileAccessRights
+
+    FEA_TARGET_FILE_ID	enum	FileExtendedAttribute	; For links
+							; only -- the
+							; 32-bit file ID of
+							; the target
+							; file.
+
+    FEA_LAST_VALID	equ	FileExtendedAttribute-1
+
+    FEA_MULTIPLE	enum	FileExtendedAttribute,-2; Special value for
+							;  FileGetExtAttr and
+							;  FileSetExtAttr to
+							;  get/set multiple
+							;  attributes for a
+							;  file.
+    FEA_END_OF_LIST	enum	FileExtendedAttribute,-1; Marker for the last
+							;  entry in an array of
+							;  FileExtAttrDesc
+							;  structures
+
+FileExtAttrDesc 	struct
+    FEAD_attr		FileExtendedAttribute	; attribute to get/set
+    FEAD_value		fptr			; pointer to buffer/new value
+    FEAD_size		word			; size of buffer/new value
+    FEAD_name		fptr.char		; pointer to null-terminated
+						;  ASCII name of attribute if
+						;  FEA_CUSTOM
+FileExtAttrDesc		ends
+
+; 	Note that these two ^-v are the SAME..  just changed the
+; 	fptr-dword to get by too picky type checking
+
+FileExtAttrDescLike 	struct
+    FEADL_attr		FileExtendedAttribute	; attribute to get/set
+    FEADL_value		dword			; pointer to buffer/new value
+    FEADL_size		word			; size of buffer/new value
+    FEADL_name		fptr.char		; pointer to null-terminated
+						;  ASCII name of attribute if
+						;  FEA_CUSTOM
+FileExtAttrDescLike	ends
+
+;	GEOS file types (FEA_FILE_TYPE)
+
+GeosFileType	etype word
+GFT_NOT_GEOS_FILE 	enum GeosFileType	; not a geos file. defined as 0
+						;  so one can reasonably look at
+						;  FEA_FILE_TYPE
+GFT_EXECUTABLE		enum GeosFileType	; something we can execute
+GFT_VM			enum GeosFileType	; managed by VMem
+GFT_DATA		enum GeosFileType	; raw byte-stream of data
+GFT_DIRECTORY		enum GeosFileType	; directory, of course
+GFT_OLD_VM		enum GeosFileType	; VM file from PC/GEOS 1.X.
+						;  Only FEA_NAME and 
+						;  FEA_FILE_TYPE are supported
+						;  from the set of PC/GEOS-
+						;  specific extended attrs.
+
+;	GEOS file header flags (FEA_FLAGS)
+
+GeosFileHeaderFlags	record
+    GFHF_TEMPLATE:1
+    GFHF_SHARED_MULTIPLE:1	;also called "multi-user"
+    GFHF_SHARED_SINGLE:1	;also called "public"
+    :1
+    GFHF_HIDDEN:1		; This file is hidden.  This flag does
+				; not replace the DOS "hidden"
+				; attribute -- the two may be
+				; set/cleared independently of
+				; each-other.
+
+    GFHF_DBCS:1			;TRUE: DBCS filename, etc.
+    GFHF_UNREAD:1		;TRUE: File has been read, set by creators
+				;	cleared by viewers
+    GFHF_NOTES:1		; file has associated document notes
+				;	(not FEA_USER_NOTES)
+    :8
+GeosFileHeaderFlags	end
+
+;	User-editable file notes (FEA_USER_NOTES)
+
+if DBCS_PCGEOS
+GFH_USER_NOTES_LENGTH		=	49
+GFH_USER_NOTES_BUFFER_SIZE	=	(GFH_USER_NOTES_LENGTH + 1)*(size wchar)
+
+FileUserNotes	type	GFH_USER_NOTES_BUFFER_SIZE/2 dup(wchar)
+
+else
+
+GFH_USER_NOTES_LENGTH		=	99
+GFH_USER_NOTES_BUFFER_SIZE	=	GFH_USER_NOTES_LENGTH + 1
+
+FileUserNotes	type	GFH_USER_NOTES_BUFFER_SIZE dup(char)
+endif
+
+;	Size of copyright notice (FEA_NOTICE)
+
+GFH_NOTICE_SIZE	=	32
+FileCopyrightNotice	type	GFH_NOTICE_SIZE dup(char)
+
+;	Room reserved for use by the desktop. Currently unused.
+
+FILE_DESKTOP_INFO_SIZE	equ	16
+FileDesktopInfo	type	FILE_DESKTOP_INFO_SIZE dup(byte)
+
+;	Password bound to the file (FEA_PASSWORD). Currently unused. Not
+;	likely to be returned in cleartext...null-terminated unless array
+;	is full...
+
+FILE_PASSWORD_SIZE	equ	8
+FilePassword	type	FILE_PASSWORD_SIZE dup(char)
+
+;	A DOS name (FEA_DOS_NAME), as supported by some filesystem drivers
+;	This name is always returned in the DOS character set, not the
+;	PC/GEOS character set.
+
+FileDosName	type	8 + 1 + 3 + 1 dup(char)
+
+;	The name of the owner of a file (FEA_OWNER). Supported primarily by
+;	network filesystem drivers. Null-terminated in the PC/GEOS character
+;	set.
+
+FILE_OWNER_NAME_SIZE	equ	16
+FileOwnerName	type	FILE_OWNER_NAME_SIZE dup(char)
+
+;	The access rights for the file (FEA_RIGHTS), either overall (e.g.
+;	for NFS) or for the current user (e.g. for novell). Supported primarily
+;	by network filesystem drivers. Null-terminated in the PC/GEOS character
+;	set in a format that's appropriate to the filesystem.
+
+FILE_RIGHTS_SIZE	equ	16
+FileAccessRights	type FILE_RIGHTS_SIZE dup(char)
+
+
+;	Data for FEA_PATH_INFO.
+
+DirPathInfo	record
+    DPI_EXISTS_LOCALLY:1		; File exists in directory under
+					;  primary tree (usually a local
+					;  directory, not a server-based one)
+    DPI_ENTRY_NUMBER_IN_PATH:7
+    DPI_STD_PATH	StandardPath:8
+DirPathInfo	end
+
+
+PathCompareType	etype	byte
+
+PCT_EQUAL	enum PathCompareType
+; The 2 paths are equal
+
+PCT_SUBDIR	enum PathCompareType
+; Path 2 is a subdirectory of path 1
+
+PCT_UNRELATED	enum PathCompareType
+; Either the 2 paths are unrelated, or path 1 is a subdirectory of
+; path 2
+
+PCT_ERROR	enum PathCompareType
+; Some error occurred while parsing one of the paths (ie, one of the
+; paths was not found, etc).
+
+EndKernel
+

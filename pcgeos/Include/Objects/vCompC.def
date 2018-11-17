@@ -1,0 +1,309 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Objects
+FILE:		vCompC.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Chris	7/91		Initial version
+
+DESCRIPTION:
+	Object definitions for VisCompClass.   
+
+	$Id: vCompC.def,v 1.1 97/04/04 14:18:28 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+
+SetDef	__VCOMPC
+
+VisCompClass	class	VisClass
+
+global VisCompInitialize:far
+global VisCompMakePressesInk:far
+global VisCompMakePressesNotInk:far
+		
+MSG_VIS_COMP_GET_GEO_ATTRS		message
+;
+; MSG_VIS_COMP_GET_GEO_ATTRS returns the current geometry and justification
+; flags for the composite.
+;
+; Context:	Utility
+; Source:	No restrictions.
+; Destination:  A VisCompClass object.
+; Interception: Would be unusual.
+;
+; Pass:		Nothing
+; Return:	cl -- VisCompGeoAttrs
+;		ch -- VisCompGeoDimensionAttrs
+;		ax, dx, bp -- destroyed
+;		
+
+MSG_VIS_COMP_SET_GEO_ATTRS		message
+;
+; MSG_VIS_COMP_SET_GEO_ATTRS sets or clears geometry or justification flags
+; in the composite.	
+;
+; Context:	Utility
+; Source:	No restrictions.
+; Destination:  A VisCompClass object.
+; Interception: Would be unusual.
+;
+; Pass:		cx -- bits to set (cl = geometry attrs, ch = dimension attrs)	
+;		dx -- bits to clear (dl = geometry attrs, dh = dimension attrs)
+; Return:	Nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_VIS_COMP_GET_CHILD_SPACING	message
+;
+; MSG_VIS_COMP_GET_CHILD_SPACING returns the child spacing to be used for
+; the composite.
+;
+; Context:	Called by the destination when doing geometry calculations on
+;		itself.
+; Source:	No restrictions (usually same as destination)
+; Destination:  A VisCompClass object.
+; Interception: By nearly every VisComp object that wants spacing other than
+;		VIS_COMP_DEFAULT_SPACING.
+;
+; Pass:		nothing
+; Returns:	cx -- spacing between children
+;		dx -- spacing between lines of wrapping children
+;		ax, bp destroyed
+;
+	
+VIS_COMP_DEFAULT_SPACING	equ	3
+	
+	
+	
+MSG_VIS_COMP_GET_MINIMUM_SIZE		message
+;
+; MSG_VIS_COMP_GET_MIN_SIZE returns the minimum size for the composite.
+; Only called by the geometry manager if VCGDA_HAS_MINIMUM_SIZE is set.
+;
+; Context:	Called by the destination when doing geometry calculations on
+;		itself.
+; Source:	No restrictions (usually same as destination)
+; Destination:  A VisCompClass object.
+; Interception: By any VisComp object that wants a minimum size, regardless
+;		of what it would normally calculate via the size of its children
+;		and expand to fit flags.
+;
+; Pass:		nothing
+; Returns:	cx -- minimum width for composite
+;		dx -- minimum height of composite
+;		ax, bp destroyed
+;
+		
+MSG_VIS_COMP_GET_MARGINS			message
+;
+; MSG_VIS_COMP_GET_MARGINS returns the margins for the composite
+; object, inside which the children will be placed.
+;
+; Context:	Called by the destination when doing geometry calculations on
+;		itself.
+; Source:	No restrictions (usually same as destination)
+; Destination:  A VisCompClass object.
+; Interception: By any VisComp object that wants non-zero margins around itself.
+;
+; Pass:		nothing
+; Returns:	ax -- left margin
+;		bp -- top margin
+;		cx -- right margin
+;		dx -- bottom margin
+;
+	
+MSG_VIS_COMP_GET_WRAP_COUNT		message
+;	
+; Called by the geometry manager if VCGA_WRAP_AFTER_CHILD_COUNT is set,
+; to get the number of children to count before wrapping.
+;
+; Context:	Called by the destination when doing geometry calculations on
+;		itself.
+; Source:	No restrictions (usually same as destination)
+; Destination:  A VisCompClass object.
+; Interception: By any VisComp object that wants to wrap after a certain number
+;		of children.
+;
+; Pass:		nothing
+; Returns:	cx -- child count
+;		ax, dx, bp -- destroyed
+;
+
+
+; Arguments passed in bp to VisCompRecalcSize and VisCompPosition:
+
+VisCompSpacingMarginsInfo record
+	VCSMI_USE_THIS_INFO:1
+	  ; VisCompCalcNewSize uses this info for the composite's spacing and 
+	  ; margins.  If zero, will send MSG_VIS_COMP_GET_CHILD_SPACING and
+	  ; MSG_VIS_COMP_GET_MARGINS to get the information it needs.
+
+	VCSMI_LEFT_MARGIN:3
+	VCSMI_TOP_MARGIN:3
+	VCSMI_RIGHT_MARGIN:3
+	VCSMI_BOTTOM_MARGIN:3
+	  ; Margins to use when doing geometry, rather than sending a MSG_VIS_-
+	  ; COMP_GET_MARGINS.
+
+	VCSMI_CHILD_SPACING:3
+	  ; Spacing (both between children and between wrapped lines) to use
+	  ; in lieu of MSG_VIS_COMP_GET_CHILD_SPACING.
+VisCompSpacingMarginsInfo end
+
+	
+
+;------------------------------------------------------------------------------
+; VisCompInstance Definition
+;------------------------------------------------------------------------------
+
+WidthJustification	etype	byte
+	WJ_LEFT_JUSTIFY_CHILDREN		enum	WidthJustification
+	WJ_RIGHT_JUSTIFY_CHILDREN		enum	WidthJustification
+	WJ_CENTER_CHILDREN_HORIZONTALLY		enum	WidthJustification
+	WJ_FULL_JUSTIFY_CHILDREN_HORIZONTALLY	enum	WidthJustification
+	
+HeightJustification	etype	byte
+	HJ_TOP_JUSTIFY_CHILDREN			enum	HeightJustification
+	HJ_BOTTOM_JUSTIFY_CHILDREN		enum	HeightJustification
+	HJ_CENTER_CHILDREN_VERTICALLY		enum	HeightJustification
+	HJ_FULL_JUSTIFY_CHILDREN_VERTICALLY	enum	HeightJustification
+	
+	
+VisCompGeoDimensionAttrs	record
+	VCGDA_WIDTH_JUSTIFICATION  WidthJustification:2
+		;Horizontal justifications for placing the children.
+		;Note that horizontal full justification is only meaningful if 
+		;the composite is oriented horizontally.
+		
+	VCGDA_EXPAND_WIDTH_TO_FIT_PARENT:1
+		;Composite will try to expand to fill the available width of
+		;the parent.  By default, a composite will only be as wide
+		;as its children require.
+		
+	VCGDA_DIVIDE_WIDTH_EQUALLY:1
+		;Will attempt to divide width equally among its manageable
+		;children if oriented horizontally.  Does not guarantee that
+		;the children can cooperate (the size can only be suggested).
+
+	VCGDA_HEIGHT_JUSTIFICATION  HeightJustification:2
+		;Vertical justifications for placing the children.
+		;Note that vertical full justification is only meaningful if 
+		;the composite is oriented vertically.
+		
+	VCGDA_EXPAND_HEIGHT_TO_FIT_PARENT:1
+		;Composite will try to expand to fill the available height of
+		;the parent.  By default, a composite will only be as tall
+		;as its children require.
+		
+	VCGDA_DIVIDE_HEIGHT_EQUALLY:1
+		;Will attempt to divide height equally among its manageable
+		;children if oriented horizontally.  Does not guarantee that
+		;the children can cooperate (the size can only be suggested).
+
+VisCompGeoDimensionAttrs	end
+	
+	
+VisCompGeoAttrs	record
+	VCGA_ORIENT_CHILDREN_VERTICALLY:1
+		;Place the composite's children vertically, rather than 
+		;horizontally.
+		
+	VCGA_INCLUDE_ENDS_IN_CHILD_SPACING:1
+		;When used with full justification, divides the spacing up
+		;so that there is as much space allocated before the first
+		;child and after the last child as there are between the
+		;children.  An example of this is a motif reply bar.  When
+		;this is clear, there is no space allocated at the ends of the
+		;composite.
+		
+	VCGA_ALLOW_CHILDREN_TO_WRAP:1
+		;Allows children to wrap if their combined lengths will not
+		;allow them to fit inside the bounds of this object's parent.
+		;The composite will keep within the bounds of its parent and 
+		;wrap the children as necessary.  When this is clear, the
+		;children will force the composite to be as big as needed
+		;to fit the children on one line (unless, of course, the 
+		;CAN_TRUNCATE_WIDTH_TO_FIT_PARENT flags are set.)
+		
+	VCGA_ONE_PASS_OPTIMIZATION:1			
+		;This is an optimization which speeds up the geometry manager,
+		;only making one pass of sizing the children and using the
+		;sum of the sizes as the size of the composite.  In order
+		;to use this flag, you must be sure that the children don't
+		;want to wrap, and are always one size, regardless of the
+		;size of the parent, such as buttons in a horizontal composite.
+		
+	VCGA_CUSTOM_MANAGE_CHILDREN:1
+		;Don't use the geometry manager to manage the children.  
+		;This allows you to set up the sizes and positions of the
+		;children without the need of the geometry manager.  If this
+		;is flag is set, the composite will be default return its
+		;current size when asked to calculate its size, like a simple
+		;non-composite object.
+		
+	VCGA_HAS_MINIMUM_SIZE:1
+		;Geometry manager will send a MSG_VIS_COMP_GET_MIN_SIZE
+		;to this object if this flag is set, and always make the 
+		;composite at least as big as that.
+		
+	VCGA_WRAP_AFTER_CHILD_COUNT:1
+		;Used in conjunction with VCGA_ALLOW_CHILDREN_TO_WRAP.
+		;If set, composite will wrap after a certain number of 
+		;children, the number being obtained from a MSG_VIS_COMP_
+		;GET_CHILD_WRAP_COUNT.
+		
+	VCGA_ONLY_DRAWS_IN_MARGINS:1
+		;This flag can be set by a composite to optimize invalidation.
+		;If set, a composite whose image is invalid will only have its
+		;margins invalidated.  Any visual child below it will have to
+		;have its image invalid in order to get invalidated.  To get
+		;proper invalidations, the composite cannot draw anything inside
+		;its margins (that isn't the color of the background).
+		
+VisCompGeoAttrs	end
+	
+	
+	
+
+;------------------------------------------------------------------------------
+;	Instance Data
+;------------------------------------------------------------------------------
+
+;
+; NOTE!  The following structure must not be changed, as this would destroy
+; the integrity of all existing GeoWrite & GeoDraw documents.  Any change
+; must be accompanied by some mechanism to manage different version levels
+; of such documents.
+;
+
+    VCI_comp		CompPart <>	
+    	; Visual linkage for the composite, contains the first visual child of
+	; the composite.  Not accessible directly; use MSG_VIS_ADD_CHILD, 
+	; MSG_VIS_MOVE_CHILD, MSG_VIS_REMOVE_CHILD to manipulate an object's 
+	; place in the visual tree.  Use MSG_VIS_GET_PARENT to return the 
+	; visual parent of the object.
+	
+    VCI_gadgetExcl	optr	<>
+    	; Contains the object that has the gadget exclusive.  Not set directly,
+	; accessed via MSG_VIS_TAKE_GADGET_EXCL, MSG_VIS_RELEASE_GADGET_EXCL,
+	; and MSG_VIS_LOST_GADGET_EXCL.
+
+    VCI_window		hptr.Window <>
+	noreloc	VCI_window
+	; The handle of the window for this object.  Set only via the visual
+	; update mechanism; obtained via VisQueryParentWin.
+
+    VCI_geoAttrs		VisCompGeoAttrs
+    VCI_geoDimensionAttrs	VisCompGeoDimensionAttrs
+	; Geometry information for the a VisComp object.  To turn the geometry
+	; off, you'll want to set VCGA_CUSTOM_MANAGE_CHILDREN.  Setting and
+	; getting these attributes can be done via MSG_VIS_COMP_SET_GEO_ATTRS
+	; and MSG_VIS_COMP_GET_GEO_ATTRS.
+
+VisCompClass		endc

@@ -1,0 +1,126 @@
+//
+//  Projekt:	MagicBoard
+//
+//  Datei:      magic.goh
+//
+//  Autor:      Jirka Kunze
+//
+
+@include <stdapp.goh>
+@include <math.goh>
+@include <game.goh>
+#include <gstring.h>
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <graphics.h>
+#include <initfile.h>
+#include <sound.h>
+
+#define SHOW_ON_STARTUP   1
+
+#undef GSSetClipRect
+#define GSSetClipRect(path, rl_sw, rt_sw, rr_sw, rb_sw)      \
+        GR_SET_CLIP_RECT, GOC_WORD( path ), GOC_SW( rl_sw ),                             \
+        GOC_SW( rt_sw ), GOC_SW( rr_sw ), GOC_SW( rb_sw )
+
+#undef GSSetWinClipRect
+#define GSSetWinClipRect(path,rl_sw,rt_sw,rr_sw,rb_sw)                  \
+        GR_SET_WIN_CLIP_RECT, GOC_WORD(path) , GOC_SW(rl_sw),                             \
+        GOC_SW(rt_sw),GOC_SW(rr_sw),GOC_SW(rb_sw)
+
+
+//  Dateinamen und Pfade
+#define FILENAME        "MagicBord High Scores"
+#define	FILEDIR		"GAME"
+
+// color system
+#define DARK_GRAY   C_DARK_GRAY
+#define LIGHT_GRAY  C_LIGHT_GRAY
+#define BLACK       C_BLACK
+#define WHITE       C_WHITE
+
+
+//
+//  Strukturen/Variablen/Definitionen
+//
+#define	MPCS_MOUSE_DOWN	0x80
+#define	MPCS_SELECTED	0x40
+#define MPCS_FOCUS      0x20
+
+//
+//  grî·e des Spielfeldes und der Spielsteine fÅr
+//  die verschiedenen Platformen
+//
+
+    #define MBP_HEIGHT       30
+    #define MBP_WIDTH        30
+    #define MBP_HEIGHT_SPACE 31
+    #define MBP_WIDTH_SPACE  31
+
+typedef WordFlags BoardFlags;
+    #define BF_1 0x0005
+    #define BF_2 0x0007
+    #define BF_3 0x0009
+
+typedef WordFlags LevelFlags;
+    #define LF_1 0x0005
+	 #define LF_2 0x000a
+    #define LF_3 0x0014
+    #define LF_4 0x0028
+
+#define SOUND_ON 1
+#define SOUND_OFF 2
+#define SOUND_SYSTEM 3
+
+extern MemHandle	playSound;
+extern MemHandle	winSound;
+extern MemHandle	loseSound;
+extern word	g_sound;
+
+void MagicInitSound(void);
+
+//
+//  externe Klassen
+//
+
+//
+//  MagicProcessClass
+//
+@class MagicProcessClass, GenProcessClass;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_MAGIC_SOUND_CHANGED;
+@endc;
+
+//
+//  MagicContentClass
+//
+@class  MagicContentClass, VisContentClass;
+    @message    void    MSG_MAGICCONTENT_SET_BOARD();
+    @message    void    MSG_MAGICCONTENT_MIX_BOARD();
+    @message    void    MSG_MAGICCONTENT_TIME_OVER();
+    @message    void    MSG_MAGICCONTENT_RESTORE_TIMER();
+    @message    void    MSG_MAGICCONTENT_USER_ACTION(word colum, word line);
+
+    @instance   sword          MCI_score;
+    @instance   word           MCI_attempt;
+    @instance   TimerHandle    MCI_timerH;
+    @instance   word           MCI_timerID;
+@endc;
+
+//
+//  MagicPieceClass
+//
+@class	MagicPieceClass, VisClass;
+    @message    void    MSG_MAGICPIECE_TEST(Boolean *gameEnd);
+    @message    void    MSG_MAGICPIECE_CLEAR();
+    @message    void    MSG_MAGICPIECE_USER_SET(word colum, word line);
+    @message    void    MSG_MAGICPIECE_COMPUTER_SET(word colum, word line);
+    @message    void    MSG_MAGICPIECE_SET_POSITION(word colum, word line);
+
+    @instance   byte    MPI_state;
+    @instance   word    MPI_number;
+    @instance   word    MPI_line;
+    @instance   word    MPI_colum;
+
+@endc;
+
+

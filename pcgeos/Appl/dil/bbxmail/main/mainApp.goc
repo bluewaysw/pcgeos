@@ -1,0 +1,441 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mainProcess.goc
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include <rolodex.goh>
+#include "sem.h"
+
+@classdecl MailAppClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg RareCode
+#endif
+
+/**************************************************************
+ *          
+ * FUNCTION:        GetAddressBook
+ * PASS:            AppLaunchBlock	*alb
+ * RETURN:          nuthin
+ * DESCRIPTION:     fill in the address book's diskHan, path and name
+ *
+ *	2/3/04	jfh	new
+ * 3/25/04	jfh	oops - need to check that the file exists before
+ *							I send it off to open the AddrBk app.
+ *
+ ***************************************************************/
+void GetAddressBook(AppLaunchBlock	*alb)
+{
+ char		name[FILE_LONGNAME_BUFFER_SIZE], iniPath[PATH_BUFFER_SIZE];
+ DiskHandle		dhIni;
+ MemHandle mh;
+ ChunkHandle chRel, chStd ;
+ word		drive, dataSize;
+ Boolean	initError, grabError;
+ char		*stdPath, *p1, *relPath;
+ word bufSize = (2*PATH_LENGTH) + FILE_LONGNAME_BUFFER_SIZE;
+ FileHandle	fh;
+
+
+	/* first see if there is one named in the ini */
+	initError = InitFileReadStringBuffer("bbxmail", "addrName", name,
+			  (IFCC_INTACT << IFRF_CHAR_CONVERT_OFFSET) |
+			  IFRF_FIRST_ONLY |
+			  FILE_LONGNAME_BUFFER_SIZE, &dataSize);
+
+	if(!initError) {
+		/* grab the one named in the ini */
+		grabError = InitFileReadStringBuffer("bbxmail", "addrPath", iniPath,
+				(IFCC_INTACT << IFRF_CHAR_CONVERT_OFFSET) |
+				IFRF_FIRST_ONLY |
+				PATH_BUFFER_SIZE, &dataSize);
+		if (!grabError)
+			grabError = InitFileReadInteger("bbxmail", "addrDh", &dhIni);
+		if (!grabError)
+			grabError = InitFileReadInteger("bbxmail", "addrDr", &drive);
+		if (!grabError) {
+			/* now get the path */
+			if(dhIni > SP_COMPONENT) {
+				/* we're not in a standard path */
+				dhIni = DiskRegisterDiskSilently(drive);
+				}
+			/* alloc some mem for our path stuff */
+			mh = MemAlloc((2*bufSize), HF_SWAPABLE, HAF_LOCK);
+			LMemInitHeap(mh, LMEM_TYPE_GENERAL, 0, sizeof(LMemBlockHeader),
+								2, STD_INIT_HEAP);
+			chRel = LMemAlloc(mh, bufSize);
+			chStd = LMemAlloc(mh, bufSize);
+			relPath = LMemDeref(ConstructOptr(mh, chRel));
+			stdPath = LMemDeref(ConstructOptr(mh, chStd));
+			/* need to prepend a \ to the path */
+			strcpy(relPath, "\\");
+			strcat(relPath, iniPath);
+			p1 = stdPath;
+			FileConstructFullPath(&p1, bufSize, dhIni, relPath, FALSE);
+			strcpy(alb->ALB_path, stdPath);
+			strcpy(alb->ALB_dataFile, name);
+			MemFree(mh);
+			/* the app launch block doesn't want SP_ disk handles */
+			alb->ALB_diskHandle = DiskRegisterDiskSilently(drive);
+			}
+		}
+
+	if (initError || grabError)  {
+		/* get the default */
+		mh = MemAlloc(bufSize, HF_SWAPABLE, HAF_LOCK);
+		stdPath = MemDeref(mh);
+		p1 = stdPath;
+		alb->ALB_diskHandle =
+				FileConstructFullPath(&p1, bufSize, SP_DOCUMENT, "\\.", FALSE);
+		strcpy(alb->ALB_path, stdPath);
+		MemFree(mh);
+
+		LockStrings();
+		strcpy(alb->ALB_dataFile, LMemDeref(@addrBookFileName));
+		UnlockStrings();
+		}
+
+	/* make sure that the file exists */
+	FilePushDir();
+	FileSetCurrentPath(alb->ALB_diskHandle, alb->ALB_path);
+	fh =FileOpen(alb->ALB_dataFile, (FILE_ACCESS_R | FILE_DENY_NONE));
+	if (fh) FileClose(fh, FALSE);
+	else {
+		/* ooops - no file to open.  Just open the app. */
+		alb->ALB_diskHandle = 0;
+		alb->ALB_path[0] = 0;
+      alb->ALB_dataFile[0] = 0;
+		}
+
+	FilePopDir();
+
+
+
+}
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_DEFAULT_ACCOUNT_ERROR
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     handle an error creating the default account
+*
+***************************************************************/
+@method MailAppClass, MSG_MAIL_APP_DEFAULT_ACCOUNT_ERROR
+{
+    LockStrings();
+    UserStandardDialog(
+	(char *) NULL,
+	/* GIT_MULTIPLE_RESPONSE, so custom */
+	NULL,
+	/* no string argument */
+	(char *) NULL,
+	(char *) NULL,
+	/* dialog string */
+	LMemDeref (@defaultAccountErr),
+	/* dialog type */
+	(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+	/* interaction type */
+	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+	);
+    UnlockStrings();
+    @send, forceQueue oself::MSG_META_QUIT();
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_LAUNCH_ADDRESS_BOOK
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Launch the Address Book application
+*
+***************************************************************/
+@method MailAppClass, MSG_MAIL_APP_LAUNCH_ADDRESS_BOOK
+{
+	 GeodeToken token = ROLODEX_TOKEN;
+    MemHandle launchBlk;
+ AppLaunchBlock	*alb;
+
+
+    /*
+     * create a launch block
+     */
+	 launchBlk = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+
+	/* pass the selected addr book file */
+	alb = MemLock(launchBlk);
+	/* fill in the launch block */
+	GetAddressBook(alb);
+	MemUnlock(launchBlk);
+
+	@call oself::MSG_MAIL_APP_LAUNCH_APPLICATION(token, launchBlk, 0, @addrLaunchErr);
+}
+
+@ifdef MAIL_STYLES_SUPPORT
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_LAUNCH_BROWSER
+* PASS:            iab - handle of InternetAppBlock with IADT_URL
+* RETURN:          none
+* DESCRIPTION:     Launch the Address Book application
+*
+***************************************************************/
+@method MailAppClass, MSG_MAIL_APP_LAUNCH_BROWSER
+{
+//    GeodeToken token = {'G','l','b','I', 16431 };   jfh 9/9/02
+	 GeodeToken token = {'W','M','K','3', 16431 };
+    MemHandle launchBlk;
+    AppLaunchBlock *lbs;
+
+    /*
+     * check if dialer
+     */
+
+    /*
+     * create a launch block
+     */
+    launchBlk = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+
+    if (launchBlk) {
+	/*
+	 * fill in the launch block with our extra data
+	 */
+	lbs = MemLock(launchBlk);
+	lbs->ALB_extraData = iab;
+	MemUnlock(launchBlk);
+    }
+    @call oself::MSG_MAIL_APP_LAUNCH_APPLICATION(token, launchBlk, 0, @browserLaunchErr);
+}
+
+@endif
+
+
+/***********************************************************************
+ *		MSG_MAIL_APP_LAUNCH_APPLICATION for MailAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	  Launch an application for an attachment  
+ * PASS:          GeodeToken geodeToken - geode token
+ *                MemHandle launchHan - handle of AppLaunchBlock (NULL if err)
+ *                EventHandle msg - handle of recorded message (0 for none)
+ *                optr errMessage - error message to use for failure
+ ***********************************************************************/
+
+@method MailAppClass, MSG_MAIL_APP_LAUNCH_APPLICATION
+{
+    IACPConnection   iacpConnectionToken = IACP_NO_CONNECTION;
+    word             serverCount;
+
+    if (launchHan) {
+	iacpConnectionToken = IACPConnect
+	    (&geodeToken, IACPCF_FIRST_ONLY | IACPSM_USER_INTERACTIBLE,
+	     launchHan, NullOptr, &serverCount);
+    }
+
+    if (iacpConnectionToken != IACP_NO_CONNECTION) {
+	/*
+	 * if there is a message, send it
+	 */
+	if (msg) {
+	    IACPSendMessage(iacpConnectionToken, msg,
+			    TO_PROCESS, IACPS_CLIENT, 0);
+	}
+	/*
+	 * all done
+	 */
+	IACPShutdown(iacpConnectionToken, NullOptr);
+
+	/*
+	 * minimize or quit, as desired
+	 */
+@ifdef APP_START_OPTIONS
+	switch (@call PfAppStartOptionList::MSG_GEN_ITEM_GROUP_GET_SELECTION()){
+	case MASO_MINIMIZE:
+	    @call ReadMailWin::MSG_GEN_DISPLAY_CLOSE();
+	    @call MailPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+	    break;
+	case MASO_QUIT:
+	    @send oself::MSG_META_QUIT();
+	    break;
+	}
+@endif
+
+    } else {
+	/*
+	 *  Somehow we can't launch an application
+	 */
+	ReportError(errMessage, NULL);
+    }
+    
+}	/* End of MSG_MAIL_APP_LAUNCH_APPLICATION.	*/
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_ADD_ADDRESS_ENTRY
+* PASS:            addrBlock - handle of block with RolodexUpdateEntryField
+* RETURN:          none
+* DESCRIPTION:     Launch the Address Book application to add an address
+***************************************************************/
+@method MailAppClass, MSG_MAIL_APP_ADD_ADDRESS_ENTRY
+{
+    GeodeToken token = ROLODEX_TOKEN;
+    MemHandle launchBlk;
+    EventHandle msg;
+ AppLaunchBlock	*alb;
+
+    msg = @record null::MSG_ROLODEX_UPDATE_ENTRY(addrBlock);
+    /*
+     * create a launch block
+     */
+    launchBlk = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+
+	/* pass the selected addr book file */
+	alb = MemLock(launchBlk);
+	/* fill in the launch block */
+	GetAddressBook(alb);
+	MemUnlock(launchBlk);
+
+	 @call oself::MSG_MAIL_APP_LAUNCH_APPLICATION(token, launchBlk, msg, @addrLaunchErr);
+}
+
+#ifdef __BORLANDC__
+#pragma codeseg InitCode
+#endif
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_DETACH
+* PASS:            callerID - ID of caller
+*                  caller - optr of caller
+* RETURN:          none
+* DESCRIPTION:     Handle some exit stuff
+***************************************************************/
+@method MailAppClass, MSG_META_DETACH
+{
+    @call TheMessageList::MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY();
+    @call SendReceiveDialog::MSG_MSR_SET_TIMER(0, 0);
+    @callsuper();
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_QUIT
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Handle some exit stuff
+***************************************************************/
+static const StandardDialog2ResponseTriggerTable exitSendTrigs = {
+    2,
+    {@exitMoniker, IC_NO}, \
+    {@sendMoniker, IC_YES} \
+};
+
+@method MailAppClass, MSG_META_QUIT
+{
+    word ret = IC_DISMISS;
+
+    /*
+     * save any options
+     */
+    @call oself::MSG_META_SAVE_OPTIONS();
+
+    /*
+     * see if there are any messages to send
+     */
+    if (@call PfAccountList::MSG_ACCOUNT_LIST_GET_NUM_ACCOUNTS()) {
+@ifndef COMPOSE_SEND_NOW
+        if (@call ComposeSendOptionsList::MSG_GEN_ITEM_GROUP_GET_SELECTION() == MSO_SEND_TO_QUEUE) {
+@endif
+            if (@call TheFolderList::MSG_FOLDER_LIST_GET_NUM_MESSAGES(MFID_OUTBOX)) {
+		ret = DoCustomDB(@mailToSendStr, NULL, &exitSendTrigs);
+	    }
+@ifndef COMPOSE_SEND_NOW
+	}
+@endif
+    }
+
+    if (ret == IC_YES) {
+	@call SendReceiveDialog::MSG_MSR_SEND_MESSAGES();
+    } else {
+	/*
+	/*
+	 * no messages to send or quit any way
+	 */
+	@callsuper();
+    }
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_IACP_NEW_CONNECTION
+* PASS:            appLaunchBlock - handle of AppLaunchBlock
+*                  justLaunched - TRUE if just launched
+*                  connection - IACPConnection that is now open
+* RETURN:          none
+* DESCRIPTION:     Handle opening from another app for mailto:, etc.
+***************************************************************/
+
+@method MailAppClass, MSG_META_IACP_NEW_CONNECTION
+{
+    MemHandle ih;
+    AppLaunchBlock *alb;
+    InternetAppBlock *iab;
+
+    /*
+     * see if there is any interesting extra data
+     */
+    alb = MemLock(appLaunchBlock);
+    ih = alb->ALB_extraData;
+    if (ih) {
+	iab = MemLock(ih);
+	switch (iab->IAB_type) {
+	case IADT_MAIL_TO:
+	     MemUnlock(ih);
+	     @send process::MSG_MAIL_PROCESS_DO_MAIL(ih);
+	     break;
+	default:
+	    MemFree(ih);
+	}
+    } else {
+	/*
+	 * no extra data; normal startup
+	 */
+	@send process::MSG_MAIL_PROCESS_DO_MAIL(0);
+    }
+    @call oself::MSG_GEN_BRING_TO_TOP();
+    MemUnlock(appLaunchBlock);
+    @callsuper();
+}
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_ATTACH_OBJECT
+* RETURN:          none
+* DESCRIPTION:     Handle startup stuff
+***************************************************************/
+
+@method MailAppClass, MSG_META_ATTACH_OBJECT
+{
+    @callsuper();
+    @call ComposeSave::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+}

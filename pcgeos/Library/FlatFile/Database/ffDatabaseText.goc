@@ -1,0 +1,1985 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1993 -- All Rights Reserved
+ *
+ * PROJECT:	  PC/GEOS
+ * MODULE:	  ffDatabaseText.goc
+ * FILE:	  ffDatabaseText.goc
+ *
+ * AUTHOR:  	  Jeremy Dashe : Jun 10, 1992
+ *		  Broken out from ffDatabaseFields.goc on 2/1/93 by
+ *			Anna Lijphart
+ *
+ * DESCRIPTION:
+ *	This file contains methods and functions for FFTextClass
+ *
+ * RCS STAMP:
+ *	$Id: ffDatabaseText.goc,v 1.1 97/04/04 18:03:10 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+#include <geoworks.h>
+#include <system.h>
+
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <Ansi/ctype.h>
+
+#include <char.h>
+#include <input.h>
+#include <chunkarr.h>
+#include <ec.h>
+#include <math.h>
+
+@include <Objects/FlatFile/ffileC.goh>
+@include <Objects/FlatFile/ffGrObjC.goh>
+#include <Objects/FlatFile/ffDPaste.h>
+@include <Objects/uiInputC.goh>
+@include <Objects/Text/tCtrlC.goh>
+#include <Objects/Text/tCommon.h>
+#include <Objects/FlatFile/ffKbd.h>
+@include <ffile.goh>
+@include <grobj.goh>
+#include <graphics.h>
+#include <extern.h>
+#include <ffFatal.h>
+
+/*************************************************************************
+  	    	Class Declarations
+ *************************************************************************/
+
+@classdecl  	FFTextClass;
+
+/*************************************************************************
+  	    	External Declarations
+ *************************************************************************/
+
+@extern chunk @FFFDNotANum;
+@extern chunk @FFFDNotADate;
+@extern chunk @FFFDNotATime;
+@extern chunk @FFDConfirmDeleteField;
+
+@extern chunk @FFDFieldHadDependents;
+
+@extern chunk @FFFDTooComplexError;
+@extern chunk @FFFDRangeError;
+@extern chunk @FFFDNameError;
+@extern chunk @FFFDArgCountError;
+@extern chunk @FFFDTypeError;
+@extern chunk @FFFDDivByZeroError;
+@extern chunk @FFFDCircularRefError;
+@extern chunk @FFFDGeneralError;
+@extern chunk @FFFDNAError;
+@extern chunk @FFFDFloatPosInfinityError;
+@extern chunk @FFFDFloatNegInfinityError;
+@extern chunk @FFFDNumOutOfRangeError;
+@extern chunk @FFFDCircNameRefError;
+@extern chunk @FFFDCircDependencyError;  
+@extern chunk @FFFDUnknownError;  
+
+EvalErrorItem FFFDErrorTextTable[] = {
+ 	{CE_TOO_COMPLEX,    	  @FFFDTooComplexError},
+    	{CE_REF_OUT_OF_RANGE, 	  @FFFDRangeError},
+    	{CE_NAME,   	    	  @FFFDNameError},
+    	{CE_ARG_COUNT, 	    	  @FFFDArgCountError},
+    	{CE_TYPE,   	    	  @FFFDTypeError},
+    	{CE_DIVIDE_BY_ZERO, 	  @FFFDDivByZeroError},
+    	{CE_CIRCULAR_REF,   	  @FFFDCircularRefError},
+    	{CE_GEN_ERR, 	    	  @FFFDGeneralError},
+    	{CE_NA, 	    	  @FFFDNAError},
+    	{CE_FLOAT_POS_INF,  	  @FFFDFloatPosInfinityError},
+    	{CE_FLOAT_NEG_INF,  	  @FFFDFloatNegInfinityError},
+    	{CE_FLOAT_GEN_ERR,  	  @FFFDNumOutOfRangeError},
+    	{CE_CIRC_NAME_REF,  	  @FFFDCircNameRefError},
+    	{CE_CIRC_DEPEND,    	  @FFFDCircDependencyError},
+    	{CE_NUM_OUT_OF_RANGE, 	  @FFFDNumOutOfRangeError},
+	{PSEE_FLOAT_POS_INFINITY, @FFFDFloatPosInfinityError},
+	{PSEE_FLOAT_NEG_INFINITY, @FFFDFloatNegInfinityError},
+	{PSEE_FLOAT_GEN_ERR,	  @FFFDGeneralError},
+};
+
+/*************************************************************************
+  	    	Forward Declarations
+ *************************************************************************/
+
+void FFTRequestPageNumber(optr oself);
+
+void FFTFormatNum(TCHAR *fieldText,
+		  FloatNum *floatNum,
+		  FormatIdType displayFormat,
+		  optr oself);
+
+void FFTFormatText(optr oself,
+		   TCHAR *fieldText,
+		   TCHAR *text,
+		   FormatIdType displayFormat);
+
+void FFTFormatFormula(optr oself,
+		      TCHAR *fieldText,
+		      CellFormula *dataCellPtr,
+		      FormatIdType displayFormat);
+
+Boolean FFTConvertToFloat(TCHAR *data, FloatNum *num);
+
+Boolean FFTConvertDateToNum(TCHAR *text, FloatNum *num);
+
+Boolean FFTConvertTimeToNum(TCHAR *text, FloatNum *num);
+
+FormatIdType FFTUnformattedNumFormat(FormatIdType displayFormat);
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_META_INITIALIZE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Perform extra object initialization.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Let the super-class do its thing.
+	Set instance data telling ourself not to interact with the search
+	controller.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.06.24	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method FFTextClass, MSG_META_INITIALIZE
+{
+    /* Set up the default stuff. */
+    @callsuper();
+
+    /* Don't interact with the search controller. */
+    @call self::MSG_META_ADD_VAR_DATA
+	(ATTR_VIS_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL,
+	 0, NULL);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_INITIALIZE for FFTextClass
+ *
+ * DESCRIPTION:	This message sets the field column associated with this
+ *	    	text object.
+ *
+ * PARAMETERS:
+ *	void (FieldID colNum)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/10/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_INITIALIZE
+{
+    /*
+     * Set the field column number for this field.
+     */
+    pself->FFT_fieldColumn = colNum;
+
+    /*
+     * Set this field so it ignores losing the target.
+     */
+    pself->FFT_inDesignMode = TRUE;
+    pself->FFT_navigating = FALSE;
+
+    ObjMarkDirty(oself);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_SET_FIELD_TYPE for FFTextClass
+ *
+ * DESCRIPTION:	This message sets the flat file field type for a
+ *	    	particular field.  If the resetIfChange flag is
+ *	    	set, the display format won't be changed unless the
+ *	    	field type has changed.
+ *
+ * PARAMETERS:
+ *	void (FieldDataType fieldType, Boolean resetIfChanged)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/04/92	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_SET_FIELD_TYPE
+{
+    Boolean typeChanged;
+
+    typeChanged = (pself->FFT_fieldType != fieldType);
+    pself->FFT_fieldType = fieldType;
+
+    /*
+     * Set the display format to a nice default if we're supposed to.
+     */
+    if (!resetIfChanged || (resetIfChanged && typeChanged)) switch (fieldType) {
+	case FDT_COMPUTED:
+	case FDT_GENERAL_TEXT:
+	case FDT_INTEGER:
+	case FDT_REAL:
+	case FDT_PAGE_NUMBER:
+	    pself->FFT_displayFormat = FORMAT_ID_GENERAL;
+	    break;
+	    
+	case FDT_DATE:
+	    pself->FFT_displayFormat = FORMAT_ID_DATE_SHORT;
+	    break;
+	    
+	case FDT_TIME:
+	    pself->FFT_displayFormat = FORMAT_ID_TIME_HM;
+	    break;
+    }
+
+    ObjMarkDirty(oself);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_SET_DISPLAY_FORMAT for FFTextClass
+ *
+ * DESCRIPTION:	This method sets the display format for this field.
+ *
+ * PARAMETERS:
+ *	void (FormatIdType displayFormat)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	11/23/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_SET_DISPLAY_FORMAT
+{
+    pself->FFT_displayFormat = displayFormat;
+    ObjMarkDirty(oself);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_RETURN_FORMAT_TYPE for FFTextClass
+ *
+ * DESCRIPTION:	This method returns the display format for this field
+ *
+ * PARAMETERS:
+ *	FormatIdType ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	11/24/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_RETURN_FORMAT_TYPE
+{
+    return pself->FFT_displayFormat;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_TEXT_SHOW_SELECTION for FFTextClass
+ *
+ * DESCRIPTION:	This message does nothing :) 
+ *		Why then, you ask, do we intercept it?
+ *		Because what it does is the following: When you replace
+ *		the text in a text field, it assumes that this field
+ *		should be displayed within the view. This message is
+ *		sent to ensure that.
+ *		When we're in Multi-Record Data Entry mode and we scroll,
+ *		FlatFileDatabase's MSG_VIS_DRAW is called. It redraws
+ *		each record layout within the page layout. When it
+ *		displays each record, it replaces the fields with the
+ *		values appropriate for that record. And when this happens,
+ *		the text object wants to move that field into focus, so...
+ *		we scroll down and then the view just jumps back up again.
+ *		By intercepting this message and doing nothing, we make
+ *		sure that it knows there is no need to scroll into view.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	9/10/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_VIS_TEXT_SHOW_SELECTION
+{
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_META_TEXT_USER_MODIFIED
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Inform the database that the given field has been made
+		dirty.
+
+		Note: We don't need to do this in design mode, so we
+		check first.
+
+PASS: 		optr	obj		= Text object made dirty (self).
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Inform the database of the change.
+	Pass off to the superclass.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.07.28	Initial version.
+	jdashe	12/29/92    	Tell the database only if in data entry mode.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method FFTextClass, MSG_META_TEXT_USER_MODIFIED
+{
+    EventHandle	msg;
+
+    if (pself->FFT_inDesignMode == FALSE) {
+	/*
+	 * Build the database notification message.
+	 */
+	msg = @record FlatFileDatabaseClass::
+	    MSG_FFD_RECORD_CONTROL(FFRCR_DIRTY_CURRENT_RECORD, 0);
+
+	/*
+	 * Send it to the database.
+	 */
+	@call GrObjGetBodyOD(SegmentOf(pself))::
+	    MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+    }
+
+    /* Let the superclass do its thing. */
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_TEXT_GENERATE_NOTIFY for FFTextClass
+ *
+ * DESCRIPTION:	We intercept this message to make sure that only the
+ *	    	"select state" notification goes out when this field
+ *	    	gets the focus/target in data entry mode.
+ *
+ * PARAMETERS:
+ *	void (VisTextGenerateNotifyParams *params)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/27/92	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_VIS_TEXT_GENERATE_NOTIFY
+{
+    /*
+     * If we're in data entry mode, mask out all notifications except
+     * SELECT_STATE.
+     */
+    if (pself->FFT_inDesignMode == FALSE) {
+	params->VTGNP_notificationTypes &= VTNF_SELECT_STATE;
+    } else {
+	/*
+	 * On the other hand, if in design mode and a computed field, make
+	 * sure all notification flags are on, as it is a non-editable text
+	 * object and VisTextClass will only have VTNF_SELECT_STATE set
+	 */
+	if (pself->FFT_fieldType == FDT_COMPUTED) {
+	    params->VTGNP_notificationTypes |= VIS_TEXT_STANDARD_NOTIFICATION_FLAGS;
+    	}
+    }
+
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_SET_FOR_DESIGN_MODE for FFTextClass
+ *
+ * DESCRIPTION:	This message causes a field to ignore target losses and
+ *	    	requests to be filled with a "#" for a page number type
+ *	    	or the field name otherwise.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/23/92		Initial version
+ *	jeremy	9/7/92	    	Added support for page numbers
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_SET_FOR_DESIGN_MODE
+{
+    pself->FFT_inDesignMode = TRUE;
+
+    switch (pself->FFT_fieldType) {
+	case FDT_PAGE_NUMBER:
+	    @call oself::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR(_TEXT(PAGE_NUMBER_SYMBOL), 0);
+	    break;
+	case FDT_GENERAL_TEXT:
+	    /*
+	     * Set the max field length for this field.
+	     */
+	    @call oself::MSG_VIS_TEXT_SET_MAX_LENGTH(MAX_FIELD_NAME_LENGTH);
+	    /*
+	     * FALL THROUGH!
+	     */
+	default:
+	    @call oself::MSG_FFT_ASK_FOR_FIELD_NAME();
+	    break;
+    }
+
+    ObjMarkDirty(oself);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_SIMPLE_SET_FOR_DESIGN_MODE for FFTextClass
+ *
+ * DESCRIPTION:	This message sets the inDesignMode flag for fields
+ *		For an explanation of where it is used, see
+ *		MSG_FFTG_SIMPLE_SET_FOR_DESIGN_MODE
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	1/25/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_SIMPLE_SET_FOR_DESIGN_MODE
+{
+    pself->FFT_inDesignMode = TRUE;
+    ObjMarkDirty(oself);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_SET_FOR_DATA_ENTRY_MODE for FFTextClass
+ *
+ * DESCRIPTION:	This message causes a field to listen to target losses and
+ *	    	clears itself out.  If it is a page number type, it will
+ *	    	request to be redrawn with the current number.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/23/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_SET_FOR_DATA_ENTRY_MODE
+{
+    EventHandle msg;
+    word len;
+
+    pself->FFT_inDesignMode = FALSE;
+
+    /*
+     * If we're a page number, request the database to redraw the number.
+     */
+    switch (pself->FFT_fieldType) {
+	case FDT_PAGE_NUMBER:
+	    FFTRequestPageNumber(oself);
+	    /*
+	     * FALL THROUGH to FDT_COMPUTED...
+	     */
+	case FDT_COMPUTED:
+	    @call self::MSG_VIS_TEXT_DELETE_ALL();
+
+	    @call self::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(
+	        (VTS_SELECTABLE | VTS_TARGETABLE),
+		(VTS_EDITABLE | VTS_ONE_LINE |
+		 VTS_SUBCLASS_VIRT_PHYS_TRANSLATION | VTS_OVERSTRIKE_MODE |
+		 VTS_USER_MODIFIED));
+
+	    @call oself::MSG_VIS_TEXT_SET_MAX_LENGTH(MAX_TEXT_FIELD_LENGTH);
+
+	    break;
+
+	case FDT_GENERAL_TEXT:
+	    /*
+	     * Clear out the field then set its text length.
+	     */
+	    @call self::MSG_VIS_TEXT_DELETE_ALL();
+
+	    pself = ObjDerefGrObjVis(oself);
+	    msg = @record FlatFileDatabaseClass::
+		MSG_FFD_GET_MAX_LENGTH(pself->FFT_fieldColumn);
+	    len = @call {MSG_FFD_GET_MAX_LENGTH}
+	    	    	oself::MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(msg);
+	    @call oself::MSG_VIS_TEXT_SET_MAX_LENGTH(len);
+	    break;
+
+	default:
+	    @call oself::MSG_VIS_TEXT_SET_MAX_LENGTH(MAX_TEXT_FIELD_LENGTH);
+	    @call self::MSG_VIS_TEXT_DELETE_ALL();
+	    break;
+    }
+
+    ObjMarkDirty(oself);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFTRequestPageNumber
+ *
+ * DESCRIPTION:	This function requests the database to update a field with
+ *	    	the current page number.
+ *
+ * PARAMETERS:	oself - an optr to the FFTextClass instance to be redrawn.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	9/17/92		Initial version
+ *
+ ***********************************************************************/
+void
+FFTRequestPageNumber(optr oself)
+{
+    Message msg;
+
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_LOAD_FIELD_WITH_PAGE_NUMBER(oself);
+
+    @send GrObjGetBodyOD(SegmentOf(ObjDerefGrObjVis(oself)))::
+	MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_GAINED_TARGET_EXCL for FFTextClass
+ *
+ * DESCRIPTION:	When we gain the target, we want to have the
+ *	    	raw (non-formatted) text loaded into this text
+ *	    	object.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	11/30/92	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_META_GAINED_TARGET_EXCL
+{
+    Message msg;
+    FieldID fieldId = pself->FFT_fieldColumn;
+    Boolean ignoreTargetLoss = pself->FFT_inDesignMode |
+	    	    	       pself->FFT_navigating;
+
+    @callsuper();
+
+    if (ignoreTargetLoss) {
+	return;
+    }
+
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_LOAD_FIELD_WITH_UNFORMATTED_TEXT(oself, fieldId);
+
+    @send GrObjGetBodyOD(SegmentOf(ObjDerefGrObjVis(oself)))::
+	MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+
+    /*
+     * Set the database's current column to this field.
+     */
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_SET_CUR_COL(fieldId);
+
+    @send GrObjGetBodyOD(SegmentOf(ObjDerefGrObjVis(oself)))::
+	MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LOST_TARGET_EXCL for FFTextClass
+ *
+ * DESCRIPTION:	This message is sent when a field loses its target.  When
+ *	    	this happens, tell the flat file about it.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/10/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_META_LOST_TARGET_EXCL
+{
+    Boolean ignoreTargetLoss = pself->FFT_inDesignMode |
+	    	    	       pself->FFT_navigating;
+
+    @callsuper();
+
+    if (ignoreTargetLoss) {
+	return;
+    }
+
+    /*
+     * Tell ourself to give the flat file the column number we represent.
+     */
+    @send self::MSG_FFT_SEND_FIELD_COLUMN();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GET_FIELD_COLUMN_FROM_TEXT_OBJECT for FFTextClassClass
+ *
+ * DESCRIPTION:	Returns the field column # associated with this text
+ *		field.
+ *
+ * PARAMETERS:
+ *	FieldID ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	6/15/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_GET_FIELD_COLUMN_FROM_TEXT_OBJECT
+{
+    return(pself->FFT_fieldColumn);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_GET_FIELD_NAME for FFTextClass
+ *
+ * DESCRIPTION:	This message fills a text buffer with a field's
+ *	    	name.
+ *
+ * PARAMETERS:
+ *	void (TCHAR *fieldName)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	12/11/92	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_GET_FIELD_NAME
+{
+    EventHandle msg;
+    
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_GET_COLUMN_FIELD_NAME(pself->FFT_fieldColumn, fieldName);
+    @call GrObjGetBodyOD(SegmentOf(pself))::
+	MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(msg);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_KBD_CHAR for FFTextClass
+ *
+ * DESCRIPTION:	We want to intercept TABs and CRs, and send the fact to
+ *	    	the flat file library for field navigation.
+ *
+ * PARAMETERS: 	void (word character = cx, 
+ *		      word flags = dx, 
+ *		      word state = bp)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/11/92	    	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_META_KBD_CHAR
+{
+    ShortcutCode  shortcut;
+    KeyboardShortcut shortcutTable[] = {
+	FF_SHORTCUT_TABLE
+     };
+#define	NUM_TABLE_SHORTCUTS (sizeof(shortcutTable) / sizeof(KeyboardShortcut))
+    
+    if ((byte) flags & CF_RELEASE) {
+	/*
+	 * Send all releases to the superclass
+	 */
+	@callsuper();
+    } else {
+	/*
+	 * The key was pressed.  Check to see if this is a key we're
+	 * interested in.
+	 */
+	shortcut = FlowCheckKbdShortcut(shortcutTable, NUM_TABLE_SHORTCUTS,
+					character, flags, state);
+	if (shortcut < 0) {
+	    /*
+	     * No record navigation was necessary.  Call the superclass
+	     * and leave.
+	     */
+	    @callsuper();
+	} else switch (shortcut) {
+	    case SC_INSERT_ENTER_CHAR:
+	    	/*
+		 * Blast a CR into the text by stripping the SHIFT and CTRL
+		 * flags.
+		 */
+	    	flags &= ~((SS_LCTRL | SS_RCTRL | SS_LSHIFT | SS_RSHIFT) << 8);
+		@callsuper oself::FFTextClass::
+		    MSG_META_KBD_CHAR(character, flags, state);
+	    	break;
+		
+	    case SC_INSERT_TAB_CHAR:
+	    	/*
+		 * Blast a TAB into the text by stripping the SHIFT and CTRL
+		 * flags.
+		 */
+	    	flags &= ~((SS_LCTRL | SS_RCTRL | SS_LSHIFT | SS_RSHIFT) << 8);
+		@callsuper oself::FFTextClass::
+		    MSG_META_KBD_CHAR(character, flags, state);
+	    	break;
+		
+	    default:
+	    	/*
+		 * We have some sort of navigation or other action to do.
+		 * Let the database deal with it.
+		 */
+		@call self::MSG_FFT_SEND_FIELD_NAVIGATION_INFO(shortcut);
+	}
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_SEND_FIELD_COLUMN for FFTextClass
+ *
+ * DESCRIPTION:	This message sends the flat file library the field
+ *	    	column number we represent.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/11/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_SEND_FIELD_COLUMN
+{
+    Message msg;
+
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_VALIDATE_SCREEN_FIELD_WITH_MESSAGE(oself,
+						   pself->FFT_fieldColumn,
+						   TRUE);
+
+    @send GrObjGetBodyOD(SegmentOf(pself))::
+	MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_SEND_FIELD_NAVIGATION_INFO for FFTextClass
+ *
+ * DESCRIPTION:	This message sends the flat file library a notification that
+ *	    	a navigation key (TAB, CR, etc.) has been intercepted.
+ *
+ * PARAMETERS:
+ *	void (ShortcutCode shortcut)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/11/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_SEND_FIELD_NAVIGATION_INFO
+{
+    Message msg;
+
+    /*
+     * Set a flag so when we lose the target, we'll ignore it.
+     */
+    pself->FFT_navigating = TRUE;
+
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_NOTIFY_FIELD_NAVIGATION(oself, pself->FFT_fieldColumn,
+					shortcut);
+
+    @call GrObjGetBodyOD(SegmentOf(pself))::
+	MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(msg);
+
+    pself = ObjDerefGrObjVis(oself);
+    /*
+     * Clear the navigating flag again.
+     */
+    pself->FFT_navigating = FALSE;
+
+    ObjMarkDirty(oself);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_ASK_FOR_FIELD_NAME for FFTextClass
+ *
+ * DESCRIPTION:	This message causes a text field to ask to be filled with
+ *	    	its own field name.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/17/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_ASK_FOR_FIELD_NAME
+{
+    Message msg;
+
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_LOAD_FIELD_WITH_NAME(oself, pself->FFT_fieldColumn);
+
+    @send GrObjGetBodyOD(SegmentOf(pself))::
+	MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_GET_DOCUMENT_HANDLE for FFTextClass
+ *
+ * DESCRIPTION:	This method grabs the current document handle from the
+ *	    	database.
+ *
+ * PARAMETERS:
+ *	VMFileHandle ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	7/ 6/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_GET_DOCUMENT_HANDLE
+{
+    Message msg = @record FlatFileDatabaseClass::MSG_FFD_GET_DOCUMENT_HANDLE();
+
+    return (@call {MSG_FFD_GET_DOCUMENT_HANDLE}
+	    GrObjGetBodyOD(SegmentOf(pself))::
+	    	   MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(msg));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_FIELD_HAS_DEPENDENCIES for FFTextClass
+ *
+ * DESCRIPTION:	This function queries the database to see if the field
+ *	    	we represent is depended upon or not.  TRUE is returned
+ *	    	if the field has dependentss, FALSE is returned otherwise.
+ *
+ * PARAMETERS:
+ *	Boolean ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	12/20/92	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_FIELD_HAS_DEPENDENCIES
+{
+    Message msg = @record FlatFileDatabaseClass::
+	MSG_FFD_FIELD_DEPENDED_UPON(pself->FFT_fieldColumn);
+
+    return (@call {MSG_FFD_FIELD_DEPENDED_UPON}
+	    GrObjGetBodyOD(SegmentOf(pself))::
+	    	   MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(msg));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_REPORT_DEMISE for FFTextClass
+ *
+ * DESCRIPTION:	This message tells the flat file database that we're
+ *	    	being deleted.
+ *
+ *	    	If the reallyNuke flag is set, tell the database to
+ *	    	delete the field entirely, not just remove it from the
+ *	    	current layout.
+ *
+ * PARAMETERS:
+ *	void (Boolean reallyNuke)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	7/ 2/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_REPORT_DEMISE
+{
+    Message msg, msg2;
+    FieldID fieldId = pself->FFT_fieldColumn;
+    Boolean success;
+    TCHAR name[MAX_FIELD_NAME_LENGTH + 1];
+    TCHAR *dialogString;
+    optr grobjBody = GrObjGetBodyOD(SegmentOf(pself));
+
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_DELETE_CHUNK_ELEMENT_FROM_LAYOUT(fieldId);
+    @call grobjBody::MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(msg);
+
+    if (reallyNuke) {
+	/*
+	 * Tell the database to delete the field entirely.
+	 */
+	msg2 = @record FlatFileDatabaseClass::MSG_FFD_DELETE_FIELD(fieldId);
+	success =  @call {MSG_FFD_DELETE_FIELD} grobjBody::
+	    MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(msg2);
+
+	/*
+	 * If the field could not be deleted for some reason, alert the
+	 * user.
+	 */
+	if (!success) {
+	    @call oself::MSG_FFT_GET_FIELD_NAME(name);
+	    MemLock(OptrToHandle(@FFDFieldHadDependents));
+	    dialogString = LMemDeref(@FFDFieldHadDependents);
+
+	    UserStandardDialog(
+	    	(TCHAR *)0,
+                /* not GIT_MULTIPLE_RESPONSE, so no custom triggers  */
+                (TCHAR *)0,
+                /* One string argument: the field name. */
+                (TCHAR *)0, name,
+                /* dialog string */
+		dialogString,
+                /* dialog type */
+                (CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+                /* interaction type */
+                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+	    /* Release the warning string */
+	    MemUnlock(OptrToHandle(@FFDFieldHadDependents));
+	}
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_REPORT_PASTED_FIELD for FFTextClass
+ *
+ * DESCRIPTION:	This function calls the database reporting that a field
+ *	    	has just been pasted into the database.
+ *
+ * PARAMETERS:
+ *	void (optr database, optr guardian, optr label)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	8/13/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_REPORT_PASTED_FIELD
+{
+    @send database::
+	MSG_FFD_ADD_PASTED_FIELD_TO_LAYOUT(guardian, label,
+					   pself->FFT_fieldColumn);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_WRITE_INSTANCE_TO_TRANSFER for FFTextClass
+ *
+ * DESCRIPTION:	This message loads a FFTInstanceData structure
+ *	    	with a FFText's instance data, font, style, and paragraph
+ *	    	attrs.
+ *
+ * PARAMETERS:
+ *	void (FFTInstanceData *indata);
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	9/24/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_WRITE_INSTANCE_TO_TRANSFER
+{
+    VisTextCharAttrDiffs cdiffs;
+    VisTextCharAttr cattrs;
+    VisTextParaAttrDiffs pdiffs;
+    VisTextMaxParaAttr pattrs;
+    
+    indata->FFT_fieldColumn   =	pself->FFT_fieldColumn;
+    indata->FFT_inDesignMode  =	pself->FFT_inDesignMode;
+    indata->FFT_fieldType     =	pself->FFT_fieldType;
+    indata->FFT_displayFormat = pself->FFT_displayFormat;
+
+    /*
+     * Get the field's font, style, and paragraph attributes.
+     */
+    (void) @call self::MSG_VIS_TEXT_GET_CHAR_ATTR(0, &cdiffs, &cattrs,
+					   TEXT_ADDRESS_PAST_END, (dword) 0);
+    memcpy(&indata->FFT_charAttrs,
+	   &cattrs,
+	   sizeof(VisTextCharAttr));
+
+    (void) @call self::MSG_VIS_TEXT_GET_PARA_ATTR(0, &pdiffs, &pattrs,
+					   TEXT_ADDRESS_PAST_END, (dword) 0);
+
+    memcpy(&indata->FFT_paraAttrs,
+	   &pattrs,
+	   sizeof(VisTextParaAttr));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_READ_INSTANCE_FROM_TRANSFER for FFTextClass
+ *
+ * DESCRIPTION:	This message loads a FFText's instance data from a
+ *	    	FFTInstanceData struct.  The field's font and other
+ *	    	attributes are copied as well.
+ *
+ * PARAMETERS:
+ *	void (FFTInstanceData *indata);
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	9/24/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_READ_INSTANCE_FROM_TRANSFER
+{
+    pself->FFT_fieldColumn   = indata->FFT_fieldColumn;
+    pself->FFT_inDesignMode  = indata->FFT_inDesignMode;
+    pself->FFT_fieldType     = indata->FFT_fieldType;
+    pself->FFT_displayFormat = indata->FFT_displayFormat;
+
+    @call self::MSG_VIS_TEXT_SET_CHAR_ATTR(&indata->FFT_charAttrs,
+					   TEXT_ADDRESS_PAST_END, (dword) 0);
+
+    @call self::MSG_VIS_TEXT_SET_PARA_ATTR(&indata->FFT_paraAttrs,
+					   TEXT_ADDRESS_PAST_END, (dword) 0);
+    ObjMarkDirty(oself);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_DRAW for FFTextClass
+ *
+ * DESCRIPTION: We intercept this message to check if we're printing in
+ *	    	design mode or not.  If we are, and if we're a label,
+ *	    	don't draw our text.
+ *
+ * PARAMETERS:
+ *	void (DrawFlags drawFlags, GStateHandle gstate); 
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	8/27/92		Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_VIS_DRAW
+{
+    /*
+     * If we're printing in design mode, don't redraw.
+     */
+    if ((pself->FFT_inDesignMode) &&
+	(drawFlags & DF_PRINT) &&
+	(pself->FFT_fieldColumn != (FieldID) -1)) {
+	    return;
+    }    
+
+    /*
+     * Redraw!
+     */
+    @callsuper();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_VUP_CREATE_GSTATE for FFTextClass
+ *
+ * DESCRIPTION: Set CMT_DITHER for text color map mode
+ *
+ * PARAMETERS:
+ *	@alias (MSG_VIS_VUP_CREATE_GSTATE) Boolean
+ *		MSG_FIXED_VIS_VUP_CREATE_GSTATE(
+ *		FixedVisVupCreateGStateReturnParams *retValue = axbpcxdx);
+ *	
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	10/14/94	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FIXED_VIS_VUP_CREATE_GSTATE
+{
+    GStateHandle gstate;
+
+    gstate = @callsuper oself::FFTextClass::MSG_VIS_VUP_CREATE_GSTATE();
+    if (gstate) {
+        GrSetTextColorMap(gstate, CMT_DITHER);
+    }
+    retValue->FVVCGSRP_bp = gstate;	/* return GState in BP for ASM caller */
+    return(TRUE);			/* set carry for ASM caller */
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_RESET_DEFINED_TYPE for FFTextClass
+ *
+ * DESCRIPTION:	This message is checks to see if the passed format id type
+ *	    	matches our own current id type. If there's a match, the current
+ *	    	type is replaced with the newFormat.
+ *
+ * PARAMETERS:
+ *	void (FormatIdType formatToReset, FormatIdType newFormat)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	12/ 2/92	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_RESET_DEFINED_TYPE
+{
+    if (pself->FFT_displayFormat == formatToReset) {
+	pself->FFT_displayFormat = newFormat;
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFT_GET_DISPLAY_ARRAY_ELEMENT for FFTextClass
+ *
+ * DESCRIPTION: Store display format into display array.
+ *
+ * PARAMETERS:
+ *	void (GetDisplayArrayInfo *getDisplayArrayInfo)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	11/28/94	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_GET_DISPLAY_ARRAY_ELEMENT
+{
+    FormatIdType    *displayArray = getDisplayArrayInfo->GDAI_displayArray;
+    FieldID 	    *layoutNameList = getDisplayArrayInfo->GDAI_layoutNameList;
+    FieldID 	    destFieldNum;
+
+    /*
+     * displayArray and FFT_fieldColumn are ordered differently, so we need
+     * to do a lookup in FFI_layoutNameList (layoutNameList) for the current
+     * FFT_fieldColumn.  This works since displayArray and layoutNameList
+     * are ordered the same way.
+     */
+    for (destFieldNum = 0; destFieldNum < MAX_NUM_FIELDS; destFieldNum++) {
+	if ((pself->FFT_fieldColumn) == layoutNameList[destFieldNum]) {
+	    displayArray[destFieldNum] = pself->FFT_displayFormat;
+	    break;
+	}
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DISPLAY_FIELD_CONTENTS for FFTextClass
+ *
+ * DESCRIPTION:	This method displays a cell's data as defined by the
+ *	    	field's display type.
+ *
+ *	    	Pass a pointer to the cell's data and a handle to a text
+ *	    	buffer at least MAX_TEXT_FIELD_LENGTH in size.  Also pass
+ *	    	a flag to determine if the field should be shown formatted
+ *	    	or "raw."
+ *
+ * PARAMETERS:
+ *	void (CellCommon *dataCellPtr,
+ *	      MemHandle textHandle,
+ *	      Boolean formatField)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/4/92	    	Initial version
+ *	jeremy	12/1/92	    	Added "raw" format
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_FFT_DISPLAY_FIELD_CONTENTS
+{
+    TCHAR *fieldText;
+    FormatIdType displayFormat;
+
+    /*
+     * If the cell is empty, clear all text from the field.
+     */
+    if (dataCellPtr == NULL) {
+	(void) @call oself::MSG_VIS_TEXT_DELETE_ALL();
+    } else {
+	/*
+	 * There's data to display, all right.  Lock down the text buffer.
+	 */ 
+
+#if ERROR_CHECK
+	if (!textHandle) {
+	    EC_ERROR(NO_TEXT_DISPLAY_BUFFER);
+	}
+#endif /* ERROR_CHECK */
+
+	fieldText = MemLock(textHandle);
+
+	/*
+	 * Get the text for this field.
+	 */
+	switch (dataCellPtr->CC_type) {
+	    case CT_CONSTANT:
+	    	/*
+		 * If the number is to be displayed unformatted, then
+		 * display it as close to GENERAL as we can.
+		 */
+	    	displayFormat = formatField ? pself->FFT_displayFormat :
+		    FFTUnformattedNumFormat(pself->FFT_displayFormat);
+								      
+	    	FFTFormatNum(fieldText, 
+			     &((CellConstant *)(dataCellPtr))->CC_current,
+			     displayFormat,
+			     oself);
+		break;
+	    
+
+	    case CT_TEXT:
+	    	/*
+		 * If the text is to be displayed unformatted, then
+		 * display it as GENERAL.
+		 */
+	    	displayFormat = formatField ? pself->FFT_displayFormat :
+		    	    	    	      FORMAT_ID_GENERAL;
+		FFTFormatText(oself,
+			      fieldText,
+			      ((char *)dataCellPtr + sizeof(CellText)),
+			      displayFormat);
+		break;
+
+
+	    case CT_FORMULA:
+	    	/*
+		 * Formulae are always formatted.
+		 */
+		FFTFormatFormula(oself,
+				 fieldText,
+				 (CellFormula *)dataCellPtr,
+				 pself->FFT_displayFormat);
+		break;
+
+
+	    case CT_EMPTY:
+		/*
+		 * The cell is empty, so clear out the field.
+		 */
+		(void) @call oself::MSG_VIS_TEXT_DELETE_ALL();
+		break;
+
+		
+	    default:
+		EC_ERROR(BAD_FIELD_DATA_TYPE);
+		break;
+	}	
+
+	/*
+	 * Store the info into the text object.
+	 */
+	if (dataCellPtr->CC_type != CT_EMPTY) {
+	    (void) @call oself::MSG_VIS_TEXT_REPLACE_ALL_PTR(fieldText, 0);
+	}
+
+	/* Done with text data buffer.	*/
+	MemUnlock(textHandle);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_TEXT_SUBST_ATTR_TOKEN for FFTextClass
+ *
+ * DESCRIPTION: Don't support this if no ATTR_VIS_TEXT_STYLE_ARRAY
+ *
+ * PARAMETERS:
+ *	void (<stuff>);
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	10/26/94	Initial version
+ *
+ ***********************************************************************/
+@method FFTextClass, MSG_VIS_TEXT_SUBST_ATTR_TOKEN
+{
+    if (ObjVarFindData(oself, ATTR_VIS_TEXT_STYLE_ARRAY)) {
+        @callsuper();
+    }
+}
+
+/***********************************************************************
+		   Field Text Formatting Functions
+ ***********************************************************************/
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFTUnformattedNumFormat
+ *
+ * DESCRIPTION:	This oxymoronical function is used to determine what
+ *	    	is the best numeric format that we should display
+ *	    	unformatted numbers as.  For example, CURRENCY should
+ *	    	look different than DATE.
+ *
+ * PARAMETERS:	displayFormat - the formatted display format (?!)
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	12/16/92	Initial version
+ *
+ ***********************************************************************/
+FormatIdType
+FFTUnformattedNumFormat(FormatIdType displayFormat)
+{
+    /*
+     * Return the simplest version of the numerical formats.
+     */
+    switch (displayFormat) {
+	case FORMAT_ID_GENERAL:
+	case FORMAT_ID_INDETERMINATE:
+	case FORMAT_ID_FIXED:
+	case FORMAT_ID_FIXED_WITH_COMMAS:
+	case FORMAT_ID_FIXED_INTEGER:
+	case FORMAT_ID_CURRENCY:
+	case FORMAT_ID_CURRENCY_WITH_COMMAS:
+	case FORMAT_ID_CURRENCY_INTEGER:
+	case FORMAT_ID_PERCENTAGE:
+	case FORMAT_ID_PERCENTAGE_INTEGER:
+	case FORMAT_ID_THOUSANDS:
+	case FORMAT_ID_MILLIONS:
+	case FORMAT_ID_SCIENTIFIC:
+	    return FORMAT_ID_GENERAL;
+	    
+	case FORMAT_ID_DATE_LONG:
+	case FORMAT_ID_DATE_LONG_CONDENSED:
+	case FORMAT_ID_DATE_LONG_NO_WKDAY:
+	case FORMAT_ID_DATE_LONG_NO_WKDAY_CONDENSED:
+	case FORMAT_ID_DATE_SHORT:
+	case FORMAT_ID_DATE_SHORT_ZERO_PADDED:
+	case FORMAT_ID_DATE_LONG_MD:
+	case FORMAT_ID_DATE_LONG_MD_NO_WKDAY:
+	case FORMAT_ID_DATE_SHORT_MD:
+	case FORMAT_ID_DATE_LONG_MY:
+	case FORMAT_ID_DATE_SHORT_MY:
+	case FORMAT_ID_DATE_MONTH:
+	case FORMAT_ID_DATE_WEEKDAY:
+	    return FORMAT_ID_DATE_SHORT;
+
+	case FORMAT_ID_TIME_HMS:
+	case FORMAT_ID_TIME_HM:
+	case FORMAT_ID_TIME_H:
+	case FORMAT_ID_TIME_MS:
+	case FORMAT_ID_TIME_HMS_24HR:
+	case FORMAT_ID_TIME_HM_24HR:
+	    return displayFormat;
+
+	default:
+	    return FORMAT_ID_GENERAL;
+    }	
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFTFormatNum
+ *
+ * DESCRIPTION:	This function formats a numeric cell's data depending
+ *	    	upon its display type and loads the result into a passed
+ *	    	buffer.
+ *
+ * PARAMETERS:	fieldText - the buffer in which the formatted string
+ *	    	    	    should be loaded (at least MAX_TEXT_FIELD_LENGTH in
+ *	    	    	    length, please)
+ *	    	floatNum - a pointer to the cell's float number
+ *	    	displayFormat - how the field should be formatted.
+ *	    	oself - an optr to the current text object.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/ 4/92	Initial version
+ *
+ ***********************************************************************/
+void
+FFTFormatNum(TCHAR *fieldText,
+	     FloatNum *floatNum,
+	     FormatIdType displayFormat,
+	     optr oself)
+{
+    EventHandle msg;
+
+    /*
+     * This is pretty easy: if not user-defined, just call FloatFormatNum()
+     * with the appropriate flags.  Otherwise, call the database to display
+     * the thing correctly.
+     */
+
+    /*
+     * If the high bit is set, it's not a user-defined type.
+     */
+    if (displayFormat & 0x8000) {
+	FloatFormatNumber(displayFormat, 0, 0, floatNum, fieldText);
+    } else {
+	/*
+	 * Tell the database to display the user-defined format.
+	 */
+	msg = @record FlatFileDatabaseClass::
+	    MSG_FFD_DISPLAY_USER_DEFINED_FORMAT(fieldText,
+						floatNum,
+						displayFormat);
+	@call GrObjGetBodyOD(SegmentOf(ObjDerefGrObjVis(oself)))::
+	    MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(msg);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFTFormatText
+ *
+ * DESCRIPTION:	This function formats a text cell's data depending
+ *	    	upon its display type and loads the result into a passed
+ *	    	buffer.
+ *
+ * PARAMETERS:	oself - an optr to something in the visual tree
+ *	    	fieldText - the buffer in which the formatted string
+ *	    	    	    should be loaded (at least MAX_TEXT_FIELD_LENGTH in
+ *	    	    	    length, please)
+ *	    	text - a pointer to the cell's text
+ *	    	displayFormat - how the field should be formatted
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/ 4/92	Initial version
+ *
+ ***********************************************************************/
+void
+FFTFormatText(optr oself,
+	      TCHAR *fieldText,
+	      TCHAR *text,
+	      FormatIdType displayFormat)
+{
+    FloatNum floatNum;
+    
+    /*
+     * Trivial reject: clear out the field if it's empty.
+     */
+    if (!*text) {
+	*fieldText = _TEXT('\0');
+	return;
+    }
+
+    /*
+     * This is pretty simple: if the display type is anything but
+     * FORMAT_ID_GENERAL, we convert the text as best we can to a number,
+     * date, or time (depending on the display type), then re-format it
+     * with the new text.
+     */
+    switch (displayFormat) {
+	case FORMAT_ID_GENERAL:
+	case FORMAT_ID_INDETERMINATE:
+	    /*
+	     * Simple!  Just copy the text straight over.
+	     */
+	    strcpy(fieldText, text);
+	    break;
+	    
+	case FORMAT_ID_DATE_LONG:
+	case FORMAT_ID_DATE_LONG_CONDENSED:
+	case FORMAT_ID_DATE_LONG_NO_WKDAY:
+	case FORMAT_ID_DATE_LONG_NO_WKDAY_CONDENSED:
+	case FORMAT_ID_DATE_SHORT:
+	case FORMAT_ID_DATE_SHORT_ZERO_PADDED:
+	case FORMAT_ID_DATE_LONG_MD:
+	case FORMAT_ID_DATE_LONG_MD_NO_WKDAY:
+	case FORMAT_ID_DATE_SHORT_MD:
+	case FORMAT_ID_DATE_LONG_MY:
+	case FORMAT_ID_DATE_SHORT_MY:
+	case FORMAT_ID_DATE_MONTH:
+	case FORMAT_ID_DATE_WEEKDAY:
+	    /*
+	     * Convert the string to a date number, then format the number.
+	     */
+	    if (!FFTConvertDateToNum(text, &floatNum)) {
+		/*
+		 * The thing couldn't be converted to a number.  Put a
+		 * nice error message to that affect into the field.
+		 */
+		MemLock(OptrToHandle(@FFFDNotADate));
+		strcpy(fieldText, LMemDeref(@FFFDNotADate));
+		MemUnlock(OptrToHandle(@FFFDNotADate));
+	    } else {
+		/*
+		 * Got a number.  Load up the thing.
+		 */
+		FFTFormatNum(fieldText, &floatNum, displayFormat, oself);
+	    }
+	    break;
+
+	case FORMAT_ID_TIME_HMS:
+	case FORMAT_ID_TIME_HM:
+	case FORMAT_ID_TIME_H:
+	case FORMAT_ID_TIME_MS:
+	case FORMAT_ID_TIME_HMS_24HR:
+	case FORMAT_ID_TIME_HM_24HR:
+	    /*
+	     * Convert the string to a time number, then format the number.
+	     */
+	    if (!FFTConvertTimeToNum(text, &floatNum)) {
+		/*
+		 * The thing couldn't be converted to a number.  Put a
+		 * nice error message to that affect into the field.
+		 */
+		MemLock(OptrToHandle(@FFFDNotATime));
+		strcpy(fieldText, LMemDeref(@FFFDNotATime));
+		MemUnlock(OptrToHandle(@FFFDNotATime));
+	    } else {
+		/*
+		 * Got a number.  Load up the thing.
+		 */
+		FFTFormatNum(fieldText, &floatNum, displayFormat, oself);
+	    }
+	    break;
+
+	case FORMAT_ID_FIXED:
+	case FORMAT_ID_FIXED_WITH_COMMAS:
+	case FORMAT_ID_FIXED_INTEGER:
+	case FORMAT_ID_CURRENCY:
+	case FORMAT_ID_CURRENCY_WITH_COMMAS:
+	case FORMAT_ID_CURRENCY_INTEGER:
+	case FORMAT_ID_PERCENTAGE:
+	case FORMAT_ID_PERCENTAGE_INTEGER:
+	case FORMAT_ID_THOUSANDS:
+	case FORMAT_ID_MILLIONS:
+	case FORMAT_ID_SCIENTIFIC:
+	    /*
+	     * Convert the string to a number, then format the number.
+	     */
+	    if (!FFTConvertToFloat(text, &floatNum)) {
+		/*
+		 * The thing couldn't be converted to a number.  Put a
+		 * nice error message to that affect into the field.
+		 */
+		MemLock(OptrToHandle(@FFFDNotANum));
+		strcpy(fieldText, LMemDeref(@FFFDNotANum));
+		MemUnlock(OptrToHandle(@FFFDNotANum));
+	    } else {
+		/*
+		 * Got a number.  Load up the thing.
+		 */
+		FFTFormatNum(fieldText, &floatNum, displayFormat, oself);
+	    }
+	    break;
+
+	default:
+
+	    /*
+	     * If the high bit is not set, it's a user-defined type.
+	     * Otherwise, it's an illegal display type.
+	     */
+	    #if ERROR_CHECK
+	    	if (displayFormat & 0x8000) {
+		    EC_ERROR(BAD_DISPLAY_FORMAT);
+		}
+	    #endif /* ERROR_CHECK */
+	    
+	    /*
+	     * Tell the database to display the user-defined format.
+	     */
+	    if (!FFTConvertToFloat(text, &floatNum)) {
+		/*
+		 * The thing couldn't be converted to a number.  Put a
+		 * nice error message to that affect into the field.
+		 */
+		MemLock(OptrToHandle(@FFFDNotANum));
+		strcpy(fieldText, LMemDeref(@FFFDNotANum));
+		MemUnlock(OptrToHandle(@FFFDNotANum));
+	    } else {
+
+		EventHandle msg;
+
+		/*
+		 * Got a number.  Load up the thing.
+		 */
+		msg = @record FlatFileDatabaseClass::
+		    MSG_FFD_DISPLAY_USER_DEFINED_FORMAT(fieldText,
+							&floatNum,
+							displayFormat);
+		@call GrObjGetBodyOD(SegmentOf(ObjDerefGrObjVis(oself)))::
+		    MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(msg);
+	    }
+	    break;
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFTFormatFormula
+ *
+ * DESCRIPTION:	This function formats a formula cell's data depending
+ *	    	upon its display type and loads the result into a passed
+ *	    	buffer.
+ *
+ * PARAMETERS:	oself - an optr to something in the visual tree
+ *	    	fieldText - the buffer in which the formatted string
+ *	    	    	    should be loaded (at least MAX_TEXT_FIELD_LENGTH in
+ *	    	    	    length, please)
+ *	    	dataCellPtr - a pointer to the cell's data
+ *	    	displayFormat - how the field should be formatted.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/ 4/92	Initial version
+ *
+ ***********************************************************************/
+void
+FFTFormatFormula(optr oself,
+		 TCHAR *fieldText,
+		 CellFormula *dataCellPtr,
+		 FormatIdType displayFormat)
+{
+    MemHandle tempHandle;
+    TCHAR *src, *nullTermText;
+    word textLen;
+    optr errOptr;
+    CellError errNum;
+    word i;
+
+    switch(dataCellPtr->CF_return) {
+	case RT_TEXT:
+	    /*
+	     * It's a string!  Load up the text cell structure, making
+	     * sure the string is NULL terminated.
+	     */
+	    src = (char *) dataCellPtr +sizeof(CellFormula)+
+	      dataCellPtr->CF_formulaSize;	
+
+	    textLen = dataCellPtr->CF_current.RV_TEXT/sizeof(TCHAR);
+	    tempHandle = MemAlloc((textLen +1)* sizeof(TCHAR),
+				  HF_SWAPABLE | HF_SHARABLE, 
+				  HAF_NO_ERR);
+	    nullTermText = MemLock(tempHandle);
+	    strncpy(nullTermText, src, textLen);
+	    nullTermText[textLen] = _TEXT('\0');
+
+	    FFTFormatText(oself, fieldText, nullTermText, displayFormat);
+
+	    MemFree(tempHandle);
+	    break;
+
+	case RT_VALUE:
+	    /*
+	     * The results are a number, date, or time.  They all use
+	     * the same cell structure, so pass it on.
+	     */
+	    FFTFormatNum(fieldText,
+			 &dataCellPtr->CF_current.RV_VALUE,
+			 displayFormat,
+			 oself);
+	    break;
+
+	case RT_ERROR:
+	    /*
+	     * An error occurred.  Display an error message.
+	     */
+	    errNum = dataCellPtr->CF_current.RV_ERROR;
+	    fieldText[0] = _TEXT('\0');
+	    for (i = 0;
+		 i < (sizeof(FFFDErrorTextTable) / sizeof(EvalErrorItem));
+		 i++) {
+		if (FFFDErrorTextTable[i].error == errNum) {
+		    errOptr = FFFDErrorTextTable[i].errorChunk;
+		    MemLock(OptrToHandle(errOptr));
+		    strcpy(fieldText, LMemDeref(errOptr));
+		    MemUnlock(OptrToHandle(errOptr));
+		    break;
+		}
+	    }
+	    /*
+	     * If the error message was unknown, put out a general error.
+	     */
+	    if (fieldText[0] == _TEXT('\0')) {
+		MemLock(OptrToHandle(@FFFDUnknownError));
+		sprintf(fieldText, LMemDeref(@FFFDUnknownError), errNum);
+		MemUnlock(OptrToHandle(@FFFDUnknownError));
+	    }		
+	    break;
+    }
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFTConvertToFloat
+ *
+ * DESCRIPTION:	This function converts a string to a FloatNum and
+ *	    	places the value into a passed FloatNum address.  If
+ *	    	the string is legal, TRUE will be returned.
+ *	    	Otherwise, FALSE will be returned.
+ *
+ * PARAMETERS: 	data - pointer to the string
+ *	    	num - pointer to a place to put the number
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	5/20/92		Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+FFTConvertToFloat(TCHAR *data, FloatNum *num)
+{
+    int len;
+
+    /*
+     * Convert the thing.
+     */
+    if ((len = strlen(data)) != 0) {
+        if ((FloatAsciiToFloat(FAF_STORE_NUMBER, len,
+			       data, (void *)num)) != 0) {
+	    /* error! */
+	    FLOAT_EXPONENT(num) = FP_NAN;
+	    return FALSE;
+        }
+    } else {
+	/*
+	 * value does not exist
+	 */
+	FLOAT_EXPONENT(num) = FP_NAN;
+    }
+
+#if 0
+    if (dataType == FDT_INTEGER) {
+	/*
+	 * Round the value up (or down).
+	 */
+	FloatPushNumber(num);
+	FloatRound(0);
+	FloatPopNumber(num);
+    }
+#endif
+
+    return TRUE;
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFTConvertDateToNum
+ *
+ * DESCRIPTION:	This function takes a string and attempts to convert it
+ *	    	into a spreadsheet-formatted FloatNum.  If the string
+ *	    	is successfully converted, TRUE is returned.  Otherwise,
+ *	    	FALSE is.
+ *
+ * PARAMETERS:	text - a pointer to the string to convert
+ *	    	num - a pointer to the FloatNum that should receive the
+ *	    	      results.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/24/92		Initial version
+ *
+ ***********************************************************************/
+Boolean
+FFTConvertDateToNum(TCHAR *text, FloatNum *num)
+{
+    if (FloatStringGetDateNumber(text)) {
+	/*
+	 * There was an error of some sort.
+	 */
+	return FALSE;
+    }
+
+    /*
+     * The string converted!  Send off bar mitzvah invites.
+     */
+    FloatPopNumber(num);
+    return TRUE;
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFTConvertTimeToNum
+ *
+ * DESCRIPTION:	This function takes a string and attempts to convert it
+ *	    	into a spreadsheet-formatted FloatNum.  If the string
+ *	    	is successfully converted, TRUE is returned.  Otherwise,
+ *	    	FALSE is.
+ *
+ * PARAMETERS:	text - a pointer to the string to convert
+ *	    	num - a pointer to the FloatNum that should receive the
+ *	    	      results.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	6/24/92		Initial version
+ *
+ ***********************************************************************/
+Boolean
+FFTConvertTimeToNum(TCHAR *text, FloatNum *num)
+{
+    if (FloatStringGetTimeNumber(text)) {
+	/*
+	 * There was an error of some sort.
+	 */
+	return FALSE;
+    }
+
+    /*
+     * The string converted!  Send off bar mitzvah invites.
+     */
+    FloatPopNumber(num);
+    return TRUE;
+}
+

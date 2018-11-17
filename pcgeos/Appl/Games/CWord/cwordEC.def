@@ -1,0 +1,1120 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Crossword
+MODULE:		EC Module
+FILE:		cwordEC.def
+
+AUTHOR:		Peter Trinh, May  6, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+Format: [Assert_? exp1 exp2]
+
+	Assert_bufferGEsize	Asserts given buffer GE given size
+	Assert_ValidPosInList	Asserts position is within list
+
+	[ Typechecking ]
+
+	Assert_ClueTokenType
+
+Format: [Assert_? exp]
+
+	Assert_CwordChar	Asserts exp is in Cword Alphabet
+	Assert_HWRChar		Asserts exp is a HWR char.
+	Assert_TextQueueBlock	Asserts exp is a handle to a
+				textQueueBlock and verifies the block.
+	Assert_ObjectBoard	Asserts exp is a handle to a Board
+				object, and verifies the object.
+	Assert_ObjectClueList	Asserts exp is a handle to a ClueList
+				object, and verifies the object.
+	Assert_ClueListMap	Asserts exp is a valid ChunkArray and
+				contains valid ClueTokenType elements.
+
+	[ Bounds Checking ]	Asserts that exp is within the given bounds
+	Assert_AGC
+	Assert_InBoard
+	Assert_InDoc
+	Assert_InGrid
+
+	[ TypeChecking ]	Asserts that exp is of the given type
+	Assert_CellTokenType
+	Assert_DirectionType
+	Assert_EngineTokenType
+	Assert_SystemType
+	Assert_VerifyModeType
+	Assert_ListItemInfo
+	Assert_CellFlags
+	Assert_InitReturnValue
+	Assert_DrawOptions
+	Assert_HighlightStatus
+	Assert_TextInfo
+	Assert_ClueListInitParam
+
+Other Macros:
+
+	ClearBufferForEC	Clears the buffer for above assertions.	
+	ECSetCenterPoint	Sets the center point of a TextInfo item.
+	SetECVarClueListLength	Sets the clue list length EC variables
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 6/94   	Initial revision
+
+
+DESCRIPTION:
+	This file contains constants and macros that are used for error
+	checking.  These constants and macros are specific to the
+	Crossword project. 
+	
+		
+	$Id: cwordEC.def,v 1.1 97/04/04 15:13:30 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if ERROR_CHECK
+
+;-------------------------------------------------------------------
+;	Include files
+;-------------------------------------------------------------------
+ifndef	__EC
+include	ec.def			; Need its constants and macros.
+endif
+
+ifndef	__ASSERT
+include assert.def		; Need its constants and macros.
+endif
+
+;-------------------------------------------------------------------
+; 	EC definitions
+;-------------------------------------------------------------------
+EC_CONSTANT_WORD	equ	0xcccc
+EC_CONSTANT_BYTE	equ	0xcc
+
+;-------------------------------------------------------------------
+;	Fatal errors for the Crossword Project
+;-------------------------------------------------------------------
+;	Errors used by all modules
+;-------------------------------------------------------------------
+CHARACTER_IS_NOT_IN_THE_CWORD_ALPHABET		enum	FatalErrors
+; The given letter is not a CwordPunctuation nor does it fall in the
+; set of acceptable kbd characters.
+
+CHARACTER_IS_NOT_AN_HWR_CHARACTER		enum	FatalErrors
+; The given character is not a Cword punctuation, nor is it in the
+; given ranges of character that is recognized by the HWR library.
+; The ranges are defined in the .ui file.
+
+CHARACTER_IS_NOT_A_CWORD_PUNCTUATION		enum	FatalErrors
+; The given character is not one of the following hard-coded
+; punctuations with application functionality assigned to it:
+;	{ '.' '?' '-', ' ' }
+
+ASCII_TO_INTEGER_IS_LARGER_THAN_WORD		enum	FatalErrors
+
+BUFFER_DOESNT_MATCH_THE_GIVEN_SIZE		enum	FatalErrors
+; The buffer either has not been cleared before calling the
+; Assert_verifyBufferSize, or the actual buffer size doesn't match
+; that of the given structure used for comparison.
+
+CAN_NOT_CHECK_ZERO_SIZED_BUFFER			enum	FatalErrors
+; Must pass a non zero size to this routine.
+
+EC_CONSTANT_IS_NULL				enum	FatalErrors
+; Can not have a 0 for an EC_CONSTANT.
+
+CHUNK_ARRAY_ELEMENT_OUT_OF_BOUNDS		enum	FatalErrors
+; An invalid index was passed to ChunkArrayElementToPtr.  This error
+; should never happen, unless the programmer is very careless or the
+; Kernel is really screwed up.
+
+NOT_EXPECTING_NULL_CHAR				enum	FatalErrors
+; A null character has been encountered and at the point of the code,
+; we're not expecting it or aren't ready to deal with it.
+
+NOT_CELL_TOKEN_TYPE				enum	FatalErrors
+; The given expression is not of a CellTokenType.
+
+NOT_CLUE_TOKEN_TYPE				enum	FatalErrors
+; The given expression is not of a ClueTokenType.
+
+NOT_DIRECTION_TYPE				enum	FatalErrors
+; The given expression is not of a DirectionType.
+
+NOT_ENGINE_TOKEN_TYPE				enum	FatalErrors
+; The given expression is not of a EngineTokenType.
+
+NOT_SYSTEM_TYPE					enum	FatalErrors
+; The given expression is not of a SystemType.
+
+NOT_VERIFY_MODE_TYPE				enum	FatalErrors
+; The given expression is not of a VerifyModeType.
+
+NOT_SQUARE_SIZE_TYPE				enum	FatalErrors
+; The given expression is not of a SquareSizeType.
+
+NOT_LIST_ITEM_INFO				enum	FatalErrors
+; The given expression is not of a ListItemInfo record.
+
+NOT_CELL_FLAGS					enum	FatalErrors
+; The given expression is not of a CellFlags record.
+
+NOT_INIT_RETURN_VALUE				enum	FatalErrors
+; The given expression is not of InitReturnValue.
+
+NOT_DRAW_OPTION					enum	FatalErrors
+; The given expression is an invalid value for a DrawOption record.
+
+NOT_HIGHLIGHT_STATUS				enum	FatalErrors
+; The given expression is an invalid value for a HighlightStatus record.
+
+NOT_CLUE_LIST_SPLIT_STATUS			enum	FatalErrors
+; The given expression is an invalid value for a ClueListSplitStatus etyp.
+
+CWORD_FONT_DRIVER_SHOULD_EXIST			enum 	FatalErrors
+; Cword is doing some font operation, such as GrCharMetrics, and
+; the operation is failing unexpectedly.
+;
+
+CWORD_FILE_SELECTOR_CANT_FIND_NAME	enum FatalErrors
+; The file selector call back routine cannot find the name of the file
+; in the call back data
+
+CWORD_FILE_SELECTOR_CANT_FIND_ATTR	enum FatalErrors
+; The file selector call back routine cannot find the fill attributes 
+; in the call back data
+
+
+CWORD_FILE_SELECTOR_MISSING_USER_DOC_FILE_HANDLE enum FatalErrors
+; The file selectors keep a handle of the user document around from
+; each rescan until the selector is closed. The stored handle is bad
+;
+
+CWORD_COULDNT_FIND_SOURCE_FILE_TO_DELETE enum FatalErrors
+; Source puzzle file is missing
+
+CWORD_COULDNT_DELETE_SOURCE_FILE_BECAUSE_IN_USE enum FatalErrors
+; Trying to delete source file but it is in use. This shouldn't be happening
+;
+
+CWORD_OPEN_PUZZLE_NOT_IN_USER_DOC	enum FatalErrors
+; The currently open puzzle is not in the user doc. It should be as it
+; is added as soon as it is opened.
+;
+
+CWORD_COMPLETED_PUZZLE_NOT_IN_COMPLETED_ARRAY enum FatalErrors
+; A puzzle was just opened in Completed mode, yet it doesn't appear
+; to be in the completed array when trying to remove it from there.
+
+CWORD_MISSING_SOURCE_PUZZLE_NAME enum FatalErrors
+; The name being copied into the CFBI_sourceFile is empty. This name 
+; can come from the AppLaunchBlock, the FileSelector or the UserDoc.
+
+
+CWORD_BINARY_SEARCH_FOR_CELL_WITH_NUMBER_FAILED enum FatalErrors
+; Searching cells for one with a specific number during build 
+; out of puzzle data has failed. This implies a bug in the algorithm
+; because that cell must exit
+
+
+
+;-------------------------------------------------------------------
+; 	Fatal errors for the HWR module
+;-------------------------------------------------------------------
+HWR_NOT_A_VALID_TEXT_QUEUE_BLOCK		enum	FatalErrors
+; One or more of the fields in the block header or contents of the
+; block might have been trashed.
+
+HWR_NOT_A_VALID_TEXT_INFO			enum	FatalErrors
+; ds:di is not pointing to a valid TextInfo structure, ie. one or more
+; of its fields have been trashed.
+
+HWR_NO_STROKES_DETECTED_IN_INK_DATABLOCK	enum	FatalErrors
+; There should be at least one stroke in an ink data block.  The end
+; of a stroke is detected by ANDing HWR_STROKE_MASK with the
+; coordinate. Perhaps HWR_STROKE_MASK is out-of-date, ie. a new
+; indicator of the end of a stroke is now used.
+
+HWR_UNTRANSFORMATION_OVERFLOW			enum	FatalErrors
+; Result of untransformation is larger than can be expressed in 16
+; bits.
+
+HWR_NO_HWR_LIBRARY_LOADED			enum	FatalErrors
+; UserGetHWRLibraryHandle was unable to return a handle to an HWR
+; library.
+
+HWR_INVALID_GESTURE				enum	FatalErrors
+
+HWR_CANT_CALL_GET_BUFFER_PTRS_IN_THIS_SITUATION	enum	FatalErrors
+; I think you can only call HWRR_GET_BUFFER_PTRS from a character or
+; string callback routine.
+
+;-------------------------------------------------------------------
+;	Fatal errors for the Board module
+;-------------------------------------------------------------------
+BOARD_SIZE_OUT_OF_SYNCH_WITH_VIEW_GVI_ATTRS	enum	FatalErrors
+; The CwordBoard's instance data CBI_currentSquareSize does not
+; reflect the content of its field GVA_attrs.  Ie. if
+; currentSquareSize is SST_SMALL then GVA_attrs should have the bit
+; GVA_SCALE_TO_FIT set, else, if is SST_LARGE, then GVA_SCALE_TO_FIT
+; should be cleared.
+
+BOARD_CANT_HAVE_BOTH_HINTED_AND_VERIFIED_FLAGS_SET	enum FatalErrors
+; If a cell is verified, and a hint is given for that cell, then the
+; cell becomes hinted and the verified flag should be cleared.
+
+BOARD_FAILED_INIT				enum	FatalErrors
+; The board failed to initialize properly.  Most likely failed on
+; ClueList error but can be a Board error.
+
+BOARD_VIS_DRAW_ERROR				enum	FatalErrors
+; We assume that there is always a masking region for drawing.  This
+; would only be otherwise if the MSG_VIS_DRAW was directly sent to the
+; Board by the app instead of the system.  We can safely assume that
+; all coordinates can be expressed in 16-bits with the current GState
+; transformation.
+
+BOARD_CHAR_SHOULD_HAVE_BEEN_HANDLED		enum	FatalErrors
+; At this point the CF should be cleared.  Check to make sure that the
+; routine that handles the character should CLEAR the CF.
+
+BOARD_MOVE_ROUTINE_EXPECTS_VALID_DESTINATION	enum	FatalErrors
+; The destination cell cant be moved into.  Either the destination
+; cell is a hole, non-existent, or basically a BOARD_NON_SELECTABLE
+; cell.  Or else the error could because the destination is the same
+; as the source.
+
+BOARD_FONT_OR_DRIVER_NOT_AVAILABLE		enum	FatalErrors
+; GrCharMetrics is complaining about the availability of the font or
+; driver.
+
+BOARD_VISIBLE_RECT_IS_UNEXPECTEDLY_LARGE	enum	FatalErrors
+; Checking the visible rectangle of the view shows it to be
+; very large. This is a bad thing. Code expects the view to
+; fit in 16 bits
+
+BOARD_INCONSISTENT_HIGHLIGHTING_STATE		enum	FatalErrors
+; The routine is expected to draw the highlight, CBI_highlightStatus
+; has the bit HS_SELECTED_WORD set, yet the Board DrawOptions bit, in
+; CBI_drawOptions, DO_SELECTED_WORD isn't set!
+
+BOARD_UNACCEPTABLE_VALUE_FOR_MODE_CHAR		enum	FatalErrors
+; 0 is used right now as a valid value, and in the context of this
+; message, 0 can not be a valid mode char.
+
+BOARD_MOVING_SELECTED_SQUARE_WHILE_HIGHLIGHTED	enum 	FatalErrors
+; The selected square must not be moved while it is highlighted.
+; This will result in screen glitches
+
+BOARD_MOVING_SELECTED_WORD_WHILE_HIGHLIGHTED	enum 	FatalErrors
+; The selected word must not be moved while it is highlighted
+; This will result in screen glitches
+
+BOARD_CURRENTLY_DEPENDS_ON_VIEW_WIDTH_AND_HEIGHT_BEING_EQUAL enum FatalErrors
+; Code in the board depends on the view's width and height to be identical.
+
+BOARD_HAVING_PROBLEMS_WITH_VIEW_SIZE_CALC 	enum FatalErrors
+; Weird hooey is happening. The board has been passed a view size and
+; is attempting to calculate the appropriate cell size. Once that cell
+; size is calced it recalculates the view size and it should match
+; the passed view size. Apparently it does not.
+
+
+;-------------------------------------------------------------------
+;	Fatal errors for the ClueList module
+;-------------------------------------------------------------------
+CLUE_LIST_FAILED_INIT				enum	FatalErrors
+; The clue list object failed to initialize properly.  Failed on
+; a ChunkArray error or Engine error.
+
+CLUE_LIST_EXPECTING_STRING_TO_SPLIT		enum	FatalErrors
+
+CLUE_LIST_ITEM_NOT_IN_MAP			enum	FatalErrors
+; Something wacky is going on.  The given item number is not in the
+; map.  Check ClueListGetItemFromMap.  Check if ClueListApplyMsg is
+; being sent a valid item number.
+
+CLUE_TEXT_WIDTH_IS_TOO_SMALL			enum	FatalErrors
+; The constant or variable containing the width of the ClueList is too
+; small to be able to support the indentation of the second line of a
+; split.  We indent into the character after the first space.
+
+CLUE_TEXT_MUST_HAVE_AT_LEAST_ONE_SPACE		enum	FatalErrors
+; We're expecting the format of the puzzle to be
+; <cluenumber><period><space><the rest of the clue>, 
+; 	eg.	1. Gab
+
+CLUE_LIST_ITEM_ORDER_IS_IMPOSSIBLE		enum	FatalErrors
+; A comparison is made between the first item number with another item
+; number of a corresponding clue token and the result is inconsistent.
+; Perhaps ClueListSearchMap did not return the very first item number
+; of a corresponding clue token.
+
+CLUE_LIST_NOT_EXPECTING_A_NULL_TERMINATOR	enum	FatalErrors
+; 
+;-------------------------------------------------------------------
+;	Fatal errors for the Engine module
+;-------------------------------------------------------------------
+ENGINE_GRID_SIZE_NOT_VALID			enum	FatalErrors
+; The number of rows or columns in the grid is not between 
+; 10 and 25 inclusive.
+
+ENGINE_CLUE_BYTES_DOESNT_FIT_IN_WORD		enum	FatalErrors
+; Number of clue bytes doesn't fit into one word.  It requires
+; a double word.
+
+ENGINE_EXPECTING_TEXT_TYPE			enum	FatalErrors
+; Initial clue should be of type CTF_TEXT.
+
+ENGINE_CLUES_NOT_READ_IN_PROPERLY		enum	FatalErrors
+; Buffer offset got trashed while reading in clues.
+
+ENGINE_CLUE_DATA_BYTES_IS_ZERO			enum	FatalErrors
+; There is a 0 bytes count for a clue in the source document.
+
+ENGINE_C_ENTER_IN_BUFFER_DATA			enum	FatalErrors
+; C_ENTER was read into clue data array as clue data.
+
+ENGINE_READING_CLUES_PAST_BUFFER		enum	FatalErrors
+; While initializing clues, buffer offset fallen off end.
+
+ENGINE_USER_LETTER_INVALID			enum	FatalErrors
+
+ENGINE_CELL_TOKEN_INVALID			enum	FatalErrors
+; Cell Token found is too large.
+
+ENGINE_CLUE_TOKEN_INVALID			enum	FatalErrors
+
+ENGINE_CLUE_TEXT_WILL_NOT_FIT_IN_BUFFER		enum	FatalErrors
+; clue text must fit in a buffer of length 
+; ENGINE_MAX_LENGTH_FOR_CLUE_TEXT
+
+ENGINE_HOLE_IS_NOT_IN_WORD			enum	FatalErrors
+ENGINE_NON_EXISTENT_IS_NOT_IN_WORD		enum	FatalErrors
+
+;-------------------------------------------------------------------
+;	Fatal errors for the Engine module
+;-------------------------------------------------------------------
+FILE_BAD_FILE_SELECTION				enum	FatalErrors
+
+FILE_BAD_CHUNK_ARRAY				enum	FatalErrors
+FILE_PATH_WONT_FIT				enum	FatalErrors
+FILE_PATH_NOT_FOUND				enum	FatalErrors
+FILE_DECOMPRESS_BUFFER_TOO_SMALL		enum	FatalErrors
+FILE_CANNOT_SET_USER_PROTOCOL			enum	FatalErrors
+FILE_CANNOT_DELETE_USER_DOC			enum	FatalErrors
+FILE_CANNOT_CLOSE_USER_DOC			enum	FatalErrors
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_bufferGEsize
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Will determine if the given pointer points to a buffer
+		that is at least as large as the given size.
+
+PASS:		bufferPtr	- dword (immediate or register)
+		bufferType	- the name of the structure that the
+				  buffer contains. 
+				  This is used to get the size of the
+				  buffer.
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	BEWARE!	Does NOT enforce bufferType to be an identifier (label
+		name). 
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 6/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_bufferGEsize		macro	bufferPtr, bufferType
+
+local	drl, drh, regargs, sizeVal
+
+; Check to see if macro is called correctly.
+ifb < bufferType >
+	ErrorMessage <Assert_bufferGEsize takes 2 arguments.>
+endif
+
+; First extract bufferPtr for the low and high words, assuming a
+; register pair.
+regargs = 0
+sizeVal = size bufferType
+_ParseDWordArg	bufferPtr, drl, drh, regargs, <Assert_bufferGEsize>
+
+if (regargs eq 0 )	; Not a register pair
+	PreserveAndGetIntoReg	es, bufferPtr.high
+	PreserveAndGetIntoReg	di, bufferPtr.low
+	PreserveAndGetIntoReg	ax, EC_CONSTANT_WORD
+	PreserveAndGetIntoReg	cx, sizeVal
+	call	ECVerifyBufferSize
+	RestoreReg		cx, sizeVal
+	RestoreReg		ax, EC_CONSTANT_WORD
+	RestoreReg		di, bufferPtr.low
+	RestoreReg		es, bufferPtr.high
+else			; Register pair
+	PreserveAndGetIntoReg	es, %drh
+	PreserveAndGetIntoReg	di, %drl
+	PreserveAndGetIntoReg	ax, EC_CONSTANT_WORD
+	PreserveAndGetIntoReg	cx, sizeVal
+	call	ECVerifyBufferSize
+	RestoreReg		cx, sizeVal
+	RestoreReg		ax, EC_CONSTANT_WORD
+	RestoreReg		di, %drl
+	RestoreReg		es, %drh
+endif
+
+		endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_ValidPosInList
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Asserts that the given position is within the valid
+		range for the given list.
+
+PASS:		listPosition	- word (immediate, memory or register)
+		listId		- DirectionType (i,m,r)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/18/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_ValidPosInList		macro	listPosition, listId
+; Check to see if macro is called correctly.
+ifb < listId >
+	ErrorMessage <Assert_ValidPosInList takes 2 arguments.>
+endif
+
+	PreserveAndGetIntoReg	ax, listPosition
+	PreserveAndGetIntoReg	dx, listId
+	call	ECVerifyValidPosInList
+	RestoreReg		dx, listId
+	RestoreReg		ax, listPosition
+
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_CwordChar
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Checks whether the given character is in the range of
+		the Cword Alphabet.
+
+PASS:		character	- word (immediate, memory or register)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 6/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_CwordChar		macro	character
+ifb < character >
+	ErrMessage <Assert_CwordChar takes only 1 argument.>    
+endif
+
+	PreserveAndGetIntoReg	cx, character
+	call	ECCheckIfCwordChar
+	ERROR_C	CHARACTER_IS_NOT_IN_THE_CWORD_ALPHABET
+	RestoreReg		cx, character
+
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_HWRChar
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Checks whether the given character is in the range for
+		HWR recognized-characters
+
+PASS:		character	- word (immediate, memory or register)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	7/19/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_HWRChar		macro	character
+ifb < character >
+	ErrMessage <Assert_HWRChar takes only 1 argument.>    
+endif
+
+	PreserveAndGetIntoReg	cx, character
+	call	CheckIfHWRChar
+	ERROR_C	CHARACTER_IS_NOT_AN_HWR_CHARACTER
+	RestoreReg		cx, character
+
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_CwordCharOrSpace
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Checks whether the given character is in the range of
+		the Cword Alphabet.
+
+PASS:		character	- word (immediate, memory or register)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 6/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_CwordCharOrSpace		macro	character
+local	noError
+ifb < character >
+	ErrMessage <Assert_CwordCharOrSpace takes only 1 argument.>    
+endif
+
+	PreserveAndGetIntoReg	cx, character
+	cmp	cx, C_SPACE
+	je	noError
+	call	ECCheckIfCwordChar
+	ERROR_C	CHARACTER_IS_NOT_IN_THE_CWORD_ALPHABET
+	noError:
+	RestoreReg		cx, character
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_TextQueueBlock
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Assumes that the given lmem-block handle is a handle
+		to a TextQueueBlock. 
+
+PASS:		handle	- word (immediate, memory, or register)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 6/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_TextQueueBlock		macro	handle
+ifb < handle >
+	ErrMessage <Assert_TextQueueBlock takes 1 argument.>
+endif
+
+	PreserveAndGetIntoReg	bx, handle
+	call	ECVerifyTextQueueBlock
+	RestoreReg		bx, handle
+
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		__AssertObjectCheckShell
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	This macro defines other object checking macros
+
+PASS:		suffix
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/10/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+__AssertObjectCheckShell		macro	suffix
+
+	; The following will be the macro defined.
+	; Name:  Assert_&suffix, eg. Assert_InBoard
+	; Pass:  lptr	- the segment and chunk handle to object
+	Assert_&suffix	macro 	objectPtr
+
+		SetDWordRegistersAndCall ds, si, objectPtr, ECVerify&suffix, Assert_&suffix
+
+	endm
+endm
+
+;
+; Build each macro by calling the shell repeatedly with each object ptr.
+; To add more objects to check, just insert between the brackets, and
+; make sure in the cwordEC.asm file, there is a function of the form:
+; ECVerifyObjectFoo proc
+;	Pass: 	*ds:si = object
+
+irp	ob, < ObjectBoard, ObjectClueList >
+	__AssertObjectCheckShell ob
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_ClueListMap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Asserts that the passed in lptr is a ClueList Map,
+		which is a ChunkArray of ClueToken.
+
+PASS:		mapPtr - dword (immediate, memory or register)
+		direction - DirectionType (immediate, memory, or register)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	
+	BEWARE!	Make sure mapPtr does not have cx as one of the
+		dword register.  Current version does not check for
+		that.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/10/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_ClueListMap		macro	mapPtr, direction
+ifb <direction>
+	ErrorMessage < Assert_ClueListMap takes 2 arguments. >
+endif
+
+	PreserveAndGetIntoReg	cx, direction
+	SetDWordRegistersAndCall ds, si, mapPtr, ECVerifyClueListMap, Assert_ClueListMap
+	RestoreReg		cx, direction
+
+		endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		__AssertBoundsCheckShell
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	This macro defines the other boundary checking macros.
+
+PASS:		suffix
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/ 8/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+__AssertBoundsCheckShell		macro	suffix
+
+	; The following will be the macro defined.
+	; Name:  Assert_&suffix, eg. Assert_InBoard
+	; Pass:  expr	- the expression that needs to be bound Checked.
+
+	Assert_&suffix	macro 	coord
+
+		SetDWordRegistersAndCall ax, bx, coord, ECVerify&suffix, Assert_&suffix
+
+	endm
+
+endm
+
+;
+; Build each macro by calling the shell repeatedly with each boundary.
+; To add more boundary, just insert between the brackets, and make sure in
+; the cwordEC.asm file, there is a function of the form:
+; ECVerifyFoo proc
+;	Pass: 	axbx = coordinate to check
+
+
+irp	bd, < AGC, InBoard, InDoc, InGrid >
+	__AssertBoundsCheckShell bd
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		__AssertWordTypeMacroShell
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	This macro defines the other type checking macros
+		used.  The types should be word sized.
+
+PASS:		suffix
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/17/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+__AssertWordTypeMacroShell		macro	suffix
+
+	; The following will be the macro defined.
+	; Name:  Assert_&suffix, eg. Assert_CellTokenType
+	; Pass:  expr	- the expression that needs to be Type Checked.
+
+	Assert_&suffix	macro 	expr
+		ifb <expr>
+			ErrorMessage <Assert_&suffix takes 1 argument.>
+		endif
+
+		PreserveAndGetIntoReg	ax, expr
+		call	ECVerify&suffix
+		RestoreReg		ax, expr
+	endm
+endm
+
+;
+; Build each macro by calling the shell repeatedly with each TYPE.  To
+; add more types, just insert between the brackets, and make sure in
+; the cwordEC.asm file, there is a function of the form:
+; ECVerifyFooType proc
+;	Pass: 	ax = expression to type check
+
+irp	wordType, <	CellTokenType, DirectionType, EngineTokenType, SystemType, VerifyModeType, SquareSizeType, ListItemInfo, InitReturnValue, CellFlags, ClueListSplitStatus  >
+
+	__AssertWordTypeMacroShell wordType
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		__AssertByteTypeMacroShell
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	This macro defines the other type checking macros
+		used.  The type should be byte sized.
+
+PASS:		suffix
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	7/27/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+__AssertByteTypeMacroShell		macro	suffix
+
+	; The following will be the macro defined.
+	; Name:  Assert_&suffix, eg. Assert_CellTokenType
+	; Pass:  expr	- the expression that needs to be Type Checked.
+
+	Assert_&suffix	macro 	expr
+		ifb <expr>
+			ErrorMessage <Assert_&suffix takes 1 argument.>
+		endif
+
+		push	ax
+		mov	al, expr
+		call	ECVerify&suffix
+		pop	ax
+	endm
+endm
+
+;
+; Build each macro by calling the shell repeatedly with each TYPE.  To
+; add more types, just insert between the brackets, and make sure in
+; the cwordEC.asm file, there is a function of the form:
+; ECVerifyFooType proc
+;	Pass: 	al = expression to type check
+
+irp	byteType, < DrawOptions, HighlightStatus   > 
+
+	__AssertByteTypeMacroShell byteType
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_ClueTokenType
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Asserts that the given clueToken is a valid
+		ClueTokenType.
+
+PASS:		clueToken, direction
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/10/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_ClueTokenType		macro	clueToken, direction
+ifb < direction >
+	ErrMessage <Assert_ClueTokenType takes 2 arguments.>
+endif
+
+	PreserveAndGetIntoReg	ax, clueToken
+	PreserveAndGetIntoReg	cx, direction
+	call	ECVerifyClueTokenType
+	RestoreReg		cx, direction
+	RestoreReg		ax, clueToken
+
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_TextInfo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Verifies that the given ptr points to a valid TextInfo
+		structure. 
+
+PASS:		ptr	- dword
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/27/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_TextInfo		macro	ptr
+	SetDWordRegistersAndCall ds, di, ptr, ECVerifyTextInfo, Assert_TextInfo
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_ClueListInitParams
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Verifies that the given pointer is pointing to a valid
+		ClueListInitParams structure.
+
+PASS:		fptr
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	7/13/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_ClueListInitParams		macro	fptr
+	SetDWordRegistersAndCall ss, bp, fptr, ECVerifyClueListInitParams, Assert_ClueListInitParams
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ClearBufferForEC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fills the buffer with the EC_CONSTANT.  The constant
+		is used when verifying that the buffer is large
+		enough.  This macro should be called before
+		Assert_bufferGEsize.  
+
+PASS:		bufferPtr	- dword (immediate or register)
+		bufferType	- the name of the structure that the
+				  buffer contains. 
+				  This is used to get the size of the
+				  buffer.
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	BEWARE!	Does NOT enforce bufferType to be an identifier (label
+		name). 
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 6/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ClearBufferForEC		macro	bufferPtr, bufferType
+
+local	drl, drh, regargs, sizeVal
+
+; Check to see if macro is called correctly.
+ifb < bufferType >
+	ErrorMessage < ClearBufferForEC takes 2 arguments.>
+endif
+
+; First extract bufferPtr for the low and high words, assuming a
+; register pair.
+regargs = 0
+sizeVal = size bufferType
+_ParseDWordArg	bufferPtr, drl, drh, regargs, <ClearBufferForEC>
+
+if (regargs eq 0)
+;
+; Not a register pair
+;
+	PreserveAndGetIntoReg	es, bufferPtr.high
+	PreserveAndGetIntoReg	di, bufferPtr.low
+	PreserveAndGetIntoReg	cx, sizeVal
+	PreserveAndGetIntoReg	ax, EC_CONSTANT_WORD
+	rep	stosb
+	RestoreReg		ax, EC_CONSTANT_WORD
+	RestoreReg		cx, sizeVal
+	RestoreReg		di, bufferPtr.low
+	RestoreReg		es, bufferPtr.high
+else			; Register pair
+	PreserveAndGetIntoReg	es, %drh
+	PreserveAndGetIntoReg	di, %drl
+	PreserveAndGetIntoReg	cx, sizeVal
+	PreserveAndGetIntoReg	ax, EC_CONSTANT_WORD
+	rep	stosb
+	RestoreReg		ax, EC_CONSTANT_WORD
+	RestoreReg		cx, sizeVal
+	RestoreReg		di, %drl
+	RestoreReg		es, %drh
+endif
+
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ECSetCenterPoint
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Sets the center point of a TextInfo structure to the
+		upper-left corner of the grid.
+
+PASS:		ss:[bp]	- ptr to TextInfo structure
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/27/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ECSetCenterPoint		macro
+	push	es, ax
+	GetResourceSegmentNS	dgroup, es
+	mov	ax, es:[ECupLeftGrid].P_x
+	mov	ss:[bp].TI_center.P_x, ax
+	mov	ax, es:[ECupLeftGrid].P_y
+	mov	ss:[bp].TI_center.P_y, ax
+	pop	es, ax
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SetECVarClueListLength
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Sets the EC variables ECacrossListLen and ECdownListLen.
+
+PASS:		numItems, direction
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	7/13/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetECVarClueListLength		macro	numItems, direction
+; Check to see if macro is called correctly.
+ifb < direction >
+	ErrorMessage < SetECVarClueListLength takes 2 arguments.>
+endif
+
+	PreserveAndGetIntoReg	ax, numItems
+	PreserveAndGetIntoReg	cx, direction
+	call	ECSetClueListLength
+	RestoreReg		cx, direction
+	RestoreReg		ax, numItems
+
+		endm
+
+
+;-------------------------------------------------------------------
+;	EC global constants that will not be included in the Non-EC
+;	version.
+;-------------------------------------------------------------------
+idata	segment
+	ECupLeftGrid	Point 	<BOARD_DEF_GRID_LEFT,BOARD_DEF_GRID_TOP>
+	EClowRightGrid	Point	<BOARD_DEF_GRID_RIGHT,BOARD_DEF_GRID_BOTTOM>
+
+	ECupLeftDoc	Point	<0,0>
+	EClowRightDoc	Point	<BOARD_DEF_DOC_RIGHT,BOARD_DEF_DOC_BOTTOM>
+
+	ECupLeftBoard	Point	<BOARD_DEF_UL_COORD_X,BOARD_DEF_UL_COORD_Y>
+	EClowRightBoard	Point	<BOARD_DEF_BOARD_RIGHT,BOARD_DEF_BOARD_BOTTOM>
+
+	ECnumCol		byte 	0
+	ECnumRow		byte	0
+
+	ECnumAcrossClues	word	0
+	ECnumDownClues		word	0
+
+	ECacrossListLen		word	0	; the actual number of items
+	ECdownListLen		word	0	; in the corresponding list
+
+idata	ends
+
+endif

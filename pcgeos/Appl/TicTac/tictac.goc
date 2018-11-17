@@ -1,0 +1,1209 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1992 -- All Rights Reserved
+
+PROJECT:	Sample Applications	
+MODULE:		TicTac test application
+FILE:		tictac.goc
+
+AUTHOR:		Tom Manshreck, Oct  7, 1992
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	10/ 7/92   	Initial version.
+	NF	9/5/96		Made change to MSG_META_START_SELECT
+
+DESCRIPTION:	This application implements a rules-free, simple game
+		of Tic Tac Toe. This app's main purpose is to
+		demonstrate the use of Vis objects and input handling
+		within a visible tree.
+	
+
+	$Id: tictac.goc,v 1.1 97/04/04 16:37:13 newdeal Exp $
+
+***********************************************************************/
+
+/***********************************************************************
+ *		Include files
+ ***********************************************************************/
+@include <stdapp.goh>	/* standard application inclusion file */
+
+
+/***********************************************************************
+ *		Definitions
+ ***********************************************************************/
+#define	BOARD_HEIGHT	180	/* height of game board:  2.5 inches */
+#define BOARD_WIDTH	270	/* width of game board:   3.75 inches */
+
+#define PIECE_HEIGHT	18	/* height of game piece:  1/4 inch   */
+#define PIECE_WIDTH	18	/* width of game piece:   1/4 inch   */
+
+#define FIRST_LINE_VERT	   8	/* These constants are used in the	*/
+#define SECOND_LINE_VERT  38	/* original positions of the game	*/
+#define	THIRD_LINE_VERT	 116	/* pieces.  There are four lines and	*/
+#define FOURTH_LINE_VERT 146	/* five columns of pieces.		*/
+
+#define FIRST_HORIZ	193
+#define SECOND_HORIZ	223
+#define THIRD_HORIZ	178
+#define FOURTH_HORIZ	208
+#define FIFTH_HORIZ	238
+
+/*  
+ * The TicTacPieceTypes enumerated type lists the different types
+ * of game pieces a particular piece object can be.  In this game,
+ * a piece is either a "box" (dark gray square) or a "ring" (light gray
+ * circle).
+ */
+typedef ByteEnum TicTacPieceTypes;
+#define TTPT_BOX	0
+#define TTPT_RING	1
+
+
+/***********************************************************************
+ *		Class and Message Definitions
+ ***********************************************************************/
+
+/* 
+ * Define the application's process object, so that we can add new
+ * messages to it later if we like.
+ */
+@class	TicTacProcessClass, GenProcessClass;
+
+/* define messages for this class here. */
+
+@endc
+
+/*  Declare the class in memory so the method table will be built.	*/
+@classdecl	TicTacProcessClass, neverSaved;
+
+
+/************************************************************************
+ *  			TicTacBoardClass
+ *  This class is a subclass of VisContentClass [Obj 26] and provides
+ *  the game board for this application.  It also manages
+ *  all the children (piece objects).
+ ***********************************************************************/
+@class	TicTacBoardClass, VisContentClass;	/* this class is a subclass */
+						/* of VisContentClass	    */
+    /* Message definitions for this class */
+
+@message void MSG_TICTAC_NEW_GAME();
+    /* 
+     * This message is sent by the `New Game` trigger in the Game menu
+     * when the user wants to reset the game.  It is sent directly to
+     * the game board object and causes the board object first to
+     * send the "new game" message to each of its children and then
+     * to redraw the game board.
+     */
+
+@message Boolean MSG_TICTAC_VALIDATE_BOUNDS(word bottom,
+				word right, word top, word left);
+    /*
+     * This message is sent by a game piece that is being moved by the
+     * user and is about to be set down.  The four parameters are the
+     * proposed new bounds of the moved piece; if they are within the
+     * game board's limit, this message returns TRUE.  If they are at
+     * all outside the game board, this message returns FALSE.
+     */
+
+@endc
+
+/*  Declare the class in memory so the method table will be built.	*/
+@classdecl	TicTacBoardClass;
+
+
+/************************************************************************
+ *  			TicTacPieceClass
+ *  This class is a subclass of VisClass [Obj 24] and provides all the
+ *  functions necessary for a game piece in the game.
+ ***********************************************************************/
+@class	TicTacPieceClass, VisClass;	/* this class is a subclass	*/
+					/* of VisClass			*/
+
+    /* The instance data fields of this class: */
+
+    @instance	TicTacPieceTypes TTPI_pieceType;
+	/*
+	 * TTPI_pieceType defines whether the object of this class is
+	 * a "box" or a "ring."  
+	 */
+
+    @instance	int	TTPI_vertPos;
+	/*
+	 * TTPI_vertPos indicates the current y position of
+	 * the piece.  This does not indicate the piece's actual
+	 * bounds but rather where its moving outline appears. 
+	 */
+
+    @instance	int	TTPI_horizPos;
+	/*  
+	 * TTPI_horizPos indicates the current x position of
+	 * the piece.  This does not indicate the piece's actual
+	 * bounds but rather where its moving outline appears. 
+	 */
+
+    @instance	int	TTPI_origVertPos;
+	/*
+	 * TTPI_origVertPos indicates the y position where  this
+	 * piece should return when the New Game trigger is pushed
+	 * and the piece goes back to its original location.
+	 */
+
+    @instance	int	TTPI_origHorizPos;
+	/* 
+	 * TTPI_origHorizPos indicates the x position where  this
+	 * piece should return when the `New Game` trigger is pushed
+	 * and the piece goes back to its original location.
+	 */
+
+    @instance	Boolean	TTPI_dragging;
+	/* Set if user is dragging this piece somewhere around the board */
+
+    /* Message definitions unique to this class.  */
+
+@message void MSG_PIECE_NEW_GAME();
+    /*
+     * This message notifies the piece object that the user has pushed
+     * the 'New Game' trigger and that the piece should return to its
+     * original position on the board (the TTPI_orig(Horiz/Vert)Pos
+     * fields).
+     */
+@endc
+
+/*  Declare the class in memory so the method table will be built.  */
+@classdecl	TicTacPieceClass;
+
+
+/***********************************************************************
+ *		The Application Object
+ ***********************************************************************/
+
+@start	AppResource;
+
+@object GenApplicationClass TicTacApp = {
+    GI_visMoniker = list { @TicTacTextMoniker }
+    GI_comp = @TicTacPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TicTacPrimary;
+}
+
+@visMoniker TicTacTextMoniker = "TicTacToe";
+
+@end	AppResource;
+
+
+
+@start	Interface;
+	/*  
+	 * The Interface resource block contains all the menu and
+	 *  generic UI objects of this application including the
+	 *  Primary window (TicTacPrimary).			
+	 */
+
+/***********************************************************************
+ *		The Primary Window Object
+ ***********************************************************************/
+    /*  
+     * This is the Primary window of the application.  It should
+     * not be opened maximized (GI_states), and it is not
+     * minimizable (since no icon is defined for it).  It has
+     * two children:  The View object and the Menu object.	
+     */
+@object GenPrimaryClass TicTacPrimary  = {
+    GI_comp = @TicTacView, @TicTacGameMenu;		
+
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+/***********************************************************************
+ *		The View Window Object
+ ***********************************************************************/
+
+  /*  
+   * This object provides the window through which the user interacts
+   *  with the visible object tree.  This object communicates with the
+   *  game board object (a subclass of VisContentClass) to coordinate
+   *  drawing, clipping, sizing, and even input handling.
+   */
+
+@object GenViewClass TicTacView = {
+    GVI_content = TicTacBoard;	
+    /* 
+     * The content object of this view is the TicTacBoard object, the
+     * root object of the visible tree.
+     */
+
+    GVI_docBounds = {0, 0, BOARD_WIDTH, BOARD_HEIGHT};
+
+
+    GVI_color = { C_BLUE, 0, 0, 0 };	
+    /* The background color of	this view should be dark blue. */
+
+    GVI_horizAttrs = @default	| GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT;
+    /* 
+     * The horizontal attributes of this view set it to the same
+     * size as the game board, and the view is not scrollable.
+     */
+
+    GVI_vertAttrs = @default	| GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT
+				| GVDA_KEEP_ASPECT_RATIO;
+    /* 
+     * The vertical attributes of this view set it to the same
+     * size as the game board, and the view is not scrollable.
+     */
+
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    /*
+     * The user won't need to type anything, so there's no need for
+     * a floating keyboard.
+     */
+}
+
+/***********************************************************************
+ *		The Game Menu and New Game Trigger Objects
+ ***********************************************************************/
+
+/* 
+ * The TicTacGameMenu object is the only menu of this application.
+ * Its only child and only menu entry is the TicTacNewTrigger object.
+ */
+@object GenInteractionClass TicTacGameMenu = {
+    GI_visMoniker = "Game";		/*  The name of the menu.	*/
+    GI_comp = @TicTacNewTrigger;	/*  The only menu item.		*/
+    GII_visibility = GIV_POPUP;		
+    /* 
+     * This attribute indicates that this interaction is a menu
+     * rather than a dialog.
+     */
+}
+
+@object GenTriggerClass TicTacNewTrigger = {
+    GI_visMoniker = "New Game";		/*  The name of the menu item.	*/
+    GTI_destination = TicTacBoard;	
+    /* 
+     * The object to receive the "New Game" message.  This is the game
+     * board object.
+     */
+    GTI_actionMsg = MSG_TICTAC_NEW_GAME;
+    /* This message will be sent when the trigger is pressed. */
+}
+
+@end	Interface;	/* End of the Interface resource block.	*/
+
+
+/***********************************************************************
+ *		The Visible Tree
+ ***********************************************************************/
+
+@start BoardBlock;	/*  This resource block contains all the	* 
+			 *  visible objects in the visible tree.	*/
+
+/***********************************************************************
+ *		The Game Board Object
+ ***********************************************************************/
+/* 
+ * This object acts as three things:  The content object of
+ * TicTacView, the game board of the game, and the organizational
+ * object for all the game pieces.  The bounds of this object are the
+ * exact size of the game board, and each piece is a child in the
+ * visible tree.
+ */ 
+
+@object TicTacBoardClass TicTacBoard = { 
+    VI_bounds = {0, 0, BOARD_WIDTH, BOARD_HEIGHT};
+		/*
+		 * The bounds are in GEOS coordinates, or points.
+		 * The upper-left corner of the content appears at
+		 * (0,0), and the lower right extends to whatever is
+		 * set as the height and width of the board.
+		 * The bounds are important here because the View is
+		 * set up to automatically match the size of the
+		 * TicTacBoard object.
+		 */
+
+    VCI_geoAttrs = VCGA_CUSTOM_MANAGE_CHILDREN;
+		/*
+		 * This attribute indicates that the geometry manager
+		 * should not be invoked on this object's children.
+		 * Rather this object will manage its own geometery.
+		 * Or, as in this case, the children will manage
+		 * themselves.
+		 */
+
+	 VCI_comp = @TTO1, @TTO2, @TTO3, @TTO4, @TTO5, @TTX1,
+		@TTX2, @TTX3, @TTX4, @TTX5;
+/*    VCI_comp = @TTX1, @TTX2, @TTX3, @TTX4, @TTX5, @TTO1,
+		@TTO2, @TTO3, @TTO4, @TTO5;  
+		/*
+		 * These are the children of the board object.  Each
+		 * is a different piece.  There are five "box" pieces
+		 * and five "ring" pieces because that is the maximum
+		 * number of each piece that may appear during a Tic
+		 * Tac Toe game.
+		 */ 
+}
+
+/***********************************************************************
+ *		The Game Pieces
+ ***********************************************************************/
+/* 
+ * Because all these objects are similar, comments are provided for
+ * only the first.  Each piece must know where it is at all times.
+ * VisClass has an instance field called VI_bounds that always		
+ * contains the bounds of the object.  However, these objects must	
+ * also know where their original locations were and where their	
+ * motion locations are.  The motion locations are maintained for	
+ * drawing the piece's outline at the arrow pointer when the piece is	
+ * being moved by the user.
+ */
+
+@object TicTacPieceClass TTO1 = {
+    VI_bounds = {	FIRST_HORIZ, 
+			FIRST_LINE_VERT,
+	 		(FIRST_HORIZ + PIECE_WIDTH), 
+			(FIRST_LINE_VERT + PIECE_HEIGHT)
+		};
+		/* The initial bounds of the object are the same as	*
+		 * its initial original position fields.  Since the	*
+		 * bounds are a Rectangle structure, though, the right	*
+		 * and bottom must also be given.			*/
+    TTPI_pieceType = TTPT_RING;
+		/* This is the type of piece this is.  This piece is	*
+		 * a "ring" type.  There are five "box" types and five	*
+		 * "ring" types in this game.  The piece determines	*
+		 * how it will draw itself depending on its type.	*/
+    TTPI_vertPos = FIRST_LINE_VERT;
+    TTPI_horizPos = FIRST_HORIZ;
+		/* The TTPI_(horiz/vert)Pos fields determine the motion *
+		 * location of the piece.  When the piece is being	*
+		 * moved by the user, these fields determine where the	*
+		 * outline of the piece will be drawn.			*/
+    TTPI_origVertPos = FIRST_LINE_VERT;
+    TTPI_origHorizPos = FIRST_HORIZ;
+		/* The TTPI_orig(Horiz/Vert)Pos fields indicate the	*
+		 * original positions of this piece.  This is needed	*
+		 * so the piece can relocate itself when the user	*
+		 * presses the New Game trigger.			*/
+}
+
+@object TicTacPieceClass TTO2 = {
+    VI_bounds = {	SECOND_HORIZ, 
+			FIRST_LINE_VERT,
+			(SECOND_HORIZ + PIECE_WIDTH), 
+			(FIRST_LINE_VERT + PIECE_HEIGHT)
+		};
+    TTPI_pieceType = TTPT_RING;
+    TTPI_vertPos = FIRST_LINE_VERT;
+    TTPI_horizPos = SECOND_HORIZ;
+    TTPI_origVertPos = FIRST_LINE_VERT;
+    TTPI_origHorizPos = SECOND_HORIZ;
+}
+
+@object TicTacPieceClass TTO3 = {
+    VI_bounds = {	THIRD_HORIZ, 
+			SECOND_LINE_VERT,
+			(THIRD_HORIZ + PIECE_WIDTH), 
+			(SECOND_LINE_VERT + PIECE_HEIGHT)
+		};
+    TTPI_pieceType = TTPT_RING;
+    TTPI_vertPos = SECOND_LINE_VERT;
+    TTPI_horizPos = THIRD_HORIZ;
+    TTPI_origVertPos = SECOND_LINE_VERT;
+    TTPI_origHorizPos = THIRD_HORIZ;
+}
+
+@object TicTacPieceClass TTO4 = {
+    VI_bounds = {	FOURTH_HORIZ, 
+			SECOND_LINE_VERT,
+	 		(FOURTH_HORIZ + PIECE_WIDTH), 
+			(SECOND_LINE_VERT + PIECE_HEIGHT)
+		};
+    TTPI_pieceType = TTPT_RING;
+    TTPI_vertPos = SECOND_LINE_VERT;
+    TTPI_horizPos = FOURTH_HORIZ;
+    TTPI_origVertPos = SECOND_LINE_VERT;
+    TTPI_origHorizPos = FOURTH_HORIZ;
+}
+
+@object TicTacPieceClass TTO5 = {
+    VI_bounds = {	FIFTH_HORIZ, 
+			SECOND_LINE_VERT,
+	 		(FIFTH_HORIZ + PIECE_WIDTH), 
+			(SECOND_LINE_VERT + PIECE_HEIGHT)
+		};
+    TTPI_pieceType = TTPT_RING;
+    TTPI_vertPos = SECOND_LINE_VERT;
+    TTPI_horizPos = FIFTH_HORIZ;
+    TTPI_origVertPos = SECOND_LINE_VERT;
+    TTPI_origHorizPos = FIFTH_HORIZ;
+}
+
+@object TicTacPieceClass TTX1 = {
+    VI_bounds = {	FIRST_HORIZ, 
+			THIRD_LINE_VERT,
+	 		(FIRST_HORIZ + PIECE_WIDTH), 
+			(THIRD_LINE_VERT + PIECE_HEIGHT)
+		};
+    TTPI_pieceType = TTPT_BOX;		/*  This is the first "box" piece */
+    TTPI_vertPos = THIRD_LINE_VERT;
+    TTPI_horizPos = FIRST_HORIZ;
+    TTPI_origVertPos = THIRD_LINE_VERT;
+    TTPI_origHorizPos = FIRST_HORIZ;
+}
+
+@object TicTacPieceClass TTX2 = {
+    VI_bounds = {	SECOND_HORIZ, 
+			THIRD_LINE_VERT,
+	 		(SECOND_HORIZ + PIECE_WIDTH), 
+			(THIRD_LINE_VERT + PIECE_HEIGHT)
+		};
+    TTPI_pieceType = TTPT_BOX;
+    TTPI_vertPos = THIRD_LINE_VERT;
+    TTPI_horizPos = SECOND_HORIZ;
+    TTPI_origVertPos = THIRD_LINE_VERT;
+    TTPI_origHorizPos = SECOND_HORIZ;
+}
+
+@object TicTacPieceClass TTX3 = {
+    VI_bounds = {	THIRD_HORIZ, 
+			FOURTH_LINE_VERT,
+	 		(THIRD_HORIZ + PIECE_WIDTH), 
+			(FOURTH_LINE_VERT + PIECE_HEIGHT)
+		};
+    TTPI_pieceType = TTPT_BOX;
+    TTPI_vertPos = FOURTH_LINE_VERT;
+    TTPI_horizPos = THIRD_HORIZ;
+    TTPI_origVertPos = FOURTH_LINE_VERT;
+    TTPI_origHorizPos = THIRD_HORIZ;
+}
+
+@object TicTacPieceClass TTX4 = {
+    VI_bounds = {	FOURTH_HORIZ, 
+			FOURTH_LINE_VERT,
+	 		(FOURTH_HORIZ + PIECE_WIDTH), 
+			(FOURTH_LINE_VERT + PIECE_HEIGHT)
+		};
+    TTPI_pieceType = TTPT_BOX;
+    TTPI_vertPos = FOURTH_LINE_VERT;
+    TTPI_horizPos = FOURTH_HORIZ;
+    TTPI_origVertPos = FOURTH_LINE_VERT;
+    TTPI_origHorizPos = FOURTH_HORIZ;
+}
+
+@object TicTacPieceClass TTX5 = {
+    VI_bounds = {	FIFTH_HORIZ, 
+			FOURTH_LINE_VERT,
+	 		(FIFTH_HORIZ + PIECE_WIDTH), 
+			(FOURTH_LINE_VERT + PIECE_HEIGHT)
+		};
+    TTPI_pieceType = TTPT_BOX;
+    TTPI_vertPos = FOURTH_LINE_VERT;
+    TTPI_horizPos = FIFTH_HORIZ;
+    TTPI_origVertPos = FOURTH_LINE_VERT;
+    TTPI_origHorizPos = FIFTH_HORIZ;
+}
+
+@end	BoardBlock;		/*  End of the BoardBlock resource block. */
+
+
+/****************************************************************
+ *		CODE FOR TicTacBoardClass			*
+ ***************************************************************/
+
+/***********************************************************************
+ *		MSG_TICTAC_NEW_GAME for TicTacBoardClass
+ ***********************************************************************
+ * SYNOPSIS:	This method notifies each of the visible children that
+ *		a new game is beginning; they should take their places,
+ *		and then the board object will redraw itself.
+ *  
+ * PARAMETERS:	void (void)    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92		Initial Revision
+ *
+ ***********************************************************************/
+@method	TicTacBoardClass, MSG_TICTAC_NEW_GAME {
+
+	/*
+	 * First notify all the children (game pieces) that a new game is
+	 * beginning and they should go back to their default positions.
+	 */
+
+    @send @visChildren::MSG_PIECE_NEW_GAME();
+
+	/* 
+	 * Invalidate the entire region of the game board, including
+	 * any child window areas.  This will cause the window system
+	 * to send MSG_META_EXPOSED to all the objects in the visible
+	 * tree (i.e., the board and the pieces).
+	 */
+
+    @send self::MSG_VIS_INVALIDATE();
+}
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for TicTacBoardClass
+ ***********************************************************************
+ * SYNOPSIS:	This method draws the board's outline and the
+ *		lines of the playing field.  It is sent each time
+ *		a portion of the view window becomes invalid (such
+ *		as when the primary is moved).   
+ * PARAMETERS:	void (word drawFlags, GStateHandle gstate)
+ *		The gstate is the handle of the graphics state
+ *		associated with the exposed portion of the view
+ *		window. 
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92		Initial Revision
+ *
+ ***********************************************************************/
+@method TicTacBoardClass, MSG_VIS_DRAW {
+
+	/*
+	 * Now set up the graphic state properly.  The board lines are
+	 * to be white and 3 points thick.
+	 */
+
+    GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+    GrSetLineWidth(gstate, MakeWWFixed(3));
+
+	/*
+	 * Now draw the border of the game board.  It is a rectangle
+	 * that outlines the entire board.
+	 */
+
+    GrDrawRect(gstate, 0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+
+	/* 
+	 * Set and draw the Tic Tac Toe playing field.  The lines are
+	 * now set to 4 points thickness, and the lines are drawn with
+	 * HLine and VLine graphics commands.  Ideally, preset
+	 * constants would be used.
+	 */
+
+    GrSetLineWidth(gstate, MakeWWFixed(4));
+    GrDrawHLine(gstate, 5, 60, 175);
+    GrDrawHLine(gstate, 5, 120, 175);
+    GrDrawVLine(gstate, 60, 5, 175);
+    GrDrawVLine(gstate, 120, 5, 175);
+
+	/* 
+	 * Lastly, call the superclass to invoke any default behavior
+	 * for this message: i.e., to pass MSG_VIS_DRAW on to its
+	 * visible children.
+	 */
+
+    @callsuper();
+}
+
+/***********************************************************************
+ *		MSG_TICTAC_VALIDATE_BOUNDS for TicTacBoardClass
+ ***********************************************************************
+ * SYNOPSIS:	This method checks to see if the bounds passed
+ *		are on the game board.  This is invoked when a game
+ *		piece is in motion and receives an END_SELECT message
+ *		indicating it is being put down.  The piece must
+ *		determine whether the suggested bounds are on the
+ *		game board; the piece should always query the board
+ *		object rather than check directly; if the board were
+ *		resizable, the piece could be incorrect sometimes.    
+ * PARAMETERS:	void (word bottom, word right, word top, word left)    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Check the four bounds against the board's edges.  If
+ *		all four are on the board, return TRUE.  If any one
+ *		of the four is off the board, return FALSE.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92		Initial Revision
+ *
+ ***********************************************************************/
+@method TicTacBoardClass, MSG_TICTAC_VALIDATE_BOUNDS {
+
+    if (((bottom < BOARD_HEIGHT) && (top > 0)) &&
+	((right < BOARD_WIDTH) && (left >= 0))) {
+	return(TRUE);
+    } 
+    else {
+	return(FALSE);
+    }
+}
+
+
+/****************************************************************
+ *		CODE FOR TicTacPieceClass			*
+ ***************************************************************/
+
+/***********************************************************************
+ *		MSG_PIECE_NEW_GAME for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:	This message causes the piece to replace itself
+ *		to its original position.  It is invoked when the
+ *		user presses the New Game trigger; the trigger sends
+ *		MSG_TICTAC_NEW_GAME to the TicTacBoard object, and
+ *		the board object sends this message to each of
+ *		the game piece objects.    
+ * PARAMETERS:	void (void)
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92		Initial Revision
+ *
+ ***********************************************************************/
+@method	TicTacPieceClass, MSG_PIECE_NEW_GAME {
+
+	/* 
+	 * Set the current (motion) positions to the original
+	 * positions. 
+	 */
+
+    pself->TTPI_vertPos = pself->TTPI_origVertPos;
+    pself->TTPI_horizPos = pself->TTPI_origHorizPos;
+
+	/* 
+	 * Send a MSG_VIS_BOUNDS_CHANGED to ourselves to make sure the
+	 * old bounds get redrawn.  This message will cause an
+	 * invalidation of the document where the old (passed) bounds
+	 * were, causing that portion of the window to be redrawn.
+	 */
+
+    @call self::MSG_VIS_BOUNDS_CHANGED(
+		pself->VI_bounds.R_bottom,
+		pself->VI_bounds.R_right, 
+		pself->VI_bounds.R_top,
+		pself->VI_bounds.R_left);
+
+	/* 
+	 * Set the bounds of the object (VI_bounds) back to their
+	 * original values.  The Rectangle structure contains four
+	 * fields, each of which must be set.
+	 */
+
+    pself->VI_bounds.R_left = pself->TTPI_origHorizPos;
+    pself->VI_bounds.R_top = pself->TTPI_origVertPos;
+    pself->VI_bounds.R_right =	(pself->TTPI_origHorizPos + PIECE_WIDTH);
+    pself->VI_bounds.R_bottom = (pself->TTPI_origVertPos + PIECE_HEIGHT);
+
+	/*
+	 * Now make sure that the piece's new position is also
+	 * invalidated, so that when the piece receives MSG_VIS_DRAW
+	 * later, the piece will also be redrawn at its new position.
+	 */
+
+    @call self::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
+
+	/* 
+	 * This method does not need to invoke a MSG_VIS_DRAW because
+	 * the TicTacBoard object will do that.  The piece object will
+	 * later receive a MSG_VIS_DRAW that will cause the piece to
+	 * be redrawn back at its original location (the newly set
+	 * bounds).
+	 */
+}
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:	Draw the piece at the current location.  If the piece
+ *		is a "box," draw a dark gray square.  If the piece is a
+ *		"ring," draw a light gray circle.  This message is received
+ *		whenever a portion of the view window becomes invalid;
+ *		TicTacView will send a MSG_META_EXPOSED to TicTacBoard, which
+ *		will send itself (by default) a MSG_VIS_DRAW.  The
+ *		MSG_VIS_DRAW will be handled and then will be passed
+ *		on to each of the game pieces.  Then each piece (in
+ *		this handler) will draw itself at its own bounds.    
+ * PARAMETERS:	void (word drawFlags GStateHandle gstate) 
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92		Initial Revision
+ *
+ ***********************************************************************/
+@method TicTacPieceClass, MSG_VIS_DRAW {
+
+	/* 
+	 * Set the mode to MM_COPY; this means that the image drawn
+	 * now will be drawn over whatever is there now.
+	 */
+
+    GrSetMixMode(gstate, MM_COPY);
+
+	/* 
+	 * If the type is TTPT_BOX, set the color to dark gray and draw a
+	 * rectangle the size of the object's bounds. Otherwise (since
+	 * there are just two types), set the color to gray and draw
+	 * an ellipse of that size.
+	 */
+
+    if (pself->TTPI_pieceType == TTPT_BOX) {
+	GrSetAreaColor(gstate, CF_INDEX, C_RED, 0, 0);
+	GrFillRect(	gstate, 
+			pself->VI_bounds.R_left, 
+			pself->VI_bounds.R_top,
+			pself->VI_bounds.R_right, 
+			pself->VI_bounds.R_bottom);
+    } else {
+	GrSetAreaColor(gstate, CF_INDEX, C_GREEN, 0, 0);
+	GrFillEllipse(	gstate, 
+			pself->VI_bounds.R_left, 
+			pself->VI_bounds.R_top,
+			pself->VI_bounds.R_right, 
+			pself->VI_bounds.R_bottom);
+    }
+}
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:	Grabs the mouse and calls for future pointer events.
+ *		When the user clickes in the view, TicTacView will pass
+ *		the click event to TicTacBoard.  Since TicTacBoardClass
+ *		does not intercept the event, VisContentClass passes
+ *		it on to its child object currently under the pointer.   
+ * PARAMETERS:	void (MouseReturnParams *retVal,
+ *		      word xPosition, word yPosition, word inputState);    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	When the piece object receives this message, it means
+ *		it has been clicked on by the user and the mouse button
+ *		is still down.  The piece must grab the mouse so that it
+ *		gets all future mouse events, and it must request that
+ *		all future mouse events be sent to it.  This ensures
+ *		that if the pointer leaves the object's bounds while
+ *		the button is still pressed, the piece object will still
+ *		receive all the pointer events (otherwise they would be
+ *		sent to whatever object was under the new pointer
+ *		position).
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92	Initial Revision
+ *	NF	9/5/96		Corrected comment on MRF_PROCESSED
+ *
+ ***********************************************************************/
+@method TicTacPieceClass, MSG_META_START_SELECT {
+
+    	/* 
+	 * Grab the gadget exclusive, so that we're allowed to grab
+	 * the mouse.
+	 */
+
+    @call @visParent::MSG_VIS_TAKE_GADGET_EXCL(oself);
+
+	/* 
+	 * Grab the mouse.  This requests that all future pointer
+	 * events be passed directly to this game piece.
+	 */
+
+    @call self::MSG_VIS_GRAB_MOUSE();		
+
+	/* 
+	 * Finally, return that this particular click event has been
+	 * processed. If we hadn't processed this click, we could
+	 * pass back MRF_REPLAY and the system would send out the
+	 * message again.
+	 */
+    retVal->flags = MRF_PROCESSED;
+}
+
+
+/***********************************************************************
+ *		MSG_META_DRAG_SELECT for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:	This message is sent to the piece object when the
+ *		select button has been pressed and the mouse has been
+ *		moved, resulting in a "drag-select" event.
+ *		For event processing from the View, see the header
+ *		for MSG_META_START_SELECT.    
+ * PARAMETERS:	void (MouseReturnParams *retVal,
+ *		      word xPosition, word yPosition, word inputState);    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92		Initial Revision
+ *
+ ***********************************************************************/
+@method TicTacPieceClass, MSG_META_DRAG_SELECT {
+    GStateHandle gstate;	/* temporary gstate to draw to	*/
+    WindowHandle win;		/* window handle of view window	*/
+
+    	/* Set flag indicating that we're being dragged. */
+
+    pself->TTPI_dragging = TRUE;
+
+	/* 
+	 * Get the view's window handle and create a temporary gstate
+	 * for drawing into.
+	 */
+
+    win = @call self::MSG_VIS_QUERY_WINDOW();
+    gstate = GrCreateState(win);
+
+	/* 
+	 * Set the color to black and the drawing mode to MM_INVERT
+	 * for outline drawing.
+	 */
+
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrSetMixMode(gstate, MM_INVERT);
+
+	/* 
+	 * Now set the current motion position to be centered on the
+	 * pointer.  But first, redeference oself, since sending the
+	 * message to @TicTacView may have invalidated pself.
+	 */
+
+    pself = ObjDerefVis(oself);
+    pself->TTPI_vertPos = yPosition - (PIECE_HEIGHT/2);
+    pself->TTPI_horizPos = xPosition - (PIECE_WIDTH/2);
+
+	/* Draw the new outline at the current position. */
+
+    if (pself->TTPI_pieceType == TTPT_BOX) {
+	GrDrawRect(    gstate, 
+		       pself->TTPI_horizPos, 
+		       pself->TTPI_vertPos,
+		       (pself->TTPI_horizPos + PIECE_WIDTH),
+		       (pself->TTPI_vertPos + PIECE_HEIGHT) );
+    } else {
+	GrDrawEllipse( gstate, 
+                       pself->TTPI_horizPos, 
+                       pself->TTPI_vertPos,
+		       (pself->TTPI_horizPos + PIECE_WIDTH),
+		       (pself->TTPI_vertPos + PIECE_HEIGHT) );
+    }
+
+	/* 
+	 * Destroy the temporary gstate and return that this event has
+	 * been processed.
+	 */
+
+    GrDestroyState(gstate);
+
+    retVal->flags = MRF_PROCESSED;
+}
+
+
+
+/***********************************************************************
+ *		MSG_META_PTR for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:	This message is received whenever the pointer passes
+ *		over this game piece object's bounds (and another
+ *		game piece is not sitting directly on top of it).
+ *		See MSG_META_START_SELECT for a description of how the event
+ *		gets passed from TicTacView to this object.    
+ * PARAMETERS:	void (MouseReturnParams *retVal,
+ *		      word xPosition, word yPosition, word inputState);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	This message can be either a drag event or a simple
+ *		pointer event.  If the latter, we want to do nothing
+ *		because no mouse button is pressed.  If the latter,
+ *		we want to execute the same function as MSG_DRAG.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92		Initial Revision
+ *
+ ***********************************************************************/
+@method TicTacPieceClass, MSG_META_PTR {
+    GStateHandle gstate;	/* temporary gstate to draw to	*/
+    WindowHandle win;		/* window handle of view window	*/
+
+	/* 
+	 * First check if piece is being dragged. If not, do nothing
+	 * and return that this event was not processed.  If this is a
+	 * drag, then draw a new outline and erase the old outline.
+	 */
+
+    if (pself->TTPI_dragging) {
+
+	/* 
+	 * Get the view's window handle and create a temporary gstate
+	 * for drawing into.
+	 */
+
+    	win = @call self::MSG_VIS_QUERY_WINDOW();
+	gstate = GrCreateState(win);
+
+	/* 
+	 * Set the color to black and the drawing mode to MM_INVERT
+	 * for outline drawing.
+	 */
+
+	GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	GrSetMixMode(gstate, MM_INVERT);
+
+	/* 
+	 * Erase the old outline by drawing an inverse outline at the
+	 * old bounds.  But first, redeference oself, since pself may
+	 * have been invalidated by the @call to @TicTacView, above.
+	 */
+
+	if (pself->TTPI_pieceType == TTPT_BOX) {
+	    GrDrawRect(    gstate,
+		           pself->TTPI_horizPos,
+                           pself->TTPI_vertPos,
+			   (pself->TTPI_horizPos + PIECE_WIDTH),
+			   (pself->TTPI_vertPos + PIECE_HEIGHT) );
+	} else {
+	    GrDrawEllipse( gstate, 
+                           pself->TTPI_horizPos, 
+                           pself->TTPI_vertPos,
+			   (pself->TTPI_horizPos + PIECE_WIDTH),
+			   (pself->TTPI_vertPos + PIECE_HEIGHT) );
+	}
+
+	/* 
+	 * Now set the current motion position to be centered on the
+	 * pointer.
+	 */
+
+	pself->TTPI_vertPos = yPosition - (PIECE_HEIGHT/2);
+	pself->TTPI_horizPos = xPosition - (PIECE_WIDTH/2);
+
+	/* Draw the new outline at the current position. */
+
+	if (pself->TTPI_pieceType == TTPT_BOX) {
+	    GrDrawRect(    gstate, 
+                           pself->TTPI_horizPos, 
+                           pself->TTPI_vertPos,
+			   (pself->TTPI_horizPos + PIECE_WIDTH),
+			   (pself->TTPI_vertPos + PIECE_HEIGHT) );
+	} else {
+	    GrDrawEllipse( gstate, 
+                           pself->TTPI_horizPos,
+                           pself->TTPI_vertPos,
+			   (pself->TTPI_horizPos + PIECE_WIDTH),
+			   (pself->TTPI_vertPos + PIECE_HEIGHT) );
+	}
+
+	/* 
+	 * Destroy the temporary gstate and return that this event has
+	 * been processed.
+	 */
+
+	GrDestroyState(gstate);
+    }
+
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+
+/***********************************************************************
+ *		MSG_META_END_SELECT for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:	This message is received when the selection button has
+ *		been released and this game piece had the mouse grab.
+ *		All it does is release the gadget exclusive, which will
+ *		cause us to end any dragging in process, & release the
+ *		mouse.    
+ * PARAMETERS:	void (MouseReturnParams *retVal,
+ *		      word xPosition, word yPosition, word inputState);    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92		Initial Revision
+ *
+ ***********************************************************************/
+@method TicTacPieceClass, MSG_META_END_SELECT {
+
+    @call @visParent::MSG_VIS_RELEASE_GADGET_EXCL(oself);
+
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+
+/***********************************************************************
+ *		MSG_VIS_LOST_GADGET_EXCL for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:	This message is received when the selection button has
+ *		been released and this game piece had the mouse grab.
+ *		It first checks to see if the new, proposed bounds are
+ *		on the game board.  If the bounds are valid, then
+ *		it sets the objects VI_bounds field to the new values
+ *		and causes the object to erase its original drawing
+ *		and draw itself at its new bounds.  If the bounds are
+ *		not on the game board, it will retain the original bounds
+ *		and redraw using them.    
+ * PARAMETERS:	void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/ 8/92		Initial Revision
+ *
+ ***********************************************************************/
+@method TicTacPieceClass, MSG_VIS_LOST_GADGET_EXCL {
+    WindowHandle win;		/* window handle of view window	*/
+    GStateHandle gstate;	/* temporary gstate to draw to	*/
+
+    /* 
+     * See if piece was being dragged or not.  If so, we have to
+     * clear out outine.
+     */
+
+    if (pself->TTPI_dragging) {
+
+	/* Clear flag to indicate we are no longer dragging. */
+
+        pself->TTPI_dragging = FALSE;
+
+	/* 
+	 * Get the window handle of the view window and create a
+	 * temporary gstate for it to draw to.
+	 */
+
+    	win = @call self::MSG_VIS_QUERY_WINDOW();
+    	gstate = GrCreateState(win);
+
+	/* 
+	 * Set the line color and mode for drawing the outline.
+	 */
+
+    	GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    	GrSetMixMode(gstate, MM_INVERT);
+
+	/* Erase outline on screen. */
+
+	/* 
+	 * If the game piece type is TTPT_BOX, draw a rectangle
+	 * outline. Otherwise draw an ellipse outline.  But first,
+	 * redeference oself, since pself may have been invalidated
+	 * by the @call to @TicTacView, above.
+	 */
+
+	pself = ObjDerefVis(oself);
+    	if (pself->TTPI_pieceType == TTPT_BOX) {
+	    GrDrawRect(    gstate,
+			   pself->TTPI_horizPos, 
+			   pself->TTPI_vertPos,
+			   ((pself->TTPI_horizPos) + PIECE_WIDTH),
+			   ((pself->TTPI_vertPos) + PIECE_HEIGHT) );
+   	} 
+	else {
+	    GrDrawEllipse( gstate, 
+			   pself->TTPI_horizPos, 
+			   pself->TTPI_vertPos,
+			   ((pself->TTPI_horizPos) + PIECE_WIDTH),
+			   ((pself->TTPI_vertPos) + PIECE_HEIGHT) );
+    	}
+
+	/* 
+	 * Check to see if the new bounds are on the game board.  If
+	 * they are, set the object's bounds to the new values.  If
+	 * the are not, retain the original values and set the values
+	 * to those last stored.
+	 */
+
+    	if (@call TicTacBoard::MSG_TICTAC_VALIDATE_BOUNDS(
+				((pself->TTPI_vertPos) + PIECE_HEIGHT),
+				((pself->TTPI_horizPos) + PIECE_WIDTH),
+				pself->TTPI_vertPos,
+				pself->TTPI_horizPos)) {
+
+	/* 
+	 * Invalidate the original drawing of the game piece.  Send
+	 * the VI_bounds rectangle as the parameters because they have
+	 * not been changed since the START_SELECT.  This message is
+	 * the equivalent of calling GrInvalRect() with the same
+	 * bounds.  But first, redeference oself...
+	 */
+
+	    pself = ObjDerefVis(oself);
+       	    @call self::MSG_VIS_BOUNDS_CHANGED(
+				pself->VI_bounds.R_bottom,
+				pself->VI_bounds.R_right,
+				pself->VI_bounds.R_top,
+				pself->VI_bounds.R_left);
+
+	/* 
+	 * Set the game piece object's bounds to the new coordinates.
+	 * But first, redereference oself...
+	 */
+
+	    pself = ObjDerefVis(oself);
+	    pself->VI_bounds.R_left   = pself->TTPI_horizPos;
+	    pself->VI_bounds.R_right  = (pself->TTPI_horizPos) + PIECE_WIDTH;
+	    pself->VI_bounds.R_top    = pself->TTPI_vertPos;
+	    pself->VI_bounds.R_bottom = (pself->TTPI_vertPos) + PIECE_HEIGHT;
+
+    	} else {
+
+	/* 
+	 * If the bounds are not on the game board, then  reset the
+	 * current positions to be the original bounds.  But first,
+	 * redeference oself...
+	 */
+
+	    pself = ObjDerefVis(oself);
+	    pself->TTPI_horizPos = pself->VI_bounds.R_left;
+	    pself->TTPI_vertPos = pself->VI_bounds.R_top;
+        }
+
+	/* 
+	 * Now, the game piece must draw itself at its newly-set
+	 * bounds (will draw itself over its original picture if the
+	 * new bounds were invalid).
+	 */  
+
+	@call self::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
+
+	/* 
+	 * Finally, destroy the temporary gstate used for drawing.
+	 */
+
+	GrDestroyState(gstate);
+    }
+
+	/* 
+	 * Release the mouse grab now that the move has finished.
+	 * Other objects in the view (other game pieces, for example)
+	 * may now receive pointer, select, and drag events.
+	 */ 
+
+    @call self::MSG_VIS_RELEASE_MOUSE();
+}

@@ -1,0 +1,844 @@
+COMMENT `-----------------------------------------------------------------------
+
+
+			GenBooleanGroupClass
+
+$Id: GenBooleanGroup.doc,v 1.1.34.1 97/03/29 03:37:35 canavese Exp $
+
+Synopsis
+--------
+	GenBooleanGroupClass defines an object similar to the GenItemGroup
+	object, but is used specifically to display a small number of non-
+	exclusive objects, each typically representing a bit-field in a word 
+	of data.
+
+	The GenBooleanGroupClass and GenBooleanClass work together in the
+	generic UI to allow an application to set up a group of non-exclusive
+	options, one or more GenBooleans appearing as generic children
+	of a GenBooleanGroup object.  Each GenBoolean represents a particular
+	option.  Under a GenBooleanGroup object, any number of options
+	can be set at a particular time, and the user can toggle the state of
+	the option by clicking on one of the GenBooleans.  (GenItemGroupClass
+	allows choosing between one of several mutually exclusive options.)
+	Applications interact solely through the GenBooleanGroup
+	object, which controls the booleans and keeps the current boolean
+	states.  The GenBooleanGroup object also has all the same geometry
+	capabilities as a grouping-type GenInteraction.
+
+	Each GenBoolean contains a word identifier to be associated with the
+	boolean.  Users often use one bit in a word-sized bitfield to represent
+	each boolean.  Each GenBoolean should have a unique identifier.  The 
+	state of a GenBooleanGroup object consists of a word-sized record of 
+	all the booleans' identifiers or'ed together.
+
+	For any application which toggles the state of an application or
+	application data, you should always first consider using a 
+	GenBooleanGroup to represent the function.  For instance, if you plan 
+	on having two triggers in a menu, one that turns on a verbose mode for 
+	errors, and one that turns it off, you should probably instead choose 
+	to represent it as a single GenBoolean in a GenBooleanGroup object
+	for clarity.
+
+
+Limitations
+-----------
+	A GenBooleanGroup can only have GenBooleans as children.  Likewise, a
+	GenBoolean must always be a generic child of a GenBooleanGroup 
+	object.
+
+	Only 16 booleans can be supported under any one GenBooleanGroup object.
+	Larger groups should be broken down into two or more GenBooleanGroups,
+	or put into a scrolling list in a GenItemGroup object.
+
+	GenBooleanGroup does not allow scrolling lists.  Non-exclusive 
+	scrolling lists are available in the more general purpose GenItemGroup
+	object.
+
+Alternatives
+------------
+	For mutually exclusive items, use GenItemGroup class rather than
+	GenBooleanGroup.
+
+	In motif, a GenBooleanGroup will never by displayed as a scrolling 
+	list.  Non-exclusive scrolling lists are available in the more general 
+	purpose GenItemGroup object.
+
+Implementation Status
+---------------------
+	Final preliminary specification.  - 2/19/92
+
+See Also
+--------
+	GenItemGroupClass (for exclusive items and scrolling lists), 
+		documented in Library/User/Gen/genItemGroup.asm
+
+;------------------------------------------------------------------------------
+;	Description
+;------------------------------------------------------------------------------
+
+Terminology
+-----------
+	apply message --
+		A message sent out when a modification in a boolean group is
+		applied, notifying the destination of changed in the state
+		of the boolean group.  A boolean group sends this message
+		in response to a MSG_GEN_APPLY, which may be sent out either
+		every time the user changes the state of the boolean group,
+		or only when the user presses an "Apply" trigger, depending
+		on type of window the boolean group appears in.  See delayed
+		mode section for more info.
+
+	checkbox --
+		A type of non-exclusive boolean where selecting it causes a 
+		checkmark to be entered in a box by its moniker.  Some specific
+		UI's do this for all GenBooleanGroup objects; others present
+		this as a possible option only.  You can suggest to the 
+		specific UI to always use checkboxes where available by adding
+		a HINT_CHECKBOX_STYLE to the GenBooleanGroup object.
+	
+	dynamic list --
+		A scrolling list where the application is queried for the
+		monikers to display for each entry, rather than using generic
+		components for the item.  See GenDynamicListClass.
+		
+	delayed mode --
+		This refers to various property objects that reside
+		in Apply/Cancel style dialog boxes.  In these dialog
+		boxes, the user can change the state of objects, but the 
+		changes aren't sent out in a notification until the user 
+		clicks on "Apply" and a MSG_GEN_APPLY reaches the object.  See 
+		the section on delayed mode below.
+
+	deselect --
+		Deselecting a GenBoolean usually means to clear its state,
+		i.e. to turn it "off."  See non-exclusive boolean group for
+		more info.
+
+	destination --
+		Refers to the object or process, if any, that will receive
+		apply messages or status message when applicable.  See also:
+		apply message, status message.
+
+	exclusives --
+		A group of items that has one and only one GenItem
+		selected at any given time.  It is possible to have no 
+		exclusives set (currently allowed in order to show an 
+		indeterminate state) but there is no way for a user to 
+		put the GenItemGroup in a none-selected state.  Clicking on
+		an already-selected GenItem will cause not cause it to be
+		turned off. Having multiple GenItems selected at any 
+		time is an error.  Not available in GenBooleanGroupClass; see 
+		GenItemGroupClass for more info.  See also:  non-exclusives, 
+		extended-selection-exclusives, exclusive-none.
+	
+	exclusive-none -- 
+		A variant of exclusives, where having no items selected
+		is fully supported.  If the user clicks on the selected
+		GenItem, it will be turned off, leaving no items selected.
+		Otherwise functions like an exclusive item group.  The behavior
+		is not available in GenBooleanGroupClass -- see GenItemGroup
+		for more info.  See also: exclusive, non-exclusive, extended-
+		selection-exclusive.
+
+	extended-selection-exclusive --
+		A type of list (always a scrolling list) where the default
+		behavior is to deselect other items when the user selects an
+		item.  If the user drags across items, or extends the
+		selection (usually done by holding a key down while clicking),
+		several items can be selected.  This is sometimes useful for
+		selecting a target for an operation, where choosing one item
+		is good enough for the novice, but selecting multiple items
+		can be useful for the experienced user.  This behavior is not 
+		available in GenBooleanGroupClass -- see GenItemGroup for more
+		info.   See also: exclusive, non-exclusive, exclusive-none.
+
+	immediate mode --
+		A list in immediate mode is one that is not delayed, i.e. any
+		change in a boolean by the user immediately "applied" (results
+		in notification).   This is used everywhere but in Apply/Cancel
+		style dialog boxes.  See delayed mode for more info.
+	
+	non-exclusives --
+		A group of booleans where the GenBoolean children can be
+		turned on and off independently of each other.  Selecting
+		one boolean will not affect any others.   Multiple booleans
+		can be turned on at a time by the application, and all can
+		be turned off as well.   This is the behavior of GenBoolean-
+		Groups.  It is also available in scrollable GenItemGroups; see
+		that object for more info.  See also:  exclusive, extended-
+		selection-exclusive, exclusive-none.
+
+	properties objects --
+		These refer to certain generic objects which contain the state
+		of some selected data in an application.  GenBooleanGroup,
+		GenBooleanGroup, GenRange, and GenText all fall into this
+		category.
+
+	radio buttons -- 
+		Radio buttons are often used in specific UI's to represent
+		mutually exclusive options to the user.  You will need to use
+		GenItemGroup objects to get this behavior.
+		
+	scrolling list --
+		A group of items where not all the entries are visible, and 
+		the user can scroll through the entries.  Good for things like
+		selecting files, formats, or anything where there are a lot of
+		options.   This mode is only available in GenItemGroup objects.
+
+	status message --
+		Can be optionally sent out when any change in the boolean group
+		state occurs, regardless of whether that change is to be 
+		applied or not.  Applications can turn on the behavior by
+		specifying ATTR_GEN_BOOLEAN_GROUP_STATUS_MESSAGE.  See 
+		delayed mode section, below.
+
+Relationships/Context
+---------------------
+	The GenBooleanGroup can be a generic child of any object in the 
+	generic world.
+
+	The GenBoolean cannot be a generic child of any object except a
+	GenBooleanGroup object.
+
+	GenBooleanGroup cannot have non-GenBooleans as generic children.
+
+	A delayed GenBooleanGroup object knows how to react appropriately to a 
+	MSG_GEN_APPLY and a MSG_GEN_RESET in an apply/reset dialog box.  For 
+	more information on delayed mode in the system, see the GenInteraction 
+	documentation.
+
+Conceptual Overview
+-------------------
+	
+
+Setting up your GenBooleanGroup object
+------------------------------------
+	To use GenBooleanGroup, you set up as many GenBoolean objects as you
+	need and assign identifiers to them.  This data should usually be a 
+	single bit of in a word field, and the identifier of each GenBoolean 
+	must be unique.  The GenBooleanGroup object will contain the or'ed sum 
+	of the selected booleans' bits.  For example, to set up some text 
+	styles, none of which are initially selected, you might do the 
+	following:
+
+		typedef WordFlags TextStyle;
+		#define TS_BOLD		0x01
+		#define	TS_ITALIC	0x02
+		#define TS_UNDERLINE	0x04
+
+		@object GenBooleanGroupClass StylesGroup = {
+			GI_comp = BoldBoolean, ItalicBoolean, UnderlineBoolean;
+			GBGI_selectedBooleans = 0;
+		}
+		@object GenBooleanClass BoldBoolean = {	
+			GI_visMoniker = "Bold";
+			GII_identifier = TS_BOLD;
+		}
+		@object GenBooleanClass ItalicBoolean = {	
+			GI_visMoniker = "Italic";
+			GII_identifier = TS_ITALIC;
+		}
+		@object GenBooleanClass UnderlineBoolean = {	
+			GI_visMoniker = "Underline";
+			GII_identifier = TS_UNDERLINE;
+		}
+
+	DEFINE_BOOLEAN is a macro to simplify creating GenBooleanClass objects,
+	which takes a label for the GenBoolean, a mnemonic, a moniker, and an
+	identifier.  The last DEFINE_ITEM above will expand to:
+
+		@object GenBooleanClass UnderlineBoolean = {
+			GI_visMoniker = 'U', "Underline";
+			GBI_identifier = TS_UNDERLINE;
+		}
+
+	You may declare the object in either manner.
+
+	To initially select bold and italic, you replace GBGI_selections with:
+	
+			GBGI_selectedBooleans = TS_BOLD | TS_ITALIC;
+
+
+Notification
+------------
+
+	While it is sometimes adequate to query the boolean group for its 
+	current state only when you need it (getting the state of the boolean 
+	group is described later), often applications will want immediate 
+	notification of any changes in the state of the GenBooleanGroup.
+
+	The destination for GenBooleanGroup messages can be specified as
+	follows:
+
+	    GBGI_destination = Dest;
+
+	where "Dest" is the object to send it to.  To send stuff to the 
+	process:
+
+	    GBGI_destination = process;
+
+	The destination can be queried for or changed using MSG_GEN_BOOLEAN_-
+	GROUP_GET_DESTINATION and MSG_GEN_BOOLEAN_GROUP_SET_DESTINATION,
+	respectively.
+
+	The GenBooleanGroup will notify the destination of any change in its
+	state that needs to be applied by sending an "apply message".  
+	This message, defined in GBGI_applyMsg,	will notify the destination
+	of the current state of the boolean group.  For example:
+		
+		@object GenBooleanGroupClass StylesGroup = {
+			GI_comp = BoldBoolean, ItalicBoolean, UnderlineBoolean;
+			GBGI_selectedBooleans = 0;
+			GBGI_destination = process;
+			GBGI_applyMsg = MSG_STYLE_CHANGE;
+		}
+
+	will cause a MSG_STYLE_CHANGE to be sent out on any applied change.
+
+	The apply message should be defined as follows:
+
+	 	@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_STYLE_CHANGE;
+
+	The parameters of this message are "void (word selectedBooleans, word
+	indeterminateBooleans, word modifiedBooleans), where "selections" refers
+	refers to the current booleans that are selected (the or'ed sums of 
+	their data).   The other parameters, indeterminateBooleans and 
+	modifiedBooleans, are discussed in later sections where needed, and
+	can be ignored for simple objects.
+
+
+Oft-used hints for the GenBooleanGroup
+------------------------------------
+	All geometry and moniker hints defined in GenClass will work for a 
+	GenBooleanGroup just as they would for a GenInteraction.  Below are 
+	a list of messages which are appropriate for GenBooleanGroupClass, along
+	with special notes where appropriate:
+
+	    HINT_ALLOW_CHILDREN_TO_WRAP		
+	    HINT_BOTTOM_JUSTIFY_CHILDREN		
+	    HINT_CENTER_CHILDREN_HORIZONTALLY	
+	    HINT_CENTER_CHILDREN_ON_MONIKERS	
+	    HINT_CENTER_CHILDREN_VERTICALLY		
+
+	    HINT_CENTER_MONIKER			
+		 This can be used on both GenBooleanGroups and GenBooleans.
+
+	    HINT_CUSTOM_CHILD_SPACING		
+	    HINT_DONT_ALLOW_CHILDREN_TO_WRAP	
+	    HINT_DONT_FULL_JUSTIFY_CHILDREN		
+	    HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING	
+	    HINT_DO_NOT_USE_MONIKER			
+	    HINT_DRAW_IN_BOX			
+
+	    HINT_EXPAND_HEIGHT_TO_FIT_PARENT	
+		 This can be used on both GenBooleanGroups and GenBooleans.
+
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT		
+		 This can be used on both GenBooleanGroups and GenBooleans.
+
+	    HINT_FIXED_SIZE				
+	    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY	
+	    HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY	
+	    HINT_INCLUDE_ENDS_IN_CHILD_SPACING	
+
+	    HINT_INITIAL_SIZE			
+		 This can be used on both GenBooleanGroups and GenBooleans.
+
+	    HINT_LEFT_JUSTIFY_CHILDREN		
+	    HINT_LEFT_JUSTIFY_MONIKERS		
+
+	    HINT_MAXIMUM_SIZE			
+		 This can be used on both GenBooleanGroup and GenBooleans.
+
+	    HINT_MINIMUM_SIZE			
+		 This can be used on both GenBooleanGroup and GenBooleans.
+
+	    HINT_NO_TALLER_THAN_CHILDREN_REQUIRE	
+	    HINT_NO_WIDER_THAN_CHILDREN_REQUIRE	
+
+	    HINT_ORIENT_CHILDREN_HORIZONTALLY	
+	    HINT_ORIENT_CHILDREN_VERTICALLY		
+	        In motif, GenBooleanGroups are oriented horizontally in a 
+		dialog box by default.  They are always vertical when appearing
+		in menus.
+
+	    HINT_PLACE_MONIKER_ABOVE		
+	    HINT_PLACE_MONIKER_BELOW		vardata
+	    HINT_PLACE_MONIKER_TO_LEFT		vardata
+	    HINT_PLACE_MONIKER_TO_RIGHT		vardata
+	    HINT_RIGHT_JUSTIFY_CHILDREN		vardata
+	    HINT_TOP_JUSTIFY_CHILDREN		vardata
+	    HINT_WRAP_AFTER_CHILD_COUNT		vardata		word
+		Not available in scrolling or dynamic GenBooleanGroup.
+
+		
+Getting and setting the selections
+----------------------------------
+
+	To get the current selections of a GenBooleanGroup object, do the 
+	following:
+
+	   sels = StylesGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+	where sels is a word variable to hold the or'ed sum of the 
+	selected booleans' data.   If no booleans are selected, the message will
+	return zero.
+
+	To change the state of one or more booleans, you can pass a record
+	containing the booleans that should be set.  For instance, to set
+	our StylesBooleanGroup to bold and italic, pass:
+
+	   @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+						TS_BOLD | TS_ITALIC, 0);
+
+	Any boolean whose data is represented in the first argument will be
+	turned on.  Any booleans whose data does not appear will be turned off.
+	The second argument is a record representing which booleans are
+	indeterminate (see section on indeterminate mode, below).
+	For simple GenBooleanGroup objects the indeterminate parameter can
+	always be zero.
+
+	To set no booleans selected, you can do a:
+
+	   @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(0, 0);
+
+	You can also select or deselect a single entry independent of the 
+	others.  To select a boolean (such as TS_BOLD above), do the 
+	following:
+	  
+	   @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+							TS_BOLD, TRUE);
+
+	The second argument should be set to TRUE to set the boolean.  Set 
+	FALSE to deselect the boolean.
+
+	Other booleans in the GenBooleanGroup will be left unchanged.
+
+	To get the state of a single boolean, you can do a:
+
+	  @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(TS_BOLD)
+
+	which returns a Boolean value, set to true if the object is selected.
+
+	Similarly, MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_MODIFIED will return 
+	whether the boolean's state has been modified, and MSG_GEN_BOOLEAN_-
+	GROUP_IS_BOOLEAN_INDETERMINATE will return whether the boolean is 
+	indeterminate.   See delayed mode and indeterminate mode for more 
+	information on these subjects.
+
+
+Operations that are done on GenBooleans
+---------------------------------------
+
+	Certain messages can be sent directly to GenBoolean objects.  You may
+	want to send messages to booleans to:
+
+		* Disable or enable a boolean
+		* Set a boolean usable or not usable
+		* Change the moniker of a boolean
+		* Get/set the identifier for a boolean
+
+	To send a message to a boolean, you will need its optr.  A convenient
+	way to get the optr is from the identifier associated with the boolean.
+	For instance:
+
+	   optr styleBoolean;
+	   styleBoolean = @call StylesGroup::
+		MSG_GEN_BOOLEAN_GROUP_GET_BOOLEAN_OPTR(TS_BOLD);
+
+	will return the optr of the boolean whose identifier is TS_BOLD.
+	
+	Then, to get the identifier for a boolean, you can do a:
+	
+	   @call styleBoolean::MSG_GEN_BOOLEAN_GET_IDENTIFIER();
+	   
+	which returns a word corresponding to the identifier for the boolean.  
+	To set the boolean's identifier to TS_BOLD, you could do a:
+
+	   @call styleBoolean::MSG_GEN_BOOLEAN_SET_IDENTIFIER(TS_BOLD);
+
+	GenBooleanClass message definitions can be found in Include/Objects/
+	gBoolC.def.
+
+
+Scrolling lists
+---------------
+	The scrolling list is a special version of the GenBooleanGroup that is 
+	set up so that the user can scroll through a list of items which 
+	aren't all visible at one time.   To get this behavior, the user must 
+	specify:
+
+		HINT_BOOLEAN_GROUP_SCROLLABLE;
+
+	in the GenBooleanGroup object.  
+
+	A scrolling list by default will be oriented vertically.
+	You can specify an orientation for scrolling lists (the default
+	orientation is vertical) via HINT_ORIENT_CHILDREN_HORIZONTALLY and
+	HINT_ORIENT_CHILDREN_VERTICALLY.  In motif, a horizontally oriented
+	scrolling list will have a scrollbar along the bottom of the scrolling
+	list.
+
+	Notification of changes for a scrolling list, as well as setting and 
+	getting the selections for a scrolling list, work the same as for 
+	non-scrolling GenBooleanGroup.   
+
+	To ensure that an item is currently visible, you can do a:
+
+		@call list::MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE(TS_BOLD);
+
+	If your scrolling list is going to have lots of booleans, or if it will
+	be a lot of work for your application to convert data into GenBoolean
+	objects in a GenBooleanGroup, consider using GenDynamicList instead.
+
+
+	Geometry hints on a scrolling list
+	----------------------------------
+	
+	If no size hints are specified, the specific UI will choose a default
+	height and width for the scrolling list.   In motif, the scrolling list
+	will be five booleans high.  The booleans will be as wide or high as the 
+	booleans' monikers require.
+
+	To specify a different height for a scrolling list, add a HINT_FIXED_-
+	SIZE to your scrolling list.  For example, to make your scrolling list
+	10 booleans high:
+
+		HINT_FIXED_SIZE = {
+			0,			  /* No width specified */
+			SST_LINES_OF_TEXT | 10,	  /* Height */
+			10			  /* Number of children */
+		};
+
+	If you specify a height argument in a size hint for a vertical 
+	scrolling list, you must also specify the number of children.  The
+	scrolling list will calculate the new boolean height to be the height
+	divided by the number of children, regardless of the height of the 
+	boolean monikers.
+
+	To specify a width of 40 average width characters:
+
+		HINT_FIXED_SIZE = {
+			SST_AVG_CHAR_WIDTHS | 40,	/* Width */
+			0,				/* Use default height */
+			0
+		};
+
+	You can also use HINT_EXPAND_WIDTH_TO_FIT_PARENT or HINT_EXPAND_HEIGHT_-
+	TO_FIT_PARENT much as you might in another object, to cause the 
+	scrolling list to expand dynamically to fill the space available.
+	In a vertical list, expanding the width of the list causes the widths
+	of the booleans to be wider; expanding the height of the list increases
+	the number of booleans that are visible.  HINT_MINIMUM_SIZE, 
+	HINT_MAXIMUM_SIZE, and HINT_INITIAL_SIZE can similarly be used along 
+	with these hints as desired.
+
+	You can also wrap booleans in either a horizontal or vertical scrolling
+	list using HINT_WRAP_AFTER_CHILD_COUNT.  For instance, if you want
+	a vertical scrolling list that is two booleans wide, add the following
+	hints:
+
+		HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		HINT_WRAP_AFTER_CHILD_COUNT = 2; 
+
+	The list's booleans will be laid out horizontally by the geometry 
+	manager, but will wrap after two booleans, resulting in vertical 
+	scrolling.
+	
+	On a horizontally scrolling list, which is by default one boolean high, 
+	you may want to specify a certain number of booleans to stack vertically
+	before wrapping. To set up a horizontally scrolling list that is 10 
+	booleans high, 4 booleans wide, and the booleans themselves 20 average 
+	characters wide, do the following:
+
+		HINT_FIXED_SIZE {
+			SST_AVG_CHAR_WIDTHS | (20*4),	/* Total width */
+			0,				/* Default height */
+			4				/* Number of children */
+		};
+		HINT_ORIENT_CHILDREN_VERTICALLY;
+		HINT_WRAP_AFTER_CHILD_COUNT = 10;
+
+	Note that if you specify a width on HINT_FIXED_SIZE for a horizontal
+	list, the number of visible children needs to be specified along with
+	the overall width.  The boolean width will be the overall width divided
+	by the number of children.
+
+
+Display-only lists
+------------------
+	GenBooleanGroups can be display-only, i.e. the user cannot interact 
+	with any booleans.  A boolean can still be selected via messages, or
+	you can have no boolean selected.   For a display-only group, clear the 
+	generic attribute GA_EDITABLE:
+
+		GI_attrs = @default & ~GA_EDITABLE;
+
+	This would be unusual for a GenBooleanGroup, as display-only boolean 
+	groups are usually found in scrolling lists.  See GenItemGroupClass.
+
+
+Delayed mode
+------------
+	The GenBooleanGroup object will send out an apply message whenever
+	it is supposed to apply a state that has been modified.  By default,
+	any message which sets the state of a GenBooleanGroup will set a new
+	value for the boolean group and mark its state as unmodified.  Any
+	subsequent changes by the user, or by sending a MSG_GEN_BOOLEAN_GROUP_-
+	SET_GROUP_MODIFIED_STATE to the object, will cause one or more booleans
+	to be marked modified.     An apply message will then be sent out with
+	the modified changes the next time the object receives a MSG_GEN_APPLY.
+	No apply message will be sent out if the state of the group is not
+	modified (unless ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED	
+	is set -- see below).
+
+	The type of window the GenBooleanGroup appears in will dictate
+	when the GenBooleanGroup receives a MSG_GEN_APPLY, and thus sends out
+	its apply message notifying the destination of a modified state.  The 
+	boolean group's parent window will either be:
+
+		1) an immediate mode dialog box, typically with OK/Cancel
+		   triggers, or a menu.  In either case, the boolean group will
+		   receive a MSG_GEN_APPLY and send out its apply message
+		   every time the user changes its state.
+
+		2) a delayed mode dialog box, typically with Apply/Reset/Cancel
+		   triggers.  In this case, the boolean group will usually only
+		   receive a MSG_GEN_APPLY and send its apply message when
+		   the user clicks on the "Apply" trigger in the dialog box.
+		   Furthermore, if the user clicks on the "Reset" trigger in
+		   the dialog box, the GenBooleanGroup will throw away its
+	 	   modified state and revert back the state before it was 
+		   modified.
+
+	See GenInteractionClass for more information on how to make your
+	dialog box of the delayed variety.
+
+	In general, it should not make much difference from a programming
+	point of view which mode the boolean group is in.  Operations should
+	work similarly in either case.
+
+	Setting a modified state for a boolean group
+	--------------------------------------------
+
+	Usually an application will only want to set a new unmodified state
+	for a boolean group, then let the user modify the state of the group.
+	and wait for an apply message to signal a change in the boolean state.  
+	Occasionally there may be a need for the application to change the 
+	modified state of a boolean group, much as if the user had set it.   To 
+	do this, the application should send a MSG_GEN_BOOLEAN_GROUP_SET_GROUP_-
+	MODIFIED_STATE to the group, followed by a MSG_GEN_BOOLEAN_GROUP_SET_-
+	GROUP_STATE to actually change the list's state.  For instance, to
+	"modify" TS_BOLD to be deselected, you could do a:
+
+	   @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE(
+							TS_BOLD, 0);
+	   @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+							TS_BOLD, FALSE);
+
+	The boolean group would act exactly as if the user had deselected 
+	the bold boolean using the mouse.  If the user then hits reset, the
+	bold boolean will be reset to its original state before it was modified.
+	Had we not called MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE, the
+	list's would be unmodified and the user pressing reset would have no 
+	effect.    MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE takes two
+	arguments, one the bitfield identifiers to set modified, and second,
+	the bitfield identifiers to set not-modified.
+
+	To get the currently modified booleans of a GenBooleanGroup object, you 
+	can do a:
+
+		@call StylesGroup::MSG_GEN_BOOLEAN_GROUP_GET_MODIFIED_BOOLEANS();
+
+	which returns a word with the booleans that are currently motified.
+
+
+
+	Receiving status messages
+	-------------------------
+
+	In delayed mode, GenBooleanGroups will only send out notification if
+	an apply occurs.  Sometimes it is useful for the destination to
+	receive notification on all any user change to the group, regardless
+	of whether it is applied.  This is most often used in dialog boxes,
+	where if the user changes the state of one object, the state of
+	another UI gadget must also be changed. For example, color of a text
+	field may be presented both as a GenBooleanGroup of toggleable
+	red/green/blue booleans, and also a GenItemGroup displaying all the
+	possible 8 combinations of these in a list of exclusive items.  Both
+	objects would need to notify the destination any time the user changes
+	one or the other, so that the destination can update the other object
+	appropriately.  Both GenItemGroups and GenBooleanGroups can optionally
+	send out a status message for any change in their state, regardless of
+	whether the change is to be applied or not.  To get status messages
+	from your GenBooleanGroup, add an ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG to
+	the object.  The attribute takes a single message to send on any user
+	change in the object's state.  For example:
+
+		ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG = MSG_STYLES_STATUS_CHANGE;
+	
+	will cause a MSG_STYLES_STATUS_CHANGE to be sent to the destination
+	on a non-applied change.    This message definition should be set up
+	as follows:
+
+		@message (GEN_BOOLEAN_GROUP_STATUS_MSG) 
+			MSG_STYLES_STATUS_CHANGE;
+					
+	The message parameters are "void (word selectedBooleans, indeterminate-
+	Booleans, changedBooleans)", where:
+
+		selectedBooleans      -- the booleans that are selected
+		indeterminateBooleans -- the booleans that are indeterminate
+				         (See section on indeterminate booleans,
+				         below)
+		changedBooleans       -- the selections that have been changed
+				         to cause this status message to be
+					 sent.
+	
+	You could then have MSG_STYLES_STATUS_CHANGE handler change the other
+	BooleanGroup's state as needed.  Similarly, you'd want to set
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG in the item group and have its status
+	message handler keep the boolean group up to date.  Since these
+	messages are usually invoked by some change by the user, each handler
+	will want to mark the other object as modified before changing its
+	state, so that reset will return both objects to their original state
+	properly.  (See the section above on setting the modified state of a
+	boolean group.)
+
+
+	Sending unmodified applies
+	--------------------------
+
+	By default, apply messages are only sent out if user  has modified
+	the state of the object since the last apply.  Occasionally
+	an application will want its delayed GenBooleanGroup to send 
+	notification of an apply if the object has not been modified by the
+	user.
+
+	To receive apply messages, regardless of the modified state of the 
+	group, set:
+
+		ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+
+	The same message for unmodified applies is sent out as for modified
+	applies.  To tell whether anything was actually modified or not, your
+	apply message handler can check the "modifiedBooleans" passed to the
+	handler.
+
+
+Indeterminate mode
+------------------
+
+	Sometimes applications need to mark one or more selections of a
+	GenBooleanGroup object as indeterminate.  For example, a user in a
+	word processing program might be selecting a paragraph of text that
+	starts in bold only, changes to italics briefly in the middle, and
+	turns both styles off near the end, and nothing in the paragraph is
+	underlined.  In this case, both bold and italic are indeterminate --
+	they are partly true, partly false for the selection in question.  You
+	can, if needed, initially set up your object to be in an indeterminate
+	state.  For example, to initially set up bold and italic as
+	indeterminate in your styles group, with only bold initially selected,
+	you can do the following:
+	
+		@object GenBooleanGroupClass StylesGroup = {
+			GI_comp = BoldBoolean, ItalicBoolean, UnderlineBoolean;
+			GBGI_selectedBooleans = TS_BOLD;
+			GBGI_indeterminateBooleans = TS_BOLD | TS_ITALIC;
+		}
+	
+	Generally when setting the state of a GenBooleanGroup,  GBGI_selected-
+	Booleans should correspond to the state of the data at the beginning
+	of the data selection (in this example, only TS_BOLD would be set), and
+	GBGI_indeterminateBooleans should correspond to all the booleans that are 
+	indeterminate for that selection.
+
+	Usually you will set the state of a selection via a message to the 
+	boolean group.  To set the state of the boolean group accordingly to
+	our example selection, do the following:
+
+	   @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_SET_SELECTIONS(	
+							    TS_BOLD,
+							    TS_BOLD | TS_ITALIC);
+
+	the first argument being the selectedBooleans to set (the state of the 
+	start of the data represented,  and the second argument being the 
+	indeterminate booleans in the data.
+
+	You can also change the indeterminate state of an individual boolean by
+	sending a MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_INDETERMINATE_STATE.
+
+	Specific user interfaces may or may not have a special way of showing
+	the indeterminate state.  In CUA or Motif, any indeterminate booleans are
+	shown as deselected. In OpenLook, the bold, italic, and underline booleans
+	would all be displayed somewhat differently for the above situation.
+
+	You can query for the indeterminate selections by doing a:
+
+	   @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_GET_INDETERMINATE_BOOLEANS();
+
+	which returns a word record containing the selections that are 
+	currently indeterminate.  You can query for an individual boolean's
+	indeterminate state via MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_INDETERMINATE.
+
+
+Generic attributes
+------------------
+
+	There are several generic attributes, available for use in the 
+	GenBooleanGroup, which modify its behavior:
+	
+		* Have the boolean group dismiss its window when the user clicks
+		  on any boolean.
+		
+		* Have user clicks cause the cursor to change to a busy cursor,
+		   for long operator.
+		   
+		* Having clicking on any boolean hold up input to other UI
+		  gadgetry until the handler action finishes (good for when
+		  buttons will disable or change UI gadgetry so the user can't
+		  subsequently click on an object before its disabled).
+		  
+		* Having clicking on any boolean cause input to its application
+		  be ignored until the action completes.
+		  
+	Setting these flags in individual booleans will have no affect.
+	
+	These are described in more detail in the GenAttrs section
+	of genClass.asm.
+		  
+
+Linked GenBooleanGroups
+--------------------
+
+	There sometimes may arise a need for GenBooleans to be split up between
+	several GenBooleanGroup.  Usually this would be necessary to accomplish
+	a geometry layout that can't work otherwise.   Since all the boolean 
+	groups keep the identical state, you still are limited to 16 booleans or 
+	less. See GenItemGroup documentation for an example of linked boolean 
+	groups.   For GenBooleanGroups, you use ATTR_GEN_BOOLEAN_GROUP_LINK 
+	instead of ATTR_GEN_BOOLEAN_GROUP_LINK.
+				   
+
+Other miscellanious stuff
+------------------------- 
+	
+	You can change the message that a GenBooleanGroup object uses for notifi-
+	cation by sending the following:
+
+	       @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_SET_APPLY_MSG(MSG_FOO);
+
+	Similarly, to retrieve it:
+
+	       message = @call StylesGroup::MSG_GEN_BOOLEAN_GROUP_GET_APPLY_MSG();
+
+
+	If, for some reason, you need to force an apply for a delayed-mode 
+	GenBooleanGroup, you can send a 
+			
+		@call StylesGroup::MSG_GEN_APPLY;
+	
+	to the GenBooleanGroup, which will cause a notification as if the user
+	had clicked on the "Apply" button.
+
+------------------------------------------------------------------------------`

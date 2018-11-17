@@ -1,0 +1,110 @@
+#!/bin/sh -
+#
+# This script copies all files to the CD-Rom image directory.
+#
+# $Id: copyTargetFiles,v 1.6 94/02/07 17:40:43 jon Exp $
+#
+
+MAKETOOLPATH=/staff/pcgeos/Tools/scripts/sdk
+export MAKETOOLPATH
+
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage: copyTargetFiles <branch> <CD-Rom dir>"
+	echo "Ex.: copyTargetFiles Release20X /n/intl_disks"
+	exit 1
+fi
+
+
+if ( cd /staff/pcgeos/$1/Installed ); then
+	cd /staff/pcgeos/$1/Installed
+	echo ""
+	echo "copyTargetFiles Started On `hostname` At `date` running as $USER"
+else
+	echo "$1 is not a PC/GEOS development tree. (e.g., . or Release20X)"
+	exit 1
+fi
+
+
+#==============================================================================
+# Copy target stuff
+#==============================================================================
+
+cd /staff/pcgeos/Installed/ProductFiles/SDK
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find target -type f -exec $MAKETOOLPATH/copy_for_sdk {} $2 \;
+
+
+#==============================================================================
+# Copy Zoomer swat stub
+#==============================================================================
+
+cd /staff/pcgeos/Tools/swat/Stub/Zoomer
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/copy_for_sdk swat.exe $2/target/zoom
+
+
+#==============================================================================
+# Copy Zoomer loader
+#==============================================================================
+
+if ( cd /staff/pcgeos/jimmy625 ); then
+
+cd /staff/pcgeos/jimmy625/Loader
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/copy_for_sdk loader.exe $2/target/zoom
+
+#==============================================================================
+# Copy Zoomer kernel
+#==============================================================================
+
+cd /staff/pcgeos/jimmy625/Library/Kernel
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/copy_for_sdk geos.geo $2/target/zoom
+
+else
+
+	echo "Error: Couldn't copy loader or kernel from jimmy625"
+fi
+
+
+#==============================================================================
+# Copy InfoView to zoomer target
+#==============================================================================
+cd /staff/pcgeos/Release20X/Installed/Appl/Demo/InfoView
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/copy_for_sdk infoview.geo $2/target/zoom/zoomec/world/other
+$MAKETOOLPATH/copy_for_sdk infoview.geo $2/target/zoom/zoomnc/world/other
+
+
+#==============================================================================
+# Copy geos(ec).ini files to zoomer target
+#==============================================================================
+cd /staff/pcgeos/Installed/ProductFiles/SDKTarget/zoomer.ini
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/copy_for_sdk -u geosec.ini $2/target/zoom/zoomec
+$MAKETOOLPATH/copy_for_sdk -u geos.ini   $2/target/zoom/zoomnc

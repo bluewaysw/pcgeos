@@ -1,0 +1,570 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          BOOKMARK.GOC
+ * DESCRIPTION:   Module for handling the bookmark database and UI.
+ *
+ * AUTHOR:        Lysle E. Shields III
+ *
+ * HISTORY:
+ *   --- -------- -----------------------------------------------
+ *   LES 01/13/97 Created
+ *   --- -------- -----------------------------------------------
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *		Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi\string.h>
+@include "options.goh"
+
+@ifdef COMPILE_OPTION_BOOKMARKS
+
+@include "bookmark.goh"
+
+#define BOOKMARK_BAD    0xFFFFFFFF
+
+@ifdef YAGO_2_BUILD
+#define BOOKMARKS_SP    0  /* Absolute */
+#define BOOKMARKS_DIR   _TEXT("F:\\GEOWORKS\\PRIVDATA")
+@else
+#define BOOKMARKS_SP    SP_PRIVATE_DATA
+#define BOOKMARKS_DIR   _TEXT(".")
+@endif
+
+#ifdef SKIPPER_PRO_BUILD
+#define BOOKMARKS_NAME  _TEXT("Skipper Pro Bookmarks")
+#else
+#ifdef SKIPPER_VERSION
+#define BOOKMARKS_NAME  _TEXT("Skipper Bookmarks")
+#else
+#ifdef YAGO_2_BUILD
+#define BOOKMARKS_NAME  _TEXT("GlobeHopper 3.0 Bookmarks")
+#else
+#define BOOKMARKS_NAME  _TEXT("WebMagick Bookmarks")
+#endif
+#endif
+#endif
+
+
+static VMFileHandle G_bookmarksFile = NullHandle ;
+static VMBlockHandle G_bookmarksArray = NullHandle ;
+static word G_numBookmarksLocked = 0 ;
+
+typedef struct {
+    word sizeBookmark ;  /* Num bytes used by bookmark */
+    word sizeLocation ;
+    TCHAR bookmark[] ;
+} T_bookmarkHeader ;
+
+/**************************************************************************
+ * Routine:  BookmarksOpen
+ **************************************************************************
+ *
+ * Description:
+ *     Open the bookmarks file creating if necessary the file
+ *     and/or huge array
+ *
+ * Outputs:
+ *     Boolean                     -- FALSE = failed, else TRUE.
+ *
+ **************************************************************************/
+Boolean BookmarksOpen(void)
+{
+    /* Do not open twice */
+    EC_ERROR_IF(G_bookmarksFile, -1) ;
+
+    /* Go to the bookmark's location */
+    FilePushDir() ;
+    FileSetCurrentPath(BOOKMARKS_SP, BOOKMARKS_DIR);
+
+    /* Open (or create) the bookmarks file */
+    G_bookmarksFile =
+        VMOpen(BOOKMARKS_NAME, VMAF_FORCE_READ_WRITE, VMO_CREATE, 0) ;
+    if (G_bookmarksFile)  {
+        /* Get the map block which points to the first array */
+        G_bookmarksArray = VMGetMapBlock(G_bookmarksFile) ;
+
+        /* If not map block is set, create the array */
+        if (!G_bookmarksArray)  {
+            /* Create the array */
+            G_bookmarksArray = HugeArrayCreate(G_bookmarksFile, 0, 0);
+            VMSetMapBlock(G_bookmarksFile, G_bookmarksArray) ;
+        }
+
+        /* At this point, we should have a file with a huge array in it */
+        G_numBookmarksLocked = 0 ;
+    }
+
+    FilePopDir() ;
+
+    return (G_bookmarksFile & G_bookmarksArray) ? TRUE:FALSE ;
+}
+
+/**************************************************************************
+ * Routine:  BookmarksClose
+ **************************************************************************
+ *
+ * Description:
+ *     Close the bookmarks file
+ *
+ **************************************************************************/
+void BookmarksClose(void)
+{
+    /* No double closings */
+    EC_ERROR_IF(!G_bookmarksFile, -1) ;
+    EC_ERROR_IF(G_numBookmarksLocked, -1) ;
+    if (G_bookmarksFile)  {
+        VMClose(G_bookmarksFile, FALSE) ;
+
+        G_bookmarksFile = NullHandle ;
+        G_bookmarksArray = NullHandle ;
+    }
+}
+
+/**************************************************************************
+ * Routine:  BookmarkLock
+ **************************************************************************
+ *
+ * Description:
+ *     Locks in a bookmark entry based on the given index (0-based)
+ *
+ * Inputs:
+ *     TCHAR **pp_location         -- Location of bookmark (http://...)
+ *                                   Pass NULL if not wanted.
+ *
+ * Outputs:
+ *     TCHAR *                     -- Name of bookmark (Site title),
+ *                                   NULL if index not found.
+ *
+ **************************************************************************/
+TCHAR *BookmarkLock(dword index, TCHAR **pp_location)
+{
+    T_bookmarkHeader *p_header ;
+    TCHAR *p_bookmark = NULL ;
+    word size ;
+
+    EC_ERROR_IF(!G_bookmarksFile, -1) ;
+    if (G_bookmarksFile)  {
+        HugeArrayLock(
+            G_bookmarksFile,
+            G_bookmarksArray,
+            index,
+            &p_header,
+            &size) ;
+        if (p_header)  {
+            /* Find the location of the site and bookmark pointers */
+            p_bookmark = p_header->bookmark ;
+
+            if (pp_location != NULL)
+                *pp_location = p_bookmark + p_header->sizeBookmark ;
+
+            G_numBookmarksLocked++ ;
+        }
+    }
+
+    return p_bookmark ;
+}
+
+/**************************************************************************
+ * Routine:  BookmarkUnlock
+ **************************************************************************
+ *
+ * Description:
+ *     Get a bookmark entry based on the given index (0-based)
+ *
+ * Inputs:
+ *     TCHAR *p_bookmark           -- Bookmark location returned from
+ *                                   BookmarkLock
+ *
+ **************************************************************************/
+void BookmarkUnlock(TCHAR *p_bookmark)
+{
+    /* Find the pointer location to the beginning of the header */
+    p_bookmark -= offsetof(T_bookmarkHeader, bookmark) ;
+
+    HugeArrayUnlock(p_bookmark) ;
+
+    G_numBookmarksLocked-- ;
+}
+
+/**************************************************************************
+ * Routine:  BookmarksGetCount
+ **************************************************************************
+ *
+ * Description:
+ *     Determine how many bookmarks are in the array.
+ *
+ * Outputs:
+ *     dword                      -- Number of bookmarks found.
+ *
+ **************************************************************************/
+dword BookmarksGetCount(void)
+{
+    dword count = 0 ;
+
+    EC_ERROR_IF(!G_bookmarksFile, -1) ;
+    if (G_bookmarksFile)  {
+        count = HugeArrayGetCount(G_bookmarksFile, G_bookmarksArray) ;
+    }
+
+    return count ;
+}
+
+/**************************************************************************
+ * Routine:  BookmarkAppend
+ **************************************************************************
+ *
+ * Description:
+ *     Create a new bookmark at the end of the bookmark array
+ *
+ * Inputs:
+ *     TCHAR *p_title              -- Title for bookmark
+ *     TCHAR *p_location           -- Location for bookmark
+ *
+ * Outputs:
+ *     dword                      -- Index of new bookmark,
+ *                                   or BOOKMARK_BAD
+ *
+ **************************************************************************/
+dword BookmarkAppend(TCHAR *p_title, TCHAR *p_location)
+{
+    word lenTitle, lenLocation ;
+    word totalSize ;
+    dword pos = BOOKMARK_BAD ;
+    T_bookmarkHeader *p_header ;
+    word size ;
+
+    EC_ERROR_IF(p_title == NULL, -1) ;
+    EC_ERROR_IF(p_location == NULL, -1) ;
+
+    EC_ERROR_IF(!G_bookmarksFile, -1) ;
+    if (G_bookmarksFile)  {
+        /* Determine the lengths of the passed in strings */
+        lenTitle = strlen(p_title) ;
+        lenLocation = strlen(p_location) ;
+        totalSize = (lenTitle + lenLocation + 2)*sizeof(TCHAR) + sizeof(T_bookmarkHeader) ;
+
+        /* Add an element to the end of the huge array */
+        HugeArrayAppend(G_bookmarksFile, G_bookmarksArray, totalSize, NULL) ;
+        pos = BookmarksGetCount() - 1 ;
+        HugeArrayLock(
+            G_bookmarksFile,
+            G_bookmarksArray,
+            pos,
+            &p_header,
+            &size) ;
+
+        /* Fill the header and data structures */
+        p_header->sizeBookmark = lenTitle+1 ;   /* Size includes null */
+        p_header->sizeLocation = lenLocation+1 ;
+        strcpy(p_header->bookmark, p_title) ;
+        strcpy(p_header->bookmark + p_header->sizeBookmark, p_location) ;
+
+        /* Dirty and unlock */
+        HugeArrayDirty(p_header) ;
+        HugeArrayUnlock(p_header) ;
+
+        /* Save all changes */
+        VMSave(G_bookmarksFile) ;
+    }
+
+    return pos ;
+}
+
+/**************************************************************************
+ * Routine:  BookmarkChange
+ **************************************************************************
+ *
+ * Description:
+ *     Change the data for a bookmark based on its postion
+ *     NOTE:  Don't call this routine with ANY bookmarks locked!
+ *
+ * Inputs:
+ *     dword pos                  -- Index of bookmark
+ *     TCHAR *p_title              -- Title for bookmark
+ *     TCHAR *p_location           -- Location for bookmark
+ *
+ **************************************************************************/
+void BookmarkChange(dword pos, TCHAR *p_title, TCHAR *p_location)
+{
+    word lenTitle, lenLocation ;
+    word totalSize ;
+    T_bookmarkHeader *p_header ;
+    word size ;
+
+    EC_ERROR_IF(p_title == NULL, -1) ;
+    EC_ERROR_IF(p_location == NULL, -1) ;
+
+    EC_ERROR_IF(G_numBookmarksLocked, -1) ;
+    EC_ERROR_IF(!G_bookmarksFile, -1) ;
+    if (G_bookmarksFile)  {
+        /* Determine the lengths of the passed in strings */
+        lenTitle = strlen(p_title) ;
+        lenLocation = strlen(p_location) ;
+        totalSize = (lenTitle + lenLocation + 2)*sizeof(TCHAR) + sizeof(T_bookmarkHeader) ;
+
+        /* Resize the old entry */
+/*
+        HugeArrayResize(
+            G_bookmarksFile,
+            G_bookmarksArray,
+            pos,
+            totalSize) ;
+*/
+        HugeArrayDelete(
+            G_bookmarksFile,
+            G_bookmarksArray,
+            1,
+            pos) ;
+        HugeArrayInsert(
+            G_bookmarksFile,
+            G_bookmarksArray,
+            totalSize,
+            pos,
+            NULL) ;
+        /* Fill the header and data structures */
+        HugeArrayLock(
+            G_bookmarksFile,
+            G_bookmarksArray,
+            pos,
+            &p_header,
+            &size) ;
+        p_header->sizeBookmark = lenTitle+1 ;
+        p_header->sizeLocation = lenLocation+1 ;
+        strcpy(p_header->bookmark, p_title) ;
+        strcpy(p_header->bookmark + p_header->sizeBookmark, p_location) ;
+
+        /* Dirty and unlock */
+        HugeArrayDirty(p_header) ;
+        HugeArrayUnlock(p_header) ;
+
+        /* Save all changes */
+        VMSave(G_bookmarksFile) ;
+    }
+}
+
+/**************************************************************************
+ * Routine:  BookmarkDelete
+ **************************************************************************
+ *
+ * Description:
+ *     Deletes an old bookmark
+ *
+ * Inputs:
+ *     dword pos                  -- Index of bookmark
+ *
+ **************************************************************************/
+void BookmarkDelete(dword pos)
+{
+    EC_ERROR_IF(!G_bookmarksFile, -1) ;
+    if (G_bookmarksFile)  {
+        HugeArrayDelete(G_bookmarksFile, G_bookmarksArray, 1, pos) ;
+    }
+}
+
+/**************************************************************************
+ * Routine:  BookmarkGet
+ **************************************************************************
+ *
+ * Description:
+ *     Copies a bookmark into a block of memory.
+ *
+ * Inputs:
+ *     dword pos                  -- Index of bookmark
+ *
+ * Outputs:
+ *     MemHandle                  -- Handle to the bookmark block, else
+ *                                   NullHandle
+ *
+ **************************************************************************/
+MemHandle BookmarkGet(dword pos)
+{
+    MemHandle mem = NullHandle ;
+    char *p_title ;
+    T_bookmarkHeader *p_header ;
+    word size ;
+    void *p_data ;
+
+    /* Lock in the bookmark */
+    p_title = BookmarkLock(pos, NULL) ;
+    if (p_title)  {
+       /* Find the header to the locked bookmark */
+       p_header = (T_bookmarkHeader *)p_title ;
+       p_header-- ;
+
+       /* Determine the size of the bookmark data */
+       size = sizeof(*p_header) +
+              p_header->sizeBookmark +
+              p_header->sizeLocation ;
+
+       /* Allocate a memory block */
+       mem = MemAlloc(size, HF_DYNAMIC | HF_SHARABLE, 0) ;
+       if (mem)  {
+           /* Copy over the data */
+           p_data = MemLock(mem) ;
+           memcpy(p_data, p_header, size) ;
+           MemUnlock(mem) ;
+       }
+       BookmarkUnlock(p_title) ;
+    }
+
+    return mem;
+}
+
+/**************************************************************************
+ * Routine:  BookmarkPut
+ **************************************************************************
+ *
+ * Description:
+ *     Store a bookmark that was recorded by BookmarkGet.
+ *     NOTE:  Call must free MemHandle.  This routine does not do it.
+ *
+ * Inputs:
+ *     dword pos                  -- Index of bookmark
+ *     MemHandle mem              -- Block of data to use.
+ *
+ **************************************************************************/
+void BookmarkPut(dword pos, MemHandle mem)
+{
+    T_bookmarkHeader *p_header ;
+    word size ;
+
+    EC_ERROR_IF(mem==NullHandle, -1) ;
+    if (mem)  {
+        /* Lock in the memory block */
+        p_header = MemLock(mem) ;
+
+        /* Determine the size of the bookmark data */
+        size = sizeof(*p_header) +
+              p_header->sizeBookmark +
+              p_header->sizeLocation ;
+
+        /* Change the data in the array */
+        BookmarkChange(
+            pos,
+            p_header->bookmark,
+            p_header->bookmark + p_header->sizeBookmark) ;
+
+        MemUnlock(mem) ;
+    }
+}
+
+/**************************************************************************
+ * Routine:  BookmarksSwap
+ **************************************************************************
+ *
+ * Description:
+ *     Swap two bookmark positions.
+ *
+ * Inputs:
+ *     word pos1                  -- Index of first bookmark to swap
+ *     word pos2                  -- Index of second bookmark to swap
+ *
+ **************************************************************************/
+void BookmarksSwap(word pos1, word pos2)
+{
+    MemHandle mem1, mem2 ;
+
+    if (pos1 != pos2)  {
+        /* Get the two bookmarks into temporary space */
+        mem1 = BookmarkGet(pos1) ;
+        mem2 = BookmarkGet(pos2) ;
+
+        /* Store in reverse order (if properly gotten) */
+        if (mem1 && mem2)  {
+            BookmarkPut(pos1, mem2) ;
+            BookmarkPut(pos2, mem1) ;
+        }
+
+        if (mem1)
+            MemFree(mem1) ;
+        if (mem2)
+            MemFree(mem2) ;
+
+        /* Save all changes */
+        VMSave(G_bookmarksFile) ;
+    }
+}
+
+/**************************************************************************
+ * Routine:  BookmarksBuildUIList
+ **************************************************************************
+ *
+ * Description:
+ *     This complex command goes through all the children of the given
+ *     parent and changes the moniker to match the entries in the
+ *     bookmarks file.  If there are more bookmarks than children, the
+ *     routine stops on the last child.  If there are more children than
+ *     bookmarks, the latter children are turned off.  This routine assumes
+ *     that the children are all regular gen objects (most like gen
+ *     triggers) and that all the children are to be changed.  The most
+ *     common technique is to create a sub-group in a menu of gentriggers.
+ *
+ * Inputs:
+ *     optr parent                -- Parent GenInteraction object
+ *
+ **************************************************************************/
+void BookmarksBuildUIList(optr parent)
+{
+    word numChildren ;
+    optr child ;
+    word i ;
+    dword numBookmarks ;
+    TCHAR bookmarkName[60] ;
+    TCHAR *p_bookmark ;
+
+    EC_ERROR_IF(!G_bookmarksFile, -1) ;
+    if (G_bookmarksFile)  {
+        numBookmarks = BookmarksGetCount() ;
+        numChildren = @call parent::MSG_GEN_COUNT_CHILDREN() ;
+        for (i=0; i<numChildren; i++)  {
+            child = @call parent::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
+            if (i >= numBookmarks)  {
+                /* If we are past the end of the bookmarks, make */
+                /* the child disappear. */
+                @call child::MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+            } else {
+                /* Change the moniker on the child to match the */
+                /* name of the bookmark */
+                p_bookmark = BookmarkLock((dword)i, NULL) ;
+                if (p_bookmark)  {
+                    /* Copy and truncate the string */
+                    /* (with fancy ... extension) */
+                    strncpy(bookmarkName, p_bookmark, sizeof(bookmarkName)/sizeof(TCHAR)-1) ;
+                    strcpy(bookmarkName+sizeof(bookmarkName)-4, _TEXT("...")) ;
+                    BookmarkUnlock(p_bookmark) ;
+
+                    /* Change the moniker on the bookmark entry */
+                    @call child::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                              bookmarkName,
+                              VUM_NOW) ;
+
+                    /* Make sure the child is visible */
+                    @call child::MSG_GEN_SET_USABLE(VUM_NOW) ;
+                } else {
+                    /* Didn't get a bookmark.  Hide the entry. */
+                    @call child::MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+                }
+            }
+        }
+    }
+}
+
+
+@endif

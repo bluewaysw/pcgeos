@@ -1,0 +1,505 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	term
+FILE:		termMacro.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	atw	4/89		Initial version
+
+DESCRIPTION:
+	This file contains macros global to the term application
+
+	$Id: termMacro.def,v 1.1 97/04/04 16:56:19 newdeal Exp $
+
+------------------------------------------------------------------------------@
+	
+if	not _TELNET
+;
+; 	Macro to call the serial driver with the given function.  Must have the
+; 	routine stored in serialDriver and any other parameters must be set.
+;
+CallSer	macro	func, segreg
+	local driverGone
+	mov	di, func
+ifnb <segreg>
+	cmp	segreg:serialDriver.high, 0
+	stc						; assume gone
+	je	driverGone
+	call	segreg:serialDriver
+else
+	cmp	ds:serialDriver.high, 0
+	stc						; assume gone
+	je	driverGone
+	call	ds:serialDriver
+endif
+driverGone:
+	endm
+endif	; !_TELNET
+
+;
+; 	Macro to call the View in the Interface module
+;	ss	- dgroup
+;
+CallScreenView	macro
+	GetResourceHandleNS	TermView, bx
+	mov	si, offset TermView
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	endm
+
+;
+;	Macro to call items in the Interface module
+;	pass: 	si - item to call
+;		ds - dgroup
+;
+CallInterface	macro
+EC <	call	ECCheckDS_dgroup					>
+	mov	bx, ds:[interfaceHandle]		;get Interface handle
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	endm
+;
+;	Macro to call items in the Interface module
+;	pass: 	si - item to call
+;		ds - dgroup
+;
+SendInterface	macro
+EC <	call	ECCheckDS_dgroup					>
+	mov	bx, ds:[interfaceHandle]		;get Interface handle
+	mov	di, mask MF_FORCE_QUEUE
+	call	ObjMessage
+	endm
+
+SendNoDupInterface	macro
+EC <	call	ECCheckDS_dgroup					>
+	mov	bx, ds:[interfaceHandle]		;get Interface handle
+	mov	di, mask MF_FORCE_QUEUE or mask MF_CHECK_DUPLICATE
+	call	ObjMessage
+	endm
+
+;
+;	macro to call the screen object
+;	bx  - handle to TermUI resource
+;
+CallScreenObj	macro
+	mov	si, offset screenObject			;bx:si ->screen object
+	mov	di, mask MF_CALL
+	call	ObjMessage
+	endm	
+
+SendScreenObj	macro
+	mov	si, offset screenObject			;bx:si ->screen object
+	mov	di, mask MF_FORCE_QUEUE
+	call	ObjMessage
+	endm	
+
+if	not _TELNET
+;
+; Macro to call objects in ScriptUI resource
+; pass:	si - offset of object to call
+; 	ds - dgroup
+;
+CallScriptUI	macro
+EC <	call	ECCheckDS_dgroup					>
+	mov	bx, ds:[scriptUIHandle]
+	mov     di, mask MF_CALL
+	call    ObjMessage
+	endm
+
+;
+; Macro to send events to objects in ScriptUI resource
+; pass:	si - offset of object to call
+; 	ds - dgroup
+;
+SendScriptUI	macro
+EC <	call	ECCheckDS_dgroup					>
+	mov	bx, ds:[scriptUIHandle]
+	mov     di, mask MF_FORCE_QUEUE
+	call    ObjMessage
+	endm
+;
+;	Macro to call items in the TransferUI resource
+;	pass: 	si - item to call
+;		ds - dgroup
+;
+SendTransferUI	macro
+EC <	call	ECCheckDS_dgroup					>
+	mov	bx, ds:[transferUIHandle]		;get transfer handle
+	mov	di, mask MF_FORCE_QUEUE
+	call	ObjMessage
+	endm
+
+endif	; !_TELNET
+
+;
+;	Macro to call items in the TransferUI resource
+;	pass: 	si - item to call
+;		ds - dgroup
+;
+CallTransferUI	macro
+EC <	call	ECCheckDS_dgroup					>
+	mov	bx, ds:[transferUIHandle]		;get transfer handle
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	endm
+
+;
+;call serial thread
+;es: dgroup
+;
+CallSerialThread	macro
+EC <	call	ECCheckES_dgroup					>
+	mov	bx, es:[threadHandle]			;get process handle
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	endm
+
+SendSerialThread	macro
+EC <	call	ECCheckES_dgroup					>
+	mov	bx, es:[threadHandle]			;get process handle
+	mov	di, mask MF_FORCE_QUEUE
+	call	ObjMessage
+	endm
+
+CallSerialThreadDS	macro
+EC <	call	ECCheckDS_dgroup					>
+	mov	bx, ds:[threadHandle]			;get process handle
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	endm
+
+SendSerialThreadDS	macro
+EC <	call	ECCheckDS_dgroup					>
+	mov	bx, ds:[threadHandle]			;get process handle
+	mov	di, mask MF_FORCE_QUEUE
+	call	ObjMessage
+	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitStateHeader
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Initialize the state header of a new state
+
+PASS:		segreg	= segment register of state chunk
+		offreg	= offset register of state chunk
+		(segreg:offseg	= fptr to beginning of StateHeader)
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	4/25/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitStateHeader		macro	segreg, offreg
+		clr	segreg:[offreg].SH_numEntries
+						; no entry in table
+		mov	segreg:[offreg].SH_maxEntries, \
+			INIT_TABLE_ENTRIES	; max entries
+		mov	segreg:[offreg].SH_wildcardDigitAction, \
+			NULL_ACTION		; no action for wildcard digit
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ResetSavedStateHeader
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Reset the saved state header
+
+PASS:		segreg:offreg	= fptr to saved state block header
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	4/26/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ResetSavedStateHeader		macro	segreg, offreg
+	clr	segreg:[offreg].SSH_numEntries
+	mov	segreg:[offreg].SSH_maxEntries, INIT_NUM_SAVED_STATES
+	;
+	; Reset status
+	;
+	BitClr	segreg:[0].FSM_status, FSMSF_SAVE_STATE
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		BitTest
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Test if a bit is set
+
+PASS:		location	= thing to test
+		bit		= the bit to test
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	4/27/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+BitTest		macro	location, bit
+		test	location, (mask bit)
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RSP
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform a Responder specific instruction
+
+PASS:		line	= line of code
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	9/28/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+RSP		macro	line
+	
+	
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NRSP
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform a non-Responder specific instruction
+
+PASS:		line	= line of code
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	9/28/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+NRSP		macro	line
+	
+		line
+	
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CCT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform an instruction with _CAPTURE_CLEAN_TEXT feature
+
+PASS:		line	= line of code
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	9/28/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CCT		macro	line
+
+if	_CAPTURE_CLEAN_TEXT
+		line
+endif
+		
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NCCT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform an instruction without _CAPTURE_CLEAN_TEXT feature
+
+PASS:		line	= line of code
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	9/28/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+NCCT		macro	line
+
+if	not _CAPTURE_CLEAN_TEXT
+		line
+endif	
+	
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		VSER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform an instruction with _VSER feature (using Virtual
+		Serial driver)
+
+PASS:		line	= line of instruction
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	10/ 8/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+VSER		macro	line
+
+if	_VSER
+		line
+endif	; _VSER
+	
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		TELT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform an instruction in Telnet appl
+
+PASS:		line	= line of instruction
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	11/20/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+TELT		macro	line
+
+if	_TELNET
+		line
+endif
+	
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NTELT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform an instruction not in Telnet appl
+
+PASS:		line	= line of instruction
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	11/20/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+NTELT		macro	line
+
+if	not _TELNET
+		line
+endif
+	
+endm
+
+if	_TELNET
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IsTextNumericIPAddr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check if an ASCII buffer text is a numeric IP addr
+
+PASS:		expr (e.g. ds:[si] NOT dssi)
+RETURN:		ZF clear if it is a numeric IP addr
+DESTROYED:	ax
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	11/26/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IsTextNumericIPAddr		macro	expr
+		mov	al, expr
+		clr	ah
+		call	LocalIsDigit		; ZF clear if digit
+endm
+
+endif	; _TELNET
+

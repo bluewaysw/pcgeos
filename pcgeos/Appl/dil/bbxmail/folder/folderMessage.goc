@@ -1,0 +1,546 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  folderMessage.goc
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ * DESCRIPTION:
+ *	Message code for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include <hugearr.h>
+
+#ifdef __BORLANDC__
+#pragma codeseg FolderCode
+#endif
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        ScanHeader
+ * PASS:            hdrHan - handle of header block
+ *                  dest - destination buffer
+ *                  fieldName - optr of field to look for
+ *                  len - maximum length
+ *                  skimAddrs - TRUE to use real names where possible
+ * RETURN:          zero if no field data
+ * DESCRIPTION:
+ *         scan the headers of a message file
+ *
+ *	3/23/04		jfh	added header decode stuff
+ * 6/29/04		jfh	fix > 30 char sender names bug
+ ***************************************************************/
+
+word
+ScanHeader(MemHandle hdrHan, TCHAR *dest, optr fieldName, int len, Boolean skimAddrs)
+{
+ MemHandle	flh, dmh, addrBlk = NullHandle;
+ TCHAR		*flp, *namePtr, *decodedText;
+ word			i, num, eSize, l2;
+
+
+	flh = MailGetHeader(hdrHan, LMemDeref(fieldName));
+	if (!flh) {
+		dest[0] = 0;
+		return(0);
+		}
+
+	flp = MemLock(flh);
+
+	/* jfh - in here we need to parse the header text to check for
+		special characters - RFC2047 */
+	dmh = CheckIfDecodeReqd(flp);
+	if (dmh) decodedText = MemLock(dmh);
+
+	/*
+	 * if told to do so, get the real names
+	 */
+	if (skimAddrs) {
+		dest[0] = 0;
+		/* put individual addees into an array (if multiple addees) */
+		if (dmh)  addrBlk = MailParseAddressString(decodedText);
+		else {
+			LocalCodePageToGeos(flp, strlen(flp), CODE_PAGE_LATIN_1, '.');
+			addrBlk = MailParseAddressString(flp);
+			}
+		MemLock(addrBlk);
+		num = ChunkArrayGetCount(MPARC_NAMES(addrBlk));
+		for (i = l2 = 0; i < num; i++) {
+			if (i > 0) {
+				/* string together multiple addresses */
+				if (len-l2 > 2) {
+					/* if the name fits, just put it in */
+					strcat(dest, ", ");
+					l2 += 2;
+					}
+				else {
+					/* I can't fit a comma so another name won't fit, so bail */
+					break;
+					}
+				} /* end of i > 0 if */
+			/* grab the name */
+			namePtr = ChunkArrayElementToPtr(MPARC_NAMES(addrBlk), i, &eSize);
+			if (!namePtr[0]) {
+				/* not there so use the address */
+				namePtr = ChunkArrayElementToPtr(MPARC_ADDRESSES(addrBlk), i, &eSize);
+				}
+			/* return the name or address */
+			if (len-l2 > eSize) {
+				/* if the name fits, just put it in */
+				strcat(dest, namePtr);
+				l2 += eSize-1;
+				}
+			else {
+				/* Instead of just bailing, we should truncate and put in at
+					least part of what we have.  The ellipsis is added in Gene's
+					code below.  jfh - 6/29/04 */
+				strncat(dest, namePtr, len-l2);
+				break;
+				}
+			}  /* end of i for loop */
+		MemFree(addrBlk);
+		}  /* end of skimAddrs if */
+	else {
+		/* just copy a up to a maximum */
+		if (dmh)  {
+			strncpy(dest, decodedText, len-1);
+         MemFree(dmh);
+			}
+		else  {
+			LocalCodePageToGeos(flp, strlen(flp), CODE_PAGE_LATIN_1, '.');
+			strncpy(dest, flp, len-1);
+			}
+		}
+
+	dest[len-1] = NULL;
+	dest[len-2] = C_ELLIPSIS;
+	MemFree(flh);
+
+	return(dest[0] != 0);
+
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MailListScanHeaders
+ * PASS:            mls - ptr to MessageListStruct to fill in
+ *                  retData - ptr to LSHStruct with data
+ * RETURN:          none
+ * DESCRIPTION:
+ *         scan the headers for a message file
+ ***************************************************************/
+
+void
+MailListScanHeaders(MessageListStruct *mls, LSHStruct *retData)
+{
+    word folderNum = retData->LSH_folderNum;
+    FileHandle fh;
+    MemHandle hdrHan, flh;
+    optr fField;
+    TCHAR *flp;
+    TCHAR *afn;
+
+    /*
+     * init to something reasonable in case we can't open the file
+     */
+    mls->MLS_time.MT_time.TDAT_year = 1999;
+    mls->MLS_time.MT_time.TDAT_month = 1;
+    mls->MLS_time.MT_time.TDAT_day = 1;
+    mls->MLS_time.MT_time.TDAT_dayOfWeek = DOTW_FRIDAY;
+    mls->MLS_time.MT_time.TDAT_hours = 0;
+    mls->MLS_time.MT_time.TDAT_minutes = 0;
+    mls->MLS_time.MT_time.TDAT_seconds = 1;
+    mls->MLS_time.MT_timezone = 0;
+    mls->MLS_flags = 0;
+    mls->MLS_mail[0] = 0;
+    mls->MLS_subject[0] = 0;
+    mls->MLS_color = 0;
+    mls->MLS_label = 0xff;
+
+    fh = FileOpen(mls->MLS_filename, FILE_DENY_W|FILE_ACCESS_R);
+    if (!fh) {
+	EC_ERROR(MAIL_UNABLE_TO_OPEN_MESSAGE_FILE);
+        return;
+    }
+    hdrHan = MailReadHeaders(fh);
+    FileClose(fh, FALSE);
+    LockStrings();
+
+    /*
+     * use the To: field for outgoing messages
+     * and the From: field for incoming messages
+     */
+    switch (folderNum) {
+        case MFID_DRAFTS:
+        case MFID_OUTBOX:
+        case MFID_SENT:
+	    fField = @toFieldName;
+	    mls->MLS_flags |= MF_OUTBOUND;
+	    break;
+        default:
+	    fField = @fromFieldName;
+    }
+    ScanHeader(hdrHan, mls->MLS_mail, fField, MAX_LIST_ADDRESS_LENGTH, TRUE);
+    /*
+     * get the subject field, if any
+     */
+    if (!ScanHeader(hdrHan, mls->MLS_subject, @subjectFieldName, 
+		    MAX_LIST_SUBJECT_LENGTH, FALSE)) {
+        strcpy(mls->MLS_subject, LMemDeref(@messListNoSubjMkr));
+    }
+    /*
+     * get the time stamp
+     */
+    flh = MailGetHeader(hdrHan, LMemDeref(@dateFieldName));
+    if (flh) {
+        flp = MemLock(flh);
+	ParseDateTimeWithTimezone(flp, &mls->MLS_time);
+        MemFree(flh);
+    }
+    /*
+     * see if the message has been read unless it is editable
+     */
+    if (folderNum != MFID_DRAFTS && folderNum != MFID_OUTBOX) {
+	flh = MailGetHeader(hdrHan, LMemDeref(@xreadFieldName));
+	if (flh) {
+	    mls->MLS_flags |= MF_READ;
+	    MemFree(flh);
+	}
+    } else {
+	/*
+	 * always mark as read if it is editable
+	 */
+	mls->MLS_flags |= MF_READ;
+    }
+    /*
+     * see if there are any attachments
+     */
+    afn = MailLockStdString(MSS_ATTACH_FIELD_NAME);
+    flh = MailGetHeader(hdrHan, afn);
+    MailUnlockStdString(MSS_ATTACH_FIELD_NAME);
+    if (flh) {
+        mls->MLS_flags |= MF_HAS_ATTACHMENTS;
+	MemFree(flh);
+    }
+
+
+    /*
+     * all done -- clean up
+     */
+    MemFree(hdrHan);
+    UnlockStrings();
+}
+
+Boolean _pascal ListScanHeadersCB(void *element, void *enumData)
+{
+    MessageListStruct *p=element;
+    LSHStruct *data = enumData;
+
+    MailListScanHeaders(p,data);
+    HugeArrayDirty(element);
+
+    return FALSE;
+}
+
+Boolean _pascal IndexScanHeadersCB(void *element, void *enumData)
+{
+    MessageListStruct *p=element;
+    LSHStruct *data = enumData;
+    MessageIndexStruct *mis;
+
+    /*
+     * Create and entry in the index array for this entry;
+     */
+    mis = ChunkArrayAppendHandles(data->LSH_arrayHandle,data->LSH_arrayChunk,0);
+    mis->MIS_index = data->LSH_index;
+    mis->MIS_flags = p->MLS_flags;
+    data->LSH_index = data->LSH_index+1;
+
+    return FALSE;
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        ScanMessagesList
+ * DESCRIPTION:     Go throught the message list built by FolderGetMessages
+ *                  and fill in the information for each entry by opening
+ *                  each message file and scanning the header.  Also, 
+ *                  create the chunk array list that is the index list
+ *                  to the main huge array list.
+ *
+ * PASS:            vmf - VMFileHandle
+ *                  vmbh - VMBlockHandle
+ *                  word - folderNum of the folder to be scanned
+ * RETURN:          
+ ***************************************************************/
+void ScanMessageList(VMFileHandle vmf, VMBlockHandle vmbh, int folderNum) 
+{
+     LSHStruct data;
+     optr indexArray;
+
+     indexArray=LockIndexArray(vmf,NULL);
+     /*
+      * create the huge array of messages
+      */
+     data.LSH_folderNum = folderNum;
+     HugeArrayEnum(vmf, vmbh, ListScanHeadersCB,0,-1,&data);
+
+     /*
+      * create the chunk array of messages
+      */
+     data.LSH_arrayHandle=OptrToHandle(indexArray);
+     data.LSH_arrayChunk=OptrToChunk(indexArray);
+     data.LSH_folderNum = folderNum;
+     data.LSH_index = 0;
+     HugeArrayEnum(vmf, vmbh, IndexScanHeadersCB,0,-1,&data);
+
+     UnlockIndexArray(OptrToHandle(indexArray));
+
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        FolderGetMessages
+ * DESCRIPTION:     Get the messages in the specified folder
+ * PASS:            folderName - name of folderGetMessages 
+ *                  numMsgs - ptr to var
+ *                  folderNum - if folderNum = -1, fold Get Messages
+ *                     will figure the number out based on the name;
+ *                    
+ * RETURN:          return VMFileHandle and VMBlockHandle for the 
+ *                  message array.  Return true if the 
+ *                  the message array was just created and 
+ *                  the entries need to be rescanned.
+ ***************************************************************/
+
+char wildStr[] = "*";
+
+MemHandle
+FolderGetCommon(FileEnumParams params, word *numMsgs)
+{
+    MemHandle bufHan;
+
+    params.FEP_returnAttrs = (void *) FESRT_NAME;
+    params.FEP_returnSize = sizeof(FileLongName);
+    params.FEP_matchAttrs = 0;
+    
+    params.FEP_bufSize = MAX_FOLDER_ENUM;
+    params.FEP_callback = (void *) FESC_WILDCARD;
+    params.FEP_cbData1 = (dword) wildStr;
+    *numMsgs = FileEnum(&params, &bufHan, NULL);
+    return(bufHan);
+}
+
+Boolean
+
+FolderGetMessages(TCHAR *folderName, int folderNum, word *numMsgs, VMFileHandle *retVMF, VMBlockHandle *retVMBH)
+{
+    FileEnumParams params;
+    VMBlockHandle vmbhArray;
+    VMFileHandle vmf;
+    MemHandle mh,mhMLS;
+    FileLongName *fnp;
+    MessageListStruct *mls;
+    dword count;
+    word i;
+    SortMessageByType sortType;
+
+    vmf = OpenMessageListFile(folderName);
+    /*
+     * If the message file already exists that we don't have to do anything
+     */
+    if (vmf) {
+	*retVMF = vmf;
+	*retVMBH = GetMessageListArray(vmf);
+	sortType = GetMessageListSortType(vmf);
+	@call SortByList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sortType,FALSE);
+	return FALSE;
+    }
+	
+    /*
+     * Create a message list by scanning the directory for all files
+     */
+    vmf = CreateMessageListFile(folderName);
+    *retVMF = vmf;
+
+    sortType = GetMessageListSortType(vmf);
+    @call SortByList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sortType,FALSE);
+
+    vmbhArray = GetMessageListArray(vmf);
+    mhMLS = MemAlloc(sizeof(MessageListStruct), HF_SWAPABLE | HF_SHARABLE, 
+			     HAF_LOCK | HAF_NO_ERR | HAF_ZERO_INIT);
+    mls = MemLock(mhMLS);
+    *numMsgs = 0;
+    count = 0;
+    params.FEP_skipCount = 0;
+    while (1) {
+	params.FEP_searchFlags = FESF_NON_GEOS|FESF_CALLBACK;
+	GotoMailDirectory(folderName);
+	mh = FolderGetCommon(params, &count);
+	if (mh) {
+	    fnp = MemLock(mh);
+	    for (i=0;i<count;++i) {
+		strcpy(mls->MLS_filename,fnp[i]);
+		HugeArrayAppend(vmf,vmbhArray,1,mls);
+	    }
+	    *numMsgs += count;
+	    MemFree(mh);
+	}
+	if (count < MAX_FOLDER_ENUM) {
+	    break;
+	} else {
+	    params.FEP_skipCount += MAX_FOLDER_ENUM;
+	}
+    }
+    SetMessageListArray(vmf,vmbhArray);
+    MemFree(mhMLS);
+    *retVMBH =  vmbhArray;
+
+    if (folderNum == -1) {
+	folderNum = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NUM(folderName);
+    }
+    ScanMessageList(*retVMF,*retVMBH,folderNum);
+    return TRUE;
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        FolderDeleteMessages
+ * DESCRIPTION:     Delete
+ * PASS:            folderName - ptr to name of folder
+ * RETURN:          non-zero if error
+ ***************************************************************/
+
+typedef struct {
+    Boolean err;
+    Boolean doUIDL;
+} DNFCBData;
+
+Boolean _pascal DeleteMessageFileCallback(void *element, void *enumData)
+{
+@ifdef LEAVE_MAIL_ON_SERVER
+    FileHandle fh;
+    MemHandle hdrHan, dataHan;
+    TCHAR *uidl, *xuidlStr;
+@endif
+	 DNFCBData *cbData = enumData;
+
+    MessageListStruct *mlp=element;
+
+@ifdef LEAVE_MAIL_ON_SERVER
+    /*
+     * get the UIDL and mark it for deletion from the server
+     */
+    if (cbData->doUIDL) {
+	fh = FileOpen(mlp->MLS_filename, FILE_ACCESS_R|FILE_DENY_W);
+	if (fh) {
+	    hdrHan = MailReadHeaders(fh);
+	    if (hdrHan) {
+		xuidlStr = MailLockStdString(MSS_XUIDL_FIELD_NAME);
+		dataHan = MailGetHeader(hdrHan, xuidlStr);
+		MailUnlockStdString(MSS_XUIDL_FIELD_NAME);
+		if (dataHan) {
+		    uidl = MemLock(dataHan);
+		    UIDLSetFlag(MOSS_DELETE_FROM_SERVER, uidl, FALSE);
+		    MemFree(dataHan);
+		}
+		MemFree(hdrHan);
+	    }
+	    FileClose(fh, FALSE);
+	}
+    }
+@endif
+
+	 /*
+     * delete the message file and any attachments
+     */
+    cbData->err = DeleteMessageFile(mlp->MLS_filename);
+    
+    if (cbData->err) {
+	return TRUE;
+    } else {
+	return FALSE;
+    }
+}
+
+word
+FolderDeleteAllFiles(TCHAR *folderName)
+{
+    VMBlockHandle vmbh;
+    VMFileHandle vmf;
+    MemHandle mhFolder;
+    FileLongName *buf;
+    word numMsgs, i, folderNum;
+    DNFCBData cbData;
+
+    /* We need to check and see if the current listed folder is the 
+     * the folder that we want to delete.
+     */
+    folderNum = @call TheMessageList::MSG_MAIL_LIST_GET_FOLDER_NUM();
+	 mhFolder = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(folderNum);
+
+    buf = MemLock(mhFolder); 
+    i = strlen(folderName);
+    if (!strncmp(folderName,buf,i)) {
+	@call TheMessageList::MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY();
+    }
+    MemFree(mhFolder);
+    /*
+     * Get the messages list array and delete them
+     */
+@ifdef LEAVE_MAIL_ON_SERVER
+	 cbData.doUIDL = @call PfMessageOptionList::
+			 MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & MMO_LEAVE_ON_SERVER;
+@endif
+
+
+    cbData.err = 0;
+
+    FolderGetMessages(folderName, -1, &numMsgs, &vmf, &vmbh);
+    HugeArrayEnum(vmf, vmbh, DeleteMessageFileCallback,0, -1, &cbData );
+    /* 
+     * Delete the message list array
+     */
+    VMClose(vmf,NULL);
+    DeleteMessageListArray(folderName);
+
+    return(cbData.err);
+}
+
+word
+FolderDeleteMessages(TCHAR *folderName)
+{
+    VMBlockHandle vmbh;
+    VMFileHandle vmf;
+    word numMsgs;
+    word err;
+
+    FileBatchChangeNotifications();
+    err = FolderDeleteAllFiles(folderName);
+    /* 
+     * we just deleted the message array, now  
+     * force it to be rebuilt.  This is necessary because certain 
+     * circumstances depend on a directory already having a message 
+     * array;
+     */
+    FolderGetMessages(folderName,-1, &numMsgs, &vmf, &vmbh);
+    VMClose(vmf, NULL);
+    FileFlushChangeNotifications();
+    return(err);
+}

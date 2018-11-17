@@ -1,0 +1,1638 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		GeoFile/Main
+FILE:		mSorting.goc
+
+AUTHOR:		John D. Mitchell
+
+METHODS:
+
+Name			Description
+----			-----------
+
+FUNCTIONS:
+
+Scope	Name			Description
+-----	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jeremy	92.10.12	Initial version.
+	JDM	93.01.04	Real cancel support.
+
+DESCRIPTION:
+	This file contains message handlers that deal with sorting in
+	GeoFile.
+
+	$Id: mSorting.goc,v 1.1 97/04/04 15:54:04 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>		/* PC/GEOS Standard Applications.	*/
+
+#include <Ansi/string.h>	/* Standard C.	*/
+
+@include <gcnlist.goh>		/* PC/GEOS Libraries.	*/
+@include <grobj.goh>
+@include <Objects/FlatFile/ffDbaseC.goh>
+#include <Objects/FlatFile/ffExBld.h>
+@include <Objects/FlatFile/ffFldPr.goh>
+@include <Objects/FlatFile/ffFldPrC.goh>
+@include <Objects/FlatFile/ffRecC.goh>
+@include <Objects/gDListC.goh>
+@include <Objects/gDocC.goh>
+@include <Objects/gViewCC.goh>
+
+@define	__GF_MAIN_SORTING_GOC	/* Don't over-define.	*/
+@include <geofile.goh>		/* GeoFile Application.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Sorting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_QUICK_SORT_DIALOG_INITIATE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Perform any initialization of the Sort dialog box and/or
+		its children.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDO CODE/STRATEGY:
+	Commit the currently being edited record (if any) to the database.
+	Save the current sort context.
+	Clear out any extraneous sort keys.
+	Set the sort options list to match the database.
+	Figure out how many fields are in the current database and
+	initialize the FieldsInDBList.
+	If there are any fields in the database then
+		If there are any sort keys then
+			Select the list element which corresponds to the
+			sort key item.
+		Otherwise,
+			Select the first element.
+		Enable the various lists.
+	Otherwise,
+		Disable the various lists.
+	Initiate the SortDialog dialog box.
+
+WHY:	Allow the easy performing of one-shot initializations.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.09.24	Initial version.
+	JDM	92.12.09	Sort options support.
+	JDM	92.12.10	Selection of first field.
+	JDM	92.12.29	Real cancel support.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_QUICK_SORT_DIALOG_INITIATE
+{
+    optr	databaseObject;
+    optr	fieldsList;
+    optr	sortApplyTrigger;
+    optr	sortOrderList;
+    optr	sortOptionsList;
+    byte	numFields;
+    byte	numSortFields;
+    byte	dbIndex;
+    sbyte	sortOrder;
+    FFDSortOptions	sortOptions;
+
+    /* Get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Commit the current record (if any).	*/
+    if (! @call databaseObject::
+		MSG_FFD_RECORD_CONTROL (FFRCR_COMMIT_CURRENT_RECORD, 0)) 
+	{
+	/* Oops.  Bad record so bail.	*/
+	return;
+        }
+    /*
+     *	This is a discardable dialog, so tell the interaction that we are
+     *  about to bring it onscreen, so it shouldn't allow itself to be
+     *  discarded.
+     */
+    @call GeodeGetOptrNS (@QuickSortDialog)::
+	    	    	MSG_GEN_INTERACTION_DISABLE_DISCARDING ();
+
+    /* Save the current sort context.	*/
+    @call databaseObject::MSG_FFD_SORT_INFO_SHADOW_SAVE ();
+
+    /* Nuke all of the items but the first (highest priority) item.	*/
+    numSortFields = @call databaseObject::
+		MSG_FFD_SORT_INFO_GET_NUM_ITEMS ();
+    while (numSortFields > 1)
+	{
+	/*
+	 * Nuke the item.
+	 * Note that the predecrement is both adjusting the value for
+	 * use as the item's index *and* the loop counter for the next
+	 * iteration.
+	 */
+	@call databaseObject::MSG_FFD_SORT_INFO_DELETE_ITEM
+			(--numSortFields);
+	}
+
+    /*
+     * Get the current sort options from the database and make the list's
+     * sort options match.
+     */
+    sortOptions = @call databaseObject::
+		MSG_FFD_SORT_INFO_GET_SORT_OPTIONS ();
+    sortOptionsList = GeodeGetOptrNS (@QuickSortOptionsList);
+    @call sortOptionsList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+		(sortOptions, FALSE);
+
+    /*
+     * Initialize the database fields list.  Get the number of fields in the
+     * current database.
+     */
+    fieldsList = GeodeGetOptrNS (@QuickSortFieldsInDBList);
+    numFields = @call databaseObject::MSG_FFD_GET_NUMBER_OF_FIELDS
+		(fieldsList, DATABASE_NAME_LIST);
+
+    /* Any fields in the database?	*/
+    sortApplyTrigger = GeodeGetOptrNS (@QuickSortApplyTrigger);
+    sortOrderList = GeodeGetOptrNS (@QuickSortDirectionList);
+    if (numFields)
+	{
+	/* Yep.  Any sort keys?	*/
+	if (numSortFields)
+	    {
+	    /* 
+	     * Yep.  Figure out the list entry to select which corresponds
+	     * to the selected sort item.
+	     */
+	    dbIndex = @call databaseObject::MSG_FFD_SORT_INFO_QUERY_ITEM
+			(0, &sortOrder);
+	    }
+	else
+	    {
+	    /* Nope.  Select the first field and default to ascending.	*/
+	    dbIndex = 0;
+	    sortOrder = SORT_ASCENDING;
+	    }
+
+	/* Select the appropriate field.	*/
+	@call fieldsList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(dbIndex, FALSE);
+
+	/* Set the sort direction based on the current field.	*/
+	@call sortOrderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			((sortOrder) ? SORT_ASCENDING : SORT_DESCENDING,
+			 FALSE);
+
+	/* Do everything associated with selecting a field.	*/
+	@call {GEN_ITEM_GROUP_APPLY_MSG} process::
+                        MSG_GF_QUICK_SORT_FIELD_SELECTED (dbIndex, 1, 0);
+
+	/* Enable the sort trigger.	*/
+	@call sortApplyTrigger::MSG_GEN_SET_ENABLED (VUM_NOW);
+
+	/* Enable the various lists.	*/
+	@call sortOptionsList::MSG_GEN_SET_ENABLED (VUM_NOW);
+	@call sortOrderList::MSG_GEN_SET_ENABLED (VUM_NOW);
+	}	/* End of if any database fields.	*/
+    else
+	{
+	/* Disable everything but the Cancel trigger.	*/
+	@call sortApplyTrigger::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call sortOptionsList::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call sortOrderList::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	}
+
+    /* Initiate the the QuickSortDialog box.	*/
+    @call GeodeGetOptrNS (@QuickSortDialog)::
+			MSG_GEN_INTERACTION_INITIATE ();
+}	/* End of MSG_GF_QUICK_SORT_DIALOG_INITIATE.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_QUICK_SORT_SORT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Sort the database as per the user's selection in the
+		quick sorting dialog box.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Disable our trigger.
+	Get ahold of the current database.
+	Get the database to sort itself using the current sort information.
+	Get rid of the saved sort context.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+	Assumes that the UI is marked as completing the interaction.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.09.24	Initial version.
+	JDM	93.01.14	UI dimisses interaction.
+	JDM	93.01.15	Forced complete screen update.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_QUICK_SORT_SORT
+{
+    optr	databaseObject;
+
+    /* Disable ourself.	*/
+    @call GeodeGetOptrNS (@QuickSortApplyTrigger)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Sort the database using the defined sort criteria.	*/
+    @call databaseObject::MSG_FFD_SORT_INFO_SORT ();
+
+    /* Get rid of the saved sort context.	*/
+    @call databaseObject::MSG_FFD_SORT_INFO_SHADOW_DELETE ();
+
+    /*
+     * Set the current row to the first row and make sure that the screen
+     * is completely updated.
+     */
+    @call databaseObject::MSG_FFD_RECORD_CONTROL (FFRCR_GOTO_FIRST_RECORD,
+						  0);
+    @call databaseObject::MSG_FFD_RECORD_CONTROL (FFRCR_REFRESH, 0);
+}	/* End of MSG_GF_QUICK_SORT_SORT.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_QUICK_SORT_CANCEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Cancel the quick sort that the user is in the middle of
+		defining.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Restore the sort context.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+	Assumes that the UI is marked as completing the interaction.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.09.24	Initial version.
+	JDM	93.01.01	Real cancel support.
+	JDM	93.01.14	UI dimisses interaction.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method  GeoFileProcessClass, MSG_GF_QUICK_SORT_CANCEL
+{
+    /* 
+     * Restore the previously save sort context since they didn't like
+     *  this one.
+     */
+    @call GetTargetDatabaseObject ()::MSG_FFD_SORT_INFO_SHADOW_RESTORE ();
+}	/* End of MSG_GF_QUICK_SORT_CANCEL.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_QUICK_SORT_DIRECTION_CHANGED
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Change the sort direction of the currently selected item in
+		the quick sort keys list.
+
+PASS: 		word	selection	= Currently selected item.
+		word	numSelections	= 1;
+		byte	stateFlags	= GenItemGroup state flags.
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDO CODE/STRATEGY:
+	Get the number of sort keys in the current sort key information.
+	If there's a single sort key then
+		Set the sort direction for the item to the given direction.
+
+CHECKS:		Make sure that there is at most one sort key.
+		Make sure that there is a current sort key list selection.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.09.24	Initial version.
+	JDM	92.12.08	Duh?! style fixes.
+	JDM	93.01.13	Do you ever wonder how something could
+				have ever worked at all?
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_QUICK_SORT_DIRECTION_CHANGED
+{
+    optr	databaseObject;
+    optr	sortKeyList;
+    word	sortKeySelection;
+    word	numItems;
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Any sort keys?	*/
+    numItems = @call databaseObject::MSG_FFD_SORT_INFO_GET_NUM_ITEMS ();
+
+#if	ERROR_CHECK
+    /* Invalid sort key count?	*/
+    if (1 < numItems)
+	{
+	EC_ERROR (SORT_QUICK_SORT_INVALID_SORT_KEY_COUNT);
+	}
+#endif	/* ERROR_CHECK	*/
+
+    /* Can only have one quick sort key.	*/
+    if (1 == numItems)
+	{
+
+#if	ERROR_CHECK
+	/* Determine if there's a selection.	*/
+	sortKeyList = GeodeGetOptrNS (@QuickSortFieldsInDBList);
+	sortKeySelection = @call sortKeyList::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+
+	if (GIGS_NONE == sortKeySelection)
+	    {
+	    EC_ERROR (SORT_QUICK_SORT_MUST_HAVE_SORT_KEY_LIST_SELECTION);
+	    }
+#endif	/* ERROR_CHECK	*/
+
+	/* Set the sort direction as appropriate.	*/
+	@call databaseObject::MSG_FFD_SORT_INFO_SET_SORT_DIRECTION
+			(0, (SORT_ASCENDING == selection) ? TRUE : FALSE);
+	}	/* End of if valid numItems.	*/
+}	/* End of MSG_GF_QUICK_SORT_DIRECTION_CHANGED.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_QUICK_SORT_FIELDS_LIST_QUERY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Retrieve a moniker for the FieldInDBLists.
+
+PASS:		optr	list	= List that is being requested for.
+ 		word	item	= Currently selected item.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get ahold of the database handle.
+	Get the database to supply the moniker for this list item.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.09.24	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_QUICK_SORT_FIELDS_LIST_QUERY
+{
+    optr	databaseObject;
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Get the moniker from the entire database list.	*/
+    @call databaseObject::MSG_FFD_REQUEST_FIELD_MONIKER
+		(list, item, DATABASE_NAME_LIST);
+}	/* End of MSG_GF_QUICK_SORT_FIELDS_LIST_QUERY.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_QUICK_SORT_FIELD_SELECTED
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Update the Quick Sort dialog box in response to the user
+		selecting a field in the Fields list.
+
+PASS: 		word	selection	= Currently selected item.
+		word	numSelections	= 1 if a selection, otherwise 0.
+		byte	stateFlags	= GenItemGroup state flags.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get ahold of the current database handle.
+	Delete the entry (if any) from the sort information list.
+	Add the given selection (if any) to the sort information list.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+	Assumes that at most one item is in the database's sort information
+	list.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.09.24	Initial version.
+	JDM	92.12.08	Proper handling of the apply trigger.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_QUICK_SORT_FIELD_SELECTED
+{
+    optr	databaseObject;
+    byte	numSortKeys;
+    SortInfoSpecifiers	sortOrder;
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Is there anything already in the sort information list.	*/
+    numSortKeys = @call databaseObject::MSG_FFD_SORT_INFO_GET_NUM_ITEMS ();
+    if (numSortKeys)
+	{
+	@call databaseObject::MSG_FFD_SORT_INFO_DELETE_ITEM (0);
+	}
+
+    /* Anything actually selected?	*/
+    if (numSelections)
+	{
+	/*
+	 * Insert the selection as the only item in the database's
+	 * sort information list.
+	 */
+	@call databaseObject::MSG_FFD_SORT_INFO_ADD_ITEM (selection);
+
+	/* Set the sort ordering for the field.	*/
+	sortOrder = @call GeodeGetOptrNS (@QuickSortDirectionList)::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+	@call databaseObject::MSG_FFD_SORT_INFO_SET_SORT_DIRECTION
+			(0, (SORT_ASCENDING == sortOrder) ? TRUE : FALSE);
+
+	/* Activate the Sort trigger.	*/
+	@call GeodeGetOptrNS (@QuickSortApplyTrigger)::MSG_GEN_SET_ENABLED
+			(VUM_NOW);
+	}
+    else
+	{
+	/* Deactivate the Sort trigger.	*/
+	@call GeodeGetOptrNS (@QuickSortApplyTrigger)::
+			MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	}
+}	/* End of MSG_GF_QUICK_SORT_FIELD_SELECTED.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Advanced Sorting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_DIALOG_INITIATE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Perform any initialization of the Sort dialog box and/or
+		its children.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDO CODE/STRATEGY:
+	Commit the currently being edited record (if any) to the database.
+	Save the current sort context.
+	Clear out any extraneous sort keys.
+	Set the sort options list to match the database.
+	Figure out how many fields are in the current database and
+	initialize the FieldsInDBList.
+	If there are any fields in the database then
+		If there are any sort keys then
+			Select the list element which corresponds to the
+			sort key item.
+		Otherwise,
+			Select the first element.
+		Enable the various lists.
+	Otherwise,
+		Disable the various lists.
+	Initiate the SortDialog dialog box.
+
+WHY:	Allow the easy performing of one-shot initializations.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.11	Initial version.
+	JDM	92.08.04	Added record committing.
+	JDM	92.12.09	Sort options support.
+	JDM	92.12.10	Selection of first field.
+	JDM	92.12.30	Real cancel support.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_DIALOG_INITIATE
+{
+    optr	databaseObject;
+    optr	fieldsList;
+    optr	sortKeyList;
+    optr	sortApplyTrigger;
+    optr	sortClearTrigger;
+    optr	sortOrderList;
+    optr	sortOptionsList;
+    optr	sortPriorityList;
+    optr	sortNotes;
+    byte	numFields;
+    byte	numSortFields;
+    FFDSortOptions	sortOptions;
+
+    /* Get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Commit the current record (if any).	*/
+    if (! @call databaseObject::
+		MSG_FFD_RECORD_CONTROL (FFRCR_COMMIT_CURRENT_RECORD, 0)) 
+	{
+	/* Oops.  Bad record so bail.	*/
+	return;
+        }
+    /*
+     *	This is a discardable dialog, so tell the interaction that we are
+     *  about to bring it onscreen, so it shouldn't allow itself to be
+     *  discarded.
+     */
+    @call GeodeGetOptrNS (@SortDialog)::
+	    	    	MSG_GEN_INTERACTION_DISABLE_DISCARDING ();
+
+
+    /* Save the current sort context.	*/
+    @call databaseObject::MSG_FFD_SORT_INFO_SHADOW_SAVE ();
+
+    /*
+     * Get the current sort options from the database and make the list's
+     * sort options match.
+     */
+    sortOptions = @call databaseObject::
+		MSG_FFD_SORT_INFO_GET_SORT_OPTIONS ();
+    sortOptionsList = GeodeGetOptrNS (@SortOptionsList);
+    @call sortOptionsList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+		(sortOptions, FALSE);
+
+    /*
+     * Initialize the database fields list.  Get the number of fields in the
+     * current database.
+     */
+    fieldsList = GeodeGetOptrNS (@FieldsInDBList);
+    numFields = @call databaseObject::MSG_FFD_GET_NUMBER_OF_FIELDS
+		(fieldsList, DATABASE_NAME_LIST);
+
+    /* Any fields in the database?	*/
+    sortKeyList = GeodeGetOptrNS (@FieldsSortKeyList);
+    sortApplyTrigger = GeodeGetOptrNS (@SortApplyTrigger);
+    sortClearTrigger = GeodeGetOptrNS (@SortClearTrigger);
+    sortOrderList = GeodeGetOptrNS (@SortOrderList);
+    sortPriorityList = GeodeGetOptrNS (@SortPriorityList);
+    sortNotes = GeodeGetOptrNS (@SortFieldNotes);
+    if (numFields)
+	{
+	/* Yep.  Any sort keys?	*/
+	numSortFields = @call databaseObject::
+			MSG_FFD_SORT_INFO_GET_NUM_ITEMS ();
+	if (numSortFields)
+	    {
+	    /* Yep.  Initialize the sort key list.	*/
+	    @call sortKeyList::MSG_GEN_DYNAMIC_LIST_INITIALIZE
+			(numSortFields);
+
+	    /* Select first item in the sort key list.	*/
+	    @call sortKeyList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(0, FALSE);
+
+	    /* Send apply message of the sort key list to start update.	*/
+	    @call sortKeyList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
+			(TRUE);
+	    @call sortKeyList::MSG_GEN_APPLY ();
+
+	    /* Turn on the Sort and Clear triggers.	*/
+	    @call sortApplyTrigger::MSG_GEN_SET_ENABLED (VUM_NOW);
+	    @call sortClearTrigger::MSG_GEN_SET_ENABLED (VUM_NOW);
+	    }
+	else
+	    {
+	    /* Nope.  Select the first database list item.	*/
+	    @call fieldsList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(0, FALSE);
+
+	    /* Assume the default sort direction.	*/
+	    @call sortOrderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(SORT_ASCENDING, FALSE);
+
+	    /* Send apply message of the sort key list to start update.	*/
+	    @call fieldsList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
+			(TRUE);
+	    @call fieldsList::MSG_GEN_APPLY ();
+
+	    /* Turn off the Sort and Clear triggers.	*/
+	    @call sortApplyTrigger::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	    @call sortClearTrigger::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+
+	    /* Initialize the sort key list to nothing.	*/
+	    @call sortKeyList::MSG_GEN_DYNAMIC_LIST_INITIALIZE (0);
+	    }
+
+	/* Enable the various lists.	*/
+	@call sortOptionsList::MSG_GEN_SET_ENABLED (VUM_NOW);
+	@call sortOrderList::MSG_GEN_SET_ENABLED (VUM_NOW);
+	@call sortPriorityList::MSG_GEN_SET_ENABLED (VUM_NOW);
+	@call sortNotes::MSG_GEN_SET_ENABLED (VUM_NOW);
+	}	/* End of if fields in the database.	*/
+    else
+	{
+	/*
+	 * Disable the various lists.
+	 *
+	 * Note that this section is for making sure that things are in a
+	 * nice, safe, known state since who knows what nefarious actions
+	 * could have preceeded this.
+	 */
+	@call sortOptionsList::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call sortOrderList::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call sortPriorityList::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call sortNotes::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call sortApplyTrigger::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call sortClearTrigger::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call GeodeGetOptrNS (@TransferSKToFDB)::MSG_GEN_SET_NOT_ENABLED
+			(VUM_NOW);
+	@call GeodeGetOptrNS (@TransferFDBToSK)::MSG_GEN_SET_NOT_ENABLED
+			(VUM_NOW);
+
+	/*
+	 * Initialize the sort key list to nothing.
+	 * Note that the database fields list is correctly handled above.
+	 */
+	@call sortKeyList::MSG_GEN_DYNAMIC_LIST_INITIALIZE (0);
+	}
+
+    /* Initiate the the SortDialog box.	*/
+    @call GeodeGetOptrNS (@SortDialog)::MSG_GEN_INTERACTION_INITIATE ();
+}	/* End of MSG_GF_SORT_DIALOG_INITIATE.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_SORT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Sort the database as per the user's selection in the
+		sorting dialog box.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Disable our trigger.
+	Get ahold of the current database.
+	Get the database to sort itself using the current sort information.
+	Get rid of the saved sort context.
+	Get rid of the sort dialog.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.06	Initial version.
+	AML	92.06.11	Set the current row to 0
+	JDM	92.12.30	Real cancel support.
+	JDM	93.01.14	UI dimisses interaction.
+	JDM	93.01.15	Forced complete screen update.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_SORT
+{
+    optr	databaseObject;
+
+    /* Disable ourself.	*/
+    @call GeodeGetOptrNS (@SortApplyTrigger)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Sort the database using the defined sort keys.	*/
+    @call databaseObject::MSG_FFD_SORT_INFO_SORT ();
+
+    /* Get rid of the saved sort context.	*/
+    @call databaseObject::MSG_FFD_SORT_INFO_SHADOW_DELETE ();
+
+    /*
+     * Set the current row to the first row and make sure that the screen
+     * is completely updated.
+     */
+    @call databaseObject::MSG_FFD_RECORD_CONTROL (FFRCR_GOTO_FIRST_RECORD,
+						  0);
+    @call databaseObject::MSG_FFD_RECORD_CONTROL (FFRCR_REFRESH, 0);
+}	/* End of MSG_GF_SORT_SORT.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_CLEAR
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Clear out the sorted keys list and reset the sort direction
+		list.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get the current database's handle.
+	Set the various triggers to the proper states.
+	Empty out the SortKeys list.
+	Delete all entries from the database's sort information list.
+	Reset the database fields list.
+	Select the first item in the database fields list.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.08	Initial version.
+	JDM	92.05.18	Reworked for better consistency.
+	JDM	92.08.07	Added sort priority support.
+	JDM	93.01.02	Cleaned up.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_CLEAR
+{
+    optr	databaseObject;
+    optr	fieldsList;
+    optr	sortKeyList;
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Disable the Sort and Clear triggers.	*/
+    @call GeodeGetOptrNS (@SortApplyTrigger)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+    @call GeodeGetOptrNS (@SortClearTrigger)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+    @call GeodeGetOptrNS (@IncreaseSortPriority)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+    @call GeodeGetOptrNS (@DecreaseSortPriority)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+
+    /* Empty out the sort keys list and selection.	*/
+    sortKeyList = GeodeGetOptrNS (@FieldsSortKeyList);
+    @call sortKeyList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED (FALSE);
+    @call sortKeyList::MSG_GEN_DYNAMIC_LIST_INITIALIZE (0);
+
+    /* Reset the sort direction list.	*/
+    @call GeodeGetOptrNS (@SortOrderList)::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION (SORT_ASCENDING,
+							 FALSE);
+
+    /* Reset the sort options list.	*/
+    @call GeodeGetOptrNS (@SortOptionsList)::
+		MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+			(@GFSO_SORT_DEFAULT_OPTIONS, FALSE);
+
+    /* Tell the database to nuke all entries in the current list.	*/
+    @call databaseObject::MSG_FFD_SORT_INFO_DELETE_ALL_ITEMS ();
+
+    /* Reinitialize the fields list so all of the monikers are enabled.	*/
+    fieldsList = GeodeGetOptrNS (@FieldsInDBList);
+    @call fieldsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE (GDLI_NO_CHANGE);
+
+    /* Select the first database list item.	*/
+    @call fieldsList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION (0, FALSE);
+    @call {GEN_ITEM_GROUP_APPLY_MSG} process::MSG_GF_SORT_FIELD_SELECTED
+		(0, 1, 0);
+}	/* End of MSG_GF_SORT_CLEAR.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_CANCEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Cancel the sort that the user is in the middle of defining.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Restore the saved sort context.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.18	Initial version.
+	JDM	93.01.14	UI dimisses interaction.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method  GeoFileProcessClass, MSG_GF_SORT_CANCEL
+{
+    /* Restore the saved sort context.	*/
+    @call GetTargetDatabaseObject()::MSG_FFD_SORT_INFO_SHADOW_RESTORE ();
+}	/* End of MSG_GF_SORT_CANCEL.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_FDB_TO_SK
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Transfer a field name from the Fields to the SortKeys list.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get ahold of the current database's handle.
+	Disable the field list's selected item so that it can't be
+	reselected. 
+	Insert the field list's selection into the database's sort
+	information list.
+	Tell the sort key list that there's a new entry.
+	Make it have the ascending-/descending-ness as per the
+	sort order list.
+	Make the newly inserted list item selected.
+	Send the sort key list's apply message so any state is updated.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.12	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_FDB_TO_SK
+{
+    optr	databaseObject;
+    optr	sortKeyList;
+    optr	fieldsList;
+    word	fieldsListSelection;
+    word	numSortKeys;
+    word	sortOrderIndex;
+
+    /* Disable ourself.	*/
+    @call GeodeGetOptrNS (@TransferFDBToSK)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Is the list full?	*/
+    numSortKeys = @call databaseObject::MSG_FFD_SORT_INFO_GET_NUM_ITEMS ();
+    if (numSortKeys < MAX_SORT_KEYS_AND_SUB_TOTAL_FIELDS)
+	{
+	/* Get the field list selection.	*/
+	fieldsList = GeodeGetOptrNS (@FieldsInDBList);
+	fieldsListSelection = @call fieldsList::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+
+	/* !!! HACK ALERT !!!
+	 *
+	 * Check to see if nothing was selected.
+	 * This should not be happening!  But since it seems to be
+	 * possible, handle this case by doing nothing.
+	 *
+	 * !!! HACK ALERT !!!
+	 */
+	if (GIGS_NONE == fieldsListSelection)
+	  return;
+
+	/* Disable the field list's selection (no double's).	*/
+	@call databaseObject::MSG_FFD_REQUEST_FIELD_MONIKER_DISABLED
+			(fieldsList, fieldsListSelection,
+			 DATABASE_NAME_LIST);
+
+	/* Add that item to the end of the current sort key list.	*/
+	numSortKeys = @call databaseObject::MSG_FFD_SORT_INFO_ADD_ITEM
+			(fieldsListSelection);
+
+	/* Make the new entry have the the apppropriate sort ordering.	*/
+	sortOrderIndex = @call GeodeGetOptrNS (@SortOrderList)::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+	@call databaseObject::MSG_FFD_SORT_INFO_SET_SORT_DIRECTION
+			(numSortKeys-1,
+			 (SORT_ASCENDING == sortOrderIndex)? TRUE : FALSE);
+
+	/* Let the sort key list know that there's a new entry.	*/
+	sortKeyList = GeodeGetOptrNS (@FieldsSortKeyList);
+	@call sortKeyList::MSG_GEN_DYNAMIC_LIST_INITIALIZE (numSortKeys);
+
+	/* Make the new sort key list item selected.	*/
+	@call sortKeyList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(numSortKeys-1, FALSE);
+
+	/* Send apply message of the sort key list to start update.	*/
+	@call sortKeyList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE (TRUE);
+	@call sortKeyList::MSG_GEN_APPLY ();
+
+	/* Turn on the Sort and Clear triggers.	*/
+	@call GeodeGetOptrNS (@SortApplyTrigger)::MSG_GEN_SET_ENABLED
+			(VUM_NOW);
+	@call GeodeGetOptrNS (@SortClearTrigger)::MSG_GEN_SET_ENABLED
+			(VUM_NOW);
+
+	/* Activate the priority changing buttons.	*/
+	@call GeodeGetOptrNS (@IncreaseSortPriority)::MSG_GEN_SET_ENABLED
+			(VUM_NOW);
+	@call GeodeGetOptrNS (@DecreaseSortPriority)::MSG_GEN_SET_ENABLED
+			(VUM_NOW);
+	}
+}	/* End of MSG_GF_SORT_FDB_TO_SK.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_SK_TO_FDB
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Delete the currently selected item from the SortKeys list.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get a handle on the current database.
+	Get the sort key index of the current selection.
+	Get the field index stored in the database's sort information.
+	Enable the appropriate field list entry.
+	Delete the current selection from the sort key list.
+	Make the current selection the field index saved earlier.
+	Send the field list apply message so that state can be updated.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.12	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_SK_TO_FDB
+{
+    optr	databaseObject;
+    optr	fieldList;
+    word	fieldSelection;
+    optr	sortKeyList;
+    word	sortKeySelection;
+    sbyte	sortAscending;
+    word	numSortKeys;
+
+    /* Disable ourself.	*/
+    @call GeodeGetOptrNS (@TransferSKToFDB)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Get the sort key list selection.	*/
+    sortKeyList = GeodeGetOptrNS (@FieldsSortKeyList);
+    sortKeySelection = @call sortKeyList::
+		MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+
+    /* Get the field list index of the selected sort key.	*/
+    fieldSelection = @call databaseObject::MSG_FFD_SORT_INFO_QUERY_ITEM
+		(sortKeySelection, &sortAscending);
+
+    /* Update the sort direction list.	*/
+    @call GeodeGetOptrNS (@SortOrderList)::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(sortAscending ? SORT_ASCENDING : SORT_DESCENDING,
+			 FALSE);
+
+    /* Enable the field list entry.	*/
+    fieldList = GeodeGetOptrNS (@FieldsInDBList);
+    @call databaseObject::MSG_FFD_REQUEST_FIELD_MONIKER
+		(fieldList, fieldSelection, DATABASE_NAME_LIST);
+
+    /* Delete that item from the current sort key list.	*/
+    numSortKeys = @call databaseObject::MSG_FFD_SORT_INFO_DELETE_ITEM
+		(sortKeySelection);
+
+    /* No keys left in the list?	*/
+    if (0 == numSortKeys)
+	{
+	/* Turn off the Sort and Clear triggers.	*/
+	@call GeodeGetOptrNS (@SortApplyTrigger)::MSG_GEN_SET_NOT_ENABLED
+			(VUM_NOW);
+	@call GeodeGetOptrNS (@SortClearTrigger)::MSG_GEN_SET_NOT_ENABLED
+			(VUM_NOW);
+
+	/* Deactivate the priority changing buttons.	*/
+	@call GeodeGetOptrNS (@IncreaseSortPriority)::
+			MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call GeodeGetOptrNS (@DecreaseSortPriority)::
+			MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	}
+
+    /* Let the sort key list know what's happend.	*/
+    @call sortKeyList::MSG_GEN_DYNAMIC_LIST_INITIALIZE (numSortKeys);
+
+    /* Make the appropriate field list entry selected.	*/
+    @call fieldList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+		(fieldSelection, FALSE);
+
+    /* Send the apply message of the Fields list so things get updated.	*/
+    @call fieldList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE (TRUE);
+    @call fieldList::MSG_GEN_APPLY ();
+}	/* End of MSG_GF_SORT_SK_TO_FDB.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_DIRECTION_CHANGED
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Change the sort direction of the currently selected item in
+		the sort keys list.
+
+PASS: 		word	selection	= Currently selected item.
+		word	numSelections	= 1;
+		byte	stateFlags	= GenItemGroup state flags.
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDO CODE/STRATEGY:
+	If there's entries in the sort key list then
+		Get ahold of the database handle.
+		If there's a selection in the sort key list then
+			Set the sort ordering for the selected field.
+			Update the sort key list's moniker to reflect the
+			change of sort direction.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.08	Initial version.
+	JDM	93.01.13	Minor cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_DIRECTION_CHANGED
+{
+    optr	databaseObject;
+    optr	sortKeyList;
+    word	sortKeySelection;
+    word	numItems;
+
+    /* Is anything in the sort key list?	*/
+    sortKeyList = GeodeGetOptrNS (@FieldsSortKeyList);
+    numItems = @call sortKeyList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS ();
+    if ((0 < numItems) && (numItems <= MAX_SORT_KEYS_AND_SUB_TOTAL_FIELDS))
+	{
+	/* First, get ahold of the database handle.	*/
+	databaseObject = GetTargetDatabaseObject ();
+
+	/* Determine if there's a selection.	*/
+	sortKeySelection = @call sortKeyList::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+
+	if (GIGS_NONE != sortKeySelection)
+	    {
+	    /* Set the sort direction as appropriate.	*/
+	    @call databaseObject::MSG_FFD_SORT_INFO_SET_SORT_DIRECTION
+			(sortKeySelection,
+			 (SORT_ASCENDING == selection) ? TRUE : FALSE);
+
+	    /* Refresh just the moniker of the item that was changed.	*/
+	    @send, forceQueue databaseObject::
+			MSG_FFD_SORT_INFO_LIST_MONIKER_QUERY
+					(sortKeyList, sortKeySelection);
+	    }
+	}	/* End of if valid numItems.	*/
+}	/* End of MSG_GF_SORT_DIRECTION_CHANGED.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_INCREASE_PRIORITY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Increase the relative sort priority of the currently
+		selected item in the sort keys/sub-totals list.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	If there are items in the sort keys/sub-totals list then
+		If there is a selected item then
+			If increasing it's priority moves the item in the
+			list then
+				Reset the monikers of the affected sort
+				keys list items.
+				Select the appropriate list item.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.10	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_INCREASE_PRIORITY
+{
+    optr	databaseObject;
+    optr	sortKeyList;
+    word	sortKeySelection;
+    word	numItems;
+
+    /* Is anything in the sort key list?	*/
+    sortKeyList = GeodeGetOptrNS (@FieldsSortKeyList);
+    numItems = @call sortKeyList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS ();
+    if ((0 < numItems) && (numItems <= MAX_SORT_KEYS_AND_SUB_TOTAL_FIELDS))
+	{
+	/* First, get ahold of the database handle.	*/
+	databaseObject = GetTargetDatabaseObject ();
+
+	/* Determine if there's a selection.	*/
+	sortKeySelection = @call sortKeyList::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+	if (GIGS_NONE != sortKeySelection)
+	    {
+	    /* Increase the item's priority (if possible).	*/
+	    if (@call databaseObject::MSG_FFD_SORT_INFO_INCREASE_PRIORITY
+			(sortKeySelection))
+		{
+		/* Update the affected sort key list entries.	*/
+		@call databaseObject::MSG_FFD_SORT_INFO_LIST_MONIKER_QUERY
+				(sortKeyList, sortKeySelection - 1);
+		@call databaseObject::MSG_FFD_SORT_INFO_LIST_MONIKER_QUERY
+				(sortKeyList, sortKeySelection);
+
+		/* Item moved so update the selection.	*/
+		@call sortKeyList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+				(sortKeySelection - 1, FALSE);
+		}
+	    }
+	}
+}	/* End of MSG_GF_SORT_INCREASE_PRIORITY.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_DECREASE_PRIORITY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Decrease the relative sort priority of the currently
+		selected item in the sort keys/sub-totals list.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	If there are items in the sort keys/sub-totals list then
+		If there is a selected item then
+			If decreasing it's priority moves the item in the
+			list then
+				Reset the monikers of the affected sort
+				keys list items.
+				Select the appropriate list item.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.10	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_DECREASE_PRIORITY
+{
+    optr	databaseObject;
+    optr	sortKeyList;
+    word	sortKeySelection;
+    word	numItems;
+
+    /* Is anything in the sort key list?	*/
+    sortKeyList = GeodeGetOptrNS (@FieldsSortKeyList);
+    numItems = @call sortKeyList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS ();
+    if ((0 < numItems) && (numItems <= MAX_SORT_KEYS_AND_SUB_TOTAL_FIELDS))
+	{
+	/* First, get ahold of the database handle.	*/
+	databaseObject = GetTargetDatabaseObject ();
+
+	/* Determine if there's a selection.	*/
+	sortKeySelection = @call sortKeyList::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+	if (GIGS_NONE != sortKeySelection)
+	    {
+	    /* Decrease the item's priority (if possible).	*/
+	    if (@call databaseObject::MSG_FFD_SORT_INFO_DECREASE_PRIORITY
+			(sortKeySelection))
+		{
+		/* Update the affected sort key list entries.	*/
+		@call databaseObject::MSG_FFD_SORT_INFO_LIST_MONIKER_QUERY
+				(sortKeyList, sortKeySelection);
+		@call databaseObject::MSG_FFD_SORT_INFO_LIST_MONIKER_QUERY
+				(sortKeyList, sortKeySelection + 1);
+
+		/* Item moved so update the selection.	*/
+		@call sortKeyList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+				(sortKeySelection + 1, FALSE);
+		}
+	    }
+	}
+}	/* End of MSG_GF_SORT_DECREASE_PRIORITY.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_FIELDS_LIST_QUERY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Retrieve a moniker for the FieldInDBLists.
+
+PASS:		optr	list	= List that is being requested for.
+ 		word	item	= Currently selected item.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get ahold of the database handle.
+	If the item is referenced in the sort key list then
+		Get the database to supply the moniker for this list item
+		in a disabled state.
+	Otherwise,
+		Get the database to supply the moniker for this list item
+		in an active state.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.08	Initial version.
+	JDM	93.01.01	Added disabled item support.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass,	MSG_GF_SORT_FIELDS_LIST_QUERY
+{
+    optr	databaseObject;
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Is the requested item already referenced in the sort key list?	*/
+    if (@call databaseObject::MSG_FFD_SORT_INFO_ITEM_SEARCH
+		(item, (byte *) NULL))
+	{
+	/* Disable the field list's selection (no double's).	*/
+	@call databaseObject::MSG_FFD_REQUEST_FIELD_MONIKER_DISABLED
+			(list, item, DATABASE_NAME_LIST);
+	}
+    else
+	{
+	/* Nope.  Get the moniker from the entire database list.	*/
+	@call databaseObject::MSG_FFD_REQUEST_FIELD_MONIKER
+			(list, item, DATABASE_NAME_LIST);
+	}
+}	/* End of MSG_GF_SORT_FIELDS_LIST_QUERY.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_FIELD_SELECTED
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Update the Sort dialog box in response to the user
+		selecting a field in the Fields list.
+
+PASS: 		word	selection	= Currently selected item.
+		word	numSelections	= 1 if a selection, otherwise 0.
+		byte	stateFlags	= GenItemGroup state flags.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get ahold of the current database handle.
+	Clear out the Notes fields.
+	Turn off the SortKeys to Fields list button.
+	if nothing selected then
+		Turn off the Fields to SortKeys list button.
+	otherwise
+		Turn on the Fields to SortKeys list button.
+		Set the Notes field text.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+	Note that it's *is* necessary to clear the notes field out first
+	because the text won't be changed if the new field doesn't have any
+	notes text.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.11	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_FIELD_SELECTED
+{
+    optr	databaseObject;
+    optr	transferFDBToSK;
+    byte	numSortKeys;
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Clear out the Notes field text.	*/
+    @call GeodeGetOptrNS (@SortFieldNotes)::MSG_VIS_TEXT_DELETE_ALL ();
+
+    /* Set the list transfer triggers to the appropriate states.	*/
+    @call GeodeGetOptrNS (@TransferSKToFDB)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+
+    transferFDBToSK = GeodeGetOptrNS (@TransferFDBToSK);
+    if (0 == numSelections)
+	{
+	/* Nothing selected so turn it off.	*/
+	@call transferFDBToSK::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	}
+    else
+	{
+	/* Is the sort key list full?	*/
+	numSortKeys = @call databaseObject::
+			MSG_FFD_SORT_INFO_GET_NUM_ITEMS ();
+	if (numSortKeys < MAX_SORT_KEYS_AND_SUB_TOTAL_FIELDS)
+	    {
+	    /* Something selected so turn it on.	*/
+	    @call transferFDBToSK::MSG_GEN_SET_ENABLED (VUM_NOW);
+	    }
+
+	/* Make sure that nothing in the other list is selected.	*/
+	@call GeodeGetOptrNS (@FieldsSortKeyList)::
+			MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED (FALSE);
+
+	/* Set the notes text display for this field.	*/
+	@call databaseObject::MSG_FFD_REQUEST_FIELD_NOTES
+			(selection, DATABASE_NAME_LIST,
+			 GeodeGetOptrNS (@SortFieldNotes));
+	}
+}	/* End of MSG_GF_SORT_FIELD_SELECTED.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_KEY_LIST_QUERY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Retrieve a moniker for the sort fields' dynamic list.
+
+PASS:		optr	list	= List that is being requested for.
+ 		word	item	= Currently selected item.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get ahold of the current database.
+	Get the database to retrieve and set the appropriate moniker in the
+	given list.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.08	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_KEY_LIST_QUERY
+{
+    optr	databaseObject;
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Get the moniker from the database.	*/
+    @call databaseObject::MSG_FFD_SORT_INFO_LIST_MONIKER_QUERY
+		(list, item);
+}	/* End of MSG_GF_SORT_KEY_LIST_QUERY.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_KEY_SELECTED
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Update the Sort dialog box in response to the user
+		selecting a field in the Fields list.
+
+PASS: 		word	selection	= Currently selected item.
+		word	numSelections	= 1 if a selection, otherwise 0.
+		byte	stateFlags	= GenItemGroup state flags.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get ahold of the current database handle.
+	Clear out the Notes fields.
+	Turn off the SortKeys to Fields list button.
+	if nothing selected then
+		Turn off the Fields to SortKeys list button.
+	otherwise
+		Turn on the Fields to SortKeys list button.
+		Set the Notes field text.
+		Set the sort order list to reflect the state of the item.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+	Note that it's *is* necessary to clear the notes field out first
+	because the text won't be changed if the new field doesn't have any
+	notes text.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.11	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_KEY_SELECTED
+{
+    optr	databaseObject;
+    optr	transferSKToFDB;
+    sbyte	ascendingSort;
+
+    /* First, get ahold of the database handle.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Clear out the Notes field text.	*/
+    @call GeodeGetOptrNS (@SortFieldNotes)::MSG_VIS_TEXT_DELETE_ALL ();
+
+    /* Set the list transfer triggers to the appropriate states.	*/
+    @call GeodeGetOptrNS (@TransferFDBToSK)::MSG_GEN_SET_NOT_ENABLED
+		(VUM_NOW);
+
+    transferSKToFDB = GeodeGetOptrNS (@TransferSKToFDB);
+    if (0 == numSelections)
+	{
+	/* Nothing selected.  Turn the appropriate transfer button off.	*/
+	@call transferSKToFDB::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+
+	/* Deactivate the priority changing buttons.	*/
+	@call GeodeGetOptrNS (@IncreaseSortPriority)::
+			MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call GeodeGetOptrNS (@DecreaseSortPriority)::
+			MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	}
+    else
+	{
+	/* Something selected so turn it on.	*/
+	@call transferSKToFDB::MSG_GEN_SET_ENABLED (VUM_NOW);
+
+	/* Make sure that nothing in the other list is selected.	*/
+	@call GeodeGetOptrNS (@FieldsInDBList)::
+			MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED (FALSE);
+
+	/* Set the notes text display for this field.	*/
+	@call databaseObject::MSG_FFD_SORT_INFO_LIST_REQUEST_NOTES
+			(GeodeGetOptrNS (@SortFieldNotes), selection);
+
+	/* Set the ascending-/descending-ness of the sort order list.	*/
+	ascendingSort = @call databaseObject::
+			MSG_FFD_SORT_INFO_GET_SORT_DIRECTION (selection);
+	@call GeodeGetOptrNS (@SortOrderList)::
+			MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+					(((ascendingSort) ?
+					  SORT_ASCENDING : SORT_DESCENDING),
+					 FALSE);
+
+	/* Activate the priority changing buttons.	*/
+	@call GeodeGetOptrNS (@IncreaseSortPriority)::MSG_GEN_SET_ENABLED
+			(VUM_NOW);
+	@call GeodeGetOptrNS (@DecreaseSortPriority)::MSG_GEN_SET_ENABLED
+			(VUM_NOW);
+	}
+}	/* End of MSG_GF_SORT_KEY_SELECTED.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_SORT_SET_SORT_OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Set the sort options of the current database.
+
+PASS: 		FFDSortOptions	selectedBooleans	= Active selections.
+		FFDSortOptions	indeterminateBooleans	= ??? (0).
+		FFDSortOptions	modifiedBooleans	= ???.	
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	The sort options are assumed to have been set in
+			the dialog initiation routine.
+
+	Asserts:	The current database's sort options are set
+			appropriately based on the given information.
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Instruct the current database to set it's sort options to match the
+	given selections.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.12.09	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_SORT_SET_SORT_OPTIONS
+{
+    /* Set the current database's sort options.	*/
+    @call GetTargetDatabaseObject()::MSG_FFD_SORT_INFO_SET_SORT_OPTIONS
+		(selectedBooleans);
+}	/* End of MSG_GF_SORT_SET_SORT_OPTIONS.	*/

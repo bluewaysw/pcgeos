@@ -1,0 +1,769 @@
+/*
+ * Project:	GeoWrite
+ * File:	UI/uiEdit.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user interface description for the edit
+ * menu.
+ *
+ *	$Id: uiEdit.ui,v 1.2 98/01/18 17:05:11 gene Exp $
+ *
+ */
+
+/*-----------------------------------------------------------------------------
+	Edit menu
+-----------------------------------------------------------------------------*/
+
+start PrimaryUI;
+
+WriteEditControl = GenEditControl vardataReloc {
+	hints = {
+		ATTR_GEN_INTERACTION_GROUP_TYPE {
+			GenInteractionGroupType GIGT_EDIT_MENU
+		},
+#ifdef GPC
+#if !_NDO2000
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+		    word mask GECF_SELECT_ALL
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+		    word mask GECTF_SELECT_ALL
+		},
+#endif
+#endif
+#if _NDO2000
+		ATTR_GEN_CONTROL_REQUIRE_UI {
+		    word mask GECF_CLIP_ART or mask GECF_CHAR_MAP
+		},
+#endif
+		ATTR_GEN_CONTROL_APP_UI {
+			UN_OPTR EditMenuGroup
+		}
+	}
+	visibility = popup;
+}
+
+end PrimaryUI;
+
+start EditMenuUI;
+
+EditMenuGroup = GenInteraction {
+	genStates = default -usable;
+#ifdef GPC
+#if !_NDO2000
+	children = InsertSubMenu, WriteSearchReplaceControl,
+		   WriteSpellControl, WriteThesaurusControl,
+		   WriteTextCountControl,
+	           WriteSelectSectionGroup;
+#else
+	children = InsertSubMenu, WriteSearchReplaceControl,
+		   WriteSpellControl, WriteThesaurusControl,
+		   WriteTextCountControl;
+#endif
+#else
+	children = InsertSubMenu, WriteSearchReplaceControl,
+		   WriteSpellControl, WriteThesaurusControl,
+		   WriteTextCountControl;
+#endif
+}
+
+#ifdef GPC
+
+WriteSelectSectionGroup = GenInteraction {
+    children = WriteSelectSection;
+}
+
+WriteSelectSection = GenTrigger {
+    kbdAccelerator = specificUI control 'A';
+    moniker = 'S', "Select Section";
+    action = MSG_META_SELECT_ALL, WriteEditControl;
+}
+
+#endif
+
+/*
+ * POSSIBLE ADDITIONS:
+ *	- Name: file, directory, section, article, user
+ *	- Arbitrary variable
+ *	- Special characters
+ */
+
+InsertSubMenu = GenInteraction {
+	moniker = 'I', "Insert Special";
+
+	children = InsertTextualSubGroup, ColumnBreakTrigger,
+		   InsertAtomSubGroup;
+	visibility = popup;
+	hints = { HINT_SAME_CATEGORY_AS_PARENT }
+}
+
+InsertTextualSubGroup = GenInteraction {
+	children = InsertLonghandDate, InsertNumericDate, InsertCurrentTime;
+	visibility = subGroup;
+	hints = { HINT_ORIENT_CHILDREN_VERTICALLY }
+}
+
+InsertLonghandDate = GenTrigger {
+#ifdef GPC
+	moniker = 'L', "Current Date (Longhand)";
+#else
+	moniker = 'L', "Longhand Date";
+#endif
+	action = MSG_WRITE_PROCESS_INSERT_TEXTUAL_DATE_TIME, process;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	DTF_LONG
+		}
+	}
+}
+
+InsertNumericDate = GenTrigger {
+#ifdef GPC
+	moniker = 'u', "Current Date (Numeric)";
+#else
+	moniker = 'u', "Numeric Date";
+#endif
+	action = MSG_WRITE_PROCESS_INSERT_TEXTUAL_DATE_TIME, process;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	DTF_SHORT
+		}
+	}
+}
+
+InsertCurrentTime = GenTrigger {
+	moniker = 'r', "Current Time";
+	action = MSG_WRITE_PROCESS_INSERT_TEXTUAL_DATE_TIME, process;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	DTF_HMS
+		}
+	}
+}
+
+/*****/
+
+ColumnBreakTrigger = GenTrigger {
+#ifdef GPC
+	moniker = 'B', "Insert Page/Column Break";
+#else
+	moniker = 'B', "Insert Page Break";
+#endif
+	/*
+	 * This accelerator is removed for two reasons:
+	 * 1) It actually causes Ctrl-Enter *not* to work (because it does
+	 *    not get to the text object (this could be fixed)
+	 * 2) It makes the menu really wide
+	 */
+	action = MSG_WRITE_PROCESS_INSERT_COLUMN_BREAK, process;
+	/* kbdAccelerator = specificUI control ENTER; */
+}
+
+/*****/
+
+InsertAtomSubGroup = GenInteraction {
+	children =
+#if _INDEX_NUMBERS
+		InsertNumberMenu,
+		InsertDateMenu,
+		InsertTimeMenu,
+		InsertContextNumberMenu;
+#else
+		InsertNumberMenu,
+		InsertDateMenu,
+		InsertTimeMenu;
+#endif
+	visibility = subGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		/* Need this here or else GUP'ing will result in the
+		 * GenEditControl responding with "ui". -Don 10/6/00 */
+		ATTR_GEN_HELP_FILE {
+			char "writer", 0
+		}
+		
+	}
+}
+
+InsertNumberMenu = GenInteraction {
+	moniker = 'N', "Number";
+	children = NumberTypeList, NumberFormatList, InsertNumberTrigger;
+	type = command;
+	visibility = dialog;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT { char "dbInsNum", 0 }
+	}
+}
+
+end EditMenuUI;
+
+start EditDialogUI;
+
+NumberTypeList = GenItemGroup {
+	moniker = "Type:";
+	children =
+#if _SECTION_SUPPORT
+		PageNumberEntry,
+		PageNumberInSectionEntry,
+		NumberOfPagesEntry,
+		NumberOfPagesInSectionEntry,
+		SectionNumberEntry,
+		NumberOfSectionsEntry;
+#else
+		PageNumberEntry,
+		NumberOfPagesEntry;
+#endif
+	hints = { HINT_ITEM_GROUP_SCROLLABLE, HINT_PLACE_MONIKER_ABOVE }
+	selection = "VTVT_PAGE_NUMBER";
+}
+
+PageNumberEntry = GenItem {
+	moniker = "Page Number";
+	identifier = "VTVT_PAGE_NUMBER";
+}
+
+#if _SECTION_SUPPORT
+PageNumberInSectionEntry = GenItem {
+	moniker = "Page Number In Section";
+	identifier = "VTVT_PAGE_NUMBER_IN_SECTION";
+}
+#endif
+
+NumberOfPagesEntry = GenItem {
+	moniker = "Number Of Pages";
+	identifier = "VTVT_NUMBER_OF_PAGES";
+}
+
+#if _SECTION_SUPPORT
+NumberOfPagesInSectionEntry = GenItem {
+	moniker = "Number Of Pages In Section";
+	identifier = "VTVT_NUMBER_OF_PAGES_IN_SECTION";
+}
+
+SectionNumberEntry = GenItem {
+	moniker = "Section Number";
+	identifier = "VTVT_SECTION_NUMBER";
+}
+
+NumberOfSectionsEntry = GenItem {
+	moniker = "Number Of Sections";
+	identifier = "VTVT_NUMBER_OF_SECTIONS";
+}
+#endif
+
+NumberFormatList = GenItemGroup {
+	moniker = "Format:";
+	children = ArabicEntry, LetterUpperEntry, LetterLowerEntry,
+		   RomanUpperEntry, RomanLowerEntry;
+	hints = { HINT_ITEM_GROUP_SCROLLABLE, HINT_PLACE_MONIKER_ABOVE }
+	selection = "VTNT_NUMBER";
+}
+
+ArabicEntry = GenItem {
+	moniker = "Number (1, 2, 3)";
+	identifier = "VTNT_NUMBER";
+}
+
+LetterUpperEntry = GenItem {
+	moniker = "Uppercase Letter (A, B, C)";
+	identifier = "VTNT_LETTER_UPPER_A";
+}
+
+LetterLowerEntry = GenItem {
+	moniker = "Lowercase Letter (a, b, c)";
+	identifier = "VTNT_LETTER_LOWER_A";
+}
+
+RomanUpperEntry = GenItem {
+	moniker = "Uppercase Roman";
+	identifier = "VTNT_ROMAN_NUMERAL_UPPER";
+}
+
+RomanLowerEntry = GenItem {
+	moniker = "Lowercase Roman";
+	identifier = "VTNT_ROMAN_NUMERAL_LOWER";
+}
+
+InsertNumberTrigger = GenTrigger {
+	moniker = 'I', "Insert";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_WRITE_PROCESS_INSERT_NUMBER, process;
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+
+end EditDialogUI;
+
+/*****/
+
+start EditMenuUI;
+
+InsertDateMenu = GenInteraction {
+	moniker = 'D', "Special Date";
+	children = DateFormatAndType, InsertDateSampleText, InsertDateTrigger;
+	type = command;
+	visibility = dialog;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT { char "dbInsDate", 0 }
+	}
+}
+
+end EditMenuUI;
+
+start EditDialogUI;
+
+DateFormatAndType = GenInteraction {
+	children = DateTypeList, DateFormatList;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+DateTypeList = GenItemGroup {
+	moniker = "Type:";
+	children = TodaysDateEntry, CreationDateEntry, ModificationDateEntry,
+		CurrentDateEntry;
+	hints = { HINT_ITEM_GROUP_SCROLLABLE, HINT_PLACE_MONIKER_ABOVE }
+	selection = "VTVT_CREATION_DATE_TIME";
+}
+
+TodaysDateEntry = GenItem {
+	moniker = "Today's Date (Won't Change)";
+	identifier = "VTVT_STORED_DATE_TIME";
+}
+
+CreationDateEntry = GenItem {
+	moniker = "Date Document Created";
+	identifier = "VTVT_CREATION_DATE_TIME";
+}
+
+ModificationDateEntry = GenItem {
+	moniker = "Date of Last Revision";
+	identifier = "VTVT_MODIFICATION_DATE_TIME";
+}
+
+CurrentDateEntry = GenItem {
+	moniker = "Date of Printing";
+	identifier = "VTVT_CURRENT_DATE_TIME";
+}
+
+DateFormatList = GenItemGroup vardataReloc {
+	moniker = "Format:";
+	children = 
+	    LongDateEntry, LongNoWeekdayDateEntry, MonthDayLongEntry, 
+	    MonthDayLongNoWeekdayEntry, MonthYearLongEntry, MonthEntry, 
+	    WeekdayEntry, LongCondensedDateEntry, LongNoWeekdayCondensedEntry, 
+	    ShortDateEntry, ShortZeroPaddedEntry, MonthDayShortEntry, 
+	    MonthYearShortEntry;
+	destination = WriteApp;
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_PLACE_MONIKER_ABOVE,
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word	MSG_WRITE_APPLICATION_UPDATE_DATE_SAMPLE
+		},
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_WRITE_APPLICATION_INITIALIZE_DATE_SAMPLE
+		},
+		ATTR_GEN_VISIBILITY_DESTINATION {
+			UN_OPTR	WriteApp
+		}
+	}
+	selection = "DTF_LONG_NO_WEEKDAY";
+	
+	genAttributes = default +notifyVisibility;
+}
+LongDateEntry = GenItem {
+	moniker = "Longhand";
+	identifier = "DTF_LONG";
+}
+LongNoWeekdayDateEntry = GenItem {
+	moniker = "Longhand, No Weekday";
+	identifier = "DTF_LONG_NO_WEEKDAY";
+}
+MonthDayLongEntry = GenItem {
+	moniker = "Longhand, No Year";
+	identifier = "DTF_MD_LONG";
+}
+MonthDayLongNoWeekdayEntry = GenItem {
+	moniker = "Longhand, No Year, No Weekday";
+	identifier = "DTF_MD_LONG_NO_WEEKDAY";
+}
+MonthYearLongEntry = GenItem {
+	moniker = "Longhand, Month and Year Only";
+	identifier = "DTF_MY_LONG";
+}
+MonthEntry = GenItem {
+	moniker = "Longhand, Month Only";
+	identifier = "DTF_MONTH";
+}
+WeekdayEntry = GenItem {
+	moniker = "Longhand, Weekday Only";
+	identifier = "DTF_WEEKDAY";
+}
+
+LongCondensedDateEntry = GenItem {
+	moniker = "Abbreviated";
+	identifier = "DTF_LONG_CONDENSED";
+}
+LongNoWeekdayCondensedEntry = GenItem {
+	moniker = "Abbreviated, No Weekday";
+	identifier = "DTF_LONG_NO_WEEKDAY_CONDENSED";
+}
+ShortDateEntry = GenItem {
+	moniker = "Numeric";
+	identifier = "DTF_SHORT";
+}
+ShortZeroPaddedEntry = GenItem {
+	moniker = "Numeric, with Leading Zeroes";
+	identifier = "DTF_ZERO_PADDED_SHORT";
+}
+MonthDayShortEntry = GenItem {
+	moniker = "Numeric, No Year";
+	identifier = "DTF_MD_SHORT";
+}
+MonthYearShortEntry = GenItem {
+	moniker = "Numeric, Month and Year Only";
+	identifier = "DTF_MY_SHORT";
+}
+
+InsertDateSampleText = GenText {
+	moniker = "Sample:";
+	genAttributes = default +readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight 0
+		}
+	}
+	text = "";
+}
+		
+
+InsertDateTrigger = GenTrigger {
+	moniker = 'I', "Insert";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_WRITE_PROCESS_INSERT_DATE, process;
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+end EditDialogUI;
+
+/*****/
+
+start EditMenuUI;
+
+InsertTimeMenu = GenInteraction {
+	moniker = 'T', "Special Time";
+	children = TimeFormatAndType, InsertTimeSampleText, InsertTimeTrigger;
+	type = command;
+	visibility = dialog;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT { char "dbInsTime", 0 }
+	}
+}
+
+end EditMenuUI;
+
+start EditDialogUI;
+
+TimeFormatAndType = GenInteraction {
+	children = TimeTypeList, TimeFormatList;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+TimeTypeList = GenItemGroup {
+	moniker = "Type:";
+	children = NowEntry, CreationTimeEntry, ModificationTimeEntry,
+		CurrentTimeEntry;
+	hints = { HINT_ITEM_GROUP_SCROLLABLE, HINT_PLACE_MONIKER_ABOVE }
+	selection = "VTVT_CREATION_DATE_TIME";
+}
+
+NowEntry = GenItem {
+	moniker = "Now (Won't Change)";
+	identifier = "VTVT_STORED_DATE_TIME";
+}
+
+CreationTimeEntry = GenItem {
+	moniker = "Time Document Created";
+	identifier = "VTVT_CREATION_DATE_TIME";
+}
+
+ModificationTimeEntry = GenItem {
+	moniker = "Time of Last Revision";
+	identifier = "VTVT_MODIFICATION_DATE_TIME";
+}
+
+CurrentTimeEntry = GenItem {
+	moniker = "Time of Printing";
+	identifier = "VTVT_CURRENT_DATE_TIME";
+}
+
+TimeFormatList = GenItemGroup vardataReloc {
+	moniker = "Format:";
+	children = HMSEntry, HMS_24Entry, HMEntry, HM_24Entry, HEntry;
+	destination = WriteApp;
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_PLACE_MONIKER_ABOVE,
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word	MSG_WRITE_APPLICATION_UPDATE_TIME_SAMPLE
+		},
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_WRITE_APPLICATION_INITIALIZE_TIME_SAMPLE
+		},
+		ATTR_GEN_VISIBILITY_DESTINATION {
+			UN_OPTR	WriteApp
+		}
+	}
+	selection = "DTF_HM";
+	
+	genAttributes = default +notifyVisibility;
+}
+HMSEntry = GenItem {
+	moniker = "Hour, Minute and Second";
+	identifier = "DTF_HMS";
+}
+HMEntry = GenItem {
+	moniker = "Hour and Minute";
+	identifier = "DTF_HM";
+}
+HEntry = GenItem {
+	moniker = "Hour Only";
+	identifier = "DTF_H";
+}
+
+HMS_24Entry = GenItem {
+	moniker = "Hour, Minute and Second, 24-Hour Clock";
+	identifier = "DTF_HMS_24HOUR";
+}
+HM_24Entry = GenItem {
+	moniker = "Hour and Minute, 24-Hour Clock";
+	identifier = "DTF_HM_24HOUR";
+}
+
+
+InsertTimeSampleText = GenText {
+	moniker = "Sample:";
+	genAttributes = default +readOnly;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight 0
+		}
+	}
+	text = "";
+}
+		
+
+InsertTimeTrigger = GenTrigger {
+	moniker = 'I', "Insert";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_WRITE_PROCESS_INSERT_TIME, process;
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+end EditDialogUI;
+
+/*****/
+
+#if _INDEX_NUMBERS
+start EditMenuUI;
+
+InsertContextNumberMenu = GenInteraction {
+	moniker = 'C', "Number From Context";
+	children = InsertContextNumberGroup, InsertContextNumberContextList,
+			InsertContextNumberTrigger;
+	type = command;
+	visibility = dialog;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT { char "dbInsCtxtNum", 0}
+	}
+}
+
+end EditMenuUI;
+
+start EditDialogUI;
+
+InsertContextNumberGroup = GenInteraction {
+	children = InsertContextNumberNumberList, InsertContextNumberFormatList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+InsertContextNumberNumberList = GenItemGroup {
+	moniker = 'T', "Type";
+	children = ContextPageNumberEntry, ContextSectionPageNumberEntry,
+		ContextSectionNumberEntry;
+	hints = { HINT_ITEM_GROUP_SCROLLABLE, HINT_PLACE_MONIKER_ABOVE }
+	selection = "VTVT_CONTEXT_PAGE_IN_SECTION";
+}
+
+ContextPageNumberEntry = GenItem {
+	moniker = "Context Page";
+	identifier = "VTVT_CONTEXT_PAGE";
+}
+
+ContextSectionPageNumberEntry = GenItem {
+	moniker = "Context Page In Section";
+	identifier = "VTVT_CONTEXT_PAGE_IN_SECTION";
+}
+
+ContextSectionNumberEntry = GenItem {
+	moniker = "Context Section Number";
+	identifier = "VTVT_CONTEXT_SECTION";
+}
+
+InsertContextNumberFormatList = GenItemGroup {
+	moniker = 'F', "Format:";
+	children = ICArabicEntry, ICLetterUpperEntry, ICLetterLowerEntry,
+		   ICRomanUpperEntry, ICRomanLowerEntry;
+	hints = { HINT_ITEM_GROUP_SCROLLABLE, HINT_PLACE_MONIKER_ABOVE }
+	selection = "VTNT_NUMBER";
+}
+
+ICArabicEntry = GenItem {
+	moniker = "Number (1, 2, 3)";
+	identifier = "VTNT_NUMBER";
+}
+
+ICLetterUpperEntry = GenItem {
+	moniker = "Uppercase Letter (A, B, C)";
+	identifier = "VTNT_LETTER_UPPER_A";
+}
+
+ICLetterLowerEntry = GenItem {
+	moniker = "Lowercase Letter (a, b, c)";
+	identifier = "VTNT_LETTER_LOWER_A";
+}
+
+ICRomanUpperEntry = GenItem {
+	moniker = "Uppercase Roman";
+	identifier = "VTNT_ROMAN_NUMERAL_UPPER";
+}
+
+ICRomanLowerEntry = GenItem {
+	moniker = "Lowercase Roman";
+	identifier = "VTNT_ROMAN_NUMERAL_LOWER";
+}
+
+InsertContextNumberContextList = GenDynamicList vardataReloc {
+	queryMsg = MSG_WRITE_DOCUMENT_GET_TOC_CONTEXT_MONIKER;
+	genAttributes = default +notifyVisibility;
+	destination = "TO_APP_MODEL";
+	behaviorType = exclusive;
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 30>
+			SpecHeight <SST_LINES_OF_TEXT, 4>
+			word	4
+		},
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD	WriteDocumentClass
+		},
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word	MSG_WRITE_PROCESS_TOC_CONTEXT_LIST_VISIBLE
+		},
+		ATTR_GEN_VISIBILITY_DESTINATION {
+			UN_OPTR	process, 0
+		}
+	}
+}
+
+InsertContextNumberTrigger = GenTrigger {
+	moniker = 'I', "Insert";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_WRITE_PROCESS_INSERT_CONTEXT_NUMBER, process;
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+end EditDialogUI;
+
+#endif		/* if _INDEX_NUMBERS */
+
+/*****/
+
+start EditMenuUI;
+
+#ifdef GPC
+WriteSearchReplaceControl = WSearchReplaceControl {
+#else
+WriteSearchReplaceControl = SearchReplaceControl {
+#endif
+	SEARCH_AND_REPLACE_TRIGGER_VALUES
+	visibility = dialog;
+	hints = {
+		ATTR_SEARCH_CONTROL_SELECTION_TYPE {
+			word 	SDT_TEXT
+		}
+#if 0
+	    	, HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		 GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 SRC_SUGGESTED_BEGINNING_FEATURES>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTERMEDIATE,
+		 SRC_DEFAULT_FEATURES>
+	    }
+#endif
+#ifdef GPC
+#if DO_DBCS
+		, ATTR_GEN_EXTRA_KBD_ACCELERATORS {
+		    KeyboardShortcut <0, 0, 0, 0, C_SYS_F2 and 0xfff>
+		}
+#else
+		, ATTR_GEN_EXTRA_KBD_ACCELERATORS {
+		    KeyboardShortcut <0, 0, 0, 0, CS_CONTROL and 0xf, VC_F2>
+		}
+#endif	/* DO_DBCS */
+#endif	/* GPC */
+	}
+}
+
+#ifdef GPC
+WriteSpellControl = WSpellControl {
+#else
+WriteSpellControl = SpellControl {
+#endif
+	SPELL_CHECK_TRIGGER_VALUES
+	visibility = dialog;
+#if 0
+	hints = {
+	    HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		 GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTRODUCTORY,
+		 SC_SUGGESTED_INTRODUCTORY_FEATURES>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 SC_DEFAULT_FEATURES>
+	    }
+	}
+#endif
+}
+
+WriteThesaurusControl = ThesControl {
+	moniker = 'e', "Thesaurus";
+	visibility = dialog;
+}
+
+WriteTextCountControl = TextCountControl {
+	moniker = 'o', "Counts";
+	visibility = dialog;
+	type = command;
+}
+
+end EditMenuUI;

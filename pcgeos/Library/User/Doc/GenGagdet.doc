@@ -1,0 +1,441 @@
+COMMENT @CLASS DESCRIPTION-----------------------------------------------------
+
+				GenGadgetClass
+
+$Id: GenGagdet.doc,v 1.1.34.1 97/03/29 03:37:46 canavese Exp $
+
+NOT UP TO DATE - brianc 8/17/92
+
+Synopsis
+--------
+
+GenGadget class provides a standard mechanism for to add gadgets to the generic
+UI.  Appropriate uses for GenGadget include:
+	* modeling a real-world device (such as a calendar) where the exact
+	  visual image of the device is desired.
+	* ???
+
+GenGadget is a special object.  The rules that apply here are different than
+for other generic objects.  GenGadget is an almost direct connection to the
+visual world.  To make it function, it must be subclassed by the application
+and the application must provide several of the visual methods.  In order for
+this to work correctly with the specific UI, the rules below must be followed.
+
+The following rules for GenGadget attempt to cover what is legal and what is
+illegal for a GenGadget.  Please try to keep this up to date.  The rules are
+broken into this sections:
+	* Declaration of class, general rules
+	* Rules for instance data: What can be modified (and when), what can
+	  be looked at and what is off limits.
+	* Methods that the application must provide, methods that are off
+	  limits and methods that may be used.
+
+------------------------------------------------------------------------------
+		General rules
+------------------------------------------------------------------------------
+
+* The application must subclass GenGadget and the subclass must be a master
+  class.
+
+------------------------------------------------------------------------------
+		Geometry rules
+------------------------------------------------------------------------------
+
+The GenGadget can be any of:
+
+* a non-composite managed by the geometry manager
+* a non-composite not managed by the geometry manager
+* a composite managed by the geometry manager with children also managed
+* a composite managed by the geometry manager with children not managed
+* a composite not managed by the geometry manager
+
+The GenGadget can also contain a window.  You should use a window if your
+GenGadget will contain data that needs to be scrolled, clipped, etc.  If
+you do not need this functionality, DO NOT use a window.
+
+If a composite:
+
+* In the ".UI" file where the object is declared, be certain to set the
+  composite attribute for your gadget.  A line such as:
+
+	"default attributes = default +composite;" is recommended.
+
+
+* See Spec/resize.doc for explanations on how to size your gadget.
+  In the simplest case, where the gadget's size is fixed, call VisSetSize
+  to initially set the size in your object's MSG_SPEC_BUILD, and set the
+  VOF_USE_VIS_CALC_NEW_SIZE to avoid receiving any CALC_NEW_SIZE calls.
+  Composite gadgets that manage their children need not do anything, and
+  will be as big as the sum of their children.  Set the 
+  VOF_USE_VIS_CALC_NEW_SIZE in this simple case as well.
+  
+  
+------------------------------------------------------------------------------
+		Rules for instance data
+------------------------------------------------------------------------------
+
+********** Specific UI data
+
+	All data in the specific UI master part (SB_offset) is strictly
+	off-limits at all times.
+
+********** Visual data
+
+VI_bounds (default = (0, 0, -1, -1):
+	Can be looked at to find the bounds of the object.  See "Geometry Rules"
+VI_typeFlags (default = no bits set):
+	All bits may be looked at
+	VTF_IS_WINDOW, VTF_IS_PORTAL - Can be set in SPEC_BUILD
+VI_attrs (default = VA_ATTACHED, VA_MANAGED, VA_DRAWABLE, VA_DETECTABLE):
+	All bits may be looked at.  Bits can be set in SPEC_BUILD.  Any other
+	changes should be done via MSG_VIS_SET_ATTRS.
+VI_optFlags (default = everything invalid (from SPEC_BUILD)):
+	Should not be set.  Use MSG_VIS_MARK_INVALID
+VI_geoFlags (default = no bits set):
+	See "Geometry rules"
+VI_link:
+	Should not be set or looked at.
+
+VCI_comp:
+	Should not be set or looked at.
+VCI_gadgetExcl:
+	Should not be set or looked at.
+VCI_window:
+	Can be looked at but not modified
+VCI_geoAttrs (default = no bits set):
+	Can be looked at, can be set in SPEC_BUILD.  Other modifications should
+	be done via MSG_VIS_COMP_SET_GEO_ATTRS.
+VCI_geoDimensionAttrs (default = no bits set):
+	Can be looked at, can be set in SPEC_BUILD.  Other modifications should
+	be done via MSG_VIS_COMP_SET_GEO_ATTRS.
+
+********** Generic data
+
+GGI_attrs:
+	GGA_COMPOSITE - Can be looked at but not changed
+
+------------------------------------------------------------------------------
+		Rules for methods
+------------------------------------------------------------------------------
+
+	Any message not listed is assumed to be off-limits for GenGadget.  If
+	you need to use any methods not listed here, see Doug or Tony.
+
+********** Methods that *MUST* be implemented by the gadget.
+			------
+Method: MSG_VIS_DRAW
+Documentation: visClass.asm, Spec/User/visual.doc
+Notes:	If a composite then the superclass can be used to draw children.
+	Children should generally be drawn after any other drawing.  Calling
+	the superclass does nothing if not a composite.
+
+Method: MSG_VIS_OPEN_WIN  (only required if gadget sets visible attributes such
+	that a graphics window is used)
+Documentation: visClass.asm, Spec/User/visual.doc
+Notes:	Used for composites with VTF_IS_WINDOW or with VTF_IS_PORTAL's to
+	open the graphics window.  There is no default for this method, it
+	MUST be implemented for windowed objects. Failure to respond to this
+	method IF YOU ARE WINDOWED will result in application death.
+
+Method: MSG_VIS_LOST_GADGET_EXCL (only required if gadget grabs the mouse)
+Documentation: visComp.asm, Spec/User/control.doc
+Notes:	Instructs the gadget that it is no longer the active gadget & that
+	it should no longer interact with the user.  If it is possible that
+	the gadget has the mouse grabbed, then it should call VisReleaseMouse
+	to release it.
+
+Method: MSG_META_LOST_FOCUS_EXCL (only req'd if gadget displays selected data)
+Method: MSG_META_LOST_TARGET_EXCL only req'd if gadget displays selected data)
+Documentation: Spec/User/control.doc
+Notes:	IF the gadget grabs the focus or target exclusives in order to get
+	the keyboard focus or become the current "target" object, AND the
+	gadget displays selection while it has the focus (such as a text
+	object) THEN it needs to respond to these methods by making sure
+	that it is not displaying an active insertion point or active 
+	selection unless it has the appropriate exclusive.
+
+********** Methods that the gadget may receive, but need not act upon.
+
+Method: MSG_META_INITIALIZE
+Documentation:
+Notes:	This method will be received if an object of the gadget class is
+	ever ObjInstantiated, outside of being placed in the .ui file.
+	This message should NOT be sent across master part boundaries, & hence
+	should NOT be sent on to GenGadgetClass if received by the
+	application's subclass of this object.  Each master class is
+	sent a MSG_META_INITIALIZE separately.
+
+Method: MSG_META_START_SELECT, MSG_META_DRAG_SELECT, MSG_META_END_SELECT
+Documentation: Spec/User/button.doc
+Notes:	Normally corresponds to first button up/down
+
+Method: MSG_META_START_ADJUST, MSG_META_DRAG_ADJUST, MSG_META_END_ADJUST
+Method: MSG_META_START_FEATURES, MSG_META_DRAG_FEATURES, MSG_META_END_FEATURES
+Method: MSG_META_START_UI_SELECT, MSG_META_DRAG_UI_SELECT, MSG_META_END_UI_SELECT
+Method: MSG_META_START_MOVE, MSG_META_DRAG_MOVE, MSG_META_END_MOVE
+Method: MSG_META_START_COPY, MSG_META_DRAG_COPY, MSG_META_END_COPY
+Method: MSG_META_START_OTHER_BUTTON, MSG_META_DRAG_OTHER_BUTTON,
+			MSG_META_END_OTHER_BUTTON
+Method: MSG_META_PTR
+Documentation: Spec/User/mouse.doc, Spec/User/button.doc
+
+Notes:
+	1) You will automatically get these events if no object has the mouse
+grabbed AND the mouse is over the bounds of your object.  If you wish to keep
+getting them, even if the mouse moves off, OR if you want to get MSG_META_PTR
+events, which aren't guaranteed for the "implied grab", you will want to 
+"Grab" the mouse.  See usage of VisGrabMouse & VisReleaseMouse below.
+
+	2) You must return in ax  MouseReturnFlags, to indicate your response
+to the mouse method.  ax = 0 indicates you have NOT processed the method, &
+are not interested in it.  If the button is inside of your gadget, you will
+probably want to return mask MRF_PROCESSED.  If you have grabbed the mouse,
+& get a MSG_META_END_XXX or MSG_META_PTR which is outside of your gadget, & if
+you decide to release the mouse because of this, you can return MRF_REPLAY,
+which will cause the event to be re-delivered, this time to the object which
+IS under the mouse.  On all MSG_META_PTR's, you probably want to return
+mask MRF_CLEAR_POINTER_IMAGE (unless you are doing something special with the
+pointer image).
+
+	3) Also: Don't do any timing yourself to try & pick out double-clicks,
+or other modifying behavior.  Relay on the DOUBLE_PRESS flag which is passed
+in the events, & on the MSG_META_DRAG_XXX which is sent out when the IM has
+decided that the user is trying to drag the mouse.
+
+Method: MSG_META_GAINED_FOCUS_EXCL
+Method: MSG_META_GAINED_TARGET_EXCL
+Documentation: Spec/User/control.doc
+Notes:	-
+
+********** Methods that have default functions but which may be replaced by
+	   the gadget to yield new behavior
+
+Method: MSG_VIS_RECALC_SIZE
+Documentation: visClass.asm
+Notes:	See "Geometry rules".  Composite can call superclass to do normal
+	geometry stuff.
+
+Method: MSG_SPEC_GET_EXTRA_SIZE
+Documentation: visClass.asm
+Notes:  See "Geometry rules."
+	
+Method: MSG_VIS_GET_CENTER
+Documentation: visClass.asm
+Notes:	See "Geometry rules".  Default averages the vis bounds
+
+Method: MSG_GET_SPACING (composite only)
+Documentation: visComp.asm
+Notes:	See resize.doc.  Lets you choose your composite's spacing between
+	children and margins.
+
+********** Methods that may be augmented by the gadget, meaning that the
+	   gadget may provide a method handler in which ObjCallSuperNoLock
+	   is called at some point to perform the original behavior for the
+	   method.
+
+Method: MSG_SPEC_BUILD
+Documentation: visClass.asm
+Notes:	See "Geometry rules".  Always call super class first and then do other
+	stuff.  Can be used to set the initial state of the visual stuff.
+
+Method: MSG_VIS_OPEN
+Documentation: visClass.asm
+Notes:	Is notification of object becoming visible on screen.
+
+Method: MSG_VIS_MOVE_RESIZE_WIN
+Documentation: visClass.asm
+Notes:	The default method resizes the window for composites with VTF_IS_WINDOW,
+to the current vis bounds.
+
+Method: MSG_VIS_CLOSE_WIN
+Documentation: visClass.asm
+Notes:	The default method closes the window for composites with VTF_IS_WINDOW.
+
+Method: MSG_VIS_CLOSE
+Documentation: visClass.asm
+Notes:	Is notification of object no longer being visible on screen.
+
+
+********** Methods that can be called (sent) by the GenGadget
+
+Method: MSG_VIS_MARK_INVALID
+Documentation: visClass.asm
+Notes:	Used to indicate to the visual world that some work needs to be done
+	on this object.  Geometry, any window position or size, & image may
+	be marked as being wrong.
+
+Method:	MSG_VIS_VUP_UPDATE_WIN_GROUP
+Documentation: visComp.asm
+Notes:	This may be sent to the gadget, or the visible parent.  It travels
+up the visible tree & causes the window the gadget is on to be visibly updated.
+Typically used if you change the geometry you are using somehow, & want the
+window updated to reflect this.
+
+Method: MSG_VIS_VUP_QUERY
+Documentation: visClass.asm
+Legal query types:
+	VUQ_DISPLAY_SCHEME - Returns the display scheme for the object
+Notes:
+
+Method: MSG_VIS_VUP_CREATE_GSTATE
+Documentation: visClass.asm
+Notes:	Used for drawing outside of an update, or for calculating size of a
+string based on current font.  Returns a graphics state with the correct
+display scheme for the application's UI.  The gstate should be destroyed
+after use.
+
+Method: MSG_VIS_VUP_QUERY_VIDEO_DRIVER
+Documentation: visClass.asm
+Notes:	-
+
+Method: MSG_VIS_VUP_GRAB_FOCUS_EXCL
+Documentation: visClass.asm, Spec/User/control.doc
+Notes:	Takes the focus exclusive for the window the gadget is on.  The kbd
+grab will be given to your object automatically.  If the window the gadget
+is on doesn't have the focus, then this just sets the default focus for the
+window.  See control.doc before using.
+
+Method: MSG_VIS_VUP_RELEASE_FOCUS_EXCL
+Documentation: visClass.asm Spec/User/control.doc
+Notes:	Releases the focus from this object if it has it.
+See control.doc before using.
+
+Method: MSG_VIS_VUP_GRAB_TARGET_EXCL
+Documentation: visClass.asm Spec/User/control.doc
+Notes:	Takes the target exclusive for the window the gadget is on.  If the
+window the gadget is on isn't the target window, then this just sets the 
+default focus.  See control.doc before using.
+
+Method: MSG_VIS_VUP_RELEASE_TARGET_EXCL
+Documentation: visClass.asm Spec/User/control.doc
+Notes:	Releases the target exclusive from this object if it has it.
+See control.doc before using.
+
+Method: MSG_VIS_TAKE_GADGET_EXCL (May be sent to visible parent only)
+Documentation: visComp.asm
+Notes:  Must be sent before grabbing the mouse, or even if not grabbing the
+mouse, but responding to a button/ptr method, to indicate that this gadget
+is now interacting with the user.
+
+Method: MSG_VIS_SET_ATTRS
+Documentation: visClass.asm
+Notes:	Should be used in place of setting the bits directly so that things
+	are updated correctly.
+
+Method: MSG_VIS_GET_SIZE
+Documentation: visClass.asm
+Notes:	Same as looking at the instance data or calling VisGetSize
+
+Method: MSG_VIS_GET_BOUNDS
+Documentation: visClass.asm
+Notes:	Same as looking at the instance data or calling VisGetBounds
+
+Method: MSG_VIS_INVALIDATE
+Documentation: visClass.asm
+Notes:	Same as using at the instance data or calling VisInvalidate
+
+Method: MSG_VIS_COMP_GET_GEO_ATTRS (composite only)
+Documentation: visComp.asm
+Notes:	Same as looking at the instance data
+
+Method: MSG_GET_SPACING (composite only)
+Documentation: visComp.asm
+Notes:	Same as looking at the instance data
+
+Method: MSG_VIS_COMP_SET_GEO_ATTRS (composite only)
+Documentation: visComp.asm
+Notes:	Should be used in place of setting the bits directly so that things
+	are updated correctly.
+
+********** Assumed off limits methods
+
+MSG_VIS_SET_POSITION (because I am not sure where it should be used)
+MSG_VIS_POSITION_BRANCH (because I am not sure where it should be used)
+MSG_VIS_SET_SIZE (because I am not sure where it should be used)
+
+MSG_SPEC_BUILD_BRANCH
+MSG_VIS_UPDATE_GEOMETRY
+MSG_UPDATE_IMAGES
+MSG_UPDATE_WINDOWS
+
+MSG_VIS_ADD_CHILD
+MSG_VIS_REMOVE_CHILD
+MSG_VIS_MOVE_CHILD
+
+********** Methods that are absolutely off-limits & may not be sent,
+	   replaced, or subclassed by the gadget:
+
+MSG_META_RESOLVE_VARIANT_SUPERCLASS
+MSG_VIS_UPDATE_WIN_GROUP
+
+MSG_VIS_SET_USABLE
+MSG_VIS_SET_NOT_USABLE
+
+------------------------------------------------------------------------------
+		Utility routines that may be used
+------------------------------------------------------------------------------
+
+VisGetSize			- returns size of visible bounds
+VisGetBounds			- returns visible bounds
+VisInvalidate			- loads visible bounds, calls WinInvalReg,
+				  forcing a redraw.  Not very fast, but works.
+
+VisGrabMouse			- Allows you to grab the mouse.   You must
+				  send a MSG_VIS_TAKE_GADGET_EXCL to vis parent
+				  before doing this, & be able to respond
+				  to MSG_VIS_LOST_GADGET_EXCL.
+				  While you have the mouse grab, you will
+				  get MSG_META_PTR, all
+				  MSG_START/END{SELECT, FEATURES}, etc.
+				  until you release the mouse.
+				  See Spec/User/mouse.doc
+
+VisReleaseMouse			- Allows you to release any mouse grab you
+				  might have.
+
+VisGrabFocusExcl		- will cause you to get the focus, if your
+				  parent window has it.  You will get a
+				  MSG_META_GAINED_FOCUS_EXCL when you are given
+				  the kbd grab, as a notification.  You
+				  will receive a MSG_META_LOST_FOCUS_EXCL when
+				  you have lost it.  If your parent window
+				  suddenly becomes the focus, & you were the
+				  last object in it to call this, you will
+				  get the focus back again.
+
+VisReleaseFocusExcl		- will release the focus, if you have it.  You
+				  won't be given the focus again, until you
+				  call VisGrabFocusExcl.
+VisGrabTargetExcl		- same as Focus routines above, but for Target
+VisReleaseTargetExcl		  (see Spec/control.doc)
+
+
+; UNLESS YOU KNOW WHAT YOU ARE DOING, do not use the following
+; ButtonXXXPassive routines:
+VisAddButtonPrePassive
+VisRemoveButtonPrePassive
+VisAddButtonPostPassive
+VisRemoveButtonPostPassive
+
+
+------------------------------------------------------------------------------
+		Dealing with state
+------------------------------------------------------------------------------
+
+	Any time that the instance data for the application part of GenGadget
+is changed, ObjSetFlags should be called with bx=mask OCF_DIRTY.  This marks
+the object as dirty so that it is saved correctly.
+
+
+;------------------------------------------------------------------------------
+
+Declaration
+-----------
+
+Methods Declared
+----------------
+
+Additional documentation
+------------------------
+
+------------------------------------------------------------------------------@

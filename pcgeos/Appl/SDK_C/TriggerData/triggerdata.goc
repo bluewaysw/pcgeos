@@ -1,0 +1,347 @@
+/********************************************************************
+ *
+ * 	Copyright (c) Geoworks 1992 -- All Rights Reserved.
+ *
+ * PROJECT:	GEOS Sample Applications
+ * MODULE:	Trigger Data-Passing
+ * FILE:	triggerdata.goc
+ *
+ * AUTHOR:	Tom Manshreck: October 8, 1992
+ *
+ * REVISION HISTORY:
+ * 	Name	Date		Description
+ * 	----	----		-----------
+ * 	TM	10/8/92   	Initial version
+ *
+ * DESCRIPTION:
+ *      This application tests the use of a GenTrigger in
+ * 	passing data. This data may be used and set
+ * 	for whatever purpose the app writer needs. The data
+ * 	to pass is not stored within a GenTrigger's normal
+ * 	instance data but is instead stored as vardata.
+ *
+ * 	(Throughout this file you will see references like
+ * 	this: [Con 7.2.1] This is a reference to chapter 7,
+ * 	section 7.2.1 of the Concepts manual. [Obj 7.2.1] is a
+ * 	reference to chapter 7, section 7.2.1 of the Objects
+ * 	manual. You should use these references to locate
+ * 	further information about the topic being discussed if
+ * 	anything is unclear.)
+ *
+ * 	ATTR_GEN_TRIGGER_ACTION_DATA [Obj 5.3.1] by default
+ * 	can store a word of data to deliver to the message
+ * 	handler for the trigger's message. If the data you
+ * 	need to deliver is one word or less, use
+ * 	ATTR_GEN_TRIGGER_ACTION_DATA without any modifications.
+ *
+ *	If instead you need to deliver data that cannot neatly
+ * 	fit within one word of data, then you should use a
+ * 	vardata alias to modify ATTR_GEN_TRIGGER_ACTION_DATA's
+ * 	behavior. This method is shown in this application.
+ *
+ * RCS STAMP:
+ * 	$Id: triggerdata.goc,v 1.1 97/04/04 16:37:53 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include Files
+ *******************************************************************/
+    @include <stdapp.goh>
+
+/********************************************************************
+ *		Constants
+ *******************************************************************/
+    #define TEXT_POINT_SIZE 48.0       /* point size */
+    #define TEXT_ROTATION   (360 - 15) /* angle of rotation */
+    #define TEXT_X_POSITION 30         /* x position, in document coords */
+    #define TEXT_Y_POSITION 0          /* y position, in document coords */
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    @class TriggerDataProcessClass, GenProcessClass;
+
+      /*
+       * This message scales the view's gstate by the passed
+       * arguments. In this application, we have a GenTrigger
+       * send this message; therefore, we must pass this
+       * message's data (xScale and yScale) in the GenTrigger's
+       * vardata section.
+       *
+       * We do this with ATTR_GEN_TRIGGER_ACTION_DATA (See below).
+       */
+    @message void MSG_TRIGGER_DATA_SCALE( WWFixedAsDWord xScale,
+                                          WWFixedAsDWord yScale );
+    @endc;
+
+    @class TriggerDataTriggerClass, GenTriggerClass;
+      /*
+       * MSG_GEN_VIEW_SET_SCALE_FACTOR expects several arguments
+       * passed to it. Because we have a GenTrigger sending this
+       * message directly, we must pass this data in the
+       * ATTR_GEN_TRIGGER_ACTION_DATA vardata section of the
+       * particular GenTrigger.
+       *
+       * ATTR_GEN_TRIGGER_ACTION_DATA expects only a word of data,
+       * however. Therefore, we need to use @vardataAlias to redefine
+       * that vardata to pass a structure of type SetScaleFactorArgs.
+       *
+       * NOTE: Because the MSG_GEN_VIEW_SET_SCALE_FACTOR handler
+       * expects arguments passed on the stack, we define the structure
+       * in reverse order to the expected arguments.
+       */
+    typedef struct {
+        WWFixedAsDWord SSFA_xScaleFactor;
+        WWFixedAsDWord SSFA_yScaleFactor;
+        byte           SSFA_unused;  /* word aligned when passed on stack */
+        byte           SSFA_scaleType;
+        sdword         SSFA_xOrigin;
+        sdword         SSFA_yOrigin;
+    } SetScaleFactorArgs;
+    @vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+            SetScaleFactorArgs ATTR_GEN_TRIGGER_SET_SCALE_DATA;
+
+      /*
+       * Likewise, we use another vardata alias to pass a
+       * TriggerScaleArgs structure when we set
+       * ATTR_GEN_TRIGGER_APP_SCALE_DATA.
+       */
+    typedef struct {
+        WWFixedAsDWord TSA_xScale;
+        WWFixedAsDWord TSA_yScale;
+    } TriggerScaleArgs;
+    @vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+          TriggerScaleArgs ATTR_GEN_TRIGGER_APP_SCALE_DATA;
+    @endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    @classdecl TriggerDataProcessClass, neverSaved;
+    @classdecl TriggerDataTriggerClass;
+
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass TriggerDataApp = {
+    GI_visMoniker = list { @TriggerDataTextMoniker };
+    GI_comp = @TriggerDataPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @TriggerDataPrimary;
+}
+
+@visMoniker TriggerDataTextMoniker = "TriggerData";
+
+@end AppResource;
+
+/********************************************************************
+ *		Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass TriggerDataPrimary  = {
+    GI_comp = @TriggerDataView,
+              @ZoomTrigger,
+              @UnzoomTrigger,
+              @ZoomAppTrigger,
+              @UnzoomAppTrigger;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+  /*
+   * This view is used to send scale-changing messages to.
+   */
+@object GenViewClass TriggerDataView = {
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+    GVI_docBounds = {
+        0,
+        0,
+        1000,
+        1000
+    };
+    GVI_content = process;
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+  /*
+   * The "Zoom" trigger here doubles the scale factor of the GenView
+   * object. It sends the MSG_GEN_VIEW_SET_SCALE_FACTOR message handler
+   * data of type SetScaleFactorArgs - the type that
+   * this message handler expects. We set up this data using our vardata
+   * alias ATTR_GEN_TRIGGER_SET_SCALE_DATA that we defined before.
+   */
+@object TriggerDataTriggerClass ZoomTrigger = {
+    GI_visMoniker = "Zoom";
+
+      /*
+       * Have the trigger scale the view.
+       */
+    GTI_destination = TriggerDataView;
+    GTI_actionMsg = MSG_GEN_VIEW_SET_SCALE_FACTOR;
+
+      /*
+       * Set up data (SetScaleFactorArgs) to pass.
+       */
+    ATTR_GEN_TRIGGER_SET_SCALE_DATA = {
+      	MakeWWFixed( 2.0 ),
+	MakeWWFixed( 2.0 ),
+	0,
+	SVT_AROUND_UPPER_LEFT,
+	0,
+	0
+    };
+}
+
+  /*
+   * The "Unzoom" trigger here returns the scale factor
+   * of the GenView to normal. It, too, sends the
+   * MSG_GEN_VIEW_SET_SCALE_FACTOR message handler data
+   * of type SetScaleFactorArgs.
+   */
+@object TriggerDataTriggerClass UnzoomTrigger = {
+    GI_visMoniker = "Unzoom";
+    GTI_destination = TriggerDataView;
+    GTI_actionMsg = MSG_GEN_VIEW_SET_SCALE_FACTOR;
+    ATTR_GEN_TRIGGER_SET_SCALE_DATA = {
+      	MakeWWFixed( 1.0 ),
+	MakeWWFixed( 1.0 ),
+	0,
+	SVT_AROUND_CENTER,
+	0,
+	0
+    };
+}
+
+  /*
+   * The "Zoom via App" trigger performs the same function as the "Zoom"
+   * trigger above, but it requires less data to pass. (The handler for
+   * this message sets up the rest of the data according to default
+   * values.) This trigger sends the MSG_TRIGGER_DATA_SCALE message
+   * handler data of type TriggerScaleArgs - the type it expects.
+   * We set up this data using our vardata alias
+   * ATTR_GEN_TRIGGER_APP_SCALE_DATA that we defined before.
+   */
+@object TriggerDataTriggerClass ZoomAppTrigger = {
+    GI_visMoniker = "Zoom via App";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_TRIGGER_DATA_SCALE;
+    ATTR_GEN_TRIGGER_APP_SCALE_DATA = {
+      	MakeWWFixed( 2.0 ),
+	MakeWWFixed( 2.0 )
+    };
+}
+
+  /*
+   * The "Unzoom via App" trigger performs the same function as the
+   * "Unzoom" trigger above, but it requires less data to pass.
+   */
+@object TriggerDataTriggerClass UnzoomAppTrigger = {
+    GI_visMoniker = "Unzoom via App";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_TRIGGER_DATA_SCALE;
+    ATTR_GEN_TRIGGER_APP_SCALE_DATA = {
+      	MakeWWFixed( 1.0 ),
+	MakeWWFixed( 1.0 )
+    };
+}
+
+@end Interface;
+
+
+/********************************************************************
+ *		Code for TriggerDataProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *		MSG_META_EXPOSED
+ ********************************************************************
+ * SYNOPSIS:	 This message is sent by the Windowing system whenever
+ *		 we need to redraw a portion of the document in the
+ *		 GenView area. We intercept it here to draw our own
+ *		 custom text so that we can see the effects of scaling
+ *		 the view with the application's triggers.
+ * PARAMETERS:   WindowHandle win
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Same as Hello sample app - draw a text string to
+ *               the view.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/13/92	Initial version
+ *******************************************************************/
+@method TriggerDataProcessClass, MSG_META_EXPOSED
+{
+      /*
+       * gstate - Handle of the GState to draw to.
+       */
+    GStateHandle gstate;
+
+      /*
+       * Begin by creating a gstate and beginning the
+       * visual update to this view.
+       */
+    gstate = GrCreateState( win );
+    GrBeginUpdate( gstate );
+
+      /*
+       * Set the font, point size, color, angle of rotation,
+       * then draw the text.
+       */
+    GrSetFont( gstate, FID_DTC_URW_SANS, MakeWWFixed( TEXT_POINT_SIZE ) );
+    GrSetTextColor( gstate, CF_INDEX, C_LIGHT_BLUE, 0, 0 );
+    GrApplyRotation( gstate, MakeWWFixed( TEXT_ROTATION ) );
+    GrDrawText( gstate,
+                TEXT_X_POSITION,
+                TEXT_Y_POSITION,
+                "The cow jumped over the moon.",
+                0 );
+
+      /*
+       * Finish by ending the update and destroying the gstate.
+       */
+    GrEndUpdate( gstate );
+    GrDestroyState( gstate );
+} /* MSG_META_EXPOSED */
+
+/********************************************************************
+ *		MSG_TRIGGER_DATA_SCALE
+ ********************************************************************
+ * SYNOPSIS:	 This message scales the view of this application
+ * 		 according to the passed arguments.
+ * PARAMETERS:   WWFixedAsDWord xScale
+ *               WWFixedAsDWord yScale
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the view's scale factor based on the input
+ *               from the trigger.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TM	10/13/92	Initial version
+ *******************************************************************/
+@method TriggerDataProcessClass, MSG_TRIGGER_DATA_SCALE
+{
+
+      /*
+       * Data is passed on the stack, so we assign arguments
+       * in reverse order.
+       */
+    @call TriggerDataView::MSG_GEN_VIEW_SET_SCALE_FACTOR(
+        0,
+        0,
+        SVT_AROUND_CENTER,
+        yScale,
+        xScale);
+} /* MSG_TRIGGER_DATA_SCALE */
+

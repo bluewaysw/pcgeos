@@ -1,0 +1,109 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1995 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	PC GEOS
+MODULE:		Termcap
+FILE:		README
+
+AUTHOR:		Simon Auyeung, Apr  6, 1995
+	
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	simon		4/ 6/95   	Initial revision
+
+
+DESCRIPTION:
+	Description of a termcap file.
+		
+
+	$Id: README,v 1.4.8.1 97/03/29 09:45:20 canavese Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+STRUCTURE OF TERMCAP FILE
+
+
+--- Beginning of termcap file ---
+;<RCS line>
+:<boolean flags>
+<Escape Sequence><1 or more tabs><Function Number>
+--- End of termcap file ---
+
+
+RCS Line
+	It is the for RCS purpose only
+
+Boolean flags
+	For setting the internal states of screen object (See
+	FSMFlagTable). 
+
+	Currently, "xn" is the only supported flag. If this flag is
+	included in termcap file, the terminal will ignore newlines
+	after 80 cols. 
+
+Escape Sequence
+	The actual escape sequence
+
+	\E	- ESC character
+	^	- the character following is a control character (e.g. ^G
+		is Ctrl-G)
+	Parameters:
+	%d	- A string of digits.  First non-digit ends argument 
+		  (setup up internal function to convert Ascii numbers
+			to hex value)
+	%c	- a single character whose value is stored as argument
+
+	%+x	- add x to value, then do %	
+
+	%i	- decrement the value by one 	
+
+	%r	- reverse order of next two parameters
+	
+	Any other characters are the characters received.
+
+Function Number
+	The number assigned from FunctionTable which is an action
+	table to map the parsed sequence.
+
+
+Termcap files are very picky about the characters you put in the
+termcap file. Any erraneous or unncessary character can create errors
+during parsing of termcap in creation of the Finite State Machine. 
+
+IMPORTANT NOTES:
+
+	* Do not use spaces instead of tabs. Otherwise, you may
+	experience unexpected crashes.
+
+	* Do not put spaces or tabs at the end of each line after the
+	function number. Otherwise, the spaces or tabs will be printed
+	on the screen. 
+	
+	* There are at most 4 parameters that can appear in an escape
+	sequence now. (e.g. \E%d;%d;%d;%d;%d;%dx will produce
+	erraneous results and trashes memory.)
+
+	* It is easy to create ambiguity in the escape sequences. If
+	you have this sequences defined, \E[%dH and \E[8, if you pass
+	\E[9 to the parser, it will map to \E[8 because it can find 9 in
+	the 3rd character parse and thus go on and assume the state of
+	\E[8 is reached.
+
+	* It does not have mechanism to parse zero or more selector
+	code separated by a delimiter. For example, it does not know
+	how to handle \E[1;2;4;5m.
+	
+	* The file must be in DOS file format. If that's a unix file,
+	you have to convert it into a DOS file. Otherwise, there will
+	unexpected behavior, for example, <newline> character will not
+	be printed. 
+
+	* Added backtracking for parsing escape codes. There is
+	limitation that if there are escape codes containing absolute
+	digits (like \E[1h) and other escape codes containing wildcard
+	digit character (like %d) at the same character position, the
+	one with absolute digit must preceed in the order in the
+	termcap file. 

@@ -1,0 +1,1612 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Viewer Interface Library
+FILE:		viewer.goh
+
+AUTHOR:		Skarpi Hedinsson, Nov  9, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	11/ 9/94   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: viewer.goh,v 1.1 97/04/04 15:59:49 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@optimize
+
+@include <mailbox.goh>
+#include <Foam/faxOpts.h>
+
+@deflib	viewer
+
+/* ---------------------------------------------------------------------------
+ *   Constants
+ * --------------------------------------------------------------------------*/
+typedef enum {
+    VIE_FILE_NOT_RECOGNIZED = 0x1,
+    /*  A file did not have a token (if GEOS file) or an DOS extension. */
+
+    VIE_NO_VIEWER_LIBRARY,
+    /*
+     *  A viewer library for the given file was not found.  An application
+     *  can respond to the message by launching a default viewer library.
+     */
+
+    VIE_SHARING_VIOLATION,
+    /*  The file could not be opened. */
+
+} ViewerInterfaceError;
+
+
+typedef enum {
+    VLR_OPEN = 0x0,
+    /*  Loads a viewer library and opens the file in ViewerParams. */
+
+    VLR_DETACH,
+    /*
+     *  Called by ViewerDetach to tell the viewer library to detach and
+     *  destroy it's UI and return a block of state to save.
+     *
+     *  Pass: optr viewerLibUI	(Viewer Library UI to destroy)
+     *  Return: hptr stateBlock
+     */
+
+    VLR_CHANGE_DOCUMENT,
+    /*
+     *  Called when a new document needs to be viewed using a viewer already
+     *  on screen.
+     *
+     *  Pass: ViewerChangeDocumentStruct *vcds
+     */
+
+    VLR_CLOSE
+    /*
+     *  Called when the application needs to close the viewer.  This could
+     *  happen when a user presses ctrl-n (or ctrl-p) to view a new file and
+     *  the new file is a different type and thus needs a differnet viewer.
+     *
+     *  Pass: optr viewerLibUI (Viewer Library UI to destory)
+     */
+
+} ViewerLibraryRoutine;
+
+typedef WordFlags ViewerAttributes;
+#define VA_NEW_DOCUMENT	(0x8000)
+	/* The document to open is new (just created.)  This will turn off
+	   the Ctrl-N/P keys of the viewer libraries. */
+#define VA_NO_UNDO (0x4000)
+        /* Undo shouldn't be allowed in the document editor. */
+#define VA_NO_RENAME (0x2000)
+        /* We won't let the user rename the document while closing. */
+/* 13 bits unused */
+
+
+/* ---------------------------------------------------------------------------
+ *   Structures
+ * --------------------------------------------------------------------------*/
+typedef struct {
+    DocumentInfo	VCD_documentInfo;
+	/* Name of document to view. */
+	
+    optr		VCD_viewerOD;
+	/* Optr of the viewer library ui. */
+
+} ViewerChangeDocumentStruct;
+
+typedef struct {
+
+    FileLongName	VP_libraryName;
+    /*  Name of the library viewing VP_documentInfo.DI_docName */
+
+    DocumentInfo	VP_documentInfo;
+    /*  The full path and name of the file to view. */
+
+    GeodeToken		VP_app;
+    /*
+     *  Specifies what application is loading the library.  This allows
+     *  a viewer library to customize user interface.
+     */
+
+    optr		VP_destination;
+    /*  Process OD of the calling thread. Needed to unload the library */
+
+    word		VP_closeMsg;
+   /*
+    *  Message sent to the destination passing the library handle when
+    *  the library should be unloaded.  The handler for this message the
+    *  calles ViewerUnloadLibrary.  See VIEWER_PARAMS_CLOSE_MSG prototype.
+    */
+
+    word		VP_nextPrevMsg;
+   /*
+    *  Message sent to the destination when the user wants to see the next
+    *  or previous document.  See VIWER_PARAMS_NEXT_PREV_MSG prototype.
+    */
+
+    ViewerAttributes 	VP_attr;
+   /* 
+    * Special attributes that apply to the viewer or the document being
+    * viewed.
+    *
+    */
+
+    hptr		VP_state;
+   /* 
+    * Handle of a state block if viewer library is being restored from state.
+    * Null if no state.
+    *
+    */
+
+} ViewerParams;
+
+/*
+ * Message prototype for the VP_closeMsg.  Use this when you need to define
+ * a callback close message for a viewer library.
+ *
+ */
+@prototype void VIEWER_PARAMS_CLOSE_MSG(GeodeHandle gh=cx, ViewerCloseStatus vcs=dx);
+
+/*
+ * Message prototype for the VP_nextPrevMsg.
+ *
+ */
+@prototype void VIEWER_PARAMS_NEXT_PREV_MSG(word character=cx);
+
+/*
+ * State file structure returned by MSG_VIEWER_RETURN_STATE and passed in
+ * VP_state.
+ *
+ */
+typedef struct {
+
+    DocumentInfo	VCS_documentInfo;
+    /*
+     * Name and directory of the current document.
+     */
+
+    VisTextRange	VCS_textRange;
+    /*
+     * The text range (cursor/selection) of the current document.
+     */
+
+} ViewerControlState;
+
+
+typedef struct {
+    FileLongName	FOCRCS_documentName;
+	/* Name of document to rename/copy. */
+    FileLongName	FOCRCS_newName;
+	/* New name for document. */
+    FDocumentDir	FOCRCS_documentDir;
+	/* Document directory where the documents are located. */
+} FileOpenControlRenameCopyStruct;
+
+
+/*
+ * The type of the file being viewed: a text note, a faxfile, an SMS, or
+ * whatever.
+ */
+typedef enum {
+    VFT_NOTE = 0,   	    /* It's a note */
+    VFT_FAXFILE = 2, 	    /* It's a faxfile */
+    VFT_GRAPHICS = 4,       /* Graphics file */
+    VFT_RESET_STATUS = 6    /* This is to make sure viewer get UI update,
+		          even when the same file is opened twice in a row. */
+} ViewerFileType;
+
+/*
+ * This structure is used with the GAGCNLT_VIEWER_NOTIFICATIONS gcn list and 
+ * GWNT_VIEWER_DOCUMENT_CHANGE notification to allow the fax transport driver's
+ * mail address control to behave differently when viewing a faxnote or a
+ * received fax.
+ *
+ * Or whatever.
+ */
+typedef struct {
+    DocumentInfo    	VDS_docInfo;	    /* The document's name */
+    ViewerFileType  	VDS_type;
+    FaxSendResolutionChoice VDS_resolution; /* If it's a fax, we need to know */
+} ViewerDocumentStatus;
+
+
+/*
+ *  The status of the document as returned from MSG_VIEWER_CLOSE.  This enum
+ *  is also passed to the viewer close message (VP_closeMsg), so applications
+ *  can determin what the status of the document was at the time the viewer
+ *  was closed.
+ */
+typedef enum {
+    VCS_CLOSED = 0x0,
+/*
+ *  Viewer closed.  This means the document was closed and the auto-save
+ *  timers have been turned off.
+ */
+
+    VCS_DOCUMENT_DELETED,
+/*  The viewer was closed and the document was deleted. */
+
+    VCS_NOT_CLOSED,
+/*
+ *  The viewer was not closed.  This happens when the user gets a
+ *  warning that he/she is about to close an empty document that will
+ *  be deleted and the user elects not to close the viewer.
+ */
+
+    VCS_ERROR,
+/*
+ *  The viewer was closed but an error occurd.  This can
+ *  only be returned with the viewer close message (VP_closeMsg).
+ */
+
+
+} ViewerCloseStatus;
+
+
+/*
+ * Maximum length of text moniker for button that lets user create
+ * new notes/message/faxes.
+ */
+#define MAX_CREATE_NEW_MONIKER_LENGTH	20	/* new for Lizzy */
+
+/* ---------------------------------------------------------------------------
+ *   FileOpenControlClass
+ * --------------------------------------------------------------------------*/
+@class  FileOpenControlClass, ComplexMonikerClass;
+
+@default ComplexMoniker = GenControlClass;
+
+typedef WordFlags FileOpenFeatures;
+/*  for future use 7 bits unused */
+#define FOF_MOVE		(0x0100) /*  new for lizzy */
+#define FOF_CREATE_FOLDER	(0x0080) /*  new for lizzy */
+#define FOF_COPY		(0x0040) /*  new for lizzy */
+#define FOF_CLOSE		(0x0020)
+#define FOF_OPEN		(0x0010)
+#define FOF_CREATE_NEW		(0x0008)
+#define FOF_DELETE		(0x0004)
+#define FOF_RENAME_COPY		(0x0002)
+#define FOF_RENAME		(0x0001)
+
+#define FOF_DEFAULT_FEATURES	(FOF_OPEN | FOF_CLOSE | FOF_CREATE_NEW)
+#define FOF_FULL_MENU	(FOF_MOVE | FOF_CREATE_FOLDER | FOF_COPY | \
+			 FOF_CREATE_NEW | FOF_RENAME_COPY | FOF_RENAME)
+
+@message void MSG_FILE_OPEN_CONTROL_OPEN(DocumentInfo *docInfo = cx:dx, \
+					 ViewerAttributes attr = bp);
+/*
+ *  Opens/displays the currently selected file by loading the
+ *  corrisponding viewer library.
+ * 
+ *  Pass: cx:dx - ptr to DocumentInfo
+ *        bp - ViewerAttributes
+ *  Return: nothing
+ *  Destroyed: ax, cx, dx, bp
+ */
+
+@message ViewerInterfaceError \
+     MSG_FILE_OPEN_CONTROL_GET_VIEWER_LIBRARY_NAME(@stack 
+					FileLongName *libName,
+					DocumentInfo *docInfo) = ax;
+/*
+ *  Returns the name of the viewer library used to view/edit the
+ *  selected file.  Applications can subclass this message to return
+ *  a different viewer library name.
+ * 
+ *  Pass: ss:bp - ViewerLibNameStruct
+ *  Return: ss:bp - VLNS_libraryName filed.
+ *          ax - ViewerInterfaceError
+ *  Destroyed: nothing
+ */
+
+@message Boolean MSG_FILE_OPEN_CONTROL_CREATE_NEW(DocumentInfo *docInfo = cx:dx)=carry;
+/*
+ *  Return TRUE if error creating a file. 
+ * 
+ *  Creates a default new file and calls MSG_FILE_OPEN_CONTROL_OPEN on
+ *  it.  A application can subclass this message to create a different
+ *  file type.
+ * 
+ *  Pass: cx:dx - buffer for DocumentInfo
+ *  Return: cx:dx - buffer with DocumentInfo filled out.
+ *          carry - set if error creating file.
+ *  Destroyed: ax, cx, dx, bp
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_DELETE();
+/*
+ *  Deletes the currently selected file.
+ * 
+ *  Pass: nothing
+ *  Return: nothing
+ *  Destroyed: ax, cx, dx, bp
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_RENAME_COPY();
+/*
+ *  OBSELEDATED BY MSG_FILE_OPEN_CONTROL_RENAME and
+ *                 MSG_FILE_OPEN_CONTROL_COPY messages
+ *
+ *  Now we don't have a UI that gives the two options at the same time.
+ *
+ *  Opens the Rename/Copy dialog which allows the user to rename or copy the
+ *  selected file.
+ * 
+ *  Pass: nothing
+ *  Return: nothing
+ *  Destroyed: ax, cx, dx, bp
+ *
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_ITEM_SELECTED( \
+				word entryNumber = cx, \
+				GenFileSelectorEntryFlags fsFlags = bp);
+/*
+ *  Message sent out when an item is selected in the file selector
+ * 
+ *  Pass: cx - entry # of selection
+ * 	bp - GenFileSelectorEntryFlags
+ * 
+ *  Return: nothing
+ *  Destroyed: ax, cx, dx, bp
+ */
+	
+@message void MSG_FILE_OPEN_CONTROL_SET_DIRECTORY(FDocumentDir fDocDir = cx);
+/*
+ *  Sets the current directory of the file selector.
+ * 
+ *  Pass: cx - FDocumentDir
+ *  Return: nothing
+ *  Destroyed: ax, cx, dx, bp
+ */
+
+@message FDocumentDir MSG_FILE_OPEN_CONTROL_GET_DIRECTORY()=cx;
+/*
+ *  Gets the current directory of the file selector.
+ * 
+ *  Pass: nothing
+ *  Return: cx - FDocumentDir
+ *  Destroyed: ax, cx, dx, bp
+ */
+				
+@message void MSG_FILE_OPEN_CONTROL_GET_FILTER_ROUTINE(
+		GenFileSelectorGetFilterRoutineResults *filter = axcxdxbp);
+/*
+ * Same as MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_SUB_DIR_OPEN(FDocumentDir fDocDir=cx);
+/*
+ * Sent when a user opens a sub directory. Passing the directory.
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_SUB_DIR_CLOSE(FDocumentDir fDocDir=cx);
+/*
+ * Sent when a user closes a sub directory. Passing the directory.
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_RENAME_DOCUMENT(
+		FileOpenControlRenameCopyStruct *renameCopyStruct=ss:bp);
+/*
+ * Renames the selected document using FileRename. Subclass this message if
+ * you need to prepare the document before renaming.
+ */
+
+
+@message void MSG_FILE_OPEN_CONTROL_COPY_DOCUMENT(
+		FileOpenControlRenameCopyStruct *renameCopyStruct=ss:bp);
+/*
+ * Copies the selected document using FileCopy. Subclass this message if
+ * you need to prepare the document before copying.
+ */
+
+
+@message void 
+    MSG_FILE_OPEN_CONTROL_CHANGE_FEATURES(FileOpenFeatures setf = cl,
+					  FileOpenFeatures clearf = ch);
+/*
+ *
+ * OBSOLEDATED BY MSG_FILE_OPEN_CONTROL_CHANGE_FEATURES_16
+ *
+ * Now there are more than 8 features, so we can't use CL, CH.
+ *
+ * Allows you to turn features on and off on the fly without forcing
+ * a visual re-build of the controllers UI.  This will allow you to
+ * remove/add the "rename/copy", "rename" and "delete" triggers in the
+ * MSG_FILE_OPEN_CONTROL_SUB_DIR_OPEN/CLOSE method handlers.
+ */
+
+
+
+@message optr
+    MSG_FILE_OPEN_CONTROL_GET_FILE_SELECTOR_OPTR() = cx:dx;
+/*
+  Returns the optr of the FileOpenControl's FFileSelector.
+*/
+
+
+/*------------------------------------------------------------------
+| The following messages are internal and should not be subclassed.
+------------------------------------------------------------------*/
+
+@message void MSG_FOC_OPEN();
+/*
+ *  Internal message sent when the user presses the "open" trigger.
+ *  The handler for this message calls MSG_FILE_OPEN_CONTROL_OPEN passing
+ *  the selected file name.
+ */
+
+@message void MSG_FOC_CLOSE();
+/*
+ * Internal message sent when a user presses the "close" trigger,
+ * which returns them to the top level directory.
+ */
+
+@message void MSG_FOC_CREATE_NEW();
+/*
+ *  Internal message sent when the user presses the "create new" trigger.
+ *  The handler for this message calls MSG_FILE_OPEN_CONTROL_CREATE_NEW
+ *  to get the name of create file.
+ */
+
+@message void MSG_FOC_UNLOAD_VIEWER_LIBRARY(GeodeHandle gh=cx);
+/*
+ *  Internal message sent by a viewer library notifying the controller
+ *  that it should unload the viewer library.
+ */
+
+@message void MSG_FOC_NEXT_PREV_DOCUMENT(word character=cx);
+/*
+ * Internal message sent by a viewer library notifying the controller that
+ * a new document should be opened.
+ */
+
+@message void MSG_FOC_NEXT_PREV_GET_NEW_DOC(FileLongName *oldDocName=ss:bp);
+/* Internal message sent when the file selector has been updated to show
+ * the next or previous document.
+ */
+ 
+@message void MSG_FOC_RENAME_DOC();
+/*
+ *  Internal message sent when the user presses the "rename" trigger to
+ *  rename a selected file.
+ *
+ */
+
+@message void MSG_FOC_COPY_DOC();
+/*
+ *  Internal message sent when the user presses the "copy" trigger to
+ *  copy a selected file.  The "copy" trigger is only enabled if the
+ *  current directory is "created texts".
+ *
+ */
+
+@message word MSG_FOC_CHECK_INCLUDE_EXCLUDE_DIR(FileLongName *name = ss:bp) = cx;
+/*
+ *  Internal message sent from our FileSelector object to check
+ *  if the specified file is in the INCLUDE_DIR or EXCLUDE_DIR list.
+ * 
+ *  Return: non zero to reject the file
+ */
+
+@message word MSG_FOC_CHECK_INCLUDE_EXCLUDE_FILE(dword token = cx:dx,
+						 word id = bp) = cx;
+/*
+ *  Internal message sent from our FileSelector object to check
+ *  if the specified file is in the INCLUDE_FILE or EXCLUDE_FILE list.
+ * 
+ *  Return: non zero to reject the file
+ */
+
+@message void MSG_FOC_OPEN_FOLDER();
+/*
+ *  Internal message sent when a user opens a folder.  This message
+ *  sets up the FileOpenControl UI for a open folder.
+ */
+
+@message void MSG_FOC_SET_FILE_SELECTOR_SELECTION(FileLongName *fileName = ss:bp);
+/*
+ *  Sends a MSG_GEN_FILE_SELECTOR_SET_SELECTION to the file selector.
+ *  
+ */
+
+@message word MSG_FILE_OPEN_CONTROL_DELETE_CALLBACK() = ax;
+/*
+ *  Sent by FoamDisplayDeleteWarningNoBlock if the user wants to delete
+ *  the current document.  FileDelete is called on the selected document.
+ *  
+ *  Returns FileError if error deleting the document.
+ */
+
+@message void MSG_FOC_MENU();
+/*
+ *  Open menu dialog in an open folder
+ */
+
+@message void MSG_FOC_CREATE_FOLDER();
+/*
+ *  Sent when the user finished interacting with create folder ui, and ok'ed
+ *  to create folder
+ */
+
+@message void MSG_FOC_COPY_DEST_READY();
+/*
+ *  The user is done interacting with destination dialog for copy operation
+ */
+
+@message void MSG_FOC_MOVE_DOC();
+/*
+ *  Sent when the user finished interacting with move document ui, and
+ *  ok'ed to move the document
+ */
+
+/*------------------------------------------------------------------
+| The following messages are not internal, but they are put there to
+| make sure that message numbers are preserved.
+------------------------------------------------------------------*/
+
+@message void MSG_FILE_OPEN_CONTROL_CREATE_FOLDER();
+/*
+ *  This message will bring up create folder ui, so user can create
+ *  a new folder inside current folder.
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_RENAME();
+/*
+ *  This message will bring up file rename dialog.
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_COPY();
+/*
+ *  This message will bring up file copy dialog.
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_MOVE();
+/*
+ *  This message will bring up file move dialog.
+ */
+
+@message void
+    MSG_FILE_OPEN_CONTROL_CHANGE_FEATURES_16( FileOpenFeatures setf = cx,
+		       		              FileOpenFeatures clearf = dx );
+/*
+ *  This message will change features( see FileOpenFeatures ).
+ *  New applications should use this message instead of its 8bit
+ *  predecesor: MSG_FILE_OPEN_CONTROL_CHANGE_FEATURES
+ */
+
+/*
+ *  MSG_META_NOTIFY(ManufacturerID manufID, 
+ *                  word notificationType, 
+ *                  word data);
+ * 
+ *  If the NotificationType is GWNT_VIEWER_SHUTTING_DOWN/
+ *  MANUFACTURER_ID_GEOWORKS and ViewerCloseStatus is VCS_CLOSED,
+ *  FOI_viewerAttr is checked to see if VA_NEW_DOCUMENT is set.
+ *  If this is the case then FDD_CREATED_TEXTS folder is opened by
+ *  calling MSG_FFS_SET_PATH and MSG_FOC_OPEN_FOLDER is called after
+ *  that to set the open folder ui.
+ * 
+ *  In order for this to happen the FileOpenControl must be added to
+ *  the GAGCNLT_VIEWER_NOTIFICATIONS gcnlist.
+ * 
+ *  Pass:  data = ViewerCloseStatus
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_GET_UNREAD_DOCUMENT(DocumentInfo *docInfo = cx:dx);
+/*
+ *  This message is sent out to ourselves when we want to get
+ *  the DocumentInfo of an unread document. The normal handler
+ *  will return the newest unread document in the passed directory.
+ *  Applications which subclass this message can return a
+ *  different document of their choosing. Do not call super
+ *  class if you do so.
+ * 
+ *  Pass:	  DocumentInfo with DI_docDir filled
+ *  Return:       DI_docName filled in buffer, 
+ * 		      or empty string if no such file
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_CLOSE_ALL_BUBBLES();
+/*
+ *  This is a utility message that can be used to close all the
+ *  bubbles (Menu, Destination, Rename, etc).
+ */
+
+@message void MSG_FILE_OPEN_CONTROL_LOAD_UNREAD_DOCUMENT(FDocumentDir folder=cx);
+/*
+ *  A utility message sent to ourselves when we get notification
+ *  that we should open the an unread document in a given
+ *  directory.
+ * 
+ *  Pass: cx = FDocumentDir or FoamPathHandle of the folder that
+ * 		contains the unread document.
+ *  Return: nothing
+ *  Destroyed: nothing
+ */
+
+@vardata FDocumentDir ATTR_FILE_OPEN_DEFAULT_DIRECTORY;
+/*  The directory to start off in */
+
+@vardata ChunkHandle ATTR_FILE_OPEN_DEFAULT_FILE_NAME_PREFIX;
+/*
+ *  Default prefix to file name when the conroller creates a new
+ *  file. (EX. FAX -> FAX 10.10.94)
+ */
+
+@vardata ChunkHandle ATTR_FILE_OPEN_CREATE_TRIGGER_MONIKER;
+/* 
+ * (ChunkHandle) FileOpenCreateNewMoniker
+ * 
+ * The moniker of the create document trigger.  The
+ * default trigger moniker for create new is "Create Document" but the
+ * trigger moniker can customized using this vardata. Example:
+ * "Create Message" or "Create Note".
+ */
+
+typedef struct {
+    optr FOCNM_topText;
+    /* Optr of chunk containing the top text of the moniker. */
+    optr FOCNM_iconBitmap;
+    /* Optr of chunk containing the icon bitmap of the moniker. */
+} FileOpenCreateNewMoniker;
+
+@vardata FileAttrInfo 	ATTR_FILE_OPEN_FILE_ATTR_INFO;
+/*
+ *  The FileAttrInfo to use when creating a new file.  The default
+ *  is to create a NOTE file but this can be changed by adding this
+ *  vardata entry.
+ */
+
+@vardata FileLongName	ATTR_FILE_OPEN_VIEWER_LIB_NAME;
+/*
+ * Stores the name of the viewer library being used to display the selected 
+ * document. This vardata is used when the controller is restarted from 
+ * state and needs to know what viewer library to load.
+ *
+ */
+
+@vardata void ATTR_FILE_OPEN_FILTER_IS_C;
+/*
+ * Set this attribute if your filter routine is written in C and obeys
+ * the Pascal calling convention.
+ *
+ */
+
+@vardata void ATTR_FILE_OPEN_FILTER;
+/*
+ * Set this attribute if you have a filter routine.
+ *
+ */
+
+@vardata ChunkHandle	ATTR_FILE_OPEN_INCLUDE_DIR; 
+/*
+ *  Set this to point to a list of FDocumentDir types, if you
+ *  DON'T have your own filter routine, but 
+ *  want the controller to exclusively list the specified
+ *  directories. See usage example below:
+ *
+ */
+
+@vardata ChunkHandle	ATTR_FILE_OPEN_EXCLUDE_DIR; 
+/*
+ *  Set this to point to a list of FDocumentDir types, if you
+ *  DON'T have your own filter routine, but 
+ *  want the controller to exclude the specified
+ *  directories.
+ * 
+ *  NOTE: ATTR_FILE_OPEN_INCLUDE_DIR has a higher priority than
+ *  ATTR_FILE_OPEN_EXCLUDE_DIR if both are used concurrently.
+ *
+ *  Usage example for ATTR_FILE_OPEN_[IN|EX]CLUDE_DIR:
+ * 
+ * 		......
+ * 		ATTR_FILE_OPEN_INCLUDE_DIR  = @IncludeList;
+ * 	}
+ *
+ *  	@chunk word IncludeList[] = {
+ * 		FDD_CREATED_TEXTS,
+ * 		FDD_RECEIVED_SM, 
+ * 		FDD_DOWNLOADED_FILES
+ * 	}
+ */
+
+@vardata ChunkHandle	ATTR_FILE_OPEN_INCLUDE_FILE;
+/*
+ *  Set this to point to a list of GeodeToken types, if you
+ *  DON'T have your own filter routine, but 
+ *  want the controller to exclusively list the specified
+ *  files. See usage example below.
+ */
+
+@vardata ChunkHandle	ATTR_FILE_OPEN_EXCLUDE_FILE;
+/*
+ *  Set this to point to a list of GeodeToken types, if you
+ *  DON'T have your own filter routine, but 
+ *  want the controller to exclude the specified
+ *  files.
+ * 
+ *  NOTE: ATTR_FILE_OPEN_INCLUDE_FILE has a higher priority than
+ *  ATTR_FILE_OPEN_EXCLUDE_FILE if both are used concurrently.
+ * 
+ *  Usage examples for ATTR_FILE_OPEN_[IN|EX]CLUDE_FILE:
+ * 
+ * 		......
+ * 		ATTR_FILE_OPEN_INCLUDE_FILE  = @IncludeList;
+ * 		......
+ * 	}
+ *
+ *  	@chunk GeodeToken IncludeList[] = {
+ * 		{"OUTB", MANUFACTURER_ID_GEOWORKS}
+ * 	}
+ * 
+ *  You can also use '{"", MANUFACTURER_ID_GEOWORKS}'
+ *  to imply non-Geos created files which don't have a
+ *  proper GeodeToken.
+ */
+
+@vardata DocumentInfo TEMP_FILE_OPEN_FILE_SELECTOR_INFO;
+/*
+ *  Temporary stores the path and selection of the file selector so it
+ *  can be reset when we are restoring from state.
+ */
+
+@vardata FileLongName TEMP_FS_SELECTION;
+/*
+ *  Temporary stores the file selectors current selection when the user
+ *  presses CTRL_N or CTRL_P in a document viewer.
+ */
+
+@vardata void HINT_FILE_OPEN_DONT_FILTER_DOCUMENT_SUB_DIRS;
+/*
+ * If present, will not perform file/directory filtering on
+ * sub-directories of SP_DOCUMENT. Used in conjunction with
+ * ATTR_FILE_OPEN_[IN|EX]CLUDE_FILE/DIR.
+ */
+
+@vardata word TEMP_FILE_OPEN_CONTROL_LAST_UI;
+/*
+ * Internal use.  Stores the last UI state
+ */
+
+@vardata word TEMP_FILE_OPEN_CONTROL_DESTINATION_PATH;
+/*
+ * Internal use.  Stores destination folder for copy/move operations
+ */
+
+typedef struct {
+    PathName         FFP_path;          /* path string */
+    FileLongName     FFP_fileName;      /* file name string */
+    word             FFP_disk;          /* disk handle or StandardPath */
+} FocFilePath;
+
+@vardata FocFilePath TEMP_FOC_SELECTOR_INFO;
+/*
+ * This saves current path and file name of file selector to state
+ */
+
+@instance byte FOI_viewerLibraryOpenCount = 0;
+/*
+ *  Tells us if the file open control has a viewer library loaded.
+ */
+
+@instance hptr FOI_viewerLibraryHandle = 0;
+/*
+ *  Handle of the currently loaded viewer library.  The handle is need
+ *  to be able to unload the library.
+ */
+
+@instance optr FOI_viewerLibraryUIOD = ConstructOptr(0,0);
+/*
+ *  OD of the UI created for the viewer library.  This OD is passed on
+ *  to ViewerDetatch which will destroy the UI and return a state block.
+ */
+
+@instance ChunkHandle FOI_viewerLibraryStateChunk = 0;
+/*
+ * The chunk handle of the save state block returned by a viewer library
+ * during a detach.  If this is zero then there is no state chunk.
+ *
+ */
+
+@instance word FOI_folderTextChunk = 0;
+/*
+ * Chunk handle of the current folder topText chunk located in the child block.
+ * Used when the the ComplexMoniker of FileOpenSelectorMoniker changes to 
+ * reflect the folder opened by the user. INTERNAL ONLY.
+ *
+ */
+
+@instance ViewerAttributes FOI_viewerAttr = 0;
+/*
+ *  ViewerAttributes passed to the current viewer in ViewerParams.
+ *  When the FileOpenControl restores from state these are the
+ *  ViewerAttributes passed to the viewer library.
+ */
+
+@default GI_states = (@default | GS_ENABLED);
+
+@endc	/* FileOpenClass */
+
+
+/* ---------------------------------------------------------------------------
+ *   ViewerControlClass
+ *
+ *   Notification type(s) responded to:
+ *  	- MANUFACTURER_ID_GEOWORKS.GWNT_FOAM_AUTO_SAVE: 
+ *
+ *   GenApplication GCN lists subclasses have to be on:
+ *	- GAGCNLT_FOAM_NOTIFICATIONS
+ *
+ * --------------------------------------------------------------------------*/
+@class  ViewerControlClass, GenControlClass;
+
+/*
+ *  Displays the file specified in vardata in the textObject passed.
+ * 
+ *  Pass: DocumentInfo of document to open.
+ *  Return: FALSE if error and doc could not be displayed.
+ *  Destroyed: nothing
+ */
+@message Boolean MSG_VIEWER_OPEN(DocumentInfo *docInfo=cx:dx)=ax;
+
+typedef struct {
+    word DOR_status;
+    DocumentHandle DOR_docHandle;
+    word unused1;
+    word unused2;
+} DocumentOpenResult;
+
+/*
+ * Opens the document in ATTR_DOCUMENT_INFO and returns the DocumentHandle.
+ * This message can be subclassed to add file checking (protocols and token).
+ * Returns a error (FALSE if no error).  Stores the document handle in
+ * VCI_docHandle.
+ */
+#define VCC_GET_STATUS(A) ((word) ((A) >> 16))
+#define VCC_GET_DOCUMENT_HANDLE(A) ((DocumentHandle) (A))
+@message dword MSG_VIEWER_OPEN_DOCUMENT(FDocAccess docAccess=cx)=ax.cx;
+
+/*
+ * Closes the document in ATTR_DOCUMENT_INFO.
+ */
+@message void MSG_VIEWER_CLOSE_DOCUMENT();
+
+/*
+ * Loads a text transfer item from an open document file into the text object.
+ * 
+ * Pass: DocumentHandle docHandle
+ * Return: TRUE if a text transfer item was not found and no text was loaded.
+ */
+@message Boolean MSG_VIEWER_ATTACH_UI(DocumentHandle docHandle=cx)=carry;
+
+/*
+ * Applications can subclass this message to display the document name in
+ * user interface.
+ */
+@message void MSG_VIEWER_SET_TITLE(TCHAR *titleText=cx:dx);
+
+/*
+ *  Close the viewer control by closing the document, turning off the auto-save
+ *  timer.  Also deletes empty documents being closed.
+ * 
+ *  Pass: nothing
+ *  Return: ViewerCloseStatus
+ *  Destroyed: nothing
+ */
+@message ViewerCloseStatus MSG_VIEWER_CLOSE()=ax;
+
+/*
+ *  Saves the text in textObject to a file.
+ * 
+ *  Pass: nothing
+ *  Return: FoamSaveAction if document was saved.
+ *          TRUE if no text was saved (document empty).
+ *          
+ *  Destroyed: nothing
+ */
+@message FoamSaveAction MSG_VIEWER_SAVE()=ax;
+
+/*
+ *  Deletes the current viewer document. Will not display a warning dialog.
+ * 
+ *  Pass: nothing
+ *  Return: nothing
+ *  Destroyed: nothing
+ */
+@message void MSG_VIEWER_DELETE();
+
+/*
+ *  Internal message sent by the controller to itself requesting the text
+ *  object chunk handle.  Controllers subclassed of ViewerControlClass need
+ *  to handle this message.
+ *
+ *  Pass: dx - Text object chunk handle.
+ *  Return: nothing
+ *  Destroyed: nothing
+ */
+@message ChunkHandle MSG_VIEWER_GET_TEXT_OBJECT_OFFSET()=dx;
+
+/*
+ * Returns a block of the viewers state.  This includes DocumentInfo and
+ * where is the cursor is positioned.  Message MSG_VIEWER_SAVE is called to
+ * save any changes made to the text object.
+ *
+ */
+@message hptr MSG_VIEWER_RETURN_STATE()=dx;
+
+/*
+ *  Same as MSG_VIEWER_OPEN only this method takes a handle to a block of
+ *  ViewerControlState which specifies what file to open.  State block is
+ *  freed after use.
+ *
+ */
+@message Boolean MSG_VIEWER_OPEN_FROM_STATE(hptr hStateBlock=dx)=ax;
+
+/*
+ *  Starts the auto-save timer.  The interval is stored in the .ini file
+ *  (under the [UI] catagory.)  The timer calls MSG_VIEWER_AUTO_SAVE when
+ *  it`s time to save the document.  The timer is only started if the
+ *  VCA_AUTO_SAVE flag is set.
+ *
+ */
+@message void MSG_VIEWER_AUTO_SAVE_START();
+
+/*
+ *  Save the text in the text object to open document.
+ *
+ */
+@message void MSG_VIEWER_AUTO_SAVE();
+
+/*
+ *  Stops the auto-save timer.
+ *
+ */
+@message void MSG_VIEWER_AUTO_SAVE_STOP();
+
+/*
+ *  Displays the document specified in vardata read-only.  The document can
+ *  not be saved and auto-save is disabled.
+ * 
+ *  Pass: DocumentInfo of document to open.
+ *  Return: FALSE if error and doc could not be displayed.
+ *  Destroyed: nothing
+ */
+@message Boolean MSG_VIEWER_OPEN_READ_ONLY(DocumentInfo *docInfo=cx:dx);
+
+/*
+ *  Get the DocumentInfo of the current document.
+ * 
+ *  Pass: DocumentInfo buffer
+ *  Return: DocumentInfo filled inn.
+ *  Destroyed: nothing
+ */
+@message void MSG_VIEWER_GET_DOCUMENT_INFO(DocumentInfo *docInfo=cx:dx);
+
+/*
+ * Returns the MailboxDataFormat for the document when registering
+ * a message with the Mailbox library.
+ *
+ * Pass: nothing
+ * Return: MailboxDataFormat
+ */
+@message MailboxDataFormat MSG_VIEWER_GET_MESSAGE_FORMAT() = cx:dx;
+
+/*
+
+  Returns the ViewerControlAttributes.
+
+  Pass: nothing
+  Return: cx - ViewerControlAttributes
+  Destroyed: nothing
+
+*/
+@message ViewerControlAttributes MSG_VIEWER_GET_ATTRIBUTES() = cx;
+
+/*
+  
+  Open the viewer passing a buffer of text. This means there is no
+  document file associated with the viewer content - this means no
+  saving of any kind.
+  	
+  Pass: cx:dx - fptr to a buffer of text.
+  Return: nothing
+  Destroyed: nothing
+
+*/
+@message void MSG_VIEWER_OPEN_TEXT_ONLY(TCHAR *text=cx:dx);
+
+typedef struct {
+    GeodeToken	token;
+    word    	junk;
+} ViewerMessageToken;
+
+/*
+ * Returns the GeodeToken to use as the destination application
+ * when creating a message for the Mailbox library. No need to call superclass
+ * unless you don't understand the format. ViewerControlClass returns
+ * 'SMSA',GEOWORKS for GMDFID_SHORT_MESSAGE, 'NBOK',GEOWORKS for
+ * GMDFID_FOAM_FILE, and 'FAXA',GEOWORKS for GMDFID_FAX_FILE.
+ *
+ * Pass: cxdx = MailbodDataFormat
+ * Return: cxdxbp = GeodeToken
+ * Destroyed: nothing
+ */ 
+@message void MSG_VIEWER_GET_MESSAGE_TOKEN(ViewerMessageToken *result=cxdxbpax,
+					   MailboxDataFormat format = cx:dx);
+
+/*
+ * Called when the viewer class is generating a short message to send.
+ * Returns a block handle of a message body text block. The default behavior 
+ * is to return the text in the viewers text object as the text body.  
+ * Subclass this method if you need to return anything other than the text 
+ * in text object.
+ * 
+ * The block should always exist on return.  It should contain at least a NULL.
+ *
+ *	PASS:	Nothing
+ *
+ *	RETURN:	MemHandle and text size of the block in which text was placed.
+ *		Block resized to be the size of the null-terminated text.
+ */
+#define VCC_SM_TEXT_GET_TEXT_SIZE(A) ((A) >> 16))
+#define VCC_SM_TEXT_GET_MEM_HANDLE(A) ((MemHandle) (A))
+@message dword MSG_VIEWER_GET_SM_TEXT() = ax.cx;
+
+/*
+ *
+ * This message is sent when a document is about to be sent using the
+ * mailbox library.  The default behavior is to save the document via
+ * MSG_VIEWER_SAVE.  If for some reason you don't want this you can
+ * subclass this message and not call superclass. 
+ *
+ *	PASS:	Nothing
+ *
+ *	RETURN:	Nothing
+ */
+@message void MSG_VIEWER_SAVE_BEFORE_MAILBOX_SEND();
+
+/*
+ *  Notify any listening (now or future) MailboxSendControl objects
+ *  what the default message body is and in what formats we can
+ *  produce it.
+ * 
+ */
+@message void MSG_VIEWER_NOTIFY_SEND_CONTROLS();
+
+
+/*  INTERNAL
+ *  Event sent when the autosave timer goes off.  MSG_VIEWER_AUTO_SAVE is
+ *  called and the autosave timer is restarted.
+ *
+ */
+@message void MSG_VIEWER_AUTO_SAVE_EXECUTE();
+
+
+/*
+ *  Internal message sent when loading a DOS document into the viewer.
+ *  The method will queue up additional MSG_VIEWER_APPEND_DOS_TEXT until
+ *  the document is fully loaded.  This releaves the performance
+ *  bottleneck of loading a very large document in a static loop.
+ *
+ *  RETURN: True when the last part of the file has been loaded.
+ */
+@message Boolean MSG_VIEWER_APPEND_DOS_TEXT(dword filePosition=cx:dx)=carry;
+
+
+/*
+ *  Internal message sent when loaded a FoamDocument into the viewer.
+ *  The FoamDocument can be saved as a vm chain of text transfer items,
+ *  in this case the method will queue up MSG_VC_APPEND_TEXT_TR_ITEM's
+ *  until the document is fully loaded.
+ *  
+ *  RETURN: True when the last transfer item has been loaded.
+ */
+@message Boolean MSG_VIEWER_APPEND_TEXT_TR_ITEM(VMBlockHandle block=cx)=carry;
+
+
+/* ----------------------------------------------------------------------------
+ * 	Records
+ * --------------------------------------------------------------------------*/
+typedef WordFlags ViewerControlAttributes;
+#define VCA_AUTO_SAVE	(0x8000)
+/* If this bit is set the viewer control will start an 
+   auto-save timer to automaticly save the context of the
+   text object to the open document. */
+
+/* The following bits reflect temporary state of the document --
+   set by the viewer control. */
+
+#define VCA_AUTO_SAVE_STOPPED	(0x4000)
+/* Auto-save has been stopped. */
+
+#define VCA_DOCUMENT_READ_ONLY	(0x2000)
+/* The viewer document is read-only and can not be saved. */
+
+#define VCA_DOCUMENT_IS_NATIVE (0x1000)
+/* The viewer document is a native (DOS) file. */
+
+#define VCA_DOCUMENT_EMPTY_WHEN_OPENED (0x800)
+/* The viewer document was empty at the time it was opened.
+   This bit can be use full if you have to take action
+   if the user has deleted all the text from the document. */
+
+#define VCA_NO_DOCUMENT (0x400)
+/* There is no document file accosiated with the viewer, this attribute
+   is set by MSG_VIEWER_OPEN_TEXT_ONLY. */
+
+#define VCA_DOCUMENT_NOT_FULLY_LOADED (0x200)
+/*  This bit is set if MSG_VC_APPEND_DOS_TEXT has not completed
+ *  loading the document. */
+
+#define VCA_DOCUMENT_NAME_CHOSEN (0x100)
+/* This bit is set if the user has chosen the
+   document name when the document was being saved. */
+
+/* 8 bits unused */
+
+
+typedef struct {
+    word	RI_docDisk;
+    /* Handle of the document's disk. */
+    dword	RI_docID;
+    /* Document ID of the open document. */
+} RegisterInfo;
+
+
+/* ----------------------------------------------------------------------------
+ * 	Vardata
+ * --------------------------------------------------------------------------*/
+@vardata DocumentInfo TEMP_VIEWER_DOC_INFO;
+/* The name of the currently displayed document */
+
+@vardata ChunkHandle ATTR_VIEWER_TEXT_OBJECT;
+/*  The text object chunk handle */
+
+@vardata RegisterInfo TEMP_REGISTER_INFO;
+/* Disk handle and document ID of the open document */
+
+@vardata dword ATTR_VIEWER_CONTROL_SHOW_SAVE_PROGRESS_DIALOG_THRESHOLD;
+/*
+ *  (only usable in Communicator products  shipped in April 1997
+ *  or later) 
+ * 
+ *  The threshold of the text size (in bytes) we're trying to save
+ *  before a progress dialog appears.
+ * 
+ *  Note: This position used to be occupied by TEMP_VIEWER_UNUSED in
+ *  	pre-April 1997 Communicator products.
+ */
+
+@vardata optr TEMP_VIEWER_LOADING_METER;
+/* Optr to loading meter */
+
+/*-----------------------------------------------------------
+ * Vardata only available in Communicator products shipped
+ * after April 1997
+ *-----------------------------------------------------------*/
+
+@vardata void HINT_VIEWER_NO_DOCUMENT_RENAME;
+/* If present, will not put up the document name dialog which
+ * allows the user to rename the new document when closing.
+ */
+
+@vardata VMBlockHandle TEMP_VIEWER_ORIGINAL_TEXT;
+/*  The HugeArray (in clipboard file) that contains a copy of
+ *  the original contents of the text object.  Used for making
+ *  temporary changes to the text while registering the document with
+ *  mailbox.
+ */
+
+/* ----------------------------------------------------------------------------
+ * 	Instance Data
+ * --------------------------------------------------------------------------*/
+@instance hptr VCI_docHandle = 0;
+/* Handle of the open document. */
+
+@instance ViewerControlAttributes VCI_attr = VCA_AUTO_SAVE;
+/* Attributes the viewer control has. */
+
+@instance hptr VCI_autoSaveHandle = 0;
+/* Auto-save timer handle */
+
+@instance word VCI_autoSaveID = 0;
+/* Auto-save timer ID */
+
+@endc	/* ViewerControlClass */
+
+
+/* ---------------------------------------------------------------------------
+ *   ViewerControlClass
+ * --------------------------------------------------------------------------*/
+@class  ViewerDialogClass, GenInteractionClass;
+
+/*
+ *  Copies the close message and destination to instance data
+ * 
+ */
+@message void MSG_VD_SET_VIEWER_PARAMS(ViewerParams *viewerParams=cx:dx);
+
+/*
+ *  Destorys the interaction and sends the close message to the destination.
+ *  Calls MSG_VD_RETURN_HEAPSPACE to return the heapspace defined by the
+ *  token stored with MSG_VD_SET_HEAPSPACE_TOKEN.
+ * 
+ */
+@message void MSG_VD_CLOSE(GeodeHandle viewerLibHandle=cx,
+			   ViewerCloseStatus closeStatus=dx);
+
+/*
+ *  Set or clear the ViewerDialogAttributes.
+ * 
+ */
+@message void MSG_VD_SET_DIALOG_ATTR(ViewerDialogAttributes attrSet=cx, \
+				     ViewerDialogAttributes attrClear=dx);
+
+/*
+ *  Store the heapspace ReservationHandle returned from GeodeRequestSpace.
+ * 
+ */
+@message void MSG_VD_SET_HEAPSPACE_TOKEN(ReservationHandle token=cx);
+
+/*
+ * Return the heapspace using GeodeReturnSpace  It uses the
+ * heapspace token that was saved using MSG_VD_SET_HEAPSPACE_TOKEN.
+ * 
+ */
+@message void MSG_VD_RETURN_HEAPSPACE();
+
+
+/* ----------------------------------------------------------------------------
+ * 	Records
+ * --------------------------------------------------------------------------*/
+typedef WordFlags ViewerDialogAttributes;
+#define VDA_ALLOW_NEXT_PREV_SHORTCUTS	(0x8000)
+	/* Set this attribute if the viewer should accept the next
+	 * (ctrl-n) and previous (ctrl-p) shortcut keys.  If the bit
+	 * is set the VDI_nextPrevMsg will be sent to the destination
+	 * when the user presses ctrl-p or ctrl-n.
+         */
+/* 15 bits unused */
+
+/* ----------------------------------------------------------------------------
+ * 	Instance Data
+ * --------------------------------------------------------------------------*/
+@vardata ReservationHandle TEMP_HEAPSPACE_TOKEN;
+/* Used to store the token set using MSG_VD_SET_HEAPSPACE_TOKEN. */
+
+@instance optr VDI_destination = ConstructOptr(0,0);
+/* Destination of close message */
+
+@instance Message VDI_closeMsg = 0;
+/* Close message to be sent to the destination */
+
+@instance Message VDI_nextPrevMsg = 0;
+/* Message sent to the destination when the user wants to view the next
+ * or previous document.
+ */
+
+@instance ViewerAttributes VDI_attr = 0;
+/* Viewer attributes passed to the viewer in ViewerParams */
+
+@instance ViewerDialogAttributes \
+			VDI_dialogAttr = VDA_ALLOW_NEXT_PREV_SHORTCUTS;
+/* Viewer dialog attributes */
+
+
+@default GI_attrs = (@default | GA_TARGETABLE);
+@default GII_attrs = (@default | GIA_MODAL | GIA_NOT_USER_INITIATABLE);
+@default GII_visibility = GIV_DIALOG;
+
+@endc
+
+
+/* ---------------------------------------------------------------------------
+ *   ViewerSendControlClass
+ * ---------------------------------------------------------------------------*/
+@class ViewerSendControlClass, MailboxSendControlClass;
+
+@message void MSG_VSC_CONNECT(optr newOutput = cx:dx,
+			      word newParentOffset = bp);
+ 	/*
+	 * Hooks up the ViewerSendControl's output to the passed optr,
+	 * and sets the output of all PrintControls mentioned in any
+	 * ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINTs to the same.
+	 *
+	 * Also hooks up the ViewerSendControl to another passed optr with a
+	 * MSG_GEN_ADD_CHILD.
+	 * 
+	 * Pass: newOutput  	  - optr to the new output
+	 *	 newParentOffset  - offset to new parent of this send control.
+	 *  	    	            Note that the block of this object must be
+	 *  	    	    	    the same as that of the newOutput!
+	 *
+	 * Return: nothing
+	 */
+
+@message void MSG_VSC_DISCONNECT(optr oldOutput = cx:dx,
+				 word oldParentOffset = bp);
+ 	/*
+	 * Clears the ViewerSendControl's output, and does the same to the 
+	 * output of all PrintControls mentioned in any 
+	 * ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINTs.
+	 *
+	 * Also disconnects the ViewerSendControl from the parent with a
+	 * MSG_GEN_REMOVE.    The VSC is set unusable by this, incidentally.
+	 * 
+	 * Pass: oldOutput  	  - optr to the old output
+	 *	 oldParentOffset  - offset to old parent of this send control.
+	 *  	    	      	    Note that the block of this object must be
+	 *  	    	    	    the same as that of the oldOutput!
+	 *
+	 * Return: nothing
+	 */
+
+typedef struct {
+    MSCSetAddressesArgs	VSCRI_mscSetAddressesArgs;
+    /*
+     *  MSCSAA_transAddrs should hold the offset of the
+     *  MailboxTransAddr array (within the same block), and the
+     *  entries in that array should hold offsets to their
+     *  data also in the same block. The segment portion of each
+     *  far pointer will be set by the ViewerSendControl method.
+     */
+    MediumType	VSCRI_mediumType;
+    /* MediumType */
+} VSCReplyInfo;
+
+@message void MSG_VSC_SET_REPLY_ADDRESSES(MemHandle vscReplyInfo);
+/*
+ *  Sets up a Reply by setting the single transport, changing the moniker
+ *  to a default CMT_SEND or to a moniker specified in 
+ *  ATTR_VIEWER_SEND_CONTROL_REPLY_SEND_MONIKER.  The method then sends a 
+ *  MSG_MAILBOX_SEND_CONTROL_SET_ADDRESSES using the addresses passed in
+ *  vscReplyInfo.
+ *
+ *  Pass: vscReplyInfo - Block containing VSCReplyInfo structure.
+ *  Return: Nothing
+ */
+
+@message void MSG_VSC_CANCEL_REPLY();
+/*
+ *  Reverts MSG_VSC_SET_REPLY_ADDRESSES setting the single transport and
+ *  the complex moniker back to the original state.
+ *  
+ *  Pass: Nothing
+ *  Return: Nothing
+ */
+
+@vardata ChunkHandle ATTR_VIEWER_SEND_CONTROL_REPLY_SEND_MONIKER;
+/*
+ *  ChunkHandle VSCReplySendMoniker
+ *  The moniker of the reply dialog "Send" trigger.  The
+ *  default trigger moniker is "Send" but the trigger moniker can 
+ *  customized using this vardata. Example:
+ *  "Send Reply" or "START".
+ */
+
+@vardata MailboxMediaTransport TEMP_VIEWER_SEND_CONTROL_SINGLE_TRANSPORT;
+/*  Temporary storage for the MailboxMediaTransport */
+
+@vardata GetComplexMoniker TEMP_VIEWER_SEND_CONTROL_COMPLEX_MONIKER;
+/*  Temporary storage for the text and iconBitmap chunk handles. */
+
+@vardata void TEMP_VIEWER_SEND_CONTROL_REPLY_IN_PROGRESS;
+/*  Temporary vardata that tells us if a reply is in progress. */
+
+typedef struct {
+    dword	VSCRSM_text;
+    /*  Moniker text, optr or ComplexMonikerText constant. */
+    dword	VSCRSM_iconBitmap;
+    /*  Moniker icon bitmap, optr or ComplexMonikerBitmap constant. */
+} VSCReplySendMoniker;
+
+@endc;
+
+
+/* ---------------------------------------------------------------------------
+ *   ViewerPrintControlClass
+ * --------------------------------------------------------------------------*/
+@class  ViewerPrintControlClass, PrintControlClass;
+
+/*
+ * Flags for the viewer print control.
+ */
+typedef ByteFlags   ViewerPrintControlFlags;
+#define	VPCF_ALWAYS_TILE    0x01    	/* Set when the doc should be tiled. */
+#define	VPCF_ALWAYS_SCALE   0x02    	/* Set when the doc should be scaled */
+
+@message Boolean MSG_VPC_CHECK_FOR_FAX_FORWARDING(PrinterMode pm = cl) = ax;
+ 	/*
+	 * Synopsis:	This method checks to see if the destination of a print
+	 *		job is a fax print driver or not.  It is recommended
+	 *		that this be called from the MSG_PRINT_START_PRINTING
+	 *		handler.
+	 *
+	 *		Also, pass the print mode of the fax being printed in
+	 *		cx.  If the destination is a fax print driver, the
+	 *		JobParameters' JP_printMode will be changed to whatever
+	 *		you pass.
+	 *
+	 * Pass:	cl	- the print mode (resolution) of the current
+	 *  	    	    	  fax.
+	 *
+	 * Return:	ax	- TRUE if the destination is a fax print driver
+	 *			- FALSE if the destination is not a fax print
+	 *			  driver, or if there is no way to tell.
+	 */
+
+@message void MSG_VPC_ALWAYS_TILE();
+ 	/*
+	 * Synopsis:	Call this to have the print control always tile the 
+	 *  	    	document.  Call at the beginning of the handler for
+	 *  	    	MSG_PRINT_START_PRINTING.
+	 *
+	 * Pass:    	nothing
+	 *
+	 * Return:  	nothing
+	 *
+	 */
+
+@message void MSG_VPC_ALWAYS_SCALE();
+ 	/*
+	 * Synopsis:	Call this to have the print control always scale the 
+	 *  	    	document.  Call at the beginning of the handler for
+	 *  	    	MSG_PRINT_START_PRINTING.
+	 *
+	 * Pass:    	nothing
+	 *
+	 * Return:  	nothing
+	 *
+	 */
+
+@protominor LizzyPrintControlFaxCheck
+@message Boolean MSG_VPC_CHECK_FOR_FAXING() = ax;
+ 	/*
+	 * Synopsis:	This method checks to see if the destination of a print
+	 *		job is a fax print driver or not.  It is recommended
+	 *		that this be called from the MSG_PRINT_START_PRINTING
+	 *		handler.
+	 *
+	 * Pass:	nothing
+	 *
+	 * Return:	ax	- TRUE if the destination is a fax print driver
+	 *			- FALSE if the destination is not a fax print
+	 *			  driver, or if there is no way to tell.
+	 */
+@protoreset
+ 	/* --------------------------------------------------------------------
+	 * 	Instance Data for ViewerPrintControlClass
+	 * ------------------------------------------------------------------*/
+@instance ViewerPrintControlFlags VPCI_flags = 0;
+
+@endc;
+
+/* ---------------------------------------------------------------------------
+ *   ViewerLoadingMeterClass
+ * --------------------------------------------------------------------------*/
+@class  ViewerLoadingMeterClass, GenControlClass;
+@message void	MSG_VIEWER_LOADING_METER_SET_VALUE(dword value = dx:cx);
+    	/*
+	 *  Synopsis:	This message sets the current value of the
+	 *  		loading meter to display.
+	 * 
+	 *  Pass:	dxcx	- value to set
+	 * 
+	 *  Return:	nothing
+	 */
+
+@message void	MSG_VIEWER_LOADING_METER_SET_MAXIMUM(dword max = dx:cx);
+	/*
+	 *  Synopsis:	Sets the maximum value of the meter.
+	 * 
+	 *  Pass:	dxcx	- maximum value
+	 * 
+	 *  Return:	nothing
+	 */
+
+@message void	MSG_VIEWER_LOADING_METER_SET_FOCUS_OBJECT(optr obj = cx:dx);
+	/*
+	 *  Synopsis:	Sets object to receive focus when we next gain
+	 *  		the focus. Usually set before we are put up.
+	 * 
+	 *  Pass:	^lcx:dx	- object
+	 * 
+	 *  Return:	nothing
+	 */
+
+typedef WordFlags ViewerLoadingMeterFeatures;
+#define VLM_UI	(0x0001)
+
+#define VLM_DEFAULT_FEATURES VLM_UI
+
+/* -----------------------------------------------------------
+ *  Instance data
+ * -----------------------------------------------------------*/
+@instance optr	VLMI_focusObject;	/* the object to forward
+					 *  keystrokes received, or to
+					 *  give focus to.
+					 */
+@default GI_states = GS_ENABLED;
+@default GII_visibility = GIV_DIALOG;
+@default GII_type = GIT_MULTIPLE_RESPONSE;
+@default GII_attrs = (GIA_NOT_USER_INITIATABLE | GIA_MODAL);
+
+@endc;	/* ViewerLoadingMeterClass */
+
+
+/* ---------------------------------------------------------------------------
+ *   Exported functions
+ * --------------------------------------------------------------------------*/
+extern ViewerInterfaceError _far _pascal \
+       ViewerGetLibrary(DocumentInfo *docInfo, FileLongName *fname);
+
+extern Boolean _far _pascal \
+       ViewerGetLibraryNameFromToken(TokenChars *token, FileLongName *libName);
+
+extern Boolean _far _pascal \
+       ViewerAddLibrary(FileLongName *libName, GeodeToken *token);
+
+extern Boolean _far _pascal \
+       ViewerUnloadLibrary(hptr libHandle);
+
+extern ViewerInterfaceError _far _pascal \
+       ViewerGetFileToken(DocumentInfo *docInfo, GeodeToken *token);
+
+extern hptr _far _pascal \
+       ViewerLibraryOpen(ViewerParams viewerParams, optr *uiOptr);
+
+extern hptr _far _pascal \
+       ViewerLibraryDetach(hptr libHandle, optr uiOptr);
+
+extern ViewerCloseStatus _far _pascal \
+       ViewerLibraryChangeDocument(hptr libHandle, \
+				   ViewerChangeDocumentStruct *vcds);
+
+extern _far _pascal \
+       ViewerLibraryClose(hptr libHandle, optr uiOptr);
+
+extern _far _pascal \
+       ViewerMarkFileRead(FileHandle fileH);
+
+extern _far _pascal \
+       ViewerMarkFileUnread(FileHandle fileH);
+
+extern void _far _pascal \
+	ViewerAddSendControl(optr newOutput, word newParentOffset);
+
+extern void _far _pascal \
+	ViewerRemoveSendControl(optr output, ViewerCloseStatus vcs);
+
+extern void _far _pascal \
+	ViewerSendDocumentNotification(MemHandle memH);
+
+#ifdef __HIGHC__
+pragma Alias(ViewerGetLibrary, "VIEWERGETLIBRARY");
+pragma Alias(ViewerGetLibraryNameFromToken, "VIEWERGETLIBRARYNAMEFROMTOKEN");
+pragma Alias(ViewerAddLibrary, "VIEWERADDLIBRARY");
+pragma Alias(ViewerUnloadLibrary, "VIEWERUNLOADLIBRARY");
+pragma Alias(ViewerGetFileToken, "VIEWERGETFILETOKEN");
+pragma Alias(ViewerLibraryOpen, "VIEWERLIBRARYOPEN");
+pragma Alias(ViewerLibraryDetach, "VIEWERLIBRARYDETACH");
+pragma Alias(ViewerLibraryChangeDocument, "VIEWERLIBRARHCHANGEDOCUMENT");
+pragma Alias(ViewerLibraryClose, "VIEWERLIBRARYCLOSE");
+pragma Alias(ViewerMarkFileRead, "VIEWERMARKFILEREAD");
+pragma Alias(ViewerMarkFileUnread, "VIEWERMARKFILEUNREAD");
+pragma Alias(ViewerAddSendControl, "VIEWERADDSENDCONTROL");
+pragma Alias(ViewerRemoveSendControl, "VIEWERREMOVESENDCONTROL");
+pragma Alias(ViewerSendDocumentNotification, "VIEWERSENDDOCUMENTNOTIFICATION");
+#endif
+
+@endlib

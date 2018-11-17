@@ -1,0 +1,295 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  GeoSafari
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+@include "safari2.goh"
+@include "global.goh"
+
+@classdecl  LogoDisplayClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg UtilCode
+#endif
+
+
+/***********************************************************************
+ *	GetDisplayType
+ ***********************************************************************
+ * SYNOPSIS:	    Get the display class (16 or 256 color)
+ * PASS:            none
+ * RETURN:          DisplayClass (DC_COLOR_4 or DC_COLOR_8)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/6/99		Initial Revision
+ *
+ ***********************************************************************/
+DisplayClass
+GetDisplayType()
+{
+    DisplayType dt;
+    optr appObj = GeodeGetAppObject(0);
+    ObjLockObjBlock(OptrToHandle(appObj));
+    LMemDeref(appObj);
+    dt = (UserGetDisplayType() >> DTAF_DISPLAY_TYPE_OFFSET) & DT_DISP_CLASS;
+    if (dt != DC_COLOR_4) {
+	dt = DC_COLOR_8;
+    }
+    MemUnlock(OptrToHandle(appObj));
+    return(dt);
+}
+
+
+
+/***********************************************************************
+ *		MSG_LOGO_DISPLAY_FILE_SELECTED
+ ***********************************************************************
+ * SYNOPSIS:	    A file has been selected
+ * PASS:            entryNum - entry #
+ *                  entryFlags - GenFileSelectorEntryFlags
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/12/99		Initial Revision
+ *
+ ***********************************************************************/
+@method LogoDisplayClass, MSG_LOGO_DISPLAY_FILE_SELECTED
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+    PathName pname;
+    FileLongName fname;
+    VMBlockHandle vmh;
+    FileHandle docFile;
+    TCHAR *p;
+    DiskHandle diskHan;
+    word err;
+    ProtocolNumber proto;
+    FileHandle clipFile = ClipboardGetClipboardFile();
+
+    @call SafariAppObj::MSG_GEN_APPLICATION_MARK_BUSY();
+    /*
+     * clear any old bitmap
+     */
+/*    if (pself->LDI_bitmap && pself->LDI_imported) {
+	SafariFreeBitmap(pself->LDI_bitmap, clipFile);
+    }
+    pself->LDI_bitmap = 0;
+    pself->LDI_imported = FALSE;
+    if (pself->LDI_file) {
+	VMClose(pself->LDI_file, FALSE);
+	pself->LDI_file = 0;
+	 }  */
+
+    if (GFS_GET_ENTRY_TYPE(entryFlags) != GFSET_FILE) {
+	/*
+	 * if not a file, delete the text
+	 */
+	@call FileDesc::MSG_VIS_TEXT_DELETE_ALL();
+	/*
+	 * disable 'Play'
+	 */
+	@call PlayButton::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    } else {
+	/*
+	 * enable 'Play'
+	 */
+	@call PlayButton::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	/*
+	 * get the name of the file and open it in the right directory
+	 */
+	diskHan = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(@call OpenSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pname));
+	p = strrchr(pname, '\\');
+	if (p) {
+	    *p = 0;
+	}
+	FileSetCurrentPath(diskHan, pname);
+	@call OpenSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(fname);
+	/*
+	 * check the protocol
+	 */
+	err = FileGetPathExtAttributes(fname, FEA_PROTOCOL, &proto, sizeof(ProtocolNumber));
+	if (err || proto.PN_major != SAFARI_DOCUMENT_PROTOCOL_MAJOR) {
+	    @call SafariAppObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	    @send, forceQueue oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+	    ReportError(@protoMsg, NULL);
+	    return;
+	}
+	if (entryFlags & GFSEF_OPEN) {
+	    /*
+	     * close the dialog(s)
+	     */
+	    @call OpenDB::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	//    @call ChooseDB::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	    /*
+	     * set the quiz
+	     */
+	    @call TheGameCard::MSG_SAF_GAME_CARD_SET_QUIZ(pname,diskHan,fname);
+	} else {
+	    ObjDerefGen(oself);
+	    docFile = VMOpen(fname, VMAF_FORCE_DENY_WRITE|VMAF_FORCE_READ_ONLY,
+			     VMO_OPEN, 0);
+	    pself->LDI_file = docFile;
+
+	    /*
+	     * find the handle for the document's map block and lock it
+	     */
+	    mapBlock = VMGetMapBlock(docFile);
+	    mapPtr = VMLock(docFile, mapBlock, &mem);
+
+	    /*
+	     * open the bitmap file
+	     */
+	/*    if (mapPtr->SMB_iLogo) {
+		vmh = mapPtr->SMB_iLogo;
+		pself->LDI_imported = FALSE;
+	    } else {
+		vmh = SafariImportBitmap(mapPtr->SMB_logo, clipFile);
+		pself->LDI_imported = TRUE;
+	    }
+		 pself->LDI_bitmap = vmh; */
+	    if (mapPtr->SMB_number) {
+		MemLock(OptrToHandle(@logoFormatStr));
+		sprintf(fname, LMemDeref(@logoFormatStr), mapPtr->SMB_number);
+		MemUnlock(OptrToHandle(@logoFormatStr));
+		@call FileDesc::MSG_VIS_TEXT_REPLACE_ALL_PTR(fname, 0);
+	    } else {
+		@call FileDesc::MSG_VIS_TEXT_DELETE_ALL();
+	    }
+	    @call FileDesc::MSG_VIS_TEXT_APPEND_PTR(mapPtr->SMB_desc, 0);
+
+	    /*
+		  * done with the map block & file
+		  */
+		 VMUnlock(mem);
+		 if (pself->LDI_file) {
+			VMClose(pself->LDI_file, FALSE);
+			pself->LDI_file = 0;
+	 		}
+
+	}
+    }
+    /*
+     * redraw ourselves
+     */
+  //  @send, forceQueue oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+
+    @call SafariAppObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE
+ ***********************************************************************
+ * SYNOPSIS:	    set our size
+ * PASS:            none
+ * RETURN:          SizeAsDWord
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/12/99		Initial Revision
+ *
+ ***********************************************************************/
+@method LogoDisplayClass, MSG_VIS_RECALC_SIZE
+{
+    return(MAKE_SIZE_DWORD(LOGO_VIEWER_WIDTH, LOGO_VIEWER_HEIGHT));
+}
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW
+ ***********************************************************************
+ * SYNOPSIS:	    draw ourselves
+ * PASS:            drawFlags - DrawFlags
+ *                  gstate - GStateHandle
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/12/99		Initial Revision
+ *
+ ***********************************************************************/
+@method LogoDisplayClass, MSG_VIS_DRAW
+{
+    Rectangle bounds;
+    FileHandle fileHan;
+    Color backColor;
+    DisplayScheme ds;
+
+    @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+
+    GrSaveState(gstate);
+    /*
+     * fill the background with the background color
+     */
+    GrGetInfo(gstate, GIT_PRIVATE_DATA, &ds);
+    backColor = (ds.DS_colorScheme & CS_lightColor) >> CS_lightColor_OFFSET;
+    GrSetAreaColor(gstate, CF_INDEX, backColor, 0, 0);
+    GrFillRect(gstate, bounds.R_left, bounds.R_top,
+	       bounds.R_right, bounds.R_bottom);
+    /*
+     * if any bitmap, draw it
+     */
+    if (pself->LDI_bitmap) {
+	if (pself->LDI_imported) {
+	    fileHan = ClipboardGetClipboardFile();
+	} else {
+	    fileHan = pself->LDI_file;
+	}
+	GrDrawHugeBitmap(gstate, bounds.R_left, bounds.R_top,
+			 fileHan, pself->LDI_bitmap);
+    }
+
+    GrRestoreState(gstate);
+}
+
+
+/***********************************************************************
+ *		MSG_VIS_CLOSE
+ ***********************************************************************
+ * SYNOPSIS:	    close ourselves
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/12/99		Initial Revision
+ *
+ ***********************************************************************/
+@method LogoDisplayClass, MSG_VIS_CLOSE
+{
+    FileHandle clipFile = ClipboardGetClipboardFile();
+
+    @callsuper();
+    ObjDerefGen(oself);
+    /*
+     * free the bitmap if we imported it
+     */
+    if (pself->LDI_bitmap && pself->LDI_imported) {
+	SafariFreeBitmap(pself->LDI_bitmap, clipFile);
+    }
+    pself->LDI_bitmap = 0;
+    pself->LDI_imported = FALSE;
+    /*
+     * close the file if it is still open
+     */
+	 if (pself->LDI_file) {
+	VMClose(pself->LDI_file, FALSE);
+	pself->LDI_file = 0;
+	 }
+}

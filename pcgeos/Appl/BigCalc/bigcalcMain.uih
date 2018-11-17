@@ -1,0 +1,239 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  
+ * FILE:	  bigcalcMain.uih
+ *
+ * AUTHOR:  	  Christian Puscasiu, Feb 28, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	CP	2/28/92	    Initial version
+ *
+ * DESCRIPTION:
+ *
+ *
+ * 	$Id: bigcalcMain.uih,v 1.1 97/04/04 14:38:09 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#ifdef DO_PIZZA
+#define BIGCALC_MEM_FONT	VTDF_PIZZA_KANJI
+#define BIGCALC_MEM_POINTSIZE	VTDS_16
+#else
+#define BIGCALC_MEM_FONT	VTDF_BISON
+#define BIGCALC_MEM_POINTSIZE	VTDS_14
+#endif
+
+class BigCalcApplication = GenApplication {
+}
+
+class PCFHolder		= GenInteraction {
+}
+
+class CustBox		= GenInteraction {
+}
+
+class SetExchangeRate = GenInteraction {
+}
+
+
+#ifdef DO_PIZZA
+#define FEP_HINT	ATTR_GEN_TEXT_NO_FEP,
+#else
+#define FEP_HINT
+#endif
+
+/****************************************
+ * "Get" trigger macro
+ ****************************************/
+
+/* 
+ * If we define a list of monikers then for each instance of GET_TRIGGER
+ * we'll copy the moniker into the resource. So, instead we'll just directly
+ * refer to the moniker itself (since monikers can be shared by multiple
+ * objects). The only side-effect of this change is that the only moniker
+ * currently define is 256-colors, and it may not look great on lower-
+ * color systems. If that is an issue for someone (New Deal), then I'd
+ * recommend just going to 16-color artwork since the image is not terribly
+ * complicated anyway. -Don 8/19/00
+ */
+
+
+#define	GET_TRIGGER(numberName,getName)\
+getName	= GenTrigger vardataReloc {\
+\
+	moniker =  	GetCalcMoniker;\
+	action		= MSG_IF_GET_FROM_CALC, numberName;\
+	hints		= {\
+			ATTR_GEN_FOCUS_HELP {UN_OPTR QHMemGetStr}\
+	}\
+}
+
+
+/****************************************
+ * Name text macro (like "Active Memory")
+ ****************************************/
+
+#define	NAME_TEXT(textName,registerName,readOnlyFlag)\
+textName = GenText {\
+\
+	text		= #registerName;\
+	genAttributes	= default +targetable, readOnlyFlag;\
+	textDisplayAttributes = default +singleLineText;\
+	maxLength	= 15;\
+	hints		= {\
+			ATTR_GEN_INIT_FILE_KEY {\
+				char	#textName,0\
+				},\
+			HINT_FIXED_SIZE {\
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 18>|\
+				SpecHeight <SST_LINES_OF_TEXT, 1>|\
+				word 1\
+				}\
+			}\
+}
+
+/****************************************
+ * Number text macro (register value)
+ ****************************************/
+
+#define	NUMBER_TEXT(numberName)\
+numberName	= MemoryInputField {\
+\
+	genAttributes	= default +targetable;\
+	maxLength	= NUMBER_DISPLAY_WIDTH;\
+\
+	textDisplayAttributes = default +singleLineText;\
+	hints		= {\
+			ATTR_GEN_INIT_FILE_KEY {\
+				char	#numberName,0\
+				},\
+			ATTR_GEN_TEXT_MAKE_UPPERCASE,\
+			ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {\
+				word DEF_PARA_ATTR_RIGHT\
+			},\
+			ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR {\
+				word DEF_CHAR_ATTR_FONT_SIZE(BIGCALC_MEM_FONT, BIGCALC_MEM_POINTSIZE)\
+			},\
+			HINT_DEFAULT_TARGET,\
+			HINT_FIXED_SIZE {\
+				SpecWidth <SST_AVG_CHAR_WIDTHS,\
+						NUMBER_DISPLAY_WIDTH+4>|\
+				SpecHeight <>|\
+				word 1\
+				},\
+			HINT_TEXT_WASH_COLOR {\
+				ColorQuad <\
+					C_WHITE,\
+					CF_INDEX,\
+					0, 0\
+						>\
+					},\
+			ATTR_GEN_TEXT_EXTENDED_FILTER {\
+				byte	VTEFT_BEFORE_AFTER\
+				},\
+			ATTR_GEN_TEXT_FLOAT_DECIMAL,\
+			FEP_HINT\
+			ATTR_GEN_TEXT_DONT_BEEP_ON_INSERTION_ERROR\
+			}\
+}
+
+
+/****************************************
+ * "Send" trigger macro
+ ****************************************/
+
+/* 
+ * If we define a list of monikers then for each instance of SEND_TRIGGER
+ * we'll copy the moniker into the resource. So, instead we'll just directly
+ * refer to the moniker itself (since monikers can be shared by multiple
+ * objects). The only side-effect of this change is that the only moniker
+ * currently define is 256-colors, and it may not look great on lower-
+ * color systems. If that is an issue for someone (New Deal), then I'd
+ * recommend just going to 16-color artwork since the image is not terribly
+ * complicated anyway. -Don 8/19/00
+ */
+
+#define	SEND_TRIGGER(numberName,sendName)\
+sendName	= GenTrigger vardataReloc {\
+\
+	moniker 	= SendCalcMoniker;\
+	action		= MSG_IF_SEND_TO_CALC, numberName;\
+	hints		= {\
+			ATTR_GEN_FOCUS_HELP {UN_OPTR QHMemSendStr}\
+	}\
+}
+
+
+/****************************************
+ * Define a line in the memory box
+ ****************************************/
+
+#define	MEMORY_LINE(lineName,textName,registerName,numberName,\
+getName,sendName)\
+lineName	= GenInteraction {\
+\
+	children	= textName,\
+			getName,\
+			numberName,\
+			sendName;\
+	hints		= {\
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,\
+			HINT_CENTER_CHILDREN_VERTICALLY,\
+			ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN\
+			}\
+}\
+GET_TRIGGER(numberName,getName)\
+NAME_TEXT(textName,registerName,-readOnly)\
+NUMBER_TEXT(numberName)\
+SEND_TRIGGER(numberName,sendName)
+
+
+/****************************************
+ * Macro for read-only (Active Memory)
+ ****************************************/
+
+#define	MEMORY_LINE_READ_ONLY(lineName,textName,registerName,numberName,\
+getName,sendName)\
+lineName	= GenInteraction {\
+\
+	children	= textName,\
+			getName,\
+			numberName,\
+			sendName;\
+	hints		= {\
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,\
+			HINT_CENTER_CHILDREN_VERTICALLY\
+			}\
+}\
+GET_TRIGGER(numberName,getName)\
+NAME_TEXT(textName,registerName,+readOnly)\
+NUMBER_TEXT(numberName)\
+SEND_TRIGGER(numberName,sendName)
+
+
+#define FUNCTION_TRIGGER(funName,funMoniker,funID)\
+funName	= GenTrigger {\
+\
+	moniker		= #funMoniker ;  \
+	action		= MSG_BC_PROCESS_CONVERT, process;\
+	hints		= {	\
+			ATTR_GEN_TRIGGER_ACTION_DATA {\
+				word	funID\
+				}\
+			} \
+}
+
+#define CHOOSER_ITEM(itemName,itemMoniker,itemID)\
+itemName	= GenItem{\
+\
+	moniker		= #itemMoniker;	\
+	localize "Worksheet name.  Leave this chunk BLANK to prevent the worksheet from being displayed."; \
+	identifier	= itemID;\
+}
+
+

@@ -1,0 +1,974 @@
+@include <StdApp.goh>
+#include <ansi/stdio.h>
+#include <ansi/string.h>
+#include <ansi/stdlib.h>
+
+@include "NewsRead.goh"
+@include "Extern.goh"
+@include "Localize/Strings.goh"
+@include "UIClass/StatDiag.goh"
+@include "NewsData.goh"
+#include "news.h"
+
+
+/*************************************************************************/
+
+extern byte G_mainListLevel ;
+extern word G_mainListPath[] ;
+extern word G_mainListMessage ;
+extern NewsgroupEntry *G_group ;
+extern Boolean G_postWinVisible ;
+extern word G_groupListSelection ;
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_ACTION_BAR_DELETE_ACTION {
+
+    word loopCount, lineCount, article;
+    ExtUITreeCacheElement lineData ;
+
+    @send application::MSG_GEN_APPLICATION_MARK_BUSY() ;
+    NewsDataLock();
+    
+    lineCount = @call NewsArticleList2::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS() ;
+
+    NewsDataSelectGroup(G_groupListSelection) ;
+
+    loopCount = lineCount ;
+    while(loopCount) {
+    
+        loopCount-- ;
+
+        if(@call NewsArticleList2::
+                            MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(loopCount)) {
+        
+            /* mark it read */
+            {
+                /* get this lines current state information */
+                @call NewsArticleList2::
+                            MSG_EXTUI_TREE_GET_LINE_ATTRS(loopCount, &lineData) ;
+
+                /* get attached content information */
+                if(lineData.EUITCE_parent != 0xFFFFFFFF) {
+
+                    NewsDataGroupSelectThread(lineData.EUITCE_parent - 1) ;
+
+                    /* delete article */
+		    article = lineData.EUITCE_index + 1;
+                    NewsDataThreadDeleteArticle(article) ;
+
+                    if(!NewsDataThreadCountArticles()) {
+                    
+                        NewsDataGroupUnselectThread() ;
+                        NewsDataGroupDeleteThread(lineData.EUITCE_parent - 1) ;                
+                        article = 0xFFFF;
+
+                    } else {
+    
+                        NewsDataGroupUnselectThread() ;
+                    }
+
+                    @send oself::MSG_NEWS_READ_DELETE_NOTIFY(
+                                            G_groupListSelection, 
+                                            lineData.EUITCE_parent - 1,
+                                            article) ;
+
+                } else {
+
+					if ((@call NewsArticleList2::
+						MSG_EXTUI_TREE_COUNT_SUB_ITEMS(loopCount)) == 0)
+					{
+						/* Thread is collapsed - operate on entire thread */
+						article = 0xFFFF;
+						NewsDataGroupDeleteThread(lineData.EUITCE_index);
+					}
+					else
+					{
+						article = 0;
+						NewsDataGroupSelectThread(lineData.EUITCE_index) ;
+						NewsDataThreadDeleteArticle(article) ;
+
+						if(!NewsDataThreadCountArticles()) {
+                    
+							NewsDataGroupUnselectThread() ;
+							NewsDataGroupDeleteThread(lineData.EUITCE_index) ;                
+							article = 0xFFFF;
+    
+						} else {
+    
+							NewsDataGroupUnselectThread() ;
+						}
+					}
+
+                    @send oself::MSG_NEWS_READ_DELETE_NOTIFY(
+                                            G_groupListSelection, 
+                                            lineData.EUITCE_index,
+                                            article) ;
+                }
+            }
+        }
+    }
+
+    NewsDataUnselectGroup() ;
+
+    NewsDataUnlock() ;
+    BucketHugeArraySave();
+    VMSave(G_databaseVMFH);
+
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+
+	/* Remove the list selection NOW, before the initialize happens.
+	   It's easier than trying to properly synchronize sending the 
+	   apply message with the confusion of thread communication that 
+	   happens during the initialization. */
+	@send NewsArticleList2::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+	/* Force the list to send a status update to update menu and tools. */
+	@send NewsArticleList2::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@send NewsArticleList2::MSG_GEN_APPLY();
+
+    @send oself::MSG_NP_ARTICLE_TREE_INITIALIZE() ;
+
+@if 0    
+    word loopCount, restItems ;
+    word newSelection ;
+    word threadCount ;
+    word selCount ;
+
+    @send application::MSG_GEN_APPLICATION_MARK_BUSY() ;
+
+    switch(G_mainListLevel) {
+        
+        case 0: {
+            
+            word selectedGroup ;
+
+            /* one read group is selected */
+            selectedGroup = @call NewsArticleList::
+                                MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+            NewsDataLock();
+            NewsDataDeleteGroup(selectedGroup);
+            NewsDataUnlock();
+
+            G_mainListMessage = 0xFFFF ;
+
+            @send oself::MSG_NP_MAIN_LIST_INITIALIZE();
+            @send process::MSG_NP_PICK_LIST_INITIALIZE();
+
+            break ;
+        }
+
+        case 1: {
+
+            word selectedItem ;
+        
+            selectedItem = @call NewsArticleList::
+                                MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+            /* if one 1  message thread is selected */
+            if(selectedItem) {
+
+                NewsDataLock() ;
+                NewsDataSelectGroup(G_mainListPath[0]) ;
+
+                NewsDataGroupDeleteThread(selectedItem - 1) ;
+                
+                threadCount = NewsDataGroupCountThreads() ;
+                
+                NewsDataUnselectGroup() ;
+                NewsDataUnlock() ;
+            
+                if(threadCount) {
+                
+                    if(selectedItem > threadCount)
+                        selectedItem-- ;
+
+                    G_mainListMessage = 0xFFFF ;
+
+                    @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+
+                    @send NewsArticleList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                                        selectedItem, FALSE) ;
+                    @send oself::MSG_NP_MAIN_LIST_SELECTION(
+                                        selectedItem, 1, FALSE) ;
+
+                } else {
+                
+                    G_mainListMessage = 0xFFFF ;
+                    G_mainListLevel = 0 ;
+
+                    @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+                }
+            }
+
+            break ;
+        }
+
+        case 2: {
+
+            selCount = @call NewsArticleList::
+                                   MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS() ;
+
+            NewsDataLock() ;
+            NewsDataSelectGroup(G_mainListPath[0]) ;
+            NewsDataGroupSelectThread(G_mainListPath[1]) ;
+
+            /* loop over all entries */
+            loopCount = @call NewsArticleList::
+                                MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+            loopCount-- ;
+            restItems = loopCount;
+            newSelection = G_mainListMessage - 1;
+
+            if(selCount) {
+                
+                /* one ore more articles are selected */
+
+                while(loopCount) {
+            
+                    loopCount-- ;
+            
+                    if(@call NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(loopCount + 1)  ) {
+
+                        NewsDataThreadDeleteArticle(loopCount) ;
+ 
+                        if(newSelection == loopCount) {
+                
+                            if(NewsDataThreadCountArticles() <= newSelection)
+                                newSelection-- ;
+                
+                        } else {
+
+                            if(loopCount < newSelection)
+                                newSelection-- ;
+                        }
+
+                        restItems-- ;
+                    }
+                }
+            } else {
+            
+                /* delete the shown item */                    
+                NewsDataThreadDeleteArticle(G_mainListMessage - 1) ;
+                
+                restItems-- ;
+
+                if(restItems) {
+
+                    if(newSelection >= NewsDataThreadCountArticles())
+                        newSelection = G_mainListMessage - 2 ;
+                }
+            }
+
+            NewsDataGroupUnselectThread() ;
+
+            if(!restItems)
+                NewsDataGroupDeleteThread(G_mainListPath[1]);
+
+            threadCount = NewsDataGroupCountThreads() ;
+
+            NewsDataUnselectGroup() ;
+            NewsDataUnlock() ;
+
+            if(restItems) {
+        
+                G_mainListMessage = newSelection + 1 ;
+
+                @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+       
+                @send NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                                        newSelection + 1, FALSE) ;
+
+                @send oself::MSG_NEWS_SHOW_ARTICLE(
+                          @ArticleText,
+                          G_mainListPath[0],
+                          G_mainListPath[1],
+                          newSelection) ;
+
+            } else {
+
+                if(threadCount) {
+
+                    @send oself::MSG_NP_MAIN_LIST_CLOSE_LEVEL() ;
+
+                    @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+                
+                    newSelection = G_mainListPath[1] ;
+
+                    if(newSelection >= threadCount) 
+                        newSelection-- ;
+
+                    G_mainListMessage = 0xFFFF; 
+                    
+                    @send NewsArticleList::
+                            MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                                            newSelection + 1, FALSE) ;
+
+                    @send oself::
+                            MSG_NP_MAIN_LIST_SELECTION(
+                                    newSelection + 1, 1, FALSE) ;
+
+                } else {
+                
+                    G_mainListMessage = 0xFFFF ;
+                    G_mainListLevel = 0 ;
+
+                    @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+                }
+            }
+        }
+        break ;
+    }
+
+    BucketHugeArraySave();
+    VMSave(G_databaseVMFH);
+
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+@endif
+}
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_ACTION_BAR_MARK_READ_ACTION {
+
+    word loopCount, lineCount ;
+    ExtUITreeCacheElement lineData ;
+
+    @send application::MSG_GEN_APPLICATION_MARK_BUSY() ;
+    NewsDataLock();
+    
+    lineCount = @call NewsArticleList2::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS() ;
+
+    NewsDataSelectGroup(G_groupListSelection) ;
+
+    loopCount = 0 ;
+    while(loopCount < lineCount) {
+    
+        if(@call NewsArticleList2::
+                            MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(loopCount)) {
+        
+            /* mark it read */
+            {
+                /* get this lines current state information */
+                @call NewsArticleList2::
+                            MSG_EXTUI_TREE_GET_LINE_ATTRS(loopCount, &lineData) ;
+
+                /* get attached content information */
+                if(lineData.EUITCE_parent != 0xFFFFFFFF) {
+
+                    NewsDataGroupSelectThread(lineData.EUITCE_parent - 1) ;
+                    NewsDataArticleMarkRead(lineData.EUITCE_index + 1) ;
+					/* Update the parent item; if entire thread goes unread, 
+					   parent's moniker changes. */
+					@send ,forceQueue ,checkDuplicate NewsArticleList2::
+						MSG_EXTUI_TABLE_UPDATE_LINE(loopCount - lineData.EUITCE_index - 1);
+
+                } else {
+
+					if ((@call NewsArticleList2::
+						MSG_EXTUI_TREE_COUNT_SUB_ITEMS(loopCount)) == 0)
+					{
+						/* Thread is collapsed - operate on entire thread */
+						NewsDataThreadMarkRead(lineData.EUITCE_index);
+					}
+					else
+					{
+	                    NewsDataGroupSelectThread(lineData.EUITCE_index) ;
+						NewsDataArticleMarkRead(0) ;
+					}
+                }
+
+                NewsDataGroupUnselectThread() ;
+            }
+
+            /* update line */
+            @send NewsArticleList2::MSG_EXTUI_TABLE_UPDATE_LINE(loopCount) ;
+        }
+
+        loopCount++ ;
+    }
+
+    NewsDataUnselectGroup() ;
+
+    NewsDataUnlock() ;
+    BucketHugeArraySave();
+    VMSave(G_databaseVMFH);
+
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+
+    /* update the list */
+
+@if 0
+    word itemCount, numSelected ;
+
+    itemCount = @call NewsArticleList::
+                        MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS() ;
+    numSelected = @call NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS() ;
+
+    NewsDataLock() ;
+    
+    @send application::MSG_GEN_APPLICATION_MARK_BUSY() ;
+
+    switch(G_mainListLevel) {
+    
+        case 0: 
+
+            while(itemCount) {
+            
+                itemCount-- ;
+
+                if(@call NewsArticleList::
+                    MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(itemCount) ||
+                    !numSelected ) {
+
+                    NewsDataGroupMarkRead(itemCount) ;
+                }
+            }
+            
+            break ;
+
+        case 1:  
+
+            NewsDataSelectGroup(G_mainListPath[0]) ;
+            
+            if(numSelected) {
+
+                while(itemCount != 1) {
+                
+                    itemCount-- ;
+
+                    if(@call NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(itemCount)) {
+
+                        NewsDataThreadMarkRead(itemCount - 1) ;
+                    }
+                }
+            
+            } else {
+           
+                if(G_mainListMessage != 0xFFFF)
+                    NewsDataThreadMarkRead(G_mainListMessage - 1) ;
+            }
+
+            NewsDataUnselectGroup() ;
+            
+            break ;
+
+        case 2:
+            
+            NewsDataSelectGroup(G_mainListPath[0]) ;
+            NewsDataGroupSelectThread(G_mainListPath[1]) ;
+
+            if(numSelected) {
+
+                while(itemCount != 1) {
+                
+                    itemCount-- ;
+
+                    if(@call NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(itemCount)) {
+
+                        NewsDataArticleMarkRead(itemCount - 1) ;
+                    }
+                }
+            
+            } else {
+           
+                if(G_mainListMessage != 0xFFFF)
+                    NewsDataArticleMarkRead(G_mainListMessage - 1) ;
+            }
+
+            NewsDataGroupUnselectThread() ;
+            NewsDataUnselectGroup() ;
+
+            break ;
+    }
+
+    NewsDataUnlock() ;
+
+    /* save database */
+    BucketHugeArraySave();
+    VMSave(G_databaseVMFH);
+
+    /* reinitialize the list */
+    @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+
+    /* select the item */
+    if(G_mainListLevel) {
+    
+        if(G_mainListMessage != 0xFFFF) {
+        
+            @send NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(G_mainListMessage, FALSE) ;
+            
+        }
+    }
+
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+@endif
+
+	/* Force the list to send a status update to update menu and tools. */
+	@send NewsArticleList2::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@send NewsArticleList2::MSG_GEN_APPLY();
+}
+
+@ifdef COMPILE_OPTION_TOP_TOOLS
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_ACTION_BAR_DELETE_READ_ACTION {
+
+    @send application::MSG_GEN_APPLICATION_MARK_BUSY() ;
+
+    switch(G_mainListLevel) {
+    
+        case 0:
+            if(@call NewsArticleList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS()) {
+
+                @call oself::MSG_NEWS_CALL_PER_SELECTED_GROUP(
+                          oself,
+                          MSG_NEWS_DELETE_ALL_READ_FOR_SINGLE_NEWSGROUP) ;
+            
+            } else {
+
+                @call oself::MSG_NEWS_CALL_ALL_GROUPS(
+                          oself,
+                          MSG_NEWS_DELETE_ALL_READ_FOR_SINGLE_NEWSGROUP) ;
+            }
+
+            @call oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+            break ;
+
+        case 1: {
+
+            word loopCount, restItems, newSelection ; 
+            word articleCount ;
+
+            NewsDataLock() ;
+            NewsDataSelectGroup(G_mainListPath[0]) ;
+
+            /* loop over all entries */
+            loopCount = @call NewsArticleList::
+                                        MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+            loopCount-- ;
+            restItems = loopCount;
+            newSelection = G_mainListMessage - 1;
+
+            while(loopCount) {
+        
+                loopCount-- ;
+        
+                if( @call NewsArticleList::
+                      MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(loopCount + 1) ||
+                    (G_mainListMessage == (loopCount + 1))    ) {
+
+                    NewsDataThreadDeleteRead(loopCount) ;
+
+                    NewsDataGroupSelectThread(loopCount) ;
+                    articleCount = NewsDataThreadCountArticles() ;
+                    NewsDataGroupUnselectThread() ;
+
+                    if(!articleCount) {
+
+                        restItems-- ;
+
+                        NewsDataGroupDeleteThread(loopCount) ;
+
+                        if(newSelection == loopCount)  {
+            
+                            if(NewsDataGroupCountThreads() <= newSelection)
+                                newSelection-- ;
+            
+                        } else {
+
+                            if(loopCount < newSelection)
+                                newSelection-- ;
+                        }
+                    }
+                }
+            }
+
+            NewsDataUnselectGroup() ;
+            NewsDataUnlock() ;
+
+            if(restItems) {
+        
+                G_mainListMessage = newSelection + 1 ;
+
+                @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+       
+                @send oself::MSG_NEWS_SHOW_ARTICLE(
+                          @ArticleText,
+                          G_mainListPath[0],
+                          newSelection,
+                          0) ;
+
+                @send NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                                        newSelection + 1, FALSE) ;
+            } else {
+
+                G_mainListMessage = 0xFFFF ;
+                G_mainListLevel = 0 ;
+
+                @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+            }
+        }
+        break ;
+    }
+
+    BucketHugeArraySave();
+    VMSave(G_databaseVMFH);
+
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+}
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_ACTION_BAR_MARK_READ_UPDATE {
+
+    word numSelected ;
+
+    numSelected = @call NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS() ;
+
+    @send MarkReadAction::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+    @send MarkReadAction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+    @send MarkAllReadAction::MSG_GEN_SET_NOT_USABLE(
+                                                VUM_DELAYED_VIA_APP_QUEUE) ;
+
+    switch(G_mainListLevel) {
+    
+        case 0:
+            if(numSelected) {
+             
+                @send MarkReadAction::
+                            MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+            
+            } else {
+
+                @send MarkReadAction::
+                    MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+                @send MarkAllReadAction::
+                    MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+            }
+            break ;
+
+        case 1:
+        case 2:
+            if(!@call NewsArticleList::MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(0)) 
+                @send MarkReadAction::
+                            MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+
+            break ;
+    }
+}
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_ACTION_BAR_DELETE_UPDATE {
+
+    word numSelected ;
+    word numItems ;
+
+    numItems = @call NewsArticleList::
+                        MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS() ;
+
+    numSelected = @call NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS() ;
+
+    @send DeleteReadAction::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+    @send DeleteReadAction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+    @send DeleteAction::MSG_GEN_SET_NOT_USABLE(
+                                                VUM_DELAYED_VIA_APP_QUEUE) ;
+
+    switch(G_mainListLevel) {
+    
+        case 0:
+            
+            if(numItems) {
+
+                @send DeleteReadAction::
+                        MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+
+                if(numSelected == 1) {
+ 
+                    NewsDataLock();
+                    NewsDataSelectGroup(@call NewsArticleList::
+                                            MSG_GEN_ITEM_GROUP_GET_SELECTION());
+                
+                    if(!G_group->NE_unread) {
+
+                        @send DeleteReadAction::MSG_GEN_SET_NOT_USABLE(
+                                                          VUM_DELAYED_VIA_APP_QUEUE) ;
+                        @send DeleteAction::MSG_GEN_SET_USABLE(
+                                                          VUM_DELAYED_VIA_APP_QUEUE) ;
+                    } 
+
+                    NewsDataUnselectGroup();
+                    NewsDataUnlock();
+                }
+            }
+            break ;
+
+        case 1:
+            
+            if(numSelected != 1) {
+            
+                @send DeleteReadAction::
+                        MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+
+            } else {
+
+                 if(!@call NewsArticleList::
+                             MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(0)) {
+
+                    NewsDataLock();
+                    NewsDataSelectGroup(G_mainListPath[0]);
+                    NewsDataGroupSelectThread(@call NewsArticleList::
+                                            MSG_GEN_ITEM_GROUP_GET_SELECTION() - 1);
+                    
+                    if(NewsDataThreadCountArticles() <= 1) {
+
+                        @send DeleteAction::MSG_GEN_SET_USABLE(
+                                                          VUM_DELAYED_VIA_APP_QUEUE) ;
+                        @send DeleteReadAction::MSG_GEN_SET_NOT_USABLE(
+                                                          VUM_DELAYED_VIA_APP_QUEUE) ;
+
+                    } else {
+
+                        @send DeleteReadAction::
+                                MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+
+                    }
+
+                    NewsDataGroupUnselectThread();
+                    NewsDataUnselectGroup();
+                    NewsDataUnlock();
+                 }
+            }
+            break ;
+
+        case 2:
+            if(!@call NewsArticleList::MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(0)) {
+
+                @send DeleteReadAction::MSG_GEN_SET_NOT_USABLE(
+                                                  VUM_DELAYED_VIA_APP_QUEUE) ;
+                @send DeleteAction::MSG_GEN_SET_USABLE(
+                                                  VUM_DELAYED_VIA_APP_QUEUE) ;
+            }
+            break ;
+    }
+}
+
+/*************************************************************************/
+
+@ifdef COMPILE_OPTION_TOP_TOOLS
+@extern method NewsProcessClass, MSG_NP_ACTION_BAR_ONLINE_MODE_UPDATE {
+
+    /* if we are connected and in online mode*/
+    if( (NewsConnectionStatus & NCS_CONNECTED) &&
+        @call OnlineModeGroup::
+                MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(1) ) {
+
+        @send OnlineModeGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+        @send DisconnectAction::MSG_GEN_SET_USABLE(VUM_NOW) ;
+    
+    } else {
+
+        @send OnlineModeGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+        @send DisconnectAction::MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+    }
+}
+@endif /* COMPILE_OPTION_TOP_TOOLS */
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_ACTION_BAR_DISCONNECT_ACTION {
+
+    extern void CloseMedium(void) ;
+
+    DisconnectFromServer(TRUE) ;
+
+    CloseMedium() ;
+
+    @send oself::MSG_NP_ACTION_BAR_UPDATE_BUTTONS() ;
+}
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_ACTION_BAR_UPDATE_BUTTONS {
+
+/*    word itemCount ;
+    word selCount ;
+
+    itemCount = @call NewsArticleList::
+                        MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS() ;
+
+    selCount = @call NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS() ;
+
+*/
+    if(!G_postWinVisible) {
+
+        @send PostAction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+        
+        if(@call NewsArticleView::MSG_GEN_GET_USABLE()) {
+
+            @send RespondAction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+@ifdef COMPILE_OPTION_HAS_MENU_BAR
+            @send MenuReplyAction::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+@endif
+        }
+
+    } else {
+
+        @send PostAction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+        @send RespondAction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+@ifdef COMPILE_OPTION_HAS_MENU_BAR
+        @send MenuReplyAction::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+@endif
+    }
+
+@if 0
+    switch(G_mainListLevel) {
+        
+        case 0:
+            @send StructNaviGroup::
+                    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                                                    NEWS_VIEW_GROUPS, FALSE) ;
+            
+//            @send ShowThreadsTrigger::
+//                    MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+
+            if(selCount == 1) {
+
+                word threadCount ;
+
+                NewsDataLock() ;
+                NewsDataSelectGroup(@call NewsArticleList::
+                                    MSG_GEN_ITEM_GROUP_GET_SELECTION()) ;
+                
+                threadCount = NewsDataGroupCountThreads() ;
+
+                NewsDataUnselectGroup() ;
+                NewsDataUnlock() ;
+
+                if(threadCount) {
+
+//                    @send ShowThreadsTrigger::
+//                            MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+                }
+            } 
+            
+
+            if(selCount == 0) {
+
+                @send UpdateAction::
+                        MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+                @send UpdateAllAction::
+                        MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+
+                if(itemCount == 0) {
+
+                    @send UpdateAllAction::
+                        MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+
+                } else {
+
+                    @send UpdateAllAction::
+                        MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+                }
+
+            } else {
+
+                @send UpdateAction::
+                        MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+                @send UpdateAllAction::
+                        MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+            }
+            break ;
+
+        case 1:
+            @send StructNaviGroup::
+                    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                                                    NEWS_VIEW_THREADS, FALSE) ;
+//            @send ShowThreadsTrigger::
+//                    MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+
+            if(G_mainListMessage != 0xFFFF) {
+                
+                word articleCount ;
+
+                NewsDataLock() ;
+                NewsDataSelectGroup(G_mainListPath[0]) ;
+                NewsDataGroupSelectThread(G_mainListMessage - 1) ;
+
+                articleCount = NewsDataThreadCountArticles() ;
+
+                NewsDataGroupUnselectThread() ; 
+                NewsDataUnselectGroup() ;
+                NewsDataUnlock() ;
+            } 
+
+            /* usable update */
+            @send UpdateAction::MSG_GEN_SET_USABLE(
+                                    VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send UpdateAllAction::MSG_GEN_SET_NOT_USABLE(
+                                    VUM_DELAYED_VIA_APP_QUEUE) ;
+
+            break ;
+        
+        case 2:
+            @send StructNaviGroup::
+                    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                                                    NEWS_VIEW_ARTICLES, FALSE) ;
+            
+//            @send ShowThreadsTrigger::
+//                    MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+
+            if(@call NewsArticleList::MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(0)) {
+   
+                @send DeleteReadAction::MSG_GEN_SET_USABLE(
+                                                  VUM_DELAYED_VIA_APP_QUEUE) ;
+                @send DeleteAction::MSG_GEN_SET_NOT_USABLE(
+                                                  VUM_DELAYED_VIA_APP_QUEUE) ;
+
+            } 
+
+            /* usable update */
+            @send UpdateAction::MSG_GEN_SET_USABLE(
+                                    VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send UpdateAllAction::MSG_GEN_SET_NOT_USABLE(
+                                    VUM_DELAYED_VIA_APP_QUEUE) ;
+            break ;
+    }
+@endif
+/*    
+    if(G_onlineMode) {
+
+        @send OnlineAction::MSG_GEN_SET_NOT_USABLE(
+                                        VUM_DELAYED_VIA_APP_QUEUE) ;
+        @send OfflineAction::MSG_GEN_SET_USABLE(
+                                        VUM_DELAYED_VIA_APP_QUEUE) ;
+
+    } else {
+
+        @send OfflineAction::MSG_GEN_SET_NOT_USABLE(
+                                        VUM_DELAYED_VIA_APP_QUEUE) ;
+        @send OnlineAction::MSG_GEN_SET_USABLE(
+                                        VUM_DELAYED_VIA_APP_QUEUE) ;
+    }
+*/
+    @send oself::MSG_NP_ACTION_BAR_MARK_READ_UPDATE() ;
+    @send oself::MSG_NP_ACTION_BAR_DELETE_UPDATE() ;
+    @send oself::MSG_NP_ACTION_BAR_ONLINE_MODE_UPDATE() ;
+}
+
+@endif
+
+/*************************************************************************/

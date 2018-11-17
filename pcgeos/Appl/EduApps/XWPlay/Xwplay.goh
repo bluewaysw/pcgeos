@@ -1,0 +1,204 @@
+/***********************************************************************
+ *Copyright 1994-2001 Breadbox Computer Company LLC  All Rights Reserved
+ *
+ * PROJECT:	Breadbox Crossword Maker
+ * FILE:		xwplay.goh
+ * AUTHOR:	John Howard   3/15
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <token.h>
+#include <gstring.h>
+/*#include <initfile.h>
+#include <compress.h> */
+
+/***************************************************************************
+ * Constants
+ **************************************************************************/
+
+#define MANUFACTURER_ID_BREADBOX    16431
+
+#define GRID 1
+#define LIST 2
+#define ANSW 3
+
+#define GRID_MIN_SIZE       15
+#define GRID_MAX_SIZE       25
+#define GRID_DEFAULT_SIZE   15
+#define WORD_MIN_SIZE       3
+#define WORD_MAX_SIZE       15
+#define WORD_LIST_MAX_SIZE  50
+#define WORD_LIST_ELEMENT_SIZE  ( WORD_MAX_SIZE + 1 )
+#define CLUE_TEXT_MAX_SIZE		245
+#define CLUE_ELEMENT_SIZE  255
+
+#define GRID_SPACE          ( ' ' )
+
+#define GRID_NUM_CALC_TRIES             5
+#define GRID_NUM_RANDOM_PLACE_TRIES     5
+
+#define XWP_DOCUMENT_PROTOCOL_MAJOR     1
+#define XWP_DOCUMENT_PROTOCOL_MINOR     0
+
+#define CWD_DOC_PROTO_MAJOR = 1
+#define CWD_DOC_PROTO_MINOR = 0
+
+#define UI_DISABLE 0
+#define UI_ENABLE 1
+
+#define XWPS_SQUARE     0x0001
+#define XWPS_ANSWERS    0x0002
+
+#define C_ACROSS     0
+#define C_DOWN    	1
+
+#define DRAW_GRID_MARGINS               /*20*/1
+#define DRAW_GRID_SPACE_SIZE            20
+#define DRAW_GRID_TEXT_SIZE             12
+#define DRAW_GRID_TEXT_FONT             /*FID_DTC_URW_MONO*/FID_UNIVERSITY
+#define DRAW_GRID_NUM_SIZE              9
+#define DRAW_GRID_NUM_FONT              /*FID_DTC_URW_SANS*/FID_UNIVERSITY 
+#define DRAW_GRID_MAX_SCALE_FACTOR      MakeWWFixed( 1.5 )
+
+#define PRINT_WORD_MIN_TEXT_SIZE    MakeWWFixed( 9.0 )
+#define PRINT_WORD_STEP_TEXT_SIZE   MakeWWFixed( 1.0 )
+#define PRINT_WORD_MAX_TEXT_SIZE    MakeWWFixed( 14.0 )
+#define PRINT_WORD_COLUMN_SPACING   (0.25 * 72)
+#define PRINT_WORD_TEXT_FONT        FID_DTC_URW_MONO
+#define PRINT_WORD_TEXT_BOX_WIDTH   (7.5 * 72)
+#define PRINT_WORD_TEXT_BOX_HEIGHT  (3 * 72)
+#define PRINT_WORD_TEXT_BOX_LEFT    (.5 * 72)
+#define PRINT_WORD_TEXT_BOX_TOP     (8 * 72)
+#define PRINT_GRID_BOUNDS_LEFT      (1.25 * 72)
+#define PRINT_GRID_BOUNDS_TOP       (1.5 * 72)
+#define PRINT_GRID_BOUNDS_RIGHT     (7.25 * 72)
+#define PRINT_GRID_BOUNDS_BOTTOM    (7.5 * 72)
+#define PRINT_HEADER_BOUNDS_LEFT    (1.25 * 72)
+#define PRINT_HEADER_BOUNDS_RIGHT   (7.25 * 72)
+#define PRINT_HEADER_BOUNDS_TOP     (.75 * 72)
+#define PRINT_HEADER_TEXT_FONT      FID_DTC_URW_ROMAN
+#define PRINT_HEADER_TEXT_SIZE      MakeWWFixed( 18.0 )
+
+#define ACK_NO 1
+#define ACK_YES 2
+
+#define NAV_LEFT 1
+#define NAV_RIGHT 2
+#define NAV_UP 3
+#define NAV_DOWN 4
+
+/***************************************************************************
+ * Structures and Types
+ **************************************************************************/
+
+typedef struct                          /* Document Map Block structure */
+{
+	 ChunkHandle XWPDM_wordListChunk;    /* word list chunk handle */
+    ChunkHandle XWPDM_wordSearchChunk;  /* word search chunk handle */
+	 ChunkHandle XWPDM_answersChunk;     /* answers array chunk handle */
+	 word XWPDM_width;                     /* Width of grid */
+	 word XWPDM_height;                    /* Height of grid */
+	 word XWPDM_settings;                  /* Booleans from XWPSettingsOther */
+}
+XWPDocumentMap;
+
+typedef struct                          /* Word list descriptor */
+{
+	 char XWPLE_word[WORD_LIST_ELEMENT_SIZE];
+	 Boolean XWPLE_placed;
+	 char XWPLE_clue[CLUE_ELEMENT_SIZE];
+}
+XWPListElement;
+
+typedef struct                          /* Word search answer descriptor */
+{
+	 word XWPAE_row;                      /* Row of first letter */
+	 word XWPAE_column;                   /* Column of first letter */
+	 word XWPAE_direction;                /* Direction of word */
+	 word XWPAE_length;                   /* Length of word */
+	 word XWPAE_wordNum;                  /* pointer to word in list */
+}
+XWPAnswerElement;
+
+typedef struct                          /* Clue list descriptor */
+{
+	 char XWPCE_clue[CLUE_ELEMENT_SIZE];
+	 XWPAnswerElement XWPCE_data;
+}
+XWPClueElement;
+
+typedef struct                  /* to change the exp dbox help context */
+{
+	char XWPHC_name[12];
+}
+XWPHelpContext;
+
+/***************************************************************************
+ * Globals
+ **************************************************************************/
+
+extern VMFileHandle g_fhDocument;
+extern optr g_oDocument;
+extern VMBlockHandle g_bhDocHeap;
+extern ChunkHandle g_chDocWordList;
+extern ChunkHandle g_chDocWordGrid;
+extern ChunkHandle g_chDocAnswers;
+extern ChunkHandle g_chDocClues;
+extern word g_width;
+extern word g_height;
+extern word g_settings;
+extern word g_cellNum;
+extern word g_cellNumArray[GRID_MAX_SIZE][GRID_MAX_SIZE];
+extern word g_selClue;
+extern word g_prevClue;
+extern Boolean g_opening;
+extern word g_letterNum;
+extern char g_solveArray[GRID_MAX_SIZE][GRID_MAX_SIZE];
+
+/***************************************************************************
+ * Function defines
+ **************************************************************************/
+
+char XWPGetLetter(optr owg, word x, word y);
+void XWPGetDocBounds(RectDWord *pr);
+void XWPDrawWordGrid(GStateHandle gstate, word nLeftBound, word nTopBound,
+							  word nRightBound, word nBottomBound, Boolean bPrinting);
+void NotifyDBox (char* string1, optr notifyMsg);
+word AckDBox (char* string1, char* string2, optr ackMsg);
+void EnableDisableFileUI(word enOrDis);
+word FillCluesArray(word aOrD);
+void HiliteSelectedWord(Boolean startingClue); 
+
+/* these are for printed output only */
+void XWPDrawHeader(GStateHandle gstate, Boolean drawNameBlock);
+void XWPDrawClueList(GStateHandle gstate);
+
+
+
+/***************************************************************************
+ * Class definitions
+ **************************************************************************/
+
+@class XWPProcessClass, GenProcessClass;
+	 @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_XWP_PROCESS_APPLY_SETTINGS_OTHER;
+	 @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_XWP_PROCESS_QUERY_ACROSS_CLUE_LIST;
+	 @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_XWP_PROCESS_QUERY_DOWN_CLUE_LIST;
+	 @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_XWP_PROCESS_APPLY_ACROSS_CLUE_LIST;
+	 @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_XWP_PROCESS_APPLY_DOWN_CLUE_LIST;
+@endc;
+
+@class XWPDocumentControlClass, GenDocumentControlClass;
+@endc;
+
+@class XWPGenViewClass, GenViewClass;
+	@message void MSG_XWP_GEN_VIEW_NAVIGATE(word dir);
+@endc;
+
+

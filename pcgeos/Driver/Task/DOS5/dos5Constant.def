@@ -1,0 +1,305 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		dos5Constant.def
+
+AUTHOR:		Adam de Boor, May 30, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	5/30/92		Initial revision
+
+
+DESCRIPTION:
+	Constants peculiar to the DOS5 driver, as separate from those defined
+	for the non-task-switching aspect of the driver.
+		
+	$Id: dos5Constant.def,v 1.1 97/04/18 11:58:19 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+;
+; INT 2FH functions. Function is passed in AX, with AH always 0x4b
+;
+MSS2F_BUILD_CALLOUT	equ	0x4b01
+;	Pass:	ES:BX	= 0
+;		CX:DX	= switcher call-in address for duration of this
+;			  call
+;	Return:	ES:BX	= address of respondent's MSSwitchCallBackInfo
+;			  structure.
+
+MSSwitchCallBackInfo	struct
+    MSSCBI_next		fptr.MSSwitchCallBackInfo; set from ES:BX returned
+						;  by previous handler.
+    MSSCBI_entry	fptr.far		; respondent's entry point
+    			dword			; reserved
+    MSSCBI_apiPtr	fptr.MSSwitchAPIInfo	; pointer to array of APIs
+						;  supported
+MSSwitchCallBackInfo	ends
+
+MSSwitchAPI		etype	word, 1
+    MSSA_NETBIOS	enum	MSSwitchAPI	; NetBios
+    MSSA_8022		enum	MSSwitchAPI	; 802.2
+    MSSA_TCPIP		enum	MSSwitchAPI	; TCP/IP
+    MSSA_LANMAN		enum	MSSwitchAPI	; LanMan
+    MSSA_IPX		enum	MSSwitchAPI	; NetWare IPX
+
+MSSwitchSupportLevel	etype	word, 1
+    MSSSL_MINIMAL	enum	MSSwitchSupportLevel
+    MSSSL_API		enum	MSSwitchSupportLevel
+    MSSSL_COMPAT	enum	MSSwitchSupportLevel
+    MSSSL_SEAMLESS	enum	MSSwitchSupportLevel
+
+MSSwitchAPIInfo		struct
+    MSSAI_length	word	10	; length of structure (0 if last one)
+    MSSAI_api		MSSwitchAPI
+    MSSAI_major		word
+    MSSAI_minor		word
+    MSSAI_support	MSSwitchSupportLevel
+MSSwitchAPIInfo		ends
+
+MSS2F_DETECT_SWITCHER		equ	0x4b02
+;	Pass:	bx	= 0
+;		es:di	= 0
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	CF	= clear
+;		ax	= 0
+;		es:di	= switcher's call-in address
+
+MSS2F_ALLOC_SWITCHER_ID		equ	0x4b03
+;	Pass:	bx	= 0
+;		es:di	= calling switcher's call-in address
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	CF	= clear
+;		ax	= 0
+;		bx	= new switcher ID (0 => no free ID's)
+
+MSS2F_FREE_SWITCHER_ID		equ	0x4b04
+;	Pass:	bx	= switcher ID to be freed
+;		es:di	= calling switcher's call-in address
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	ax	= 0
+;		bx	= 0 (non-0 => passed ID invalid)
+
+MSS2F_IDENTIFY_INSTANCE_DATA	equ	0x4b05
+;	Pass:	cx:dx	= call-in address
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	ax	= 0
+;		es:bx	= address of respondent's Win386StartupInfo
+Win386StartupInfo	struct
+    W3SI_version	byte	3, 0
+    W3SI_next		fptr.Win386StartupInfo
+    W3SI_virtDevFile	fptr
+    W3SI_refData	fptr
+    W3SI_instData	fptr.Win386InstanceItem
+Win386StartupInfo	ends
+
+Win386InstanceItem	struct
+    W3II_item		fptr.byte	; start of item (0 if last (?))
+    W3II_size		word		; length of item (bytes)
+Win386InstanceItem	ends
+
+;
+; Callout Functions. Passed in AX to entry point supplied in
+; MSSwitchCallBackInfo structure.
+; 
+
+MSSwitchOutFunc	etype	word, 0, 1
+MSSOF_INIT_SWITCHER	enum	MSSwitchOutFunc
+;	Pass:	es:di	= switcher call-in address (maybe NULL)
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	ax	= 0 if initialization ok.
+;			= non-0 if switcher should not load
+
+MSSOF_QUERY_SUSPEND	enum	MSSwitchOutFunc
+;	Pass:	bx	= current session ID
+;		es:di	= switcher call-in address
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	ax	= 0 if suspension OK
+;			= non-0 if suspension not allowed
+;
+;	MSSOF_SESSION_ACTIVE will be called for all respondents if any
+;	returns ax non-0, even if MSSOF_QUERY_SUSPEND wasn't called for
+;	that respondent.
+
+MSSOF_SUSPEND_SESSION	enum	MSSwitchOutFunc
+;	Pass:	bx	= current session ID
+;		es:di	= switcher call-in address
+;		interrupts disabled (not to be enabled)
+;		DOS calls disallowed
+;	Return:	ax	= 0 if suspension OK
+;			= non-0 if suspension disallowed
+;
+;	MSSOF_SESSION_ACTIVE will be called for all respondents if any
+;	returns ax non-0, even if MSSOF_SUSPEND_SESSION wasn't called for
+;	that respondent.
+
+MSSOF_RESUME_SESSION	enum	MSSwitchOutFunc
+;	Pass:	bx	= ID of session being resumed (current one)
+;		cx	= flags:
+;			  b0	= 1 => first time session run
+;		es:di	= switcher call-in address
+;		interrupts disabled (not to be enabled)
+;		DOS calls disallowed
+;	Return:	ax	= 0
+
+MSSOF_SESSION_ACTIVE	enum	MSSwitchOutFunc
+;	Pass:	bx	= current session ID
+;		cx	= flags:
+;			  b0	= 1 => first time session run
+;		es:di	= switcher call-in address
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	ax	= 0
+
+MSSOF_CREATE_SESSION	enum	MSSwitchOutFunc
+;	Pass:	bx	= ID of session being created
+;		es:di	= switcher call-in adress
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	ax	= 0 if OK to create session
+;			= non-0 if creation denied.
+;
+;	MSSOF_DESTROY_SESSION will be called for all respondents if any returns
+;	ax non-0, even if MSSOF_CREATE_SESSION wasn't called for the respondent.
+
+MSSOF_DESTROY_SESSION	enum	MSSwitchOutFunc
+;	Pass:	bx	= ID of session being destroyed
+;		es:di	= switcher call-in address
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	ax	= 0
+
+MSSOF_SWITCHER_EXIT	enum	MSSwitchOutFunc
+;	Pass:	bx	= flags:
+;			  b0	= set if this is the only switcher in the
+;				  system.
+;		es:di	= call-in address
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	ax	= 0
+
+;
+; Call-in functions, passed to the call-in address that was passed on the
+; call-out function that caused this reaction.
+; 
+MSSwitchInFunc		etype	word, 0, 1
+
+MSSIF_GET_VERSION	enum	MSSwitchInFunc
+;	Pass:	interrupts disabled (not to be enabled)
+;		DOS calls disallowed
+;	Return:	CF	= clear
+;		ax	= 0
+;		es:bx	= MSSwitchVersion
+
+MSSwitcherFlags	record
+    :15				; undefined, so far
+    MSSF_DISABLED:1		; set if switcher currently disabled
+MSSwitcherFlags	end
+
+MSSwitchVersion		struct
+    MSSV_apiMajor	word
+    MSSV_apiMinor	word
+    MSSV_productMajor	word
+    MSSV_productMinor	word
+    MSSV_switchID	word
+    MSSV_flags		MSSwitcherFlags
+    MSSV_name		fptr.char 	; pointer to asciiz name of switcher
+    MSSV_prev		fptr.far	; previous switcher's entry point
+MSSwitchVersion		ends
+
+MSSIF_TEST_REGION	enum	MSSwitchInFunc
+;	Pass:	es:di	= start of buffer to check
+;		cx	= size of buffer (bytes, 0 => 64K)
+;		interrupts disabled (not to be enabled)
+;		DOS calls disallowed
+;	Return:	CF	= clear
+;		ax	= 0 if buffer entirely global
+;			  1 if buffer partially local (switchable)
+;			  2 if buffer entirely local (switchable)
+
+MSSIF_SUSPEND_SWITCHER	enum	MSSwitchInFunc
+;	Pass:	es:di	= switcher call-in of new switcher, or
+;			  0:0 if call-in not supported
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	ax	= 0 if switcher now suspended
+;			= non-0 if suspension failed:
+;				= 1 if other switchers advised not to start
+;				= 2 if other switchers may run anyway
+
+MSSIF_RESUME_SWITCHER	enum	MSSwitchInFunc
+;	Pass:	es:di	= call-in address of exiting switcher
+;		interrupts enabled
+;		DOS calls allowed
+;	Return:	CF	= clear
+;		ax	= 0
+
+MSSIF_HOOK_CALLOUT	enum	MSSwitchInFunc
+;	Pass:	es:di	= address of MSSwitchCallBackInfo for respondent.
+;			  MSSCBI_next uninitialized
+;		interrupts enabled
+;		DOS calls may be made
+;	Return:	CF	= clear
+;		ax	= 0
+
+MSSIF_UNHOOK_CALLOUT	enum	MSSwitchInFunc
+;	Pass:	es:di	= address of MSSwitchCallBackInfo for respondent
+;		interrupts enabled
+;		DOS calls may be made
+;	Return:	CF	= clear
+;		ax	= 0
+
+MSSIF_QUERY_API_SUPPORT	enum	MSSwitchInFunc
+;	Pass:	bx	= MSSwitchAPI
+;	Return:	CF	= clear
+;		ax	= 0
+;		es:bx	= address of MSSwitchAPIInfo struct belonging to the
+;			  respondent with the best level of support for the
+;			  passed API.
+
+
+;==============================================================================
+;			Additional Object Classes
+;==============================================================================
+
+DOS5Class	class	TaskDriverClass
+
+MSG_DOS5_SUSPEND_COMPLETE				message
+;	Pass whatever hotkey off to the old keyboard intercept routine
+;	and issue the requisite keyboard BIOS call to let the switcher know
+;	it's ok to act on it.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+MSG_DOS5_SUSPEND_ABORTED				message
+;	Note that someone refused to suspend, so we need to cancel the hotkey
+;	in the keyboard driver.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+.assert MSG_DOS5_SUSPEND_ABORTED eq MSG_DOS5_SUSPEND_COMPLETE+1
+
+MSG_DOS5_HOTKEY_PRESSED					message
+;	Notification from the keyboard driver that a hotkey we've registered
+;	was pressed.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+DOS5Class	endc

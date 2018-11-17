@@ -1,0 +1,433 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		mailboxInbox.def
+
+AUTHOR:		Adam de Boor, Apr 19, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	4/19/94		Initial revision
+
+
+DESCRIPTION:
+	Interface to the Inbox module
+		
+	$Id: mailboxInbox.def,v 1.1 97/04/05 01:19:54 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Init		segment	resource
+
+global	InboxCreate:near
+;	Desc:	Create the structures for tracking the inbox
+;
+;	Pass:	bx	= handle of Admin file
+;	Return:	carry set if couldn't create
+;		carry clear if inbox created:
+;			ax	= VM handle of inbox queue
+;			cx	= VM handle of application token map
+;
+
+global	InboxCreateQueue:near
+;	Desc:	Create the inbox queue.
+;
+;	Pass:	nothing
+;	Return:	carry set if couldn't create
+;		carry clear if inbox queue created:
+;			ax	= VM handle of inbox queue
+;		dx - destroyed
+;
+
+global	InboxInit:near
+;	Desc:	Prepare inbox for a new GEOS session.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+global	InboxFix:near
+;	Desc:	Fix up the reference counts for all messages in the inbox,
+;		cleaning up the thing after a crash. 
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+global	InboxStartTimerCommon:near
+;	Desc:	Tell the app object to start a periodic timer to do something.
+;
+;	Pass:	cs:dx	= INI file key (under category [mailbox])
+;		ax	= default period to use (# of minutes)
+;		di	= min. period to use (# of minutes)
+;		bx	= message to send to app object
+;	Return:	nothing
+;		ax, bx, cx, dx, di, ds - destroyed
+;
+
+global	InboxRegisterFileChange:near
+;	Desc:	Register inbox for file-change notification.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroy:cx, dx
+;
+
+Init		ends
+
+
+InboxCode	segment	resource
+
+global	InboxNotifyAppLoaded:far
+;	Desc:	Note there's a new application loaded, or the app has changed
+;		server modes.
+;
+;	Pass:	bxcxdx	= GeodeToken
+;		al	= IACPServerMode
+;		ah	= IACPServerFlags
+;	Return:	nothing
+;
+
+global	InboxNotifyAppNotLoaded:far
+;	Desc:	Note the indicated application is no longer loaded.
+;
+;	Pass:	bxcxdx	= GeodeToken
+;	Return:	nothing
+;
+
+global	InboxNotifyNewIACPBinding:far
+;	Desc:	Note there's now a binding for the indicated token.
+;
+;	Pass:	bxcxdx	= GeodeToken
+;	Return:	nothing
+;
+
+global	InboxNotifyRemoveIACPBinding:far
+;	Desc:	Note the binding for the indicated token has been removed
+;
+;	Pass:	bxcxdx	= GeodeToken
+;	Return:	nothing
+;
+
+global	InboxNotifyNewForegroundApp:far
+;	Desc:	Note there's a new foreground app with which the user is
+;		interacting.
+;
+;	Pass:	bxcxdx	= GeodeToken
+;	Return:	nothing
+;
+
+global	InboxGetAppName:far
+;	Desc:	Fetch the name to use for a token.
+;
+;	Pass:	bxcxdx	= GeodeToken
+;		ds	= locked lmem block in which to store the string
+;	Return:	*ds:ax	= application name string (something standard if
+;			  token is for an unknown application)
+;
+
+global	InboxMessageAdded:far
+;	Desc:	Note that a message was added to the inbox, and act accordingly
+;
+;	Pass:	bx	= VM file handle holding the message
+;		di	= DBQ handle for inbox
+;		dxax	= DBGroupAndItem of the message
+;	Return:	nothing
+;
+
+global	MailboxAcknowledgeMessageReceipt:far
+;
+;	See mailbox.def
+;
+
+global	InboxExit:far
+;	Desc:	Prepare the inbox for system shutdown.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+global	InboxDoEvent:far
+;	Desc:	Callback routine to process one message in the inbox queue.
+;		Put up a notify dialog box when the deadline is reached
+;
+;	Pass:	sidi	= MailboxMessage
+;	Return:	carry set to stop enumerating (always clear)
+;		ax, cx, dx - destroyed
+;
+
+global	InboxStoreAddresses:far
+;	Desc:	Store the addresses for an incoming message.
+;
+;	Pass:	cx	= number of addresses
+;		es:si	= MailboxTransAddr array
+;		*ds:di	= MailboxMessageDesc (MMD_transAddrs points to an
+;			  empty variable-sized chunk array) (not used)
+;		ds:bx	= MailboxMessageDesc
+;		ax	= MailboxTransportOption (not used)
+;	Return:	carry set if address couldn't be stored:
+;			ax	= MailboxError
+;		carry clear if all addresses stored:
+;			ax	= destroyed
+;		ds	= fixed up
+;		bx, cx, si - destroyed
+;
+
+if	_NO_UNKNOWN_APPS_ALLOWED
+global	InboxCheckAppUnknown:far
+;	Desc:	See if the destination application is unknown on this machine.
+;
+;	Pass:	ds:si	= MailboxRegisterMessageArgs with MRA_destApp to check
+;	Return:	carry set if application is unknown.
+;
+
+endif	; _NO_UNKNOWN_APPS_ALLOWED
+
+global	InboxRetargetMessage:far
+;	Desc:	Change the destination token of a message
+;
+;	Pass:	dxax	= MailboxMessage
+;		ds:si	= new GeodeToken
+;	Return:	nothing
+;
+
+InboxCode	ends
+
+InboxUICode	segment	resource
+
+if	_CONTROL_PANELS
+global	InboxGetDefaultSystemCriteria:far
+;	Desc:	Fetch the panel criteria to use for the system inbox control
+;		panel. Most likely, this will be based on the last message added
+;		to the inbox.
+;
+;	Pass:	nothing
+;	Return:	cx	= MailboxDisplayPanelType
+;		^hdx	= MailboxDisplayPanelCriteria
+;
+endif	; _CONTROL_PANELS
+
+InboxUICode	ends
+
+udata	segment
+
+global	inboxCheckPeriod:word
+global	inboxTimerHandle:hptr
+global	inboxTimerID:word
+global	inboxNumFirstClassMessages:word
+
+udata	ends
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;		       InboxControlPanelClass
+;
+
+if	_CONTROL_PANELS
+InboxControlPanelClass	class	MessageControlPanelClass
+
+MSG_ICP_SET_APPLICATION	message	
+; Change the criteria for displaying messages, according to the user's desires
+;
+; Context:	Sent by the InboxApplicationList associated with the panel when
+;		the user changes the application, or when we send it its
+;		MSG_IAL_REBUILD_LIST for the first time, or when the selected
+;		application no longer has any messages in the inbox for it.
+; Source:	InboxApplicationList
+;
+; Pass:
+;		cx	= application index # (must be mapped via
+;			  ?)
+;		dl	= GenItemGroupStateFlags
+;		bp	= number of selections (0 or 1)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_ICP_MESSAGE_RETRIEVAL_NOW_POSSIBLE	message	
+; Take note that it is now possible to retrieve messages, owing to the
+; availability of a new transport with this capability.
+
+; This is received only by the system intbox panel. If the Get New menu isn't
+; usable, receipt of this message should cause it to be set usable.
+;
+; Context:	Sent by MTAddTransport when it finds a driver that has a
+;		RETRIEVE_MESSAGES capability bit not previously seen in any
+;		other driver. It is delivered via a META_SEND_CLASSED_EVENT sent
+;		TO_SYSTEM_INBOX_PANEL
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_ICP_RETRIEVE_MESSAGES	message	
+; Begin message retrieval, s'il vous plais
+;
+; Context:	Sent by the InboxPanelGetNew list when the user has asked to
+;		retrieve messages for some transport
+; Source:	InboxPanelGetNew (OutboxTransportList)
+;
+; Pass:
+;		cx	= transport # (must call the list back to get the
+;			  actual transport info)
+;		dl	= GenItemGroupStateFlags
+;		bp	= number of selections (0 or 1)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+;MSG_MCP_SET_SPECIFIC:	send IAL_REBUILD_LIST to InboxPanelApps if system
+;MSG_MCP_SET_CRITERIA:	if specific, mangle moniker
+
+InboxControlPanelClass	endc
+endif	; _CONTROL_PANELS
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;			  InboxDetailsClass
+;
+
+if	_CONTROL_PANELS
+InboxDetailsClass	class	MessageDetailsClass
+
+MSG_ID_SEND_MESSAGE	message	
+; Send the message to the application, loading the app if necessary.
+;
+; Context:	Sent by the delivery trigger for the detail box
+; Source:	guess
+; Destination:  guess again
+; Interception: seems kinda pointless
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_ID_DELETE_MESSAGE	message	
+; Delete the message.
+;
+; Context:	Sent by the Delete trigger for the detail box
+; Source:	guess
+; Destination:  guess again
+; Interception: seems kinda pointless
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+InboxDetailsClass	endc
+endif	; _CONTROL_PANELS
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;			InboxMessageListClass
+;
+
+if	_CONTROL_PANELS
+InboxMessageListClass	class	MessageListClass
+; MSG_ML_RESCAN: setup transmitQueue, transmitID, currentTime, and sigAddrBytes
+; MSG_ML_UPDATE_LIST: set transmitQueue.high to 0, don't need to bother
+;		      with currentTime, and sigAddrBytes should be left over
+;		      from previous rescan
+
+    IMLI_currentTime	FileDateAndTime
+    ; Time at the start of the scan, for use in determining if a message is
+    ; eligible for transmission.
+    
+InboxMessageListClass	endc
+endif	; _CONTROL_PANELS
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;		       InboxApplicationListClass
+;
+
+
+if	_CONTROL_PANELS
+InboxApplicationListClass	class	GenDynamicListClass
+
+MSG_IAL_GET_APPLICATION	message	
+; Fetch the application the user has selected.
+;
+; Context:	Called by InboxControlPanel when it's been told the user has
+;		chosen a new application. The result is used to build the
+;		criteria for the panel.
+; Source:	InboxControlPanel
+;
+; Pass:
+;		cx	= application index
+; Return:
+;		carry clear if found
+;			cxdxbp	= GeodeToken
+;		carry set if not found
+;			cx, dx, bp  - destroyed
+;
+
+MSG_IAL_SET_APPLICATION	message
+; Set the application we've selected for the user.
+;
+; Context:	Called by InboxControlPanel when it's told what criteria
+;		it should be using
+; Source:	InboxControlPanel
+;
+; Pass:
+;		cxdxbp	= GeodeToken (bp = INBOX_TOKEN_NUM_ALL if select "All")
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_IAL_REBUILD_LIST	message	
+; Rebuild the list of possible applications.
+;
+; Context:	Delivered via MSG_META_SEND_CLASSED_EVENT using
+;		TO_INBOX_APPLICATION_LIST when the list of applications
+;		managed by inboxAppToken.asm has an entry added or
+;		removed from the list. The change to the list has already
+;		happened, so the list can be rebuilt immediately.
+;
+; 		This is also send by InboxControlPanel when it receives its
+;		MSG_MCP_SET_SPECIFIC and finds the thing is specific.
+;
+; Source:	?
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    IALI_selectedTokenNum	word	CA_NULL_ELEMENT
+    ; Element # of the token of the selected application in the app token
+    ; array.  CA_NULL_ELEMENT if nothing is selected.  INBOX_TOKEN_NUM_ALL
+    ; if "All" is selected.
+
+INBOX_TOKEN_NUM_ALL	equ	(CA_NULL_ELEMENT - 1)
+
+InboxApplicationListClass	endc
+endif	; _CONTROL_PANELS
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;		InboxTransWinCloseClass
+;
+InboxTransWinCloseClass	class	MessageSendableNotifyDialogClass
+InboxTransWinCloseClass	endc

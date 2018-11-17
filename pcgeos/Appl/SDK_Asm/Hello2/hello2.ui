@@ -1,0 +1,166 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	Hello (Sample PC/GEOS application)
+ * File:	hello.ui
+ *
+ * Author:	Eric E. Del Sesto
+ *
+ *	This file contains the user Interface description for this
+ * application. This file is written in a language called ESPIRE, which is
+ * compiled by the UIC compiler. See Spec/User/uic.doc for info.
+ *
+ * RCS STAMP:
+ *	$Id: hello2.ui,v 1.1 97/04/04 16:33:30 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+/* first, read pre-defined class definitions. See the file
+ * /staff/pcgeos/Include/generic.uih. */
+
+#include "generic.uih"
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+/* The very top-level generic object of an application MUST be a GenApplication
+ * object. The hello.gp file contains "appobj" statement which indicates
+ * that this "HelloApp" object is in fact the top-level UI object.
+ * This object should be in its own resource so that GeoManager can load it
+ * quickly to grab the icon for this application. GeoManager will store this
+ * icon in its "Token Database", so that the icon image can be reused quickly.*/
+
+start	AppResource;
+
+HelloApp = GenApplication {
+	/* The geoManager uses this token information to store this
+	 * application's icon in a database. */
+
+					/* four letters used as index to
+					 * refer to this application in the
+					 * token database. */
+
+					/* manufacturer ID number. Also used
+					 * for accessing database, to ensure
+					 * uniqueness. */
+
+	children = HelloPrimary;
+					/* The GenApplication object only
+					 * has one child: the main application
+					 * window. */
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = HelloPrimary,
+					/* The main window should appear
+					 * on-screen when the application
+					 * is launched. */
+						EnterTextBox;
+					/* This dialog is on-screen when the
+					 * application starts */
+
+	moniker = list {		/* The application object has a list
+					 * of visual monikers */
+		HelloTextMoniker	/* Used in the express menu and in
+					 * the header for the primary window */
+	}
+}
+
+visMoniker HelloTextMoniker = "Hello Sample Application";
+
+end	AppResource;
+
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+/* Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed. */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+HelloPrimary = GenPrimary {
+	children = HelloView, EnterTextBox;
+					/* this window has one child: the
+					   GenView object (see below) */
+
+	/* At present, we are not supplying the icon image for this application,
+	 * (just the text moniker given above), so we want to prevent the
+	 * user from minimizing this window. */
+
+	hints = {
+		ATTR_GEN_DISPLAY_NOT_MINIMIZABLE
+	}
+}
+
+end Interface;
+
+
+/*-----------------------------------------------------------------------------
+	GenView object
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+/* This GenView object creates a window where the application can display
+ * portions of the document as necessary. As we want this window to be
+ * scrollable, the specific UI (Motif) will create scroll bars which the
+ * user can interact with. Whenever a portion of the window needs to be
+ * redrawn, the GenView object will invalidate a portion of the window,
+ * causing a MSG_META_EXPOSED to be sent to the application. The application
+ * will draw the document into the window as requested. The window keeps
+ * track of a mask, which is used to clip the application's drawing operations,
+ * so that only the invalid portion of the window is drawn to. */
+
+HelloView = GenView {
+	/* size of document, in points (72 points per inch). The GenView object
+	 * will either adopt a default size, or will size itself to fit
+	 * inside the GenPrimary window. */
+
+	docRight = "14*72";		/* width in points */
+	docBottom  = "11*72";		/* height in points */
+
+	/* make view scrollable in X and Y.  Also, we'll keep the view
+	 * from getting larger than the content.
+	 */
+	horizAttributes = scrollable, noLargerThanContent;
+	vertAttributes  = scrollable, noLargerThanContent;
+
+	/* when the contents of this view (i.e. the document) must be updated,
+	 * the UI should send a MSG_META_EXPOSED to the HelloProcessClass
+	 * object. */
+
+	output = process;
+}
+
+end Interface;
+
+start	BoxResource;
+
+EnterTextBox	= GenInteraction {
+	moniker	= "Enter Text Here and click OK";
+	attributes = default +notUserInitiatable;
+	children = EnterText, OKTrigger;
+	type = command;
+	visibility = dialog;
+}
+
+EnterText	= GenText {
+	maxLength = 15;
+	textDisplayAttributes = singleLineText;
+	text = "Text to start with";
+}
+
+OKTrigger	= GenTrigger {
+	moniker = "Change Text";
+	action	=  MSG_DRAW_NEW_TEXT,process;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION,
+		}		
+}
+
+end	BoxResource;
+

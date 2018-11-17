@@ -1,0 +1,293 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GlobalPC 1998.  All rights reserved.
+ *	GLOBALPC CONFIDENTIAL
+ *
+ * PROJECT:	  PC GEOS
+ * MODULE:	  GeoWrite
+ * FILE:	  uiTemplate.ui
+ *
+ * AUTHOR:  	  Joon Song, Nov 11, 1998
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	joon	11/11/98   	Initial version
+ *
+ * DESCRIPTION:
+ *
+ *	
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+start WizardHeaderUI, data;
+#include "Art/wizardHeader.ui"
+end WizardHeaderUI;
+
+
+start TemplateWizardUI, notDetachable;
+
+#include "Art/mkrWizardPrev.ui"
+#include "Art/mkrWizardNext.ui"
+
+
+TemplateWizardDialog = WriteTemplateWizard {
+	genStates = default -usable;
+	children = 
+		TemplateWizardHeader,
+		TemplateWizardTopGroup, 
+		TemplateWizardHorizontalDivider,
+		TemplateWizardReplyBar;
+	visibility = dialog;
+	attributes = default +notUserInitiatable, +modal;
+	hints = {
+		ATTR_GEN_INTERACTION_ABIDE_BY_INPUT_RESTRICTIONS,
+		ATTR_GEN_WINDOW_CUSTOM_WINDOW,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT {
+			SpecWinSizePair < mask SWSS_RATIO or PCT_100,
+					  mask SWSS_RATIO or PCT_100 >
+		},
+		ATTR_GEN_WINDOW_CUSTOM_LAYER_ID {
+		    word 0
+		},
+		ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+		    word WIN_PRIO_COMMAND
+		}
+	}
+}
+
+visMoniker TemplateWizardDialogMoniker = "Design Assistant";
+
+TemplateWizardHeader = GenGlyph {
+	moniker = TemplateWizardHeaderMoniker;
+}
+
+chunk wizardHeaderText = "Design Assistant";
+localize "Text displayed at the top of the Design Assistant header.";
+chunk wizardHeaderFontSize = "54";
+localize "Font Size of Design Assistant header.";
+chunk wizardHeaderKerning = "4";
+localize "Kerning value of Design Assistant header.";
+chunk wizardHeaderY = "16";
+localize "Y coordinate of the Design Assistant header.";
+
+/* WARNING: do NOT change this gstring without also modifying the
+   appropriate constants in writeConstant.def:
+   ASST_HEADER_TEXT_SETTINGS_OFFSET:  offset to GSSetTextAttr opcode.
+   ASST_HEADER_TEXT_DRAW_SHADOW_OFFSET: offset to GSDrawTextOptr opcode (shadow).
+   The gstring is manually modified at runtime using these constants.
+   These constants are read as offsets from the BEGINNING of the GSTRING,
+   *not* the moniker. */
+visMoniker TemplateWizardHeaderMoniker = {
+	size = standard;
+	style = icon;
+	aspectRatio = normal;
+	color = color8;
+	cachedSize = 600, 81;
+	gstring {
+		GSBeginString 
+		GSSetTextAttr 0,CF_RGB,0,0, SDM_100, PT_SOLID, 0, \
+		0, 0, \
+		0, \
+		0, \
+		0, 0, FID_DTC_URW_ROMAN, 54, 0, 4, FW_NORMAL, FWI_MEDIUM
+		GSDrawBitmapOptr 0, 0, WizardHeaderBitmap 
+		GSDrawTextOptr 168, 18, wizardHeaderText
+		GSSetTextColor 255, 255, 153
+		GSDrawTextOptr 166, 16, wizardHeaderText 
+		GSEndString
+	}
+}
+
+TemplateWizardTopGroup = GenInteraction {
+	children = TemplateWizardDocumentView, TemplateWizardVerticalDivider,
+		   TemplateWizardUIGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+TemplateWizardDocumentView = GenInteraction {
+	children = TemplateWizardDocumentImage;
+	hints = {
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+TemplateWizardDocumentImage = WriteTemplateImage {
+}
+
+TemplateWizardVerticalDivider = GenGlyph {
+	hints = {
+		HINT_GLYPH_SEPARATOR,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+TemplateWizardUIGroup = GenInteraction {
+	children = TemplateWizardDescriptionText,
+		   TemplateWizardInputGroup;
+	hints = {
+		HINT_CUSTOM_EXTRA_MARGINS { Rectangle < 10, 5, 10, 5 > },
+		HINT_CUSTOM_CHILD_SPACING { SpecSizeSpec <SST_PIXELS, 20> },
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+TemplateWizardDescriptionText = GenText {
+	genAttributes = default +readOnly;
+	text = "";
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+TemplateWizardInputGroup = GenInteraction {
+	children = TemplateWizardDateGroup, TemplateWizardFieldText;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+TemplateWizardDateGroup = GenItemGroup {
+	children = TemplateWizardDateLong, 
+		   TemplateWizardDateLongNoWeekday,
+		   TemplateWizardDateLongNoWeekdayCondensed, 
+		   TemplateWizardDateShort,
+		   TemplateWizardDateOther;
+	genStates = default -usable;
+	selection = DTF_LONG;
+	destination = TemplateWizardDialog;
+	applyMsg = MSG_WRITE_TEMPLATE_WIZARD_DATE_SELECTED;
+	hints = {
+		ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED,
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+TemplateWizardDateLong  = GenItem {
+	identifier = DTF_LONG;
+}
+
+TemplateWizardDateLongNoWeekday  = GenItem {
+	identifier = DTF_LONG_NO_WEEKDAY;
+}
+
+TemplateWizardDateLongNoWeekdayCondensed  = GenItem {
+	identifier = DTF_LONG_NO_WEEKDAY_CONDENSED;
+}
+
+TemplateWizardDateShort  = GenItem {
+	identifier = DTF_SHORT;
+}
+
+TemplateWizardDateOther  = GenItem {
+	moniker = "Type in your own text";
+	identifier = DTF_END_DATE_FORMATS;
+}
+
+TemplateWizardFieldText = WriteTemplateFieldText {	
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ALIGN_LEFT_MONIKER_EDGE_WITH_CHILD, /* deal with wacky */
+		HINT_CENTER_CHILDREN_HORIZONTALLY,	 /* ui behavior */
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_TEXT_WHITE_WASH_COLOR,
+		HINT_DEFAULT_FOCUS
+	}
+}
+
+TemplateWizardHorizontalDivider = GenGlyph {
+	hints = {
+		HINT_GLYPH_SEPARATOR,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}	
+
+TemplateWizardReplyBar = GenInteraction {
+	children = TemplateWizardCancelTrigger, TemplateWizardPrevNextGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY
+	}
+}
+
+TemplateWizardCancelTrigger = GenTrigger {
+	moniker = "VMO_CANCEL", "Cancel";
+	action = MSG_WRITE_TEMPLATE_WIZARD_CANCEL_AND_CLOSE, 
+		 TemplateWizardDialog;
+	genAttributes = default +signalInteractionComplete,
+				+initiatesInputIgnore;
+	hints = {
+		HINT_ENSURE_TEMPORARY_DEFAULT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+TemplateWizardPrevNextGroup = GenInteraction {
+	children = TemplateWizardPrevTrigger, TemplateWizardNextTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, 8>
+		}
+	}
+}
+
+TemplateWizardPrevTrigger = GenTrigger {
+	moniker = list { WizardPrevTextMoniker, WizardPrevMoniker }
+	action = MSG_WRITE_TEMPLATE_WIZARD_UNDO, TemplateWizardDialog;
+	hints = {
+		HINT_ENSURE_TEMPORARY_DEFAULT,
+		HINT_CENTER_MONIKER,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 13>
+			SpecHeight <>
+		},
+		HINT_USE_ICON_TEXT_COMBINATION_MONIKER {
+			IconTextMonikerParams<0, 4>
+		}
+	}
+}
+
+visMoniker WizardPrevTextMoniker = 'P', "Previous Step";
+
+TemplateWizardNextTrigger = GenTrigger {
+	action = MSG_WRITE_TEMPLATE_WIZARD_REPLACE_TAG, TemplateWizardDialog;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_ENSURE_TEMPORARY_DEFAULT,
+		HINT_CENTER_MONIKER,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 13>
+			SpecHeight <>
+		},
+		HINT_USE_ICON_TEXT_COMBINATION_MONIKER {
+			IconTextMonikerParams<mask ITMF_SWAP_ICON_TEXT, 4>
+		}
+	}
+}
+
+WizardHackGlyph = GenGlyph {
+	moniker = list { WizardNextTextMoniker, WizardNextMoniker }
+}
+
+visMoniker WizardNextTextMoniker = 'N', "Next Step";
+visMoniker TemplateWizardFinishMoniker = 'F', "Finish";
+
+end TemplateWizardUI;

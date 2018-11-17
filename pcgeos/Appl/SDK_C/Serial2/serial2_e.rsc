@@ -1,0 +1,49 @@
+resource CONSTANTDATA
+SDSerialDriverLoadErrorString 1 3 "" 0 0 0
+ErrorStringArray 2 0 "" 0 0 0
+SerialErrorBit4 3 3 "" 0 0 0
+SerialErrorBit3 4 3 "" 0 0 0
+SerialErrorBit2 5 3 "" 0 0 0
+SerialErrorBit1 6 3 "" 0 0 0
+resource APPRESOURCE
+SerialTextMoniker 5 1 "" 0 0 0
+resource INTERFACE
+_GI_visMoniker_SerialMainMenu 2 1 "" 0 0 0
+OpenConnection 7 1 "" 0 0 0
+CloseConnection 8 1 "" 0 0 0
+_GI_visMoniker_SendDataTrig 9 1 "" 0 0 0
+_GI_visMoniker_SerialSendBufferDisplay 11 1 "" 0 0 0
+_GTXI_text_SerialSendBufferDisplay 12 3 "" 0 0 0
+_GI_visMoniker_SerialRcvBufferDisplay 14 1 "" 0 0 0
+_GTXI_text_SerialRcvBufferDisplay 15 3 "" 0 0 0
+_GI_visMoniker_SerialErrorDisplay 17 1 "" 0 0 0
+_GTXI_text_SerialErrorDisplay 18 3 "" 0 0 0
+resource SERIALSETTINGS
+_GI_visMoniker_SerialSettingsDialog 1 1 "" 0 0 0
+_GI_visMoniker_ComPortGroup 3 1 "" 0 0 0
+_GI_visMoniker_Com1Setting 6 1 "" 0 0 0
+_GI_visMoniker_Com2Setting 8 1 "" 0 0 0
+_GI_visMoniker_Com3Setting 10 1 "" 0 0 0
+_GI_visMoniker_Com4Setting 12 1 "" 0 0 0
+_GI_visMoniker_BaudRateGroup 14 1 "" 0 0 0
+_GI_visMoniker_Baud2400 17 1 "" 0 0 0
+_GI_visMoniker_Baud4800 19 1 "" 0 0 0
+_GI_visMoniker_Baud9600 21 1 "" 0 0 0
+_GI_visMoniker_Baud14400 23 1 "" 0 0 0
+_GI_visMoniker_Baud19200 25 1 "" 0 0 0
+_GI_visMoniker_ParityBitsGroup 27 1 "" 0 0 0
+_GI_visMoniker_ParityNone 30 1 "" 0 0 0
+_GI_visMoniker_ParityOdd 32 1 "" 0 0 0
+_GI_visMoniker_ParityEven 34 1 "" 0 0 0
+_GI_visMoniker_SerialLengthGlyph 37 1 "" 0 0 0
+_GI_visMoniker_Length5 40 1 "" 0 0 0
+_GI_visMoniker_Length6 42 1 "" 0 0 0
+_GI_visMoniker_Length7 44 1 "" 0 0 0
+_GI_visMoniker_Length8 46 1 "" 0 0 0
+_GI_visMoniker_XStopBitsGroup 48 1 "" 0 0 0
+_GI_visMoniker_XStopNone 51 1 "" 0 0 0
+_GI_visMoniker_XStopOne 53 1 "" 0 0 0
+_GI_visMoniker_ModeGroup 55 1 "" 0 0 0
+_GI_visMoniker_RawMode 58 1 "" 0 0 0
+_GI_visMoniker_RareMode 60 1 "" 0 0 0
+_GI_visMoniker_CookedMode 62 1 "" 0 0 0

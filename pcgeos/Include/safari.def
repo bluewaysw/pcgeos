@@ -1,0 +1,448 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) NewDeal 1999 -- All Rights Reserved
+
+FILE:		safariConstant.def
+AUTHOR:		Gene Anderson
+
+DESCRIPTION:
+	This file defines constants for the GeoSafari library
+
+	$Id$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef  __SAFARI
+
+StartLibrary	safari
+
+UseLib	ui.def
+
+SAFARI_DOCUMENT_PROTOCOL_MAJOR	equ 2
+SAFARI_DOCUMENT_PROTOCOL_MINOR	equ 0
+
+SAFARI_MAX_QUESTIONS equ 26
+
+SAFARI_MAX_DESCRIPTION_LENGTH equ 63
+
+SafariGameDesc	type SAFARI_MAX_DESCRIPTION_LENGTH dup (TCHAR)
+
+SafariFilterType	etype byte
+;SFT_NORMAL		enum SafariFilterType	;question # = answer
+SFT_ALPHABETIC		enum SafariFilterType	;answer = A-D, AA-DD
+SFT_NUMERIC		enum SafariFilterType	;answer = 0-9, ., /, ' '
+SFT_NO_KEYBOARD		enum SafariFilterType	;no keyboard input
+SFT_ANYTHING		enum SafariFilterType	;allow anything
+
+SafariFileOptions	record
+	:5
+	SFO_FILTER SafariFilterType:3
+	:5
+	SFO_IMBED_GRAPHICS:1
+	SFO_QUESTION_SOUNDS:1
+	SFO_NO_LEDS:1
+SafariFileOptions	end
+
+LOGO_VIEWER_WIDTH	equ	128
+LOGO_VIEWER_HEIGHT	equ	128
+
+INDICATOR_WIDTH		equ	18
+;  jh - let's try adding 4 to the height to space them out
+;INDICATOR_HEIGHT	equ	23
+INDICATOR_HEIGHT	equ	27
+INDICATOR_LED_WIDTH	equ	16
+INDICATOR_LED_HEIGHT	equ	11
+INDICATOR_LED_LEFT_MARGIN equ (INDICATOR_WIDTH-INDICATOR_LED_WIDTH)/2
+INDICATOR_LED_TOP_MARGIN  equ (INDICATOR_HEIGHT-INDICATOR_LED_HEIGHT)/2
+INDICATOR_FLASH_TIME	equ	20
+
+;==========================================================================
+;	file info
+;==========================================================================
+
+;
+; chunk array header in map block
+;
+SafariMapBlock	struct
+    SMB_meta		LMemBlockHeader
+    SMB_quiz		word
+    SMB_number		word
+    SMB_desc		SafariGameDesc
+    SMB_flags		SafariFileOptions
+    SMB_logo		FileLongName
+    SMB_16color		FileLongName
+    SMB_256color	FileLongName
+    SMB_nextQuiz	FileLongName
+    SMB_iLogo		word
+    SMB_i16Color	word
+    SMB_i256color	word
+    SMB_extra		byte 16 dup (?)
+SafariMapBlock	ends
+
+SafariQuestionStruct	struct
+    SQS_indicator	sword
+    SQS_bounds		Rectangle
+SafariQuestionStruct	ends
+
+SAFARI_QUESTION_MAX_LENGTH equ 255
+
+;==========================================================================
+;	classes
+;==========================================================================
+
+;SAFARI_GAME_CARD_WIDTH    equ	571
+;SAFARI_GAME_CARD_HEIGHT   equ	410
+; jh - set it up for a default screen of 800 x 600
+SAFARI_GAME_CARD_WIDTH    equ	659
+SAFARI_GAME_CARD_HEIGHT   equ	472
+
+IndicatorState		record
+	:4
+	IS_PRESSED:1	;used by PlayerIndicatorClass
+	IS_FLASHING:1
+	IS_ON:1
+	IS_DISABLED:1
+IndicatorState		end
+
+IndicatorClass	class	GenGadgetClass
+
+MSG_INDICATOR_SET_STATE				message
+;
+; Set the state of an indicator
+;
+; Pass:
+;	cx - IndicatorState
+; Return:
+;	none
+
+MSG_INDICATOR_FLASH				message
+;
+; Change states while flashing
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+
+	II_state	IndicatorState
+	II_timer	hptr
+IndicatorClass	endc
+
+PlayerIndicatorClass	class	IndicatorClass
+	PII_destination	optr
+	PII_message	word
+	PII_label	lptr
+PlayerIndicatorClass	endc
+
+IndicatorGroupClass	class	GenInteractionClass
+
+MSG_INDICATOR_GROUP_INIT_FLASHING		message
+;
+; Set the indicators flashing in a pattern
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_INDICATOR_GROUP_SET_ALL			message
+;
+; Set all the indicators to the given state
+;
+; Pass:
+;	cx - IndicatorState
+; Return:
+;	none
+
+MSG_INDICATOR_GROUP_GET_NTH			message
+;
+; Get the Nth indicator
+;
+; Pass:
+;	cx - indicator # (0-SAFARI_MAX_QUESTIONS-1)
+; Return:
+;	cx:dx - optr of Nth child
+
+	IGI_startNum	word;
+	IGI_nextGroup	optr;
+
+IndicatorGroupClass	endc
+
+SpacerClass	class	GenGadgetClass
+SpacerClass	endc
+
+GameCardClass   class	GenGadgetClass
+
+GameCardBitmapType		etype byte
+GCBT_NO_BITMAP			enum GameCardBitmapType, 0
+GCBT_IMPORTED_BITMAP		enum GameCardBitmapType, 1
+GCBT_IMBEDDED_BITMAP		enum GameCardBitmapType, 2
+
+MSG_GAME_CARD_SET_PATH				message
+;
+; Set the path for game card info
+;
+; Pass:
+;	cx:dx - ptr to PathName
+;	bp - StandardPath
+; Return:
+;	none
+
+
+MSG_GAME_CARD_SET_BITMAP			message
+;
+; Set the background bitmap
+;
+; Pass:
+;	cx:dx - ptr to FileLongName
+; Return:
+;	none
+
+MSG_GAME_CARD_SET_IMPORTED_BITMAP		message
+;
+; Set the background bitmap from a pre-imported file
+;
+; Pass:
+;	cx - VMBlockHandle
+;	dx - VM file handle
+; Return:
+;	none
+;
+
+MSG_GAME_CARD_CLEAR_BITMAP			message
+;
+; Clear the background bitmap
+;
+; Pass:
+;	none
+; Return:
+;	none
+;
+
+	GCI_stdPath	StandardPath
+	GCI_path	PathName
+	GCI_bitmap	FileLongName
+	GCI_bitmapHan	word
+	GCI_bitmapType	GameCardBitmapType
+	GCI_filename	FileLongName;
+	GCI_fileHan     hptr
+
+GameCardClass	endc
+
+;;;
+;;; SafariGlyphClass: gadget with on/off state and bitmaps
+;;;
+
+SafariGlyphClass class GenGadgetClass
+
+MSG_SAFARI_GLYPH_SET_STATE		message
+;
+; Set the state
+;
+; Pass:
+;	cl - state (on=TRUE)
+; Return:
+;	none
+;
+
+MSG_SAFARI_GLYPH_SET_ON_BITMAP		message
+;
+; Set the "on" bitmap
+;
+; Pass:
+;	cx:dx - optr of bitmap
+; Return:
+;	none
+;
+
+MSG_SAFARI_GLYPH_SET_OFF_BITMAP		message
+;
+; Set the "off" bitmap
+;
+; Pass:
+;	cx:dx - optr of bitmap
+; Return:
+;	none
+;
+
+	SGI_onBitmap	optr
+	SGI_offBitmap	optr
+	SGI_state	BooleanByte
+SafariGlyphClass endc
+
+;;;
+;;; SafariButtonClass: button with custom bitmaps and behavior
+;;;
+
+SafariButtonClass  class SafariGlyphClass
+	SBI_destination	optr
+	SBI_message	word
+SafariButtonClass  endc
+
+;;;
+;;; SafariBackgroundClass: GenInteraction with a bitmap or color
+;;;
+
+SafariBackgroundClass  class GenInteractionClass
+	SBI_background	optr
+	SBI_color	Color
+SafariBackgroundClass  endc
+
+;;;
+;;; SafariFeedbackClass: gadget to give interesting feedback
+;;;
+
+SAFARI_FEEDBACK_WIDTH	equ 240
+SAFARI_FEEDBACK_HEIGHT  equ 16
+
+SafariFeedbackClass class GenGadgetClass
+
+MSG_SAFARI_FEEDBACK_START		message
+;
+; Start giving feedback in specified color
+;
+; Pass:
+;	dl - red
+;	cl - green
+;	ch - blue
+; Return:
+;	none
+;
+
+MSG_SAFARI_FEEDBACK_COUNTDOWN		message
+;
+; Countdown for giving feedback
+;
+; Pass:
+;	none
+; Return:
+;	none
+;
+
+MSG_SAFARI_FEEDBACK_FLASH_ON		message
+;
+; flash the whole bar for a wrong answer
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_SAFARI_FEEDBACK_FLASH_OFF		message
+;
+; flash the whole bar for a wrong answer, part II
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+	SFI_timer	hptr
+	SFI_curX1       word
+	SFI_curX2	word
+	SFI_direction	sword
+	SFI_color	ColorQuad
+SafariFeedbackClass endc
+
+;;;
+;;; SafariTimebarClass: gadget to tell how much time is left
+;;;
+
+SAFARI_TIMEBAR_WIDTH	equ 10
+SAFARI_TIMEBAR_HEIGHT   equ 192
+
+SafariTimebarState	etype byte
+STBS_RUNNING	enum SafariTimebarState, 0
+STBS_PAUSED	enum SafariTimebarState, 1
+STBS_STOPPED	enum SafariTimebarState, 2
+
+SafariTimebarClass class GenGadgetClass
+
+MSG_SAFARI_TIMEBAR_SET_STATE		message
+;
+; set time left and state
+;
+; Pass:
+;	cl - time left
+;	ch - maximum time
+;	dl - SafariTimebarState
+; Return:
+;	none
+;
+
+	STBI_count	byte
+	STBI_maxCount	byte
+	STBI_state	SafariTimebarState
+SafariTimebarClass endc
+
+;;;
+;;; SafariScoreClass: gadget to show the score
+;;;
+
+SAFARI_SCORE_WIDTH	equ	36
+SAFARI_SCORE_HEIGHT	equ	42
+
+SafariScoreSide	etype byte
+SSS_LEFT		enum SafariScoreSide
+SSS_RIGHT		enum SafariScoreSide
+
+SafariScoreClass class GenGadgetClass
+
+MSG_SAFARI_SCORE_SET_SCORE		message
+;
+; Set the score
+;
+; Pass:
+;	cl - score (-1 for blank)
+; Return:
+;	none
+
+	SSI_side	SafariScoreSide
+	SSI_score	byte	  -1
+SafariScoreClass endc
+
+;==========================================================================
+;	library routines
+;==========================================================================
+
+global SafariImportBitmap:far
+;
+; Import a bitmap file
+;
+; Pass:
+;	ds:si - ptr to filename
+;	bx - VM file handle to import into
+;	$cwd - set to directory
+; Return:
+;	ax - VMBlockHandle
+
+global SafariFreeBitmap:far
+;
+; Free an imported bitmap
+;
+; Pass:
+;	ax - VMBlockHandle
+;	bx - VM file handle
+; Return:
+;	none
+
+
+
+global SAFARIIMPORTBITMAP:far
+global SAFARIFREEBITMAP:far
+
+;==========================================================================
+;	logo file info
+;==========================================================================
+
+;
+; map block in logo file
+;
+SafariLogoMapBlock	struct
+    SLMB_i16Color	word
+    SLMB_i256color	word
+    SLMB_extra		byte 16 dup (?)
+SafariLogoMapBlock	ends
+
+EndLibrary	safari

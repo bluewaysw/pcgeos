@@ -1,0 +1,556 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ */
+
+/*
+ * Some code added by MG to test VSS / SourceOffSite
+ * More text by MG...
+ */
+
+/***************************************************************************
+ *  FILE:  sitelist.GOH
+ ***************************************************************************/
+
+@ifndef _SITELIST_GOH_
+@define _SITELIST_GOH_
+
+/* == Types: ============================================================== */
+typedef MemHandle T_siteList ;
+#define SITE_LIST_BAD NullHandle 
+
+typedef optr T_siteEntry ;
+#define SITE_ENTRY_BAD  NullHandle 
+
+typedef word T_siteEntryID ;
+#define SITE_ENTRY_ID_BAD   0xFFFF
+
+#define SITE_ENTRY_INDEX_BAD  0xFFFF
+
+typedef word T_siteField ;
+#define SITE_FIELD_NAME          0
+#define SITE_FIELD_SITE          1
+#define SITE_FIELD_PORT          2
+#define SITE_FIELD_ENTRY_TYPE    3
+#define SITE_FIELD_USERNAME      4
+#define SITE_FIELD_PASSWORD      5
+#define SITE_FIELD_VMCHAIN       6
+#define SITE_FIELD_UNKNOWN       7
+
+typedef word T_siteEntryType ;
+#define SITE_ENTRY_TYPE_ANONYMOUS       0
+#define SITE_ENTRY_TYPE_PASSWORD        1
+
+#define SITE_ENTRY_TITLE_LIMIT          128
+#define SITE_ENTRY_SITE_LIMIT           512
+#define SITE_ENTRY_NAME_LIMIT           128
+#define SITE_ENTRY_PASSWORD_LIMIT       128
+
+/* == Routines: ========================================================= */
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListOpen
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Opens a site list (or creates one).  If creation is necessary, it
+ |    sets up all the correct data.
+ | Inputs:
+ |    char *filename              -- Name of database to use
+ | Outputs:
+ |    T_siteList                  -- Site list handle for all future 
+ |                                   actions
+ *-----------------------------------------------------------------------*/
+T_siteList SiteListOpen(char *filename) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListClose
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Closes out a site list and deletes any related information.
+ | Inputs:
+ |    T_siteList list             -- List session block
+ *-----------------------------------------------------------------------*/
+void SiteListClose(T_siteList list) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListGetFile
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Return the file handle to the currently opened file (usually for
+ |    creating VMChains).
+ | Inputs:
+ |    T_siteList list             -- List session block
+ | Outputs:
+ |    VMFileHandle                -- Handle to the VM file
+ *-----------------------------------------------------------------------*/
+VMFileHandle SiteListGetFile(T_siteList list) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListGetCount
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Count the number of sorted items in the database.
+ |    NOTE:  If someone did a SiteEntryCreate, it is not added to the list
+ |           until the entry is locked and unlocked.
+ | Inputs:
+ |    T_siteList list             -- List session block
+ | Outputs:
+ |    word                        -- Number of sites in database
+ *-----------------------------------------------------------------------*/
+word SiteListGetCount(T_siteList list) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListFindNth
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Find the Nth item in the sorted list.
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |    word n                      -- Nth item to find
+ | Outputs:
+ |    T_siteEntryID               -- Found ID in sorted list, or
+ |                                   SITE_ENTRY_ID_BAD if not found.
+ *-----------------------------------------------------------------------*/
+T_siteEntryID SiteListFindNth(T_siteList list, word n) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteEntryCreate
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Create a brand new spanking site entry in the list.
+ | Inputs:
+ |    T_siteList list             -- List session block
+ | Outputs:
+ |    T_siteEntryID               -- New ID to the site entry.    
+ *-----------------------------------------------------------------------*/
+T_siteEntryID SiteEntryCreate(T_siteList list) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteEntryDestroy
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Destroy an entry and put it on the free list.  Also make sure
+ |    it is no longer on the sort list.
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |    T_siteEntryID id            -- id of entry to destroy
+ | Outputs:
+ |    Boolean                     -- TRUE if removed from sort list, 
+ |                                   else FALSE
+ *-----------------------------------------------------------------------*/
+Boolean SiteEntryDestroy(T_siteList list, T_siteEntryID id) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteEntryLock
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Lock the entry for accessing.
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |    T_siteEntryID id            -- id of entry to lock
+ | Outputs:
+ |    T_siteEntry                 -- 
+ *-----------------------------------------------------------------------*/
+T_siteEntry SiteEntryLock(T_siteList list, T_siteEntryID id) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteEntryUnlock
+ *-------------------------------------------------------------------------
+ | Description:
+ |    We are done with this record.  Unlock it.
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |    T_siteEntryID id            -- id of entry to lock
+ | Outputs:
+ |    word                        -- Newly sorted position
+ *-----------------------------------------------------------------------*/
+word SiteEntryUnlock(T_siteEntry entry) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteFieldGet
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Given a locked entry, access an individual item and copy over the
+ |    the data.
+ | Inputs:
+ |    T_siteEntry entry           -- Currently locked entry
+ |    T_siteField field           -- Field to copy out
+ |    char *buffer                -- Location to store data
+ |    word lenBuffer              -- Limit on buffer size (full)
+ *-----------------------------------------------------------------------*/
+void SiteFieldGet(
+         T_siteEntry entry, 
+         T_siteField field, 
+         char *buffer, 
+         word lenBuffer) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteFieldSet
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Given a locked entry, allow the caller to change the data in it.
+ | Inputs:
+ |    T_siteEntry entry           -- Currently locked entry
+ |    T_siteField field           -- Field to change
+ |    char *buffer                -- Location of new data
+ |    word lenBuffer              -- Size of new data to store, or pass
+ |                                   0 to determine for strings.
+ *-----------------------------------------------------------------------*/
+void SiteFieldSet(
+         T_siteEntry entry, 
+         T_siteField field, 
+         char *buffer, 
+         word lenBuffer) ;
+
+/* == Classes: ========================================================= */
+
+typedef word T_siteSelParts ;
+#define SITE_SEL_PART_LIST            0x8000
+#define SITE_SEL_PART_ADD_DEL         0x4000
+#define SITE_SEL_PART_MODIFY          0x2000
+#define SITE_SEL_PART_NAME_PASS       0x1000
+#define SITE_SEL_PART_MAIN_ADD_ON     0x0800
+#define SITE_SEL_PART_MODIFY_ADD_ON   0x0400
+#define SITE_SEL_PART_EDIT_PORT       0x0200
+
+#define SITE_SEL_PARTS_RESERVED        0x01FF  /* Don't use these bits */
+
+#define SITE_SEL_PARTS_DEFAULT \
+            (SITE_SEL_PART_LIST | \
+             SITE_SEL_PART_ADD_DEL | \
+             SITE_SEL_PART_MODIFY | \
+             SITE_SEL_PART_NAME_PASS | \
+             SITE_SEL_PART_EDIT_PORT)
+
+/*---------------------------------------------------------------------*/
+@class SiteSelectionClass, GenInteractionClass ;
+        /* ----------------------------------------------------- */
+        /* Internal messages not called by users of this object. */
+        /* ----------------------------------------------------- */
+        @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_SITE_SEL_UI_QUERY_LIST_ITEM ;
+        @message void MSG_SITE_SEL_UI_UPDATE_UI() ;
+        @reserveMessages 30 ;
+
+        /* ----------------------------------------------------- */
+        /* Public messages:                                      */
+        /* ----------------------------------------------------- */
+        @message void MSG_SITE_SELECTION_SETUP() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_OPEN_DATABASE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Open access to the database using the given name.
+ | Outputs:
+ |    Boolean                     -- TRUE if opened, else FALSE
+ *-----------------------------------------------------------------------*/
+        @message Boolean MSG_SITE_SELECTION_OPEN_DATABASE() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_OPEN_DATABASE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Close access to the database using the given name.
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_CLOSE_DATABASE() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_IS_DATABASE_OPEN
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Determine if the database is currently opened
+ | Outputs:
+ |    Boolean                     -- TRUE if opened, else FALSE
+ *-----------------------------------------------------------------------*/
+        @message Boolean MSG_SITE_SELECTION_IS_DATABASE_OPEN() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_GET_SITE_LIST
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Return the handle to the site list.
+ | Outputs:
+ |    T_siteList                  -- Site list to find
+ *-----------------------------------------------------------------------*/
+        @message T_siteList MSG_SITE_SELECTION_GET_SITE_LIST() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_GET_CURRENT_SITE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Return the handle to currently highlighted site on the list (if any)
+ | Outputs:
+ |    T_siteEntryID               -- Currently highlighted site.
+ *-----------------------------------------------------------------------*/
+        @message T_siteEntryID MSG_SITE_SELECTION_GET_CURRENT_SITE() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_GET_CURRENT_SITE_INDEX
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Return the index to currently highlighted site on the list (if any)
+ | Outputs:
+ |    word                        -- Current index highlighted, 0xFFFF if
+ |                                   none.
+ *-----------------------------------------------------------------------*/
+        @message word MSG_SITE_SELECTION_GET_CURRENT_SITE_INDEX() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_SET_CURRENT_SITE_INDEX
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Change the currently active site.
+ | Inputs: 
+ |    word newIndex               -- Index to the new spot, or 
+ |                                   SITE_ENTRY_INDEX_BAD for none.
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_SET_CURRENT_SITE_INDEX(word newIndex) ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_SET_ENABLED_PARTS
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Turn on and off enabled UI parts.
+ | Inputs: 
+ |    T_siteSelParts partsOn      -- Parts to turn on
+ |    T_siteSelParts partsOff     -- Parts to turn off
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_SET_ENABLED_PARTS(
+                        T_siteSelParts partsOn,
+                        T_siteSelParts partsOff) ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_SET_USABLE_PARTS
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Turn on and off usable UI parts.
+ | Inputs: 
+ |    T_siteSelParts partsOn      -- Parts to turn on
+ |    T_siteSelParts partsOff     -- Parts to turn off
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_SET_USABLE_PARTS(
+                        T_siteSelParts partsOn,
+                        T_siteSelParts partsOff) ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_GET_SITE_AND_PUT_INTO_UI
+ *-------------------------------------------------------------------------
+ | Description:
+ |    The user has selected an entry.  Lock it in and copy over any useful
+ |    data.
+ |    NOTE:  Intercept this method in sub-classes to setup the data in
+ |           additional UI.
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_GET_SITE_AND_PUT_INTO_UI() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_START_ADD_SITE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    User wants to start adding a new site.  Setup for this transaction.
+ |    NOTE:  This method is intercepted by the subclass when special UI
+ |           parts need to be initialized.
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ *-----------------------------------------------------------------------*/
+        @message (GEN_TRIGGER_ACTION) MSG_SITE_SELECTION_START_ADD_SITE ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_START_MODIFY_SITE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    User wants to modify the current site.  Setup for this transaction.
+ |    The data in the form is usually set up as part of handling method
+ |    MSG_SITE_SELECTION_GET_SITE_AND_PUT_INTO_UI.
+ |
+ |    NOTE:  This method is intercepted by the subclass when special UI
+ |           parts need to be initialized.
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ *-----------------------------------------------------------------------*/
+        @message (GEN_TRIGGER_ACTION) MSG_SITE_SELECTION_START_MODIFY_SITE ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_DELETE_SITE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Ask the user if he really wants to delete the site and if so,
+ |    do the real delete.
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ *-----------------------------------------------------------------------*/
+        @message (GEN_TRIGGER_ACTION) MSG_SITE_SELECTION_DELETE_SITE ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_FINISH_ADD_SITE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    The user has entered data into the edit/modify dialog and hit add.
+ |    Check to see if this is valid, and if so, add it.
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ *-----------------------------------------------------------------------*/
+        @message (GEN_TRIGGER_ACTION) MSG_SITE_SELECTION_FINISH_ADD_SITE ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_FINISH_MODIFY_SITE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    The user has entered data into the edit/modify dialog and hit modify.
+ |    Check to see if this is valid, and if so, add it.
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ *-----------------------------------------------------------------------*/
+        @message (GEN_TRIGGER_ACTION) MSG_SITE_SELECTION_FINISH_MODIFY_SITE ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_GET_UI_AND_PUT_INTO_SITE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Do the real work of actually taking the data out of the site and
+ |    putting it into the given record.
+ | Outputs:
+ |     T_siteEntryID id               -- Where to store the data.
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_GET_UI_AND_PUT_INTO_SITE(
+                    T_siteEntryID id) ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_REFRESH_LIST
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Resize the list to the appropriate number of elements in the sorted
+ |    array.  Also can be called if the elements have shifted.
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_REFRESH_LIST() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_VALIDATE_ENTERED_DATA
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Check the entries to see if all fields are entered correctly.
+ |    If an error is found, a dialog is IMMEDIATELY displayed.
+ |    NOTE:  Subclasses should intercept this message.
+ | Outputs:
+ |    Boolean                     -- TRUE (valid) if ok, else FALSE
+ *-----------------------------------------------------------------------*/
+        @message Boolean MSG_SITE_SELECTION_VALIDATE_ENTERED_DATA() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_GET_MAIN_ADDON_BLOCK
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Returns the duplicated memory block handle made from the main 
+ |    add-on template.
+ | Outputs:
+ |    MemHandle                   -- Addon block (or NullHandle if none)
+ *-----------------------------------------------------------------------*/
+        @message MemHandle MSG_SITE_GET_MAIN_ADDON_BLOCK() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_GET_MODIFY_ADDON_BLOCK
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Returns the duplicated memory block handle made from the modify 
+ |    add-on template.
+ | Outputs:
+ |    MemHandle                   -- Addon block (or NullHandle if none)
+ *-----------------------------------------------------------------------*/
+        @message MemHandle MSG_SITE_GET_MODIFY_ADDON_BLOCK() ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_GET_TITLE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Get the title of the currently selected title.
+ | Inputs:  
+ |    char *buffer                -- Pointer to place name ("" if none).
+ |    word limit                  -- size of buffer (including null).
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_GET_TITLE(char *buffer, word limit) ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_GET_USERNAME
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Get the username of the currently selected title.  If the user has
+ |    edited it, we'll be getting that one instead of the one in the
+ |    database.
+ | Inputs:  
+ |    char *buffer                -- Pointer to place name ("" if none).
+ |    word limit                  -- size of buffer (including null).
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_GET_USERNAME(char *buffer, word limit) ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_GET_PASSWORD
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Get the password of the currently selected title.  If the user has
+ |    edited it, we'll be getting that one instead of the one in the
+ |    database.
+ | Inputs:  
+ |    char *buffer                -- Pointer to place name ("" if none).
+ |    word limit                  -- size of buffer (including null).
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_GET_PASSWORD(char *buffer, word limit) ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_GET_TITLE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Get the site of the currently selected title.
+ | Inputs:  
+ |    char *buffer                -- Pointer to place name ("" if none).
+ |    word limit                  -- size of buffer (including null).
+ *-----------------------------------------------------------------------*/
+        @message void MSG_SITE_SELECTION_GET_SITE(char *buffer, word limit) ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SiteSelectionClass::MSG_SITE_SELECTION_PASSWORD_TYPE
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Determine if the password is of the type anonymous or password.
+ | Outputs:
+ |    T_siteEntryType             -- Type of entry
+ *-----------------------------------------------------------------------*/
+        @message T_siteEntryType MSG_SITE_SELECTION_GET_PASSWORD_TYPE() ;
+
+        /* ----------------------------------------------------- */
+        /* Instance data */
+        /* ----------------------------------------------------- */
+        @instance T_siteList SSI_list = SITE_LIST_BAD ;
+        @instance ChunkHandle SSI_filename = NullHandle ;
+        @instance T_siteSelParts SSI_usableParts = SITE_SEL_PARTS_DEFAULT ;
+        @instance T_siteSelParts SSI_enabledParts = SITE_SEL_PARTS_DEFAULT ;
+        @instance MemHandle SSI_uiBlock = NullHandle ;
+        @instance optr SSI_mainAddonTemplateUI = NullHandle ;
+        @instance optr SSI_modifyAddonTemplateUI = NullHandle ;
+        @instance MemHandle SSI_mainAddonUIBlock = NullHandle ;
+        @instance MemHandle SSI_modifyAddonUIBlock = NullHandle ;
+
+        @instance word SSI_currentSiteIndex = 0xFFFF ;
+        @instance T_siteEntryID SSI_currentSite = SITE_ENTRY_ID_BAD ;
+
+        @reloc SSI_uiBlock, handle ;
+        @reloc SSI_mainAddonUIBlock, handle ;
+        @reloc SSI_modifyAddonUIBlock, handle ;
+@endc ;
+/*---------------------------------------------------------------------*/
+
+@endif  /* _SITELIST_GOH_ */
+
+/***************************************************************************
+	Somebody has changed this file.
+	?? When did this get added? 
+ ***************************************************************************/
+
+

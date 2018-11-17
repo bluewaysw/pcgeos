@@ -1,0 +1,293 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Irlmp C Test App
+FILE:		serverirCallback.goc
+
+AUTHOR:		Andy Chiu, Mar  8, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	3/ 8/96   	Initial version.
+
+DESCRIPTION:
+	Callback from Irlmp
+
+	$Id: servCBck.goc,v 1.1 97/04/04 16:40:49 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@define __SERVERIR_CALLBACK_GOH
+@include "serverir.goh"
+
+
+/***********************************************************************
+ *		SCConnectIndication
+ ***********************************************************************
+ * SYNOPSIS:	Received IIC_CONNECT_INDICATION from Irlmp Library
+ * CALLED BY:	
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	3/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal SCConnectIndication (ClientHandle client, IrlmpConnectArgs *connectArgs)
+{
+    char *status;
+    IrlmpDataArgs dataArgs;
+
+    SUShowStatusOptr(@connectIndicationMsg);
+
+    if (connectArgs->ICA_dataSize) {
+	SUSetRecvText((IrlmpDataArgs *)connectArgs);
+
+	HugeLMemFree(connectArgs->ICA_data);
+    }
+
+    /* Send out a LM_Connect.response */
+    /* ------------------------------ */
+    SUGetSendText(&dataArgs);
+    SUClearSendText();
+
+    IrlmpConnectResponse(client, &dataArgs);
+	
+}	/* End of SCConnectIndication.	*/
+
+
+/***********************************************************************
+ *		SCDisconnectIndication
+ ***********************************************************************
+ * SYNOPSIS:	Received IIC_DISCONNECT_INDICATION from Irlmp Library
+ * CALLED BY:	
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	3/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal SCDisconnectIndication (IrlmpDataArgs *dataArgs)
+{
+    SUShowStatusOptr(@disconnectIndicationMsg);
+
+    if (dataArgs->IDA_dataSize) {
+	SUSetRecvText(dataArgs);
+
+	HugeLMemFree(dataArgs->IDA_data);
+    }
+       
+}	/* End of SCDisconnectIndication.	*/
+
+
+
+/***********************************************************************
+ *		SCDataIndication
+ ***********************************************************************
+ * SYNOPSIS:	Received IIC_DATA_INDICATION from IrlmpLibrary
+ * CALLED BY:	
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	3/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal SCDataIndication (IrlmpDataArgs *dataArgs)
+{
+    SUShowStatusOptr(@dataIndicationMsg);
+    if (dataArgs->IDA_dataSize) {
+	SUSetRecvText(dataArgs);
+	HugeLMemFree(dataArgs->IDA_data);
+    }
+
+}	/* End of SCDataIndication.	*/
+
+
+/***********************************************************************
+ *		SCUDataIndication
+ ***********************************************************************
+ * SYNOPSIS:	LM_UData.indication
+ * CALLED BY:	
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	3/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal SCUDataIndication (IrlmpDataArgs *dataArgs)
+{
+    SUShowStatusOptr(@udataIndicationMsg);
+    if (dataArgs->IDA_dataSize) {
+	SUSetRecvText(dataArgs);
+	HugeLMemFree(dataArgs->IDA_data);
+    }
+
+}	/* End of SCUDataIndication.	*/
+
+
+/***********************************************************************
+ *		SCStatusIndication
+ ***********************************************************************
+ * SYNOPSIS:	LM_Status.indication
+ * CALLED BY:	
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	3/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal SCStatusIndication (void)
+{
+
+    SUShowStatusOptr(@statusIndicationMsg);
+
+}	/* End of SCStatusIndication.	*/
+
+
+
+/***********************************************************************
+ *		SCStatusConfirmation
+ ***********************************************************************
+ * SYNOPSIS:	LM_Status.confirm
+ * CALLED BY:	
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	3/11/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal SCStatusConfirmation (ConnectionStatus status)
+{
+    optr statusOptr;
+
+    if (status & CS_IMPENDING_DISCONNECTION) {
+	if (status & CS_UNACKED_DATA)
+	    statusOptr = @statusNoisyUnackedMsg;
+	else 
+	    statusOptr = @statusNoisyMsg;
+    }
+    else if (status & CS_UNACKED_DATA)
+	statusOptr = @statusUnackedMsg;
+    else 
+	statusOptr = @statusOkayMsg;
+
+    
+    SUShowStatusOptr(statusOptr);
+
+}	/* End of SCStatusConfirmation.	*/
+
+
+
+/***********************************************************************
+ *		ServerirIrlmpCallback
+ ***********************************************************************
+ * SYNOPSIS:	Callback routine for IrLMP Library
+ * CALLED BY:	Irlmp library
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	will trash ds on return
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	3/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal ServerirIrlmpCallback (ClientHandle cl,
+			     IrlmpIndicationOrConfirmation type,
+			     word extra,
+			     dword data, 
+			     word status)
+{
+    IrlmpDataArgs *dataArgs;
+
+
+    /* We need to do this so that access to our global variables */
+    /* will work.  This makes sure that ds points to our dgroup  */
+    /*-----------------------------------------------------------*/
+    GeodeLoadDGroup(extra);
+
+    switch (type) {
+        case IIC_CONNECT_INDICATION:
+	  SCConnectIndication(clientHandle, (IrlmpConnectArgs *) data);
+	  break;
+        case IIC_DISCONNECT_INDICATION:
+	  SCDisconnectIndication((IrlmpDataArgs *) data );
+	  break;
+        case IIC_DATA_INDICATION:
+	  SCDataIndication((IrlmpDataArgs *) data);
+	  break;
+        case IIC_UDATA_INDICATION:
+	  SCUDataIndication((IrlmpDataArgs *)data);
+	  break;
+        case IIC_STATUS_INDICATION:
+	  SCStatusIndication();
+	  break;
+        case IIC_STATUS_CONFIRMATION:
+	  SCStatusConfirmation((ConnectionStatus) status);
+	  break;
+        default:
+	  break;
+    } /* switch */
+
+}	/* End of ServerirIrlmpCallback.	*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

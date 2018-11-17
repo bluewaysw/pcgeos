@@ -1,0 +1,1050 @@
+/***************************************************************************
+ *  FILE:  TREPCODE.GOC
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Module:  TextReport Generator Library
+ *-------------------------------------------------------------------------
+ |
+ | Objective:
+ |    Encapsulates a commonly used library to generate text reports
+ |    that are shown in a dialog.  Main features:
+ |        * User previews report as a text object
+ |        * User can cut and copy the text elsewhere
+ |        * Additional UI objects can be added as needed
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/13/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+/***************************************************************************
+ *      Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects\treport.goh>
+@include <Ansi\String.h>
+@include "externs.goh"
+@include "internal.goh"
+
+/* Macro to find an object inside of the dialog from the
+   GenTextReportDialogClass methods */
+@define RT_CHILD(o)  ConstructOptr( \
+                         OptrToHandle(pself->GTRDI_standardUI), \
+                         OptrToChunk(o))
+
+/* Macro to find an object while inside any of the objects inside of the */
+/* dialog. */
+@define LOCAL_CHILD(o)  ConstructOptr(OptrToHandle(oself), OptrToChunk(o))
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  GenTextReportDialogClass
+ *=========================================================================*/
+
+@classdecl GenTextReportDialogClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_INTERACTION_INITIATE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    When the dialog is brought up, check to see if we have a temporary
+ |    file to hold the text and the complete UI to go in the dialog.
+ |    Create either/both if they are missing.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/14/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method GenTextReportDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    MemHandle mem ;
+    GeodeHandle process ;
+    ThreadHandle thread ;
+    optr app ;
+    word *p_option ;
+    optr *p_link ;
+    optr pcon ;
+
+	 @call oself::MSG_GEN_TEXT_REPORT_GET_FILE();
+	 /* Open the VM file if it is not already */
+/*    if (pself->GTRDI_file == NullHandle)  {
+        FilePushDir() ;
+        FileSetStandardPath(SP_STATE) ;
+        pself->GTRDI_filename[0] = '\0' ;
+        pself->GTRDI_file = VMOpen(
+                                pself->GTRDI_filename,
+                                VMAF_FORCE_READ_WRITE,
+                                VMO_TEMP_FILE,
+                                0);
+        FilePopDir() ;
+    }
+
+    /* See if we need to create the UI to go here */
+    if (pself->GTRDI_standardUI == NullHandle)  {
+        thread = MemGetInfo(OptrToHandle(oself), MGIT_EXEC_THREAD) ;
+        process = GeodeGetProcessHandle();
+        mem = ObjDuplicateResource(OptrToHandle(@TextReportTop), process, thread) ;
+        pself->GTRDI_standardUI = ConstructOptr(
+                                      mem,
+                                      OptrToChunk(@TextReportTop)) ;
+        @call oself::MSG_GEN_ADD_CHILD(@RT_CHILD(TextReportTop), CCO_LAST) ;
+        app = GeodeGetAppObject(process) ;
+        @call app::MSG_META_GCN_LIST_ADD(
+                  @RT_CHILD(TextReportPrintControl),
+                  GAGCNLT_SELF_LOAD_OPTIONS,
+                  MANUFACTURER_ID_GEOWORKS) ;
+        @call app::MSG_META_GCN_LIST_ADD(
+                  @RT_CHILD(TextReportEditControl),
+                  GAGCNLT_SELF_LOAD_OPTIONS,
+                  MANUFACTURER_ID_GEOWORKS) ;
+        @call app::MSG_META_GCN_LIST_ADD(
+                  @RT_CHILD(TextReportViewControl),
+                  GAGCNLT_SELF_LOAD_OPTIONS,
+                  MANUFACTURER_ID_GEOWORKS) ;
+        @call app::MSG_META_GCN_LIST_ADD(
+                  @RT_CHILD(TextReportViewControl),
+                  MGCNLT_ACTIVE_LIST,
+                  MANUFACTURER_ID_GEOWORKS) ;
+        @call app::MSG_META_GCN_LIST_ADD(
+                  @RT_CHILD(TextReportViewControl),
+                  GAGCNLT_STARTUP_LOAD_OPTIONS,
+                  MANUFACTURER_ID_GEOWORKS) ;
+        @call (pself->GTRDI_standardUI)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+        @call (@RT_CHILD(TextReportPrintControl))::MSG_PRINT_CONTROL_SET_DOC_NAME_OUTPUT(oself);
+        @call @RT_CHILD(TextReportText)::MSG_VIS_TEXT_SET_OUTPUT(
+                  ((dword)process)<<16) ;
+    }
+
+    pcon = @RT_CHILD(TextReportPrintControl) ;
+
+    /* Determine if we need fax and add or delete it */
+    ObjLockObjBlock(OptrToHandle(pcon)) ;
+    if (ObjVarFindData(oself, HINT_TEXT_REPORT_ALLOW_FAX_OPTION))  {
+        /* Make sure the fax option is NOT prohibited */
+        /* Remove the prohibit flag (if even a hint) */
+        p_option =
+            ObjVarFindData(pcon, ATTR_GEN_CONTROL_PROHIBIT_UI) ;
+        if (p_option)
+            *p_option &= (~PRINTCF_FAX_TRIGGER) ;
+    } else {
+        /* Make sure the fax option IS prohibited */
+        /* Add prohibit flag if it doesn't already exist */
+        p_option =
+            ObjVarFindData(pcon, ATTR_GEN_CONTROL_PROHIBIT_UI) ;
+        if (!p_option)  {
+            p_option =
+                ObjVarAddData(
+                    pcon,
+                    ATTR_GEN_CONTROL_PROHIBIT_UI,
+                    sizeof(word)) ;
+            if (p_option)
+                *p_option = 0 ;
+        }
+        if (p_option)
+            *p_option |= PRINTCF_FAX_TRIGGER ;
+    }
+    pself = ObjDerefGen(oself) ;
+
+    /* Determine if we need to hide the B&W trigger option */
+    if (ObjVarFindData(oself, HINT_TEXT_REPORT_HIDE_PRINT_BW_OPTION))  {
+        /* Yes, hide that option */
+        /* Delete the option if it exists */
+        ObjVarDeleteData(pcon, ATTR_PRINT_CONTROL_APP_UI) ;
+    } else {
+        /* Create the option if it doesn't exist */
+        p_link = ObjVarFindData(pcon, ATTR_PRINT_CONTROL_APP_UI) ;
+        if (!p_link)  {
+            p_link = ObjVarAddData(
+                     pcon,
+                     ATTR_PRINT_CONTROL_APP_UI,
+                     sizeof(optr)) ;
+            pself = ObjDerefGen(oself) ;
+            *p_link = @RT_CHILD(TextReportPrinterOptions) ;
+        }
+    }
+    MemUnlock(OptrToHandle(pcon)) ;
+
+    @callsuper() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_TEXT_REPORT_GET_FILE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the currently open file for the text.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/14/99  Created
+ |    jfh  08/06/03  Creates the file here if it doesn't exist.  Moved the
+ |							create part here from the INITIATE method so that the
+ |							file could get re-created when calld by the CONTENT
+ |							opening method (need to do if app is coming back from
+ |							being minimized).
+ *-----------------------------------------------------------------------*/
+
+@method GenTextReportDialogClass, MSG_GEN_TEXT_REPORT_GET_FILE
+{
+
+	 /* create the VM file if it is not already */
+    if (pself->GTRDI_file == NullHandle)  {
+        FilePushDir() ;
+        FileSetStandardPath(SP_STATE) ;
+        pself->GTRDI_filename[0] = '\0' ;
+        pself->GTRDI_file = VMOpen(
+                                pself->GTRDI_filename,
+                                VMAF_FORCE_READ_WRITE,
+                                VMO_TEMP_FILE,
+                                0);
+        FilePopDir() ;
+    }
+	 return pself->GTRDI_file ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_PRINT_GET_DOC_NAME
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Send to the print control object the current report name.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method GenTextReportDialogClass, MSG_PRINT_GET_DOC_NAME
+{
+    char *p_printname ;
+
+    if (pself->GTRDI_printname)
+        p_printname = LMemDerefHandles(
+                          OptrToHandle(oself),
+                          pself->GTRDI_printname) ;
+    else
+        p_printname = "Untitled Report" ;
+    @call printCtrlOD::MSG_PRINT_CONTROL_SET_DOC_NAME(p_printname) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_TEXT_REPORT_CLOSE_FILE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Close out the temporary file used to hold the report text.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/14/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method GenTextReportDialogClass, MSG_GEN_TEXT_REPORT_CLOSE_FILE
+{
+    VMClose(pself->GTRDI_file, FALSE) ;
+    pself->GTRDI_file = NullHandle ;
+    FilePushDir() ;
+    FileSetStandardPath(SP_STATE) ;
+    FileDelete(pself->GTRDI_filename) ;
+    FilePopDir() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_TEXT_REPORT_GENERATE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Clear out the current text object (setting paragraph and char
+ |    attributes to the default) and send out a message to the destinaton
+ |    to do the real work.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method GenTextReportDialogClass, MSG_GEN_TEXT_REPORT_GENERATE
+{
+    optr text ;
+    dword start ;
+
+    if ((pself->GTRDI_destination) && (pself->GTRDI_generateMsg))  {
+        text = @RT_CHILD(TextReportText) ;
+        @call text::MSG_VIS_TEXT_DELETE_ALL() ;
+        start = 0 ;
+        @call text::MSG_VIS_TEXT_SET_LEFT_MARGIN(0, TEXT_ADDRESS_PAST_END, start) ;
+        @call text::MSG_VIS_TEXT_SET_PARA_MARGIN(0, TEXT_ADDRESS_PAST_END, start) ;
+        @call text::MSG_VIS_TEXT_SET_RIGHT_MARGIN(0, TEXT_ADDRESS_PAST_END, start) ;
+        @call text::MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT(
+                  ((VTDS_12 << VTDCA_SIZE_OFFSET) || VTDF_URW_SANS),
+                  TEXT_ADDRESS_PAST_END, start) ;
+        @call text::MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT(
+                  DEF_PARA_ATTR_JUST_TABS(J_LEFT, VTDDT_NONE),
+                  TEXT_ADDRESS_PAST_END, start) ;
+        @call text::MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT(
+                  ((VTDS_12 << VTDCA_SIZE_OFFSET) || VTDF_URW_SANS),
+                  TEXT_ADDRESS_PAST_END, start) ;
+        @call text::MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT(
+                  DEF_PARA_ATTR_JUST_TABS(J_LEFT, VTDDT_NONE),
+                  TEXT_ADDRESS_PAST_END, start) ;
+        @call text::MSG_VIS_LARGE_TEXT_SET_DISPLAY_MODE(VLTDM_PAGE);
+        @send ,forceQueue
+            (pself->GTRDI_destination)::
+                {GEN_TEXT_REPORT_GENERATE}(pself->GTRDI_generateMsg)(text) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_TEXT_REPORT_GET_DESTINATION
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the destination to receive a generation request.
+ |
+ | Output:
+ |    optr                        -- Destination object (or NULL if none)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/03/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenTextReportDialogClass, MSG_GEN_TEXT_REPORT_GET_DESTINATION
+{
+    return pself->GTRDI_destination ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_TEXT_REPORT_GET_DESTINATION
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Set a new destination object.
+ |
+ | Inputs:
+ |    optr dest                   -- Destination to send generate msgs.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/03/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenTextReportDialogClass, MSG_GEN_TEXT_REPORT_SET_DESTINATION
+{
+    pself->GTRDI_destination = dest ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_TEXT_REPORT_GET_MESSAGE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the message identifier sent as a generate message.
+ |
+ | Outputs:
+ |    Message                     -- Message passed to destination as
+ |                                   generate message.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/03/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenTextReportDialogClass, MSG_GEN_TEXT_REPORT_GET_MESSAGE
+{
+    return pself->GTRDI_generateMsg ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_TEXT_REPORT_SET_MESSAGE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Set the message identifier sent as a generate message.
+ |
+ | Input:
+ |    Message msg                 -- Message passed to destination as
+ |                                   generate message.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/03/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenTextReportDialogClass, MSG_GEN_TEXT_REPORT_SET_MESSAGE
+{
+    pself->GTRDI_generateMsg = msg ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_TEXT_REPORT_GET_PRINT_NAME
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Copy the current document name into a given buffer.
+ |
+ | Inputs:
+ |    char *p_printname           -- Locaton to store print name
+ |    word sizebuffer             -- size of location (including zero)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/03/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenTextReportDialogClass, MSG_GEN_TEXT_REPORT_GET_PRINT_NAME
+{
+    char *p_name ;
+
+    if ((pself->GTRDI_printname) && (sizebuffer))  {
+        /* Dereference the name */
+        p_name = LMemDerefHandles(
+                    OptrToHandle(oself),
+                    pself->GTRDI_printname) ;
+
+        /* Copy it over directly */
+        strncpy(p_printname, p_name, sizebuffer-1) ;
+    } else {
+        *p_printname = '\0' ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenTextReportDialogClass::MSG_GEN_TEXT_REPORT_SET_PRINT_NAME
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Set the print name used when sending the report out to the printer.
+ |
+ | Inputs:
+ |    char *p_printname           -- NULL terminated string name
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/03/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenTextReportDialogClass, MSG_GEN_TEXT_REPORT_SET_PRINT_NAME
+{
+    word len ;
+    ChunkHandle c;
+
+    /* Allocate or determine the necessary memory */
+    len = 1+strlen(p_printname) ;
+    if (pself->GTRDI_printname)  {
+        LMemReAllocHandles(OptrToHandle(oself), pself->GTRDI_printname, len) ;
+        pself = ObjDerefGen(oself) ;
+    } else {
+        c = LMemAlloc(OptrToHandle(oself), len) ;
+        pself = ObjDerefGen(oself) ;
+        pself->GTRDI_printname = c ;
+    }
+
+    /* If we have the memory, copy it over */
+    if (pself->GTRDI_printname)
+        strcpy(
+            LMemDerefHandles(
+                OptrToHandle(oself),
+                pself->GTRDI_printname),
+            p_printname) ;
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  GenTextReportTextClass
+ *=========================================================================*/
+
+@classdecl VisReportTextClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  VisReportTextClass::MSG_VIS_TEXT_FREE_ALL_STORAGE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Clear out the whole storage of the text and make sure all our
+ |    regions are gone.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/14/99  Created
+ |    LES  08/06/99  Made changes to truly clear out the text object
+ |                   instance members to ensure a 'clean' start next
+ |                   time.
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisReportTextClass, MSG_VIS_TEXT_FREE_ALL_STORAGE
+{
+    ChunkArrayHeader *cahp;
+    VisLargeTextInstance *vself;
+
+    @callsuper();
+
+    LMemReAlloc(
+        @LOCAL_CHILD(TextReportVLTextReportRegionArray),
+        sizeof(ChunkArrayHeader));
+    cahp = LMemDeref(@LOCAL_CHILD(TextReportVLTextReportRegionArray));
+    cahp->CAH_count = 0;
+    cahp->CAH_elementSize = sizeof(VisLargeTextRegionArrayElement);
+    cahp->CAH_curOffset = 0;
+    cahp->CAH_offset = sizeof(ChunkArrayHeader);
+
+    vself = ObjDerefVis(oself);
+
+    /* Clear everything! */
+    /* The next section of code is going to reinitialize the text object */
+    /* so that everything is back to how it started.  This is really not */
+    /* the best way to do it, but is the easiest way to insure the large */
+    /* text object doesn't crash each time we reuse it.  This solves a */
+    /* problem of crashing each time we pulled up the object.  */
+    /* Unfortunately, this would not be necessary if a better end */
+    /* situation could be found */
+    /* (basically, all the values are what SWAT gave me -- LES 08/6/99 */
+    memset(
+        &vself->VI_bounds,
+        0,
+        offsetof(VisLargeTextInstance, VLTI_attrs) -
+            offsetof(VisLargeTextInstance, VI_bounds)) ;
+
+    /* now fill in all the non-zero entries */
+    vself->VI_attrs = 0x78 ;
+    vself->VI_optFlags = 0xFC ;
+    vself->VTI_charAttrRuns = 1 ;
+    vself->VTI_paraAttrRuns = 0x1000 ;
+    vself->VTI_storageFlags = 6 ;
+    vself->VTI_state = 0xe0 ;
+    vself->VTI_gstateRegion = 0xFFFF ;
+    vself->VTI_washColor.CQ_redOrIndex = 0xF ;
+    vself->VTI_maxLength = 0x2710 ;
+    vself->VTI_lastWidth = 0xFFFF ;
+    vself->VLTI_regionArray = OptrToChunk(@TextReportVLTextReportRegionArray) ;
+    vself->VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES ;
+    vself->VLTI_attrs = 0x8000 ;
+
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisReportTextClass::MSG_VIS_REPORT_TEXT_SET_TAB_GROUP
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change the text so all appended text uses the given list of tabs.
+ |    Note, if the last character is not a \r, then the change will also
+ |    affect the current line/paragraph.
+ |
+ | Inputs:
+ |    optr tabGroup               -- Chunk optr to array of Tab structs.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisReportTextClass, MSG_VIS_REPORT_TEXT_SET_TAB_GROUP
+{
+    dword start ;
+    Tab *p_tab ;
+
+    start = @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+    @call oself::MSG_VIS_TEXT_CLEAR_ALL_TABS(TEXT_ADDRESS_PAST_END, start) ;
+
+    MemLock(OptrToHandle(tabGroup)) ;
+    p_tab = LMemDeref(tabGroup) ;
+    while (p_tab->T_position < 0x8000)  {
+        @call oself::MSG_VIS_TEXT_SET_TAB(*p_tab, TEXT_ADDRESS_PAST_END, start) ;
+        p_tab++ ;
+    }
+    MemUnlock(OptrToHandle(tabGroup)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisReportTextClass::MSG_VIS_REPORT_TEXT_SET_FONT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change the text so all appended text uses the given font ID.
+ |
+ | Inputs:
+ |    FontID fontID               -- New font
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisReportTextClass, MSG_VIS_REPORT_TEXT_SET_FONT
+{
+    dword start ;
+    start = @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+    @call oself::MSG_VIS_TEXT_SET_FONT_ID(
+              fontId,
+              TEXT_ADDRESS_PAST_END,
+              start) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisReportTextClass::MSG_VIS_REPORT_TEXT_SET_POINT_SIZE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change the text so all appended text uses the given point size
+ |
+ | Inputs:
+ |    WWFixedAsDWord pointSize    -- New point size
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisReportTextClass, MSG_VIS_REPORT_TEXT_SET_POINT_SIZE
+{
+    WWFixed fixed ;
+    dword start ;
+
+    fixed.WWF_frac = FractionOf(pointSize);
+    fixed.WWF_int = IntegerOf(pointSize);
+
+    start = @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+    @call oself::MSG_VIS_TEXT_SET_POINT_SIZE(
+              fixed,
+              TEXT_ADDRESS_PAST_END,
+              start) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisReportTextClass::MSG_VIS_REPORT_TEXT_SET_STYLE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change the text so all appended text uses the given style.
+ |
+ | Inputs:
+ |    TextStyle style             -- New style to use (overrides all)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisReportTextClass, MSG_VIS_REPORT_TEXT_SET_STYLE
+{
+    dword start ;
+    start = @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+    @call oself::MSG_VIS_TEXT_SET_TEXT_STYLE(
+              0,
+              0,
+              (~0),
+              style,
+              TEXT_ADDRESS_PAST_END,
+              start) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisReportTextClass::MSG_VIS_REPORT_TEXT_SET_PARA_ATTR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change the text so all appended text uses the given paragraph
+ |    attributes.
+ |
+ | Inputs:
+ |    optr paraAttr               -- Chunk of VisTextParaAttr struct
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisReportTextClass, MSG_VIS_REPORT_TEXT_SET_PARA_ATTR
+{
+    dword start ;
+    VisTextParaAttr *p_para ;
+
+    start = @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+    MemLock(OptrToHandle(paraAttr)) ;
+    p_para = LMemDeref(paraAttr) ;
+    @call oself::MSG_VIS_TEXT_SET_PARA_ATTR(
+              p_para,
+              TEXT_ADDRESS_PAST_END,
+              start) ;
+    MemUnlock(OptrToHandle(paraAttr)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisReportTextClass::MSG_VIS_REPORT_TEXT_SET_CHAR_ATTR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change the text so all appended text uses the given character
+ |    attributes.
+ |
+ | Inputs:
+ |    optr charAttr               -- Chunk of VisTextCharAttr struct
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisReportTextClass, MSG_VIS_REPORT_TEXT_SET_CHAR_ATTR
+{
+    dword start ;
+    VisTextCharAttr *p_char ;
+
+    start = @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+    MemLock(OptrToHandle(charAttr)) ;
+    p_char = LMemDeref(charAttr) ;
+    @call oself::MSG_VIS_TEXT_SET_CHAR_ATTR(
+              p_char,
+              TEXT_ADDRESS_PAST_END,
+              start) ;
+    MemUnlock(OptrToHandle(charAttr)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisReportTextClass::MSG_PRINT_START_PRINTING
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    When a view is opened, setup the view, the text object, and go
+ |    ahead and generate a report.
+ |
+ | Inputs:
+ |    printCtrlOD                 - OD of the PrintControlClass object
+ |    gstate                      - GState handle to print (draw) to
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisReportTextClass, MSG_PRINT_START_PRINTING
+{
+    word curPage ;
+    word numPages;
+    XYValueAsDWord textSize;     /* Image size of text. */
+    ColorQuad bwPrint = {C_BLACK, CF_INDEX, 0, 0};
+    optr regArray ;
+    VisLargeTextRegionArrayElement *p_element ;
+    word size ;
+
+    /* Get a quick handle to the region array */
+    regArray = ConstructOptr(OptrToHandle(oself), pself->VLTI_regionArray) ;
+
+
+    /* if user wants B/W printing */
+    if (@call @LOCAL_CHILD(BWPrintOpts)::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 1)
+        @call self::MSG_VIS_TEXT_SET_COLOR(
+            bwPrint,
+            TEXT_ADDRESS_PAST_END,
+            0);
+
+    /* save region size */
+    textSize = @call oself::MSG_VIS_LARGE_TEXT_GET_DRAFT_REGION_SIZE(0);
+
+    @send self::MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(
+        (6.5*72), (9*72));
+
+    /* set number of pages to print */
+    numPages = @call self::MSG_VIS_LARGE_TEXT_GET_REGION_COUNT();
+
+    /* now do the printing */
+    for (curPage=0; curPage < numPages; curPage++)  {
+        GrSaveState(gstate);
+        p_element = ChunkArrayElementToPtr(regArray, curPage, &size) ;
+
+        /* Clip it to match translation and margins */
+        GrSetClipRect(
+            gstate,
+            PCT_REPLACE,
+            0,                     /* left */
+            0,      /* top */
+            (6.5*72),                 /* right */
+            ((9*72) - 6));   /* bottom */
+
+            /* the -6 is a half line offset to prevent
+               an extra line from printing at the bottom
+               of a page (LES:  07/15/99 -- still need?) */
+
+        /* Translate the gstate to selected page */
+        GrApplyTranslationDWord(
+            gstate,
+            -(p_element->VLTRAE_spatialPosition.PD_x),
+            -(p_element->VLTRAE_spatialPosition.PD_y));
+        GrInitDefaultTransform(gstate);
+
+        /* Draw current page */
+        @call self::MSG_VIS_DRAW(DF_PRINT, gstate);
+
+        GrRestoreState(gstate);
+        GrNewPage(gstate, PEC_FORM_FEED);
+    }
+
+    @send @LOCAL_CHILD(TextReportPrintControl)::
+              MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+
+    /* reset things back to where the user had them */
+    @send oself::MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(
+        DWORD_X(textSize),
+        DWORD_Y(textSize));
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisReportTextClass::MSG_VIS_REPORT_TEXT_SET_JUSTIFICATION
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Set the justification (left, center, right, full) of the next
+ |    text to be appended (and usually the currently line unless a newline
+ |    has just been entered).
+ |
+ | Inputs:
+ |    Justification just          - New justification to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/03/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisReportTextClass, MSG_VIS_REPORT_TEXT_SET_JUSTIFICATION
+{
+    dword start ;
+    start = @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+
+    @call oself::MSG_VIS_TEXT_SET_PARA_ATTRIBUTES(
+              VTPAA_JUSTIFICATION,
+              ((word)just)<<VTPAA_JUSTIFICATION_OFFSET,
+              TEXT_ADDRESS_PAST_END,
+              start) ;
+}
+
+@method VisReportTextClass, MSG_VIS_REPORT_TEXT_NEW_PAGE
+{
+    /* Put in a page break and cause a new page to occur */
+    @call oself::MSG_VIS_TEXT_APPEND_PTR("\014", 1) ;
+}
+
+@method VisReportTextClass, MSG_VIS_LARGE_TEXT_APPEND_REGION
+{
+    optr regArray ;
+    VisLargeTextRegionArrayElement *p_element ;
+    word size ;
+
+    /* Get a quick handle to the region array */
+    regArray = ConstructOptr(OptrToHandle(oself), pself->VLTI_regionArray) ;
+
+    /* Let the system do the inserting/appending of a new structure */
+    @callsuper() ;
+    pself = ObjDerefVis(oself) ;
+
+    /* Access that region element */
+    p_element = ChunkArrayElementToPtr(regArray, ++region, &size) ;
+    p_element->VLTRAE_charCount = 0 ;
+    p_element->VLTRAE_lineCount = 0 ;
+    p_element->VLTRAE_section = 0 ;
+    p_element->VLTRAE_spatialPosition.PD_x = (1*72) ;
+    p_element->VLTRAE_spatialPosition.PD_y = (1*72) + (((dword)region)*(11*72)) ;
+    p_element->VLTRAE_size.XYS_width = (6.5*72) ;
+    p_element->VLTRAE_size.XYS_height = (9*72) ;
+    p_element->VLTRAE_calcHeight.WBF_frac = 0 ;
+    p_element->VLTRAE_calcHeight.WBF_int = 0 ;
+    p_element->VLTRAE_region = 0 ;
+    p_element->VLTRAE_flags = VLTRF_ENDED_BY_COLUMN_BREAK ;
+    p_element->VLTRAE_reserved[0] = 0 ;
+    p_element->VLTRAE_reserved[1] = 0 ;
+    p_element->VLTRAE_reserved[2] = 0 ;
+
+    @call @visParent::MSG_VIS_CONTENT_SET_DOC_BOUNDS(
+              (11*72)*(((dword)region)+1),
+              (8.5*72),
+              0,
+              0) ;
+}
+
+@method VisReportTextClass, MSG_VIS_DRAW
+{
+    optr regArray ;
+    word i, num ;
+    VisLargeTextRegionArrayElement *p_element ;
+    word size ;
+//    sdword bottom ;
+
+    @callsuper() ;
+
+    if (!(drawFlags & DF_PRINT))  {
+        regArray = ConstructOptr(OptrToHandle(oself), pself->VLTI_regionArray) ;
+
+        GrSaveState(gstate) ;
+        num = ChunkArrayGetCount(regArray) ;
+        for (i=0; i<num; i++)  {
+            p_element = ChunkArrayElementToPtr(regArray, i, &size) ;
+            GrApplyTranslationDWord(
+                gstate,
+                p_element->VLTRAE_spatialPosition.PD_x,
+                p_element->VLTRAE_spatialPosition.PD_y) ;
+
+            GrSetLineMaskSys(gstate, SDM_50) ;
+            GrDrawRect(
+                gstate,
+                -1,
+                -1,
+                p_element->VLTRAE_size.XYS_width+1,
+                p_element->VLTRAE_size.XYS_height+1) ;
+            GrSetLineMaskSys(gstate, SDM_100) ;
+
+            GrDrawRect(
+                gstate,
+                -(1*72),
+                p_element->VLTRAE_size.XYS_height+(1*72),
+                p_element->VLTRAE_size.XYS_width+1*72,
+                p_element->VLTRAE_size.XYS_height+(1*72)+1) ;
+
+            GrApplyTranslationDWord(
+                gstate,
+                -p_element->VLTRAE_spatialPosition.PD_x,
+                -p_element->VLTRAE_spatialPosition.PD_y) ;
+        }
+        GrRestoreState(gstate) ;
+    }
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  VisTextReportContentClass
+ *=========================================================================*/
+
+@classdecl VisTextReportContentClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextReportContentClass::MSG_META_CONTENT_VIEW_OPENING
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    When a view is opened, setup the view, the text object, and go
+ |    ahead and generate a report.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/14/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisTextReportContentClass, MSG_META_CONTENT_VIEW_OPENING
+{
+    VMFileHandle file;
+    optr parent ;
+    optr text ;
+
+    @callsuper();
+
+    text = @LOCAL_CHILD(TextReportText) ;
+    /* Set up the geometry for the content so that the geometry manager
+     * is not used. */
+    pself->VI_attrs &= ~VA_MANAGED;
+    pself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH);
+    pself->VI_geoAttrs |= VCGA_CUSTOM_MANAGE_CHILDREN;
+
+    /* Add the text object as a child of the content.  This must be done
+     * dynamically because the text object is a visual child, not a generic
+     * one. */
+    @call oself::MSG_VIS_ADD_CHILD(text, CCO_FIRST);
+
+    /* Set up the text object to be large */
+    parent = @call @LOCAL_CHILD(TextReportTop)::MSG_GEN_FIND_PARENT() ;
+	 file = @call parent::MSG_GEN_TEXT_REPORT_GET_FILE() ;
+    @call text::MSG_VIS_TEXT_SET_VM_FILE(file);
+    @call text::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+    @call text::MSG_VIS_TEXT_CREATE_STORAGE(
+           VTSF_MULTIPLE_CHAR_ATTRS |
+           VTSF_MULTIPLE_PARA_ATTRS,
+           FALSE); /* from mg - instead of VTI_attrs */
+/*    @call text::MSG_VIS_TEXT_SET_OUTPUT(((optr)GeodeGetCodeProcessHandle())<<16) ; */
+    @call text::MSG_VIS_TEXT_SELECT_START() ;
+    @call text::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+
+    /* and grab the focus */
+    @send text::MSG_META_GRAB_FOCUS_EXCL();
+    @send text::MSG_META_GRAB_TARGET_EXCL();
+    @send text::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(VTS_SELECTABLE, VTS_EDITABLE) ;
+
+    @send parent::MSG_GEN_TEXT_REPORT_GENERATE() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextReportContentClass::MSG_META_CONTENT_VIEW_CLOSING
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    When the view is being closed out, be sure to free all storage used
+ |    by the text object and to disconnect it.  Also be sure to close
+ |    out the text object's file.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/14/99  Created
+ |    LES  08/06/99  Tried cleaning up the code even better.
+ |
+ *-----------------------------------------------------------------------*/
+
+@method VisTextReportContentClass, MSG_META_CONTENT_VIEW_CLOSING
+{
+    optr text ;
+    optr parent ;
+
+    @callsuper();
+
+    /* Unlink the text object and destroy its ddata */
+    parent = @call @LOCAL_CHILD(TextReportTop)::MSG_GEN_FIND_PARENT() ;
+    text = @LOCAL_CHILD(TextReportText) ;
+    @call text::MSG_VIS_TEXT_DELETE_ALL() ;
+    @call text::MSG_VIS_TEXT_FREE_ALL_STORAGE(TRUE);
+    @call text::MSG_VIS_TEXT_SET_VM_FILE(NullHandle);
+    @call text::MSG_VIS_CLOSE() ;
+    @call oself::MSG_VIS_REMOVE_CHILD(text, CCO_FIRST);
+    ObjVarDeleteData(text, TEMP_VIS_TEXT_CACHED_RUN_INFO) ;
+    ObjVarDeleteData(text, ATTR_VIS_TEXT_SELECTED_TAB) ;
+    @call parent::MSG_GEN_TEXT_REPORT_CLOSE_FILE() ;
+}
+
+
+/***************************************************************************
+ *  END OF FILE:  TREPCODE.GOC
+ ***************************************************************************/

@@ -1,0 +1,273 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	PC/GEOS
+ * MODULE:	GeoFile/UI
+ * FILE:	uiTmplat.goc
+ * AUTHOR:	Anna Lijphart: Jan, 1992
+ *
+ * DESCRIPTION:
+ *	This file contains the definitions and handlers for the Template
+ *	object. 
+ *
+ * RCS STAMP:
+ *	$Id: uiTmplat.goc,v 1.1 97/04/04 15:54:13 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#include <geoworks.h>		/* PC/GEOS Standard Application.	*/
+@include <stdapp.goh>
+
+#include <Ansi/string.h>	/* Standard C.	*/
+
+@include <grobj.goh>		/* Graphic object library */
+@include <ffile.goh>		/* FlatFile Libraries.	*/
+@include <gcnlist.goh>
+@include <Objects/FlatFile/ffDbase.goh>
+@include <Objects/FlatFile/ffDbaseC.goh>
+@include <Objects/FlatFile/ffFldPrC.goh>
+@include <Objects/FlatFile/ffTChstC.goh>
+@include <Objects/gDocC.goh>
+
+@define	__GF_UI_TEMPLATE_GOC	/* Don't over-define.	*/
+@include <geofile.goh>		/* GeoFile Application.	*/
+
+@extern chunk @GFMemoryFullError;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	GeoFileFlatFileClass Declaration
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@classdecl	GeoFileFlatFileClass ;
+
+@start TemplateUI, notDetachable;
+
+@object GeoFileFlatFileClass TemplateFlatFile = {
+	VI_attrs = @default & ~VA_MANAGED;
+	VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
+	VI_bounds = {0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT};	
+	SSI_maxRow = TEMP_DATA_ROW;
+	SSI_maxCol = MAX_NUM_FIELDS-1;
+	SSI_attributes = SA_TARGETABLE | SA_ENGINE_MODE;
+	SSI_chunk = OptrToChunk(@TemplateFlatFile);
+	/* SSI_drawFlags = SDF_DRAW_GRID | 	\
+			SDF_DRAW_NOTE_BUTTON ; */
+}
+
+@end TemplateUI
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_GAINED_TARGET_EXCL for GeoFileFlatFileClass
+ *
+ * DESCRIPTION:	Enable the Field Properties and Expression builder UI
+ *		controllers.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/28/92		Initial version
+ *
+ ***********************************************************************/
+@method GeoFileFlatFileClass, MSG_META_GAINED_TARGET_EXCL
+{
+    /* Enable the Field Properties and Expression builder UI controllers. */
+    MemHandle 	fieldPropDataBlock, fieldListChangeBlock;
+    FFFieldPropertiesMessageBlock *fieldPropDataPtr;
+    FFDListStatusChangeMessageBlock *fieldListChangePtr;
+    EventHandle msg;
+    optr    	appOptr, createNewFieldUIC;
+    TCHAR 	*errorMessage;
+    ModeType	currentMode;
+    GeodeHandle	processHandle;
+
+    @callsuper();
+    
+	 appOptr 	      = GeodeGetAppObject(0);
+
+    /*
+     * Set instance data for the GrObjHead
+     */
+    pself = ObjDerefGen(oself);
+    pself->FFI_grObjHeadOptr = GeodeGetOptrNS(@ffGrObjHead);
+
+    /* Set up the appropriate UI for this document */
+    GFDSetUIForDocument(oself, 0, 0);
+
+    createNewFieldUIC = GeodeGetOptrNS(@CreateNewFieldUIController);
+
+    /* Allocate the data block */
+    fieldPropDataBlock = MemAlloc(sizeof(FFFieldPropertiesMessageBlock),
+				  HF_DYNAMIC | HF_SHARABLE,
+				  HAF_STANDARD | HAF_ZERO_INIT);
+    if (!fieldPropDataBlock) {
+	/*
+	 * Not enough memory! Notify user and then return
+	 */
+        (void) MemLock(OptrToHandle(@GFMemoryFullError));
+        errorMessage = LMemDeref(@GFMemoryFullError);
+
+	UserStandardDialog(
+	    (TCHAR *)0, 
+	    /* not GIT_MULTIPLE_RESPONSE, so no customTriggers */
+	    (TCHAR *)0,
+	    /* no string arguments */
+	    (TCHAR *)0, (TCHAR *)0,
+	    /* string */
+	    errorMessage,
+	    /* dialog type */
+	    (CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+	    /* interaction type */
+	    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+        MemUnlock(OptrToHandle(@GFMemoryFullError));
+	@call createNewFieldUIC::
+			MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	return;
+    }
+
+    fieldPropDataPtr   = MemLock(fieldPropDataBlock);
+
+    /* Fill in the data block info here */
+    fieldPropDataPtr->fieldName[0] = _TEXT('\0');
+    fieldPropDataPtr->dataType = FDT_GENERAL_TEXT;
+
+
+    MemUnlock(fieldPropDataBlock);
+    MemInitRefCount(fieldPropDataBlock, (word) 1);
+
+    msg = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+	    	      MANUFACTURER_ID_GEOWORKS,
+					      /* Manufacturer's ID */
+    	    	      GWNT_FLAT_FILE_FIELD_PROPERTIES_STATUS_CHANGE,
+    	    	    	    	    	      /* Manufacturer's list type */
+    	    	      fieldPropDataBlock);    /* Handle of data block */
+
+    @call appOptr::MSG_META_GCN_LIST_SEND(
+		      (word) GCNLSF_SET_STATUS,
+    	    	    	   	    	      /* GCNListSendFlags */
+    		      (EventHandle) msg,      /* Handle to classed event */
+    		      (MemHandle) fieldPropDataBlock,
+    	    	       		    	      /* Handle of extra data block */
+      (word) GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_FIELD_PROPERTIES_STATUS_CHANGE,
+    	    	    	    	    	      /* Manufacturer's list type */
+    		      (word) MANUFACTURER_ID_GEOWORKS);
+    	    	    	    	    	      /* Manufacturer's ID */
+
+    /* Now enable the Treasure Chest and Expression Builders */
+    /* Allocate the data block */
+    fieldListChangeBlock = MemAlloc(sizeof(FFDListStatusChangeMessageBlock),
+				    (HF_DYNAMIC | HF_SHARABLE),
+				    HAF_STANDARD | HAF_NO_ERR);
+    fieldListChangePtr   = MemLock(fieldListChangeBlock);
+
+    /* Fill in the data block info here */
+    pself = ObjDerefGen (oself);
+    fieldListChangePtr->databaseOptr = oself;
+    fieldListChangePtr->whichList = INVALID_FIELD_LIST_QUERY;
+    fieldListChangePtr->changeType = 0;
+    fieldListChangePtr->fieldIndex = 0;
+    fieldListChangePtr->numFields = 0;
+    fieldListChangePtr->nonce = ++(pself->FFI_nonce);
+
+    /*
+     * If we're editing a multi-record layout, disable the treasure chest
+     */
+    if (pself->FFI_currentLayoutType == LT_MULTI_RECORD) {
+	fieldListChangePtr->disableImmediately = TRUE;
+    }
+    else {
+	fieldListChangePtr->disableImmediately = FALSE;
+    }
+
+    MemUnlock(fieldListChangeBlock);
+    MemInitRefCount(fieldListChangeBlock, (word) 1);
+
+    msg = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+	    	      MANUFACTURER_ID_GEOWORKS,    /* Manufacturer's ID */
+    	    	      GWNT_FLAT_FILE_FIELD_LIST_CHANGE,
+    	    	    	    	    	      /* Manufacturer's list type */
+    	    	      fieldListChangeBlock);    /* Handle of data block */
+
+    @call appOptr::MSG_META_GCN_LIST_SEND(
+    		      (word) GCNLSF_SET_STATUS,
+    	    	    	   	    	      /* GCNListSendFlags */
+    		      (EventHandle) msg,    /* Handle to classed event */
+    		      (MemHandle) fieldListChangeBlock,
+    	    	       		    	      /* Handle of extra data block */
+    	       (word) GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_FIELD_LIST_CHANGE,
+    	    	    	    	    	      /* Manufacturer's list type */
+    		      (word) MANUFACTURER_ID_GEOWORKS);
+    	    	    	    	    	      /* Manufacturer's ID */
+
+    /* Set the correct pointer tool */
+    currentMode = @call self::MSG_FFD_GET_CURRENT_MODE();
+    pself = ObjDerefGen(oself);
+    switch (currentMode) {
+	case MT_DESIGN:
+	    pself->FFI_designModeGrObjTool = (ClassStruct *) &PointerClass;
+	    @call GeodeGetOptrNS(@ffGrObjHead)::
+		MSG_GH_SET_CURRENT_TOOL((ClassStruct *) &PointerClass, 0);
+	    break;
+	case MT_DATA_ENTRY:
+	    pself->FFI_designModeGrObjTool =
+		(ClassStruct *) &EditTextGuardianClass;
+	    @call GeodeGetOptrNS(@ffGrObjHead)::
+		MSG_GH_SET_CURRENT_TOOL((ClassStruct *) &EditTextGuardianClass,
+								0);
+	    break;
+    }
+
+    /*
+     * Set the layout name in the Treasure Chest & RCP
+     */
+    processHandle = GeodeGetProcessHandle();
+    @call HandleToOptr(processHandle)::
+		      MSG_GF_SET_TREASURE_CHEST_VIS_MONIKER(oself);
+    @call HandleToOptr(processHandle)::
+		  MSG_GF_SET_RECORD_CONTROL_PANEL_VIS_MONIKER(oself);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFD_NOTIFY_LAYOUT_SIZE_GREW for GeoFileFlatFileClass
+ *
+ * DESCRIPTION:	This handles when the layout size grew for some reason.
+ *	    	Reset the page/record size controllers.
+ *
+ * PARAMETERS:
+ *	void (LayoutSize srBounds, PageSizeBounds psr)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	9/21/92		Initial version
+ *
+ ***********************************************************************/
+@method GeoFileFlatFileClass, MSG_FFD_NOTIFY_LAYOUT_SIZE_GREW
+{
+    @call GeodeGetOptrNS(@GFRecordWidth)::
+	MSG_GEN_VALUE_SET_VALUE(MakeWWFixed(srBounds.LS_width), FALSE);
+    @call GeodeGetOptrNS(@GFRecordHeight)::
+	MSG_GEN_VALUE_SET_VALUE(MakeWWFixed(srBounds.LS_height), FALSE);
+
+    /*
+     * Set the PageSizeController with the new page bounds.
+     */
+    SpoolSetDocSize(TRUE, &psr);
+}

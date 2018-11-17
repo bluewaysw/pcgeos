@@ -1,0 +1,2208 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mailComposer.goc
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ * DESCRIPTION:
+ *	MailComposerClass for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include "dex.goh"
+
+@classdecl MailComposerClass;
+@classdecl MailFieldTextClass;
+@classdecl MailComposeTextClass;
+  
+@ifdef AUTO_SIGNATURE_OPTION
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_AUTO_SIGN
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Automatically insert the signature if appropriate
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_AUTO_SIGN
+{
+    dword curOff;
+
+    /*
+     * see if we should...
+     */
+    if (@call PfSigOptList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & MMO_AUTO_SIGN) {
+	/*
+	 * save the current cursor position
+	 */
+	curOff = @call ComposeBodyText::MSG_VIS_TEXT_GET_SELECTION_START();
+	/*
+	 * insert the signature
+	 */
+	@call oself::MSG_MAIL_COMPOSER_SIGN();
+	/*
+	 * reset the cursor position
+	 */
+	@call ComposeBodyText::MSG_VIS_TEXT_SELECT_RANGE(curOff, curOff);
+    }
+}
+
+@endif
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        CreateMessageFile
+ * PASS:            folderName - ptr to folder name
+ *                  oslf - optr of object
+ * RETURN:          file handle or error
+ * DESCRIPTION:
+ *         Create a message file in the specified directory
+ ***************************************************************/
+
+FileHandle
+CreateMessageFile(TCHAR *folderName, optr oslf)
+{
+        PathName  fileName;
+	TCHAR *vdp, *vf1;
+	word fh;
+
+	strcpy(fileName, folderName);
+        GotoMailDirectory(NULL);
+
+	/*
+	 * Important: we need to have space for the temp file name
+	 * at the end of the directory name.
+	 */
+	fh = FileCreateTempFile(fileName, FCF_NATIVE|FILE_DENY_RW|FILE_ACCESS_RW, 0);
+	/*
+	 * save the filename and path for later in case we do another save
+	 */
+	vdp = ObjVarAddData(oslf, ATTR_MAIL_COMPOSER_FILE_NAME,
+			    sizeof(FileLongName));
+	vf1 = strrchr(fileName, C_BACKSLASH);
+	vf1[0] = 0;
+	strcpy(vdp, vf1+1);
+	vdp = ObjVarAddData(oslf, ATTR_MAIL_COMPOSER_DIR_NAME,
+			    sizeof(PathName));
+	strcpy(vdp, fileName);
+			    
+	return(fh);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        AppendMessageFilePtr
+ * PASS:            fileHan - handle of message file
+ *                  textBuf - ptr to text
+ * RETURN:          -1 for error
+ * DESCRIPTION:
+ *         Append some text to the message file
+ ***************************************************************/
+
+word
+AppendMessageFilePtr(FileHandle fileHan, TCHAR *textBuf)
+{
+        word textLen = strlen(textBuf);
+        EC ( ECCheckFileHandle(fileHan));
+	return(FileWrite(fileHan, textBuf, textLen, FALSE));
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        AppendMessageFileCR
+ * PASS:            fileHan - handle of message file
+ * RETURN:          -1 for error
+ * DESCRIPTION:
+ *         Append a CR to the message file
+ ***************************************************************/
+
+char crStr[] = "\r";
+
+word
+AppendMessageFileCR(FileHandle fileHan)
+{
+        EC ( ECCheckFileHandle(fileHan));
+	return(AppendMessageFilePtr(fileHan, crStr));
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        AppendMessageFileChunk
+ * PASS:            fileHan - handle of message file
+ *                  textHan - optr of text chunk
+ * RETURN:          -1 for error
+ * DESCRIPTION:
+ *         Append a text chunk to the message file
+ ***************************************************************/
+
+word
+AppendMessageFileChunk(FileHandle fileHan, optr textChunk)
+{
+        word err;
+        EC ( ECCheckFileHandle(fileHan) );
+	EC ( MemLock(OptrToHandle(textChunk)) );
+	EC ( ECLMemValidateHeap(OptrToHandle(textChunk)) );
+	EC ( ECLMemExists(textChunk) );
+	EC ( MemUnlock(OptrToHandle(textChunk)) );
+
+        MemLock(OptrToHandle(textChunk));
+	err = AppendMessageFilePtr(fileHan, LMemDeref(textChunk));
+	MemUnlock(OptrToHandle(textChunk));
+	return(err);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        AppendBody
+ * PASS:            fileHan - handle of message file
+ * RETURN:          -1 for error
+ * DESCRIPTION:
+ *         Append a text block to the message file
+ ***************************************************************/
+
+word
+AppendBody(FileHandle fileHan)
+{
+        char *buf;
+	dword messageLen, textLen;
+	dword textStart = 0, textEnd;
+	TextReference tr;
+	MemHandle bh;
+
+	bh = MemAlloc((MESSAGE_BUF_LEN+1)*sizeof(TCHAR),
+				HF_DYNAMIC,
+				HAF_STANDARD);
+	EC ( ECCheckFileHandle(fileHan));
+	if (!bh) {
+	    return(-1);
+	}
+	buf = MemLock(bh);
+	/*
+	 * put a blank line in between
+	 */
+	messageLen = @call ComposeBodyText::MSG_VIS_TEXT_GET_TEXT_SIZE();
+
+	tr.TR_type = TRT_POINTER;
+	tr.TR_ref.TRU_pointer.TRP_pointer = buf;
+	while (textStart < messageLen) {
+	    textEnd = textStart+MESSAGE_BUF_LEN;
+	    if (textEnd > messageLen) {
+	        textEnd = messageLen;
+	    }
+	    textLen = @call ComposeBodyText::MSG_VIS_TEXT_GET_TEXT_RANGE(
+		      0,                      /*VisTextGetTextRangeFlags */
+		      tr,
+		      textEnd,                /* rangeEnd */
+		      textStart);             /* rangeStart */
+	    AppendMessageFilePtr(fileHan, buf);
+	    textStart += textLen;
+	}
+	MemFree(bh);
+	return(0);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        AppendDate
+ * PASS:            fileHan - handle of message file
+ * RETURN:          none
+ * DESCRIPTION:
+ *         append a date line
+ *	1/26/04	jfh	changed to stop translation
+ *
+ ***************************************************************/
+
+void
+AppendMessageFileDate(FileHandle fileHan)
+{
+ char datebuf[DATE_TIME_BUFFER_SIZE], num[5];
+ TimerDateAndTime	date;
+// MailTime mTimeDate;
+ sword zone;
+ Boolean useDST;
+ optr dow[] = {@MonStr, @TueStr, @WedStr, @ThuStr, @FriStr, @SatStr, @SunStr};
+ optr month[] = {@JanStr, @FebStr, @MarStr, @AprStr, @MayStr, @JunStr,
+					  @JulStr, @AugStr, @SepStr, @OctStr, @NovStr, @DecStr};
+
+
+	AppendMessageFileChunk(fileHan, @dateFieldOut);
+	TimerGetDateAndTime(&date);
+	LockStrings();
+	/* we can't do this since RFC2822 wants it all in English */
+	/*LocalCustomFormatDateTime(datebuf,
+			      LMemDeref(@dateFormatStr),
+					&timedate); */
+	/* so we'll do the formatting here in case the date stuff has
+	 * been translated */
+	/* first the day of the week */
+	strcpy(datebuf, LMemDeref(dow[date.TDAT_dayOfWeek]));
+	strcat(datebuf, ", ");
+	/* the date in dd mmm yyyy */
+	UtilHex32ToAscii(num, (dword)date.TDAT_day, UHTAF_NULL_TERMINATE);
+	strcat(datebuf, num);
+	strcat(datebuf, " ");
+	strcat(datebuf, LMemDeref(month[date.TDAT_month]));
+	strcat(datebuf, " ");
+	UtilHex32ToAscii(num, (dword)date.TDAT_year, UHTAF_NULL_TERMINATE);
+	strcat(datebuf, num);
+	strcat(datebuf, " ");
+	/* and the time in hh:mm:ss */
+	UtilHex32ToAscii(num, (dword)date.TDAT_hours, UHTAF_NULL_TERMINATE);
+	strcat(datebuf, num);
+	strcat(datebuf, ":");
+	UtilHex32ToAscii(num, (dword)date.TDAT_minutes, UHTAF_NULL_TERMINATE);
+	strcat(datebuf, num);
+	strcat(datebuf, ":");
+	UtilHex32ToAscii(num, (dword)date.TDAT_seconds, UHTAF_NULL_TERMINATE);
+	strcat(datebuf, num);
+	strcat(datebuf, " ");
+
+	UnlockStrings();
+	AppendMessageFilePtr(fileHan, datebuf);
+
+	/*
+	 * get and append the timezone
+	 */
+	zone = LocalGetTimezone(&useDST);
+	FormatTimezoneStr(datebuf, zone);
+	AppendMessageFilePtr(fileHan, datebuf);
+
+	AppendMessageFileCR(fileHan);
+
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        CreateMessageFromUI
+ * PASS:            fileHan - handle of message file
+ * RETURN:          non-zero for error
+ * DESCRIPTION:
+ *         Create a message file from the ComposeUI
+ ***************************************************************/
+
+#define CM_FROM_CHUNK    ConstructOptr(mh, sizeof(LMemBlockHeader))
+#define CM_FROM_RN_CHUNK ConstructOptr(mh, sizeof(LMemBlockHeader)+2)
+#define CM_SUBJ_CHUNK    ConstructOptr(mh, sizeof(LMemBlockHeader)+4)
+#define CM_TO_CHUNK      ConstructOptr(mh, sizeof(LMemBlockHeader)+6)
+#define CM_CC_CHUNK      ConstructOptr(mh, sizeof(LMemBlockHeader)+8)
+#define CM_BCC_CHUNK     ConstructOptr(mh, sizeof(LMemBlockHeader)+10)
+
+
+word
+CreateMessageFromUI(FileHandle fileHan)
+{
+	MemHandle mh;
+	TCHAR *afn;
+
+	/*
+	 * truncate the file so no old stuff is left
+	 */
+	if (FileTruncate(fileHan, 0, FALSE)) {
+	    return(-1);
+	}
+	/*
+	 * allocate an LMem heap with 5 handles, one for each header
+	 * and/or variable data
+	 */
+	mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+	MemLock(mh);
+	LMemAlloc(mh, 0);
+	LMemAlloc(mh, 0);
+	LMemAlloc(mh, 0);
+	LMemAlloc(mh, 0);
+	LMemAlloc(mh, 0);
+@ifdef BCC_SUPPORT
+        LMemAlloc(mh, 0);
+@endif
+
+        /*
+	 * Compose the message:
+	 *
+	 *  From: 1. <2.>
+	 *  Subject: 3. (if any subject)
+	 *  To: 4.
+	 *  Date:
+	 *  Cc: 5. (if any CC)
+	 *  Bcc: 6. (if any BCC)
+	 *  X-Mailer: Global Mail 1.0
+	 *  X-Mail-Tools-Attachment: (if any attachments)
+	 *  Comments: conversion instructions if any GEOS attachments
+	 *
+	 *  <<Message body>>
+	 */
+	@call PfRealNameText::MSG_VIS_TEXT_GET_ALL_OPTR(CM_FROM_RN_CHUNK);
+	@call PfReturnAddr::MSG_VIS_TEXT_GET_ALL_OPTR(CM_FROM_CHUNK);
+	@call ComposeSubjectField::MSG_VIS_TEXT_GET_ALL_OPTR(CM_SUBJ_CHUNK);
+	@call ComposeToField::MSG_VIS_TEXT_GET_ALL_OPTR(CM_TO_CHUNK);
+	@call ComposeCCField::MSG_VIS_TEXT_GET_ALL_OPTR(CM_CC_CHUNK);
+@ifdef BCC_SUPPORT
+        @call ComposeBccField::MSG_VIS_TEXT_GET_ALL_OPTR(CM_BCC_CHUNK);
+@endif
+	/*
+	 * From: Real Name <mailaddr@foo.com>
+	 *   - or -
+	 * From: mailaddr@foo.com
+	 */
+        AppendMessageFileChunk(fileHan, @fromFieldOut);
+	if (!IsEmptyChunk(CM_FROM_RN_CHUNK)) {
+	    AppendMessageFilePtr(fileHan, "\"");
+	    AppendMessageFileChunk(fileHan, CM_FROM_RN_CHUNK);
+	    AppendMessageFilePtr(fileHan, "\" <");
+	    AppendMessageFileChunk(fileHan, CM_FROM_CHUNK);
+	    AppendMessageFilePtr(fileHan, ">");
+	} else {
+	    AppendMessageFileChunk(fileHan, CM_FROM_CHUNK);
+	}
+	AppendMessageFileCR(fileHan);
+	/*
+	 * Subject: (if non-empty)
+	 */
+	if (!IsEmptyChunk(CM_SUBJ_CHUNK)) {
+	    AppendMessageFileChunk(fileHan, @subjectFieldOut);
+	    AppendMessageFileChunk(fileHan, CM_SUBJ_CHUNK);
+	    AppendMessageFileCR(fileHan);
+	}
+	/*
+	 * To: (error if empty)
+	 */
+	if (!IsEmptyChunk(CM_TO_CHUNK)) {
+	    AppendMessageFileChunk(fileHan, @toFieldOut);
+	    AppendMessageFileChunk(fileHan, CM_TO_CHUNK);
+	    AppendMessageFileCR(fileHan);
+	}
+	/*
+	 * Date: day, DD MM YY HH:MM:SS +/-offsetGMT
+	 */
+	AppendMessageFileDate(fileHan);
+	/*
+	 * Cc: (if any)
+	 */
+	if (!IsEmptyChunk(CM_CC_CHUNK)) {
+	    AppendMessageFileChunk(fileHan, @ccFieldOut);
+	    AppendMessageFileChunk(fileHan, CM_CC_CHUNK);
+	    AppendMessageFileCR(fileHan);
+	}
+@ifdef BCC_SUPPORT
+        /*
+	 * Bcc: (if any)
+	 */
+        if (!IsEmptyChunk(CM_BCC_CHUNK)) {
+	    AppendMessageFileChunk(fileHan, @bccFieldOut);
+	    AppendMessageFileChunk(fileHan, CM_BCC_CHUNK);
+	    AppendMessageFileCR(fileHan);
+	}
+@endif
+	/*
+	 * X-Mailer:
+	 */
+	AppendMessageFileChunk(fileHan, @xmailerFieldStr);
+	AppendMessageFileCR(fileHan);
+	/*
+	 * X-Mail-Tools-Attachment: (if any)
+	 */
+	if (@call ComposeAttachList::MSG_ATTACH_LIST_GET_NUM_FILES()) {
+	    afn = MailLockStdString(MSS_ATTACH_FIELD_OUT);
+	    AppendMessageFilePtr(fileHan, afn);
+	    MailUnlockStdString(MSS_ATTACH_FIELD_OUT);
+	    @call ComposeAttachList::MSG_ATTACH_LIST_APPEND_ATTACHMENTS(fileHan);
+	    AppendMessageFileCR(fileHan);
+	}
+	/*
+	 * last but not least, the body, separated by a CR
+	 */
+	AppendMessageFileCR(fileHan);
+	AppendBody(fileHan);
+
+@ifdef GEOS_FILE_INSTRUCTIONS
+        /*
+	 * if any GEOS files, instructions for non-GEOS users
+	 */
+        if (@call ComposeAttachList::MSG_ATTACH_LIST_GET_NUM_GEOS_FILES()) {
+	    AppendMessageFileCR(fileHan);
+	    AppendMessageFileCR(fileHan);
+	    AppendMessageFileChunk(fileHan, @geosFileInstSigLine);
+	    AppendMessageFileChunk(fileHan, @geosFileInst);
+	}
+@endif
+
+	/*
+	 * clean up: free (locked) block
+	 */
+	MemFree(mh);
+	
+	return(0);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        UpdateMessageListAction
+ * PASS:            action - GMFAction (open, create, move)
+ *                  folderNum - folder #
+ *                  fileName - filename
+ * RETURN:          none
+ *         
+ * DESCRIPTION:
+ *         Update the message list array based on a file action
+ ***************************************************************/
+
+void
+UpdateMessageListAction(GMFAction action, word folderNum, TCHAR *fName)
+{
+    if (action == GMFA_OPEN) {
+	UpdateMessageListArrayName(folderNum, fName);
+    } else {
+	InsertMessageListArray(folderNum, fName);
+    }
+    /*
+     * rebuild the folder list
+     */
+    RebuildFolderList(MFID_LEAVE_SELECTION, TRUE);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        GetMessageFile
+ * PASS:            oslf - object
+ *                  dirName - directory to create in
+ *                  move - TRUE to move if directory does not match
+ *                  gmfr - GMFAction
+ *                  folderNum - MailFolderID of destination
+ * RETURN:          file handle (NULL if none)
+ *         
+ * DESCRIPTION:
+ *         Get or create the message file for saving
+ ***************************************************************/
+
+FileHandle
+GetMessageFile(optr oslf, TCHAR *dirName, Boolean move, GMFAction *gmfr, MailFolderID *folderNum)
+{
+    FileHandle fHan;
+    FileLongName *vdPath;
+    FileLongName *fName,*newName;
+    MemHandle mh;
+    
+    /*
+     * see if there is a stored file; if so, we are
+     * editing an existing file
+     */
+    fName = ObjVarFindData(oslf, ATTR_MAIL_COMPOSER_FILE_NAME);
+    if (fName) {
+        /*
+	 * move the file if it is not in the correct directory already
+	 */
+        vdPath = ObjVarFindData(oslf, ATTR_MAIL_COMPOSER_DIR_NAME);
+	*folderNum = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NUM(vdPath);
+	EC_ERROR_IF ( !vdPath, MAIL_COMPOSER_FILE_NAME_BUT_NO_DIRECTORY );
+	if (move && strcmp(vdPath, dirName)) {
+	    MoveMessageFile(fName, vdPath, dirName, &mh);
+	    DeleteMessageListArrayName(*folderNum, fName);
+	    newName=MemLock(mh);
+	    strcpy(fName, newName);
+	    MemFree(mh);
+	    *folderNum = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NUM(dirName);
+	    GotoMailDirectory(dirName);
+	    *gmfr = GMFA_MOVE;
+	} else {
+	    GotoMailDirectory(vdPath);
+	    *gmfr = GMFA_OPEN;
+	}
+	fHan = FileOpen(fName, FILE_DENY_W|FILE_ACCESS_RW);
+    } else {
+        /*
+	 * no file -- create a new one
+	 */
+        fHan = CreateMessageFile(dirName, oslf);
+	*folderNum = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NUM(dirName);
+	fName = ObjVarFindData(oslf, ATTR_MAIL_COMPOSER_FILE_NAME);
+	*gmfr = GMFA_CREATE;
+    }
+    return(fHan);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        ValidMailAddresses
+ * PASS:            fieldObj - text field to check
+ * RETURN:          TRUE if address(es) OK
+ * DESCRIPTION:
+ ***************************************************************/
+Boolean
+ValidMailAddresses(optr fieldObj) {
+    MemHandle addrBlk, textBlk;
+    TCHAR *textPtr;
+    Boolean allOK = TRUE;
+    word i, num;
+    word *arrayPtr, eSize;
+
+    /*
+     * get the field text and parse it, if any text
+     */
+    textBlk = @call fieldObj::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    textPtr = MemLock(textBlk);
+    if (!textPtr[0]) {
+	goto doneOK;
+    }
+    addrBlk = MailParseAddressString(textPtr);
+    /*
+     * see if all the addresses parsed correctly
+     */
+    MemLock(addrBlk);
+    num = ChunkArrayGetCount(MPARC_RESULTS(addrBlk));
+    for (i = 0; i < num && allOK; i++) {
+	arrayPtr = ChunkArrayElementToPtr(MPARC_RESULTS(addrBlk), i, &eSize);
+	if (*arrayPtr != MPAR_OK) {
+	    allOK = FALSE;
+	    textPtr = ChunkArrayElementToPtr(MPARC_ADDRESSES(addrBlk), i, &eSize);
+	    ReportError(@badAddrErr, textPtr);
+	}
+    }
+    
+    /*
+     * all done -- clean up
+     */
+    MemFree(addrBlk);
+doneOK:
+    MemFree(textBlk);
+    return(allOK);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_SEND_MESSAGE
+ * PASS:            messageNum - ptr to storage for message number in outbox
+ *                  (can be null to not return info)
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Compose a message from the UI and send it
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_SEND_MESSAGE
+{     
+        FileHandle fileHan;
+	TCHAR *fName, *oboxName;
+	GMFAction action;
+	MailFolderID fid;
+	Boolean isErr = TRUE;
+	optr errObj = NullOptr;
+
+	if (messageNum) *messageNum = 0xffff;  /* in case of error */
+
+	/*
+	 * Check for error conditions
+	 * (1) To: field empty - report error
+	 */
+	if (IsEmptyText(@ComposeToField)) {
+	    ReportError(@emptyToFieldErr, NULL);
+	    errObj = @ComposeToField;
+	    goto done;
+	}
+	/*
+	 * (2) From: field empty - bring up Email Accounts dialog
+	 */
+	if (IsEmptyText(@PfReturnAddr)) {
+	    ReportError(@noServerErr, NULL);
+	    @call PfAccountsDialog::MSG_GEN_INTERACTION_INITIATE();
+	    goto done;
+	}
+	/*
+	 * make sure the email address(es) look valid
+	 */
+	if (!ValidMailAddresses(@ComposeToField)) {
+	    errObj = @ComposeToField;
+	    goto done;
+	}
+	if (!ValidMailAddresses(@ComposeCCField)) {
+	    errObj = @ComposeCCField;
+	    goto done;
+	}
+@ifdef BCC_SUPPORT
+        if (!ValidMailAddresses(@ComposeBccField)) {
+	    errObj = @ComposeCCField;
+	}
+@endif
+	/*
+	 * Create a file
+	 */
+        oboxName = MailLockStdString(MSS_OUTBOX_FOLDER);
+	fileHan = GetMessageFile(oself, oboxName, TRUE, &action, &fid);
+	MailUnlockStdString(MSS_OUTBOX_FOLDER);
+	if (!fileHan) {
+	    ReportError(@unableToCreateMessageErr, NULL);
+	    goto done;
+	}
+	/*
+	 * Create the message file
+	 */
+	if (CreateMessageFromUI(fileHan)) {
+	    ReportError(@unableToCreateMessageErr, NULL);
+	} else {
+	    /*
+	     * mark the attachments as OK so we don't try to delete
+	     * them when our window is closed.
+	     */
+	    pself->MCI_flags = 0;
+	    @call ComposeSave::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+            @call oself::MSG_GEN_DISPLAY_CLOSE();
+	    isErr = FALSE;
+	}
+	/*
+	 * update the folder list
+	 */
+	fName = ObjVarFindData(oself, ATTR_MAIL_COMPOSER_FILE_NAME);
+	FileClose(fileHan, FALSE);
+	UpdateMessageListAction(action, fid, fName);
+	if (!isErr && messageNum) {
+	    *messageNum = FindMessageListArrayName(fid, fName);
+	}
+	/*
+	 * all done with the file
+	 */
+	ObjVarDeleteData(oself, ATTR_MAIL_COMPOSER_FILE_NAME);
+	ObjVarDeleteData(oself, ATTR_MAIL_COMPOSER_DIR_NAME);
+	/*
+	 * if an error occurred, and there is a text object of note,
+	 * put the focus and target there
+	 */
+done:
+	if (isErr && errObj) {
+	    @call errObj::MSG_META_GRAB_FOCUS_EXCL();
+	    @call errObj::MSG_META_GRAB_TARGET_EXCL();
+	}
+	return(isErr);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_SEND_MESSAGE_NOW
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Compose a message from the UI and send it now
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_SEND_MESSAGE_NOW
+{
+    word messageNum;
+
+    if (!@call oself::MSG_MAIL_COMPOSER_SEND_MESSAGE(&messageNum)) {
+	@call SendReceiveDialog::MSG_MSR_SEND_MESSAGE_NOW(messageNum);
+    }
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_SEND_MESSAGE_LATER
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Compose a message from the UI and send it later
+ ***************************************************************/
+@method MailComposerClass, MSG_MAIL_COMPOSER_SEND_MESSAGE_LATER
+{    
+    if (!(@call oself::MSG_MAIL_COMPOSER_SEND_MESSAGE(0))) {
+        EnableDisableForOutbox();
+    }
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_META_TEXT_USER_MODIFIED
+ * PASS:            obj - optr of text object
+ * RETURN:          none
+ * DESCRIPTION:
+ *         One of the compose text objects has been modified
+ ***************************************************************/
+
+@method MailComposerClass, MSG_META_TEXT_USER_MODIFIED
+{
+        @call ComposeSave::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_META_FUP_KBD_CHAR
+ * PASS:            character - character
+ *                  flags - CharFlags + ShiftState
+ *                  state - scan code
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Give our SearchReplace control a shot first
+ *
+ ***************************************************************/
+
+@method MailComposerClass, MSG_META_FUP_KBD_CHAR
+{
+    if (!(flags & CF_RELEASE) &&
+	!(flags & CF_STATE_KEY) &&
+	!(flags & CF_TEMP_ACCENT)) {
+	if (@call ComposeFindControl::MSG_GEN_FIND_KBD_ACCELERATOR(character, flags, state))
+	    return TRUE;
+    }
+    return(@callsuper());
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        UpdateUIForMessageSave
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Update the UI after:
+ *           saving a new message to Drafts
+ *           throwing a new message away to Trash
+ ***************************************************************/
+
+void
+UpdateUIForNewMessage(optr oslf)
+{
+        /*
+	 * mark things as not user modified and disable save
+	 */
+        @call ComposeToField::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+	@call ComposeSubjectField::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+	@call ComposeCCField::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+	@call ComposeBodyText::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+	@call ComposeSave::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+@ifdef BCC_SUPPORT
+        @call ComposeBccField::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+@endif
+	/*
+	 * bring the window on screen
+	 */
+	@call oslf::MSG_MAIL_PRIMARY_OPEN();
+	/*
+	 * set the target
+	 */
+	@call ComposeBodyText::MSG_META_GRAB_TARGET_EXCL();
+	@call ComposeBodyText::MSG_VIS_TEXT_SELECT_START();
+}
+
+void
+UpdateUIForMessageSave(optr oslf)
+{
+    UpdateUIForNewMessage(oslf);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_SAVE_MESSAGE
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Save a new message to Drafts
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_SAVE_MESSAGE
+{
+	FileHandle fHan;
+	MemHandle mh;
+	TCHAR *mp,*fName;
+	GMFAction action;
+	TCHAR *draftName;
+	MailFolderID fid;
+
+	draftName = MailLockStdString(MSS_DRAFTS_FOLDER);
+	fHan = GetMessageFile(oself, draftName, FALSE, &action, &fid);
+	MailUnlockStdString(MSS_DRAFTS_FOLDER);
+	if (!fHan) {
+	    ReportError(@unableToSaveMessageErr, NULL);
+	    return;
+	}
+	/*
+	 * try to create the message file
+	 */
+	if (CreateMessageFromUI(fHan)) {
+	    ReportError(@unableToSaveMessageErr, NULL);
+	} else {
+	    /*
+	     * tell the user the message was successfully saved
+	     */
+	    mh = @call ComposeSubjectField::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	    mp = MemLock(mh);
+	    if (strlen(mp)) {
+	        ReportOK(@messageSavedStr, mp);
+	    } else {
+	        LockStrings();
+		ReportOK(@messageSavedStr, LMemDeref(@noSubjectStr));
+		UnlockStrings();
+	    }
+	    MemFree(mh);
+	    UpdateUIForMessageSave(oself);
+	}
+	FileClose(fHan, FALSE);
+	fName = ObjVarFindData(oself, ATTR_MAIL_COMPOSER_FILE_NAME);
+	UpdateMessageListAction(action, fid, fName);
+	
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_DONE_WITH_FILE
+ * PASS:            fileHan - handle of message file
+ * RETURN:          none
+ * DESCRIPTION:
+ *         done with message file
+ ***************************************************************/
+@method MailComposerClass, MSG_MAIL_COMPOSER_DONE_WITH_FILE
+{
+    if (fileHan) {
+	FileClose(fileHan, FALSE);
+	ObjVarDeleteData(oself, ATTR_MAIL_COMPOSER_FILE_NAME);
+	ObjVarDeleteData(oself, ATTR_MAIL_COMPOSER_DIR_NAME);
+    }
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_THROW_AWAY_MESSAGE
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         throw away a new message to Trash
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_THROW_AWAY_MESSAGE
+{
+	FileHandle fHan;
+	TCHAR *fName;
+	GMFAction action;
+	TCHAR *trashName;
+	MailFolderID fid;
+
+	trashName = MailLockStdString(MSS_TRASH_FOLDER);
+	fHan = GetMessageFile(oself, trashName, TRUE, &action, &fid);
+	MailUnlockStdString(MSS_TRASH_FOLDER);
+	/*
+	 * try to create the message file
+	 */
+	CreateMessageFromUI(fHan);
+	fName = ObjVarFindData(oself, ATTR_MAIL_COMPOSER_FILE_NAME);
+	FileClose(fHan, FALSE);
+	UpdateUIForMessageSave(oself);
+	UpdateMessageListAction(action, fid, fName);
+	EnableDisableForOutbox();
+	EnableDisableForTrash();
+	ObjVarDeleteData(oself, ATTR_MAIL_COMPOSER_FILE_NAME);
+	ObjVarDeleteData(oself, ATTR_MAIL_COMPOSER_DIR_NAME);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_CHECK_FOR_SAVE
+ * PASS:            none
+ * RETURN:          TRUE if save not needed
+ * DESCRIPTION:
+ *         Check for changes and close compose window
+ ***************************************************************/
+
+StandardDialog3ResponseTriggerTable saveThrowBackMkrs = {
+    3,
+    {@saveMoniker, IC_YES}, \
+    {@throwAwayMoniker, IC_NO}, \
+    {@backMoniker, IC_DISMISS} \
+};
+
+word
+CheckSave(void)
+{       word retVal;
+
+        LockStrings();
+        retVal = UserStandardDialog(
+			   (char *) NULL,
+			   /* not GIT_MULTIPLE_RESPONSE, so no custom */
+			   &saveThrowBackMkrs,
+			   /* 0 string arguments */
+			   (char *) NULL,
+			   (char *) NULL,
+			   /* dialog string */
+			   LMemDeref (@saveThrowBackStr),
+			   /* dialog type */
+			   (CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			   /* interaction type */
+			   (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)
+			   );
+	UnlockStrings();
+	return(retVal);
+}
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_CHECK_FOR_SAVE
+{
+    /*
+     * see if Save is enabled and ask the user
+     */
+    if (@call ComposeSave::MSG_GEN_GET_ENABLED()) {
+	switch (CheckSave()) {
+	case IC_YES:
+	    @call oself::MSG_MAIL_COMPOSER_SAVE_MESSAGE();
+	    break;
+	case IC_NO:
+	    @call oself::MSG_MAIL_COMPOSER_THROW_AWAY_MESSAGE();
+	    break;
+	case IC_DISMISS:
+	    /*
+	     * if 'back', just return
+	     */
+	    @call oself::MSG_GEN_BRING_TO_TOP();
+	    return(FALSE);
+	}
+    } else {
+	/*
+	 * see if we have any forwarded attachments to get rid of
+	 */
+	if (pself->MCI_flags & MCF_HAVE_FORWARDED_ATTACHMENTS) {
+	    @call ComposeAttachList::MSG_ATTACH_LIST_DELETE_FILES();
+	}
+    }
+    return(TRUE);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_GEN_DISPLAY_CLOSE
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Check for changes and close compose window
+ ***************************************************************/
+
+@method MailComposerClass, MSG_GEN_DISPLAY_CLOSE
+{
+    /*
+     * see if the user wants to save or keep editing
+     */
+    if (!@call oself::MSG_MAIL_COMPOSER_CHECK_FOR_SAVE()) {
+	return;
+    }
+    /*
+     * call our superclass to take us off screen
+     */
+    @callsuper();
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        ComposeReadHeader
+ * PASS:            hdrHan - handle of header data
+ *                  findField - optr of field name to find (e.g., "FROM")
+ *                  textObj - text object to set
+ * RETURN:          zero if field not found
+ * DESCRIPTION:
+ *         read a mail header from a message
+ ***************************************************************/
+
+word
+ComposeReadHeader(MemHandle hdrHan, optr findField, optr textObj)
+{
+        MemHandle mh;
+
+	LockStrings();
+	mh = MailGetHeader(hdrHan, LMemDeref(findField));
+	UnlockStrings();
+	if (mh) {
+	    @call textObj::MSG_VIS_TEXT_APPEND_BLOCK(mh, 0);
+	    MemFree(mh);
+	}
+	return(mh);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_RESET
+ * PASS:            none
+ * RETURN:          FALSE if not ready for new message
+ * DESCRIPTION:
+ *         Init for a new message
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_RESET
+{
+    @call ComposeBodyText::MSG_MAIL_LARGE_TEXT_OPEN(@ComposeBodyContent, VTSF_MULTIPLE_PARA_ATTRS|VTSF_MULTIPLE_CHAR_ATTRS|VTSF_TYPES);
+
+    if (!@call oself::MSG_MAIL_COMPOSER_CHECK_FOR_SAVE()) {
+	return(FALSE);
+    }
+    pself->MCI_flags = 0;
+
+    @call ComposeToField::MSG_VIS_TEXT_DELETE_ALL();
+    @call ComposeToField::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    @call ComposeSubjectField::MSG_VIS_TEXT_DELETE_ALL();
+    @call ComposeCCField::MSG_VIS_TEXT_DELETE_ALL();
+    @call ComposeCCField::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    @call ComposeBodyText::MSG_VIS_TEXT_DELETE_ALL();
+@ifdef BCC_SUPPORT
+    @call ComposeBccField::MSG_VIS_TEXT_DELETE_ALL();
+    @call ComposeBccField::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+@endif
+    @call ComposeSave::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    if (@call PfSignature::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+	@call ComposeSign::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    } else {
+	@call ComposeSign::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+    @call ComposeBodyText::MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT((J_LEFT << VTDPA_JUSTIFICATION_OFFSET) | (VTDDT_INCH << VTDPA_DEFAULT_TABS_OFFSET), TEXT_ADDRESS_PAST_END, 0);
+    @call ComposeBodyText::MSG_VIS_TEXT_SET_LEFT_AND_PARA_MARGIN(2*8,
+							TEXT_ADDRESS_PAST_END,
+							0);
+    /*
+     * reset to no attachments
+     */
+    @call ComposeAttachList::MSG_ATTACH_LIST_RESET();
+@ifdef MAIL_ALIAS_SUPPORT
+     /*
+      * set up the address list to use for expanding aliases
+      */
+     @call ComposeAddressDialog::MSG_ADDRESS_DIALOG_UPDATE_LIST();
+@endif
+     /*
+      * reset file info
+      */
+     ObjVarDeleteData(oself, ATTR_MAIL_COMPOSER_FILE_NAME);
+     ObjVarDeleteData(oself, ATTR_MAIL_COMPOSER_DIR_NAME);
+     return(TRUE);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_EDIT_MESSAGE
+ * PASS:            fileName - handle of block w/ file name
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Edit an existing message
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_EDIT_MESSAGE
+{
+        FileLongName *vdp;
+	FileLongName path;
+	FileHandle fileHan;
+	TCHAR *fp, *pp1, *pp2;
+	MemHandle mh, hdrHan;
+
+	EC ( ECCheckMemHandle(fileName) );
+
+        /*
+	 * reset the UI
+	 */
+	if (!@call oself::MSG_MAIL_COMPOSER_RESET()) {
+	    return;
+	}
+	/*
+	 * save the file name and path
+	 */
+	fp = MemLock(fileName);
+	vdp = ObjVarAddData(oself, ATTR_MAIL_COMPOSER_FILE_NAME,
+			    sizeof(FileLongName));
+	strcpy(vdp, fp);
+	FileGetCurrentPath(&path, sizeof(FileLongName));
+	pp2 = strrchr(&path, C_BACKSLASH)+1;
+	pp1 = ObjVarAddData(oself, ATTR_MAIL_COMPOSER_DIR_NAME, sizeof(FileLongName));
+	strcpy(pp1, pp2);
+
+	fileHan = OpenMessageFile(fileName);
+	if (!fileHan) {
+	    ReportError(@unableToOpenMessageErr, NULL);
+	    return;
+	}
+	/*
+	 * make note of any attachments
+	 */
+	@call ComposeAttachList::MSG_ATTACH_LIST_READ_ATTACHMENTS(fileHan);
+	/*
+	 * read the headers
+	 */
+	hdrHan = MailReadHeaders(fileHan);
+        ComposeReadHeader(hdrHan, @toFieldName, @ComposeToField);
+	ComposeReadHeader(hdrHan, @subjectFieldName, @ComposeSubjectField);
+	ComposeReadHeader(hdrHan, @ccFieldName, @ComposeCCField);
+	/*
+	 * set the window moniker to show the subject
+	 */
+	if (hdrHan) {
+	    LockStrings();
+	    mh = MailGetHeader(hdrHan, LMemDeref(@subjectFieldName));
+	    UnlockStrings();
+	} else {
+	    mh = 0;
+	}
+	@call oself::MSG_MAIL_PRIMARY_UPDATE_LONG_TERM_MONIKER(mh);
+
+	MemFree(hdrHan);
+        /*
+	 * read the body
+	 */
+	MailReadBody(fileHan, @ComposeBodyText);
+
+	FileClose(fileHan, FALSE);
+	/*
+	 * bring ourselves on screen
+	 */
+	UpdateUIForNewMessage(oself);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_NEW_MESSAGE
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Init for a new message
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_NEW_MESSAGE
+{
+    /*
+     * set the window moniker
+     */
+    @call oself::MSG_MAIL_PRIMARY_UPDATE_LONG_TERM_MONIKER(NULL);
+
+    if (@call oself::MSG_MAIL_COMPOSER_RESET()) {
+	UpdateUIForNewMessage(oself);
+    }
+@ifdef AUTO_SIGNATURE_OPTION
+    /*
+     * auto sign if appropriate
+     */
+     @call oself::MSG_MAIL_COMPOSER_AUTO_SIGN();
+@endif
+    /*
+     * give the To: field the focus and target so the user
+     * can fill it in
+     */
+    @call ComposeToField::MSG_META_GRAB_FOCUS_EXCL();
+    @call ComposeToField::MSG_META_GRAB_TARGET_EXCL();
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MarkAsQuote
+ * PASS:            textObj - optr of text object
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Mark the text as a quote
+ ***************************************************************/
+TCHAR rplyCR[] = "\r";
+TCHAR rplyCRBrkt[] = "\r>";
+TCHAR rplyBrkt[] = ">";
+
+void
+MarkAsQuote(optr textObj)
+{
+    /*
+     * don't do anything if no text
+     */
+    if (@call textObj::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+        /*
+	 * add a > at the start
+	 */
+        @call textObj::MSG_VIS_TEXT_SELECT_START();
+	@call textObj::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(rplyBrkt, 0);
+        /*
+	 * replace CR with CR + >
+	 */
+        DoReplaceAll(textObj, rplyCR, rplyCRBrkt);
+    }
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MakeReplyLine
+ * PASS:            hdrHan - handle of header block
+ * RETURN:          handle of block with text
+ * DESCRIPTION:
+ *         Make the "At <date & time>, <name> wrote:" line
+ ***************************************************************/
+
+MemHandle
+MakeReplyLine(MemHandle hdrHan)
+{
+    MemHandle retHan = 0, mh, dth;
+    TCHAR *bp, *dp, *dtp, *np;
+    MailTime timedate;
+
+    LockStrings();
+
+    /*
+     * get the Date: field
+     */
+    mh = MailGetHeader(hdrHan, LMemDeref(@dateFieldName));
+    if (!mh) {
+	goto error1;
+    }
+    dp = MemLock(mh);
+    dth = MemAlloc(DATE_TIME_BUFFER_SIZE,
+		   HF_DYNAMIC, HAF_STANDARD);
+    if (!dth) {
+	goto error2;
+    }
+    dtp = MemLock(dth);
+    /*
+     * parse the date and reformat it to our liking
+     */
+    if (ParseDateTimeWithTimezone(dp, &timedate) != -1) {
+	goto error3;
+    }
+    LocalCustomFormatDateTime(dtp,
+			      LMemDeref(@replyDateFormatStr),
+			      &timedate);
+    MemFree(mh);
+
+    /*
+     * get the From: field
+     */
+    mh = MailGetHeader(hdrHan, LMemDeref(@fromFieldName));
+    if (!mh) {
+	MemFree(dth);
+	goto error1;
+    }
+    np = MemLock(mh);
+    /*
+     * get rid of <mail@addr>, if there
+     */
+    dp = strchr(np, '<');
+    if (dp) {
+        while (*dp == '<' || *dp == ' ') {
+	    *dp = 0;
+	    dp--;
+	}
+    }
+    /*
+     * create the "At <date & time>, <name> wrote:" string
+     */
+    retHan = MemAlloc(DATE_TIME_BUFFER_SIZE + MAX_ADDRESS_NAME_LENGTH,
+		      HF_DYNAMIC, HAF_STANDARD);
+    if (!retHan) {
+        goto error3;
+    }
+    bp = MemLock(retHan);
+    sprintf(bp, LMemDeref(@replyAtStr), dtp, np);
+
+    /*
+     * clean up and return the buffer
+     */
+    MemUnlock(retHan);
+error3:
+    MemFree(dth);      /* formatted date buffer */
+error2:
+    MemFree(mh);       /* From: field buffer */
+error1:
+    UnlockStrings();
+    return(retHan);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_REPLY_MESSAGE
+ * PASS:            fileName - handle of block w/ file name
+ *                  type - MailComposeType (reply, reply all)
+ * RETURN:          none
+ * DESCRIPTION:
+ *         reply to a message
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_REPLY_MESSAGE
+{
+        MemHandle hdrHan, mh;
+	FileHandle fileHan;
+	TCHAR *str, *subj;
+	MailMessageOptions opts;
+
+	EC ( ECCheckMemHandle(fileName) );
+
+        /*
+	 * reset the UI
+	 */
+	if (!@call oself::MSG_MAIL_COMPOSER_RESET()) {
+	    return;
+	}
+	ObjDerefGen(oself);
+	fileHan = OpenMessageFile(fileName);
+	if (!fileHan) {
+	    ReportError(@unableToOpenMessageErr, NULL);
+	    return;
+	}
+	hdrHan = MailReadHeaders(fileHan);
+	/*
+	 *  From -> To
+	 */
+	if (!ComposeReadHeader(hdrHan, @replyToFieldName, @ComposeToField)) {
+	    ComposeReadHeader(hdrHan, @fromFieldName, @ComposeToField);
+	}
+	/*
+	 * Subject -> Re: Subject
+	 */
+	LockStrings();
+	mh = MailGetHeader(hdrHan, LMemDeref(@subjectFieldName));
+	if (mh) {
+	    str = MemLock(mh);
+	    subj = SkipSubjectRe(str);
+	    @call ComposeSubjectField::MSG_VIS_TEXT_APPEND_OPTR(@reStr, 0);
+	    @call ComposeSubjectField::MSG_VIS_TEXT_APPEND_PTR(subj, 0);
+	    MemFree(mh);
+	}
+	UnlockStrings();
+	/*
+	 *  Cc -> Cc (if reply all)
+	 */
+	if (type == MCT_REPLY_ALL) {
+	    ComposeReadHeader(hdrHan, @ccFieldName, @ComposeCCField);
+	}
+	/*
+	 *  include other recipients (if reply all)
+	 *    To (except us) -> To
+	 */
+	if (type == MCT_REPLY_ALL) {
+	    LockStrings();
+	    mh = MailGetHeader(hdrHan, LMemDeref(@toFieldName));
+	    if (mh) {
+		MemHandle toH;
+		ChunkHandle ourAddrC;
+		int i;
+		word eSize;
+		str = MemLock(mh);
+		toH = MailParseAddressString(str);
+		MemFree(mh);
+		ourAddrC = @call PfReturnAddr::MSG_VIS_TEXT_GET_ALL_OPTR(
+		    ConstructOptr(toH, 0));
+		(void)MemLock(toH);
+		for (i = 0; i < ChunkArrayGetCount(MPARC_ADDRESSES(toH)); i++) {
+		    str = ChunkArrayElementToPtr(MPARC_ADDRESSES(toH), i, &eSize);
+		    if (*str) {
+			if (LocalCmpStrings(LMemDerefHandles(toH, ourAddrC),
+					    str, 0) != 0) {
+			    if (@call ComposeToField::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+				@call ComposeToField::MSG_VIS_TEXT_APPEND_OPTR(@addrSeparator, 0);
+			    }
+			    @call ComposeToField::MSG_VIS_TEXT_APPEND_PTR(str, 0);
+			}
+		    }
+		}
+		MemFree(toH);
+	    }
+	    UnlockStrings();
+	}
+        /*
+	 * if 'quote reply' or forward, read the body and quote it
+	 */
+	opts = @call PfMessageOptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	if (opts & MMO_QUOTE_ORIGINAL) {
+	    MailReadBody(fileHan, @ComposeBodyText);
+	    MarkAsQuote(@ComposeBodyText);
+	    /*
+	     * add a CR to separate the reply
+	     */
+	    @call ComposeBodyText::MSG_VIS_TEXT_APPEND_PTR(rplyCR, 0);
+	    /*
+	     * Add "At <date & time>, <name> wrote:"
+	     * at the start (not added sooner so it doesn't get quoted)
+	     */
+	    @call ComposeBodyText::MSG_VIS_TEXT_SELECT_START();
+	    mh = MakeReplyLine(hdrHan);
+	    if (mh) {
+		@call ComposeBodyText::MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK(mh, 0);
+		MemFree(mh);
+	    }
+	}
+        MemFree(hdrHan);
+	FileClose(fileHan, FALSE);
+	/*
+	 * bring ourselves on screen
+	 */
+	UpdateUIForNewMessage(oself);
+	/*
+	 * put the cursor at the end
+	 */
+	@call ComposeBodyText::MSG_VIS_TEXT_SELECT_END();
+
+@ifdef AUTO_SIGNATURE_OPTION
+        /*
+	 * auto sign if appropriate
+	 */
+        @call oself::MSG_MAIL_COMPOSER_AUTO_SIGN();
+@endif
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MakeOutboxAttachmentPath
+ * PASS:            fileName - ptr to filename in PathName buffer
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Copy any attachments to Outbox/Attachments and record them
+ ***************************************************************/
+
+TCHAR backSlashStr4[] = "\\";
+
+void
+MakeOutboxAttachmentPath(TCHAR *fileName)
+{
+    MemHandle bufHandle;
+    TCHAR *acctName, *p1;
+    FileLongName tempFileName;
+    word curAcct;
+    TCHAR *mdName;
+
+    strcpy(tempFileName, fileName);
+    p1 = fileName;
+    mdName = MailLockStdString(MSS_MAIL_DIR);
+    FileConstructFullPath(&p1, sizeof(PathName),
+			  SP_PRIVATE_DATA, mdName, TRUE);
+    MailUnlockStdString(MSS_MAIL_DIR);
+    strcat(fileName, backSlashStr4);
+    curAcct = @call PfAccountList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    bufHandle = @call PfAccountList::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(curAcct);
+    acctName = MemLock(bufHandle);
+    strcat(fileName, acctName);
+    MemFree(bufHandle);
+
+    strcat(fileName, backSlashStr4);
+    mdName = MailLockStdString(MSS_OUTBOX_FOLDER);
+    strcat(fileName, mdName);
+    MailUnlockStdString(MSS_OUTBOX_FOLDER);
+    strcat(fileName, backSlashStr4);
+    mdName = MailLockStdString(MSS_ATTACH_DIR);
+    strcat(fileName, mdName);
+    MailUnlockStdString(MSS_ATTACH_DIR);
+
+    strcat(fileName, backSlashStr4);
+    strcat(fileName, tempFileName);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        ForwardAttacments
+ * PASS:            fileHan - handle of original message file
+ * RETURN:          # of attachments
+ * DESCRIPTION:
+ *         Copy any attachments to Outbox/Attachments and record them
+ ***************************************************************/
+
+typedef struct {
+    word FWA_num;
+} FWAStruct;
+
+Boolean
+_pascal ForwardAttachmentCB(void *el, void *retVal)
+{
+    AttachFilePath *p1 = el;
+    FWAStruct *r1 = retVal;
+    PathName path;
+    FileError err = 0;
+
+    strcpy(path, p1->AFP_file);
+    MakeOutboxAttachmentPath(path);
+    /*
+     * Allow the file to exist or for access denied (exists but we can
+     * access it for writing); this allows forwarding the same file twice
+     */
+    err = FileCopy(p1->AFP_full, path, 0, 0);
+    if (!err || err == ERROR_FILE_EXISTS || err == ERROR_ACCESS_DENIED) {
+	r1->FWA_num++;
+	@call ComposeAttachList::MSG_ATTACH_LIST_ATTACH_FILE_PATH(path);
+    }
+    return(FALSE);
+}
+
+word
+ForwardAttachments(FileHandle fileHan)
+{
+    FWAStruct fwas;
+    MemHandle mh;
+
+    mh = CreateChunkArrayBlock(sizeof(AttachFilePath));
+    ReadAttachments(mh, fileHan);
+    fwas.FWA_num = 0;
+    ChunkArrayEnum(ME_FIRST_CHUNK, &fwas, ForwardAttachmentCB);
+    MemFree(mh);
+    return(fwas.FWA_num);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_FORWARD_MESSAGE
+ * PASS:            fileHan - handle of message file
+ * RETURN:          none
+ * DESCRIPTION:
+ *         forward a message
+ ***************************************************************/
+
+void
+ForwardReadHeader(MemHandle hdrHan, optr fieldName, optr fieldOut)
+{
+    MemHandle mh;
+
+    LockStrings();
+    mh = MailGetHeader(hdrHan, LMemDeref(fieldName));
+    if (mh) {
+        @call ComposeBodyText::MSG_VIS_TEXT_APPEND_OPTR(fieldOut, 0);
+	@call ComposeBodyText::MSG_VIS_TEXT_APPEND_BLOCK(mh, 0);
+	@call ComposeBodyText::MSG_VIS_TEXT_APPEND_PTR(crStr, 0);
+	MemFree(mh);
+    }
+    UnlockStrings();
+}
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_FORWARD_MESSAGE
+{
+    MemHandle hdrHan;
+    FileHandle fileHan;
+
+    EC ( ECCheckMemHandle(fileName) );
+
+    /*
+     * reset the UI
+     */
+    if (!@call oself::MSG_MAIL_COMPOSER_RESET()) {
+	return;
+    }
+    fileHan = OpenMessageFile(fileName);
+    if (!fileHan) {
+        ReportError(@unableToOpenMessageErr, NULL);
+	return;
+    }
+    hdrHan = MailReadHeaders(fileHan);
+    /*
+     * Subject -> Fwd: Subject
+     */
+    @call ComposeSubjectField::MSG_VIS_TEXT_APPEND_OPTR(@fwdStr, 0);
+    ComposeReadHeader(hdrHan, @subjectFieldName, @ComposeSubjectField);
+    /*
+     * Read the headers into the body
+     */
+    ForwardReadHeader(hdrHan, @fromFieldName, @fromFieldOut);
+    ForwardReadHeader(hdrHan, @subjectFieldName, @subjectFieldOut);
+    ForwardReadHeader(hdrHan, @toFieldName, @toFieldOut);
+    ForwardReadHeader(hdrHan, @dateFieldName, @dateFieldOut);
+    ForwardReadHeader(hdrHan, @ccFieldName, @ccFieldOut);
+    @call ComposeBodyText::MSG_VIS_TEXT_APPEND_PTR(crStr, 0);
+    MemFree(hdrHan);
+    /*
+     * Read the body
+     */
+    MailReadBody(fileHan, @ComposeBodyText);
+    /*
+     * mark everything as a quote
+     */
+    MarkAsQuote(@ComposeBodyText);
+    /*
+     * add a CR to separate the reply
+     */
+    @call ComposeBodyText::MSG_VIS_TEXT_APPEND_PTR(rplyCR, 0);
+    /*
+     * copy any attachments from Inbox/Attachments to Outbox/Attachments
+     * and record them in the message.
+     */
+    if (ForwardAttachments(fileHan)) {
+	pself->MCI_flags = MCF_HAVE_FORWARDED_ATTACHMENTS;
+    }
+    
+    FileClose(fileHan, FALSE);
+    /*
+     * bring ourselves on screen
+     */
+    UpdateUIForNewMessage(oself);
+    /*
+     * put the focus in the To: field since it needs to be filled in
+     */
+    @call ComposeToField::MSG_META_GRAB_FOCUS_EXCL();
+    @call ComposeToField::MSG_META_GRAB_TARGET_EXCL();
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_SIGN
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         append the signature to the current message
+ ***************************************************************/
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_SIGN
+{
+        MemHandle mh;
+
+	/*
+	 * get the signature, and then append it and a CR
+	 */
+	mh = @call PfSignature::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	@call ComposeBodyText::MSG_VIS_TEXT_APPEND_PTR(crStr, 1);
+	@call ComposeBodyText::MSG_VIS_TEXT_APPEND_BLOCK(mh, 0);
+	MemFree(mh);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_COMPOSER_MAIL_TO
+ * PASS:            mth - MemHandle of InternetAppBlock with address
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Send a message to Global PC for a bug report
+ ***************************************************************/
+
+/* convert URL filename back from unencoded format */
+void DecodeURL(char *url)
+{
+    char *p, *q;
+
+    p = q = url;
+    while (*p) {
+	if (*p == '%') {
+	    int c;
+	    p++;
+	    if (*p >= '0' && *p <= '9') {
+		c = (*p-'0') * 16;
+	    } else if (*p >= 'A' && *p <= 'F') {
+		c = ((*p-'A')+10) * 16;
+	    } else if (*p >= 'a' && *p <= 'f') {
+		c = ((*p-'a')+10) * 16;
+	    }
+	    p++;
+	    if (*p >= '0' && *p <= '9') {
+		c += *p-'0';
+	    } else if (*p >= 'A' && *p <= 'F') {
+		c += (*p-'A')+10;
+	    } else if (*p >= 'a' && *p <= 'f') {
+		c += (*p-'a')+10;
+	    }
+	    p++;
+	    *q++ = (char)c;
+	} else if (*p == '+') {
+	    *q++ = ' ';
+	    p++;
+	} else {
+	    *q++ = *p++;
+	}
+    }
+    *q = C_NULL;
+}
+
+@method MailComposerClass, MSG_MAIL_COMPOSER_MAIL_TO
+{
+    InternetAppBlock *iab;
+    char *args = 0, *subj = 0;
+
+    /*
+     * reset for a new message
+     */
+    if (!@call oself::MSG_MAIL_COMPOSER_RESET()) {
+	MemFree(mth);
+	return;
+    }
+    /*
+     * put the mailto: address into the To: field
+     */
+    iab = MemLock(mth);
+    args = strchr(((char *)iab)+sizeof(InternetAppDataType), '?');
+    if (args) {
+	/* cc= support will need better parsing strategy */
+	subj = strstr(args, "subject=");
+	if (subj) {
+	    subj += 8;  /* length of "subject=" */
+	    DecodeURL(subj);
+	}
+	*args = C_NULL;
+    }
+    @call ComposeToField::MSG_VIS_TEXT_APPEND_PTR(((char *)iab)+sizeof(InternetAppDataType), 0);
+    if (subj)
+	@call ComposeSubjectField::MSG_VIS_TEXT_APPEND_PTR(subj, 0);
+    MemFree(mth);
+    /*
+     * bring ourselves on screen
+     */
+    UpdateUIForNewMessage(oself);
+@ifdef AUTO_SIGNATURE_OPTION
+    /*
+     * auto sign if appropriate
+     */
+    @call oself::MSG_MAIL_COMPOSER_AUTO_SIGN();
+@endif
+}
+
+@ifdef MAIL_ALIAS_SUPPORT
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_META_LOST_SYS_FOCUS_EXCL
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         address field lost focus -- expand aliases
+ ***************************************************************/
+@method MailFieldTextClass, MSG_META_LOST_SYS_FOCUS_EXCL
+{
+    MemHandle subjHan = NULL;
+
+    @callsuper();
+
+    /*
+     * see if we're supposed to expand aliases or not
+     */
+    if (pself->MFTI_flags & MFTF_EXPAND_ALIASES) {
+	/*
+	 * don't bother expanding aliases if the text hasn't changed
+	 */
+	if (@call oself::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE()) {
+	    @call oself::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+	    @call ComposeAddressDialog::MSG_ADDRESS_DIALOG_EXPAND_ALIASES(oself);
+	}
+    }
+    /*
+     * see if we're supposed to update the subject in the primary moniker
+     * NOTE: if we ever switch to more than one (compose) message window,
+     * this will need to use an optr in instance data instead of ComposeMailWin
+     */
+    if (pself->MFTI_flags & MFTF_UPDATE_SUBJECT) {
+	if (@call oself::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE()) {
+	    @call oself::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+	    if (@call oself::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+		subjHan = @call oself::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	    }
+	    @call ComposeMailWin::MSG_MAIL_PRIMARY_UPDATE_LONG_TERM_MONIKER(subjHan);
+	}
+    }
+}
+
+@endif
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_FIELD_TEXT_SET_NEXT_FIELD
+ * PASS:            nextField - optr of next object
+ * RETURN:          none
+ * DESCRIPTION:
+ *         (re)set the next field for navigation
+ *         NOTE: this is only needed if Bcc support is included
+ *         and can be turned on and off
+ ***************************************************************/
+@method MailFieldTextClass, MSG_MAIL_FIELD_TEXT_SET_NEXT_FIELD
+{
+    pself->MFTI_nextField = nextField;
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_VIS_TEXT_GENERATE_NOTIFY
+ * PASS:            params - VisTextGenerateNotifyParams
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Munge the notification params before it is sent out
+ *         We do this for MailFieldText so that the FontControl and
+ *         PointsizeControl (and later, any other attributes)
+ *         do not interact with us.
+ ***************************************************************/
+
+@method MailFieldTextClass, MSG_VIS_TEXT_GENERATE_NOTIFY
+{
+    params->VTGNP_notificationTypes &= VTNF_SELECT_STATE;
+    @callsuper();
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_META_KBD_CHAR
+ * PASS:            character - character
+ *                  flags - CharFlags + ShiftState
+ *                  state - scan code
+ * RETURN:          none
+ * DESCRIPTION:
+ *         CR pressed -- move to the next field
+ *         NOTE: because this is a one-line text object,
+ *         we can't use MSG_META_TEXT_CR_FILTERED as
+ *         the text object doesn't get that press
+ ***************************************************************/
+@method MailFieldTextClass, MSG_META_KBD_CHAR
+{
+    optr obj;
+
+    /*
+     * if we get a press of the Enter key...
+     */
+    obj = pself->MFTI_nextField;
+    if (obj && !(flags & CF_RELEASE)) {
+	switch (character) {
+	case ((CS_CONTROL<<8)|VC_ENTER):
+	case ((CS_CONTROL<<8)|VC_DOWN):
+	    @call obj::MSG_META_GRAB_FOCUS_EXCL();
+	    @call obj::MSG_META_GRAB_TARGET_EXCL();
+	    break;
+	case ((CS_CONTROL<<8)|VC_TAB):
+	    if (flags & ((SS_LSHIFT|SS_RSHIFT)<<8)) {
+		@callsuper();
+	    } else {
+		@call obj::MSG_META_GRAB_FOCUS_EXCL();
+		@call obj::MSG_META_GRAB_TARGET_EXCL();
+	    }
+	    break;
+	default:
+	    @callsuper();
+	}
+    } else {
+	@callsuper();
+    }
+}
+
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_VIS_TEXT_SET_FONT_ID, et al
+ * PASS:            
+ * RETURN:          none
+ * DESCRIPTION:
+ *         special behavor for setting attributes in compose body
+ *         Sigh...GOC doesn't seem to like doing this as one handler
+ *         for messages that have different size arguments.
+ ***************************************************************/
+@method MailComposeTextClass, MSG_VIS_TEXT_SET_FONT_ID
+{
+    /*
+     * get whether we were modified before
+     */
+    Boolean mod = @call oself::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+
+    /*
+     * set the attributes
+     */
+    @callsuper();
+
+    /*
+     * if the text wasn't modified before our change, make it so again
+     */
+    if (!mod) {
+	@call ComposeSave::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	@call oself::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    }
+
+}
+
+@method MailComposeTextClass, MSG_VIS_TEXT_SET_POINT_SIZE
+{
+    /*
+     * get whether we were modified before
+     */
+    Boolean mod = @call oself::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+
+    /*
+     * set the attributes
+     */
+    @callsuper();
+
+    /*
+     * if the text wasn't modified before our change, make it so again
+     */
+    if (!mod) {
+	@call ComposeSave::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	@call oself::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    }
+
+}
+
+
+@method MailComposeTextClass, MSG_VIS_TEXT_SET_SMALLER_POINT_SIZE,
+                              MSG_VIS_TEXT_SET_LARGER_POINT_SIZE
+{
+    /*
+     * get whether we were modified before
+     */
+    Boolean mod = @call oself::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+
+    /*
+     * set the attributes
+     */
+    @callsuper();
+
+    /*
+     * if the text wasn't modified before our change, make it so again
+     */
+    if (!mod) {
+	@call ComposeSave::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	@call oself::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    }
+
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_META_KBD_CHAR
+ * PASS:            character - character
+ *                  flags - CharFlags + ShiftState
+ *                  state - scan code
+ * RETURN:          none
+ * DESCRIPTION:
+ *         special handling for <Shift><Tab>
+ *         Really ought to use FlowCheckKbdShortcut(), but that's
+ *         a pain to set up in C for only one shortcut
+ *         Even with three, it's hardly worth the fixed memory overhead
+ *         since the stupid compiler will put the table there...
+ ***************************************************************/
+
+Boolean
+NotOnFirstLine(optr textObj)
+{
+    dword off, line;
+
+    off = @call textObj::MSG_VIS_TEXT_GET_SELECTION_START();
+    line = @call textObj::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(off);
+
+    return(line);
+}
+
+Boolean
+NotOnLastLine(optr textObj)
+{
+    dword offC, offE, lineC, lineE;
+
+    offC = @call textObj::MSG_VIS_TEXT_GET_SELECTION_START();
+    offE = @call textObj::MSG_VIS_TEXT_GET_TEXT_SIZE()-1;
+
+    lineC = @call textObj::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(offC);
+    lineE = @call textObj::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(offE);
+
+    return(lineC-lineE);
+}
+
+@method MailComposeTextClass, MSG_META_KBD_CHAR
+{
+    if (character == (0xff00|VC_TAB) && (flags & ((SS_LSHIFT|SS_RSHIFT)<<8))) {
+@ifdef ALTERNATE_FIELD_ORDER
+        @call ComposeSubjectField::MSG_META_GRAB_FOCUS_EXCL();
+        @call ComposeSubjectField::MSG_META_GRAB_TARGET_EXCL();
+@else
+@ifdef BCC_SUPPORT
+        @call ComposeBccField::MSG_META_GRAB_FOCUS_EXCL();
+        @call ComposeBccField::MSG_META_GRAB_TARGET_EXCL();
+@else
+        @call ComposeCCField::MSG_META_GRAB_FOCUS_EXCL();
+        @call ComposeCCField::MSG_META_GRAB_TARGET_EXCL();
+@endif // BCC_SUPPORT
+@endif // ALTERNATE_FIELD_ORDER
+    } else if (character == (0xff00|VC_UP) && !(flags & 0xff00)) {
+	/*
+	 * don't go off the top
+	 */
+	if (NotOnFirstLine(oself)) {
+	    @callsuper();
+	}
+    } else if (character == (0xff00|VC_DOWN) && !(flags & 0xff00)) {
+	/*
+	 * don't go off the bottom
+	 */
+	if (NotOnLastLine(oself)) {
+	    @callsuper();
+	}
+    } else {
+	@callsuper();
+    }
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_VIS_TEXT_REPLACE_WITH_TEXT_TRANSFER_FORMAT
+ * PASS:            file - VM file handle
+ *                  block - VM handle of TextTransferBlockHeader
+ *                  pasteFrame - 0 for normal paste; else quick transfer
+ *                  start, end
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Special behavor for pasting. Since we don't support sending
+ *         annoying HTML mail (thankyouverymuch), we just paste the text,
+ *         none of the attributes
+ ***************************************************************/
+
+@method MailComposeTextClass, MSG_VIS_TEXT_REPLACE_WITH_TEXT_TRANSFER_FORMAT
+{
+    TextTransferBlockHeader *tTrans;
+    VMBlockHandle tvmh;
+    MemHandle mh, th;
+    VisTextReplaceParameters params;
+    dword tCount, ci;
+    TCHAR *p, *q;
+    word elSize, i, j, ceCount, oldCe;
+    Boolean nonLatin1, sawGraphic;
+
+    th = NullHandle;
+    oldCe = 0;
+    nonLatin1 = sawGraphic = FALSE;
+
+    @call oself::MSG_META_SUSPEND();
+
+    tTrans = VMLock(file, block, &mh);
+    tvmh = VMCHAIN_GET_VM_BLOCK(tTrans->TTBH_text);
+    VMUnlock(mh);
+
+    /*
+     * map the range to a real range
+     */
+    params.VTRP_range.VTR_start = start;
+    params.VTRP_range.VTR_end = end;
+    @call oself::MSG_VIS_TEXT_GET_RANGE(&params.VTRP_range, 0);
+    /*
+     * prep for a quick transfer if need be
+     */
+    if (!@call oself::MSG_VIS_TEXT_PREP_FOR_QUICK_TRANSFER(tvmh, file,
+					       pasteFrame,
+					       params.VTRP_range.VTR_end,
+					       params.VTRP_range.VTR_start)) {
+	/*
+	 * OK, do the paste...the hard way. We need to do this because
+	 * the transfer item may have graphics in it, and just using
+	 * MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY, et al, won't deal with
+	 * them. Besides which keeping out non Latin-1 characters would be
+	 * nice, too.
+	 */
+        @call oself::MSG_VIS_TEXT_SELECT_RANGE(end, start);
+	/*
+	 * get # of chars, not including NULL
+	 */
+	tCount = HugeArrayGetCount(file, tvmh) - 1;
+	for (ci = 0; ci < tCount; ci++) {
+	    /*
+	     * get the next blob of text
+	     */
+	    ceCount = HAL_COUNT(HugeArrayLock(file, tvmh, ci, &p, &elSize));
+	    EC_ERROR_IF(ceCount > 10000, -1);
+	    /*
+	     * if more text than we had last time, resize the block
+	     */
+	    if (ceCount > oldCe) {
+		if (th) {
+		    MemReAlloc(th, ceCount, HAF_STANDARD);
+		    q = MemDeref(th);
+		}
+	    }
+	    /*
+	     * make sure we don't copy the NULL
+	     */
+	    if (ceCount > tCount - ci) {
+		ceCount = tCount - ci;
+	    }
+	    /*
+	     * if no block, then allocate one and lock it
+	     */
+	    if (!th) {
+		th = MemAlloc(ceCount*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
+		if (!th) {
+		    HugeArrayUnlock(p);
+		    goto done;
+		}
+		q = MemLock(th);
+	    }
+	    /*
+	     * copy characters one at a time if they aren't a graphic
+	     * and are in Latin-1
+	     */
+	    for (i = 0, j = 0; i < ceCount; i++, ci++) {
+		if (p[i] != C_GRAPHIC && LocalGeosToCodePageChar(p[i], CODE_PAGE_LATIN_1, C_NULL)) {
+		    q[j++] = p[i];
+		} else {
+		    if (p[i] == C_GRAPHIC) {
+			sawGraphic = TRUE;
+		    } else {
+			q[j++] = '_';
+			nonLatin1 = TRUE;
+		    }
+		}
+	    }
+	    /*
+	     * unlock the text transfer block and do the paste
+	     */
+	    HugeArrayUnlock(p);
+	    @call oself::MSG_VIS_TEXT_REPLACE_SELECTION_PTR(q, j);
+	    oldCe = ceCount;
+	}
+    }
+    /*
+     * done with the block -- clean up
+     */
+    if (th) {
+	MemFree(th);
+    }
+
+done:
+    @call oself::MSG_META_UNSUSPEND();
+    /*
+     * report any errors
+     */
+    if (nonLatin1) {
+	ReportError(@nonLatin1Err, NULL);
+    }
+    if (sawGraphic) {
+	ReportError(@noGraphicsErr, NULL);
+    }
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_VIS_TEXT_FILTER_VIA_CHARACTER
+ * PASS:            charToFilter - character to check
+ * RETURN:          0 to reject else character
+ * DESCRIPTION:
+ ***************************************************************/
+
+@method MailComposeTextClass, MSG_VIS_TEXT_FILTER_VIA_CHARACTER
+{
+    if (!LocalGeosToCodePageChar(charToFilter, CODE_PAGE_LATIN_1, C_NULL)) {
+	return(0);
+    }
+    return(charToFilter);
+}

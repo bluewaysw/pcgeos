@@ -1,0 +1,1331 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+FILE:		sCtrlC.def
+
+AUTHOR:		Gene Anderson, May 11, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eca	5/11/92		Initial revision
+
+DESCRIPTION:
+	Controllers defined by the Spreadsheet library.
+
+	$Id: sCtrlC.def,v 1.1 97/04/04 14:17:37 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __SCTRLC
+
+StartLibrary	ssheet
+
+NotifySSheetDataRangeChange struct
+    NSSDRC_selection	CellRange	;selected range
+    ;
+    ; NOTE: this does not include the header and footer, if any
+    ; NOTE: NSSDRC_range.CR_start.CR_row == -1 if there is no data
+    ;
+    NSSDRC_range	CellRange	;range of cells with data
+NotifySSheetDataRangeChange end
+
+;******************************************************************************
+;		SSEditBarControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_ENTER_DATA_WITH_EVENT
+; MSG_SPREADSHEET_RESTORE_DATA
+; MSG_SPREADSHEET_GOTO_CELL
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_EDIT_BAR_CHANGE:
+;						NotifySSheetEditBarChange
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_ACTIVE_CELL_CHANGE:
+;						NotifySSheetActiveCellChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSEditBarControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+MSG_SSEBC_INITIAL_KEYPRESS			message
+;
+; Handle the initial keypress to start editing text in the edit bar
+;
+;	PASS:	same as MSG_META_KBD_CHAR:
+;		    cl - Character		(Chars or VChar)
+;		    ch - CharacterSet	(CS_BSW or CS_CONTROL)
+;		    dl - CharFlags
+;		    dh - ShiftState		(left from conversion)
+;		    bp low - ToggleState
+;		    bp high - scan code
+;	RETURN:	none
+;
+MSG_SSEBC_ENTER_DATA			message
+;
+; Enter data from the edit bar
+;
+;	PASS:	bp - event to send along with data, or zero if none.
+;	RETURN:	none
+;
+
+MSG_SSEBC_GOTO_CELL			message
+;
+; Go to the specified cell
+;
+;	PASS:	none
+;	RETURN:	none
+;
+MSG_SSEBC_DIS_ENABLE_EDIT_ICONS		message
+;
+; Enable or disable the edit icons
+;	PASS:	cx - MSG_GEN_SET_ENABLED or MSG_GEN_SET_DISABLED
+;	RETURN:	none
+;
+MSG_SSEBC_PASS_KEYPRESS			message
+;
+; Pass a keypress that finished editing
+;
+;	PASS:	same as MSG_META_KBD_CHAR:
+;		    cl - Character		(Chars or VChar)
+;		    ch - CharacterSet	(CS_BSW or CS_CONTROL)
+;		    dl - CharFlags
+;		    dh - ShiftState		(left from conversion)
+;		    bp low - ToggleState
+;		    bp high - scan code
+;	RETURN:	none
+;
+MSG_SSEBC_GOTO_CELL_DB			message
+;
+; Go to the specified cell (from the DB)
+;
+;	PASS:	none
+;	RETURN:	none
+;
+MSG_SSEBC_CANCEL_DATA				message
+;
+; Cancel changes to data made in the edit bar
+;
+;	PASS:	none
+;	RETURN:	none
+;
+MSG_SSEBC_GET_FLAGS				message
+;
+; Get flags about the state of the edit bar
+;
+;	PASS:	none
+;	RETURN:	cl - SSEditBarControlFlags
+;
+MSG_SSEBC_GRAB_FOCUS				message
+;
+; Grab the focus
+;
+;	PASS:	none
+;	RETURN:	none
+;
+MSG_SSEBC_INITIATE_GOTO_CELL_DB			message
+;
+; Brings up the "Goto Cell" dialog box
+;
+;	PASS:	none
+;	RETURN:	none
+;
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+SSEditBarControlFlags	record
+    :7
+    SSEBCF_IS_FOCUS:1			;TRUE: edit bar has focus
+SSEditBarControlFlags	end
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSEBCFeatures	record
+    SSEBCF_GOTO_CELL:1
+SSEBCFeatures	end
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+
+SSEBCTFeatures	record
+    SSEBCTF_FILTER_SELECTOR:1
+    SSEBCTF_BACKSPACE_BUTTON:1
+    SSEBCTF_EDIT_BAR:1
+    SSEBCTF_EDIT_ICONS:1
+    SSEBCTF_GOTO_CELL_BUTTON:1
+    SSEBCTF_GOTO_CELL:1
+SSEBCTFeatures	end
+
+SSEBC_DEFAULT_FEATURES equ mask SSEBCF_GOTO_CELL
+
+SSEBC_DEFAULT_TOOLBOX_FEATURES equ mask SSEBCTF_GOTO_CELL or \
+				mask SSEBCTF_EDIT_ICONS or \
+				mask SSEBCTF_EDIT_BAR
+
+SSEBCMiscData	record
+	:15
+
+	SSEBCMD_PROTECTION:1
+	; if set, the cell displayed by edit bar is protected.
+	; 
+SSEBCMiscData	end
+
+;
+; Notification structures
+;
+NotifySSheetEditBarChange	struct
+    NSSEBC_selectStart	word		;start of selection
+    NSSEBC_selectEnd	word		;end of selection
+    NSSEBC_textSize	word		;length of text string for contents
+    NSSEBC_miscData	SSEBCMiscData	;other data needed by Editbar
+    NSSEBC_text		label	char	;contents (NULL-terminated)
+NotifySSheetEditBarChange	ends
+
+
+NotifySSheetActiveCellChange	struct
+    NSSACC_textSize	word		;length of text string for contents
+    NSSACC_text		label	char	;cell text (NULL-terminated)
+NotifySSheetActiveCellChange	ends
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSEditBarControlClass	endc
+
+;******************************************************************************
+;		SSSortControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_SORT_RANGE
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_SELECTION_CHANGE
+;						NotifySSheetSelectionChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSSortControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSSC_SORT				message
+;
+; Begin a sort
+;
+MSG_SSSC_SORT_TRIGGER			message
+;
+; Begin sort from a trigger
+;
+; PASS:		cl - RangeSortFlags
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+
+SSSCFeatures	record
+    SSSCF_SORT_BY:1
+    SSSCF_SORT_ORDER:1
+    SSSCF_SORT_OPTIONS:1
+SSSCFeatures	end
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+
+SSSCTFeatures	record
+    SSSCTF_SORT_DESCENDING:1
+    SSSCTF_SORT_ASCENDING:1
+SSSCTFeatures	end
+
+
+
+
+
+
+SSSC_DEFAULT_FEATURES equ mask SSSCF_SORT_BY or \
+				mask SSSCF_SORT_ORDER or \
+				mask SSSCF_SORT_OPTIONS
+
+SSSC_DEFAULT_TOOLBOX_FEATURES equ mask SSSCTF_SORT_ASCENDING or \
+				mask SSSCTF_SORT_DESCENDING
+
+;
+; Notification structures
+;
+SSheetSelectionFlags	record
+    :11
+    SSSF_ENTIRE_ROW:1			;TRUE: entire row selected
+    SSSF_ENTIRE_COLUMN:1		;TRUE: entire column selected
+    SSSF_SINGLE_CELL:1			;TRUE: single cell selected
+    SSSF_SINGLE_ROW:1			;TRUE: single row selected
+    SSSF_SINGLE_COLUMN:1		;TRUE: single column selected
+SSheetSelectionFlags	end
+
+NotifySSheetSelectionChange	struct
+    NSSSC_selection	CellRange	;range of selection
+    NSSSC_flags		SSheetSelectionFlags
+NotifySSheetSelectionChange	ends
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSSortControlClass	endc
+
+;******************************************************************************
+;		SSChooseFuncControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+;
+; Notification type(s) responded to:
+;
+
+SSChooseFuncControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSCF_CHOOSE_FUNCTION		message
+MSG_SSCF_REQUEST_FUNCTION_MONIKER	message
+MSG_SSCF_CHANGE_TYPE			message
+;
+; Change the type of function display
+;
+; PASS:		cx - FunctionType to display
+;
+MSG_SSCF_CHANGE_FUNCTION		message
+;
+; Change the function that is selected
+;
+; PASS:		cx - index of function in list
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+SSCFFeatures	record
+    SSCFF_DESCRIPTION:1		;TRUE: show description of function
+    SSCFF_ARGUMENT_LIST:1	;TRUE: show description of arguments
+    SSCFF_PASTE_ARGUMENTS:1	;TRUE: give paste arguments option
+    SSCFF_FUNCTION_TYPE:1	;TRUE: give list of function types
+    SSCFF_CHOOSE:1		;TRUE: the basics, mon
+SSCFFeatures	end
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+
+
+SSCF_DEFAULT_FEATURES equ mask SSCFF_CHOOSE or \
+			mask SSCFF_FUNCTION_TYPE or \
+			mask SSCFF_PASTE_ARGUMENTS or \
+			mask SSCFF_DESCRIPTION or \
+			mask SSCFF_ARGUMENT_LIST
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+    SSCFCI_types		FunctionType
+
+SSChooseFuncControlClass	endc
+
+;******************************************************************************
+;		SSDefineNameControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+;
+; Notification type(s) responded to:
+;
+
+SSDefineNameControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+MSG_DNC_NAME_OP_DONE			message
+MSG_DNC_NAME_OP_ERROR			message
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_DNC_UPDATE_UI_WITH_NUM_NAMES	message
+MSG_DNC_INIT_ADD_NAME			message
+MSG_DNC_ADD_NAME			message
+MSG_DNC_INIT_CHANGE_NAME		message
+MSG_DNC_CHANGE_NAME			message
+MSG_DNC_DELETE_NAME			message
+MSG_DNC_REQUEST_MONIKER			message
+MSG_DNC_NAME_UPDATE_DEFINITION		message
+MSG_DNC_QUERY_NAME_DELETE		message
+MSG_DNC_QUERY_NAME_DELETE_DONE		message
+MSG_DNC_ADD_ALLOW_RELATIVE_STATUS	message
+MSG_DNC_CHANGE_ALLOW_RELATIVE_STATUS	message
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+SSDNFeatures	record
+    SSDNF_DEFINE_NAME:1
+SSDNFeatures	end
+
+SSDNCommand	struc
+	SSDNC_listEntry		word	; 
+	SSDNC_controllerOD	dword	; 
+	SSDNC_msgToSendBack	word	;
+	SSDNC_dataBlk		word	;
+SSDNCommand	ends
+
+
+SSDN_DEFAULT_FEATURES equ mask SSDNF_DEFINE_NAME
+
+;
+; Notification structures used by SSDefineNameControl and SSChooseNameControl
+;
+NotifySSheetNameChange	struct
+    NSSNC_count		word		; used to force uniqueness of 
+NotifySSheetNameChange	ends		;    notifications
+
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSDefineNameControlClass	endc
+
+;******************************************************************************
+;		SSChooseNameControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+;
+; Notification type(s) responded to:
+;
+
+SSChooseNameControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SS_CHOOSE_NAME			message
+MSG_CHOOSE_NAME_REQUEST_MONIKER		message
+MSG_CNC_UPDATE_UI_WITH_NUM_NAMES	message
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+SSCNFeatures	record
+    SSCNF_CHOOSE_NAME:1
+SSCNFeatures	end
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+
+
+SSCN_DEFAULT_FEATURES equ mask SSCNF_CHOOSE_NAME
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSChooseNameControlClass	endc
+
+;******************************************************************************
+;		SSColumnWidthControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_CHANGE_COLUMN_WIDTHS
+; MSG_SPREADSHEET_SET_COLUMN_WIDTH
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_CELL_WIDTH_HEIGHT_CHANGE
+;					NotifySSheetCellWidthHeightChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSColumnWidthControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSCWC_CHANGE_COLUMN_WIDTHS				message
+;
+; Make selected columns narrower or wider
+;	PASS:	cx - change in column width
+;
+MSG_SSCWC_SET_COLUMN_WIDTH				message
+;
+; Set width of selected columns
+;	PASS:	cx - column width
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSCWCFeatures	record
+    SSCWCF_NARROWER:1
+    SSCWCF_WIDER:1
+    SSCWCF_BEST_FIT:1
+    SSCWCF_CUSTOM:1
+SSCWCFeatures	end
+
+
+
+SSCWC_DEFAULT_FEATURES equ mask SSCWCF_NARROWER or \
+			mask SSCWCF_WIDER or \
+			mask SSCWCF_BEST_FIT or \
+			mask SSCWCF_CUSTOM
+;
+; Notification structures
+;
+SSheetWidthHeightFlags	record
+    :6
+    SSWHF_MULTIPLE_WIDTHS:1		;TRUE: multiple column widths
+    SSWHF_MULTIPLE_HEIGHTS:1		;TRUE: multiple row heights
+SSheetWidthHeightFlags	end
+
+NotifySSheetCellWidthHeightChange	struct
+    NSSCWHC_flags	SSheetWidthHeightFlags
+    NSSCWHC_width	word		;width of column
+    NSSCWHC_height	word		;height of row
+NotifySSheetCellWidthHeightChange	ends
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSColumnWidthControlClass	endc
+
+
+;******************************************************************************
+;		SSRowHeightControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_SET_ROW_HEIGHT
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_CELL_WIDTH_HEIGHT_CHANGE
+;					NotifySSheetCellWidthHeightChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSRowHeightControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSRHC_ROW_HEIGHT_AUTOMATIC				message
+;
+; Change in state of row height automatic flag
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSRHCFeatures	record
+    SSRHCF_CUSTOM:1
+SSRHCFeatures	end
+
+
+
+SSRHC_DEFAULT_FEATURES equ mask SSRHCF_CUSTOM
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSRowHeightControlClass	endc
+
+;******************************************************************************
+;		SSEditControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_CLEAR_SELECTED
+; MSG_SPREADSHEET_INSERT_SPACE
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_SELECTION_CHANGE
+;					NotifySSheetSelectionChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSEditControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSEC_CLEAR					message
+;
+; Send out clear message to spreadsheet
+;
+; PASS:		none
+; RETURN:	none
+;
+MSG_SSEC_INSERT_DELETE_ROW_COLUMN		message
+;
+; Message to insert/delete a row/column
+;
+; PASS:		cx - SpreadsheetInsertFlags
+; RETURN:	none
+;
+MSG_SSEC_DO_INSERT				message
+;
+; Handle insert from DB
+;
+; PASS:		none
+; RETURN:	none
+;
+MSG_SSEC_DO_DELETE				message
+;
+; Handle delete from DB
+;
+; PASS:		none
+; RETURN:	none
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSECFeatures	record
+    SSECF_DELETE:1
+    SSECF_INSERT:1
+    SSECF_CLEAR:1
+SSECFeatures	end
+
+
+
+SSEC_DEFAULT_FEATURES equ mask SSECF_CLEAR or \
+			mask SSECF_INSERT or \
+			mask SSECF_DELETE
+
+SSECToolboxFeatures	record
+    SSECTF_DELETE_COLUMN:1
+    SSECTF_DELETE_ROW:1
+    SSECTF_INSERT_COLUMN:1
+    SSECTF_INSERT_ROW:1
+SSECToolboxFeatures	end
+
+
+
+SSEC_DEFAULT_TOOLBOX_FEATURES equ mask SSECTF_INSERT_ROW or \
+				mask SSECTF_INSERT_COLUMN or \
+				mask SSECTF_DELETE_ROW or \
+				mask SSECTF_DELETE_COLUMN
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSEditControlClass	endc
+
+
+;******************************************************************************
+;		SSHeaderFooterControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_SET_HEADER_RANGE
+; MSG_SPREADSHEET_SET_FOOTER_RANGE
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_DOC_ATTRS_CHANGE
+;					NotifySSheetDocAttrsChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSHeaderFooterControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSHFC_SET_HEADER_FOOTER			message
+;
+; Set or remove the header or footer range
+;	PASS:	cx - TRUE to remove header/footer
+;		dx - MSG_SPREADSHEET_SET_{HEADER,FOOTER}
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSHFCFeatures	record
+    SSHFCF_SET_HEADER:1
+    SSHFCF_SET_FOOTER:1
+    SSHFCF_CLEAR_HEADER:1
+    SSHFCF_CLEAR_FOOTER:1
+SSHFCFeatures	end
+
+
+
+SSHFC_DEFAULT_FEATURES equ mask SSHFCF_SET_HEADER or \
+			mask SSHFCF_SET_FOOTER or \
+			mask SSHFCF_CLEAR_HEADER or \
+			mask SSHFCF_CLEAR_FOOTER
+
+NotifySSheetDocAttrsChange	struct
+    NSSDAC_drawFlags	SpreadsheetDrawFlags
+    NSSDAC_header	CellRange
+    NSSDAC_footer	CellRange
+    NSSDAC_circCount	sword			;# of trips
+    NSSDAC_converge	FloatNum		;minimum difference
+    NSSDAC_calcFlags	SpreadsheetFlags	;calculation flags
+NotifySSheetDocAttrsChange	ends
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSHeaderFooterControlClass	endc
+
+;******************************************************************************
+;		SSBorderControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_SET_BORDERS
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_CELL_ATTRS_CHANGE
+;					NotifySSheetCellAttrsChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSBorderControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSBC_SET_OUTLINE				message
+;
+; "outline" was selected
+;
+MSG_SSBC_SET_SIDES				message
+;
+; "left","top","right" or "bottom" was selected
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSBCFeatures	record
+    SSBCF_SIDES:1
+SSBCFeatures	end
+
+
+
+SSBC_DEFAULT_FEATURES equ mask SSBCF_SIDES
+
+SpreadsheetCellFlags	record
+	:9
+	SCF_FORMATS:1		;TRUE: multiple numeric formats
+	SCF_JUSTIFICATIONS:1	;TRUE: multiple justifications
+	SCF_ROWS:1		;TRUE: multiple row heights
+	SCF_COLUMNS:1		;TRUE: multiple column widths
+	SCF_BORDER_PATTERNS:1	;TRUE: multiple border patterns
+	SCF_BORDER_GRAY_SCREENS:1 ;TRUE: multiple border gray screens
+	SCF_BORDER_COLORS:1	;TRUE: multiple border colors
+SpreadsheetCellFlags	end
+;
+NotifySSheetCellAttrsChange	struct
+    NSSCAC_borderInfo		CellBorderInfo
+    NSSCAC_borderColor		ColorQuad
+    NSSCAC_borderGrayScreen	SystemDrawMask
+    NSSCAC_borderPattern	GraphicPattern
+    NSSCAC_borderIndeterminates	CellBorderInfo
+    NSSCAC_borderColorIndeterminates SpreadsheetCellFlags
+NotifySSheetCellAttrsChange	ends
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+    SSBCI_status	CellBorderInfo		;current list status
+
+SSBorderControlClass	endc
+
+
+;******************************************************************************
+;		SSBorderColorControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_SET_BORDER_COLOR
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_CELL_ATTRS_CHANGE
+;					NotifySSheetCellAttrsChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSBorderColorControlClass	class	ColorSelectorClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+
+
+SSBCC_DEFAULT_FEATURES equ mask CSF_INDEX or mask CSF_RGB \
+				or mask CSF_DRAW_MASK or mask CSF_PATTERN \
+				or mask CSF_OTHER
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSBorderColorControlClass	endc
+
+
+;******************************************************************************
+;		SSRecalcControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_CHANGE_RECALC_PARAMS
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_DOC_ATTRS_CHANGE
+;					NotifySSheetDocAttrsChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+;
+; NOTE: This controller needs a floating point stack.  As the spreadsheet
+; library explicitly uses the Math library, which automatically creates
+; a stack for any threads in the app, this should not be a concern.
+
+SSRecalcControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSRC_RECALC_NOW				message
+;
+; Recalculate now
+;
+MSG_SSRC_SET_RECALC				message
+;
+; Set recalc params from DB
+;
+MSG_SSRC_ITERATE_ON_OFF				message
+;
+; Turn iteration on/off
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSRCFeatures	record
+    SSRCF_CONVERGE_DB:1
+    SSRCF_RECALC_NOW:1
+SSRCFeatures	end
+
+
+
+SSRC_DEFAULT_FEATURES equ mask SSRCF_RECALC_NOW or \
+			mask SSRCF_CONVERGE_DB
+
+SSRCToolboxFeatures	record
+    SSRCTF_RECALC_NOW:1
+SSRCToolboxFeatures	end
+
+
+
+SSRC_DEFAULT_TOOLBOX_FEATURES equ mask SSRCTF_RECALC_NOW
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSRecalcControlClass	endc
+
+;******************************************************************************
+;		SSOptionsControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_ALTER_DRAW_FLAGS
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_DOC_ATTRS_CHANGE
+;					NotifySSheetDocAttrsChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSOptionsControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSOC_SET_OPTIONS					message
+;
+; Set options from list
+;	PASS:	cx - SpreadsheetDrawFlags
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSOCFeatures	record
+    SSOCF_SHOW_FORMULAS:1
+    SSOCF_DRAW_HEADER_FOOTER_BUTTON:1
+    SSOCF_DRAW_NOTE_BUTTON:1
+    SSOCF_DRAW_GRID:1
+SSOCFeatures	end
+
+
+
+SSOC_DEFAULT_FEATURES equ mask SSOCF_DRAW_GRID or \
+			mask SSOCF_DRAW_NOTE_BUTTON or \
+			mask SSOCF_DRAW_HEADER_FOOTER_BUTTON or \
+			mask SSOCF_SHOW_FORMULAS
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSOptionsControlClass	endc
+
+;******************************************************************************
+;		SSNoteControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_SET_NOTE_FOR_ACTIVE_CELL
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_CELL_NOTES_CHANGE
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SSNoteControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSNC_SET_NOTES				message
+;
+; Set notes...
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+;
+; Maximum length that a note can be. There is no real benefit to setting this
+; to a low value except to restrict and annoy the user.
+;
+MAX_NOTE_LENGTH	=	512
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSNCFeatures	record
+    SSNCF_NOTES:1
+SSNCFeatures	end
+
+
+
+SSNC_DEFAULT_FEATURES equ mask SSNCF_NOTES
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSNoteControlClass	endc
+
+
+;******************************************************************************
+;		SSFillControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_FILL_SERIES
+; MSG_SPREADSHEET_FILL_RANGE
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_SELECTION_CHANGE
+;					NotifySSheetSelectionChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+;
+; NOTE: This controller needs a floating point stack.  As the spreadsheet
+; library explicitly uses the Math library, which automatically creates
+; a stack for any threads in the app, this should not be a concern.
+
+SSFillControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+
+MSG_SSFC_DO_FILL				message
+;
+; Fill series to right or down, no step
+;
+;	PASS:	cl - SpreadsheetSeriesFillFlags
+;
+MSG_SSFC_DO_SERIES				message
+;
+; Fill series, with step size
+;
+MSG_SSFC_SET_UNITS				message
+;
+; Set units for series fill
+;
+;	PASS:	cx - SpreadsheetSeriesFillType
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+SSFCFeatures	record
+    SSFCF_FILL_RIGHT:1
+    SSFCF_FILL_DOWN:1
+    SSFCF_FILL_SERIES:1
+SSFCFeatures	end
+
+
+
+SSFC_DEFAULT_FEATURES equ mask SSFCF_FILL_RIGHT or \
+			mask SSFCF_FILL_DOWN or \
+			mask SSFCF_FILL_SERIES
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSFillControlClass	endc
+
+;******************************************************************************
+;		SSChartControl
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPREADSHEET_CHART_RANGE
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPREADSHEET_SELECTION_CHANGE
+;					NotifySSheetSelectionChange
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+;
+SSChartControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SSCC_CHART						message
+;
+; Send a chart message off the the spreadsheet
+;
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+ifdef	SPIDER_CHART
+SSCCFeatures	record
+    SSCCF_SPIDER:1
+    SSCCF_HIGH_LOW:1
+    SSCCF_PIE:1
+    SSCCF_SCATTER:1
+    SSCCF_AREA:1
+    SSCCF_LINE:1
+    SSCCF_BAR:1
+    SSCCF_COLUMN:1
+SSCCFeatures	end
+
+SSCC_DEFAULT_FEATURES equ mask SSCCF_COLUMN or \
+			mask SSCCF_BAR or \
+			mask SSCCF_LINE or \
+			mask SSCCF_AREA or \
+			mask SSCCF_SCATTER or \
+			mask SSCCF_PIE or \
+			mask SSCCF_HIGH_LOW or \
+			mask SSCCF_SPIDER
+
+SSCCToolboxFeatures	record
+    SSCCTF_SPIDER:1
+    SSCCTF_HIGH_LOW:1
+    SSCCTF_PIE:1
+    SSCCTF_SCATTER:1
+    SSCCTF_AREA:1
+    SSCCTF_LINE:1
+    SSCCTF_BAR:1
+    SSCCTF_COLUMN:1
+SSCCToolboxFeatures	end
+
+SSCC_DEFAULT_TOOLBOX_FEATURES equ mask SSCCTF_COLUMN or \
+			mask SSCCTF_BAR or \
+			mask SSCCTF_LINE or \
+			mask SSCCTF_AREA or \
+			mask SSCCTF_SCATTER or \
+			mask SSCCTF_PIE or \
+			mask SSCCTF_HIGH_LOW or \
+			mask SSCCTF_SPIDER
+else
+SSCCFeatures	record
+    :1
+    SSCCF_HIGH_LOW:1
+    SSCCF_PIE:1
+    SSCCF_SCATTER:1
+    SSCCF_AREA:1
+    SSCCF_LINE:1
+    SSCCF_BAR:1
+    SSCCF_COLUMN:1
+SSCCFeatures	end
+
+SSCC_DEFAULT_FEATURES equ mask SSCCF_COLUMN or \
+			mask SSCCF_BAR or \
+			mask SSCCF_LINE or \
+			mask SSCCF_AREA or \
+			mask SSCCF_SCATTER or \
+			mask SSCCF_PIE or \
+			mask SSCCF_HIGH_LOW
+
+SSCCToolboxFeatures	record
+    :1
+    SSCCTF_HIGH_LOW:1
+    SSCCTF_PIE:1
+    SSCCTF_SCATTER:1
+    SSCCTF_AREA:1
+    SSCCTF_LINE:1
+    SSCCTF_BAR:1
+    SSCCTF_COLUMN:1
+SSCCToolboxFeatures	end
+
+SSCC_DEFAULT_TOOLBOX_FEATURES equ mask SSCCTF_COLUMN or \
+			mask SSCCTF_BAR or \
+			mask SSCCTF_LINE or \
+			mask SSCCTF_AREA or \
+			mask SSCCTF_SCATTER or \
+			mask SSCCTF_PIE or \
+			mask SSCCTF_HIGH_LOW
+endif
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+SSChartControlClass	endc
+
+EndLibrary	ssheet

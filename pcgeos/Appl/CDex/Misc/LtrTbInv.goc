@@ -1,0 +1,228 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GeoDex
+MODULE:		Misc	
+FILE:		miscLetterTabInvert.asm
+
+AUTHOR:		Ted H. Kim, March 9, 1992
+
+ROUTINES:
+	Name			Description
+	----			-----------
+	LettersInvertTab	Inverts the letter tab for non-CGA mode
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	3/92		Initial revision
+	jfh	12/2/04	port to GOC
+
+DESCRIPTION:
+	Contains routines used to invert the letter tab polygon.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*LettersCode     segment resource */
+
+@include "cdex.goh"
+@include "misc\consts.goh"
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LettersInvertTab 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Calculates all vertices that comprise a tab and inverts it.
+
+CALLED BY:	(INTERNAL)
+
+PASS:		ax - letter number
+		cx - left position of tab
+		bx - top position of tab
+		di - handle of gState
+		ds - seg addr of instance data
+		es - seg addr of core block
+
+	GOC:	GStateHandle gstate
+
+
+RETURN:		tab inverted
+		ds:si - pointer to coordBuffer
+		es:bx - instance data for LettersClass 
+		cx - number of vertices
+
+DESTROYED:	dx
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	2/6/90		Initial version
+	jfh	12/2/04	ported to GOC - turned in to method vs routine to use
+						instance data vs passing arguements
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method LettersClass, MSG_LETTERS_INVERT_TAB
+{
+ Boolean		firstInRow;
+ word			leftTabPos, topTabPos, i;
+
+
+	/* do some initialization */
+	leftTabPos = pself->LI_tabLeft;
+	topTabPos = pself->LI_tabTop;
+	i = 0;
+	if (pself->LI_letter == LTI_A || pself->LI_letter == LTI_K ||
+			pself->LI_letter == LTI_U)  firstInRow = TRUE;
+	else  firstInRow = FALSE;
+
+	/* is the tab in the 1st row?  if so, adjust x position */
+	if (pself->LI_letter < LTRN_ROW_MID)
+		leftTabPos += RIGHT_BOUND_ADJUST;
+
+	/* Each letter tab is a complex polygon.  In order to invert it,
+		we first have to figure out the coordnates of all the vertices
+		that comprise this polygon. */
+
+	/* calculate vertex number 1 (0,1) */
+	pself->LI_coordBuf[i] = leftTabPos + VERTEX1_X1_ADJUST;
+	if (!firstInRow)
+		pself->LI_coordBuf[i] -= VERTEX1_X1_ADJUST2;
+	pself->LI_coordBuf[i+1] = topTabPos;
+	/* AdjustForTenthColumn */
+	if (pself->LI_letter == LTI_J || pself->LI_letter == LTI_T ||
+							pself->LI_letter == LTI_RECYCLE)
+		pself->LI_coordBuf[i]++;
+	i += 2;
+
+	/* calculate vertex number 2 (2,3) */
+	pself->LI_coordBuf[i] = leftTabPos + VERTEX2_X2_ADJUST;
+	if (pself->LI_letter == LTI_T)
+		pself->LI_coordBuf[i]++;
+	pself->LI_coordBuf[i+1] = topTabPos;
+	/* AdjustForNinthColumn */
+	if (pself->LI_letter == LTI_I || pself->LI_letter == LTI_S ||
+							pself->LI_letter == LTI_SPACE2)
+		pself->LI_coordBuf[i]++;
+	/* AdjustForTenthColumn */
+	if (pself->LI_letter == LTI_J || pself->LI_letter == LTI_T ||
+							pself->LI_letter == LTI_RECYCLE)
+		pself->LI_coordBuf[i]++;
+	i += 2;
+
+	/* calculate vertex number 3 (4,5) */
+	pself->LI_coordBuf[i] = leftTabPos + VERTEX3_X3_ADJUST;
+	if (pself->LI_letter == LTI_T)
+		pself->LI_coordBuf[i]++;
+	pself->LI_coordBuf[i+1] = topTabPos + VERTEX3_Y3_ADJUST;
+	/* AdjustForNinthColumn */
+	if (pself->LI_letter == LTI_I || pself->LI_letter == LTI_S ||
+							pself->LI_letter == LTI_SPACE2)
+		pself->LI_coordBuf[i]++;
+	/* AdjustForTenthColumn */
+	if (pself->LI_letter == LTI_J || pself->LI_letter == LTI_T ||
+							pself->LI_letter == LTI_RECYCLE)
+		pself->LI_coordBuf[i]++;
+	i += 2;
+
+	/* calculate vertex number 4 (6,7) */
+	if (pself->LI_letter == LTI_T) {
+		pself->LI_coordBuf[i] = leftTabPos + VERTEX4_X4_ADJUST;
+		pself->LI_coordBuf[i+1] = topTabPos + VERTEX4_Y4_ADJUST;
+		}
+	else if (pself->LI_letter == LTI_RECYCLE) {
+		pself->LI_coordBuf[i] = leftTabPos + VERTEX4_X4_ADJUST2;
+		pself->LI_coordBuf[i+1] = topTabPos + VERTEX4_Y4_ADJUST2;
+		}
+	else  {
+		pself->LI_coordBuf[i] = leftTabPos + VERTEX4_X4_ADJUST3;
+		pself->LI_coordBuf[i+1] = topTabPos + VERTEX4_Y4_ADJUST3;
+		}
+	/* AdjustForNinthColumn */
+	if (pself->LI_letter == LTI_I || pself->LI_letter == LTI_S ||
+							pself->LI_letter == LTI_SPACE2)
+		pself->LI_coordBuf[i]++;
+	/* AdjustForTenthColumn */
+	if (pself->LI_letter == LTI_J || pself->LI_letter == LTI_T ||
+							pself->LI_letter == LTI_RECYCLE)
+		pself->LI_coordBuf[i]++;
+	i += 2;
+
+	/* calculate vertex number 5 for recycle or 'T' (8,9) */
+	if (pself->LI_letter == LTI_T || pself->LI_letter == LTI_RECYCLE ||
+				  pself->LI_letter < LTRN_ROW_MID) {
+		if (pself->LI_letter == LTI_RECYCLE) {
+			pself->LI_coordBuf[i] = leftTabPos + VERTEX5_X5_ADJUST - 1;
+			pself->LI_coordBuf[i+1] = topTabPos + VERTEX5_Y5_ADJUST;
+			i += 2;
+			}
+		else if (pself->LI_letter == LTI_T) {
+			pself->LI_coordBuf[i] = leftTabPos + VERTEX5_X5_ADJUST2 - 1;
+			pself->LI_coordBuf[i+1] = topTabPos + VERTEX5_Y5_ADJUST;
+			i += 2;
+			}
+		}
+	else {
+		/* calculate vertex number 5 for any letter in the second or
+			the third row except recycle tab and 'T' (8,9) */
+		pself->LI_coordBuf[i] = leftTabPos + VERTEX5_X5_ADJUST + 1;
+		pself->LI_coordBuf[i+1] = topTabPos + VERTEX5_Y5_ADJUST;
+		i += 2;
+		/* calculate vertex number 6 for any letter in the second or
+			the third row except recycle tab and 'T' */
+		pself->LI_coordBuf[i] = leftTabPos + VERTEX6_X6_ADJUST;
+		pself->LI_coordBuf[i+1] = topTabPos + VERTEX6_Y6_ADJUST;
+		/* AdjustForNinthColumn */
+		if (pself->LI_letter == LTI_I || pself->LI_letter == LTI_S ||
+							pself->LI_letter == LTI_SPACE2)
+			pself->LI_coordBuf[i]++;
+		i += 2;
+		/* calculate vertex number 7 for any letter in the second or
+			the third row except recycle tab and 'T' */
+		pself->LI_coordBuf[i] = leftTabPos + VERTEX7_X7_ADJUST;
+		pself->LI_coordBuf[i+1] = topTabPos + VERTEX7_Y7_ADJUST;
+		/* AdjustForNinthColumn */
+		if (pself->LI_letter == LTI_I || pself->LI_letter == LTI_S ||
+							pself->LI_letter == LTI_SPACE2)
+			pself->LI_coordBuf[i]++;
+		i += 2;
+		}
+
+	/* calculate vertex number 5 (8,9) for 'B' through 'J'
+		number 6 (10,11) for recycle and 'T', and number 7 (12,13) for the rest */
+	pself->LI_coordBuf[i] = leftTabPos;
+	if (!firstInRow)
+		pself->LI_coordBuf[i] += VERTEX7_X7_ADJUST2;
+	pself->LI_coordBuf[i+1] = topTabPos + VERTEX7_Y7_ADJUST;
+	i += 2;
+
+	/* calculate vertex number 6 for 'B' through 'J'
+		number 7 for recycle tab and 'T', and number 8 for the rest */
+	pself->LI_coordBuf[i] = leftTabPos;
+	if (!firstInRow)
+		pself->LI_coordBuf[i] += VERTEX8_X8_ADJUST;
+	pself->LI_coordBuf[i+1] = topTabPos + VERTEX8_Y8_ADJUST;
+	i += 2;
+
+	/* for letter tabs 'T' and recycle tab, total # of vertices is 7 */
+	if (pself->LI_letter == LTI_T || pself->LI_letter == LTI_RECYCLE)
+		pself->LI_numPts = NUMBER_OF_COORDINATES1;
+	/* for letters in the 2nd and the 3rd row, total # of vertices is 9 */
+	else if (pself->LI_letter >= LTRN_ROW_MID)
+		pself->LI_numPts = NUMBER_OF_COORDINATES2;
+	/* for letters in the 1st row, total # of vertices is 6 */
+	else  pself->LI_numPts = NUMBER_OF_COORDINATES3;
+
+	/*draw: */
+	GrSetMixMode(gstate, MM_INVERT);
+	GrFillPolygon(gstate, ODD_EVEN, pself->LI_coordBuf, pself->LI_numPts);
+	/* re-set to normal mode */
+	GrSetMixMode(gstate, MM_COPY);
+
+}
+

@@ -1,0 +1,314 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		chartConstants.def
+
+AUTHOR:		John Wedgwood, Oct  7, 1991
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jcw	10/ 7/91	Initial revision
+
+
+DESCRIPTION:
+	Constants and structures that are global to the chart library
+		
+	$Id: chartConstants.def,v 1.1 97/04/04 17:46:05 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;	CONSTANTS		
+;-----------------------------------------------------------------------------
+ 
+
+;
+; The largest that an axis label or title can be.
+;
+MAX_CHART_TEXT_LENGTH	equ 	255
+
+SBCS< CHART_TEXT_BUFFER_SIZE	equ 	256				>
+DBCS< CHART_TEXT_BUFFER_SIZE	equ 	256*(size wchar)		>
+
+
+; constants for formatting numbers
+
+MAX_DIGITS	equ	12
+DECIMAL_DIGITS equ 	2
+
+CreatePolylineFlags	record
+	CPF_CLOSED:1
+
+	CPF_LEGEND:1
+	; Set if we're creating a special hacked subclass of the
+	; VisSpline. 
+
+CreatePolylineFlags	end
+
+CreateTextFlags	record
+	CTF_CENTERED:1
+
+	CTF_SET_ON_CREATE:1
+	; The text will only be set when this object is newly created
+	; -- with the assumption that the user will be modifying
+	; titles, etc.
+
+	CTF_MAX_HEIGHT:1
+	; The text object will be forced to never change its height
+	; from the passed height.
+
+	CTF_USE_ANCHOR:1
+	; If set, position the text so that it's anchored at the
+	; specified position.  Allow text to calculate its own bounds
+	; based on its width/height
+	;
+
+	CTF_USE_CHAR_AND_PARA_ATTRS:1
+	; Use the passed VisTextCharAttr and VisTextParaAttr
+	; structures when creating this grobj.
+
+CreateTextFlags	end
+
+
+
+STANDARD_CHART_GROBJ_LOCKS equ mask GOL_MOVE or \
+			mask GOL_RESIZE or \
+			mask GOL_ROTATE or \
+			mask GOL_DELETE or \
+			mask GOL_SKEW or \
+			mask GOL_GROUP
+
+CreateGrObjFlags	record
+	CGOF_USE_TOKENS:1
+	; If set, then the "tokens" fields contain information to use
+	; when setting grobj attributes, and the other line/area
+	; attribute information is ignored
+
+	CGOF_AREA_COLOR:1
+	; If set, the areaColor field contains valid data to be used
+
+	CGOF_AREA_MASK:1
+	; If set, the areaMask field contains valid data to be used
+
+	CGOF_LINE_COLOR:1
+	; If set, the lineColor field contains valid data to be used
+
+	CGOF_LINE_MASK:1
+	; If set, the lineMask field contains valid data to be used
+
+	CGOF_LINE_STYLE:1
+	; If set, the lineStyle field contains valid data to be used
+
+	CGOF_ROTATED:1
+	; If set, then grobj is rotated (90 degrees)
+
+	CGOF_DRAW_ORDER:1
+	; If set, then place this grobj in a specified draw order
+
+	CGOF_ADD_TO_GROUP:1
+	; Instead of adding this grobj to the body, add it to the
+	; group.  The passed position and size will be relative to the
+	; passed group, rather than the ChartGroup
+
+	CGOF_CUSTOM_BOUNDS:1
+	; Don't use the default method for setting this object's
+	; bounds.
+
+	CGOF_CREATED:1
+	; This flag is used internally by the CreateOrUpdate routines
+	; to signify that the object in question has just been
+	; created.
+
+CreateGrObjFlags	end
+
+CreateGrObjParams	struct
+	CGOP_position	Point		<> ; relative to ChartGroup object
+	CGOP_size	Point		<>
+	CGOP_areaColor	Color		<>
+	CGOP_lineColor	Color		<>
+	CGOP_areaMask	SystemDrawMask	<>
+	CGOP_lineMask	SystemDrawMask	<>
+	CGOP_lineStyle	LineStyle	<>
+
+	CGOP_lineToken	word
+	CGOP_areaToken	word
+	CGOP_locks	GrObjLocks	<>
+	CGOP_drawOrder	word		; draw order
+	CGOP_flags	CreateGrObjFlags	<>
+	CGOP_group	optr
+	CGOP_groupCenter Point		<>
+	; the center of the Group, with respect to the upper left-hand
+	; corner of the chart group.  This value MUST be passed in
+	; when creating or updating objects that are in a group.
+
+	align word
+CreateGrObjParams	ends
+
+CreateGStringParams	struct
+	CGSP_common	CreateGrObjParams
+	CGSP_gstring	hptr.GState
+	CGSP_vmBlock	word
+CreateGStringParams	ends
+
+
+CreateRectParams	struct
+	CRP_common	CreateGrObjParams
+	align	word
+CreateRectParams	ends
+
+CreatePolylineParams	struct
+	CPP_common	CreateGrObjParams
+	CPP_points	fptr
+	CPP_numPoints	word
+	CPP_flags	CreatePolylineFlags
+	CPP_markerShape	MarkerShape
+	align word
+CreatePolylineParams	ends
+
+MinMaxType	etype	byte
+	MMT_MIN	enum	MinMaxType, 0
+	MMT_CENTER enum	MinMaxType, 1
+	MMT_MAX enum	MinMaxType, 2
+
+TextAnchorFlags	record
+	TAF_H MinMaxType:2
+	TAF_V MinMaxType:2
+TextAnchorFlags	end
+
+TAT_TOP_LEFT	equ (MMT_MIN shl offset TAF_H) or (MMT_MIN shl offset TAF_V)
+TAT_TOP		equ (MMT_CENTER shl offset TAF_H) or (MMT_MIN shl offset TAF_V)
+TAT_TOP_RIGHT	equ (MMT_MAX shl offset TAF_H) or (MMT_MIN shl offset TAF_V)
+TAT_RIGHT	equ (MMT_MAX shl offset TAF_H) or (MMT_CENTER shl offset TAF_V)
+TAT_BOTTOM_RIGHT equ (MMT_MAX shl offset TAF_H) or (MMT_MAX shl offset TAF_V)
+TAT_BOTTOM	equ (MMT_CENTER shl offset TAF_H) or (MMT_MAX shl offset TAF_V)
+TAT_BOTTOM_LEFT	equ (MMT_MIN shl offset TAF_H) or (MMT_MAX shl offset TAF_V)
+TAT_LEFT	equ (MMT_MIN shl offset TAF_H) or (MMT_CENTER shl offset TAF_V)
+TAT_CENTER	equ (MMT_CENTER shl offset TAF_H) or \
+					(MMT_CENTER shl offset TAF_V)
+
+
+CreateTextParams	struct
+	CTP_common	CreateGrObjParams
+	CTP_text	fptr
+	CTP_flags	CreateTextFlags
+	CTP_anchor	TextAnchorFlags
+	CTP_charAttr	nptr.VisTextCharAttr
+	CTP_paraAttr	nptr.VisTextParaAttr
+	align word
+CreateTextParams	ends
+
+CreateArcParams	struct
+	CAP_common	CreateGrObjParams
+	CAP_startAngle	WWFixed
+	CAP_endAngle	WWFixed
+CreateArcParams	ends
+
+; Table containing all the data necessary to perform the
+; update mechanism
+
+UpdateTableEntry	struct
+	UTE_message	word
+	UTE_size	word
+	UTE_class	fptr
+	UTE_gcnListType		GeoWorksGenAppGCNListType
+	UTE_notificationType	GeoWorksNotificationType
+UpdateTableEntry	ends
+
+
+;-----------------------------------------------------------------------------
+;			     Fatal Errors
+;-----------------------------------------------------------------------------
+COLUMN_TOO_LARGE				enum FatalErrors
+ROW_TOO_LARGE					enum FatalErrors
+VALUE_GREATER_THAN_16_BITS			enum FatalErrors 
+EXPECTED_ZERO_VALUE				enum FatalErrors 
+DS_DI_NOT_POINTING_AT_AN_AXIS_OBJECT		enum FatalErrors 
+EXPECTED_NONZERO_VALUE				enum FatalErrors 
+INVALID_SELECTION_COUNT				enum FatalErrors 
+INCORRECT_END_OF_DATA_FIELD			enum FatalErrors 
+DS_DI_NOT_POINTING_TO_INSTANCE_DATA		enum FatalErrors 
+ILLEGAL_SERIES_NUMBER				enum FatalErrors 
+ILLEGAL_CATEGORY_NUMBER				enum FatalErrors 
+ILLEGAL_CALL_TABLE_VALUE			enum FatalErrors 
+DS_SI_NOT_A_CHART_OBJECT			enum FatalErrors
+DS_DI_NOT_PLOT_AREA_INSTANCE_DATA		enum FatalErrors 
+DS_SI_NOT_SERIES_AREA				enum FatalErrors 
+ILLEGAL_CHART_TYPE				enum FatalErrors 
+DS_SI_NOT_SERIES_CLASS				enum FatalErrors 
+DS_SI_NOT_LEGEND_CLASS				enum FatalErrors 
+GROBJ_ALREADY_EXISTS				enum FatalErrors 
+DS_SI_NOT_COLUMN_CLASS				enum FatalErrors 
+ILLEGAL_PLOT_BOUNDS				enum FatalErrors 
+DS_SI_NOT_AXIS_CLASS				enum FatalErrors 
+CHART_REALIZE_CALLED_WITH_INVALID_GEOMETRY	enum FatalErrors
+DS_SI_WRONG_CLASS				enum FatalErrors 
+; DS:SI is not an object of the required class for this procedure.
+
+INVALID_ELEMENT_NUMBER				enum FatalErrors 
+
+GROBJ_FIELD_FOR_MULTIPLE_OBJECT_NOT_NULL	enum FatalErrors 
+; The COI_grobj field is not null when it's expected to be.  Most
+; likely a mismatch between calls to ChartObjectMultipleGetGrObj and
+; ChartObjectMultipleSetGrObj. 
+
+ILLEGAL_CHART_VARIATION				enum FatalErrors 
+; Chart variation passed to a BUILD routine is invalid
+
+ILLEGAL_FLAGS					enum FatalErrors 
+; bad flags record passed -- most likely garbage data.
+
+ILLEGAL_PARAMETER				enum FatalErrors 
+; A bad parameter was passed to this procedure or method
+
+CHART_WRONG_NUMBER_ITEMS_ON_FP_STACK		enum FatalErrors
+
+ILLEGAL_VALUE					enum FatalErrors 
+; A value was not returned when one was expected.
+
+ILLEGAL_STATE					enum FatalErrors
+; A state flag was turned the wrong way
+
+OBJECT_NOT_FOUND				enum FatalErrors 
+; The requested object was not part of the composite
+
+OBJECT_NOT_IN_COMPOSITE				enum FatalErrors
+; 
+
+REGISTER_WAS_TRASHED				enum FatalErrors 
+; A register was trashed by a called routine (most likely in the Math
+; library :)
+;
+
+ILLEGAL_POINTER					enum FatalErrors 
+; A pointer is not pointing into a locked block
+
+ILLEGAL_SEGMENT					enum FatalErrors 
+; A segment register is not pointing at a locked block
+
+AXIS_ALREADY_HAS_TITLE				enum FatalErrors 
+; A message to add a title to an axis was sent when the axis already
+; has a title
+
+TOO_MANY_ROWS				enum FatalErrors
+; the passed data block contains too many rows.
+
+TOO_MANY_COLUMNS			enum FatalErrors 
+; the passed data block contains too many columns.
+; 
+
+NOT_A_VIS_GUARDIAN			enum FatalErrors 
+; A message was sent to a GrObject that was expected to be a vis
+; guardian, but it wasn't.
+
+
+TITLE_ERROR	enum FatalErrors
+; An internal error occured with one of the title objects.
+
+INVALID_CLASS_SEGMENT			enum	FatalErrors
+; Make sure the seg reg stores the seg ptr to the class structures 's block,
+; not dgroup

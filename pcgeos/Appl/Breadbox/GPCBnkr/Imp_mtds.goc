@@ -1,0 +1,679 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/*
+ **************************************************************************
+ *  FILE:			imp_mtds.goc
+ *  PROJECT:		GPC Banker
+ *  DESCRIPTION:	This file has methods for the import
+ *				from Quicken QIF functions
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "gpcbnkr.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_IMPORT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *                  is clicked
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method GPCBnkrProcessClass, MSG_OPEN_IMPORT
+{
+ Boolean		notThere;
+
+    /* start out in Banker Files */
+    MemLock (OptrToHandle(@BankerFolderTxt));
+    notThere = @call ImpFileSel::MSG_GEN_PATH_SET
+					 (LMemDeref(@BankerFolderTxt),
+					 SP_DOCUMENT);
+    MemUnlock (OptrToHandle(@BankerFolderTxt));
+
+    /* or Document if not there */
+    if(notThere)  @call ImpFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+    /* Open the dialog box */
+    @call ImportDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	(GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_IMPORT_SELECTOR_ACTION for GPCBnkrProcessClass
+ *                 (word entryNum, word entryFlags)
+ * DESCRIPTION:
+ *
+ *              checks for dbl click on file to import
+ *              
+ *
+ ***********************************************************************/
+
+@extern method GPCBnkrProcessClass, MSG_IMPORT_SELECTOR_ACTION
+{
+
+    /* need this to make Import button dim in CUI */
+    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_NO_ENTRIES) {
+	  @send ImportButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	  return;
+	  }
+
+    /* was it a double click? */
+    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) {
+	  if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)  {
+		@send, forceQueue process::MSG_IMPORT_QIF();
+		}
+	  }
+    else  {  /* if not dbl click see if we're on a file */
+	  if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
+		@send ImportButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+	  else
+		@send ImportButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+       }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_IMPORT_QIF for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	 Opens the selected file and does the import
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_IMPORT_QIF
+{
+char		QIFName[FILE_LONGNAME_BUFFER_SIZE];
+char		QIFPath[PATH_BUFFER_SIZE];
+dword		selFlags, i, QIFfileSize, transDateNum;
+FileHandle		QIFFileHandle;
+DiskHandle		QIFDiskhandle;
+word		j, charRead, transImp;
+word		fileCloseError;
+char		QIFheaderBuffer[50];
+char		charBuffer[1];
+char		lineBuffer[50], tempStr[50];
+char		countBuffer[11];
+FloatNum		balance;
+byte		QIFlineID;
+TimerDateAndTime	date;
+TransStruct		tempElement;
+Boolean		negFlag = FALSE, notCheck, wasNField = FALSE;
+Boolean		isDupe;
+Boolean		foundBank = FALSE;
+dword		dwnumber, readStart;
+byte		typeHolder;
+DBItem		transItem;
+Boolean		newAccount = FALSE;
+char		memo[ENTRY_SIZE];
+char		cat[ENTRY_SIZE];
+char		parent[CAT_SIZE];
+FloatNum		amount;
+TempMultiStruct	*arrayElement;
+Boolean		firstSplit = TRUE;
+Boolean		hadParent;
+word			catLen, catType;
+
+
+    if (!numTrans) newAccount = TRUE;
+
+    /* initialize the temp structure elements
+     *  that need it*/
+    tempElement.TS_number = 0;
+    tempElement.TS_amount = 0;
+    tempElement.TS_cleared = FALSE;
+    strcpy(tempElement.TS_payee, "");
+    strcpy(tempElement.TS_memo, "");
+    strcpy(tempElement.TS_category, "");
+
+    /* first get the flags and file name of the selection */
+    selFlags = @call ImpFileSel::
+	       MSG_GEN_FILE_SELECTOR_GET_SELECTION(QIFName);
+
+    /* check to see if it's a file - redundant if dbl clicked */
+    if (GFS_GET_ENTRY_TYPE(selFlags) != GFSET_FILE)  {
+       /* if not just return */
+       return;
+       }
+
+    /* put up are you sure box if there are trans in the account */
+    if (!newAccount) {
+	  if (AckDBox(QIFName, 0, @ImportMsg) == ACK_NO) return;
+	  }
+	  
+    /* get the file's path and disk handle */
+    @call ImpFileSel::MSG_GEN_PATH_GET(QIFPath, sizeof(QIFPath));
+    QIFDiskhandle = @call ImpFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+    /* save our Banker file directory */
+    FilePushDir();
+
+    /* and set the QIF file dir  - FileSel doesn't do this */
+    FileSetCurrentPath(QIFDiskhandle, QIFPath);
+
+    /* dismiss the file selector box now */
+    @send ImportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /* and open the QIF file */
+    QIFFileHandle = FileOpen(QIFName, (FILE_ACCESS_R | FILE_DENY_W));
+    /* if QIFFileHandle is NULL then there was an error */
+    if (!QIFFileHandle)  {
+	  NotifyDBox(0, @ImpOpenErrMsg);
+	  FilePopDir();
+       return;  /* bail out */
+       }
+
+    /* put up progress box */
+    @call ImportProg::MSG_GEN_INTERACTION_INITIATE();
+    /* mark app busy */
+    @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* OK let's read the file...
+     * FileRead returns -1 if there was an error */
+    /* first get the file size */
+    QIFfileSize = FileSize(QIFFileHandle);
+    /* set the file read start */
+    readStart = 0;
+    /* first check for QIF bank header */
+    QIFheaderBuffer[0] = 0;  /* init the buffer */
+    for (i = 0; i < QIFfileSize; i++)  {
+	  charRead = FileRead(QIFFileHandle, charBuffer, 1, FALSE);
+	  if (charRead == 1)  {  /* good read */
+		readStart++;
+		/* add null to end of char buffer */
+		charBuffer[1] = NULL;
+		/* check for CR/LF */
+		if ((charBuffer[0] != '\r') && (charBuffer[0] != '\n'))  {
+		   /* not CR/LF so add to line */
+		   strcat(QIFheaderBuffer, charBuffer);
+		   }  /*  end of not CR/LF if */
+		  else if (charBuffer[0] == '\r')  {
+		   /* here's where we end the line and check type */
+		   MemLock (OptrToHandle(@ImportMsg));
+		   if (strcmp(QIFheaderBuffer, LMemDeref(@Type1String)) == 0) {
+			 /* this starts a valid bank file */
+			 /* so exit loop here */
+			 foundBank = TRUE;
+			 i = QIFfileSize;
+			 }
+		   /* NEW for V1.0.2 - some versions have a space after
+		    * the header so check for it too. */
+		   if (strcmp(QIFheaderBuffer, LMemDeref(@Type2String)) == 0) {
+			 /* this starts a valid bank file */
+			 /* so exit loop here */
+			 foundBank = TRUE;
+			 i = QIFfileSize;
+			 }
+		   MemUnlock (OptrToHandle(@ImportMsg));
+		   QIFheaderBuffer[0] = 0;  /* re-init the buffer */
+		   }
+		} /* end of good read if */
+	    else  {
+		/* read error */
+		NotifyDBox(0, @ImpReadErrMsg);
+		/* close the file */
+		fileCloseError = FileClose(QIFFileHandle, FALSE);
+		if (fileCloseError != 0)  {
+		   NotifyDBox(0, @ImpCloseErrMsg);
+		   }
+		/* dismiss the progress box */
+		@send ImportProg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+		/* mark app not busy */
+		@send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+		/* and restore the Banker file dir */
+		FilePopDir();
+		return;
+		}  /* end of bad read else */
+
+	  } /* end of look for bank for */
+
+    if (!foundBank) {
+	  /* not a valid bank file */
+	  NotifyDBox(0, @ImpBadTypeErrMsg);
+	  /* close the file */
+       fileCloseError = FileClose(QIFFileHandle, FALSE);
+	  if (fileCloseError != 0) NotifyDBox(0, @ImpCloseErrMsg);
+	  /* dismiss the progress box */
+       @send ImportProg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	  /* mark app not busy */
+       @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	  /* and restore the Banker file dir */
+	  FilePopDir();
+       return;
+       }   /* end of no valid bank if */
+
+    /* start the PROGRESS BOX counting here */
+    transImp = 0;
+    @call IPExamine::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @call IPCount::MSG_GEN_SET_USABLE(VUM_NOW);
+
+
+    /* OK now read file one char at a time ------------------- */
+    /* initialize the line buffer */
+    lineBuffer[0] = NULL;
+    /* start the reading loop */
+    for (i = readStart; i < QIFfileSize; i++) {
+	  charRead = FileRead(QIFFileHandle, charBuffer, 1, FALSE);
+	  /* make sure it's a good read */
+	  if (charRead == 1)  {  /* good read */
+		/* add null to end of char buffer */
+		charBuffer[1] = NULL;
+		/* check for CR/LF */
+		if ((charBuffer[0] != '\r') && (charBuffer[0] != '\n'))  {
+		   /* not CR/LF so add to line */
+		   strcat(lineBuffer, charBuffer);
+		   }  /*  end to not CR/LF if */
+		else if (charBuffer[0] == '\r')  {
+		   /* here's where we end the line and store the data */
+		   /* grab the identifier */
+		   QIFlineID = lineBuffer[0];
+		   /* now strip it from the buffer */
+		   *tempStr = NULL;
+		   strcpy(tempStr, &lineBuffer[1]);
+		   strcpy(lineBuffer, tempStr);
+		   /* and take action based on lineID */
+		   switch (QIFlineID) {
+			 case 'D': /* date */
+			    LocalParseDateTime(lineBuffer, DTF_SHORT, &date);
+			    break;
+			 case 'T': /* amount */
+			    /* check for minus number */
+			    if (lineBuffer[0] == '-')  {
+				  negFlag = TRUE;
+				  /* strip the minus sign */
+				  *tempStr = NULL;
+				  strcpy(tempStr, &lineBuffer[1]);
+				  strcpy(lineBuffer, tempStr);
+				  }
+			    FloatAsciiToFloat(FAF_STORE_NUMBER,
+						 strlen(lineBuffer),
+						 lineBuffer,
+						 &tempElement.TS_amount);
+			    break;
+			 case 'C': /* cleared status */
+			    tempElement.TS_cleared = TRUE;
+			    break;
+			 case 'N': /* number/type */
+			    wasNField = TRUE;
+			    MemLock (OptrToHandle(@ImportMsg));
+				 if (LocalCmpStringsNoCase(lineBuffer,
+									  LMemDeref(@ImpQIFDEP),
+									  strlen(LMemDeref(@ImpQIFDEP))) == 0) {
+				  tempElement.TS_type = TRANS_DP;
+				  }
+				 else if (LocalCmpStringsNoCase(lineBuffer,
+										  LMemDeref(@ImpQIFDEB),
+										  strlen(LMemDeref(@ImpQIFDEB))) == 0) {
+				  tempElement.TS_type = TRANS_DB;
+				  }
+				 else if (LocalCmpStringsNoCase(lineBuffer,
+										  LMemDeref(@ImpQIFCR),
+										  strlen(LMemDeref(@ImpQIFCR))) == 0) {
+				  tempElement.TS_type = TRANS_CR;
+				  }
+				 else if (LocalCmpStringsNoCase(lineBuffer,
+										  LMemDeref(@ImpQIFXfer),
+										  strlen(LMemDeref(@ImpQIFXfer))) == 0) {
+				  if (negFlag) tempElement.TS_type = TRANS_XFM;
+				  else tempElement.TS_type = TRANS_XFP;
+				  }
+			    else {
+				  notCheck = UtilAsciiToHex32(lineBuffer, &dwnumber);
+				  if (notCheck || lineBuffer[0] == NULL) {
+					tempElement.TS_number = 0;
+					if (negFlag) tempElement.TS_type = TRANS_DB;
+					else tempElement.TS_type = TRANS_CR;
+					}
+				  else  {
+					tempElement.TS_type = TRANS_CK;
+					tempElement.TS_number = dwnumber;
+					}
+				  }
+			    MemUnlock (OptrToHandle(@ImportMsg));
+			    break;
+			 case 'P': /* payee */
+			    strcpy(tempElement.TS_payee, lineBuffer);
+			    break;
+			 case 'M': /* memo */
+			    strcpy(tempElement.TS_memo, lineBuffer);
+			    break;
+			 case 'L': /* category */
+			    /* truncate cat/subcat if needed */
+			    hadParent = FALSE;
+			    catLen = strlen(lineBuffer);
+			    for (j = 0; j < catLen; j++)  {
+				  if (lineBuffer[j] == ':')  {
+					lineBuffer[j] = 0;
+					/* make sure its not too long */
+					if (strlen(lineBuffer) > (CAT_SIZE - 1))
+									    lineBuffer[CAT_SIZE - 1] = 0;
+					strcpy(tempElement.TS_category, lineBuffer);
+					/* now check for the subcat */
+					/* make sure its not too long */
+					if (strlen(&lineBuffer[j+1]) > (CAT_SIZE - 1))
+									    lineBuffer[j + CAT_SIZE] = 0;
+					strcat(tempElement.TS_category, ":");
+					strcat(tempElement.TS_category, &lineBuffer[j+1]);
+					hadParent = TRUE;
+					}
+				  if (hadParent) j = catLen; /* bail from loop */
+				  }  /* end of look for : loop (j) */
+			    if (!hadParent)  {
+				  /* make sure its not too long */
+				  if (strlen(lineBuffer) > (CAT_SIZE - 1))
+									    lineBuffer[CAT_SIZE - 1] = 0;
+
+				  strcpy(tempElement.TS_category, lineBuffer);
+				  }
+			    break;
+			 case 'S': /* splits cat */
+			    /* truncate cat/subcat if needed */
+			    hadParent = FALSE;
+			    catLen = strlen(lineBuffer);
+			    for (j = 0; j < catLen; j++)  {
+				  if (lineBuffer[j] == ':')  {
+					lineBuffer[j] = 0;
+					/* make sure its not too long */
+					if (strlen(lineBuffer) > (CAT_SIZE - 1))
+									    lineBuffer[CAT_SIZE - 1] = 0;
+					strcpy(cat, lineBuffer);
+					/* now check for the subcat */
+					/* make sure its not too long */
+					if (strlen(&lineBuffer[j+1]) > (CAT_SIZE - 1))
+									    lineBuffer[j + CAT_SIZE] = 0;
+					strcat(cat, ":");
+					strcat(cat, &lineBuffer[j+1]);
+					hadParent = TRUE;
+					}
+				  if (hadParent) j = catLen; /* bail from loop */
+				  }  /* end of look for : loop (j) */
+			    if (!hadParent)  {
+				  /* make sure its not too long */
+				  if (strlen(lineBuffer) > (CAT_SIZE - 1))
+									    lineBuffer[CAT_SIZE - 1] = 0;
+
+				  strcpy(cat, lineBuffer);
+				  }
+			    break;
+			 case 'E': /* splits memo */
+			    strcpy(memo, lineBuffer);
+			    break;
+			 case '$': /* splits amount */
+			    /* check for minus number */
+			    if (lineBuffer[0] == '-')  {
+				  negFlag = TRUE;
+				  /* strip the minus sign */
+				  *tempStr = NULL;
+				  strcpy(tempStr, &lineBuffer[1]);
+				  strcpy(lineBuffer, tempStr);
+				  }
+			    FloatAsciiToFloat(FAF_STORE_NUMBER,
+						 strlen(lineBuffer),
+						 lineBuffer,
+						 &amount);
+
+			    /* since this is the last element of a split
+				* add it to the split array now */
+			    if (firstSplit) {
+				  /* create a mem block to hold the info temporarily */
+				  multiHeapHandle = MemAlloc(
+								2048,
+								HF_SWAPABLE,
+								HAF_LOCK);
+				  LMemInitHeap(multiHeapHandle,
+							LMEM_TYPE_GENERAL,
+							0,
+							sizeof(LMemBlockHeader),
+							STD_INIT_HANDLES,
+							STD_INIT_HEAP);
+				  /* create the chunk array  */
+				  multiChunkArray = ChunkArrayCreate(
+								multiHeapHandle,
+								sizeof(TempMultiStruct),
+								0,
+								0);
+				  MemUnlock(multiHeapHandle);
+				  firstSplit = FALSE;
+				  numMultis = 0;
+				  multiFlag = TRUE;
+				  } /* end of create split array if */
+
+			    /* now put the info into the array */
+			    MemLock(multiHeapHandle);
+			    arrayElement = ChunkArrayAppendHandles(
+						    multiHeapHandle,
+						    multiChunkArray,
+						    0);
+			    arrayElement->TMS_amount = amount;
+			    strcpy(arrayElement->TMS_note, memo);
+			    strcpy(arrayElement->TMS_cat, cat);
+			    MemUnlock(multiHeapHandle);
+
+			    /* put the cat (if any) into cat list */
+			    if (strlen(cat)) {
+				  /* set inc or exp */
+				  if ((tempElement.TS_type == TRANS_CR) ||
+						(tempElement.TS_type == TRANS_DP) ||
+						(tempElement.TS_type == TRANS_XFP))  catType = CTYPE_INC;
+				  else catType = CTYPE_EXP;
+				  /* check for parent & sub together */
+				  hadParent = FALSE;
+				  catLen = strlen(cat);
+				  for (j = 0; j < catLen; j++)  {
+					if (cat[j] == ':')  {
+					    /* add this parent or find out it's a dupe */
+					    cat[j] = 0;
+						 isDupe = AddCatCheck(cat, "", catType);
+					    /* if not a dupe, add it */
+					    if (!isDupe) AddCatOK();
+					    strcpy(parent, cat);
+					    /* now check for the subcat */
+						 isDupe = AddCatCheck(&cat[j+1], parent, catType);
+					    /* if not a dupe, add it */
+					    if (!isDupe) AddCatOK();
+					    hadParent = TRUE;
+					    }
+					if (hadParent) j = catLen; /* bail from loop */
+					}  /* end of look for : loop (j) */
+				  if (!hadParent)  {
+					/* add it or find out it's a dupe */
+					isDupe = AddCatCheck(cat, "", catType);
+					/* if not a dupe, make things right */
+					if (!isDupe) AddCatOK();
+					}
+				  } /* end of cat into cat list if */
+
+			    /* increment numSplits */
+			    numMultis++;
+			    break;
+			 case '^': /* end of trans */
+			    /* import the transaction */
+
+			    /* set cat correctly */
+			    if (multiFlag)  {
+				  MemLock (OptrToHandle(@ImportMsg));
+				  strcpy(tempElement.TS_category, LMemDeref(@MultCatText));
+				  MemUnlock (OptrToHandle(@ImportMsg));
+				  }
+
+			    /* put the cat (if any) into cat list */
+			    if (strlen(tempElement.TS_category) && !multiFlag) {
+				  /* set inc or exp */
+				  if ((tempElement.TS_type == TRANS_CR) ||
+						(tempElement.TS_type == TRANS_DP) ||
+						(tempElement.TS_type == TRANS_XFP))  catType = CTYPE_INC;
+				  else catType = CTYPE_EXP;
+				  /* check for parent & sub together */
+				  strcpy(cat, tempElement.TS_category);
+				  hadParent = FALSE;
+				  catLen = strlen(cat);
+				  for (j = 0; j < catLen; j++)  {
+					if (cat[j] == ':')  {
+					    /* add this parent or find out it's a dupe */
+					    cat[j] = 0;
+						 isDupe = AddCatCheck(cat, "", catType);
+					    /* if not a dupe, add it */
+					    if (!isDupe) AddCatOK();
+					    strcpy(parent, cat);
+					    /* now check for the subcat */
+						 isDupe = AddCatCheck(&cat[j+1], parent, catType);
+					    /* if not a dupe, add it */
+					    if (!isDupe) AddCatOK();
+					    hadParent = TRUE;
+					    }
+					if (hadParent) j = catLen; /* bail from loop */
+					}  /* end of look for : loop (j) */
+				  if (!hadParent)  {
+					/* add it or find out it's a dupe */
+					isDupe = AddCatCheck(cat, "", catType);
+					/* if not a dupe, make things right */
+					if (!isDupe) AddCatOK();
+					}
+				  } /* end of cat into cat list if */
+
+			    /* set & save globals used in fn */
+			    typeHolder = currentType;
+			    if (!wasNField)  {  /* there was no 'N' field */
+				  if (negFlag)  currentType = TRANS_DB;
+				  else  currentType = TRANS_CR;
+				  }
+			    else  currentType = tempElement.TS_type;
+
+			    /* check on limit */
+			    if (numTrans == 1899) NotifyDBox(0, @TransNumWarnMsg);
+			    if (numTrans == 2000) {
+			    NotifyDBox(0, @TransNumStopMsg);
+			    @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+			    FilePopDir();
+			    return;
+			    }
+			    /* now call the function that enters this transaction */
+			    balance = EnterTransaction(
+							TRUE,   /* import */
+							tempElement.TS_amount,
+							date.TDAT_year,
+							date.TDAT_month,
+							date.TDAT_day,
+							tempElement.TS_number,
+							tempElement.TS_payee,
+							tempElement.TS_memo,
+							tempElement.TS_category,
+							FALSE,    /* tax */
+							tempElement.TS_cleared,
+							&transItem);        /* returned */
+
+			    /* add this transaction to the acct sort index array */
+			    transDateNum = MakeDateNum(date);
+			    TransIndexInsert(transDateNum,
+							 date,
+							 tempElement.TS_number,
+							 tempElement.TS_amount,
+							 tempElement.TS_cleared,
+							 transItem);
+
+			    /* reset & save globals used in fn */
+			    currentType = typeHolder;
+
+			    /* initialize the temp structure elements
+				*  that need it*/
+			    tempElement.TS_number = 0;
+			    tempElement.TS_amount = 0;
+			    tempElement.TS_cleared = FALSE;
+			    strcpy(tempElement.TS_payee, "");
+			    strcpy(tempElement.TS_memo, "");
+			    strcpy(tempElement.TS_category, "");
+
+			    negFlag = FALSE;
+			    wasNField = FALSE;
+			    firstSplit = TRUE;
+			    multiFlag = FALSE;
+
+			    /* inform the user of progress */
+			    transImp++;
+			    UtilHex32ToAscii(countBuffer,
+						   (sdword) transImp,
+						   UHTAF_NULL_TERMINATE);
+			    @call IPCount::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+						   countBuffer, 0);
+			    break;
+			 case '!':  /* QIF data type */
+			    /* we have another type.  Thus we've reached
+				* the end of our data... */
+			    i = QIFfileSize; /* bail out of for loop*/
+			    break;
+			 default:
+			    ;
+			    /* it wasn't a Banker supported code */
+			    /* so we'll just ignore the line */
+			 }  /* end of line ID switch */
+
+		   /* now reset the line buffer for next line */
+		   lineBuffer[0] = NULL;
+		   }  /* end of end the line if */
+
+		}  /* end of good read if */
+	  else  {  /* bad read */
+		/* read error */
+		NotifyDBox(0, @ImpReadErrMsg);
+		i = QIFfileSize; /* bail out of for loop*/
+		}
+
+	  }  /* end of reading for loop */
+
+    /* mark app not busy */
+    @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    /* close the file */
+    fileCloseError = FileClose(QIFFileHandle, FALSE);
+    if (fileCloseError != 0)  {
+	  NotifyDBox(0, @ImpCloseErrMsg);
+	  }
+
+    /* and restore the Banker file dir */
+    FilePopDir();
+
+    if (newAccount)  {
+	  /* enable buttons */
+	  @send ModifyButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send EntriesModifyMenuItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send EntriesDeleteMenuItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send EntriesVoidMenuItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+
+    /* init the register dlist */
+    if (numTrans > DEFAULT_LIST_LINES-1)
+	  @send RegisterDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numTrans);
+    else
+	  @send RegisterDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(DEFAULT_LIST_LINES);
+    @send RegisterDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+
+}

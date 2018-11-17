@@ -1,0 +1,1139 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Interface Gadgets
+MODULE:		Date Input Gadget
+FILE:		DateInp.goc
+
+AUTHOR:		Skarpi Hedinsson, Jul  1, 1994
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/ 1/94   	Initial revision
+	jfh	9/1/04	port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <Objects\cgadget.goh>
+@include "externs.goh"
+
+void DateInputUpdateText(DateStruct date);
+void SendDIActionMessage(optr diObj, Message msg, optr dest);
+void DISendApplyMsg(optr diObj, Message msg, optr dest);
+Boolean DIParseDateStringIfModified(optr diObj);
+
+/* a few lonely globals */
+optr g_diText = 0;
+char g_fmtStr[DATE_TIME_FORMAT_SIZE];
+
+@classdecl DateInputClass;
+@classdecl DateInputTextClass;
+
+
+/*----------------------------------------------------------------------
+
+MESSAGE:	DateInputGetInfo --
+		MSG_GEN_CONTROL_GET_INFO for DateInputClass
+
+DESCRIPTION:	Return group
+
+PASS:
+	*ds:si 	- instance data
+	es 	- segment of DateInputClass
+	ax 	- The message
+	cx:dx	- GenControlBuildInfo structure to fill in
+
+RETURN:
+	cx:dx - list of children
+
+DESTROYED:
+	bx, si, di, ds, es (message handler)
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	10/31/91		Initial version
+	jfh	9/1/04	port to GOC
+-----------------------------------------------------------------------------*/
+@method DateInputClass, MSG_GEN_CONTROL_GET_INFO
+{
+ /* Features information constants */
+ static const  GenControlChildInfo DIC_childList[] = {
+		{@DateInputGroup, DIF_DATE, GCCF_ALWAYS_ADD}};
+
+ /* The order of this list is actually backwards from the
+  * record it reflects. */
+ static const  GenControlFeaturesInfo DIC_featuresList[] = {
+		{@DateInputGroup, @DateInputName, 0}};
+
+ /* Our constant for the GenControlBuildInfo structure. */
+ static const  GenControlBuildInfo DIC_dupInfo = {
+			GCBF_NOT_REQUIRED_TO_BE_ON_SELF_LOAD_OPTIONS_LIST,	/* GCBI_flags */
+			0, 					/* GCBI_initFileKey */
+			0, 					/* GCBI_gcnList */
+			0, 					/* GCBI_gcnCount */
+			0, 					/* GCBI_notificationList */
+			0,						/* GCBI_notificationCount */
+			0, 					/* GCBI_controllerName */
+			NullHandle,			/* GCBI_dupBlock */
+			DIC_childList,		/* GCBI_childList */
+			ARRAY_LEN(DIC_childList, GenControlChildInfo),	/* GCBI_childCount */
+			DIC_featuresList,			/* GCBI_featuresList */
+			ARRAY_LEN(DIC_featuresList, GenControlFeaturesInfo), /* GCBI_featuresCount */
+			DI_DEFAULT_FEATURES,		/* GCBI_features */
+			0, 					/* GCBI_toolBlock */
+			0, 					/* GCBI_toolList */
+			0,						/* GCBI_toolCount */
+			0, 					/* GCBI_toolFeaturesList */
+			0,						/* GCBI_toolFeaturesCount */
+			0 						/* GCBI_toolFeatures */
+			};
+
+	/* Copy the structure containing most of the correct information. */
+	memcpy(info, MemLockFixedOrMovable(&DIC_dupInfo), sizeof(GenControlBuildInfo));
+	MemUnlockFixedOrMovable(&DIC_dupInfo);
+
+	/* Fill the remaining field in manually. */
+	info->GCBI_dupBlock = HandleOf(@DateInputGroup);
+}
+
+/*----------------------------------------------------------------------
+
+MESSAGE:	DateInputGenerateUI -- MSG_GEN_CONTROL_GENERATE_UI
+						for DateInputClass
+
+DESCRIPTION:	This message is subclassed to set the monikers of
+		the filled/unfilled items
+
+PASS:		*ds:si - instance data
+		es - segment of DateInputClass
+		ax - The message
+
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Skarpi	06/22/94	Initial version
+   	PBuck	03/24/95	Added ATTR_DATE_INPUT_TARGETABLE handler
+	jfh	9/1/04	port to GOC
+	jfh	10/7/04	Added code to force date format to numeric only.  In
+						desktop GEOS it is possible for DTF_SHORT to include
+                  long month names
+-----------------------------------------------------------------------------*/
+@method DateInputClass, MSG_GEN_CONTROL_GENERATE_UI
+{
+ GenControlGetFeaturesReturn	features;
+ optr				diObj;
+ char				formatStr[DATE_TIME_FORMAT_SIZE];
+ word				i;
+
+
+	@callsuper();
+
+	/* we'll need the optr of the text obj */
+	diObj = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+	g_diText = @call diObj::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+
+	/* Set up the text object to be targetable if so specified */
+	if (ObjVarFindData(oself, ATTR_DATE_INPUT_TARGETABLE)) {
+		@send g_diText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		@send g_diText::MSG_GEN_SET_ATTRS(GA_TARGETABLE, 0);
+		@send g_diText::MSG_GEN_SET_USABLE(VUM_NOW);
+		}
+
+	/* If the do draw/don't draw feature isn't set, then we have no worries */
+	@call oself::MSG_GEN_CONTROL_GET_NORMAL_FEATURES(&features);
+	if (!features.GCSR_features & DIF_DATE)
+		return;
+
+	/* Set up our own custom format based on the current pref settings.  We'll
+		set the day and month to just plain numbers (no padding) and leave the
+		year as is.  We'll also leave the order and separator as is. */
+	LocalGetDateTimeFormat(formatStr, DTF_SHORT);
+	strcpy(g_fmtStr, formatStr);
+	for (i = strlen(g_fmtStr) - 1; i > 0; i--) {
+		if (g_fmtStr[i] == 'M') {
+			i--;
+			g_fmtStr[i] = 'N';
+			}
+		if (g_fmtStr[i] == 'D') {
+			i--;
+			g_fmtStr[i] = 'S';
+			}
+		}
+
+	/* If the first field of DII_date is -1, then we should
+		put today's date in there. */
+	if (pself->DII_date.DT_year == 0xffff)
+		@send oself::MSG_DATE_INPUT_SET_CURRENT_DATE();
+	else {
+		/* Set the GenText to display the date in DII_date. */
+		DateInputUpdateText(pself->DII_date);
+		}
+
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DISpecActivateObjectWithMnemonic
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	This message is send when ever the user enters the keyboard
+		mnemonic for this control.  We call supercalls if the 
+		activation was a success when we pass the the focus and
+		target to the GenText.
+
+CALLED BY:	MSG_SPEC_ACTIVATE_OBJECT_WITH_MNEMONIC
+PASS:		*ds:si	= DateInputClass object
+		ds:di	= DateInputClass instance data
+		ds:bx	= DateInputClass object (same as *ds:si)
+		es 	= segment of DateInputClass
+		ax	= message #
+RETURN:		carry set if found, clear otherwise.
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/18/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DISpecActivateObjectWithMnemonic	method dynamic DateInputClass, 
+					MSG_SPEC_ACTIVATE_OBJECT_WITH_MNEMONIC
+		uses	ax, cx, dx, bp
+		.enter
+	;
+	; Call superclass.  If the mnemonic is a match the carry is set.
+	;
+		mov	di, offset DateInputClass
+		call	ObjCallSuperNoLock
+		jnc	done
+	;
+	; We have a match.  Send MSG_GEN_MAKE_FOCUS to the GenText object.
+	;
+		mov	di, offset DIText
+		mov	ax, MSG_GEN_MAKE_FOCUS		
+		call	ObjCallControlChild
+		stc					; return carry
+done:
+		.leave
+		ret
+DISpecActivateObjectWithMnemonic	endm
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DIMetaGainedFocusExcl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Pass focus to GenText.
+
+CALLED BY:	MSG_META_GAINED_FOCUS_EXCL
+PASS:		*ds:si	= DateInputClass object
+		es 	= segment of DateInputClass
+		ax	= message #
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JAG	1/30/95   	Initial version
+	jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method DateInputClass, MSG_META_GAINED_FOCUS_EXCL
+{
+
+	@callsuper();
+
+	/* Pass focus on to text obj.  */
+	@send g_diText::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DIDateDec
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Increment/decrement the date by one.
+
+CALLED BY:	MSG_DI_DATE_DEC, MSG_DI_DATE_INC
+PASS:		*ds:si	= DateInputClass object
+		ds:di	= DateInputClass instance data
+		ax	= message #
+RETURN:		nothing
+DESTROYED:	nothing
+SIDE EFFECTS:	Updates the DSI_date instance data.
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	6/27/94   	Initial version
+	jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method DateInputClass, MSG_DI_DATE_DEC, MSG_DI_DATE_INC
+{
+ word				days, len, type, prevMonth, i;
+ VisTextRange	range;
+ char				dateStr[25], selChr[1], rangeStr[25];
+ Boolean			tDayMonthChanged = FALSE;
+
+
+	/* First parse the text in the text object.  Do this in case the
+		user typed in an invalid change then the next step was to click
+		an up or down button */
+	if (!@call oself::MSG_DI_PARSE_DATE_STRING()) return;
+
+	/* lets let the user inc/dec month or year too.  If there is no
+		selection we'll just do the day, but if d, m or y is selected
+		we'll do just that one. */
+	@call g_diText::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+	if (range.VTR_start != range.VTR_end) {
+		/* first an error trap - to make sure a separator isn't selected
+			in the range */
+		len = @call g_diText::MSG_VIS_TEXT_GET_SELECTION_PTR(rangeStr);
+		for (i = 0; i < len; i++) {
+			if (rangeStr[i] == g_fmtStr[4]) {
+				/* show an error message */
+				NotifyDBox (0, @DateSelectErrorMessage);
+				@send g_diText::MSG_VIS_TEXT_SELECT_END();
+				return;
+				}
+			}
+		/* grab the date */
+		len = @call g_diText::MSG_VIS_TEXT_GET_ALL_PTR(dateStr);
+		/* now we need to figure out what flavor of DTF_SHORT we have -
+			it will be |xM|/|xD|/|xY| in some order and with some
+			separator. If the range start is 0 we've selected the 1st element.
+			If range end = len we've selected the last element. */
+		if (!range.VTR_start) {
+			selChr[0] = g_fmtStr[2];
+			}
+		else if (range.VTR_end == len) {
+			selChr[0] = g_fmtStr[12];
+			}
+		else {
+			selChr[0] = g_fmtStr[7];
+			}
+		/* now set the type based on the sel character */
+		if (selChr[0] == 'M') type = ID_MONTH;
+		else if (selChr[0] == 'D') type = ID_DAY;
+      else type = ID_YEAR;
+		}
+	else {
+		/* no selection so we do day */
+		type = ID_DAY;
+		}
+
+	if (type == ID_DAY) {
+		if (message == MSG_DI_DATE_INC) { /* Increment the date by one */
+			/* do the day */
+			days = LocalCalcDaysInMonth(pself->DII_date.DT_year, pself->DII_date.DT_month);
+			if (pself->DII_date.DT_day == days) {
+				pself->DII_date.DT_day = 1;
+				pself->DII_date.DT_month++;
+				tDayMonthChanged = TRUE;
+				}
+			else {
+				pself->DII_date.DT_day++;
+				}
+			/* and the year if needed */
+			if (pself->DII_date.DT_month == 13) {
+				pself->DII_date.DT_month = 1;
+				pself->DII_date.DT_year++;
+				}
+			}
+		else  {  /* Decrement the date by one */
+			/* do the day day */
+			if (pself->DII_date.DT_day == 1) {
+				prevMonth = pself->DII_date.DT_month - 1;
+				if (prevMonth == 0) prevMonth = 12;
+				days = LocalCalcDaysInMonth(pself->DII_date.DT_year, prevMonth);
+				pself->DII_date.DT_day = days;
+				pself->DII_date.DT_month--;
+				tDayMonthChanged = TRUE;
+				}
+			else {
+				pself->DII_date.DT_day--;
+				}
+			/* and the year if needed */
+			if (pself->DII_date.DT_month == 0) {
+				pself->DII_date.DT_month = 12;
+				pself->DII_date.DT_year--;
+				}
+			}
+		} /* end of day */
+
+	else if (type == ID_MONTH) {
+		if (message == MSG_DI_DATE_INC) { /* Increment the month by one */
+			pself->DII_date.DT_month++;
+			if (pself->DII_date.DT_month == 13) {
+				pself->DII_date.DT_month = 1;
+				pself->DII_date.DT_year++;
+				}
+			}
+		else  {  /* Decrement the month by one */
+			pself->DII_date.DT_month--;
+			if (pself->DII_date.DT_month == 0) {
+				pself->DII_date.DT_month = 12;
+				pself->DII_date.DT_year--;
+				}
+			}
+		/* may need to adjust day if the current day is greater than
+			the number of days in the new month */
+		days = LocalCalcDaysInMonth(pself->DII_date.DT_year, pself->DII_date.DT_month);
+		if (pself->DII_date.DT_day > days) {
+         pself->DII_date.DT_day = days;
+			}
+		} /* end of month */
+
+	else {
+		if (message == MSG_DI_DATE_INC) { /* Increment the year by one */
+			pself->DII_date.DT_year++;
+			}
+		else  {  /* Decrement the year by one */
+			pself->DII_date.DT_year--;
+			}
+		} /* end of year */
+
+	/* reset the day of the week */
+	pself->DII_date.DT_weekday = LocalCalcDayOfWeek(
+						pself->DII_date.DT_year,
+						pself->DII_date.DT_month,
+						pself->DII_date.DT_day);
+
+	/* Show the new date */
+	DateInputUpdateText(pself->DII_date);
+
+	/* if there was a selection, re-select it */
+	if (range.VTR_start != range.VTR_end) {
+		if (type == ID_DAY || type == ID_MONTH) {
+			/* a bit of work to do to adjust for sel change from 1 to 2 digits
+				or vice versa */
+			if (type == ID_DAY) {
+				if (message == MSG_DI_DATE_INC && pself->DII_date.DT_day == 10) {
+					/* we go from 1 to 2 digits */
+					range.VTR_end++;
+					}
+				if (message == MSG_DI_DATE_DEC && pself->DII_date.DT_day == 9) {
+					/* we go from 2 to 1 digits */
+					range.VTR_end--;
+					}
+				/* Now, if the month changed due to a day change we need to do
+					some more work. */
+				if (tDayMonthChanged) {
+					/* whether or not the month comes first we need to change
+						the selection crossing the month */
+					if (pself->DII_date.DT_day == 1)  range.VTR_end--;
+					else  range.VTR_end++;
+					/* does month come before day? */
+					if (g_fmtStr[2] == 'M' ||
+							       (g_fmtStr[7] == 'M' && g_fmtStr[12] == 'D')) {
+						/* month is first - so do some shifting if num digits change*/
+						if ((pself->DII_date.DT_month == 10 && message == MSG_DI_DATE_INC) ||
+							(pself->DII_date.DT_month == 12 && message == MSG_DI_DATE_DEC)) {
+							/* month went from 1 to 2 digits  */
+							range.VTR_start++;
+							range.VTR_end++;
+							}
+						if ((pself->DII_date.DT_month == 9 && message == MSG_DI_DATE_DEC) ||
+							(pself->DII_date.DT_month == 1 && message == MSG_DI_DATE_INC)) {
+							/* month went from 2 to 1 digit  */
+							range.VTR_start--;
+							range.VTR_end--;
+							}
+						}  /* end of month first shifting if */
+					}  /* end of month change if */
+				}  /* end of day type if */
+			else {
+				/* the user changed the month */
+				if ((message == MSG_DI_DATE_INC && pself->DII_date.DT_month == 10) ||
+					(message == MSG_DI_DATE_DEC && pself->DII_date.DT_month == 12)){
+					/* we go from 1 to 2 digits */
+					range.VTR_end++;
+					}
+				if ((message == MSG_DI_DATE_DEC && pself->DII_date.DT_month == 9) ||
+					(message == MSG_DI_DATE_INC && pself->DII_date.DT_month == 1)) {
+					/* we go from 2 to 1 digits */
+					range.VTR_end--;
+					}
+				}  /* end of month type if */
+			}  /* end of 1-2 or 2-1 digit change if */
+		@send g_diText::MSG_VIS_TEXT_SELECT_RANGE(range.VTR_end, range.VTR_start);
+		}  /* end of re-select range if */
+
+	/* Send message letting the output know the date has changed  */
+	SendDIActionMessage(oself, pself->DII_actionMsg, pself->GCI_output);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DIParseDateStringIfModified
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	If the text has been modified by the user,
+		then re-parse the string.
+
+CALLED BY:	
+PASS:		*ds:si = DateInput object
+RETURN:		carry set if string not valid.
+
+	GOC
+	FALSE if string not valid
+
+		ds fixed up
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+		This could move the object block around.
+
+PSEUDO CODE/STRATEGY:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CT	6/ 9/95    	Initial version
+	jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+Boolean DIParseDateStringIfModified(optr diObj)
+{
+ Boolean		valid = FALSE;
+
+
+	if (@call g_diText::MSG_GEN_TEXT_IS_MODIFIED())  {
+		valid = @call diObj::MSG_DI_PARSE_DATE_STRING();
+		}
+	return (valid);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DIDateInputSetCurrentDate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Sets the date to the current system date.
+
+CALLED BY:	MSG_DATE_INPUT_SET_CURRENT_DATE
+PASS:		*ds:si	= DateInputClass object
+		ds:di	= DateInputClass instance data
+RETURN:		nothing
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/19/94   	Initial version
+	jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method DateInputClass, MSG_DATE_INPUT_SET_CURRENT_DATE
+{
+ TimerDateAndTime		date;
+
+
+	/* Get the current date */
+	TimerGetDateAndTime(&date);
+
+	/* Copy the current date to instance data */
+	pself->DII_date.DT_year = date.TDAT_year;
+	pself->DII_date.DT_month = date.TDAT_month;
+	pself->DII_date.DT_day = date.TDAT_day;
+	pself->DII_date.DT_weekday = date.TDAT_dayOfWeek;
+	pself->DII_date.DT_week = 0;
+
+	/* Update the GenText with the current date  */
+	DateInputUpdateText(pself->DII_date);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DISetDate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Message sent to the DateInput to change the current
+		displayed date.
+
+CALLED BY:	MSG_DATE_INPUT_SET_DATE
+PASS:		*ds:si	= DateInputClass object
+		ds:di	= DateInputClass instance data
+		cx	= year
+		dl	= month
+		dh	= day
+
+		GOC
+		(byte day, byte month, word year)
+
+RETURN:		nothing
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/ 1/94   	Initial version
+	jfh	9/2/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method DateInputClass, MSG_DATE_INPUT_SET_DATE
+{
+
+
+	/* First change the instance data DII_date to reflect the new date */
+	pself->DII_date.DT_year = year;
+	pself->DII_date.DT_month = month;
+	pself->DII_date.DT_day = day;
+
+	/* calculate DOW ???? */
+
+	/* Now update the date in the GenText. */
+	DateInputUpdateText(pself->DII_date);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DSGetDate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Returns the current date of the DateInput.
+
+CALLED BY:	MSG_DATE_INPUT_GET_DATE
+PASS:		*ds:si	= DateInputClass object
+		ds:di	= DateInputClass instance data
+
+		GOC
+		DateStruct *retVal to fill in
+
+RETURN:		cx	= year
+		dl	= month
+		dh	= day
+		bp	= day of week
+
+		GOC
+		DateStruct *retVal filled in
+
+DESTROYED:	dl
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/ 1/94   	Initial version
+	jfh	9/2/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method DateInputClass, MSG_DATE_INPUT_GET_DATE
+{
+
+
+	/* Act like a GenValue: first expand out the currently entered
+		thing.  But only if we are built out, and the text has been
+		modified. */
+//	DIParseDateStringIfModified(oself);
+
+	/* Set the correct return values */
+	retValue->DT_year = pself->DII_date.DT_year;
+	retValue->DT_month = pself->DII_date.DT_month;
+	retValue->DT_day = pself->DII_date.DT_day;
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DIDateInputRedisplayDate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Forces the date to be redisplayed
+
+CALLED BY:	MSG_DATE_INPUT_REDISPLAY_DATE
+PASS:		*ds:si	= DateInputClass object
+		ds:di	= DateInputClass instance data
+RETURN:		nothing
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CT	9/29/94   	Initial version
+   jfh	9/2/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method DateInputClass, MSG_DATE_INPUT_REDISPLAY_DATE
+{
+
+	DateInputUpdateText(pself->DII_date);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SendDIActionMessage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Sends the action message (DII_actionMsg) to the output 
+		(GCI_output).
+
+CALLED BY:	DIDateInc, DIDateDec, DISetDate
+PASS:		*ds:si - Object
+RETURN:		nothing
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	6/30/94    	Initial version
+	jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void SendDIActionMessage(optr diObj, Message msg, optr dest)
+{
+ EventHandle	event;
+ DateStruct		date;
+
+
+	/* get the date */
+	@call diObj::MSG_DATE_INPUT_GET_DATE(&date);
+
+	/* Get the action message and destination passed in and
+		send message.  */
+	event = @record {DATE_INPUT_ACTION} NullOptr::msg(date.DT_day,
+	                                            date.DT_month, date.DT_year);
+	@call diObj::MSG_GEN_OUTPUT_ACTION(event, dest);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DateInputUpdateText
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Displays the current date in the InputDateText GenText object.
+
+CALLED BY:	DateInputGenerateUI
+PASS:		*ds:si	= object
+RETURN:		nothing
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/ 1/94    	Initial version
+	jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void DateInputUpdateText(DateStruct date)
+{
+ DateTimeBuffer		dateBuf;
+ TimerDateAndTime		tdate;
+
+
+	/* Copy the instance data to the TDAT struct*/
+	tdate.TDAT_year = date.DT_year;
+	tdate.TDAT_month = date.DT_month;
+	tdate.TDAT_day = date.DT_day;
+	tdate.TDAT_dayOfWeek = date.DT_weekday;
+
+	/* Format the date according to the system defaults */
+	LocalCustomFormatDateTime(dateBuf, g_fmtStr, &tdate);
+
+	/* Now update the GenText with the short date */
+	@call g_diText::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateBuf, 0);
+
+	/* Reset the modified state of the text */
+	@send g_diText::MSG_GEN_TEXT_SET_MODIFIED_STATE(TRUE);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DIParseDateString
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Parses the date in DIText and saves it to DII_date.
+
+CALLED BY:	MSG_DI_PARSE_DATE_STRING
+PASS:		*ds:si	= DateInputClass object
+		ds:di	= DateInputClass instance data
+RETURN:		carry	= clear if parse was valid
+				GOC - TRUE if parse OK
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/19/94   	Initial version
+	jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method DateInputClass, MSG_DI_PARSE_DATE_STRING
+{
+ DateTimeBuffer		dateBuf;
+ TimerDateAndTime		tDate;
+ Boolean					parseOK;
+ word						days;
+
+
+	/* Get the text from the GenText */
+	@call g_diText::MSG_VIS_TEXT_GET_ALL_PTR(dateBuf);
+
+	parseOK = LocalCustomParseDateTime(dateBuf, g_fmtStr, &tDate);
+
+	if (parseOK == -1) {
+		/* LocalParseDateTime accepts 2/30/92, so do some extra semantic
+			checking to make sure this is a valid date. */
+		days = LocalCalcDaysInMonth(tDate.TDAT_year, tDate.TDAT_month);
+		if (tDate.TDAT_day <= days) {
+			/* Update the instance data with the inputted date */
+			pself->DII_date.DT_year = tDate.TDAT_year;
+			pself->DII_date.DT_month = tDate.TDAT_month;
+			pself->DII_date.DT_day = tDate.TDAT_day;
+			pself->DII_date.DT_weekday = tDate.TDAT_dayOfWeek;
+			pself->DII_date.DT_week = 0;
+
+			/* Reset the modified state of the text, so we don't parse again
+				before modified. */
+			@send g_diText::MSG_GEN_TEXT_SET_MODIFIED_STATE(TRUE);
+
+			return(TRUE);
+			}
+		}
+
+	/* Date in GenText is not a valid date, we do therefor not update
+		the DII_date.  First we will sound the alarm indicating the date
+		is not valid.  */
+
+//	NotifyDBox (0, @DateErrorMessage);
+
+	/* Restore the "old" date in the GenText object. */
+	DateInputUpdateText(pself->DII_date);
+
+	/* The parse was no good so we return FALSE  */
+	return(FALSE);
+
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DITMetaKbdChar
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Message sent out on any keyboard press or release.  We need
+		to subclass this message to catch the arrow-up and arrow_down
+		keystrokes. We then send a message to increment or decrement
+		the date to the DateInput control.
+
+CALLED BY:	MSG_META_KBD_CHAR
+PASS:		*ds:si	= DateInputTextClass object
+		ds:di	= DateInputTextClass instance data
+		ds:bx	= DateInputTextClass object (same as *ds:si)
+		es 	= segment of DateInputTextClass
+		ax	= message #
+		cx = character value
+		dl = CharFlags
+		dh = ShiftState
+		bp low = ToggleState
+		bp high = scan code
+RETURN:		nothing
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/12/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DITMetaKbdChar	method dynamic DateInputTextClass, MSG_META_KBD_CHAR
+		.enter
+	;
+	; Ignore key releases.
+	;
+		test	dl, mask CF_RELEASE
+		jnz	callSuper
+
+	;
+	; See if it's a character we're interested in.  Make sure that
+	; the desired ctrl/shift/whatever key is also being pressed.
+	;
+		mov	bx, (offset ditKeymap) - (size KeyAction)
+		mov	di, (offset ditKeymap) + (size ditKeymap)
+		call	KeyToMsg		; ax <- message to send
+		jc	callSuper
+
+	;
+	; Send message associated with the action.
+	;
+		call	SendToDateInput
+
+		.leave
+		ret
+		
+callSuper:
+		mov	ax, MSG_META_KBD_CHAR
+		mov	di, offset @CurClass
+		GOTO	ObjCallSuperNoLock
+DITMetaKbdChar	endm
+;----
+SendToDateInput	proc near
+
+	;
+	; Record the event.  ax = Message to send
+	;	
+		push	ds:[LMBH_handle]
+		push	si
+		mov	bx, segment DateInputClass
+		mov	si, offset DateInputClass
+		mov	di, mask MF_RECORD
+		call	ObjMessage
+	;
+	; Send the event.
+	;
+		mov	cx, di		; Get handle to ClassedEvent in cx
+		pop	bx, si		; TimeInputText OD
+		clr	di
+		mov	ax, MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
+		call	ObjMessage
+		ret
+SendToDateInput endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DITVisTextFilterViaCharacter
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Called for every character entered into the GenText.  Here
+		all characters exept the valid date characters are filtered
+		out.
+
+CALLED BY:	MSG_VIS_TEXT_FILTER_VIA_CHARACTER
+PASS:		*ds:si	= DateInputTextClass object
+		ds:di	= DateInputTextClass instance data
+		ds:bx	= DateInputTextClass object (same as *ds:si)
+		es 	= segment of DateInputTextClass
+		ax	= message #
+		cx	= character to filter
+RETURN:		cx	= 0 to reject replacement, otherwise the replacement
+			  char. 
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/ 1/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DITVisTextFilterViaCharacter	method dynamic DateInputTextClass, 
+					MSG_VIS_TEXT_FILTER_VIA_CHARACTER
+		uses	ax, dx, bp
+		.enter
+	;
+	; First check if character is numeric
+	;
+		mov	ax, cx			; ax <- character
+		call	LocalIsDigit
+		jnz	done
+	;
+	; Is it one of the valid date separators?
+	;
+		mov	cx, 6			; number of seperators
+		clr	dx
+topLoop:
+		mov	bx, cx
+DBCS <		shl	bx, 1						>
+DBCS <		mov	dx, cs:[validDateSeparators][bx]		>
+SBCS <		mov	dl, cs:[validDateSeparators][bx]		>
+DBCS <		cmp	ax, dx						>
+SBCS <		cmp	al, dl						>
+		je	same
+		loop	topLoop
+		jmp	notGood
+same:
+	;
+	; Only return the system selected date seperator
+	;
+		call	GetSystemDateSeparator	; ax <- separator
+done:
+		mov	cx, ax			; cx <- return char
+		.leave
+		ret
+notGood:
+		clr	ax
+		jmp	done
+
+DITVisTextFilterViaCharacter	endm
+
+validDateSeparators	label	TCHAR
+		TCHAR	C_NULL			; should never be reached
+		TCHAR	C_SLASH
+		TCHAR	C_MINUS
+		TCHAR	C_PERIOD
+		TCHAR	C_COMMA
+		TCHAR	C_COLON
+		TCHAR	C_SEMICOLON
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DIMetaTextLostFocus
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Send whenever the text object loses the focus.
+
+CALLED BY:	MSG_META_TEXT_LOST_FOCUS
+PASS:		*ds:si	= DateInputClass object
+		ds:di	= DateInputClass instance data
+RETURN:		nothing
+DESTROYED:	nothing
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+		Get the date out of the GenText and store it in the
+		DateInput instance data.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	7/ 5/94   	Initial version
+	jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method DateInputClass, MSG_META_TEXT_LOST_FOCUS
+{
+
+
+	/* Act like a GenValue: only send out the apply message if
+		the text has been modified. */
+	if (!@call g_diText::MSG_GEN_TEXT_IS_MODIFIED()) return;
+
+	/* Everything's fine.  Send the apply message. */
+	if (pself->DII_actionMsg)
+		DISendApplyMsg(oself, pself->DII_actionMsg, pself->GCI_output);
+
+	return;
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DITextApply
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Send out apply msg.
+
+CALLED BY:	MSG_DI_TEXT_APPLY
+PASS:		*ds:si	= DateInputClass object
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JAG	2/ 3/95   	Initial version
+	jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method DateInputClass, MSG_DI_TEXT_APPLY
+{
+
+	DISendApplyMsg(oself, pself->DII_actionMsg, pself->GCI_output);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DISendApplyMsg
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Complete text and send out the apply message.
+
+CALLED BY:	(INTERNAL)
+PASS:		*ds:si	= DateInputClass object
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JAG	2/ 3/95    	Initial version
+   jfh	9/1/04	port to GOC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void DISendApplyMsg(optr diObj, Message msg, optr dest)
+{
+
+
+	/* Parse the date string */
+	if (DIParseDateStringIfModified(diObj)) {
+		/* Let the output know that a new time has been set. */
+		if (msg)
+			SendDIActionMessage(diObj, msg, dest);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox  (char* string1, optr notifyMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    Puts up selected notification box
+ *
+ *
+ ***********************************************************************/
+void NotifyDBox (char* string1, optr notifyMsg)
+{
+
+    /* put up a notification box */
+	 MemLock (OptrToHandle(notifyMsg));
+	 UserStandardDialog(0, 0, 0,
+			  string1,
+			  LMemDeref(notifyMsg),
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	 MemUnlock (OptrToHandle(notifyMsg));
+
+}
+
+

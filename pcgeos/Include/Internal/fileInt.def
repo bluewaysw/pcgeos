@@ -1,0 +1,142 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include
+FILE:		fileInt.def
+
+AUTHOR:		Adam de Boor, Apr  7, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	4/ 7/90		Initial revision
+
+
+DESCRIPTION:
+	"Internal" definitions for special drivers/libraries when dealing with
+	the File module of the kernel.
+		
+	$Id: fileInt.def,v 1.1 97/04/04 14:15:42 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__FILEINT
+
+include file.def
+include fileEnum.def
+include Internal/dos.def
+include Internal/driveInt.def
+
+StartKernel
+
+;
+; Call DOS after grabbing DOS/BIOS lock.
+;
+global FileInt21:far
+
+;
+; Iterate over all open files with the sftLock held.
+;
+global FileForEach:far
+
+;
+; Iterate over all active paths (current directories and directory-stack entries
+; for all threads).
+;
+global FileForEachPath:far
+
+;
+; Find the disk handle of the destination for a file operation.
+;
+global FileGetDestinationDisk:far
+
+
+
+FullFileAccessFlags	record
+    FFAF_RAW:1,			; Set to override hidden-header behaviour
+				;  of DOS-based FSDs. Intended for Disk Maker
+				;  and similar tools...
+    FFAF_EXCLUDE FileExclude:3,; What others may not do
+    FFAF_EXCLUSIVE:1,		; Set to override override
+    FFAF_OVERRIDE:1,		; Set to override read conflicts
+    FFAF_MODE FileAccess:2	; What caller wants to do
+FullFileAccessFlags	end
+
+;
+; 	If this bit is set in a FileAccessFlags record, it overrides any
+; 	FE_DENY_READ or FE_EXCLUSIVE on an open file if the new file is
+; 	being opened read-only. This allows the system to examine the headers
+; 	of GEOS files, while keeping applications from opening such files.
+; 
+FAF_OVERRIDE	equ	mask FFAF_OVERRIDE
+
+;
+;	Of course, there are a few cases, like the swap file, where an override
+;	of the override is necessary...
+;
+FAF_EXCLUSIVE	equ	mask FFAF_EXCLUSIVE
+
+FAF_GEOS_BITS	equ mask FFAF_OVERRIDE or mask FFAF_EXCLUSIVE or mask FFAF_RAW
+
+;	Structure of a handle to a file. 
+
+HandleFile	struct
+    HF_sfn		byte	?	;DOS System File Number
+    HF_handleSig	byte		;handle's signature (HandleType)
+    HF_owner		hptr		;owner of file
+    HF_accessFlags	FullFileAccessFlags	;file access permissions
+    HF_stdPath		StandardPathByte;standard path on which the file was
+					; opened, if any (SP_NOT_STANDARD_PATH
+					; if not on standard path)
+    HF_next		hptr		;next handle in file chain
+    HF_disk		word		;offset of descriptor for disk on which
+					; file is located, if any required.
+					; The descriptor lives in the
+					; FSIR block of the kernel. If 0, the
+					; primary FSD is used for all access.
+    HF_private		word		;data private to the FSD
+    HF_otherInfo	hptr	?	;VM handle if VM file, else any other
+					; file handle open to the same disk file
+    HF_semaphore	word	?	;access semaphore
+HandleFile	ends
+
+
+
+;
+;	Structure of a thread's current directory & directory stack. Required
+;	by users of FileForEachPath (FS drivers)...
+;
+
+FilePath	struct
+    FP_prev	hptr.FilePath	; Previous directory for the thread
+
+    FP_logicalDisk	word	
+    ; Logical disk that this path is on.  May be different than the
+    ; actual disk stored in this block handle's HM_otherInfo field, if
+    ; one of the directories in the current path is a link to a
+    ; directory on another disk.
+
+    FP_stdPath	StandardPath	; Standard path to which this path is relative,
+				;  even if std paths aren't enabled.
+
+    ; FP_pathInfo.DPI_STD_PATH matches FP_stdPath unless we're traversing
+    ; the physical directories corresponding to the current logical one.
+
+    FP_pathInfo	DirPathInfo
+
+    ; pointer to the user-specified path within this same block.
+    FP_path	nptr.PATH_BUFFER_SIZE dup(char)
+
+    ; start of data private to the FSD on which the path is located. may be
+    ; empty (*FP_path == FP_private)
+
+    FP_private	label	byte
+FilePath	ends
+
+global	FilePushTopLevelPath:far
+global	FilePopTopLevelPath:far
+
+EndKernel
+

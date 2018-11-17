@@ -1,0 +1,235 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC SDK
+MODULE:		Sample Library -- Mandelbrot Set Library
+FILE:		mscMain.goc
+
+AUTHOR:		Paul DuBois, Aug 23, 1993
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+MSG_MSC_CALCULATE		Start calculating points in the MSet
+
+MSG_MSC_PAUSE			Pauses the calculation
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	8/23/93   	Initial version.
+
+DESCRIPTION:
+	This file contains code for the MSetCalc class
+
+	$Id: mscMain.goc,v 1.1 97/04/07 10:43:58 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+#include <geoworks.h>
+@include <SDK_C/mset.goh>
+@include <Objects/SDK_C/msetC.goh>
+@include <Objects/SDK_C/msCalcC.goh>
+#include <msFatErr.h>
+#include <ec.h>
+
+/***********************************************************************
+ *		Class Declarations
+ ***********************************************************************/
+@classdecl	MSetCalcClass ;
+
+/***********************************************************************
+ *		Message handlers
+ ***********************************************************************/
+static VMBlockHandle
+MSCGetHandle (VMFileHandle	vmfh,
+	      VMBlockHandle	dataVM,
+	      word		which,
+	      word		size);
+
+/***********************************************************************
+ *		Message handlers
+ ***********************************************************************/
+
+/***********************************************************************
+ *		MSG_MSC_CALCULATE for MSetCalcClass
+ ***********************************************************************
+ * SYNOPSIS:	Start calculating the points in the Mandelbrot Set.
+ *		Stop when another message arrives for this object, or
+ *		when all the calculating is done.  Calculations may be
+ *		re-started by sending this message again.
+ *
+ * PARAMETERS:	optr		myMSet,
+ *		VMFileHandle	vmfh,
+ *		VMBlockHandle	mscpVM	  VMHandle to MSetCalcParameters
+ * RETURN:	nothing
+ *
+ * SIDE EFFECTS:
+ *	CPU drain.  Allocates blocks of memory and attaches them to the VM
+ *	file.  Puts the handles to the newly-allocated memory in the block
+ *	that contains the MSetParameters.
+ *
+ *	May send a MSG_MSET_NO_CALC_MEMORY to the MSet object if a
+ *	memory allocation fails.
+ *
+ * STRATEGY:
+ * BUGS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	8/23/93   	Initial Revision
+ *
+ ***********************************************************************/
+@method MSetCalcClass, MSG_MSC_CALCULATE
+{
+    MemHandle		mscpH;	/* Handle to MSetCalcParameters */
+    MSetCalcParameters*	mscpP;	/* Pointer to MSetCalcParameters */
+
+    VMBlockHandle	dataVM;	/* VM Handle to array of MSetDataHandles */
+
+    word		block, offset;
+    word		numBlocks, blockSize;
+
+    mscpP = VMLock(vmfh, mscpVM, &mscpH);
+
+    dataVM = mscpP->MSCP_dataMapBlock;
+    numBlocks = (mscpP->MSCP_pixelHeight+7) / 8;	/* 8 lines per block */
+    blockSize = mscpP->MSCP_pixelWidth * sizeof(word) * 8;
+
+    /*
+     *	Main calculation loop.  Loop over blocks, then over lines within the
+     *	block.  Note that the actual calculation routine is intelligent
+     *	enough not to redo points it's already calculated.  Therefore, if a
+     *	message arrives, it is easy enough for MSCalcThread to pick up where
+     *	it left off after the message is handled.
+     */
+    for (block=0; block < numBlocks; block++)
+    {
+	VMBlockHandle	dBlockVM; /* VM handle to a block of data */
+	MemHandle	dBlockH;  /* Handle to a block of data  */
+	word*		dBlockP;  /* Pointer to a block of data */
+
+	/*
+	 * Get the next block (allocating and attaching a new block if
+	 * necessary), and call the calculation routine for each of its
+	 * eight lines.
+	 */
+	dBlockVM = MSCGetHandle(vmfh, dataVM, block, blockSize);
+	if (dBlockVM == NullHandle) {
+	    @send myMSet::MSG_MSET_NO_CALC_MEMORY();
+	    goto done;
+	}
+
+	for (offset=0; offset<8; offset++)
+	{
+	    MSetCalcReturnFlags	calcRetVal;
+	    int	lineNum = block*8 + offset;
+
+	    /*
+	     *	Try not to leave the data block locked too long, in case the
+	     *	other thread wants to lock it also (to draw it, for instance)
+	     */
+	    dBlockP = (word*) VMLock(vmfh, dBlockVM, &dBlockH);
+	    calcRetVal =
+		MSLineBasedDoLine(lineNum,
+				  mscpP,
+				  &dBlockP[offset*mscpP->MSCP_pixelWidth]);
+	    if (calcRetVal & MSCRF_BLOCK_DIRTIED)
+	    {
+		VMDirty(dBlockH);
+		/* 
+		 * checkDuplicate and replace require forceQueue.  They also
+		 * will not work on messages that use @stack.  Note that some
+		 * messages have an implicit @stack keyword because they have
+		 * too many arguments to pass in registers.
+		 */
+		@send, forceQueue, checkDuplicate, replace
+		    myMSet::MSG_MSET_NEW_LINE((sword)lineNum);
+	    }
+	    VMUnlock(dBlockH);
+
+	    if (calcRetVal & MSCRF_MESSAGE_WAITING)
+		goto done;
+	}    
+    }
+
+ done:
+    VMUnlock(mscpH);
+}	/* End of MSG_MSC_CALCULATE.	*/
+
+/***********************************************************************
+ *		MSCGetHandle
+ ***********************************************************************
+ * SYNOPSIS:	Extracts a VMBlockHandle from the MSet's data map block,
+ *		creating one of size <size> bytes if necessary.
+ *
+ * CALLED BY:	INTERNAL
+ *		Handler for MSG_MSC_CALCULATE
+ *
+ * RETURN:	The requested VMBlockHandle.
+ *		NullHandle if allocation failed.
+ * SIDE EFFECTS:
+ *	If the requested handle doesn't exist yet, allocates a block of
+ *	<size> bytes, attaches it to the VM file, and stores the handle
+ *	in the map block.  Newly created blocks are zero-initialized.
+ *
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	10/26/93   	Initial Revision
+ *
+ ***********************************************************************/
+static VMBlockHandle
+MSCGetHandle (VMFileHandle	vmfh,
+	      VMBlockHandle	dataVM,
+	      word		which,
+	      word		size)
+{ 
+    MemHandle		dataH;	/* handle to array of MSetDataHandles */
+    MSetDataHandle*	dataP;	/* array of MSetDataHandles */
+    VMBlockHandle	dBlockVM; /* VM handle of a data block */
+
+    dataP = VMLock(vmfh, dataVM, &dataH);
+
+    if ((dBlockVM = dataP[which].MSDH_blockHandle) == NullHandle)
+    {
+	MemHandle	dBlockH; /* Handle of a new data block */
+
+	dBlockH = MemAlloc(size, HF_SWAPABLE, HAF_ZERO_INIT);
+	if (dBlockH != NullHandle) {
+	    dBlockVM = dataP[which].MSDH_blockHandle =
+		VMAttach(vmfh, NullHandle, dBlockH);
+	    VMDirty(dataH);
+	}
+    }
+
+    VMUnlock(dataH);
+    return dBlockVM;
+}				/* End of MSCGetHandle.	*/
+
+/***********************************************************************
+ *		MSG_MSC_PAUSE for MSetCalcClass
+ ***********************************************************************
+ * SYNOPSIS:	Pauses the calculation thread.
+ * PARAMETERS:	none
+ * RETURN:	nothing
+ * SIDE EFFECTS: none
+ *
+ * STRATEGY:	Does nothing -- just here to cause MSG_MSC_CALCULATE to exit
+ *		because a message is waiting.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	8/27/93   	Initial Revision
+ *
+ ***********************************************************************/
+@method MSetCalcClass, MSG_MSC_PAUSE
+{
+}	/* End of MSG_MSC_PAUSE.	*/

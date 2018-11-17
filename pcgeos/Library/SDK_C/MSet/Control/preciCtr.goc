@@ -1,0 +1,431 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC SDK
+MODULE:		Sample Library -- Mandelbrot Set Library
+FILE:		preciCtr.goc
+
+AUTHOR:		Tom Lester, Sept 9, 1993
+
+METHODS:
+
+Name				Description
+----				-----------
+MSG_GEN_CONTROL_GET_INFO	Provide the system with the information
+				necessary to manage the Color Controller.
+
+MSG_GEN_CONTROL_UPDATE_UI	Update the display objects expressing the
+				state of the currently selected MSet object.
+
+MSG_MSPC_SET_PRECISION		Send message to MSet object when user 
+				selects new precision.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TL	9/ 9/93   	Initial version.
+
+DESCRIPTION:
+	This file declares the UI objects and methods for the 
+	MSetPrecisionControlClass. The UI objects are contained in 
+	two resource segments: MSetPrecisionControlUI for the feature
+	objects and MSetPrecisionControlToolUI for the tool objects.
+
+	These resources are declared in the mset.gp file
+	as "read-only" and "shared" because they are just duplicated
+	when an instance of the MSetPrecisionControlClass is created in 
+	an application.
+
+	$Id: preciCtr.goc,v 1.1 97/04/07 10:43:49 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifndef __MSET_PRECISION_CONTROL_GOC
+#define __MSET_PRECISION_CONTROL_GOC
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+
+#include <geoworks.h>			/* defines MANUFACTURER_ID_SDK */
+#include <SDK_C/SDK.h>			/* SDK app local notification lists */
+@include <Objects/SDK_C/msetC.goh>	/* MSetClass definition */
+@include <SDK_C/mset.goh>		/* MSet structure definitions */
+@include <Objects/SDK_C/msPrecCC.goh>	/* MSetPrecisionControlClass definition*/
+
+#include "msFatErr.h"			/* fatal errors */
+@include "Local/strings.goh"		/* extern chunk declarations */
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@classdecl	MSetPrecisionControlClass ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ * Precision control
+ */
+
+@start MSetPrecisionControlUI, notDetachable ;
+/*
+ * Define the features UI resource. The resource is set notDetachable so
+ * that the feature objects will not be saved to a state file. This 
+ * resource can contain any objects that may typically appear in a menu 
+ * (e.g. GenInteractions, GenTriggers, and list objects). For the 
+ * PrecisionControl features we are using a single list object.
+ */
+
+
+@object GenItemGroupClass PrecisionList = {
+	GI_states = @default & ~GS_USABLE;	/* Set the list not usable */
+		/* The children of the list are defined below. Each 
+		 * entry in the list will appear as a single menu item. 
+		 */
+	GI_comp = @Fixed16BitEntry, @Fixed48BitEntry, @FloatingEntry;
+		/* The "apply" message will be sent to the destination
+		 * specified in the GIGI_destination field. 
+		 */
+	GIGI_applyMsg = MSG_MSPC_SET_PRECISION;
+		/* The destination is defined as the TravelOption 
+		 * TO_OBJ_BLOCK_OUTPUT. This will send the apply message 
+		 * to the controller's output object which is set by the
+		 * controller to be itself.
+		 */
+	GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+}
+
+/* 
+ * Define the GenItems for the PrecisionList. 
+ */
+@object GenItemClass Fixed16BitEntry = {
+	GI_visMoniker = '1', "16 Bit";
+	GII_identifier = MSP_16BIT;
+}
+
+@object GenItemClass Fixed48BitEntry = {
+	GI_visMoniker = '4', "48 Bit";
+	GII_identifier = MSP_48BIT;
+}
+
+@object GenItemClass FloatingEntry = {
+	GI_visMoniker = 'F', "Floating Point";
+	GII_identifier = MSP_FLOATING;
+}
+
+
+@end MSetPrecisionControlUI
+
+
+/*
+ * Toolbox UI
+ */
+
+@start MSetPrecisionControlToolUI, notDetachable ;
+/* 
+ * Define the Tools UI resource. This follows exactly the same rules as the
+ * Features UI resource above, but it represents the UI gadgetry that will appear
+ * in the controller's tool boxes rather than its default menus. For the 
+ * PrecisionControl Toolbox features we are using a single list object with the 
+ * hint HINT_TOOLBOX. 
+ */
+
+@object GenItemGroupClass PrecisionToolList = {
+	GI_states = @default & ~GS_USABLE;	/* Set the list not usable */
+		/* The children of the list are defined below. Each 
+		 * entry in the list will appear as a single menu item. 
+		 */
+	GI_comp = @Fixed16BitToolEntry, @Fixed48BitToolEntry, @FloatingToolEntry;
+		/* The "apply" message will be sent to the destination
+		 * specified in the GIGI_destination field. 
+		 */
+	GIGI_applyMsg = MSG_MSPC_SET_PRECISION;
+		/* The destination is defined as the TravelOption 
+		 * TO_OBJ_BLOCK_OUTPUT. This will send the apply message 
+		 * to the controller's output object which is set by the
+		 * controller to be itself.
+		 */
+	GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+	HINT_TOOLBOX;
+}
+
+/* Define the GenItems for the PrecisionToolList. 
+ */
+@object GenItemClass Fixed16BitToolEntry = {
+	GI_visMoniker = " 16 ";
+	GII_identifier = MSP_16BIT;
+}
+
+@object GenItemClass Fixed48BitToolEntry = {
+	GI_visMoniker = " 48 ";
+	GII_identifier = MSP_48BIT;
+}
+
+@object GenItemClass FloatingToolEntry = {
+	GI_visMoniker = " Float ";
+	GII_identifier = MSP_FLOATING;
+}
+
+@end MSetPrecisionControlToolUI
+
+/*
+ ***************************************************************************
+ *		Code for MSetPrecisionControlClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_GEN_CONTROL_GET_INFO for MSetPrecisionControlClass
+ ***********************************************************************
+ * SYNOPSIS:	return information about the controler
+ * PARAMETERS:	void (GenControlBuildInfo *info)
+ * SIDE EFFECTS: none
+ *
+ * DESCRIPTION:
+ *	Every controller must handle MSG_GEN_CONTROL_GET_INFO. This 
+ *	message is sent to the controller in several circumstances, 
+ *	and it must return critical information about the controller's 
+ *	state and configuration. It takes a pointer to an empty 
+ *	GenControlBuildInfo structure and must fill in all the 
+ *	structure's fields before returning. 
+ *
+ * STRATEGY:	
+ *	Fill in the GenControlBuildInfo structure and return it.
+ *	We have a number of static local variables with the base
+ *	information and set the structure to these variables.
+ *	Then we fill in a couple of fields manually.
+ * 
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TL	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+@method MSetPrecisionControlClass, MSG_GEN_CONTROL_GET_INFO
+{
+	/* General information constants */
+
+    static const char MSPC_IniFileKey[] = "MSetPrecision";
+    static const GCNListType MSPC_gcnList[] = {
+	{MANUFACTURER_ID_SDK, SDK_GAGCNLT_APP_TARGET_NOTIFY_MSET_ATTR_CHANGE}
+    };
+
+    static const NotificationType MSPC_notifyTypeList[] = {
+	{MANUFACTURER_ID_SDK, SDK_NT_MSET_ATTR_CHANGE}
+    };
+
+	/* Features information constants */
+
+    static const GenControlChildInfo MSPC_childList[] = {
+	{OptrToChunk(@PrecisionList), (MSPCF_16BIT | MSPCF_48BIT | 
+				       MSPCF_FLOATING), 0}
+    };
+
+	/*
+	* Controller features information.
+	* Careful, this table is in the *opposite* order of the bit-flags to
+	* which it corresponds.
+	*/
+    static const GenControlFeaturesInfo MSPC_featuresList[] = {
+	{OptrToChunk(@FloatingEntry), @FloatingName, 0},
+	{OptrToChunk(@Fixed48BitEntry), @Fixed48BitName, 0},
+	{OptrToChunk(@Fixed16BitEntry), @Fixed16BitName, 0}
+    };
+
+	/* Tools information constants */
+
+    static const GenControlChildInfo MSPC_toolList[] = {
+	{OptrToChunk(@PrecisionToolList), (MSPCTF_16BIT | MSPCTF_48BIT | 
+				       MSPCTF_FLOATING), 0}
+    };
+
+	/*
+	* Controller toolbox features information.
+	* Careful, this table is in the *opposite* order of the bit-flags to
+	* which it corresponds.
+	*/
+    static const GenControlFeaturesInfo MSPC_toolFeaturesList[] = {
+	{OptrToChunk(@FloatingToolEntry), @FloatingName, 0},
+	{OptrToChunk(@Fixed48BitToolEntry), @Fixed48BitName, 0},
+	{OptrToChunk(@Fixed16BitToolEntry), @Fixed16BitName, 0}
+    };
+
+	/* Our constant for the GenControlBuildInfo structure.
+	 * Fields with a ## marker to the left of their names are
+	 * filled in dynamically by the handler following the
+	 * constant definition. */
+    static const GenControlBuildInfo MSPC_dupInfo = {
+	GCBF_SUSPEND_ON_APPLY,			/* GCBI_flags */
+	MSPC_IniFileKey,			/* GCBI_initFileKey */
+	MSPC_gcnList,				/* GCBI_gcnList */
+	ARRAY_LEN(MSPC_gcnList, GCNListType), 	/* GCBI_gcnCount */
+	MSPC_notifyTypeList,			/* GCBI_notificationList */
+	ARRAY_LEN(MSPC_notifyTypeList, NotificationType),
+						/* GCBI_notificationCount */
+	@MSPCName,				/* GCBI_controllerName */
+
+	/*##*/	NullHandle,			/* GCBI_dupBlock */
+	MSPC_childList,				/* GCBI_childList */
+	ARRAY_LEN(MSPC_childList, GenControlChildInfo),
+						/* GCBI_childCount */
+	MSPC_featuresList,			/* GCBI_featuresList */
+	ARRAY_LEN(MSPC_featuresList, GenControlFeaturesInfo),
+						/* GCBI_featuresCount */
+	MSPC_DEFAULT_FEATURES,			/* GCBI_features */
+
+	/*##*/	NullHandle,			/* GCBI_toolBlock */
+	MSPC_toolList,				/* GCBI_toolList */
+	ARRAY_LEN(MSPC_toolList, GenControlChildInfo),
+						/* GCBI_toolCount */
+	MSPC_toolFeaturesList,			/* GCBI_toolFeaturesList */
+	ARRAY_LEN(MSPC_toolFeaturesList, GenControlFeaturesInfo),
+						/* GCBI_toolFeaturesCount */
+	MSPC_DEFAULT_TOOLBOX_FEATURES,		/* GCBI_toolFeatures */
+    };
+
+
+	/* Here is the code that fills in the above missing fields and
+	 * returns the proper structure. */
+
+    /* Copy the structure containing most of the correct information. */
+
+    memcpy(info, MemLockFixedOrMovable(&MSPC_dupInfo), 
+	   sizeof(GenControlBuildInfo));
+    MemUnlockFixedOrMovable(&MSPC_dupInfo);
+
+    /* Fill the remaining fields in manually. */
+    info->GCBI_dupBlock = HandleOf(@PrecisionList);	/* Get the handle of the
+						 * features UI block. */
+    info->GCBI_toolBlock = HandleOf(@PrecisionToolList);/* Get the handle of the
+						 * tool features UI block. */
+
+}	/* End of MSG_GEN_CONTROL_GET_INFO.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_MSPC_SET_PRECISION for MSetPrecisionControlClass
+ ***********************************************************************
+ * SYNOPSIS:	Send message when user selects new precision.
+ * PARAMETERS:
+ *		void (word selection, word numSelections,
+ *		      byte stateFlags)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	Record MSG_MSET_SET_PRECISION message and then
+ * 		send it to the controller output which is set to 
+ *              be the application target in the msPrecCC.goh file.
+ *              The application target is the currently selected 
+ *              MSet object.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TL	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+@method MSetPrecisionControlClass, MSG_MSPC_SET_PRECISION
+{
+    EventHandle msg;
+
+    msg = @record MSetClass::MSG_MSET_SET_PRECISION(selection);
+
+    @send self::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
+
+}	/* End of MSG_MSPC_SET_PRECISION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_CONTROL_UPDATE_UI for MSetPrecisionControlClass
+ ***********************************************************************
+ * SYNOPSIS:	    Handle notification of attributes change
+ *  
+ * PARAMETERS:	    
+ * 	PASS:	MemHandle	toolBlock	= Handle of block
+ *						  containing tools.
+ *		MemHandle	childBlock	= Handle of block
+ *						  containing UI children.
+ *		WordFlags	toolboxFeatures	= Toolbox features flags.
+ *		WordFlags	features	= Controller features
+ *						  flags.
+ *		MemHandle	data		= Handle of block
+ *						  containing the data given
+ *						  to MSG_META_NOTIFIY_...
+ *						  ...WITH_DATA_BLOCK.
+ *		word		changeID	= GCN type.
+ *		ManufacturerID	manufID		= ID of manufacturer of the
+ *						  notify message.
+ * 	RETURN:	Void.
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ * 	Extract the data out of the given data block.
+ *	Update the regular features (if necessary).
+ *	Update the toolbox features (if necessary).
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TL	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+@method MSetPrecisionControlClass, MSG_GEN_CONTROL_UPDATE_UI
+{
+	MSetParameters *ndata;
+	word precision;
+
+#if ERROR_CHECK
+    /* Is this notification for us?	*/
+    if ((MANUFACTURER_ID_SDK != manufID) ||
+	(SDK_NT_MSET_ATTR_CHANGE != changeID))
+	{
+	EC_ERROR (ERROR_PRECISION_CONTROL_INVALID_CHANGE_ID_IN_UPDATE_UI);
+	}
+#endif
+
+    /*
+     * Get the data that we need to update from the block passed
+     */
+    ndata = (MSetParameters *) MemLock(data);
+    precision = ndata->MSP_precision;
+    MemUnlock(data);
+
+    /*
+     * Set the precision list
+     */
+    if (features & (MSPCF_16BIT | MSPCF_48BIT | MSPCF_FLOATING)) {
+    	@send childBlock,(ChunkHandle)@PrecisionList::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(precision, 0);
+    }
+
+
+    /*
+     * Set the precision tool list
+     */
+    if (toolboxFeatures & (MSPCTF_16BIT | MSPCTF_48BIT | MSPCTF_FLOATING)) {
+    	@send toolBlock,(ChunkHandle)@PrecisionToolList::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(precision, 0);
+    }
+
+
+}	/* End of MSG_GEN_CONTROL_UPDATE_UI.	*/
+
+#endif	/* __MSET_PRECISION_CONTROL_GOC */

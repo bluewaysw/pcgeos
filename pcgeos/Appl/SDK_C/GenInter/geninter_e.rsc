@@ -1,0 +1,45 @@
+resource USERCREATEDIALOGUI
+_GI_visMoniker_GenInterUserCreateDialog 1 1 "" 0 0 0
+_GI_visMoniker_GenInterUserCreateDialogGlyph 3 1 "" 0 0 0
+resource APPRESOURCE
+GenInterTextMoniker 5 1 "" 0 0 0
+resource INTERFACE
+_GI_visMoniker_GenInterFileNew 4 1 "" 0 0 0
+_GI_visMoniker_GenInterFileOpen 6 1 "" 0 0 0
+_GI_visMoniker_GenInterFileUseTemplate 8 1 "" 0 0 0
+_GI_visMoniker_GenInterFileClose 10 1 "" 0 0 0
+_GI_visMoniker_GenInterFileSave 13 1 "" 0 0 0
+_GI_visMoniker_GenInterFileSaveAs 15 1 "" 0 0 0
+_GI_visMoniker_GenInterFileRevert 17 1 "" 0 0 0
+_GTXI_text_GenInterFileSaveRevertText 19 3 "" 0 0 0
+_GI_visMoniker_GenInterFileFeaturesSubMenu 21 1 "" 0 0 0
+_GI_visMoniker_GenInterFileFeaturesEditUserNotes 23 1 "" 0 0 0
+_GI_visMoniker_GenInterFileFeaturesEditUserNotesSave 26 1 "" 0 0 0
+_GI_visMoniker_GenInterFileFeaturesSaveAsTemplate 28 1 "" 0 0 0
+_GI_visMoniker_GenInterFileFeaturesSaveAsDefault 30 1 "" 0 0 0
+_GI_visMoniker_GenInterFileFeaturesSaveAsPublic 32 1 "" 0 0 0
+_GI_visMoniker_GenInterFileFeaturesResetDefault 34 1 "" 0 0 0
+_GI_visMoniker_GenInterFilePrintPrint 37 1 "" 0 0 0
+_GI_visMoniker_GenInterFilePrintPageSetup 39 1 "" 0 0 0
+_GI_visMoniker_GenInterCreateDialog 41 1 "" 0 0 0
+_GI_visMoniker_GenInterFileExit 43 1 "" 0 0 0
+_GTXI_text_GenInterFileExitText 45 3 "" 0 0 0
+_GI_visMoniker_GenInterOnScreen1 48 1 "" 0 0 0
+_GI_visMoniker_GenInterOnScreen2 50 1 "" 0 0 0
+_GI_visMoniker_GenInterApp2 52 1 "" 0 0 0
+_GI_visMoniker_GenInterSys1 54 1 "" 0 0 0
+_GI_visMoniker_GenInterSys2 56 1 "" 0 0 0
+_GI_visMoniker_GenInterOptionsInMenu 60 1 "" 0 0 0
+_GI_visMoniker_GenInterOptionsInPrimary 62 1 "" 0 0 0
+_GI_visMoniker_GenInterControlGroup 64 1 "" 0 0 0
+_GTXI_text_GenInterFileNewText 68 3 "" 0 0 0
+_GI_visMoniker_GenInterPopoutMenu 71 1 "" 0 0 0
+_GI_visMoniker_GenInterPopoutPopOut 73 1 "" 0 0 0
+_GI_visMoniker_GenInterPopoutPopIn 75 1 "" 0 0 0
+_GI_visMoniker_GenInterPopoutToggle 77 1 "" 0 0 0
+_GI_visMoniker_GenInterIconBar 79 1 "" 0 0 0
+UseTempYesMoniker 81 1 "" 0 0 0
+UseTempNoMoniker 82 1 "" 0 0 0
+CloseYesMoniker 83 1 "" 0 0 0
+SaveYesMoniker 84 1 "" 0 0 0
+SaveNoMoniker 85 1 "" 0 0 0

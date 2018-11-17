@@ -1,0 +1,268 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		PostScript Translation Library
+FILE:		exportConstant.def
+
+AUTHOR:		Jim DeFrisco, 19 Feb 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	2/91		Initial revision
+
+
+DESCRIPTION:
+	This file contains the constants used in the Export module.
+		
+
+	$Id: exportConstant.def,v 1.1 97/04/07 11:25:49 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+;--------------------------------------------------------------------------
+;	Constants
+;--------------------------------------------------------------------------
+
+;	define what we want newline to be.
+;	PostScript says that it can be: CR, LF, or CR-LF
+
+NL	equ	<C_CR, C_LF>
+
+;	These tag bytes signal whether the next set of bitmap data is binary
+; 	or ascii encoded.  This is part of the scheme to send binary data
+; 	to the printer instead of hex ascii.
+
+EPS_BIN_TAG		equ	42h		; 'B' in ascii
+EPS_HEX_TAG		equ	48h		; 'H' in ascii
+
+; 	If we have a sufficiently wide scan line to send, then we split
+;	it into smaller packets to increase the chance of a successful
+;	binary send.  This is the definition of 'sufficiently wide.'
+;	It's in bytes cause that's what we send.
+
+EPS_WIDE_LINE_LENGTH	equ	100
+
+; 	This defines how many packets we split a scan line into.
+
+EPS_WIDE_LINE_BUFFS_PER_LINE	equ	4
+
+
+;--------------------------------------------------------------------------
+;	Structures
+;--------------------------------------------------------------------------
+
+	; while we're here, let's define some constants for use in 
+	; exportText.asm to download the drawing commands
+HO_MOVETO	equ	'0'
+HO_RMOVETO	equ	'1'
+HO_LINETO	equ	'2'
+HO_RLINETO	equ	'3'
+HO_HLINETO	equ	'4'
+HO_VLINETO	equ	'5'
+HO_CURVETO	equ	'6'
+HO_RCURVETO	equ	'7'
+HO_FILL		equ	'8'
+HO_SETCACHE	equ	'9'
+HO_UNUSED1	equ	'a'
+HO_UNUSED2	equ	'b'
+HO_UNUSED3	equ	'c'
+HO_UNUSED4	equ	'd'
+
+HO_DIGITS_RANGE	equ	110	; absolute value of encoded single digits range
+HO_DIGITS_ZERO	equ	0x7c	; encoded value of 0
+HO_110S_LOW	equ	-10
+HO_110S_HIGH	equ	10
+HO_110S_ZERO	equ	0xf5
+
+AdobeFontEncoding	etype	byte, 0, 1
+AFE_STANDARD		enum	AdobeFontEncoding	; StandardEncoding
+AFE_EXPERT		enum	AdobeFontEncoding	; ExportEncoding
+AFE_SYMBOL		enum	AdobeFontEncoding	; Symbol Standard
+AFE_SPECIAL		enum	AdobeFontEncoding	; special encoding
+
+;	this structure contains everything (well, almost) we ever wanted to 
+;	know about Adobe fonts.
+AdobeFontEntry	struct
+    AFE_id	FontID			; a PC/GEOS font ID in the Adobe set
+    AFE_nlen	byte			; length of name string
+    AFE_style	TextStyle		; style of font, byte
+    AFE_encode	AdobeFontEncoding	; how standard font is encoded
+    AFE_name	char			; actual font string (preceded by _)
+AdobeFontEntry	ends
+
+;	ColorBitmap compaction structures
+;	This structure holds the info needed while compacting a color bitmap
+ColorCompact	struct
+    CC_chunk	lptr			; chunk holding this component
+    CC_offset	word			; offset into chunk of current info
+    CC_pixel	byte			; current pixel value
+    CC_count	byte			; current count
+ColorCompact	ends
+
+;	PageFont structures
+;	This structure is used to record what fonts are present on the page
+;	The TGS_pageFonts lptr points to a chunk that has an array of these
+;	structures in it.  The first word of the chunk contains the number
+;	of PageFont elements in the array.
+
+PageFontFlags	record
+    PFF_UNUSED:6,			; only need a few bits
+    PFF_DOWNLOAD:1,			; 1 if we download this font
+    PFF_REENCODE:1			; 1 if we need to reencode it
+PageFontFlags	end
+
+PageFont	struct
+    PF_id	FontID			; PC/GEOS font id
+    PF_style	TextStyle		; desired styles
+    PF_newstyle	TextStyle		; desired styles, after font selection
+    PF_flags	PageFontFlags		; 0=don't download, 1=download
+    PF_nlen	byte			; name length
+    PF_map	byte 32 dup (?)		; "chars needed" 1bit/char x 256 chars
+    PF_name	char 60 dup (?)		; array to hold PostScript name to use
+PageFont	ends
+
+PageFonts	struct
+    PF_count	word			; #PageFont structs
+    PF_first	PageFont		; first font
+PageFonts	ends
+
+;	This structure is returned in a GR_COMMENT field from the font
+;	driver when getting the path description for a character
+CharSizeInfo	struct			
+    CSI_wx	word			; char width
+    CSI_wy	word			; char height
+    CSI_llx	sword			; lower left x bound
+    CSI_lly	sword			; lower left y bound
+    CSI_urx	sword			; upper right x bound
+    CSI_ury	sword			; upper right y bound
+CharSizeInfo	ends
+
+;	ConvertArcParams
+;	This structure contains a bunch of intermediate values needed during
+; 	the conversion of 3Point params to normal params.
+ConvertArcParams	struct
+    CAP_p1	PointWWFixed		; #1 -> #2 midpoint
+    CAP_p2	PointWWFixed		; #2 -> #3 midpoint
+    CAP_m1	WWFixed			; #1 -> #2 slope
+    CAP_m2	WWFixed			; #2 -> #3 slope
+    CAP_tl	PointWWFixed		; top left bound coord
+    CAP_br	PointWWFixed		; bottom right bound coord
+    CAP_bounds	Rectangle		; bounds of ellipse
+    CAP_ang1	WWFixed			; angle 1
+    CAP_ang2	WWFixed			; angle 2
+    CAP_radius	WWFixed			; radius of circle
+    CAP_center	PointWWFixed		; radius of circle
+ConvertArcParams	ends
+
+;	TGSLocals structure
+;	this structure is allocated in the stack frame of the TranslateGString
+;	routine and inherited by some of the routines that it calls
+
+TGSLocals	struct
+    TGS_gstate	hptr.GState		; attribute gstate handle
+    TGS_stream	hptr			; handle of EPSExportLowStreamStruct
+    TGS_gstring	hptr.GState		; gstring handle
+    TGS_tempgs	hptr.GState		; temporary gstring handle
+    TGS_options	sptr.PSExportOpts	; options block
+
+    TGS_flags	GSControl		; stoppage control
+    TGS_emitRetType GSRetType		; why we stopped
+    TGS_xfactor	byte			; zero if tmatrix elements are zero
+    TGS_yfactor	byte			;   else 1
+    TGS_matrix	TransMatrix		; scratch area for getting ctm
+    TGS_pathmatrix TransMatrix		; to save path matrix
+    TGS_chunk	optr			; scratch LMem blk for copying gstrings
+    TGS_xtrachunk lptr			; chunk handle for extra chunk
+    TGS_pathchunk lptr			; chunk handle for path stuff
+    TGS_pageFonts optr.PageFonts	; chunk handle for page font info
+    TGS_fontMaker FontMaker		; font manufacturer id
+    TGS_fontBBox Rectangle		; scratch for storing FontBBox
+    TGS_width	WWFixed			; net text width (for text field)
+    TGS_gwidth	WWFixed			; current text width (for style group)
+    TGS_runlen	WWFixed			; length of current style run
+    TGS_locmot	WWFixed			; local motion from last style run
+    TGS_gpos	WWFixed			; current style group x position
+    TGS_nchars	word			; #REAL characters in text field 
+    TGS_arc	ThreePointArcParams	; needed to process three point arcs
+    TGS_newArc	ConvertArcParams	; struct to help convert 3point arcs
+    TGS_bmPos	Point			; bitmap position
+    TGS_bmWidth	word			; bitmap width
+    TGS_bmHeight word			; bitmap height
+    TGS_bmBytesPL word			; #bytes per scan line
+    TGS_bmScansPS word			; #scan lines in current slice
+    TGS_bmDataPtr nptr			; pointer into bitmap data
+    TGS_bmXres	word			; x resolution, dpi
+    TGS_bmYres	word			; y resolution, dpi
+    TGS_bmRed	ColorCompact <>		; info to compact color bitmap
+    TGS_bmGreen	ColorCompact <>		; info to compact color bitmap
+    TGS_bmBlue	ColorCompact <>		; info to compact color bitmap
+    TGS_bmPalette lptr			; chunk handle for palette
+
+    TGS_bmFile	hptr			; bitmap file (for exporting bitmaps)
+    TGS_bmBlock	word			; bitmap block (for exporting bitmaps)
+    TGS_bmSliceFS word			; first scanline of current slice
+
+    ; keep these next two fields together -- they are both bytes...
+    TGS_bmType	BMType			; byte for BMFormat (MONO, 4BIT...)
+    TGS_newstyle TextStyle		; modified text style
+
+    TGS_pathType  byte			; one of the GetPathType enums
+    TGS_pathCnt  byte			; element count in path
+    TGS_pathgs  hptr.GState		; used in EmitPath code...
+    TGS_pathGState  hptr.GState		; used to keep attr and curpos
+    TGS_writeErr StreamError		; non-zero if StreamWrite returned an
+					;  error
+    TGS_buffer	char 300 dup (?)	; character buffer for arguments
+TGSLocals	ends
+
+; these are internal graphics string structures.  They are here because of a 
+; hack to make the reading of bitmap slices work under 1.1.  The need for 
+; this will (hopefully) go away with 2.0 gstring support.
+
+; exportManager.asm includes gstate.def
+;GS_gstring	equ	<size LMemBlockHeader+2>
+
+;--------------------------------------------------------------------------
+;               Graphics String Structures
+;--------------------------------------------------------------------------
+;
+;       This record is used to distinguish between various gstring types.`
+;               GSF_WRITE_ERROR - set to indicate disk full error encountered
+;               GSF_FILE_HAN    - set to indicate gstring is a stream, as
+;                                   as opposed to a memory block
+;               GSF_READ_ONLY   - set to indicate gstring is being read
+
+GSflags record
+    GSF_UNUSED:4,
+    GSF_WRITE_ERROR:1,
+    GSF_READ_ONLY:1,
+    GSF_HANDLE_TYPE GStringType:2
+GSflags end
+
+
+GString struct
+    GSS_header          LMemBlockHeader <>      ; LMem header
+    GSS_flags           GSflags <>              ; holds file/mem flags, etc.
+    GSS_unused          byte                    ; force to even boundary
+    GSS_hChunk          lptr                    ; handle to file buffer or
+						;  gstring chunk (mem strings)
+    GSS_hString         hptr                    ; file handle or mem handle
+						;  (to gstring)
+    GSS_hSubStr         lptr                    ; chunk handle to current
+						;  sub-string
+    GSS_hReloc          lptr                    ; chunk handle to reloc buffer
+					        ;  (to gstring)
+    GSS_curPos          word                    ; current string pointer
+    GSS_vmemSize        word                    ; size limit for vmem blocks
+    GSS_vmemHandle      hptr                    ; VM handle to current vmem blk
+    GSS_vmemMemHandle   hptr                    ; mem handle to current vmem blk
+    GSS_startBlock      word                    ; starting VM block handle or
+						;  chunk handle (passed to
+						;  GrLoadGString)
+    GSS_chunkOffset     word                    ; Offset into chunk where
+GString ends
+

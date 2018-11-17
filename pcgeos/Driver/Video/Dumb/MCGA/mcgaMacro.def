@@ -1,0 +1,235 @@
+
+COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+
+PROJECT:	PC GEOS
+MODULE:		MCGA screen driver
+FILE:		mcgaMacro.def
+
+AUTHOR:		Jim DeFrisco
+
+REVISION HISTORY:
+	Name	Date	Description
+	----	----	-----------
+	jim	6/90	initial
+
+	$Id: mcgaMacro.def,v 1.1 97/04/18 11:42:34 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		SetBuffer	segreg, trashReg
+
+DESCRIPTION:	Set a segment register to point to the video buffer
+
+PASS:
+	segreg - segment register to set
+	trashReg - register that can be trashed
+
+RETURN:
+	segreg - set
+
+-------------------------------------------------------------------------------@
+
+SetBuffer	macro	segreg, trashReg
+	mov	trashReg,SCREEN_BUFFER
+	mov	segreg,trashReg
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		NextScan
+
+DESCRIPTION:	Increment to the next scan line
+
+PASS:
+	dest - register with scan line address
+	adjust - modification (in bytes) to position on next scan
+
+RETURN:
+	dest - updated
+
+-------------------------------------------------------------------------------@
+
+NextScan	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	add	dest, SCREEN_BYTE_WIDTH+(adjust)
+    else
+	add	dest, SCREEN_BYTE_WIDTH
+	add	dest, (adjust)
+    endif
+else
+	add	dest, SCREEN_BYTE_WIDTH
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		PrevScan
+
+DESCRIPTION:	Decrement to the previous scan line
+
+PASS:
+	dest - register with scan line address
+	adjust - modification (in bytes) to position on next scan
+
+-------------------------------------------------------------------------------@
+
+PrevScan	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	add	dest, (adjust)-SCREEN_BYTE_WIDTH
+    else
+	sub	dest, SCREEN_BYTE_WIDTH
+	add	dest, (adjust)
+    endif
+else
+	sub	dest, SCREEN_BYTE_WIDTH
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		StoreNextScanMod
+
+DESCRIPTION:	Store a self modified value for NextScanMod
+
+PASS:
+	dest - destination address
+	adjust - register with value to modify or constant
+
+-------------------------------------------------------------------------------@
+
+StoreNextScanMod	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	mov	dest, SCREEN_BYTE_WIDTH+(adjust)
+    else
+	mov	dest, SCREEN_BYTE_WIDTH
+	add	dest, (adjust)
+    endif
+else
+	mov	dest, SCREEN_BYTE_WIDTH
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		NextScanMod
+
+DESCRIPTION:	Increment register to the next scan line
+
+PASS:
+	reg - register with scan line address
+	sym - symbol for word to relocate
+
+RETURN:
+	reg - updated
+
+-------------------------------------------------------------------------------@
+
+NextScanMod	macro	reg, sym
+	local	stuff
+
+stuff	label	word
+sym	=	stuff + 2
+	add	reg, 1234h
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		StorePrevScanMod
+
+DESCRIPTION:	Store a self modified value for PrevScanMod
+		For the MCGA, this is the same as StoreNextScanMod
+
+PASS:
+	dest - destination address
+	reg - register with value to modify
+
+RETURN:
+	reg - destroyed
+
+-------------------------------------------------------------------------------@
+
+StorePrevScanMod	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	mov	dest, (adjust)-SCREEN_BYTE_WIDTH
+    else
+	mov	dest, -SCREEN_BYTE_WIDTH
+	add	dest, (adjust)
+    endif
+else
+	mov	dest, -SCREEN_BYTE_WIDTH
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		PrevScanMod
+
+DESCRIPTION:	Increment register to the next scan line
+		For the MCGA, this is the same as NextScanMod
+
+PASS:
+	reg - register with scan line address
+	sym - symbol for word to relocate
+
+RETURN:
+	reg - updated
+
+-------------------------------------------------------------------------------@
+
+PrevScanMod	macro	reg, sym
+	local	stuff
+
+stuff	label	word
+sym	=	stuff + 2
+	add	reg, 1234h
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		CalcScanLine
+
+DESCRIPTION:	Calculate the beginning scan line position
+
+PASS:
+	reg - register containing line number
+	offsetReg - register containing offset to add to base scan line address
+
+RETURN:
+	reg - address
+	offsetReg - destroyed
+
+-------------------------------------------------------------------------------@
+
+	; result should be: reg = 80L + O
+	;		where:
+	;			L = line number (passed in reg)
+	;			O = offset (passed in offsetReg)
+
+CalcScanLine	macro	reg, offsetReg
+	sal	reg,1			;reg = 2L
+	sal	reg,1			;reg = 4L
+	sal	reg,1			;reg = 8L
+	sal	reg,1			;reg = 16L
+	add	offsetReg,reg		;offsetReg = 16L + O
+	sal	reg,1			;reg = 32L
+	sal	reg,1			;reg = 64L
+	add	reg,offsetReg		;reg = 64L + (16L + O) = 80L + O
+endm
+

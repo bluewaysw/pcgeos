@@ -1,0 +1,740 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GlobalPC 1998 -- All Rights Reserved
+ *
+ * PROJECT:	  Backup and Restore Applications
+ * MODULE:	  The front-end application
+ * FILE:	  bkrt.goc
+ *
+ * AUTHOR:  	  Edwin Yu: November 17, 1998
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	11/17/98  edwin	    Initial version
+ * 	01/24/00  jfh	    added virtual root to file selector
+ *   02/18/00  jfh		put localizable strings in resource
+ *
+ *
+ * DESCRIPTION:
+ *
+ *	$Id: $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include "bkrt.goh"       /* application goh file */
+@include "bckrst.goh"     /* system library */
+@include "Art/mkrApp.goh"
+@include "Art/mkrAppTiny.goh"
+@include "Art/mkrFile.goh"
+@include "Art/mkrDoc.goh"
+
+/*
+ ***************************************************************************
+ *		Constants and structures
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *		Global variables
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *              Text Monikers
+ ***************************************************************************
+ */
+
+@start Interface;
+
+/* used with FileMonikerButton & DocMonikerButton to create text/graphic combo */
+@visMoniker FileMonikerButtonText = "Individual Documents...";
+@visMoniker FileMonikerButtonTextNoEllipse = "Individual Documents";
+@visMoniker DocMonikerButtonText = "Entire Documents Folder...";
+@visMoniker DocMonikerButtonTextNoEllipse = "Entire Documents Folder";
+@end Interface;
+
+/*
+ *		Application Object
+ */
+
+@start	AppResource ;
+
+@object GenApplicationClass BKRTApp = {
+    GI_visMoniker = list { @AppMoniker,
+			   @AppTinyMoniker,
+			   @BKRTMoniker };
+    GI_comp = @BKRTPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @BKRTPrimary;
+    /*
+     * The GenDocumentControl object must be on the "active list" so it can
+     * have access to the AppLaunchBlock, passed with MSG_META_ATTACH, that
+     * contains the data file the application is supposed to open.
+     */
+/*    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @ */
+    /*
+     * The GenDocumentControl object must also be on the "application startup"
+     * list so the application can manipulate documents when started as a
+     * server for another application (NOTE: it must be on this list even if
+     * you don't ever expect your application to act as such a server).
+     */
+/*    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) ; */
+    /*
+     * The GenDocumentControl will load its saved options from the .ini file
+     * itself, but needs to be told when to save them.
+     */
+/*    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) = */
+    /*
+     * Specify the INI file category [Con 6.3] under which to save all options
+     * for this application.
+     */
+/*    ATTR_GEN_INIT_FILE_CATEGORY = "docui"; */
+    ATTR_GEN_HELP_FILE = "backup";
+}
+
+@visMoniker BKRTMoniker = "Backup Manager";
+
+@end	AppResource;
+
+/*
+ *		Primary window
+ */
+@start	Interface;
+
+@object GenPrimaryClass BKRTPrimary  = {
+    GI_comp = 
+              @BKRTBackupSingle,
+              @BKRTBackupDocDir,
+              @BKRTMainWindow,                /* backup, restore, quit */
+              @BKRTRestoreStatus,
+              @BKRTBackupSuccess,
+              @BKRTBackupFail,
+              @BKRTDeleteSuccess,
+              @BKRTDeleteFail,
+              @BKRTBackupReminder,
+              @BKRTDeleteConfirmation,
+              @BKRTRestoreConfirmation;
+    HINT_PRIMARY_FULL_SCREEN;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+
+/***************************************************************************
+ *   The main menu
+ */
+@object GenInteractionClass BKRTMainWindow = 
+{
+    GI_comp=@BKRTBackupMenuBox,    /* Backup menu */
+            @BKRTViewOptionGroup,  /* pull-down menu of backup type options*/
+            @BiggerList,
+@if 0
+            @BKRTTitlebar,         /* Title bar for the list of backup groups */
+            @BKRTFileList, /* BKRTViewBackupGroups, Backup list of the selected type */
+@endif
+            @BKRTMainTriggers;     /* Restore group */
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+/***************************************************************************
+ *   Backup Menu and gadgets
+ */
+@object GenInteractionClass BKRTBackupMenuBox = {
+    GI_comp = @BKRTBackupMenu, @BKRTBackupAuto;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CUSTOM_CHILD_SPACING = 50;
+}
+/***************************************************************************
+ *   Backup Document Now
+ */
+@object GenInteractionClass BKRTBackupMenu = {
+    GI_visMoniker = "Backup Documents Now";
+    GI_comp = @BKRTBackupSingleGroup, @BKRTBackupDocDirGroup;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_DRAW_IN_BOX;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CUSTOM_CHILD_SPACING = 3;
+}
+@object GenTriggerClass BKRTBackupSingleGroup = {
+    GI_visMoniker = list { @FileMonikerButton,
+                           @FileMonikerButtonText };
+    GTI_destination = BKRTBackupSingle;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+    HINT_MINIMUM_SIZE = {
+	SST_WIDE_CHAR_WIDTHS | 15,
+	SST_PIXELS | 18,
+	0
+    };
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};  
+}
+@object MyGenInteractionClass BKRTBackupSingle = {
+    GI_visMoniker = "Backup an Individual Document";
+    GI_comp = @FileSelector, @MemoText, @FileSelectTriggers;
+    GII_type = GIT_MULTIPLE_RESPONSE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object MyGenFileSelectorClass FileSelector = {
+    GI_visMoniker = "Select a document to backup:";
+    GFSI_attrs = FSA_HAS_FILE_LIST |  FSA_ALLOW_CHANGE_DIRS
+					| FSA_USE_VIRTUAL_ROOT;
+    GFSI_destination = FileSelector;
+    ATTR_GEN_PATH_DATA = { SP_DOCUMENT, "" };
+    ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = { SP_DOCUMENT, "" };
+    HINT_PLACE_MONIKER_ABOVE;
+}
+@object GenTextClass MemoText = {
+    GI_visMoniker = "Memo:";
+    GTXI_maxLength = LEN_DESCRIPTION;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenInteractionClass FileSelectTriggers = {
+    GI_comp = @FileSelectBackup, @FileSelectCancel;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+@object GenTriggerClass FileSelectBackup =
+{
+     GI_visMoniker = "Backup";
+     GTI_destination = process;
+     GTI_actionMsg   = MSG_BKRTP_BACKUP_SELECTED_FILE;
+     HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass FileSelectCancel = {
+     GI_visMoniker = "Don't Backup";
+     HINT_SEEK_REPLY_BAR;
+     ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+}
+
+
+@object GenTriggerClass BKRTBackupDocDirGroup = {
+    GI_visMoniker = list { @DocMonikerButton,
+                           @DocMonikerButtonText };
+    GTI_destination = BKRTBackupDocDir;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+    HINT_MINIMUM_SIZE = {
+	SST_WIDE_CHAR_WIDTHS | 15,
+	SST_PIXELS | 18,
+	0
+    };
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};  
+}
+@object MyGenInteractionClass BKRTBackupDocDir = {
+    GI_visMoniker = "Backup Contents of Document Folder";
+    GI_comp = @DocDirInfo, @DocDirSizeGroup, @EmailBackupGroup,
+		    @MemoText2, @DocBackupTrig;
+    GII_type = GIT_MULTIPLE_RESPONSE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_WINDOW_NO_SYS_MENU; 
+}
+@object GenTextClass DocDirInfo = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "Your Document Folder currently contains:";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object MyDocumentFolderWindowClass DocDirSizeGroup = {
+    GI_comp = @DocDirText, @DocDirSize;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass DocDirText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Number of documents:\rTotal size of these documents:";
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 31 ,
+	0
+    };
+}
+@object MyGenTextClass DocDirSize = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "0\r0 bytes";
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 17,
+	0
+    };
+}
+
+@visMoniker AndEFax = "Backup Email & eFax: "; 
+@object GenItemGroupClass EmailBackupGroup = {
+    GI_visMoniker = "Backup Email: ";
+    GI_comp = @EmailBackupYes, @EmailBackupNo;
+    GIGI_selection = 1;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_BKRTP_EMAIL_BACKUP_SELECTION_APPLY;
+    GIGI_destination = process;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenItemClass EmailBackupYes = {
+    GI_visMoniker	= 'Y', "Yes";
+    GII_identifier	= 1;
+}
+@object GenItemClass EmailBackupNo = {
+    GI_visMoniker	= 'N', "No";
+    GII_identifier	= 0;
+}
+
+@object GenTextClass MemoText2 = {
+    GI_visMoniker = "Memo:";
+    GTXI_maxLength = LEN_DESCRIPTION;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | LEN_DESCRIPTION,
+	0
+    };
+}
+@object GenInteractionClass DocBackupTrig = {
+    GI_comp = @DocDirBackup, @DocDirCancel;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+@object GenTriggerClass DocDirBackup =
+{
+    GI_visMoniker = "Backup";
+    GTI_destination = process;
+    GTI_actionMsg   = MSG_BKRTP_BACKUP_USER_DOC;
+    HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass DocDirCancel = {
+	GI_visMoniker = "Don't Backup";
+     HINT_SEEK_REPLY_BAR;
+     ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+}
+/***************************************************************************
+ *   Automatic Backups
+ */
+@object GenItemGroupClass BKRTBackupAuto = {
+    GI_visMoniker = "Automatic Backups";
+    GI_comp = @AutoOptionNever, @AutoOptionWeek, @AutoOptionMonth;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_DRAW_IN_BOX;
+    HINT_MINIMUM_SIZE = {
+	SST_PCT_OF_FIELD_WIDTH | 320,
+	0
+    };
+    HINT_CUSTOM_CHILD_SPACING = 0;
+}
+@object GenItemClass AutoOptionNever = {
+    GI_visMoniker	= 'N', "Never";
+    GII_identifier	= AB_NEVER;
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 13,
+	SST_PCT_OF_FIELD_HEIGHT | 29,
+	0
+    };
+}
+@object GenItemClass AutoOptionWeek = {
+    GI_visMoniker	= 'w', "Once a week";
+    GII_identifier	= AB_WEEK;
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 13,
+	SST_PCT_OF_FIELD_HEIGHT | 34,
+	0
+    };
+}
+@object GenItemClass AutoOptionMonth = {
+    GI_visMoniker	= 'm', "Once a month";
+    GII_identifier	= AB_MONTH;
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 13,
+	SST_PCT_OF_FIELD_HEIGHT | 29,
+	0
+    };
+}
+
+/***************************************************************************
+ *   The items on the main window.
+ */
+@object GenInteractionClass BKRTViewOptionGroup = {
+    GI_comp = @OptionText, @BKRTViewOptions;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenTextClass OptionText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "View your previous backups:";
+}
+@object MyItemGroupClass BKRTViewOptions =
+{
+    GI_comp = @OptionOne, @OptionTwo; /* , @OptionThree, @OptionFour; */
+    GIGI_selection = BT_SINGLE_FILE;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+@object GenItemClass OptionOne =
+{
+    GI_visMoniker = list { @FileMonikerButton,
+                           @FileMonikerButtonTextNoEllipse };
+    GII_identifier = BT_SINGLE_FILE;
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
+}
+@object GenItemClass OptionTwo =
+{
+    GI_visMoniker = list { @DocMonikerButton,
+			   @DocMonikerButtonTextNoEllipse }
+    GII_identifier = BT_DOCUMENT_DIR;
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 7};
+}
+/****
+  @object GenItemClass OptionThree =
+  {
+  GI_visMoniker = "System Configuration Settings";
+  GII_identifier = BT_SYS_CONFIG;
+  }
+  @object GenItemClass OptionFour =
+  {
+  GI_visMoniker = "Full System";
+  GII_identifier = BT_FULL_SYS;
+  }
+******/
+
+/***************************************************************************
+ *   Title bar for the scrollable list of backup groups
+ */
+@object GenInteractionClass BiggerList = {
+    GI_comp = @BKRTTitlebar, @BKRTFileList;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CUSTOM_CHILD_SPACING = 0;
+}
+@object GenInteractionClass BKRTTitlebar = 
+{
+    GI_comp = @TriggerDate, @TriggerFile, @TriggerMemo;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CUSTOM_CHILD_SPACING = 0;
+}
+@object GenTriggerClass TriggerDate =
+{
+    GI_visMoniker = "Date & Time";
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 13 ,
+	0
+    };
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BKRTP_SORT_DATETIME;
+}
+@object GenTriggerClass TriggerFile =
+{
+    GI_visMoniker = "File Name & Location";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BKRTP_SORT_FILENAME;
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 22 ,
+	0
+    };
+}
+@object GenTriggerClass TriggerMemo =
+{
+    GI_visMoniker = "Memo";
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 31 ,
+	0
+    };
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BKRTP_SORT_MEMO;
+}
+
+/***************************************************************************
+ *   The scrollable list of backup groups
+ */
+@object BackupListClass BKRTFileList = 
+{
+    GIGI_destination = BKRTFileList;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_BL_QUERY_MONIKER;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+/*    HINT_ITEM_GROUP_TOOLBOX_STYLE; */
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = { MSG_BKRTP_CONFIRMATION_ON_RESTORE };
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_ITEM_GROUP_SCROLLABLE;
+}
+@object GenInteractionClass BKRTMainTriggers = 
+{
+    GI_comp = @BKRTViewFolderTrigger, @BKRTViewAllDocFoldersTrigger,
+              @BKRTRestoreTrigger, @BKRTDeleteTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CUSTOM_CHILD_SPACING = 30;
+}
+@object GenTriggerClass BKRTViewFolderTrigger = 
+{
+    GI_visMoniker = "View Contents of This Backup";
+    GI_states = @default & ~GS_ENABLED & ~GS_USABLE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BKRTP_VIEW_BACKUP_GROUP;
+}
+@object MyGenTriggerClass BKRTViewAllDocFoldersTrigger = 
+{
+    GI_visMoniker = "View All Folder Backups";
+    GI_states = @default & ~GS_ENABLED & ~GS_USABLE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BKRTP_VIEW_ALL_BACKUP_GROUPS;
+}
+@object GenTriggerClass BKRTRestoreTrigger = 
+{
+    GI_visMoniker = "Restore Document";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BKRTP_CONFIRMATION_ON_RESTORE;
+}
+@object GenInteractionClass BKRTRestoreConfirmation =
+{
+    GI_comp = @BKRTRestoreText, @BKRTRestoreSure, @BKRTRestoreNo;
+    GII_type = GIT_MULTIPLE_RESPONSE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+@object GenTextClass BKRTRestoreText  = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Restore will override any existing documents.  Do you want to proceed?";
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 45 ,
+	0
+    };
+    ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+}
+@object GenTriggerClass BKRTRestoreSure = 
+{
+    GI_visMoniker = "Yes";
+    GTI_destination = process;
+    GTI_actionMsg   = MSG_BKRTP_RESTORE_GROUP;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+    HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass BKRTRestoreNo = 
+{
+    GI_visMoniker = "No";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass BKRTDeleteTrigger = 
+{
+    GI_visMoniker = "Delete...";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = BKRTDeleteConfirmation;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+}
+@object GenInteractionClass BKRTDeleteConfirmation =
+{
+    GI_comp = @BKRTDeleteText, @BKRTDeleteSure, @BKRTDeleteNo;
+    GII_type = GIT_MULTIPLE_RESPONSE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+}
+@object GenTextClass BKRTDeleteText  = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Are you sure you want to delete this document backup?";
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 35 ,
+	0
+    };
+}
+@object GenTriggerClass BKRTDeleteSure = 
+{
+    GI_visMoniker = "Yes";
+    GTI_destination = process;
+    GTI_actionMsg   = MSG_BKRTP_DELETE_GROUP;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+    HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass BKRTDeleteNo = 
+{
+    GI_visMoniker = "No";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    HINT_SEEK_REPLY_BAR;
+}
+
+/***************************************************************************
+ *   Backup/Restore Success/failure dialog.
+ */
+@object GenInteractionClass BKRTBackupSuccess =
+{
+    GI_comp = @BKRTBackupSuccessText, @BKRTBackupSuccessDone;
+    GII_type = GIT_MULTIPLE_RESPONSE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+}
+@object GenTextClass BKRTBackupSuccessText  = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Backup completed!";
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 35 ,
+	0
+    };
+    ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+}
+@object GenTriggerClass BKRTBackupSuccessDone = 
+{
+    GI_visMoniker = "Done";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    HINT_SEEK_REPLY_BAR;
+}
+@object GenInteractionClass BKRTBackupFail =
+{
+    GI_comp = @BKRTBackupFailText;
+    GII_type = GIT_NOTIFICATION;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+}
+@object GenTextClass BKRTBackupFailText = 
+{
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "Backup failed!";
+}
+
+@object GenInteractionClass BKRTDeleteSuccess =
+{
+    GI_comp = @BKRTDeleteSuccessText;
+    GII_type = GIT_NOTIFICATION;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+}
+@object GenTextClass BKRTDeleteSuccessText  = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "Deletion completed!";
+}
+@object GenInteractionClass BKRTDeleteFail =
+{
+    GI_comp = @BKRTDeleteFailText;
+    GII_type = GIT_NOTIFICATION;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+}
+@object GenTextClass BKRTDeleteFailText = 
+{
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "Deletion failed!";
+}
+
+
+
+@object GenInteractionClass BKRTRestoreStatus = {
+    GI_visMoniker = "Restore Status";
+    GI_comp = @RestoreSize, @RestoreDone;
+    GII_type = GIT_MULTIPLE_RESPONSE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_WINDOW_NO_SYS_MENU; 
+}
+@object GenInteractionClass RestoreSize = {
+    GI_comp = @GroupText, @GroupSize;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass GroupText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Number of documents:\rTotal size of these documents:";
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 31 ,
+	0
+    };
+}
+@object MyGenTextClass GroupSize = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "0\r0 bytes";
+}
+
+@object GenTriggerClass RestoreDone =
+{
+     GI_visMoniker = "OK";
+     ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+	HINT_SEEK_REPLY_BAR;
+}
+
+/******************************************************************
+ *    Automatic Backup Reminder.
+ */
+@object GenInteractionClass BKRTBackupReminder = 
+{
+    GI_visMoniker = "Automatic Scheduled Backup";
+    GI_comp = @BackupReminderText, @AutoBackupYes, @AutoBackupNo;
+    GII_type = GIT_MULTIPLE_RESPONSE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+}
+@object GenTextClass BackupReminderText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Would you like to do a document folder backup now?";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+@object GenTriggerClass AutoBackupYes =
+{
+    GI_visMoniker = "OK";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BKRTP_AUTOMATIC_BACKUP;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+    HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass AutoBackupNo =
+{
+    GI_visMoniker = "No";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end Interface;
+
+@start TextStrings, data;
+/* -------------------------------------------------------------- */
+/* and the localizable strings */
+@chunk char RestorDocMon[] = "Restore Document";
+@chunk char RestorDocFolderMon[] = "Restore Documents Folder";
+@chunk char YourDocText[] = "Your document \"";
+@chunk char BackedUpText[] = "\" has been successfully backed up.";
+@chunk char CloseFileMsg[] = "Please save and close the file before you back it up.";
+@chunk char CouldntGetSizeMsg[] = "Could not backup file.";
+@chunk char NotEnufSpaceMsg[] = "Not enough hard disk space.  Please delete some backup data.";
+@chunk char GoodDocBUText[] = "The Documents folder has been successfully backed up.";
+@chunk char AlreadyHaveText1[] = "You already have a document named \"";
+@chunk char AlreadyHaveText2[] = "\" in the \"Document";
+@chunk char AlreadyHaveText3[] = "\" folder.  Do you want to replace that document with this backup version?";
+@chunk char SeveralDocsText[] = "You have several documents and folders in your Documents folder which have the same names as documents and folders in this backup.  Do you want to replace those documents and folders with these older versions?";
+@chunk char SeveralDocsEMailText[] = "You have several documents and folders in your Documents folder which have the same names as documents and folders in this backup.  Restoring will replace those documents and folders with these older versions. You also have email in this backup which will delete all current email and restore email from this backup.  Do you want to proceed?";
+@chunk char EmailWarningText[] = "All the email in this account will be deleted.  Do you want to delete these emails and restore the backed up emails?";
+@chunk char InProgressMon[] = "In progress...";
+@chunk char RestoreComplMon[] = "Restore Completed";
+@chunk char RestoreFailMon[] = "Restore Failed";
+@chunk char AutoBackUpText[] = "Automatic Backup";
+@chunk char DocsFolderText[] = "(Documents folder)";
+@chunk char NoDocsStr[] = "[ You have no individual documents backed up ]";
+@chunk char NoFoldersStr[] = "[ You have no Documents folders backed up ]";
+@chunk char DeleteDocBUText[] = "Are you sure you want to delete this document backup?";
+@chunk char DeleteFolderBUText[] = "Are you sure you want to delete this Documents folder backup?";
+@chunk char SysConfigMon[] = "System Configuration:";
+@chunk char FullSysMon[] = "Full System:";
+@chunk char BytesStr[] = " bytes";
+
+
+@end TextStrings;
+
+

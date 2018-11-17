@@ -1,0 +1,346 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Sample Applications
+MODULE:		Mailbox Library Samples
+FILE:		songlistUI.goc
+
+AUTHOR:		Chung Liu, Dec  9, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	12/ 9/94   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: songlistUI.goc,v 1.1 97/04/04 16:40:16 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <songlistConstant.goh>
+
+@start AppResource;
+
+@object GenApplicationClass SLApp = {
+    GI_visMoniker = list { @SLTextMoniker };
+    GI_comp = @SLPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @SLPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+	@SLSendControl;
+}
+
+@visMoniker SLTextMoniker = "Song List Test Application";
+
+@end AppResource;
+
+@start Interface;
+
+@object GenPrimaryClass SLPrimary = {
+    GI_comp = @SLListGroup, @SLTextInteraction, @SLSendControl,
+              @SLAddOrEditDialog, @SLMergeSLDataDialog, @SLDeleteDialog;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+/* Our send control has a custom list of object types to send, so 
+ * MSCI_dataTypes is an array of MailboxSendObjectType records.
+ * If we wanted the send control to have standard object types, 
+ * we can just use ATTR_MAILBOX_SEND_CONTROL_SEND_DOCUMENT, etc.
+ */
+@object SLSendControlClass SLSendControl = {
+    GI_visMoniker = 'S', "Send";
+    GCI_output = process;
+    GII_visibility = GIV_POPUP;
+    MSCI_dataTypes = @SLSendControlDataTypesArray;
+    MSCI_defBodyType = MOT_CURRENT_SONG;
+}
+
+/* Each MailboxSendObjectType contains a MailboxObjectType token, and
+ * the moniker to use for that object type. */
+@chunkArray MailboxSendObjectType SLSendControlDataTypesArray = {
+    MOT_CURRENT_SONG, 0, @CurrentSongTextMoniker,
+    MOT_CURRENT_RECORD, 0, @CurrentRecordTextMoniker,
+    MOT_CURRENT_ARTIST, 0, @CurrentArtistTextMoniker,
+    MOT_ALL_ARTISTS, 0, @AllArtistsTextMoniker,
+};
+
+@visMoniker CurrentSongTextMoniker = "Current Song";
+@visMoniker CurrentRecordTextMoniker = "Current Record";
+@visMoniker CurrentArtistTextMoniker = "Current Artist";
+@visMoniker AllArtistsTextMoniker = "All Artists";
+
+@object GenInteractionClass SLListGroup = {
+    GI_comp = @SLArtistListGroup, @SLRecordListGroup, @SLSongListGroup;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;    
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DIVIDE_WIDTH_EQUALLY;
+}
+
+@object GenInteractionClass SLArtistListGroup = {
+    GI_comp = @SLArtistList, @SLArtistEditTrigger, @SLArtistAddTrigger, 
+              @SLArtistDeleteTrigger;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;    
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenDynamicListClass SLArtistList = {
+    GI_visMoniker = "Artists:";
+    GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+    GIGI_destination = process;
+    GDLI_queryMsg = MSG_SLP_ARTIST_MONIKER_QUERY;
+    GIGI_applyMsg = MSG_SLP_ARTIST_APPLY;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;    
+}
+
+@object GenTriggerClass SLArtistEditTrigger = {
+    GI_visMoniker = "Edit";
+    GTI_actionMsg = MSG_SLP_ARTIST_EDIT;
+    GTI_destination = process;
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass SLArtistAddTrigger = {
+    GI_visMoniker = "Add";
+    GTI_actionMsg = MSG_SLP_ARTIST_ADD;
+    GTI_destination = process;
+}
+
+@object GenTriggerClass SLArtistDeleteTrigger = {
+    GI_visMoniker = "Delete";
+    GTI_actionMsg = MSG_SLP_ARTIST_DELETE;
+    GTI_destination = process;
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenInteractionClass SLRecordListGroup = {
+    GI_comp = @SLRecordList, @SLRecordEditTrigger, @SLRecordAddTrigger, 
+              @SLRecordDeleteTrigger;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;    
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenDynamicListClass SLRecordList = {
+    GI_visMoniker = "Records:";
+    GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+    GIGI_destination = process;
+    GDLI_queryMsg = MSG_SLP_RECORD_MONIKER_QUERY;
+    GIGI_applyMsg = MSG_SLP_RECORD_APPLY;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;    
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass SLRecordEditTrigger = {
+    GI_visMoniker = "Edit";
+    GTI_actionMsg = MSG_SLP_RECORD_EDIT;
+    GTI_destination = process;
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass SLRecordAddTrigger = {
+    GI_visMoniker = "Add";
+    GTI_actionMsg = MSG_SLP_RECORD_ADD;
+    GTI_destination = process;
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass SLRecordDeleteTrigger = {
+    GI_visMoniker = "Delete";
+    GTI_actionMsg = MSG_SLP_RECORD_DELETE;
+    GTI_destination = process;
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenInteractionClass SLSongListGroup = {
+    GI_comp = @SLSongList, @SLSongEditTrigger, @SLSongAddTrigger, 
+              @SLSongDeleteTrigger;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;    
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenDynamicListClass SLSongList = {
+    GI_visMoniker = "Songs:";
+    GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+    GIGI_destination = process;
+    GDLI_queryMsg = MSG_SLP_SONG_MONIKER_QUERY;
+    GIGI_applyMsg = MSG_SLP_SONG_APPLY;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;    
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass SLSongAddTrigger = {
+    GI_visMoniker = "Add";
+    GTI_actionMsg = MSG_SLP_SONG_ADD;
+    GTI_destination = process;
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass SLSongEditTrigger = {
+    GI_visMoniker = "Edit";
+    GTI_actionMsg = MSG_SLP_SONG_EDIT;
+    GTI_destination = process;
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass SLSongDeleteTrigger = {
+    GI_visMoniker = "Delete";
+    GTI_actionMsg = MSG_SLP_SONG_DELETE;
+    GTI_destination = process;
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenInteractionClass SLTextInteraction = {
+    GI_comp = @SLText;
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;    
+}
+
+@object GenTextClass SLText = {
+    GI_visMoniker = "Notes:";
+    GI_attrs = GA_READ_ONLY;
+    GTXI_attrs = GTA_INIT_SCROLLING;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_FIXED_SIZE = {
+	0,
+	(SST_LINES_OF_TEXT | 10)
+    };
+}
+
+/*
+ * SLDeleteDialog is used to confirm deletion of artist, record or song. 
+ */
+@object GenInteractionClass SLDeleteDialog = {
+    /* Moniker for this dialog is set depending on what is being deleted
+     * (artist, record, or song).
+     */
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+    GII_type = GIT_COMMAND;
+    GI_comp = @SLDeleteText, @SLDeleteTrigger;
+}
+
+@object GenTextClass SLDeleteText = {
+    GI_attrs = GA_READ_ONLY;
+    GI_visMoniker = "Do you really want to delete:";
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenTriggerClass SLDeleteTrigger = {
+    /* the action message for this trigger is set on the fly to one of:
+     * MSG_SLP_ARTIST_REALLY_DELETE
+     * MSG_SLP_RECORD_REALLY_DELETE
+     * MSG_SLP_SONG_REALLY_DELETE
+     */
+    GI_visMoniker = "Delete";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+    GTI_destination = process;
+}
+
+/*
+ * SLAddOrEditDialog is used for adding and editing the name and/or notes
+ * of an artist, record, or song.
+ */
+@object GenInteractionClass SLAddOrEditDialog = {
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+    GII_type = GIT_COMMAND;
+    GI_comp = @SLAddOrEditNameText, @SLAddOrEditNotesText, 
+              @SLAddOrEditTrigger;
+}
+
+@object GenTextClass SLAddOrEditNameText = {
+    GI_visMoniker = "Name:";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_USE_TAB_FOR_NAVIGATION
+	| GTA_ALLOW_TEXT_OFF_END;
+    GTXI_maxLength = SL_MAX_NAME_LENGTH;
+}
+
+@object GenTextClass SLAddOrEditNotesText = {
+    GI_visMoniker = "Notes:";
+    GTXI_attrs = GTA_INIT_SCROLLING | GTA_USE_TAB_FOR_NAVIGATION;
+}
+
+@object GenTriggerClass SLAddOrEditTrigger = {
+    /* the action message for this trigger is set on the fly to one of:
+     * MSG_SLP_ARTIST_REALLY_ADD
+     * MSG_SLP_RECORD_REALLY_ADD
+     * MSG_SLP_SONG_REALLY_ADD
+     * MSG_SLP_ARTIST_REALLY_EDIT
+     * MSG_SLP_RECORD_REALLY_EDIT
+     * MSG_SLP_SONG_REALLY_EDIT
+     */
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+    GTI_destination = process;
+}
+
+/*
+ * SLMergeSLDataDialog is used to resolve how to merge artists, records, or
+ * songs with the same name, when a mailbox message comes in.
+ */
+@object GenInteractionClass SLMergeSLDataDialog = {
+    GI_visMoniker = "Collision During Merge";
+    GI_comp = @SLMergeSLDataText, @SLMergeSLDataItemGroup;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL |
+	GIA_NOT_USER_INITIATABLE;
+    GII_type = GIT_NOTIFICATION;
+}
+
+@object GenTextClass SLMergeSLDataText = {
+    GI_visMoniker = "The following item already exists:";
+    GI_attrs = GA_READ_ONLY;
+    HINT_SHOW_ENTIRE_MONIKER;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenItemGroupClass SLMergeSLDataItemGroup = {
+    GI_visMoniker = "Select a merge option:";    
+    GI_comp = @SLMergeSLDataAppendItem,
+              @SLMergeSLDataUseOldItem,
+              @SLMergeSLDataUseNewItem;
+    GIGI_behaviorType =	GIGBT_EXCLUSIVE;
+    GIGI_selection = SLMII_APPEND_ITEM_IDENTIFIER;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenItemClass SLMergeSLDataAppendItem = {
+    GI_visMoniker = "Append new notes to old notes.";
+    GII_identifier = SLMII_APPEND_ITEM_IDENTIFIER;
+}
+
+@object GenItemClass SLMergeSLDataUseOldItem = {
+    GI_visMoniker = "Keep old notes, and delete new notes.";
+    GII_identifier = SLMII_DELETE_ITEM_IDENTIFIER;
+}
+
+@object GenItemClass SLMergeSLDataUseNewItem = {
+    GI_visMoniker = "Keep new notes, and delete old notes.";
+    GII_identifier = SLMII_USE_ITEM_IDENTIFIER;
+}
+
+@end Interface;
+
+

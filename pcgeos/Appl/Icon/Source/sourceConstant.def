@@ -1,0 +1,163 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright GeoWorks 1994.  All Rights Reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Icon editor
+MODULE:		Source
+FILE:		sourceConstant.def
+
+AUTHOR:		Steve Yegge, Jun 10, 1994
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	stevey	6/10/94		Initial revision
+
+
+DESCRIPTION:
+
+	Constants & definitions for the source-code generation module.
+		
+	$Id: sourceConstant.def,v 1.1 97/04/04 16:06:48 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;		Constants
+;-----------------------------------------------------------------------------
+
+LINE_ENTRIES			equ	 7	; 0-7: 8 entries per line
+LARGE_LINE_ENTRIES		equ	 5	; 0-5: 6 entries per line
+SOURCE_CACHE_BUFFER_SIZE	equ	2048
+MAX_RESOURCE_SIZE_IN_KBYTES	equ	12
+CREATED_BITMAP			equ	-1
+
+;
+;  We might decide to support other sizes in later versions...
+;
+MOUSE_POINTER_WIDTH		equ	16
+MOUSE_POINTER_HEIGHT		equ	16
+
+WriteSourceFlags	record
+	:2
+	WSF_UNCOMPACTED_BITMAP:1		; had to uncompact first?
+	WSF_WRITING_LARGE:1			; writing giant bitmap?
+	WSF_WRITING_MASK:1			; used by PointerDef code
+	WSF_LAST_ELEMENT:1			; doing last element of bitmap
+	WSF_COMPACTED_BITMAP:1			; need to free new bitmap
+	WSF_REMOVED_MASK:1			; same for this case
+WriteSourceFlags	end
+
+;-----------------------------------------------------------------------------
+;		Structures
+;-----------------------------------------------------------------------------
+
+;
+;  This rather large structure is used to store all the options,
+;  parameters and local variables needed by the routines in the
+;  Source module.  I used to store everything in dgroup, but that
+;  was then and this is now.  Note that the routines are optimized
+;  somewhat for speed over size, and some intermediate values are
+;  cached here that could otherwise have been calculated.
+;
+
+WriteSourceFrame	struct
+	WSF_format	WriteSourceFormatType
+	WSF_language	WriteSourceLanguageType
+	WSF_header	WriteSourceHeaderType
+	WSF_compact	WriteSourceCompactType
+
+	WSF_fileName	DosDotFileName		; output file name
+	WSF_fileHandle	hptr			; output file handle
+
+	WSF_curFormat	word			; format number we're writing
+	WSF_bitmap	HBitmap			; bitmap we're writing
+	WSF_element	fptr			; locked huge array element
+	WSF_elemSize	word			; size of element in bytes
+	WSF_type	VisMonikerListEntryType	; info for this format
+
+	WSF_tempBitmap	HBitmap			; we create several of these
+
+	WSF_hexBuffer	word			; for hex strings like "e9"
+	WSF_lineCount	byte			; numbers written on this line
+
+	WSF_outBufHan	hptr			; handle of buffer block
+	WSF_outBufSeg	sptr			; segment of buffer block
+	WSF_outBufPtr	word			; pointer into buffer
+	WSF_stringSeg	sptr			; segment of strings block
+
+	WSF_flags	WriteSourceFlags	; misc flags
+
+	;
+	; Some options for writing out large bitmaps in multiple
+	; resources, using GrDrawBitmapOptr.
+	;
+
+	WSF_resSize	word			; base resource size
+	WSF_xOffset	word			; to pass to GrDrawBitmapOptr
+	WSF_yOffset	word			; ditto
+	WSF_sliceSize	word			; scanlines per swath
+	WSF_numSwaths	word			; number of slices to write
+	WSF_lastSwath	word			; num scanlines in last swath
+
+	align word				; make structure word-aligned
+WriteSourceFrame	ends
+
+;-----------------------------------------------------------------------------
+;		Macros
+;-----------------------------------------------------------------------------
+
+;
+;  this WriteString macro makes two assumptions:
+;
+;	* ss:bp is the inherited WriteSourceFrame
+;	* ds is ss:WSF_stringSeg
+;
+;  Destroyed:  cx
+;
+WriteString	macro	string
+		push	si
+		mov	si, offset string
+		call	GetChunkStringSize	; dssi <- fptr to string
+						; cx <- size of string to write
+		call	IconWriteString
+		pop	si
+endm
+
+;-----------------------------------------------------------------------------
+;			FatalErrors
+;-----------------------------------------------------------------------------
+
+INVALID_SOURCE_STRING				enum	FatalErrors
+;  Most likely caused by an invalid chunk handle or corrupt
+;  chunk handle table.
+
+FAILED_ASSUMPTION_FOR_DBVIEWERWRITESOURCE	enum	FatalErrors
+;  Somehow WriteSourceTrailer got called when WSF_outBufPtr was
+;  zero.  Tell stevey.
+
+ATTEMPTED_TO_WRITE_INVALID_POINTER_IMAGE	enum	FatalErrors
+;  PointerDef images have to be rectangular.  This error means we
+;  encountered a non-rectangular bitmap (meaning the scanlines were
+;  not all of equal length) when trying to write it as a PointerDef.
+
+BITMAP_TOO_BIG_TO_WRITE_SOURCE_CODE		enum	FatalErrors
+;  At least until we add support for writing source for bitmaps
+;  larger than 64K, we die when you try to do it.
+
+SELECTED_TOO_LARGE_A_RESOURCE_SIZE		enum	FatalErrors
+;  Someone changed the Resource-size GenValue to allow a size
+;  larger than 12K without checking the code to see if it'd be
+;  OK.  As long as you don't go higher than 64k, feel free to
+;  change MAX_RESOURCE_SIZE_IN_KBYTES to 64 (if you know what
+;  you're doing).
+
+NO_SCANLINES_IN_BITMAP				enum	FatalErrors
+;  This shouldn't happen - you tried to write source code for
+;  a bitmap that had zero scanlines in it.
+
+CORRUPTED_BITMAP				enum	FatalErrors
+;  This shouldn't happen - the bitmap you tried to write source
+;  for had an element of size zero in it.

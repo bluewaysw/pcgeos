@@ -1,0 +1,1745 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ *  PROJECT:        GEOS
+ *  MODULE:         HotSpot Library
+ *  FILE:           hsUtils.goc
+ * 
+ *  AUTHOR:         Cassie Hartzog, Apr 13, 1994
+ *
+ *  REVISION HISTORY:
+ *  	Name    Date            Description
+ *  	----    ----            -----------
+ *  	Cassie  4/13/94         Initial version.
+ * 
+ *  DESCRIPTION:           
+ * 	    Utility routines used by HotSpotTextClass
+ *
+ *	$Id: hsutils.goc,v 1.1 97/04/04 18:09:11 newdeal Exp $
+ *
+ ************************************************************************/
+
+/*
+ ***************************************************************************
+ *              Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <hotspot.goh> 
+@include <Objects/clipbrd.goh>
+#include <graphics.h>
+#include <gstring.h>
+
+#include "hserrors.h"
+					
+/***************************************************************************
+ *                       Function Declarations (internal)
+ **************************************************************************/
+void    AddGraphicRunsHugeArray(optr oself, VisTextReplaceParameters *params);
+void    AddGraphicRuns(optr oself, VisTextReplaceParameters *params, 
+		       char *ref);
+void    DeleteGraphicChar(optr oself, HotSpotArrayElement *elemPtr);
+void    MoveHotSpotObjects(optr oself, HotSpotArrayElement *elemPtr, 
+			   dword start, dword end);
+word    AddTokenAtPosition(optr oself, dword position);
+word    HotSpotArrayInsert(optr oself, dword elemNum, dword position);
+void    HotSpotArrayDeleteToken(optr oself, word token);
+void    HotSpotArrayDelete(optr oself, word delCount, dword elemNum);
+void    CreateHotSpotArray(optr oself);
+void    GetVisibleRange(optr oself, GStateHandle gstate, 
+			dword *start, dword *end);
+sdword 	GetRegionPosition(optr oself, sdword point, word flag);
+dword 	GetLineHeight(optr oself, dword position);
+void 	RepositionVisibleHotSpots(optr oself);
+void 	RepositionVisibleHotSpotsLow(optr oself, GStateHandle gstate);
+void    RepositionHotSpotsInRange(optr oself, dword start, dword end);
+void 	CheckForSpecialReposition(optr oself, 
+				  VisTextReplaceParameters *params);
+void 	SendVariableGraphicNotification(optr oself, dword pos, 
+					GraphicType type,
+				    	VariableGraphicActionType action);
+
+ 
+/*
+ ***************************************************************************
+ *              Message Handlers
+ ***************************************************************************
+ */
+
+/***************************************************************************
+ *                  MSG_VIS_TEXT_CREATE_STORAGE
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Create the HotSpotArray and intialize it.
+ *
+ *  PARAMETERS: 
+ *
+ *  RETURN: 
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_VIS_TEXT_CREATE_STORAGE
+{
+    @callsuper();
+    CreateHotSpotArray(oself);
+}
+
+/***************************************************************************
+ *              MSG_VIS_TEXT_FREE_STORAGE
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Free the HotSpotArray.
+ *
+ *  PARAMETERS: 
+ *
+ *  RETURN: 
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_VIS_TEXT_FREE_STORAGE
+{
+    VMBlockHandle *data;
+	
+    @callsuper();
+
+    data = (VMBlockHandle *) ObjVarFindData(oself, 
+		ATTR_HOT_SPOT_TEXT_HOT_SPOT_ARRAY);
+    EC_ERROR_IF(!(*data), HSTEXT_NO_HOT_SPOT_ARRAY);                
+	
+    VMFreeVMChain(GetVMFile(oself), (*data<<8));
+    ObjVarDeleteData(oself, ATTR_HOT_SPOT_TEXT_HOT_SPOT_ARRAY);
+}
+
+
+/***************************************************************************
+ *              MSG_VIS_TEXT_SCREEN_UPDATE
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   The hotspots needs to be redrawn, because of some
+ *              activity in the text layer which may have cleared
+ *	    	them.  If the actions was the insert/delete of a 
+ *              hotspot graphic char, we don't need to redraw the
+ *              hotspots.
+ *
+ *  PARAMETERS:
+ *
+ *  RETURN:     
+ *      
+ *  SIDE EFFECTS:   VTIF_UPDATE_PENDING flag is cleared
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  05/19/94        Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_VIS_TEXT_SCREEN_UPDATE
+{
+
+    if (ObjVarFindData(oself, ATTR_HOT_SPOT_TEXT_ADD_OR_DELETE_HOT_SPOT)) {
+	/* Clear this attr, if it is set, now that we are done adding */
+	pself = ObjDerefVis(oself);
+	pself->VTI_intFlags &= ~VTIF_UPDATE_PENDING;
+    }   
+    else {
+	@callsuper(); 
+	RedrawHotSpots(oself); 
+    }    
+}
+
+
+/***************************************************************************
+ *                  MSG_VIS_TEXT_SET_CONTEXT
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   
+ *
+ *  PARAMETERS: 
+ *
+ *  RETURN: 
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_VIS_TEXT_SET_CONTEXT
+{
+    ObjVarAddData(oself, ATTR_HOT_SPOT_TEXT_NO_REPOSITION_HOT_SPOTS, 0);
+    @callsuper();
+}
+
+/***************************************************************************
+ *              MSG_VIS_TEXT_ATTRIBUTE_CHANGE
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Reposition hotspots if the attribute change was
+ *              of a type that could cause text flow changes, i.e.
+ *	    	point size or justification changes.
+ *
+ *  PARAMETERS:	void
+ *
+ *  RETURN:     void
+ *      
+ *  SIDE EFFECTS:   
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  05/19/94        Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_VIS_TEXT_ATTRIBUTE_CHANGE
+{
+    /*
+     * Changed to always reposition hotspots, so that changing
+     * tabs, indentation, borders, etc. will not cause hotspots
+     * to stay put while graphic moves.  (cassie 11/29/94)
+     * 12/13/94 - new code in Bindery sets context on pasted text
+     * before the hotspot array has been updated.
+     *
+    RepositionVisibleHotSpots(oself);
+     */
+
+    /* 
+     * If this vardata was set, no need to reposition hotspots
+     * because the change did not cause text to reflow.
+     */ 
+    if (!ObjVarDeleteData(oself, ATTR_HOT_SPOT_TEXT_NO_REPOSITION_HOT_SPOTS)) 
+	RepositionVisibleHotSpots(oself); 
+}
+
+ 
+/***************************************************************************
+ *              MSG_VIS_DRAW
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   If the visible text range has changed, reposition those
+ *              hotspots which have become visible 
+ *
+ *  PARAMETERS:	DrawFlags drawFlags = cl
+ *	    	GStateHandle gstate = bp
+ *
+ *  RETURN:     nothing
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+
+ *      ----    ----            -----------
+ *      cassie  05/19/94        Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_VIS_DRAW
+{
+    if (ObjVarDeleteData(oself, ATTR_NO_MOVE_HOTSPOTS_WHEN_DRAWING)) 
+	RepositionVisibleHotSpotsLow(oself, gstate);
+    @callsuper();
+}
+
+/***************************************************************************
+ *                      MSG_HSTEXT_RECALC_HOT_SPOTS
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Reposition all hotspots in the passed range   
+ *
+ *  PARAMETERS: VisTextRange *range
+ *
+ *  RETURN:     nothing
+ *  
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date        Description
+ *      ----    ----        -----------
+ *      cassie  07/16/94    Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_HSTEXT_RECALC_HOT_SPOTS
+{
+    HotSpotArrayElement *elemPtr;
+
+    HotSpotArrayLock(oself, &elemPtr);
+	
+    MoveHotSpotObjects(oself, elemPtr, range->VTR_start, range->VTR_end);
+
+    HotSpotArrayUnlock(elemPtr);
+}
+
+
+/***************************************************************************
+ *                      MSG_HSTEXT_REPOSITION_HOT_SPOTS
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Reposition all hotspots 
+ *
+ *  PARAMETERS: VisTextRange *range
+ *
+ *  RETURN:     nothing
+ *  
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date        Description
+ *      ----    ----        -----------
+ *      cassie  07/16/94    Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_HSTEXT_REPOSITION_HOT_SPOTS
+{	
+    RepositionHotSpotsInRange(oself, 0, TEXT_ADDRESS_PAST_END);
+}
+ 
+/***************************************************************************
+ *              MSG_VIS_TEXT_GRAPHIC_VARIABLE_DRAW
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Return the size of VTVT_HOTSPOT graphic variables, but
+ *              don't draw anything
+ *
+ *  PARAMETERS:	GStateHandle gstate = cx,
+ *		VisTextGraphic *graphic = dx:bp
+ *
+ *  RETURN:     dword - size  (high word contains width, low word height)
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  05/19/94        Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_VIS_TEXT_GRAPHIC_VARIABLE_DRAW
+{
+    if ((graphic->VTG_type == VTGT_VARIABLE) &&
+	(graphic->VTG_data.VTGD_variable.VTGV_type == VTVT_HOTSPOT)) {
+	return(0x10000);    	    /* return height = 1, width = 0 */
+    }
+    else
+	return(@callsuper());
+}
+ 
+/***************************************************************************
+ *              MSG_VIS_TEXT_GRAPHIC_VARIABLE_SIZE
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Get the size of the graphic variable
+ *
+ *  PARAMETERS:	GStateHandle gstate = cx,
+ *		VisTextGraphic graphic = dx:bp
+ *
+ *  RETURN:     dword - size  (high word contains width, low word height)
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  05/19/94        Initial Revision
+ *
+ **************************************************************************/
+@extern method HotSpotTextClass, MSG_VIS_TEXT_GRAPHIC_VARIABLE_SIZE
+{
+    if ((graphic->VTG_type == VTGT_VARIABLE) &&
+	(graphic->VTG_data.VTGD_variable.VTGV_type == VTVT_HOTSPOT))
+	return(0x10000);
+    else
+	return(@callsuper());
+}
+
+/***************************************************************************
+ *                    UpdateHotSpotArray                                      
+ ***************************************************************************
+ *
+ *  SYNOPSIS:  Some text has being replaced, possibly changing
+ *             the position of some graphic runs.  Update the positions
+ *             in the HotSpotArray accordingly.  BY THE TIME THIS HAS
+ *	       BEEN CALLED, the graphic run array and HotSpotArray are no
+ *	       longer in synch. This routine will resynchronize them.
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              VisTextReplaceParameters *params - replace parameters
+ *	    	Boolean flag - THIS PARAMETER IS IGNORED
+ *
+ *  RETURN:     nada
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+void UpdateHotSpotArray(optr oself, VisTextReplaceParameters *params,
+			Boolean flag)
+{
+    HotSpotArrayElement *elemPtr;
+    word    	    	delCount = 0;
+    dword   	    	adjustment, number, start, end,
+    	    	    	elemNumber = 0, count = 0;
+    GStateHandle    	gstate;
+
+    adjustment = params->VTRP_insCount - 
+	    	(params->VTRP_range.VTR_end - params->VTRP_range.VTR_start);
+
+    HotSpotArrayLock(oself, &elemPtr);
+	
+    /*
+     * Find the first graphic run that comes at or after the start
+     * position of the replace range.
+     */
+    while (elemPtr->HSAE_position < params->VTRP_range.VTR_start &&
+	elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END) {
+	HotSpotArrayNext(&elemPtr);
+	elemNumber++;                    /* HotSpotArray element number */
+    }               
+    /*                      
+     * For each graphic that comes at or before the end position of the
+     * replace range, destroy its HotSpot object.  Keep a count of how 
+     * many elements are to be removed from the HotSpotArray.
+     */
+    while (elemPtr->HSAE_position < params->VTRP_range.VTR_end &&
+	   elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END) {
+	DeleteGraphicChar(oself, elemPtr);
+	delCount++;
+	HotSpotArrayNext(&elemPtr);     
+    }
+    /*
+     * If the replace range covers the last graphic or starts after it, 
+     * we will have exited the loop because we hit the last element. 
+     * Back up and check whether the next to last element comes after
+     * the replace range, and therefore needs to have its position updated.
+     */ 
+    if (elemPtr->HSAE_position == TEXT_ADDRESS_PAST_END) {
+	/*
+	 * if we are not already at the first element, and the position
+	 * of the prev element is not beyond the replace range, then
+	 * restore elemPtr to point at last element
+	 */
+	if (HotSpotArrayPrev(&elemPtr) != 0 &&
+	    elemPtr->HSAE_position <= params->VTRP_range.VTR_end)
+	    HotSpotArrayNext(&elemPtr);        /* point to last element */
+    }
+    /*
+     * Adjust the position of all elements following current one.
+     */
+    if (elemPtr->HSAE_token != NULL_HOT_SPOT_TOKEN)  {
+    	if (adjustment) {
+    	    while (elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END) {
+		elemPtr->HSAE_position += adjustment;
+		HugeArrayDirty((void *)elemPtr);          
+		HotSpotArrayNext(&elemPtr);     
+		count++;
+	    }       
+	    /*
+	     * Back up to element we started at.  HotSpotArrayPrev returns 
+	     * the number of elements available from beginning of array to 
+	     * and including the current one, so if it ever drops below 1 
+	     * while count is non-zero, we're in trouble.
+	     */
+	    while(count--) {
+	    	number = HotSpotArrayPrev(&elemPtr);   
+		EC_ERROR_IF(number <= 1, HSTEXT_UNEXPECTED_END_OF_HUGE_ARRAY);
+	    }
+	}
+	/* 
+	 * If not in the process of adding or deleting a hotspot, which
+	 * doesn't make the text flow change, reposition the visible
+	 * hotspots following the insertion point, so they flow with 
+	 * their graphics.
+	 */
+    	if (!ObjVarFindData(oself, ATTR_HOT_SPOT_TEXT_ADD_OR_DELETE_HOT_SPOT))
+	{
+	    gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+	    GetVisibleRange(oself, gstate, &start, &end);
+	    GrDestroyState(gstate);
+	    MoveHotSpotObjects(oself, elemPtr, start, end);
+	}
+    }
+    HotSpotArrayUnlock(elemPtr);
+
+    if (!ObjVarFindData(oself, ATTR_HOT_SPOT_TEXT_ADD_OR_DELETE_HOT_SPOT))
+	/*
+	 * If we are adding or deleting chars on a line which 
+	 * is center, right or full-justified, we may need to 
+	 * reposition those hotspots which come *before* the
+	 * current element. The call to MoveHotSpotObjects above
+	 * only reposition those after the current element.
+	 */
+	CheckForSpecialReposition(oself, params);
+	
+    /* Now delete all the elements that fall in the replace range */
+    if (delCount)                           
+	HotSpotArrayDelete(oself, delCount, elemNumber);
+
+}
+
+/***************************************************************************
+ *              CheckForSpecialReposition
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   If the line which is not left justified, we may need
+ *	    	to move hotspots which precede the replace range.
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              VisTextReplaceParameters *params 
+ *
+ *  RETURN: 	void
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/20/94        Initial Revision
+ *
+ **************************************************************************/
+void CheckForSpecialReposition(optr oself, VisTextReplaceParameters *params)
+{
+    VisTextParaAttrDiffs diffs;
+    VisTextMaxParaAttr 	 attrs;
+    VisTextRange    	 range;
+    HotSpotArrayElement *elemPtr;
+
+    /* 
+     * First, find out if the line on which the replace was done
+     * is justified in some way other than the standard left justified.
+     */
+    @call self::MSG_VIS_TEXT_GET_PARA_ATTR(0, &diffs, &attrs,
+					   params->VTRP_range.VTR_start,
+					   params->VTRP_range.VTR_start);
+    if ((attrs.VTMPA_paraAttr.VTPA_attributes & VTPAA_JUSTIFICATION) 
+	!= J_LEFT) {
+	/*
+	 * We want to find the start range of the paragraph
+	 * containing the replaced text.
+	 */
+	range.VTR_start = params->VTRP_range.VTR_start;
+	range.VTR_end = params->VTRP_range.VTR_start;
+	@call self::MSG_VIS_TEXT_GET_RANGE(&range, VTRC_PARAGRAPH_CHANGE);
+	/*
+	 * Reposition every hotspot in the paragraph that precedes the 
+	 * start of the replace range.
+	 */
+	if (range.VTR_start < params->VTRP_range.VTR_start) {
+	    HotSpotArrayLock(oself, &elemPtr);  
+	    while ((elemPtr->HSAE_position < range.VTR_start) && 
+	    	   (elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END))
+		HotSpotArrayNext(&elemPtr);
+	    MoveHotSpotObjects(oself, elemPtr, range.VTR_start, 
+			       params->VTRP_range.VTR_start);
+	    HotSpotArrayUnlock(elemPtr);
+	}
+    }       
+}
+
+/***************************************************************************
+ *                      AddGraphicRunsHugeArray
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   For the passed text coming from a HugeArray, add a 
+ *              HotSpotArrayElement for each C_GRAPHIC char in the string. 
+ *
+ *  PARAMETERS: optr oself - HotSPotText object
+ *              VisTextReplaceParameters *params - replace params
+ *
+ *  RETURN:     nothing
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  STRATEGY:   HugeArrays are used to paste text.  Pasted text may
+ *              contain hotspot graphics (text entered from the
+ *              keyboard cannot, but undo text can).
+ *              We check here for such graphics and tell the 
+ *              HotSpotManager to create HotSpot objects for them.
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/20/94        Initial Revision
+ *
+ **************************************************************************/
+void AddGraphicRunsHugeArray(optr oself, VisTextReplaceParameters *params)
+{
+    dword insPosition = params->VTRP_range.VTR_start;
+    dword sourcePos   = 0;
+    dword elemCount;
+    word numChars;
+    char *ref;
+    word elemSize;                                                             
+
+    do { 
+	/* lock the next HugeArrayBlock */
+	elemCount = HugeArrayLock(params->VTRP_textReference.   
+				    TR_ref.TRU_hugeArray.TRHA_file,
+				  params->VTRP_textReference.
+				    TR_ref.TRU_hugeArray.TRHA_array,
+				  sourcePos, (void _far *_far)&ref, 
+				  &elemSize);
+
+	if ((numChars = HAL_COUNT(elemCount)) != 0) {
+	    sourcePos += numChars;        
+	    EC_ERROR_IF(elemSize != 1, 
+			HSTEXT_UNEXPECTED_HUGE_ARRAY_ELEMENT_SIZE);
+		
+	    /* while more chars in this block and not at end of the string */
+	    while (numChars-- && *ref) {
+		if (*ref == C_GRAPHIC) 
+		    AddTokenAtPosition(oself, insPosition); 
+		insPosition++;
+		ref++;
+	    }
+	    HugeArrayUnlock(ref);
+	}       
+    } while (HAL_COUNT(elemCount));    /* while more chars to be inserted */
+
+    /* subtract the null before checking if all chars have been inserted*/
+    EC_ERROR_IF(--sourcePos != params->VTRP_insCount, 
+		HSTEXT_UNEXPECTED_END_OF_HUGE_ARRAY);
+
+    /*
+     * notify myself to check the new text for hot spot objects 
+     * after the replace operation is complete
+     */
+    @send, forceQueue self::MSG_HSTEXT_CHECK_FOR_PASTED_HOT_SPOTS(*params);
+				
+}
+
+
+/***************************************************************************
+ *                           AddGraphicRuns
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   For the passed text string, add a HotSpotArrayElement
+ *              for each C_GRAPHIC char in the string.  
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              VisTextReplaceParameters *params 
+ *              char *ref - replace text
+ *
+ *  RETURN: 
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/20/94        Initial Revision
+ *
+ **************************************************************************/
+void AddGraphicRuns(optr oself, VisTextReplaceParameters *params, char *ref)
+{
+    dword insPosition = params->VTRP_range.VTR_start;
+    dword insCount    = params->VTRP_insCount;
+	
+    while (insCount--) {
+	if (*ref == C_GRAPHIC) 
+	    AddTokenAtPosition(oself, insPosition);
+	insPosition++;
+	ref++;
+    }
+
+    /*
+     * If this replace operations is the result of an undo action,
+     * it may be that the replace text contains a hotspot graphic.
+     * Notify myself to check the new text for hot spot objects 
+     * after the replace operation is complete.
+     */
+    if (params->VTRP_flags & VTRF_UNDO) 
+	@send, forceQueue 
+	    self::MSG_HSTEXT_CHECK_FOR_PASTED_HOT_SPOTS(*params);
+	
+}
+
+
+/***************************************************************************
+ *                  DeleteGraphicChar                    
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   A graphic run is being deleted.  If it is a HotSpot object
+ *              graphic, destroy the associated object.
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              word token - token of HotSpot object 
+ *
+ *  RETURN: 
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+void DeleteGraphicChar(optr oself, HotSpotArrayElement *elemPtr)
+{
+    optr    GBody;
+
+    /*
+     * Only send the DESTROY message if the HotSpotManager doesn't
+     * already know that it has been destroyed.
+     */
+    if (!ObjVarFindData(oself, ATTR_HOT_SPOT_TEXT_ADD_OR_DELETE_HOT_SPOT))  {
+
+	if (elemPtr->HSAE_type & GT_VARIABLE) {
+	    /* 
+	     * if it is a hotspot graphic, tell HotSpotManager to destroy it.
+ 	     */
+	    if (elemPtr->HSAE_type == (GT_VARIABLE | GT_HOTSPOT)) { 
+		GBody = @call self::
+		    MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(&HotSpotManagerClass);
+	    	@send, forceQueue GBody::
+		    MSG_HOT_SPOT_MANAGER_DESTROY_HOT_SPOT(elemPtr->HSAE_token);
+	    }
+	}
+	else {
+	    EC_ERROR_IF(!(elemPtr->HSAE_type & GT_GSTRING), 
+			HSTEXT_INVALID_GRAPHIC_TYPE); 
+	}
+    }    
+}
+
+/***************************************************************************
+ *                  SendVariableGraphicNotifiction
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   A variable graphic is being inserted or deleted.  
+ *	    	Send a notification to ourselves describing the action.
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              dowrd pos - position of variable graphic
+ *              GraphicType type - same as VisTextVariableType
+ *	    	VariableGraphicActionType action - insert or delete
+ *
+ *  RETURN: 	void
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  11/09/94        Initial Revision
+ *
+ **************************************************************************/
+void SendVariableGraphicNotification(optr oself, dword pos, GraphicType type,
+				VariableGraphicActionType action)
+{
+    NotifyDeleteVariableGraphic *data;
+    MemHandle 	    	    	memHandle;
+    
+    memHandle = MemAlloc(sizeof(NotifyDeleteVariableGraphic),
+	    		 HF_STATIC, HAF_STANDARD);
+    if (!memHandle)
+	FatalError(ERROR_MEMALLOC_FAILED);
+    data = (NotifyDeleteVariableGraphic *) MemLock(memHandle);
+    data->NDVG_position = pos;
+    data->NDVG_type = type;
+    data->NDVG_action = action;
+    MemUnlock(memHandle);
+    MemIncRefCount(memHandle);
+    @call self::MSG_META_NOTIFY_WITH_DATA_BLOCK(MANUFACTURER_ID_GEOWORKS, 
+				    	    	GWNT_DELETE_VARIABLE_GRAPHIC,
+					    	memHandle);
+}
+
+/***************************************************************************
+ *                  MoveHotSpotObjects
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Update the HotSpotArray position of all graphics which
+ * 	    	come after the passed element.
+ *
+ *  PARAMETERS: oself - HotSpotText object
+ *              elemPtr - first HotSpotArrayElement to check 
+ *              start - start of range for which to reposition hotspots
+ *              end - end of range for which to reposition hotspots
+ *
+ *  RETURN:     nothing
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+void MoveHotSpotObjects(optr oself, HotSpotArrayElement *elemPtr, 
+                        dword start, dword end)
+{
+    VisTextGraphic  graphic;
+    EventHandle     event;
+
+    if (start >= end) 
+	return;
+    while ((elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END) &&
+	   (elemPtr->HSAE_position >= start) &&    
+	   (elemPtr->HSAE_position <= end)) {
+
+	/* Get the VisTextGraphic for this character */ 
+	@call self::MSG_VIS_TEXT_GET_GRAPHIC_AT_POSITION(&graphic,
+						elemPtr->HSAE_position);
+	/*
+	 * If it is a hotspot graphic, record a MOVE_HOT_SPOT message and
+	 * have my parent, the document, pass the classed event on to the 
+	 * HotSpotManager, where it will get delivered because of TO_SELF.
+	 *
+	 */
+	if (elemPtr->HSAE_type == (GT_VARIABLE | GT_HOTSPOT)) { 
+	    EC_ERROR_IF((graphic.VTG_type != VTGT_VARIABLE) ||
+			(graphic.VTG_data.VTGD_variable.VTGV_type != 
+			 VTVT_HOTSPOT), HSTEXT_INVALID_GRAPHIC_TYPE); 
+
+	    event = @record HotSpotManagerClass::
+		MSG_HOT_SPOT_MANAGER_MOVE_HOT_SPOT(elemPtr->HSAE_token);
+	    @send, forceQueue @visParent::
+		MSG_META_SEND_CLASSED_EVENT(event, TO_SELF);
+	}
+	HotSpotArrayNext(&elemPtr);     
+    }
+    return;
+}
+
+
+/***************************************************************************
+ *	    	RedrawHotSpots
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Invalidate HotSpotManager so that hotspots are redrawn.
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *
+ *  RETURN:     nothing
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  05/11/94        Initial Revision
+ *
+ **************************************************************************/
+void RedrawHotSpots(optr oself)
+{
+    optr    	    GBody;
+    GStateHandle    gstate;
+    dword   	    start, end;
+    HotSpotArrayElement *elemPtr;
+
+    /* Get the new visible range */
+    gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+    GetVisibleRange(oself, gstate, &start, &end);
+    GrDestroyState(gstate);
+    if (start >= end)
+	return;
+
+    GBody = @call self::
+	    MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(&HotSpotManagerClass);
+    /*
+     * Invalidate hotspots in the visible range
+     */
+    HotSpotArrayLock(oself, &elemPtr);  
+    while ( (elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END) && 
+	    (elemPtr->HSAE_position <= end) )  {
+	if ((elemPtr->HSAE_position >= start) && 
+	    (elemPtr->HSAE_type == (GT_VARIABLE | GT_HOTSPOT))) {
+	    @send, forceQueue GBody::
+	        MSG_HOT_SPOT_MANAGER_INVALIDATE_HOT_SPOT(elemPtr->HSAE_token);
+	}
+	HotSpotArrayNext(&elemPtr);     
+    }
+    HotSpotArrayUnlock(elemPtr);
+    return;
+}
+
+/***************************************************************************
+ *              CreateHotSpotArray
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   We're initializing storage for a HotSpotText object.
+ *              Create the HotSpotArray.      
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *
+ *  RETURN:     nothing
+ *      
+ *  SIDE EFFECTS:   vardata containing the HotSpotArray's block is added
+ *                  to the HotSpotText object.
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  05/11/94        Initial Revision
+ *
+ **************************************************************************/
+void CreateHotSpotArray(optr oself)
+{
+	VMBlockHandle block, *data;
+	HotSpotArrayElement initElem;
+	
+	block = HugeArrayCreate(GetVMFile(oself), sizeof(initElem), 0);
+	data = ObjVarAddData(oself, 
+			ATTR_HOT_SPOT_TEXT_HOT_SPOT_ARRAY | VDF_SAVE_TO_STATE, 
+			sizeof(block));         
+	*data = block;          
+	
+	initElem.HSAE_position = TEXT_ADDRESS_PAST_END;
+	initElem.HSAE_token = -1;
+	initElem.HSAE_type = GT_NONE;
+	HugeArrayAppend(GetVMFile(oself), block, 1, &initElem);
+	ObjMarkDirty(oself);
+}
+
+
+/***************************************************************************
+ *                      HotSpotArrayLock
+ ***************************************************************************
+ *
+ *  SYNOPSIS:       Lock the HotSpotArray
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              HotSpotArrayElement **elemPtr - ptr to address of first 
+ *                              element in HotSpotArray , it is unlocked with
+ *                      HugeArrayUnlock
+ *  RETURN:     dword - number of elements
+ *              elemPtr points to first element
+ *      
+ *  SIDE EFFECTS:
+ *
+ *      REVISION HISTORY:
+ *              Name    Date            Description
+ *              ----    ----            -----------
+ *              cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+dword HotSpotArrayLock(optr oself, HotSpotArrayElement **elemPtr)
+{
+	VMBlockHandle *data;
+	word elemSize, *esPtr = &elemSize;
+	
+	data = (VMBlockHandle *) ObjVarFindData(oself,
+				  ATTR_HOT_SPOT_TEXT_HOT_SPOT_ARRAY);
+	EC_ERROR_IF(!data, HSTEXT_NO_HOT_SPOT_ARRAY);  
+	return(HugeArrayLock(GetVMFile(oself), *data, 0, 
+			     (void **)elemPtr, esPtr));
+}
+
+
+/***************************************************************************
+ *                      HotSpotArrayUnlock
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Lock the HotSpotArray
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              HotSpotArrayElement **elemPtr - ptr to address of first 
+ *                        element in HotSpotArray , it is unlocked with
+ *                        HugeArrayUnlock
+ *  RETURN:     dword - number of elements
+ *              elemPtr points to first element
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+void HotSpotArrayUnlock(HotSpotArrayElement *elemPtr)
+{
+	HugeArrayUnlock((void *)elemPtr);
+}
+
+/***************************************************************************
+ *                              HotSpotArrayNext
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Get the next HotSPotArrayELement
+ *
+ *  PARAMETERS: HotSpotArrayElement *elemPtr - ptr to current element
+ * 
+ *  RETURN:     word - # elements available with returned ptr,
+ *                     0 if we were at last element
+ *      
+ *  SIDE EFFECTS:
+ *
+ *      REVISION HISTORY:
+ *              Name    Date            Description
+ *              ----    ----            -----------
+ *              cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+word HotSpotArrayNext(HotSpotArrayElement **elemPtr)
+{
+	word elemSize;
+	
+	return(HugeArrayNext((void **)elemPtr, &elemSize));
+}
+
+/***************************************************************************
+ *                      HotSpotArrayPrev
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Get the previous HotSPotArrayELement
+ *
+ *  PARAMETERS: HotSpotArrayElement *elemPtr - ptr to current element
+ * 
+ *  RETURN:     word - # elements available from first element in
+ *                      block to prev element
+ *                   - 0 if we were at first element
+ *              elemPtr - points at prev element
+ *
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+word HotSpotArrayPrev(HotSpotArrayElement **elemPtr)
+{
+	word elemSize;
+	HotSpotArrayElement *elemPtr2;
+	
+	return(HugeArrayPrev((void **)elemPtr, (void **)&elemPtr2, &elemSize));
+}
+
+
+/***************************************************************************
+ *                       HotSpotArrayGetToken    
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Get the graphic token for a given position, if there
+ *              is one there.
+ *
+ *  PARAMETERS: HotSpotArrayElement *elemPtr - a locked HotSpotArrayElement
+ *              dword position - position to get token for
+ *
+ *  RETURN:     token, or NULL_HOT_SPOT_TOKEN if no graphic at position
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+word HotSpotArrayGetToken(optr oself, 
+			  HotSpotArrayElement **elemPtr, dword position)
+{
+#if ERROR_CHECK
+    VisTextGraphic graphic;
+#endif
+    word token = NULL_HOT_SPOT_TOKEN;
+
+    while ((*elemPtr)->HSAE_position < position &&
+	   (*elemPtr)->HSAE_position != TEXT_ADDRESS_PAST_END)
+	HotSpotArrayNext(elemPtr);
+
+    /*
+     * if there is a graphic at this position, make sure it is 
+     * a hotspot or embedded graphic before returning the token
+     */
+    if ((*elemPtr)->HSAE_position == position) {
+#if ERROR_CHECK
+	@call self::MSG_VIS_TEXT_GET_GRAPHIC_AT_POSITION(&graphic, 
+                                                         position);
+#endif
+	if ((*elemPtr)->HSAE_type & GT_GSTRING) {
+	    EC_ERROR_IF(graphic.VTG_type != VTGT_GSTRING,
+		HSTEXT_INVALID_GRAPHIC_TYPE);
+	    token = (*elemPtr)->HSAE_token;   
+    	}
+    	else if ((*elemPtr)->HSAE_type == (GT_VARIABLE | GT_HOTSPOT)) { 
+	    token = (*elemPtr)->HSAE_token;   
+	    EC_ERROR_IF((graphic.VTG_type != VTGT_VARIABLE) ||
+			(graphic.VTG_data.VTGD_variable.VTGV_type 
+			 != VTVT_HOTSPOT),
+		    	HSTEXT_INVALID_GRAPHIC_TYPE);
+	}
+    }
+    return(token);
+}
+
+/***************************************************************************
+ *                       HotSpotArrayGetType
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Get the graphic type for a given position, if there
+ *              is one there.
+ *
+ *  PARAMETERS: HotSpotArrayElement *elemPtr - a locked HotSpotArrayElement
+ *              dword position - position to get token for
+ *
+ *  RETURN:     GraphicType
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+GraphicType HotSpotArrayGetType(optr oself, dword position)
+{
+    HotSpotArrayElement	*elemPtr;
+
+    HotSpotArrayLock(oself, &elemPtr);
+    while (elemPtr->HSAE_position < position &&
+	   elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END)
+	HotSpotArrayNext(&elemPtr);
+
+    /*
+     * if there is a graphic at this position, make sure it is 
+     * a hotspot or embedded graphic before returning the token
+     */
+    if (elemPtr->HSAE_position == position) 
+	return(elemPtr->HSAE_type);
+    else
+    	return(GT_NONE);
+}
+
+/***************************************************************************
+ *	    	HotSpotArraySetType
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Set the graphic type for the HotSpotArrayElement at
+ *	    	a given position.
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              dword position - position of element
+ *              GraphicType type - type of graphic
+ *
+ *  RETURN:     nothing
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+void HotSpotArraySetType(optr oself, dword position, GraphicType type)
+{
+    HotSpotArrayElement	*elemPtr;
+
+    HotSpotArrayLock(oself, &elemPtr);
+    while (elemPtr->HSAE_position < position &&
+	   elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END)
+	HotSpotArrayNext(&elemPtr);
+    EC_ERROR_IF(elemPtr->HSAE_position == TEXT_ADDRESS_PAST_END,
+		HSTEXT_HOT_SPOT_ARRAY_ELEMENT_NOT_FOUND); 
+    elemPtr->HSAE_type = type;
+    HugeArrayDirty((void *)elemPtr);          
+    HotSpotArrayUnlock(elemPtr);
+}
+
+
+/***************************************************************************
+ *                         HotSpotArrayGetPosition 
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Get the position of the graphic run for a HotSpot token,
+ *              if there is one.
+ *
+ *  PARAMETERS: HotSpotArrayElement *elemPtr - a locked HotSpotArrayElement
+ *              word token - token for which to get position of graphic run
+ *
+ *  RETURN:     dword - position of graphic run, or 
+ *                      TEXT_ADDRESS_PAST_END if token not found
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+dword HotSpotArrayGetPosition(HotSpotArrayElement **elemPtr, word token)
+{
+	
+	while ((*elemPtr)->HSAE_token != token &&
+			(*elemPtr)->HSAE_position != TEXT_ADDRESS_PAST_END)
+			HotSpotArrayNext(elemPtr);
+	return((*elemPtr)->HSAE_position);              
+}
+
+
+/***************************************************************************
+ *    	    	AddTokenAtPosition      
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Add a new HotSpot token at the given position
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              dword position - position at which to add token
+ *
+ *  RETURN:     word - HotSpot token
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+word AddTokenAtPosition(optr oself, dword position)
+{
+    HotSpotArrayElement *elemPtr;
+    dword count = 0;
+    word token;
+	
+    HotSpotArrayLock(oself, &elemPtr);
+    while (elemPtr->HSAE_position < position &&
+	   elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END) {
+	HotSpotArrayNext(&elemPtr);
+	count++;
+    }               
+			
+    EC_ERROR_IF(elemPtr->HSAE_position == position,
+		HSTEXT_HOT_SPOT_ARRAY_POSITION_ALREADY_IN_ARRAY);
+
+    HotSpotArrayUnlock(elemPtr);
+    token = HotSpotArrayInsert(oself, count, position);
+    return(token);  
+}
+
+
+/***************************************************************************
+ *          	HotSpotArrayInsert      
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Lock the HotSpotArray
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              dword elemNum - element number to insert at
+ *              dword position - position of graphic run
+ *
+ *  RETURN:     word - token for element
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *       Name    Date            Description
+ *       ----    ----            -----------
+ *       cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+word HotSpotArrayInsert(optr oself, dword elemNum, dword position)
+{
+    VMBlockHandle *arrayBlock;
+    HotSpotArrayElement element;
+    HotSpotTextInstance *pself;
+	
+    arrayBlock = (VMBlockHandle *) ObjVarFindData(oself, 
+				   ATTR_HOT_SPOT_TEXT_HOT_SPOT_ARRAY);
+    EC_ERROR_IF(!*arrayBlock, HSTEXT_NO_HOT_SPOT_ARRAY);                                                            
+    ObjMarkDirty(oself);
+    pself = ObjDerefVis(oself);
+    element.HSAE_type = GT_NONE;
+    element.HSAE_position = position;
+    element.HSAE_token = pself->HSTI_tokenCount++;
+    if (pself->HSTI_tokenCount == NULL_HOT_SPOT_TOKEN)
+	FatalError(HOTSPOT_TOKEN_COUNT_OVERFLOW);
+    HugeArrayInsert(GetVMFile(oself), *arrayBlock, 1, elemNum, &element);
+    return(element.HSAE_token);
+}
+
+/***************************************************************************
+ *                      HotSpotArrayDeleteToken
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Delete the HotSpotArrayElement which has the passed token.
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              word token - token to remove from array
+ *
+ *  RETURN:     nothing
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+void HotSpotArrayDeleteToken(optr oself, word token)
+{
+    HotSpotArrayElement *elemPtr;
+    dword count = 0;
+    VMBlockHandle *arrayBlock;
+	
+    HotSpotArrayLock(oself, &elemPtr);
+    while (elemPtr->HSAE_token != token &&
+	   elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END) {
+	count++;
+	HotSpotArrayNext(&elemPtr);
+    }               
+    EC_ERROR_IF(elemPtr->HSAE_position == TEXT_ADDRESS_PAST_END,
+		HSTEXT_HOT_SPOT_ARRAY_ELEMENT_NOT_FOUND); 
+    HotSpotArrayUnlock(elemPtr);
+									  
+    arrayBlock = (VMBlockHandle *) ObjVarFindData(oself,
+				   ATTR_HOT_SPOT_TEXT_HOT_SPOT_ARRAY);
+    EC_ERROR_IF(!arrayBlock, HSTEXT_NO_HOT_SPOT_ARRAY);      
+    HugeArrayDelete(GetVMFile(oself), *arrayBlock, 1, count);
+#if ERROR_CHECK
+    if (HugeArrayGetCount(GetVMFile(oself), *arrayBlock) == 0)
+	FatalError(HSTEXT_HOT_SPOT_ARRAY_EMPTY);        
+#endif
+		   
+}
+
+/***************************************************************************
+ *	    	HotSpotArrayDelete
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Delete the a range of HotSpotArrayElements
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              word delCount - number of elements to delete
+ *              dword elemNum - element to start deleting at
+ *
+ *  RETURN:     nothing
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  04/15/94        Initial Revision
+ *
+ **************************************************************************/
+void HotSpotArrayDelete(optr oself, word delCount, dword elemNum)
+{
+    VMBlockHandle *arrayBlock;
+	
+    arrayBlock = (VMBlockHandle *) ObjVarFindData(oself,
+				   ATTR_HOT_SPOT_TEXT_HOT_SPOT_ARRAY);
+    EC_ERROR_IF(!arrayBlock, HSTEXT_NO_HOT_SPOT_ARRAY); 
+	
+    HugeArrayDelete(GetVMFile(oself), *arrayBlock, delCount, elemNum);
+
+#if ERROR_CHECK
+    if (HugeArrayGetCount(GetVMFile(oself), *arrayBlock) == 0)
+	FatalError(HSTEXT_HOT_SPOT_ARRAY_EMPTY);        
+#endif
+}
+
+/***************************************************************************
+ *          	GetVMFile
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Get the VMFile for the text object.    
+ *
+ *  PARAMETERS: optr oself - HotSpotTextObject
+ *
+ *  RETURN:     VMFileHandle
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *     Name    Date            Description
+ *     ----    ----            -----------
+ *     cassie  04/28/94        Initial Revision
+ *
+ **************************************************************************/
+VMFileHandle    GetVMFile(optr oself)
+{
+    return((VMFileHandle) MemGetInfo(OptrToHandle(oself), 
+				     MGIT_OWNER_OR_VM_FILE_HANDLE));
+}
+
+/***************************************************************************
+ * 	    	GetVisibleRange
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Get the text range of the region(s) currently visible
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *              dword *start - place to put start range
+ *              dword *end - place to put end range
+ *
+ *  RETURN: 	start, end filled in
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  05/19/94        Initial Revision
+ *
+ **************************************************************************/
+void GetVisibleRange(optr oself, GStateHandle gstate, dword *start, dword *end)
+{
+    PointDWFixed point;
+    RectDWord rect;
+    VisTextConvertOffsetParams params;
+
+    /* get the current mask rectangle */
+    GrGetMaskBoundsDWord(gstate, &rect);
+
+    /*
+     * Get the left coordinate of the first char, and use it instead of
+     * the left coordinate of the mask bounds, which can be outside the 
+     * text bounds
+     */
+    params.VTCOP_offset = 0;
+    @call self::MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE(&params);
+    point.PDF_x.DWF_int = params.VTCOP_xPos;
+
+    /* get the position of the upper, left corner of the region */
+    point.PDF_y.DWF_int = GetRegionPosition(oself, rect.RD_top, 0);
+    point.PDF_x.DWF_frac = point.PDF_y.DWF_frac = 0;
+    *start = @call self::MSG_VIS_TEXT_GET_TEXT_POSITION_FROM_COORD(&point);
+    /*
+     * get the lower left position which is one pixel below the 
+     * bottom of the region 
+     */
+    point.PDF_y.DWF_int = GetRegionPosition(oself, rect.RD_bottom, 1);
+    *end = @call self::MSG_VIS_TEXT_GET_TEXT_POSITION_FROM_COORD(&point);
+    return;
+}
+
+/***************************************************************************
+ *                  GetRegionPosition
+ ***************************************************************************
+ *
+ *  SYNOPSIS:	    Get the y position of the start or end of the region 
+ *	    	    for the passed point.
+ *
+ *  PARAMETERS:     point - point to get region for
+ *	    	    flag - 1 to get next region if top falls between regions 
+ *	    	    	   0 to get prev region if top falls between regions
+ *  RETURN: 	    yPosition of region for point
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      edwin   06/30/94        Initial Revision
+ *
+ **************************************************************************/
+sdword GetRegionPosition(optr oself, sdword point, word flag)
+{
+    VisLargeTextGetRegionPosReturnStruct retVal;
+    word    count, index = 0;
+
+    retVal.VLTGRPRS_yPosition = 0;
+    count = @call self::MSG_VIS_LARGE_TEXT_GET_REGION_COUNT();
+
+    /* find the last region which starts before point */
+    while ((retVal.VLTGRPRS_yPosition < point) && (index < count)) {
+	@call self::MSG_VIS_LARGE_TEXT_GET_REGION_POS(&retVal, index);
+	index++;
+	if (point <= retVal.VLTGRPRS_yPosition + retVal.VLTGRPRS_height)
+	    break;
+    }
+    /* get the pos for the correct region number */
+    index = (index ? index-1 : index);
+    @call self::MSG_VIS_LARGE_TEXT_GET_REGION_POS(&retVal, index);
+
+    /*
+     * if point falls before region bounds, return start of region
+     */
+    if (point <= retVal.VLTGRPRS_yPosition)
+	return(retVal.VLTGRPRS_yPosition);
+    /*
+     * if point falls within region bounds, return start or end of 
+     * region, depending on value passed in flag
+     */
+    else if (point <= retVal.VLTGRPRS_yPosition + retVal.VLTGRPRS_height)
+	return(retVal.VLTGRPRS_yPosition + retVal.VLTGRPRS_height * flag);
+    /*
+     * else point falls past region bounds, so return end of region
+     */
+    else {
+	return(retVal.VLTGRPRS_yPosition + retVal.VLTGRPRS_height);
+    }
+}
+
+
+/***************************************************************************
+ *              RepositionVisibileHotSpots
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Move hotspots to account for reflow caused by 
+ *              point size change, justification change, etc.
+ *
+ *  PARAMETERS:	optr oself
+ *
+ *  RETURN:     void
+ *      
+ *  SIDE EFFECTS:   
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  11/08/94        Initial Revision
+ *
+ **************************************************************************/
+void RepositionVisibleHotSpots(optr oself)
+{
+    GStateHandle    gstate;
+
+    gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+    RepositionVisibleHotSpotsLow(oself, gstate);
+    GrDestroyState(gstate);
+    return;
+}
+
+/***************************************************************************
+ *              RepositionVisibleHotSpotsLow
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Move all visible hotspots to account for any text flow
+ *              changes.
+ *
+ *  PARAMETERS:	(optr oself, GStateHandle gstate)
+ *
+ *  RETURN:     void
+ *      
+ *  SIDE EFFECTS:   
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  05/19/94        Initial Revision
+ *
+ **************************************************************************/
+void RepositionVisibleHotSpotsLow(optr oself, GStateHandle gstate)
+{
+    dword   start, end;
+    HotSpotArrayElement *elemPtr;
+
+    GetVisibleRange(oself, gstate, &start, &end);
+    RepositionHotSpotsInRange(oself, start, end);
+}
+
+/***************************************************************************
+ *              RepositionHotSpotsInRange
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Move all visible hotspots to account for any text flow
+ *              changes.
+ *
+ *  PARAMETERS:	(optr oself, dword start, dword end)
+ *
+ *  RETURN:     void
+ *      
+ *  SIDE EFFECTS:   
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      cassie  05/19/94        Initial Revision
+ *
+ **************************************************************************/
+void RepositionHotSpotsInRange(optr oself, dword start, dword end)
+{
+    HotSpotArrayElement *elemPtr;
+
+    if (start < end) {
+	HotSpotArrayLock(oself, &elemPtr);  
+	while ((elemPtr->HSAE_position < start) && 
+	       (elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END))
+	    HotSpotArrayNext(&elemPtr);
+	MoveHotSpotObjects(oself, elemPtr, start, end);
+	HotSpotArrayUnlock(elemPtr);
+    }       
+    return;
+}
+
+/***************************************************************************
+ *                  RoundOffFractionalPart
+ ***************************************************************************
+ *
+ *  SYNOPSIS:	    Round off the fractional part of a PointDWFixed
+ *
+ *  PARAMETERS:     void (PointDWFixed *point)
+ *                  point - whose fractional part is to be rounded off
+ *  RETURN: 	    nothing. the fractional part is rounded off.
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      edwin   06/30/94        Initial Revision
+ *
+ **************************************************************************/
+void    RoundOffFractionalPart(PointDWFixed *point)
+{
+    if (point->PDF_x.DWF_frac >= 0x8000) {
+        point->PDF_x.DWF_int++;
+    }
+    point->PDF_x.DWF_frac = 0;
+
+    if (point->PDF_y.DWF_frac >= 0x8000) {
+        point->PDF_y.DWF_int++;
+    }
+    point->PDF_y.DWF_frac = 0;
+    return;
+}
+
+
+/***************************************************************************
+ *                  MakeIntegerEven
+ ***************************************************************************
+ *
+ *  SYNOPSIS:       Make the integral part of PointDWFixed even
+ *
+ *  PARAMETERS:     void (PointDWFixed *point)
+ *                  point - whose integral part is to be made even
+ *  RETURN:         nothing. the integral part is made even.
+ *      
+ *  SIDE EFFECTS:
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      edwin   06/30/94        Initial Revision
+ *
+ **************************************************************************/
+void    MakeIntegerEven(PointDWFixed *point)
+{
+    RoundOffFractionalPart(point);
+
+    if (point->PDF_x.DWF_int % 2 != 0) 
+        point->PDF_x.DWF_int++;
+
+    if (point->PDF_y.DWF_int % 2 != 0) 
+        point->PDF_y.DWF_int++;
+    return;
+}
+
+#if ERROR_CHECK
+
+/***************************************************************************
+ *                  ECCheckHotSpotArray                 
+ ***************************************************************************
+ *
+ *  SYNOPSIS:   Check that the HotSpotArray is consistent with the
+ *              actual text.
+ *
+ *  PARAMETERS: optr oself - HotSpotText object
+ *
+ *  RETURN:     void
+ *  
+ *  SIDE EFFECTS:   fatal error if out of sync
+ *
+ *  REVISION HISTORY:
+ *      Name    Date        Description
+ *      ----    ----        -----------
+ *      cassie  05/23/94    Initial Revision
+ *
+ **************************************************************************/
+void ECCheckHotSpotArray(optr oself)
+{
+    HotSpotArrayElement *elemPtr;
+    VisTextGraphic  	graphic;
+    TextReference   	ref;
+    char    	    	*cp;
+    dword   	    	size, pos = 0;
+    word    	    	blockSize;
+    
+    HotSpotArrayLock(oself, &elemPtr);
+
+    /* if no HotSpotArrayElements, return */
+    if (elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END) {
+
+	/* process fffh bytes of text at a time */
+	size = @call self::MSG_VIS_TEXT_GET_TEXT_SIZE();
+	while (size) {
+	    blockSize = (size < 0xfff ? size : 0xfff); 
+	    ref.TR_type = TRT_BLOCK;
+
+	    /* allocate one extra byte for null terminator */
+	    ref.TR_ref.TRU_block.TRB_handle = MemAlloc(blockSize+1, 
+						       HF_DYNAMIC, 
+						       HAF_STANDARD);
+	    if (!ref.TR_ref.TRU_block.TRB_handle)
+		FatalError(ERROR_MEMALLOC_FAILED);
+
+	    if (@call self::MSG_VIS_TEXT_GET_TEXT_RANGE(0, ref,
+    	    	    	    	    pos + blockSize, pos) != blockSize)
+		FatalError(HSTEXT_HOT_SPOT_TEXT_BAD_REPLACE_RANGE);
+	    cp = (char *) MemLock(ref.TR_ref.TRU_block.TRB_handle);
+
+	    /* while more text and more elements */
+	    while (*cp && elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END) {
+		/*
+		 * if char is a graphic, check if current position in text 
+		 * matches position for this char in the HotSpotArrayElement 
+		 */
+		if (*cp == C_GRAPHIC) {
+		    @call self::MSG_VIS_TEXT_GET_GRAPHIC_AT_POSITION(&graphic,
+								     pos);
+		    if (graphic.VTG_type == VTGT_GSTRING) {
+			EC_ERROR_IF(elemPtr->HSAE_type != GT_GSTRING,
+				    HSTEXT_INVALID_GRAPHIC_TYPE);
+		    }
+		    else {
+			EC_ERROR_IF(!(elemPtr->HSAE_type & GT_VARIABLE),
+				    HSTEXT_INVALID_GRAPHIC_TYPE);
+			if (graphic.VTG_data.VTGD_variable.VTGV_type == 
+			    VTVT_HOTSPOT)
+			    EC_ERROR_IF(!(elemPtr->HSAE_type == 
+					  (GT_VARIABLE | GT_HOTSPOT)),
+			        	HSTEXT_INVALID_GRAPHIC_TYPE);	
+			;
+		    }
+		    if (elemPtr->HSAE_position == pos)
+			HotSpotArrayNext(&elemPtr);
+		    else 
+			FatalError(HSTEXT_HOT_SPOT_ARRAY_OUT_OF_SYNC);
+		}
+		pos++;      
+		cp++;        
+	    }
+	    MemFree(ref.TR_ref.TRU_block.TRB_handle); 
+	    size -= blockSize;
+	}  
+	/*      
+	 * we've reached the end of the text, so if there are more 
+	 * elements in the array, the array is out of sync
+	 */
+	if (elemPtr->HSAE_position != TEXT_ADDRESS_PAST_END)
+	    FatalError(HSTEXT_HOT_SPOT_ARRAY_OUT_OF_SYNC);
+    }
+    HotSpotArrayUnlock(elemPtr);
+    return;
+}
+
+#endif
+

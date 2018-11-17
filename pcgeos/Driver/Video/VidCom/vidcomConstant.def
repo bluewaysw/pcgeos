@@ -1,0 +1,364 @@
+
+COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+
+PROJECT:	PC GEOS
+MODULE:		Video drivers
+FILE:		vidcomConstant.def
+
+AUTHOR:		Jim DeFrisco
+
+REVISION HISTORY:
+	Name	Date	Description
+	----	----	-----------
+	Jim	4/88	initial version
+
+
+DESCRIPTION:
+	This file contains constants that are of use to the drivers.
+
+	$Id: vidcomConstant.def,v 1.1 97/04/18 11:41:56 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
+
+;---------------------------------------------------------------------------
+;		Misc constants
+;---------------------------------------------------------------------------
+	; CHAR_JUSTIFICATION: turns on or off support for character-level
+	; (as opposed to word-level) justification.  This also needs
+	; similar constants turned on in the kernel and text library.
+ifdef DO_PIZZA
+	CHAR_JUSTIFICATION	equ	TRUE
+else
+	CHAR_JUSTIFICATION	equ	FALSE
+endif
+
+;---------------------------------------------------------------------------
+;		Video driver FatalError constants
+;---------------------------------------------------------------------------
+
+if	ERROR_CHECK
+
+LOCK_RETURNED_ERROR					       enum FatalErrors
+FONT_BAD_CHAR_FLAG                                             enum FatalErrors
+NULL_VIDMEM_BITMAP_ADDR                                        enum FatalErrors
+BAD_FLAGS_TO_VID_SET_XOR                                       enum FatalErrors
+VIDEO_CAN_NOT_FIND_SAVE_UNDER_WINDOW                           enum FatalErrors
+ERROR_CALLING_FONT_DRIVER				       enum FatalErrors
+VIDEO_HIDE_CURSOR_COUNT_UNDERFLOW			       enum FatalErrors
+; Calls to Hide & Show the mouse ptr image must be balanced, as a "hide" count
+; is kept.  The ptr image is shown only if the count is zero.  This error occurs
+; if the count goes negative, i.e. a "Show ptr image" comes in when the count
+; is already zero.
+VIDEO_ONLY_SUPPORTS_16x16_CURSORS			       enum FatalErrors
+; This video driver does not support arbitrary sized cursors.
+VIDEO_BAD_SAVE_UNDER_BOUNDS				       enum FatalErrors
+; Rectangle bounds for save under are incorrectly sorted.
+VIDEO_TOO_MANY_SAVE_UNDERS				       enum FatalErrors
+; DR_VID_SAVE_UNDER was called when there was no empty slot for it.
+VIDEO_PUTBITS_BAD_PALETTE				       enum FatalErrors
+; PutBits called with palette flag set, but palette pointer is bogus.  Signals
+; a problem in the kernel
+UNSORTED_BOUNDS						       enum FatalErrors
+; ExclRectBounds was called with the registers unsorted
+endif
+
+;----------------------------------------------------------------------------
+;		Constants usually internal to the kernel
+;----------------------------------------------------------------------------
+
+SEPARATOR	equ	8000h		; for disjoint polyline/polygon format
+
+DISPLAY_CMYK_BITMAPS equ FALSE		; set to TRUE to enable display of 
+					; CMYK bitmaps. (works only on VGA-type
+					; displays and is for debugging 
+					; purposes only).  There is a 
+					; corresponding constant in the kernel
+					; in graphicsConstant.def that also
+					; needs to be set TRUE.
+;----------------------------------------------------------------------------
+;		Driver type constants
+;----------------------------------------------------------------------------
+
+ifdef	BIT_CLR32
+BITS_PER_PIXEL		=	32
+elifdef	BIT_CLR16
+BITS_PER_PIXEL		=	16
+elifdef	BIT_CLR8
+BITS_PER_PIXEL		=	8
+elifdef	BIT_CLR4
+BITS_PER_PIXEL		=	4
+elifdef	BIT_CLR2
+BITS_PER_PIXEL		=	2
+else
+BITS_PER_PIXEL		=	1
+endif	; BIT_CLR32
+
+
+
+ifdef	IS_8
+
+ifdef	BIT_CLR32
+BIT_SHIFTS		=	(-2)
+elifdef	BIT_CLR16
+BIT_SHIFTS		=	(-1)
+elifdef	BIT_CLR8
+BIT_SHIFTS		=	0
+elifdef BIT_CLR4
+BIT_SHIFTS		=	1
+elifdef BIT_CLR2
+BIT_SHIFTS		=	2
+else
+BIT_SHIFTS		=	3
+endif	; BIT_CLR32
+
+ifdef IS_MEM
+SCREEN_UNIT_WIDTH	=	0
+else
+SCREEN_UNIT_WIDTH	=	SCREEN_BYTE_WIDTH
+endif
+
+LOAD_UNIT		equ	<lodsb>
+STORE_UNIT		equ	<stosb>
+MOVE_UNIT		equ	<movsb>
+MoveStrUnit	macro
+	rep movsb
+endm
+
+A_REG			equ	<al>
+B_REG			equ	<bl>
+C_REG			equ	<cl>
+D_REG			equ	<dl>
+
+ShiftLeftIf16	macro	reg
+endm
+
+ShiftRightIf16	macro	reg
+endm
+
+IncIf16	macro	reg
+endm
+
+LabelUnit	macro	name
+name	label	byte
+endm
+
+endif
+
+
+ifdef	IS_16
+
+ifdef	BIT_CLR32
+BIT_SHIFTS		=	(-1)
+elifdef	BIT_CLR16
+BIT_SHIFTS		=	0
+elifdef	BIT_CLR8
+BIT_SHIFTS		=	1
+elifdef BIT_CLR4
+BIT_SHIFTS		=	2
+elifdef BIT_CLR2
+BIT_SHIFTS		=	3
+else
+BIT_SHIFTS		=	4
+endif	; BIT_CLR32
+
+ifdef IS_MEM
+SCREEN_UNIT_WIDTH	=	0
+else
+SCREEN_UNIT_WIDTH	=	SCREEN_BYTE_WIDTH/2
+endif
+
+LOAD_UNIT		equ	<lodsw>
+STORE_UNIT		equ	<stosw>
+MOVE_UNIT		equ	<movsw>
+MoveStrUnit	macro
+	rep movsw
+endm
+
+A_REG			equ	<ax>
+B_REG			equ	<bx>
+C_REG			equ	<cx>
+D_REG			equ	<dx>
+
+ShiftLeftIf16	macro	reg
+	shl	reg,1
+endm
+
+ShiftRightIf16	macro	reg
+	shr	reg,1
+endm
+
+IncIf16	macro	reg
+	inc	reg
+endm
+
+LabelUnit	macro	name
+name	label	word
+endm
+endif
+
+
+
+if	BIT_SHIFTS gt 0
+UNIT_MASK		=	((1 shl BIT_SHIFTS) - 1)
+endif	; BIT_SHIFTS gt 0
+
+ifdef	IS_MEM
+SAVE_UNDER_SLOP		=	0
+else
+if	BIT_SHIFTS le 0
+SAVE_UNDER_SLOP		=	2
+else
+SAVE_UNDER_SLOP		=	(1 shl (BIT_SHIFTS + 1))
+endif	; BIT_SHIFTS le 0
+endif	; IS_MEM
+
+
+
+ifdef   INVERSE_DRIVER
+
+; These two values MUST BE 0 and 1.  See the mono xxxAdmin.asm files
+; for details.
+INVERSE_VIDEO_MODE	=	1
+NORMAL_VIDEO_MODE	=	0
+
+endif ; INVERSE_DRIVER
+
+
+;****************************************************************************
+;	Video State Record
+;****************************************************************************
+
+VideoState	record
+    VS_DITHER:1,			; use the dither matrix when rendering
+    VS_CYAN_ZERO:1,			; dithering, but dither all zeroes
+    VS_MAGENTA_ZERO:1,			; dithering, but dither all zeroes
+    VS_YELLOW_ZERO:1,			; dithering, but dither all zeroes
+    VS_BLACK_ZERO:1,			; dithering, but dither all zeroes
+    VS_CYAN_ONES:1,			; dithering, but dither all ones
+    VS_MAGENTA_ONES:1,			; dithering, but dither all ones
+    VS_YELLOW_ONES:1,			; dithering, but dither all ones
+    VS_BLACK_ONES:1,			; dithering, but dither all ones
+    VS_IGNORE_SPLASH_MODE:1		; don't check with the kernel to see
+					;  what mode the splash screen might
+					;  have placed the adapter in, as
+					;  we've changed things...
+    VS_UNUSED:6				; future bits
+VideoState	end
+
+;****************************************************************************
+;	VIDEO BIOS EQUATES
+;****************************************************************************
+
+VIDEO_BIOS		=	10h		; video bios interrupt number
+
+SET_VMODE		=	00h		; set video mode function #
+SET_CURSIZ		=	01h		; set cursor size
+SET_CURPOS		=	02h		; set cursor position
+GET_CURPOS		=	03h		; get cursor position
+GET_LPENPOS		=	04h		; get light pen position
+DISP_PAGE		=	05h		; set/get display page regs
+SCROLL_UP		=	06h		; scroll window up
+SCROLL_DOWN		=	07h		; scroll window down
+GET_CHRATT		=	08h		; read character and attribute
+SET_CHRATT		=	09h		; write character and attribute
+SET_CHAR		=	0ah		; write character
+SET_PALETTE		=	0bh		; set color palette
+SET_PIXEL		=	0ch		; set pixel
+GET_PIXEL		=	0dh		; get pixel
+PUT_CHAR		=	0eh		; write character as tty
+GET_VMODE		=	0fh		; get video mode function #
+SET_1PALREG		=	1000h		; set color palette (pcjr)
+SET_BORDER		=	1001h		; set border color (pcjr)
+SET_PALREGS		=	1002h		; set color palette (pcjr)
+GET_PALREG		=	1007h		; get palette entry (vga only)
+SET_DACREG		=	1010h		; set 1 DAC register (vga,mcga)
+SET_DACREGS		=	1012h		; set blk of DAC registers
+SET_COLORPAGE		=	1013h		; select color page
+GET_DACREGS		=	1017h		; get blk of DAC registers
+GET_CONFIG		=	12h		; vid subsys config (alt sel)
+
+;****************************************************************************
+;	Enum for palType variable (in vidVariable.def)
+;****************************************************************************
+
+ActivePaletteType	etype byte, 0, 1
+DEFAULT_PAL_SET		enum	ActivePaletteType
+CUSTOM_PAL_SET		enum	ActivePaletteType
+
+;****************************************************************************
+;	VIDEO MODES (as identified by the BIOS routines)
+;****************************************************************************
+
+;	the names of these modes are coded as follows:
+;		first two letters 	= CH for character modes
+;				    	  GR for graphics modes
+;		next two characters 	= hex number for # colors available
+;		fifth character 	= underscore
+;		next two characters	= horizontal resolution, (chars for
+;					  text modes, high two digits of res
+;					  for graphics modes)
+;		final two characters	= vertical resolution (same encoding
+;					  as horizontal resolution)
+
+CH0F_8025		=	03h		; character 80x25 (16-color)
+GR04_3220		=	05h		; graphics 320x200 (4-color)
+GR02_6420		=	06h		; graphics 640x200 (mono)
+CH02_8025		=	07h		; character 80x25 (hi res mono)
+GR04_6420		=	0ah		; graphics 640x200 (4-color)
+						;  (pcjr and tandy 1000)
+GR02_6435		=	0fh		; graphics 640x350 (mono)
+GR0F_6435		=	10h		; graphics 640x350 (16-color)
+GR02_6448		=	11h		; graphics 640x350 (mono)
+GR0F_6448		=	12h		; graphics 640x350 (16-color)
+GRFF_3220		=	13h		; graphics 320x200 (256-color)
+
+;----------------------------------------------------------------------------
+;		CRT Controller
+;----------------------------------------------------------------------------
+
+CRTC_ADDRESS		=	3b4h		; Address register
+CRTC_DATA		=	3b5h		; Data register
+
+CRTC_REG_HORIZ_TOTAL	=	0h		; Horizontal total
+CRTC_REG_HORIZ_DISPLAYED =	1h		; Horizontal Displayed
+CRTC_REG_HORIZ_SYNC_POS	=	2h		; Horizontal Sync Position
+CRTC_REG_HORIZ_SYNC_WIDTH =	3h		; Horizontal Sync Pulse Width
+CRTC_REG_VERT_TOTAL	=	4h		; Vertical Total
+CRTC_REG_VERT_ADJUST	=	5h		; Vertical Total Adjust
+CRTC_REG_VERT_DISPLAYED	=	6h		; Vertical Displayed
+CRTC_REG_VERT_SYNC_POS	=	7h		; Vertical Sync Position
+CRTC_REG_INTERLACE_MODE	=	8h		; Interlace Mode
+CRTC_REG_MAX_SCAN_LINE	=	9h		; Maximum Scan Line
+CRTC_REG_CURSOR_START	=	0ah		; Cursor Start
+CRTC_REG_CURSOR_END	=	0bh		; Cursor End
+CRTC_REG_START_HIGH	=	0ch		; Start Address High
+CRTC_REG_START_LOW	=	0dh		; Start Address Low
+CRTC_REG_CURSOR_HIGH	=	0eh		; Cursor Location High
+CRTC_REG_CURSOR_LOW	=	0fh		; Cursor Location Low
+CRTC_REG_LIGHT_PEN_HIGH	=	10h		; Light Pen High
+CRTC_REG_LIGHT_PEN_LOW	=	11h		; Light Pen Low
+
+;--------------------
+
+;	a few other useful constants in writing the cursor drawing code...
+
+CUR_SIZE	=	16		; this code assumes 16x16 cursors
+					;  (fixed size)
+CUR_BWIDTH	=	3		; width of shifted cursor in bytes
+
+CUR_IMAGE_SIZE	=	STANDARD_CURSOR_IMAGE_SIZE
+
+;--------------------
+
+; A limit on how big of a memory block we'll try to allocate in the name
+; of save-under.  This has been added to avoid problem's like the one
+; which Adam ran into, in which 39,840 byte blocks were being created in
+; the mcga graphical setup, because each full-screen window was modal.
+;
+MAX_MEM_ALLOC_FOR_SAVE_UNDER_REGION	= 8 * 1024	; 8K's it.  Anything
+							; more starts to get
+							; hard on the heap.
+

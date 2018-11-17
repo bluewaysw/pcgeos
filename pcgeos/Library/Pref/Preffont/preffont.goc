@@ -1,0 +1,2866 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+ *
+ * PROJECT:	  
+ * MODULE:	  
+ * FILE:	  preffont.goc
+ *
+ * AUTHOR:  	  Adam de Boor: Apr  9, 1993
+ *
+ * ROUTINES:
+ *	Name	  	    Description
+ *	----	  	    -----------
+ *
+ * REVISION HISTORY:
+ *	Name	  Date	    Description
+ *	----	  ----	    -----------
+ *	ardeb	  4/ 9/93   Initial version
+ *
+ * DESCRIPTION:
+ *	Preferences module to configure font controllers for various
+ *	applications.
+ *
+ *	$Id: preffont.goc,v 1.2 98/03/24 22:06:31 gene Exp $
+ *
+ ***********************************************************************/
+
+@include    <stdapp.goh>
+@include    <config.goh>
+@include    <Objects/vTextC.goh>
+#include    <Ansi/stdio.h>
+#include    <Ansi/string.h>
+#include    <Ansi/stdlib.h>
+#include    <graphics.h>
+#include    <font.h>
+#include    <gstring.h>
+#include    <initfile.h>
+#include    <vm.h>
+#include    <win.h>
+
+@define Dup(obj) HandleOf(oself),ChunkOf(obj)
+
+/*****************************************************************************
+ *
+ *			       ARTWORK
+ *
+ *****************************************************************************/
+@include    <Art/mkrFont.goh>
+
+@start 	APPLCMONIKERRESOURCE, data;
+@ifdef DO_DBCS
+@include    <Art/mkrRSC.goh>
+@include    <Art/mkrLSC.goh>
+@else
+@include    <Art/mkrRightArrowSC.goh>
+@include    <Art/mkrLeftArrowSC.goh>
+@endif
+@end	APPLCMONIKERRESOURCE;
+
+@start 	APPLMMONIKERRESOURCE, data;
+@ifdef DO_DBCS
+@include    <Art/mkrRSM.goh>
+@include    <Art/mkrLSM.goh>
+@else
+@include    <Art/mkrRightArrowSM.goh>
+@include    <Art/mkrLeftArrowSM.goh>
+@endif
+@end	APPLMMONIKERRESOURCE;
+
+@start 	APPLCGAMONIKERRESOURCE, data;
+@ifdef DO_DBCS
+@include    <Art/mkrRSCGA.goh>
+@include    <Art/mkrLSCGA.goh>
+@else
+@include    <Art/mkrRightArrowSCGA.goh>
+@include    <Art/mkrLeftArrowSCGA.goh>
+@endif
+@end	APPLCGAMONIKERRESOURCE;
+
+/*****************************************************************************
+ *
+ *		       CONSTANTS AND STRUCTURES
+ *
+ *****************************************************************************/
+
+const GeodeToken moduleToken = { "FONT", MANUFACTURER_ID_APP_LOCAL };
+
+/*
+ * Data placed on the clipboard when moving fonts around. Format identifier
+ * is MANUFACTURER_ID_APP_LOCAL:CIF_FONT
+ */
+#define CIF_FONT    0
+#define CIF_FONT_ID FormatIDFromManufacturerAndType(MANUFACTURER_ID_APP_LOCAL,\
+						    CIF_FONT)
+
+typedef struct {
+    VMChainLink     FTB_meta;       /* Always 0, but needs to be here */
+    word    	    FTB_numFonts;   /* Number of fonts described */
+    FontEnumStruct  FTB_fonts[1];   /* Array of fonts being transfered */
+} FontTransferBlock;
+
+/*****************************************************************************
+ *
+ *			       CLASSES
+ *
+ *****************************************************************************/
+
+@class PFDialogClass, PrefDialogClass;
+
+@message (GEN_TRIGGER_ACTION) MSG_PFD_APPLICATION_CHOSEN;
+
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_PFD_AVAILABLE_FONT_SELECTED;
+/*
+ * Note that the user has selected something from the list of available
+ * fonts. Tell the two PFItemGroup objects what the font(s) is(are), so they can
+ * determine whether to enable their Add triggers, then update the font used
+ * by the PFFontSample.
+ */
+
+@message MemHandle MSG_PFD_GET_SELECTED_FONTS();
+/*
+ * Fetch the IDs and names of the currently-selected fonts in the list of
+ * available fonts. Returns 0 if no font currently selected, else the handle
+ * of a FontTransferBlock.
+ */
+
+@message Boolean MSG_PFD_GET_FONT(word index, FontEnumStruct *fesp);
+/*
+ * Fetch the info for a font given its index within the font block. Returns
+ * TRUE if font exists, FALSE if index was out-of-bounds
+ */
+
+@message void MSG_PFD_SET_FEEDBACK_TEXT();
+/*
+ * Update the feedback text object from our instance data.
+ */
+
+@message Boolean MSG_PFD_FIND_FONT_BY_NAME(const char *prefix,
+					   Boolean ignoreCase,
+					   word *indexPtr);
+/*
+ * Look for a font the first chars of whose name match the passed null-
+ * terminated string.
+ */
+
+    @instance char PFDI_category[MAX_INITFILE_CATEGORY_LENGTH] = "system";
+    @instance ChunkHandle PFDI_appName = 0;
+    @instance MemHandle PFDI_fonts = 0;
+    @instance word  	PFDI_nFonts = 0;
+
+@endc;
+
+/*
+ * Subclass of GenItem to allow cool quick-transfer behaviour.
+ */
+@class	PFItemClass, GenItemClass;
+
+@message void MSG_PFI_SET_FONT(const FontEnumStruct *fesp);
+/*
+ * Set the font being displayed for the item. Also sets the moniker for the
+ * item to be the font's name.
+ */
+
+@message void MSG_PFI_GET_FONT(FontEnumStruct *fesp);
+/*
+ * Fetch the font being displayed by the item.
+ */
+
+@message void MSG_PFI_APPEND_ID(optr str);
+/*
+ * Append the ID of this item's font to the null-terminated string in the given
+ * chunk in a format the font controller will accept (4-digit hex number).
+ */
+    @instance FontEnumStruct	PFII_font = {FID_INVALID, _TEXT("")};
+    /* When the thing is in the short list, it gets this set. When it's used
+     * as the child of the Dynamic list, it doesn't */
+
+    @instance Boolean	    	PFII_noTransfer = FALSE;
+    /* Non-zero if item cannot be quick-transfered */
+
+@vardata MemHandle TEMP_PFI_REGION_BLOCK;
+/*
+ * The handle of the region currently being used for quick-transfer.
+ */
+
+@endc;
+
+/*
+ * Subclass of PrefDynamicList to allow setting the class for the items.
+ */
+@class PFDynamicListClass, PrefDynamicListClass;
+    @default GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+
+@endc;
+
+
+/*
+ * Subclass of PrefItemGroup to save things to and restore things from the
+ * ini file differently.
+ */
+@class PFItemGroupClass, PrefItemGroupClass;
+@message (GEN_TRIGGER_ACTION) MSG_PFIG_DELETE_SELECTION;
+/*
+ * Delete the font selected in the item group from the list
+ */
+
+@message (GEN_TRIGGER_ACTION) MSG_PFIG_ADD_SELECTION;
+/*
+ * Add the font(s) selected in the list of available fonts to the end of this
+ * list
+ */
+
+@message void MSG_PFIG_AVAIL_FONT_SELECTED(MemHandle fonts);
+/*
+ * Take note that a font has been selected in the list of available fonts.
+ * Enable your Add trigger if one of the fonts isn't already in the list.
+ * Block passed is a FontTransferBlock
+ */
+
+@message optr MSG_PFIG_CREATE_CHILD(const FontEnumStruct *fesp);
+/*
+ * Create and add a new child to ourselves. The child is set usable after having
+ * been added at the end.
+ */
+
+@message Boolean MSG_PFIG_CHECK_FONT_IN_LIST(FontID fid);
+/*
+ * See if the passed font is in our list of fonts already. Returns TRUE if so.
+ */
+
+@message void MSG_PFIG_CHILD_DUMPED_ON(optr child, sword xPosition,
+				       sword yPosition, word inputState);
+
+@message void MSG_PFIG_ENSURE_DELETE_TRIGGER_ENABLED();
+
+    @default GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+
+    @instance ChunkHandle PFIGI_deleteTrigger = 0;
+    @instance ChunkHandle PFIGI_addTrigger = 0;
+    @instance Boolean	  PFIGI_doingQT = FALSE;
+@endc;
+
+
+@class PFDeleteTriggerClass, GenTriggerClass;
+    @instance Boolean PFDTI_doingQT = FALSE;
+@endc;
+
+/*****************************************************************************
+ *
+ *			       OBJECTS
+ *
+ *****************************************************************************/
+@start	DialogResource;
+
+@object PFDialogClass PFRoot = {
+    GI_visMoniker = "Fonts";
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @PFTitleGroup, @PFFeedbackText, @PFListGroup, @PFSetAppBox;
+    PFDI_appName = @PFSystemName;
+    HINT_INTERACTION_SINGLE_USAGE;
+    HINT_INTERACTION_COMPLEX_PROPERTIES;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_LEFT_JUSTIFY_CHILDREN;
+    ATTR_GEN_HELP_CONTEXT = "dbFonts";
+}
+
+@ifdef DO_DBCS
+@chunk TCHAR	PFMultiFontTransferString[] = _TEXT("<<fonts>>");
+@else
+@chunk TCHAR	PFMultiFontTransferString[] = "\307fonts\310";
+@endif
+
+@chunk TCHAR	PFSystemName[] = _TEXT("System Default");
+
+@object PrefInteractionClass PFTitleGroup = {
+    GI_comp = @PFTitle, @PFHelp;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object TitledGlyphClass PFTitle = {
+    GI_visMoniker = list {
+	@FontTextMoniker,
+	@FontLCMoniker,
+	@FontLMMoniker,
+	@FontLCGAMoniker
+    }
+}
+
+@object GenTextClass PFHelp = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Configure the font lists on the Tool Bar and the Font menu of your applications.  Drag and drop the name of a font with the right mouse button.";
+    HINT_MINIMUM_SIZE = { SST_PIXELS | 425, 0, 0 };
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass PFFeedbackText = {
+    GI_attrs = @default | GA_READ_ONLY;	/* set by us, only */
+    GTXI_text = "";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@chunk TCHAR 	PFFeedbackTemplate[] = _TEXT("Configure font menus for: %s.");
+
+
+
+@object PrefInteractionClass PFListGroup = {
+    GI_comp = @PFPopupListGroup, @PFPopupAddTrigger,
+	      @PFAvailableFontsGroup,
+	      @PFMenuAddTrigger, @PFMenuGroup;
+    GII_type = GIT_ORGANIZATIONAL;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+}
+
+/*****************************************************************************/
+
+@object PrefInteractionClass PFAvailableFontsGroup = {
+    GI_comp = @PFAvailableFonts, @PFFontSample;
+    GII_type = GIT_ORGANIZATIONAL;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+}
+
+@object PFDynamicListClass PFAvailableFonts = {
+    GI_visMoniker = "Available Fonts:";
+    GIGI_destination = @PFRoot;
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_PFD_AVAILABLE_FONT_SELECTED;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_IF_SYSTEM_ATTRS = SA_VERTICALLY_TINY;
+	    HINT_INITIAL_SIZE = {
+		SST_AVG_CHAR_WIDTHS|20,
+		SST_LINES_OF_TEXT|6,
+		6
+	    };
+    HINT_ELSE;
+	    HINT_INITIAL_SIZE = {
+		SST_AVG_CHAR_WIDTHS|20,
+		SST_LINES_OF_TEXT|10,
+		10
+	    };
+    HINT_ENDIF;
+}
+
+@object GenTextClass PFFontSample = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "AaBbCc 123";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+	    DEF_CHAR_ATTR_FONT_SIZE(VTDF_URW_ROMAN, VTDS_18);
+@ifdef DO_PIZZA
+    HINT_FIXED_SIZE = {
+	0,
+	SST_PIXELS|25,
+	1
+    };
+@endif
+}
+
+/*****************************************************************************/
+
+@object PrefInteractionClass PFPopupListGroup = {
+    GI_comp = @PFPopupList, @PFPopupDelete;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+}
+
+@object PFItemGroupClass PFPopupList = {
+    GI_visMoniker = "On Tool Bar:";
+    GI_comp = @PFPopupDropOffItem;
+    PFIGI_deleteTrigger = @PFPopupDelete;
+    PFIGI_addTrigger = @PFPopupAddTrigger;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    ATTR_GEN_INIT_FILE_KEY = "fonttool";
+    HINT_IF_SYSTEM_ATTRS = SA_VERTICALLY_TINY;
+	    HINT_MINIMUM_SIZE = {
+		SST_AVG_CHAR_WIDTHS|20,
+		SST_LINES_OF_TEXT|6,
+		6
+	    };
+    HINT_ELSE;
+	    HINT_MINIMUM_SIZE = {
+		SST_AVG_CHAR_WIDTHS|20,
+		SST_LINES_OF_TEXT|10,
+		10
+	    };
+    HINT_ENDIF;
+}
+
+@object PFItemClass PFPopupDropOffItem = {
+@ifdef DO_DBCS
+    GI_visMoniker = "<<Drop Font Here>>";
+@else
+    GI_visMoniker = "\307Drop Font Here\310";
+@endif
+    GII_identifier = FID_INVALID;
+    PFII_noTransfer = TRUE;
+}
+
+@object GenTriggerClass PFPopupAddTrigger = {
+    GI_visMoniker = list {
+	@LeftArrowSCMoniker, @LeftArrowSMMoniker, @LeftArrowSCGAMoniker
+    }
+    GTI_actionMsg = MSG_PFIG_ADD_SELECTION;
+    GTI_destination = @PFPopupList;
+    GI_states = @default & ~GS_ENABLED;
+    GI_attrs = @default | GA_INITIATES_INPUT_HOLD_UP;
+}
+
+@object PFDeleteTriggerClass PFPopupDelete = {
+    GI_visMoniker = "Remove Font";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_PFIG_DELETE_SELECTION;
+    GTI_destination = @PFPopupList;
+}
+
+/*****************************************************************************/
+
+@object PrefInteractionClass PFMenuGroup = {
+    GI_comp = @PFMenuList, @PFMenuDelete;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+}
+
+@object PFItemGroupClass PFMenuList = {
+    GI_visMoniker = "On Font Menu:";
+    GI_comp = @PFMenuDropOffItem;
+    PFIGI_deleteTrigger = @PFMenuDelete;
+    PFIGI_addTrigger = @PFMenuAddTrigger;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    ATTR_GEN_INIT_FILE_KEY = "fontmenu";
+    HINT_IF_SYSTEM_ATTRS = SA_VERTICALLY_TINY;
+	    HINT_MINIMUM_SIZE = {
+		SST_AVG_CHAR_WIDTHS|20,
+		SST_LINES_OF_TEXT|6,
+		6
+	    };
+    HINT_ELSE;
+	    HINT_MINIMUM_SIZE = {
+		SST_AVG_CHAR_WIDTHS|20,
+		SST_LINES_OF_TEXT|10,
+		10
+	    };
+    HINT_ENDIF;
+}
+
+@object PFItemClass PFMenuDropOffItem = {
+@ifdef DO_DBCS
+    GI_visMoniker = "<<Drop Font Here>>";
+@else
+    GI_visMoniker = "\307Drop Font Here\310";
+@endif
+    GII_identifier = FID_INVALID;
+    PFII_noTransfer = TRUE;
+}
+
+@object GenTriggerClass PFMenuAddTrigger = {
+    GI_visMoniker = list {
+	@RightArrowSCMoniker, @RightArrowSMMoniker, @RightArrowSCGAMoniker
+    }
+    GTI_actionMsg = MSG_PFIG_ADD_SELECTION;
+    GTI_destination = @PFMenuList;
+    GI_states = @default & ~GS_ENABLED;
+    GI_attrs = @default | GA_INITIATES_INPUT_HOLD_UP;
+}
+
+@object PFDeleteTriggerClass PFMenuDelete = {
+    GI_visMoniker = "Remove Font";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_PFIG_DELETE_SELECTION;
+    GTI_destination = @PFMenuList;
+}
+
+/*****************************************************************************/
+
+@object PrefInteractionClass PFSetAppBox = {
+    GI_visMoniker = "Choose Application";
+    GI_comp = @PFSASystem, @PFSASelector, @PFSAOkTrigger;
+    GII_type = GIT_COMMAND;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_MODAL;
+    HINT_SEEK_REPLY_BAR;
+    HINT_INTERACTION_SINGLE_USAGE;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    ATTR_GEN_HELP_CONTEXT = "dbFontChooseApp";
+}
+
+@object PrefItemGroupClass PFSASystem = {
+    GI_visMoniker = "Application:";
+    GI_comp = @PFSASystemItem;
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    GIGI_selection = 0;
+    GIGI_numSelections = 1;
+    ATTR_PREF_ITEM_GROUP_ENABLE = {
+	0, ChunkOf(@PFSASelector), PEF_DISABLE_IF_SELECTED
+    };
+}
+
+@object GenItemClass PFSASystemItem = {
+    GI_visMoniker = 'S', "System Default";
+    GII_identifier = 0;
+}
+
+@object GenFileSelectorClass PFSASelector = {
+    GFSI_fileCriteria = FSFC_DIRS | FSFC_GEOS_EXECUTABLES;
+    GFSI_attrs = FSA_ALLOW_CHANGE_DIRS | FSA_HAS_CLOSE_DIR_BUTTON |
+	FSA_HAS_OPEN_DIR_BUTTON | FSA_HAS_CHANGE_DIRECTORY_LIST |
+	    FSA_HAS_CHANGE_DRIVE_LIST | FSA_HAS_FILE_LIST;
+    HINT_FILE_SELECTOR_SINGLE_ACTION;
+    ATTR_GEN_PATH_DATA = { SP_APPLICATION };
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass PFSAOkTrigger = {
+    GTI_actionMsg = MSG_PFD_APPLICATION_CHOSEN;
+    GTI_destination = @PFRoot;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end	DialogResource;
+
+/*****************************************************************************
+ *
+ *			       STRINGS
+ *
+ *****************************************************************************/
+@start 	Strings, data;
+
+@visMoniker FontTextMoniker = "Fonts";
+
+@visMoniker PFMonikerList = list {
+    @FontTextMoniker,
+    @FontLCMoniker,
+    @FontLMMoniker,
+    @FontLCGAMoniker
+}
+
+@end	Strings;
+
+
+/*****************************************************************************
+ *
+ *			    CLASS RECORDS
+ *
+ *****************************************************************************/
+@classdecl  PFItemClass;
+@classdecl  PFDynamicListClass;
+@classdecl  PFItemGroupClass;
+@classdecl  PFDialogClass;
+@classdecl  PFDeleteTriggerClass;
+
+/*****************************************************************************
+ *
+ *		  EXPORTED ROUTINES FOR PREFERENCES
+ *
+ *****************************************************************************/
+
+
+/***********************************************************************
+ *				PFGetPrefUITree
+ ***********************************************************************
+ * SYNOPSIS:	    Return the root of our UI tree to be duplicated
+ * CALLED BY:	    GLOBAL
+ * RETURN:	    optr of root
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/ 9/93		Initial Revision
+ *
+ ***********************************************************************/
+optr _pascal
+PFGetPrefUITree(void)
+{
+    return (@PFRoot);
+}
+
+
+/***********************************************************************
+ *				PFGetModuleInfo
+ ***********************************************************************
+ * SYNOPSIS:	    Get info about this here module
+ * CALLED BY:	    GLOBAL
+ * RETURN:	    moduleInfo filled in
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/ 9/93		Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+PFGetModuleInfo(PrefModuleInfo *moduleInfo)
+{
+    /* we set both user and system things, so... */
+    moduleInfo->PMI_requiredFeatures = 0;
+    moduleInfo->PMI_prohibitedFeatures = 0;
+    moduleInfo->PMI_minLevel = UIIL_ADVANCED;
+    moduleInfo->PMI_maxLevel = UIIL_MAX_LEVEL;
+    moduleInfo->PMI_monikerList = @PFMonikerList;
+    moduleInfo->PMI_monikerToken = moduleToken;
+}
+    
+
+/***********************************************************************
+ *				PFCreateTransferFormat
+ ***********************************************************************
+ * SYNOPSIS:	    Utility routine to create a FontTransferBlock for the
+ *	    	    selected fonts in the passed item group or dynamic
+ *		    list.
+ * CALLED BY:	    (INTERNAL)
+ * RETURN:	    handle of block, or 0 if nothing selected.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/25/93		Initial Revision
+ *
+ ***********************************************************************/
+static MemHandle
+PFCreateTransferFormat(optr 	oself,
+		       Boolean	isDynamic)
+{
+    word    	    	numFonts;
+    MemHandle	    	block;
+    FontTransferBlock	*ftbp;
+    FontEnumStruct  	*fesp;
+    word    	    	*selections;
+    int	    	    	i;
+
+    /*
+     * Figure the number of fonts selected in the passed list.
+     */
+    numFonts = @call oself::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+    if (numFonts == 0) {
+	return(0);
+    }
+
+    /*
+     * Allocate room for the array of selected things. I assume we can't use
+     * an lmem chunk for this, as in theory, things could move around during
+     * the call, and I don't know if alloca is functional, so use malloc()...
+     */
+    selections = malloc(numFonts * sizeof(word));
+    (void)@call oself::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(selections,
+								  numFonts);
+
+    /*
+     * Allocate a block to hold the descriptions for the fonts.
+     */
+    block = MemAlloc(sizeof(FontTransferBlock) +
+		     (numFonts-1) * sizeof(FontEnumStruct),
+		     HF_DYNAMIC,
+		     0);
+    ftbp = MemLock(block);
+    ftbp->FTB_meta.VMC_next = 0;    /* No next block */
+    ftbp->FTB_numFonts = numFonts;
+
+    /*
+     * Now loop through the array of selections, filling in the description
+     * for each.
+     */
+    for (i = 0, fesp = ftbp->FTB_fonts; i < numFonts; i++, fesp++) {
+	if (isDynamic) {
+	    /*
+	     * For dynamic list, selection is index, so call the dialog
+	     * to get the data.
+	     */
+	    @call @Dup(@PFRoot)::MSG_PFD_GET_FONT(selections[i], fesp);
+	} else {
+	    /*
+	     * For non-dynamic list, item holds font description, so locate
+	     * the item and ask it.
+	     */
+	    optr    child;
+	    
+	    child= @call oself::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(selections[i]);
+	    @call child::MSG_PFI_GET_FONT(fesp);
+	}
+    }
+    free(selections);
+    MemUnlock(block);
+
+    return(block);
+}
+    
+/*****************************************************************************
+ *
+ *			    PFDialogClass
+ *
+ *****************************************************************************/
+
+/***********************************************************************
+ *		MSG_PREF_INIT for PFDialogClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize things properly.
+ * PARAMETERS:	    void (PrefMgrFeatures features, UIInterfaceLevel level)
+ * SIDE EFFECTS:    All outline fonts are enumerated and their names and
+ *		    IDs stored in a memory block, with the handle stored
+ *		    in PFDI_fonts.
+ *
+ *	    	    PFAvailableFonts has its number of entries set to the
+ *		    number of fonts.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDialogClass, MSG_PREF_INIT
+{
+    pself->PFDI_fonts = MemAlloc(sizeof(FontEnumStruct) * MAX_FONTS,
+				 HF_DYNAMIC, 0);
+    if (pself->PFDI_fonts != 0) {
+	FontEnumStruct	*buf = MemLock(pself->PFDI_fonts);
+
+	/*
+	 * Enumerate all useful outline fonts, in alphabetical order. We don't
+	 * much care about the family...
+	 */
+	pself->PFDI_nFonts =
+	    GrEnumFonts(buf, MAX_FONTS,
+			FEF_OUTLINES | FEF_ALPHABETIZE,
+			0);
+
+	if (pself->PFDI_nFonts != 0) {
+	    /*
+	     * Shrink the block down to hold only that many structures.
+	     */
+	    MemReAlloc(pself->PFDI_fonts,
+		       pself->PFDI_nFonts * sizeof(FontEnumStruct),
+		       0);
+	    MemUnlock(pself->PFDI_fonts);
+	    @call @Dup(@PFAvailableFonts)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->PFDI_nFonts);
+	} else {
+	    /*
+	     * No fonts. Leave dynamic list uninitialized (?) and free the
+	     * block we allocated.
+	     */
+	    MemFree(pself->PFDI_fonts);
+	    pself->PFDI_fonts = 0;
+	}
+    } else {
+	pself->PFDI_nFonts = 0;
+    }
+
+    /*
+     * Now set the feedback text.
+     */
+    @call self::MSG_PFD_SET_FEEDBACK_TEXT();
+
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *		MSG_PFD_SET_FEEDBACK_TEXT for PFDialogClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set the text in the feedback text object according to
+ *		    our instance data.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the text in PFFeedbackText is replaced
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/15/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDialogClass, MSG_PFD_SET_FEEDBACK_TEXT
+{
+    int	    	len;
+    TCHAR    	*feedback;
+    MemHandle	newTextHan;
+    TCHAR    	*newText;
+    const TCHAR	*appName;
+    
+    feedback = LMemDerefHandles(@Dup(@PFFeedbackTemplate));
+    appName = LMemDerefHandles(HandleOf(oself),pself->PFDI_appName);
+    len = strlen(appName) + strlen(feedback) + 1;
+
+    newTextHan = MemAlloc(len*(sizeof(TCHAR)), HF_DYNAMIC, 0);
+    newText = MemLock(newTextHan);
+
+    sprintf(newText, feedback, appName);
+    MemUnlock(newTextHan);
+
+    @call @Dup(@PFFeedbackText)::MSG_VIS_TEXT_REPLACE_ALL_BLOCK(newTextHan, 0);
+
+    MemFree(newTextHan);
+}
+
+
+
+/***********************************************************************
+ *		MSG_PFD_AVAILABLE_FONT_SELECTED for PFDialogClass
+ ***********************************************************************
+ * SYNOPSIS:	    Note that the user has selected a font from the list
+ *		    of available fonts.
+ * PARAMETERS:	    void (word selection, word numSelections, byte stateFlags)
+ * SIDE EFFECTS:    font used for the font sample is changed
+ *	    	    the two PFItemGroup objects are notified
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDialogClass, MSG_PFD_AVAILABLE_FONT_SELECTED
+{
+    MemHandle	fonts = @call self::MSG_PFD_GET_SELECTED_FONTS();
+
+    /*
+     * Let the two PFItemGroup objects know about the selection, so they can
+     * update the state of their Add triggers.
+     */
+    @call @Dup(@PFPopupList)::MSG_PFIG_AVAIL_FONT_SELECTED(fonts);
+    @call @Dup(@PFMenuList)::MSG_PFIG_AVAIL_FONT_SELECTED(fonts);
+    
+    /*
+     * Change the font of the font sample to match that selected.
+     */
+    if (fonts != 0) {
+	FontTransferBlock   *ftbp = MemLock(fonts);
+
+	if (ftbp->FTB_numFonts == 1) {
+	    /*
+	     * Only one selected, so enable the text object and set the font
+	     * it's to display.
+	     */
+	    @call @Dup(@PFFontSample)::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	    @call @Dup(@PFFontSample)::MSG_VIS_TEXT_SET_FONT_ID
+		(ftbp->FTB_fonts[0].FES_ID, 0, VIS_TEXT_RANGE_SELECTION);
+	} else {
+	    /*
+	     * More than one selected, so disable the text object.
+	     */
+	    @call @Dup(@PFFontSample)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	}
+	MemFree(fonts);
+    } else {
+	/*
+	 * Nothing selected, so disable the thing.
+	 */
+	@call @Dup(@PFFontSample)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_PFD_GET_SELECTED_FONTS for PFDialogClass
+ ***********************************************************************
+ * SYNOPSIS:	    Fetch the description of the currently-selected fonts
+ *		    in the list of available fonts.
+ * PARAMETERS:	    MemHandle (void)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDialogClass, MSG_PFD_GET_SELECTED_FONTS
+{
+    return PFCreateTransferFormat(ConstructOptr(@Dup(@PFAvailableFonts)),
+				  TRUE);
+}
+
+/***********************************************************************
+ *		MSG_PFD_GET_FONT for PFDialogClass
+ ***********************************************************************
+ * SYNOPSIS:	    Fetch the description of a font given its index in
+ *		    our font block
+ * PARAMETERS:	    Boolean (word index, FontEnumStruct *fesp)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDialogClass, MSG_PFD_GET_FONT
+{
+    if (index < pself->PFDI_nFonts) {
+	FontEnumStruct  *fonts = MemLock(pself->PFDI_fonts);
+
+	*fesp = fonts[index];
+
+	MemUnlock(pself->PFDI_fonts);
+	return(TRUE);
+    } else {
+	return(FALSE);
+    }
+}
+
+/***********************************************************************
+ *		MSG_META_GET_INI_CATEGORY for PFDialogClass
+ ***********************************************************************
+ * SYNOPSIS:	    Fetch the category under which to save or from which
+ *		    to fetch options.
+ * PARAMETERS:	    void (char *buf)
+ * SIDE EFFECTS:    buffer is overwritten
+ *
+ * STRATEGY:	    use the category for the current application, as
+ *		    stored in our instance data.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDialogClass, MSG_META_GET_INI_CATEGORY
+{
+    strcpy(buf, pself->PFDI_category);
+}
+
+
+/***********************************************************************
+ *		MSG_PFD_APPLICATION_CHOSEN for PFDialogClass
+ ***********************************************************************
+ * SYNOPSIS:	    Take note that the user has chosen an application and
+ *		    figure its ini category, etc.
+ * PARAMETERS:	    void (optr trigger)
+ * SIDE EFFECTS:    PFDI_appName and PFDI_category are changed.
+ *   	    	    various things redraw
+ *		    options reload
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/14/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDialogClass, MSG_PFD_APPLICATION_CHOSEN
+{
+    /*
+     * See if the System Default item has been selected.
+     */
+    if (@call @Dup(@PFSASystem)::MSG_GEN_ITEM_GROUP_GET_SELECTION() != GIGS_NONE)
+    {
+	/*
+	 * It has. Just update our category, free the old app name, if it's
+	 * not the system, and set the app name to be the system.
+	 */
+	pself = ObjDerefPref(oself);
+	if (pself->PFDI_appName != ChunkOf(@PFSystemName)) {
+	    LMemFreeHandles(HandleOf(oself),pself->PFDI_appName);
+	    pself->PFDI_appName = ChunkOf(@PFSystemName);
+	}
+	
+	strcpy(pself->PFDI_category, "system");
+    } else {
+	/*
+	 * Not system default. Use IACP to ask the chosen application what its
+	 * init file category is.
+	 */
+	dword	    	flagsAndDisk;	/* entry flags + disk handle returned
+					 * by file selector */
+	PathName    	pathname;   	/* Buffer for fetching the complete
+					 * path of the application from the
+					 * file selector */
+	DiskHandle  	disk;	    	/* Disk on which it resides */
+	GeodeToken  	token;	    	/* Token for the application, so we
+					 * can connect to it */
+	TCHAR	    	*cp;	    	/* Utility pointer */
+	int 	    	nameLen;    	/* Length of application name */
+	ChunkHandle 	nameChunk;   	/* Place to which tail of application's
+					 * path is copied */
+	TCHAR	    	*appName;   	/* Dereferenced form of same */
+	GeodeToken  	us; 	    	/* For figuring if we (preferences)
+					 * have been selected. */
+
+	/*
+	 * Ask the file selector for the full path of the selected application.
+	 */
+	flagsAndDisk = @call @Dup(@PFSASelector)::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pathname);
+
+	if (flagsAndDisk & GFSEF_NO_ENTRIES) {
+	    /*
+	     * Nothing actually selected.
+	     */
+	    return;
+	} else if (GFS_GET_ENTRY_TYPE(flagsAndDisk) != GFSET_FILE) {
+	    /*
+	     * Not a file.
+	     */
+	    return;
+	}
+
+	/*
+	 * Extract the disk handle from there...
+	 */
+	disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(flagsAndDisk);
+
+	/*
+	 * Get the application's token so we can connect to it.
+	 */
+	FilePushDir();
+	if ((FileSetCurrentPath(disk, _TEXT("\\")) == 0) ||
+	    FileGetPathExtAttributes(pathname, FEA_TOKEN, &token,
+				     sizeof(token)) != 0)
+	{
+	    FilePopDir();
+	    return;
+	}
+
+	FilePopDir();
+
+	/*
+	 * If the app selected is our process, don't do the IACP thing, as
+	 * that'll cause us to deadlock. Just call the application directly.
+	 */
+	GeodeGetInfo(0, GGIT_TOKEN_ID, &us);
+#ifdef DO_DBCS
+	if ((us.GT_manufID == token.GT_manufID) &&
+	    (us.GT_chars[0] == token.GT_chars[0]) &&
+	    (us.GT_chars[1] == token.GT_chars[1]) &&
+	    (us.GT_chars[2] == token.GT_chars[2]) &&
+	    (us.GT_chars[3] == token.GT_chars[3]))
+#else
+	if ((us.GT_manufID == token.GT_manufID) &&
+	    (strncmp(us.GT_chars,token.GT_chars, sizeof(us.GT_chars)) == 0))
+#endif
+	{
+	    @call application::MSG_META_GET_INI_CATEGORY(pself->PFDI_category);
+	} else {
+	    /*
+	     * Not us, so use IACP to get the category.
+	     */
+	    QueueHandle 	queue;	    	/* Unattached queue to receive
+						 * the completion message that
+						 * tells us the category is in
+						 * our instance data */
+	    IACPConnection	connection; 	/* IACP connection through which
+						 * we ask the server */
+	    MemHandle   	albh;	    	/* Handle of AppLaunchBlock used
+						 * in the IACPConnect call */
+	    AppLaunchBlock	*alb;	    	/* Locked version of same */
+	    word	    	numServers; 	/* Number of servers to which we
+						 * connected (s/b one, always)
+						 */
+	    EventHandle 	msg, compMsg;	/* Recorded messages sent via
+						 * IACP */
+	    /*
+	     * Create an AppLaunchBlock in case the app isn't running, open in
+	     * engine mode, with the path to the application set in the ALB
+	     * so IACP doesn't have to hunt for it.
+	     */
+	    albh = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_ENGINE);
+	    if (albh == 0) {
+		return;
+	    }
+	    
+	    alb = MemLock(albh);
+	    strcpy(alb->ALB_appRef.AIR_fileName, pathname);
+	    alb->ALB_appRef.AIR_diskHandle = disk;
+	    MemUnlock(albh);
+	    
+	    /*
+	     * Connect to the application.
+	     */
+	    connection =
+		IACPConnect(&token,
+			    IACPCF_FIRST_ONLY | IACPSM_NOT_USER_INTERACTIBLE,
+			    albh,
+			    0,
+			    &numServers);
+	    
+	    if (connection == IACP_NO_CONNECTION) {
+		return;
+	    }
+	    
+	    /*
+	     * Allocate an unattached event queue to receive the completion
+	     * message. In a normal IACP conversation, we'd return from here and
+	     * wait for the results to come back, but we have to keep the buffer
+	     * (our instance variable) locked, so we have to wait for the
+	     * results right here. This queue helps us do it.
+	     */
+	    queue = GeodeAllocQueue();
+	    
+	    /*
+	     * Record a message to the app's GenApplication object to store its
+	     * init file category in our instance data.
+	     */
+	    msg = @record (optr)&GenApplicationClass::MSG_META_GET_INI_CATEGORY(pself->PFDI_category);
+	    /*
+	     * Record a completion message to go to our unattached queue. The
+	     * message itself doesn't matter; just its receipt.
+	     */
+	    compMsg = @record queue,0::MSG_META_NULL();
+	    
+	    /*
+	     * Send the message to the application.
+	     */
+	    if (IACPSendMessage(connection, msg, TO_SELF, compMsg,
+				IACPS_CLIENT) == 0)
+	    {
+		/*
+		 * Server exited?!
+		 */
+		IACPShutdown(connection, 0);
+		GeodeFreeQueue(queue);
+		return;
+	    }
+	    
+	    /*
+	     * Wait until the completion message arrives at our queue, then biff
+	     * both it and the queue.
+	     */
+	    msg = QueueGetMessage(queue);
+	    ObjFreeMessage(msg);
+	    GeodeFreeQueue(queue);
+	    
+	    /*
+	     * No further need for the server, so shut it down.
+	     */
+	    IACPShutdown(connection, 0);
+	}
+
+	/*
+	 * Find the last part of the pathname.
+	 */
+	cp = strrchr(pathname, _TEXT('\\'));
+	if (cp++ == 0) {
+	    cp = pathname;
+	}
+	nameLen = strlen(cp);
+
+	/*
+	 * Allocate a chunk to hold it.
+	 */
+	nameChunk = LMemAlloc(HandleOf(oself), (nameLen+1)*(sizeof(TCHAR)));
+	appName = LMemDerefHandles(HandleOf(oself), nameChunk);
+	strcpy(appName, cp);
+
+	/*
+	 * Free the previous appName chunk, if it's not the system default one.
+	 */
+	pself = ObjDerefPref(oself);
+	if (pself->PFDI_appName != ChunkOf(@PFSystemName)) {
+	    LMemFreeHandles(HandleOf(oself), pself->PFDI_appName);
+	}
+	
+	pself->PFDI_appName = nameChunk;
+
+    }
+    /*
+     * Call ourselves to reload options with the new category, then update our
+     * feedback text to reflect the changes.
+     */
+    @call self::MSG_META_LOAD_OPTIONS();
+    @call self::MSG_PFD_SET_FEEDBACK_TEXT();
+}
+
+
+/***********************************************************************
+ *		MSG_PFD_FIND_FONT_BY_NAME for PFDialogClass
+ ***********************************************************************
+ * SYNOPSIS:	    Locate the closest font to the passed prefix
+ * PARAMETERS:	    Boolean (const char *prefix, 
+ *			     Boolean ignoreCase,
+ *			     word *indexPtr)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/25/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDialogClass, MSG_PFD_FIND_FONT_BY_NAME
+{
+    unsigned len = strlen(prefix);
+    const FontEnumStruct *fesp;
+    int		    	i;
+
+    /*
+     * If no font block, return false and an index of 0 (?)
+     */
+    if (pself->PFDI_fonts == 0) {
+	*indexPtr = 0;
+	return(FALSE);
+    }
+    /*
+     * The block is sorted, so look for the first entry whose first
+     * strlen(prefix) chars match the prefix exactly (absent case, if
+     * ignoreCase is true), or follow the prefix, lexicographically.
+     */
+    fesp = (const FontEnumStruct *)MemLock(pself->PFDI_fonts);
+    for (i = pself->PFDI_nFonts; i > 0; i--, fesp++) {
+	switch(ignoreCase ?
+	       LocalCmpStringsNoCase(fesp->FES_name, prefix, len) :
+	       LocalCmpStrings(fesp->FES_name, prefix, len))
+	{
+	case -1:
+	    /*
+	     * Font comes before the prefix, so keep searching.
+	     */
+	    break;
+	case 0:
+	    /*
+	     * Found a match, return true and the index.
+	     */
+	    *indexPtr = pself->PFDI_nFonts - i;
+	    MemUnlock(pself->PFDI_fonts);
+	    return(TRUE);
+	case 1:
+	    /*
+	     * Gone beyond where it could be, so return false and the index.
+	     */
+	    *indexPtr = pself->PFDI_nFonts - i;
+	    MemUnlock(pself->PFDI_fonts);
+	    return(FALSE);
+	}
+    }
+    /*
+     * Couldn't find it, so return false and the index of the last font
+     * in the list.
+     */
+    *indexPtr = pself->PFDI_nFonts-1;
+    MemUnlock(pself->PFDI_fonts);
+    return(FALSE);
+}
+
+
+/*****************************************************************************
+ *
+ *			   PFItemGroupClass
+ *
+ *****************************************************************************/
+
+
+/***********************************************************************
+ *		MSG_PFIG_ENSURE_DELETE_TRIGGER_ENABLED for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Make sure our delete trigger is enabled so the user
+ *	    	    can drop the font(s) being transferred on it to
+ *		    delete them.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    delete trigger is enabled. Proper state can be restored
+ *		    by sending a MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG to
+ *		    the item group.
+ *
+ * STRATEGY:	    none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/25/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_PFIG_ENSURE_DELETE_TRIGGER_ENABLED
+{
+    @call @Dup(pself->PFIGI_deleteTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+}
+
+/***********************************************************************
+ *				PFIGCheckFontInListCallback
+ ***********************************************************************
+ * SYNOPSIS:	    Callback function to figure if a font is already in
+ *	    	    this list.
+ * CALLED BY:	    PFItemGroup::PFIG_CHECK_FONT_IN_LIST via
+ *		    	ObjCompProcessChildren
+ * RETURN:	    TRUE if the selected font is this child's font
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+static Boolean _pascal
+PFIGCheckFontInListCallback(optr  	itemGroup,
+			      optr  	item,
+			      void  	*cbData)    /* Addr of fid */
+{
+    PFItemInstance  *itemInst = ObjDerefGen(item);
+
+    return (itemInst->PFII_font.FES_ID == *(FontID *)cbData);
+}
+
+/***********************************************************************
+ *		MSG_PFIG_CHECK_FONT_IN_LIST for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    See if the passed font ID belongs to one of our
+ *		    children.
+ * PARAMETERS:	    Boolean (FontID fid)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_PFIG_CHECK_FONT_IN_LIST
+{
+    return ((fid != FID_INVALID) &&
+	    ObjCompProcessChildren(oself, 0, 0, &fid,
+				   offsetof(GenBase, Gen_offset),
+				   offsetof(GenInstance, GI_comp),
+				   offsetof(GenInstance, GI_link),
+				   PFIGCheckFontInListCallback));
+}
+
+
+/***********************************************************************
+ *		MSG_PFIG_AVAIL_FONT_SELECTED for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Enable or disable the Add trigger for this thing
+ *		    based on whether it already has the passed font ID
+ *		    as one of its elements.
+ * PARAMETERS:	    void (MemHandle fonts)
+ * SIDE EFFECTS:    PFIGI_addTrigger may be disabled or enabled
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_PFIG_AVAIL_FONT_SELECTED
+{
+    Message msg = MSG_GEN_SET_NOT_ENABLED;
+
+    if (fonts != 0) {
+	FontTransferBlock   *ftbp;
+	int 	    	    i;
+	FontEnumStruct	    *fesp;
+
+	ftbp = MemLock(fonts);
+	for (i = ftbp->FTB_numFonts, fesp = ftbp->FTB_fonts;
+	     i > 0;
+	     i--, fesp++)
+	{
+	    if (!@call self::MSG_PFIG_CHECK_FONT_IN_LIST(fesp->FES_ID)) {
+		/*
+		 * Font ID doesn't belong to one of our kids, so enable the
+		 * trigger.
+		 */
+		msg = MSG_GEN_SET_ENABLED;
+		break;
+	    }
+	}
+	MemUnlock(fonts);
+    }
+    
+    /*
+     * Now we know what message to send, send it.
+     */
+    @call {MSG_GEN_SET_ENABLED}@Dup(pself->PFIGI_addTrigger)::msg(VUM_NOW);
+}
+
+
+/***********************************************************************
+ *		MSG_PFIG_ADD_SELECTION for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Add the selected font in the list of available
+ *		    fonts to the end of our list.
+ * PARAMETERS:	    void (optr trigger)
+ * SIDE EFFECTS:    a new PFItem object is instantiated and given
+ *		    the ID and name of the selected font.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_PFIG_ADD_SELECTION
+{
+    MemHandle	    	fonts;
+    FontTransferBlock	*ftbp;
+    int	    	    	i;
+    FontEnumStruct  	*fesp;
+
+    fonts = @call @Dup(@PFRoot)::MSG_PFD_GET_SELECTED_FONTS();
+
+    ftbp = MemLock(fonts);
+
+    for (i = ftbp->FTB_numFonts, fesp = ftbp->FTB_fonts;
+	 i > 0;
+	 i--, fesp++)
+    {
+	if (!@call self::MSG_PFIG_CHECK_FONT_IN_LIST(fesp->FES_ID)) {
+	    optr    	    child;
+	    
+	    child = @call self::MSG_PFIG_CREATE_CHILD(fesp);
+
+	    /*
+	     * Set it usable.
+	     */
+	    @call child::MSG_GEN_SET_USABLE(VUM_NOW);
+	}
+    }
+
+    MemFree(fonts);
+    
+    @call self::MSG_GEN_MAKE_APPLYABLE();
+
+    /*
+     * Disable our Add trigger so it doesn't happen again for this font.
+     */
+    pself = ObjDerefPref(oself);
+    @call @Dup(pself->PFIGI_addTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+
+/***********************************************************************
+ *		MSG_PFIG_CREATE_CHILD for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create a new child for ourselves.
+ * PARAMETERS:	    optr (const FontEnumStruct *fesp);
+ * SIDE EFFECTS:    child is created, added at the end, and set usable
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_PFIG_CREATE_CHILD
+{
+    optr    child;
+    word    numKids;
+    
+    /*
+     * Create an item for the font.
+     */
+    child = ObjInstantiate(HandleOf(oself), &PFItemClass);
+    @call child::MSG_PFI_SET_FONT(fesp);
+
+    /*
+     * Add it as our last child, but one (want the Drop New Font Here entry
+     * always at the end).
+     */
+    numKids = @call oself::MSG_GEN_COUNT_CHILDREN();
+    @call oself::MSG_GEN_ADD_CHILD(child, (numKids-1)|CCF_MARK_DIRTY);
+
+    return (child);
+}
+
+
+/***********************************************************************
+ *		MSG_PFIG_DELETE_SELECTION for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Delete the font selected within this here list
+ * PARAMETERS:	    void (optr trigger)
+ * SIDE EFFECTS:    the list is set to have no selection
+ *	    	    the delete trigger is disabled
+ *	    	    the add trigger is enabled if the selected font here
+ *		    is also the selected font in the list of available
+ *		    fonts.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_PFIG_DELETE_SELECTION
+{
+    optr    	    child;
+    word    	    numFonts;
+    word    	    *selections;
+    int	    	    i;
+
+    numFonts = @call self::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+
+    if (numFonts != 0) {
+	selections = (word *)malloc(numFonts * sizeof(word));
+	(void)@call self::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(selections,
+								     numFonts);
+
+	/*
+	 * Set nothing as selected before we biff anything, just in case.
+	 */
+	@call oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+	for (i = 0; i < numFonts; i++) {
+	    if (selections[i] != FID_INVALID) {
+		/*
+		 * There actually is a selection. Find the item and biff it.
+		 */
+		child = @call oself::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(selections[i]);
+
+		/*
+		 * Destroy the child.
+		 */
+		@call child::MSG_GEN_DESTROY(VUM_NOW, CCF_MARK_DIRTY);
+	    }
+	}
+
+	free(selections);
+
+	/*
+	 * Get the dynamic list to send out its status again, so we can
+	 * enable our Add trigger if we just deleted one of the fonts selected
+	 * in the list of available fonts.
+	 */
+	@call @Dup(@PFAvailableFonts)::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(0);
+    }
+
+    /*
+     * Disable the delete trigger, as there's nothing to delete, ya know.
+     */
+    pself = ObjDerefPref(oself);
+    @call @Dup(pself->PFIGI_deleteTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call self::MSG_GEN_MAKE_APPLYABLE();
+}
+
+/***********************************************************************
+ *		MSG_GEN_SAVE_OPTIONS for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Save out our current list of font IDs to the ini file.
+ * PARAMETERS:	    void (GenOptionsParams *params)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_GEN_SAVE_OPTIONS
+{
+    ChunkHandle	str = LMemAlloc(HandleOf(oself), 1*(sizeof(TCHAR)));
+    optr    	ostr;
+
+    ostr = ConstructOptr(HandleOf(oself), str);
+    *(TCHAR *)LMemDeref(ostr) = _TEXT('\0');
+
+    /*
+     * Now ask all the children to append their font IDs to the string.
+     */
+    @send @genChildren::MSG_PFI_APPEND_ID(ostr);
+
+    /*
+     * Write it out to the ini file or delete the thing if there are no
+     * fonts in the list.
+     */
+    if (LMemGetChunkSize(ostr) == 1) {
+	InitFileDeleteEntry(params->GOP_category,
+			    params->GOP_key);
+    } else {
+	InitFileWriteString(params->GOP_category,
+			    params->GOP_key,
+			    (char *)LMemDeref(ostr));
+    }
+
+    LMemFree(ostr);
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_LOAD_OPTIONS for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Prime our list with the fonts stored in the ini
+ *		    file.
+ * PARAMETERS:	    void (GenOptionsParams *params)
+ * SIDE EFFECTS:    all previous children are destroyed and new ones
+ *		    created.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_GEN_LOAD_OPTIONS
+{
+    MemHandle	str;
+    word    	length;
+    
+    /*
+     * Nuke all the children we have currently.
+     */
+    @send @genChildren::MSG_GEN_DESTROY(VUM_NOW, CCF_MARK_DIRTY);
+
+    if (!InitFileReadStringBlock(params->GOP_category,
+				 params->GOP_key,
+				 &str,
+				 (IFCC_UPCASE << IFRF_CHAR_CONVERT_OFFSET),
+				 &length))
+    {
+	if (!(length & 3)) {
+	    /*
+	     * Got some valid data. Parse the thing into font IDs, four hex
+	     * digits at a time.
+	     */
+	    FontEnumStruct	fes;
+	    TCHAR	*cp;
+	    int 	i;
+
+	    cp = MemLock(str);
+	    for (i = length/4; i > 0; i--, cp += 4) {
+#define cvtdigit(c) (((c) >= _TEXT('A')) ? (c) - _TEXT('A') + 10 : (c) - _TEXT('0'))
+		fes.FES_ID = ((cvtdigit(cp[0]) << 12) |
+			      (cvtdigit(cp[1]) << 8) |
+			      (cvtdigit(cp[2]) << 4) |
+			      cvtdigit(cp[3]));
+		if (GrGetFontName(fes.FES_ID, fes.FES_name) != 0) {
+		    optr child = @call self::MSG_PFIG_CREATE_CHILD(&fes);
+		    @call child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+		}
+	    }
+	}
+	MemFree(str);
+    }
+}
+
+/***********************************************************************
+ *		MSG_GEN_RESET for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Just reload the options for the list.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    all kids are destroyed and recreated
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/12/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_GEN_RESET
+{
+    @call self::MSG_META_LOAD_OPTIONS();
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Update the state of the Delete trigger for the
+ *		    group when the selection changes.
+ * PARAMETERS:	    void (Boolean modifiedState)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG
+{
+    Message 	msg;
+    
+    @callsuper();
+
+    switch (@call self::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS()) {
+    case 0:
+	msg = MSG_GEN_SET_NOT_ENABLED;
+	break;
+    case 1:
+	if (@call self::MSG_GEN_ITEM_GROUP_GET_SELECTION() == FID_INVALID) {
+	    msg = MSG_GEN_SET_NOT_ENABLED;
+	    break;
+	}
+	/*FALLTHRU*/
+    default:
+	msg = MSG_GEN_SET_ENABLED;
+	break;
+    }
+    /*
+     * Now we know what message to send, send it.
+     */
+    @call {MSG_GEN_SET_ENABLED}@Dup(pself->PFIGI_deleteTrigger)::msg(VUM_NOW);
+}
+
+
+/***********************************************************************
+ *				PFIGCheckPastable
+ ***********************************************************************
+ * SYNOPSIS:	    See if the current quick transfer item is something
+ *	    	    we can handle.
+ * CALLED BY:	    PFItemGroup::META_PTR,
+ *		    PFItemGroup::PFIG_CHILD_DUMPED_ON
+ * RETURN:	    ClipboardQuickTransferFeedback, plus *fontsp filled in
+ *		        if item is supported; caller must free the block
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+static ClipboardQuickTransferFeedback _pascal
+PFIGCheckPastable(optr 	    	    oself,
+		  MemHandle    	    *fontsp)
+{
+    ClipboardQueryArgs  cqa;
+    ClipboardQuickTransferFeedback  result;
+
+    ClipboardQueryItem(CIF_QUICK, &cqa);
+
+    if (ClipboardTestItemFormat(cqa.CQA_header, CIF_FONT_ID)) {
+	/*
+	 * Well, the transfer item is one of ours, so see if we've already
+	 * got the item in our list and refuse it if so.
+	 */
+	ClipboardItemHeader	    *cihp;
+	MemHandle	    	    cihMem;
+	ClipboardRequestArgs        cra;
+	FontTransferBlock   	    *ftbp;
+
+	
+
+	/*
+	 * Lock down the header block so we can check the source.
+	 */
+	cihp = VMLock(FileFromTransferBlockID(cqa.CQA_header),
+		      BlockFromTransferBlockID(cqa.CQA_header),
+		      &cihMem);
+
+	/*
+	 * Lock down the transfer format, so we can get the font ID
+	 */
+	ClipboardRequestItemFormat(CIF_FONT_ID, cqa.CQA_header, &cra);
+	*fontsp = VMDetach(cra.CRA_file,
+			   VMCHAIN_GET_VM_BLOCK(cra.CRA_data),
+			   0);
+	ftbp = MemLock(*fontsp);
+
+	if (cihp->CIH_sourceID == oself) {
+	    /*
+	     * We are the source, so it's always a move.
+	     */
+	    result = CQTF_MOVE;
+	} else {
+	    /*
+	     * Refuse to accept the transfer if it's for a font we already
+	     * have in our list.
+	     */
+	    int	    	    i;
+	    FontEnumStruct  *fesp;
+
+	    result = CQTF_CLEAR; /* Assume we've got them all */
+	    for (i = ftbp->FTB_numFonts, fesp = ftbp->FTB_fonts;
+		 i > 0;
+		 i--, fesp++)
+	    {
+		if (!@call self::MSG_PFIG_CHECK_FONT_IN_LIST(fesp->FES_ID))
+		{
+		    /*
+		     * Found one we don't have, so signal copy.
+		     */
+		    result = CQTF_COPY;
+		}
+	    }
+	}
+	MemUnlock(*fontsp);
+	if (result == CQTF_CLEAR) {
+	    MemFree(*fontsp);
+	    *fontsp = 0;
+	}
+	VMUnlock(cihMem);
+    } else {
+	/*
+	 * Not our format...
+	 */
+	result = CQTF_CLEAR;
+	*fontsp = 0;
+    }
+    ClipboardDoneWithItem(cqa.CQA_header);
+
+    return(result);
+}
+
+/***********************************************************************
+ *				PFIGEndQT
+ ***********************************************************************
+ * SYNOPSIS:	    Do what's necessary to stop receiving quick-transfer
+ *		    stuff.
+ * CALLED BY:	    PFItemGroup::META_PTR,
+ *		    PFItemGroup::META_END_MOVE_COPY
+ * RETURN:	    nothing
+ * SIDE EFFECTS:    mouse & gadget excl released
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+PFIGEndQT(optr oself)
+{
+    PFItemGroupInstance	*pself = ObjDerefPref(oself);
+
+    pself->PFIGI_doingQT = FALSE;
+    @call oself::MSG_VIS_RELEASE_MOUSE();
+    @call oself::MSG_META_RELEASE_TARGET_EXCL();
+}
+
+
+/***********************************************************************
+ *		MSG_META_PTR for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Provide quick-transfer feedback, if necessary.
+ * PARAMETERS:	    void (MouseReturnFlags *retVal,
+ *			  sword xPosition,
+ *			  sword yPosition,
+ *			  word inputState)
+ * SIDE EFFECTS:    mouse cursor changed to reflect whether we can accept
+ *		    the transfer.
+ *
+ * STRATEGY:	    If the inputState indicates the user is performing
+ *		    quick-transfer and we need to see (and tell others)
+ *		    whether we're willing to accept the current quick
+ *		    transfer item.
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/92		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_META_PTR
+{
+    /*
+     * Check if doing quick-transfer. If not, there's nothing else we have
+     * to do.
+     */
+    if ((GET_UI_FUNCTIONS_ACTIVE(inputState) & UIFA_MOVE_COPY) &&
+	ClipboardGetQuickTransferStatus())
+    {
+	MemHandle	fonts;
+
+	if (pself->PFIGI_doingQT) {
+	    /*
+	     * Feedback already set properly. Just make sure the mouse hasn't
+	     * wandered outside our bounds (of course, since we're a scrolling
+	     * list, we won't ever actually get an event like this; we'll get
+	     * the MSG_META_CONTENT_LEAVE instead, but we like to be thorough)
+	     */
+	    Rectangle	bounds;
+
+	    @call self::MSG_VIS_GET_BOUNDS(&bounds);
+	    if ((xPosition >= bounds.R_right) ||
+		(xPosition < bounds.R_left) ||
+		(yPosition >= bounds.R_bottom) ||
+		(yPosition < bounds.R_top))
+	    {
+		/*
+		 * Clear the feedback, release the mouse, and tell the
+		 * system to find someone else to send the event to, based
+		 * on its position this time, not the mouse grab.
+		 */
+		PFIGEndQT(oself);
+		ClipboardSetQuickTransferFeedback(CQTF_CLEAR, inputState);
+		retVal->flags = MRF_REPLAY;
+	    } else {
+		/*
+		 * Things haven't changed, so why go through all the work
+		 * again?
+		 */
+		retVal->flags = MRF_PROCESSED;	/* this event processed */
+	    }
+	} else {
+	    /*
+	     * Grab the target exclusive, so we get MSG_META_CONTENT_LEAVE
+	     * when the mouse leaves our bounds (when we're scrollable), and
+	     * the mouse, so we get MSG_META_END_MOVE_COPY and find out when
+	     * the mouse leaves our bounds (when we're not scrollable).
+	     *
+	     * In theory, we ought to grab the gadget exclusive and release
+	     * the mouse on LOST_GADGET, but that causes really weird
+	     * behaviour, so we don't do it.
+	     */
+	    @call self::MSG_META_GRAB_TARGET_EXCL();
+	    @call self::MSG_VIS_GRAB_MOUSE();
+	    pself = ObjDerefPref(oself);
+	    pself->PFIGI_doingQT = TRUE;
+	    ClipboardSetQuickTransferFeedback(PFIGCheckPastable(oself, &fonts),
+					      inputState);
+	    if (fonts) {
+		MemFree(fonts);
+	    }
+	    retVal->flags = MRF_PROCESSED;
+	}
+    } else {
+	/*
+	 * Not doing quick-transfer, so let our superclass handle it.
+	 */
+	@callsuper();
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_META_CONTENT_LEAVE for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    If doing quick-transfer feedback, stop it.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    PFIGI_doingQT will be cleared and the mouse released
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/12/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_META_CONTENT_LEAVE
+{
+    if (pself->PFIGI_doingQT) {
+	PFIGEndQT(oself);
+    }
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *		MSG_PFIG_CHILD_DUMPED_ON for PFItemGroupClass
+ ***********************************************************************
+ * SYNOPSIS:	    Take care of a quick transfer ending up on one of
+ *	    	    our children.
+ * PARAMETERS:	    void (optr child, sword xPosition,
+ *			  sword yPosition, word inputState)
+ * SIDE EFFECTS:    the quick-transfer is ended; the child may be moved.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemGroupClass, MSG_PFIG_CHILD_DUMPED_ON
+{
+    MemHandle	    	fonts;
+    int	    	    	i;
+    FontEnumStruct  	*fesp;
+    FontTransferBlock	*ftbp;
+
+    /*
+     * Stop any quick-transfer feedback
+     */
+    PFIGEndQT(oself);
+
+    /*
+     * Now figure out what to do about it.
+     */
+    switch (PFIGCheckPastable(oself, &fonts)) {
+    case CQTF_COPY:
+    {
+	/*
+	 * Create a new entry for the thing and then move it into position.
+	 */
+	optr	new;
+	word	destPos;
+	
+	destPos = @call self::MSG_GEN_FIND_CHILD(child);
+
+	ftbp = MemLock(fonts);
+	for (i = ftbp->FTB_numFonts, fesp = ftbp->FTB_fonts;
+	     i > 0;
+	     i--, fesp++)
+	{
+	    if (!@call self::MSG_PFIG_CHECK_FONT_IN_LIST(fesp->FES_ID)) {
+		new = @call self::MSG_PFIG_CREATE_CHILD(fesp);
+		/*
+		 * Don't actually want it as a child, yet...
+		 */
+		@call self::MSG_GEN_REMOVE_CHILD(new, CCF_MARK_DIRTY);
+		/*
+		 * Add the thing before the child on which it was dropped.
+		 */
+		@call self::MSG_GEN_ADD_CHILD(new, CCF_MARK_DIRTY | destPos);
+		/*
+		 * Finally, bring the thing up on-screen.
+		 */
+		@call new::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		destPos += 1;
+	    }
+	}
+
+	MemFree(fonts);
+
+	/*
+	 * Let the source item know it's been cloned.
+	 */
+	ClipboardEndQuickTransfer(CQNF_COPY);
+
+	@call self::MSG_GEN_MAKE_APPLYABLE();
+
+	/*
+	 * Get the dynamic list to send out its status again, so we can
+	 * disable our Add trigger if the person just pasted the selected
+	 * font into us.
+	 */
+	@call @Dup(@PFAvailableFonts)::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(0);
+	break;
+    }
+    case CQTF_MOVE:
+    {
+	/*
+	 * Rearranging things, so no need to create anything; just move
+	 *
+	 * MSG_GEN_MOVE_CHILD seems inherently problematic, since the
+	 * child number must be based on *after* the child you're moving
+	 * has been removed, so we just remove the thing, figure the
+	 * position, and add it back in.
+	 */
+	optr	src;
+
+	ftbp = MemLock(fonts);
+	for (i = ftbp->FTB_numFonts, fesp = ftbp->FTB_fonts;
+	     i > 0;
+	     i--, fesp++)
+	{
+	    src = @call self::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(fesp->FES_ID);
+	    if (src != child) {
+		word    destPos;
+
+		/*
+		 * Take the source item from the list so we can accurately
+		 * figure its new position.
+		 */
+		@call src::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		@call self::MSG_GEN_REMOVE_CHILD(src, CCF_MARK_DIRTY);
+	    
+		/*
+		 * Figure the position of its destination.
+		 */
+		destPos = @call self::MSG_GEN_FIND_CHILD(child);
+	    
+		/*
+		 * Add the source in that position, shuffling the destination
+		 * down one.
+		 */
+		@call self::MSG_GEN_ADD_CHILD(src, CCF_MARK_DIRTY | destPos);
+		@call src::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	    }
+	}
+
+	MemFree(fonts);
+	/*
+	 * End the quick transfer, letting the source know it need do
+	 * nothing, as its parent took care of everything.
+	 */
+	ClipboardEndQuickTransfer(CQNF_MOVE | CQNF_SOURCE_EQUAL_DEST);
+
+	@call self::MSG_GEN_MAKE_APPLYABLE();
+	break;
+    }
+    case CQTF_CLEAR:
+	/*
+	 * Couldn't paste it, so just end the transfer saying we did nothing.
+	 */
+	ClipboardEndQuickTransfer(CQNF_NO_OPERATION);
+	break;
+    }
+}
+
+/*****************************************************************************
+ *
+ *			     PFItemClass
+ *
+ *****************************************************************************/
+
+/***********************************************************************
+ *		MSG_GEN_DESTROY for PFItemClass
+ ***********************************************************************
+ * SYNOPSIS:	    Ignore this message if we're a PFII_noTransfer thing
+ * PARAMETERS:	    void (VisUpdateMode updateMode, word flags)
+ * SIDE EFFECTS:    none here
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/15/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemClass, MSG_GEN_DESTROY
+{
+    if (!pself->PFII_noTransfer) {
+	@callsuper();
+    }
+}
+
+/***********************************************************************
+ *		MSG_PFI_SET_FONT for PFItemClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set the font info recorded for this item, as well
+ *	    	    as this item's moniker.
+ * PARAMETERS:	    void (const FontEnumStruct *fesp)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemClass, MSG_PFI_SET_FONT
+{
+    /*
+     * Remember the info...
+     */
+    pself->PFII_font = *fesp;
+    /*
+     * And use the passed name to create a moniker for ourselves.
+     */
+    @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fesp->FES_name, VUM_NOW);
+
+    /*
+     * Set our identifier to be the font ID.
+     */
+    @call oself::MSG_GEN_ITEM_SET_IDENTIFIER(fesp->FES_ID);
+}
+
+/***********************************************************************
+ *		MSG_PFI_GET_FONT for PFItemClass
+ ***********************************************************************
+ * SYNOPSIS:	    Fetch the font being displayed by this item.
+ * PARAMETERS:	    void (FontEnumStruct *fesp)
+ * SIDE EFFECTS:    *fesp is overwritten.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemClass, MSG_PFI_GET_FONT
+{
+    *fesp = pself->PFII_font;
+}
+
+
+/***********************************************************************
+ *		MSG_PFI_APPEND_ID for PFItemClass
+ ***********************************************************************
+ * SYNOPSIS:	    Append the ID for this font to the chunk passed
+ * PARAMETERS:	    void (optr str)
+ * SIDE EFFECTS:    the chunk is enlarged.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemClass, MSG_PFI_APPEND_ID
+{
+    FontID  fid = pself->PFII_font.FES_ID;
+    word    offset = LMemGetChunkSize(str)-(1*(sizeof(TCHAR)));
+
+    if (fid != FID_INVALID) {
+	/*
+	 * Make room for the 4-digit number at the end of the string, before the
+	 * null byte that must be there.
+	 */
+	LMemInsertAt(str, offset, 4*sizeof(TCHAR));
+
+	/*
+	 * Format the number appropriately.
+	 */
+	sprintf((char *)LMemDeref(str)+offset, _TEXT("%04x"), fid);
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_META_START_MOVE_COPY for PFItemClass
+ ***********************************************************************
+ * SYNOPSIS:	    If we know what font we're displaying, place it on
+ *	    	    the clipboard for quick-transfer, etc.
+ * PARAMETERS:	    void (MouseReturnFlags *retVal,
+ *			  sword xPosition,
+ *			  sword yPosition,
+ *			  word inputState)
+ * SIDE EFFECTS:    The CIF_QUICK transfer item is replaced with our
+ *		    font, if we have one.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemClass, MSG_META_START_MOVE_COPY
+{
+    GStateHandle 	pathgs;	    /* GState for creating path of the
+				     * font name */
+    MemHandle   	region;	    /* Block holding font name converted to
+				     * region, with bounds at the front */
+    ClipboardQuickTransferRegionInfo regionInfo;
+    	    	    	    	    /* Info about the region for the quick-
+				     * transfer code */
+    GStateHandle	gs; 	    /* GState for transforming the mouse
+				     * coordinates to screen coordinates */
+    XYValueAsDWord	mousePos;   /* Transformed mouse coordinates */
+    Rectangle   	*boundsp;   /* Pointer to bounds of region, so we
+				     * can center the thing on the cursor
+				     * hot spot */
+    MemHandle	    	fonts;	    /* Memory handle of FontTransferBlock */
+    FontTransferBlock	*ftbp;	    /* The transfer format */
+    
+    /*
+     * If not transferrable, don't transfer it.
+     */
+    if (pself->PFII_noTransfer) {
+	retVal->flags = 0;
+	return;
+    }
+    
+    /*
+     * Set up the path for the transfer region.
+     */
+    pathgs = GrCreateState(0);
+#ifdef DO_PIZZA
+    GrSetFont(pathgs, FID_BITSTREAM_KANJI_SQUARE_GOTHIC, MakeWWFixed(18.0));
+#else
+    GrSetFont(pathgs, FID_DTC_URW_SANS, MakeWWFixed(18.0));
+#endif
+    GrBeginPath(pathgs, PCT_REPLACE);
+
+    if (@call
+	 @genParent::MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(pself->GII_identifier))
+    {
+	/*
+	 * We're part of the selection, so get all the selected fonts from
+	 * our parent.
+	 */
+	pself = ObjDerefGen(oself);
+	fonts = PFCreateTransferFormat(GenFindParent(oself),
+				       pself->PFII_font.FES_ID == FID_INVALID);
+	ftbp = MemLock(fonts);
+    } else {
+	/*
+	 * Just transfer ourselves.
+	 */
+	fonts = MemAlloc(sizeof(FontTransferBlock), HF_DYNAMIC, 0);
+	ftbp = MemLock(fonts);
+	ftbp->FTB_meta.VMC_next = 0; /* No next block */
+	ftbp->FTB_numFonts = 1;
+	
+	if (pself->PFII_font.FES_ID != FID_INVALID) {
+	    ftbp->FTB_fonts[0] = pself->PFII_font;
+	} else {
+	    /*
+	     * Must be in the dynamic list. Our identifier is, I hope, the font
+	     * number...
+	     */
+	    @call @Dup(@PFRoot)::MSG_PFD_GET_FONT(pself->GII_identifier,
+						  &ftbp->FTB_fonts[0]);
+	}
+    }
+
+    /*
+     * Now draw the appropriate string into the path we're creating.
+     */
+    if (ftbp->FTB_numFonts == 1) {
+	/*
+	 * Name of the sole font being transferred.
+	 */
+	GrDrawText(pathgs, 0, 0, ftbp->FTB_fonts[0].FES_name, 0);
+    } else {
+	/*
+	 * Standard string to indicate multiple things being transferred.
+	 */
+	GrDrawText(pathgs, 0, 0,
+		   LMemDerefHandles(@Dup(@PFMultiFontTransferString)), 0);
+    }
+    MemUnlock(fonts);
+    
+    /*
+     * Draw the font name into a path in 18 point Sans and fetch the
+     * region for it.
+     */
+    GrEndPath(pathgs);
+    region = GrGetPathRegion(pathgs, ODD_EVEN);
+    GrDestroyState(pathgs);
+    
+    /*
+     * Now set up the info for dragging the region around on the screen.
+     *  - fetch the strategy of the video driver for our window
+     *  - the region we get back has its bounds at the front (should be
+     *    at (0,0), since Sans has no weird left-side bearing.
+     *  - center the region around the pointer hotspot
+     */
+    WinGetInfo(@call self::MSG_VIS_QUERY_WINDOW(), WIT_STRATEGY,
+	       &regionInfo.CQTRI_strategy);
+    regionInfo.CQTRI_region = (dword)ConstructOptr(region,0);
+    
+    gs = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+    mousePos = GrTransform(gs, xPosition, yPosition);
+    GrDestroyState(gs);
+    
+    boundsp = (Rectangle *)MemLock(region);
+    regionInfo.CQTRI_regionPos.P_x =
+	DWORD_X(mousePos) - (boundsp->R_right - boundsp->R_left) / 2;
+    regionInfo.CQTRI_regionPos.P_y =
+	DWORD_Y(mousePos) - (boundsp->R_bottom - boundsp->R_top) / 2;
+    MemUnlock(region);
+    
+    if (ClipboardStartQuickTransfer(CQTF_NOTIFICATION | CQTF_USE_REGION,
+				    CQTF_MOVE,
+				    DWORD_X(mousePos),
+				    DWORD_Y(mousePos),
+				    &regionInfo,
+				    oself))
+    {
+	/*
+	 * Create and register a quick-transfer item.
+	 */
+	VMBlockHandle   	format;	    /* Block handle for transfer
+					     * format */
+	VMBlockHandle   	item;	    /* Block handle for item */
+	VMFileHandle    	clipboard;  /* The clipboard file */
+	MemHandle	    	mem;	    /* Memory handle for whatever VM
+					     * block is currently locked */
+	ClipboardItemHeader	*cihp;	    /* The transfer item */
+	MemHandle	    	*memp;	    /* Pointer for setting
+					     * TEMP_PFI_REGION_BLOCK */
+	
+	clipboard = ClipboardGetClipboardFile();
+	
+	/*
+	 * Allocate and initialize the transfer format.
+	 */
+	format = VMAttach(clipboard, 0, fonts);
+	
+	/*
+	 * Allocate and initialize the fixed part of the item header.
+	 * Set the sourceID to be our generic parent, as it's the
+	 * thing that'll be watching for META_PTR and META_END_MOVE_COPY
+	 * messages.
+	 */
+	item = VMAlloc(clipboard, sizeof(ClipboardItemHeader), 0);
+	cihp = VMLock(clipboard, item, &mem);
+	
+	cihp->CIH_owner = oself;
+	cihp->CIH_flags = CIF_QUICK;
+	strcpy(cihp->CIH_name, _TEXT("Font"));
+	cihp->CIH_formatCount = 1;
+	cihp->CIH_sourceID = @call self::MSG_GEN_FIND_PARENT();
+	
+	/*
+	 * Now set up the initial (and only) transfer format.
+	 */
+	cihp->CIH_formats[0].CIFI_format = CIF_FONT_ID;
+	cihp->CIH_formats[0].CIFI_vmChain =
+	    VMCHAIN_MAKE_FROM_VM_BLOCK(format);
+	cihp->CIH_formats[0].CIFI_renderer.GT_chars[0] = '\0';
+	VMDirty(mem);
+	VMUnlock(mem);
+	
+	/*
+	 * Register the item as the quick-transfer item.
+	 */
+	ClipboardRegisterItem(BlockIDFromFileAndBlock(clipboard, item),
+			      CIF_QUICK);
+	
+	/*
+	 * Record handle of region for freeing when transfer is complete.
+	 */
+	memp = ObjVarAddData(oself,
+			     TEMP_PFI_REGION_BLOCK,
+			     sizeof(MemHandle));
+	*memp = region;
+	
+	/*
+	 * If we're under a GenView, tell it to let the mouse wander.
+	 */
+	@call self::MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER();
+
+	/*
+	 * Make sure the delete trigger for our parent is enabled so the
+	 * user can drop the thing on the trigger even if nothing's actually
+	 * selected in the list.
+	 */
+	pself = ObjDerefGen(oself);
+	if (pself->PFII_font.FES_ID != FID_INVALID) {
+	    @call @genParent::MSG_PFIG_ENSURE_DELETE_TRIGGER_ENABLED();
+	}
+    } else {
+	/*
+	 * Couldn't start, so free up the region & transfer format.
+	 */
+	MemFree(region);
+	MemFree(fonts);
+    }
+    retVal->flags = MRF_PROCESSED;
+}
+
+
+/***********************************************************************
+ *		MSG_META_END_MOVE_COPY for PFItemClass
+ ***********************************************************************
+ * SYNOPSIS:	    Cope with having something dropped on us.
+ * PARAMETERS:	    void (MouseReturnFlags *retVal,
+ *			  sword xPosition,
+ *			  sword yPosition,
+ *			  word inputState)
+ * SIDE EFFECTS:    message sent to parent
+ *
+ * STRATEGY:	    we just pass the buck to our parent list, but this
+ *		    is the easiest way I know of to give it the OD of
+ *		    the entry on which the dropping occurred...
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemClass, MSG_META_END_MOVE_COPY
+{
+    @call @genParent::MSG_PFIG_CHILD_DUMPED_ON(oself, xPosition, yPosition,
+					       inputState);
+    retVal->flags = MRF_PROCESSED;
+}
+
+
+/***********************************************************************
+ *		MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED for
+ *	    	    	    	    PFItemClass
+ ***********************************************************************
+ * SYNOPSIS:	    Take note that the quick-transfer we began is now done
+ * PARAMETERS:	    void (ClipboardQuickNotifyFlags flags)
+ * SIDE EFFECTS:    the TEMP_PFI_REGION_BLOCK vardata is nuked and the
+ *		        handle it stored is freed.
+ *	    	    if CQNF_MOVE & !CQNF_SOURCE_EQUAL_DEST, then destroy
+ *	    	    	ourselves
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFItemClass, MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED
+{
+    MemHandle	*memp;
+
+    /*
+     * Free the block holding the region.
+     */
+    memp = ObjVarFindData(oself, TEMP_PFI_REGION_BLOCK);
+    MemFree(*memp);
+
+    ObjVarDeleteData(oself, TEMP_PFI_REGION_BLOCK);
+
+    /*
+     * Make sure our parent's delete trigger state is correct, since we might
+     * have tweaked it when we started this transfer.
+     */
+    pself = ObjDerefGen(oself);
+    if (pself->PFII_font.FES_ID != FID_INVALID) {
+	@call @genParent::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(0);
+    }
+
+    /*
+     * Delete ourselves if the operation turned out to be a move someplace other
+     * than our own list (our parent will take care to just move us if we
+     * get dropped on it).
+     */
+    if ((flags & (CQNF_MOVE|CQNF_SOURCE_EQUAL_DEST)) == CQNF_MOVE) {
+	pself = ObjDerefGen(oself);
+	if (@call @genParent::MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(pself->GII_identifier))
+	{
+	    /*
+	     * We're selected, so we need to nuke the entire selection,
+	     * not just ourselves.
+	     */
+	    @call @genParent::MSG_PFIG_DELETE_SELECTION(oself);
+	} else {
+	    /*
+	     * Just destroy ourselves, thanks.
+	     */
+	    @call self::MSG_GEN_DESTROY(VUM_NOW, CCF_MARK_DIRTY);
+	}
+    }
+    
+
+}
+/*****************************************************************************
+ *
+ *			  PFDynamicListClass
+ *
+ *****************************************************************************/
+
+/***********************************************************************
+ *		MSG_GEN_DYNAMIC_LIST_GET_ITEM_CLASS for PFDynamicListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Fetch the class to use for the on-screen items
+ * PARAMETERS:	    ClassStruct *(void)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDynamicListClass, MSG_GEN_DYNAMIC_LIST_GET_ITEM_CLASS
+{
+    return (&PFItemClass);
+}
+
+
+/***********************************************************************
+ *	MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER for PFDynamicListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set the moniker for an entry in the list of available
+ *		    fonts.
+ * PARAMETERS:	    void (optr list, word item)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/10/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDynamicListClass, MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER
+{
+    FontEnumStruct  fes;
+
+    if (@call @Dup(@PFRoot)::MSG_PFD_GET_FONT(item, &fes))
+    {
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
+	    (item, 0, 0, 0,
+	     0,	    	    	/* null-terminated */
+	     VMDT_TEXT,
+	     VMST_FPTR,
+	     (dword)fes.FES_name);
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_PREF_DYNAMIC_LIST_FIND_ITEM for PFDynamicListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Locate an item given a possible moniker.
+ * PARAMETERS:	    Boolean (word *itemPtr,
+ *			     const char *str,
+ *			     Boolean ignoreCase)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/25/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDynamicListClass, MSG_PREF_DYNAMIC_LIST_FIND_ITEM
+{
+    return @call @Dup(@PFRoot)::MSG_PFD_FIND_FONT_BY_NAME(str, ignoreCase,
+							  itemPtr);
+}
+
+/*****************************************************************************
+ *
+ *			 PFDeleteTriggerClass
+ *
+ *****************************************************************************/
+
+/***********************************************************************
+ *				PFIGEndQT
+ ***********************************************************************
+ * SYNOPSIS:	    Do what's necessary to stop receiving quick-transfer
+ *		    stuff.
+ * CALLED BY:	    PFItemGroup::META_PTR,
+ *		    PFItemGroup::META_END_MOVE_COPY
+ * RETURN:	    nothing
+ * SIDE EFFECTS:    mouse & gadget excl released
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal
+PFDTEndQT(optr oself)
+{
+    PFDeleteTriggerInstance	*pself = ObjDerefGen(oself);
+
+    pself->PFDTI_doingQT = FALSE;
+    @call oself::MSG_VIS_RELEASE_MOUSE();
+}
+
+
+/***********************************************************************
+ *				PFDTCheckPastable
+ ***********************************************************************
+ * SYNOPSIS:	    See if the current quick transfer item is something
+ *	    	    we can handle.
+ * CALLED BY:	    PFDeleteTrigger::META_PTR,
+ *		    PFDeleteTrigger::META_END_MOVE_COPY
+ * RETURN:	    ClipboardQuickTransferFeedback
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/11/93		Initial Revision
+ *
+ ***********************************************************************/
+static ClipboardQuickTransferFeedback _pascal
+PFDTCheckPastable(optr 	    	    oself)
+{
+    ClipboardQueryArgs  cqa;
+    ClipboardQuickTransferFeedback  result;
+
+    ClipboardQueryItem(CIF_QUICK, &cqa);
+
+    if (ClipboardTestItemFormat(cqa.CQA_header, CIF_FONT_ID)) {
+	/*
+	 * Well, the transfer item is one of ours, so see if we've already
+	 * got the item in our list and refuse it if so.
+	 */
+	ClipboardItemHeader	    *cihp;
+	MemHandle	    	    cihMem;
+
+	/*
+	 * Lock down the header block so we can check the source.
+	 */
+	cihp = VMLock(FileFromTransferBlockID(cqa.CQA_header),
+		      BlockFromTransferBlockID(cqa.CQA_header),
+		      &cihMem);
+
+	if (ChunkOf(cihp->CIH_sourceID) == ChunkOf(@PFAvailableFonts)) {
+	    /*
+	     * Source is the list of available fonts, so we can't do anything.
+	     */
+	    result = CQTF_CLEAR;
+	} else {
+	    /*
+	     * Anything else is a move, to us.
+	     */
+	    result = CQTF_MOVE;
+	}
+	VMUnlock(cihMem);
+    } else {
+	/*
+	 * Not our format...
+	 */
+	result = CQTF_CLEAR;
+    }
+    ClipboardDoneWithItem(cqa.CQA_header);
+
+    return(result);
+}
+
+/***********************************************************************
+ *		MSG_META_PTR for PFDeleteTriggerClass
+ ***********************************************************************
+ * SYNOPSIS:	    Provide quick-transfer feedback, if necessary.
+ * PARAMETERS:	    void (MouseReturnFlags *retVal,
+ *			  sword xPosition,
+ *			  sword yPosition,
+ *			  word inputState)
+ * SIDE EFFECTS:    mouse cursor changed to reflect whether we can accept
+ *		    the transfer.
+ *
+ * STRATEGY:	    If the inputState indicates the user is performing
+ *		    quick-transfer and we need to see (and tell others)
+ *		    whether we're willing to accept the current quick
+ *		    transfer item.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/25/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDeleteTriggerClass, MSG_META_PTR
+{
+    if ((GET_UI_FUNCTIONS_ACTIVE(inputState) & UIFA_MOVE_COPY) &&
+	ClipboardGetQuickTransferStatus())
+    {
+	if (pself->PFDTI_doingQT) {
+	    /*
+	     * Feedback already set properly. Just make sure the mouse hasn't
+	     * wandered outside our bounds (of course, since we're a scrolling
+	     * list, we won't ever actually get an event like this; we'll get
+	     * the MSG_META_CONTENT_LEAVE instead, but we like to be thorough)
+	     */
+	    Rectangle	bounds;
+
+	    @call self::MSG_VIS_GET_BOUNDS(&bounds);
+	    if ((xPosition >= bounds.R_right) ||
+		(xPosition < bounds.R_left) ||
+		(yPosition >= bounds.R_bottom) ||
+		(yPosition < bounds.R_top))
+	    {
+		/*
+		 * Clear the feedback, release the mouse, and tell the
+		 * system to find someone else to send the event to, based
+		 * on its position this time, not the mouse grab.
+		 */
+		PFDTEndQT(oself);
+		ClipboardSetQuickTransferFeedback(CQTF_CLEAR, inputState);
+		retVal->flags = MRF_REPLAY;
+	    } else {
+		/*
+		 * Things haven't changed, so why go through all the work
+		 * again?
+		 */
+		retVal->flags = MRF_PROCESSED;	/* this event processed */
+	    }
+	} else {
+	    /*
+	     * Grab the mouse, so we get MSG_META_END_MOVE_COPY and find out
+	     * when the mouse leaves our bounds.
+	     */
+	    @call self::MSG_VIS_GRAB_MOUSE();
+	    pself = ObjDerefGen(oself);
+	    pself->PFDTI_doingQT = TRUE;
+	    ClipboardSetQuickTransferFeedback(PFDTCheckPastable(oself),
+					      inputState);
+	    retVal->flags = MRF_PROCESSED;
+	}
+    } else {
+	/*
+	 * Not doing quick-transfer, so let our superclass handle it.
+	 */
+	@callsuper();
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_META_END_MOVE_COPY for PFDeleteTriggerClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/25/93		Initial Revision
+ *
+ ***********************************************************************/
+@method PFDeleteTriggerClass, MSG_META_END_MOVE_COPY
+{
+    /*
+     * Stop any quick-transfer feedback
+     */
+    PFDTEndQT(oself);
+
+    /*
+     * Now figure out what to do about it.
+     */
+    switch (PFDTCheckPastable(oself)) {
+    case CQTF_MOVE:
+	/*
+	 * End the quick transfer, letting the source know it needs to biff
+	 * the source items.
+	 */
+	ClipboardEndQuickTransfer(CQNF_MOVE);
+
+	@call self::MSG_GEN_MAKE_APPLYABLE();
+	break;
+    case CQTF_CLEAR:
+	/*
+	 * Couldn't paste it, so just end the transfer saying we did nothing.
+	 */
+	ClipboardEndQuickTransfer(CQNF_NO_OPERATION);
+	break;
+    }
+
+    retVal->flags = MRF_PROCESSED;
+}
+

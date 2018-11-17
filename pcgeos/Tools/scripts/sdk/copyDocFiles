@@ -1,0 +1,103 @@
+#!/bin/sh -
+#
+# This script copies TechDoc files to the CD-Rom image directory.
+#
+# $Id: copyDocFiles,v 1.4 94/02/01 12:51:59 joon Exp $
+#
+
+MAKETOOLPATH=/staff/pcgeos/Tools/scripts/sdk
+export MAKETOOLPATH
+
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage: copyDocFiles <branch> <CD-Rom dir>"
+	echo "Ex.: copyDocFiles Release20X /n/intl_disks"
+	exit 1
+fi
+
+
+if ( cd /staff/pcgeos/$1/Installed ); then
+	cd /staff/pcgeos/$1/Installed
+	echo ""
+	echo "copyDocFiles Started On `hostname` At `date` running as $USER"
+else
+	echo "$1 is not a PC/GEOS development tree. (e.g., . or Release20X)"
+	exit 1
+fi
+
+
+#==============================================================================
+# Copy the ASCII files over
+#==============================================================================
+
+cd /staff/pcgeos/TechDoc/Ascii
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find Concepts Esp Objects QuickRef Routines Tools Tutorial ZoomDoc \
+	-name \*.txt \
+	-exec $MAKETOOLPATH/copy_doc_file {} $2/TechDocs/Ascii \;
+
+
+#==============================================================================
+# Now the PS files...
+#==============================================================================
+
+cd /staff/pcgeos/TechDoc/PScript
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find Concepts Esp Objects QuickRef Routines Tools Tutorial ZoomDoc \
+	-name \*.ps \
+	-exec $MAKETOOLPATH/copy_for_sdk {} $2/TechDocs/PScript \;
+
+
+#==============================================================================
+# Lastly, the Frame formatted docs...
+#==============================================================================
+
+cd /staff/pcgeos/TechDoc/Frame
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find Concepts Esp Objects QuickRef Routines Tools Tutorial ZoomDoc \
+	\(  \( -name \*.doc \) \
+	    -a ! \
+	    \( -name zz\*.doc -o -name ZZ\*.doc \) \
+	    -exec $MAKETOOLPATH/copy_for_sdk {} $2/TechDocs/Frame \; \
+	\) -o \
+	\(  -type d \
+		\( -name Ref -o \
+		   -name NotIncluded -o \
+		   -name EXTRA -o \
+		   -name OLD -o \
+		   -name old -o \
+		   -name Art \
+		\) \
+	    -prune \
+	\)
+
+#
+# Remove the subdirectories of Concepts and Objects after copying
+# the files therein to the parent directory
+#
+
+mv $2/TechDocs/Frame/Concepts/*/* $2/TechDocs/Frame/Concepts
+rmdir `find $2/TechDocs/Frame/Concepts/* -type d -print`
+
+mv $2/TechDocs/Frame/Objects/*/* $2/TechDocs/Frame/Objects
+rmdir `find $2/TechDocs/Frame/Objects/* -type d -print`
+
+#
+# Copy the DOCSMAP file
+#
+$MAKETOOLPATH/cp_for_sdk -u /staff/pcgeos/TechDoc/docsmap.txt \
+			    $2/TechDocs/docsmap.txt
+
+echo copyDocFiles Ended At `date`

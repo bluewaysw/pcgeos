@@ -1,0 +1,102 @@
+#!/bin/sh -
+##############################################################################
+#
+#	(c) Copyright Geoworks 1996.  All Rights Reserved.
+#			GEOWORKS CONFIDENTIAL
+#
+# PROJECT:	PC GEOS
+# MODULE:	Tools/scripts -- C Police tools
+# FILE: 	checkheaders
+# AUTHOR: 	Jeremy Dashe, February 27, 1996
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	jdashe	2/27/96		Initial version
+#
+# DESCRIPTION:
+#
+# 	This script finds header files in /staff/pcgeos/Include
+# 	modified in the last N days (default is 8) and shows their
+# 	modification timestamp next to their C header versions.
+# 	Hopefully, you can catch out-of-date .h/.goh files this way.
+#
+#	$Id: checkheaders,v 1.1 96/02/28 10:34:55 jdashe Exp $
+#
+###############################################################################
+#
+# Usage: checkheaders [days]
+#
+
+#
+# Function for stripping permissions flags and number of links from
+# the ls -lt of the file and printing the results.
+#
+# Args: [full path of file to nicePrint]
+# 
+nicePrint () {
+	orig=`ls -lt $1`
+	neater=`echo $orig | sed -e 's/^[-rxw]*[ \t]*[1-9]//'`
+	echo $neater
+}
+
+#
+# Number of days old a file must be since last modified.
+#
+days="8"
+
+for i in $@; do
+    case $i in
+	*)	  
+	    #
+	    # Just grab the last argument as the number of days.
+	    #
+	    days="$i"
+    esac
+done
+
+echo
+echo Installs to the Include and CInclude directories in the last $days days:
+echo ========================================================================
+echo
+for i in ` find /staff/pcgeos/Include -mtime -$days -type f \( -name \*.def \
+	 -o  -name \*.uih \
+	 -o  -name \*.h \
+	 -o  -name \*.hi \
+	 -o  -name \*.ih \
+	 -o  -name \*.goh \) \
+	-print `; do
+
+	#
+	# Strip out the root file name.
+	#
+	fstart=`echo $i | sed -e 's/^\/staff\/pcgeos\/Include\///g'`
+	froot=`echo $fstart | sed -e 's/\..*$//g'`
+
+	echo ---------------------------------
+	nicePrint $i
+
+	#
+	# I'm sure there's an easier way to do this, but here we print
+	# the matching .goh and/or .h file, based on the file's root.
+	#
+	if [ -f /staff/pcgeos/CInclude/$froot.h -o \
+	     -f /staff/pcgeos/CInclude/$froot.goh ]; then
+	    if [ -f /staff/pcgeos/CInclude/$froot.h ]; then
+		nicePrint /staff/pcgeos/CInclude/$froot.h
+	    fi
+	    if [ -f /staff/pcgeos/CInclude/$froot.goh ]; then
+		nicePrint /staff/pcgeos/CInclude/$froot.goh
+	    fi
+	else
+	    #
+	    # ... or just mention that there's no CInclude version.
+	    #
+	    echo \(No corresponding CInclude file.\)
+	fi
+done 
+
+echo ---------------------------------
+echo
+
+exit 0

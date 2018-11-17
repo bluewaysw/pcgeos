@@ -1,0 +1,526 @@
+/***************************************************************************
+ *  FILE:  VTGridC.GOC                                                      *
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Library:  VisTextGridClass (and accompanying VisTextGridTextClass)
+ *-------------------------------------------------------------------------
+ |
+ | Objective:
+ |    Enhanced version of VisGrid to handle text input
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/09/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+/***************************************************************************
+ *      Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi\string.h>
+@include <Ansi\stdio.h>
+@include <Objects\vtgridc.goh>
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  VisTextGridClass
+ *=========================================================================*/
+
+    @classdecl VisTextGridClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextGridClass::MSG_VIS_GRID_SELECT_CELL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    This method is intercepted by the VisTextGridClass so that the
+ |    child text class is moved around to the right selected cell (if any)
+ |    Appropriate callbacks are made to save the old data and load
+ |    the new data.
+ |
+ | Inputs:
+ |    word column, row            -- New location
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method VisTextGridClass, MSG_VIS_GRID_SELECT_CELL
+/* (word column, word row) ; */
+{
+    optr textObj ;
+
+    /* Send out a request to save the old data if dirty */
+    textObj = pself->VTGI_textObj ;
+    if (textObj)  {
+        /* Store the old data (if changed) */
+        @call oself::MSG_VIS_TEXT_GRID_SAVE_CELL_IF_DIRTY() ;
+    }
+
+    @call oself::MSG_VIS_TEXT_GRID_HIDE_TEXT() ;
+    /* Ok, redraw the old and new location */
+    @callsuper() ;
+
+    /* Now let's get the new data and move the text object there */
+    textObj = pself->VTGI_textObj ;
+    if (textObj)  {
+        if ((pself->VTGI_queryDataMessage) &&
+                (pself->VGI_destination))  {
+            @send ,forceQueue (pself->VGI_destination)::{VIS_TEXT_GRID_QUERY_DATA}(pself->VTGI_queryDataMessage)(
+                           column,
+                           row,
+                           oself,
+                           textObj) ;
+        } else {
+            /* If no query message, just hide the text object */
+            @call oself::MSG_VIS_TEXT_GRID_HIDE_TEXT() ;
+        }
+    }
+}
+
+@method VisTextGridClass, MSG_VIS_TEXT_GRID_HIDE_TEXT
+{
+    optr textObj ;
+
+    textObj = pself->VTGI_textObj ;
+
+    /* Now let's get the new data and move the text object there */
+    if (textObj)  {
+        /* Suspend the text object to keep a bunch of actions from appearing */
+        @call textObj::MSG_META_SUSPEND() ;
+
+        /* Hide the text object */
+        @call textObj::MSG_META_RELEASE_FOCUS_EXCL();
+        @call textObj::MSG_VIS_SET_SIZE(1, 1) ;
+        @call textObj::MSG_VIS_SET_POSITION(-1, -1) ;
+        @call oself::MSG_META_GRAB_FOCUS_EXCL();
+
+        @call textObj::MSG_META_UNSUSPEND() ;
+    }
+}
+
+@method VisTextGridClass, MSG_VIS_TEXT_GRID_SHOW_TEXT_AT
+/* (word column, word row) ; */
+{
+    optr textObj ;
+    word x, y, width, height ;
+    VisTextRange range ;
+
+    textObj = pself->VTGI_textObj ;
+
+    /* Now let's get the new data and move the text object there */
+    if (textObj)  {
+        /* Suspend the text object to keep a bunch of actions from appearing */
+        @call textObj::MSG_META_SUSPEND() ;
+
+        /* Hide the text object */
+        @call textObj::MSG_META_RELEASE_FOCUS_EXCL();
+        @call textObj::MSG_VIS_SET_SIZE(1, 1) ;
+        @call textObj::MSG_VIS_SET_POSITION(-1, -1) ;
+        if ((pself->VTGI_queryDataMessage) &&
+                (pself->VGI_destination))  {
+            pself = ObjDerefVis(oself) ;
+
+            /* Move the text object there */
+            x = @call oself::MSG_VIS_GRID_FIND_COLUMN_X(column) ;
+            y = @call oself::MSG_VIS_GRID_FIND_ROW_Y(row) ;
+            width = @call oself::MSG_VIS_GRID_GET_COLUMN_WIDTH(column) ;
+            height = @call oself::MSG_VIS_GRID_GET_ROW_HEIGHT(row) ;
+            @call textObj::MSG_VIS_SET_SIZE(width, height) ;
+            @call textObj::MSG_VIS_SET_POSITION(
+                      pself->VI_bounds.R_left+x,
+                      pself->VI_bounds.R_top+y) ;
+
+            /* Redraw the text object */
+            range.VTR_start = 0 ;
+            range.VTR_end = TEXT_ADDRESS_PAST_END ;
+            @call textObj::MSG_VIS_TEXT_INVALIDATE_RANGE(&range);
+            @call textObj::MSG_META_GRAB_FOCUS_EXCL();
+            @call textObj::MSG_VIS_RECREATE_CACHED_GSTATES();
+            @call textObj::MSG_VIS_TEXT_SELECT_ALL() ;
+            @call textObj::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(0, VTS_USER_MODIFIED) ;
+        }
+
+        /* Ok, done with all our mischief, update on the screen */
+        @call textObj::MSG_META_UNSUSPEND() ;
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextGridClass::MSG_VIS_TEXT_GRID_SET_TEXT_OBJECT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Declare which object to use as the text object (must be class or
+ |    subclass of VisTextGridTextClass).
+ |
+ | Inputs:
+ |    optr textObj                -- Declared text object
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/14/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method VisTextGridClass, MSG_VIS_TEXT_GRID_SET_TEXT_OBJECT
+/* (optr textObj) */
+{
+    pself->VTGI_textObj = textObj ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextGridClass::MSG_VIS_TEXT_GRID_GET_TEXT_OBJECT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Tell what is the current text object.
+ |
+ | Outputs:
+ |    optr textObj                -- Declared text object
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/28/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method VisTextGridClass, MSG_VIS_TEXT_GRID_GET_TEXT_OBJECT
+{
+    return pself->VTGI_textObj ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextGridClass::MSG_VIS_TEXT_GRID_SET_QUERY_DATA_MSG
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Declare what message to be used when asking for data to be placed
+ |    in the text object.
+ |
+ | Inputs:
+ |    Message msg                 -- Message to be called
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/14/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method VisTextGridClass, MSG_VIS_TEXT_GRID_SET_QUERY_DATA_MSG
+{
+    pself->VTGI_queryDataMessage = msg ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextGridClass::MSG_VIS_TEXT_GRID_SET_SAVE_DATA_MSG
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Declare what message to be used when asking to save out changed
+ |    data from the text object
+ |
+ | Inputs:
+ |    Message msg                 -- Message to be called
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/14/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method VisTextGridClass, MSG_VIS_TEXT_GRID_SET_SAVE_DATA_MSG
+{
+    pself->VTGI_saveDataMessage = msg ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextGridClass::MSG_VIS_TEXT_GRID_SAVE_CELL_IF_DIRTY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Forces the grid to check if its current text object needs to be
+ |    saved.  If so, if makes a call to the destination (which should
+ |    be in the same UI thread).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/19/99  Created (by pulling out code from
+ |                   MSG_VIS_GRID_SELECT_CELL)
+ |
+ *-----------------------------------------------------------------------*/
+@method VisTextGridClass, MSG_VIS_TEXT_GRID_SAVE_CELL_IF_DIRTY
+{
+    optr textObj = pself->VTGI_textObj ;
+
+    if (textObj)  {
+        if ((pself->VGI_selectionX != VIS_GRID_SELECTION_NONE) &&
+            (pself->VGI_selectionY != VIS_GRID_SELECTION_NONE))  {
+            if (@call textObj::MSG_VIS_TEXT_GET_STATE()&VTS_USER_MODIFIED)  {
+                @send ,forceQueue (pself->VGI_destination)::{VIS_TEXT_GRID_SAVE_DATA}(pself->VTGI_saveDataMessage)(
+                           pself->VGI_selectionX,
+                           pself->VGI_selectionY,
+                           oself,
+                           textObj) ;
+                pself = ObjDerefVis(oself) ;
+                @call textObj::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(0, VTS_USER_MODIFIED) ;
+            }
+        }
+    }
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  VisTextGridTextClass
+ *=========================================================================*/
+
+    @classdecl VisTextGridTextClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextGridTextClass::MSG_META_KBD_CHAR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Intercepted keyboard command to check first to see if a keyboard
+ |    control is occuring or its a something for the text object to use.
+ |    If a keyboard control (and text is selected or empty), it passed
+ |    on to the parent for processing (via MSG_META_FUP_KBD_CHAR) or
+ |    else processed by the text object.
+ |
+ | Inputs:
+ |    word character              -- Extended character
+ |    word flags                  -- control flags (SHIFT?)
+ |    word state                  -- press/release?
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/14/99  Created
+ |    LES  07/20/99  Added code to remap the ENTER key to
+ |                   VTGTI_remapEnterKey
+ |
+ *-----------------------------------------------------------------------*/
+@method VisTextGridTextClass, MSG_META_KBD_CHAR
+{
+    VisTextRange range ;
+    Boolean isLocationKey = FALSE ;
+
+    /* Remap the keystroke if it has changed */
+    if (((character & 0xFF) == VC_ENTER) &&
+            (pself->VTGTI_remapEnterKey != VC_ENTER))  {
+        @call oself::MSG_VIS_TEXT_SELECT_ALL() ;
+
+        character &= 0xFF00 ;
+        character |= pself->VTGTI_remapEnterKey ;
+    }
+
+    @call oself::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+    if ((character&0xFF00)==(((word)CS_CONTROL)<<8))  {
+        switch (character&0x00FF)  {
+            case VC_RIGHT:
+            case VC_LEFT:
+            case VC_UP:
+            case VC_DOWN:
+            case VC_HOME:
+            case VC_END:
+                isLocationKey = TRUE ;
+                break ;
+        }
+    }
+
+    if (isLocationKey)  {
+        if ((range.VTR_start == range.VTR_end) &&
+               (@call oself::MSG_VIS_TEXT_GET_TEXT_SIZE()!=0)) {
+            @callsuper() ;
+        } else {
+            @call oself::MSG_META_SUSPEND() ;
+            @call oself::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+            @call oself::MSG_META_UNSUSPEND() ;
+        }
+    } else {
+        @callsuper() ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextGridTextClass::MSG_META_LOST_FOCUS_EXCL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    At any time the focus is lost, we need to make sure the data is
+ |    that the user typed is saved.  This implies that we don't have any
+ |    direct undo choices.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/19/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method VisTextGridTextClass, MSG_META_LOST_FOCUS_EXCL
+{
+    @call @visParent::MSG_VIS_TEXT_GRID_SAVE_CELL_IF_DIRTY() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  VisTextGridTextClass::MSG_VIS_TEXT_GRID_TEXT_SET_ENTER_REMAP_KEY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Sets what key the ENTER key is remapped to.
+ |
+ | Inputs:
+ |    byte key                    -- New key to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/20/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method VisTextGridTextClass, MSG_VIS_TEXT_GRID_TEXT_SET_ENTER_REMAP_KEY
+{
+    pself->VTGTI_remapEnterKey = key ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  VisGridUtilityDrawGroup
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    A routine that you use to go through all the cells of a given
+ |    area in a VisGridClass object and draw the necessary items.
+ |    Typically this is called from a VIS_GRID_DRAW_CELL_GROUP routine.
+ |
+ | Inputs:
+ |    optr visGridObj             -- Grid object wanting to be drawn
+ |    word startColumn, startRow  -- Upper left corner
+ |    word endColumn, endRow      -- Ending lower right corner
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/22/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void VisGridUtilityDrawGroup(
+         optr visGridObj,
+         word startColumn,
+         word startRow,
+         word endColumn,
+         word endRow)
+{
+    GStateHandle gstate ;
+    word column, row ;
+    word x, y ;
+    word width, height ;
+    ColorQuad color ;
+    ColorQuad selectColor ;
+    optr dest ;
+    Message mess ;
+    word selectRow, selectCol ;
+    GridDrawFlags flags ;
+
+    /* First, we need a graphics object */
+    gstate = @call visGridObj::MSG_VIS_VUP_CREATE_GSTATE() ;
+    GrSetAreaColorMap(gstate, CMT_DITHER);
+    GrSetLineColorMap(gstate, CMT_DITHER);
+    @call visGridObj::MSG_VIS_GRID_GET_COLOR(
+              VIS_GRID_COLOR_ITEM_BACKGROUND,
+              &color) ;
+    @call visGridObj::MSG_VIS_GRID_GET_COLOR(
+              VIS_GRID_COLOR_ITEM_SELECTION_BACK,
+              &selectColor) ;
+
+    /* Determine who and how we are calling per drawn cell */
+    dest = @call visGridObj::MSG_VIS_GRID_GET_DESTINATION() ;
+    mess = @call visGridObj::MSG_VIS_GRID_GET_DRAW_MESSAGE() ;
+
+    /* Which cell is currently selected? */
+    @call visGridObj::MSG_VIS_GRID_GET_SELECTED_CELL(
+              &selectCol,
+              &selectRow) ;
+
+    /* Set the area color for all cells */
+    GrSetAreaColor(
+        gstate,
+        color.CQ_info,
+        color.CQ_redOrIndex,
+        color.CQ_green,
+        color.CQ_blue) ;
+
+    /* Go through each cell by row and then by column */
+    for (row=startRow; row<=endRow; row++)  {
+        for (column=startColumn; column<=endColumn; column++)  {
+            /* Keep the same basic settings per iteration */
+            GrSaveState(gstate) ;
+
+            /* Each drawn cell has to be setup precisely */
+            /* X and Y locations are necessary */
+            /* But to the outside programmer, the coordinates */
+            /* are 0, 0 for the top left. */
+            x = @call visGridObj::MSG_VIS_GRID_FIND_COLUMN_X(column) ;
+            y = @call visGridObj::MSG_VIS_GRID_FIND_ROW_Y(row) ;
+            GrApplyTranslation(
+                gstate,
+                MakeWWFixed(x),
+                MakeWWFixed(y)) ;
+
+            /* We will also clip the width and height, so do that */
+            width = @call visGridObj::MSG_VIS_GRID_GET_COLUMN_WIDTH(column) ;
+            height = @call visGridObj::MSG_VIS_GRID_GET_ROW_HEIGHT(row) ;
+            GrSetClipRect(gstate, PCT_REPLACE, 0, 0, width, height) ;
+
+            /* Note if we are the selected item and change the color(s) */
+            /* appropriately.  NOTE:  We have no default text color. */
+            flags = 0 ;
+            if ((row==selectRow) && (column==selectCol))  {
+                GrSetAreaColor(
+                    gstate,
+                    selectColor.CQ_info,
+                    selectColor.CQ_redOrIndex,
+                    selectColor.CQ_green,
+                    selectColor.CQ_blue) ;
+                GrFillRect(gstate, 0, 0, width, height) ;
+                flags |= GRID_DRAW_FLAG_SELECTED ;
+            }
+
+            /* Now draw the cell with all the above settings */
+            @call (dest)::{VIS_GRID_DRAW_CELL}(mess)
+                (gstate, column, row, width, height, visGridObj, flags) ;
+
+            /* Recover the state -- no telling what happened */
+            GrRestoreState(gstate) ;
+        }
+    }
+
+    /* Are we a VisTextGridClass object? */
+//    if (@call visGridObj::MSG_META_IS_OBJECT_IN_CLASS(&VisTextGridClass))  {
+    if (1)  {
+        optr textObj ;
+        Rectangle bounds ;
+
+        /* Draw the text object */
+        textObj = @call visGridObj::MSG_VIS_TEXT_GRID_GET_TEXT_OBJECT() ;
+        if ((OptrToHandle(textObj)) && (OptrToChunk(textObj)))  {
+            @call textObj::MSG_VIS_GET_BOUNDS(&bounds) ;
+            GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+            GrFillRect(gstate, bounds.R_left, bounds.R_top, bounds.R_right, bounds.R_bottom) ;
+            @call textObj::MSG_VIS_DRAW(0, gstate) ;
+        }
+    }
+
+    /* We are done with this graphics surface. */
+    GrDestroyState(gstate) ;
+}
+
+/***************************************************************************
+ *  END OF FILE:  VTGridC.GOC                                                      *
+ ***************************************************************************/
+

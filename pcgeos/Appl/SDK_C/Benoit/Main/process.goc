@@ -1,0 +1,201 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1993 -- All Rights Reserved
+
+PROJECT:	GEOS SDK Sample Application	
+MODULE:		Benoit (Mandelbrot Set Sample Application)
+FILE:		process.goc
+
+AUTHOR:		Tom Lester, Aug  4, 1993
+
+METHODS:
+	Name		Description
+	----		-----------
+	MSG_GEN_PROCESS_INSTALL_TOKEN
+	                intercepted to install document tokens
+
+	MSG_META_VM_FILE_DIRTY
+			intercepted to optimize dirty notifications from the
+			MSet objects, and to fix a nasty little
+			synchronization problem.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TL	8/ 4/93   	Initial version.
+
+DESCRIPTION:
+	This file contains the BProcessClass declaration and the 
+	methods for the BProcessClass.
+
+	$Id: process.goc,v 1.1 97/04/04 16:39:49 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <token.h>
+
+@define __BENOIT_MAIN_PROCESS_GOC	/* Don't over-define  */
+@include <benoit.goh>			/* Benoit Application */
+@include <Main/process.goh>
+
+/*
+ ***************************************************************************
+ *		Class & Method Declarations
+ ***************************************************************************
+ */
+
+/*
+ * The neverSaved flag is necessary because ProcessClass objects are
+ * hybrid objects. It tells the system that no object of this class will
+ * ever be loaded from or stored to a file.
+ */
+@classdecl	BProcessClass, neverSaved ;
+
+
+
+/***********************************************************************
+ *		MSG_META_VM_FILE_DIRTY for BProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Optimized version of GenDocument's handler
+ * PARAMETERS:	VMFileHandle	file
+ * RETURN:	void
+ * SIDE EFFECTS:
+ *	Sends notification to the GenDocumentGroup object.
+ *
+ * STRATEGY:
+ *	GenDocumentClass' handler for this message sends a notification
+ *	(MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE) to the current model
+ *	GenDocumentGroupClass object.  To do this, it must work its way down
+ *	the model hierarchy, starting from the root, which happens to be an
+ *	object run by the UI thread.
+ *	
+ *	Since we know that the current model is going to be our own document
+ *	control object, we can avoid having to go to the UI thread to find
+ *	the model.  Since the UI thread is not allowed to @call the app
+ *	thread, the _MARK_DIRTY_BY_FILE intended for the model would find
+ *	its way onto the end of the app's queue.
+ *	
+ *	Here is the problem with having the _MARK_DIRTY_ put on the queue
+ *	(asynchronous), instead of handling right here (synchronous):
+ *	
+ *	BDocumentClass' MSG_GEN_DOCUMENT_DETACH_UI, among other things,
+ *	stops the MSet's calculation thread (to prevent more VMDirty calls)
+ *	and then the @callsuper() force-queues a message to remove the
+ *	document from the document control.  When the thread pauses, or any
+ *	time before, it may send out a MSG_META_VM_FILE_DIRTY to us.  This
+ *	is OK, since we only queue the message to remove the document after
+ *	we finish executing the pause method.  The queue for this thread
+ *	then looks like:
+ *	
+ *		MSG_META_VM_FILE_DIRTY
+ *		Message which removes document
+ *		<possibly other messages here>
+ *	
+ *	Now, if _MARK_DIRTY_BY_FILE_ sent by the VM_FILE_DIRTY must find the
+ *	model by going to the UI thread and back, it is going to end up at
+ *	the end of the queue:
+ *	
+ *		Message which removes docuemnt
+ *		<possibly other messages here>
+ *		MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE
+ *			-- traveling to the model
+ *	
+ *	When that message finds the document group object, the dirtied
+ *	document will be gone, causing a FatalError.
+ *	
+ *	However, if instead we handle the MSG_META_VM_FILE_DIRTY right here,
+ *	without trying to send it down the model hierarchy, the problem is
+ *	solved.
+ *
+ *	NOTE that we only need to subclass this message because Benoit is
+ *	truly a special case -- normally, documents are only dirtied by the
+ *	thread running the Document Group object, but in this case, we have
+ *	the MSet's calculation thread dirtying the document.  If the call to
+ *	VMDirty had occurred in this thread, this message would come via a
+ *	direct call as opposed to via the queue; we would @call the UI
+ *	thread to send the _MARK_DIRTY_ along to the model.  By the time the
+ *	VMDirty finished, the UI thread would have placed the _MARK_DIRTY_
+ *	on our queue, and it would get handled before the message which
+ *	removed the document.  The queue would look like:
+ *	
+ *		MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE
+ *		Message which removes document
+ *		<possibly other messages here>
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/21/93   	Initial Revision
+ *
+ ***********************************************************************/
+@method BProcessClass, MSG_META_VM_FILE_DIRTY
+{
+
+    /*
+     *	Since we're a multi-launchable application, we cannot explicitly use
+     *	the optrs to the objects we set up at compile-time.  This routine is
+     *	used to get the optr of our own (unshared) BDocumentGroup object.
+     *
+     *	For all the explanation, this is a very tiny bit of code...
+     */
+    @call GeodeGetOptrNS(@BDocumentGroup)::
+	MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE(file);
+}	/* End of MSG_META_VM_FILE_DIRTY.	*/
+
+/***********************************************************************
+ *      MSG_GEN_PROCESS_INSTALL_TOKEN for BProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    intercepted to install document tokens
+ * PARAMETERS:	    void ()
+ *                 
+ * CONTEXT:         
+ *   This is sent by the desktop to a process to get that process 
+ *   to install its token and moniker list into the token database
+ * 
+ * STRATEGY: 	
+ *   We intercept this message to add the icon for the
+ *   Benoit documents to the token database.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TL	9/13/93   	Initial Revision
+ *
+ ***********************************************************************/
+@method BProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+    dword BtokenChars;
+    TokenFlags BtokenFlags;
+
+    /*
+     * call the superclass to install the app token and moniker list
+     */
+    @callsuper();
+
+    /* 
+     * the token chars are the same as those in the GDCI_documentToken
+     * field of the GenDocumentControlClass object.
+     * 
+     * All files created by the document control will have these token 
+     * characters, and the File Selector object will be set to allow only 
+     * such files to be selected.
+     */
+    BtokenChars = TOKEN_CHARS('B', 'e', (dword)'n', (dword)'D');
+
+    if (!TokenGetTokenInfo(BtokenChars, MANUFACTURER_ID_SDK, 
+						&BtokenFlags)) {
+	TokenDefineToken(BtokenChars, 
+			 MANUFACTURER_ID_SDK, 
+			 @BDatafileMonikerList,
+			 0);	/* Moniker list is in data resource, so no
+				 * object relocation required */
+    }
+}

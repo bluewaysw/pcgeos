@@ -1,0 +1,244 @@
+@include <StdApp.goh>
+
+@include "UIClass/TitlMkrC.goh"
+
+@classdecl TitledMonikerClass ;
+
+/*************************************************************************/
+
+#define TITLED_MONIKER_TEXT_LINE_SPACE      0
+#define TITLED_MONIKER_GSTRING_TEXT_SPACE   0
+#define TITLED_MONIKER_TEXT_FONT            FID_UNIVERSITY
+#define TITLED_MONIKER_TEXT_SIZE            9
+
+/*************************************************************************/
+
+@method TitledMonikerClass, MSG_SPEC_BUILD {
+
+    Rectangle rect ;
+	GStateHandle gstring ;
+    optr stringChunk, textChunk;
+    word linesRequest;
+
+    stringChunk = pself->TMI_gstring ;
+    textChunk = pself->TMI_text ;
+    linesRequest = pself->TMI_lines ;
+
+    if(stringChunk)
+        MemLock(HandleOf(stringChunk)) ;
+
+    /* set the moniker */
+    if(stringChunk)
+        gstring = GrLoadGString(    PtrToSegment(LMemDeref(stringChunk)), 
+                                    GST_PTR, 
+                                    PtrToOffset(LMemDeref(stringChunk))) ; 
+    else
+        gstring = TRUE ;
+
+    if(gstring) {
+
+   	    GStateHandle outgstate ;
+        word width, height ;
+        word textWidth ;
+        ChunkHandle outchunk ;
+        word element ;
+        TCHAR *textPtr, *textStartPtr ;
+        word lineCount, lineHeight ;
+        word monikerWidth ;
+        word lineOffset = 0 ;
+        word textOffset, textStartOffset ;
+        MemHandle mem;
+        word textSize ;
+        FontID fontID ;
+        WWFixedAsDWord wwTextSize ;
+
+	    mem = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+
+        outgstate = 
+            GrCreateGString(mem, GST_CHUNK, &outchunk) ;       
+
+        /* is this available in the item header? */
+        if(stringChunk) {
+
+            GrGetGStringBounds(gstring, outgstate, 0, &rect) ;
+        
+            /* size of gstring */
+	        height = rect.R_bottom - rect.R_top ;
+	        width = rect.R_right - rect.R_left ;
+
+        } else {
+
+            height = 0 ;
+            width = 0 ;
+        }
+
+        fontID = GrGetFont(outgstate, &wwTextSize) ;
+        textSize = IntegerOf(wwTextSize) ;
+
+        if(pself->TMI_textSize)
+            textSize = pself->TMI_textSize ;
+        if(pself->TMI_textFont)
+            fontID = pself->TMI_textFont ;
+
+        GrSetFont(  outgstate, fontID, MakeWWFixed(textSize))  ;
+            
+        lineHeight = 
+                textSize + pself->TMI_lineSpace ;
+
+        lineCount = 0 ;
+        textPtr = 
+            LMemDeref(ConstructOptr(HandleOf(oself), textChunk)) ;
+        textStartPtr = textPtr ;
+        textWidth = 0 ;
+        do {
+            
+            /* if there is no text the first time in the line*/
+            if(*textPtr == 0)
+                break ;
+
+            textPtr ++;
+
+            if((*textPtr == 0) || (*textPtr == '\r')) {
+
+                word tempWidth ;
+
+                if(textPtr != textStartPtr)
+                {
+                    tempWidth = GrTextWidth(outgstate, textStartPtr, 
+                                                textPtr - textStartPtr) ;  
+                
+                    lineCount++ ;
+                
+                } else {
+                    
+                    lineCount++ ;
+
+                    tempWidth = 0 ;
+                }
+
+                if(textWidth < tempWidth)
+                    textWidth = tempWidth ;
+            
+                if(*textPtr == 0)
+                    break ;
+
+                textPtr ++;
+                
+                textStartPtr = textPtr ;
+            }
+
+        } while(*textPtr) ;
+
+        monikerWidth = (width < textWidth ? textWidth : width) ;
+
+        if(linesRequest > lineCount) {
+        
+            lineOffset = (linesRequest * lineHeight - lineCount * lineHeight) / 2;
+        
+        }
+
+        GrRelMoveTo(outgstate, MakeWWFixed(
+                    monikerWidth / 2 - width / 2),
+                    MakeWWFixed(0)) ;
+        
+        if(stringChunk)
+            GrDrawGStringAtCP(outgstate, gstring, 0, &element) ;
+
+        GrRelMoveTo(outgstate, MakeWWFixed(
+                    width / 2),
+                    MakeWWFixed(
+                        height + 
+                        (pself->TMI_gstring  ? 
+                            TITLED_MONIKER_GSTRING_TEXT_SPACE : 0) + 
+                        lineOffset -
+                        pself->TMI_vertOverlap)) ;
+
+        /* get the text width */
+        textPtr = 
+            LMemDeref(ConstructOptr(HandleOf(oself), textChunk)) ;
+        textStartOffset = 0 ;
+        textOffset = 0 ;
+        do {
+            
+            /* if there is no text the first time in the line*/
+            if(textPtr[textOffset] == 0)
+                break ;
+
+            textOffset ++;
+
+            if((textPtr[textOffset] == 0) || (textPtr[textOffset] == '\r')) {
+
+                word tempWidth ;
+
+                if(textOffset != textStartOffset)
+                {
+                    tempWidth = GrTextWidth(outgstate, &textPtr[textStartOffset], 
+                                                textOffset - textStartOffset) ;  
+                
+                    GrRelMoveTo(outgstate,MakeWWFixed(
+                                - (tempWidth / 2)),
+                                MakeWWFixed(0)) ;
+
+                    /* draw centered */
+                    GrDrawTextAtCP( 
+                                outgstate, 
+                                &textPtr[textStartOffset],
+                                textOffset - textStartOffset ) ;
+                
+                    GrRelMoveTo(outgstate,MakeWWFixed(
+                                - (tempWidth / 2)),
+                                MakeWWFixed(lineHeight)) ;
+                } else {
+
+                    GrRelMoveTo(outgstate, MakeWWFixed(
+                                0),
+                                MakeWWFixed(lineHeight)) ;
+                }
+
+                if(textPtr[textOffset] == 0)
+                    break ;
+
+                textOffset ++;
+                
+                textStartOffset = textOffset ;
+            }
+
+        } while(textPtr[textOffset]) ;
+
+        /* close the string */
+        GrEndGString(outgstate) ;
+
+        if(linesRequest < lineCount)
+            linesRequest = lineCount ;
+
+        /* set the new vis moniker */
+        @send oself::MSG_GEN_REPLACE_VIS_MONIKER(
+                        VUM_DELAYED_VIA_UI_QUEUE,
+                        height + 
+                        (pself->TMI_gstring ? 
+                            TITLED_MONIKER_GSTRING_TEXT_SPACE : 0) + 
+                        linesRequest * lineHeight + 2 - pself->TMI_vertOverlap,
+                        (monikerWidth + 1) & 0xFFFE,
+                        0,
+                        VMDT_GSTRING,
+                        VMST_OPTR,
+                        ConstructOptr(mem, outchunk)) ;
+
+
+        if(stringChunk) 
+            GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA) ;
+
+        GrDestroyGString(outgstate, 0, GSKT_KILL_DATA) ;
+
+        /* free the gstring */
+        MemFree(mem);
+
+        if(stringChunk)
+            MemUnlock(HandleOf(stringChunk)) ;
+    }
+
+    @callsuper();
+}
+
+/*************************************************************************/
+

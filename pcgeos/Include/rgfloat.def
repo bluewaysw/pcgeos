@@ -1,0 +1,1445 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Register (four byte) Floating point
+FILE:		rgfloat.def
+
+AUTHOR:		David Litwin, Sep  8, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 8/94   	Initial revision
+
+
+DESCRIPTION:
+	Definitions and macros for the RegFloat routines.
+	This is a library providing IEEE 754 32 bit (4 byte) floating
+	point routines that are passed in two word registers instead
+	of memory.
+		
+	$Id: rgfloat.def,v 1.1 97/04/04 14:26:29 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __RGFLOAT
+
+StartLibrary	rgfloat
+
+RegFloatExp	record
+	RFE_SIGN_BIT:1
+	RFE_EXPONENT:8
+	RFE_MANTISSA:7
+RegFloatExp	end
+
+RegFloat	struct
+	RF_low		word			; second 2/3 of mantissa
+	RF_high		RegFloatExp		; sign, exp & first 1/3 mantissa
+RegFloat	ends
+
+AdjustedRegFloat	struct
+	ARF_exponent	byte			; un-biased exponent
+
+	ARF_mantissaH	byte			; high byte of mantissa
+						;  (includes implied one)
+	ARF_mantissaL	word			; low word of mantissa
+AdjustedRegFloat	ends	
+
+
+BWFixed	struct
+	BWF_int		byte
+	BWF_frac	word
+BWFixed	ends
+
+
+PointRF struct
+	PRF_x	RegFloat
+	PRF_y	RegFloat
+PointRF ends
+
+
+REG_FLOAT_MANTISSA_SIZE		equ	24
+REG_FLOAT_EXPONENT_SIZE		equ	8
+REG_FLOAT_EXP_BIAS		equ	127
+REG_FLOAT_EXP_BIAS_FOR_WORD	equ	32512
+
+BIGGEST_REG_FLOAT_HIGH_WORD		equ	7fffh
+SMALLEST_REG_FLOAT_HIGH_WORD		equ	0080h
+
+TRIVIAL_CHECKS				equ	0
+; This includes code that does some checks for trivial conditions,
+; right now just 1 in multiplication and division.
+; While this makes those cases go quite fast, it slows everything
+; else down, so I've set this constant to 0.  Turn it on at your
+; own peril.
+;
+
+WARN_ON_INSIGNIFIGANT_ADDITIONS		equ	0
+; This warns when, in normalizing for addition/subtraction, the exponents
+; are more than 24 apart, meaning the mantissa will have to shift out
+; of existence, and the addition/subtraction will have no noticeable
+; effect.
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		BWFixed math macros
+
+ARGUMENTS:
+	There are three classes of BWFixed math macros: one-argument,
+	two-argument, and signed compare macros.  If stored in registers,
+	BWFixeds are traditionally referred to by regH.regL (eg. dlax or
+	dl.ax), where the high byte comes first.  If stored in memory, 
+	remember the 80x86 machines store data LSB first, so it will be
+	stored regL, regH.
+
+	For one-argument functions, the destination can either a register
+	pair or memory:
+
+	dest
+	----
+	regpair
+	memory
+
+	For two-argument functions, the arguments can either be a register
+	pair and memory, two register pairs, or a constant and a register
+	pair:
+
+	dest		source
+	------		----
+	regpair		memory
+	regpair		constant
+	regpair		regpair
+	memory		regpair
+	memory		constant
+	memory		memory		NOTE: requires trash register
+
+EXAMPLES:
+	negbwf	dlax
+	addbwf	clax, dlsi
+	cmpbwf	dlax, ss:[bp].FOO_bar
+	movbwf	dlax, 0x123456
+
+NOTE:
+	ASSUMES: non-constant argument of 4 letters is a register pair
+	ASSUMES: non-constant argument of less than 4 letters is bogus
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		_CheckBWFixedOneArg
+
+DESCRIPTION:	Check argument to one-arg BWFixed macro
+
+ARGUMENTS:	dest - argument side
+		op - string to emit for error-identification
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+_CheckBWFixedOneArg	macro	dest, op
+
+ifnb <dest>
+    if ((.TYPE &dest) AND 4)
+	ErrMessage <op : single argument cannot be constant>
+    endif
+else
+    ErrMessage <op : missing argument>
+endif
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		_CheckBWFixedTwoArg
+
+DESCRIPTION:	Check arguments to two-arg BWFixed macro
+
+ARGUMENTS:	dest - left-hand side
+		src - right-hand side
+		op - string to emit for error-identification
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+_CheckBWFixedTwoArg	macro	dest, src, op
+
+ifnb	<src>
+    ifidn <dest>, <src>
+	ErrMessage <op : destination = source>
+    else
+	if ((.TYPE &dest) AND 4)
+	    ErrMessage <op : destination argument cannot be constant>
+	endif
+    endif
+endif
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		_ParseBWFixedArg
+
+DESCRIPTION:	Parse an argument to a BWFixed math macro
+
+PASS:		arg - argument passed to macro
+		regcount - # of register-pair arguments
+		op - string to emit for error-identification
+
+RETURN:		rl - low word of arg
+		rh - high byte of arg
+		regcount - # of register-pair or constant arguments
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+_ParseBWFixedArg	macro	arg, rl, rh, regcount, op
+	local	lc
+alen	sizestr	<&arg>
+
+ifnb <arg>
+
+if (4 AND .TYPE (arg))
+    ErrMessage <op : ParseBWFixedArg doesn't deal with constants>
+    regcount=regcount+1
+else
+    if (alen eq 4)
+	rh substr <arg>, 1, 2
+	rl substr <arg>, 3, 2
+	lc substr <arg>, 4, 1		;; lc <- last character
+	
+	ifidn rl, rh
+	    ErrMessage <op : register used twice in BWFixed>
+	endif
+	regcount=regcount+1
+    else
+        rh catstr <arg>, <.BWF_int>
+        rl catstr <arg>, <.BWF_frac>
+    endif
+endif
+
+else
+    ErrMessage <op : missing argument>
+endif
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		tstbwf
+
+DESCRIPTION:	Test a BWFixed for zero
+
+ARGUMENTS:	dest - memory or register pair to test for zero
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+tstbwf	macro	dest
+	local	foo, drl, drh, regargs
+
+regargs = 0
+_CheckBWFixedOneArg	<dest>, <tstbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <tstbwf>
+
+	tst	drl
+	jnz	foo
+	tst	drh
+foo:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		notbwf
+
+DESCRIPTION:	Not a BWFixed
+
+ARGUMENTS:	dest - memory or register pair to not
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+notbwf	macro	dest
+	local	drl, drh, regargs
+
+regargs = 0
+_CheckBWFixedOneArg	<dest>, <notbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <notbwf>
+
+	not	drl
+	not	drh
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		negbwf
+
+DESCRIPTION:	Negate a BWFixed
+
+ARGUMENTS:	dest - memory or register pair to not
+		[zeroreg] - if you have a register = 0, this is quicker
+CAVEATS:
+	Does not set flags the same as the 'neg' instruction
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+negbwf	macro	dest, zeroreg
+	local	drl, drh, regargs
+
+regargs = 0
+_CheckBWFixedOneArg	<dest>, <negbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <negbwf>
+
+	not	drh
+	neg	drl
+	cmc
+ifnb	<zeroreg>
+	adc	drh, zeroreg
+else
+	adc	drh, 0
+endif
+
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		movbwf
+
+DESCRIPTION:	Move a BWFixed
+
+ARGUMENTS:	dest - memory or register pair for destination
+		source - memory or register pair for source
+		[trashreg] - re'qd if moving memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+movbwf	macro	dest, source, trashreg
+	local	drl, drh, srl, srh, regargs, rx, rl
+
+regargs = 0
+_CheckBWFixedTwoArg	<dest>, <source>, <movbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <movbwf>
+_ParseBWFixedArg	<source>, srl, srh, regargs, <movbwf>
+
+if (regargs gt 0)
+	mov	drh, srh
+	mov	drl, srl
+elseifnb <trashreg>
+_ParseTrashReg	<trashreg>, rx, rl, <movbwf>
+
+	mov	rx, srh
+	mov	drh, rx
+	mov	rl, srl
+	mov	drl, rl
+else
+	ErrMessage <movbwf : need trash register to move mem, mem>
+endif
+
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		xchgbwf
+
+DESCRIPTION:	Exchange two BWFixed's
+
+ARGUMENTS:	dest - memory or register pair for destination
+		source - memory or register pair for source
+		[trashreg] - re'qd if moving memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+xchgbwf	macro	dest, source, trashreg
+	local	drl, drh, srl, srh, regargs, rx, rl
+
+regargs = 0
+_CheckBWFixedTwoArg	<dest>, <source>, <xchgbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <xchgbwf>
+_ParseBWFixedArg	<source>, srl, srh, regargs, <xchgbwf>
+
+if (regargs gt 0)
+	xchg	drh, srh
+	xchg	drl, srl
+elseifnb <trashreg>
+_ParseTrashReg	<trashreg>, rx, rl, <xchgbwf>
+
+	mov	rx, srh
+	xchg	drh, rx
+	mov	srh, rx
+	mov	rl, srl
+	xchg	drl, rl
+	mov	srl, rl
+else
+	ErrMessage <xchgbwf : need trash register to xchg mem, mem>
+endif
+
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		addbwf
+
+DESCRIPTION:	Add a BWFixed
+
+ARGUMENTS:	dest - memory or register pair for destination
+		source - memory or register pair for source
+		[trashreg] - re'qd if adding memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+addbwf	macro	dest, source, trashreg
+	local	drl, drh, srl, srh, regargs, rx, rl
+
+regargs = 0
+_CheckBWFixedTwoArg	<dest>, <source>, <addbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <addbwf>
+_ParseBWFixedArg	<source>, srl, srh, regargs, <addbwf>
+
+if (regargs gt 0)
+	add	drl, srl
+	adc	drh, srh
+elseifnb <trashreg>
+_ParseTrashReg	<trashreg>, rx, rl, <addbwf>
+
+	mov	rl, srl
+	add	drl, rl
+	mov	rx, srh
+	adc	drh, rx
+else
+	ErrMessage <addbwf : need trash register to add mem, mem>
+endif
+
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		subbwf
+
+DESCRIPTION:	Subtract a BWFixed
+
+ARGUMENTS:	dest - memory or register pair for destination
+		source - memory or register pair for source
+		[trashreg] - re'qd if adding memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+subbwf	macro	dest, source, trashreg
+	local	drl, drh, srl, srh, regargs, rx, rl
+
+regargs = 0
+_CheckBWFixedTwoArg	<dest>, <source>, <subbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <subbwf>
+_ParseBWFixedArg	<source>, srl, srh, regargs, <subbwf>
+
+if (regargs gt 0)
+	sub	drl, srl
+	sbb	drh, srh
+elseifnb <trashreg>
+_ParseTrashReg	<trashreg>, rx, rl, <subbwf>
+
+	mov	rl, srl
+	sub	drl, rl
+	mov	rx, srh
+	sbb	drh, rx
+else
+	ErrMessage <subbwf : need trash register to sub mem, mem>
+endif
+
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		sbbbwf
+
+DESCRIPTION:	Subtract with borrow a BWFixed
+
+ARGUMENTS:	dest - memory or register pair for destination
+		source - memory or register pair for source
+		[trashreg] - re'qd if adding memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+sbbbwf	macro	dest, source, trashreg
+	local	drl, drh, srl, srh, regargs, rx, rl
+
+regargs = 0
+_CheckBWFixedTwoArg	<dest>, <source>, <sbbbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <sbbbwf>
+_ParseBWFixedArg	<source>, srl, srh, regargs, <sbbbwf>
+
+if (regargs gt 0)
+	sbb	drl, srl
+	sbb	drh, srh
+elseifnb <trashreg>
+_ParseTrashReg	<trashreg>, rx, rl, <sbbbwf>
+
+	mov	rl, srl
+	sbb	drl, rl
+	mov	rx, srh
+	sbb	drh, rx
+else
+	ErrMessage <sbbbwf : need trash register to sbb mem, mem>
+endif
+
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		shlbwf, salbwf
+
+DESCRIPTION:	Logical/Arithmetic shift left for BWFixed
+
+ARGUMENTS:	dest - memory or register pair to shift left
+
+CAVEATS:	Does not set flags the same as the 'shl/sal' instruction
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shlbwf	macro	dest
+	local	drl, drh, regargs
+
+regargs = 0
+_CheckBWFixedOneArg	<dest>, <shlbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <shlbwf>
+
+	shl	drl, 1
+	rcl	drh, 1
+
+endm
+
+salbwf	macro	dest
+	shlbwf	dest
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		shrbwf
+
+DESCRIPTION:	Logical shift right for BWFixed
+
+ARGUMENTS:	dest - memory or register pair to shift right
+
+CAVEATS:	Does not set flags the same as the 'shr' instruction
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shrbwf	macro	dest
+	local	drl, drh, regargs
+
+regargs = 0
+_CheckBWFixedOneArg	<dest>, <shrbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <shrbwf>
+
+	shr	drh, 1
+	rcr	drl, 1
+
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		rcrbwf
+
+DESCRIPTION:	Rotate through carry right for BWFixed
+
+ARGUMENTS:	dest - memory or register pair to shift right
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+rcrbwf	macro	dest
+	local	drl, drh, regargs
+
+regargs = 0
+_CheckBWFixedOneArg	<dest>, <rcrbwf>
+_ParseBWFixedArg	<dest>, drl, drh, regargs, <rcrbwf>
+
+	rcr	drh, 1
+	rcr	drl, 1
+
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		ClearOverflowFlag
+
+DESCRIPTION:	clear the overflow flag
+
+ARGUMENTS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ClearOverflowFlag	macro
+	or	ax, ax
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		pushrf
+
+DESCRIPTION:	push a RegFloat
+
+ARGUMENTS:	source - memory or register pair to push
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+pushrf	macro	source
+	local	source
+	pushdw	<source>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		poprf
+
+DESCRIPTION:	pop a RegFloat
+
+ARGUMENTS:	source - memory or register pair to pop
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+poprf	macro	source
+	local	source
+	popdw	<source>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		tstrf
+
+DESCRIPTION:	set the Z flag if the RegFloat is zero
+
+		We handle both zero and negative zero by testing the
+		high word against zero except the sign bit.
+
+ARGUMENTS:	dest - memory or register pair to test
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+tstrf	macro	dest, arg2
+		local	foo, drl, drh, regargs
+regargs = 0
+_CheckDWordOneArg	<dest>, <tstrf>, <arg2>
+_ParseDWordArg	<dest>, drl, drh, regargs, <tstrf>
+
+	test	drh, not (mask RFE_SIGN_BIT)
+	jnz	foo
+	tst	drl
+foo:
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		cmprf
+
+DESCRIPTION:	Compare two RegFloats (unsigned operations)
+
+ARGUMENTS:	dest, source - dest, source to compare
+		[trashreg] - required if comparing memory to memory
+
+CAVEATS:	This is only valid for *unsigned* comparisons.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+cmprf	macro	dest, source, trashreg
+	cmpdw	<dest>, <source>, <trashreg>
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		movrf
+
+DESCRIPTION:	Move a  RegFloat
+
+ARGUMENTS:	dest, source - dest, source to mov
+		[trashreg] - required if moving memory to memory
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+movrf	macro	dest, source, trashreg
+	movdw	<dest>, <source>, <trashreg>
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		RoundRfMantissa
+
+DESCRIPTION:	Round a mantissa according to word of roundInfo
+
+ARGUMENTS:	mantissa	= BWFixed
+		roundinfo	= byte or word register to round by
+		exponent	= exponent to adjust if it carry's
+		exitlabel	= label to jump to on overflow
+	
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+RoundRfMantissa	macro	mantissa, roundinfo, exponent, exitlabel
+	local	lc, elabel, roundUp, rounded, regargs
+
+regargs = 0
+_ParseBWFixedArg	<mantissa>, mrl, mrh, regargs, <RoundRfMantissa>
+
+	lc substr <roundinfo>, 2, 1		;; lc <- last character
+	
+	ifdif lc, <l>			;; if it doesn't end in "l"
+	  ifdif lc, <h>			;;   or "h" it must be a word register
+	     cmp	roundinfo, 8000h	; word regsiter for roundinfo
+	  else
+	  cmp	roundinfo, 80h			; byte regsiter for roundinfo
+	  endif
+	else
+	cmp	roundinfo, 80h			; byte regsiter for roundinfo
+	endif
+	
+	jb	rounded
+	ja	roundUp
+	test	mrl, 0001h			; check if mantissa is odd
+	jz	rounded				; round toward even if ambigous
+roundUp:
+	add	mrl, 1				; inc doesn't set the carry
+	adc	mrh, 0
+	jnc	rounded
+
+	AdjustRfForCarry	<mantissa>, <exponent>, <exitlabel>
+rounded:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		AdjustRfForCarry
+
+DESCRIPTION:	Adjust the mantissa and exponent if an addition 
+		caused the mantissa to push out a carry bit.
+		Increment the exponent and shift the mantissa right,
+		bringing in the carry.
+
+ARGUMENTS:	mantissa	- a BWFixed quantity
+		exponent	- a byte
+		exitlabel	- where to jump on overflow of exponent
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+AdjustRfForCarry	macro	mantissa, exponent, exitlabel
+	local	foo, elabel, roundUp, rounded, regargs
+
+regargs = 0
+_ParseBWFixedArg	<mantissa>, mrl, mrh, regargs, <AdjustRfForCarry>
+
+	jnc	foo
+	rcr	mrh, 1
+	rcr	mrl, 1
+	inc	exponent
+	jo	exitlabel
+foo:
+
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		InvertNegativeFloatsMantissa
+
+DESCRIPTION:	Invert the mantissa if the float is negative
+		This is used for comparison purposes
+
+ARGUMENTS:
+	source	= RegFloat
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InvertNegativeFloatsMantissa	macro	source
+	local	foo, srl, srh, regargs
+regargs = 0
+_CheckDWordOneArg	<source>, <InvertNegativeFloatsMantissa>
+_ParseDWordArg	<source>, srl, srh, regargs, <InvertNegativeFloatsMantissa>
+
+	test	srh, 8000h
+	jz	foo
+	not	srl
+	xor	srh, 007fh
+foo:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		jrf
+
+DESCRIPTION:	Generic signed compare and branch instructions for
+		RegFloats, used by all the different jX[X]rf macros
+
+		Basically, floats compare like DWords unless they are both
+		negative, in which case they will yield the reverse result
+		because the exponent isn't two's complemented.  So for the
+		generic comparison we invert the exponents of either if they
+		are negative, and invert back after the basic compare.
+
+ARGUMENTS:
+	jumpCondition - dword conditional jump routine to use (e.g. jaedw)
+	dest, source - dest, source to compare
+	blabel - label to branch to branch to if jump condition met
+	[trashreg] - required if comparing memory to memory
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+jrf	macro	jumpCondition, dest, source, blabel, trashreg
+	local	foo, bar
+
+	InvertNegativeFloatsMantissa	<dest>
+	InvertNegativeFloatsMantissa	<source>
+	jumpCondition	<dest>, <source>, <foo>, <thrashreg>
+	clc
+	jmp	bar
+foo:
+	stc
+bar:
+	pushf
+	InvertNegativeFloatsMantissa	<dest>
+	InvertNegativeFloatsMantissa	<source>
+	popf
+	jc	blabel
+	
+endm
+
+jgrf	macro	dest, source, blabel, trashreg
+	jrf	jgdw, <dest>, <source>, <blabel>, <trashreg>
+endm
+jgerf	macro	dest, source, blabel, trashreg
+	jrf	jgedw, <dest>, <source>, <blabel>, <trashreg>
+endm
+jlrf	macro	dest, source, blabel, trashreg
+	jrf	jldw, <dest>, <source>, <blabel>, <trashreg>
+endm
+jlerf	macro	dest, source, blabel, trashreg
+	jrf	jledw, <dest>, <source>, <blabel>, <trashreg>
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		jUrf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	This is a header for a bunch of macros that deal with comparing
+		two RegFloats we know to be positive.  Because of this
+		we can do the quicker simple dword compare.
+
+PASS:		dest, source	= RegFloat to compare
+		blabel		= label to jump to if condition is met
+		trashreg	= optional register to trash
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/13/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+jgUrf		macro	dest, source, blabel, trashreg
+	jgdw	dest, source, blabel, trashreg
+endm
+jgeUrf		macro	dest, source, blabel, trashreg
+	jgedw	dest, source, blabel, trashreg
+endm
+jlUrf		macro	dest, source, blabel, trashreg
+	jldw	dest, source, blabel, trashreg
+endm
+jleUrf		macro	dest, source, blabel, trashreg
+	jledw	dest, source, blabel, trashreg
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		jerf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	jump to the specified label if two RegFloats are equal
+
+PASS:		float1	- RegFloat
+		float2	- RegFloat
+		blabel	- label to branch to on equal
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/ 9/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+jerf		macro	dest, source, blabel
+	local	srl, srh, drl, drh, regargs, exitFoo
+
+regargs = 0
+_CheckDWordTwoArg	<dest>, <source>, <jerf>
+_ParseDWordArg	<dest>, drl, drh, regargs, <jerf>
+_ParseDWordArg	<source>, srl, srh, regargs, <jerf>
+
+	cmp	srh, drh
+	jne	exitFoo
+	cmp	srl, drl
+	je	blabel
+exitFoo:
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		jnerf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Jump to the specified label if two RegFloats are
+		not equal
+
+PASS:		float1	- RegFloat
+		float2	- RegFloat
+		blabel	- label to branch to on not equal
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/ 9/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+jnerf		macro	dest, source, blabel
+	local	srl, srh, drl, drh, regargs, exitFoo
+
+regargs = 0
+_CheckDWordTwoArg	<dest>, <source>, <jnerf>
+_ParseDWordArg	<dest>, drl, drh, regargs, <jnerf>
+_ParseDWordArg	<source>, srl, srh, regargs, <jnerf>
+
+	cmp	srh, drh
+	je	exitFoo
+	cmp	srl, drl
+	jne	blabel
+exitFoo:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		jsrf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Jump if a RegFloat is signed
+
+PASS:		float	- RegFloat
+		blabel	- label to branch to if signed
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/13/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+jsrf		macro	source, blabel
+	local	srl, srh, regargs
+regargs = 0
+_CheckDWordOneArg	<source>, <jsrf>
+_ParseDWordArg	<source>, srl, srh, regargs, <jsrf>
+
+	test	srh, mask RFE_SIGN_BIT 
+	jnz	blabel
+endm
+
+jnsrf		macro	source, blabel
+	local	srl, srh, regargs
+regargs = 0
+_CheckDWordOneArg	<source>, <jnsrf>
+_ParseDWordArg	<source>, srl, srh, regargs, <jnsrf>
+
+	test	srh, mask RFE_SIGN_BIT 
+	jz	blabel
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		clrrf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Clear (zero) a RegFloat
+
+PASS:		dest	= RegFloat
+		zeroreg	= optional zero register to use
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/ 9/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+clrrf		macro	dest, zeroreg
+	clrdw	<dest>, <zeroreg>
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		negrf
+
+DESCRIPTION:	Negate a RegFloat
+
+ARGUMENTS:
+	dest - memory or register pair to not
+
+CAVEATS:
+	Does not set flags the same as the 'neg' instruction
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+negrf	macro	dest
+	local	drl, drh, regargs
+regargs = 0
+_CheckDWordOneArg	<dest>, <negrf>
+_ParseDWordArg	<dest>, drl, drh, regargs, <negrf>
+
+	xor	drh, 8000h			; toggle sign bit
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		absrf
+
+DESCRIPTION:	Return the absolute value of a RegFloat
+
+ARGUMENTS:
+	dest - memory or register pair to abs
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/ 9/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+absrf	macro	dest
+	local	drl, drh, regargs
+regargs = 0
+_CheckDWordOneArg	<dest>, <absrf>
+_ParseDWordArg	<dest>, drl, drh, regargs, <absrf>
+
+	andnf	drh, 7fffh			; clear sign bit
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		ECCheckForBadExpRange
+
+DESCRIPTION:	Error if range is larger than REG_FLOAT_MANTISSA_SIZE,
+		as this will shift one of the matissa's into non-existence.
+
+ARGUMENTS:
+	range
+		*preserves the flags*
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	9/ 7/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ECCheckForBadExpRange	macro	range
+	local	notTooBig, noProblem, warnThem
+
+	pushf
+	cmp	range, REG_FLOAT_MANTISSA_SIZE
+	jl	notTooBig
+	jmp	warnThem
+
+notTooBig:
+	cmp	range, -REG_FLOAT_MANTISSA_SIZE
+	jg	noProblem
+
+warnThem:
+	WARNING	WARNING_RF_ADD_OR_SUB_ARGS_RANGE_TOO_GREAT
+
+noProblem:
+	popf
+endm
+
+
+WARNING_RF_ADD_OR_SUB_ARGS_RANGE_TOO_GREAT	enum Warnings
+; The difference between the arguments is more than 2^24, so 
+; it might not have any effect.
+;
+
+ERROR_RF_DIVIDE_BY_ZERO			enum FatalErrors
+; Well..  divided by zero!
+;
+
+ERROR_RF_OVER_UNDER_FLOW			enum FatalErrors
+; hmm..
+;
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		dblrf
+
+DESCRIPTION:	doubles a RegFloat - treats zero right - returns overflow
+
+ARGUMENTS:	source	= RegFloat
+		Oflag	= set in the event of an overflow
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	robertg	9/ 15/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+dblrf	macro	src
+	local	lc,rreg,lreg,fc,hrreg, continue, exitFoo, overflowExit
+
+	rreg substr 	<src>,1,2
+	lreg substr	<src>,3,2
+	lc substr	<src>,2,1
+	fc substr	<src>,1,1
+	hrreg catstr	fc, <h>
+
+	tst	lreg
+	jnz	continue
+	tst	rreg
+	jz	exitFoo
+
+continue:
+	rol	rreg
+	ifdif lc,<i>
+	;
+	; do these as separate sub and inc for correct overflow flag setting
+	;
+	  sub	hrreg, REG_FLOAT_EXP_BIAS
+	  inc	hrreg
+	  jo	overflowExit
+	  add	hrreg, REG_FLOAT_EXP_BIAS
+	else
+	;
+	; do these as separate sub and add for correct overflow flag setting
+	;
+	  sub	rreg, REG_FLOAT_EXP_BIAS_FOR_WORD
+	  add	rreg, 100h
+	  jo	overflowExit
+	  add	rreg, REG_FLOAT_EXP_BIAS_FOR_WORD
+	endif
+	ror	rreg
+exitFoo:
+	ClearOverflowFlag
+overflowExit:
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		halfrf
+
+DESCRIPTION:	halfs a RegFloat - treats zero right - returns overflow
+
+ARGUMENTS:	source	= RegFloat
+		Oflag	= set in the event of an underflow
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	robertg	9/ 15/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+halfrf	macro	src
+	local	lc, rreg, lreg, fc, hrreg, continue, exitFoo, underflowExit
+
+	rreg substr <src>, 1, 2
+	lreg substr <src>, 3, 2
+	lc substr <src>, 2, 1
+	fc substr <src>, 1, 1
+	hrreg catstr fc, <h>
+
+	tst	lreg
+	jnz	continue
+	tst	rreg
+	jz	exitFoo
+
+continue:
+	rol	rreg
+	ifdif lc,<i>
+	;
+	; do these as separate sub's for correct overflow flag setting
+	;
+	  sub	hrreg, REG_FLOAT_EXP_BIAS
+	  dec	hrreg
+	  jo	underflowExit
+	  add	hrreg, REG_FLOAT_EXP_BIAS
+	else
+	;
+	; do these as separate sub's for correct overflow flag setting
+	;
+	  sub	rreg, REG_FLOAT_EXP_BIAS_FOR_WORD
+	  sub	rreg, 100h
+	  jo	underflowExit
+	  add	rreg, REG_FLOAT_EXP_BIAS_FOR_WORD
+	endif
+	ror	rreg
+exitFoo:
+	ClearOverflowFlag
+underflowExit:
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		xchgrf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	
+
+PASS:		
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/ 8/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+xchgrf		macro	foo, bar
+	xchgdw	foo, bar
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		AddMemToDxCxRf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Add a memory based RegFloat to the RegFloat
+		in dxcx.
+
+PASS:		mem	= address of a RegFloat
+		trash	= exists if we can trash bxax
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/ 8/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+AddMemToDxCxRf		macro	mem, trash
+ifb <trash>
+	xchgrf	bxax, mem
+	call	RegFloatAdd
+	xchgrf	bxax, mem
+else
+	movrf	bxax, mem
+	call	RegFloatAdd
+endif
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		AddMemToBxAxRf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Add a memory based RegFloat to the RegFloat
+		in bxax.
+
+PASS:		mem	= address of a RegFloat
+		trash	= exists if we can trash dxcx
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/ 8/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+AddMemToBxAxRf		macro	mem, trash
+ifb <trash>
+	xchgrf	dxcx, mem
+	call	RegFloatAddBxAx
+	xchgrf	dxcx, mem
+else
+	movrf	dxcx, mem
+	call	RegFloatAddBxAx
+endif
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SubMemFromDxCxRf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Subtract a memory based RegFloat from the RegFloat
+		in dxcx.
+
+PASS:		mem	= address of a RegFloat
+		trash	= exists if we can trash bxax
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/ 8/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SubMemFromDxCxRf		macro	mem, trash
+ifb <trash>
+	xchgrf	bxax, mem
+	call	RegFloatSub
+	xchgrf	bxax, mem
+else
+	movrf	bxax, mem	
+	call	RegFloatSub
+endif
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SubMemFromBxAxRf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Subtract a memory based RegFloat from the RegFloat
+		in bxax.
+
+PASS:		mem	= address of a RegFloat
+		trash	= exists if we can trash dxcx
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	12/ 8/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SubMemFromBxAxRf		macro	mem, trash
+ifb <trash>
+	xchgrf	dxcx, mem
+	call	RegFloatSubBxAx
+	xchgrf	dxcx, mem
+else
+	movrf	dxcx, mem
+	call	RegFloatSubBxAx
+endif
+endm
+
+
+;-----------------------------------------------------------------------------
+;	Exported routines		
+;-----------------------------------------------------------------------------
+
+global RegFloatMultiply:far
+global RegFloatAdd:far
+global RegFloatAddBxAx:far
+global RegFloatSub:far
+global RegFloatSubBxAx:far
+global RegFloatDivide:far
+global RegFloatSqrt:far
+global RegFloatToWWFixed:far
+global WWFixedToRegFloat:far
+
+EndLibrary	rgfloat

@@ -1,0 +1,239 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		grWinInt.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines various graphics and window routines that are
+	how intended for general use.
+
+	$Id: grWinInt.def,v 1.1 97/04/04 14:16:00 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__GR_WIN_INT
+
+StartKernel
+
+global WinInvalTree:far
+global WinInvalWhole:far
+global WinLocatePoint:far
+global WinForEach:far
+
+global GrChunkRegOp:far
+global GrPtrRegOp:far
+global GrMoveReg:far
+global GrGetPtrRegBounds:far
+global GrTestPointInReg:far
+global GrTestRectInReg:far
+
+global GrSetUpdateGState:far
+
+global GrRegionPathInit:far
+global GrRegionPathClean:far
+global GrRegionPathMovePen:far
+global GrRegionPathAddOnOffPoint:far
+global GrRegionPathAddLineAtCP:far
+global GrRegionPathAddBezierAtCP:far
+global GrRegionPathAddPolygon:far
+global GrRegionPathAddPolyline:far
+
+;------------------------------------------------------------------------------
+;		Pseudo-internal constants/structures
+;------------------------------------------------------------------------------
+
+RegionOpFlags	record
+    ROF_UNUSED:11,
+    ROF_ES_DS_SAME:1,				; passed ES & DS are equal
+    ROF_OVERFLOW:1,				; overflow has occurred
+    ROF_NOT_OP:1,				; perform NOT
+    ROF_OR_OP:1,				; perform OR
+    ROF_AND_OP:1				; perform AND
+RegionOpFlags	end
+
+RegionPathFlags	record
+    RPF_UNUSED:7,				; future use
+    RPF_CANT_ALLOC:1				; memory allocation failed
+RegionPathFlags	end
+
+;
+; Structure of region/path memory block:
+;
+RegionPath struct
+    RP_handle		hptr			;handle of region block
+    RP_size		word			;size of block (in bytes)
+    RP_endPtr		word			;amount we're using
+    RP_curLine		sword			;current line #
+    RP_curPtr		nptr			;current line ptr
+    RP_y_min		sword			;minimum y value
+    RP_y_max		sword			;maximum y value
+    RP_pen		Point			;pen position
+    RP_lastSet		Point			;last position set in region
+    RP_fillRule		RegionFillRule		;fill rule being used
+    RP_flags		RegionPathFlags	<>	; flags for error handling,etc.
+;the bounds must be last...
+    RP_bounds		Rectangle		;bounds of region
+RegionPath ends
+
+RegPathInt struct
+    RP_header	RegionPath
+    RP_data	sword				;first word of data
+    RP_eor	sword				;EOR for first line
+RegPathInt ends
+
+;
+; Structure of Bezier curves for REGION_ADD_BEZIER_CP:
+;
+RegionBezier struct
+    RB_p1		Point			;control point #1
+    RB_p2		Point			;control point #2
+    RB_p3		Point			;control point #3
+RegionBezier ends
+
+;
+; Recommended stack size (not bytes) for Bezier stack:
+;
+REC_BEZIER_STACK	=	100
+
+;
+; Point direction definition for winding rule
+;
+RegionPointDirection	etype	word
+    RPD_UP		enum	RegionPointDirection, 1
+    RPD_DOWN		enum	RegionPointDirection, -1
+
+
+;--------------------------------------------------------------------------
+;			Path structures
+;--------------------------------------------------------------------------
+
+; Type of coordinates the subPath elements are composed of
+;
+PathCoordSource	etype	byte
+    PCS_DOCUMENT	enum PathCoordSource	; expressed in document coords
+    PCS_PAGE		enum PathCoordSource	; expressed in page coords
+
+; Information record associated with each subPath, in OBP_data.
+; BPF_COMBINE must be the last field in the record.
+;
+BeginPathFlags	record
+    :10
+    BPF_FILL_RULE RegionFillRule:1	; fill rule to use here
+    BPF_FILL_RULE_VALID:1		; if set, use the above fill rule
+    BPF_COORD_TYPE PathCoordSource:1	; set if dealing with Window coords
+    BPF_BOUNDS_KNOWN:1			; set if the bounds have been calculated
+    BPF_COMBINE PathCombineType:2	; how to combine subPaths
+BeginPathFlags	end	
+
+; PSF_FILL_RULE must be at the low bit of the high byte!!!
+;
+PathStateFlags	record
+    :7
+    PSF_FILL_RULE RegionFillRule:1	; fill rule used (align at byte)
+    :6
+    PSF_PATH_IS_RECT:1			; set if the path is just a rectangle
+    PSF_REGION_VALID:1			; current RegionPath is valid
+PathStateFlags	end
+
+; Flags used when combining Paths with other Paths or GStrings
+;
+PathCombineSource	etype	byte
+    PCS_PATH	enum PathCombineSource	; combining with a Path
+    PCS_GSTRING	enum PathCombineSource	; combining with a GString
+    PCS_RECT	enum PathCombineSource	; combining with a pointer to a
+					;  rectangular GString (clip rects).
+
+; Structure of RegionFull (Region preceded by its bounds)
+;
+RegionFull	struct
+    RF_bounds	Rectangle		; bounds of Region
+    RF_region	label	Region		; Region follows the bounds
+RegionFull	ends
+
+; Structure of a RegionFullRect (Rectangular Region preceded by bounds)
+;
+RegionFullRect	struct
+    RFR_header	RegionFull		; RegionFull structure
+    RFR_top	sword
+    RFR_stop1	word			; EOREGREC
+    RFR_bottom	sword
+    RFR_left	sword
+    RFR_right	sword
+    RFR_stop2	word			; EOREGREC
+    RFR_stop3	word			; EOREGREC
+RegionFullRect	ends
+
+; Structure of a Path
+;
+CACHED_PATHS	equ	0		; Paths are not cached
+
+Path		 struct
+    P_slowRegion hptr.RegionPath	; handle of RegionPath
+    P_rectRegion RegionFullRect		; rectangular region
+    P_flags	 PathStateFlags		; state of this Path
+    P_top	 sword			; top coord for region (top of window)
+    P_bottom	 sword			; bottom coord
+    P_matrix	 WWFixed		; TM_11+TM_22+TM_31+TM_32
+if CACHED_PATHS
+    P_checksum	 word			; checksum for TMatrix used to create
+endif
+    P_data	 label	byte		; OpBeginPath
+Path		 ends
+
+; Notes on Path invalidation: When invalidating a Path, simply clear the
+; valid flag (PSF_REGION_VALID). If a memory handle remains in P_region,
+; it will be re-used or freed as needed.
+
+
+
+;-----------------------------------------------------------------------------
+;	CurvePolyline - a structure used when converting a
+;bezier curve to a set of points.  This structure is used as a block
+;header for the points.  Point data is at end of structure.		
+;-----------------------------------------------------------------------------
+ 
+CurvePolyline		struct
+	CP_handle	hptr.CurvePolyline
+	CP_numPoints	word
+	CP_curPtr	nptr
+	CP_size		word
+	CP_points	label	PointWBFixed
+CurvePolyline		ends
+
+
+RASTER_BEZIER_SEGMENT_SIZE	= 4096
+
+RASTER_BEZIER_INITIAL_POINTER	= RASTER_BEZIER_SEGMENT_SIZE - \
+					size IntRegionBezier 
+
+; Most reasonably-sized bezier curve polylines are approximately 20
+; points or so...
+
+CURVE_POLYLINE_SIZE		= 64 * size Point
+CURVE_POLYLINE_SIZE_INCREMENT	= 128 * size Point
+
+BEZIER_POINT_TOLERANCE	=	2
+; Distance tolerance between control points of a bezier curve 
+
+
+;------------------------------------------------------------------------------
+;		Region Constants
+;------------------------------------------------------------------------------
+
+EOREGREC	=	8000h			; end of region record value
+EOREG_HIGH	=	0x80			; high byte of EOREGREC
+
+;	Return values from GrTestRectInReg
+
+GrTRIRReturnTypes 	etype byte
+GR_RECT_OUT		enum GrTRIRReturnTypes
+GR_RECT_PART		enum GrTRIRReturnTypes
+GR_RECT_IN		enum GrTRIRReturnTypes
+
+EndKernel
+
+

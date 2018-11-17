@@ -1,0 +1,109 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1996 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	PC GEOS
+MODULE:		GTelnet application
+FILE:		gtelnet.def
+
+AUTHOR:		Simon Auyeung, Oct 25, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	10/25/96   	Initial revision
+
+
+DESCRIPTION:
+	Defines the external methods (and internal private methods) that
+	can be used by other applications to talk to gtelnet application.
+		
+	$Id: gtelnet.def,v 1.1 97/04/04 14:26:58 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__GTELNET
+
+;-----------------------------------------------------------------------------
+;			Constants
+;-----------------------------------------------------------------------------
+
+TELNET_DEFAULT_PORT		equ	23
+GTELNET_GEODE_TOKEN		equ	'TELT'
+
+;-----------------------------------------------------------------------------
+;			Class definition
+;-----------------------------------------------------------------------------
+
+GTelnetClass	class	GenProcessClass
+
+GTelnetOpenConnectionStatus	etype	word, 0, 1
+GTOCS_NORMAL			enum	GTelnetOpenConnectionStatus
+; The connection is successfully established.
+
+GTOCS_CONNECTION_IN_USE		enum	GTelnetOpenConnectionStatus
+; The connection fails because there is already a telnet connection going on.
+
+GTOCS_OUT_OF_MEMORY		enum	GTelnetOpenConnectionStatus
+; The connection fails because of no more memory
+
+GTOCS_OUT_OF_DISKSPACE		enum	GTelnetOpenConnectionStatus
+; The connection fails because of no more diskspace.
+
+GTOCS_INTERNAL_ERROR		enum	GTelnetOpenConnectionStatus
+; The connection fails because of internal setup error 
+
+
+GTelnetOpenConnectionParams	struct
+	GTOCP_callbackObject	optr
+	; The object to send the callback message
+	; GTOCP_callbackMessage to and receive the result of the 
+	; requested connection. Pass NULL if no object to notify.
+	;
+	; Passed to callback routine:
+	;   cx	= GTelnetOpenConnectionStatus 
+
+	GTOCP_callbackMessage	word
+	; The callback message sent to callback object specified in
+	; GTOCP_callbackObject. 
+
+	GTOCP_accpnt		word
+	; The access point to use when opening telnet connection. If PPP is
+	; connected, the access point must be the same as the one used by the
+	; current connection.  
+
+	GTOCP_portNum		word
+	; The telnet port to connect to. To use default telnet port, set it
+	; to TELNET_DEFAULT_PORT.
+
+	GTOCP_ipAddr		fptr.TCHAR
+	; Null-terminated resolved or unresolved IP address. The solved IP
+	; address is in numeric format like "123.123.11.22" with ASCII
+	; characters or like "hello.world.com".
+
+	GTOCP_connectionName	fptr.TCHAR
+	; Null-terminated connection name to describe the telnet connection
+	; host.
+
+GTelnetOpenConnectionParams	ends
+
+MSG_GTELNET_OPEN_CONNECTION	message
+;
+; SYNOPSIS:	Ask GTelnet application to open a telnet connection
+;
+; Pass:		ss:bp	= GTelnetOpenConnectionParams on stack
+; Return:	nothing
+;
+;               The result of the connection is returned in the
+;               callback message specified in GTOCP_callbackObject and
+;               GTOCP_callbackMessage.
+;
+; Destroyed:	nothing. 
+;
+GTelnetClass	endc
+

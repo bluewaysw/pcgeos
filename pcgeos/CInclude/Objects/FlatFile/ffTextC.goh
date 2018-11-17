@@ -1,0 +1,570 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PC/GEOS
+ * MODULE:	  ffTextC.goh
+ * FILE:	  ffTextC.goh
+ *
+ * AUTHOR:  	  Jeremy Dashe: Jun 10, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	 Name	Description
+ *	----	 ----	-----------
+ *	6/10/92	 jeremy	Initial version
+ *
+ * DESCRIPTION:
+ *	This file contains class definition for the text classes used
+ *	in the flat file database library.
+ *
+ *
+ * 	$Id: ffTextC.goh,v 1.1 97/04/04 15:50:43 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@optimize
+
+#include <geos.h>
+@include <Objects/FlatFile/ffDbase.goh>
+#include <Objects/FlatFile/ffDPaste.h>
+#include <Objects/FlatFile/ffKbd.h>
+@include <grobj.goh>
+#include <chunkarr.h>
+#include <Objects/Text/tCommon.h>
+
+/**************************************************************************/
+
+@class	FFLabelGuardianClass, MultTextGuardianClass;
+
+/*
+ * MSG_FFLG_INITIALIZE --
+ *	This method sets the FFLG_field instance data to point to the
+ *	guardian of the field that this label is associated with.
+ */
+@message void MSG_FFLG_INITIALIZE(VMBlockHandle vmBlockHandle,
+				  ChunkHandle chunkHandle,
+				  VMFileHandle *file);    
+
+/*
+ * MSG_FFLG_RELEASE_FIELD --
+ * 	This method unlinks a label from its associated field.
+ */
+@message void MSG_FFLG_RELEASE_FIELD();
+
+/*
+ * MSG_FFLG_PASTE_ALERT --
+ * 	This message is sent by the database to labels that 
+ *    	have just been pasted into the layout.  Individual
+ *    	labels need to add themselves to a list that is
+ *    	created by the database so that matching fields can
+ *    	re-attach with their labels.
+ */
+@message void MSG_FFLG_PASTE_ALERT(LabelIDArray *labels = cx:dx);
+
+/*
+ * The FFLG_field is set to point to the field that
+ * this label is associated with.
+ */
+@instance GrObjElementObjPtr FFLG_field;
+@instance GrObjElementObjPtr FFLG_self;
+
+typedef struct {    	    	    	/*  	    	    	    	      */
+    GrObjElementObjPtr FFLG_field;  	/* <= UPDATE ME IF THE ABOVE INSTANCE */
+    GrObjElementObjPtr FFLG_self; 	/* <=  	       DATA CHANGES!   	      */
+} FFLabelGuardianInstanceBlock;	 	/*  	    	    	    	      */
+
+/*
+ * The FFLG_TEMPORARY_WARD_INSTANCE_DATA vardata structure is used when
+ * a label's guardian is pasted in, but its ward does not yet exist.
+ *
+ * The ward's instance data is kept in the vardata block until the ward
+ * gets created.  Then the data is taken from the vardata and copied to
+ * the ward, and the vardata gets nuked.  Simple, eh?
+ */
+
+@vardata optr FFLG_TEMPORARY_WARD_INSTANCE_DATA;
+
+@endc
+
+/**************************************************************************/
+
+@class	FFTextFieldGuardianClass, TextGuardianClass;
+
+/*
+ * MSG_FFTFG_INITIALIZE --
+ *	This method sets the FFTFG_label instance data to point to the
+ *	guardian of the label that this field is associated with, and
+ *	to set the edges on or off.
+ */
+@message void MSG_FFTFG_INITIALIZE(VMBlockHandle vmBlockHandle,
+				   ChunkHandle chunkHandle,
+				   FieldEdgeFlags edgeFlags);
+
+/*
+ * MSG_FFTFG_SET_FIELD_TYPE --
+ *	This message sets the flat file field type for a particular
+ *	field (this one).
+ */
+@message void MSG_FFTFG_SET_FIELD_TYPE(FieldDataType fieldType);
+
+/*
+ * MSG_FFTFG_SET_DISPLAY_FORMAT --
+ *	This message sets the display format for a
+ *    	particular field.
+ */
+@message void MSG_FFTFG_SET_DISPLAY_FORMAT(FormatIdType displayFormat = cx);
+
+/*
+ * MSG_FFTFG_SET_FOR_DATA_ENTRY --
+ * 	This message prepares a field for data entry.  If the
+ *	field type is an editable one, it becomes editable.  Other-
+ *	wise, it becomes non-editable.
+ */
+@message void MSG_FFTFG_SET_FOR_DATA_ENTRY();
+
+/*
+ * MSG_FFTFG_SET_FOR_DESIGN_MODE --
+ * 	This message prepares a field for design mode by setting
+ *	it not editable and requesting the database to set its name.
+ */
+@message void MSG_FFTFG_SET_FOR_DESIGN_MODE();
+
+/*
+ * MSG_FFTFG_SIMPLE_SET_FOR_DESIGN_MODE --
+ * 	This message just sets the inDesignMode flag for fields.
+ *	It is necessary to deal with a bizarre case when switching
+ *	layouts and is not recommended for other user (use 
+ *	MSG_FFTFG_SET_FOR_DESIGN_MODE instead)
+ */
+@message void MSG_FFTFG_SIMPLE_SET_FOR_DESIGN_MODE();
+
+/*
+ * MSG_FFTFG_GET_LABEL_OPTR --
+ *	This message sends back the optr of the label pointed to by
+ *	FFTFG_label.
+ *	Pass this message the document handle associated with this label.
+ */
+@message optr MSG_FFTFG_GET_LABEL_OPTR(VMFileHandle documentHandle);
+
+/*
+ * MSG_FFTFG_RELEASE_LABEL --
+ * 	This method unlinks a field from its associated label.
+ */
+@message void MSG_FFTFG_RELEASE_LABEL();
+
+/*
+ * MSG_FFTFG_SET_EDGES --
+ *	This message sets which of a field's four border lines will be drawn.
+ *	Pass it FieldEdgeFlags to indicate which lines to draw, and a
+ *	Boolean whether to redraw or not.
+ */
+@message void MSG_FFTFG_SET_EDGES(FieldEdgeFlags edges, Boolean redraw);
+
+/*
+ * MSG_FFTFG_PING --
+ *	This message simply increments a passed flag.  Used to detect if
+ *	at least one FFTFG exists in a grobj body.
+ */
+@message void MSG_FFTFG_PING(word *incrementMe = cx:dx);
+
+/*
+ * MSG_FFTFG_PASTE_ALERT --
+ * 	This message is sent by the database to fields that 
+ *    	have just been pasted into the layout.  Individual
+ *    	fields need to tell the database about their existence
+ *    	so that new fields can be created for them (or old
+ *    	ones inserted into the current layout).
+ *
+ *    	The address to an array of labels is passed as well,
+ *    	for field GrObjects to look through and see if there
+ *    	is a matching label that is to be re-attached to
+ *    	its field.  If a matching label is found, it is removed
+ *    	from the array to speed up later searches.
+ */
+@message void MSG_FFTFG_PASTE_ALERT(LabelIDArray *labels = cx:dx);
+
+/*
+ * MSG_FFTFG_NUKE_FIELD --
+ *	This message is sent when the current field is to be deleted with
+ *	no user- or database verification.
+ */
+@message void MSG_FFTFG_NUKE_FIELD();
+
+/* MSG_FFTFG_UPDATE_PAGE_NUMBER --
+ * 	This message is sent when all page number fields should
+ * 	update themselves with a new page number.
+ */
+@message void MSG_FFTFG_UPDATE_PAGE_NUMBER();
+
+/*
+ * MSG_FFTFG_UPDATE_UI_BLOCK --
+ * 	This message is called when one or more fields become
+ *	selected, and the various field appearence controllers
+ *    	need to be updated.
+ *
+ *      What we'll do here is take the passed data block and
+ *    	describe our appearence via edge flags and format
+ *    	tokens.  If there are different edge flags set, we'll
+ *    	set the corresponding "indeterminate" flags.
+ */
+@message void MSG_FFTFG_UPDATE_UI_BLOCK(MemHandle appearenceChangeBlock);
+
+/*
+ * MSG_FFTFG_RESET_DEFINED_TYPE --
+ *	This message is passed immediately on to our ward, which checks
+ *	to see if the passed format id type matches its current id type.
+ *	If there's a match, the current type is replaced with the newFormat.
+ */
+@message void MSG_FFTFG_RESET_DEFINED_TYPE(FormatIdType formatToReset,
+					   FormatIdType newFormat);
+
+/*
+ * MSG_FFTFG_GET_DISPLAY_ARRAY_ELEMENT --
+ *	Used for export to build array of display formats (from current
+ *	layout) for each field.
+ */
+typedef struct {
+    FormatIdType    *GDAI_displayArray;     	/* display array to fill in */
+    FieldID 	    *GDAI_layoutNameList;	/* FFI_layoutNameList */
+    byte    	    GDAI_numInLayoutNameList;	/* number in above */
+} GetDisplayArrayInfo;
+@message void MSG_FFTFG_GET_DISPLAY_ARRAY_ELEMENT(
+				Segment getDisplayArrayInfoSegment = cx,
+				word getDisplayArrayInfoOffset = dx);
+
+
+/*************************************************************************
+ ***	    Instance data for the FFTextFieldGuardianClass
+ ***
+ ***			  ***> WARNING! <***
+ ***
+ ***	    If you change the instance data in any way, BE SURE to
+ ***	    update the FFTFGInstanceData structure!
+ ***	    REALLY BAD THINGS will happen if you don't!
+ *************************************************************************/
+
+/*
+ * The FFTFG_fieldType is the data type asociated with this field.
+ */
+@instance FieldDataType FFTFG_fieldType;
+
+/*
+ * The FFTFG_label is set to point to the label that
+ * this field is associated with.
+ */
+@instance GrObjElementObjPtr FFTFG_label;
+
+/*
+ * The FFTFG_edgeFlags indicate which of a field's four border
+ * edges are to be drawn.
+ */
+@instance FieldEdgeFlags FFTFG_edgeFlags = FEF_ALL_EDGES;
+
+typedef struct {    	    	    	/*  	    	    	    	      */
+    FieldDataType FFTFG_fieldType;  	/* <= UPDATE ME IF THE ABOVE INSTANCE */
+    GrObjElementObjPtr FFTFG_label; 	/* <=  	       DATA CHANGES!   	      */
+    FieldEdgeFlags FFTFG_edgeFlags; 	/* <= 	     	  	    	      */
+} FFTFGInstanceData;	    	 	/*  	    	    	    	      */
+
+/**************************************************************************
+ ***	    End of instance data for the FFTextFieldGuardianClass.
+ ***
+ ***        See the above note if you've just added or changed existing
+ ***        instance data!
+ **************************************************************************/
+
+/*
+ * The FFTFG_NUKE_FLAG vardata item is used to indicate that the current
+ * field should be deleted without asking permission from the user or
+ * notification to the database.
+ */
+@vardata Boolean FFTFG_NUKE_FLAG;
+
+/*
+ * The FFTFG_TEMPORARY_WARD_INSTANCE_DATA vardata structure is used when
+ * a field's guardian is pasted in, but its ward does not yet exist.
+ *
+ * The ward's instance data is kept in the vardata block until the ward
+ * gets created.  Then the data is taken from the vardata and copied to
+ * the ward, and the vardata gets nuked.  Simple, eh?
+ */
+
+@vardata optr FFTFG_TEMPORARY_WARD_INSTANCE_DATA;
+
+@endc
+
+/**************************************************************************/
+
+@class 	FFTextClass, GrObjTextClass;
+
+/*
+ * MSG_FFT_INITIALIZE --
+ *	This method sets FFT_fieldColumn with the column number of
+ *	the field associated with this text object.
+ */
+@message void MSG_FFT_INITIALIZE(FieldID colNum);
+
+/*
+ * MSG_FFT_SET_FIELD_TYPE --
+ *	This message sets the flat file field type for a
+ *	particular field.  If the resetIfChange flag is
+ *    	set, the display format won't be changed unless the
+ *    	field type has changed.
+ */
+@message void MSG_FFT_SET_FIELD_TYPE(FieldDataType fieldType,
+				     Boolean resetIfChanged);
+
+/*
+ * MSG_FFT_SET_DISPLAY_FORMAT --
+ *	This message sets the display format for a
+ *    	particular field.
+ */
+@message void MSG_FFT_SET_DISPLAY_FORMAT(FormatIdType displayFormat);
+
+/*
+ * MSG_FFT_SET_FOR_DESIGN_MODE --
+ * 	This message causes a field to ignore target losses and
+ *    	requests to be filled with a "#" for a page number type
+ *    	or the field name otherwise.
+ */
+@message void MSG_FFT_SET_FOR_DESIGN_MODE();
+
+/*
+ * MSG_FFT_SIMPLE_SET_FOR_DESIGN_MODE --
+ * 	This message just sets the inDesignMode flag for fields.
+ *	It is necessary to deal with a bizarre case when switching
+ *	layouts and is not recommended for other user (use 
+ *	MSG_FFT_SET_FOR_DESIGN_MODE instead)
+ */
+@message void MSG_FFT_SIMPLE_SET_FOR_DESIGN_MODE();
+
+/*
+ * MSG_FFT_SET_FOR_DATA_ENTRY_MODE --
+ * 	This message causes a field to listen to target losses (if it
+ *	is of a type that should).
+ */
+@message void MSG_FFT_SET_FOR_DATA_ENTRY_MODE();
+
+/*
+ * MSG_FFT_SEND_FIELD_COLUMN --
+ *	This method sends the field column a text field is associated
+ *	with to the flat file database.
+ */
+@message void MSG_FFT_SEND_FIELD_COLUMN();
+
+/*
+ * MSG_FFT_SEND_FIELD_NAVIGATION_INFO --
+ *	This message sends the flat file library a notification that
+ *	a navigation key (TAB, CR, etc.) has been intercepted.
+ */
+@message void MSG_FFT_SEND_FIELD_NAVIGATION_INFO(ShortcutCode shortcut);
+
+/*
+ * MSG_GET_FIELD_COLUMN_FROM_TEXT_OBJECT --
+ *	Returns the field column # associated with this text field.
+ */
+@message FieldID MSG_GET_FIELD_COLUMN_FROM_TEXT_OBJECT();
+
+/*
+ * MSG_FFT_GET_FIELD_NAME --
+ * 	This message fills a text buffer with a field's name.
+ *	Pass a buffer in which to place the name.    
+ */
+@message void MSG_FFT_GET_FIELD_NAME(char *fieldName);
+
+/*
+ * MSG_FFT_ASK_FOR_FIELD_NAME --
+ *	This message causes a text field to ask to be filled with
+ *	its field name.
+ */
+@message void MSG_FFT_ASK_FOR_FIELD_NAME();
+
+/*
+ * MSG_FFD_GET_DOCUMENT_HANDLE --
+ *	This message returns the VMFileHandle for the current database.
+ */
+@message VMFileHandle MSG_FFT_GET_DOCUMENT_HANDLE();
+
+/*
+ * MSG_FFT_FIELD_HAS_DEPENDENCIES --
+ *	This function queries the database to see if the field
+ *    	we represent is depended upon or not.  TRUE is returned
+ *    	if the field has dependentss, FALSE is returned otherwise.
+ */
+@message Boolean MSG_FFT_FIELD_HAS_DEPENDENCIES();
+
+/*
+ * MSG_FFT_REPORT_DEMISE --
+ *	This message tells the flat file that we're being nuked.
+ *	
+ *	If the reallyNuke flag is set, tell the database to
+ *    	delete the field entirely, not just remove it from the
+ *    	current layout.
+ */
+@message void MSG_FFT_REPORT_DEMISE(Boolean reallyNuke);
+
+/*
+ * MSG_FFT_REPORT_PASTED_FIELD --
+ *
+ * 	This message calls the database reporting that a field
+ *    	has just been pasted into the database.
+ *
+ *	Its database, guardian, and label optrs comprise the args.
+ */
+@message void MSG_FFT_REPORT_PASTED_FIELD(optr database,
+					  optr guardian,
+					  optr label);
+
+/*
+ * MSG_FFT_WRITE_INSTANCE_TO_TRANSFER --
+ *	This message loads a FFTextGuardianAndWardInstanceDataStruct
+ *	with a FFText's instance data.
+ */
+@message void MSG_FFT_WRITE_INSTANCE_TO_TRANSFER(FFTInstanceData *indata);
+
+/*
+ * MSG_FFT_READ_INSTANCE_FROM_TRANSFER --
+ *	This message loads a FFText's instance data from a passed
+ *	FFTInstanceData structure.
+ */
+@message void MSG_FFT_READ_INSTANCE_FROM_TRANSFER(FFTInstanceData *indata);
+
+/*
+ * MSG_FFT_DISPLAY_FIELD_CONTENTS --
+ * 	This method displays a cell's data as defined by the
+ *   	field's display type.
+ *
+ *    	Pass a pointer to the cell's data and a handle to a text
+ *	buffer at least MAX_TEXT_FIELD_LENGTH in size.  Also pass
+ *    	a flag to determine if the field should be shown formatted
+ *    	or "raw."
+ *
+ */
+@message void MSG_FFT_DISPLAY_FIELD_CONTENTS(CellCommon *dataCellPtr,
+					     MemHandle textHandle,
+					     Boolean formatField);
+
+/*
+ * MSG_FFT_RETURN_FORMAT_TYPE --
+ *	This method returns the field's current format type token.
+ */
+@message FormatIdType MSG_FFT_RETURN_FORMAT_TYPE();
+
+/*
+ * MSG_FFT_RESET_DEFINED_TYPE --
+ *	This message is checks to see if the passed format id type
+ *	matches our own current id type. If there's a match, the current
+ *	type is replaced with the newFormat.
+ */
+@message void MSG_FFT_RESET_DEFINED_TYPE(FormatIdType formatToReset,
+					 FormatIdType newFormat);
+
+/*
+ * MSG_FFT_GET_DISPLAY_ARRAY_ELEMENT --
+ *	Used for export to build array of display formats (from current
+ *	layout) for each field.
+ */
+@message void MSG_FFT_GET_DISPLAY_ARRAY_ELEMENT(
+				    GetDisplayArrayInfo *getDisplayArrayInfo);
+
+typedef struct {
+	word	FVVCGSRP_ax;
+	word	FVVCGSRP_bp;
+	word	FVVCGSRP_cx;
+	word	FVVCGSRP_dx;
+} FixedVisVupCreateGStateReturnParams;
+@alias (MSG_VIS_VUP_CREATE_GSTATE) Boolean MSG_FIXED_VIS_VUP_CREATE_GSTATE(FixedVisVupCreateGStateReturnParams *retValue = axbpcxdx);
+
+/*************************************************************************
+ ***	    Instance data for the FFTextClass
+ ***
+ ***			  ***> WARNING! <***
+ ***
+ ***	    If you change the instance data in any way, BE SURE to
+ ***	    update the FFTInstanceData structure!
+ ***	    REALLY BAD THINGS will happen if you don't!
+ *************************************************************************/
+
+/*
+ * FFT_fieldColumn is set to the specific column number for this field.
+ */
+@instance FieldID FFT_fieldColumn;
+
+/*
+ * FFT_inDesignMode is set when the database is in -- you guessed it --
+ * design mode.  The field shouldn't request validation when it
+ * loses the target and when it should temporarily clear itself of
+ * text when printing.
+ */
+@instance Boolean FFT_inDesignMode = TRUE;
+
+/*
+ * FFT_fieldType is identical to our ward's FFTFG_fieldType.  It's kept
+ * locally to speed up redrawing the field's data.
+ */
+@instance FieldDataType FFT_fieldType;
+
+/*
+ * FFT_displayFormat is a FormatIdType used to configure what data is
+ * to look like when displayed.
+ */
+@instance FormatIdType FFT_displayFormat = FORMAT_ID_GENERAL;
+
+/*
+ * FFT_navigating is used much like FFT_inDesignMode, but is specifically
+ * used when field navigation is happening.
+ */
+@instance Boolean FFT_navigating = FALSE;
+
+typedef struct {
+    FieldID FFT_fieldColumn;	    	/* <= 	    	    	    	      */
+    Boolean FFT_inDesignMode;	    	/* <= UPDATE ME IF THE ABOVE INSTANCE */
+    FieldDataType FFT_fieldType;    	/* <=  	       DATA CHANGES!   	      */
+    FormatIdType FFT_displayFormat; 	/* <= 	     	  	    	      */
+    Boolean FFT_navigating; 	    	/* <=	    	    	    	      */
+
+    VisTextCharAttr FFT_charAttrs;  	/* <- These are independant of in-    */
+    VisTextParaAttr FFT_paraAttrs;  	/* <- stance data because they were   */
+    	    	    	    	    	/*    handiest to cut/paste this way. */
+} FFTInstanceData;
+
+/**************************************************************************
+ ***	    End of instance data for the FFTextClass.
+ ***
+ ***        See the above note if you've just added or changed existing
+ ***        instance data!
+ **************************************************************************/
+
+@endc
+
+/**************************************************************************/
+
+/*
+ * The infamous FFTextGuardianAndWardInstanceDataStruct structure.
+ * This structure is used when cut-/copy-/pasting fields to/from the
+ * clipboard.
+ *
+ * It is intended to be the same size and content as the combined instance
+ * data for the FFTextFieldGuardianClass and the FFTextClass.  If either
+ * of the two classes' instance data changes, be sure to reflect the changes
+ * here and in ffDatabaseFields.goc.
+ */
+typedef struct {
+    FFTFGInstanceData	g_indata;    /* FFTextFieldGuardianClass instance data */
+    FFTInstanceData 	t_indata;    /* FFTextClass instance data */
+} FFTextGuardianAndWardInstanceDataStruct;
+    
+/*
+ * The infamous FFLabelGuardianAndWardInstanceDataStruct structure.
+ * This structure is used when cut-/copy-/pasting labels to/from the
+ * clipboard.
+ *
+ * It is intended to be the same size and content as the combined instance
+ * data for the FFLabelFieldGuardianClass and the FFTextClass.  If either
+ * of the two classes' instance data changes, be sure to reflect the changes
+ * here and in ffDatabaseFields.goc.
+ */
+typedef struct {
+    FFLabelGuardianInstanceBlock g_indata;   /* FFLabelGuardian instance data */
+    FFTInstanceData 	t_indata;    	     /* FFTextClass instance data */
+} FFLabelGuardianAndWardInstanceDataStruct;

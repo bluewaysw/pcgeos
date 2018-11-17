@@ -1,0 +1,174 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Printer/Fax/CCom
+FILE:		ccomConstant.def
+
+AUTHOR:		Adam de Boor, Jan 31, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	1/31/91		Initial revision
+
+
+DESCRIPTION:
+	Constants for this here kludged driver.
+		
+	$Id: ccomConstant.def,v 1.1 97/04/18 11:52:38 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;==============================================================================
+;
+;			Printer Driver Constants
+;
+;==============================================================================
+
+PR_MARGIN_LEFT		= 18
+PR_MARGIN_RIGHT		= 18
+PR_MARGIN_TOP		= 18
+PR_MARGIN_BOTTOM	= 18
+
+STD_RES_X_RES		= FAX_HORIZ_RES
+STD_RES_Y_RES		= FQ_STANDARD
+STD_RES_BAND_HEIGHT	= 60
+STD_RES_BYTES_COLUMN	= 1				; not used
+
+HI_RES_X_RES		= FAX_HORIZ_RES
+HI_RES_Y_RES		= FQ_FINE
+HI_RES_BAND_HEIGHT	= 60
+HI_RES_BYTES_COLUMN	= 1				; not used
+
+LEFT_MARGIN_OFFSET	= ((PR_MARGIN_LEFT * STD_RES_X_RES) / 72)	; pixels
+TOP_MARGIN_OFFSET_MED	= ((PR_MARGIN_TOP * STD_RES_Y_RES) / 72 )	; pixels
+TOP_MARGIN_OFFSET_HIGH	= ((PR_MARGIN_TOP * HI_RES_Y_RES) / 72 )	; pixels
+
+DR_PRINT_LAST_RESIDENT	= DR_PRINT_HOME_CURSOR
+
+PHONE_NUMBER_LENGTH	= 28
+COVER_SHEET_MSG_LENGTH	= 256
+
+FaxQuality	etype	word
+    FQ_STANDARD	enum	FaxQuality, 98	; standard (98 dpi vertical) resolution
+    FQ_FINE	enum	FaxQuality, 196	; fine (196 dpi vertical) resolution
+
+FAX_HORIZ_RES	equ	204		; 204 dpi horizontal resolution
+
+CCOM_FILE_CREATE_FLAGS equ (FILE_CREATE_NO_TRUNCATE or mask FCF_NATIVE) shl 8
+
+CONVERT_BUFFER_SIZE		equ	4096	; Size of buffer for CFAX tokens
+
+FAX_BAND_WIDTH			equ	1728	; Fax is always 1728 pixels wide
+FAX_BAND_HEIGHT			equ	60	; For now...
+
+ENOUGH_BYTES_TO_FIT_PHONE_NUMBER	= 10
+;==============================================================================
+;
+;		       Internal Data Structures
+;
+;==============================================================================
+
+CFFrame	struct
+    CFF_faxFileHeader		FaxFileHeader <>
+    CFF_dumbToken	byte	EOL_TOKEN
+    CFF_waitQueueEntry		WaitQueue <>
+    CFF_sendFileEntry		SendFileElement <>
+    CFF_convertFileEntry	ConvertFileElement <>
+    CFF_sequenceNum	dword
+    CFF_sequenceStart	word
+    CFF_adminFileName	char	13 dup(?)
+    CFF_numPages	word		; Number of pages in the fax
+    CFF_curPage		word		; Current page number
+    CFF_curPageFile	hptr		; File handle of current page
+    CFF_outBufSeg	sptr		; Output buffer for conversion
+    CFF_outBufHan	hptr		; Output buffer handle
+    CFF_pageHeight	word		; Scaled scanlines in output page
+    CFF_curScan		word		; Current scanline in output page.
+    CFF_pageStart	dword		; Position of page in spool file
+    CFF_sendFileHan	hptr		; Handle open to S#~ file.
+    CFF_convFileHan	hptr		; Handle open to C#~ file.
+    CFF_coverSheet	word	FALSE	; TRUE of FALSE for cover sheet
+    CFF_phoneNum	char	28 dup (?)	; holding phone numbe
+    even
+CFFrame	ends
+
+
+
+
+;==============================================================================
+;
+;		       User Interface definitions
+;
+;==============================================================================
+
+FaxInfoClass		class	GenInteractionClass
+
+;-----------------------------------------------------------------------------
+;	MESSAGES		
+;-----------------------------------------------------------------------------
+
+MSG_FAX_INFO_SET_COVER_SHEET		message
+;	Pass:	cx = TRUE/FALSE if fax cover sheet to added
+;
+
+ 
+MSG_FAX_INFO_SET_PAGE_RANGE		message
+;	Pass:	cx	= start page
+;		dx	= end page
+;	Return:	nothing
+
+MSG_FAX_INFO_WANTS_GEODEX		message
+;	Pass:	nothing
+;	Return:	nothing
+	
+MSG_FAX_INFO_CHECK_INPUT		message
+;	Pass:	nothing
+;	Return:	carry set if input form is ok
+;
+;	The handler for this method will notify the user of the
+;	error of his/her ways.
+;
+
+MSG_FAX_INFO_SEARCH_GEODEX		message
+;	Pass:	cx	= handle of GeoDex process
+;	Return:	nothing
+;
+;	Sends a MSG_ROLODEX_REQUEST_SEARCH to the passed process
+;	sending the text in the PhoneNumber field, clearing said
+;	field out.
+;
+
+;-----------------------------------------------------------------------------
+;	INSTANCE DATA		
+;-----------------------------------------------------------------------------
+ 
+		
+	FII_numPages	word		0
+FaxInfoClass		endc
+
+
+
+;==============================================================================
+;
+;			Fatal Error Constants
+;
+;==============================================================================
+PARTIAL_IMAGE_TOKEN_NOT_ALLOWED				enum	FatalErrors
+INVALID_DRIVER_FUNCTION					enum	FatalErrors
+CANNOT_CREATE_CONVERT_LIST_FILE				enum	FatalErrors
+CANNOT_CREATE_RECIPIENT_LIST_FILE			enum	FatalErrors
+
+UI_FAX_BAD_PHONE_NUMBER					enum	FatalErrors
+UI_FAX_COULD_NOT_FIND_SPOOL_SUMMONS			enum	FatalErrors
+FILE_ENUM_ERROR						enum	FatalErrors
+
+ERROR_WRITING_TO_CONVERT_FILE				enum	Warnings
+ERROR_WRITING_TO_SEND_FILE				enum	Warnings
+ERROR_WRITING_TO_RECIPIENT_FILE				enum	Warnings
+
+ERROR_WRITING_TO_DATA_FILE				enum	Warnings
+ERROR_WRITING_TO_SEQUENCE_FILE				enum	Warnings
+ERROR_WRITING_TO_WAITQUE_FILE				enum	Warnings

@@ -1,0 +1,68 @@
+#!/bin/sh
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1994 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Shell scripts
+# FILE: 	nmake
+# AUTHOR: 	Chris Boyke
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	chrisb	6/7/94		Initial Revision
+#
+# DESCRIPTION:
+#
+# Compile a geode and send it to the directory pointed to by the NET
+# environment variable
+#
+# Usage:
+#	nmake 
+# OR
+#	nmake -n <non-ec geode name>
+#
+#	$Id: nmake,v 1.4 95/01/31 22:04:24 chrisb Exp $
+#
+
+if [ "$1" = "-x" ]; then
+    set -x
+    shift
+fi
+
+
+# See if we're making non-ec, and if so, download the correct file
+# (Note:  caller still needs to pass name of non-ec geode.)
+
+if [ "$1" = "-n" ]; then
+    pcsArg=$1
+    shift
+fi
+
+
+# Check for a product subdirectory as the first argument
+
+pcsDir="."
+
+if [ "$1" != "" ]; then
+
+    # Snarf the first component of the first argument and see if it's
+    # a valid subdirectory
+
+    argDir=`expr $1 : '\([^/]*\).*'`
+    if [ -d "$argDir" ]; then
+        pcsDir=$argDir
+    fi
+fi
+
+if ( pmake $PMFLAGS $* ); then
+    if [ -f SENDCMD ]; then
+	# Allow copying to a non-standard directory
+	cat SENDCMD
+	SENDCMD
+    else
+        cd $pcsDir
+	pcs -D -u $pcsArg -d$NET
+    fi
+fi

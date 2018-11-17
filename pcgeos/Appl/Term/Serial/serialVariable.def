@@ -1,0 +1,187 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	GeoComm
+MODULE:		Serial
+FILE:		serialVariable.def
+
+AUTHOR:		Dennis Chow, September 6, 1989
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dc      9/6/89		Initial revision.
+	eric	9/90		documentation update
+
+
+DESCRIPTION:
+	Variables local to this module.
+		
+	$Id: serialVariable.def,v 1.1 97/04/04 16:55:41 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-------------------------------------------------------------------------	
+; 			initialized variables
+;-------------------------------------------------------------------------	
+
+;class definition for SerialReaderClass.
+
+idata	segment
+
+SerialReaderClass     mask    CLASSF_NEVER_SAVED
+
+;this Semaphore is used by the application thread to block until the
+;serial thread (GeoComm #1) is fully awake.
+
+startSem	Semaphore <0,0>		;initially locked.
+
+;
+; This mutex is for exclusive access between closing com port and
+; read/writing com port.
+;
+serialMutex	Semaphore <1, 0>	;initially unlocked
+
+if _LOGIN_SERVER
+;
+; The login server variables are used by more than one thread, so we must
+; protect them with a semaphore.
+;
+loginSem		Semaphore <1, 0>	; only 1 thread may use
+						; callback at a time.
+
+loginPhase		LoginPhase LP_NONE	; currently in login mode?
+
+endif ; _LOGIN_SERVER
+idata	ends
+
+;-------------------------------------------------------------------------	
+; 			unitialized variables
+;-------------------------------------------------------------------------	
+
+udata	segment
+
+serialFormat	db	(?)	;format of data line
+serialState	db	(?)	;state of serial driver 
+inputChar	db	(?)	;char to hold first char read
+
+;this buffer is filled with up to 1K of input data from the Stream Driver.
+;If the serialSuspendInput flag is TRUE, then we are executing a script,
+;and therefore DO NOT want to read more chars into this buffer.
+
+auxBuf		db	AUX_BUF_SIZE dup (?) 	;buffer to hold serial data
+;
+; these buffers are for DBCS conversion between Unicode and DOS code pages
+; they are only used in routines run under the serial thread (check with
+; ECCheckRunBySerialThread), so they are consistent throughout the calling
+; routine
+;
+DBCS <convertBuf		wchar	AUX_BUF_SIZE dup (?)		>
+DBCS <convertBuf2		wchar	AUX_BUF_SIZE dup (?)		>
+
+auxHead		dw 	(?)	;offset into dgroup to the start of unprocessed
+				;data in [auxBuf].
+auxNumChars	dw 	(?)	;number of remaining unprocessed chars in
+				;[auxBuf].
+
+;misc flags
+
+serialFlowCtrl	dw	(?)	;current flow control
+
+serialPort	dw	(?)	;com port we are using
+
+serialBaud	dw	(?)	;baud rate for the port
+
+serialDriver	fptr		;serial driver strategy
+
+if _LOGIN_SERVER
+
+;
+; When acting as login server, old values are saved here.
+;
+serialPortSaved	dw	(?)
+serialDriverSaved	fptr.far
+
+;
+; Store values pased in LoginAttachInfo (Internal/login.def)
+;
+
+loginInitVars		LoginInitInfo
+loginAttachVars		LoginAttachInfo
+
+
+endif ; _LOGIN_SERVER
+
+threadHandle	hptr	(?)	;handle to serial thread
+
+;the following variables should be considered instance data for the
+;Script object, when it is created.
+
+serialThreadMode SerialThreadMode
+    ;STM_NORMAL		enum SerialThreadMode
+    ;			;file send, receive, or just plain terminal mode
+    ;
+    ;STM_SCRIPT_SUSPEND	enum SerialThreadMode
+    ;			;suspending input from host while script is
+    ;			;executing. Term thread will be parsing script.
+    ;
+    ;STM_SCRIPT_PROMPT	enum SerialThreadMode
+    ;			;scanning input from host for a match. Term thread
+    ;			;will be blocked on a timer.
+    ;
+    ;STM_SCRIPT_PAUSE	enum SerialThreadMode
+    ;			;ignoring input (just displaying it) from host.
+    ;			;Term thread will be blocked on a timer.
+
+;serialSuspendInput db	(?)	;TRUE when executing a script, and so want
+;				;to prevent auxBuf from being re-filled
+;				;until we have processed the data currently
+;				;in it.
+
+if	_MODEM_STATUS
+
+;
+; The mode response buffer stores a line of characters for parsing the modem
+; response. 
+;
+responseBufPtr		fptr		; fptr to response buffer
+responseAuxHead		nptr		; ptr to where to save data from
+					; serial line when we are checking
+					; modem status
+responseType		TermModemResponseType
+					; current response type
+termResponseTimer	hptr		; handle to timer
+termResponseTimerID	word		; ID of timeout event
+
+endif	; if _MODEM_STATUS
+
+udata	ends
+
+if _GET_FLOW_CONTROL_FROM_INI
+
+idata	segment
+; These strings are temporary, used to help us dynamically set flow
+; control to see what works, and what doesn't.
+
+terminalCat	char "terminal", C_NULL
+serialFlowKey	char "flowControl", C_NULL
+
+idata	ends
+endif
+
+if	_MODEM_STATUS
+	
+idata	segment
+	
+responseBufHandle	hptr	NULL	; block storing a line of chars
+responseReplySem	Semaphore <0,0>	; initially locked
+modemInitStart		byte	FALSE	; indicate modem init string is
+					; sending. 
+
+
+	
+idata	ends
+	
+endif	; if _MODEM_STATUS

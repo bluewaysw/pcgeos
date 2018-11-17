@@ -1,0 +1,350 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  GeoSafari Builder
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+@include "safbuild.goh"
+@include "global.goh"
+
+@classdecl      QuestionDialogClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg UICode
+#endif
+
+
+/***********************************************************************
+ *	MSG_QUESTION_DIALOG_SHOW_HIDE
+ ***********************************************************************
+ * SYNOPSIS:	    Show or hide part of the dialog
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+/*@method QuestionDialogClass, MSG_QUESTION_DIALOG_SHOW_HIDE
+{
+    @call oself::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    if (@call QOther::MSG_GEN_GET_USABLE()) {
+	@call QOther::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    } else {
+	@call QOther::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+    @call oself::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    @call oself::MSG_GEN_INTERACTION_INITIATE();
+} */
+
+
+
+/***********************************************************************
+ *	MSG_QUESTION_DIALOG_SET_INDICATOR
+ ***********************************************************************
+ * SYNOPSIS:	    Set the indicator number
+ * PASS:            indNum
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_QUESTION_DIALOG_SET_INDICATOR
+{
+    GenValueStateFlagsAsWord foo;
+    foo.GVSFAW_flags = 0;
+
+    /*
+     * update the UI
+     */
+    @call QIndicator::MSG_GEN_VALUE_SET_INTEGER_VALUE(indNum+1, 0);
+    /*
+     * update the indicators
+     */
+    @call oself::MSG_QUESTION_DIALOG_SET_INDICATOR_GV(MakeWWFixed(indNum+1),foo);
+}
+
+
+/***********************************************************************
+ *	MSG_QUESTION_DIALOG_SET_INDICATOR_GV
+ ***********************************************************************
+ * SYNOPSIS:	    Set the indicator number (actual num+1)
+ * PASS:            value - value as WWFixedAsDWord
+ *                  stateFlags - GenValueStateFlagsAsWord
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_QUESTION_DIALOG_SET_INDICATOR_GV
+{
+    IndicatorState istate;
+    optr ind;
+
+    @call QuestionDB::MSG_GEN_MAKE_APPLYABLE();
+    /*
+     * update the indicators
+     */
+    if (@call QuizOptionsList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & SFO_NO_LEDS) {
+	istate = IS_DISABLED;
+    } else {
+	istate = 0;
+    }
+    @call LeftIndicatorGroup::MSG_INDICATOR_GROUP_SET_ALL(istate);
+    /*
+     * set the new one on
+     */
+    ind = @call LeftIndicatorGroup::MSG_INDICATOR_GROUP_GET_NTH(IntegerOf(value)-1);
+    if (ind) {
+	@call ind::MSG_INDICATOR_SET_STATE(IS_ON);
+    }
+}
+
+
+/***********************************************************************
+ *	MSG_QUESTION_DIALOG_CLOSE
+ ***********************************************************************
+ * SYNOPSIS:	    Close the dialog
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_QUESTION_DIALOG_CLOSE
+{
+@if 0
+    EventHandle msg;
+@endif
+
+    /*
+     * close the dialog
+     */
+    @call oself::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+    /*
+     * save any changes
+     */
+@if 0
+    msg = @record SafBuildDocumentClass::MSG_SAFBUILD_DOCUMENT_SAVE_QUESTION();
+    @send SafBuildApp::MSG_META_SEND_CLASSED_EVENT(msg, TO_APP_MODEL);
+@endif
+}
+
+
+
+/***********************************************************************
+ *	MSG_QUESTION_DIALOG_CHANGE_SELECTION_LEFT
+ ***********************************************************************
+ * SYNOPSIS:	    change the left coord
+ * PASS:            value - WWFixed
+ *                  stateFlags - GenValueStateFlagsAsWord
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_QUESTION_DIALOG_CHANGE_SELECTION_LEFT
+{
+    word left, top, right, bottom;
+
+    @call QuestionDB::MSG_GEN_MAKE_APPLYABLE();
+    left = @call QBLeft::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    right = @call QBRight::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    if (left > right) {
+	right = left;
+    }
+    top = @call QBTop::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    bottom = @call QBBottom::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    @call TheGameCard::MSG_SB_GAME_CARD_SET_SELECTION(left,top,right,bottom);
+}
+
+
+
+/***********************************************************************
+ *	MSG_QUESTION_DIALOG_CHANGE_SELECTION_TOP
+ ***********************************************************************
+ * SYNOPSIS:	    change the top coord
+ * PASS:            value - WWFixed
+ *                  stateFlags - GenValueStateFlagsAsWord
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_QUESTION_DIALOG_CHANGE_SELECTION_TOP
+{
+    word left, top, right, bottom;
+
+    @call QuestionDB::MSG_GEN_MAKE_APPLYABLE();
+    left = @call QBLeft::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    right = @call QBRight::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    top = @call QBTop::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    bottom = @call QBBottom::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    if (top > bottom) {
+	bottom = top;
+    }
+    @call TheGameCard::MSG_SB_GAME_CARD_SET_SELECTION(left,top,right,bottom);
+}
+
+
+
+/***********************************************************************
+ *	MSG_QUESTION_DIALOG_CHANGE_SELECTION_RIGHT
+ ***********************************************************************
+ * SYNOPSIS:	    change the right coord
+ * PASS:            value - WWFixed
+ *                  stateFlags - GenValueStateFlagsAsWord
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_QUESTION_DIALOG_CHANGE_SELECTION_RIGHT
+{
+    word left, top, right, bottom;
+
+    @call QuestionDB::MSG_GEN_MAKE_APPLYABLE();
+    left = @call QBLeft::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    right = @call QBRight::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    if (right < left) {
+	left = right;
+    }
+    top = @call QBTop::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    bottom = @call QBBottom::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    @call TheGameCard::MSG_SB_GAME_CARD_SET_SELECTION(left,top,right,bottom);
+}
+
+
+/***********************************************************************
+ *	MSG_QUESTION_DIALOG_CHANGE_SELECTION_BOTTOM
+ ***********************************************************************
+ * SYNOPSIS:	    change the bottom coord
+ * PASS:            value - WWFixed
+ *                  stateFlags - GenValueStateFlagsAsWord
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_QUESTION_DIALOG_CHANGE_SELECTION_BOTTOM
+{
+    word left, top, right, bottom;
+
+    @call QuestionDB::MSG_GEN_MAKE_APPLYABLE();
+    left = @call QBLeft::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    right = @call QBRight::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    top = @call QBTop::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    bottom = @call QBBottom::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    if (bottom < top) {
+	top = bottom;
+    }
+    @call TheGameCard::MSG_SB_GAME_CARD_SET_SELECTION(left,top,right,bottom);
+}
+
+
+/***********************************************************************
+ *	MSG_META_TEXT_USER_MODIFIED
+ ***********************************************************************
+ * SYNOPSIS:	    Handle text being modified
+ * PASS:            obj - optr of text object
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/28/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_META_TEXT_USER_MODIFIED
+{
+    @call oself::MSG_GEN_MAKE_APPLYABLE();
+}
+
+
+
+/***********************************************************************
+ *	MSG_VIS_OPEN
+ ***********************************************************************
+ * SYNOPSIS:	    Handle opening
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/28/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_VIS_OPEN
+{
+    pself->QDI_onScreen = TRUE;
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *	MSG_VIS_CLOSE
+ ***********************************************************************
+ * SYNOPSIS:	    Handle closing
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/28/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_VIS_CLOSE
+{
+    pself->QDI_onScreen = FALSE;
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *	MSG_QUESTION_DIALOG_ON_SCREEN
+ ***********************************************************************
+ * SYNOPSIS:	    See if we're on screen
+ * PASS:            none
+ * RETURN:          TRUE if on screen
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/28/99		Initial Revision
+ *
+ ***********************************************************************/
+@method QuestionDialogClass, MSG_QUESTION_DIALOG_ON_SCREEN
+{
+    return(pself->QDI_onScreen);
+}

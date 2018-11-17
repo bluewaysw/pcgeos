@@ -1,0 +1,1848 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		mailboxUI.def
+
+AUTHOR:		Adam de Boor, May 31, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	5/31/94		Initial revision
+
+
+DESCRIPTION:
+	Interface to the UI module.
+	
+	Note that to avoid confusion, object classes defined in this module
+	are *not* prefixed with UI. Mailbox is used instead.
+		
+	$Id: mailboxUI.def,v 1.1 97/04/05 01:20:05 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+UseLib	Objects/emomC.def
+UseLib	Objects/emTrigC.def
+
+;------------------------------------------------------------------------------
+;
+;		      MAILBOX APPLICATION CLASS
+;
+;------------------------------------------------------------------------------
+MailboxApplicationClass	class	GenApplicationClass
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;		QUERY PANEL SUPPORT
+;
+TravelOption	= first MailboxApplicationMessages
+
+if	_CONTROL_PANELS
+
+TO_OUTBOX_TRANSPORT_LIST	enum TravelOption
+; Deliver the message to the OutboxTransportList in the system outbox
+; panel, if it actually exists.
+
+TO_INBOX_APPLICATION_LIST	enum TravelOption
+; Deliver the message to the InboxApplicationList in the system inbox
+; panel, if it actually exists.
+
+TO_SYSTEM_OUTBOX_PANEL		enum TravelOption
+; Deliver the message to the system outbox panel, if it exists.
+
+TO_SYSTEM_INBOX_PANEL		enum TravelOption
+; Deliver the message to the system inbox panel, if it exists.
+
+endif	; _CONTROL_PANELS
+
+if	_CONTROL_PANELS or _SIMPLE_MESSAGE_NOTIFY
+
+MSG_MA_DISPLAY_INBOX_PANEL				message
+; Ensure there's a modified control panel on-screen to display the messages
+; selected by the indicated criteria.
+;
+; When _CONTROL_PANELS is FALSE but _SIMPLE_MESSAGE_NOTIFY is TRUE, this
+; will produce a dialog telling the user there's a new message for the
+; application, but not displaying the message itself.
+;
+; Context:	Sent when notification arrives of an application being
+;		available for messages.
+; Source:	Inbox module
+; Destination:  MailboxApplication
+; Interception: not
+;
+; Pass:
+;		cx	= MailboxDisplayPanelType
+;		^hdx	= MailboxDisplayPanelCriteria
+; Return:
+;		memory block(s) freed
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+endif	; _CONTROL_PANELS or _SIMPLE_MESSAGE_NOTIFY
+
+if	_CONTROL_PANELS
+
+MSG_MA_DISPLAY_SYSTEM_INBOX_PANEL	message	
+; Bring up the system inbox panel showing something reasonable.
+;
+; Context:	Sent by MailboxPanelTrigger object from an express menu
+; Source:	MailboxPanelTrigger
+; Destination:  MailboxApplication
+; Interception: not
+;
+; Pass:
+;		nothing
+; Return:
+;		
+;		- unchanged
+;		- destroyed
+;
+
+endif	; _CONTROL_PANELS
+
+if	_CONTROL_PANELS or _CONNECTED_MEDIUM_NOTIFICATION
+
+MSG_MA_DISPLAY_OUTBOX_PANEL				message
+; Ensure there's a modified control panel on-screen to display the messages
+; selected by the indicated criteria. When panel is MDPT_BY_TRANSPORT, the
+; messages for that transport & address are assumed to be on-screen if there's
+; an MDPT_BY_MEDIUM panel up whose criteria match the BY_MEDIUM criteria that
+; must also be passed.
+;
+; If an MDPT_BY_MEDIUM panel is sought and there's an MDPT_BY_TRANSPORT panel
+; up that matches, that panel will be switched to be MDPT_BY_MEDIUM.
+;
+; Similarly, if an MDPT_BY_MEDIUM panel is found for a specific unit when one
+; for any unit of the medium is sought, that panel will be switched to display
+; for any unit of the medium.
+;
+; When _CONTROL_PANELS is FALSE, this will cause messages for the medium or
+; transport address to be queued for transmission.
+;
+; Context:	Sent when notification arrives of a new medium or connection
+;		being available for messages.
+; Source:	Outbox module
+; Destination:  MailboxApplication
+; Interception: not
+;
+; Pass:
+;		cx	= MailboxDisplayPanelType
+;		^hdx	= MailboxDisplayPanelCriteria
+;		if MDPT_BY_TRANSPORT:
+;			^hbp	= MailboxDisplayPanelCriteria for
+;				  MDPT_BY_MEDIUM
+; Return:
+;		memory block(s) freed
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+endif	; _CONTROL_PANELS or _CONNECTED_MEDIUM_NOTIFICATION
+
+if	_CONTROL_PANELS
+
+MSG_MA_DISPLAY_SYSTEM_OUTBOX_PANEL	message	
+; Bring up the system outbox panel showing something reasonable.
+;
+; Context:	Sent by MailboxPanelTrigger object from an express menu
+; Source:	MailboxPanelTrigger
+; Destination:  MailboxApplication
+; Interception: not
+;
+; Pass:
+;		nothing
+; Return:
+;		
+;		- unchanged
+;		- destroyed
+;
+
+MSG_MA_INBOX_SYS_PANEL_CRITERIA_CHANGED		message
+; Record a different set of criteria for the system inbox control panel,
+; bringing down any specific panels that are displaying the same information.
+;
+; Context:	Sent when the user changes the criteria used by the system
+;		inbox control panel.
+; Source:	MailboxControlPanel
+; Destination:	MailboxApplication
+; Interception:	not
+;
+; Pass:
+;		cx	= MailboxDisplayPanelType
+;		^hdx	= MailboxDisplayPanelCriteria
+; Return:
+;		memory block(s) freed
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+MSG_MA_OUTBOX_SYS_PANEL_CRITERIA_CHANGED		message
+; Record a different set of criteria for the system outbox control panel,
+; bringing down any specific panels that are displaying the same information.
+;
+; Context:	Sent when the user changes the criteria used by the system
+;		outbox control panel.
+; Source:	MailboxControlPanel
+; Destination:	MailboxApplication
+; Interception:	not
+;
+; Pass:
+;		cx	= MailboxDisplayPanelType
+;		^hdx	= MailboxDisplayPanelCriteria
+;		if MDPT_BY_TRANSPORT:
+;			^hbp	= MailboxDisplayPanelCriteria for
+;				  MDPT_BY_MEDIUM
+; Return:
+;		memory block(s) freed
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+endif		; _CONTROL_PANELS
+
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+MSG_MA_ADD_PROGRESS_BOX		message
+; Tells the application there's another progress box that wishes to
+; come on-screen. The application adds the box as a child and sets it usable,
+; then records its OD in an array to allow MSG_MA_UNHIDE_PROGRESS_BOXES
+; to work.
+;
+; Context:	Sent by an MailboxProgressBox object when it receives its
+;		MSG_MPB_SETUP message.
+; Source:	MailboxProgressBox
+; Destination:  Mailbox App Object
+; Interception: not
+;
+; Pass:
+;		^lcx:dx	= progress box
+;		bp	= MPBType
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+MSG_MA_UNHIDE_PROGRESS_BOXES		message	
+; Brings all progress boxes back up on-screen. Used by the outbox control
+; panel.
+;
+; Context:	Sent when the outbox control panel is brought up.
+; Source:	MSG_MA_DISPLAY_OUTBOX_CONTROL_PANEL
+; Destination:  Mailbox App Object
+; Interception: not
+;
+; Pass:
+;		bp	= MPBType
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+if	_CONTROL_PANELS
+
+MailboxAppDisplayPanel	struct
+    MADP_next		lptr.MailboxAppDisplayPanel
+    MADP_panel		optr
+    MADP_type		MailboxDisplayPanelType
+    MADP_criteria	label MailboxDisplayPanelCriteria; followed immediately
+							;  by second MDPC if
+							;  MADP_type is
+							;  MDPT_BY_TRANSPORT
+MailboxAppDisplayPanel	ends
+
+endif	; _CONTROL_PANELS
+
+MailboxPanelBoxData	struct
+if	_CONTROL_PANELS
+    MPBD_system		lptr.MailboxAppDisplayPanel
+    MPBD_panels		lptr.MailboxAppDisplayPanel
+endif	; _CONTROL_PANELS
+
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+    MPBD_progressBoxes	lptr.ChunkArrayHeader
+endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+MailboxPanelBoxData	ends
+
+if	_CONTROL_PANELS or MAILBOX_PERSISTENT_PROGRESS_BOXES
+    MAI_inPanels	MailboxPanelBoxData
+    MAI_outPanels	MailboxPanelBoxData
+endif	; _CONTROL_PANELS or MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;		ADDITIONAL GCN LIST SUPPORT
+;
+
+;
+;			    Notifications
+;
+MSG_MB_NOTIFY_BOX_CHANGE		message	MetaApplicationMessages
+; Notification message sent over MGCNLT_OUTBOX_CHANGE/MGCNLT_INBOX_CHANGE to
+; alert objects defined by this library that the inbox or outbox has changed.
+;
+; Context:	Sent via GCN lists from MSG_MA_BOX_CHANGED
+; Source:	MailboxApplicationClass
+; Destination:	Any class defined by the Mailbox library
+; Interception:	kinda has to be to be useful
+;
+; Pass:
+; 		cxdx	= MailboxMessage affected. Note that if the change
+;			  type is MACT_REMOVED, cxdx will only have meaning
+;			  to the recipient *if* it had kept a reference to the
+;			  message in question. Else the group and item could
+;			  easily have been re-used by the time the notification
+;			  is seen.
+;		bp	= MABoxChange
+; Return:	
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MB_NOTIFY_NEW_TRANSPORT		message	MetaApplicationMessages
+; Notification message sent over MGCNLT_NEW_TRANSPORT to alert objects that
+; a new transport+medium is available for use by the user.
+;
+; Context:	Sent via the MGCNLT_NEW_TRANSPORT GCN list when a new medium
+;		that is used by an existing transport driver, or a new
+;		transport driver that uses an already-encountered medium,
+;		is discovered. Such discovery changes the list of transports
+;		the user sees. Receipt of this message is expected to update
+;		that list appropriately.
+; Source:	MTNewTransport
+; Destination:  OutboxTransportList objects on MGCNLT_NEW_TRANSPORT list
+; Interception: must be to do anything. No need to call superclass unless
+;		superclass specifies otherwise.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+
+;
+
+;
+;			      GCN Lists
+;
+MailboxGCNListType	etype	word, first MailboxApplicationMessages, 2
+
+MGCNLT_OUTBOX_CHANGE		enum MailboxGCNListType
+	; MSG_MB_NOTIFY_BOX_CHANGE
+
+MGCNLT_INBOX_CHANGE		enum MailboxGCNListType
+	; MSG_MB_NOTIFY_BOX_CHANGE
+
+MGCNLT_NEW_TRANSPORT		enum MailboxGCNListType
+	; MSG_MB_NOTIFY_NEW_TRANSPORT
+
+MGCNLT_ADDRESS_CONTROLS		enum MailboxGCNListType
+	; nothing, as yet. this list exists to keep the mailbox library from
+	; exiting before all the address controls are removed.
+
+MAChangeType	etype	byte
+    MACT_REMOVED	enum	MAChangeType
+    ; Message/address has been removed/sent to and no longer exists. For
+    ; outbox messages, there will be one such notification for each address
+    ; (i.e. MABC_ADDRESS will not be MABC_ALL), and then one for the message
+    ; itself.
+    
+    MACT_EXISTS		enum	MAChangeType
+    ; Message/address back in the inbox/outbox, no longer in the process of
+    ; being transmitted. It's safe to display the thing again.
+    
+    MACT_QUEUED		enum	MAChangeType
+    ; Address is in the queue for transmission, on the cusp of being transmitted
+    ; and should no longer be displayed.
+    
+    MACT_PREPARING	enum	MAChangeType
+
+    MACT_READY		enum	MAChangeType
+    
+    MACT_SENDING	enum	MAChangeType
+    ; Address is currently being transmitted to.
+
+MABoxChange	record
+    MABC_TYPE MAChangeType:3	; type of change
+    MABC_OUTBOX:1		; set if outbox affected, else inbox.
+    MABC_ADDRESS:12		; affected address number
+MABoxChange	end
+MABC_ALL		equ	0x0fff		; value in MABC_ADDRESS if all
+						; addresses affected.
+
+MSG_MA_BOX_CHANGED	message	
+; Tell interested parties that something has been added to or removed from the
+; outbox or inbox. Gets translated into a SEND_TO_GCN_LIST sent to ourself,
+; sending MSG_MB_NOTIFY_BOX_CHANGE
+;
+; Context:	Sent from the Outbox module when a message is added or removed
+;		etc.
+; Source:	OUDeleteMessageIfNothingUnsent, ...
+; Interception: not
+;
+; Pass:
+;		cxdx	= MailboxMessage added or removed. Note that in the
+;			  case of removal, this will only have meaning to
+;			  an object that eventually receives the notification
+;			  *if* it had kept a reference to the message in
+;			  question. Else the group and item could easily have
+;			  been re-used by the time the notification is seen.
+;		bp	= MABoxChange
+; Return:
+;		
+;		- unchanged
+;		- destroyed
+;
+
+MSG_MA_REMOVE_BLOCK_OBJECTS_FROM_ALL_GCN_LISTS	message	
+; Looks through all the GCN lists attached to this object and removes any object
+; in the indicated block from any list that contains it. This is used by the
+; MailboxSendControl class to make sure any MailboxMessageList,
+; MailboxTransportList, or MailboxApplicationList objects in its child block
+; are removed from the GCN lists of the MailboxApplication object before the
+; child block gets destroyed.
+;
+; Context:	Sent from MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS method of
+;		MailboxSendControl object
+; Source:	MailboxSendControl... others?
+; Destination:  MailboxApplication
+; Interception: not
+;
+; Pass:
+;		cx	= handle of block containing objects that are to be
+;			  removed from all GCN lists
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+MAGCNListParams	struct
+    MAGCNLP_meta	GCNListParams
+    MAGCNLP_owner	hptr
+MAGCNListParams	ends
+
+MSG_MA_GCN_LIST_REMOVE			message
+; Like MSG_META_GCN_LIST_REMOVE but also passes the object's owner, so
+; we don't have to worry about the handle being valid so we can find the
+; owner and decrement our detach count when it's not the mailbox library.
+;
+; Anything removed via MSG_META_GCN_LIST_REMOVE we just assume is owned
+; by us.
+;
+; Context:	Sent from UtilRemoveFromMailboxGCNList
+; Source:	See above
+; Destination:	MailboxApplication
+; InterceptioN;	not
+;
+; Pass:
+; 		ss:bp	= MAGCNListParams
+; Return:
+; 		carry set if object removed
+;		ax, cx, dx, bp - destroyed
+;
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;		      OUTBOX TRANSMISSION STUFF
+;
+
+MSG_MA_OUTBOX_SENDABLE_CONFIRMATION	message	
+; Put up a confirmation box that the given message is now in the outbox and
+; available for transmission to the indicated addresses.
+;
+; If the message is marked MMF_SEND_WITHOUT_QUERY, the message will be submitted
+; for transmission, instead.
+;
+; Context:	Message has been successfully added to the outbox, the current
+;		time is within the message's transmission window, and the
+;		medium needed to send the message exists.
+; Source:	Outbox module
+; Destination:  Mailbox App object
+; Interception: not
+;
+; Pass:
+;		cxdx	= MailboxMessage (1 reference already added for the
+;			  confirmation box; must be removed when box comes
+;			  off-screen)
+;		bp	= talID of message addresses to display
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_OUTBOX_CONFIRMATION			message	
+; Put up a confirmation box that the given message is now in the outbox but
+; cannot be sent.
+;
+; Context:	Message has been successfully added to the outbox, but the
+;		message cannot be sent yet, either because the current
+;		time is not within the message's transmission window, or the
+;		medium needed to send the message does not exist.
+; Source:	Outbox module
+; Destination:  Mailbox App object
+; Interception: not
+;
+; Pass:
+;		cxdx	= MailboxMessage (1 reference already added for the
+;			  confirmation box; must be removed when box comes
+;			  off-screen)
+;		bp	= talID of message addresses to display
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+MSG_MA_NOTIFY_UNSENDABLE			message
+; Put up a box to tell the user a message could not be sent.
+;
+; Context:	Called from the transmit thread when it is unable to send a
+;		message and will not retry the send. The moniker for the
+;		message must be built before this method returns, as the
+;		addresses will not remain marked with the given talID.
+; Source:	Outbox transmit thread
+; Destination:	Mailbox App object
+; Interception:	not
+;
+; Pass:
+; 		ss:bp	= MANotifyUnsendableArgs
+; Return:
+; 		nothing
+; 		ax, cx, dx, bp - destroyed
+; 
+MANotifyUnsendableArgs	struct
+    MANUA_talID		word		; talID of affected addresses
+    MANUA_string	optr.char	; reason for the failure
+    MANUA_message	MailboxMessage	; message that could not be sent
+MANotifyUnsendableArgs	ends
+
+MSG_MA_OUTBOX_NOTIFY_TRANS_WIN_OPEN	message
+; Put up a confirmation box that the start of transmission window of the given
+; message is now reached.
+;
+; Context:	The transmission window has just opened
+; Source:	Outbox module
+;
+; Pass:
+;		cxdx	= MailboxMessage (1 reference already added for the
+;			  confirmation box; must be removed when box comes
+;			  off-screen)
+;		bp	= talID of message addresses to display
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_OUTBOX_NOTIFY_TRANS_WIN_CLOSE	message
+; Put up a confirmation box that the end of transmission window of the given
+; message is now reached.
+;
+; Context:	The transmission window is now closing.
+; Source:	Outbox module
+;
+; Pass:
+;		cxdx	= MailboxMessage (1 reference already added for the
+;			  confirmation box; must be removed when box comes
+;			  off-screen)
+;		bp	= talID of message addresses to display
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+if	_QUERY_DELETE_AFTER_PERMANENT_ERROR
+
+MSG_MA_OUTBOX_NOTIFY_ERROR_RETRY	message
+; Puts up a permenant error notification dialog.
+;
+; Context:	A permenant error has just error during message transmission.
+; Source:	Outbox module
+;
+; Pass:
+;		ss:bp	= OERSetMessageArgs
+;		dx	= size OERSetMessageArgs
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+endif	; _QUERY_DELETE_AFTER_PERMANENT_ERROR
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;			   UTILITY METHODS
+;
+
+MSG_MA_DESTROY_DIALOG	message	
+; Destroy the dialog box that is the first object in the block containing the
+; trigger that sent this message to us.
+;
+; Context:	Sent as the action message from a GenTrigger that has brought
+;		down its containing dialog box.
+; Source:	GenTrigger action message
+;
+; Pass:
+;		^lcx:dx	= trigger in same duplicated block as dialog that is 
+;			  generic child of the application
+;			  .
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_REGISTER_FILE_CHANGE	message	
+; Register for file-change notification
+;
+; Context:	Sent by MainRegisterFileChangeCallback
+;
+; Pass:
+;		cx:dx	= vfptr of routine to call:
+;			  Pass:
+;				ax	= callback data
+;				dx	= FileChangeNotificationType (never
+;					  FCNT_BATCH)
+;				es:di	= FileChangeNotificationData
+;			  Return:
+;			  	nothing
+;		bp	= callback data
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MAFileChangeCallback	struct
+    MAFCC_callback	vfptr.far
+    MAFCC_data		word
+MAFileChangeCallback	ends
+
+    MAI_fileChangeCallbacks	lptr.ChunkArrayHeader
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;			      DETACHING
+;
+TEMP_MA_CLIENTS_REMAINING	vardata
+; A flag we set on ourselves if we do an ObjIncDetach because mainClientThreads
+; is non-zero or we get a MSG_MA_HAVE_CLIENTS_AGAIN while detaching. This
+; prevents us from doing two increments, should there be a MSG_MA_HAVE_-
+; CLIENTS_AGAIN in the queue at that point.
+
+MSG_MA_CLIENTS_ALL_GONE		message
+; Take note that there are no more client threads in the wings. This means we
+; can finish detaching, if that's what we were trying to do and this was the
+; last obstacle.
+;
+; Context:	Sent by MailboxLibraryEntry when the count of client threads
+;		(mainClientThreads) drops to 0.
+;
+; Pass:
+; 		nothing
+; Return:
+; 		nothing
+; 		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_HAVE_CLIENTS_AGAIN	message
+; Take note that there are client threads for the library again. This is
+; intended to take care of the case where we lose all client threads and then
+; get another one, somehow, while still in the middle of detaching...
+;
+; The application will perform another ObjIncDetach if it's actively detaching,
+; so MA_CLIENTS_ALL_GONE can send its MSG_META_ACK when it finds the app is
+; detaching.
+;
+; Context:	Sent by MailboxLibraryEntry when the count of client threads
+;		(mainClientThreads) increases to 1.
+;
+; Pass:
+; 		nothing
+; Return:
+; 		nothing
+; 		ax, cx, dx, bp - destroyed
+;
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;			   INBOX METHODS
+;
+
+MSG_MA_START_INBOX_CHECK_TIMER	message
+; Set up a one-shot timer that calls itself to check whether there is any
+; new unseen first-class messages added to the inbox during this period.
+;
+; The timer will send MSG_MA_CHECK_INBOX, whose handler will send this message
+; to set up another one-shot timer for the next check period.
+;
+; Context:	The system has just started up, or current timer has expired.
+; Source:	Inbox init code, and app object itself
+; Destination:  Mailbox app object
+; Interception: not
+;
+; Pass:
+;		cx	= number of timer ticks for each check period (0 to
+;			  use current value stored in instance data)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_CHECK_INBOX	message
+; Periodic message to inform user if there are new first-class messages in the
+; inbox.
+;
+; Context:	Sent by timer for every inbox check period.
+; Source:	Timer event set up by app object itself
+; Destination:	Mailbox app object
+; Interception:	not
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_MA_STOP_INBOX_CHECK_TIMER	message
+; Stop the pending timer event that checks the inbox.
+;
+; Context:	The system is about to shut down.
+; Source:	Inbox exit code
+; Destination:	Mailbox app object
+; Interception:	not
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    MAI_lastCheckTime		FileDateAndTime
+    ; date and time when the inbox is last checked
+
+    ; KEEP THESE THREE TOGETHER, IN THIS ORDER.
+    MAI_inboxCheckPeriod	word
+    ; number of ticks between checking new unseen first-class messages in
+    ; inbox.
+    MAI_inboxTimerHandle	hptr
+	noreloc	MAI_inboxTimerHandle
+    MAI_inboxTimerID		word
+    ; handle and ID of current inbox check timer
+
+MSG_MA_INBOX_NOTIFY_TRANS_WIN_CLOSE	message
+; Put up a confirmation box that the deadline of the given message is now
+; reached.
+;
+; Context:	The deadline is just reached.
+; Source:	Inbox module
+;
+; Pass:
+;		cxdx	= MailboxMessage (1 reference already added for the
+;			  confirmation box; must be removed when box comes
+;			  off-screen)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_MESSAGE_NOTIFICATION_DONE	message	
+; Finish notification of receiving application by removing the reference we
+; placed on the message initially.
+;
+; Context:	Sent by IRSendMessageAvailableNotification either directly or
+;		as the completion message for an IACP transaction
+; Source:	see above
+;
+; Pass:
+;		cxdx	= MailboxMessage
+;		bp	= IACP connection to close (0 if none)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_MESSAGE_NOTIFICATION_NOT_HANDLED	message	
+; Cope with a message having been received for an application that's not
+; equipped to handle it (it has no method for MSG_META_MAILBOX_NOTIFY_MESS-
+; AGE_AVAILABLE). On some systems this will do nothing, relying on the user
+; to delete the message. On others it will send the message to some other
+; application we know can handle it. On others it will delete the thing.
+;
+; Context:	Sent through IACP after MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAIL-
+;		ABLE has returned carry clear (or rather, after ObjMessage
+;		has returned carry clear because it couldn't find a method
+;		to handle the message).
+; Source:	Inbox routine called on receiving application's thread.
+;
+; Pass:
+;		cxdx	= affected MailboxMessage
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;			   OTHER TIMER STUFF
+;
+
+MSG_MA_START_ADMIN_FILE_UPDATE_TIMER	message
+; Set up a one-shot timer that calls itself to update the admin file on disk
+; by flusing dirty VM blocks via VMUpdate.
+;
+; The timer will send MSG_MA_UPDATE_ADMIN_FILE, whose handler will send this
+; message to set up another one-shot timer for the next update period.
+;
+; Context:	The system has just started up, or current timer has expired.
+; Source:	Admin init code, and app object itself
+; Destination:  Mailbox app object
+; Interception: not
+;
+; Pass:
+;		cx	= number of timer ticks for each update period (0 to
+;			  use current value stored in instance data)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_UPDATE_ADMIN_FILE	message
+; Periodic message to update the admin file on disk.
+;
+; Context:	Sent by timer for every update period.
+; Source:	Timer event set up by app object itself
+; Destination:	Mailbox app object
+; Interception:	not
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_STOP_ADMIN_FILE_UPDATE_TIMER	message
+; Stop the pending timer event that updates the admin file on disk.
+;
+; Context:	The system is about to shut down.
+; Source:	Admin exit code
+; Destination:	Mailbox app object
+; Interception:	not
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    ; KEEP THESE THREE TOGETHER, IN THIS ORDER.
+    MAI_adminFileUpdatePeriod	word
+    ; number of ticks between updating admin file
+    ; inbox.
+    MAI_adminFileUpdateTimerHandle	hptr
+	noreloc	MAI_adminFileUpdateTimerHandle
+    MAI_adminFileUpdateTimerID		word
+    ; handle and ID of current admin update timer
+
+MSG_MA_UPDATE_ADMIN_FILE_URGENT	message
+; Try to update the admin file again, after an update has just failed due to
+; locked VM blocks.  Default handler will call VMUpdate, and if it fails again,
+; it will setup a timer to send this same message to itself after some delay.
+;
+; Context:	A VMUpdate call has just failed because of locked VM blocks.
+; Source:	Utility code or timer event set up by message handler itself
+; Destination:	Mailbox app object
+; Interception:	not
+;
+; Pass:
+;		if sent by utility code
+;			bp	= 0
+;		if sent by timer event
+;			bp	= timer ID
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    MAI_adminFileUpdateUrgentTimerHandle	hptr
+	noreloc MAI_adminFileUpdateUrgentTimerHandle
+    MAI_adminFileUpdateUrgentTimerID		word
+    ; handle and ID of current admin file urgent update timer
+
+MSG_MA_START_NEXT_EVENT_TIMER	message
+; Starts a timer to notify us at the time for the next interesting event.
+;
+; Pass:
+;		dxcx	= FileDateAndTime of event
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MA_RECALC_NEXT_EVENT_TIMER	message	
+; Redetermine what the next event timer should be.
+;
+; Context:	Called when something has changed that could make some
+;		event need to occur, or some old event no longer possible.
+;		For example, when transmission media come and go, it affects
+;		whether an event is schedulable for the retry and win-open
+;		times of messages.
+; Source:	anyone
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+MSG_MA_DO_NEXT_EVENT	message
+; Message sent from system time when it's time to perform the next interest
+; event.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    MAI_nextEventDateTime	FileDateAndTime
+    MAI_nextEventTimerHandle	hptr
+	noreloc	MAI_nextEventTimerHandle
+    MAI_nextEventTimerID	word
+
+MSG_MA_DISMISS_CONFIRM_BOXES	message
+; Dismiss all confirm boxes on screen that are displaying this MailboxMessage.
+;
+; Context:	Some new confirm boxes with the same MailboxMessage are about
+;		to come up on screen.  All existing confirm boxes with the
+;		same message must go away so that we don't have multiple
+;		confirm boxes representing the same message.
+; Source:	Outbox code
+;
+; Pass:
+;		cxdx	= MailboxMessage
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MAConfirmBoxData	struct
+    MACBD_msgDisplayed	MailboxMessage
+    MACBD_dialog	optr.GenInteractionBase
+    MACBD_dismissMsg	word
+MAConfirmBoxData	ends
+
+    MAI_confirmBoxes	lptr.ChunkArrayHeader
+    ; array of MAConfirmBoxData's for all sorts of outbox confirmation boxes
+    ; that are on screen.
+    ;
+    ; NOTE: As an optimization, trans-win-close (deadline) dialogs are not
+    ; stored in this array, because under no situation would such dialogs be
+    ; requested by other new dialogs to go away.
+
+MailboxApplicationClass	endc
+
+;------------------------------------------------------------------------------
+;
+;			  MAILBOX EMOM CLASS
+;
+;------------------------------------------------------------------------------
+
+if	_CONTROL_PANELS
+
+MailboxEMOMClass	class	EMObjectManagerClass
+
+MEMOMObjectType	etype	word, 0
+    MEMOMOT_INBOX_PANEL		enum MEMOMObjectType
+    MEMOMOT_OUTBOX_PANEL	enum MEMOMObjectType
+
+MailboxEMOMClass	endc
+
+MailboxPanelTriggerClass class EMTriggerClass
+
+MSG_MPT_SET_PANEL_TYPE	message
+; Set the type of panel the trigger brings up. This determines (1) what message
+; the thing sends to the MailboxApplication object, (2) what GCN list it adds
+; itself to to update its moniker (to reflect empty/full state), (3) what
+; moniker it uses...
+;
+; Context:	Sent when object is created, before it's set usable.
+; Source:	MailboxEMOMClass
+; Destination:  self
+; Interception: not
+;
+; Pass:
+;		cx	= MEMOMObjectType
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MPTState	record
+    MPTS_FULL:1				; Set if the box has anything in it
+    MPTS_TYPE MEMOMObjectType:1		; Which panel is brought up
+MPTState	end
+
+    MPTI_state		MPTState	<>
+
+MailboxPanelTriggerClass endc
+
+endif	; _CONTROL_PANELS
+
+;------------------------------------------------------------------------------
+;
+;		      MAILBOX SEND DIALOG CLASS
+;
+;------------------------------------------------------------------------------
+
+;
+; This is the root of the companion dialog that the MailboxSendControl will
+; duplicate when MSG_MAILBOX_SEND_CONTROL_TRANSPORT_SELECTED is received.
+; The dialog runs most of the interaction, with some assistance from the
+; MSC, of course.
+; 
+MailboxSendDialogClass	class	GenInteractionClass
+
+MSG_MSD_SET_TRANSPORT	message	
+; Adjust the UI to account for the user having selected a (possibly different)
+; transport + option + medium for sending a message.
+;
+; Context:	Called by MailboxSendControl before the dialog is initiated
+; Source:	MailboxSendControl
+;
+; Pass:
+;		dx:bp	= MailboxMediaTransport for the message.
+; Return:
+;		cx	= chunk handle of MailboxAddressControl object, if
+;			  any (0 if none)
+;		bp - unchanged
+;		ax, dx - destroyed
+;
+; Notes:
+; 	if MT different from current:
+; 		remove reference from the current MAC
+;		update moniker with new transport string
+;		load transport driver
+;		get MAC class for the MT
+;		if any MAC, instantiate
+;		set current medium invalid so MAC gets called
+;	if MT.medium different from current:
+;		call MAC_SET_MEDIUM on current MAC, if any
+;
+
+    MSDI_curTrans	MailboxMediaTransport	<>
+    ; The transport we currently think we're using
+    
+    MSDI_lastTransStr	lptr.char	0
+    ; String last obtained during MSD_SET_TRANSPORT. Used to build our moniker.
+    
+    MSDI_curMAC		lptr.MailboxAddressControlBase	0
+    ; The current address controller, if any
+
+MSG_MSD_ADD_ADDRESS_CONTROL	message
+; Add the address control to the dialog tree.  The MailboxSendDialog object
+; sends this message to itself when the address control is to be added to
+; somewhere in the dialog UI tree.  Subclass can intercept this message to
+; add the address control to the desired position.
+;
+; Context:	The address control has just been instantiated
+; Source:	MailboxSendDialog object
+; Destination:  Itself
+; Interception: Default handler is to add the address control as the first
+;		child of ourselves.  Subclass can intercept this message to
+;		implement custom UI layout.  No need to call superclass.
+;
+; Pass:
+;		^lcx:dx	= MailboxAddressControl object to add
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MSD_SET_CONTENTS	message	
+; Adjust the UI to account for a different body-content having been selected
+;
+; Context:	Called by MailboxSendControl before the dialog is initiated,
+;		based on the current default body type, and whenever the
+;		user selects a different body type with the Contents list
+; Source:	MailboxSendControl
+;
+; Pass:
+;		cx	= body type index
+;		dx	= MailboxObjectType
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+; Notes:
+; 	Call the MSC back to get the string for the body type
+;	Update the moniker from the template
+;
+    MSDI_titleMoniker	lptr.VisMoniker	0
+    ; The template moniker to use. \1 is the transport string. \2 is the
+    ; body type
+
+    MSDI_lastContentStr	lptr.char	0
+    ; String last obtained during MSD_SET_CONTENTS. Used to build our moniker.
+
+MSG_MSD_ENABLE_DATA_OBJECT_UI	message	
+; Augment the dialog with another tree of UI for the user to refine his/her
+; choice of what's going in the message body.
+;
+; Context:	Called by MailboxSendControl when someone sends it a
+;		MSG_MAILBOX_SEND_CONTROL_ENABLE_DATA_OBJECT_UI
+; Source:	MailboxSendControl
+;
+; Pass:
+;		^lcx:dx	= root of tree to add
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+; Notes:
+; 	If root different from current:
+;		MSG_GEN_REMOVE to the current, if any
+;		set new root
+;		if new root:
+;			hook it in
+;			set it usable
+;
+
+MSG_MSD_RESET_DATA_OBJECT_UI	message	
+; Clear out all data-object UI previously added with MSD_ENABLE_DATA_OBJECT_UI
+;
+; Context:	Called by MailboxSendControl when switching body types,
+;		*before* calling MSG_MAILBOX_SEND_CONTROL_OBJECT_TYPE_SELECTED
+; Source:	MailboxSendControl
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+
+MSG_MSD_TRANSACTION_COMPLETE	message	
+; Let the current MailboxAddressControl know the transaction is complete and
+; clean up our part of it.
+;
+; Context:	Called by MailboxSendControl when a transaction is finished.
+; Source:	MailboxSendControl
+;
+; Pass:
+;		*dx:bp	= MSCTransaction that's complete
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+; Notes:
+; 	Call MAC_DEL_REF on MAC in transaction
+; 	Free address array
+;
+
+
+MSG_MSD_CANCEL_TRANSACTION	message	
+; Let the current MailboxAddressControl know the transaction was canceled and
+; clean up our part of it.
+;
+; Context:	Called by MailboxSendControl when a transaction is canceled.
+; Source:	MailboxSendControl
+;
+; Pass:
+;		*dx:bp	= MSCTransaction that's been canceled
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+; Notes:
+; 	Call MAC_MESSAGE_CANCELED on MAC in transaction
+; 	Call MAC_DEL_REF on MAC in transaction
+; 	Free address array
+;
+
+MSG_MSD_CREATE_TRANSACTION	message	
+; Get the info for beginning the transaction
+;
+; Context:	Called by MailboxSendControl in response to MAILBOX_SEND_-
+;		CONTROL_CREATE_TRANSACTION
+; Source:	MailboxSendControl
+;
+; Pass:
+;		*dx:bp	= MSCTransaction to fill in
+; Return:
+;		MSCT_transport, MSCT_transOption, MSCT_addrControl set
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+; Notes:
+;	fill in MSCT_transport + MSCT_transOption
+; 	if any current MAC:
+;		stuff current MAC in MSCT
+;		call MAC_ADD_REF on current MAC
+;
+
+MSG_MSD_CREATE_BODY	message	
+; Fill in fields of the transaction in preparation for creating the message
+; body and see if the address control wants to create the message.
+;
+; Context:	Called by MailboxSendControl before send MSG_META_MAILBOX_-
+;		CREATE_MESSAGE out its output.
+; Source:	MailboxSendControl, subclass
+; Destination:  MailboxSendDialog
+; Interception: default method will get page-range info and store it in
+;		the transaction, the calls the current address control to see
+;		if it wants to create the body. If you don't like any
+;		of this, don't call the superclass.
+;
+; Pass:
+;		cx	= MailboxObjectType
+;		*dx:bp	= MSCTransaction
+; Return:
+;		carry set if address control is handling the creation:
+;			ax	= TRUE if body creation isn't re-entrant,
+;				  so no further message-creation dialogs
+;				  should be allowed for the transport+option
+;				  until this one is complete.
+;				= FALSE if body creation is re-entrant
+;		carry clear if address control not handling creation
+;			ax	= destroyed
+;		cx, bp - unchanged
+;		dx - destroyed
+;
+
+MSG_MSD_GET_ADDRESSES	message	
+; Fetch the addresses from the address control.
+;
+; Context:	Called by MailboxSendControl when user asks to send the message.
+; Source:	MailboxSendControl
+; Destination:  MailboxSendDialog
+; Interception: why?
+;
+; Pass:
+;		*dx:bp	= MSCTransaction needing address info
+; Return:
+;		carry set if addresses are invalid and dialog should not be
+;			taken down
+;		carry clear if have valid address info:
+;			MSCT_addresses, MSCT_addrControl, MSCT_transData set
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+
+
+MSDRangeType	etype	word
+MSDRT_ALL_PAGES		enum	MSDRangeType, -1
+MSDRT_PAGE_RANGE	enum	MSDRangeType, 0
+
+MSG_MSD_ADJUST_ALL_OR_FROM	message	
+; React to the user messing with the All/From list when sending a range of pages
+; by either min/maxing the page ranges (if sending all) or doing nothing
+;
+; Context:	Sent by MSCPageAllFromList when user chooses something else
+; Source:	MSCPageAllFromList
+;
+; Pass:
+;		cx	= current selection (MSDRangeType)
+;		dx	= non-zero if indeterminate
+;		bp	= number of selections (0 or 1)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MSD_PAGE_RANGE_BOUNDS_ADJUSTED	message	
+; Take note of the user having adjusted the upper or lower bounds of the page
+; range
+;
+; Context:	Sent by either the min or max bound GenValue object when
+;		changed
+; Source:	GenValue
+;
+; Pass:
+;		dx.cx	= current value (ignored)
+;		bp	= GenValueStateFlags
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MSD_REMEMBER_CURRENT_PAGE	message	
+; Record what the current page is, in case the user asks to do something with
+; the current page and we need to record it in the transaction.
+;
+; Context:	Sent by the send control in response to a GCN notification
+; Source:	MailboxSendControl
+;
+; Pass:
+;		dx	= current page
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+MSG_MSD_SET_ADDRESS_VALID	message	
+; Sets the state of the "Send" trigger
+;
+; Context:	Called by MailboxAddressControl when its subclass tells it
+;		the address is valid or invalid
+; Source:	MailboxAddressControl
+;
+; Pass:
+;		cx	= non-zero if Send should be enabled
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+MSG_MSD_SET_VALID	message	
+; Adjust the mask of valid things that control the state of the Send trigger
+;
+; Context:	Called by subclass, usually, when one of the objects in the
+;		dialog informs it that that part of the interaction is valid
+;		or no longer valid
+; Source:	subclass
+; Destination:  MailboxSendDialogClass
+; Interception: not useful
+;
+; Pass:
+;		cl	= MSDValidState bits to set
+;		ch	= MSDValidState bits to clear
+; Return:
+;		nothing
+;		dx, bp - unchanged
+;		ax, cx - destroyed
+;
+
+MSDValidState	record
+    MSDVS_6:1			; subclasses may want to create string equates
+    MSDVS_5:1			;  for these bits. For example
+    MSDVS_4:1			;  	MSDVS_TEXT equ <MSDVS_1>
+    MSDVS_3:1			;  to make bit 1 mean that the text is valid.
+    MSDVS_2:1			;  An appropriate overriding default value
+    MSDVS_1:1			;  should also be set for the subclass
+    MSDVS_DATA_UI:1		; set if data ui exist and haven't been marked
+				;  invalid
+    MSDVS_ADDRESS:1		; set if address marked valid
+MSDValidState	end
+
+MSG_MSD_SET_ADDRESSES	message
+; Sets the current addresses of this send dialog to be the address stored in
+; the passed message.
+; 
+; Context:	Called by parent send control, usually when performing a reply
+;		to the message
+; Source:	MailboxSendControlClass
+; Destination:	MailboxSendDialogClass
+; Interception:	not useful
+;
+; Pass:
+;		cxdx	= MailboxMessage
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSDSetAddressesWithTransportArgs	struct
+    MSDSAWTA_addresses		optr.ChunkArrayHeader
+					; array of MBACAddresses entries
+    MSDSAWTA_transAndOption	MailboxTransportAndOption
+					; transport + option for these addrs
+MSDSetAddressesWithTransportArgs	ends
+
+MSG_MSD_SET_ADDRESSES_WITH_TRANSPORT	message
+; Similar to MSG_MSD_SET_ADDRESSES, except that the transport + option is also
+; passed in this message.  If the send dialog is using the same transport +
+; option, the addresses will be used.  Otherwise, the addresses will be
+; ignored.
+;
+; Context:	Called by parent send control, usually when setting up for
+;		a reply
+; Source:	parent MailboxSendControlClass object
+; Destination:	MailboxSendDialogClass object used  by the send control.
+; Interception:	not useful
+;
+; Pass:
+;		ss:bp	= MSDSetAddressesWithTransportArgs
+; Return:
+;		carry set if the dialog is for a different transport + option
+;		ax, cx, dx - destroyed
+;
+
+MSG_MSD_CANCEL	message	
+; User wishes to cancel the transaction.
+;
+; Context:	Sent by MSCCancelTrigger when dialog created by send control
+; Source:	GenTrigger action
+; Destination:  MailboxSendDialog
+; Interception: not
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+TEMP_MAILBOX_SEND_DIALOG_APPLICATION_STATE	vardata	ApplicationStates
+; Stores the GenApplication's ApplicationState.  This is used when turning
+; the AS_AVOID_TRANSPARENT_DETACH bit on and off.  Responder only.
+
+TEMP_MAILBOX_SEND_DIALOG_CURRENT_PAGE		vardata	word
+; The current page, for setting in the transaction when current page is the
+; thing to send.
+
+    MSDI_sendTrigger	lptr.GenTriggerBase	0
+    ; The "Send" trigger for this dialog
+
+    MSDI_validFlags	MSDValidState	not mask MSDVS_ADDRESS
+    ; Mask of currently-valid things. All bits must be set for the Send trigger
+    ; to be enabled. The default value is set to assume the thing only uses
+    ; an address control and thus all the other bits should be set.
+
+    MSDI_transaction	word
+    ; Transaction chunk for current transaction. Created during INTERACTION_-
+    ; INITIATE, if attached to a send control.
+
+;MSG_GEN_REMOVE				message
+; Shuts down any existing MailboxAddressControl object it was using
+; 
+
+MailboxSendDialogClass	endc
+;------------------------------------------------------------------------------
+;
+;		POOF SEND DIALOG CLASSES
+;
+;------------------------------------------------------------------------------
+
+if	_POOF_MESSAGE_CREATION
+PoofSendDialogClass	class	MailboxSendDialogClass
+
+MSG_PSD_SET_TRANSPORT	message
+; Adjust the UI to account for the user having selected a (possibly different)
+; transport + option + medium for sending a message.
+;
+; Context:	Sent by OutboxTransportList associated with the dialog when
+;		the user selects a transport.
+; Source:	OutboxTransportList
+; Destination:	PoofSendDialog
+; Interception:	not
+;
+; Pass:
+;		cx	= transport index # (must be mapped via
+;			  MSG_OTL_GET_TRANSPORT)
+;		bp	= number of selections (0 or 1)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    PSDI_transportList	lptr.OutboxTransportListBase	0
+    ; The transport list in this send dialog.
+
+MSG_PSD_SEND_MESSAGE	message
+; Registers the message with the outbox.
+;
+; Context:	The user clicks the Send trigger after selecting the address
+;		and transport, etc.
+; Source:	Send trigger in Poof dialog
+; Destination:	PoofSendDialog
+; Interception:	not
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_PSD_SEND_MESSAGE_GET_BODY	message
+; Get the message body and summary from it's subclasses.
+;
+; Context:	The message is being prepared to register with the outobx.
+; Source:	PoofSendDialog itself
+; Destination:	Subclass of PoofSendDialogClass
+; Interception:	Subclass must intercept this message to set up the message
+;		body and return the body-ref.  Do not call superclass.
+;
+; Pass:
+;		ss:bp	= MailboxRegisterMessageArgs
+; Return:
+;		ax	= lptr of body-ref in object block
+;		carry clear if no error
+;			cx	= lptr of summary in object block
+;			dx	= MailboxMessageFlags
+;			MRA_bodyStorage, MRA_bodyFormat, MRA_bodyRefLen filled
+;			in.
+;
+
+MSG_PSD_SEND_MESSAGE_CLEANUP_BODY	message
+; Do any necessary cleanup work after a message is registered with the outbox,
+; successfully or not.
+;
+; Context:	The message has been registered, with or without error.
+; Source:	PoofSendDialog itself
+; Destination:	Subclass of PoofSendDialogClass
+; Interception:	Subclass can intercept this message, if necessary, to clean up
+;		the message body.  Do not free body-ref chunk.  No need to
+;		call superclass.
+;		There is no default handler in PoofSendDialogClass.
+;
+; Pass:
+;		cx	= TRUE if canceled
+;		*dx:bp	= body-ref
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    PSDI_poofType	MailboxObjectType
+
+PoofSendDialogClass	endc
+
+PoofQuickMessageSendDialogClass	class	PoofSendDialogClass
+PoofQuickMessageSendDialogClass	endc
+
+PoofFileSendDialogClass		class	PoofSendDialogClass
+
+MSG_PFSD_FILE_SELECTION_CHANGED	message
+; Updates the state of the "Send" trigger.  The file selection validity is
+; AND'ed with other attributes in the same dialog (such as address validity)
+; to determine whether the "Send" trigger should be enabled or not.
+; 
+; Will activate the "Send" trigger if the selection is a double-click.  (Of
+; course, the trigger will actually sends it's action message only if it's
+; enabled.)
+;
+; Context:	The selection in the file selector has just been changed.
+; Source:	File selector object
+; 
+; Pass:
+;		bp	= GenFileSelectorEntryFlags
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+	MSDVS_FILE_SELECTION	equ	<MSDVS_DATA_UI>
+	; Reserve bit 1 of MSDValidState for our use (file selection).  This
+	; bit is valid when a file is selected, invalid when a directory or
+	; volume is selected.
+	;
+	; Default value of MSDVS_FILE_SELECTION is off.  See mailboxUI.uih
+
+PoofFileSendDialogClass		endc
+
+PoofClipboardSendDialogClass	class	PoofSendDialogClass
+PoofClipboardSendDialogClass	endc
+
+endif	; _POOF_MESSAGE_CREATION
+
+
+;
+; The following are dummy class definitions.
+;
+; The useful version of these classes are meant to be used by external
+; drivers and apps when compiled with the respective feature
+; compile-time constants.  When the feature constant is off, no class is
+; available to the outside.
+;
+; These dummy classes are here to avoid crashes in the case when a geode
+; compiled with the features tries to access a Mailbox lib compiled
+; without the feature.  In such cases the library entry point will point
+; to these dummy classes rather than null's.
+;
+; We don't bother to define any of the messages as in the external
+; definitions, as none of the messages is intercepted in the dummy classes
+; anyway.  However, we need to define the same instance data as in the
+; external definitions such that relocations and other things still work.
+;
+
+;
+; MailboxProgressBoxClass (external def in Internal/mboxInt.def as of 4/14/95)
+;
+if	not MAILBOX_PERSISTENT_PROGRESS_BOXES
+MailboxProgressBoxClass	class	GenInteractionClass
+    MPBI_progressGauge	lptr		?
+
+    MPBI_thread		hptr			0
+		noreloc	MPBI_thread
+
+    MPBI_gen		word			0
+
+MPBType		etype	word, 0
+    MPBT_INBOX	enum 	MPBType
+    MPBT_OUTBOX	enum	MPBType
+    
+    MPBI_type		MPBType		MPBT_INBOX
+
+MailboxProgressBoxClass	endc
+endif	; not MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+;
+; MailboxProgressGaugeClass (external def in Internal/mboxInt.def as of
+; 4/14/95)
+;
+if	not MAILBOX_PERSISTENT_PROGRESS_BOXES
+MailboxProgressGaugeClass	class	GenInteractionClass
+    MPGI_text		lptr
+    MPGI_percent	lptr
+    MPGI_pages		lptr
+    MPGI_graphic	lptr
+    MPGI_bytes		lptr
+MailboxProgressGaugeClass	endc
+endif	; not MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+;
+; MailboxPagesClass (external def in Internal/mboxInt.def as of 4/14/95)
+;
+if	not MAILBOX_PERSISTENT_PROGRESS_BOXES
+MailboxPagesClass	class	GenTextClass
+MailboxPagesClass	endc
+endif	; not MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+
+;------------------------------------------------------------------------------
+;
+;		     EXPORTED ROUTINES/VARIABLES
+;
+;------------------------------------------------------------------------------
+ROStrings	segment	lmem
+	global	uiAdminFileName:chunk
+	global	uiDataDriverDir:chunk
+	global	uiDataDriverToken:chunk
+	global	uiTransportSeparatorString:chunk
+	global	uiToDestinationStr:chunk
+	global	uiShortDateSeparator:chunk
+	global	uiLongDateSeparator:chunk
+	global	uiNow:chunk
+	global	uiEternity:chunk
+	global	uiRetry:chunk
+	global	uiSend:chunk
+	global	uiUponRequest:chunk
+	global	uiWaitingString:chunk
+	global	uiMessagesNameTemplate:chunk
+	global	uiTransDriverToken:chunk
+	global	uiTransDriverDir:chunk
+	global	uiConnectingString:chunk
+	global	uiQueuedString:chunk
+	global	uiPreparingString:chunk
+	global	uiLostConnectionString:chunk
+	global	uiMessageUnsendable:chunk
+	global	uiNotEnoughDiskSpace:chunk
+	global	uiConnectErrorNoMem:chunk
+	global	uiUserCanceled:chunk
+	global	uiNoReasonString:chunk
+	global	uiAllMoniker:chunk
+	global	uiMailboxDir:chunk
+	global	uiUnknownApp:chunk
+	global	uiPriorityEmergency:chunk
+	global	uiVerbActiveDeliver:chunk
+	global	uiVerbPassiveDeliver:chunk
+	global	uiUnavailable:chunk
+	global	uiMessageInvalid:chunk
+	global	uiSomeoneElse:chunk
+	global	uiPoofMenuQuickMessage:chunk
+	global	uiPoofMenuFile:chunk
+	global	uiPoofMenuClipboard:chunk
+	global	uiDoneThatMoniker:chunk
+	global	uiGiveItUpMoniker:chunk
+	global	uiCouldntPrepareReason:chunk
+	global	uiMboxApp:chunk
+	global	uiAnd:chunk
+	global	uiCannotLoadDriverStr:chunk
+if	_CONFIRM_AFTER_FIRST_FAILURE
+	global	uiOutboxSendingAnotherDocument:chunk
+endif	; _CONFIRM_AFTER_FIRST_FAILURE
+
+	global	uiMediumNotAvailableStr:chunk
+	global	uiMediumBusyStr:chunk
+
+	global	uiNotTimeForTransmissionStr:chunk
+
+
+if	_OUTBOX_SEND_WITHOUT_QUERY
+	global	uiSentUponRequestStr:chunk
+endif	; _OUTBOX_SEND_WITHOUT_QUERY
+
+if	_RESPONDER_OUTBOX_CONTROL
+	global	uiRespSubjTitle:chunk
+	global	uiRespDestTitle:chunk
+	global	uiRespTransTitle:chunk
+	global	uiRespStateTitle:chunk
+	global	uiRespStatusPageNTemplate:chunk
+	global	uiRespStatusPageNOfMTemplate:chunk
+	global	uiRespStatusOneByteTemplate:chunk
+	global	uiRespStatusBytesTemplate:chunk
+	global	uiRespStatusPercentTemplate:chunk
+endif	; _RESPONDER_OUTBOX_CONTROL
+	global	uiConfirmDeleteStr:chunk
+	global	uiCannotStartString:chunk
+
+
+if	_HONK_IF_MEDIUM_REMOVED
+	global	uiMediumRemovedHonk:chunk
+endif
+
+ROStrings	ends
+
+AppResource	segment	lmem
+	global	MailboxApp:chunk
+AppResource	ends
+
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+OutProg		segment	lmem
+	global	OutProgRoot:chunk
+	global	OutProgMessage:chunk
+	global	OutProgPercent:chunk
+OutProg		ends
+
+endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+OutCancel	segment lmem
+	global	OutboxCancelRoot:chunk
+	global	OutboxCancelMessage:chunk
+OutCancel	ends
+
+OutLostConnect	segment	lmem
+	global	OutboxLostConnectionRoot:chunk
+	global	OutboxLostConnectionMessage:chunk
+OutLostConnect	ends
+
+if	_CONTROL_PANELS
+
+OutboxPanelUI	segment	lmem
+	global	OutboxPanelRoot:chunk
+	global	OutboxPanelTransports:chunk
+	global	OutboxPanelDetailsListAllGroup:chunk
+	global	OutboxPanelDetailsNumFailures:chunk
+	global	OutboxPanelDetailsReason:chunk
+	global	OutboxPanelDetailsDestination:chunk
+OutboxPanelUI	ends
+
+endif	; _CONTROL_PANELS
+
+OutConfirmUI	segment	lmem
+	global	OutConfirmMessage:chunk
+
+
+OutConfirmUI	ends
+
+if	_CONTROL_PANELS
+
+InboxPanelUI	segment	lmem
+	global	InboxPanelRoot:chunk
+	global	InboxPanelApps:chunk
+	global	InboxPanelGetNewTransports:chunk
+	global	InboxPanelDetailsSize:chunk
+	global	InboxPanelDetailsPriority:chunk
+InboxPanelUI	ends
+
+endif	; _CONTROL_PANELS
+
+InWinCloseUI	segment	lmem
+	global	InWinCloseText:chunk
+InWinCloseUI	ends
+
+if	_POOF_MESSAGE_CREATION
+
+SendQuickMessageDialogUI	segment	lmem
+	global	PoofQuickMessageSendPanel:chunk
+	global	PoofQuickMessageSendTransports:chunk
+SendQuickMessageDialogUI	ends
+
+SendFileDialogUI	segment	lmem
+	global	PoofFileSendPanel:chunk
+	global	PoofFileSendTransports:chunk
+SendFileDialogUI	ends
+
+SendClipboardDialogUI	segment	lmem
+	global	PoofClipboardSendPanel:chunk
+	global	PoofClipboardSendTransports:chunk
+SendClipboardDialogUI	ends
+
+endif	; _POOF_MESSAGE_CREATION
+
+if	_QUERY_DELETE_AFTER_PERMANENT_ERROR
+OutErrorRetryUI	segment	lmem
+	global	OutErrorRetryRoot:chunk
+	global	OutErrorRetryMessage:chunk
+	global	OutErrorRetryReason:chunk
+	global	OutErrorRetryDeleteString:chunk
+OutErrorRetryUI	ends
+
+
+endif	; _QUERY_DELETE_AFTER_PERMANENT_ERROR
+
+udata	segment
+	global	uiDisplayType:DisplayType
+udata	ends
+
+SendControlCode	segment	resource
+	global	MSCStoreFormats:far
+SendControlCode	ends
+
+if	_OUTBOX_FEEDBACK
+OutboxFeedbackUI segment lmem
+	global	OutboxFeedbackNoteRoot:chunk
+	global	OutboxFeedbackNoteText:chunk
+	global	OFCanceled:chunk
+	global	OFInOutbox:chunk
+	global	OFProgress:chunk
+OutboxFeedbackUI ends
+
+OutboxFeedbackData segment lmem
+
+	global	Globe1Bitmap:chunk
+	global	Globe2Bitmap:chunk
+	global	Globe3Bitmap:chunk
+	global	Globe4Bitmap:chunk
+	global	Globe5Bitmap:chunk
+	global	Globe6Bitmap:chunk
+	global	Globe7Bitmap:chunk
+	global	Globe8Bitmap:chunk
+	global	Globe9Bitmap:chunk
+	global	Globe10Bitmap:chunk
+
+	global	Letter1Bitmap:chunk
+	global	Letter2Bitmap:chunk
+
+OutboxFeedbackData ends
+
+endif	; _OUTBOX_FEEDBACK
+
+OutboxControlUI	segment	lmem
+
+if	_RESPONDER_OUTBOX_CONTROL
+	global	MOCDeleteTrigger:chunk
+endif	; _RESPONDER_OUTBOX_CONTROL
+
+OutboxControlUI	ends

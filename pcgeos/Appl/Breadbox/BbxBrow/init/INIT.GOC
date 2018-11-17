@@ -1,0 +1,1027 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ */
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          init.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <sem.h>
+#include <library.h>
+#include <resource.h>
+#include <fileEnum.h>
+#include <initfile.h>
+
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <ansi\stdlib.h>
+#include <ansi\ctype.h>
+
+@include "fixes.goh"
+
+@include "htmlview.goh"
+#include "javascr.h"
+
+@extern object srcCacheOpt;
+@extern object objCacheOpt;
+@extern object SettingsBoolGroup;
+@extern object HTMLSettingsBoolGroup;
+@extern object BboxLogo;
+@extern object CurrentURLText;
+@extern object DocumentControl ;
+
+@ifdef GLOBAL_INTERNET_BUILD
+@extern object HelpFrame;
+@extern object HelpTop;
+@endif
+
+@ifdef COPY_TO_SCRAPBOOK
+@extern object HTMLVApp;
+@endif
+
+@ifdef TV_BW_OPTION
+@extern object NavigateTVBW;
+@endif
+
+@ifdef TITLE_BAR_STATUS
+@extern object HTMLVPrimary;
+@extern object SimpleToolbar;
+@extern object StatusIndicators;
+@extern object SecureStatus;
+@extern object PCStatusLight;
+@endif
+
+@ifdef POST_DATA_CACHE
+extern void PostDataCacheInit(void);
+@endif
+
+/***************************************************************************
+ *              Global variables and initialization
+ ***************************************************************************/
+
+/* Name management */
+optr namePool;
+
+/* global blocks containing caches and associations */
+MemHandle localCacheBlock;           
+MemHandle frameCacheBlock;           
+MemHandle assocCacheBlock;           
+
+/* Association arrays for extensions and mime types */
+optr assocExtType;
+optr assocTypeDriver;
+
+/* Association arrays for URL drivers */
+optr assocSchemeDriver;
+
+/*
+ * History management
+ */
+LRUBufferData LRUBuffer[HTML_LRUSIZE];
+
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+optr localPageArray;            /* chunk array with NameTokens of local pages */
+@endif
+
+/* Allocation watcher for the whole application */
+AllocWatcherHandle G_allocWatcher = NullWatcher ;
+
+/*
+ * Turn on/off progress display of graphics when loading/importing
+ */
+#if PROGRESS_DISPLAY
+Boolean progressDisplay = TRUE;
+
+/* time interval for sending load progress notification from fetch thread
+   to import thread */
+word progressLoadWait = PROGRESS_DEFAULT_WAIT;
+/* minimum graphic height to use load progress display */
+word progressMinHeight = PROGRESS_DEFAULT_HEIGHT;
+#endif
+
+/*
+ * Semaphore guarding exclusive access to driver name cache by LoadURLByDriver()
+ */
+extern SemaphoreHandle URLDriverSemaphore;
+extern SemaphoreHandle MimeDriverSemaphore;
+
+/* lazarus fix */
+extern TCHAR lastURLType[];
+extern GeodeHandle lastURLDriver;
+extern TCHAR lastURLDriverName[];
+
+/* busy cursor */
+Boolean isBusyOff = FALSE;
+
+word cacheFileRefCount;
+
+#ifdef GLOBAL_INTERNET_BUILD
+/* holds cache directory */
+word vmCacheSP = HTML_VMCACHE_SP;
+TCHAR vmCacheDir[20];  /* no need for full path buffer */
+#endif
+
+#ifdef ALLOW_FETCH_WHILE_IMPORTING
+Boolean G_fetchWhileImport = FALSE;
+#endif
+
+#ifdef DO_DBCS
+DosCodePage G_codePage = CODE_PAGE_MULTILINGUAL;
+#endif
+
+/***************************************************************************
+ *              Driver management
+ ***************************************************************************/
+
+/*
+ *  Initialize storage for navigation routines
+ */
+@ifdef COMPILE_OPTION_INI_MIME_LIST
+/*
+ * mimeDrivers = {
+ *  Graphics Import Library,image/gif,GIF
+ *  Graphics Import Library,image/jpeg,JPG
+ *  Document Import Library,application/install,PAK
+ * }
+ */
+void LoadMimeTypes(void)
+{
+    int i = 0;
+    MemHandle iniData;
+    int iniDataSize;
+    TCHAR *drvP;
+    TCHAR *mimeP;
+    TCHAR *extP;
+
+    NameAssocAssociate(assocExtType, _TEXT("HTM"), _TEXT("text/html"));
+    NameAssocAssociate(assocExtType, _TEXT("TXT"), _TEXT("text/plain"));
+    NameAssocAssociate(assocExtType, _TEXT("JS"), _TEXT("application/x-javascript"));    
+
+    while (!InitFileReadStringSectionBlock(HTMLVIEW_CATEGORY, "mimeDrivers",
+					   i++, &iniData, IFRF_READ_ALL,
+					   &iniDataSize)) {
+	if (iniData) {
+	    drvP = MemLock(iniData);
+	    mimeP = strchr(drvP, ',');
+	    extP = strchr(mimeP+1, ',');
+	    if (mimeP && extP) {
+		*mimeP = 0;
+		*extP = 0;
+		NameAssocAssociate(assocTypeDriver, mimeP+1, drvP);
+		NameAssocAssociate(assocExtType, extP+1, mimeP+1);
+	    }
+	    MemFree(iniData);
+	}
+    }
+}
+@else
+void LoadMimeTypes(void)
+{
+    static GeodeToken mimeToken = {{MIME_DRV_TOKEN}, MIME_DRV_MFID};
+    static FileExtAttrDesc findMimeFEAD[] =
+      {{ FEA_TOKEN, &mimeToken, sizeof(GeodeToken), NULL },
+       { FEA_END_OF_LIST, 0, 0, NULL }};
+    static FileEnumParams findMimeFEP=
+      {FESF_GEOS_EXECS,
+       (void *)FESRT_NAME,
+       FILE_LONGNAME_BUFFER_SIZE,
+       findMimeFEAD,
+       FE_BUFSIZE_UNLIMITED,
+       0,
+       NULL,
+       NULL,0,0,
+       0};
+
+    MemHandle mh;
+    word found,notHandled;
+    struct {
+      FileLongName FMR_name;
+    } *findMimeRet;
+    TCHAR *info,*type;
+    GeodeHandle drv;
+    GeodeLoadError err;
+    void *FilterInfo;
+    TCHAR buf[MIME_INFO_MAXBUF];
+
+    NameAssocAssociate(assocExtType, _TEXT("HTM"), _TEXT("text/html"));
+    NameAssocAssociate(assocExtType, _TEXT("TXT"), _TEXT("text/plain"));
+                                        /* internally handled types */
+
+    FileSetStandardPath(SP_IMPORT_EXPORT_DRIVERS);
+    found = FileEnum(&findMimeFEP, &mh, &notHandled);
+    if(found)
+    {
+      for(findMimeRet=MemLock(mh); found; found--,findMimeRet++)
+      {
+        err = -1;                       /* this is not an error code */
+        drv = GeodeUseLibrary(findMimeRet->FMR_name, MIME_DRV_PROTOMAJOR,
+          MIME_DRV_PROTOMINOR, &err);   /* load import library */
+
+        if(drv!=NullHandle && err==-1)  /* see LoadURLByDriver() */
+        {
+          FilterInfo = ProcGetLibraryEntry(drv,MIME_ENTRY_INFO);
+                                        /* get entry point in library */
+
+          info = ((pcfm_MimeDrvInfo *)ProcCallFixedOrMovable_pascal)
+            (buf, FilterInfo);          /* call library to handle URL */
+
+          GeodeFreeLibrary(drv);        /* release driver */
+
+          while(*info)                  /* enumerate MIME types */
+          {
+            type = info;                /* info points to MIME type */
+            NameAssocAssociate(assocTypeDriver, type, findMimeRet->FMR_name);
+            info += strlen(info)+1;     /* skip over MIME type */
+            while(*info)                /* until empty extension is found */
+            {
+              NameAssocAssociate(assocExtType, info, type);
+              info += strlen(info)+1;   /* skip over extension */
+            }
+            info++;                     /* skip over empty string */
+          }
+        }
+      }
+      MemFree(mh);                        /* release file list */
+    }
+}
+@endif
+
+@ifdef COMPILE_OPTION_INI_URL_LIST
+/*
+ * urlDrivers = {
+ *  Geos 3.0 External URL Driver,mailto
+ *  Geos 3.0 External URL Driver,chat
+ *  Geos 3.0 HTTP URL Driver,HTTP
+ *  Geos 3.0 HTTP URL Driver,HTTPS
+ *  Geos 3.0 FTP URL Driver,FTP
+ * }
+ */
+void LoadURLDrivers(void)
+{
+    int i = 0;
+    MemHandle iniData;
+    int iniDataSize;
+    TCHAR *drvP;
+    TCHAR *urlP;
+
+    while (!InitFileReadStringSectionBlock(HTMLVIEW_CATEGORY, "urlDrivers",
+					   i++, &iniData, IFRF_READ_ALL,
+					   &iniDataSize)) {
+	if (iniData) {
+	    drvP = MemLock(iniData);
+	    urlP = strchr(drvP, ',');
+	    if (urlP) {
+		*urlP = 0;
+		NameAssocAssociate(assocSchemeDriver, urlP+1, drvP);
+	    }
+	    MemFree(iniData);
+	}
+    }
+}
+@else
+void LoadURLDrivers(void)
+{
+    static GeodeToken URLToken = {{URL_DRV_TOKEN}, URL_DRV_MFID};
+    static FileExtAttrDesc findURLFEAD[] =
+      {{ FEA_TOKEN, &URLToken, sizeof(GeodeToken), NULL },
+       { FEA_END_OF_LIST, 0, 0, NULL }};
+    static FileEnumParams findURLFEP=
+      {FESF_GEOS_EXECS,
+       (void *)FESRT_NAME,
+       FILE_LONGNAME_BUFFER_SIZE,
+       findURLFEAD,
+       FE_BUFSIZE_UNLIMITED,
+       0,
+       NULL,
+       NULL,0,0,
+       0};
+
+    MemHandle mh;
+    word found,notHandled;
+    struct {
+      FileLongName FMR_name;
+    } *findURLRet;
+    TCHAR *info,*type;
+    GeodeHandle drv;
+    GeodeLoadError err;
+    void *FilterInfo;
+    TCHAR buf[URL_INFO_MAXBUF];
+
+    FileSetCurrentPath(URL_DRV_SP, URL_DRV_DIR);
+
+    found = FileEnum(&findURLFEP, &mh, &notHandled);
+    if(found)
+    {
+      for(findURLRet=MemLock(mh); found; found--,findURLRet++)
+      {
+        err = -1;                       /* this is not an error code */
+        drv = GeodeUseLibrary(findURLRet->FMR_name, URL_DRV_PROTOMAJOR,
+          URL_DRV_PROTOMINOR, &err);   /* load import library */
+
+        if(drv!=NullHandle && err==-1)  /* see LoadURLByDriver() */
+        {
+          FilterInfo = ProcGetLibraryEntry(drv,URL_ENTRY_INFO);
+                                        /* get entry point in library */
+
+          info = ((pcfm_URLDrvInfo *)ProcCallFixedOrMovable_pascal)
+            (buf, FilterInfo);          /* call library to handle URL */
+
+          GeodeFreeLibrary(drv);        /* release driver */
+
+          while(*info)                  /* enumerate URL types */
+          {
+            type = info;                /* info points to URL type */
+            NameAssocAssociate(assocSchemeDriver, type, findURLRet->FMR_name);
+            info += strlen(info)+1;     /* skip over URL type */
+          }
+        }
+      }
+      MemFree(mh);                        /* release file list */
+    }
+}
+@endif
+
+/**************************************************************************
+ *              AddCacheFileReference
+ **************************************************************************
+ *
+ * Description:
+ *     Notify the cache system that one more client (typically, a text 
+ *     object) is using it. The cache is created when the first client
+ *     attaches.
+ *
+ **************************************************************************/
+void AddCacheFileReference(void)
+{
+    if(cacheFileRefCount++ == 0)        /* one more "client" uses the file */
+    {                                   /* first client creates new file */
+#ifdef GLOBAL_INTERNET_BUILD
+      FileSetCurrentPath(vmCacheSP, vmCacheDir);
+#else
+      FileSetCurrentPath(HTML_VMCACHE_SP, HTML_VMCACHE_DIR);
+#endif
+      
+      AttachToObjCache();               // load cache state from VM file
+
+#ifdef GLOBAL_INTERNET_BUILD
+      /* create separate file for text object storage, share cache file ref
+	 count */
+      textObjFile = VMOpen(TEXT_OBJ_FILE_NAME, VMAF_FORCE_READ_WRITE,
+			   VMO_CREATE_TRUNCATE, 1);
+      /* Set the required object attributes for storing objects in a VM file.
+         But, we MUST not set VMA_OBJECT_RELOC since relocation fails on the
+         URLContent object for some odd reason, and there's currently no
+         need for it to work. - DH 9/7/99 */
+      VMSetAttributes(textObjFile, (VMA_OBJECT_ATTRS) & ~VMA_OBJECT_RELOC, 0);
+
+      namePool = NamePoolCreate(textObjFile);
+                                        // create global name pool
+#else
+      namePool = NamePoolCreate(cacheFiles[0]);
+                                        // create global name pool
+#endif
+
+#ifdef GLOBAL_INTERNET_BUILD
+      FileSetCurrentPath(HTML_VMCACHE_SP, HTML_VMCACHE_DIR);
+#endif
+      AttachToSrcCache();               // load cache state from VM file
+
+#if JAVASCRIPT_SUPPORT
+      /* Start and initialize JavaScript environment */
+      jsecontext = NULL;
+#endif
+    }
+}
+
+/**************************************************************************
+ *              RemoveCacheFileReference
+ **************************************************************************
+ *
+ * Description:
+ *     Notify the cache system that one client (typically, a text object)
+ *     has detached. If the last client releases the cache, its data
+ *     structures can be destroyed.
+ *
+ **************************************************************************/
+void RemoveCacheFileReference(void)
+{
+    word i;
+  
+    if(--cacheFileRefCount == 0)        /* count down clients, no more: close */
+    {
+#if JAVASCRIPT_SUPPORT
+      /* Shut down JavaScript environment */
+      if(jsecontext)
+        ExitBrowserJS();
+#endif
+ 
+      DetachFromObjCache();             /* save cache state to disk */
+      SrcCacheCommit();                 /* update cache state one last time */
+
+      MemFree(objCacheBlock);
+      srcCacheArray = objCacheArray = NullOptr;
+                                        /* arrays are no longer available */
+
+#ifdef ALT_SRC_CACHE
+      if (altSrcCacheHosts) MemFree(altSrcCacheHosts);
+      if (altSrcCacheExts) MemFree(altSrcCacheExts);
+      altSrcCacheHosts = NullHandle;
+      altSrcCacheExts = NullHandle;
+#endif
+
+      /* There is some more stuff we only want to do if the last text object
+         as well as the navigation system have detached from the cache.
+         We assume that the Name Pool is no longer needed by anyone, as are
+         the allocation watch object and the semaphores controlling access
+         to the cache. This way, we do not depend on the order in which
+         the actual destruction messages are occuring. */
+
+      NamePoolFree(namePool);           /* release name pool */
+      namePool = NullOptr;
+
+      for(i=0; i<NUM_CACHE_FILES; i++)  /* close cache file */
+        VMClose(cacheFiles[i], FILE_NO_ERRORS);
+      VMClose(srcCacheFile, FILE_NO_ERRORS);
+#ifdef GLOBAL_INTERNET_BUILD
+      VMClose(textObjFile, FILE_NO_ERRORS);
+      FileSetCurrentPath(vmCacheSP, vmCacheDir);
+#endif
+
+      AllocWatcherDestroy(G_allocWatcher) ;
+      G_allocWatcher = NullWatcher ;
+
+      /* Remove the old semaphores */
+      ThreadFreeSem(srcCacheSem);
+      ThreadFreeSem(objCacheSem);
+    }
+}
+
+/**************************************************************************
+ *              CleanupImpDoc
+ **************************************************************************
+ *
+ * Description:
+ *     Cleanup impdoc files. 
+ *
+ **************************************************************************/
+void CleanupImpDoc(void)
+{
+    FileEnumParams findCacheFEP =
+    {FILE_ENUM_ALL_FILE_TYPES,
+     (void *)FESRT_NAME,
+     FILE_LONGNAME_BUFFER_SIZE,
+     0,
+     FE_BUFSIZE_UNLIMITED,
+     0,
+     NULL,
+     NULL,0,0,
+     0};
+    struct {
+        FileLongName IF_name;
+    } *impdocFile;
+    MemHandle mh;
+    int found, notHandled;
+
+    FileSetCurrentPath(SP_PRIVATE_DATA, _TEXT("impdoc"));
+    if (!ThreadGetError()) {  /* only we CD'ed correctly */
+	found = FileEnum(&findCacheFEP, &mh, &notHandled);
+	if (found) {
+	    for (impdocFile = MemLock(mh); found; found--, impdocFile++ ) {
+		FileDelete(impdocFile);
+	    }
+	    MemFree(mh);
+	}
+    }
+}
+
+#ifdef GLOBAL_INTERNET_BUILD_and_0  /* not needed for portal registration */
+/*
+ * this is kinda ugly, we add a cookie directly to the cookie file
+ */
+void SetPortalCookie(void)
+{
+    MemHandle userInfo = NullHandle;
+    TCHAR *userInfoP;
+    MemHandle formUserInfo;
+    T_formString *formUserInfoP;
+    word dataSize;
+    FileHandle cookieFile;
+    char *cookieValue;
+    char cookieStatic[] = "\tFALSE\t\/\tFALSE\tWed, 30-Dec-2037 16:00:00 GMT\tgpcu\t";
+    TCHAR portalDomain[100] = "";
+@ifdef DO_DBCS
+    DosCodePage cp = G_codePage;
+    word status, backukp;
+@endif
+
+    if (InitFileReadStringBuffer("browserSetup", "portal",
+				 portalDomain, 100, &dataSize)) return;
+    if (!(*portalDomain)) return;
+@ifdef DO_DBCS
+    dataSize = strlen(portalDomain) + 1;  /* include null */
+    LocalGeosToDos(portalDomain, portalDomain, &dataSize, DEFCHAR, &cp, 0,
+		   &status, &backup);
+@endif
+
+    if (InitFileReadDataBlock("browserSetup", "userInfo",
+			      &userInfo, &dataSize)) return;
+    if (!userInfo) return;
+
+    userInfoP = MemLock(userInfo);
+    if (userInfoP) {
+	formUserInfo = FormStringCreate();
+	if (formUserInfo) {
+	    FormStringConvertAndAppend(formUserInfo, userInfoP);
+	    formUserInfoP = MemLock(formUserInfo);
+	    if (formUserInfoP) {
+		FileSetStandardPath(SP_PRIVATE_DATA);
+		cookieFile = FileOpen(_TEXT("cookies.txt"),
+				      FILE_DENY_W | FILE_ACCESS_RW);
+		if (!cookieFile) {
+		    cookieFile = FileCreate(_TEXT("cookies.txt"), FCF_NATIVE |
+					    FILE_CREATE_TRUNCATE |
+					    FILE_DENY_RW |
+					    FILE_ACCESS_RW,
+					    FILE_ATTR_NORMAL);
+		} else {
+		    /* opened existing cookie file, move to end */
+		    /* !!we assume that there's no other cookie for the
+		       portal domain!! */
+		    (void)FilePos(cookieFile, 0, FILE_POS_END);
+		    /* if error, moving to end, don't write anything */
+		    if (ThreadGetError()) {
+			FileClose(cookieFile, FALSE);
+			cookieFile = 0;
+		    }
+		}
+		if (cookieFile) {
+		    /* domain */
+@ifdef DO_DBCS
+		    FileWrite(cookieFile, portalDomain,
+			      strlensbcs(portalDomain), FALSE);
+		    /* flag, path, secure, expiration, and name */
+		    FileWrite(cookieFile, cookieStatic,
+			      strlensbcs(cookieStatic), FALSE);
+@else
+		    FileWrite(cookieFile, portalDomain,
+			      strlen(portalDomain), FALSE);
+		    /* flag, path, secure, expiration, and name */
+		    FileWrite(cookieFile, cookieStatic,
+			      strlen(cookieStatic), FALSE);
+@endif
+		    /* value */
+		    cookieValue = FormStringDerefData(formUserInfo);
+		    FileWrite(cookieFile, cookieValue,
+			      formUserInfoP->numChars-1, FALSE);
+		    /* newline */
+		    FileWrite(cookieFile, "\n", 1, FALSE);
+		    FileClose(cookieFile, FALSE);
+		    /* successfully wrote cookie, don't do it again */
+		    InitFileDeleteEntry("browserSetup", "userInfo");
+		}
+	    }
+	    MemFree(formUserInfo);
+	}
+	MemUnlock(userInfo);
+    }
+    MemFree(userInfo);
+}
+#endif
+
+/*
+ *  Initialize storage for navigation routines
+ */
+void InitNavigation(void)
+{
+    word i, fontID, pointSize;
+    WWFixed wwf;
+    dword availMem ;
+    word Kavail ;
+#ifdef ALT_SRC_CACHE || GLOBAL_INTERNET_BUILD
+    word dataSize;
+#endif
+
+    HWChecksumCheck() ;
+
+    /* Assume we have plenty of room for the allocation watcher */
+    /* But use the limit in the .INI file (if any) */
+    availMem = 0x400000 ;  /* 4 megs unless told otherwise */
+    if (!InitFileReadInteger(HTMLVIEW_CATEGORY, "memlimit", &Kavail))  {
+        /* Use that limit */
+        availMem = ((dword)Kavail) * 1000L ;
+    }
+    G_allocWatcher = AllocWatcherCreate(availMem) ;
+
+#ifdef GLOBAL_INTERNET_BUILD
+    /* setup VM cache directory */
+    InitFileReadInteger(HTMLVIEW_CATEGORY, "vmCacheSP", &vmCacheSP);
+    if (InitFileReadStringBuffer(HTMLVIEW_CATEGORY, "vmCacheDir",
+				 vmCacheDir, sizeof(vmCacheDir), &dataSize)) {
+	/* not found in .ini, use default */
+	xstrncpy(vmCacheDir, HTML_VMCACHE_DIR, sizeof(vmCacheDir)/sizeof(TCHAR));
+    }
+#endif
+
+    HWChecksumCheck() ;
+    FileSetCurrentPath(HTML_CACHE_SP, _TEXT("."));
+    FileCreateDir(HTML_CACHE_DIR);      /* create source cache directory */
+    cacheFileRefCount = 0;              /* No users of cache file yet */
+    HWChecksumCheck() ;
+    AddCacheFileReference();            /* first user - create cache file */
+    HWChecksumCheck() ;
+
+@ifdef GLOBAL_INTERNET_BUILD
+    /* set up help window */
+    @send HelpFrame::MSG_URL_FRAME_SET_INTERACTION_OBJ(@HelpTop);
+@endif
+
+    for(i=0; i<HTML_LRUSIZE; i++)       /* initialize buffer for recent URLs */
+    {
+      LRUBuffer[i].name = NAME_POOL_NONE;
+      LRUBuffer[i].frameSet = 0;
+    }
+
+@ifdef POST_DATA_CACHE
+     PostDataCacheInit();
+@endif
+
+    HWChecksumCheck() ;
+    localCacheBlock = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    frameCacheBlock = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    assocCacheBlock = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+                                        /* allocate storage fr caches */
+#ifdef ALT_SRC_CACHE
+    /* read alt source cache info, freed on exit */
+    if (InitFileReadStringBlock(HTMLVIEW_CATEGORY, "altSrcCacheHosts",
+				&altSrcCacheHosts, 0, &dataSize)) {
+	altSrcCacheHosts = NullHandle;
+    }
+    if (InitFileReadStringBlock(HTMLVIEW_CATEGORY, "altSrcCacheExts",
+				&altSrcCacheExts, 0, &dataSize)) {
+	altSrcCacheExts = NullHandle;
+    }
+#endif
+
+#ifdef CACHE_VALIDATION
+    InitFileReadBoolean(HTMLVIEW_CATEGORY, "weakCacheExpiration",
+			&weakCacheExpiration);
+#endif
+
+#ifdef UNSUPPORTED_EXTS
+    /* read unsupported extensions, freed on exit */
+    if (InitFileReadStringBlock(HTMLVIEW_CATEGORY, "unSupportedExts",
+				&unSupportedExts, 0, &dataSize)) {
+	unSupportedExts = NullHandle;
+    }
+#endif
+
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+    MemLock(localCacheBlock);
+    localPageArray = ConstructOptr(localCacheBlock,
+      ChunkArrayCreate(localCacheBlock, sizeof(NameToken), 0, 0));
+    MemUnlock(localCacheBlock);
+@endif
+
+    HWChecksumCheck() ;
+    assocExtType = NameAssocCreate(assocCacheBlock, namePool);
+    assocTypeDriver = NameAssocCreate(assocCacheBlock, namePool);
+    assocSchemeDriver = NameAssocCreate(assocCacheBlock, namePool);
+
+    HWChecksumCheck() ;
+    LoadMimeTypes();                    /* load Mime type associations */
+
+    HWChecksumCheck() ;
+    LoadURLDrivers();                   /* load URL driver associations */
+    InitURLDrivers();                   /* bleah, cookie stuff */
+
+    HWChecksumCheck() ;
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+    FileSetCurrentPath(HTML_LOCAL_PAGE_SP, _TEXT("."));
+    FileCreateDir(HTML_LOCAL_PAGE_DIR); /* create local pages directory */
+@endif
+
+     /* clean up impdoc files */
+     CleanupImpDoc();
+
+    /*
+     * Restore font/size from INI file
+     */
+    if(UserGetDefaultUILevel()==UIIL_INTRODUCTORY)
+    {
+      fontID = FONT_DEFAULT;
+      pointSize = FONT_DEFAULT_SIZE_INTRO;
+      InitFileReadInteger(HTMLVIEW_CATEGORY, "introDefaultFont", &fontID);
+      InitFileReadInteger(HTMLVIEW_CATEGORY, "introDefaultPointSize",
+        &pointSize);
+    }
+    else
+    {
+      fontID = FONT_DEFAULT;
+      pointSize = FONT_DEFAULT_SIZE;
+      InitFileReadInteger(HTMLVIEW_CATEGORY, "defaultFont", &fontID);
+      InitFileReadInteger(HTMLVIEW_CATEGORY, "defaultPointSize", &pointSize);
+    }
+
+    *(WWFixedAsDWord *)&wwf = MakeWWFixed(pointSize);
+    @call CurrentURLText::MSG_VIS_TEXT_SET_POINT_SIZE(wwf, 0, 0);
+    @call CurrentURLText::MSG_VIS_TEXT_SET_FONT_ID((FontID)fontID, 0, 0);
+
+    HWChecksumCheck() ;
+
+    URLDriverSemaphore = ThreadAllocSem(1);
+    MimeDriverSemaphore = ThreadAllocSem(1);
+    /* lazarus fix */
+    lastURLDriver = NullHandle;
+    *lastURLType = C_NULL;
+    *lastURLDriverName = C_NULL;
+
+    /* busy cursor */
+    InitFileReadBoolean(HTMLVIEW_CATEGORY, "busyOff", &isBusyOff);
+
+#if PROGRESS_DISPLAY
+    InitFileReadBoolean(HTMLVIEW_CATEGORY, "progressDisplay", &progressDisplay);
+    /* get wait before sending load progress notification */
+    InitFileReadInteger(PROGRESS_INI_CAT, PROGRESS_INI_WAIT_KEY,
+			&progressLoadWait);
+    /* get minimum graphic height to use progress display */
+    InitFileReadInteger(PROGRESS_INI_CAT, PROGRESS_INI_HEIGHT_KEY,
+			&progressMinHeight);
+#endif
+@ifdef COPY_TO_SCRAPBOOK
+     @call application::MSG_META_GCN_LIST_ADD(@HTMLVApp, GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE, MANUFACTURER_ID_GEOWORKS);
+@endif
+#ifdef GLOBAL_INTERNET_BUILD_and_0  /* not needed for portal registration */
+     /* set up initial portal cookie, if needed */
+     SetPortalCookie();
+#endif
+@ifdef CACHE_ALL
+     /* read cache all flag */
+     InitFileReadBoolean(HTMLVIEW_CATEGORY, "cacheAll", &G_cacheAll);
+@endif
+#ifdef ALLOW_FETCH_WHILE_IMPORTING
+     InitFileReadBoolean(HTMLVIEW_CATEGORY, "fetchWhileImport", &G_fetchWhileImport);
+#endif
+}
+
+/*
+ *  Load old cache contents from permanent storage. This has to be done
+ *  after initializing the application by the system to make sure that
+ *  the cache size limits have been loaded from the INI file.
+ */
+void InitCache(void)
+{
+}
+
+/*
+ *  Release storage for navigation routines
+ */
+void DeInitNavigation(void)
+{
+@ifdef COPY_TO_SCRAPBOOK
+     @call application::MSG_META_GCN_LIST_REMOVE(@HTMLVApp, GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE, MANUFACTURER_ID_GEOWORKS);
+@endif
+    HistoryClear() ;                    // Release history name tokens
+
+    RemoveCacheFileReference();         /* no longer using cache file */
+
+    MemFree(localCacheBlock);
+    MemFree(frameCacheBlock);
+    MemFree(assocCacheBlock);
+    assocExtType = assocTypeDriver = assocSchemeDriver = NullOptr;
+
+    DeInitURLDrivers();
+
+/* let MimeDriverSempahore be auto freed on exit as we need it when freeing
+   import threads */
+/*    ThreadFreeSem(MimeDriverSemaphore);*/
+    ThreadFreeSem(URLDriverSemaphore);
+}
+
+Boolean TestInitStringMissing(char *key)
+{
+    PathName temp;
+    word size;
+
+    return InitFileReadStringBuffer(HTMLVIEW_CATEGORY, key, temp,
+                                    IFRF_FIRST_ONLY | sizeof(temp), &size);
+}
+
+@ifdef TV_BW_OPTION
+extern void _pascal SetVidBW(word bwOn);
+@endif
+
+void DisableInappropriateOptions(void)
+{
+    word opt, form, tvBW;
+    DisplayScheme ds;
+    DisplayClass dc;
+    DisplaySize dsz;
+@ifdef TV_BW_OPTION
+    DisplayAspectRatio dsr;
+@endif
+@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+    Boolean toolbarShown = TRUE;
+@endif
+
+    @call application::MSG_GEN_APPLICATION_SET_APP_LEVEL(
+      UserGetDefaultUILevel());
+
+    opt = @call SettingsBoolGroup::
+      MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    form = @call HTMLSettingsBoolGroup::
+      MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+@ifdef COMPILE_OPTION_ENABLE_SETTINGS
+    @send srcCacheOpt::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+@ifdef COMPILE_OPTION_FORMATTING_CACHE_ON
+    @send objCacheOpt::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+@endif
+@endif
+
+    @call application::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&ds);
+
+    dc = (ds.DS_displayType & DT_DISP_CLASS) >> DT_DISP_CLASS_OFFSET;
+    if(dc!=DC_GRAY_4 && dc!=DC_COLOR_8 && dc!=DC_GRAY_8 && dc!=DC_CF_RGB)
+    {                                   /* disable color if not 256+ colors */
+      form &= ~(HTML_MONOCHROME | HTML_NO_BACKGROUND);
+                                        /* these bits are inverted in the UI! */
+    }
+
+    dsz = (ds.DS_displayType & DT_DISP_SIZE) >> DT_DISP_SIZE_OFFSET;
+    if(dsz == DS_TINY)                   
+    {                                   
+@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+      toolbarShown = FALSE;
+@else
+      opt &= ~HTMLV_ENABLE_TOOLBAR;      /* no toolbar on tiny displays */
+@endif
+      form &= ~HTML_ADD_MARGIN;          /* no margins either */
+      @send BboxLogo::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+
+@ifdef TV_BW_OPTION
+    dsr = (ds.DS_displayType & DT_DISP_ASPECT_RATIO) >> DT_DISP_ASPECT_RATIO_OFFSET;
+    /* check ini file to see if the system is in B&W mode */
+    InitFileReadInteger("screen0", "tvOptions", &tvBW);
+    if (dsr == DAR_TV && !(tvBW & 2)) {	
+	@send NavigateTVBW::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	/* set selected mode */
+	SetVidBW(@call NavigateTVBW::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS());    
+    } else {
+	@send NavigateTVBW::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+@endif
+
+@ifdef TITLE_BAR_STATUS
+    dsr = (ds.DS_displayType & DT_DISP_ASPECT_RATIO) >> DT_DISP_ASPECT_RATIO_OFFSET;
+    if (dsr == DAR_TV && UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	@call SimpleToolbar::MSG_GEN_REMOVE_CHILD(@StatusIndicators, 0);
+	@call HTMLVPrimary::MSG_GEN_ADD_CHILD(@StatusIndicators, 0);
+	@call SecureStatus::MSG_META_DELETE_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS);
+	@call PCStatusLight::MSG_META_DELETE_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS);
+    } else {
+	@call StatusIndicators::MSG_META_DELETE_VAR_DATA(HINT_SEEK_TITLE_BAR_RIGHT);
+    }
+    @send StatusIndicators::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+@endif
+
+@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+    /* Try to get saved toolbar state from INI file. */
+    InitFileReadBoolean(HTMLVIEW_CATEGORY, "toolbarShown", &toolbarShown) ;
+@endif
+
+@ifdef GPC_ONLY
+    /* The GlobalPC product always defaults to the same view settings. */
+    @send SettingsBoolGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(opt, 0);
+    @send HTMLSettingsBoolGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(form, 0);
+@endif
+
+@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+    UpdateToolbar(toolbarShown);
+@else
+    UpdateToolbar(opt & HTMLV_ENABLE_TOOLBAR);
+@endif
+}
+
+Boolean QueryINIExist(char *category, char *key)
+{
+    TCHAR buffer[200] ;
+    word size = 0 ;
+
+    HWChecksumCheck() ;
+    if (InitFileReadStringBuffer(
+           category,
+           key,
+           buffer,
+           sizeof(buffer)-1*sizeof(TCHAR),
+           &size))
+       return FALSE ;  /* Not found or an error */
+    HWChecksumCheck() ;
+
+    return TRUE ;
+}
+
+/* The following routine is mainly intended to check for existing .INI */
+/* settings and to setup them up if they are MISSING.  This ensures that */
+/* the program will work correctly the first time without manual settings. */
+void EnsureINISettings(AppAttachFlags attachFlags)
+{
+    static char cat[] = HTMLVIEW_CATEGORY ;
+    word version = 0 ;
+    MemHandle homeH;
+    Boolean autoOpen ;
+@ifdef COMPILE_OPTION_GOTO_PAGE_IN_INFO_SERV
+    TCHAR home[200] ;
+    word size ;
+@endif
+#ifdef YAGO_2_BUILD
+    char fileManager[] = "fileManager" ;
+    char filenameTokens[] = "filenameTokens" ;
+#endif
+    HWChecksumCheck() ;
+    InitFileReadInteger(cat, "version", &version) ;
+    HWChecksumCheck() ;
+
+    /* Compare the .INI version number with what we think we have */
+    /* If it has changed, we do a complete rewrite of the .INI area */
+    if (version != HTML_VIEW_INI_VERSION_NUMBER)  {
+        /* Just delete the whole category -- a vast change has occured */
+#ifndef GLOBAL_INTERNET_BUILD  /* never delete stuff */
+        InitFileDeleteCategory(cat) ;
+#endif
+        InitFileWriteInteger(cat, "version", HTML_VIEW_INI_VERSION_NUMBER) ;
+        InitFileWriteInteger(cat, "memlimit", DEFAULT_ALLOCATE_WATCHER_LIMIT) ;
+#ifdef YAGO_2_BUILD
+        InitFileDeleteEntry(fileManager, filenameTokens) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.JPG = \"HTML\",0,\"WMK2\",16431")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.GIF = \"HTML\",0,\"WMK2\",16431")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.HTM = \"HTML\",0,\"WMK2\",16431")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.BAT = \"gDOS\",0")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.COM = \"gDOS\",0")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.EXE = \"gDOS\",0")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.TXT = \"TeEd\",0,\"TeEd\",0")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.DOC = \"FILE\",0,\"TeEd\",0")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.HLP = \"FILE\",0,\"TeEd\",0")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         *.MAC = \"FILE\",0,\"TeEd\",0")) ;
+        InitFileWriteStringSection(fileManager, filenameTokens, _TEXT("         * = \"FILE\",0,\"TeEd\",0"))) ;
+        InitFileWriteStringSection(cat, "home", _TEXT("FILE:///F:/GEOWORKS/DOCUMENT/WELCOME.HTM")) ;
+        @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(_TEXT("FILE:///F:/GEOWORKS/DOCUMENT/WELCOME.HTM"), 0) ;
+        NavigateSetHome(_TEXT("FILE:///F:/GEOWORKS/DOCUMENT/WELCOME.HTM")) ;
+        InitFileCommit();                 /* make it survive a crash */
+#endif
+    }
+    HWChecksumCheck() ;
+
+@ifdef COMPILE_OPTION_START_WITH_NEW
+    autoOpen = TRUE;
+@else
+    autoOpen = FALSE;
+@endif
+
+@ifdef COMPILE_OPTION_GOTO_PAGE_IN_INFO_SERV
+    /* Copy over the home page from the infoServ area if there is one. */
+    home[0] = '\0' ;
+    InitFileReadStringBuffer("infoServ", "homePage", home, sizeof(home), &size) ;
+    if (home[0])  {
+        InitFileDeleteEntry("infoServ", "homePage") ;
+        NavigateSetHome(home) ;
+        autoOpen = TRUE;
+    }
+    /* Copy over the home page from the Webbrowser area if there is one. */
+    home[0] = '\0' ;
+    InitFileReadStringBuffer("WebBrowser", "homepage", home, sizeof(home), &size) ;
+    if (home[0])  {
+        InitFileDeleteEntry("WebBrowser", "homepage") ;
+        NavigateSetHome(home) ;
+        autoOpen = TRUE;
+    }
+@endif
+
+    /* Copy the home page UI name into the current URL text, if no datafile */
+     if (!(attachFlags & AAF_DATA_FILE_PASSED) &&
+	 !(@call application::MSG_HMLVA_GET_LAUNCH_URL())) {
+	 NavigateGetHome(&homeH) ;
+         if(homeH)
+         {
+	   @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_BLOCK(homeH, 0) ;
+	   MemFree(homeH);
+         }
+     }
+
+    if(autoOpen)
+      @send ,forceQueue DocumentControl::MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC();
+}

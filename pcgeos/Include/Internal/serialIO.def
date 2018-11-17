@@ -1,0 +1,133 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PCGEOS
+MODULE:		Serial driver
+FILE:		serialIO.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	atw	7/ 2/93		Initial revision
+
+
+DESCRIPTION:
+	Contains description of the serial IO layout
+		
+	$Id: serialIO.def,v 1.3 97/09/22 19:25:14 jang Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+;------------------------------------------------------------------------------
+;			   PORT DESCRIPTORS
+;------------------------------------------------------------------------------
+
+
+
+SerialStatus	record		; Line-status register (note similarity to
+    				; SerialError record in serialDriver.def)
+    SS_FIFO:1		; Error in receive FIFO
+    SS_TSRE:1		; Transmitter really empty (data has been transmitted)
+    SS_THRE:1		; Transmitter holding register empty (last byte still
+    			;  being shifted out, but port can accept another byte)
+    SS_BREAK:1		; Break condition detected
+    SS_FRAME_ERR:1	; Framing error detected
+    SS_PARITY_ERR:1	; Parity error detected
+    SS_OVERRUN:1	; Data lost
+    SS_DATA_AVAIL:1	; Received data register contains valid data
+SerialStatus	end
+
+SerialIEN	record		; Interrupt-enable register
+    SIEN_MODEM:1	; Modem-status change interrupt
+    SIEN_LINE_ERR:1	; Line-error interrupt
+    SIEN_TRANSMIT:1	; Transmit-register empty interrupt
+    SIEN_DATA_AVAIL:1	; Data received interrupt
+SerialIEN	end
+
+;
+; IIDTable in MiniSerialInt routine depends on values of these enum types
+;
+SerialInts	etype byte, 0
+    SI_MODEM_STATUS	enum	SerialInts, 00b	; Cleared by reading the modem
+						;  status register
+    SI_TRANSMIT		enum	SerialInts, 01b	; Cleared by writing the data
+						;  register *or* reading the
+						;  interrupt ID register
+    SI_DATA_AVAIL	enum	SerialInts, 10b	; Cleared by reading the data
+						;  register
+    SI_LINE_ERR		enum	SerialInts, 11b	; Cleared by reading the status
+						;  register
+SerialFIFOMode	etype	byte, 0
+    SFM_CHARACTER	enum	SerialFIFOMode
+    SFM_DMA		enum	SerialFIFOMode
+    SFM_FIFO		enum	SerialFIFOMode, 3
+
+SerialIID	record		; Interrupt identification register
+    SIID_FIFO_MODE SerialFIFOMode:2
+    :2=0
+    SIID_TCLIP:1			; 1=trigger change level int pending
+    SIID_TYPE SerialInts:2		; Interrupt type
+    SIID_IRQ:1=0			; 0 if interrupt request pending
+SerialIID	end
+
+FIFO_RECV_THRESHOLD	equ	14
+FIFO_RECV_THRESHOLD_SFS equ SFS_FOURTEEN_BYTES
+
+SerialFIFOSize	etype	byte, 0
+    SFS_ONE_BYTE	enum	SerialFIFOSize
+    SFS_FOUR_BYTES	enum	SerialFIFOSize
+    SFS_EIGHT_BYTES	enum	SerialFIFOSize
+    SFS_FOURTEEN_BYTES	enum	SerialFIFOSize
+
+SerialFIFOControl	record	; Writable form of SP_iid register for 16550
+    SFC_SIZE SerialFIFOSize:2
+    :2=0
+    SFC_DELAY_DMA:1	; set if DMA trigger should be delayed until FIFO is
+			;  full/empty (recv/transmit) or timeout occurs. If
+			;  clear, DMA will be active for a single character.
+    SFC_XMIT_RESET:1
+    SFC_RECV_RESET:1
+    SFC_ENABLE:1
+SerialFIFOControl	end
+
+
+SerialFlow	record		; Data for handling flow-control MUST BE A BYTE
+    SF_INPUT:1		; flow control active for input (i.e. can stop the
+			;  remote)
+    SF_OUTPUT:1		; flow control active for output (i.e. obey flow
+			;  control requests from remote)
+    SF_XON:1,		; Set if need to send XON for next output character
+    SF_XOFF:1,		; Set if need to send XOFF for next output character
+
+    SF_SOFTSTOP:1,	; Set if output stopped by receipt of XOFF
+    SF_HARDSTOP:1,	; Set if output stopped by drop in transmit signal
+
+    SF_SOFTWARE:1,	; Use software flow-control
+    SF_HARDWARE:1,	; Use hardware flow-control
+SerialFlow	end
+
+XOFF_CHAR	equ	13h			;'S' and 0x1f	= ^S
+XON_CHAR	equ	11h			;'Q' and 0x1f	= ^Q
+
+;
+; Layout of the I/O space of a serial  port.
+;
+
+SerialPorts	struct
+    SP_divLow		label byte		; Divisor latch low byte
+						;  (if SF_DLAB==1)
+    SP_data		byte			; Data latch (SF_DLAB==0)
+    SP_divHigh		label byte		; Divisor latch high byte
+						;  (SF_DLAB==1)
+    SP_ien		SerialIEN		; Interrupt-enable (SF_DLAB==0)
+    SP_iid		SerialIID		; Interrupt identification
+    SP_lineCtrl		SerialFormat		; Line control (format) register
+    SP_modemCtrl 	SerialModem		; Modem control register
+    SP_status		SerialStatus		; Line status register
+    SP_modemStatus 	SerialModemStatus	; Modem status register
+    			byte
+SerialPorts	ends

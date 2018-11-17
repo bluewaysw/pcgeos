@@ -1,0 +1,370 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) Palm Computing, Inc. 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		macros.def
+
+DECLARER:	
+
+MACROS:
+	StrLen		(use LocalStringSize or LocalStringLength in
+				localize.def)
+	VisDeref	Dereference
+	ObjCall		MF_CALL an object.
+	ObjSend		Send a message to an object.
+	CopyBytes	More flexible version of copybuf.
+	GetInstance	Dereferences an object's master group with error checks.
+
+TYPES:
+	Name		Description
+	----		-----------
+
+
+DESCRIPTION:
+	This file defines common structures and constants
+
+	$Id: macros.def,v 1.1 97/04/04 14:21:25 newdeal Exp $
+
+------------------------------------------------------------------------------@
+COMMENT @-------------------------------------------------------------------
+
+MARCO:		strlen
+
+DESCRIPTION: 	Determine the length of a string
+
+ARGUMENTS:	[sourceSeg] - segment of string, assumes es
+		[sourceOff] - offset of string, assumes di
+
+RETURN:		cx	- length of the string
+
+DESTROYED:	ax
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	acl	8/ 6/92		Initial version
+
+----------------------------------------------------------------------------@
+strlen		macro	sourceSeg, sourceOff
+    local	esSaved
+
+    esSaved = 0
+
+    ifnb <sourceSeg>
+        if <sourceSeg> ne <es>
+            esSaved = 1
+            push	es
+            ifidn	<sourceSeg>, <ds>
+                push    ds
+                pop	es
+            else
+                mov     es, sourceSeg
+            endif
+        endif
+    endif
+  
+    push  di
+    ifnb <sourceOff>
+        if <sourceSeg> ne <di>
+            mov	    di, sourceOff
+        endif
+    endif
+
+    cld
+    xor   ax, ax
+    mov	  cx, -1
+    repne scasb
+    not	  cx
+    dec	  cx
+    pop   di
+
+    if (esSaved gt 0)
+       pop   es
+    endif
+
+endm
+
+
+
+COMMENT @-------------------------------------------------------------------
+
+MARCO:		VisDeref
+
+DESCRIPTION: 	Dereference 
+
+ARGUMENTS:	*ds:si	  - object instance date
+		[destReg] - 
+
+RETURN:		[destReg] - offset of vis instance date
+
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	art	2/12/93		Initial version
+
+----------------------------------------------------------------------------@
+VisDeref macro   destReg
+
+ifnb <destReg>
+	mov	destReg, ds:[si] 
+	add	destReg, ds:[destReg].Vis_offset
+else
+	mov     di, ds:[si]
+	add     di, ds:[di].Vis_offset
+endif
+
+endm
+
+
+COMMENT @-------------------------------------------------------------------
+
+MARCO:		ObjCall
+
+DESCRIPTION: 	MF_CALL an object.
+
+ARGUMENTS:	message
+		object to call with message
+		additional flags
+
+RETURN:		^lbx:si - object
+
+DESTROYED:	ax, di
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	rsf	4/28/93		Initial version
+
+----------------------------------------------------------------------------@
+ObjCall macro   message, object, flags
+
+ifnb	<message>
+	ifdif	<ax>, <message>
+		mov	ax, message
+	endif
+endif
+ifnb	<object>
+	ifdif	<bxsi>, <object>
+		GetResourceHandleNS	object, bx
+		mov	si, offset object
+	endif
+endif
+ifb	<flags>
+	mov	di, mask MF_CALL
+else
+	mov	di, mask MF_CALL or flags
+endif
+	call	ObjMessage
+
+endm
+
+
+COMMENT @-------------------------------------------------------------------
+
+MARCO:		ObjSend
+
+DESCRIPTION: 	Send a message to an object.
+
+ARGUMENTS:	object to call message
+		message
+
+RETURN:		^lbx:si - object
+
+DESTROYED:	ax, di
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	rsf	4/28/93		Initial version
+
+----------------------------------------------------------------------------@
+ObjSend macro   message, object, flags
+
+ifnb	<message>
+	ifdif	<ax>, <message>
+		mov	ax, message
+	endif
+endif
+ifnb	<object>
+	ifdif	<bxsi>, <object>
+		GetResourceHandleNS	object, bx
+		mov	si, offset object
+	endif
+endif
+ifb	<flags>
+	clr	di
+else
+	mov	di, flags
+endif
+	call	ObjMessage
+
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CopyBytes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Copies bytes.
+
+PASS:		ds:si  - ptr to source
+		es:di  - ptr to dest
+		length - number of bytes to copy
+		<optional> SAVE_REGS to preserve registers
+
+DESTROYED:	cx, si, di (unless SAVE_REGS passed)
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+EXPANDS TO:
+	if SAVE_REGS:
+		15 bytes if length is even
+		16 bytes if length is odd
+	else:
+		5 bytes if length is even
+		6 bytes if length is odd
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	11/4/92		Initial version
+	rsf	3/5/93		Handles length in a register now
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+CopyBytes		macro	length, saveFlag
+	local	copyRest
+
+ifnb <saveFlag>
+    ifidn <saveFlag>, <SAVE_REGS>
+	push	cx, si, di			; 3 / 45
+    endif
+endif
+if	(.TYPE length) AND 10h  ; should be non-zero if register
+    ifdif	<length>, <cx>
+	mov	cx, length			; ? / 2
+    endif
+	test	cx, 1				; ? / 5
+	jz	copyRest			; ? / 4 or 16
+	movsb					; 1 / 18
+copyRest:
+	shr	cx, 1				; ? / 2
+else
+	mov	cx, (length) / 2		; 3 / 4
+        if (((length) and 1) eq 1)
+		movsb				; 1 / 18
+	endif
+endif
+	rep	movsw				; 2 / 9 + 12.5ns
+ifnb <saveFlag>
+    ifidn <saveFlag>, <SAVE_REGS>
+	pop	cx, si, di			; 3 / 36
+    endif
+endif
+endm
+
+
+
+COMMENT @-------------------------------------------------------------------
+
+MARCO:		ChunkLock
+
+DESCRIPTION: 	Lock a chunk
+
+ARGUMENTS:	chunk name
+		segment register (ds default)
+		offset register (si default, could be di, bp)
+
+RETURN:		chunk locked in segment:offset
+		bx - segment handle
+		carry set if error
+
+DESTROYED:	ax, di
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	rsf	12/7/93		Initial version
+
+----------------------------------------------------------------------------@
+ChunkLock macro   chunkname, segmentregister, offsetregister
+
+
+ifb	<chunkname>
+	ErrMessage	<ChunkLock expects a chunk name to lock!>
+endif
+
+
+	GetResourceHandleNS	chunkname, bx
+	call	MemLock				; carry set if error
+	mov	segmentregister, ax
+	mov	offsetregister, offset chunkname
+	mov	offsetregister, segmentregister:[offsetregister]	
+						; dereference handle
+
+endm
+
+
+
+COMMENT @-------------------------------------------------------------------
+
+MACRO:		GetInstance
+
+DESCRIPTION: 	Dereferences an object's master group
+
+ARGUMENTS:	*ds:si	-- locked LMem object
+
+		master	-- master group name (ex., Meta, Gen, GenText,
+			   VisComp, SketchPage)
+
+		destReg	-- (optional) register to return the group offset.
+			   Must be an index/offset register.  (di is default)
+
+RETURN:		ds:[destReg]	-- master group, dereferenced
+
+CHECKS:		Verify that *ds:si is an LMem object, and that the desired
+		master group has been grown out.
+
+DESTROYED:	flags
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	cjc	????????	Initial version
+
+----------------------------------------------------------------------------@
+
+ERROR_MASTER_GROUP_NOT_GROWN_OUT_YET	enum    FatalErrors
+; Trying to dereference an object master group (ex. add di, ds:[di].Vis_offset)
+; before the master group was grown out.  Sending MSG_META_DUMMY to the
+; object before trying to derefernce the master group should fix the problem.
+;
+
+GetInstance macro   master, destReg
+EC <	call	ECCheckLMemObject					>
+ifnb <destReg>
+            mov     destReg, ds:[si] ;; de-referencing local handle
+else
+            mov     di, ds:[si]
+endif
+if <master> ne <Meta>
+    ifnb <destReg>
+EC <	pushf								>
+EC <	tst	ds:[destReg].master&_offset				>
+EC <	ERROR_Z	ERROR_MASTER_GROUP_NOT_GROWN_OUT_YET			>
+EC <	popf								>
+            add     destReg, ds:[destReg].master&_offset
+    else
+EC <	pushf								>
+EC <	tst	ds:[di].master&_offset					>
+EC <	ERROR_Z	ERROR_MASTER_GROUP_NOT_GROWN_OUT_YET			>
+EC <	popf								>
+            add     di, ds:[di].master&_offset
+    endif
+endif
+            endm

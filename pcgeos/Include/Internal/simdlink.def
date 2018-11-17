@@ -1,0 +1,166 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Serial/IR communication
+MODULE:		simulation of data link
+FILE:		simdlink.def
+
+AUTHOR:		Steve Jang, May 27, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	5/27/94   	Initial revision
+
+DESCRIPTION:
+
+	This is a packet driver for testing Socket library.  It establishes
+a connection between two datalink level drivers, and transfers packets
+from one to the other.
+		
+	$Id: simdlink.def,v 1.1 97/04/04 14:15:16 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+include		driver.def
+
+StartDriver	simdlink
+
+UseDriver	Internal/socketDr.def
+
+;
+;  Protocol number for this interface
+;
+SIMDLINK_PROTO_MAJOR	equ	SOCKET_PROTO_MAJOR + 0
+SIMDLINK_PROTO_MINOR	equ	SOCKET_PROTO_MINOR + 1
+
+NodeType	etype	byte,	0, 1
+	NT_NET_MANAGER_NODE		enum	NodeType
+	NT_LIBRARY_NODE			enum	NodeType
+
+SDFunction		etype	word,	SocketFunction, 2
+
+;DR_INIT                enum DriverFunction     ;Initialize driver
+;DR_EXIT                enum DriverFunction     ;Exit driver
+;DR_SUSPEND             enum DriverFunction
+;DR_UNSUSPEND           enum DriverFunction
+
+;
+; NOTE: THE FOLLOWING FUNCTIONS ARE INHERITED FROM GENERIC NET DRIVER
+;       INTERFACE, AND BE SIMULATED IN THIS DRIVER.
+;
+;	SEE SOCKET DRIVER INTERFACE DEFINITIONS
+;
+if 0
+DR_SIMDLINK_REGISTER			equ	DR_SOCKET_REGISTER
+DR_SIMDLINK_UNREGISTER			equ	DR_SOCKET_UNREGISTER
+DR_SIMDLINK_CONNECT_REQUEST		equ	DR_SOCKET_CONNECT_REQUEST
+DR_SIMDLINK_DISCONNECT_REQUEST		equ	DR_SOCKET_DISCONNECT_REQUEST
+DR_SIMDLINK_SEND_DATA			equ	DR_SOCKET_SEND_DATA
+DR_SIMDLINK_SEND_DATAGRAM		equ	DR_SOCKET_SEND_DATAGRAM
+DR_SIMDLINK_RESET_REQUEST		equ	DR_SOCKET_RESET_REQUEST
+endif
+
+;
+; THE FOLLOWING FUNCTIONS ARE SPECIFIC TO SIMDLINK TEST DRIVER.
+; WITH THESE FUNCTIONS ONE CAN CREATE A SIMULATED NETWORK OF NODES.
+; ( EVEN SOMETHING LIKE IP )
+;
+
+;
+; IMPORTANT!  IMPORTANT!  IMPORTANT!  IMPORTANT!  IMPORTANT!  IMPORTANT! 
+;
+
+DR_SIMDLINK_CLEAN_UP			enum	SDFunction
+;
+; Clean up the mess that simdlink driver made on the system
+; This must be called right before GeodeFreeDriver is called,
+; otherwise the driver will never exit or crash.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+DR_SIMDLINK_LOCK_INFO_RESOURCE		enum	SDFunction
+;
+; Locks the info resource block for sim dlink driver.
+; This is for use in sim network manager program.
+; One should already know the internal data structure of simdlink driver in
+; order to use this block.
+;
+; Pass:		nothing
+; Return:	ds	= segment of the info resource block
+;
+
+DR_SIMDLINK_UNLOCK_INFO_RESOURCE	enum	SDFunction
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+DR_SIMDLINK_SET_DOMAIN_HANDLE		enum	SDFunction
+;
+; If you set the domain handle before you call CREATE_NODE, this will become
+; the domain handle for your new node.
+;
+; Pass:		bx = domain handle you want to use
+; Return:	nothing
+;
+
+
+DR_SIMDLINK_CREATE_NODE			enum	SDFunction
+;
+; Create a driver representation.
+;
+; Pass:		ds:si = domain name
+;		es:dx = address string
+;		ax    = domain name size
+;		bh    = NodeType
+;               bl    = packet handler index
+;		cx    = address string size
+; Return:	ax    = domain handle
+;		carry set on error
+;
+
+DR_SIMDLINK_REMOVE_NODE			enum	SDFunction
+;
+; Remove a driver representation. Datalinks coming into this node will be
+; destroyed.
+;
+; Pass:		es:si	= address ASCIIZ
+;		cx	= address string size
+; Return:	nothing
+;
+
+DR_SIMDLINK_CONNECT_NODES		enum	SDFunction
+;
+; Create a connection between two driver representations.
+;
+; Pass:		ds:si	= address of one end
+;		es:bx 	= aaddres of the other end
+;		dx	= length of address
+; Return:	ax	= connection handle
+;
+
+DR_SIMDLINK_DISCONNECT_NODES		enum	SDFunction
+;
+; Disconnect two driver representation nodes.
+;
+; Pass:		ds:si	= address of one end
+;		es:bx	= address of the other end
+;		dx	= address length
+; Return:	nothing
+;
+
+DR_SIMDLINK_GET_NODE_INFO		enum	SDFunction
+;
+; Get info on node's type
+;
+; Pass:		bx = domain handle
+; Return:	ah = NodeType
+; 		al = packet handler index
+;
+
+
+EndDriver	simdlink

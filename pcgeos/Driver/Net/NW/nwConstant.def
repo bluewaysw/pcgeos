@@ -1,0 +1,250 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		nwConstant.def
+
+AUTHOR:		Chris Boyke
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+       chrisb	1/13/93   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: nwConstant.def,v 1.1 97/04/18 11:48:45 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+NetWareCallFunction	equ	FileInt21
+
+
+;------------------------------------------------------------------------------
+;		Extra-Super-Duper-Special Constants
+;------------------------------------------------------------------------------
+
+NW_USER_INFO			= TRUE
+NW_TEXT_MESSAGES		= TRUE
+NW_SEMAPHORES			= TRUE
+
+NW_GEOWORKS_STATIC_SOCKET	= FALSE	;the GeoWorks socket for messaging
+NW_DYNAMIC_SOCKETS		= FALSE	;application-created sockets
+
+NW_SOCKETS		= NW_GEOWORKS_STATIC_SOCKET or NW_DYNAMIC_SOCKETS
+
+;if we have sockets (or...) then create our vars block on the heap.
+
+
+;------------------------------------------------------------------------------
+;		Constants
+;------------------------------------------------------------------------------
+
+TICKS_PER_POLL_SERVER_FOR_MESSAGES	= 60*10		;10 seconds
+
+NW_ERROR						enum FatalErrors
+NW_ERROR_INVALID_DRIVER_FUNCTION			enum FatalErrors
+NW_ERROR_OPENING_SOCKET					enum FatalErrors
+NW_ERROR_CANNOT_OPEN_GEOWORKS_FIXED_SOCKET		enum FatalErrors
+NW_ERROR_NEED_TO_CALL_IPX_INITIALIZE_FIRST		enum FatalErrors
+NW_ERROR_BAD_ASSUMPTION_THIS_PROPERTY_HAS_MORE_DATA_SEGMENTS enum FatalErrors
+FILE_OPENED_BY_NETWARE_BUT_NOT_IN_LIST_OF_FILES_TO_REOPEN enum FatalErrors
+NW_ERROR_COULDNT_REOPEN_CLOSED_FILE			enum FatalErrors
+NW_ERROR_CANNOT_REMAP_LOGIN_DRIVE			enum FatalErrors
+NW_ERROR_CANNOT_REOPEN_MEGAFILE				enum FatalErrors
+NW_ERROR_GASP_CHOKE_WHEEZE				enum FatalErrors
+NW_ERROR_CANNOT_CLOSE_MEGAFILE				enum FatalErrors
+STRING_BUFFER_OVERFLOW					enum FatalErrors 
+
+;------------------------------------------------------------------------------
+;		Internal Structures
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;			NetWareSocketInfoStruc
+;------------------------------------------------------------------------------
+;Info about one socket.
+
+if NW_SOCKETS
+
+NWSocketInfo	record
+    NWSI_GEOWORKS_MAIN_SOCKET:1		;set if is the GeoWorks "Lobby"
+					;socket that we will register with
+					;Novell.
+    NWSI_STATIC_SOCKET:1
+    NWSI_DYNAMIC_SOCKET:1
+    NWSI_CONNECTION_ORIENTED:1
+    :4
+NWSocketInfo	end
+
+MAX_NUM_LISTEN_ECBS_PER_SOCKET	equ	2
+MAX_NUM_SEND_ECBS_PER_SOCKET	equ	2
+
+HugeECBFlags	record
+   HECBF_PENDING:1			;true when NetWare has possession of
+					;the HugeECB, for sending or listening
+					;on this socket. Block will be locked
+					;on the heap in that case.
+   :7
+HugeECBFlags	end
+
+;For each listen and send ECB that is pending on a socket, we have one of
+;these items in a chunk array.
+
+NW_PENDING_ECB_INFO_PROTECT	equ	0x7BF4
+
+NWPendingECBInfo	struc
+EC <NWPEI_protect	word		;protect byte			>
+    NWPEI_flags		HugeECBFlags
+    NWPEI_hugeECB	hptr.NLHugeECB	;handle of the HugeECB on the global
+					;heap.
+NWPendingECBInfo	ends
+
+;For each HugeECB that is in the departure queue for a socket, we have
+;one of these items in a chunk array. Add new items to the end of the array.
+
+NWDepartureQueueECBInfo	struc
+    NWDQEI_hugeECB	hptr.HugeECB	;handle of HugeECB (is unlocked)
+NWDepartureQueueECBInfo	ends
+
+;This structure contains everything we need to know about an open socket.
+;We have to know all of this stuff so that we can close the socket during
+;a shutdown, re-open it later, etc. This structure is stored inside a
+;chunk array in the NWVars block.
+
+NWSocketInfoStruct	struc
+
+    NWSIS_socketInfo		NWSocketInfo
+					;flags for this socket
+
+    NWSIS_socketAddress		NovellSocketAddress <>
+					;address of socket (word)
+
+    ;these fields allow us to keep track of the pending listen requests
+    ;that we have submitted to IPX/SPX.
+
+    NWSIS_listenECBArray	lptr	;chunk array of NWPendingECBInfo items,
+					;one for each HugeECB that we have
+					;passed to NetWare to listen on this
+					;socket.
+
+    NWSIS_sendECBArray		lptr	;chunk array of NWPendingECBInfo items,
+					;one for each HugeECB that we have
+					;passed to NetWare to send from this
+					;socket.
+
+;    NWSIS_departureQueueArray	lptr	;chunk array of NWDepartureQueueECBInfo
+;					;items, all waiting to be passed
+;					;to IPX/SPX for transmission.
+NWSocketInfoStruct	ends
+
+
+NWVarsBlockStruct	struct
+	;LMemHeader (this MUST be here!)
+
+	NWVBS_LMemHeader	LMemBlockHeader
+
+        NWVBS_socketArray	lptr	;chunk array containing several
+					;NWSocketInfoStruc structures.
+NWVarsBlockStruct	ends
+
+endif
+
+
+if NW_SOCKETS
+; Not used
+
+
+NetWareProcessClass	class	ProcessClass
+
+  MSG_NW_QUEUE_HECB_FOR_XMIT			message
+  MSG_NW_CHECK_XMIT_RESULTS			message
+  MSG_NW_GRAB_INCOMING_ECB			message
+
+  ;MSG_NW_SUBMIT_ECB_TO_LISTEN_ON_SOCKET	message
+
+  ;not yet used
+  ;MSG_NW_EXAMINE_DEPARTURE_QUEUE_FOR_SOCKET	message
+
+;no instance data: we just use our dgroup idata and udata
+
+NetWareProcessClass	endc
+
+endif
+
+
+
+;------------------------------------------------------------------------------
+;		IDATA Resource
+;------------------------------------------------------------------------------
+
+idata	segment			;Fixed resource
+
+;this is required for a driver:
+
+DriverTable	DriverInfoStruct	<
+			NetWareStrategy,
+			0,
+			0
+		>
+
+public	DriverTable
+
+;flags indicating how much of NetWare we have to use:
+
+ipxPresent	BooleanByte	FALSE
+
+netwarePresent	BooleanByte	FALSE
+
+if NW_SOCKETS
+  nwVars	hptr.NWVarsBlockStruct
+				;handle of block which contains info about
+				;open sockets, etc.
+				;about our state.
+
+
+  NetWareProcessClass	mask CLASSF_NEVER_SAVED
+
+
+endif
+
+if ERROR_CHECK
+  DGROUP_PROTECT1	equ	0xABD3
+  dgroupHere word	DGROUP_PROTECT1	;protect word
+endif
+
+idata	ends
+
+;------------------------------------------------------------------------------
+;		UDATA Resource
+;------------------------------------------------------------------------------
+
+udata	segment
+
+
+ipxEntryPoint	fptr		;entry point of IPX, within NetWare running
+				;on this machine. Set by NetWareIPXInitialize.
+
+udata	ends
+
+NetWareInitCode	segment	resource
+NetWareInitCode	ends
+
+NetWareResidentCode segment resource
+NetWareResidentCode ends
+
+NetWareIPXCode	segment	resource
+NetWareIPXCode	ends
+
+NetWareCommonCode	segment	resource
+NetWareCommonCode	ends
+
+NetWareProcStrings	segment	resource
+NetWareProcStrings	ends
+
+NetWareSemaphoreCode	segment	resource
+NetWareSemaphoreCode	ends

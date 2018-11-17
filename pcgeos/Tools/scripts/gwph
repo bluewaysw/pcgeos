@@ -1,0 +1,93 @@
+#!/usr/public/perl -w
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1996 -- All Rights Reserved
+#
+# FILE: 	gwph, a PERL script
+# AUTHOR: 	Jim Guggemos, Jun 27, 1996
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	JimG	6/27/96   	Initial Revision
+#	RyaH	10/30/97	Modification to file location
+#
+# DESCRIPTION:
+#	Looks up a name or extension in the Geoworks phone database from
+#	the internal engineering web page and 
+#
+#	$Id: gwph,v 1.8 98/01/14 17:19:07 ryanh Exp $
+#
+###############################################################################
+
+if ( @ARGV < 1 )
+{
+    print "usage: gwph <name/email/ext>*\n";
+    exit( 1 );
+}
+
+$datafile="/n/web/company/cgi-bin/Database_search/people.file";
+
+if ( !open( DATA_FILE, $datafile ) )
+{
+    print "Cannot open data file: $datafile\n";
+    exit( 1 );
+}
+
+while ( $dataline=<DATA_FILE> )
+{
+    chop( $dataline );
+    @fields = split( /\|/, $dataline );
+    
+    # The fields are, in order:
+    #   Extension Name FullPhoneNumber Email ID Notes
+
+    if ( @fields >= 4 )
+    {
+	# The Email field is imbedded in an HTML anchor cell.  Thus, we
+	# need to split it to get it out.  It looks like:
+	#  <a href="mailto:guggemos@geoworks.com">guggemos</a>
+	#
+	# Thus the actual email address, if it exists, is in $email[2].
+	#
+	@email = split( /<|>/, $fields[3] );
+
+	foreach $arg (@ARGV)
+	{
+	    if ( $arg eq $fields[0] || $fields[1] =~ /.*$arg.*/i ||
+		 $email[2] =~ /.*$arg.*/i )
+	    {
+		@phone_decades = split( /[.-]/, $fields[2] );
+
+		$site="";
+		if ( $#phone_decades > 0 )
+		{
+			if ( $phone_decades[0] =~ /206/ )
+			{
+			    $site="Seattle - ";
+			}
+			elsif ( $phone_decades[0] =~ /510/ )
+			{
+			    if ( $phone_decades[1] =~ /814/ || $phone_decades[1] =~ /865/ )
+			    {
+				$site="Alameda - ";
+			    }
+			    else
+			    {
+				$site="Berkeley - ";
+			    }
+			}
+		}
+		$em = "";
+		if ( $email[2] )
+		{
+		    $em = "E-mail: $email[2]";
+		}
+		    
+		printf( "%s: %s (%sx%s)  %s\n", $fields[1],
+		    $fields[2], $site, $fields[0], $em );
+		last;
+	    }
+	}
+    }
+}

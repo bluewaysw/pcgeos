@@ -1,0 +1,562 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Spell library
+FILE:		spelllib.goh
+
+AUTHOR:		Joon Song, Sep 22, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Joon	9/22/94   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: spelllib.goh,v 1.1 97/04/04 15:54:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@optimize
+
+@deflib	spell
+
+#include <sllang.h>
+
+/* enum SpellRoutine */
+typedef enum {
+    SROUT_CHECK_WORD = 0x0,
+    SROUT_GET_TEXT_OFFSETS,
+    SROUT_GET_ERROR_FLAGS,
+    SROUT_RESET_SPELL_CHECK,
+} SpellRoutine;
+
+
+/* enum SpellResult */
+typedef enum {
+    IC_RET_OK = 0x0,
+    IC_RET_ALTERNATE = 0x2,
+    IC_RET_INVALID,
+    IC_RET_PRE_PROC,
+    IC_RET_ERR = 0x8,
+    IC_RET_FOUND = 0xa,
+    IC_RET_NOT_FOUND,
+    IC_RET_USR_BRK = 0xe,
+    IC_RET_NOMEM,
+    IC_RET_NO_OPEN,
+    IC_RET_WILD,
+    IC_RET_HYP_ALT = 0x13,
+    IC_RET_IGNORED,
+    IC_RET_NO_USER_DICT,
+    IC_RET_BAD_LANG,
+} SpellResult;
+
+#define	ERRET	IC_RET_ERR
+
+
+extern SpellResult
+    _pascal ICCheckWord(MemHandle icBuff, char *lookupWord);
+/*
+ *	Spell checks the passed word
+ *
+ *	Pass:	*lookupWord	= ptr to word to spell check
+ *		icBuff		= handle of ICBuff
+ *
+ *	Return:	SpellResult
+ */
+
+
+extern void
+    _pascal ICGetTextOffsets(MemHandle icBuff,
+			     word *firstOffset,
+			     word *lastOffset);
+/*
+ *	Gets the left/right offsets into the text string that was spell-checked
+ *	where the word actually began/ended (basically returns offsets past
+ *	parsed-out junk).
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *
+ *	Return:	*firstOffset	= offset to first char of word (0-based)
+ *		*lastOffset	= offset to last char of word
+ *
+ */
+
+
+typedef WordFlags SpellErrorFlagsHigh;
+	/* 13 bits unused */
+	#define SEFH_INVALID_PUNCTUATION	(0x0004)
+	#define SEFH_A_ERROR			(0x0002)
+	#define SEFH_AN_ERROR			(0x0001)
+
+typedef WordFlags SpellErrorFlags;
+	#define SEF_DOUBLE_WORD_ERROR		(0x8000)
+	#define SEF_ORDINAL_NUMBER_ERROR	(0x4000)
+	#define SEF_APOSTROPHY_ALTERNATIVE	(0x2000)
+	#define SEF_FINAL_CHAR			(0x1000)
+	#define SEF_INIT_ERROR			(0x0800)
+	#define SEF_CAPITALIZATION_ERROR	(0x0400)
+	#define SEF_COMPOUNDING_ERROR		(0x0200)
+	/* 1 bit unused */
+	#define SEF_INVALID_PRE_CHARS		(0x0080)
+	#define SEF_INVALID_TRAILING_CHARS	(0x0040)
+	#define SEF_NEGATIVE_WORD		(0x0020)
+	#define SEF_NOT_FREE_STANDING_WORD	(0x0010)
+	#define SEF_SOFT_HYPHEN_ERROR		(0x0008)
+	#define SEF_ACCENT_ERROR		(0x0004)
+	#define SEF_INVALID_POST_CLITIC		(0x0002)
+	#define SEF_INVALID_PRE_CLITIC		(0x0001)
+
+
+extern void
+    _pascal ICGetErrorFlags(MemHandle icBuff,
+			    SpellErrorFlags *errorFlags,
+			    SpellErrorFlagsHigh *errorFlagsHigh);
+/*
+ *	Gets the error flags.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *
+ *	Return:	*errorFlags	= SpellErrorFlags
+ *		*errorFlagsHigh	= SpellErrorFlagsHigh
+ *
+ */
+
+
+extern void
+    _pascal ICResetSpellCheck(MemHandle icBuff);
+/*
+ * 	Resets internal spell check flags (used for a/an checking, etc).
+ * 
+ * 	Pass:	icBuff		= handle of ICBuff
+ *
+ * 	Return:	nothing
+ *
+ */
+
+
+
+/*
+ * 	ROUTINES THAT ARE CALLED EXTERNALLY ONLY IN RARE INSTANCES
+ * 	(Most of the functionality that they provide is provided by
+ * 	 the SpellControl object)
+ */
+
+extern Boolean
+    _pascal ICCheckForEmbeddedPunctuation(MemHandle icBuff);
+/*
+ *	Checks to see if the word that was spell checked had embedded
+ *	punctuation.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *
+ *	Return:	Boolean		= FALSE if no embedded punctuation
+ *
+ */
+
+
+extern StandardLanguage
+    _pascal ICGetLanguage(MemHandle iCBuff);
+/*
+ *	Gets the current language.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *
+ *	Return: StandardLanguage
+ *
+ */
+
+
+extern SpellResult
+    _pascal ICInit(MemHandle *icBuff);
+/*
+ *	Inits a ICBuff for the spell checking library.
+ *
+ *	Pass: 	icBuff		= location to store handle of ICBuff
+ *
+ *	Return: SpellResult	= error code
+ *		icBuff		= handle of ICBuff structure (null if error)
+ *		
+ *
+ */
+
+
+extern SpellResult
+    _pascal ICExit(MemHandle icBuff);
+/*
+ *	Exits/frees up memory associated with this client of the spooler.
+ *
+ *	Pass:	icBuff		= handle of ICBuff structure returned by ICInit
+ *				  (this gets freed if no error)
+ *
+ *	Return: SpellResult	= error code
+ *
+ */
+
+
+extern void
+    _pascal ICStopCheck(MemHandle icBuff);
+/*
+ *	Called when a spell check has been completed/aborted. This allows the
+ *	spell checker to do some nice things, like kill the spell thread.
+ *
+ *	Pass:	icBuff		= handle of ICBuff structure returned by ICInit
+ *
+ *	Return: nothing
+ *
+ */
+
+
+extern word
+    _pascal ICSpl(MemHandle icBuff, char *string);
+/*
+ *	extern void _pascal ICGEOSPL();
+ *
+ *	This is the standard entry point to the spell check library. The
+ *	passing parameters are all set in the ICBuff structure. The passed
+ *	string is assumed to be in the GEOS character set and so is converted
+ *	to the DEC character set.
+ *
+ *	Pass:	icBuff		= handle of ICBuff structure returned by ICInit
+ *		string		= ptr to null terminated string.
+ *
+ *	Return:	word		= error code
+ *
+ */
+
+
+extern word
+    _pascal ICGetNumAlts(MemHandle icBuff);
+/*
+ *	Get the # alternate spellings
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *
+ *	Return:	word		= # alternate spellings
+ *
+ */
+
+
+extern void
+    _pascal ICGetAlternate(MemHandle icBuff, word index,
+			   char *original, char *alternate);
+/*
+ *	Get an alternate spelling string.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *		index		= index of alternate spelling entry we desire
+ *				  (0 <- 1st entry)
+ *		*original	= source string to get alternates for
+ *		*alternate	= ptr to store alternate spelling
+ *
+ *	Return:	nothing
+ *
+ */
+
+
+extern void
+    _pascal ICIgnore(MemHandle icBuff, char *ignoreWord);
+/*
+ *	Ignores the passed string for the remainder of the session.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *		ignoreWord	= null terminated string to ignore
+ *
+ *	Return:	nothing
+ *
+ */
+
+
+/* enum UserResult */
+typedef enum {
+    UR_OK = 0x0,
+    UR_ADD,
+    UR_NFD,
+    UR_FND,
+    UR_CER,
+    UR_WORD_ALREADY_ADDED,
+    UR_IER,
+    UR_DER,
+    UR_LER,
+    UR_PER,
+    UR_SER,
+    UR_UER,
+    UR_USER_DICT_FULL,
+    UR_GER,
+    UR_DNE,
+    UR_INV,
+    UR_FER,
+    UR_HER
+} UserResult;
+
+
+extern void
+    _pascal ICAddUser(MemHandle icBuff, char *addWord,
+		      SpellResult *spellResult, UserResult *userResult);
+/*
+ *	Adds the passed string to the user dictionary.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *		*addWord	= null terminated string to add
+ *
+ *	Return:	*spellResult	= SpellResult (0 if no error)
+ *		*userResult	= UserResult
+ *
+ */
+
+
+extern void
+    _pascal ICDeleteUser(MemHandle icBuff, char *deleteWord,
+			 SpellResult *spellResult, UserResult *userResult);
+/*
+ * 	Deletes the passed string from the user dictionary.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *		*deleteWord	= null terminated string to delete
+ *
+ *	Return:	*spellResult	= SpellResult
+ *		*userResult	= UserResult
+ *
+ */
+
+
+typedef struct {
+/*
+ * DON'T CHANGE THIS STRUCTURE WITHOUT CHANGING ASSOCIATED C DECLARATION
+ *  IN "icgeospl.c".
+ */
+
+    /* # words in the user dictionary */
+    word	UDLI_numEntries;
+
+    /* Total size of associated block (including this structure) */
+    word	UDLI_totalSize;
+
+    /* The index of the word that the lastFoundPtr points to (starts at 0) */
+    word	UDLI_lastFoundIndex;
+
+    /* near ptr to word indexed above. */
+    word	UDLI_lastFoundPtr;
+
+} UserDictionaryListInfo;
+
+
+extern MemHandle
+    _pascal ICBuildUserList(MemHandle icBuff);
+/*
+ *	Builds out a list of words in the user dictionary.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *
+ *	Return:	MemHandle	= handle of block containing
+ *				  UserDictionaryListInfo + words.
+ *
+ */
+
+
+extern void
+    _pascal ICResetIgnore(MemHandle icBuff);
+/*
+ *	Resets the ignore buffer.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *
+ *	Return:	nothing
+ *
+ */
+
+
+extern void
+    _pascal ICUpdateUser(MemHandle icBuff);
+/*
+ *	Saves the user dictionary out to disk.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *
+ *	Return:	nothing
+ *
+ */
+
+
+/* enum SpellTask */
+typedef enum {
+    ST_INIT = 0x1,
+    ST_TERMINATE,
+    ST_VERIFY,
+    ST_WILDCARD = 0x5,
+    ST_ANAGRAM,
+    ST_HYPHENATE,
+    ST_DEFINITION,
+    ST_CORRECT = 0x64,
+} SpellTask;
+
+
+extern void
+    _pascal ICSetTask(MemHandle icBuff, SpellTask spellTask);
+/*
+ *	Sets the task for the next ICSpl call.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *		spellTask	= SpellTask
+ *
+ *	Return:	nothing
+ *
+ */
+
+
+extern MemHandle
+    _pascal Hyphenate(char *wordToHyphenate, word shortest);
+/*
+ *	Returns hyphenation points for the passed word
+ *
+ *	Pass:	wordToHyphenate	= null terminated string to hyphenate
+ *		shortest	= length of shortest word to hyphenate
+ *
+ *	Return:	MemHandle	= handle of block containing HyphenationPoints
+ *				  structure (in vTextC.def)
+ *
+ * 				  NULL if error or no hyphenation points
+ *
+ */
+
+
+#ifdef PRODUCT_REDWOOD
+
+extern word
+    _pascal ICFreeUserDict(void);
+/*
+ *	Currently used in Redwood only, frees the user dictionary.
+ *
+ *	Pass:	nothing
+ *
+ *	Return:	word		= error code
+ *
+ */
+
+#endif
+
+
+typedef struct {
+    MemHandle	MRP_meaningsBlock;
+    ChunkHandle	MRP_meaningsChunk;
+    ChunkHandle MRP_grammarsChunk;
+} MeaningsRetParams;
+
+
+extern word
+    _pascal ThesaurusGetMeanings(char *lookupWord, MeaningsRetParams *params);
+/*
+ *	Given a word, returns a chunk array of meaning strings and
+ *	an array of parts of speech (1 per meaning)
+ *
+ *	Pass:	*lookupWord	= word to look up
+ *
+ *	Return:	params->MRP_meaningsBlock =
+ *			MemHandle of block containing meanings chunk array
+ *			and partsOfSpeech array
+ *
+ *		params->MRP_meaningsChunk =
+ *			ChunkHandle of chunk array of null terminated strings,
+ *			each of which is one meaning.
+ *			Note if size = 0, word not found
+ *
+ *			NOTE: in the REDWOOD case, this is returned as an
+ *				array of synonyms which correspond to that
+ *				meaning, instead of the definition for the
+ *				meaning.  EDS 1/7/94
+ *
+ *		params->MRP_grammarsChunk =
+ *			ChunkHandle of integer array chunk (0..25).  Integers
+ *			range from 0 to 3, and represent the part of speech of
+ *			the corresponding meaning (if that meaning exists). 
+ *			0 = adj, 1 = noun, 2 = adverb, 3 = verb.
+ *
+ *		word	= success/failure indicator:
+ *		         	number of synonyms/meanings found = success
+ *				0 = word not found
+ *				negative = error
+ *
+ */
+
+
+extern word
+    _pascal ThesaurusGetSynonyms(char *lookupWord,
+				 word senseNumber,
+				 optr *synonyms);
+/*
+ *	Takes the number of the sense that is desired (see
+ *	ThesaurusGetMeanings) and returns a chunk array of null
+ *	terminated strings, one per synonym.
+ *
+ *	Pass:	*lookupWord	= word to lookup
+ *		senseNumber	= sense number corresponding to sense to get
+ *				  synonyms for (1.. )
+ *
+ *	Return:	*synonyms	= chunk array of null-terminated synonym
+ *				  strings
+ *		word		= success/failure indicator:
+ *					number of senses = success
+ *					0 = word not found
+ *					negative = error
+ *
+ */
+
+extern SpellResult
+    _pascal ICGetAnagrams(MemHandle icBuff,
+			  char *lookupWord,
+			  word minimumLength);
+/*
+ *	Find anagrams for the passed word.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *		*lookupWord	= ptr to word to spell check
+ *		minimumLength	= minimum length of anagram
+ *
+ *	Return:	SpellResult
+ */
+			  
+extern SpellResult
+    _pascal ICGetWildcards(MemHandle icBuff, char *lookupWord);
+/*
+ *	Find words that match the passed wildcard.
+ *
+ *	Pass:	icBuff		= handle of ICBuff
+ *		*lookupWord	= ptr to wildcard string
+ *
+ *	Return:	SpellResult
+ */
+			  
+
+#ifdef __HIGHC__
+pragma Alias(ICCheckWord, "ICCHECKWORD");
+pragma Alias(ICGetTextOffsets, "ICGETTEXTOFFSETS");
+pragma Alias(ICGetErrorFlags, "ICGETERRORFLAGS");
+pragma Alias(ICResetSpellCheck, "ICRESETSPELLCHECK");
+pragma Alias(ICCheckForEmbeddedPunctuation, "ICCHECKFOREMBEDDEDPUNCTUATION");
+pragma Alias(ICGetLanguage, "ICGETLANGUAGE");
+pragma Alias(ICInit, "ICINIT");
+pragma Alias(ICExit, "ICEXIT");
+pragma Alias(ICStopCheck, "ICSTOPCHECK");
+pragma Alias(ICSpl, "ICSPL");
+pragma Alias(ICGetNumAlts, "ICGETNUMALTS");
+pragma Alias(ICGetAlternate, "ICGETALTERNATE");
+pragma Alias(ICIgnore, "ICIGNORE");
+pragma Alias(ICAddUser, "ICADDUSER");
+pragma Alias(ICDeleteUser, "ICDELETEUSER");
+pragma Alias(ICBuildUserList, "ICBUILDUSERLIST");
+pragma Alias(ICResetIgnore, "ICRESETIGNORE");
+pragma Alias(ICUpdateUser, "ICUPDATEUSER");
+pragma Alias(ICSetTask, "ICSETTASK");
+pragma Alias(Hyphenate, "HYPHENATE");
+pragma Alias(ThesaurusGetMeanings, "THESAURUSGETMEANINGS");
+pragma Alias(ThesaurusGetSynonyms, "THESAURUSGETSYNONYMS");
+pragma Alias(ICGetAnagrams, "ICGETANAGRAMS");
+pragma Alias(ICGetWildcards, "ICGETWILDCARDS");
+#endif
+
+@endlib

@@ -1,0 +1,207 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Security Library
+FILE:		security.def
+
+AUTHOR:		Reza Hussein, May 10, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	reza	5/10/95   	Initial revision
+
+
+DESCRIPTION:
+
+	This file contains the definitions for the library.  It is included
+both by the library and by users of the library.  When included by the library,
+the symbol "_DECLARER_" must be true.
+		
+	$Id: security.def,v 1.1 97/04/04 14:26:40 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __SECURITY
+
+StartLibrary	security
+
+;----------------------------------------------------------------------------
+;  Constants
+;----------------------------------------------------------------------------
+MAX_LOCK_CODE_LENGTH		equ	10		; 10 digits
+MAX_LOCK_CODE_LENGTH_WITH_NULL	equ	MAX_LOCK_CODE_LENGTH + 1
+MIN_LOCK_CODE_LENGTH		equ	5		; 5 digits
+MAX_NEW_LOCK_CODE_LENGTH	equ	5		; 5 digits
+MAX_NEW_LOCK_CODE_LENGTH_WITH_NULL \
+				equ	MAX_NEW_LOCK_CODE_LENGTH + 1
+							; 8 digits
+
+MAX_PIN_CODE_LENGTH		equ	8		; 8 digits
+MAX_PIN_CODE_LENGTH_WITH_NULL	equ	MAX_PIN_CODE_LENGTH + 1
+MIN_PIN_CODE_LENGTH		equ	4		; 4 digits
+
+MAX_PUK_CODE_LENGTH		equ	8		; 8 digits
+MAX_PUK_CODE_LENGTH_WITH_NULL	equ	MAX_PUK_CODE_LENGTH + 1
+MIN_PUK_CODE_LENGTH		equ	8		; 8 digits
+
+MAX_NETWORK_CODE_LENGTH		equ	4		; 4 digits
+MAX_NETWORK_CODE_LENGTH_WITH_NULL equ	MAX_NETWORK_CODE_LENGTH + 1
+MIN_NETWORK_CODE_LENGTH		equ	4		; 4 digits
+
+;
+; User changeable settings 
+;
+DEFAULT_PIN_CODE_REQUEST	equ	BB_TRUE		; On
+DEFAULT_LOCK_TIME_OUT		equ	15		; 15 minutes
+DEFAULT_SECURITY_LEVEL		equ	BB_TRUE		; Phone
+DEFAULT_LOCKED_STATE		equ	BB_TRUE		; On
+
+;----------------------------------------------------------------------------
+;  Enumerated types
+;----------------------------------------------------------------------------
+SecurityCodeType	etype word, 0, 2
+	SCT_LOCK_CODE		enum SecurityCodeType
+	SCT_PIN_CODE		enum SecurityCodeType
+	SCT_NETWORK_CODE	enum SecurityCodeType
+
+CellPhoneMediaStatus	etype word, 0, 2
+	CPMS_OK			enum	CellPhoneMediaStatus
+	CPMS_CODE_REQUIRED	enum	CellPhoneMediaStatus
+	CPMS_RADIO_UNIT_OFF	enum	CellPhoneMediaStatus
+	CPMS_SIM_ERROR		enum	CellPhoneMediaStatus
+	CPMS_NO_SERVICE		enum	CellPhoneMediaStatus
+
+;----------------------------------------------------------------------------
+;  Classes
+;----------------------------------------------------------------------------
+SecuritySettingsControlClass	class	GenControlClass
+;
+; Controller to handle user changeable security settings.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_PIN_CODE_REQUEST		message
+;
+; Internal: Message sent out when PIN code request trigger is pressed to
+; initiate changing of PIN code request state on phone power ups.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_PIN_CODE_REQUEST_APPROVED 	message
+;
+; Internal: PIN code dialog sends this to us when user has entered
+; correct PIN code, so we can put try to set the PIN code status.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_PIN_CODE_REQUEST_CHANGED 		message
+;
+; Internal: PIN code dialog sends this to us when PIN code request
+; change suceeds.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_LOCK_TIME_OUT		message
+;
+; Internal: Sent to us when change Lock time-out trigger is pressed.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_LOCK_TIME_OUT_APPROVED	message
+;
+; Internal: Lock code dialog sends this to us when user has entered
+; the correct lock code, so we can put up a lock time out list.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_LOCK_TIME_OUT_CHANGED		message
+;
+; Internal: Lock time-out list sends this to us when user has selected
+; a new lock time-out value.
+;
+; Pass: cx = lock time-out value (in mins)
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_SECURITY_LEVEL		message
+;
+; Internal: Sent to us when Change Security level trigger is pressed.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_SECURITY_LEVEL_APPROVED	message
+;
+; Internal: Lock code dialog sends this to us when user has entered
+; correct lock code before allowing user to change security levels.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_PIN_CODE			message
+;
+; Internal: Sent to us when Change PIN code trigger is pressed.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_PIN_CODE_APPROVED		message
+;
+; Internal: PIN code dialog sends this to us when user has entered
+; correct PIN code...
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_LOCK_CODE			message
+;
+; Internal: Sent to us when Change Lock code trigger is pressed.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_LOCK_CODE_APPROVED		message
+;
+; Internal: Lock code dialog sends this to us when user has entered
+; correct lock code, so we can change to new lock code.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_NETWORK_PASSWORD		message
+;
+; Internal: Sent to us when change Network passwd trigger is pressed.
+;
+
+MSG_SECURITY_SETTINGS_CONTROL_CHANGE_NETWORK_PASSWORD_APPROVED	message
+;
+; Internal: Sent to us when user has entered correct PUK code.
+;
+
+	SecuritySettingsControlFeatures	record
+		SSCF_UI:1
+	SecuritySettingsControlFeatures	end
+
+	SSCF_DEFAULT_FEATURES	equ	mask SSCF_UI
+
+SecuritySettingsControlClass	endc
+
+;----------------------------------------------------------------------------
+;  Exported functions
+;----------------------------------------------------------------------------
+SecurityEnterLockMode	equ	SECURITYENTERLOCKMODE
+SecurityCheckSIMCard	equ	\
+	SECURITYTRYTOMAKECELLPHONEMEDIAAVAILABLE
+global	SecurityCheckCellPhoneMediaAvailable:far
+global	SecurityDoPasswordDialog:far
+SecurityTryToMakeCellPhoneMediaAvailable	equ \
+	SECURITYTRYTOMAKECELLPHONEMEDIAAVAILABLE
+SecurityGetLockTimeOutTime	equ	SECURITYGETLOCKTIMEOUTTIME
+SecurityCheckSIMCardAndPhone	equ 	SECURITYCHECKSIMCARDANDPHONE
+global	SecurityCopySIMContacts:far
+SecuritySuspendAutoLock	equ	SECURITYSUSPENDAUTOLOCK
+SecurityResumeAutoLock	equ	SECURITYRESUMEAUTOLOCK
+
+;----------------------------------------------------------------------------
+;  C versions
+;----------------------------------------------------------------------------
+global	SECURITYENTERLOCKMODE:far
+global	SECURITYCHECKCELLPHONEMEDIAAVAILABLE:far
+global	SECURITYDOPASSWORDDIALOG:far
+global	SECURITYTRYTOMAKECELLPHONEMEDIAAVAILABLE:far
+global	SECURITYGETLOCKTIMEOUTTIME:far
+global	SECURITYCHECKSIMCARDANDPHONE:far
+global	SECURITYSUSPENDAUTOLOCK:far
+global	SECURITYRESUMEAUTOLOCK:far
+
+EndLibrary	security
+
+

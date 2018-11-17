@@ -1,0 +1,163 @@
+***************************************************************************
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		ALGORITHM
+
+AUTHOR:		Steve Scholl, November 15, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ss      11/28/90        Initial revision.
+
+DESCRIPTION:
+	
+
+	$Id: ALGORITHMS,v 1.1.26.1 97/03/29 03:39:46 canavese Exp $
+
+****************************************************************************
+
+
+	This file is the temporary store house for write ups of algorithms
+	and other info that may be useful to future GROBJ programmers
+
+
+
+* Interactive Handle Display During Marquee Selection
+	
+	During each PTR event two tasks must be accomplished.
+		1. Erase the handles of any objects that drew their
+		   handles during the last PTR event
+		2. Draw the handles of any objects that are inside
+		   the current marquee rectangle
+
+	We wish to send only one message per object and send messages 
+	to as few objects as possible. The set of objects we must 
+	operate on is formed from the union of the two sets described by
+	tasks 1 and 2. Objects in set 2 can be easily determined by
+	using ObjCompProcessChildren and comparing the visual bounds of
+	objects with the bounds of the marquee. To keep track of set 1,
+	there is a bit in each object's state flags: OSF_TEMP_HANDLES.
+	The bit is set by messages such as MSG_O_DRAW_HANDLES_OPPOSITE,
+	to signify that the state of the handles has been temporarily
+	modified.
+
+	The GraphicBody exports the handler 
+	MSG_GRUP_PROCESS_CHILDREN_IN_RECT. The messages expects the
+	32 bounds of a rectangle and two message numbers. One message
+	is for sending to objects that have their OSF_TEMP_HANDLES
+	bit set. The other message is for sending to objects which fall 
+	within the bounds of the passed rectangle. For objects that meet
+	both conditions, another parameter specifies whether to send
+	both messages or neither.
+	
+	For example, during the PTR event of a normal drag selection
+	the pointer tool calls MSG_GRUP_PROCESS_CHILDREN_IN_RECT with
+			Marquee bounds
+			MSG_O_UNDRAW_HANDLES
+			MSG_O_DRAW_HANDLES_FORCE
+			CIRS_XOR_CHECK
+
+	The UNDRAW message will be sent to OSF_TEMP_HANDLES objects
+	to erase their handles. The FORCE message will be sent to
+	objects inside the Marquee bounds, to force them to draw
+	their handles regardless of their selected bit. The 
+	CIRS_XOR_CHECK tells the GRUP handler to send neither message
+	if the object is both inside the bounds and has its TEMP_HANDLES
+	bit set. This object already has its handles drawn and we wish
+	the handles to remain drawn, so nothing is exactly what we want
+	done.
+
+
+	Note: The OSF_TEMP_HANDLES bit is cleared by MSG_O_DRAW_HANDLES
+	and MSG_O_UNDRAW_HANDLES.
+
+
+* What do the ObjectStateFlags really mean?
+
+	OSF_ACTION_ACTIVATED 
+		Object is waiting for a START_SELECT or similar message. 
+
+		For MOVE, RESIZE and ROTATE actions, the ACTIVATED period
+		is non-existent, as the pointer tool jump starts these
+		actions. 
+		
+		For CREATE, the ACTIVATED period persists from
+		when the object is instantiated (user selects tool) to
+		when the user clicks on the document to start creating
+		the object. In this state, none of the objects 
+		transformation, position, mapped corners or area/line
+		attributes instance data is valid.
+
+
+	OSF_ACTION_PENDING
+		Object is waiting for a drag event. 
+
+		For MOVE, CREATE, RESIZE and ROTATE actions, 
+		the PENDING period is non-existent, as the pointer tool 
+		jump starts these actions. 
+
+
+* How does an object get into the document?
+	describe floater and add duplicate
+	mention reseting activate create mode
+
+
+* Groups
+	How drawing works
+	Problem of center moving during rotate
+	How hit detection works
+	GStates - see GState Section
+	Grouping objects
+	Ungrouping objects
+
+* GStates
+	Body's
+	For use by objects
+	For use by objects in groups
+
+* Attributes
+	arrays
+	default attributes
+
+* Body Keeper
+
+
+* Transformations
+	ObjectTransformation
+	ObjectFullTransformation
+	Moving
+	Resizing
+	Rotating
+	Normal/Sprite transform
+
+* Pointer tool
+	Moving
+	Resizing
+	Rotating
+	Selecting
+
+* Drawing and Hit Detection of Selection Handles
+
+* Hit detection for objects
+
+
+* Coordinate systems
+	Naming conventions
+	OBJECT
+	RESIZE
+	DOCUMENT
+	PARENT
+	
+
+
+*******************************************************
+* Important things to know
+  	The body block can never be discarded
+
+* Floater notes
+	Floater can only exist if there is both a current body
+	and a current tool. If the current body is cleared
+	the floater is destroyed.

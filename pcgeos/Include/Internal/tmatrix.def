@@ -1,0 +1,84 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		tmatrix.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines the transformation matrix used by windows and
+	graphics states.
+
+	$Id: tmatrix.def,v 1.1 97/04/04 14:15:43 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__TMATRIX
+
+StartKernel
+
+;--------------------------------------------------------------------------
+;			Transformation Matrix
+;--------------------------------------------------------------------------
+
+
+;	Optimization Flags for Transformation Matrix
+;
+;		These flags determine (for each matrix) whether it is
+;		simple (no scaling or rotation), or if not simple, whether
+;		any rotation is applied.  Used in TM_flags field of TMatrix
+;		The TF_INV_VALID flag is used to determine if the reverse
+;		translation factors are valid.  They are normally recalculated
+;		for the W_curTMatrix and W_TMatrix when the transformation
+;		matrices are updated in WinValWinStruct.
+
+TransFlags	record	
+    TF_INV_VALID:1, 
+    TF_ROTATED:1, 
+    TF_SCALED:1, 
+    TF_TRANSLATED:1
+TransFlags	end
+
+TM_ROTATED	equ	mask TF_ROTATED
+TM_SCALED	equ	mask TF_SCALED
+TM_TRANSLATED	equ	mask TF_TRANSLATED
+
+TM_COMPLEX	equ	TM_ROTATED or TM_SCALED
+
+	; if the fraction (high) of the dword fractional component of the
+	; inverse scale factors is non-zero and below this value, then we 
+	; need to look at the low word of the fraction in doing UnTransform
+	; calculations.
+TM_WFRAC_MIN	equ	0x10		; getting pretty small...
+
+;	Transformation Matrix Structure
+;
+;		A subset of the entire 3x3 homogeneous coordinate trans-
+;		formation matrix is stored here.  The last column is not
+;		required since it is always [0,0,1].  The field names represent
+;		their position within the whole 3x3 matrix, as follows:
+;
+;			TM_11	TM_12	tm13
+;			TM_21	TM_22	tm23
+;			TM_31	TM_32	tm33
+;
+
+;
+;	The default transformation matrix is the null transform
+;
+TMatrix	struct
+    TM_11	WWFixed	<0, 1>
+    TM_12	WWFixed	<0, 0>
+    TM_21	WWFixed	<0, 0>
+    TM_22	WWFixed	<0, 1>
+    TM_31	DWFixed	<0, 0>
+    TM_32	DWFixed	<0, 0>
+    TM_xInv	DDFixed <0,0>		; inverse translation factor (x coords)
+    TM_yInv	DDFixed	<0,0>		; inverse translation factor (y coords)
+    TM_flags	TransFlags	<>	; optimization flags
+    		even			; padding for word alignment
+TMatrix	ends
+
+EndKernel

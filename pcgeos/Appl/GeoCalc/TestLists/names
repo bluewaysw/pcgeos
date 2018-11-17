@@ -1,0 +1,245 @@
+$Id: names,v 1.1.14.1 97/03/29 09:26:35 canavese Exp $
+=============================================================================
+		testlist for names
+=============================================================================
+
+Things to test:
+---------------
+		Basic Name Operations
+		---------------------
+*1) Create a cell that references a name which has not been defined.
+	==> In A1 enter "=foo"
+	*** The cell should display #NAME# indicating that there
+	    is a reference to a name that does not exist.
+
+*2) Define the name referenced in the cell (foo). Give it the definition '1'.
+	==> Formula->Define Name, New, Name = foo, Definition = 1
+	*** The cell should recalculate and display the new value (1)
+
+*3) Define a new name (refNameOne) and define it as referring to another
+   name (refNameTwo).
+	==> Formula->Define Name, New, Name = refNameOne, Definition = refNameTwo
+   
+   Define the other name (refNameTwo) and define it as referring to the
+   first name (refNameOne)
+	==> Formula->Define Name, New, Name = refNameTwo, Definition = refNameOne
+   
+   Create a cell that references the first name
+	==> In A2 enter "=refNameOne"
+	*** The cell should display "#CNAME#" indicating that a circular
+	    name reference was encountered.
+
+   Create a cell that references the second name
+	==> In A3 enter "=refNameTwo"
+	*** The cell should display "#CNAME#" indicating that a circular
+	    name reference was encountered.
+
+*4) Define a new name (newName) and define it as '1'.
+	==> Formula->Define Name, New, Name = newName, Definition = 1
+   
+   Create a cell that references the name
+   	==> In A4 enter "=newName"
+
+   Delete the name
+   	==> Formula->Define Name, Select 'newName', Delete
+	*** The cell should recalculate and display "#NAME#" indicating
+	    that the cell refers to an undefined name.
+
+*5) Define the name 'newName' again
+	==> Formula->Define Name, New, Name = newName, Definition = 1
+	*** The cell should recalculate and display '1'
+
+   Change the title of the name
+   	==> Formula->Define Name, Change, Name = changedName
+	*** The edit bar should display the cell formula with the new name
+
+*6) Define a name with no definition.
+	==> Formula->Define Name, New, Name = noDef
+	*** Should generate error dialog box and no change
+
+*7) Define a name with no name.
+	==> Formula->Define Name, New, Definition = 1
+	*** Should generate error dialog box and no change
+
+*8) Change the title of a name to be the same as a name that is
+   referenced, but not defined.
+	==> Formula->Define Name, New, Name = qq, Definition = 1
+        ==> In A5 enter "=qq" (Will display '1.00')
+	==> In A6 enter "=xx" (Will display '#NAME#')
+	==> Formula->Define Name, Select 'qq' and change the name to 'xx'
+	*** Both cells should show '1.00' and both should display
+	    '=xx' in the edit bar.
+
+*9) Change the definition of refNameTwo to be 1.
+	==> Formula->Define Name, Change, Definition = 1
+	*** Both cells A2 and A3 should display '1'
+
+
+
+		Operations with Names in Scraps
+		-------------------------------
+There are several cases to test, both within a single spreadsheet and
+between spreadsheets. These should be tested with Cut/Copy/Paste and also
+with quick-move/copy. I suggest new files for these. It works best for me
+if I tile the two files.
+
+*1) Copy and Paste a name that is defined the same in both spreadsheets.
+	Define the name in both places
+	==> In File1: Formula->Define Name, New, Name = defBothSame, Def = 1
+	==> In File2: Formula->Define Name, New, Name = defBothSame, Def = 1
+	
+	In File1 enter a cell that references the name
+	==> In File1: In A1 enter "=defBothSame"
+	
+	Copy the cell from File1 to File2
+	==> In File1: Select A1, choose Edit->Copy
+	==> In File2: Click in cell A1, choose Edit->Paste
+	
+	*** The cell should display '1' and the edit-bar should display
+	    "=defBothSame".
+
+*2a) Copy and Paste a name that is defined different in both spreadsheets.
+	Define the name in both places
+	==> In File1: Formula->Define Name, New, Name = defBothDiff, Def = 1
+	==> In File2: Formula->Define Name, New, Name = defBothDiff, Def = 2
+	
+	In File1 enter a cell that references the name
+	==> In File1: In A2 enter "=defBothDiff"
+	
+	Copy the cell from File1 to File2
+	==> In File1: Select A2, choose Edit->Copy
+	==> In File2: Click in cell A2, choose Edit->Paste
+	
+	You will be asked which definition to use. Choose to use the
+	definition in the target spreadsheet.
+	
+	*** The cell should display '2' and the edit-bar should display
+	    "=defBothDiff".
+
+*2b) Copy and Paste a name that is defined different in both spreadsheets.
+	Define the name in both places
+	==> In File1: Formula->Define Name, New, Name = defBothDiff, Def = 1
+	==> In File2: Formula->Define Name, New, Name = defBothDiff, Def = 2
+	
+	In File1 enter a cell that references the name
+	==> In File1: In A2 enter "=defBothDiff"
+	
+	Copy the cell from File1 to File2
+	==> In File1: Select A2, choose Edit->Copy
+	==> In File2: Click in cell B2, choose Edit->Paste
+	
+	You will be asked which definition to use. Choose to use the
+	definition in the scrap.
+	
+	*** The cell should display '1' and the edit-bar should display
+	    "=defBothDiff0".
+
+*3a) Copy and Paste a name that is defined only in the source and which
+    is not defined or referenced in the destination.
+	Define the name
+	==> In File1: Formula->Define Name, New, Name = defOne, Def = 1
+
+	In File1 enter a cell that references the name
+	==> In File1: In A3 enter "=defOne"
+	
+	Copy the cell from File1 to File2
+	==> In File1: Select A3, choose Edit->Copy
+	==> In File2: Click in cell A3, choose Edit->Paste
+
+	*** The cell should display '1' and the edit-bar should display
+	    "=defOne".
+
+*3b) Copy and Paste a name that is defined only in the source and which
+    is not defined but is referenced in the destination.
+	Define the name
+	==> In File1: Formula->Define Name, New, Name = defOneA, Def = 1
+
+	In File1 enter a cell that references the name
+	==> In File1: In B3 enter "=defOneA"
+	
+	In File2 enter a cell that references the name
+	==> In File1: In B3 enter "=defOneA"
+	
+	Copy the cell from File1 to File2
+	==> In File1: Select B3, choose Edit->Copy
+	==> In File2: Click in cell C3, choose Edit->Paste
+
+	*** The cell should display '1' and the edit-bar should display
+	    "=defOneA". Cell B3 should also recalculate and display '1'
+	    while the edit-bar should show "=defOneA".
+
+*4) Copy and Paste a name that is undefined but referenced in the source
+   and which is defined in the destination.
+	Define the name
+	==> In File2: Formula->Define Name, New, Name = defTwo, Def = 1
+
+	In File1 enter a cell that references the name
+	==> In File1: In A4 enter "=defTwo"
+	
+	Copy the cell from File1 to File2
+	==> In File1: Select A4, choose Edit->Copy
+	==> In File2: Click in cell A4, choose Edit->Paste
+
+	*** The cell should display '1' and the edit-bar should display
+	    "=defTwo".
+
+*5a) Copy and Paste a name which is undefined in the source and which is
+    undefined but referenced in the destination.
+	Define the references
+	==> In File1: In A5 enter "=undefRef"
+	==> In File2: In A5 enter "=undefRef"
+
+	Copy the cell from File1 to File2
+	==> In File1: Select A5, choose Edit->Copy
+	==> In File2: Click in cell B5, choose Edit->Paste
+
+	*** The cell should display '#NAME#' and the edit-bar should display
+	    "=undefRef".
+
+*5b) Copy and Paste a name which is undefined in the source and which is
+    undefined and unreferenced in the destination.
+	Define the reference
+	==> In File1: In A6 enter "=undefRefOne"
+
+	Copy the cell from File1 to File2
+	==> In File1: Select A6, choose Edit->Copy
+	==> In File2: Click in cell A6, choose Edit->Paste
+
+	*** The cell should display '#NAME#' and the edit-bar should display
+	    "=undefRefOne".
+
+*6) Copy and Paste all varieties of names in the same spreadsheet
+	==> In File1: Select A1:A6, choose Edit->Copy
+	==> In File1: Select A7,    choose Edit->Paste
+
+	*** All references should show up the same in A7:A12 as they
+	    are in A1:A6.
+
+*7) Cut and Paste all varieties of names in the same spreadsheet
+	==> In File1: Select A1:A12, choose Edit->Cut
+	==> In File1: Select A1,     choose Edit->Paste
+
+	*** The spreadsheet should look the same as when you cut.
+	    What's special about this is that the undefined but
+	    referenced names should have gotten nuked, and then
+	    recreated when you pasted.
+
+*8) Paste a scrap which references a name over the only references to an
+   undefined name with the same title.
+	Create the name
+	==> In File1: Formula->Define Name, New, Name = undefName, Def = 1
+
+	Create the references
+	==> In File2: In A7 enter "=undefName"
+	==> In File1: In A7 enter "=undefName" (should display '1')
+
+	Copy the cell from File1 to File2
+	==> In File1: Select A7, choose Edit->Copy
+	==> In File2: Click in cell A7, choose Edit->Paste
+
+	*** The cell should display '1' and the edit-bar should display
+	    "=undefName". What's special about this is that the last
+	    reference to the undefined name vanishes and then a new reference
+	    is inserted.
+=============================================================================
+

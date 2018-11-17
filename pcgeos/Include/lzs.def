@@ -1,0 +1,287 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+			GEOWORKS CONFIDENTIAL
+
+PROJECT:	Data compression
+MODULE:		Stac LZS Library
+FILE:		lzs.def
+
+AUTHOR:		Jennifer Wu, Aug 27, 1996
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jwu	8/27/96		Initial revision
+
+
+DESCRIPTION:
+	API and definitions for Stac LZS data compression library.
+	LZS221-C Version 4 Release 2
+
+	Note: This library cannot be used without a license 
+	      from Stac Electronics.
+		
+	$Id: lzs.def,v 1.1 97/04/04 14:21:58 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __LZS
+
+StartLibrary	lzs
+
+;---------------------------------------------------------------------------
+;
+;			CONSTANTS
+;
+;---------------------------------------------------------------------------
+
+;
+; Minimum size for destination buffer.
+; 
+LZS_DEST_MIN	equ	16
+
+
+;---------------------------------------------------------------------------
+;
+;			RECORDS AND STRUCTS
+;
+;---------------------------------------------------------------------------
+
+COMMENT |--------------------------------------------------------------
+
+			Compression
+
+Flush:
+	A flush operation will force any intermediate data out to 
+	the destination buffer, appending an end marker to the 
+	destination buffer.
+
+	If both CF_SOURCE_FLUSH and CF_DEST_FLUSH are set, then
+	when either source or destination buffers exhaust, a flush
+	operation will occur.
+
+	The value of the flush bits cannot be changed between 
+	successive LZSCompress calls until the corresponding 
+	buffer is exhausted.
+
+Save History:
+	Setting CF_SAVE_HISTORY will save the compression history
+	at the end of a flush operation.  This will allow for a 
+	higher compression ratio for the next block to be compressed.
+
+	If history is preserved between blocks of data, the blocks 
+	must be decompressed in the same order they were compressed.
+
+Performance modes.  
+	If CF_PERFORMANCE_MODE flag is set, performance mode 0 is 
+	used.  Only one of the flags may be set at a time.  The
+	lower the mode, the faster the execution.  Faster speeds
+	result in lower compression ratios.
+
+-----------------------------------------------------------------------|
+
+CompressFlags	record
+  :11=0				; must be zero!
+  CF_PERFORMANCE_MODE_2:1
+  CF_PERFORMANCE_MODE_1:1	
+  CF_SAVE_HISTORY:1		; save history after flushing
+  CF_DEST_FLUSH:1		; flush when destination buffer fills
+  CF_SOURCE_FLUSH:1		; flush after reading all the source
+CompressFlags	end
+
+CompressParams	struct
+  CP_source		fptr		; source buffer
+  CP_dest		fptr		; destination buffer
+  CP_sourceCnt		dword		; size of source data
+  CP_destCnt		dword		; size of destBuf
+  CP_history		fptr		; compression history
+  CP_flags		CompressFlags
+  CP_performance 	word		; 0 - 255, smaller equals faster 
+					;   equals lower compression ratio
+CompressParams	ends
+
+LZSCompressResult	record
+  :13=0
+  LZSCR_FLUSHED:1		
+  LZSCR_DEST_EXHAUSTED:1	; destination buffer filled
+  LZSCR_SOURCE_EXHAUSTED:1	; all data read from source buffer
+LZSCompressResult	end
+
+
+COMMENT |--------------------------------------------------------------
+
+			Decompression
+
+Uncompressed:
+	If CF_UNCOMPRESSED is set, the source data is treated as if
+	it were uncompressed data.  The decompression history will
+	be updated to reflect this data.  The data from the source
+	buffer will be moved into the destination buffer.
+
+Save History:
+	If set, the decompression history will not be reset after
+	an end marker is seen.  Blocks must be decompressed in 
+	the same order they were compressed if history is preserved
+	between blocks.
+
+End Marker:
+	Decompression will stop before all the source data has
+	been decompressed if an end marker is found in the source
+	data.  This flag indicates that an end marker was seen
+	during decompression.
+
+-----------------------------------------------------------------------|
+
+DecompressFlags	record
+ :13=0				; must be zero!
+ DF_SAVE_HISTORY:1		; save history after end marker
+ DF_UNCOMPRESSED:1		; source buffer contains uncompressed data
+ :1=0				; must be zero!
+DecompressFlags end
+
+DecompressParams	struct
+  DP_source		fptr
+  DP_dest		fptr
+  DP_sourceCnt		dword
+  DP_destCnt		dword
+  DP_history		fptr
+  DP_flags		DecompressFlags
+DecompressParams	ends
+
+
+LZSDecompressResult	record
+  :13=0
+  LZSDR_END_MARKER:1		; end marker was seen
+  LZSDR_DEST_EXHAUSTED:1	; destination buffer filled
+  LZSDR_SOURCE_EXHAUSTED:1	; all data read from source buffer
+LZSDecompressResult	end
+
+
+;--------------------------------------------------------------------------
+;
+;			USER API
+;
+;--------------------------------------------------------------------------
+
+global 	LZSSizeOfCompressionHistory:far
+;
+;	SYNOPSIS: Determine the number of bytes required for 
+;		  one compression history. 
+;
+;	PASS:	nothing
+;	RETURN:	ax	= number of bytes required
+;
+;	DESTROYS: nothing
+;
+
+global 	LZSInitCompressionHistory:far
+;
+;	SYNOPSIS: Initialize a compression history.  Each history 
+;		  must be initialized before use with LZSCompress.
+;		  Each history is typically only initialized once,
+;		  although a compression history may be initialized
+;		  at any time if desired.
+;
+;	PASS:	cx:dx	= fptr to compression history
+;	RETURN:	ax	= undefined, but will always be non-zero
+;
+;	DESTROYS: nothing
+;
+
+
+global	LZSCompress:far
+;
+;	SYNOPSIS: Compress data from the source buffer into the
+;		  dest buffer.  The function will stop when all 
+;		  the source bytes have been read from the source
+;		  or when the destination buffer is filled (or 
+;		  slightly less to leave room for overhead bytes).
+;		  
+;		  The sourceCnt will decrement and the source ptr will
+;		  increment for each byte read.
+;
+;		  The destCnt will decrement and the dest ptr will 
+;		  increment for each byte written.
+;
+;		  If the source buffer does not exhaust, the 
+;		  buffer is still in use by the compression engine,
+;		  and the original allocated source buffer should 
+;		  be used in the next LZSCompress call.  The actual
+;		  pointer and counter values are stored in the compression
+;		  history area, and the fptr of the source buffer and 
+;		  its size for the next function call are ignored.
+;
+;		  The same thing applies to the destination buffer when
+;		  the destination buffer does not exhaust.
+;
+;	PASS:	ss:bp	= CompressParams
+;	RETURN:	ax	= LZSCompressResults
+;		CompressParams updated according to above description.
+;
+;	DESTROYS: nothing
+;
+
+
+global	LZSSizeOfDecompressionHistory:far
+;
+;	SYNOPSIS: Determine the number of bytes required for 
+;		  one decompression history. 
+;
+;	PASS:	nothing
+;	RETURN:	ax	= number of bytes required
+;
+;	DESTROYS: nothing
+;
+
+
+global	LZSInitDecompressionHistory:far
+;
+;	SYNOPSIS: Initialize a decompression history.  Each 
+;		  decompression history must be initialized 
+;		  before use with LZSDecompress.  Each history
+;		  is typically only initialized once, although
+;		  a decompression history may be initialized 
+;		  at any time if desired.
+;
+;	PASS:	cx:dx	= fptr to decompression history
+;	RETURN:	ax	= undefined, but will always be non-zero
+;
+;	DESTROYS: nothing
+;
+
+
+global	LZSDecompress:far
+;
+;	SYNOPSIS: Decompress data from the source buffer into the dest
+;		  buffer.  The function will stop when all the source
+;		  data has been processed or when the destination buffer
+;		  has been filled (or slightly less).
+;
+;		  The sourceCnt will decrement and source ptr will 
+;		  increment for each byte read.
+;
+;		  The destCnt will decrement and dest ptr will
+;		  increment for each byte written.
+;
+;		  If the source buffer exhausts, the destination buffer
+;		  is still in use by the decompression engine, and the
+;		  original allocated destination buffer should be used
+;		  in the next call to LZSDecompress.  The destination
+;		  buffer and size parameters for the next call are
+;		  "don't cares".  The same thing applies to the source
+;		  buffer when the destination buffer exhausts.
+;
+;	PASS:	ss:bp	= DecompressParams
+;	RETURN:	ax	= LZSDecompressResult
+;		DecompressParams updated according to the above description.
+;	
+;	DESTROYS:	nothing
+;
+
+
+
+EndLibrary	lzs
+

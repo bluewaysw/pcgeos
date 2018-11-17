@@ -1,0 +1,313 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Berkeley Softworks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS
+ * FILE:	gCtrlC.goh
+ * AUTHOR:	Tony Requist: February 12, 1991
+ *
+ * DECLARER:	UI
+ *
+ * DESCRIPTION:
+ *	This file defines GenControlClass
+ *
+ *	$Id: gCtrlC.goh,v 1.1 97/04/04 15:52:12 newdeal Exp $
+ *
+ ***********************************************************************/
+
+
+@optimize
+@deflib ui
+
+@include <Objects/gInterC.goh>
+@include <gcnlist.goh>
+
+@class	GenControlClass, GenInteractionClass;
+
+@message void MSG_GEN_CONTROL_GET_INFO(GenControlBuildInfo *info = cx:dx);
+
+typedef ByteFlags GenControlFeatureFlags;
+
+typedef struct {
+    ChunkHandle			GCFI_object;
+    optr			GCFI_name;
+    GenControlFeatureFlags    	GCFI_flags;
+} GenControlFeaturesInfo;
+
+typedef ByteFlags GenControlChildFlags;
+#define GCCF_NOTIFY_WHEN_ADDING		0x04
+#define GCCF_ALWAYS_ADD			0x02
+#define GCCF_IS_DIRECTLY_A_FEATURE	0x01
+
+typedef struct {
+    ChunkHandle			GCCI_object;
+    WordFlags			GCCI_featureMask;
+    GenControlChildFlags	GCCI_flags;
+} GenControlChildInfo;
+
+typedef WordFlags GenControlBuildFlags;
+#define GCBF_SUSPEND_ON_APPLY			0x8000
+#define GCBF_USE_GEN_DESTROY			0x4000
+#define GCBF_SPECIFIC_UI			0x2000
+#define GCBF_CUSTOM_ENABLE_DISABLE		0x1000
+#define GCBF_ALWAYS_UPDATE  	    		0x0800
+#define GCBF_EXPAND_TOOL_WIDTH_TO_FIT_PARENT   	0x0400
+#define GCBF_ALWAYS_INTERACTABLE    		0x0200
+#define GCBF_ALWAYS_ON_GCN_LIST	    		0x0100
+#define GCBF_MANUALLY_REMOVE_FROM_ACTIVE_LIST 	0x0080
+#define GCBF_IS_ON_ACTIVE_LIST    		0x0040
+#define GCBF_IS_ON_START_LOAD_OPTIONS_LIST	0x0020
+#define GCBF_NOT_REQUIRED_TO_BE_ON_SELF_LOAD_OPTIONS_LIST 0x0010
+#define GCBF_DO_NOT_DESTROY_CHILDREN_WHEN_CLOSED    0x0008
+
+typedef struct {
+    GenControlBuildFlags	GCBI_flags;
+    const char			*GCBI_initFileKey;
+    const GCNListType		*GCBI_gcnList;
+    word			GCBI_gcnCount;
+    const NotificationType	*GCBI_notificationList;
+    word			GCBI_notificationCount;
+    optr			GCBI_controllerName;
+
+    MemHandle			GCBI_dupBlock;
+    const GenControlChildInfo	*GCBI_childList;
+    word			GCBI_childCount;
+    const GenControlFeaturesInfo *GCBI_featuresList;
+    word			GCBI_featuresCount;
+    WordFlags			GCBI_features;
+
+    MemHandle			GCBI_toolBlock;
+    const GenControlChildInfo	*GCBI_toolList;
+    word			GCBI_toolCount;
+    const GenControlFeaturesInfo *GCBI_toolFeaturesList;
+    word			GCBI_toolFeaturesCount;
+    WordFlags			GCBI_toolFeatures;
+    char			*GCBI_helpContext;
+
+    byte			GCBI_reserved [8];
+} GenControlBuildInfo;
+
+@message void MSG_GEN_CONTROL_GENERATE_UI();
+
+@message void MSG_GEN_CONTROL_DESTROY_UI();
+
+@message void MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI(optr parent = cx:dx);
+
+@message void MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI();
+
+@message void MSG_GEN_CONTROL_UPDATE_UI(@stack
+					MemHandle toolBlock,
+					MemHandle childBlock,
+					WordFlags toolboxFeatures,
+					WordFlags features,
+					MemHandle data,
+					word changeID,
+					ManufacturerID manufID);
+
+@message void MSG_GEN_CONTROL_ENABLE_DISABLE(Message msg = cx,
+					     VisUpdateMode updateMode = dl);
+
+typedef enum /* word */ {
+    GCUIT_NORMAL,
+    GCUIT_TOOLBOX
+} GenControlUIType;
+
+typedef struct {
+    WordFlags	GCSI_userAdded;
+    WordFlags	GCSI_userRemoved;
+    WordFlags	GCSI_appRequired;
+    WordFlags	GCSI_appProhibited;
+} GenControlScanInfo;
+
+@message void MSG_GEN_CONTROL_SCAN_FEATURE_HINTS(GenControlUIType type = cx,
+			     GenControlScanInfo *info = dx:bp);
+
+@message void MSG_GEN_CONTROL_ADD_FEATURE(WordFlags featureToAdd);
+
+@message void MSG_GEN_CONTROL_REMOVE_FEATURE(WordFlags featureToRemove);
+
+@message void MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE(WordFlags featureToAdd = cx);
+
+@message void MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE(
+					WordFlags featureToRemove = cx);
+
+typedef WordFlags GenControlInteractableFlags;
+#define GCIF_CONTROLLER	0x8000
+#define GCIF_TOOLBOX_UI	0x0002
+#define GCIF_NORMAL_UI	0x0001
+
+@message void MSG_GEN_CONTROL_NOTIFY_INTERACTABLE(
+				GenControlInteractableFlags flags = cx);
+
+@message void MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE(
+				GenControlInteractableFlags flags = cx);
+
+@message void MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE();
+
+@message void MSG_GEN_CONTROL_ADD_TO_GCN_LISTS();
+
+@message void MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS();
+
+typedef struct {
+    WordFlags    GCSR_features;
+    WordFlags    GCSR_required;
+    WordFlags    GCSR_prohibited;
+    WordFlags    GCSR_supported;
+} GenControlGetFeaturesReturn;
+
+@message void MSG_GEN_CONTROL_GET_NORMAL_FEATURES(
+			GenControlGetFeaturesReturn *return = axcxdxbp);
+
+@message void MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES(
+			GenControlGetFeaturesReturn *return = axcxdxbp);
+
+@message void MSG_GEN_CONTROL_ADD_APP_UI(optr appUI = cx:dx);
+@message void MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI(optr appUI = cx:dx);
+
+@message void MSG_GEN_CONTROL_REBUILD_NORMAL_UI();
+
+@message void MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI();
+
+@message void MSG_GEN_CONTROL_ADD_TO_UI();
+
+@message void MSG_GEN_CONTROL_REMOVE_FROM_UI();
+
+@message void MSG_GEN_CONTROL_OUTPUT_ACTION(EventHandle event = bp);
+@message void MSG_GEN_CONTROL_TWEAK_DUPLICATED_UI(
+					MemHandle childBlock = cx,
+					WordFlags features = dx);
+@message void MSG_GEN_CONTROL_TWEAK_DUPLICATED_TOOLBOX_UI(
+					MemHandle toolBlock = cx,
+					WordFlags toolboxFeatures = dx);
+
+@message void MSG_GEN_CONTROL_NOTIFY_ADDING_FEATURE(optr feature = cx:dx);
+@message void MSG_GEN_CONTROL_FREE_OBJ_BLOCK(MemHandle blockToFree = cx);
+
+typedef WordFlags GenControlStatusChange;
+#define GCSF_HIGHLIGHTED_TOOLGROUP_SELECTED	0x0004
+#define GCSF_TOOLBOX_FEATURES_CHANGED		0x0002
+#define GCSF_NORMAL_FEATURES_CHANGED		0x0001
+
+typedef struct {
+    optr    			NGCS_controller;
+    GenControlStatusChange	NGCS_statusChange;
+} NotifyGenControlStatusChange;
+
+/*
+ * vardata
+ */
+
+typedef struct {
+    GenControlInteractableFlags	TGCI_interactableFlags;
+    MemHandle			TGCI_childBlock;
+    MemHandle			TGCI_toolBlock;
+    optr			TGCI_toolParent;
+    WordFlags			TGCI_features;
+    WordFlags			TGCI_toolboxFeatures;
+    GCNListType	    	    	TGCI_activeNotificationList;
+    GenControlInteractableFlags	TGCI_upToDate;
+} TempGenControlInstance;
+
+    @vardata TempGenControlInstance TEMP_GEN_CONTROL_INSTANCE;
+
+typedef WordFlags GenControlUserFlags;
+#define GCUF_USER_TOOLBOX_UI	0x0002
+#define GCUF_USER_UI	    	0x0001
+
+typedef struct {
+    GenControlUserFlags	GCUD_flags;
+    word	    	GCUD_userAddedUI;
+    word	    	GCUD_userRemovedUI;
+    word	    	GCUD_userAddedToolboxUI;
+    word	    	GCUD_userRemovedToolboxUI;
+} GenControlUserData;
+
+    @vardata GenControlUserData HINT_GEN_CONTROL_MODIFY_INITIAL_UI;
+    @vardata GenControlUserData HINT_GEN_CONTROL_USER_MODIFIED_UI;
+
+    @vardata void HINT_GEN_CONTROL_TOOLBOX_ONLY;
+
+    @vardata WordFlags ATTR_GEN_CONTROL_REQUIRE_UI;
+    @vardata WordFlags ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI;
+
+    @vardata WordFlags ATTR_GEN_CONTROL_PROHIBIT_UI;
+    @vardata WordFlags ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI;
+
+    @vardata optr ATTR_GEN_CONTROL_APP_UI;
+    @reloc ATTR_GEN_CONTROL_APP_UI, 0, optr;
+
+    @vardata optr ATTR_GEN_CONTROL_APP_TOOLBOX_UI;
+    @reloc ATTR_GEN_CONTROL_APP_TOOLBOX_UI, 0, optr;
+
+typedef ByteEnum GenControlScalableUICommand;
+#define GCSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_ON	0
+/*
+ * if (GCSUIE_appFeature is ON)
+ *     menu features = GCSUIE_newFeatures
+ */
+#define GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_ON	1
+/*
+ * if (GCSUIE_appFeature is ON)
+ *     tool features = GCSUIE_newFeatures
+ */
+#define GCSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_OFF	2
+/*
+ * if (GCSUIE_appFeature is OFF)
+ *     menu features = GCSUIE_newFeatures
+ */
+#define GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_OFF	3
+/*
+ * if (GCSUIE_appFeature is OFF)
+ *     tool features = GCSUIE_newFeatures
+ */
+#define GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL    	4
+/*
+ * if (app level >= GCSUIE_appFeature)
+ *     menu features = GCSUIE_newFeatures
+ */
+#define GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL    	5
+/*
+ * if (app level >= GCSUIE_appFeature)
+ *     tool features = GCSUIE_newFeatures
+ */
+#define GCSUIC_ADD_NORMAL_FEATURES_IF_APP_FEATURE_ON	6
+/*
+ * if (GCSUIE_appFeature is ON)
+ *     menu features |= GCSUIE_newFeatures
+ */
+#define GCSUIC_ADD_TOOLBOX_FEATURES_IF_APP_FEATURE_ON	7
+/*
+ * if (GCSUIE_appFeature is ON)
+ *     tool features |= GCSUIE_newFeatures
+ */
+
+typedef struct {
+    GenControlScalableUICommand		GCSUIE_command;
+    WordFlags				GCSUIE_appFeature;
+    WordFlags				GCSUIE_newFeatures;
+} GenControlScalableUIEntry;
+
+   @vardata GenControlScalableUIEntry HINT_GEN_CONTROL_SCALABLE_UI_DATA;
+
+   @vardata void TEMP_GEN_CONTROL_OPTIONS_LOADED;
+
+   @vardata void ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP;
+
+   @vardata void HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE;
+
+/*
+ * Instance data
+ */
+
+    @instance optr 	GCI_output;
+
+    @default GI_states = (@default & ~GS_ENABLED);
+
+@endc
+
+#ifdef __HIGHC__
+#endif
+
+@endlib
+
+

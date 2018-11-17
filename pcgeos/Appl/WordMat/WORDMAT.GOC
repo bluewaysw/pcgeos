@@ -1,0 +1,1706 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/***************************************************************************
+
+
+  PROJECT:      Word Matcher
+  MODULE:       Word Matcher application
+  FILE:         wordMat.goc
+
+  AUTHOR:       Gerd Boerrigter
+
+  $Header: $
+
+  DESCRIPTION:
+    Main application.
+
+    The word list is stored in "userdata/Word Matcher", except for the
+    Nokia, where it is stored in "document".
+
+    If DO_IMPEX is @defined, the application contains import/export
+    capability.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-29  GerdB     Initial version.
+    98-05-14  GerdB     Added version for Desktop.
+    ??-??-??  GPC       dumped the graphics on the buttons and some other
+					  stuff
+    01-12-00  jfh	    deleted N9000 code & un-included button art files
+    01-13-00  jfh	    fixed #1136
+    01-14-00  jfh       fixed #1443 (added Back button & saved previous
+					    blocks for Back to go to)
+	 06/25/02  jfh			Added password stuff and ini switch
+	 01/20/04  jfh			changed DO_IMPEX from compile switch to .ini setting
+	 				    
+***************************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <wmlib.h>
+
+@include "Art/appl.goh"
+/*@include "Art/more.goh"
+@include "Art/rename.goh"
+@include "Art/delete.goh"
+@include "Art/search.goh" */
+@include "passwdui.goh"
+#include <initfile.h>
+
+#define MAX_LIST_LENGTH     300
+#define MAX_SAVED_BLOCKS  10
+
+
+/********************************************************************
+ *              Class Definitions
+ *******************************************************************/
+@class WordMatcherProcessClass, GenProcessClass;
+    @message void MSG_WM_SEARCH_ACTION( GenTextStateFlags flags );
+    @message void MSG_WM_DELETE();
+    @message void MSG_WM_RENAME();
+    @message void MSG_WM_CONT_SEARCH();
+    @message void MSG_WM_BACK_BLOCK();
+    @message void MSG_WM_DO_RENAME();
+	 @message void MSG_WM_OPEN_IMPORT();
+	 @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_IMPORT_SELECTOR_ACTION;
+	 @message void MSG_WM_OPEN_EXPORT();
+	 @message void MSG_WM_IMPORT();
+	 @message void MSG_WM_EXPORT();
+	 @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_WM_LIST_MONIKER_QUERY;
+  /*  @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_WM_LIST_APPLY; */
+@endc;
+
+@class WordMatcherViewClass, GenViewClass;
+@endc;
+
+@class WordMatcherTextClass, GenTextClass;
+@endc;
+
+@class WordSearchTextClass, GenTextClass;
+@endc;
+
+@class GenStopTriggerClass, GenTriggerClass;
+	@message void MSG_STOP_IMPORT();
+	@message Boolean MSG_STOP_GET_STOPPED();
+	@message void MSG_STOP_SET_NOT_STOPPED();
+	@message void MSG_STOP_SET_STOPPED();
+	@instance Boolean GSTI_stop = FALSE;
+@endc;
+
+void
+WMFillList( void );
+
+void 
+WWClearList (void);
+
+/********************************************************************
+ *              Class Declarations
+ *******************************************************************/
+@classdecl WordMatcherProcessClass, neverSaved;
+@classdecl WordMatcherViewClass;
+@classdecl WordMatcherTextClass;
+@classdecl WordSearchTextClass;
+@classdecl GenStopTriggerClass;
+
+/********************************************************************
+ *              Global Variables
+ *******************************************************************/
+#define CONV_DOS 1
+#define CONV_WIN 2
+#define CONV_GEOS 3
+
+
+WMParamsStruct      params;
+TCHAR               wordList[ MAX_LIST_LENGTH ][ WM_MAX_SIZE_WORD+1 ];
+word                currentIndex;
+MemHandle			listBlockHan[ MAX_SAVED_BLOCKS ];
+word				lastListBlockNum;
+word				curListBlockNum;
+word				numListEntries[MAX_SAVED_BLOCKS];
+Boolean			atLastBlock;
+Boolean			g_usePword = FALSE;
+
+/********************************************************************
+ *              UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *              AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass WordMatcherApp = {
+    GI_visMoniker = list {
+                        @ApplMonikerColor,
+                        @ApplMonikerMono,
+                        @ApplMonikerCGA,
+/*@ifdef PRODUCT_NDO2000 */
+                        @WordmatTinyTCMoniker,
+                        @WordmatTinyTMMoniker,
+                        @WordmatTinyTCGAMoniker,
+/*@endif */
+                        @WordMatcherTextMoniker };
+    GI_comp = @WorldMatcherPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+	   @WorldMatcherPrimary;
+    ATTR_GEN_HELP_FILE = "wrdmatch";
+}
+
+
+@visMoniker WordMatcherTextMoniker = "Word Matcher";
+
+@end AppResource;
+
+/********************************************************************
+ *              Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass WorldMatcherPrimary = {
+    GI_comp = @FileMenu, @WMObjectsHolder,
+              @WMTriggerGroup,
+				  @WMRenameDialog, @WMDummyLine2/*, @WMDone*/,
+				  @PwdAskPasswordDialog, @PwdChangePasswordDialog,
+				  @ImportDBox, @ImportProg, @ExportDBox;
+
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    ATTR_GEN_HELP_CONTEXT = "TOC";    /* the help file Entry Point */
+//    HINT_PRIMARY_NO_FILE_MENU;
+/*@ifndef PRODUCT_NDO2000
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+/*@endif  */
+    ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE;
+    HINT_CENTER_WINDOW;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass FileMenu = {
+	 GI_comp = @ImpexGroup, @AboutGroup;
+	 GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenInteractionClass AboutGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@include "art/bbxreg.goh"
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @AppName, @By, @BreadBoxLogo,
+				  @Visit, @Web, @AboutSpacer1,
+				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Word Matcher";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 36, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "by";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+@object GenGlyphClass AboutSpacer1 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2002";
+}
+@object GenGlyphClass BBoxLLC = {
+  GI_visMoniker = "Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Rights = {
+  GI_visMoniker = "All Rights Reserved";
+}
+@object GenGlyphClass AboutSpacer2 = {
+  GI_visMoniker = "   ";
+}
+
+@object GenGlyphClass WMDummyLine2 = {
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_GLYPH_SEPARATOR;
+}
+
+/*@object GenTriggerClass WMDone = {
+/*@ifdef GPC_ONLY
+    GI_visMoniker = "Done";
+/*@else
+    GI_visMoniker = 'x', "Exit";
+/*@endif
+    GTI_destination = @WordMatcherApp;
+    GTI_actionMsg = MSG_META_QUIT;
+    HINT_SEEK_REPLY_BAR;
+} */
+
+
+@object GenInteractionClass WMTriggerGroup = {
+    GI_comp = @BackTrigger,
+		    @ContinueTrigger,
+              @RenameTrigger,
+              @DeleteTrigger;
+    GII_visibility = GIV_SUB_GROUP;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenTriggerClass BackTrigger = {
+    GI_visMoniker = 'B', "Back";
+    GI_states = @default & ~GS_ENABLED;
+	 GTI_destination = process;
+	 GTI_actionMsg = MSG_WM_BACK_BLOCK;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@visMoniker WordMatcherContinueTitle = 'M', "More";
+@object GenTriggerClass ContinueTrigger = {
+    GI_visMoniker = list {
+/*                    @MoreMonikerColor,
+                    @MoreMonikerMono,
+                    @MoreMonikerCGA, */
+                    @WordMatcherContinueTitle
+    };
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_WM_CONT_SEARCH;
+    GTI_destination = process;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@visMoniker WordMatcherRenameTitle = 'R', "Rename Word";
+@object GenTriggerClass RenameTrigger = {
+    GI_visMoniker = list {
+/*                    @RenameMonikerColor,
+                    @RenameMonikerMono,
+                    @RenameMonikerCGA, */
+                    @WordMatcherRenameTitle
+    };
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_WM_RENAME;
+    GTI_destination = process;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@visMoniker WordMatcherDeleteTitle = 'D', "Delete Word";
+@object GenTriggerClass DeleteTrigger = {
+    GI_visMoniker = list {
+/*                    @DeleteMonikerColor,
+                    @DeleteMonikerMono,
+                    @DeleteMonikerCGA, */
+                    @WordMatcherDeleteTitle
+    };
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_WM_DELETE;
+    GTI_destination = process;
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+
+@object GenInteractionClass ImpexGroup = {
+    GI_comp =   @ImportTrigger,
+                @ExportTrigger;
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass ImportTrigger = {
+    GI_visMoniker = 'I', "Import";
+	 GTI_actionMsg = MSG_WM_OPEN_IMPORT;
+    GTI_destination = process;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass ExportTrigger = {
+    GI_visMoniker = 'E', "Export";
+    GTI_actionMsg = MSG_WM_OPEN_EXPORT;
+    GTI_destination = process;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+/* -------------------------------------------------------------- */
+@object GenInteractionClass ImportDBox = {
+	 GI_visMoniker = "Import Word List";
+	 GI_comp = @ImpConvGroup, @ImpFileSel, @ImportButton, @ImpCanx;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenItemGroupClass ImpConvGroup = {
+	GI_visMoniker = "Import conversion from:";
+	GI_comp = @ICDOSItem, @ICWinItem, @ICGeosItem;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_CENTER_MONIKER;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_DRAW_IN_BOX;
+}
+@object GenItemClass ICDOSItem = {
+	GI_visMoniker = "DOS Code Page";
+	GII_identifier = CONV_DOS;
+}
+@object GenItemClass ICWinItem = {
+	GI_visMoniker = "Windows";
+	GII_identifier = CONV_WIN;
+}
+@object GenItemClass ICGeosItem = {
+	GI_visMoniker = "Geos";
+	GII_identifier = CONV_GEOS;
+}
+
+@object GenFileSelectorClass ImpFileSel = {
+    GFSI_fileCriteria = FSFC_MASK_CASE_INSENSITIVE |
+				    FSFC_DIRS |
+				    FSFC_NON_GEOS_FILES;
+    GFSI_destination = process;
+    GFSI_notificationMsg = MSG_IMPORT_SELECTOR_ACTION;
+	 ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.TXT"};
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass ImportButton = {
+    GI_visMoniker = "Import";
+	 GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+	 GTI_actionMsg = MSG_WM_IMPORT;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ImpCanx = {
+	 GI_visMoniker = @VMO_CANCEL, "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+/* ---------------------------------------- */
+@object GenInteractionClass ImportProg = {
+	 GI_visMoniker = "Import progress";
+	 GI_comp = @IPRead, @IPCount, @IPButton;
+    GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+@object GenTextClass IPRead = {
+	 GI_visMoniker = "Words read: ";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "0";
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenTextClass IPCount = {
+	 GI_visMoniker = "Words imported: ";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "0";
+	 HINT_TEXT_NO_FRAME;
+}
+
+@visMoniker StopMoniker = "Stop";
+@visMoniker CancelMoniker = "Cancel";
+@visMoniker OKMoniker = "OK";
+@object GenStopTriggerClass IPButton = {
+	 GTI_destination = @IPButton;
+	 GTI_actionMsg = MSG_STOP_IMPORT;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+/* -------------------------------------------------------------- */
+@object GenInteractionClass ExportDBox = {
+	 GI_visMoniker = "Export Word List";
+	 GI_comp = @ExpConvGroup, @ExpNameStuff, @ExpFileSel, @Export, @ExpCanx;
+    GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenItemGroupClass ExpConvGroup = {
+	GI_visMoniker = "Export conversion from:";
+	GI_comp = @ECDOSItem, @ECWinItem, @ECGeosItem;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_CENTER_MONIKER;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_DRAW_IN_BOX;
+}
+@object GenItemClass ECDOSItem = {
+	GI_visMoniker = "DOS Code Page";
+	GII_identifier = CONV_DOS;
+}
+@object GenItemClass ECWinItem = {
+	GI_visMoniker = "Windows";
+	GII_identifier = CONV_WIN;
+}
+@object GenItemClass ECGeosItem = {
+	GI_visMoniker = "Geos";
+	GII_identifier = CONV_GEOS;
+}
+
+@object GenInteractionClass ExpNameStuff = {
+    GI_comp = @ExpFileName, @ExpNameWarn;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass ExpFileName = {
+    GI_visMoniker = "File Name:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (12);
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+    ATTR_GEN_TEXT_MAKE_UPPERCASE;
+    ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @Export;
+    HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 16, 0, 0};
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenGlyphClass ExpNameWarn = {
+    GI_visMoniker = "(DOS file name)";
+    @localize "reminder that export file name must be a DOS name";
+}
+
+@object GenFileSelectorClass ExpFileSel = {
+    GFSI_fileCriteria = FSFC_MASK_CASE_INSENSITIVE |
+				    FSFC_DIRS |
+				    FSFC_NON_GEOS_FILES;
+	 GFSI_attrs = @default | FSA_SHOW_FILES_DISABLED;
+	 ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.TXT"};
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass Export = {
+    GI_visMoniker = "Export";
+	 GI_states = @default &~GS_ENABLED;
+    GTI_destination = process;
+	 GTI_actionMsg = MSG_WM_EXPORT;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ExpCanx = {
+	 GI_visMoniker = @VMO_CANCEL, "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+  /*
+   * WMObjectsHolder is necessary:
+   * 1. It handles MSG_GEN_NAVIGATE_TO_NEXT_FIELD to switch the
+   *    focus to the next file selector.
+   */
+@object GenInteractionClass WMObjectsHolder = {
+    GI_comp = @WMSearchGroup,
+              @WMInstruction,
+              @WMDummyLine,
+              @WMList;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass WMDummyLine = {
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_GLYPH_SEPARATOR;
+}
+@object GenDynamicListClass WMList = {
+    GI_visMoniker = "Words found that match your search:";
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_PLACE_MONIKER_TO_LEFT;
+    HINT_INITIAL_SIZE = {0, SST_LINES_OF_TEXT | 8, 8};
+    GIGI_destination = process;
+  /*  GIGI_applyMsg = MSG_WM_LIST_APPLY; */
+    GDLI_queryMsg = MSG_WM_LIST_MONIKER_QUERY;
+     /*
+      * GDLI_numItems will be set at app-launch time.
+      */
+
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+
+    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+}
+
+@object GenTextClass WMInstruction = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "(Enter a \"?\" for each letter that you don't know.)";
+}
+
+@object GenInteractionClass WMSearchGroup = {
+    GI_comp = @WMSearchText,
+              @SearchTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+
+@visMoniker WordMatcherSearchTitle = "Search";
+@object GenTriggerClass SearchTrigger = {
+/*    GI_visMoniker = list {
+                    @SearchMonikerColor,
+                    @SearchMonikerMono,
+				@SearchMonikerCGA,
+                    @WordMatcherSearchTitle
+    }; */
+    GI_visMoniker = "Search";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_WM_SEARCH_ACTION;
+    GTI_destination = process;
+    HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT = @WMSearchText;
+}
+
+
+@object WordMatcherTextClass WMSearchText = {
+    GI_visMoniker = 'S', "Search for this word:";
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_PLACE_MONIKER_TO_LEFT;
+
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = WM_MAX_SIZE_WORD;
+    GTXI_destination = process;
+    GTXI_applyMsg = MSG_WM_SEARCH_ACTION;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DEFAULT_FOCUS;
+    ATTR_GEN_TEXT_NO_SPACES;
+    ATTR_GEN_TEXT_MAKE_UPPERCASE;
+}
+
+@object GenInteractionClass WMRenameDialog = {
+    GI_visMoniker = "Rename Word in Dictionary";
+    GI_comp = @WMRenameGroup,
+              @WMRenameRenameTrigger, @WMNoRenameTrigger;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL
+                         | GIA_INITIATED_VIA_USER_DO_DIALOG;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+
+@object GenTriggerClass WMRenameRenameTrigger = {
+    GI_visMoniker = "Rename";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+  //  GI_states = @default & ~( GS_ENABLED );
+    GTI_actionMsg = MSG_WM_DO_RENAME;
+    GTI_destination = process;
+
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass WMNoRenameTrigger = {
+@ifdef GPC_ONLY
+    GI_visMoniker = "Don't Rename";
+@endif
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+}
+
+/*
+@object GenInteractionClass WMDeleteDialog = {
+    GI_visMoniker = "Delete Word from Dictionary";
+    GI_comp = @WMRenameGroup,
+              @WMRenameDeleteTrigger, @WMNoDeleteTrigger;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL
+                         | GIA_INITIATED_VIA_USER_DO_DIALOG;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenTriggerClass WMRenameDeleteTrigger = {
+    GI_visMoniker = "Delete";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GI_states = @default & ~( GS_ENABLED );
+    GTI_actionMsg = MSG_WM_DO_RENAME;
+    GTI_destination = process;
+
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass WMNoDeleteTrigger = {
+    GI_visMoniker = "Don't Delete";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+}
+*/
+
+@object GenInteractionClass WMRenameGroup = {
+    GI_comp = @WMRenameInstruction,
+              @WMRenameNewWord;
+    HINT_DRAW_SHADOW;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+}
+
+
+@object GenTextClass WMRenameInstruction = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Please note: editing this word will permanently change it in the Word Matcher dictionary.";
+    HINT_FIXED_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 45 ,
+	0
+    };
+}
+
+@object WordSearchTextClass WMRenameNewWord = {
+    GI_visMoniker = "Dictionary entry";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = WM_MAX_SIZE_WORD;
+    HINT_DEFAULT_FOCUS;
+}
+
+@chunk TCHAR DelWarnString[] = "Are you sure you want to permanently delete the word \"\001\" from the Word Matcher dictionary?";
+
+@chunk TCHAR AddInfoStr[] = "No match is found for the word for which you are searching.  Would you like to add this word to the Word Matcher dictionary?";
+@chunk TCHAR NotFoundInfoStr[] = "No words were found with that search pattern.";
+@chunk TCHAR noFoundInfoStr[] = "No matching word was found for your search";
+@chunk TCHAR ErrStr1[] = "Can't add word - no Word match data file";
+@chunk TCHAR ErrStr2[] = "Can't add word - word is too short";
+@chunk TCHAR ErrStr3[] = "Can't add word - word is too long";
+@chunk TCHAR ErrStr4[] = "Can't add word - couldn't create memory block";
+
+
+@end Interface;
+
+
+/********************************************************************
+ *              Code for WordMatcherProcessClass
+ *******************************************************************/
+
+void ReportError(word error)
+{
+ optr		errOptr[] = {@ErrStr1, @ErrStr2, @ErrStr3, @ErrStr4}; 
+
+
+	UserStandardDialogOptr(0, 0, 0, 0, errOptr[error - 1],
+		( ( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET ) |
+		( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET )) );
+
+}
+
+
+@method WordMatcherProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ Boolean		initError, impex;
+
+
+	 /* see if we use passwords for rename and add... */
+	initError = InitFileReadBoolean("WMatch", "useSpecial", &g_usePword);
+	if (initError) g_usePword = FALSE;
+
+	 if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	@send RenameTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	@send DeleteTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	@send ContinueTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+
+
+	/* see if we enable impex ... */
+	initError = InitFileReadBoolean("WMatch", "impex", &impex);
+	if (initError || !impex)
+		@send ImpexGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	if (impex)
+		@send ImpexGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+
+	 @callsuper();
+
+    @call WordMatcherApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+    FilePushDir();
+
+    FileSetCurrentPath( SP_USER_DATA, "Word Matcher" );
+
+    params.WMPS_file = VMOpen( "WM Words",
+                     VMAF_FORCE_READ_WRITE,
+                     VMO_CREATE, 0 );
+
+    FilePopDir();
+
+} /* MSG_GEN_PROCESS_OPEN_APPLICATION */
+
+/* **************************************************************** */
+@method WordMatcherProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+ word		i;
+
+    VMClose( params.WMPS_file, 0 );
+
+    /* cleanup saved block stuff */
+    if (lastListBlockNum) {
+	  for (i = 0; i < lastListBlockNum; i++) {
+		MemFree(listBlockHan[i]);
+		}
+	  }
+
+    return @callsuper();
+
+} /* MSG_GEN_PROCESS_CLOSE_APPLICATION */
+
+
+/***************************************************************************
+    MSG_WM_LIST_MONIKER_QUERY
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Queries for the moniker for the given item.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-21  GerdB     Initial version.
+
+***************************************************************************/
+@method WordMatcherProcessClass, MSG_WM_LIST_MONIKER_QUERY
+/*  void
+    (
+    optr    list
+    word    item
+    ) */
+{
+    @send WMList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+        item, &wordList[ item ][ 0 ] );
+
+} /* MSG_WM_LIST_MONIKER_QUERY */
+
+
+/***************************************************************************
+    MSG_WM_SEARCH_ACTION
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Handle <CR> in word entry field - do a search.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-21  GerdB     Initial version.
+
+***************************************************************************/
+@method WordMatcherProcessClass, MSG_WM_SEARCH_ACTION
+{
+ word		i, error;
+
+
+    /* init/cleanup saved block stuff */
+    if (lastListBlockNum) {
+	  for (i = 0; i < lastListBlockNum; i++)  {
+		MemFree(listBlockHan[i]);
+		}
+	  }
+    lastListBlockNum = 0;
+    curListBlockNum = 0;
+    atLastBlock = FALSE;
+
+    /*
+     * Get text from text object into buffer
+     */
+    params.WMPS_lengthWord = @call WMSearchText::
+                MSG_VIS_TEXT_GET_ALL_PTR( &params.WMPS_search );
+
+    @send ContinueTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+    @send BackTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+    @send DeleteTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+    @send RenameTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+    @send SearchTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* Make a new search. */
+    if ( WMFindWord( &params, TRUE ) )
+    {
+        /* We found at least one word */
+	   WMFillList();
+
+    }
+    else
+    {
+        /* Test if questionmarks in word. */
+        if ( NULL == strchr( &params.WMPS_search, '?' ) )
+        {
+            /* Ask if word should be added. */
+
+		  if ( IC_YES == UserStandardDialogOptr(
+                    NullOptr, NullOptr, NullOptr, NullOptr,
+                    @AddInfoStr,
+                    ( ( CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET ) |
+                      ( GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET )) ))
+		  {
+		  /* check for pword */
+		  if (g_usePword) {
+				if(!PwdCheckPasswordInINI("WMatch", "special", TRUE, TRUE)) return;
+				}
+
+		  error = WMAddWord( &params );
+		  if (error)
+				ReportError(error);
+		  if (WMFindWord( &params, TRUE ) ) {
+		    WMFillList();
+		}
+            }
+            else {
+		WWClearList();
+	    }
+        }
+        else
+        {
+            /* Inform user about unsecessful search. */
+		 UserStandardDialogOptr(
+			 NullOptr, NullOptr, NullOptr, NullOptr,
+			 @noFoundInfoStr,
+			 ( ( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET ) |
+		 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET )) );
+			  /*
+	    *  Clear the list.
+	    */
+           WWClearList();
+        }
+    }
+} /* MSG_WM_SEARCH_ACTION */
+
+/***************************************************************************
+    MSG_WM_CONT_SEARCH
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Handle press of Continue command button - do a search.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-21  GerdB     Initial version.
+
+***************************************************************************/
+@method WordMatcherProcessClass, MSG_WM_CONT_SEARCH
+{
+ char *		listStart;
+
+
+    if (curListBlockNum < lastListBlockNum - 1) {
+	  curListBlockNum++;
+	  /* dump the block into wordList */
+	  listStart = MemLock(listBlockHan[curListBlockNum]);
+	  memcpy(&wordList[ 0 ][ 0 ], listStart, sizeof(wordList));
+	  MemUnlock(listBlockHan[curListBlockNum]);
+	  @send BackTrigger::MSG_GEN_SET_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+
+	  @send WMList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numListEntries[curListBlockNum]);
+
+	  if (atLastBlock && (curListBlockNum == lastListBlockNum - 1))  {
+	     @send ContinueTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+		}
+
+	  }
+    else {
+	  currentIndex = 0;
+
+	  if ( WMFindWord( &params, FALSE ) )  {
+		/* We found at least one word */
+		WMFillList();
+		curListBlockNum++;
+		@send BackTrigger::MSG_GEN_SET_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+		}
+	  /* to fix the case of the last word found being the last word in the
+	   * block.  This will turn off the More button. */
+	  else {
+		atLastBlock = TRUE;
+		@send ContinueTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+		}
+	  }
+
+} /* MSG_WM_CONT_SEARCH */
+
+/***************************************************************************
+    MSG_WM_BACK_BLOCK
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Handle press of Back button - show prev block.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    01/13/00  jfh       Initial version.
+
+***************************************************************************/
+@method WordMatcherProcessClass, MSG_WM_BACK_BLOCK
+{
+ char * 	listStart;
+
+
+    curListBlockNum--;
+    if (!curListBlockNum)
+	  @send BackTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+    else
+	  @send BackTrigger::MSG_GEN_SET_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+
+    if (curListBlockNum < lastListBlockNum)
+	  @send ContinueTrigger::MSG_GEN_SET_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+    else
+	  @send ContinueTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+
+    /* dump the block into wordList */
+    listStart = MemLock(listBlockHan[curListBlockNum]);
+    memcpy(&wordList[ 0 ][ 0 ], listStart, sizeof(wordList));
+    MemUnlock(listBlockHan[curListBlockNum]);
+
+    @send WMList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numListEntries[curListBlockNum]);
+
+} /* MSG_WM_BACK_BLOCK */
+
+
+void
+WMFillList( void )
+{
+    Boolean     isFound;
+    char *	 listStart;
+
+    /* Start with 1. list element */
+    currentIndex = 0;
+    memcpy( &wordList[ currentIndex ][ 0 ],
+            params.WMPS_found, params.WMPS_lengthWord );
+    wordList[ currentIndex++ ][ params.WMPS_lengthWord ] = 0;
+
+    do {
+        isFound = WMFindWord( &params, FALSE );
+
+        if (!isFound) {
+            break;
+        }
+
+        memcpy( &wordList[ currentIndex ][ 0 ],
+                params.WMPS_found, params.WMPS_lengthWord );
+        wordList[ currentIndex++ ][ params.WMPS_lengthWord ] = 0;
+
+    } while( currentIndex < MAX_LIST_LENGTH );
+
+    if ( isFound ) {
+	   /* Still more words available - MAYBE */
+
+	   /* set the trigger */
+	   @send ContinueTrigger::MSG_GEN_SET_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+	   }
+    else {
+        @send ContinueTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+	   }
+
+    if (currentIndex) {
+	   /* allocate a block... */
+	   listBlockHan[lastListBlockNum] = MemAlloc(
+			 sizeof (wordList),
+			 HF_SWAPABLE,
+			 HAF_ZERO_INIT);
+	   /*and save just created list */
+	   listStart = MemLock(listBlockHan[lastListBlockNum]);
+	   memcpy(listStart, wordList, sizeof(wordList));
+	   MemUnlock(listBlockHan[lastListBlockNum]);
+	   numListEntries[lastListBlockNum] = currentIndex;
+	   lastListBlockNum++;
+	   }
+
+    if (currentIndex < MAX_LIST_LENGTH)  {
+	  atLastBlock = TRUE;
+	  @send ContinueTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+	  }
+
+    @send WMList::MSG_GEN_DYNAMIC_LIST_INITIALIZE( currentIndex );
+
+    /* do this here, not in apply msg - jfh */
+    @send DeleteTrigger::MSG_GEN_SET_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+    @send RenameTrigger::MSG_GEN_SET_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+    @send WMList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    @send WMList::MSG_META_GRAB_FOCUS_EXCL();
+
+} /* WMFillList */
+
+void WWClearList (void)
+{
+    char notFound[] = "( not found )";
+    int len = strlen(notFound);
+
+    /* Start with 1. list element */
+    currentIndex = 0;
+    memcpy( &wordList[ currentIndex ][ 0 ], notFound, len );
+    wordList[ currentIndex++ ][ len ] = 0;
+
+    @send WMList::MSG_GEN_DYNAMIC_LIST_INITIALIZE( currentIndex );
+
+    return;
+   
+}
+
+
+
+
+/***************************************************************************
+    MSG_WM_DELETE
+----------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-21  GerdB     Initial version.
+
+***************************************************************************/
+@method WordMatcherProcessClass, MSG_WM_DELETE
+{
+    WMParamsStruct      deleteParams;
+    word                selection;
+    word                num;
+
+    selection = @call WMList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    if ( GIGS_NONE != selection )
+    {
+	   MemHandle mh;
+        word dialogReturn;
+
+        mh = OptrToHandle( @DelWarnString );
+        MemLock( mh );
+
+        dialogReturn = UserStandardDialog(
+                (char *)0, (char *)0, (char *)0, &wordList[ selection ][ 0 ],
+                LMemDeref( @DelWarnString ),
+                ( ( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET ) |
+                  ( GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET ))
+        );
+        MemUnlock( mh );
+        if ( IC_YES == dialogReturn )
+	   {
+
+		  /* check for pword */
+		  if (g_usePword) {
+				if(!PwdCheckPasswordInINI("WMatch", "special", TRUE, TRUE)) return;
+				}
+
+            deleteParams = params;
+
+            memcpy( deleteParams.WMPS_search, &wordList[ selection ][ 0 ],
+                    deleteParams.WMPS_lengthWord );
+
+            WMDeleteWord( &deleteParams, TRUE ) ;
+
+            /* Delete from Array */
+            if ( selection != currentIndex ) {
+                /* not last element */
+                memcpy( &wordList[ selection ][ 0 ],
+                        &wordList[ selection + 1 ][ 0 ],
+                        (currentIndex-selection) * (WM_MAX_SIZE_WORD+1) );
+            }
+            --currentIndex;
+
+            @call WMList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS( selection, 1 );
+
+            num = @call WMList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+
+            if ( 0 == num )
+            {
+                @send DeleteTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+                @send RenameTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+            }
+
+        }
+    }
+} /* MSG_WM_DELETE */
+
+
+/***************************************************************************
+    MSG_WM_RENAME
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Handle <CR> in word entry field - do a search.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-21  GerdB     Initial version.
+
+***************************************************************************/
+@method WordMatcherProcessClass, MSG_WM_RENAME
+{
+    word                selection;
+
+    selection = @call WMList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    if ( GIGS_NONE != selection )
+    {
+	   @send WMRenameNewWord::MSG_VIS_TEXT_DELETE_ALL();
+	   @send WMRenameNewWord::MSG_VIS_TEXT_SET_MAX_LENGTH( params.WMPS_lengthWord );
+
+	   @send WMRenameNewWord::MSG_VIS_TEXT_APPEND_PTR(
+			 &wordList[ selection ][ 0 ], 0 );
+
+	   @send WMRenameDialog::MSG_GEN_INTERACTION_INITIATE();
+    }
+} /* MSG_WM_RENAME */
+
+/***************************************************************************
+    MSG_WM_DO_RENAME
+----------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-21  GerdB     Initial version.
+
+***************************************************************************/
+@method WordMatcherProcessClass, MSG_WM_DO_RENAME
+{
+    WMParamsStruct      renameParams;
+    word                selection;
+    VMFileHandle        fileHan;
+
+    selection = @call WMList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    if ( GIGS_NONE != selection )
+    {
+		  /* check for pword */
+		  if (g_usePword) {
+				if(!PwdCheckPasswordInINI("WMatch", "special", TRUE, TRUE)) return;
+				}
+
+	   renameParams = params;
+
+	   memcpy( renameParams.WMPS_search, &wordList[ selection ][ 0 ],
+			 renameParams.WMPS_lengthWord );
+
+	/*
+	 *  MSG_VIS_TEXT_GET_ALL_PTR adds a NULL, which may overwrite
+	 *  WMPS_file field, so I save it and restore it afterwards.
+	 */
+	fileHan = renameParams.WMPS_file;
+	   renameParams.WMPS_lengthWord = @call WMRenameNewWord::
+				MSG_VIS_TEXT_GET_ALL_PTR( &renameParams.WMPS_found );
+	renameParams.WMPS_file = fileHan;
+
+	   memcpy( &wordList[ selection ][ 0 ],
+			 renameParams.WMPS_found, renameParams.WMPS_lengthWord );
+
+	    wordList[ selection ][ renameParams.WMPS_lengthWord ] = 0;
+
+	   WMRenameWord( &renameParams, TRUE ) ;
+	   @send WMList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+		  selection, wordList[selection] );
+    }
+} /* MSG_WM_DO_RENAME */
+
+
+
+/***************************************************************************
+    MSG_META_GAINED_FOCUS_EXCL
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    If the SearchPattern tet object gets the focus, select the whole
+    text.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-05-20  GerdB     Initial version.
+
+***************************************************************************/
+/*  void
+    (
+    ) */
+@method WordMatcherTextClass, MSG_META_GAINED_FOCUS_EXCL
+{
+    @callsuper();
+    @send WMSearchText::MSG_VIS_TEXT_SELECT_ALL();
+
+} /* MSG_META_GAINED_FOCUS_EXCL */
+
+
+@method WordMatcherTextClass, MSG_META_TEXT_USER_MODIFIED
+{
+    char *str;
+
+    @callsuper();
+
+    @call self::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    str = LMemDerefHandles(OptrToHandle(oself), @self->GTXI_text);
+
+    if(*str) {
+	@send SearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    } else {
+	@send SearchTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+    return;
+}
+
+/*@method WordSearchTextClass, MSG_META_TEXT_USER_MODIFIED
+{
+    @callsuper();
+    @send WMRenameRenameTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    return;
+}*/
+
+/*@method WordSearchTextClass, MSG_VIS_OPEN
+{
+    @callsuper();
+    @send WMRenameRenameTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    return;
+} */
+
+@method WordSearchTextClass, MSG_META_KBD_CHAR
+{
+dword		length;
+
+
+    if (isalpha((character & 0x00FF)))
+	character = (character & 0xFF00) | toupper((character & 0x00FF));
+
+    /* and make sure lengths are the same */
+    length = @call WMRenameNewWord::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    if (params.WMPS_lengthWord == (word)length)
+	  @send WMRenameRenameTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    else
+       @send WMRenameRenameTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    
+    @callsuper();
+
+    return;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_WM_OPEN_IMPORT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *                  is clicked
+ *
+ *
+ *
+ ***********************************************************************/
+
+@method WordMatcherProcessClass, MSG_WM_OPEN_IMPORT
+{
+DosCodePage	cp;
+
+
+	/* Open in Document */
+	@call ImpFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+	/* see if DOS code page supported */
+	cp = LocalGetCodePage();
+	if (LocalIsCodePageSupported(cp)) {
+		@send ICDOSItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send ImpConvGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+												CONV_DOS, FALSE);
+		}
+	else  {
+		@send ICDOSItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send ImpConvGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+												CONV_WIN, FALSE);
+		}
+
+	@send IPButton::MSG_GEN_USE_VIS_MONIKER(@StopMoniker, VUM_DELAYED_VIA_APP_QUEUE);
+	@send IPButton::MSG_STOP_SET_NOT_STOPPED();
+
+	/* Open the dialog box */
+	@call ImportDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	(GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_IMPORT_SELECTOR_ACTION for GPCBnkrProcessClass
+ *                 (word entryNum, word entryFlags)
+ * DESCRIPTION:
+ *
+ *              checks for dbl click on file to import
+ *              
+ *
+ ***********************************************************************/
+@method WordMatcherProcessClass, MSG_IMPORT_SELECTOR_ACTION
+{
+
+	 /* was it a double click? */
+    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) {
+	  if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)  {
+		@send, forceQueue process::MSG_WM_IMPORT();
+		}
+	  }
+    else  {  /* if not dbl click see if we're on a file */
+	  if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
+		@send ImportButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+	  else
+		@send ImportButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+       }
+
+}
+
+/***************************************************************************
+    MSG_WM_IMPORT
+----------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-05-11  GerdB     Initial version.
+
+***************************************************************************/
+@method WordMatcherProcessClass, MSG_WM_IMPORT
+{
+    FileHandle  file;
+    WMParamsStruct      importParams;
+    int         i;
+    int         size;
+    byte        c;
+    char        inWord[60];
+char		name[FILE_LONGNAME_BUFFER_SIZE];
+char		path[PATH_BUFFER_SIZE];
+dword		selFlags;
+DiskHandle	dh;
+word	sel, error;
+dword			imported = 0;
+dword			read = 0;
+
+
+    /* first get the flags and file name of the selection */
+    selFlags = @call ImpFileSel::
+			 MSG_GEN_FILE_SELECTOR_GET_SELECTION(name);
+
+    /* check to see if it's a file - redundant if dbl clicked */
+    if (GFS_GET_ENTRY_TYPE(selFlags) != GFSET_FILE)  {
+       /* if not just return */
+       return;
+       }
+
+	 /* get the file's path and disk handle */
+	 @call ImpFileSel::MSG_GEN_PATH_GET(path, sizeof(path));
+	 dh = @call ImpFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+	 FilePushDir();
+
+	 /* and set the file dir  - FileSel doesn't do this */
+	 FileSetCurrentPath(dh, path);
+
+	 /* which conversion */
+	 sel = @call ImpConvGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	 /* dismiss the file selector box now */
+	 @send ImportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+	 file = FileOpen( name, (FILE_ACCESS_R | FILE_DENY_RW) );
+	 FilePopDir();
+
+	if ( NullHandle != file ) {
+
+		importParams = params;
+
+
+		/* put up progress box */
+		@call ImportProg::MSG_GEN_INTERACTION_INITIATE();
+
+		/* Handle each line ( == one word). */
+		do {
+			/* Do one word letter by letter. */
+			i = 0;
+			do {
+				size = FileRead( file, &c, 1, 0 );
+
+				if (( 1 != size ) || ( '\r' == c )) {
+					break;
+					}
+				if ( 0x0a == c ) {
+					continue;
+					}
+				inWord[ i ] = c;
+				i++;
+				} while ( TRUE );
+
+			if ( 1 != size ) {
+				break;
+				}
+
+			error = 0;
+			if ( i <= WM_MAX_SIZE_WORD ) {
+				memcpy ( importParams.WMPS_search, inWord, i );
+				importParams.WMPS_lengthWord = i;
+
+				/* This doen't work for all languages, because not all
+						 characters are available in DOS (eg. Danish) */
+				/*	 LocalDosToGeos( &importParams.WMPS_search,
+										  importParams.WMPS_lengthWord, '@' );
+				/* then try this - jfh ... */
+				if (sel == CONV_DOS)
+					LocalDosToGeos( &importParams.WMPS_search,
+										  importParams.WMPS_lengthWord, '@' );
+				if (sel == CONV_WIN) // Windows
+					LocalCodePageToGeos( &importParams.WMPS_search,
+										  importParams.WMPS_lengthWord, CODE_PAGE_LATIN_1, '@' );
+
+				/* Make a new search. */
+				if ( !WMFindWord( &importParams, TRUE ) )  {
+					/* We didn't found the word, so add it. */
+					error = WMAddWord( &importParams );
+					if (!error) {
+						/* inform the user of progress */
+						imported++;
+						UtilHex32ToAscii(name, imported, UHTAF_NULL_TERMINATE);
+						@call IPCount::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+						}
+					}
+				}
+			else { /* end of word too big if */
+				error = WME_TOO_BIG;
+				}
+
+			/* inform the user of progress */
+			read++;
+			UtilHex32ToAscii(name, read, UHTAF_NULL_TERMINATE);
+			@call IPRead::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+
+			if (error)  ReportError(error);
+
+			/* check for stop */
+			if (@call IPButton::MSG_STOP_GET_STOPPED())  break;
+
+			} while ( TRUE );
+
+		FileClose( file, 0 );
+
+		@send IPButton::MSG_STOP_SET_STOPPED();
+		@send IPButton::MSG_GEN_USE_VIS_MONIKER(@OKMoniker, VUM_DELAYED_VIA_APP_QUEUE);
+
+		}  /* end of good words file if */
+
+} /* MSG_WM_IMPORT */
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_STOP_IMPORT for GenStopTriggerClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@method GenStopTriggerClass, MSG_STOP_IMPORT
+{
+
+	if (!pself->GSTI_stop) {
+		pself->GSTI_stop = TRUE;
+		@send IPButton::MSG_GEN_USE_VIS_MONIKER(@CancelMoniker, VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	else {
+		@send ImportProg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_STOP_GET_STOPPED for GenStopTriggerClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@method GenStopTriggerClass, MSG_STOP_GET_STOPPED
+{
+
+	return (pself->GSTI_stop);
+
+}
+
+@method GenStopTriggerClass, MSG_STOP_SET_NOT_STOPPED
+{
+
+	pself->GSTI_stop = FALSE;
+
+}
+
+@method GenStopTriggerClass, MSG_STOP_SET_STOPPED
+{
+
+	pself->GSTI_stop = TRUE;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_WM_OPEN_EXPORT for WordMatcherProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *                  is clicked
+ *
+ *
+ *
+ ***********************************************************************/
+@method WordMatcherProcessClass, MSG_WM_OPEN_EXPORT
+{
+DosCodePage	cp;
+
+
+	 /* start out in Document */
+	 @call ExpFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+	/* see if DOS code page supported */
+	cp = LocalGetCodePage();
+	if (LocalIsCodePageSupported(cp)) {
+		@send ECDOSItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send ExpConvGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+												CONV_DOS, FALSE);
+		}
+	else  {
+		@send ECDOSItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send ExpConvGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+												CONV_WIN, FALSE);
+		}
+
+	 /* set default name */
+	 @call ExpFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR("WMWORDS.TXT", 0);
+
+	 /* Open the dialog box */
+	 @call ExportDBox::MSG_GEN_INTERACTION_INITIATE();
+
+    @send ExpFileName::MSG_META_GRAB_FOCUS_EXCL();
+    @send ExpFileName::MSG_META_GRAB_TARGET_EXCL(); 
+	 @send ExpFileName::MSG_VIS_TEXT_SELECT_RANGE_SMALL(0, 7);
+
+}
+
+/***************************************************************************
+    MSG_WM_EXPORT
+----------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+	 98-05-11  GerdB     Initial version.
+
+***************************************************************************/
+@method WordMatcherProcessClass, MSG_WM_EXPORT
+{
+    FileHandle  file;
+    Boolean     isFound;
+    WMParamsStruct      exportParams;
+    int         i;
+ char			name[13];
+ char			path[PATH_BUFFER_SIZE];
+ DiskHandle	dh;
+word	sel;
+
+
+    /* get the exp file name */
+	 @call ExpFileName::MSG_VIS_TEXT_GET_ALL_PTR(name);
+
+    /* get the file's path and disk handle */
+	 @call ExpFileSel::MSG_GEN_PATH_GET(path, sizeof(path));
+	 dh = @call ExpFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+    /* dismiss the file selector box now */
+    @send ExportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+	 FilePushDir();
+
+	 /* and set the file dir  - FileSel doesn't do this */
+	 FileSetCurrentPath(dh, path);
+
+	 file = FileCreate( name, (FILE_CREATE_TRUNCATE | FCF_NATIVE)
+                                  | (FILE_ACCESS_W | FILE_DENY_RW), 0);
+    FilePopDir();
+
+	 /* which conversion */
+	 sel = @call ExpConvGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	 exportParams = params;
+
+	 /* mark app busy */
+	 @send WordMatcherApp::MSG_GEN_APPLICATION_MARK_BUSY();
+	 for ( i = 0; i <= WM_MAX_SIZE_WORD; ++i )
+    {
+        exportParams.WMPS_search[ i ] = '?';
+        exportParams.WMPS_lengthWord  = i + 1;
+
+        strcat( exportParams.WMPS_search, "?" );
+        ++exportParams.WMPS_lengthWord;
+
+        /* Make a new search. */
+        if ( WMFindWord( &exportParams, TRUE ) )
+        {
+            /* We found at least one word */
+            do {
+
+                /* This doen't work for all languages, because not all
+                   characters are available in DOS (eg. Danish) */
+			 /*		 LocalGeosToDos( &exportParams.WMPS_found,
+										  exportParams.WMPS_lengthWord, '@' );
+
+					 /* then try this - jfh ... */
+					 if (sel == CONV_DOS)
+						LocalGeosToDos( &exportParams.WMPS_search,
+										  exportParams.WMPS_lengthWord, '@' );
+					 if (sel == CONV_WIN)  // Windows
+						LocalGeosToCodePage( &exportParams.WMPS_search,
+										  exportParams.WMPS_lengthWord, CODE_PAGE_LATIN_1, '@' );
+
+					 FileWrite( file, &exportParams.WMPS_found,
+                           exportParams.WMPS_lengthWord, 0 );
+
+                FileWrite( file, "\r", 1, 0 );
+                isFound = WMFindWord( &exportParams, FALSE );
+            } while ( isFound );
+        }
+    }
+
+    FileClose( file, 0 );
+	 /* mark app not busy */
+	 @send WordMatcherApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+} /* MSG_WM_EXPORT */
+
+
+
+
+
+

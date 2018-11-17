@@ -1,0 +1,625 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Streams
+FILE:		strDrInt.def
+
+DECLARER:	Stream Driver
+INTENDED USERS:	Drivers that use streams
+OVERRIDE CONST:	- (should never be implicitly included)
+REQUIRES:	semaphore.def (Semaphore), geos.def (ActionDescriptor)
+
+AUTHOR:		Adam de Boor, Jan  9, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	1/ 9/90		Initial revision
+
+
+DESCRIPTION:
+	Internal definitions for the stream driver and for stream-using drivers
+	that need to manipulate the stream data directly.
+		
+	$Id: strDrInt.def,v 1.1 97/04/04 14:14:48 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__STRDRINT
+
+include	Internal/semInt.def
+include	Internal/streamDr.def
+
+StartDriver	stream
+
+;------------------------------------------------------------------------------
+;		       INTERNAL DATA STRUCTURES
+;------------------------------------------------------------------------------
+;
+; Structure passed to StreamNotify and used internally to deliver notification
+;
+StreamNotifierData union
+    SND_routine	fptr.far		; For SNM_ROUTINE
+    SND_message	optr			; For SNM_MESSAGE
+StreamNotifierData end
+
+StreamNotifier	struct
+    SN_type	StreamNotifyMode
+    SN_ack	byte	0		; Non-zero if acknowledgment still
+					;  pending.
+    SN_data	word			; Method for method notification,
+    					;  additional piece of data (AX) for
+					;  routine notification.
+    SN_dest	StreamNotifierData
+StreamNotifier	ends
+
+;
+; Each side of the stream requires the same data to function, as a stream is
+; symmetrical. This is reflected in the data structures:
+;
+StreamSideData	struct
+    SSD_error	StreamNotifier	<>	; Error event notifier
+    SSD_data	StreamNotifier	<>	; Data event notifier
+    SSD_lastErr	word			; Stored error code
+    SSD_thresh	word			; Buffer threshold
+    SSD_ptr	nptr.byte		; Pointer into the buffer. This is the
+					;  "head" of the circular buffer if
+					;  the data are for the reader, the
+					;  "tail" of the circular buffer if
+					;  the data are for the writer.
+    SSD_sem	Semaphore	<>	; Scheduling semaphore whose value
+    					;  reflects the number of bytes
+					;  available for use by this side of
+					;  the stream, (bytes in the buffer
+					;  for the reader, space in the buffer
+					;  for the writer).
+    SSD_lock	Semaphore	<>	; Mutual-exclusion semaphore to
+					;  guarantee sole-access to this side
+					;  of the stream.
+		
+StreamSideData	ends
+
+;
+; Finally, the full header for the stream buffer block:
+;
+StreamState	record
+    SS_LINGERING:1,		; Someone wants to destroy the stream but is
+				;  waiting for all the data to be read before
+				;  doing so. If this is set, all writes to
+				;  the stream are prohibited.
+    SS_NUKING:1,		; Someone wants to destroy the stream but is
+				;  waiting for everyone to get the f*** out
+				;  before doing so. If this is set, all
+				;  operations on the stream are prohibited.
+    SS_RDATA:1,			; Non-zero if read notification sent during this
+				;  write.
+    SS_WDATA:1,			; Non-zero if write notification sent during
+				;  this read.
+    :4
+StreamState	end
+
+StreamData	struct
+    SD_handle	hptr		; Handle to the block (for destruction
+				;  if nothing else)
+    SD_reader	StreamSideData	<>
+    SD_writer	StreamSideData	<>
+    SD_max	word		; Greatest value for the SSD_ptr
+				;  fields in the StreamSideData
+				;  structures (i.e. bufSize +
+				;  size StreamData)
+    SD_useCount	byte 		; Count of number of threads in the stream
+				;  driver using this thread. 8 bits is probably
+				;  excessive, but what the hell? We want word-
+				;  alignment, so...
+    SD_state	StreamState <>	; State record for closing.
+    SD_closing	hptr	0	; Queue on which thread that is
+				;  destroying the stream will block
+				;  while waiting for all the data
+				;  to be read/all the hosers to leave.
+    SD_unbalanced word 	0	; Count of unbalanced gets/puts for the stream
+				;  so we know if we're to check the stream's
+				;  state or not...
+    SD_data	label	byte	; Start of data buffer
+StreamData	ends
+
+;------------------------------------------------------------------------------
+;			 MACROS AND FUNCTIONS
+;------------------------------------------------------------------------------
+
+STREAM_ACK	=	-1		; Notification must be acknowledged.
+STREAM_NOACK	=	0		; Complementary value to make code
+					;  look nice.
+global	StreamNotify:far
+;	PASS:	ah	= STREAM_ACK if notifier must be acknowledged before
+;			  another notification will be sent out
+;		ds:di	= address of StreamNotifier
+;		cx,dx,bp= data for notification routine
+;	RETURN:	nothing
+;
+
+global	StreamStrategy:far
+;	PASS:	di	= function code
+;	RETURN:	?
+;
+;	This is just a fast way for other drivers to get into the stream
+;	driver w/o having to store a vector pointing to this function...
+;	Avoids call gate in protected mode, etc.
+;
+global	StreamReadDataNotify:far
+global	StreamWriteDataNotify:far
+;	PASS:		es	= segment of stream
+;	RETURN:		nothing
+;	DESTROYED:	ax, di
+;
+;	Sends data notification to the indicated side of the stream.
+
+global	StreamShutdown:far
+;	PASS:		bx	= stream token
+;			ax	= STREAM_DISCARD/STREAM_LINGER
+;	RETURN:		carry set on error:
+;				ax	= STREAM_CLOSING
+;			carry clear if ok:
+;				ax	= destroyed
+;	DESTROYED:	nothing
+;
+;	Revoke access to the stream, waking up anyone blocked, etc., but
+;	leaving the stream in existence. If STREAM_LINGER, does not return
+;	until all data have been read, else data are flushed after access
+;	is revoked.
+;
+
+global	StreamFree:far
+;	PASS:		bx	= stream token
+;	RETURN:		nothing
+;	DESTROYED:	nothing
+;
+;	Frees up the stream.
+;
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StreamPSem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform a P operation on one of the stream's scheduling
+		semaphores, dealing with being woken up while the stream
+		is being destroyed.
+
+PASS:		segment	= segment register pointing to the stream data
+		sem	= offset to the semaphore
+		options	= TRASH_AX_BX if ax and bx may be biffed
+
+RETURN:		carry set if should abort the operation.
+
+PSEUDO CODE/STRATEGY:
+		Only checks for abort needed if actually has to block on the
+		semaphore, as it assumes SD_state has been checked before
+		this macro is invoked.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/10/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StreamPSem	macro	segment, sem, nukeFlags, options
+		local	continue
+		clc
+		lock	dec	segment:sem.Sem_value
+		jns	continue
+if <options> ne <TRASH_AX_BX>
+		push	ax
+		push	bx
+endif
+		mov	ax, segment
+		lea	bx, segment:sem.Sem_queue
+		call	ThreadBlockOnQueue
+if <options> ne <TRASH_AX_BX>
+		pop	bx
+		pop	ax
+endif
+		test	segment:SD_state, nukeFlags
+		jz	continue
+		stc
+continue:
+		endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StreamTimedPSem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform a P operation on one of the stream's semaphores,
+		dealing with being woken up while the stream is being
+		destroyed or with a timeout period.
+
+PASS:		segment	= segment register pointing to the stream data
+		sem	= offset to the semaphore
+		time	= location of timeout value (ticks)
+		options	= TRASH_AX_BX_CX if ax, bx and cx may be biffed
+
+RETURN:		carry set if should abort the operation/timeout reached.
+
+PSEUDO CODE/STRATEGY:
+		Only checks for abort needed if actually has to block on the
+		semaphore, as it assumes SD_state has been checked before
+		this macro is invoked.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/10/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StreamTimedPSem	macro	segment, sem, time, options
+		local	continue
+		clc
+		lock	dec	segment:sem.Sem_value
+		jns	continue
+if <options> ne <TRASH_AX_BX_CX>
+		push	ax
+		push	bx
+		push	cx
+endif
+		mov	ax, segment
+		lea	bx, segment:sem.Sem_queue
+if <time> ne <cx>
+   		mov	cx, time
+endif
+		call	TimerBlockOnTimedQueue
+if <options> ne <TRASH_AX_BX_CX>
+		pop	cx
+		pop	bx
+		pop	ax
+endif
+		jc	continue
+		test	segment:SD_state, mask SS_NUKING
+		jz	continue
+		stc
+continue:
+		endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StreamUseByte
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Adjust the SSD_ptr for one side of a stream.
+
+PASS:		segment	= segment register pointing to StreamData
+		sideData= offset to StreamSideData being manipulated
+		options	= TRASH_AX if ax may be biffed
+
+PSEUDO CODE/STRATEGY:
+	The SSD_ptr fields are bounded by the value in SD_max and the offset
+	of SD_data. The algorithm involved is self-evident.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/ 9/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StreamUseByte	macro	segment, sideData, options
+		local	noWrap
+if <options> ne <TRASH_AX>
+		push	ax
+endif
+		mov	ax, segment:sideData.SSD_ptr
+		inc	ax
+		cmp	ax, segment:SD_max
+		jne	noWrap
+		mov	ax, offset SD_data
+noWrap:
+		mov	segment:sideData.SSD_ptr, ax
+if <options> ne <TRASH_AX>
+		pop	ax
+endif
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StreamUseByteHere
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Similar to StreamUseByte but the SSD_ptr is already in
+		a register.
+
+PASS:		segment	= segment of StreamData
+		sideData= side of stream being updated
+		ptr	= register holding SSD_ptr
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/ 9/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StreamUseByteHere macro	segment, sideData, ptr
+		local	noWrap
+		inc	ptr
+		cmp	ptr, segment:SD_max
+		jne	noWrap
+		mov	ptr, offset SD_data
+noWrap:
+		mov	segment:sideData.SSD_ptr, ptr
+		endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StreamGetByte
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fetch a byte from a stream, blocking if none available.
+		Assumes there's no need to lock the reading side of the
+		stream.
+
+PASS:		segment	= segment register pointing to StreamData
+		dest	= place to store byte (byte register, not bl)
+
+RETURN:		carry set if the stream is being closed and this operation
+		should be aborted.
+
+DESTROYED:	bx, ax
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/ 9/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StreamGetByte	macro	segment, dest
+		local	closing
+		;
+		; Reduce count of bytes available, blocking if none
+		;
+		StreamPSem	segment, SD_reader.SSD_sem, <mask SS_NUKING>, TRASH_AX_BX
+		jc	closing
+		;
+		; Fetch data pointer
+		;
+		mov	bx, segment:SD_reader.SSD_ptr
+		;
+		; Fetch byte for whose benefit this whole thing is.
+		;
+		mov	dest, {byte}segment:[bx]
+		;
+		; Update the data pointer
+		;
+		StreamUseByteHere	segment, SD_reader, bx
+		;
+		; Let any waiting writer know it's got another byte of room,
+		; preserving the byte we just got if it's in either half of ax
+		;
+if (<dest> eq <al>) or (<dest> eq <ah>)
+   		push	ax
+endif
+		VSem	segment, SD_writer.SSD_sem, TRASH_AX_BX
+if (<dest> eq <al>) or (<dest> eq <ah>)
+   		pop	ax
+endif
+		clc
+closing:
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StreamGetByteNB
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fetch a byte from a stream, returning carry set if none
+		available. Assumes there's no need to lock the reading
+		side of the stream.
+
+PASS:		segment	= segment register pointing to StreamData
+		dest	= place to store byte (byte register, not bl)
+		options	= INTS_OFF if interrupts already off and should stay
+			  that way, else interrupts turned (back) on
+
+DESTROYED:	bx, ax
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/ 9/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StreamGetByteNB	macro	segment, dest, options
+		local	done
+		;
+		; Make sure interrupts are off while we do this as our
+		; examination of the semaphore isn't atomic.
+		;
+if (<options> ne <INTS_OFF>) AND (<options> ne <NO_VSEM>)
+		INT_OFF
+endif
+		;
+		; See if there's a byte waiting for us.
+		;
+		mov	bx, segment:SD_reader.SSD_sem.Sem_value
+		dec	bx
+		stc			; assume empty
+		jl	done		; empty -- return carry set
+		;
+		; Account for byte we're removing.
+		;
+		mov	segment:SD_reader.SSD_sem.Sem_value, bx
+		;
+		; Fetch data pointer and the byte we want.
+		;
+		mov	bx, segment:SD_reader.SSD_ptr
+		mov	dest, {byte}segment:[bx]
+		;
+		; Update the data pointer.
+		;
+		StreamUseByteHere	segment, SD_reader, bx
+		;
+		; Alert any pending writer, preserving ax if either half of
+		; it holds the byte we just fetched so laboriously
+		;
+if <options> ne <NO_VSEM>
+    if (<dest> eq <al>) or (<dest> eq <ah>)
+   		push	ax
+    endif
+		VSem	segment, SD_writer.SSD_sem, TRASH_AX_BX
+    if (<dest> eq <al>) or (<dest> eq <ah>)
+   		pop	ax
+    endif
+else
+	;
+	; Flag stream as being out of whack for a bit.
+	;
+		inc	segment:[SD_unbalanced]
+endif
+		clc			; make sure it's clear...
+done:
+if (<options> ne <INTS_OFF>) AND (<options> ne <NO_VSEM>)
+		INT_ON
+endif
+		endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StreamPutByte
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Write a byte to a stream, blocking if no space available
+		Assumes there's no need to lock the writing side of the
+		stream.
+
+PASS:		segment	= segment register pointing to StreamData
+		source	= place from which to get byte (byte register, not bl)
+
+RETURN:		carry set if stream is being closed and this operation should
+		be aborted.
+
+DESTROYED:	bx, ax
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/ 9/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StreamPutByte	macro	segment, source
+		local	closing
+		;
+		; Make sure source byte isn't trashed while we see if there's
+		; room for it, blocking if the answer is no.
+		;
+if (<source> eq <al>) or (<source> eq <ah>)
+   		push	ax
+endif
+		StreamPSem	segment, SD_writer.SSD_sem, <mask SS_NUKING or mask SS_LINGERING>, TRASH_AX_BX
+if (<source> eq <al>) or (<source> eq <ah>)
+   		pop	ax
+endif
+		jc	closing
+		;
+		; Fetch the data pointer and store the byte we're writing.
+		;
+		mov	bx, segment:SD_writer.SSD_ptr
+		mov	{byte}segment:[bx], source
+		;
+		; Update the data pointer to account for the byte.
+		;
+		StreamUseByteHere	segment, SD_writer, bx
+		;
+		; Let any blocked reader know of the treat awaiting it.
+		;
+		VSem	segment, SD_reader.SSD_sem, TRASH_AX_BX
+		clc
+closing:
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StreamPutByteNB
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Write a byte to a stream, returning carry set if no room
+		available. Assumes there's no need to lock the writing side
+		of the stream.
+
+PASS:		segment	= segment register pointing to StreamData
+		source	= place from which to get byte (byte register, not bl)
+		options	= INTS_OFF if interrupts already off and should stay
+			  that way, else interrupts turned (back) on
+			  NO_VSEM to not do the VSem
+
+DESTROYED:	bx, ax
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/ 9/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StreamPutByteNB	macro	segment, source, options
+		local	done
+		;
+		; Interrupts must be off here as our examination of the
+		; semaphore isn't exactly atomic.
+		;
+if (<options> ne <INTS_OFF>) AND (<options> ne <NO_VSEM>)
+		INT_OFF
+endif
+		mov	bx, segment:SD_writer.SSD_sem.Sem_value
+		stc			; assume no room (not affected by dec)
+		dec	bx
+		jl	done		; => no room 
+		;
+		; Account for the byte we're writing.
+		;
+		mov	segment:SD_writer.SSD_sem.Sem_value, bx
+		;
+		; Fetch the data pointer and store the byte, updating
+		; the data pointer to account for it.
+		;
+		mov	bx, segment:SD_writer.SSD_ptr
+		mov	{byte}segment:[bx], source
+		StreamUseByteHere	segment, SD_writer, bx
+		;
+		; Alert any blocked reader to the morsel coming its way
+		;
+if <options> ne <NO_VSEM>
+		VSem	segment, SD_reader.SSD_sem, TRASH_AX_BX
+else
+		inc	segment:[SD_unbalanced]
+endif
+		clc			; make sure it's clear...
+done:
+if (<options> ne <INTS_OFF>) AND (<options> ne <NO_VSEM>)
+		INT_ON
+endif
+		endm
+
+EndDriver	stream

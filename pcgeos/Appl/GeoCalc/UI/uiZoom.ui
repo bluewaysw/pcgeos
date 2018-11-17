@@ -1,0 +1,133 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1990 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  
+ * FILE:	  uiZoom.ui
+ *
+ * AUTHOR:  	  Gene Anderson: Feb  7, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	2/ 7/91	  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	UI description for View menu
+ *
+ * 	$Id: uiZoom.ui,v 1.1 97/04/04 15:48:38 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/****************************************************************************
+ *	View Menu
+ ***************************************************************************/
+
+start Interface;
+
+#if _VIEW_CTRL
+ViewMenu = GenInteraction {
+	visibility = popup;
+	children =
+		GCViewControl,
+#if _SPLIT_VIEWS
+		GCSplitViewGroup,
+#endif
+		GCEditBarControl;
+	hints = {
+		ATTR_GEN_INTERACTION_GROUP_TYPE { 
+			GenInteractionGroupType GIGT_VIEW_MENU 
+		}
+	}
+}
+#endif
+
+GCEditBarControl = GeoCalcSSEditBarControl {
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP
+	}
+}
+
+end Interface;
+
+start MenuUI;
+
+#if _VIEW_CTRL
+GCViewControl = GenViewControl {
+	hints = {
+		HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		     GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		     UIIL_INTRODUCTORY,
+		     GVC_SUGGESTED_INTRODUCTORY_FEATURES and \
+			not (mask GVCF_MAIN_SCALE_TO_FIT or \
+						mask GVCF_SCALE_TO_FIT)>,
+		    <GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		     UIIL_BEGINNING,
+		     (GVC_SUGGESTED_BEGINNING_FEATURES and \
+			not (mask GVCF_MAIN_SCALE_TO_FIT or \
+						mask GVCF_SCALE_TO_FIT)) \
+				or mask GVCF_REDRAW>,
+		    <GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		     UIIL_INTERMEDIATE,
+		     (GVC_DEFAULT_FEATURES and \
+			not (mask GVCF_MAIN_SCALE_TO_FIT or \
+						mask GVCF_SCALE_TO_FIT)) \
+				or mask GVCF_REDRAW>,
+#ifdef GPC_ONLY
+		    <GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+		     UIIL_INTRODUCTORY,
+		     GVC_DEFAULT_TOOLBOX_FEATURES>
+#else
+		    <GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+		     UIIL_BEGINNING,
+		     (GVC_DEFAULT_TOOLBOX_FEATURES and \
+			not mask GVCTF_SCALE_TO_FIT) or mask GVCTF_REDRAW>
+#endif
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+			word (mask GVCTF_SCALE_TO_FIT)
+		}
+	}
+}
+#endif
+
+#if _SPLIT_VIEWS
+GCSplitViewGroup = GenInteraction {
+	children = LockTrigger, UnlockTrigger;
+}
+
+LockTrigger = GenTrigger vardataReloc {
+#ifdef GPC
+	moniker = 'F',"Freeze Rows / Columns";
+#else
+	moniker = 'L',"Lock Rows / Columns";
+#endif
+	action = MSG_GEOCALC_DOCUMENT_SPLIT_VIEWS, "TO_APP_TARGET";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD GeoCalcDocumentClass
+		}
+	}
+}
+
+
+
+UnlockTrigger = GenTrigger vardataReloc {
+#ifdef GPC
+	moniker = 'U', "Unfreeze Rows / Columns";
+#else
+	moniker = 'U', "Unlock Rows / Columns";
+#endif
+	action = MSG_GEOCALC_DOCUMENT_UNSPLIT_VIEWS, "TO_APP_TARGET";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD GeoCalcDocumentClass
+		}
+	}
+}
+
+#endif
+
+end MenuUI;

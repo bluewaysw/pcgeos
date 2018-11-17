@@ -1,0 +1,315 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks 1996 -- All Rights Reserved.
+ *
+ * PROJECT:	GEOS Sample Applications
+ * MODULE:	Paragraph/Character Attributes
+ * FILE:	paraattr.goc
+ *
+ * AUTHOR:	Ed Ballot: April 12, 1996
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      4/12/96         Initial version
+ *
+ * DESCRIPTION:
+ *      This application illustrates how to set up multiple paragraph
+ *      and character attributes in a text object and add new paragraph
+ *      attributes to a selected paragraph using MSG_VIS_TEXT_SET_PARA_ATTR.
+ *      (In this example, the left hand margin of the paragraph is
+ *      indented by 0.5 centimeters. This is done in the method
+ *      MSG_PARA_PROCESS_INDENT.)
+ *
+ *      In Geos, the basic text of a text object resides in one
+ *      chunk (except for VisLargeTextClass, which can store text
+ *      in multiple chunks) and the attributes for that text are
+ *      store in seperate ChunkArrays called "element arrays".
+ *      There are several element arrays, the two most
+ *      commonly used are character attributes (bold, italic, underline,
+ *      etc) and paragraph attributes (margins, line spacing, etc.).
+ *      (To see all the attributes you can modify, look at the
+ *      VisTextCharAttr and VisTextParaAttr structures in
+ *      Include\Objects\Text\tCommon.h.) Another array, the "run array"
+ *      links the text to the attributes defined in the element array.
+ *      The run array simply tells the text object which element in the
+ *      element array to apply to a given span (run) of text.
+ *
+ *      The CharAttr element array is easy to set up because the
+ *      elements are fixed size (sizeof(VisTextCharAttr)). A macro
+ *      (CHAR_ATTR_ELEMENT_ARRAY_HEADER) has been set up to easily
+ *      define the CharAttr element array.
+ *
+ *      The ParaAttr element array is less easy to set up because its
+ *      elements are variable sized (VisTextParaAttr + array containing
+ *      up to 25 Tab structures). To statically set up a ParaAttr
+ *      element chunk array, you need to define a structure that mimics
+ *      the header information in a chunk array plus the initial elements
+ *      in the chunk array. In this case, that is done with
+ *      ParaAttrElementArray structure, which defines the standard header
+ *      information for a text's element array plus the first element in
+ *      the array (element1).
+ *
+ *      Usually, a controller (e.g., TextStyleControlClass) is used to
+ *      allow the user to modify text attributes. In some cases, the
+ *      application may want to set attributes itself. This sample
+ *      application shows how to modify the paragraph attributes of a
+ *      text object using MSG_VIS_TEXT_SET_PARA_ATTR. This message gives
+ *      you full access to the VisTextParaAttr structure (but requires
+ *      that you fill in the entire structure). There are several
+ *      messages that allow you to modify specific attributes without
+ *      having to deal with the entire VisTextParaAttr structure.
+ *      Examples of these messages are:
+ *              MSG_VIS_TEXT_SET_LEFT_AND_PARA_MARGIN
+ *              MSG_VIS_TEXT_SET_LEFT_MARGIN
+ *              MSG_VIS_TEXT_SET_LINE_SPACING
+ *              (see vTextC.goh for complete list of messages)
+ *
+ * NOTE:
+ *      You may have to change the Include/Objects/Text/tCommon.h
+ *      file. It had a bug in it in which it referred to L_ENGLISH.
+ *      This should be SL_ENGLISH instead.
+ *
+ * RCS STAMP:
+ *	$Id: paraattr.goc,v 1.1 97/04/04 16:41:34 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include Files
+ *******************************************************************/
+    @include <stdapp.goh>
+
+/********************************************************************
+ *		Data Types
+ *******************************************************************/
+      /*
+       * Paragraph attribute elements. So far, just one. But more
+       * will be added dynamically via MSG_PARA_PROCESS_INDENT.
+       */
+    typedef struct {
+        TextElementArrayHeader header;
+        word		elementOffset;
+        VisTextParaAttr element1;
+    } ParaAttrElementArray;
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    @class ParaProcessClass, GenProcessClass;
+    @message void MSG_PARA_PROCESS_INDENT();
+    @endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    @classdecl ParaProcessClass, neverSaved;
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass ParaApp = {
+    GI_visMoniker = list { @ParaTextMoniker };
+    GI_comp = @ParaPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @ParaPrimary;
+}
+
+@visMoniker ParaTextMoniker = "ParaAttr Sample";
+
+@end AppResource;
+
+/********************************************************************
+ *		Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass ParaPrimary  = {
+    GI_comp = @ParaText,
+              @ParaTrigger;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+  /*
+   * Text object with multiple ParaAttrs and CharAttrs.
+   */
+@object GenTextClass ParaText = {
+    GI_attrs = @default | GA_TARGETABLE;
+    GTXI_text = "line 1 is here \rline 2 is here.";
+    GTXI_attrs = @default & ~GTA_USE_TAB_FOR_NAVIGATION;
+    ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS = @ParaCharAttrRuns;
+    ATTR_GEN_TEXT_MULTIPLE_PARA_ATTR_RUNS = @ParaParaAttrRuns;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+  /*
+   * Define character attribute elements (VisTextCharAttr struct).
+   * So far, just one element is defined (using URW_SANS @ 14 points).
+   */
+@CHAR_ATTR_ELEMENT_ARRAY_HEADER ParaCharAttrElements = {
+    CHAR_ATTR_FONT_SIZE( FID_DTC_URW_SANS, 14 )
+};
+
+  /*
+   * Character attribute runs. Use TRAE_ALL to define the entire
+   * run (span of text) as element 0 (URW_SANS, 14)
+   */
+@RUN_ARRAY_HEADER(ParaCharAttrElements) ParaCharAttrRuns = {
+    TRAE_ALL( 0 ),
+    TRAE_END
+};
+
+  /*
+   * Note that we have to set up a specialized ChunkArray, so it
+   * must be defined as a @chunk, but in reality contains the
+   * structure of a ChunkArray. The reason for this is that
+   * the ParaAttr element is variable sized, but statically
+   * declared chunk arrays must have fixed size elements (unless
+   * we cheat and define the header like I am doing).
+   *
+   * TextElementArrayHeader is defined in Include\Objects\vTextC.goh
+   */
+@chunk ParaAttrElementArray ParaParaAttrElements = {
+    { { { 1,                               /* CAH_count */
+          0,                               /* CAH_elementSize */
+          0,                               /* CAH_curOffset */
+          sizeof( TextElementArrayHeader ) /* CAH_offset */
+        },
+        EA_FREE_LIST_TERMINATOR /* EAH_freePtr */
+      },
+      TAT_PARA_ATTRS, /* TEAH_arrayType */
+      0               /* TEAH_unused */
+    },
+
+     /*
+      * elementOffset is the offset to the first VisTextParaAttr
+      * element in this chunk. Looking at ParaAttrElementArray struct
+      * you can see that element1 is offset by the size of the
+      * TextElementArrayHeader plus a word.
+      */
+    sizeof( TextElementArrayHeader ) + sizeof( word ), /*elementOffset*/
+
+     /*
+      * Macros for defining VisTextParaAttr structures can be found
+      * in Include\Objects\Text\tCommon.h
+      */
+    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA( 1, 0, J_LEFT, 0, 0, 0 )
+};
+
+
+  /*
+   * Paragraph attribute runs. One that spans all text (TRAE_ALL).
+   */
+@RUN_ARRAY_HEADER(ParaParaAttrElements) ParaParaAttrRuns = {
+    TRAE_ALL( 0 ),
+    TRAE_END
+};
+
+
+@object GenTriggerClass ParaTrigger = {
+    GI_visMoniker = "Indent";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_PARA_PROCESS_INDENT;
+}
+
+@end Interface;
+
+/********************************************************************
+ *		Code for ParaProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *		MSG_PARA_PROCESS_INDENT
+ ********************************************************************
+ * SYNOPSIS:	 Add paragraph attrs to selected text.
+ * PARAMETERS:	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:	 Get the paragraph attributes of the currently
+ *	         selected text, increment the left margin and
+ *               para margin setting by half a centimeter, and
+ *               set the new paragraph attribute.
+ *
+ *               Note that the entire paragraph will get these
+ *               settings, not just the selected text.
+ *
+ *               Note that para margin is the indention given to
+ *               the first line of a paragraph. In our case, we
+ *               want para and left margins the same, so we
+ *               increment them both.
+ *
+ *               Note that you can change any of the VisTextParaAttr
+ *               elements. In this example, only the margines are
+ *               modified. (To see what paragraph attributes you can
+ *               set, see VisTextParaAttr which is defined in
+ *               Include\Objects\Text\tCommon.h)
+ *
+ *               Final note, in this example, we could have used
+ *               MSG_VIS_TEXT_SET_LEFT_AND_PARA_MARGIN to accomplish
+ *               our task more easily, but that would defeat the
+ *               illustration of using MSG_VIS_TEXT_SET_PARA_ATTR.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EB	4/12/96		Initial version
+ ***********************************************************************/
+@method ParaProcessClass, MSG_PARA_PROCESS_INDENT
+{
+      /*
+       * range - Range of the selected text in the text object.
+       * flags - Paragraph attribute flags (not used here, only for
+       *         demonstration purposes).
+       * diffs - Structure containing information about different
+       *         attributes among multiple paragraphs.
+       * attrs - The paragraph attributes for the selected text.
+       */
+    VisTextRange         range;
+    VisTextGetAttrFlags  flags;
+    VisTextParaAttrDiffs diffs;
+    VisTextMaxParaAttr   attrs;
+
+      /*
+       * Initialize local variables.
+       * Get selected text to add paragraph attributes to.
+       */
+    flags = 0;
+    @call ParaText::MSG_VIS_TEXT_GET_SELECTION_RANGE( &range );
+
+      /*
+       * All we want to do is indent by 0.5 cm, so get current attrs
+       * of the selected range (this includes the current indentation).
+       * Ignore the "suspicious pointer conversion" warning.
+       */
+    @call ParaText::MSG_VIS_TEXT_GET_PARA_ATTR( flags,
+                                                &diffs,
+                                                &attrs,
+                                                range.VTR_end,
+                                                range.VTR_start );
+
+      /*
+       * Now add 0.5 cm (= 114 pts) left indention.
+       */
+    attrs.VTMPA_paraAttr.VTPA_leftMargin += 114;
+    attrs.VTMPA_paraAttr.VTPA_paraMargin += 114;
+
+      /*
+       * If the user wants to be funny and indent too much,
+       * then we'll catch him/her and "wrap" the indent back to zero.
+       */
+    if ( attrs.VTMPA_paraAttr.VTPA_leftMargin > VIS_TEXT_MAX_PARA_WIDTH ) {
+        attrs.VTMPA_paraAttr.VTPA_leftMargin = 0;
+        attrs.VTMPA_paraAttr.VTPA_paraMargin = 0;
+    }
+    @call ParaText::MSG_VIS_TEXT_SET_PARA_ATTR( &attrs.VTMPA_paraAttr,
+                                                range.VTR_end,
+                                                range.VTR_start );
+} /* MSG_PARA_PROCESS_INDENT */
+

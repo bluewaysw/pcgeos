@@ -1,0 +1,279 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994 -- All Rights Reserved
+ *
+ * PROJECT:	  PC/GEOS
+ * MODULE:	  Sokoban
+ * FILE:	  editor.ui
+ *
+ * AUTHOR:  	  Eric Weber, Feb  3, 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EW	2/ 3/94   	Initial version
+ *
+ * DESCRIPTION:
+ *	
+ *
+ *
+ * 	$Id: sokobanEditor.ui,v 1.1 97/04/04 15:13:07 newdeal Exp $
+ *
+ ***********************************************************************/
+
+class EditContent = VisContent {
+	dirty = byteComp : 0;
+}
+
+start Interface;
+
+/* main menu for editor */
+LevelMenu = GenInteraction {
+	moniker = 'L',"Level";
+	children = ReturnTrigger, CreateDialog, EditDialog;
+	visibility = popup;
+}
+
+/* just pop up the editor */
+ReturnTrigger = GenTrigger {
+	moniker = 'R',"Return to editor";
+	action	= MSG_GEN_INTERACTION_INITIATE, EditorDialog;
+	genStates = default -enabled;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+	}
+}
+
+/* dialog box for creating a new screen */
+CreateDialog = GenInteraction {
+	moniker = 'C',"Create External Level";
+	children = YSizeValue, XSizeValue, CreateOKTrigger;
+	visibility = dialog;
+	type = command;
+	attributes = modal;
+	hints = {
+		HINT_RIGHT_JUSTIFY_CHILDREN,
+	}
+}
+
+CreateOKTrigger = GenTrigger {
+	moniker = "OK";
+	action = MSG_SOKOBAN_CREATE_LEVEL, process;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}
+}
+
+/* dialog for choosing an existing screen to edit */
+EditDialog = GenInteraction {
+	moniker = 'E',"Edit External Level";
+	visibility = dialog;
+	type = command;
+	attributes = modal;
+	children = EditLevel, EditOKTrigger;
+}
+
+EditLevel = GenValue {
+	moniker = "Level:";
+	minimum = 1;
+	maximum = 999;
+	value = 1;
+}
+
+EditOKTrigger = GenTrigger {
+	moniker = "OK";
+	action = MSG_SOKOBAN_EDIT_LEVEL, process;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}
+}
+
+YSizeValue = GenValue {
+	moniker = "rows";
+	minimum = 1;
+	maximum = MAX_ROWS;
+	value = 1;
+}
+
+XSizeValue = GenValue {
+	moniker = "columns";
+	minimum = 1;
+	maximum = MAX_COLUMNS;
+	value = 1;
+}
+
+/* dialog box for editing a screen */
+EditorDialog = GenInteraction {
+	moniker = "Screen Editor";
+	children = EditorControls, EditorView, EditorSave, EditorResize, EditorResizeDialog;
+	attributes = default +notUserInitiatable;
+	visibility = dialog;
+	type = command;
+	hints = {
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+	}
+}
+
+EditorControls = GenInteraction {
+	children = EditorTools, EditorLevel;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+	}
+}
+
+EditorView = GenView {
+	output = EditorContent;
+/*	viewAttributes = default +sendAllKbdChars; */
+	horizAttributes = default +noLargerThanContent, +noSmallerThanContent;
+	vertAttributes = default +noLargerThanContent, +noSmallerThanContent;
+}
+
+
+EditorSave = GenTrigger {
+	moniker = "Save";
+	action = MSG_EDIT_CONTENT_SAVE_LEVEL, EditorContent;
+	genStates = default -enabled;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+	}
+}
+
+EditorResize = GenTrigger {
+	moniker = "Resize";
+	action = MSG_EDIT_CONTENT_INITIATE_RESIZE, EditorContent;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+	}
+}
+
+
+EditorTools = GenItemGroup {
+	children = GrassTool, WallTool, GroundTool, SafeTool, 
+		   PlayerTool, BagTool;
+	behaviorType = exclusive;
+	selection = SST_WALL;
+	destination = EditorContent;
+	applyMsg = MSG_EDIT_CONTENT_SELECT_TOOL;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_TOOLBOX,
+	}
+}
+
+EditorLevel = GenValue {
+	moniker = "Level:";
+	minimum = 1;
+	maximum = 999;
+	value = 1;
+	destination = EditorContent;
+	applyMsg = MSG_EDIT_CONTENT_LEVEL_CHANGED;
+}
+
+/* these are also defined in sokoban.def */
+#define VGA_BITMAP_WIDTH	16
+#define VGA_BITMAP_HEIGHT	16
+#define CGA_BITMAP_WIDTH	16
+#define CGA_BITMAP_HEIGHT	8
+
+
+#define BUTTON(name,id,vgamkr,monomkr,cgamkr) \
+name = GenItem { \
+	moniker = list { \
+		name##_VGA, \
+		name##_Mono, \
+		name##_CGA \
+	} \
+	identifier = id; \
+} \
+ \
+visMoniker name##_VGA = { \
+	size = standard; \
+	color = color4; \
+	aspectRatio = normal; \
+	cachedSize = VGA_BITMAP_WIDTH, VGA_BITMAP_HEIGHT; \
+	gstring { \
+		GSBeginString | \
+		GSDrawBitmapOptr 0, 0,  vgamkr | \
+		GSEndString \
+	} \
+} \
+ \
+visMoniker name##_Mono = { \
+	size = standard; \
+	color = gray1; \
+	aspectRatio = normal; \
+	cachedSize = VGA_BITMAP_WIDTH, VGA_BITMAP_HEIGHT; \
+	gstring { \
+		GSBeginString | \
+		GSDrawBitmapOptr 0, 0, monomkr | \
+		GSEndString \
+	} \
+} \
+ \
+visMoniker name##_CGA = { \
+	size = standard; \
+	color = gray1; \
+	aspectRatio = verySquished; \
+	cachedSize = CGA_BITMAP_WIDTH, CGA_BITMAP_HEIGHT; \
+	gstring { \
+		GSBeginString | \
+		GSDrawBitmapOptr 0, 0,  cgamkr | \
+		GSEndString \
+	} \
+} \
+
+
+BUTTON(GrassTool, SST_GRASS, vgaGrassBitmap, vgaGrassBitmap, cgaGrassBitmap)
+BUTTON(WallTool, SST_WALL, wallBitmap, wallBitmap, cgaWallBitmap)
+BUTTON(GroundTool, SST_GROUND, vgaGroundBitmap,monoGroundBitmap,cgaWallBitmap)
+BUTTON(SafeTool, SST_SAFE, vgaSafeBitmap, monoSafeBitmap, cgaSafeBitmap)
+BUTTON(PlayerTool, SST_PLAYER, vl1, ml1, cgaPlayerBitmap)
+BUTTON(BagTool, SST_BAG, vgaPacketBitmap, monoPacketBitmap, cgaPacketBitmap)
+
+EditorResizeDialog = GenInteraction {
+	moniker = "Resize Level";
+	visibility = dialog;
+	attributes = notUserInitiatable, modal;
+	children = EditorResizeRowsValue, EditorResizeColumnsValue, EditorResizeOKTrigger;
+	type = properties;
+	hints = {
+		HINT_INTERACTION_SINGLE_USAGE,
+	}
+}
+
+EditorResizeRowsValue = GenValue {
+	moniker = "rows";
+	minimum = 1;
+	maximum = MAX_ROWS;
+}
+
+EditorResizeColumnsValue = GenValue {
+	moniker = "columns";
+	minimum = 1;
+	maximum = MAX_COLUMNS;
+}
+
+EditorResizeOKTrigger = GenTrigger {
+	action = MSG_EDIT_CONTENT_RESIZE_LEVEL, EditorContent;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY },
+	}
+}
+
+end Interface;
+
+start EditorInterface;
+
+EditorContent = EditContent {
+	view = EditorView;
+	visCompGeoAttrs = default +customManageChildren;
+}
+
+
+end EditorInterface;
+
+

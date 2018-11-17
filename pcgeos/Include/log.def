@@ -1,0 +1,216 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Logging facility
+FILE:		log.def
+
+AUTHOR:		Eric Weber, May 24, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EW	5/24/95   	Initial revision
+
+
+DESCRIPTION:
+	Log utility API
+		
+	$Id: log.def,v 1.1 97/04/04 14:26:49 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __LOG
+
+StartLibrary log
+
+MAX_LOG_MODULE_NAME_LENGTH	equ	32
+
+;
+; identifier of a module user can control logging for
+;
+LogModuleID	etype	word,	0, 2
+LMI_EMAIL		enum	LogModuleID
+LMI_SOCKET		enum	LogModuleID
+LMI_TCP			enum	LogModuleID
+LMI_PPP			enum	LogModuleID
+LMI_WWW			enum	LogModuleID
+LMI_MAIL_EDITOR		enum	LogModuleID
+LMI_MAIL_VIEWER		enum	LogModuleID
+LMI_RBUS		enum	LogModuleID
+LMI_SCM			enum	LogModuleID
+LMI_TEST_MANAGER	enum	LogModuleID
+LMI_TCP_ECHO		enum	LogModuleID
+LMI_TEST_SCRIPT		enum	LogModuleID
+LMI_SMS			enum	LogModuleID
+LMI_SMS_RECV		enum	LogModuleID
+LMI_SMS_EDIT		enum	LogModuleID
+LMI_B_CARD		enum	LogModuleID
+LMI_SMSEND		enum	LogModuleID
+				; when adding things here, add them to
+				; log.h, and to Library/Foam/Log/logStrings.ui
+
+;
+; severity of a log event
+;
+; LEL_NONE is never used to describe an event, only to select events
+;
+LogEventLevel	etype	byte,	0, 1
+	LEL_NONE	enum	LogEventLevel
+	LEL_INFO	enum	LogEventLevel
+	LEL_WARNING	enum	LogEventLevel
+	LEL_ERROR	enum	LogEventLevel
+	LEL_FATAL	enum	LogEventLevel
+
+
+;
+; extended description of an event
+;
+LogMaskHigh	record
+	LMH_level	LogEventLevel:3		
+	LMH_counter	:1			; this is counter info
+	LMH_custom	:12
+LogMaskHigh	end
+
+LogEventMask	struct
+	LEM_low		word		; low 16 bits of custom mask
+	LEM_high	LogMaskHigh
+LogEventMask	ends
+
+;
+; information about an event to be logged
+;
+LogEventParams		struct
+	LEP_module	LogModuleID
+	LEP_mask	LogEventMask
+	LEP_event	fptr.char
+	LEP_string1	fptr.char
+	LEP_string2	fptr.char
+LogEventParams		ends
+
+;
+; destination of log events
+;
+LogOutputType		record
+	LOT_FILE:1
+	LOT_SERIAL:1
+	:6
+LogOutputType		end
+
+
+LogEvent	equ	LOGEVENT
+;
+; Add an event record to the log
+;
+; Pass:		(on stack) LogEventParams
+; Return:	args popped
+; Destroyed:	nothing
+;
+; string1 and string2 are substituted for ^A and ^B in LEP_event
+; the strings can be discarded when LogEvent returns
+;
+; The event will be logged if the level passed to LogEvent is not
+; LEL_none and equals or exceeds the level in the mask set by
+; LogSetModuleMask.  The event will also be logged if the custom
+; masks supplied to LogEvent and LogSetModuleMask have any common
+; set bits.
+
+global	IncrementCounters:far
+global	DecrementCounters:far
+global	ZeroCounters:far
+;
+; Increment/Decrement/Zero some of the counters for this module.
+;
+; Pass:		dxax	- mask of counters to increment/decrement/zero
+;		bx	- LogModuleID
+;
+; Return:	nothing
+; Destroyed:	nothing
+;
+; Each module has access to 32 unsigned 32-bit counters.  At regular
+; intervals, all of the counters for a module will be converted to
+; hex and passed to LogEvent with a mask of LMH_counter.  Hence,
+; they will be logged if and only if the LMH_counter bit is set in
+; the module mask, irregardless of the LogEventLevel of the mask.
+;
+; Increment and Decrement will not change the counter value if 
+; doing so would cause it to go below zero or above maxint.
+
+
+global	LogSetOutput:far
+;
+; Direct the output of the log utility
+;
+; Pass:		al	= LogOutputType (0 to disable logging)
+;		bx	= SerialPortNum (if LOT_SERIAL is set)
+;		ds:dx	= filename relative to SP_PRIVATE_DATA (if LOT_FILE)
+;
+; Return:	carry	= set if any output could not be opened
+;		bx	= mask of sucessfully opened outputs
+;
+
+global	LogGetModuleName:far
+;
+; Get the name of an app
+;
+; Pass:		es:di	= buffer of for module name
+;			  should be MAX_APP_NAME_LENGTH chars long
+;		bx	= LogModuleID
+;
+; Return:	es:di	= filled in with null-terminated module name
+;		cx	= size of name, without null
+;
+
+global	LogGetModuleMask:far
+;
+; Get the currently enabled logging for a module
+;
+; Pass:		bx	= LogModuleID
+; Return:	dxax	= LogEventMask
+;
+; See LogEvent for an explanation of how the mask is used
+;
+
+global	LogSetModuleMask:far
+;
+; Set the currently enabled logging for a module
+;
+; Pass:		bx	= LogModuleID
+;		dxax	= LogEventMask
+;
+; Return:	nothing
+;
+; See LogEvent for an explanation of how the mask is used
+;
+
+global	LogGetLevelName:far
+;
+; Get the name of an event level
+;
+; Pass:		es:di	= buffer of for module name
+;			  should be MAX_APP_NAME_LENGTH chars long
+;		bx	= LogEventLevel
+;
+; Return:	es:di	= filled in with null-terminated module name
+;		cx	= size of name, without null
+;
+
+;
+; C Stubs
+;
+global	LOGEVENT:far
+global	INCREMENTCOUNTERS:far
+global	DECREMENTCOUNTERS:far
+global	ZEROCOUNTERS:far
+global	LOGSETOUTPUT:far
+global	LOGGETMODULENAME:far
+global	LOGGETMODULEMASK:far
+global	LOGSETMODULEMASK:far
+global	LOGGETLEVELNAME:far
+
+EndLibrary log

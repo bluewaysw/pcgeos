@@ -1,0 +1,399 @@
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <Ansi/ctype.h>
+#include "impdefs.h"
+#include "warnings.h"
+#include "rtfinput.h"
+#include "import.h"
+#include "groups.h"
+#include "control.h"
+#include "text.h"
+#include "global.h"
+
+/*********************************************************/
+/********************* CONTROL TABLE *********************/
+/*********************************************************/
+
+@include "control.tbl"
+
+#if _DO_HELP
+extern Boolean bLastCharWasPound;
+extern Boolean boolHyperLinksEnabled;
+extern optr Text;
+#endif
+
+Boolean ControlLookup(char *pLabel, ControlTableEntry *pResult)
+    {
+    int i;
+    ControlTableEntry *pEntry = &ControlTable[0];
+/*  pResult = NULL; */
+
+    for (i = 0; i < ARRAY_LEN(ControlTable, ControlTableEntry); i++, pEntry++)
+        if (!strcmp(pLabel, pEntry->CTE_label))
+            break;
+    if (i < ARRAY_LEN(ControlTable, ControlTableEntry))
+        {
+        memcpy (pResult, pEntry, sizeof(ControlTableEntry));
+        return TRUE;
+        }
+    else
+        return FALSE;
+    }
+
+static long int ControlGetParam(char *pc)
+    {
+    char c = *pc;
+    Boolean bNegative = FALSE;
+    long int param = 0;
+
+    if (c == '-')
+        {
+        bNegative = TRUE;
+        c = InputGet();
+        }
+    while (c != EOF && isdigit(c))
+        {
+        param *= 10;
+        param += (c - '0');
+        c = InputGet();
+        }
+    if (bNegative)
+        param = -param;
+    *pc = c;
+    return param;
+    }
+
+Boolean ControlGet(char *control, long int *param, Boolean *pbHasParam)
+    {
+    char c;
+    byte len;
+
+    /* Read in chars until we hit EOF or a non-alphanumeric. */
+    control[0] = '\0';
+    len = 0;
+    c = InputGet();
+    while (c != EOF && isalpha(c) && len < CONTROL_MAX_LENGTH)
+        {
+        control[len++] = c;
+        c = InputGet();
+        }
+    control[len] = '\0';
+
+    /* Case: Unexpected end of file! */
+    if (c == EOF)
+        return FALSE;
+
+    /* Case: Control symbol, only read this one char. */
+    else if (len == 0)
+        {
+        control[0] = c;
+        control[1] = '\0';
+        }
+
+    /* Case: Numeric parameter follows control word. */
+    else
+        {
+        if (isdigit(c) || c == '-')
+            {
+            *param = ControlGetParam(&c);
+            if (c == EOF)
+                return FALSE;
+            *pbHasParam = TRUE;
+            }
+        else
+            *pbHasParam = FALSE;
+
+    /* Prevent input from forgetting terminating char, unless it was a /*
+    /* space. Those we can forget. This doesn't apply to control symbol! */
+        if (c != ' ')
+            InputUnGet(c);
+        }
+    return TRUE;
+    }
+
+/*  This function locates the first zero bit in nMask and generates a new
+    mask to cover it.  If nMask was a mask for only one bit, it should
+    match the new mask, and TRUE is returned. */
+/*  Unfortunately, it's only good for one bit, and we may need to reset two
+    bits simultaneously. So much for that idea.. But here it stands, as a
+    testament to the author's ruthless ingenuity. :) */
+/*
+static Boolean IsSingleBitMask(word nMask)
+    {
+    int i;
+    word temp = nMask;
+
+    for (i = 0; i < 16; i++, temp >>= 1)    // shift to right each step
+        if (!(temp & 1))                    // Is the first bit a zero?
+            break;
+    if (i < 16)                             // Found a zero bit
+        if (~(1 << i) == nMask)             // Check match
+            return TRUE;
+    return FALSE;
+    }
+*/
+
+/* This function converts a WWFixedAsDWord into various fixed-type values. */
+dword ConvertParameter(WWFixedAsDWord fParam, ControlDestType eType)
+    {
+    dword nData = 0;
+
+    switch (eType)
+        {
+        case CDT_BYTEFLAG:
+        case CDT_WORDFLAG:
+            /* A value doesn't map to a flag! */
+            EC_WARNING(RTF_WARNING_VALUE_DOESNT_CONVERT_TO_FLAG);
+            break;
+        case CDT_BYTENUM:
+            nData = ((short int)IntegerOf(fParam)) & 0xFF;
+            break;
+        case CDT_WORDNUM:
+            nData = (short int)IntegerOf(fParam);
+            break;
+        case CDT_BBFIXED:
+            nData = (BBFixedAsWord)((dword)fParam >> 8);
+            break;
+        case CDT_133:
+            nData = (word)((dword)fParam >> 13);
+            break;
+        case CDT_WBFIXED:
+            nData = (dword)fParam >> 8;
+            break;
+        case CDT_WWFIXED:
+        case CDT_DWORD:
+            nData = (dword)fParam;
+            break;
+        default:
+            /* Unknown DestType! */
+            EC_WARNING(RTF_WARNING_UNKNOWN_CONTROL_DEST_TYPE);
+        }
+    return nData;
+    }
+
+int GetDestTypeLen(ControlDestType eType)
+    {
+    switch (eType)
+        {
+        case CDT_DWORD:
+            return sizeof(dword);
+        case CDT_BYTEFLAG:
+        case CDT_BYTENUM:
+            return sizeof(byte);
+        case CDT_WORDFLAG:
+        case CDT_WORDNUM:
+        case CDT_BBFIXED:
+        case CDT_133:
+            return sizeof(word);
+        case CDT_WBFIXED:
+            return sizeof(WBFixed);
+        case CDT_WWFIXED:
+            return sizeof(WWFixed);
+        }
+    return 0;
+    }
+
+byte *GetFieldPointer(ControlType eType)
+    {
+    byte *pField = NULL;
+
+    switch (eType)
+        {
+        case CT_CPROP:      pField = GetGroupCharAttrs(); break;
+        case CT_PPROP:      pField = GetGroupParaAttrs(); break;
+        case CT_TABPROP:    pField = GetGroupWorkTab(); break;
+        case CT_DEFCPROP:   pField = &DefaultCharAttrs; break;
+        case CT_DEFPPROP:   pField = &DefaultParaAttrs; break;
+        case CT_DEFDOCPROP: pField = &DefaultDocAttrs; break;
+        }
+    return pField;
+    }
+
+void UnlockField(ControlType eType)
+	{
+	switch (eType)
+        {
+        case CT_CPROP:
+        case CT_PPROP:
+        case CT_TABPROP:
+       		GroupsUnlock();
+       		break;
+        case CT_DEFCPROP:
+        case CT_DEFPPROP:
+        case CT_DEFDOCPROP:
+        	break;
+        }
+	}
+
+void ControlApplyProperty(ControlType eType, ControlTableEntry *pEntry, long int iParam, Boolean bHasParam)
+    {
+    Boolean bUseParam = TRUE;
+    ControlSourceType eSrcType = CSDT_GET_SRC(pEntry->CTE_SDType);
+    ControlDestType eDestType = CSDT_GET_DEST(pEntry->CTE_SDType);
+    byte *pField = GetFieldPointer(eType);
+    byte nDestLen = GetDestTypeLen(eDestType);
+    dword nData = 0;
+#if _DO_HELP
+    word nInfo = pEntry->CTE_extra;
+#else
+    word nInfo = pEntry->CTE_extra & ~CONTROL_GEOS_HELP;
+#endif
+    WWFixedAsDWord fParam = MakeWWFixed(iParam);
+
+    /* If there's a function, execute it. */
+    if (pEntry->CTE_pfFunc)
+        bUseParam = ProcCallFixedOrMovable_cdecl (pEntry->CTE_pfFunc,
+          eType, pEntry, &fParam, bHasParam);
+
+    /* If it returns a parameter, or if there was no function: */
+    if (bUseParam && pField != NULL)
+        {
+        /* Read the data from the field, and modify it. */
+        pField += pEntry->CTE_offset;
+        memcpy (&nData, pField, nDestLen);
+        switch (eSrcType)
+            {
+            /* For CST_VALUE, copy param verbatim into dest */
+            case CST_VALUE:
+                nData = ConvertParameter(fParam, eDestType);
+                break;
+            /* For CST_FLAG.., use nInfo to set/reset dest */
+            case CST_FLAGSET:
+                /* nInfo contains bit(s) to set. */
+                nData |= nInfo;
+                break;
+            case CST_FLAGRESET:
+                /* nInfo contains bit(s) to reset. */
+                nData &= ~nInfo;
+                break;
+            case CST_FLAGMASK:
+                /* fParam contains the mask, nInfo the bits. */
+                nData = (nData & ~fParam) | nInfo;
+                break;
+            /* For CST_TOGGLE, use param and nInfo to set/reset dest */
+            /* nInfo contains bit(s) to set/reset. */
+            case CST_TOGGLE:
+                if (!bHasParam || fParam != 0)
+                    nData |= nInfo;
+                else
+                    nData &= ~nInfo;
+            }
+        /* Write out the new data. */
+        memcpy(pField, &nData, nDestLen);
+        if (eType == CT_CPROP)
+            SetGroupCharAttrsDirty();
+        else if (eType == CT_PPROP)
+            SetGroupParaAttrsDirty();
+        }
+    UnlockField(eType);
+    }
+
+void ControlParse(void)
+    {
+    char control[CONTROL_MAX_LENGTH + 1];
+    long int param = 0;
+    Boolean bHasParam = FALSE;
+    ControlTableEntry entry;
+    Boolean bCanSkip = FALSE;
+
+    /* Get the control word or symbol. */
+    if (!ControlGet(control, &param, &bHasParam))
+        return;
+    /* Check to see if we got the special "\*" control. */
+    if (control[0] == '*' && control[1] == '\0')
+        {
+        /* Make sure another control follows. */
+        char c = InputGet();
+        if (c != '\\')
+            {
+            /* No control. Forget we ever saw it. */
+            InputUnGet(c);
+            return;
+            }
+        else
+            {
+            /* If we don't recognize the next destination, skip it! */
+            if (!ControlGet(control, &param, &bHasParam))
+                return;
+            bCanSkip = TRUE;
+            }
+        }
+    /* Lookup the control. */
+    if (ControlLookup(control, &entry))
+        {
+	HandleControls(entry, param, bHasParam);        
+        }
+    else
+        /* Didn't find it.. can we skip a destination? */
+        if (bCanSkip)
+            /* Sure, just set reader to skip mode. */
+            SetDestMode (DM_SKIP);
+    }
+
+void HandleControls(ControlTableEntry entry, long int param,
+		    Boolean bHasParam) {
+    /* We found it! */
+    TextBufferDump();
+    switch (entry.CTE_type)
+    {
+    case CT_DEST:
+	HandleDestControl(entry);
+	break;
+    case CT_CHAR:
+	if (GetDestMode() != DM_SKIP)
+	    TextBufferAddChar ((char)entry.CTE_extra);	    
+	
+	break;
+    case CT_CPROP:
+    case CT_PPROP:
+    case CT_TABPROP:
+    case CT_DEFCPROP:
+    case CT_DEFPPROP:
+    case CT_DEFDOCPROP:
+	if (GetDestMode() != DM_SKIP) {
+	    ControlApplyProperty (entry.CTE_type, &entry, param, bHasParam);
+	}
+	break;
+    case CT_OTHER:
+	/* We DM_SKIP these ONLY if CTE_offset isn't set to DM_SKIP. */
+	if (GetDestMode() != DM_SKIP || (DestMode)entry.CTE_offset == DM_SKIP)
+	{
+	    if (entry.CTE_pfFunc)
+	    {
+		WWFixedAsDWord fTemp;
+		/* Nasty hack: \bin needs all 32 bits of the parameter. :( */
+		if (CSDT_GET_SRC(entry.CTE_SDType) == CST_LONGINT)
+		    fTemp = (WWFixedAsDWord)param;    /* never mind the types */
+		else
+		    fTemp = MakeWWFixed(param);
+		
+		ProcCallFixedOrMovable_cdecl (entry.CTE_pfFunc,
+					      entry.CTE_type, &entry, &fTemp, bHasParam);
+	    }
+	    else
+		/* It's CT_OTHER, what's the func? */
+		EC_WARNING(RTF_WARNING_CONTROL_NEEDS_FUNCTION_POINTER);
+	}
+	break;
+    default:
+	/* Unknown control type */
+	EC_WARNING(RTF_WARNING_UNKNOWN_CONTROL_TYPE);
+	break;
+    }
+}
+
+void HandleDestControl(ControlTableEntry entry)
+{
+    if (GetGroup() == (GroupType)CSDT_GET_DEST(entry.CTE_SDType)
+	&& GetDestMode() != DM_SKIP)
+    {
+	if ((DestMode)entry.CTE_offset == DM_SKIP)
+	    SetDestMode (DM_SKIP);
+	else
+	{
+	    SetGroup ((GroupType)CSDT_GET_SRC(entry.CTE_SDType));
+	    SetDestination ((DestinationType)entry.CTE_extra);
+	    SetDestMode ((DestMode)entry.CTE_offset);
+	}
+    }
+}

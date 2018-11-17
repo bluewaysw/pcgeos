@@ -1,0 +1,1559 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Objects
+FILE:		gAppC.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	3/92		Initial version
+
+DESCRIPTION:
+	Object definitions for GenApplicationClass.   
+
+	$Id: gAppC.def,v 1.1 97/04/04 14:17:40 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__GAPPC
+
+StartLibrary	ui
+
+include ui.def
+include Objects/gProcC.def
+
+GenApplicationClass	class GenClass
+
+;----------------------------------------------------------------------------
+;	Methods
+;----------------------------------------------------------------------------
+
+MSG_GEN_APPLICATION_MARK_BUSY				message
+.assert (MSG_GEN_APPLICATION_MARK_BUSY eq FIRST_GEN_APP_GCN_LIST_TYPE)
+MSG_GEN_APPLICATION_MARK_NOT_BUSY			message
+;
+; MSG_GEN_APPLICATION_MARK_BUSY is called by gadgets which are
+; marked with GA_INITIATES_BUSY_STATE, as well as by the
+; application should it wish the ptr to be displayed as
+; busy for this application.  While "Busy", the UI will continue to operate
+; for the application.  If the application may not continue, then
+; MSG_GEN_APPLICATION_HOLD_UP_INPUT or MSG_GEN_APPLICATION_IGNORE_INPUT should be called.
+; The application object keeps a count of how many times this has been called.
+; When MSG_GEN_APPLICATION_MARK_NOT_BUSY has been called enough times to  bring
+; the balance to 0, the cursor image is restored, if the application
+; is otherwise not busy.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+
+MSG_GEN_APPLICATION_HOLD_UP_INPUT			message
+MSG_GEN_APPLICATION_RESUME_INPUT			message
+;
+; MSG_GEN_APPLICATION_HOLD_UP_INPUT causes the UI to hold up all button & kbd
+; information for this application.  The held up data will be allowed to
+; flow on after a balanced number of calls to MSG_GEN_APPLICATION_RESUME_INPUT.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_APPLICATION_IGNORE_INPUT			message
+MSG_GEN_APPLICATION_ACCEPT_INPUT			message
+;
+; Calling GEN_IGNORE_INPUT will cause all input bound for this
+; application to be destroyed, i.e. not delivered to the application.
+; Use ONLY as a last resort for solving synchronization problems between 
+; UI, user & application.  An equal number of calls to GEN_ACCEPT_INPUT will
+; straighten this situation out, restoring input to the application.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+
+MSG_GEN_APPLICATION_QUERY_UI					message
+;
+; MSG_GEN_GUP_QUERY_UI is used to determine which UI should be used
+; at a given point in the generic tree, for a certain type of object.
+;
+; Pass:		nothing
+; Return:	carry - set
+;		ax - handle of UI
+;		cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_GET_STATE				message
+;
+; Fetches current application state
+;
+; Pass:		nothing
+; Return:	carry - set
+;		ax - ApplicationStates
+;		cx, dx, bp - unchanged
+;
+
+MSG_GEN_APPLICATION_FIND_MONIKER			message
+;
+; Finds the specified moniker in the GenApplication's VisMonikerList,
+; and optionally copies it to a remote ObjectBlock.
+;
+; Pass:	 	bp	- VisMonikerSearchFlags (see visClass.asm)
+;			  flags indicating what type of moniker to find
+;			  in the VisMonikerList, and what to do with
+;			  the Moniker when it is found.
+;		cx	- handle of destination block (if bp contains
+;			  VMSF_COPY_CHUNK command)
+;		dh	- DisplayType to use for search
+; Return:	^lcx:dx	- VisMoniker (cx = nil if none)
+;		bp - unchanged
+;		ax - destroyed
+;
+
+MSG_GEN_APPLICATION_SET_TASK_ENTRY_MONIKER		message
+;
+; Change the moniker which is used in the GenField's Task List.
+; Update the menu visually if currently displayed.
+;
+; Pass:		^lcx:dx = VisMoniker or VisMonikerList to use.
+;			(single moniker will be copied to destination block)
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME			message
+;
+; Fetches current application display scheme
+;
+; Pass:		nothing
+; Return:	Display scheme structure in ax,cx,dx,bp:
+;		al - DS_colorScheme	;(not to be used by applications)
+;		ah - DS_displayType
+;		cl - DS_lightColor
+;		ch - DS_darkColor
+;		dx - DS_fontID
+;		bp - DS_pointSize
+;		carry	- set
+;
+
+MSG_GEN_APPLICATION_SET_APP_MODE_MESSAGE		message
+;
+; Stores a method # into GAI_appMode.  Generally, this
+; message indicates the current mode of the application.  Should the
+; application be shutdown & restored, this method will be sent to the
+; process to restore the state to this mode.
+;
+; Pass:		cx - method # to store -- Currently, either
+;		     MSG_GEN_PROCESS_OPEN_APPLICATION or 
+;		     MSG_GEN_PROCESS_OPEN_ENGINE
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_GET_APP_MODE_MESSAGE		message
+;
+; Fetches method # stored in GAI_appMode.  Currently either:
+;			MSG_GEN_PROCESS_OPEN_APPLICATION or 
+;			MSG_GEN_PROCESS_OPEN_ENGINE
+;
+; Pass:		nothing
+; Return:	cx - method
+;		ax, dx, bp - destroyed
+;
+
+;MSG_META_ATTACH	message	(defined elsewhere, usage declared here)
+;
+; Pass:	 	dx - AppLaunchBlock
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_APPLICATION_GET_APP_INSTANCE_REFERENCE		message
+;
+; Pass:		nothing
+; Return:	dx - block handle of structure AppInstanceReference
+;		ax, cx, bp - destroyed
+
+MSG_GEN_APPLICATION_SET_APP_INSTANCE_REFERENCE		message
+;
+; Pass:		dx - block handle of structure AppInstanceReference
+; Return:	nothing (frees block)
+;		ax, cx, dx, bp - destroyed
+;		
+
+MSG_GEN_APPLICATION_SEND_APP_INSTANCE_REFERENCE_TO_FIELD	message
+;
+; Sends its AppInstanceReference off to the parent field.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_INITIATE_UI_QUIT			message
+;
+; Starts the "send MSG_QUITs to everything on the active list" 
+; procedure
+;
+; Pass:	 	nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_INSTALL_TOKEN			message
+;
+; Pass:		nothing
+; Return:	nothing - application's token and moniker list installed
+;				into token database
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_APPLICATION_TOGGLE_CURSOR			message
+;
+; Toggle the cursor for a text object.
+; data which should not be saved to a state file.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_APPLICATION_GET_LAUNCH_FLAGS			message
+;
+; Fetches launch flags
+;
+; Pass:		nothing
+; Return:	al	- AppLaunchFlags
+;		ah, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_SET_APP_LEVEL			message
+;
+; Set the UIInterfaceLevel for the application (used by hints stored
+; with controllers)
+;
+; Pass:		cx - level
+; Return:	ax, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_GET_APP_FEATURES			message
+;
+; Fetches a word of feature bits stored with the application (used by hints
+; stored with controllers)
+;
+; Pass:		nothing
+; Return:	ax - features
+;		dx - UIInterfaceLevel for the app
+;		cx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_SET_APP_FEATURES			message
+;
+; Stores a word of feature bits with the application.  This is turn generates
+; a MSG_GEN_APPLICATION_UPDATE_APP_FEATURES for the application to subclass
+;
+; Pass:		cx - features
+; Return:	ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_DETACH_PENDING			message	; internal
+;
+; Sent to specific UI to notify it of this application being
+; detached.  Used to abort any app-modal dialogs put up with UserDoDialog,
+; so that the application process will be able to detach.  (Prevents new
+; app modal dialogs from coming up under UserDoDialog as well)
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_APPLICATION_BUILD_STANDARD_DIALOG		message
+;
+; Build a standard dialog box, add it below the application object, & 
+; set it USABLE.  When done with the dialog, it should be destroyed by
+; first sending it MSG_GEN_REMOVE(VUM_NOW), then MSG_META_BLOCK_FREE.
+;
+; Pass:		dx - size StandardDialogParams
+;		ss:bp - StandardDialogParams
+; Return:
+;		cx:dx - summons, or NULL if unable to create
+;		bp - CustomDialogBoxFlags
+;		ax - destroyed
+;
+
+MSG_GEN_APPLICATION_UNUSED				message
+
+MSG_GEN_APPLICATION_DO_STANDARD_DIALOG			message
+;
+; Execute a standard dialog box.  The message call returns immediately.
+; When the dialog box goes away, the message GADDP_message is sent to
+; GADDP_finishOD with cx = InteractionCommand or other response if
+; GADDP_dialog.SDP_type = SDBF_CUSTOM and GADDP_dialog.SDP_customFlags.
+; CDBF_INTERACTION_TYPE = GIT_MULTIPLE_RESPONSE.
+; The dialog box is automatically removed from the screen and from
+; memory.  Only one dialog box at a time can be displayed.
+;
+; Pass:		dx - size GenAppDoDialogParams
+;		ss:bp - GenAppDoDialogParams
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+; passed to GADDP_finishOD:
+;		cx - InteractionCommand of response trigger in standard dialog
+;
+GenAppDoDialogParams	struct
+    GADDP_dialog	StandardDialogParams
+    GADDP_finishOD	optr			;OD to send method to
+    GADDP_message	word			;message to send
+GenAppDoDialogParams	ends
+
+		
+MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY		message
+MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY	message
+;
+; Forces "Busy" cursor over application, regardless of other states.  Should
+; be used whenever the UI thread of an app is churning away on something, so
+; that it is impossible for the user to get such basic feedback as ptr image
+; changes, button depression, etc.  If the UI thread is free, or relatively
+; free to work, but the Process is busy, or in the middle of some operation
+; for which "busy" feedback is desired, use MSG_GEN_APPLICATION_MARK_BUSY instead.
+; Created first for Prominade, where the app takes awhile to build out the
+; modal windows on screen, & is not yet prepared for the user to interact
+; with anything.  As with standard BUSY methods, a busy "count" is kept
+; to allow nested calling pairs.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_APPLICATION_OPEN_COMPLETE			message	; internal
+;
+; This method sent to the app itself on completion of opening (setting itself
+; usable).  This is sent via the queue, as many windows open in this fashion.
+; The idea is that when this comes in, the app is up.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_APPLICATION_SET_NOT_USER_INTERACTABLE		message
+MSG_GEN_APPLICATION_SET_USER_INTERACTABLE		message
+;
+; Methods to set/clear AS_NOT_USER_INTERACTABLE bit.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_APPLICATION_SET_ATTACHED_TO_STATE_FILE		message
+;
+; Sets a bit in the application state saying it is attached to a
+; state file.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_APPLICATION_SET_NOT_ATTACHED_TO_STATE_FILE	message
+;
+; Clears the bit in the app state saying it is attached to a state file.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_APPLICATION_SET_NOT_QUITTING			message
+;
+; Clears the bit in the app state saying the user is quitting it.
+;
+; Pass:		nothing
+; Return:	ax, cx, dx, bp - unchanged
+; 
+
+MSG_GEN_APPLICATION_NOTIFY_MODAL_WIN_CHANGE	message
+;
+; Is called on application object by UI whenever it should check to see if there
+; is a change in modal status.  Current behavior is to look for top sys
+; modal window owned by app, then top app modal window within app's layer.
+;
+; Pass: 	Nothing
+; Return:	nothing
+; 		ax, cx, dx, bp - destroyed
+;
+
+;----------------------------------------
+;	Localization stuff
+;----------------------------------------
+
+AppMeasurementType	etype	byte
+AMT_US			enum	AppMeasurementType, MEASURE_US
+AMT_METRIC		enum	AppMeasurementType, MEASURE_METRIC
+AMT_DEFAULT		enum	AppMeasurementType, 0xff ;Use system default
+
+MSG_GEN_APPLICATION_GET_MEASUREMENT_TYPE	message
+;
+; Set the measurement type for the application
+;
+; Pass:		none
+; Return:	al - MeasurementType (either metric or US)
+;		ah - AppMeasurementType (in application)
+;		cx, dx, bp - unchanged
+
+MSG_GEN_APPLICATION_SET_MEASUREMENT_TYPE	message
+;
+; Set the measurement type for the application
+;
+; Pass:	 	cl - AppMeasurementType
+; Return:	nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+
+MSG_GEN_APPLICATION_TEST_FOR_CANCEL_MNEMONIC	message
+;
+; Called by the generic UI to get the appropriate cancel mnemonic for this
+; application.  This is not handled by the generic UI, it is subclassed by
+; by the specific UI.
+;
+; Pass:		cx = character value
+;		dl = CharFlags
+;		dh = ShiftState
+;		bp low = ToggleState
+;		bp high = scan code
+; Return:	
+;		carry set if match found
+;		ax = destroyed
+;		cx, dx, bp = preserved
+;
+
+MSG_GEN_APPLICATION_INK_QUERY_REPLY	message
+;
+;	This is a message sent to an application object in reply to a
+;	MSG_META_QUERY_IF_PRESS_IS_INK. It takes the same params as
+;	MSG_FLOW_INK_REPLY.
+;
+;	Pass: cx - InkReturnValue
+;	      bp - InkDestinationInfo (or 0 if none)
+;	Return: nothing
+;	Destroyed: ax, cx, dx, bp
+;
+
+MSG_GEN_APPLICATION_GCN_LIST_SEND_INTERNAL	message	private
+;
+; INTERNAL message only.  GenApplication uses this to implement the
+; GCNLSF_IGNORE_IF_STATUS_TRANSITIONING option of GCNListSendFlags, as
+; passed in MSG_META_GCN_LIST_SEND.
+;
+; Context:	UI Controller Update mechanism
+; Source:	GenApplication internal code ONLY
+;		Originated by self, but sent via encapsulation first to
+;		self, then to Process, until finally back to self, as a
+;		way of flushing queues to see if GCNList is "idle" or not.
+; Dest:		Self
+; Interception:	Should NOT be intercepted by anything other than 
+;		GenApplication internal code.
+; Pass:		cx	- statusCount of GCNList at time of
+;			  MSG_META_GCN_LIST_SEND
+;		dx	- size GCNListMessageParams
+;		ss:bp	- ptr to GCNListMessageParams
+;		
+; Return:	Nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_APPLICATION_GET_GCN_LIST_OF_LISTS	message
+;
+; Fetches GenApplication GCN List of Lists chunk.  May then be used within
+; kernel primitives such as GCNListAddToBlock, GCNListRemoveFromBlock,
+; GCNListSendToBlock, ChunkArrayEnum, or to perform operations on individual
+; lists after calling GCNListFindListInBlock (such as ChunkArrayEnum on an
+; individual list).
+; 
+; Context:	Part of App GCNList mechanism
+; Source:	Anywhere, though generally should be a source run by the same
+;		thread as the object being called to be useful, as only such
+;		sources would be able to legally access this chunk using the
+;		Kernel primitive GCNList functions.
+; Dest:		Any GenApplication object
+; Pass:		Nothing
+; Return:	ax	- GCNList of lists chunk, or zero if doesn't exist
+;		cx, dx, bp - destroyed
+
+GenApplicationMessages = GenApplicationMessages + 1
+;MSG_META_ENSURE_ACTIVE_FT		message
+;
+; Behavior as implemented in GenApplicationClass:
+;
+; Checks to make sure that something within the app has the Focus & Target
+; exclusives.  Called from within the UI, usually on the closure of a window,
+; to give the Focus and/or Target to the next best location.
+; Typical click-to-type model is implemented using the following rules:
+;
+;	For Target, the priority order is:
+;		1) Anything already having the exclusive
+;		2) Top targetable PRIO_STD priority level window
+;		3) Top targetable PRIO_COMMAND priority level window
+;
+;	For Focus, priority goes to:
+;		1) Anything already having the exclusive
+;		2) Top system modal window
+;		3) Top application modal window
+;		4) Last non-modal window to have or request the exclusive
+;		5) Window having Target exclusive
+;		6) Top focusable PRIO_STD priority level window
+;		7) Top focusable PRIO_COMMAND priority level window
+;
+; Pass: 	Nothing
+; Return:	nothing
+; 		ax, cx, dx, bp - destroyed
+;
+;
+
+MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION	message
+;
+; Context:	Part of visibility notification mechanism
+; Source:	Sent by the specific UI part of an object when the object
+;		becomes visible and not visible
+; Dest:		Any GenApplication object
+;
+; Pass:
+;	cx:dx - data (by default this is the optr of the object)
+;	bp - non-zero if open, zero if close
+; Return:
+;	none
+
+MSG_GEN_APPLICATION_BRING_WINDOW_TO_TOP		message
+;
+; Pass:		^lcx:dx = window to bring to top
+; Return:	nothing
+;		ax, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_LOWER_WINDOW_TO_BOTTOM	message
+;
+; Pass:		^lcx:dx = window to lower to bottom
+; Return:	nothing
+;		ax, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_GET_ATTACH_FLAGS		message
+;
+; Fetches application's AppAttachFlags.
+;
+; Pass:		nothing
+; Return:	cx - AppAttachFlags
+;		ax, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_BUILD_DIALOG_FROM_TEMPLATE	message
+;
+; Build a dialog box, add it below the application object, & 
+; set it USABLE.  When done with the dialog, it should be destroyed by
+; first sending it MSG_GEN_REMOVE(VUM_NOW), then MSG_META_BLOCK_FREE.
+;
+; Pass:		^lcx:dx	- object block, chunk offset of dialog to duplicate
+;		^lcx:dx - summons, or NULL if unable to create
+;		bp - CustomDialogType (extracted from GenInteraction attrs)
+;		ax - destroyed
+;
+
+MSG_GEN_APPLICATION_UPDATE_APP_FEATURES			message
+;
+; Update the features for the application.
+;
+; Context:	Send by the application object in response to
+;		MSG_GEN_APPLICATION_SET_APP_FEATURES or
+;		MSG_GEN_APPLICATION_SET_APP_LEVEL
+; Destination:	App's subclass of the application object
+; Interception:	All apps that support user level will want to intercept this,
+;		fill in the missing fields, and call their superclass with
+;		MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE.
+;
+; Pass:		ss:bp - GenAppUpdateFeaturesParams
+;		    GAUFP_featuresOn - features on
+;		    GAUFP_featuresChanged - features that have changed
+;		    GAUFP_appOpening - non-zero if application is opening
+;		    GAUFP_level - current app level
+;		    GAUFP_oldLevel - old application level
+; Return:	ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE		message
+;
+; Update the features for the application via a table
+;
+; Pass:		ss:bp - GenAppUpdateFeaturesParams
+; Return:	ax, cx, dx, bp - destroyed
+
+GenAppUpdateFeaturesParams	struct
+    GAUFP_featuresOn		word
+    GAUFP_featuresChanged	word
+    GAUFP_level			UIInterfaceLevel
+    GAUFP_oldLevel		UIInterfaceLevel
+    GAUFP_appOpening		word
+    GAUFP_table			fptr	;table of fptr's to GenAppUsabilityTuple
+    ; NOTE!  All GenAppUsabilityTuple's listed in this table must lie within
+    ; the same block as the table itself. An offset of 0 indicates that there
+    ; is no GenAppUsabilityTuple for that feature, not that the
+    ; GenAppUsabilityTuple lies at offset 0.  -- Doug 8/24/93
+    ;
+    GAUFP_tableLength		word
+    GAUFP_levelTable		fptr.GenAppUsabilityTuple
+    GAUFP_reparentObject	optr
+    GAUFP_unReparentObject	optr
+GenAppUpdateFeaturesParams	ends
+
+
+GenAppUsabilityCommand	etype	byte
+GAUC_USABILITY		enum	GenAppUsabilityCommand
+;
+; Indicates the controller should be usable if the feature is ON
+; (this is the default)
+;
+GAUC_RECALC_CONTROLLER	enum	GenAppUsabilityCommand
+;
+; Indicates the controller needs to have its features recalculate if the
+; feature bit this table represents changes
+;
+GAUC_REPARENT		enum	GenAppUsabilityCommand
+;
+; Indicates the controller should be moved to the GAUFP_reparentObject
+;
+GAUC_POPUP		enum	GenAppUsabilityCommand
+;
+; Indicates the controller should be made a popup menu if the feature is ON
+; (unless reverse is set)
+;
+GAUC_TOOLBAR		enum	GenAppUsabilityCommand
+;
+; Indicates the controller is a GenBoolean that corresponds to a toolbar
+; state.  Turning the feature off or on forces the GenBoolean to send an
+; apply in addition to the normal behavior.
+;
+GAUC_RESTART		enum	GenAppUsabilityCommand
+;
+; Indicates that this generic object needs to be restarted via setting
+; not-usable then setting usable.
+;
+
+GenAppUsabilityTupleFlags	record
+    :2
+    GAUTF_END_OF_LIST:1
+    GAUTF_OFF_IF_BIT_ON:1
+    GAUTF_COMMAND		GenAppUsabilityCommand:4
+GenAppUsabilityTupleFlags	end
+
+GenAppUsabilityTuple	struct
+    GAUT_flags		GenAppUsabilityTupleFlags
+    GAUT_objChunk	lptr
+    GAUT_objResId	word
+GenAppUsabilityTuple	ends
+
+GenAppMakeUsabilityTuple	macro	object, opt1, opt2, opt3, opt4, opt5
+__utflags = GAUC_USABILITY
+
+irp arg, <opt1, opt2, opt3, opt4, opt5>
+    ifnb <arg>
+	ifidn <arg>, <end>
+	    __utflags = __utflags or mask GAUTF_END_OF_LIST
+	elifidn <arg>, <reversed>
+	    __utflags = __utflags or mask GAUTF_OFF_IF_BIT_ON
+	elifidn <arg>, <reparent>
+	    __utflags = (__utflags and (not mask GAUTF_COMMAND)) or GAUC_REPARENT
+	elifidn <arg>, <popup>
+	    __utflags = (__utflags and (not mask GAUTF_COMMAND)) or GAUC_POPUP
+	elifidn <arg>, <toolbar>
+	    __utflags = (__utflags and (not mask GAUTF_COMMAND)) or GAUC_TOOLBAR
+	elifidn <arg>, <recalc>
+	    __utflags = (__utflags and (not mask GAUTF_COMMAND)) or GAUC_RECALC_CONTROLLER
+	elifidn <arg>, <restart>
+	    __utflags = (__utflags and (not mask GAUTF_COMMAND)) or GAUC_RESTART
+	else
+	    ErrMessage <Bad option to GenAppMakeUsabilityTuple>
+	endif
+    endif
+endm
+	GenAppUsabilityTuple	<__utflags, offset object, resid object>
+endm
+
+
+MSG_GEN_APPLICATION_IACP_NO_MORE_CONNECTIONS	message	private
+; Quit the application if there are no IACP connections active. If there are
+; still no connections active when this message comes in, we send a
+; MSG_META_QUIT to ourselves, as our purpose in life has been fulfilled.
+;
+; Context:	Queued by app object to itself when it isn't in application
+;		(i.e. user-interactible) mode and the final IACP connection
+;		has gone away.
+; Source:	GenApplication object
+; Destination:  GenApplication object
+; Interception: Not intercepted (must call superclass at end if you do, though)
+;
+; Pass: 
+; 		^ldx:bp	= original ackOD from whoever is detaching app (if
+;		this is being called as the result of a MSG_META_DETACH
+;		being called on the process)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS	message	
+; Fetch the number of active engine or app-mode IACP connections so we know,
+; when the user quits the application, whether we should really go away.
+;
+; Context:	Called by GenProcessClass when the ui has finished processing
+;		MSG_META_QUIT to determine if the app should really exit or
+;		if there are client applications using this app as a server.
+; Source:	GenProcessClass
+; Destination:  GenApplicationClass
+; Interception: only if you have other server objects besides your
+;		GenApplication object. You should call the superclass first
+;		and then add the number of connections to the other objects
+;		onto the result returned by GenApplicationClass
+;
+; Pass:
+;		nothing
+; Return:
+;		cx - number of open IACP connections to app as server
+;		dx, bp - unchanged
+;		ax - destroyed
+;
+
+MSG_GEN_APPLICATION_APP_MODE_COMPLETE	message	
+; Life as a user-interactible application is now complete. Continue shutting
+; down the process if there are no IACP connections active.
+;
+; Context:	Sent by GenProcess after it receives MSG_META_ACK from detaching
+;		the application object.
+; Source:	GenProcessClass
+; Destination:  GenApplicationClass
+; Interception: Not generally intercepted. If you have other server objects
+;		connections to which you want taken into account, subclass
+;		MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS instead.
+;		In cases where the application object is willing to heed
+;		these connections, returning non-zero from that message
+;		will make it hang around.
+;
+; Pass:	
+; 		^ldx:bp	= original ackOD from whoever is detaching app (if
+;		this is being called as the result of a MSG_META_DETACH
+;		being called on the process)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS	message	
+; Shutdown all IACP connections to which the application may be a party, either
+; on the server or the client side.
+;
+; Context:	Sent by the application object to itself.
+; Source:	GenApplicationClass
+; Destination:  GenApplicationClass
+; Interception: May be intercepted to allow connections to other server objects
+;		to be shut down. You must always call the superclass at some
+;		point, however, to ensure the application connections are
+;		shut down as well.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+MSG_GEN_APPLICATION_IACP_REGISTER	message	
+; Register the application as a server for the application token.
+;
+; Context:	Send by the application object to itself to register with
+;		IACP
+; Source:	GenApplicationClass
+; Destination:  GenApplicationClass
+; Interception: May be intercepted if there are other lists with which you
+;		want to register the application, or other server objects.
+;		You must always call the superclass at some point, however.
+;
+; Pass:
+;		cl	= IACPServerMode in which server is operating.
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_IACP_UNREGISTER	message	
+; Unregister the application as a server for the application token. The
+; GenApplication handler will always force-queue a
+; MSG_GEN_APPLICATION_IACP_NO_MORE_CONNECTIONS to itself following this to
+; make sure no one connected to it while it was calling IACPUnregisterServer.
+; Should another connection be found when that queued message is received,
+; and the state of the application allow it (i.e. it's not being forcibly
+; shutdown by the GenField on which it sits), the application will re-register
+; with IACP by invoking MSG_GEN_APPLICATION_IACP_REGISTER on itself.
+;
+; Context:	Send by the application object to itself to unregister with
+;		IACP
+; Source:	GenApplicationClass
+; Destination:  GenApplicationClass
+; Interception: May be intercepted if there are other lists with which you
+;		want to unregister, or other server objects. You must always
+;		call the superclass at some point, however.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+MSG_GEN_APPLICATION_IACP_COMPLETE_CONNECTIONS	message	
+; Complete any and all pending IACP connections, accepting any queued messages
+; that have been waiting so patiently there.
+;
+; Context:	Sent by GenApplication in its default APPLICATION_OPEN_COMPLETE
+;		method, as we assume the application should be able to field
+;		IACP messages once everything's up on screen.
+; Source:	GenApplication
+; Destination:  GenApplication
+; Interception: May be intercepted if there are other lists, besides that for
+;		the app's token, over which connections might be pending. Must
+;		always call superclass eventually.
+;
+; Pass:
+;		nothing
+; Return:
+;		ax, cx, dx, bp - destroyed
+;
+
+GenApplicationMessages	= GenApplicationMessages + 4
+
+MSG_GEN_APPLICATION_BRING_UP_HELP			message
+;
+; Bring up help for the application.  Normally this is accomplished by
+; sending a message to the focus telling it to bring up help.
+;
+; Context:	Help object mechanism
+; Source:	Unrestricted, though generally help button or <F1>
+; Destination:	GenApplicationClass
+; Interception:	Generally not intercepted, although it can be if something
+;		besides bringing up help is preferred for <F1> such
+;		as indicating to the user that help is not available.
+; Pass:		^ldx:bp	= original ackOD from whoever is detaching app
+; Return:	none
+;		ax - destroyed
+;
+
+MSG_GEN_APPLICATION_UNUSED_3			message
+
+MSG_GEN_APPLICATION_UNUSED_4			message
+
+MSG_GEN_APPLICATION_TOGGLE_CURRENT_MENU_BAR		message
+;
+; Toggle the popout state of the current GenPrimary's menu bar.  Only works
+; if menu bar is togglable (UIWO_POPOUT_MENU_BAR set).
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_TOGGLE_FLOATING_KEYBOARD		message
+;
+; Brings up any floating keyboard for the current app. Apps can subclass this
+; to bring up their own PenInputControl (or equivalent) object, otherwise
+; the app object will create its own.
+;
+; Context: 	Generally only used on pen-based systems
+; Source:  	The GenApplication object in response to a HardIconBarFunction
+; Destination: 	Any GenApp object
+; Interception: Can be intercepted if the app has its own PenInputControl obj
+;
+; Pass: 	nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_APPLICATION_TOGGLE_EXPRESS_MENU			message
+;
+; Open/close the parent field's express menu.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+;MSG_GEN_APPLICATION_IACP_FORWARDED_APP_MODE_CONNECTION is no longer used
+GenApplicationMessages = GenApplicationMessages + 1
+
+MSG_GEN_APPLICATION_GET_MODAL_WIN			message
+;
+; Returns current modal window, if any
+;
+; Pass:		nothing
+; Return:	^lcx:dx	- top modal window, if any
+;		ax, bp -- destroyed
+
+MSG_GEN_APPLICATION_UNUSED_2					message
+
+MSG_GEN_APPLICATION_CHECK_IF_ALWAYS_INTERACTABLE_OBJECT	message
+;
+; Checks if the passed object should always be interactable.
+;
+;
+; Pass:		^lcx:dx - OD to check if it should be interactable
+; Return:	carry set if object should be "always interactable"
+;		(should get events while a UserDoDialog is on screen)
+;		ax, cx, dx, bp	
+
+MSG_GEN_APPLICATION_SET_STATE message
+; Adjust the ApplicationStates bits that aren't internal to GenApplication
+;
+; Context:      Sent by anyone wishing to change the AS_FOCUSABLE,
+;               AS_MODELABLE, AS_NOT_USER_INTERACTABLE, or
+;               AS_AVOID_TRANSPARENT_DETACH state bits.
+; Source:       ?
+; Destination:  GenApplication
+; Interception: Must pass to superclass at some point, but when doesn't matter
+;               much.
+;
+; Pass:
+;               cx      = ApplicationStates to set
+;               dx      = ApplicationStates to clear
+; Return:
+;               ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_QUIT_AFTER_UI				message
+; 
+; Called from MSG_META_QUIT handler in GenProcessClasss,
+; after the UI has finished its MSG_GEN_APPLICATION_INITIATE_UI_QUIT
+; sequence.  This is the app's last chance to abort the quit before the
+; detaching begins.  Default behavior aborts if app is still open for
+; the user, i.e. not ALF_OPEN_FOR_IACP_CONNECTION_ONLY, or an IACP
+; connection remains that requires the app to be open.
+; 
+; Source:	GenProcessClass
+; Destination:  GenApplicationClass
+; Interception:	Can be intercepted & not sent to superclass to abort quit.
+; Pass:         nothing (will always send ACK to process, for QL_AFTER_UI)
+; Return:	nothing
+
+MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_APP_MODE_CONNECTIONS	message	
+; Fetch the number of active app-mode IACP connections so we know, when
+; the user quits the application, whether the app should close down to engine
+; mode or not.
+;
+; Context:	Called by GenProcessClass when the ui has finished processing
+;		MSG_META_QUIT to determine if the app should really close or
+;		if there are client applications using this app in app-mode
+;		remotely (such as for remote printing).
+; Source:	GenProcessClass
+; Destination:  GenApplicationClass
+; Interception: only if you have other server objects besides your
+;		GenApplication object. You should call the superclass first
+;		and then add the number of connections to the other objects
+;		onto the result returned by GenApplicationClass
+;
+; Pass:
+;		nothing
+; Return:
+;		ax - number of open app-mode IACP connections to app as server
+;		cx, dx, bp - unchanged
+;
+
+protominor UINewForZoomer
+
+MSG_GEN_APPLICATION_CHECK_IF_RUNNING_USER_DO_DIALOG	message
+;
+; Checks to see if one of the threads is blocked running a UserDoDialog.
+; NOTE: This is only synchronous if called from the UI thread - if called
+;	from the app thread, the UI could put a dialog box up after the
+;	call returns. 
+;
+; Context:	Called by anything
+; Source:	Anywhere
+; Destination:	GenApplicationClass
+; Interception: Generally not intercepted
+;
+; Pass: 	nothing
+; Return:	ax - non-zero if UserDoDialog is happening
+; Destroyed:	cx, dx, bp
+
+MSG_GEN_APPLICATION_FLOATING_KEYBOARD_CLOSED	message
+;
+; Message sent by the floating keyboard whenever it is closed, so the app
+; knows about it.
+;
+; Context:	Called by anything
+; Source:	Anywhere
+; Destination:	GenApplicationClass
+; Interception: Generally not intercepted
+;
+; Pass: 	nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+
+MSG_GEN_APPLICATION_GET_TRANSPARENT_DETACH_LIST			message	
+;
+; Returns GeoWorks GCN list app should be on, if any.
+;
+; Context:	Part of transparent detach mechanism (Always returns 0 if
+;		not using tranparent detach)
+; Source:	Unrestricted
+; Destination:	GenApplication object
+; Interception:	May be intercepted to change which GCN list an app will
+;		reside on.
+; Pass:		nothing
+; Return:	ax	- GeoWorks GCN List, or 0 if none
+;
+
+MSG_GEN_APPLICATION_CLOSE_COMPLETE			message	; internal
+;
+; This method sent to the app from the process after both the UI has detached
+; and the appropriate CLOSE message has been called on the process, following
+; a MSG_META_DETACH request coming into the process.  The app object sees
+; this as meaning that the "detach" from whatever mode was running is now
+; complete, both from the UI & process side.  GS_USABLE & all detach flags
+; are cleared on the app object, & MSG_GEN_APPLICATION_APP_MODE_COMPLETE is
+; called to decide where to go from here.  Note that this message is
+; called as a part of DETACH the application regardless of what mode it is
+; running in  (whether engine, app or custom)
+;
+; Pass:		^ldx:bp	= original ackOD from whoever is detaching app
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_APPLICATION_FIELD_QUIT_ABORTED				message
+;
+; This is a notification message sent to applications by their parent field,
+; if 'quitOnClose' was aborted by one of the apps running under the field.
+;
+; Context:	
+; Source:	GenField object
+; Destination:	GenApplication object
+; Interception: May be intercepted by apps if they want to be notified when
+;		quitOnClose is aborted.  (Aborted meaning one or more of the
+;		apps under the field decided not to quit.)
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+protominor UINewFor21
+
+MSG_GEN_APPLICATION_REMOVE_ALL_BLOCKING_DIALOGS	message
+;
+; Bring down all blocking dialogs (Ie, dialogs that are brought up via
+; UserDoDialog or UserStandardDialog).
+;
+; Context:	
+; Source:	anywhere
+; Destination:	GenApplication object
+; Interception: Generally not intercepted
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+
+MSG_GEN_APPLICATION_GET_FLOATING_KEYBOARD_OD	message
+;	Get the Application's floating keyboard.
+;
+; Context:	none
+; Source:	anywhere
+; Destination:  GenApplication object
+; Interception: Not likely...
+;
+; Pass:		nothing
+; Return:	^lcx:dx	= GenPenInputControl object of app
+; Destroyed:	nothing
+;
+
+protoreset
+
+
+protominor	NewForJediAndBeyond
+
+MSG_GEN_APPLICATION_ROTATE_DISPLAY		message
+;
+; Causes the device hardware to rotate (if supported), the degree of
+; rotation being determined by the hardware itself.
+;
+; Context:	Generally only used on pen-based systems
+; Source:	The GenApplication object in response to a HardIconBarFunction
+; Destination:	Any GenApp object
+; Interception:	Probably don't want to, unless you feel the need to
+;			do something weird when the screen is rotated.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_APPLICATION_CLOSE_FILE_ACK	message
+;
+; The app object sends MSG_GEN_DOCUMENT_CLOSE_FILE to the
+; GenDocument object with the model exclusive.  That object sends this
+; message back to us to let us know that the file has been physically
+; closed.
+;
+; Context:	IACP file close notification mechanism
+; Source:	GenDocumentClass object in response to above message
+; Destination:  Any GenApp object
+; Interception: Not recommended
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+protoreset
+
+protominor	NewForLizzy
+
+MSG_GEN_APPLICATION_CHANGE_DISPLAY_MODE	message
+;
+; Causes the specified display attributes to be set, if possible.  If
+; different resolutions or definitions are requested by different applications,
+; the highest requested resolution or definition will take effect.  At
+; this time, it is undefined what will happen if different applications
+; request different settings for DisplayModeRotation or DisplayModeColor.
+; 
+; Pass:		cx	- requested DisplayMode
+; Return:	cx	- actual DisplayMode as set
+;		carry set if requested mode is not supported
+;		ax, dx, bp - destroyed
+;
+
+protoreset
+
+protominor	UINewOptions
+
+MSG_GEN_APPLICATION_OPTIONS_CHANGED	message
+;
+; Sent by controllers when user has made an options change (of an option
+; stored in the geos.ini file).  UI will control enabled/disabled status
+; of Save Options and Reset Options triggers based on this.
+;
+
+MSG_GEN_APPLICATION_QUIT_OPTIONS_QUERY		message
+;
+; Internal message.
+;
+
+protoreset
+
+protominor UISetTemplateUserLevel
+
+MSG_GEN_APPLICATION_SET_TEMPLATE_USER_LEVEL	message
+;
+; Set application user level and corresponding app features.  There is
+; no default handler for this message, so applications supporting templates
+; must handle this.
+;
+; Pass:		cx	- desired user level
+; Return:	nothing
+;
+
+protoreset
+
+protominor UIStandardTimedDialog
+
+MSG_GEN_APPLICATION_DO_STANDARD_TIMED_DIALOG	message
+;
+; Similar to MSG_GEN_APPLICATION_DO_STANDARD_DIALOG, except that it also
+; lets you specify a timeout.  If timeout occurs, the dialog is removed
+; automatically and the response is IC_NULL.
+;
+; Pass:		dx - size GenAppDoTimedDialogParams
+;		ss:bp - GenAppDoTimedDialogParams
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+; passed to GADTDP_finishOD:
+;		cx - InteractionCommand of response trigger in standard dialog,
+;			or IC_NULL if timeout occurred.
+;
+GenAppDoTimedDialogParams	struct
+    GADTDP_dialog	StandardDialogParams
+    GADTDP_finishOD	optr			;OD to send method to
+    GADTDP_message	word			;message to send
+    GADTDP_timeout	word			;# of ticks for timeout
+GenAppDoTimedDialogParams	ends
+
+protoreset
+;
+; 
+;------------------------------------------------------------------------------
+;	Extensions to inherited messages
+;------------------------------------------------------------------------------
+
+;MSG_META_SEND_CLASSED_EVENT	message	(MetaClass)
+;
+; This method is defined in MetaClass, & augmented by any class that wishes
+; to do so, by the addition of new TravelOption types.  MetaClass provides
+; TO_NULL & TO_SELF.
+;
+; GenApplication Class extends TravelOption options to include a way to
+; send a method to the PrintControl object of an application.
+;
+; Context:	This is THE way to get a message delivered to an object
+;		whose optr is unkown, but it is know to be currently
+;		actively within one of the hierarchies listed in the
+;		"TravelOption" enumeration.
+; Source:	no restrictions
+; Destination:	Any object may receive this message, though usefullness will
+;		depend to TravelOption type.  See "TravelOption" enumeration
+;		declarations for info on where the message may usefully be sent.
+; Interception:	Intercepted by Focus, Target, or Model nodes,
+;		or any object defining a new "TravelOption" level, in order
+;		to implement requests for sending to that destination.  If
+;		the TravelOption passed does not match the type your handler
+;		is redirecting, the request should be passed on to the 
+;		superclass.
+; Pass:		^hcx	- ClassedEvent
+;		dx	- TravelOption
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;		(event handle freed)
+
+TO_PRINT_CONTROL		enum TravelOption, first GenApplicationMessages
+; Destination:  PrintControlClass object
+
+;------------------------------------------------------------------------------
+;	Variable data
+;------------------------------------------------------------------------------
+
+; Declarative hints:
+
+	; Application description.  Could be used to classify applications
+	; for inquiries, or control their use.  (Parent setting to prohibit
+	; use of games during certain hours).  Whatever.
+
+HINT_APP_IS_ENTERTAINING 		vardata
+HINT_APP_IS_EDUCATIONAL 		vardata
+HINT_APP_IS_PRODUCTIVITY_ORIENTED 	vardata
+
+ATTR_GEN_APPLICATION_PRINT_CONTROL	vardata	optr
+;
+; This holds the object, if any, that receives message destined
+; "TO_PRINT_CONTROL", which at this time is primarily used for allowing
+; remote printing of files.
+
+;------------------------------------------------------------------------------
+;	Variable Data
+;------------------------------------------------------------------------------
+
+TEMP_GEN_APPLICATION_NO_LONGER_USED	vardata
+; was TEMP_GEN_APPLICATION_APP_SEARCH_LIST
+
+ATTR_GEN_APPLICATION_KBD_OBJ	vardata	optr
+;
+; Contains the OD of a GenPenInputControl object that has been created
+; by the default MSG_GEN_APPLICATION_TOGGLE_FLOATING_KEYBOARD handler
+; (or one that was provided by the user)
+;
+
+TEMP_GEN_APPLICATION_SAVED_ALB		vardata	hptr.AppLaunchBlock
+;
+; Copy of AppLaunchBlock held in trust for when we get done detaching, if
+; we receive a MSG_META_IACP_NEW_CONNECTION while the application object
+; is detaching. If this exists when we receive a
+; MSG_GEN_APPLICATION_APP_MODE_COMPLETE, the application will come back to life
+; by connecting to the first server on list with this ALB.
+;
+
+TEMP_GEN_APPLICATION_ABORT_QUIT		vardata
+; 
+; Can be set anytime between the start of a QUIT & the time the app object
+; handles MSG_GEN_APPLICATION_QUIT_DETACH, to indicate the QUIT should be
+; aborted.  (Used outside of MSG_META_QUIT handlers, which should simply
+; ACK the quit with the abort flag)
+
+ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER	vardata optr
+;
+; Contains OD of the Save Options trigger in the Options menu.  This trigger
+; is set not-usable by the UI when running in UILM_TRANSPARENT mode.
+; Applications shouldn't manually set this trigger usable or not-usable.
+;
+; If this vardata and ATTR_GEN_APPLICATION_RESET_OPTIONS_TRIGGER both
+; exist, UI will also control enabled/disabled status of this trigger
+; based on whether there have been any options changes made by the user.
+; MSG_GEN_APPLICATION_OPTIONS_CHANGED is used to notify UI of options
+; changes in the application.  Controller options changes are handled
+; automatically.
+;
+
+FloatingKeyboardInfo	struct
+	FKI_defaultPosition	word
+	; If set, the keyboard will be moved to the default position before
+	; being brought onscreen
+	FKI_sysModal		word
+	; If set, the currently focused window is system modal, so the 
+	; window needs to be moved to a higher layer
+FloatingKeyboardInfo	ends
+
+TEMP_GEN_APPLICATION_FLOATING_KEYBOARD_INFO	vardata FloatingKeyboardInfo
+;
+; If this piece of vardata is present, it means that the floating keyboard
+; should come up when the app gains/regains the target. This is used to cause
+; floating keyboards to disappear when desk accessories are brought up. It 
+; should never be added/removed by an application.
+;
+
+TEMP_GEN_APPLICATION_EXTRA_STATE_BLOCK	vardata	hptr
+; Holds handle of extra state block while we're in engine mode, for easy
+; access when it is passed off to the app in OPEN_APPLICATION, & also as a
+; place to keep in after CLOSE_APPLICATION, regardless of whether there's a
+; state file yet.  This vardata entry is also a flag, its presence meaning
+; that the app has either restoring from state, or being lazarused after
+; having been in app mode, & so has "state" in the sense that it has been
+; used.
+
+TEMP_GEN_APPLICATION_APP_MODE_COMPLETE_ACK_OD	vardata optr
+; Holds ack OD while we are waiting for IACP connections to be closed
+; so we can do real detach.
+;
+
+ATTR_GEN_APPLICATION_ADDITIONAL_TOKENS		vardata	GeodeToken
+; Holds one or more additional tokens for which the application should register
+; as an IACP server. This is most often used with generic application-category
+; tokens, in conjunction with IACPBindToken (during installation), so an
+; application can receive Inbox messages directed to that category of
+; applications.
+; 
+
+HINT_APPLICATION_NO_INBOX_QUERY_WHEN_FOREGROUND_APP vardata
+; When the application is the foreground app and a message arrives for it in
+; the system inbox, do not ask the user whether the message should be delivered,
+; just deliver it.
+; 
+
+HINT_APPLICATION_QUIT_ON_IACP_ALLOW_FILE_ACCESS vardata
+;
+; Suggests that the application simply issue itself a MSG_META_QUIT if it ever
+; receives a MSG_META_IACP_CLOSE_FILE.
+
+protominor NewForJediAndBeyond
+
+TEMP_GEN_APPLICATION_CLOSE_FILE_ACK_EVENT	vardata hptr
+;
+; If this vardata exists when when GenApplicationClass receives
+; MSG_GEN_APPLICATION_CLOSE_FILE_ACK, then it'll fire off the completion
+; message stored herein.
+;
+
+protoreset
+
+protominor NewForLizzy
+
+TEMP_GEN_APPLICATION_DISPLAY_MODE		vardata	DisplayMode
+;
+; The last requested DisplayMode for this application.  If this vardata
+; does not exist, the default modes are assumed.
+;
+
+protoreset
+
+protominor UINewOptions
+
+ATTR_GEN_APPLICATION_RESET_OPTIONS_TRIGGER	vardata optr
+;
+; UI will control enabled/disabled status of this trigger based on
+; whether there have been any options changes made by the user.  Also use
+; ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER.
+;
+
+protoreset
+
+;------------------------------------------------------------------------------
+;	Other Constants & Structures
+;------------------------------------------------------------------------------
+
+; UI data stored with each process
+
+AppUIData	struct
+    AUID_specificUI		hptr		;handle of specific UI
+    AUID_displayScheme		DisplayScheme <>
+    AUID_noTargetNoFocusReg	fptr.Region	;cursor for no target, no focus
+    AUID_targetNoFocusReg	fptr.Region	;cursor for target, no focus
+    AUID_noTargetFocusReg	fptr.Region	;cursor for no target, focus
+    AUID_targetFocusReg		fptr.Region	;cursor for target, focus
+    AUID_textKbdBindings	fptr		;VisText kbd bindings.
+    AUID_textEditCursor		optr.PointerDef	;handle:chunk to PointerDef
+						;(cursor) for text editing
+AppUIData	ends
+
+ApplicationStates	record
+	:1
+
+	AS_TRANSPARENT:1
+	; Set if running in UILM_TRANSPARENT mode
+
+	AS_HAS_FULL_SCREEN_EXCL:1
+	; Set if between GAINED_FULL_SCREEN_EXCL & LOST_FULL_SCREEN_EXCL
+
+	AS_SINGLE_INSTANCE:1
+	; Set if application is not capable of being launched multiple times.
+	; The system will automatically set this if the geode doesn't have
+	; GA_MULTI_LAUNCHABLE set. You need only set this if there's some
+	; other reason your application shouldn't have more than one copy
+	; of itself loaded, as far as the user is concerned (e.g. something
+	; that can act as both a behind-the-scenes server and a user-visible
+	; application must be written to be multi-launchable, but you may
+	; not want the user to run more than one copy directly).
+	; 
+	; This is used only by MSG_GEN_APPLICATION_IACP_REGISTER to determine
+	; what to tell the IACP system, so it can properly implement the current
+	; launch model.
+
+	AS_QUIT_DETACHING:1
+	; Set if detach sequence has been started as the result of a QUIT.  Set
+	; only if the AS_QUITTING bit is set, in the ui thread the moment
+	; a MSG_META_DETACH is fired off to the process.  Because it is done
+	; in the ui thread, this bit will be set even while the MSG_META_DETACH
+	; is sitting in the process queue, & AS_DETACHING is *not* yet set.
+
+	AS_AVOID_TRANSPARENT_DETACH:1
+	; Set if this application should ignore transparent detaches.  If
+	; running in UILM_TRANSPARENT mode, this application will not
+	; detach when another application is launched.
+
+	AS_TRANSPARENT_DETACHING:1
+	; Set if this application is being transparently-detached, that is,
+	; being shutdown to state because another application has been started
+	; in this application's field and that field is in UILM_TRANSPARENT
+	; mode.
+
+	AS_REAL_DETACHING:1
+	; Set if MSG_GEN_PROCESS_REAL_DETACH has been sent off to the process,
+	; signally the irreversible demise of the application.  Set only when
+	; the UI has finished detaching, & GS_USABLE on the app has been
+	; cleared.
+
+	AS_QUITTING:1,
+	; Set if the application is currently quitting.  If the app is attached,
+	; this flag also indicates if input is being ignored for the app for
+	; the reason of quitting.
+
+	AS_DETACHING:1,
+	; Set if the app object is detaching
+
+	AS_FOCUSABLE:1,
+	; Set if the application may receive the "FOCUS" exclusive.  If set,
+	; the application will be given the modal exclusive within its field,
+	; when launched, or clicked in by the user.  This bit is set TRUE
+	; by default.   This bit is copied to the GeodeWinFlags stored as
+	; part of the geode upon load, which act to guide the window system.
+
+	AS_MODELABLE:1,
+	; Set if the application may receive the "MODEL" exclusive.  If set,
+	; the application will be given the modal exclusive within its field,
+	; when launched, or clicked in by the user.  Unless you're doing 
+	; something really weird, you'll want to have this match the state of
+	; your GENS_TARGETABLE bit.  This bit is set TRUE by default.
+	; This bit is copied to the GeodeWinFlags stored as
+	; part of the geode upon load, which act to guide the window system.
+
+	AS_NOT_USER_INTERACTABLE:1
+	; Clear if this is a standard application which has at least one 
+	; primary window or other interactable window on-screen.  If this bit 
+	; is set, then the UI need not provide options to navigate or select 
+	; this application for user interaction.  (Added for the addition of 
+	; the non-visible Spooler application, so that ALT-ESC would not 
+	; navigate to it in MOTIF)
+
+	AS_RECEIVED_APP_OBJECT_DETACH:1
+	; Set if we have received a MSG_GEN_APPLICATION_OBJECT_DETACH
+
+	AS_ATTACHED_TO_STATE_FILE:1
+	; Set if we are attached to a state file.
+
+	AS_ATTACHING:1
+
+ApplicationStates	end
+
+
+ApplicationOptFlags	record
+	AOF_MULTIPLE_INIT_FILE_CATEGORIES:1
+	; Optimization flag for UserGetIniCategory.  Keep clear if application
+	; has only 1 init file category.  Set for full upward recursive search
+	; for ATTR_GEN_INIT_FILE_CATEGORY's using MSG_META_GET_INI_CATEGORY.
+
+	:7
+ApplicationOptFlags	end
+
+
+GenAppIACPConnection	struc
+	GAIACPC_connection	IACPConnection
+	; The IACP connection
+
+	GAIACPC_appMode		word
+	; The type of connection -- MSG_GEN_PROCESS_OPEN_APPLICATION or engine
+	; mode message)
+
+GenAppIACPConnection	ends
+
+;------------------------------------------------------------------------------
+;	Instance data
+;------------------------------------------------------------------------------
+
+    GAI_appRef		AppInstanceReference
+    ; Enough info to be able to reload this application.  Stuffed here
+    ; as part of being attached, this info is sent on to the field object
+    ; should we be forcibly detached.
+		noreloc	GAI_appRef.AIR_diskHandle
+
+    GAI_appMode		dw	(?)
+    ; Stores the method that should be sent to the application process
+    ; to bring the application back from a saved state.  This is initially
+    ; 0 (unless saved away in a state file) & is set by GenProcessClass as soon
+    ; as a mode is determined for the application (Which is usually passed
+    ; as part of MSG_META_ATTACH, to the process when it is first loaded)
+
+    GAI_launchFlags	AppLaunchFlags
+    ; Flags passed into attaching of application which describe how the
+    ; application is being lauched. ALF_OPEN_IN_BACK is set if app should
+    ; come up behind other apps within field, & not request the app exclusive.
+    ; The ALF_OPEN_FOR_IACP_CONNECTION_ONLY here really means that the
+    ; the application is not open for the user. (i.e. it may be set even
+    ; if there are no IACP connections, simply to indicate that the app
+    ; isn't being kept open for the user.  This bit is AND'ed out with
+    ; equivalent bit in any new AppLaunchBlock where the app mode
+    ; is MSG_GEN_PROCESS_OPEN_APPLICATION.
+
+    GAI_optFlags	ApplicationOptFlags
+    ; Misc optimization flags for application. 
+
+    GAI_appFeatures	word
+    ; A word of features stored with the application (used by hints in
+    ; controllers)
+
+    GAI_specificUI	hptr 
+    ; Specific UI that this application is running under.
+		noreloc GAI_specificUI
+
+    GAI_states		ApplicationStates
+
+    GAI_attachFlags	AppAttachFlags
+    ; AppAttachFlags - can be used by objects by fetching with
+    ; MSG_GEN_APPLICATION_GET_ATTACH_FLAGS.  (Set each time GenApplication is
+    ; attached, not stored to state file.)
+
+    GAI_appLevel	UIInterfaceLevel	UIIL_ADVANCED
+    ; Interface level the application is running at (used by hints in
+    ; controllers)
+
+    GAI_iacpConnects	lptr.ChunkArrayHeader	0
+    ; Array of active IACP connections to us as a server. (holds
+    ; GenAppIACPConnection elements)
+
+GenApplicationClass	endc
+
+
+EndLibrary 	ui

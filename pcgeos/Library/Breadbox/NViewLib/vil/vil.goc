@@ -1,0 +1,1140 @@
+/*
+ *      VIL.GOC - main code of viewer library for NView
+ *
+ *      by Marcus Groeber, mgroeber@compuserve.com
+ *
+ */
+
+@include <stdapp.goh>
+@include <foam.goh>
+@include <viewer.goh>
+@include <objects\text\tCtrlC.goh>
+@include <objects\vlTextC.goh>
+
+#include <ansi\stdio.h>
+#include <ansi\string.h>
+
+@include <nview.goh>
+
+/* Parameter structure to pass to MSG_VIS_TEXT_SEARCH_FROM_OFFSET. */
+
+typedef struct {
+  MemHandle                     SFOS_searchReplaceStruct;
+  dword                         SFOS_startObject;
+  dword                         SFOS_startOffset;
+  dword                         SFOS_currentOffset;
+  SearchFromOffsetFlags         SFOS_flags;
+  SearchFromOffsetReturnStruct  *SFOS_retStruct;
+} mySearchFromOffsetStruct;
+
+
+@class DocViewDialogClass, ViewerDialogClass;
+
+/* The following messages are utilities; we added them to help out 
+   with some VILFile library duties */
+  @message NViewStatus          MSG_MVD_OPEN_DOCUMENT(DocumentInfo *doc);
+  @message void                 MSG_MVD_CLOSE_DOCUMENT();
+  @message NViewStatus          MSG_MVD_RESTORE_STATE(MemHandle stateBlock);
+  @message MemHandle            MSG_MVD_SAVE_STATE();
+
+/* In our dialog UI, we added a "Close" button.   It sends this message. */
+  @message void                 MSG_MVD_CLOSE();
+
+  @message void                 MSG_MVD_SAVE_NOTE();
+  @message void                 MSG_MVD_SAVE_RTF();
+  @message void                 MSG_MVD_FIND();
+  @message void                 MSG_MVD_FIND_NEXT();
+  @message void                 MSG_MVD_ZOOM();
+  @message void                 MSG_MVD_OPEN();
+
+  @message void                 MSG_MVD_GET_DOC(DocumentInfo *doc);
+  @message void                 MSG_MVD_SET_FILE(VMFileHandle fh, char *name);
+  @message VMFileHandle         MSG_MVD_GET_FILE(char *name);
+  @message void                 MSG_MVD_SET_PAGE_SETUP(PageSetupInfo *page);
+
+  /* Prototype to cast MSG_VIS_TEXT_SEARCH_FROM_OFFSET for a correct stack
+     frame (necessary because of a byte-aligned field that cannot be created
+     by pushing the structure contents as individual parameters. */
+
+  @message void MSG_MVD_SEARCH_FROM_OFFSET(@stack mySearchFromOffsetStruct s);
+
+  @instance VMFileHandle        MVDI_fileHan;
+  @instance char                MVDI_fileName[14];
+  @instance PageSetupInfo       MVDI_pageSetup;
+  @instance DocumentInfo        MVDI_doc;
+
+@endc;
+
+@class  DocViewContentClass, VisContentClass;
+@endc
+
+
+/* Here is the template UI block; the library will make a copy 
+   of this template whenever it needs to display a document. */
+@start TheViewerUI, notDetachable;
+
+/* At the top of the template's UI tree is a subclassed ViewerDialog */
+  @object DocViewDialogClass TVDialog = {
+      GI_states = @default & ~GS_USABLE;
+      GI_attrs = @default | GA_TARGETABLE ;
+      GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+      GII_visibility = GIV_DIALOG;
+      GI_comp = @VLTextGroup, @ViewPane1, @ViewPane2, @ViewPane3, @FindDialog,
+                @NoteEntryDialog, @RTFEntryDialog;
+      HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {0, 0};
+
+      ATTR_GEN_HELP_CONTEXT = "Viewer";
+      ATTR_GEN_HELP_FILE = "nview   ";
+  }
+
+  @chunk TCHAR ViewDialogTitle = "Viewing:";
+  @object ComplexMonikerClass VLTextGroup = {
+      ComplexMoniker = GenInteractionClass;
+      CMI_topText = @ViewDialogTitle;
+      GI_comp = @VLTextView;
+      HINT_DRAW_IN_BOX;
+      HINT_DRAW_SHADOW;
+      HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+      HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+      HINT_COMPLEX_MONIKER_MINIMIZE_ICON_SPACING;
+      HINT_FIXED_SIZE = {SST_PIXELS | 530, 0, 0};
+      HINT_MINIMIZE_MARGINS;
+  }
+
+  @object GenViewClass VLTextView = {
+      GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+      GVI_attrs = @default | GVA_DRAG_SCROLLING
+                           | GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+                           | GVA_DONT_SEND_KBD_RELEASES
+                           | GVA_FOCUSABLE;
+      GVI_content = @VLTextContent;
+      GVI_scaleFactor = {{0x8000, 1}, {0x8000, 1}};     /* 150% */
+      ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+      HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+      HINT_DEFAULT_FOCUS;
+      HINT_DEFAULT_TARGET;
+  }
+
+
+  /*
+   *    Primary pane of command buttons
+   */
+  @object GenInteractionClass ViewPane1 = {
+    GI_comp = @SaveTrigger, @SearchTrigger, @ZoomTrigger, @CloseViewTrigger;
+  }
+
+  @chunk TCHAR SaveTitle = "Save";
+  @object TwoLevelTriggerClass SaveTrigger = {
+      CMI_topText = @SaveTitle;
+      TLTI_other_parent = @ViewPane2;
+      HINT_SEEK_MENU_BAR;
+      HINT_SEEK_SLOT = 0;
+  }
+
+  @chunk TCHAR SearchTitle = "Find";
+  @object TwoLevelTriggerClass SearchTrigger = {
+      CMI_topText = @SearchTitle;
+      TLTI_other_parent = @ViewPane3;
+      HINT_SEEK_MENU_BAR;
+      HINT_SEEK_SLOT = 1;
+  }
+
+  @object ComplexMonikerClass ZoomTrigger = {
+      ComplexMoniker = GenTriggerClass;
+      CMI_topText = CMT_ZOOM;
+      GTI_actionMsg = MSG_MVD_ZOOM;
+      GTI_destination = @TVDialog;
+      HINT_SEEK_REPLY_BAR;
+      HINT_SEEK_SLOT = 2;
+  }
+
+  @object ComplexMonikerClass CloseViewTrigger = {
+    ComplexMoniker = GenTriggerClass;
+    CMI_topText = CMT_CLOSE;
+    GTI_actionMsg = MSG_MVD_CLOSE;
+    GTI_destination = @TVDialog;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = 3;
+  }
+
+  /*
+   *    "Save" pane of command buttons
+   */
+  @object GenInteractionClass ViewPane2 = {
+    GI_comp = @ViewControls, @SaveBackTrigger;
+    GI_states = @default & ~GS_USABLE;
+  }
+
+  @object GenInteractionClass ViewControls = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_comp = @SaveNoteTrigger, @SaveRTFTrigger;
+  }
+
+  @chunk TCHAR SaveNoteTitle[] = "Save\rNote";
+  @object ComplexMonikerClass SaveNoteTrigger = {
+    ComplexMoniker = GenTriggerClass;
+    CMI_topText = @SaveNoteTitle;
+    GTI_actionMsg = MSG_MVD_SAVE_NOTE;
+    GTI_destination = @TVDialog;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = 0;
+  }
+
+  @chunk TCHAR SaveRTFTitle[] = "Save\rRTF";
+  @object ComplexMonikerClass SaveRTFTrigger = {
+    ComplexMoniker = GenTriggerClass;
+    CMI_topText = @SaveRTFTitle;
+    GTI_actionMsg = MSG_MVD_SAVE_RTF;
+    GTI_destination = @TVDialog;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = 1;
+  }
+
+  @object TwoLevelTriggerClass SaveBackTrigger = {
+      TLTI_other_parent = @ViewPane1;
+      ATTR_TLT_IS_BACK_TRIGGER;
+      HINT_SEEK_MENU_BAR;
+      HINT_SEEK_SLOT = 3;
+  }
+
+  /*
+   *    "Find" pane of command buttons
+   */
+  @object GenInteractionClass ViewPane3 = {
+    GI_comp = @ViewControls2, @SearchBackTrigger;
+    GI_states = @default & ~GS_USABLE;
+  }
+
+  @object GenInteractionClass ViewControls2 = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_comp = @FindTrigger, @FindNextTrigger;
+  }
+
+  @chunk TCHAR FindTitle[] = "Find";
+  @object ComplexMonikerClass FindTrigger = {
+      ComplexMoniker = GenTriggerClass;
+      CMI_topText = @FindTitle;
+      GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+      GTI_destination = @FindDialog;
+      HINT_SEEK_REPLY_BAR;
+      HINT_SEEK_SLOT = 0;
+  }
+
+  @chunk TCHAR FindNextTitle[] = "Find\rnext";
+  @object ComplexMonikerClass FindNextTrigger = {
+      ComplexMoniker = GenTriggerClass;
+      CMI_topText = @FindNextTitle;
+      GTI_actionMsg = MSG_MVD_FIND_NEXT;
+      GTI_destination = @TVDialog;
+      HINT_SEEK_REPLY_BAR;
+      HINT_SEEK_SLOT = 1;
+  }
+
+  @object TwoLevelTriggerClass SearchBackTrigger = {
+      TLTI_other_parent = @ViewPane1;
+      ATTR_TLT_IS_BACK_TRIGGER;
+      HINT_SEEK_MENU_BAR;
+      HINT_SEEK_SLOT = 3;
+  }
+
+  /*
+   *    Find Dialog
+   */
+  @object GenInteractionClass FindDialog = {
+      GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+      GII_visibility = GIV_POPUP;
+      GII_type = GIT_COMMAND;
+      GI_comp  = @FindOKButton, @FindEntryBox;
+      HINT_SIZE_WINDOW_AS_DESIRED;
+      HINT_FIXED_SIZE = {SST_PIXELS | FOAM_DEFAULT_BUBBLE_WIDTH, 0, 0};
+  }
+
+  @object ComplexMonikerClass FindOKButton = {
+      ComplexMoniker = GenTriggerClass;
+      GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+      CMI_topText = CMT_OK;
+      GTI_actionMsg = MSG_MVD_FIND;
+      GTI_destination = @TVDialog;
+      HINT_SEEK_REPLY_BAR;
+      HINT_SEEK_SLOT = 0;
+  }
+
+  @chunk TCHAR FindDialogTitle[] = "Find in file";
+  @object ComplexMonikerClass FindEntryBox = {
+      ComplexMoniker = GenInteractionClass;
+      CMI_topText = @FindDialogTitle;
+      CMI_fontSize = FOAM_NORMAL_FONT_SIZE;
+      CMI_iconBitmap = CMB_SEARCH;
+      GI_comp = @FindGreyFrame;
+
+      ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+      HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+      HINT_PLACE_MONIKER_ABOVE;
+      HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+      HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+      HINT_CENTER_CHILDREN_VERTICALLY;
+      HINT_CENTER_CHILDREN_ON_MONIKERS;
+      HINT_INDENT_CHILDREN = 0;
+  }
+
+  @object GreyFrameClass FindGreyFrame = {
+      GI_comp = @FindTextField;
+  }
+
+  @object GenTextClass FindTextField = {
+      GTXI_maxLength = SEARCH_REPLACE_TEXT_MAXIMUM - 1;
+      GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+      HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  }
+
+  /*
+   *    "Save As Note" filename dialog
+   */
+  @object GenInteractionClass NoteEntryDialog = {
+      GII_visibility = GIV_POPUP;
+      GII_type = GIT_COMMAND;
+      GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+      GI_comp  = @NoteEntryOKButton, @NoteEntryBox;
+      HINT_SIZE_WINDOW_AS_DESIRED;
+      HINT_FIXED_SIZE = {SST_PIXELS | FOAM_DEFAULT_BUBBLE_WIDTH, 0, 0};
+  }
+
+  @object ComplexMonikerClass NoteEntryOKButton = {
+      ComplexMoniker = GenTriggerClass;
+      CMI_topText = CMT_OK;
+      ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+      HINT_SEEK_REPLY_BAR;
+      HINT_SEEK_SLOT = 0;
+  }
+
+  @chunk TCHAR NoteEntryTitle[] = "Save As Note";
+  @object ComplexMonikerClass NoteEntryBox = {
+      ComplexMoniker = GenInteractionClass;
+      CMI_topText = @NoteEntryTitle;
+      CMI_fontSize = FOAM_NORMAL_FONT_SIZE;
+      CMI_iconBitmap = CMB_INPUT_TITLE_ICON;
+      GI_comp = @NoteEntryGreyFrame;
+
+      ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+      HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+      HINT_PLACE_MONIKER_ABOVE;
+      HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+      HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+      HINT_CENTER_CHILDREN_VERTICALLY;
+      HINT_CENTER_CHILDREN_ON_MONIKERS;
+      HINT_INDENT_CHILDREN = 0;
+  }
+
+  @object GreyFrameClass NoteEntryGreyFrame = {
+      GI_comp = @NoteEntryTextField;
+  }
+
+  @object GenTextClass NoteEntryTextField = {
+      GTXI_maxLength = FOAM_DOCUMENT_PREFIX_TEXT_SIZE;
+      GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+      HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+      ATTR_GEN_TEXT_LEGAL_FILENAMES;
+  }
+
+  /*
+   *    "Save As RTF" filename dialog
+   */
+  @object GenInteractionClass RTFEntryDialog = {
+      GII_visibility = GIV_POPUP;
+      GII_type = GIT_COMMAND;
+      GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+      GI_comp  = @RTFEntryOKButton, @RTFEntryBox;
+      HINT_SIZE_WINDOW_AS_DESIRED;
+      HINT_FIXED_SIZE = {SST_PIXELS | FOAM_DEFAULT_BUBBLE_WIDTH, 0, 0};
+  }
+
+  @object ComplexMonikerClass RTFEntryOKButton = {
+      ComplexMoniker = GenTriggerClass;
+      CMI_topText = CMT_OK;
+      ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+      HINT_SEEK_REPLY_BAR;
+      HINT_SEEK_SLOT = 0;
+  }
+
+  @chunk TCHAR RTFEntryTitle[] = "Save As RTF";
+  @object ComplexMonikerClass RTFEntryBox = {
+      ComplexMoniker = GenInteractionClass;
+      CMI_topText = @RTFEntryTitle;
+      CMI_fontSize = FOAM_NORMAL_FONT_SIZE;
+      CMI_iconBitmap = CMB_INPUT_TITLE_ICON;
+      GI_comp = @RTFEntryGreyFrame;
+
+      ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+      HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+      HINT_PLACE_MONIKER_ABOVE;
+      HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+      HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+      HINT_CENTER_CHILDREN_VERTICALLY;
+      HINT_CENTER_CHILDREN_ON_MONIKERS;
+      HINT_INDENT_CHILDREN = 0;
+  }
+
+  @object GreyFrameClass RTFEntryGreyFrame = {
+      GI_comp = @RTFEntryTextField;
+  }
+
+  @object GenTextClass RTFEntryTextField = {
+      GTXI_maxLength = DOS_DOT_FILE_NAME_LENGTH;
+      GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+      HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+      ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+  }
+
+  @object DocViewContentClass VLTextContent = {
+      VCNI_attrs = @default | VCNA_LARGE_DOCUMENT_MODEL
+                            | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+                            | VCNA_SAME_WIDTH_AS_VIEW;
+  }
+
+  @object VisLargeTextClass DocViewText = {
+      VTI_state = @default | VTS_SELECTABLE;
+      VTI_features = @default | VTF_DONT_SHOW_SOFT_PAGE_BREAKS;
+      VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES;
+      VLTI_attrs = VLTA_EXACT_HEIGHT;
+      VLTI_regionArray = @VLTTextRegionArray;
+  }
+
+  @chunk ChunkArrayHeader VLTTextRegionArray =
+      {
+        0,
+        sizeof(VisLargeTextRegionArrayElement),
+        0,
+        sizeof(ChunkArrayHeader)
+      };
+
+@end TheViewerUI;
+
+
+@start ProgressDialogTemplate, notDetachable;
+
+  /*
+   *    Progress dialog
+   */
+ @chunk TCHAR CnvDescripText[] = "Converting document...";
+
+ @object FoamProgressDialogClass ProgressIndicator = {
+     FPDI_descriptionText = @CnvDescripText;
+     GII_attrs = (@default | GIA_SYS_MODAL) & ~GIA_MODAL;
+     GI_states = (@default) & ~GS_USABLE;
+     HINT_DRAW_IN_BOX;
+     ATTR_GEN_CONTROL_PROHIBIT_UI = { FPDF_CANCEL };
+ }
+
+@end ProgressDialogTemplate;
+
+
+@start StringResource, data;
+
+  @chunk char MsgNotFound[] = "Search text not found.";
+  @chunk char MsgViewing[] = "Viewing: %s";
+  @chunk char DefaultNote[] = "NView Note";
+  @chunk char DefaultRTF[] = "NVIEW.RTF";
+
+  @chunk char StatusAborted[] = "Aborted by user.";
+  @chunk char StatusCannotOpenFile[] = "Cannot open input file. Please check "
+    "if it is in use by another application.";
+  @chunk char StatusCannotImport[] = "The file could not be loaded.";
+  @chunk char StatusUnhandledFormat[] = "The format of this file is not "
+    "supported.";
+  @chunk char StatusOutOfMemory[] = "Not enough memory for this operation.";
+  @chunk char StatusCannotCreateFile[] = "Cannot create output file.";
+  @chunk char StatusCannotExport[] = "The file could not be saved.";
+
+@end StringResource;
+
+
+void ReportStatus(NViewStatus err)
+{
+    optr msg[] = { NullOptr, @StatusAborted, @StatusCannotOpenFile,
+      @StatusCannotImport, @StatusUnhandledFormat, @StatusOutOfMemory,
+      @StatusCannotCreateFile, @StatusCannotExport };
+
+    if(err != NVS_NO_ERROR)
+      UserStandardDialogOptr(           /* notify user */
+        NullOptr, NullOptr, NullOptr, NullOptr, msg[err],
+        (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+          (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+}
+
+
+/*
+ ***************************************************************************
+ *              Handlers for Viewer Library entry points
+ ***************************************************************************
+ */
+
+/* VLR_OPEN       optr( ViewerParams *vp ) */
+optr _export _pascal TVOpen( ViewerParams *vp )
+{
+  optr                  theTableUI;
+  ReservationHandle     moreSpace;
+  NViewStatus           ret;
+
+  /* We want to request more heapspace for the app to hold all 
+     the memory we're going to need. */
+
+  moreSpace = GeodeRequestSpace( HEAPSPACE, GeodeGetProcessHandle() );
+
+  if ( moreSpace == 0 )
+  {
+    /* We should alert the user that we're out of memory, 
+       perhaps with a SysNotify().  But I won't do that for 
+       now because I'm lazy.  */
+
+    return( NullHandle );
+  }  
+
+  /* Create the UI to display the document by copying the template resource */
+  theTableUI = UserCreateDialog( @TVDialog );
+
+  /* Tell the ViewerDialog about the heapspace we reserved.  The dialog will 
+     free it when closed. */
+  @call theTableUI::MSG_VD_SET_HEAPSPACE_TOKEN( moreSpace );
+
+  @call theTableUI::MSG_VD_SET_VIEWER_PARAMS( vp );
+
+  /* Are we restoring from state or just opening a document? */
+  if (vp->VP_state == FALSE )
+  {
+    /* Call the code we wrote that opens and displays the document */
+    ret = @call theTableUI::MSG_MVD_OPEN_DOCUMENT( &vp->VP_documentInfo );
+    if(ret)
+    {
+      /* If there was a problem, discard the UI. */
+      @send theTableUI::MSG_VD_CLOSE(GeodeGetCodeProcessHandle(), VCS_CLOSED );
+      ReportStatus(ret);
+      return( NullHandle );
+    }
+  }
+  else                                  /* We're restoring from state. */
+  {  
+    /* Call the code we wrote that restores from state. */
+    ret = @call theTableUI::MSG_MVD_RESTORE_STATE(vp->VP_state);
+    if(ret)
+    {
+      /* If there was a problem, discard the UI. */
+      @send theTableUI::MSG_VD_CLOSE( GeodeGetCodeProcessHandle(), VCS_CLOSED );
+      ReportStatus(ret);
+      return( NullHandle );
+    }
+  }
+
+  /* Whether we're opening a document or restoring from state, we've 
+     initialized the UI correctly.  Bring up the dialog box. */
+  @call theTableUI::MSG_GEN_INTERACTION_INITIATE();
+
+  return( theTableUI );
+}
+
+/* VLR_DETACH hptr( optr optrUI );  */
+hptr _export _pascal TVDetach( optr optrUI )
+{
+  /* We will save our data to state, close the document, and discard UI */
+  MemHandle theState;
+
+  theState = @call optrUI::MSG_MVD_SAVE_STATE();
+  @call optrUI::MSG_MVD_CLOSE_DOCUMENT();
+  @call optrUI::MSG_VD_CLOSE( GeodeGetCodeProcessHandle(), VCS_CLOSED );
+  return( theState );
+}
+
+/* VLR_CHANGE_DOCUMENT   void( ViewerChangeDocumentStruct *vcds) */
+void _export _pascal TVChangeDocument( ViewerChangeDocumentStruct *vcds)
+{
+  NViewStatus ret;
+
+  /* Switch between documents--close the current document and open
+     the passed document. */
+
+  @call vcds->VCD_viewerOD::MSG_MVD_CLOSE_DOCUMENT();
+  ret = @call vcds->VCD_viewerOD::MSG_MVD_OPEN_DOCUMENT(&vcds->VCD_documentInfo);
+  if(ret)
+  {
+    @send vcds->VCD_viewerOD::MSG_VD_CLOSE(GeodeGetCodeProcessHandle(), VCS_CLOSED);
+  }
+}
+
+/* VLR_CLOSE  void (optr optrUI) */
+void _export _pascal TVClose( optr optrUI )
+{
+  /* Close the current document and discard UI */
+  @call optrUI::MSG_MVD_CLOSE_DOCUMENT();
+  @call optrUI::MSG_VD_CLOSE( GeodeGetCodeProcessHandle(), VCS_CLOSED );
+}
+
+
+/*
+ ***************************************************************************
+ *              Methods and procedures for DocViewDialogClass
+ ***************************************************************************
+ */
+
+@classdecl DocViewDialogClass;
+
+const PageSetupInfo defaultPageSetup =
+  DEFAULT_PAGE_SETUP;
+const VisTextCharAttr ca =
+  CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_SANS, 12, 0);
+const VisTextParaAttr pa =
+  PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(0, 0, J_LEFT, 0, 0, 0);
+
+
+/* The user pressed the "Close" button.  Close the document
+   file and discard the document display UI */
+
+@method DocViewDialogClass, MSG_MVD_CLOSE
+{
+  @call self::MSG_MVD_CLOSE_DOCUMENT();  
+  @send self::MSG_VD_CLOSE( GeodeGetCodeProcessHandle(), VCS_CLOSED );
+}
+
+void EasySearchReplace(optr text, char *findString, char *replaceString)
+{
+    MemHandle mh;
+    SearchReplaceStruct *srStruct;
+    char *p;
+
+    /* Allocate buffer for data structure. */
+    mh = MemAlloc(
+      sizeof(*srStruct) + strlen(findString) + 1 + strlen(replaceString) + 1,
+      HF_DYNAMIC, HAF_LOCK | HAF_ZERO_INIT);
+    srStruct = MemDeref(mh);
+    srStruct->params = SO_IGNORE_CASE | SO_PARTIAL_WORD;
+
+    srStruct->searchSize = strlen(findString)+1;
+    p = ((char *)srStruct) + sizeof(*srStruct);
+    strcpy(p, findString);
+    srStruct->replaceSize = strlen(replaceString)+1;
+    p += srStruct->searchSize;
+    strcpy(p, replaceString);
+
+    MemUnlock(mh);
+
+    @call text::MSG_VIS_TEXT_REPLACE_ALL_OCCURRENCES_FROM_OFFSET(0, 0, mh);
+
+    MemFree(mh);
+}
+
+void PostProcess(optr text)
+{
+    const char FF[]={C_FF,0};
+
+    /* Remove line breaks, which tend to confuse the Foam library routines
+       dealing with text transfer items... */
+
+    EasySearchReplace(text, FF, "");
+}
+
+NViewStatus Import(optr oself, DocumentInfo *doc, PageSetupInfo *pageSetup)
+{
+    char *ext;
+    GeosFileType type;
+    GeodeToken token;
+    Boolean saveNote = TRUE, saveRTF = TRUE;
+    NViewStatus ret = NVS_UNHANDLED_FORMAT;
+    optr text = ConstructOptr(OptrToHandle(oself),OptrToChunk(@DocViewText));
+    optr trig;
+
+    @call text::MSG_META_SUSPEND();
+    @call text::MSG_VIS_TEXT_DELETE_ALL();
+
+    @call text::MSG_VIS_TEXT_SET_CHAR_ATTR(&ca, TEXT_ADDRESS_PAST_END,0);
+    @call text::MSG_VIS_TEXT_SET_PARA_ATTR(&pa, TEXT_ADDRESS_PAST_END,0);
+
+    FilePushDir();
+    FoamSetDocumentDir(doc->DI_docDir);
+    FileGetPathExtAttributes(doc->DI_docName, FEA_FILE_TYPE,
+      &type, sizeof(type));
+    FileGetPathExtAttributes(doc->DI_docName, FEA_CREATOR,
+      &token, sizeof(token));
+
+    *pageSetup = defaultPageSetup;      /* no page setup is known from file */
+
+    if(type == GFT_NOT_GEOS_FILE)       /* Detect non-Geos binary files */
+    {
+      ext = strrchr(doc->DI_docName, '.');         
+      if(ext)                           /* check extension */
+      {
+        if(LocalCmpStringsNoCase(ext+1, "RTF", 3)==0)
+        {
+          ret = LoadRTFDoc(doc->DI_docDir, doc->DI_docName, text, pageSetup);
+          saveRTF = FALSE;              /* saving RTF makes no sense */
+        }
+        else if(LocalCmpStringsNoCase(ext+1, "HTM", 3)==0)
+        {
+          ret = LoadHTMLDoc(doc->DI_docDir, doc->DI_docName, text);
+        }
+        else if(LocalCmpStringsNoCase(ext+1, "PRC", 3)==0 ||
+                LocalCmpStringsNoCase(ext+1, "PDB", 3)==0)
+        {
+          ret = LoadPalmDoc(doc->DI_docDir, doc->DI_docName, text);
+        }
+        else                            /* all others are plain text */
+        {
+          ret = LoadTextDoc(doc->DI_docDir, doc->DI_docName, text);
+        }
+      }
+    }
+    else if(type == GFT_VM)
+    {
+      if(!strncmp(token.GT_chars, DOCUMENT_CREATOR_TOKEN, TOKEN_CHARS_LENGTH))
+      {
+        ret = LoadNoteDoc(doc->DI_docDir, doc->DI_docName, text, pageSetup);
+        saveNote = FALSE;               /* saving Note makes no sense */
+      }
+    }
+
+    FilePopDir();
+
+    if(ret==NVS_NO_ERROR)
+    {
+      @call text::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(VTS_EDITABLE, 0);
+      PostProcess(text);                /* clean up text contents... */
+      @call text::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(0, VTS_EDITABLE);
+    }
+
+    @call text::MSG_VIS_TEXT_SELECT_START();
+    @call text::MSG_META_UNSUSPEND();
+
+    /* Enabled/Disable triggers according to file type */
+    trig = ConstructOptr(OptrToHandle(oself),OptrToChunk(@SaveNoteTrigger));
+    if(saveNote)
+      @call trig::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    else
+      @call trig::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    trig = ConstructOptr(OptrToHandle(oself),OptrToChunk(@SaveRTFTrigger));
+    if(saveRTF)
+      @call trig::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    else
+      @call trig::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    return ret;
+}
+
+/* word MSG_MVD_OPEN_DOCUMENT( DocumentInfo *doc ); */
+/* The entry point routines send this message when they want to open a
+   document. */
+
+@method DocViewDialogClass, MSG_MVD_OPEN_DOCUMENT
+{
+    char buf[80];
+    ReplaceComplexMoniker rcm = {
+      0,0,                      // RCM_textStyleSet/Clear
+      0,                        // RCM_fontSize
+      0,                        // RCM_topTextSource
+      0,                        // RCM_iconBitmapSource
+      CMST_FPTR,                // RCM_topTextSourceType
+      CMST_KEEP,                // RCM_iconBitmapSourceType
+      0,                        // RCM_iconBitmapSize
+      RCMO_TOP_TEXT,            // RCM_overwrite
+    };
+    ReplaceComplexMonikerChunkHandles retValue;
+    optr group = ConstructOptr(OptrToHandle(oself),OptrToChunk(@VLTextGroup));
+
+    /* set title moniker */
+    MemLock(OptrToHandle(@MsgViewing));
+    sprintf(buf, LMemDeref(@MsgViewing), doc->DI_docName);
+    MemUnlock(OptrToHandle(@MsgViewing));
+
+    rcm.RCM_topTextSource = (dword)&buf;
+    @call group::MSG_COMPLEX_MONIKER_REPLACE_MONIKER(&retValue, &rcm);
+
+    pself->MVDI_doc = *doc;
+
+    return NVS_NO_ERROR;
+}
+
+
+/* Save and Close the file */
+/* Our code calls this message when it wants to close a document.  */
+
+@method DocViewDialogClass, MSG_MVD_CLOSE_DOCUMENT
+{
+}
+
+/* Our code calls this message when it wants to restore from state */
+
+@method DocViewDialogClass, MSG_MVD_RESTORE_STATE
+{
+  TVState *theBuffer;
+  NViewStatus ret;
+
+  /* Lock down the passed block */
+  theBuffer = MemLock(stateBlock);
+
+  /* Simply do the same as if opening the document from scratch... */
+  ret = @call self::MSG_MVD_OPEN_DOCUMENT(&(theBuffer->TVS_doc));
+
+  /* We're finished with the state block */
+  MemUnlock(stateBlock);
+  return ret;
+}
+
+/* Our code sends this message when it needs to shut down to state. */
+
+@method DocViewDialogClass, MSG_MVD_SAVE_STATE
+{
+  MemHandle     stateBlock;
+  TVState       *theBuffer;
+
+  /* Allocate the block */
+  stateBlock = MemAlloc(
+    sizeof(TVState), (HF_DYNAMIC | HF_SHARABLE), HAF_LOCK);
+  theBuffer = MemDeref(stateBlock);
+
+  /* Only store the name of the document we're looking at */
+  theBuffer->TVS_doc = pself->MVDI_doc;
+
+  /* We're done.  Unlock the block and return it. */
+  MemUnlock(stateBlock);
+  return stateBlock;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_MVD_SAVE_NOTE for DocViewDialogClass
+ *
+ * DESCRIPTION: Save current file as Note
+ *
+ ***********************************************************************/
+@method DocViewDialogClass, MSG_MVD_SAVE_NOTE
+{
+    FileLongName name;
+    NViewStatus ret;
+    PageSetupInfo pageSetup = pself->MVDI_pageSetup;
+
+    optr text = ConstructOptr(OptrToHandle(oself),OptrToChunk(@DocViewText));
+    optr dlg = ConstructOptr(OptrToHandle(oself),OptrToChunk(@NoteEntryDialog));
+    optr field =
+      ConstructOptr(OptrToHandle(oself),OptrToChunk(@NoteEntryTextField));
+    optr progress;
+
+    @call field::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@DefaultNote, 0);
+    @call field::MSG_VIS_TEXT_SELECT_ALL();
+    if(UserDoDialog(dlg) == IC_APPLY)
+    {
+      @call field::MSG_VIS_TEXT_GET_ALL_PTR(name);
+      progress = PutUpDialogViaUIThread(@ProgressIndicator);
+      ret = SaveNoteDoc(text, &pageSetup, FDD_CREATED_TEXTS, name);
+      TakeDownDialogViaUIThread(progress);
+      ReportStatus(ret);                /* Show error message */
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_MVD_SAVE_RTF for DocViewDialogClass
+ *
+ * DESCRIPTION: Save current file as RTF
+ *
+ ***********************************************************************/
+@method DocViewDialogClass, MSG_MVD_SAVE_RTF
+{
+    DosDotFileName name;
+    NViewStatus ret;
+    PageSetupInfo pageSetup = pself->MVDI_pageSetup;
+    optr progress;
+
+    optr text = ConstructOptr(OptrToHandle(oself),OptrToChunk(@DocViewText));
+    optr dlg = ConstructOptr(OptrToHandle(oself),OptrToChunk(@RTFEntryDialog));
+    optr field =
+      ConstructOptr(OptrToHandle(oself),OptrToChunk(@RTFEntryTextField));
+
+    @call field::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@DefaultRTF, 0);
+    @call field::MSG_VIS_TEXT_SELECT_ALL();
+    if(UserDoDialog(dlg) == IC_APPLY)
+    {
+      @call field::MSG_VIS_TEXT_GET_ALL_PTR(name);
+      progress = PutUpDialogViaUIThread(@ProgressIndicator);
+      ret = SaveRTFDoc(text, &pageSetup, FDD_CREATED_TEXTS, name);
+      TakeDownDialogViaUIThread(progress);
+      ReportStatus(ret);                /* Show error message */
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_MVD_FIND for DocViewDialogClass
+ *
+ * DESCRIPTION: Finds the first occurance of the specified string.
+ *
+ ***********************************************************************/
+@method DocViewDialogClass, MSG_MVD_FIND
+{
+    optr text = ConstructOptr(OptrToHandle(oself),OptrToChunk(@DocViewText));
+    optr dlg = ConstructOptr(OptrToHandle(oself),OptrToChunk(@FindDialog));
+
+    /* Assume we don't need this any more */
+    @send dlg::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+
+    /* Begin at the beginning... */
+    @call text::MSG_VIS_TEXT_SELECT_START();
+
+    /* Search for first occurance (not really different from the rest). */
+    @call self::MSG_MVD_FIND_NEXT();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_MVD_FIND_NEXT for DocViewDialogClass
+ *
+ * DESCRIPTION: Finds the next occurance of the specified string.
+ *
+ ***********************************************************************/
+@method DocViewDialogClass, MSG_MVD_FIND_NEXT
+{
+    VisTextRange vtr;
+    SearchFromOffsetReturnStruct retStruct;
+    MemHandle mh;
+    SearchReplaceStruct *srStruct;
+    mySearchFromOffsetStruct sfos;
+    char *p, findString[SEARCH_REPLACE_TEXT_MAXIMUM];
+    optr text = ConstructOptr(OptrToHandle(oself),OptrToChunk(@DocViewText));
+    optr field = ConstructOptr(OptrToHandle(oself),OptrToChunk(@FindTextField));
+
+    @call text::MSG_VIS_TEXT_GET_SELECTION_RANGE(&vtr);
+    @call field::MSG_VIS_TEXT_GET_ALL_PTR(findString);
+
+    /* Allocate buffer for data structure. */
+    mh = MemAlloc(sizeof(*srStruct) + strlen(findString) + 1,
+      HF_DYNAMIC, HAF_LOCK | HAF_ZERO_INIT);            
+    srStruct = MemDeref(mh);
+    p = ((char *)srStruct) + sizeof(*srStruct);
+
+    srStruct->searchSize = strlen(findString)+1;
+    srStruct->params = SO_IGNORE_CASE | SO_PARTIAL_WORD;
+    strcpy(p, findString);
+
+    MemUnlock(mh);
+
+    sfos.SFOS_searchReplaceStruct = mh;
+    sfos.SFOS_startObject = text;
+    sfos.SFOS_startOffset = 0;
+    sfos.SFOS_currentOffset = vtr.VTR_end;
+    sfos.SFOS_flags = 0;
+    sfos.SFOS_retStruct = &retStruct;
+
+    @call text::{MSG_MVD_SEARCH_FROM_OFFSET}
+      MSG_VIS_TEXT_SEARCH_FROM_OFFSET(sfos);
+
+    if(retStruct.SFORS_object)          /* success: mark text */
+    {
+      @call text::MSG_VIS_TEXT_SELECT_RANGE(
+        retStruct.SFORS_offset + retStruct.SFORS_len, retStruct.SFORS_offset);
+      @call text::MSG_META_GRAB_TARGET_EXCL();
+    }
+    else
+    {
+      UserStandardDialogOptr(           /* notify user */
+         NullOptr, NullOptr, NullOptr, NullOptr, @MsgNotFound,
+         (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+           (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_MVD_ZOOM
+ *
+ * DESCRIPTION: Cycle Zoom factor
+ *
+ ***********************************************************************/
+@method DocViewDialogClass, MSG_MVD_ZOOM
+{
+    GetScaleParams scale;
+    WWFixedAsDWord newScale;
+    optr view = ConstructOptr(OptrToHandle(oself),OptrToChunk(@VLTextView));
+
+    @call view::MSG_GEN_VIEW_GET_SCALE_FACTOR(&scale);
+
+    /* Cycle Zoom factor */
+    if(scale.GSP_xScaleFactor==MakeWWFixed(1.5))
+      newScale = MakeWWFixed(2);
+    else if(scale.GSP_xScaleFactor==MakeWWFixed(2.0))
+      newScale = MakeWWFixed(1);
+    else
+      newScale = MakeWWFixed(1.5);
+
+    @call view::MSG_GEN_VIEW_SET_SCALE_FACTOR(
+      0, 0, SVT_AROUND_UPPER_LEFT, newScale, newScale);
+}
+
+@method DocViewDialogClass, MSG_MVD_GET_DOC
+{
+    *doc = pself->MVDI_doc;
+}
+
+@method DocViewDialogClass, MSG_MVD_SET_FILE
+{
+    pself->MVDI_fileHan = fh;
+    strcpy(pself->MVDI_fileName, name);
+}
+
+@method DocViewDialogClass, MSG_MVD_GET_FILE
+{
+    strcpy(name, pself->MVDI_fileName);
+    return pself->MVDI_fileHan;
+}
+
+@method DocViewDialogClass, MSG_MVD_SET_PAGE_SETUP
+{
+    pself->MVDI_pageSetup = *page;
+}
+
+@method DocViewDialogClass, MSG_META_FUP_KBD_CHAR
+{
+    switch(character)
+    {
+      case (CS_UI_FUNCS << 8) | UC_ZOOM:
+        if(!(flags & CF_RELEASE))
+          @call self::MSG_MVD_ZOOM();   /* Capture Zoom key on N9110 */
+        return TRUE;                    /* We have handled this key */
+    }
+
+    return @callsuper();
+}
+
+
+/*
+ ***************************************************************************
+ *              Methods and procedures for content class
+ ***************************************************************************
+ */
+
+@classdecl  DocViewContentClass;
+
+@method DocViewContentClass, MSG_META_KBD_CHAR
+{
+    optr view = ConstructOptr(OptrToHandle(oself),OptrToChunk(@VLTextView));
+
+    switch(character)
+    {
+      case (CS_CONTROL << 8) | VC_UP:
+        if(!(flags & CF_RELEASE))
+          @call view::MSG_GEN_VIEW_SCROLL_PAGE_UP();
+        return;
+      case (CS_CONTROL << 8) | VC_DOWN:
+        if(!(flags & CF_RELEASE))
+          @call view::MSG_GEN_VIEW_SCROLL_PAGE_DOWN();
+        return;
+      case (CS_CONTROL << 8) | VC_LEFT:
+        if(!(flags & CF_RELEASE))
+          @call view::MSG_GEN_VIEW_SCROLL_UP();
+        return;
+      case (CS_CONTROL << 8) | VC_RIGHT:
+        if(!(flags & CF_RELEASE))
+          @call view::MSG_GEN_VIEW_SCROLL_DOWN();
+        return;
+      case (CS_UI_FUNCS << 8) | 0x16:
+        if(!(flags & CF_RELEASE))
+          @call self::MSG_MVD_ZOOM();
+        return;
+    }
+
+    @callsuper();
+}
+
+/********************************************************************
+ *              MSG_META_CONTENT_VIEW_OPENING
+ ********************************************************************
+ * SYNOPSIS:     We use MSG_META_CONTENT_VIEW_OPENING as a convenient
+ *               place to initialize some things.
+ * CALLED BY:
+ * PARAMETERS:   optr view
+ * RETURNS:      void
+ *******************************************************************/
+@method DocViewContentClass, MSG_META_CONTENT_VIEW_OPENING
+{
+    PageSetupInfo pageSetup;
+    DocumentInfo doc;
+    VMFileHandle fileHan;
+    char fileName[14];
+    NViewStatus ret;
+    optr text = ConstructOptr(OptrToHandle(oself),OptrToChunk(@DocViewText));
+    optr cont = ConstructOptr(OptrToHandle(oself),OptrToChunk(@VLTextContent));
+    optr dlg = ConstructOptr(OptrToHandle(oself),OptrToChunk(@TVDialog));
+    optr group, progress;
+
+    @callsuper();
+
+    /* Add the text object as a child of the content. */
+    @call cont::MSG_VIS_MARK_INVALID(
+      VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_DELAYED_VIA_APP_QUEUE);
+    @call cont::MSG_VIS_ADD_CHILD(text, CCO_FIRST);
+
+    /* Create temp file and tell object about the file to store its data in. */
+    FileSetStandardPath(SP_WASTE_BASKET);
+    memset(fileName, 0, sizeof(fileName));
+    fileHan = VMOpen(fileName, 0, VMO_TEMP_FILE, 0);
+    @call dlg::MSG_MVD_SET_FILE(fileHan, fileName);
+    @call text::MSG_VIS_TEXT_SET_VM_FILE(fileHan);
+
+    @call text::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+    @call text::MSG_VIS_TEXT_CREATE_STORAGE(
+      VTSF_MULTIPLE_CHAR_ATTRS | VTSF_MULTIPLE_PARA_ATTRS | VTSF_TYPES,
+      FALSE);
+
+    @call text::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+
+    @call dlg::MSG_MVD_GET_DOC(&doc);
+
+    progress = PutUpDialogViaUIThread(@ProgressIndicator);
+    ret = Import(oself, &doc, &pageSetup);
+    TakeDownDialogViaUIThread(progress);
+
+    @call dlg::MSG_MVD_SET_PAGE_SETUP(&pageSetup);
+
+    if(ret == NVS_NO_ERROR)
+    {
+      group = ConstructOptr(OptrToHandle(oself),OptrToChunk(@ViewControls));
+      @call group::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      group = ConstructOptr(OptrToHandle(oself),OptrToChunk(@ViewControls2));
+      @call group::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+    else
+    {
+      ReportStatus(ret);
+      @send dlg::MSG_MVD_CLOSE();
+    }
+
+} /* MSG_META_CONTENT_VIEW_OPENING */
+
+/********************************************************************
+ *              MSG_META_CONTENT_VIEW_CLOSING
+ ********************************************************************
+ * SYNOPSIS:     We use MSG_META_CONTENT_VIEW_CLOSING as a convenient
+ *               place to clean up after ourselves.
+ * CALLED BY:
+ * PARAMETERS:   void
+ * RETURNS:      void
+ *******************************************************************/
+@method DocViewContentClass, MSG_META_CONTENT_VIEW_CLOSING
+{
+    VMFileHandle fileHan;
+    char fileName[14];
+    optr text = ConstructOptr(OptrToHandle(oself),OptrToChunk(@DocViewText));
+    optr cont = ConstructOptr(OptrToHandle(oself),OptrToChunk(@VLTextContent));
+    optr dlg = ConstructOptr(OptrToHandle(oself),OptrToChunk(@TVDialog));
+
+    @callsuper();
+
+    @call text::MSG_VIS_TEXT_FREE_ALL_STORAGE( TRUE );
+    @call text::MSG_VIS_TEXT_SET_VM_FILE( NullHandle );
+    @call cont::MSG_VIS_REMOVE_CHILD( text, CCO_FIRST );
+
+    /* Close and remove temporary file. */
+    fileHan = @call dlg::MSG_MVD_GET_FILE(fileName);
+    VMClose(fileHan, FALSE);
+    FileSetStandardPath(SP_WASTE_BASKET);
+    FileDelete(fileName);
+
+} /* MSG_META_CONTENT_VIEW_CLOSING */

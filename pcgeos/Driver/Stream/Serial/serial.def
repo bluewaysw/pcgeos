@@ -1,0 +1,652 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Serial Driver -- Common definitions
+FILE:		serial.def
+
+AUTHOR:		Adam de Boor, Feb  6, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	2/ 6/90		Initial revision
+	andres	12/ 9/96	Modified for PENELOPE
+
+DESCRIPTION:
+	Header for the serial driver. Refer to serialMain.asm for notes
+	of interest for the whole driver.
+		
+	$Id: serial.def,v 1.60 98/05/05 10:30:48 jang Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+_Driver		= 1
+
+;
+; Standard include files
+;
+include	geos.def
+include geode.def
+include	resource.def
+include	ec.def
+include system.def
+include timer.def
+include driver.def
+include heap.def
+include medium.def
+include assert.def
+
+include	Internal/semInt.def
+include	Internal/interrup.def
+include	Internal/dos.def
+
+DefDriver	Internal/serialDr.def
+UseDriver	Internal/strDrInt.def
+include Internal/powerDr.def
+include Internal/serialIO.def
+
+.ioenable		; We're a driver, so we can use these things
+
+;------------------------------------------------------------------------------
+;		       Configuration Constants
+;------------------------------------------------------------------------------
+SERIAL_PROBE_RETRIES	equ	30		; number of times to try
+						;  setting SIEN_TRANSMIT to
+						;  provoke an interrupt
+SERIAL_PROBE_WAIT	equ	2		; number of ticks to delay
+						;  waiting for that interrupt
+						;  to arrive.
+
+SERIAL_EXISTENCE_CHECK_TRIES	equ	3	; number of times to read the
+						;  interrupt ID register
+						;  looking for a valid byte.
+SERIAL_EXISTENCE_CHECK_WAIT	equ	2	; number of ticks to delay
+						;  waiting for that byte to
+						;   show up
+
+TRACK_INTERRUPT_DEPTH		equ	FALSE	; set TRUE to track the depth
+						;  of nested interrupts.
+
+_FUNKY_INFRARED		equ	FALSE		; if true, then infrared ports
+						;  will have their DTR/RTS
+						;  signals tweaked when the
+						;  baud rate is changed.
+
+INTERRUPT_STAT		equ	FALSE		; see documentation below in
+						; Interrupt Stats section
+
+NEW_ISR			equ	TRUE		; use new ISR. It's faster and
+						; smaller, but doesn't support
+						; IRQ sharing
+
+LOG_MODEM_SETTINGS		equ	FALSE
+
+
+NOTIFY_WHEN_SNE_MODEM_CHANGED	equ	TRUE	; set TRUE if the notify 
+						; routine should be called
+						; immediately after being set
+						; so it can get the initial
+						; modem settings.
+
+COUNT_INTERRUPTS_AND_INPUT	equ	FALSE	; set TRUE to count the number
+						; of interrupts from all
+						; serial ports in numSerialInts
+						; and the number of bytes
+						; read from all ports in the
+						; numRead variable.
+
+;------------------------------------------------------------------------------
+;			   Interrupt Stats
+;------------------------------------------------------------------------------
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	If INTERRUPT_STAT execute the line
+
+	Name	Date		Description
+	----	----		-----------
+	SJ	4/29/96    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IS	macro	line
+if	INTERRUPT_STAT
+		line
+endif
+endm
+
+;
+; If you turn this on, the following information will be written out
+; to ini file.  The reason we write this to ini file is that for some devices
+; it is not easy to attach swat.  I used this and Appl/Tools/Ini to check
+; statistics of serial interrupts on responder device.
+;
+; The range of values is 0-65535.  So, you can only send limitted number of
+; packets before you look at this statistics.  Statistics begin when you open
+; port and written out when you close port.
+;
+; Right now only com1, com2, com3 exist.
+;
+; [com1]
+; interruptCount = ?		; number of serial interrupts happened
+; errorCount = ?		; number of error interrupts
+; xmitIntCount = ?		; number of transmit interrupts
+; recvIntCount = ? 		; number of data ready interrupts
+; fifoTimeoutCount = ?		; number of data ready + FIFO timeout
+; modemStatusCount = ?		; number of modem status interrupt
+; noActionCount = ?		; number of interrupts that require no action
+; bogusIntCount = ?		; number of ints that were not one of above
+; bufferFullCount = ?		; how many times input stream buffer was full
+; overrunCount = ?		; number of overrun errors
+;
+; [com2], [com3]
+; the same format
+;
+
+if INTERRUPT_STAT
+PrintMessage <INTERRUPT STATISTICS TURNED ON>
+
+SerialInterruptId	etype	byte
+II_MODEM_STATUS		enum	SerialInterruptId, 0000b	; 0
+II_NO_ACTION		enum	SerialInterruptId, 0001b	; 1
+II_XMIT_READY		enum	SerialInterruptId, 0010b	; 2
+II_DATA_READY		enum	SerialInterruptId, 0100b	; 4
+II_ERROR_STATUS		enum	SerialInterruptId, 0110b	; 6
+II_DUMMY1		enum	SerialInterruptId, 1000b	; 8
+II_DUMMY2		enum	SerialInterruptId, 1010b	; 10
+II_TRIG_LVL_CHANGE	enum	SerialInterruptId, 1100b	; 12
+
+SerialInterruptIdMask	equ 00001111b	; low nibble determines what we need
+					; to do in the interrupt handler
+;
+; define statistics structure
+;
+InterruptStatStructure	struct
+  ISS_interruptCount	word
+  ISS_errorCount	word
+  ISS_xmitIntCount	word
+  ISS_recvIntCount	word
+  ISS_fifoTimeout	word
+  ISS_overrunCount	word
+  ISS_bufferFullCount	word
+  ISS_modemStatusCount	word
+  ISS_noActionCount	word
+  ISS_bogusIntCount	word
+InterruptStatStructure	ends
+
+;
+; MACRO to increment statistics
+;
+; Pass:		ds:si MUST be pointing to SerialPortData
+;		statVar: offset to a InterruptStatStruct field
+;			InterruptStatStructure	struct
+;			  ISS_interruptCount	word
+;			  ISS_errorCount	word
+;			  ISS_xmitIntCount	word
+;			  ISS_recvIntCount	word
+;			  ISS_fifoTimeout	word
+;			  ISS_overrunCount	word
+;			  ISS_bufferFullCount	word
+;			InterruptStatStructure	ends
+; Return:	nothing
+; Destroys:	nothing
+;
+IncIntStatCount	macro	statVar
+		push	di
+		mov	di, offset statVar
+		call	SerialIncIntStatCount
+		WARNING_C OVERFLOW_IN_STATS
+		pop	di
+endm
+
+endif	; INTERRUPT_STAT
+
+
+;------------------------------------------------------------------------------
+;			    Useful Macros
+;------------------------------------------------------------------------------
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LoadVarSeg
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Point a segment register at our data segment
+
+PASS:		segment	= destination register
+		trash	= optional intermediate register to biff
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	2/ 6/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+LoadVarSeg	macro	segment, trash
+if <trash> ne <>
+		mov	trash, dgroup
+		mov	segment, trash
+elseif @CurSeg ne Resident
+		ErrMessage <LoadVarSeg without extra register can only function in Resident>
+else
+;		mov	segment, cs:serialData
+		push	bx
+		mov	bx, handle dgroup
+if <segment> eq <ds>
+		call	MemDerefDS
+elseif <segment> eq <es>
+		call	MemDerefES
+else
+		ErrMessage Destination for LoadVarSeg must be es or ds
+endif
+		pop	bx
+endif
+		endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IsPortOpen
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Tests a port (via its SerialPortData structure) to see if
+		it is in use.
+
+		A "jg" after this macro will jump if the port is NOT
+		open; a "jng" will jump if the port IS open.
+
+PASS:		structure_offset - offset to the port's data structure
+
+PSEUDO CODE/STRATEGY:
+		Compare the port's semaphore value with zero.  If it's
+		greater than zero, the semaphore is not in use, and there-
+		fore its port is not open.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jdashe	5/17/94		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IsPortOpen	macro	structure_offset
+
+		push	bx
+		mov	bx, ds:[structure_offset].SPD_openSem
+		tst	ds:[bx].Sem_value
+		pop	bx
+		
+		endm
+
+;-----------------------------------------------------------------------------
+;		PRODUCT-SPECIFIC CODE AND CONSTANTS
+;-----------------------------------------------------------------------------
+
+ifidn		HARDWARE_TYPE, <PC>
+	STANDARD_PC_HARDWARE		equ	TRUE
+else
+.err	< YOU MUST DEFINE A NEW HARDWARE TYPE IN SERIAL.DEF >
+endif
+
+ImplementMe	macro
+		.err	<Need something here for non-standard hardware>
+		endm
+
+;------------------------------------------------------------------------------
+;			     FATAL ERRORS
+;------------------------------------------------------------------------------
+INVALID_FUNCTION					enum FatalErrors
+OPEN_BAD_FLAGS						enum FatalErrors
+PORT_NOT_OPEN						enum FatalErrors
+VECTOR_PORT_LIST_CORRUPTED				enum FatalErrors
+SERIAL_PORT_CANT_INTERRUPT_AND_I_DONT_KNOW_WHY		enum FatalErrors
+BAD_MODEM_FLAGS						enum FatalErrors
+BAD_FLOW_CONTROL_FLAGS					enum FatalErrors
+AX_NOT_STREAM_WRITE_OR_STREAM_READ_OR_STREAM_BOTH	enum FatalErrors
+INVALID_PORT_NUMBER					enum FatalErrors
+OPENING_UNKNOWN_SERIAL_PORT				enum FatalErrors
+AX_NOT_STREAM_LINGER_OR_STREAM_DISCARD			enum FatalErrors
+DS_NOT_POINTING_TO_SERIAL_DATA				enum FatalErrors
+
+INVALID_PORT_DATA_OFFSET				enum FatalErrors
+; The passed offset does not point to a valid SerialPortData structure.
+
+NOT_A_PASSIVE_PORT					enum FatalErrors
+; A passive port was expected.  Active ports (or garbage) are not
+; appropriate.
+
+NOT_AN_ACTIVE_PORT					enum FatalErrors
+; An active port was expected.  Passive ports (or garbage) are not
+; appropriate.
+
+BAD_CONTEXT_FOR_PASSIVE_PORT				enum FatalErrors
+; A passive port is being used in the wrong context, or some
+; supporting informating is missing for using a passive port.
+
+PASSIVE_PORTS_NOT_AVAILABLE_ON_ZOOMER			enum FatalErrors
+; A passive port is being used on the Zoomer.  This isn't supported yet.
+
+INVALID_MEDIA_KEY_VALUE					enum FatalErrors
+; The value for a port's key in the [media] category is not a multiple of
+; size MediumType bytes.
+
+REF_COUNT_UNDERFLOW					enum FatalErrors
+; SPD_refCount dropped to 0 too soon, meaning something dec'ed when it shouldn't
+
+MUST_SPECIFY_READER_OR_WRITER				enum FatalErrors
+; AX is supposed to contain STREAM_READ or STREAM_WRITE but contains neither.
+
+WHAT_THE_HELL?						enum FatalErrors
+; A generic error indicating something truly unexpected has been detected.
+
+SERIAL_ERROR	equ	mask SerialError
+
+;-----------------------------------------------------------------------------
+;	Warnings
+;-----------------------------------------------------------------------------
+
+OVERFLOW_IN_STATS					enum Warnings
+; one of the interrupt stat variable has overflowed
+
+SERIAL_CHECK_PORT_FAILED__USING_DEFAULT_VALUE		enum Warnings
+; The code in SerialCheckPortPC has failed to find the serial
+; port.. on some systems, we know the port is actually there and
+; in a funny state.  In these cases, we should just use a default
+; value for the IRQ and press on.
+
+;-----------------------------------------------------------------------------
+;	PLATFORM CONSTANTS AND DEFINITIONS
+;-----------------------------------------------------------------------------
+
+	;
+	;  These constants are used by the basic hardware
+if STANDARD_PC_HARDWARE
+
+COM1_BASE	equ	3f8h		; Expected base of COM1
+COM2_BASE	equ	2f8h		; Expected base of COM2
+COM3_BASE	equ	3e8h		; Expected base of COM3
+COM4_BASE	equ	2e8h		; Expected base of COM4
+
+LAST_ACTIVE_SERIAL_COMPORT	equ	offset com8
+
+endif	; STANDARD_PC_HARDWARE
+
+
+;-----------------------------------------------------------------------------
+;		Universal Constants and Definitions
+;-----------------------------------------------------------------------------
+
+
+SerialNotificationsNeeded	record
+    SNN_INPUT_FULL:1		; non-zero if we received a byte, but the
+				;  input stream was too full to hold it.
+    SNN_EMPTY:1			; non-zero if transmit interrupt wasn't useless
+				;  since our output stream is empty but we
+				;  could have transmitted if we'd had data
+    SNN_ERROR:1			; non-zero if line-error notification needs to
+				;  be sent.
+    SNN_RECEIVE:1		; non-zero if received-data notification needs
+				;  to be sent.
+    SNN_TRANSMIT:1		; non-zero if transmitted-data notification
+				;  needs to be sent.
+    SNN_MODEM:1			; non-zero if modem-change notification needs
+				;  to be sent.
+    SNN_DESTROY:1		; non-zero if stream-destroy-complete
+				;  notification needs to be sent.
+    SNN_STATUS	SerialStatus:8	; initial line status
+SerialNotificationsNeeded	end
+
+SerialPortState	struct
+    SPS_baud	SerialBaud
+    SPS_format	SerialFormat
+    SPS_modem	SerialModem
+    SPS_ien	SerialIEN
+SerialPortState	ends
+
+SerialPortFlags	record
+    :6
+    SPF_FIFO:1			; set if port supports FIFOs
+    SPF_PORT_GONE:1		; set if port is on a PCMCIA card that has been
+				;  removed, so no port registers are to be
+				;  trusted.
+SeriaPortFlags	end
+
+FIFO_SIZE	equ	16	;The # bytes that can fit in the FIFO
+
+SerialPortData	struct
+    ;
+    ; Miscellaneous data
+    ;
+    SPD_base		word		0	; Base port for the printer
+    SPD_inStream	sptr.StreamData	0	; Stream that manages incoming
+						;  data for us
+    SPD_outStream	sptr.StreamData	0	; Stream that manages outgoing
+						;  data for us
+    SPD_openSem		nptr.Semaphore		; Semaphore on which things can
+						;  wait that want to open the
+						;  port
+    SPD_otherPortData	nptr.SerialPortData 0	; Points to the passive data
+						;  for this port if this is the
+						;  active port data, and vice-
+						;  versa.
+    SPD_passive		SerialPassiveStatus 0	; Flags for passive
+						;  connections. 
+    SPD_portNum		SerialPortNum		; The number of this port,
+						;  because we sometimes have
+						;  to map it back
+    SPD_socket		sword	 -1		; PCMCIA socket #, or -1 if
+						;  not PCMCIA
+    SPD_medium		MediumType SERIAL_MAX_MEDIA dup(<>)
+    						; Type of media bound to the
+						;  port. Must take MUT_INT
+    ;
+    ; Flow-control stuff
+    ;
+    SPD_highWater	word			; High-water mark for input
+    						;  stream at which XOFF must be
+						;  sent.
+SERIAL_MARGIN	equ	64	; Amount below total size at which to set
+				;  high water mark for a port.
+    SPD_lowWater	word			; Low-water mark to which input
+    						;  stream must drain before an
+						;  XON is sent.
+    SPD_mode		SerialFlow <
+	1, 1,					; flow control active both ways
+	0, 0,					; Neither XON nor XOFF pending
+	0, 0,					; Not stopped by hardware or
+						;  software
+	1,					; Use software FC by default
+	0					; Don't use hardware as we don't
+						;  know what signals to obey
+    >
+    SPD_stopCtrl SerialModem	mask SMC_RTS	; Signal to drop in hardware FC
+						;  when we want the other side
+						;  to shut up.
+    SPD_stopSignal SerialModemStatus mask SMS_CTS; Signal(s) whose lowering we
+						;  should take as a signal to
+						;  shut up for a bit.
+    ;
+    ; Interrupt stuff
+    ;
+    SPD_irq		byte		-1	; Interrupt level at which the
+						;  port is operating.
+    SPD_ien equ <SPD_curState.SPS_ien>		; Interrupts to enable for port
+    SPD_vector		nptr.SerialVectorData	; Data for interrupt vector
+    						;  being used.
+    SPD_next		nptr.PortData		; Next port using same vector
+    SPD_modemEvent	StreamNotifier		; Notifier for the SNE_MODEM
+    						;  event
+    SPD_passiveEvent	StreamNotifier		; Notifier for the SNE_PASSIVE
+    						;  event
+    SPD_notifications	SerialNotificationsNeeded
+						; used in interrupt code
+    SPD_modemStatus	SerialModemStatus	; status to be passed in
+						;  modem notifier
+    SPD_error		SerialError		; error to be generated
+    SPD_flags		SerialPortFlags	
+    SPD_byteMask	byte	0x7f		; mask for incoming bytes
+						;  (assume cooked mode to begin)
+    ;
+    ; Current port state, maintained as things change, for re-establishing
+    ; PCMCIA port state.
+    ; 
+    SPD_curState	SerialPortState
+
+    ;
+    ; Saved port state from open.
+    ;
+    SPD_initState	SerialPortState
+
+    SPD_ioMode		byte			; different hardware will have
+						; different IO modes
+
+    ;
+    ; Port-closing synchronization stuff
+    ;
+    SPD_refCount	byte		0	; Number of references to the
+						;  port. 1 on open, inc/dec
+						;  at start/end of strat.
+						;  When hit 0, free streams
+if NEW_ISR
+    ;
+    ; handlers for serial interrupt
+    ; used in MiniSerialInt
+    ;
+    SPD_handlers	nptr		offset FcHandlerTbl
+endif
+
+SerialPortData	ends
+
+SerialVectorData	struct
+    SVD_old	fptr.far		; Old vector contents
+    SVD_port	nptr.SerialPortData	; First port using this vector
+    SVD_handler	word			; Routine to handle the vector
+    SVD_irq	byte			; Interrupt level
+    SVD_mask	byte			; Mask for interrupt before vector
+					;  snagged.
+    SVD_active	word	0
+    SVD_useful	SerialNotificationsNeeded
+    SVD_interrupted	byte	0
+SerialVectorData	ends
+
+if NEW_ISR
+
+MaskJumpEntry	struct
+    MJE_mask	word			; mask to test with
+    MJE_func	nptr			; function to call if test is true
+MaskJumpEntry	ends
+
+endif
+
+;------------------------------------------------------------------------------
+;		     GLOBAL SYMBOL DECLARATIONS
+;------------------------------------------------------------------------------
+idata		segment
+		global	com1:SerialPortData,
+			com2:SerialPortData,
+			com3:SerialPortData,
+			com4:SerialPortData,
+			com5:SerialPortData,
+			com6:SerialPortData,
+			com7:SerialPortData,
+			com8:SerialPortData,
+			comPorts:nptr.SerialPortData,
+			numPorts:word
+		global	com1_passive:SerialPortData,
+			com2_passive:SerialPortData,
+			com3_passive:SerialPortData,
+			com4_passive:SerialPortData,
+			com5_passive:SerialPortData,
+			com6_passive:SerialPortData,
+			com7_passive:SerialPortData,
+			com8_passive:SerialPortData,
+			comPortsPassive:nptr.SerialPortData
+		global	primaryVec:SerialVectorData,
+			alternateVec:SerialVectorData,
+			weird1Vec:SerialVectorData,
+			weird2Vec:SerialVectorData
+idata		ends
+
+udata		segment
+		global	deviceMap:SerialDeviceMap
+if TRACK_INTERRUPT_DEPTH
+		global	maxIntDepth:word, curIntDepth:word
+endif
+
+if INTERRUPT_STAT
+		global	com1Stat:InterruptStatStructure
+		global	com2Stat:InterruptStatStructure
+		global	com3Stat:InterruptStatStructure
+endif
+
+udata		ends
+
+Resident	segment	resource
+	;
+	; serialMain.asm
+	;
+		global	serialData:sptr
+		global	SerialGetPortData:near
+		global	SerialGetPortDataFAR:far
+		global	SerialFindPortNum:far
+		global	SerialReestablishState:near
+		global	SerialSetMediumFAR:far
+		global	SerialBufferPowerChange:near
+		global	SerialCallPowerDriver:far
+	;
+	; serialInt.asm
+	;
+		global	SerialNotify:far
+		global	SerialPassiveNotify:far
+		global	SerialRestart:far
+IS <		global	SerialIncIntStatCount:near 			>
+IS <		global	RecordInterruptType:near 			>
+if	NEW_ISR
+		global	QuickHandlerTbl:nptr
+		global	FcHandlerTbl:nptr
+		global	MiniSerialPrimaryInt:far
+		global	MiniSerialAlternateInt:far
+		global	MiniWeird1Int:far
+		global	MiniWeird2Int:far
+		global	StopIncomingData:far
+		global	ResumeIncomingData:far
+		global	SerialSendNotifications:near
+else
+		global	SerialPrimaryInt:far
+		global	SerialAlternateInt:far
+		global	SerialWeird1Int:far
+		global	SerialWeird2Int:far
+endif
+		global	SerialEOIFar:far
+		global	SerialSuspend:near
+		global	SerialUnsuspend:near
+		global	SerialEnableTransmit:near
+		global	SerialNotifyModemNotifierChanged:near
+		global	IrdaRecvModeFar:far
+	;
+	; EC
+	;
+EC <		global	ECSerialVerifyPassive:far			>
+EC <		global	ECSerialVerifyActive:far			>
+Resident	ends
+
+	;
+	; serialMain.asm
+	; 
+OpenClose	segment resource
+		global	SerialInitVector:far
+		global	SerialResetVector:far
+		global	SerialResetPort:near
+		global	SerialCheckExists:near
+	;
+	; serialInit.asm
+	;
+		global	SerialInit:far
+		global	SerialExit:far
+		global	SerialDefinePort:far
+		global	SerialCheckPort:near
+OpenClose	ends

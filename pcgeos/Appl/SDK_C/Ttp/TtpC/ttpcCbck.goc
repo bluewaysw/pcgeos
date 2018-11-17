@@ -1,0 +1,395 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Irlmp
+FILE:		ttpcCbck.goc
+
+AUTHOR:		Andy Chiu, May  7, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	5/ 7/96   	Initial version.
+
+DESCRIPTION:
+	Ttp Client test application for Irlmp Library	
+
+	$Id: ttpcCbck.goc,v 1.1 97/04/04 16:41:08 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@define __TTPC_CALLBACK_GOC
+@include "ttpc.goh"
+
+
+/***********************************************************************
+ *		TtpCIrlmpDiscoveryCallback
+ ***********************************************************************
+ * SYNOPSIS:	Callback to receive LM_Discovery.confirm
+ * CALLED BY:	Irlmp Library
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *
+ *       data   = chunk array of DiscoveryLog
+ *       status = IrlmpDiscoveryStatus
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TtpCIrlmpDiscoveryCallback (ClientHandle client,
+				    IrlmpIndicationOrConfirmation type,
+				    word extra,
+				    dword data, 
+				    word status)
+{
+    word numElements;
+    optr chunkArray = (optr) data;
+    word elementSize;
+    DiscoveryLog *log;
+
+    GeodeLoadDGroup(extra);
+
+    EC_ERROR_IF(type != IIC_DISCOVER_DEVICES_CONFIRMATION, -1);
+
+EC( ECCheckGeodeHandle(extra);   )
+
+    numElements = ChunkArrayGetCount(chunkArray);
+    if (numElements) {
+	/* Get the first DiscoveryLog in the array.  It can't be out of */
+	/* bounds!                                                      */
+	/* ------------------------------------------------------------ */
+	log = ChunkArrayElementToPtr(chunkArray, 0, &elementSize);
+	irlapAddr = log->DL_devAddr;
+	TUShowStatusOptr(@discoverMsg);
+	TUSetIrlapAddr();
+
+	/* disable discover trigger, enable connect trigger */
+    	@send GeodeGetCodeOptrNS(@TtpCDiscoverTrigger)::
+	    MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    	@send GeodeGetCodeOptrNS(@TtpCConnectTrigger)::
+	    MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+    }
+    else
+	TUShowStatusOptr(@discoverFailedMsg);
+
+    /* Unregister, since we're done with discovery */
+    /* ------------------------------------------- */
+    IrlmpUnregister(client);
+
+}	/* End of TtpCIrlmpDiscoveryCallback.	*/
+
+
+/***********************************************************************
+ *		TCConnectConfirm
+ ***********************************************************************
+ * SYNOPSIS:	TTP_Connect.confirm
+ * CALLED BY:	TtpCTtpCallback
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TCConnectConfirm (ClientHandle client, IrlmpConnectArgs *connectArgs)
+{
+    TUShowStatusOptr(@connectConfirmMsg);
+    if (connectArgs->ICA_dataSize) {
+	TUSetRecvText((IrlmpDataArgs *)connectArgs);
+	HugeLMemFree(connectArgs->ICA_data);
+    }
+
+    TTPAdvanceCredit(client, 5);
+
+    /* disable the connect trigger */
+    @send GeodeGetCodeOptrNS(@TtpCConnectTrigger)::
+	    	MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+    /* enable data, status and disconnect triggers */
+    @send GeodeGetCodeOptrNS(@TtpCDataTrigger)::
+	    	MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @send GeodeGetCodeOptrNS(@TtpCStatusTrigger)::
+	    	MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @send GeodeGetCodeOptrNS(@TtpCDisconnectTrigger)::
+	    	MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @send GeodeGetCodeOptrNS(@TtpCGetValueTrigger)::
+	    	MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+}	/* End of TCConnectConfirm.	*/
+
+
+/***********************************************************************
+ *		TCDisconnectIndication
+ ***********************************************************************
+ * SYNOPSIS:	TTP_Disconnect.indication
+ * CALLED BY:	TtpCTtpCallback
+ * RETURN:	nothing
+ * SIDE EFFECTS: data is freed
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TCDisconnectIndication (ClientHandle client, IrlmpDataArgs *dataArgs)
+{
+    TUShowStatusOptr(@disconnectIndicationMsg);
+    if (dataArgs->IDA_dataSize) {
+	TUSetRecvText(dataArgs);
+	HugeLMemFree(dataArgs->IDA_data);
+    }
+    IrlmpUnregister(client);
+
+    /* Enable connect trigger */
+    @send GeodeGetCodeOptrNS(@TtpCConnectTrigger)::
+	    	MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+    /* disable data, status, disconnect getvalue triggers */
+    @send GeodeGetCodeOptrNS(@TtpCDataTrigger)::
+    	    	MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @send GeodeGetCodeOptrNS(@TtpCStatusTrigger)::
+	    	MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @send GeodeGetCodeOptrNS(@TtpCGetValueTrigger)::
+	    	MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @send GeodeGetCodeOptrNS(@TtpCDisconnectTrigger)::
+	    	MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+}	/* End of TCDisconnectIndication.	*/
+
+
+/***********************************************************************
+ *		TCDataIndication
+ ***********************************************************************
+ * SYNOPSIS:	TTP_Data.indication
+ * CALLED BY:	TtpCTtpCallback
+ * RETURN:	nothing
+ * SIDE EFFECTS: data is freed
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TCDataIndication (ClientHandle client, IrlmpDataArgs *dataArgs)
+{
+    TUShowStatusOptr(@dataIndicationMsg);
+    if (dataArgs->IDA_dataSize) {
+	TUSetRecvText(dataArgs);
+	HugeLMemFree(dataArgs->IDA_data);
+    }
+
+    TTPAdvanceCredit(client, 1); 
+
+}	/* End of TCDataIndication.	*/
+
+
+/***********************************************************************
+ *		TCStatusIndication
+ ***********************************************************************
+ * SYNOPSIS:	LM_Status.indication
+ * CALLED BY:	TtpcTtpCallback
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TCStatusIndication (void)
+{
+
+    TUShowStatusOptr(@statusIndicationMsg);
+
+}	/* End of TCStatusIndication.	*/
+
+
+
+/***********************************************************************
+ *		TCStatusConfirmation
+ ***********************************************************************
+ * SYNOPSIS:	LM_Status.confirm
+ * CALLED BY:	TtpCTtpCallback
+ * RETURN:	nothing
+ * SIDE EFFECTS: data is freed
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TCStatusConfirmation (ConnectionStatus status)
+{
+    optr statusOptr;
+
+    if (status & CS_IMPENDING_DISCONNECTION) {
+	if (status & CS_UNACKED_DATA)
+	    /* Noisy, unacked */
+	    statusOptr = @statusNoisyUnackedMsg;
+	else
+	    /* Noisy no unacked */
+	    statusOptr = @statusNoisyMsg;
+    }
+     /* Not noisy */
+    else if (status & CS_UNACKED_DATA)
+	/* not noisy, unacked */
+	statusOptr = @statusUnackedMsg;
+    else
+	/* not noisy, not unacked */
+	statusOptr = @statusOkayMsg;
+
+    TUShowStatusOptr(statusOptr);
+
+}	/* End of TCStatusConfirmation.	*/
+
+
+/***********************************************************************
+ *		TCGetValueByClassConfirmation
+ ***********************************************************************
+ * SYNOPSIS:	Show the results and unregister
+ * CALLED BY:	TtpcTtpCallback
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TCGetValueByClassConfirmation (ClientHandle client,
+				       optr        objectArray,
+				       word         returnValue)
+
+{
+
+    char *data;
+    char *lineFeed;
+    word numMatches;
+    char buf[UHTA_NULL_TERM_BUFFER_SIZE];
+    word wordValue;
+
+    IrlmpDisconnectIas(client);
+
+@if 0
+    /* To avoid a deadlock, we have to queue the message  */
+    /* The endpoint block was locked to call the callback */
+    /* and the unregister routine will also try to get    */
+    /* exclusive access                                   */
+    @send ConstructOptr(GeodeGetCodeProcessHandle(),0)::MSG_CP_UNREGISTER();
+
+    MemLock(HandleOf(@returnValueMsg));
+
+    lineFeed = LMemDeref(@lineFeedMsg);
+    
+    CUSetRecvTextPtr(lineFeed);
+    
+    /* The first byte is the return value */
+    UtilHex32ToAscii(buf, (dword) returnValue, UHTAF_NULL_TERMINATE);
+    CUSetRecvTextPtr(LMemDeref(@returnValueMsg));
+    CUSetRecvTextPtr(buf);
+    CUSetRecvTextPtr(lineFeed);
+
+    /* The number of matches is the next two words */
+    if (!returnValue) {
+	UtilHex32ToAscii(buf, (dword)ChunkArrayGetCount(objectArray),
+			 UHTAF_NULL_TERMINATE);
+	CUSetRecvTextPtr(LMemDeref(@matchesMsg));
+	CUSetRecvTextPtr(buf);
+	CUSetRecvTextPtr(lineFeed);
+    }
+
+    MemUnlock(HandleOf(@returnValueMsg));
+@endif
+}	/* End of TCGetValueByClassConfirmation.	*/
+
+
+/***********************************************************************
+ *		TtpCTtpCallback
+ ***********************************************************************
+ * SYNOPSIS:	Callback routine for Irlmp Library
+ * CALLED BY:	Irlmp Library
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/ 8/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TtpCTtpCallback (ClientHandle client,
+			 IrlmpIndicationOrConfirmation type,
+			 word extra,
+			 dword data, 
+			 word status)
+{
+    EC( ECCheckProcessHandle(extra);)
+
+	switch (type) {
+        case TTPIC_CONNECT_CONFIRMATION:
+	  /* TinyTP connection request was accepted. */
+	  TCConnectConfirm(client, (IrlmpConnectArgs *)data);
+	  break;
+	case TTPIC_DISCONNECT_INDICATION:
+	  /* Connection was disconnected. */
+	  TCDisconnectIndication(client,(IrlmpDataArgs *) data);
+	  break;
+	case TTPIC_DATA_INDICATION:
+	  TCDataIndication(client, (IrlmpDataArgs *)data);
+	  break;
+	case IIC_STATUS_INDICATION:
+	  TCStatusIndication();
+	  break;
+	case IIC_STATUS_CONFIRMATION:
+	  TCStatusConfirmation(status);
+	  break;
+	case IIC_GET_VALUE_BY_CLASS_CONFIRMATION:
+	  TCGetValueByClassConfirmation(client, (optr) data,status);
+	  break;
+        default:
+	  break;
+    }
+
+}	/* End of TtpCTtpCallback.	*/
+

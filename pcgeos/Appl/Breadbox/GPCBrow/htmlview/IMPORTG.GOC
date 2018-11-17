@@ -1,0 +1,829 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          ImportThread.goc
+ *
+ * AUTHOR:        Lysle Shields
+ *
+ ***********************************************************************/
+
+/* we need this for the callback... */
+#pragma option -WDE
+
+/**************************************************************************
+ *		Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi\string.h>
+#include <library.h>
+
+@include "htmlview.goh"
+@include "importg.goh"
+@ifdef PROGRESS_DISPLAY
+@include "urlfetch.goh"
+@endif
+#if PROGRESS_DISPLAY
+#include <Ansi/stdio.h>
+#endif
+#include <sem.h>
+
+@extern object HTMLVApp;
+
+#if PROGRESS_DISPLAY
+/* must be MAX_FETCH_ENGINE_CHILDREN + 1 */
+#define MAX_IMPORT_THREADS 3
+#define IMPORT_WORK_FILENAME _TEXT("IMPORTWK.%03d")
+
+/* queue for import progress data */
+#define IMPORT_PROGRESS_DATA_QUEUE_SIZE 20
+#endif
+
+#ifdef CACHE_FILE_HEADER_SIZE_LIMIT
+extern word G_cacheFileHeaderSizeLimit;
+#endif
+
+#ifdef ALLOW_FETCH_WHILE_IMPORTING
+extern Boolean G_fetchWhileImport;
+#endif
+
+/**************************************************************************
+ *	    Types and structures
+ **************************************************************************/
+
+typedef struct {
+    optr textObj ;
+    NameToken name ;
+    TCHAR mimeType[MIME_MAXBUF] ;
+    PathName curHTML;
+    Boolean temporary;
+    Boolean objCache;
+#if PROGRESS_DISPLAY
+    ImportProgressData importProgressData;
+#endif
+    Boolean *p_stop ;
+    MimeStatus *mimeStatus ;
+} T_importGraphicRequest;
+
+
+/**************************************************************************
+ *	    Classes
+ **************************************************************************/
+
+    /*---------------------------------------------------------------------*/
+    @class ImportThreadEngineClass, MetaClass ;
+        @instance sword numAborts = 0 ;
+        @message void MSG_IMPORT_THREAD_ENGINE_KILL() ;
+        @message void MSG_IMPORT_THREAD_ENGINE_IMPORT_GRAPHIC(MemHandle mem) ;
+        @message void MSG_IMPORT_THREAD_ENGINE_START_ABORT() ;
+        @message void MSG_IMPORT_THREAD_ENGINE_END_ABORT() ;
+    @endc
+    /*---------------------------------------------------------------------*/
+
+/**************************************************************************
+ *	    Globals
+ **************************************************************************/
+
+static Boolean G_importThreadStarted = FALSE ;
+
+#if PROGRESS_DISPLAY
+
+/* array of import threads */
+/* we have one import thread per fetch thread, plus one for import
+   operations without progress feedback */
+static MemHandle G_importThreadMemory[MAX_IMPORT_THREADS];
+static optr G_importThreadObj[MAX_IMPORT_THREADS];
+static VMFileHandle G_importWorkFile[MAX_IMPORT_THREADS];
+static MimeStatus G_importMimeStatus[MAX_IMPORT_THREADS] ;
+
+/* queue for import progress data */
+static MemHandle G_importProgressDataQueue[IMPORT_PROGRESS_DATA_QUEUE_SIZE];
+/* semaphore to access queue */
+static SemaphoreHandle G_importProgressDataQueueSem = 0;
+
+#ifdef ALLOW_FETCH_WHILE_IMPORTING
+/* if import thread is actively importing */
+Boolean G_importActive[MAX_IMPORT_THREADS-1];
+#endif
+
+#else
+
+static MemHandle G_importThreadMemory = NullHandle ;
+static optr G_importThreadObj = NullHandle ;
+static MimeStatus G_importMimeStatus ;
+
+#endif
+
+/**************************************************************************
+ *	    Fetch Engline Template Resource
+ **************************************************************************/
+
+@start ImportThreadEngineResource ;
+    /*---------------------------------------------------------------------*/
+    /* NOTE:  Never send messages to this object */
+    @object ImportThreadEngineClass ImportThreadTemplate = {
+    }
+    /*---------------------------------------------------------------------*/
+@end ImportThreadEngineResource ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  ImportThreadEngineStart
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Starts up the import engine thread.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE is sucessful, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean ImportThreadEngineStart(void)
+{
+    MemHandle dup = NullHandle ;
+    ThreadHandle newThread = NullHandle ;
+    Boolean status = FALSE ;
+#if PROGRESS_DISPLAY
+    int i;
+    FileLongName workFileName;
+#endif
+
+    EC_ERROR_IF(G_importThreadStarted, -1) ;
+    if (!G_importThreadStarted)  {
+
+#if PROGRESS_DISPLAY
+ #ifdef ALLOW_FETCH_WHILE_IMPORTING
+	/* init import state */
+	for (i = 0; i < MAX_IMPORT_THREADS-1; i++) {
+	    G_importActive[i] = FALSE;
+	}
+ #endif
+	/* allocate progress data queue semaphore */
+	G_importProgressDataQueueSem = ThreadAllocSem(1);
+	for (i = 0; i < IMPORT_PROGRESS_DATA_QUEUE_SIZE; i++) {
+	    G_importProgressDataQueue[i] = 0;
+	}
+
+	for (i = 0; i < G_numFetchChildren+1; i++) {
+#endif
+        /* First create a thread that has an event queue */
+        @call process::MSG_PROCESS_CREATE_EVENT_THREAD(
+                  &newThread,
+                  &ProcessClass,
+                  4000) ;
+        if (newThread)  {
+            /* Now create an object block that is on that thread */
+            dup = ObjDuplicateResource(
+                      OptrToHandle(@ImportThreadTemplate),
+                      -1,
+                      newThread) ;
+            if (dup)  {
+                /* Set up a global object pointer so all calls */
+                /* go directly to the object's queue */
+#if PROGRESS_DISPLAY
+                G_importThreadObj[i] = ConstructOptr(
+                                dup,
+                                OptrToChunk(@ImportThreadTemplate)) ;
+                G_importThreadMemory[i] = dup ;
+#ifdef GLOBAL_INTERNET_BUILD
+		FileSetCurrentPath(vmCacheSP, vmCacheDir);
+#else
+		FileSetCurrentPath(HTML_VMCACHE_SP, HTML_VMCACHE_DIR);
+#endif
+		sprintf(workFileName, IMPORT_WORK_FILENAME, i);
+		G_importWorkFile[i] = VMOpen(workFileName, VMAF_FORCE_READ_WRITE, VMO_CREATE_TRUNCATE, 1);
+		if (G_importWorkFile[i])
+		    /* set sync update so stuff will stay in memory for faster
+		       access */
+		    VMSetAttributes(G_importWorkFile[i], VMA_SYNC_UPDATE, 0) ;
+#else
+                G_importThreadObj = ConstructOptr(
+                                dup,
+                                OptrToChunk(@ImportThreadTemplate)) ;
+                G_importThreadMemory = dup ;
+#endif
+
+                /* Everything got created! */
+                status = TRUE ;
+#if PROGRESS_DISPLAY
+            } else {
+		/* error */
+		status = FALSE;
+		break;
+	    }
+        } else {
+	    /* error */
+	    status = FALSE;
+	    break;
+	}
+	}
+#else
+            }
+        }
+#endif
+        G_importThreadStarted = TRUE ;
+    }
+
+    return status ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ImportThreadEngineStop
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Stop the URL Fetch engine thread (kill)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void ImportThreadEngineStop(void)
+{
+#if PROGRESS_DISPLAY
+    int i;
+    FileLongName workFileName;
+#endif
+
+    EC_ERROR_IF(!G_importThreadStarted, -1) ;
+
+    if (G_importThreadStarted)  {
+#if PROGRESS_DISPLAY
+	/* free progress data queue semaphore */
+	ThreadFreeSem(G_importProgressDataQueueSem);
+
+	for (i = 0; i < G_numFetchChildren+1; i++) {
+	    @send ,insertAtFront ,forceQueue
+		 (G_importThreadObj[i])::MSG_IMPORT_THREAD_ENGINE_KILL() ;
+	    G_importThreadObj[i] = NullHandle ;
+	    G_importThreadMemory[i] = NullHandle ;
+	    if (G_importWorkFile[i]) {
+		VMClose(G_importWorkFile[i], FILE_NO_ERRORS);
+		sprintf(workFileName, IMPORT_WORK_FILENAME, i);
+#ifdef GLOBAL_INTERNET_BUILD
+		FileSetCurrentPath(vmCacheSP, vmCacheDir);
+#else
+		FileSetCurrentPath(HTML_VMCACHE_SP, HTML_VMCACHE_DIR);
+#endif
+		G_importWorkFile[i] = 0;
+	    }
+	}
+#else
+        @send ,insertAtFront ,forceQueue
+            G_importThreadObj::MSG_IMPORT_THREAD_ENGINE_KILL() ;
+        G_importThreadObj = NullHandle ;
+        G_importThreadMemory = NullHandle ;
+#endif
+        G_importThreadStarted = FALSE ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ImportThreadRequestImportGraphic
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Add a request to import another graphic.
+ |
+ | Inputs:
+ |    optr textObj                -- Object to receive imported graphic
+ |    NameToken name              -- Name of graphic to be replace in text
+ |    char *mimeType              -- MIME type
+ |    char *curHTML               -- file to import
+ |    Boolean temporary;          -- TRUE to delete file after import
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if successfully requested
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@ifdef PROGRESS_DISPLAY
+/*
+ * remove progress data from queue
+ */
+void ImportRemoveProgressDataFromQueue(MemHandle progressData)
+{
+    int i;
+
+    ThreadPSem(G_importProgressDataQueueSem);
+    for (i = 0; i < IMPORT_PROGRESS_DATA_QUEUE_SIZE; i++) {
+	if (G_importProgressDataQueue[i] == progressData) {
+	    G_importProgressDataQueue[i] = 0;
+	    break;
+	}
+    }
+    ThreadVSem(G_importProgressDataQueueSem);
+}
+
+ObjCacheToken LOCAL ImportLockCacheToken(ImportProgressData *ipd)
+{
+    ObjCacheToken oct;    
+    VMFileHandle vmf;
+    VMChain vmc;
+
+    oct = (ObjCacheToken)ipd->IPD_cacheItem;
+    if (oct != OCT_NULL)
+      ObjCacheLockItem(oct, &vmf, &vmc, NULL, 0);
+
+    if (oct == OCT_NULL ||
+        VMCHAIN_GET_VM_BLOCK(vmc) != ipd->IPD_bitmap ||
+        vmf != ipd->IPD_vmFile) 
+    {
+      if (oct != OCT_NULL)
+      {
+        ObjCacheUnlockItem(oct);
+        ObjCacheUnlockItem(oct);
+      }
+
+      oct = ObjCacheAddURL(
+        ipd->IPD_vmFile, VMCHAIN_MAKE_FROM_VM_BLOCK(ipd->IPD_bitmap),
+        OCT_GSTRING, &(ipd->IPD_iad), sizeof(ImageAdditionalData),
+        ipd->IPD_nameT, TRUE, TRUE);
+
+      ipd->IPD_cacheItem = (dword)oct;
+
+      ObjCacheLockItem(oct, NULL, NULL, NULL, 0);
+    }
+
+    return oct;
+}
+
+/*
+ * import progress callback routine, notify destination text object
+ */
+proc_ImportProgressCallback ImportGraphicProgressCallback
+{
+    MemHandle importProgressData;
+    ImportProgressData *newDataP, *pendingDataP;
+    int i;
+    Boolean updated = FALSE;
+
+    if (importProgressDataP) {
+	/* if import progress is already pending for this graphic, update it */
+	ThreadPSem(G_importProgressDataQueueSem);
+	for (i = 0; i < IMPORT_PROGRESS_DATA_QUEUE_SIZE; i++) {
+	    if (G_importProgressDataQueue[i]) {
+		pendingDataP = MemLock(G_importProgressDataQueue[i]);
+		if (pendingDataP) {
+		    if ((pendingDataP->IPD_nameT ==
+			importProgressDataP->IPD_nameT) &&
+			(pendingDataP->IPD_bitmap ==
+			importProgressDataP->IPD_bitmap) &&
+			(pendingDataP->IPD_vmFile ==
+			importProgressDataP->IPD_vmFile)) {
+			if (importProgressDataP->IPD_firstLine <
+			    pendingDataP->IPD_firstLine) {
+			    pendingDataP->IPD_firstLine =
+				importProgressDataP->IPD_firstLine;
+			}
+			if (importProgressDataP->IPD_lastLine >
+			    pendingDataP->IPD_lastLine) {
+			    pendingDataP->IPD_lastLine =
+				importProgressDataP->IPD_lastLine;
+			}
+			updated = TRUE;
+			/* I guess we keep searching, just in case */
+		    }
+		    MemUnlock(G_importProgressDataQueue[i]);
+		}
+	    }
+	}
+	ThreadVSem(G_importProgressDataQueueSem);
+
+        /* if updated pending progress, don't need to send another */
+	if (updated) return;
+
+        /* create/reference a token for this entry */
+        ImportLockCacheToken(importProgressDataP);
+
+	/* copy notification data then send to text obj asynchronously */
+	importProgressData = MemAlloc(sizeof(ImportProgressData),
+				      HF_DYNAMIC, HAF_STANDARD);
+	if (importProgressData) {
+	    newDataP = MemLock(importProgressData);
+	    if (newDataP) {
+		memcpy(newDataP, importProgressDataP, sizeof(*newDataP));
+		MemUnlock(importProgressData);
+
+                /* store new progress data in queue */
+	        ThreadPSem(G_importProgressDataQueueSem);
+	        for (i = 0; i < IMPORT_PROGRESS_DATA_QUEUE_SIZE; i++) {
+		    if (!G_importProgressDataQueue[i]) {
+		        G_importProgressDataQueue[i] = importProgressData;
+		        break;
+		    }
+	        }
+	        ThreadVSem(G_importProgressDataQueueSem);
+
+		@send, forceQueue importProgressDataP->IPD_textObj::
+		    MSG_URL_TEXT_IMPORT_GRAPHIC_PROGRESS(importProgressData);
+	    } else {
+		/* couldn't lock, memory error, dump this progress */
+		MemFree(importProgressData);
+	    }
+	}
+    }
+}
+@endif
+
+#if PROGRESS_DISPLAY
+Boolean ImportThreadRequestImportGraphic(
+            optr textObj,
+            NameToken name,
+            TCHAR *mimeType,
+            TCHAR *curHTML,
+            Boolean temporary,
+	    _LoadProgressParams_)
+#else
+Boolean ImportThreadRequestImportGraphic(
+            optr textObj,
+            NameToken name,
+            TCHAR *mimeType,
+            TCHAR *curHTML,
+            Boolean temporary)
+#endif
+{
+    T_importGraphicRequest *p_request ;
+    MemHandle mem ;
+    Boolean didRequest = FALSE ;
+    @extern object SettingsBoolGroup ;
+#if PROGRESS_DISPLAY
+    /* creates vfptr to callback routine */
+    static proc_ImportProgressCallback *importProgressCallback = ImportGraphicProgressCallback;
+    int importThread = 0;  /* default to non-loading progress import thread */
+
+    /* G_importThreadObj[0] is non-blocking one for non-progress requests */
+    if (loadProgressDataP) {
+	importThread = loadProgressDataP->LPD_loadThread+1;
+    }
+#endif
+
+    /* All we need to do is create a block and copy all the requested */
+    /* info.  The request is then sent to the thread for processing. */
+    mem = MemAlloc(sizeof(*p_request), HF_DYNAMIC, 0) ;
+    if (mem)  {
+        p_request = MemLock(mem) ;
+        if (p_request)  {
+            p_request->textObj = textObj;
+            p_request->name = name;
+
+            /* Validate the name we are using */
+EC(         NamePoolIsTokenValid(namePool, name, TRUE) ; )
+
+            strncpy(p_request->mimeType, mimeType, (sizeof(p_request->mimeType)/sizeof(TCHAR))-1) ;
+            strncpy(p_request->curHTML, curHTML, (sizeof(p_request->curHTML)/sizeof(TCHAR))-1) ;
+            p_request->temporary = temporary;
+
+            /* Is the object cache turned on? */
+            p_request->objCache = (@call SettingsBoolGroup::
+              MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() &
+                HTMLV_OBJECT_CACHE);
+
+#if PROGRESS_DISPLAY
+	    /* set up import progress data */
+	    p_request->importProgressData.IPD_vmFile = G_importWorkFile[importThread];
+	    p_request->importProgressData.IPD_loadProgressDataP = loadProgressDataP;
+	    p_request->importProgressData.IPD_textObj = textObj;
+	    p_request->importProgressData.IPD_nameT = name;
+        p_request->mimeStatus = G_importMimeStatus + importThread ;
+        memset(G_importMimeStatus+importThread, 0, sizeof(MimeStatus)) ;
+            p_request->importProgressData.IPD_cacheItem = OCT_NULL;
+	    /* point to callback routine, unless .ini setting turned
+	       progressDisplay off */
+	    p_request->importProgressData.IPD_callback =
+                (progressDisplay  
+#ifndef COMPILE_OPTION_IMPORT_PROGRESS_LOCAL
+                  /* no import progress if no loading progress */
+                  && loadProgressDataP                  
+#endif
+		) ? importProgressCallback : NULL;
+#else
+        p_request->mimeStatus = &G_importMimeStatus ;
+        memset(&G_importMimeStatus, 0, sizeof(MimeStatus)) ;
+#endif
+
+            MemUnlock(mem) ;
+
+            /* Now pass that to the import thread */
+#if PROGRESS_DISPLAY
+            @send ,forceQueue G_importThreadObj[importThread]::
+                              MSG_IMPORT_THREAD_ENGINE_IMPORT_GRAPHIC(mem) ;
+#else
+            @send ,forceQueue G_importThreadObj::
+                              MSG_IMPORT_THREAD_ENGINE_IMPORT_GRAPHIC(mem) ;
+#endif
+
+            didRequest = TRUE ;
+        }
+    }
+
+    return didRequest ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ImportThreadAbortAll
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    This routine is called when a request has come in to stop all
+ |    transactions (user abort).  All messages are then flushed out of
+ |    ImportThread engine.
+ |    NOTE:  This is done asyncronously.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |    MG   11/21/98  Added to import engine based on URLFetchEngineAbortAll()
+ |
+ *-----------------------------------------------------------------------*/
+void ImportThreadAbortAll(void)
+{
+#if PROGRESS_DISPLAY
+    int i;
+#endif
+
+    EC_ERROR_IF(!G_importThreadStarted, -1) ;
+
+    HWChecksumCheck() ;
+    if (G_importThreadStarted)  {
+        /* Put a start at the beginning of the queue and an end at */
+        /* the end of the queue (thus straddling all the events */
+        /* to be ignore/removed). */
+#if PROGRESS_DISPLAY
+	for (i = 0; i < G_numFetchChildren+1; i++) {
+        /* Mark the thread for abort */
+        G_importMimeStatus[i].MS_mimeFlags |= MIME_STATUS_ABORT ;
+	    @send ,forceQueue ,insertAtFront G_importThreadObj[i]::MSG_IMPORT_THREAD_ENGINE_START_ABORT() ;
+	    @send ,forceQueue G_importThreadObj[i]::MSG_IMPORT_THREAD_ENGINE_END_ABORT() ;
+	}
+#else
+        G_importMimeStatus.MS_mimeFlags |= MIME_STATUS_ABORT ;
+        @send ,forceQueue ,insertAtFront G_importThreadObj::MSG_IMPORT_THREAD_ENGINE_START_ABORT() ;
+        @send ,forceQueue G_importThreadObj::MSG_IMPORT_THREAD_ENGINE_END_ABORT() ;
+#endif
+    }
+}
+
+
+/***************************************************************************
+ *              ImportThreadEngineClass
+ ***************************************************************************/
+
+@classdecl ImportThreadEngineClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  ImportThreadEngineClass::MSG_IMPORT_THREAD_ENGINE_KILL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Kill the current thread (after clean up, if any).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ImportThreadEngineClass, MSG_IMPORT_THREAD_ENGINE_KILL
+{
+    ThreadPSem(MimeDriverSemaphore);
+    if(lastMimeDriver) {                  /* release previously used drivers */
+      GeodeFreeLibrary(lastMimeDriver);
+      lastMimeDriver = 0;
+    }
+    ThreadVSem(MimeDriverSemaphore);
+
+    /* Destroy the thread we are currently in */
+    @send ConstructOptr(ThreadGetInfo(0, TGIT_THREAD_HANDLE), 0)::
+      MSG_META_DETACH(0, NullHandle) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ImportThreadEngineClass::MSG_IMPORT_THREAD_ENGINE_IMPORT_GRAPHIC
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    All the real import work is done on this thread.  The passed in
+ |    memory block contains all the necessary data to do the import.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ImportThreadEngineClass, MSG_IMPORT_THREAD_ENGINE_IMPORT_GRAPHIC
+{
+    VMFileHandle vmf;
+    VMBlockHandle vmb = 0;
+    ImageAdditionalData iad;
+    T_importGraphicRequest request ;
+    T_importGraphicRequest *p_request ;
+    @extern object MsgLoadImg ;
+    @extern object MsgBlank ;
+    dword usedMem ;
+    ObjCacheToken oct;
+    word firstLine;
+#ifdef CACHE_FILE_HEADER_SIZE_LIMIT
+    VMHeaderInfoStruct vmInfo;
+#endif
+
+    /* Copy the request to a local variable to keep the system from */
+    /* holding a locked block in memory (and avoid fragmentation) */
+    p_request = MemLock(mem) ;
+    memcpy(&request, p_request, sizeof(request)) ;
+    MemUnlock(mem) ;
+    MemFree(mem) ;
+
+    if(pself->numAborts == 0)           /* don't start import if stopping */
+    {
+      /* Make sure the given name token is there in the name pool */
+      EC( NamePoolIsTokenValid(namePool, request.name, TRUE) ; )
+
+      /* Note that we are loading/importing an image */
+      @SendStatusUpdateOptr(
+        @MsgLoadImg, HTML_STATUS_TYPE_IMPORTING);
+
+      /* Find out what file to import into */
+      vmf = ObjCacheGetVMFile(request.name);
+
+#ifdef CACHE_FILE_HEADER_SIZE_LIMIT
+      /* after getting a expected VM file, do a check on the size of the
+	 header.  If too big, bail on this graphic */
+      VMGetHeaderInfo(vmf, &vmInfo);
+#endif
+
+      /* Make sure our path is relative to the document dir */
+      FileSetStandardPath(SP_DOCUMENT);
+
+      /* Ok.  Here it is -- do the actual call to import */
+      usedMem = 0 ;
+#if PROGRESS_DISPLAY
+      /* set up import progress data and import */
+#ifdef CACHE_FILE_HEADER_SIZE_LIMIT
+      if (vmInfo.headerSize > G_cacheFileHeaderSizeLimit) {
+	  objFileNum++;  /* skip to next file */
+      } else
+#endif
+      vmb = ToolsImportGraphicByDriver(request.curHTML, request.mimeType,
+        vmf, &iad, &usedMem, request.mimeStatus, &(request.importProgressData));
+
+      /* import for loading progress finished, release fetch thread to
+	 handle new fetch requests */
+      if (request.importProgressData.IPD_loadProgressDataP) {
+ #ifdef ALLOW_FETCH_WHILE_IMPORTING
+	  /* IPD_loadProgressDataP points into G_importLoadProgressData) */
+	  if (G_fetchWhileImport) {
+	      G_importActive[request.importProgressData.IPD_loadProgressDataP->LPD_loadThread] = FALSE;
+	  } else  /* encloses ThreadVSem only */
+ #endif
+	  ThreadVSem(request.importProgressData.IPD_loadProgressDataP->LPD_importSync);
+      }
+#else
+#ifdef CACHE_FILE_HEADER_SIZE_LIMIT
+      if (vmInfo.headerSize > G_cacheFileHeaderSizeLimit) {
+	  objFileNum++;  /* skip to next file */
+      } else
+#endif
+      vmb = ToolsImportGraphicByDriver(request.curHTML, request.mimeType,
+        vmf, &iad, &usedMem, request.mimeStatus);
+#endif
+
+      /* If we actually found the data, replace */
+      /* all the similar images. */
+      if (vmb)  {
+          /* Note how much more memory has been used */
+          /* (so we can free it later) */
+@ifdef 0
+          @send (request.textObj)::MSG_URL_TEXT_INCREASE_USED_MEMORY(usedMem) ;
+@else
+          /* graphics are stored in disk-based VM cache files, so we don't
+	     really need to hold their memory */
+          AllocWatcherFree(G_allocWatcher, usedMem);
+@endif
+
+#if PROGRESS_DISPLAY          
+          /* simulate final progress update with real graphic */
+          request.importProgressData.IPD_vmFile = vmf;
+          request.importProgressData.IPD_bitmap = vmb;
+          request.importProgressData.IPD_iad = iad;
+
+          /* Create a cache token for this update */
+          oct = ImportLockCacheToken(&(request.importProgressData));
+
+          /* Only add permanently if we actually got the whole graphic */
+          if(request.objCache && iad.IAD_completeGraphic)
+            ObjCacheForceCachable(oct);
+
+          /* Release the reference to the current cache token that is "owned"
+             by the importProgressData structure of the request. There is still
+             one more reference left on the counter that will be released
+             by MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS. */
+          ObjCacheUnlockItem(oct);
+
+          firstLine = request.importProgressData.IPD_callback? 
+              iad.IAD_size.XYS_height-1:0;
+#else
+          /* Add to the cache if we are allowed to */
+          /* Only add if we actually got the whole graphic */
+          oct = ObjCacheAddURL(
+            vmf, VMCHAIN_MAKE_FROM_VM_BLOCK(vmb),
+            OCT_GSTRING, &iad, sizeof(iad), 
+            request.name, TRUE,
+            !(request.objCache && iad.IAD_completeGraphic));
+
+          firstLine = 0;
+#endif
+
+          /* Replace the images. Cache and Name token are replaced by receiver */
+          @send (request.textObj)::MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS(
+            oct, request.name, firstLine, iad.IAD_size.XYS_height-1);
+      }
+      else
+          @send (request.textObj)::MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS(
+            OCT_NULL, request.name, 0, 0xFFFF);
+
+      if(request.temporary)             /* destroy file if requested */
+        FileDelete(request.curHTML);
+
+      /* Done with this graphic */
+      @SendStatusUpdateOptr(
+        @MsgBlank, HTML_STATUS_TYPE_IMPORTING);
+    }
+
+    /* We have completed this operation on the text object.  Mark */
+    /* it one less. */
+    @send (request.textObj)::MSG_URL_TEXT_DEC_PENDING() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ImportThreadEngineClass::MSG_IMPORT_THREAD_ENGINE_START_ABORT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    An abort request has come in.  Start aborting.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |    MG   11/21/98  Added to import engine
+ |
+ *-----------------------------------------------------------------------*/
+@method ImportThreadEngineClass, MSG_IMPORT_THREAD_ENGINE_START_ABORT
+{
+    HWChecksumCheck() ;
+    pself->numAborts++ ;
+
+    /* cannot abort in the middle of an import right now */
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ImportThreadEngineClass::MSG_IMPORT_THREAD_ENGINE_END_ABORT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    The end of the abort list has been reached.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |    MG   11/21/98  Added to import engine
+ |
+ *-----------------------------------------------------------------------*/
+@method ImportThreadEngineClass, MSG_IMPORT_THREAD_ENGINE_END_ABORT
+{
+    HWChecksumCheck() ;
+    pself->numAborts-- ;
+
+    EC_ERROR_IF(pself->numAborts < 0, -1) ;
+}
+
+
+/***************************************************************************
+ * END OF FILE:  URLFETCH.GOC
+ ***************************************************************************/

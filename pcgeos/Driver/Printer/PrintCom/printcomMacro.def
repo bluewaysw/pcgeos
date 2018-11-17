@@ -1,0 +1,130 @@
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Printer Drivers
+FILE:		printMacro.def
+
+AUTHOR:		Dave Durran
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	2/26/90		Initial revision
+	Dave	8/1/91		Added Adams neat macros to build tables
+
+DESCRIPTION:
+	This file contains macros that are common to all printer drivers
+		
+	$Id: printcomMacro.def,v 1.1 97/04/18 11:50:07 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; The string_table and res_table string equates hold the initializers for
+; the string and resource tables, respectively. Define them initially
+; empty so we know when we add the first thing to them.
+;
+string_table	equ <>
+res_table	equ <>
+
+;
+; Define the PrintDevice enumerated type that we'll be filling in as we
+; go.
+; (ALREADY DEFINED IN printDr.def)
+; PrintDevice	etype	word, 0, 2
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefPrinter
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Define another printer supported by this driver.
+
+PASS:		const	= The name of the PrintDevice constant for the printer.
+		str	= The device string for the printer, within
+			  quotation marks.
+		resource= The name of the resource holding the information
+			  about the printer.
+
+PSEUDO CODE/STRATEGY:
+		This macro must be used while the driver's extended-info
+		lmem resource is the current segment.
+
+		When all printers have been defined, invoke the PrinterTables
+		macro to define the actual deviceStrings and deviceInfoTab
+		tables.
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	7/16/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DefPrinter	macro	const, str, resource
+;
+; Add the constant to the enumerated type.
+;
+const		enum	PrintDevice
+
+;
+; Define the chunk holding the string.
+;
+LocalDefString	<const&String>	<str, 0>
+
+ifb string_table
+
+; This is the first printer being defined, so just stick the string and
+; resource into their respective initializers w/o a comma
+
+string_table	equ	<const&String>
+res_table	equ	<handle resource>
+
+else
+
+; Defining an additional printer, so append the string & resource to the
+; initializer equates separated by a comma and a space.
+
+string_table	catstr string_table, <, const&String>
+res_table	catstr res_table, <, handle resource>
+
+endif
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		PrinterTables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Define the string and resource tables for the driver based
+		on the things defined with DefPrinter
+
+PASS:		current segment is the driver's extended-info segment
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	7/16/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+PrinterTables	macro
+
+SBCS <	deviceStrings	lptr.char	string_table			>
+DBCS <	deviceStrings	lptr.wchar	string_table			>
+		word	0
+deviceInfoTab	hptr	res_table
+		word	0
+
+endm
+

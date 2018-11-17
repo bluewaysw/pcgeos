@@ -1,0 +1,342 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	PCGEOS
+ * MODULE:	ResEdit
+ * FILE:	uiPrint.ui
+ *
+ * AUTHOR:  	Cassie Hartzog: Aug 27, 1993
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	8/27/93	  cassie    Initial version
+ *
+ * DESCRIPTION:
+ *	ResEdit UI for printing and page setup
+ *
+ * 	$Id: uiPrint.ui,v 1.1 97/04/04 17:13:39 newdeal Exp $
+ *
+ ***********************************************************************/
+
+
+start PrintUI;
+
+PrintSubGroup = GenInteraction {
+        children =
+                ResEditPrintControl;
+        visibility = subGroup;
+}
+
+ResEditPrintControl = PrintControl vardataReloc {
+	printAttributes =
+		default -pageControls,
+		+showProgress,
+		+graphicsOutput,
+		+markAppBusy;
+
+	genStates = default +enabled;
+	printOutput = "TO_APP_MODEL";
+	docNameOutput = ResEditDocumentGroup;
+	hints = {
+		HINT_SAME_CATEGORY_AS_PARENT,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass },
+		ATTR_PRINT_CONTROL_APP_UI { UN_OPTR ResEditPrintUI },
+                ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN,
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP
+	}
+}
+
+ResEditPrintUI = GenInteraction {
+	moniker = "ResEdit Options";
+	children =
+		PrintOptions,
+		PrintMarginsGroup,
+		PrintResourcesDialog;
+	genStates = default -usable;
+	genAttributes = default +notifyVisibility;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_RESEDIT_APPLICATION_NOTIFY_VISIBILITY
+		},
+                ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+PrintResourcesDialog = GenInteraction {
+	moniker = "Resources to Print";
+	children = 
+		PrintResourcesList,
+		CurrentFilters;
+	type = properties;
+	visibility = dialog;
+	attributes = default +sysModal; 
+	hints = {
+		HINT_INTERACTION_MAKE_RESIZABLE
+	}
+
+}
+
+PrintResourcesList = GenDynamicList vardataReloc {
+	behaviorType = extendedSelection;
+	queryMsg = MSG_RESEDIT_DOCUMENT_GET_RESOURCE_NAME;
+ 	destination = "TO_APP_MODEL";
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, MAX_NAME_LEN+1>
+			SpecHeight <SST_LINES_OF_TEXT, 10>
+			word	10
+		},
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+CurrentFilters = GenText {
+	moniker = "Current Filters: ";
+	text = "none";
+	genAttributes = default +readOnly;
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, MAX_NAME_LEN+1>
+			SpecHeight <>
+		},
+		HINT_TEXT_NO_FRAME,
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+	
+/****************************************
+ * Print Options Group
+ ****************************************/
+
+PrintOptions = GenInteraction {
+	children = 
+		PrintOptionsGroup,
+		SavePrintOptionsTrigger;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+                ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+PrintOptionsGroup = GenBooleanGroup ignoreDirty {
+	children =
+		PrintPageNumberOption,
+		PrintResourceNamesOption, 
+		PrintChunkNamesOption, 
+		PrintChunkTypeOption,
+		PrintInstructionsOption,
+		PrintTranslationOption;
+	selectedBooleans = "mask PF_PAGE_NUMBER or mask PF_RESOURCE_NAMES or mask PF_CHUNK_NAMES";
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_LEFT_JUSTIFY_CHILDREN,
+                ATTR_GEN_INIT_FILE_KEY {char "printOptions",0}
+	}
+}
+
+PrintPageNumberOption = GenBoolean ignoreDirty {
+	moniker = "Print Page Number";
+	identifier = "mask PF_PAGE_NUMBER";
+}
+
+PrintResourceNamesOption = GenBoolean ignoreDirty {
+	moniker = "Print Resource Names";
+	identifier = "mask PF_RESOURCE_NAMES";
+}
+
+PrintChunkNamesOption = GenBoolean ignoreDirty {
+	moniker = "Print Chunk Names";
+	identifier = "mask PF_CHUNK_NAMES";
+}
+
+PrintChunkTypeOption = GenBoolean ignoreDirty {
+	moniker = "Print Chunk Type Information";
+	identifier = "mask PF_CHUNK_TYPE";
+}
+
+PrintInstructionsOption = GenBoolean ignoreDirty {
+	moniker = "Print Instructions";
+	identifier = "mask PF_INSTRUCTIONS";
+}
+
+PrintTranslationOption = GenBoolean ignoreDirty {
+	moniker = "Print Translation Instead of Original";
+	identifier = "mask PF_TRANSLATION";
+}
+
+/****************************************
+ * Margins
+ ****************************************/
+
+PrintMarginsGroup = GenInteraction {
+        moniker = "Margins:";
+        children =
+                PageSizeMarginsLeftGroup,
+                PageSizeMarginsRightGroup;
+        hints = {
+                ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN,
+                HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+                        HINT_ORIENT_CHILDREN_VERTICALLY,
+                HINT_ELSE,
+                        HINT_ORIENT_CHILDREN_HORIZONTALLY,
+                HINT_ENDIF
+        }
+}
+
+PageSizeMarginsLeftGroup = GenInteraction {
+        children =
+                PageSizeMarginLeft,
+                PageSizeMarginTop;
+        hints = {
+                HINT_CENTER_CHILDREN_ON_MONIKERS,
+                ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+        }
+}
+
+PageSizeMarginLeft = GenValue {
+        moniker = "Left:";
+        displayFormat = inchesOrCentimeters;
+        increment = 18;
+        hints = {
+                ATTR_GEN_VALUE_METRIC_INCREMENT {WWFixed <11353, 14>},
+                ATTR_GEN_INIT_FILE_KEY {char "leftMargin",0}
+        }
+}
+
+PageSizeMarginTop = GenValue {
+        moniker = "Top:";
+        displayFormat = inchesOrCentimeters;
+        increment = 18;
+        hints = {
+                ATTR_GEN_VALUE_METRIC_INCREMENT {WWFixed <11353, 14>},
+                ATTR_GEN_INIT_FILE_KEY {char "topMargin",0}
+        }
+}
+
+PageSizeMarginsRightGroup = GenInteraction {
+        children =
+                PageSizeMarginRight,
+                PageSizeMarginBottom;
+        hints = {
+                HINT_CENTER_CHILDREN_ON_MONIKERS,
+                ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+        }
+}
+
+PageSizeMarginRight = GenValue {
+        moniker = "Right:";
+        displayFormat = inchesOrCentimeters;
+        increment = 18;
+        hints = {
+                ATTR_GEN_VALUE_METRIC_INCREMENT {WWFixed <11353, 14>},
+                ATTR_GEN_INIT_FILE_KEY {char "rightMargin",0}
+        }
+}
+
+PageSizeMarginBottom = GenValue {
+        moniker = "Bottom:";
+        displayFormat = inchesOrCentimeters;
+        increment = 18;
+        hints = {
+                ATTR_GEN_VALUE_METRIC_INCREMENT {WWFixed <11353, 14>},
+                ATTR_GEN_INIT_FILE_KEY {char "bottomMargin",0}
+        }
+}
+
+SavePrintOptionsTrigger = GenTrigger {
+	moniker = 'S', "Save ResEdit Options";
+	action = MSG_RESEDIT_DOCUMENT_SAVE_PRINT_OPTIONS, "TO_APP_MODEL";
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+
+end PrintUI;
+
+
+start MiscObjectUI;
+
+PrintText = ResEditText ignoreDirty {
+	right	= "8*72";			/* Standard page size */
+	bottom	= "10*72";
+	optFlags = default -geometryInvalid;
+	text = "";
+	storage = default -defaultCharAttr, +multipleCharAttr;
+	charAttrRuns = PrintTextCharAttrRuns;
+	type = RETT_HEIGHT;
+}
+
+chunk PrintTextCharAttrRuns = data {
+    RUN_ARRAY_HEADER(2, PrintTextCharAttrs)
+    TextRunArrayElement TRAE_ALL(CHAR_ATTR_NORMAL), TRAE_END
+}
+
+#ifdef DO_PIZZA
+chunk PrintTextCharAttrs = data {
+    CHAR_ATTR_ELEMENT_ARRAY_HEADER(1)
+CHAR_ATTR_NORMAL = 0
+    CHAR_ATTR_FONT_SIZE_STYLE(FID_PIZZA_KANJI, 16, 0)
+}
+#else
+chunk PrintTextCharAttrs = data {
+    CHAR_ATTR_ELEMENT_ARRAY_HEADER(1)
+CHAR_ATTR_NORMAL = 0
+    CHAR_ATTR_FONT_SIZE_STYLE(FID_BERKELEY, VIS_TEXT_DEFAULT_POINT_SIZE, 0)
+}
+#endif
+
+InstructionPrintText = ResEditText ignoreDirty {
+	right	= "8*72";			/* Standard page size */
+	bottom	= "10*72";
+	optFlags = default -geometryInvalid;
+	text = "";
+	type = RETT_HEIGHT;
+}
+
+/*
+ * HeightText is used only to get the height of text.
+ * For calculating chunk height for the PosArray, etc.
+ */
+HeightText = ResEditText ignoreDirty {
+	text = "HeightText";
+	attr = default -drawable;
+	type = RETT_HEIGHT;
+#ifdef DO_PIZZA
+	storage = default -defaultCharAttr, +multipleCharAttr;
+	charAttrRuns = HeightTextCharAttrRuns;
+#endif
+}
+
+#ifdef DO_PIZZA
+
+chunk HeightTextCharAttrRuns = data {
+    RUN_ARRAY_HEADER(2, HeightTextCharAttrs)
+    TextRunArrayElement TRAE_ALL(CHAR_ATTR_NORMAL), TRAE_END
+}
+
+chunk HeightTextCharAttrs = data {
+    CHAR_ATTR_ELEMENT_ARRAY_HEADER(1)
+CHAR_ATTR_NORMAL = 0
+    CHAR_ATTR_FONT_SIZE_STYLE(FID_PIZZA_KANJI, 16, 0)
+}
+#endif
+
+/*
+ * HeightGlyph is used only to get the size of graphics items when 
+ * calculating chunk height for the PosArray.
+ */
+HeightGlyph = ResEditGlyph ignoreDirty {
+	genStates = default -enabled;
+}
+
+end MiscObjectUI;
+

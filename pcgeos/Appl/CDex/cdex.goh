@@ -1,0 +1,907 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GeoDex
+FILE:		geodexConstant.def
+
+AUTHOR:		Ted H. Kim, 9/21/89
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	9/21/89		Initial revision
+	ted	3/92		Complete restructuring for 2.0
+	jfh	11/23/04		port to GOC
+
+DESCRIPTION:
+	Contains all constants, enums, and methods definitions. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+@include <stdapp.goh>
+#include <gstring.h>
+#include <ansi/string.h>
+/*#include <math.h>  */
+#include <initfile.h> 
+/*@include <spell.goh>  */
+#include <print.h>      /* These two for printing  */
+@include <spool.goh>
+@include <impex.goh>
+//@include <usrlevel.goh>
+@include <objects\text\tCtrlC.goh>
+#include <ssmeta.h>
+@include <ssheet.goh>
+@include <ffile.goh> 
+
+//@include <rolodex.goh>
+
+
+/*-----------------------------------------------------------------------------
+;			Contants Definitions
+;----------------------------------------------------------------------------*/
+
+/*OK 	equ	1
+CANCEL	equ	2 */
+
+#define GEODEX_DISPLAY_FONT  FID_BERKELEY
+
+/*VERTICAL_COMPACT_THRESHOLD	equ	300	; resolution for CGA screen
+STANDARD_MEM_BLOCK_SIZE		equ	512	; memory block size to allocate
+
+/* constants for quick dial stuff */
+
+/*MAX_FREQ_ENTRY	equ	10	; maximum number of entries in frequency table
+MAX_HIST_ENTRY	equ	10	; maximum number of entries in histroy table
+FREQ_TABLE_SIZE	equ	50	; total number of bytes in frequency table
+HIST_TABLE_SIZE	equ	50	; total number of bytes in history table
+*/
+
+#define NUM_PHONE_TYPE_FIELDS  7
+
+/* Edit field index from Impex/impexConstant.def file.  Used by
+	DB routines, too.  Matches order in UI file.  */
+
+/*TextEditFieldIndex	etype	word,	0, 1 */
+#define TEFI_LASTNAME  0
+#define TEFI_ADDRESS  1
+#define TEFI_NOTES  2
+#define TEFI_PHONE1  3
+
+/*NUM_TEXT_EDIT_FIELDS	equ	TextEditFieldIndex */
+#define NUM_TEXT_EDIT_FIELDS  4  //XXX I'm not sure about this
+
+/*TEFI_PHONE_NAME1 enum	TextEditFieldIndex, TEFI_PHONE1 + NUM_PHONE_TYPE_FIELDS */
+#define TEFI_PHONE_NAME1  TEFI_PHONE1 + NUM_PHONE_TYPE_FIELDS
+
+/*PHONE_MONIKER_SIZE	equ	35*(size char)	; quick dial button moniker size  */
+
+#define SORT_BUFFER_LENGTH  100	// buffer used to store index field
+											// make sure this number is even!
+
+/*SORT_BUFFER_SIZE	equ	SORT_BUFFER_LENGTH*(size char)
+*/
+#define ADDR_FIELD_LENGTH  4096
+#define NOTE_FIELD_LENGTH	10240	/* 10K limit	*/
+
+#define PHONE_TYPE_LENGTH  10	// phone number type ("CAR","HOME",..)
+#define PHONE_NO_LENGTH  64	// the actual phone number
+#define MAX_TAB_LETTER_LENGTH	 5	// maximum number of letters in a tab
+
+/* constants for serial port stuff  */
+
+/*NO_PORT		equ	0ffh		;flag if no comm port opened
+SERIAL_IN_SIZE	equ	1024		;initial input buffer size
+SERIAL_OUT_SIZE	equ	1024		;initial output buffer size
+*/
+
+#define GEODEX_NUM_FIELDS  10
+
+/*----------------------------------------------------------------------------
+;		Letter Tabs of Rolodex
+;---------------------------------------------------------------------------*/
+
+
+#define MAX_NUM_OF_LETTER_TABS  29
+/*MAX_LETTER_TAB_SETS	=  2		; have two sets of letter tabs.
+
+/*	The displayed "10 tabs per row" number is guided by the artwork */
+/*DisplayLetterTabIndex		etype	byte,	0, 10
+	DLTI_ROW_ONE		enum	DisplayLetterTabIndex
+	DLTI_ROW_TWO		enum	DisplayLetterTabIndex
+	DLTI_ROW_THREE		enum	DisplayLetterTabIndex
+
+MAX_NUMBER_OF_LETTER_TABS	equ	DisplayLetterTabIndex */
+
+#define DLTI_ROW_TWO  9
+#define DLTI_ROW_THREE  19
+
+
+/*----------------------------------------------------------------------------
+;		Phone Numbers and Storage
+;---------------------------------------------------------------------------*/
+
+/* number of characters allowed in prefix and area code text field */
+
+#define DIAL_OPTION_TEXT_LENGTH  10
+
+/* constants for phone number stuff */
+
+/*PhoneTypeIndex	etype	byte,	1 */
+typedef ByteEnum PhoneTypeIndex;
+#define PTI_BLANK  1
+#define PTI_HOME  2
+#define PTI_OFFICE  3
+#define PTI_CAR  4
+#define PTI_FAX  5
+#define PTI_PAGER  6
+#define PTI_EMAIL  7
+
+#define NUM_DEFAULT_PHONE_TYPES  6  // (minus one for blank)
+
+#define INDEX_TO_STORE_FIRST_ADDED_PHONE_TYPE  7
+
+#define MAX_PHONE_NO_RECORD  8		// max for any record (one blank)
+#define MAX_NEW_PHONE_TYPE_NAME  245		// additional to predefined
+#define MAX_TOTAL_PHONE_TYPE_NAMES  MAX_NEW_PHONE_TYPE_NAME + NUM_DEFAULT_PHONE_TYPES
+
+/*	This constant is extracted fomr the source code.  The number is
+	the count of "most recent" and the count of "highest frequency"
+	phone number monikers to display.  UI gadgets are also related
+	to this number. */
+
+/*COUNT_QUICK_PHONE_NUMBERS	equ	10
+
+/*	This structure holds the strings used to describe what the number
+	number is, eg, "CAR", "FAX", "PAGER", "BATHROOM".  All strings are
+	stored C_NULL terminated.  Depending on storage strategies for the
+	string heap (success allocation heap, compaction, etc), the offsets
+	may not be in increasing order -- therefore, don't count on it!
+	Blank entries are pointers to C_NULL strings.  The zero-th string
+	is always a zero word.  This maintains backward compatibility.
+
+	String pointers are displacements to the string, relative to the
+	beginning of the structure.  The DBItem can move, so ptrs must be
+	relative.  The offset list is zero terminated.
+
+	This structure is stored in a DBItem pointed to by ds:[phoneTypeBlk]. */
+
+typedef struct {
+	word PEI_size; 		//size this whole item
+	word PEI_offsets[MAX_TOTAL_PHONE_TYPE_NAMES];
+	char* PEI_stringHeap;
+	/*  strings describing phone number type (ie, "CAR","FAX") follows..
+		PEI_nullString	word		; first entry always 0  */
+} PhoneTypeNameItem;
+
+
+/*----------------------------------------------------------------------------
+;		User Level Stuff
+;---------------------------------------------------------------------------*/
+
+typedef WordFlags GeoDexFeatures;
+#define GF_NOTES_FEATURE  0x8000
+#define GF_GEOPLANNER  0x4000
+#define GF_UTILS_MENU  0x2000
+#define GF_VIEW_MENU  0x1000
+#define GF_SEARCH_FEATURES  0x0800
+#define GF_SORT_OPTION  0x0400
+#define GF_DIAL_OPTION  0x0200
+
+#define INTRODUCTORY_FEATURES  0
+
+#define BEGINNING_FEATURES  (GF_NOTES_FEATURE | GF_UTILS_MENU)
+
+#define INTERMEDIATE_FEATURES  (BEGINNING_FEATURES \
+				| GF_GEOPLANNER \
+				| GF_VIEW_MENU \
+				| GF_SEARCH_FEATURES \
+				| GF_SORT_OPTION \
+				| GF_DIAL_OPTION)
+
+#define DEFAULT_FEATURES  INTERMEDIATE_FEATURES
+
+
+/*-----------------------------------------------------------------------------
+;			Enum Definitions
+;----------------------------------------------------------------------------*/
+
+	/* do not change the order of UndoStatus constants  */
+
+/*UndoStatus	etype	byte,	0  */
+typedef ByteEnum UndoStatus;
+#define UNDO_DELETE  0
+#define UNDO_NOTHING  1
+#define UNDO_ADD  2
+#define UNDO_NEW  3
+#define UNDO_OLD  4
+#define UNDO_CHANGE  5
+#define UNDO_RESTORE  6
+
+
+	/* enums for current text edit field
+		Used to index into idata:FieldTable[]  */
+
+/*TextEditFieldOffset	etype	byte,	0, (size word) jfh - changed to byte*/
+#define TEFO_INDEX  0
+#define TEFO_ADDR  1
+#define TEFO_NOTE  2
+#define TEFO_PHONE_TYPE  3
+#define TEFO_PHONE_NO  4
+
+	/* current view mode constants */
+#define CARD_VIEW	 0
+#define BROWSE_VIEW  1
+#define BOTH_VIEW	 2
+#define DISABLED_VIEW  3
+
+	/* current serial port status constants */
+
+/*PortStatusFlags		etype		word,	0
+	PORT_OPEN	enum	PortStatusFlags
+	PORT_NOT_OPEN	enum	PortStatusFlags
+	NO_MODEM	enum	PortStatusFlags
+
+ImpexFlag		etype	byte, 0 */
+typedef ByteEnum ImpexFlag;
+#define IE_FILE  0
+#define IE_CLIPBOARD  1
+
+	/* Enums for Print Options dialog */
+#define PFF_CUR_REC  0
+#define PFF_CUR_REC_ADDR  1
+#define PFF_ALL  2
+#define PFF_ALL_ADDR  3
+#define PFF_ALL_PHONES  4
+
+/*ImpexMergeState		etype	word, 0
+	IMS_HAVENT_ASKED	enum	ImpexMergeState
+	/* Haven't encountered a record with a duplicate, yet, so haven't
+	 asked the user what she wants us to do */
+	
+/*	IMS_DUPLICATE		enum	ImpexMergeState
+	/* Create a record with a duplicate index field to hold the new data */
+	
+/*	IMS_REPLACE		enum	ImpexMergeState
+	/* Replace entire record, deleting previous contents, even if it holds
+	; data in fields not provided by the scrap. */
+	
+/*	IMS_UPDATE		enum	ImpexMergeState
+	/* Use the field data to augment the existing record, replacing any
+	; existing data with non-empty data from the scrap, but leaving any
+	; data where the scrap was empty */
+	
+/*	IMS_AUGMENT		enum	ImpexMergeState
+	/* Use the field data to augment the existing record, ignoring scrap
+	; data where the existing record already has data, but including data
+	; from the scrap where no such data existed in the existing record. */
+	
+	/* error message enums */
+
+/*RolodexErrorValue		etype	word, 0 */
+//typedef WordEnum RolodexErrorValue;
+#define ERROR_NO_MATCH  0
+#define ERROR_TOO_MANY_NAME  1
+#define ERROR_NO_MODEM  2
+#define ERROR_NO_MEMORY  3
+#define ERROR_NO_CALENDAR  4
+#define ERROR_NO_RECORD  5
+#define ERROR_NO_DATA_FILE  6
+#define ERROR_IN_BROWSE_MODE  7
+#define ERROR_PORT_IN_USE  8
+#define ERROR_SERIAL_LOAD  9
+#define ERROR_NO_SERIAL_DRIVER  10
+#define ERROR_INDEX_FIELD  11
+#define ERROR_TEXT_TOO_LARGE  12
+#define ERROR_NO_PHONE_ENTRY  13
+#define ERROR_RESORT_WARNING  14
+#define ERROR_NO_INDEX_IMPORT  15
+#define ERROR_SEARCH_AT_END  16
+#define ERROR_SEARCH_AT_BEG  17
+#define ERROR_NO_EMAIL  18
+#define ERROR_LAST  19
+
+	/* Constants enum generated For ERROR Macros */
+
+/*	MEMORY_BLOCK_DISCARDED	 		enum	FatalErrors
+	DB_OPEN_BAD_FILE	 		enum	FatalErrors
+	ROLODEX_UNDO_ERROR	 		enum	FatalErrors	
+	IN_INSERT_RECORD_WITH_PHONE_COUNT	enum	FatalErrors
+	IN_FIND_NEXT_RECORD			enum	FatalErrors
+	NEW_RECORD_FLAG_MUST_BE_SET		enum	FatalErrors
+	DIRECTORY_CREATE_ERROR			enum	FatalErrors
+	NO_FILTER_HAS_BEEN_CREATED_BEFORE	enum	FatalErrors
+	DISPLAY_ERROR_BAD_ERROR_VALUE		enum	FatalErrors
+	ILLEGAL_HIST_TABLE_ENTRY_NUMBER		enum	FatalErrors
+	ILLEGAL_FREQ_TABLE_ENTRY_NUMBER		enum	FatalErrors
+	BOTH_UNDOITEM_AND_CURRECORD_ARE_ZERO	enum	FatalErrors
+	CANNOT_HAVE_LIST_ENTRY_SELECTED_IN_CARD_VIEW	enum	FatalErrors
+	SORT_BUFFER_IS_NOT_CURRENT		enum	FatalErrors
+	CORRUPTED_DATA_FILE			enum	FatalErrors
+	PRINT_LINE_BUFFER_OVERFLOW		enum	FatalErrors
+	BAD_PICTURE_NUMBER  			enum    FatalErrors
+	IMPORT_FIELD_MUST_BE_TEN		enum	FatalErrors
+	CHAR_NOT_FOUND_IN_CHAR_SET_TABLES	enum	FatalErrors
+	CORRUPT_IMPORT_FIELD_DATA		enum	FatalErrors
+	LETTER_TAB_STRING_TOO_LONG		enum	FatalErrors
+	/*	The string on the letter tab was too long.
+	;	Consult the constant MAX_TAB_LETTER_LENGTH. */
+
+/*	CHAR_SET_INDEX_TOO_BIG			enum	FatalErrors
+	/*	The character set index (used to display the
+	;	letter tab set) is larger than MAX_LETTER_TAB_SET.
+	;	You might have corrupted data...  */
+
+/*EC <	SPECIFIC_CONSTANT_WRONG			enum	FatalErrors	>
+	/*	Some specific constant has the wrong value.
+	;	Check code for which constant is wrong. */
+
+/*	UNEXPECTED_LACK_OF_CHILDREN		enum	FatalErrors
+	/*	Expected to find a child, but system reports none */
+
+	/* ---------------------------------------------------------------
+	;  Constants used for debugging warning/notices  */
+
+/*	CUR_PHONE_TYPE_ZERO			enum	Warnings
+	/*	The variable dgroup:curphoneType is zero.  Taking
+	;	corrective action.  For future, you might want to
+	;	see why this is happening. */
+
+/*EC <	PHONE_TYPE_BLOCK_BEYOND_4000_BYTES	enum	Warnings	>
+	/*	Just a note when the phone type name DBItem grows
+	;	beyond 4000 bytes.  Will probably happen sooner in
+	;	DBCS than SBCS version... */
+
+
+/*----------------------------------------------------------------------------
+;		Record constants
+;---------------------------------------------------------------------------*/
+
+typedef WordFlags RecordStatusFlags;
+#define RSF_FILE_SAVE  0x2000			// called by FileSave
+#define RSF_INDEX_DIRTY  0x1000		// index field is dirty
+#define RSF_ADDR_DIRTY  0x0800 		// obj other than index field is dirty
+#define RSF_FIND_LETTER  0x0400		// called by DB_FindLetter
+#define RSF_UPDATE  0x0200				// DB_CopyPhone has been called
+#define RSF_WARNING  0x0100			// index field empty warning was up
+#define RSF_DELETE  0x0080				// called by RolodexDelete
+#define RSF_NEW  0x0040					// record is not inserted yet
+#define RSF_SORT_EMPTY  0x0020		// sort field is empty
+#define RSF_ADDR_EMPTY  0x0010		// address field is empty
+#define RSF_NOTE_EMPTY  0x0008		// notes field is empty
+#define RSF_PHONE_EMPTY  0x0004		// phone type name field is empty
+#define RSF_PHONE_NO_EMPTY  0x0002		// phone number field is empty
+#define RSF_EMPTY  0x0001				// record is blank
+
+
+	/* dirty/clean status for each field in a record */
+
+/*DirtyFieldFlags		record
+	:2  */
+typedef ByteFlags DirtyFieldFlags;
+#define DFF_INDEX  0x20
+#define DFF_ADDR  0x10
+#define DFF_NOTE  0x08
+#define DFF_PHONE_TYPE  0x04
+#define DFF_PHONE_NO  0x02
+#define DFF_NOT_USED  0x01
+
+#define DFF_PHONE  (DFF_PHONE_TYPE | DFF_PHONE_NO)
+
+	/* letter tab status flags */
+
+typedef WordFlags LetterInstanceFlags;
+#define LIF_INVERTED		0x0002
+#define LIF_GRAB			0x0001
+
+	/* phone fields status flags */
+
+/*PhoneFlags	record
+	:6, */
+typedef WordFlags PhoneFlags;
+#define PF_ENTRY_FOUND  0x0200
+#define PF_AUTO_DIAL  0x0100
+#define PF_TABLE_DIRTY  0x0080
+#define PF_SAVE_RECORD  0x0040
+#define PF_FREQ_TABLE  0x0020
+#define PF_DELETE_ALL  0x0010
+#define PF_DONT_INC_CUR_PHONE_INDEX  0x0008
+#define PF_QUICK_BUTTON  0x0004
+#define PF_DONT_CLEAR  0x0002
+#define PF_CONFIRM  0x0001
+/*PhoneFlags	end
+
+	/* flags used for searching */
+
+/*SearchOptionFlag	record
+	:5,   */
+typedef WordFlags SearchOptionFlag;
+#define SOF_REACHED_END  0x0400
+#define SOF_BACKWARD_SEARCH  0x0200
+#define SOF_NOTE_SEARCH  0x0100
+#define SOF_ADDR_SEARCH  0x0080
+#define SOF_PHONE_SEARCH  0x0040
+#define SOF_CAL_SEARCH  0x0020
+#define SOF_MATCH_FOUND  0x00100
+#define SOF_INDEX_SEARCH  0x0008
+#define SOF_NEW  0x0004
+#define SOF_MATCH_IN_PHONE  0x0002
+#define SOF_CUR_REC_ONE_MORE_TIME  0x0001
+/*SearchOptionFlag	end
+
+	/* flags used in printing */
+
+/*PrintFlag	record
+	/*
+	; This first group selects the format of the printout.  The
+	; user has the choice of printing info on the current record
+	; or on the entire collection of records.  There is also the
+	; choice of printing all the info, or just the address info.
+	; The final choice, PF_PHONES, prints a special list of all
+	; phone numbers in the database.  */
+
+/*	PF_CUR_ADDRESS:1,		; current address only, envelope
+	PF_ADDRESSES:1,			; all addresses, for labels
+	PF_CUR_REC:1,			; current record, all fields
+	PF_ALL:1,			; all records, all fields
+	PF_PHONES:1,			; print phone numbers format
+
+	/* Print the Notes field for each record that's printed?  This
+	; selection is turned off if "Print Phones" selected. */
+
+/*	PF_NOTES:1,			; print the notes field for each
+
+	/* Type of paper to print on  */
+
+/*	PF_LABELS:1,			; print address labels (single column)
+	PF_TRAY:1,			; print tray feed labels
+PrintFlag	end
+	
+	/* flags used in setting up the modem */
+
+/*SerialFlowFlags	record
+	:6,
+	SFF_SOFTWARE:1,
+	SFF_HARDWARE:1,
+SerialFlowFlags	end
+
+	/* flags for the serial port */
+
+/*SerialSettingChangedFlags	record
+	:4,
+	SSCF_PORT:1,
+	SSCF_BAUD:1,
+	SSCF_FORMAT:1,
+	SSCF_FLOW:1,
+SerialSettingChangedFlags	end
+
+ExportFlag	record
+	:6
+	EF_FILE_EXPORT:1,
+	EF_CLIPBOARD_COPY:1,
+ExportFlag	end
+
+DialingOptionFlag	record
+	:14  */
+typedef WordFlags DialingOptionFlag;
+#define DOF_CONFIRM  0x0002
+#define DOF_RESET  0x0001
+/*DialingOptionFlag	end
+
+SearchFieldOptionFlag	record
+	:13
+	SFOF_ADDR:1,
+	SFOF_NOTE:1,
+	SFOF_PHONE:1,
+SearchFieldOptionFlag	end
+
+SortFlag	record
+	:6 */
+typedef ByteFlags SortFlag;
+#define SF_IGNORE_SPACE  0x02
+#define SF_DONT_IGNORE_SPACE  0x01
+/*SortFlag	end
+
+/*----------------------------------------------------------------------------
+;		Structures
+;---------------------------------------------------------------------------*/
+
+	/* data record structure in GeoDex */
+
+typedef	struct {
+	word DBR_noPhoneNo;		// number of phone numbers in a record
+	DBItem DBR_notes;			// DB item of notes text
+	word DBR_toPhone;			// offset to phone number string
+	word DBR_toAddr;			// offset to address string
+	word DBR_indexSize;		// size of index field
+	word DBR_addrSize;		// size of address field
+	byte DBR_phoneDisp;		// phone number to display
+} DB_Record;
+
+/*-----------------------------------------------------------------------
+	/* phone entry structure within a single data record  */
+
+typedef struct {
+	word PE_count; 		// number of phone calls made
+	byte PE_type; 			// phone number type ID number
+	word PE_length;		// length of phone number string 
+}PhoneEntry;
+/*
+PE_strings	equ	size	PhoneEntry
+
+/*-----------------------------------------------------------------------
+	; main DB item handle table structure */
+
+typedef	struct {
+	DBItem TE_item; //handle of a record
+	word TE_key; //key field to search for
+} TableEntry;
+
+/*	M A C R O S
+;
+;	TableEntryIndexToOffset   <index>
+;		convert an index to table offset, in place.
+;	TableEntryOffsetToIndex   <offset>
+;		Reduce a table offset to an index, in place.
+;	TableEntryOffsetMask	  <offset>
+;		Force offset to 'size TableRecord' boundry  */
+
+/*if (size TableEntry) eq 4
+ TableEntryIndexToOffset   macro	indexReg
+		shl	indexReg, 1
+		shl	indexReg, 1
+ 		endm
+
+ TableEntryOffsetToIndex   macro	offsetReg
+		shr	offsetReg, 1
+		shr	offsetReg, 1
+		endm
+
+ TableEntryOffsetMask	   macro	offsetReg
+		and	offsetReg, 1111111111111100b
+		endm
+
+elseif (size TableEntry) eq 8
+ TableEntryIndexToOffset   macro	indexReg
+		shl	indexReg, 1
+		shl	indexReg, 1
+		shl	indexReg, 1
+		endm
+
+ TableEntryOffsetToIndex   macro	offsetReg
+		shr	offsetReg, 1
+		shr	offsetReg, 1
+		shr	offsetReg, 1
+		endm
+
+ TableEntryOffsetMask	   macro	offsetReg
+		and	offsetReg, 1111111111111000b
+		endm
+
+else
+	ErrMessage <Please build TableEntry index-offset macros>
+endif
+
+
+/*-----------------------------------------------------------------------
+	; quick dial entry structure */
+
+typedef struct {
+	word QVE_item; //handle of a record
+	word QVE_key; //key field to search for
+	byte QVE_phoneID; //phone number type name ID number
+} QuickViewEntry;
+
+/*DBTransferHeader        struct
+	DBTH_delimiter          char
+	DBTH_escDelimit         char
+	DBTH_numFields          word
+	DBTH_numRecords         word
+	DBTH_maxSizeField       word
+	DBTH_maxFields          word
+	DBTH_maxRecords         word
+DBTransferHeader        ends */
+
+typedef struct {
+	MemHandle PTS_handle;	//offset to text following structs
+	word PTS_size;				//size of each text element
+} PhoneTypeStruct;
+
+/*-----------------------------------------------------------------------
+	; udata from database module that needs to be saved.
+	; Stored in map DBItem of database (first item). */
+
+typedef struct {
+	word GMB_numMainTab; //number of records in database
+	word GMB_offsetToNonAlpha; //offset to non-alphabetic records
+	word GMB_numNonAlpha; //number of non-alphabetic records
+	word GMB_endOffset; //offset to the end of main table
+
+	/* udata from quickDial module that needs to be saved */
+	word GMB_numFreqTab; //number of entries in frequency table
+	word GMB_numHistTab; //number of entries in history table
+	word GMB_offsetFreqTab; //offset one past last entry in freq tab
+	word GMB_offsetHistTab; //offset one past last entry in hist tab
+
+	/* udata from phone module that needs to be saved */
+	word GMB_totalPhoneNames; //total number of phone number type names
+	word GMB_curPhoneIndex; //which phone number is displayed (1..N)
+
+	/* udata from rolodex module that needs to be saved */
+	DBItem GMB_mainTable; //main table DB handle
+	DBItem GMB_freqTable; //DB handle of frequency table
+	DBItem GMB_histTable; //DB handle of history table
+	DBItem GMB_phoneTypeBlk; //DB handle phone number type name block
+	word GMB_orgRecord; //original record handle before undo
+	SortFlag GMB_sortOption; //tells you which sort option is used
+	word GMB_curLanguage; //current language code (StandardLanguage)
+
+	/* phone numbers from phone options dialog box */
+	char GMB_prefix[DIAL_OPTION_TEXT_LENGTH+1];
+	char GMB_curAreaCode[DIAL_OPTION_TEXT_LENGTH+1];
+	char GMB_assumedAreaCode[DIAL_OPTION_TEXT_LENGTH+1];
+
+} GeodexMapBlock;
+
+/* a struct to hold data that is saved to/retrieved from state */
+typedef struct {
+	DBItem SS_curRecord;
+	word SS_curOffset;
+	char SS_curLetter[MAX_TAB_LETTER_LENGTH];
+	word SS_curLetterLen;
+	byte ss_curCharSet;
+	RecordStatusFlags SS_recStatus;
+	byte SS_curPhoneType;
+	word SS_displayStatus;
+	DirtyFieldFlags SS_dirtyFields;
+} SaveStateStruct;
+
+/*-----------------------------------------------------------------------------
+;			Global variables
+;----------------------------------------------------------------------------*/
+
+	/* holds the size of text fields */
+extern word g_fieldSize[GEODEX_NUM_FIELDS+NUM_PHONE_TYPE_FIELDS];
+/*
+	global	noText:char		// an empty string */
+
+extern GeodexMapBlock g_gmb;
+extern word g_phoneFieldDirty;
+extern MemHandle g_fieldHandles[NUM_TEXT_EDIT_FIELDS + 2];
+extern word g_fieldLengths[NUM_TEXT_EDIT_FIELDS + 4];
+extern char g_sortBuffer[SORT_BUFFER_LENGTH + 1];
+
+	/*global	SpeedDialTable:word
+
+	global	serialDriver:fptr
+	global	serialBaud:word
+	global	serialPort:word
+	global	serialHandle:word
+	global	phoneNoBlk:word
+	global	phoneOffset:word
+	global	phoneHandle:word
+	global	quickButtonNo:word
+	global	phoneCount:word
+	global	totalPhoneNames:word */
+extern byte g_curPhoneType;
+	/*lobal	numFreqTab:word
+	global	numHistTab:word
+	global	offsetFreqTab:word
+	global	offsetHistTab:word */
+extern PhoneFlags g_phoneFlag;
+
+extern MemHandle g_fileHandle;
+extern DBGroup g_groupHandle;
+
+	/*global	xferFileHandle:word
+	global	xferBlockHandle:word */
+
+extern ImpexFlag g_exportFlag;
+extern Boolean g_indexEmpty;
+extern word g_numRecords;
+extern word g_numFields;
+/*	global	mergeFlag:ImpexMergeState */
+
+//extern word g_FieldTable;
+
+extern DBItem g_undoItem;
+extern UndoStatus g_undoAction;
+	/*global	numCharSet:word
+	global	charSetChanged:byte
+	global	tempRecord:word
+	global	stateBlock:word */
+	/*global	nextLetter:byte */
+extern char g_prevLetter[MAX_TAB_LETTER_LENGTH];
+extern Boolean g_doublePress;
+	/*global	geodeCount:word
+	global	processID:word */
+extern Boolean g_startFromScratch;
+	/*global	cga:word
+	global	appFeatures:word
+
+	global	colorFlag:byte */
+extern Boolean g_ignoreInput;
+	/*global	filterString:byte
+	global	searchField:word
+	global	searchOffset:word */
+extern word g_searchFlag;
+	/*global	filterNumNonAlpha:word
+	global	filterOffNonAlpha:word
+
+/* here's a couple I had to add - jfh */
+extern word g_warnReply;
+
+/* the globals saved to state ... */
+extern DBItem g_curRecord;
+extern word g_curOffset;  /* this is the byte offset (one record = 4 bytes)*/
+extern char g_curLetter[MAX_TAB_LETTER_LENGTH];
+extern word g_curLetterLen;
+	/*global	curCharSet:byte */
+extern RecordStatusFlags g_recStatus;
+extern byte g_curPhoneType;
+extern word g_displayStatus;
+extern DirtyFieldFlags g_dirtyFields;
+
+/*-----------------------------------------------------------------------------
+;			Prototypes
+;----------------------------------------------------------------------------*/
+
+void RolodexCard (void);
+void RolodexBrowse (Boolean skipInit);
+void RolodexBoth (void);
+void BringUpBothView(void);
+void CreatePhoneTypeTable(void);
+void ClearRecord(void);
+void ClearTextFields(word number, word offset);
+void DisplayCurRecord(DBItem curRec);
+void DisplayPhoneType(void);
+void UpdateLetterButton(void);
+void GetLastName(void);
+char GetLexicalValue(char letter);
+word SearchCharSet(void);
+void DisplayPhoneNoField(DB_Record *record);
+void ClearTextFieldsSelection(void);
+Boolean CompareRecord(word number, word offset);
+DBItem FindNext(void);
+DBItem FindNextTabLetterWithEntry(word letterID);
+DBItem FindEntryInCurTab(word letterID);
+DBItem FindPrevious(void);
+void UpdateNameList(void);
+void SetNewExclusive(void);
+sword CompareKeys(TableEntry *entry);
+sword CompareUsingSortOptionNoCase(char *str1, char *str2, word num);
+sword CompareName(TableEntry *entry);
+Boolean SaveCurRecord(void);
+void GetRecord(word number, word offset);
+void NewDBFree(DBItem item);
+void FreeMemChunks(word number, word offset);
+void DisplayErrorBox(word errorVal);
+void DeleteFromMainTable(void);
+void MarkMapDirty(void);
+Boolean UpdateRecord(Boolean phoneOnly);
+void UpdateIndex(void);
+void UpdateAddr(void);
+void UpdateNotes(void);
+Boolean UpdatePhone(void);
+void MoveStringToDatabase(word destOffset, word field, word length);
+void InsertRecord(void);
+word FindSortBufInMainTable(TableEntry *insEntry);
+Boolean InitRecord(Boolean phoneOnly);
+void CopyPhone(void);
+word AddPhoneTypeName(void);
+PhoneTypeIndex GetPhoneTypeID(void);
+void InsertPhoneEntry(PhoneTypeIndex index);
+void DeletePhoneEntry(PhoneTypeIndex index);
+Boolean SaveCurPhone(void);
+void InitFieldSize(void);
+Boolean ExportRecord(SSMetaStruc	*ssms, word recNum);
+void ExportFieldName(SSMetaStruc *ssms);
+Boolean ImportMetaFile(SSMetaStruc *ssms);
+
+/*-----------------------------------------------------------------------------
+;			Class and Instance Data Definitions
+;----------------------------------------------------------------------------*/
+
+@class	LettersCompClass, GenGadgetClass; /* , master */
+	@instance MemHandle LCC_interface = 0;		// handle of Interface block
+	@instance MemHandle LCC_rolodexApp = 0;	// handle of RolodexApp
+
+	@default GGI_attrs = GGA_COMPOSITE;
+
+@endc
+
+@class	LettersClass, GenGadgetClass; /*, master*/
+	@instance word LI_flag = 0;
+	@instance word LI_letter = 0xffff;			// current letter tab
+	@instance word LI_tabTop = 0;
+	@instance word LI_tabLeft = 0;
+	@instance MemHandle LI_rolodexApp = 0;		// handle of RolodexApp
+	@instance MemHandle LI_interface = 0;		// handle of Interface block
+	@instance MemHandle LI_menu = 0;				// handle of MenuResource block
+	@instance MemHandle LI_search = 0;			// handle of Search block
+	@instance word LI_numPts = 0;					// number of coordinates in a tab
+	/* x, y coordinate pairs used to invert letter tabs */
+	@instance word LI_coordBuf[22] = {0,0,0,0,0,0,0,0,0,0,0,
+													0,0,0,0,0,0,0,0,0,0,0};
+
+	@message void MSG_LETTERS_INVERT_TAB(GStateHandle gstate);
+	@message void MSG_LETTERS_INVERT(word numRecs, byte letter,
+												GStateHandle gstate);
+	@message void MSG_DRAW_LETTER_TABS(byte textColorIndex,
+												  Boolean haveGState,
+												  GStateHandle gstate);
+	@message void MSG_LETTERS_GET_TAB_LETTER(word letterID);
+	@message word MSG_LETTERS_GET_LETTER();
+	@message void MSG_LETTERS_CLEAR();
+
+@endc
+
+@class	NotesDialogClass, GenInteractionClass;
+
+	@message void MSG_ROLODEX_SAVE_AFTER_NOTE_EDIT();
+
+@endc
+
+@class	RolodexApplicationClass, GenApplicationClass;
+
+	@message void MSG_ROLODEX_APPLICATION_SET_USER_LEVEL();
+	@message void MSG_ROLODEX_APPLICATION_INITIATE_FINE_TUNE();
+	@message void MSG_ROLODEX_APPLICATION_FINE_TUNE();
+	@message void MSG_ROLODEX_APPLICATION_UPDATE_BARS();
+	@message void MSG_ROLODEX_APPLICATION_CHANGE_USER_LEVEL();
+	@message void MSG_ROLODEX_APPLICATION_CANCEL_USER_LEVEL();
+	@message void MSG_ROLODEX_APPLICATION_QUERY_RESET_OPTIONS();
+	@message void MSG_ROLODEX_APPLICATION_USER_LEVEL_STATUS();
+
+	@default GAI_appFeatures = DEFAULT_FEATURES;
+
+@endc
+
+@class	RolodexProcessClass, GenProcessClass; /*RolodexClass*/
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_ROLODEX_CHANGE_VIEW;
+	@message void MSG_ROLODEX_NOTES();
+	@message void MSG_ROLODEX_PHONE_UP();
+	@message void MSG_ROLODEX_PHONE_DOWN(word data);
+	@message (GEN_TEXT_APPLY_MSG) MSG_ROLODEX_PHONE_DOWN_TEXT;
+	@message void MSG_ROLODEX_PREVIOUS();
+	@message void MSG_ROLODEX_NEXT();
+	@message void MSG_ROLODEX_NEW();
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_ROLODEX_REQUEST_ENTRY_MONIKER;
+	@message void MSG_ROLODEX_FIND_LETTER(word letterID);
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_ROLODEX_FIND_RECORD;
+	@message void MSG_ROLODEX_EXPAND_TO_BOTH_VIEW();
+	@message void MSG_ROLODEX_CR();
+	@message void MSG_ROLODEX_APPLY_DIAL_OPTIONS();
+	@message void MSG_ROLODEX_DELETE();
+	@message void MSG_ROLODEX_COPY_RECORD();
+	@message void MSG_ROLODEX_PASTE_RECORD();
+	@message void MSG_ROLODEX_UNDO();
+
+	@message void MSG_ROLODEX_AUTO_DIAL();
+	@message void MSG_ROLODEX_QUICK_DIAL();
+	@message void MSG_ROLODEX_QUICK_BUTTON();
+	@message void MSG_ROLODEX_LOOKUP();
+	@message void MSG_ROLODEX_END_CALL();
+	@message void MSG_ROLODEX_PRINT();
+	@message void MSG_ROLODEX_CALL_CALENDAR();
+	@message void MSG_ROLODEX_DIAL_FROM_PHONE_LIST();
+	@message void MSG_ROLODEX_DIAL_CUR_NUMBER();
+	@message void MSG_ROLODEX_CREATE_EXPORT_TRANSFER_ITEM();
+	@message void MSG_ROLODEX_CREATE_IMPORT_TRANSFER_ITEM();
+	@message void MSG_ROLODEX_RESORT();
+	@message void MSG_ROLODEX_EXPORT_TO_CLIPBOARD();
+	@message void MSG_ROLODEX_PRINT_OPTION();
+	@message void MSG_ROLODEX_DISPATCH_EVENT();
+
+@endc
+
+
+/* for adding export feature */
+@class	RolDocumentControlClass, GenDocumentControlClass;
+@endc
+
+

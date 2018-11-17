@@ -1,0 +1,767 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		chunkarr.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	2/90		Initial version
+	Doug	3/90		Moved into KLib
+
+DESCRIPTION:
+	This file contains the description of the general array manipulation
+	routines and data structures
+
+	$Id: chunkarr.def,v 1.1 97/04/04 14:22:22 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__CHUNKARR
+
+StartKernel
+
+;-----------------------------------------------------------------------------
+;		Constants and Structures
+;-----------------------------------------------------------------------------
+
+CA_NULL_ELEMENT		= 0xffff
+
+; A general array structure (with the array stored in a chunk) is used several
+; places, with general routines to manipulate the array.
+
+; All arrays have a standard header
+
+; NOTE: goc's chunk array support depends on CAH_count being the first field.
+
+ChunkArrayHeader	struct
+    CAH_count		word	0			;number of elements in
+							; array
+    CAH_elementSize	word	?			;size of each element
+							; (0 for variable sized)
+    CAH_curOffset	word	0			;list of current item
+							; offsets in enumeration
+    CAH_offset		word	size ChunkArrayHeader	;offset to first element
+ChunkArrayHeader	ends
+
+; Chunk arrays can have variable sized elements (denoted by CAH_elementSize
+; = 0).  If this is the case, the chunk array is a series of offsets into the
+; chunk, folowed by the data.
+
+;	Arrray elements with reference counts
+;
+; The ElementArray mechanism works on top of the chunk array mechanism.  An
+; element array is just a chunk array in which each array element (referred
+; to as an element) has a reference count.  The reference count is stored as
+; the first three bytes of the element.
+;
+; ElementArrays are accessed via the element number.
+;
+; A free list is maintained of empty elements.  Variable length elements
+; are resized to (size RefElementHeader) when free.  A free element has
+; REH_refCount as the pointer to the next free element and
+; REH_refCount.WAAH_high = 0xff marking the element as free
+
+;	Header for an element array
+
+EA_FREE_LIST_TERMINATOR	=	CA_NULL_ELEMENT
+
+ElementArrayHeader	struct
+    EAH_meta	ChunkArrayHeader
+    EAH_freePtr	word
+ElementArrayHeader	ends
+
+;	Header for an element (fixed size)
+
+RefElementHeader	struct
+    REH_refCount	WordAndAHalf
+RefElementHeader	ends
+
+EA_FREE_ELEMENT		=	0xff
+
+;-----------------------------------------------------------------------------
+;		Routines
+;-----------------------------------------------------------------------------
+
+global ChunkArrayCreate:far
+;
+; Create a new general array with 0 elements
+;
+; Pass:
+;	ds - block for new array
+;	bx - element size
+;	cx - size for ChunkArrayHeader (this allows for reserving extra
+;	     space)  0 = default
+;	si - chunk to resize and use for chunk array (0 if you want to
+;	     allocate a new chunk)
+;	al - ObjChunkFlags to pass to LMemAlloc (if SI passed as 0)
+; Return:
+;	*ds:si - array
+; Destroyed:
+;	none
+
+CA_LAST_ELEMENT		equ	0xFF00
+
+global ChunkArrayElementToPtr:far
+;
+; Return a pointer to a given element
+;
+; Pass:
+;	*ds:si - array
+;	ax - element number to find (pass CA_LAST_ELEMENT to get last element)
+; Return:
+;	carry - set if element number out of bounds (ds:di will be the last
+;		element in the array)
+;	cx - element size (if variable sized elements)
+;	ds:di - element
+; Destroyed:
+;	none
+
+global ChunkArrayPtrToElement:far
+;
+; Return an index given an element.
+;
+; Pass:
+;	*ds:si - array
+;	ds:di - element
+; Return:
+;	ax - element number.
+; Destroyed:
+;	none
+
+global ChunkArrayGetElement:far
+;
+; Get an element given its element number
+;
+; Pass:
+;	*ds:si - element array
+;	ax - element number
+;	cx:dx - buffer for element
+; Return:
+;	ax - element size
+;	buffer - filled
+; Destroyed:
+;	none
+
+global ChunkArrayAppend:far
+;
+; Append an element to an array
+;
+; Pass:
+;	*ds:si - array
+;	ax - element size (if variable)
+; Return:
+;	ds:di - new element
+; Destroyed:
+;	none
+
+global ChunkArrayInsertAt:far
+;
+; Insert an element into an array.
+;
+; Pass:
+;	*ds:si - array
+;	ds:di - element to insert in front of.
+;	ax - element size to insert (if variable)
+; Return:
+;	ds:di - new element
+; Destroyed:
+;	none
+
+global ChunkArrayDelete:far
+;
+; Delete an element from an array
+;
+; Pass:
+;	*ds:si - array
+;	ds:di - element
+; Return:
+;	none
+; Destroyed:
+;	none
+
+global ChunkArrayDeleteRange:far
+;
+; Delete a range of elements from an array
+;
+; Pass:
+;	*ds:si - array
+;	ax - first element
+;	cx - number of elements to delete
+; Return:
+;	none
+; Destroyed:
+;	none
+
+global ChunkArrayGetCount:far
+;
+; Get the number of elements in an array
+;
+; Pass:
+;	*ds:si - array
+; Return:
+;	cx - number of elements
+; Destroyed:
+;	none
+
+global ChunkArrayEnumRange:far
+;
+; Enumerate elements of an array to a callback routine.
+; See ChunkArrayEnum for callback definition.
+;
+; Pass:
+;	*ds:si - array
+;	bx:di - callback routine
+;	ax - Element to start with
+;	cx - Number of elements to process (-1 for all)
+;	dx, bp, es - data to pass to callback
+; Return:
+;	ax, cx, dx, bp, es - modified by callbacks
+;	carry - set if the callback returned the carry set
+; Destroyed:
+;	none
+
+global ChunkArrayEnum:far
+;
+; Enumerate all elements of an array to a callback routine
+; With variable sized elements, ax cannot be used to pass
+; data to the callback routine.
+;
+; Pass:
+;	*ds:si - array
+;	bx:di - callback routine
+;	ax, cx, dx, bp, es - data to pass to callback (for fixed size elements)
+;	cx, dx, bp, es - data to pass to callback (for variable sized elements)
+; Return:
+;	ax, cx, dx, bp, es - modified by callbacks
+;	carry - set if the callback returned the carry set
+; Destroyed:
+;	none
+;
+;   Callback:
+;	Pass:
+;		*ds:si - array
+;		ds:di - array element being enumerated
+;		fixed size elements:
+;		    ax, cx, dx, bp, es - data passed to ChunkArrayEnum 
+;		variable sized elements:
+;		    ax - element size
+;		    cx, dx, bp, es - data passed to ChunkArrayEnum
+;	Return:
+;		ax, cx, dx, bp, es - data to pass to next
+;		carry set to quit processing.
+;	Destroyed:
+;		bx, si, di
+
+global ChunkArrayZero:far
+;
+; Zero out the array, leaving no elements.
+;
+; Pass:
+;	*ds:si - array
+; Destroyed:
+;	none
+
+global ChunkArrayElementResize:far
+;
+; Resize an element of a chunk array.  This is only valid for chunk arrays
+; with variable sized elements
+;
+; Pass:
+;	*ds:si - array
+;	ax - element number
+;	cx - new size
+; Destroyed:
+;	none
+
+global ChunkArraySort:far
+;
+; Sort the array into ascending order, as dictated by the comparison callback
+;
+; Pass:
+;	*ds:si - array
+;	cx:dx - comparison callback routine
+;		called:
+;			Pass:
+;				ds:si	- first array element
+;				es:di	- second array element
+;			Return:
+;				flags set so caller can jl, je, or jg
+;				according as first element is less than,
+;				equal to, or greater than the second.
+;			Destroyed:
+;				si, di
+; Return:
+;	nothing
+; Destroyed:
+;	cx, dx
+
+global ArrayQuickSort:far
+;
+; Sort the array into ascending order, as dictated by the comparison callback
+;
+; Pass:
+;	ds:si - array (note difference from ChunkArraySort)
+;	ax    - size of each element
+;	cx    - number of elements in the array
+;	ss:bp - Inheritable QuickSortParameters
+;	bx    - Value to pass to the callback routines
+; Return:
+;	nothing
+; Destroyed:
+;	ax, cx, dx
+;
+QuickSortParameters	struct
+    QSP_compareCallback	fptr	; Compare two elements
+	;	; must be vfptr in XIP'ed geode
+	;	Pass:
+	;		ds:si	- first array element
+	;		es:di	- second array element
+	;		bx	- parameter passed to ArrayQuickSort
+	;	Return:
+	;		flags set so caller can jl, je, or jg
+	;		according as first element is less than,
+	;		equal to, or greater than the second.
+	;	Destroyed:
+	;		ax, bx, cx, dx, di, si
+	;
+    QSP_lockCallback	fptr	; Lock an element (segment = 0, for none)
+	;	; must be vfptr in XIP'ed geode
+	;	Pass:
+	;		ds:si	- array element to lock
+	;		bx	- parameter passed to ArrayQuickSort
+	;	Return:
+	;		nothing
+	;	Destroyed:
+	;		nothing
+	;
+    QSP_unlockCallback	fptr	; Unlock an element (segment = 0, for none)
+	;	; must be vfptr in XIP'ed geode
+	;	Pass:
+	;		ds:si	- array element to unlock
+	;		bx	- parameter passed to ArrayQuickSort
+	;	Return:
+	;		nothing
+	;	Destroyed:
+	;		nothing
+	;
+    QSP_insertLimit	word	; Size of list below which we choose to use
+				;    insertion sort and not quicksort.
+    QSP_medianLimit	word	; Size of list below which we no longer choose
+				;    the median but instead use the first key.
+    ;
+    ; These are used internally by the quicksort algorithm and should not
+    ; be set by the caller.
+    ;
+    QSP_nLesser		word	; Number of elements in the lesser list part
+    QSP_nGreater	word	; Number of elements in the greater list part
+   align	word
+QuickSortParameters	ends
+
+;
+; This constant determines how small a list can get before quicksort is
+; dumped in favor of insertion-sort.
+;
+; Knuth suggests a value of 9 for this, but Knuth is assuming that the time
+; to swap and the time to compare are fairly close. I guess this is probably
+; a reasonable assumption for most uses (comparing two buffers and swapping
+; them should be roughly analogous).
+;
+DEFAULT_INSERTION_SORT_LIMIT	= 6
+
+;
+; This constant determines how small a list can get before the quicksort code
+; no longer chooses the median of the first/middle/last elements of the list
+; before sorting.
+;
+; For certain data-sets it may be reasonable to set the insertion-limit low
+; so that quicksort is the chosen algorithm for smaller lists and at the same
+; time set the median limit higher in order to encourage quicksort to avoid
+; the comparisons necessary to choose the median.
+;
+DEFAULT_MEDIAN_LIMIT		= 0
+
+;--------------------------------------------
+;		Element array routines
+;--------------------------------------------
+
+global ElementArrayCreate:far
+;
+; Create a new element array with 0 elements
+;
+; Pass:
+;	ds - block for new array
+;	bx - element size
+;	cx - size for ElementArrayHeader (this allows for reserving extra
+;	     space)  0 = default
+;	si - chunk to resize and use for name array (0 if you want to
+;	     allocate a new chunk)
+;	al - ObjChunkFlags to pass to LMemAlloc (if SI passed as 0)
+
+; Return:
+;	*ds:si - array
+; Destroyed:
+;	none
+
+global ElementArrayAddReference:far
+;
+; Add a reference to an element
+;
+; Pass:
+;	*ds:si - element array
+;	ax - element number
+; Return:
+;	none
+; Destroyed:
+;	none
+
+global ElementArrayAddElement:far
+;
+; Add an element (or add a reference to an existing element)
+;
+; Pass:
+;	*ds:si - element array
+;	cx:dx - element to add (includes RefElementHeader, whose contents
+;		are ignored)
+;	ax - size of element (if variable)
+;	bx:di - routine to call to compare elements (0 for straight binary
+;		comparison)
+;	bp - value to pass to callback in ax
+;			Pass:
+;				es:di - element to add
+;				ds:si - element from array
+;				cx - element size (element sizes must match
+;				     or callback is not called)
+;				ax - value for callback
+;			Return:
+;				zero flag - set if elements equal
+;			Destroyed:
+;				ax, bx, cx, dx
+; Return:
+;	ax - element number
+;	carry - set if this element was newly added
+; Destroyed:
+;	none
+
+global ElementArrayRemoveReference:far
+;
+; Remove a reference to an element
+;
+; Pass:
+;	*ds:si - element array
+;	ax - element number
+;	bx:di - routine to call if the element will actually be removed
+;			Pass:
+;				ds:di - element
+;				ax - callback data
+;			Return:
+;				none
+;			Destroyed:
+;				ax, bx, cx, dx
+;	cx - value to pass to callback in ax
+; Return:
+;	carry - set if element actually removed
+; Destroyed:
+;	none
+
+global ElementArrayDelete:far
+;
+; Delete an element regardless of its reference count
+;
+; Pass:
+;	*ds:si - element array
+;	ax - element number
+; Return:
+;	none
+; Destroyed:
+;	none
+
+global ElementArrayElementChanged:far
+;
+; Check to see if an element (which has just changed) is now equal to another
+; element and needs to be combined with that other element.
+;
+; Pass:
+;	*ds:si - element array
+;	ax - element token that changed
+; Return:
+;	ax - new element token
+; Destroyed:
+;	none
+
+global ElementArrayGetUsedCount:far
+;
+; Get the number of elements in the array that actually hold data.
+;
+; Pass:
+;	*ds:si - element array
+;	bx:di - callback routine to further qualify elements (bx = 0 for none)
+; Return:
+;	ax - number of used elements
+; Destroyed:
+;	none
+;
+;	Callback:
+;	Pass:
+;		*ds:si - array
+;		ds:di - array element being enumerated
+;		cx, dx - data for callbcak
+;	Return:
+;		carry - set if element qualifies
+;	Destroyed:
+;		ax, bx, cx, dx, si, di - destroyed
+
+global ElementArrayUsedIndexToToken:far
+;
+; Get the token of an element given its index *with respect to used elements*
+; in the array. Can be used to implement alternative numbering schemes for
+; array elements by filtering elements through the callback routine.
+;
+; Pass:
+;	*ds:si - element array
+;	ax - index
+;	bx:di - callback routine to further qualify elements (bx = 0 for none)
+; Return:
+;	ax - token
+; Destroyed:
+;	none
+;
+;	Callback:
+;	Pass:
+;		*ds:si - array
+;		ds:di - array element being enumerated
+;		cx, dx - data for callbcak
+;	Return:
+;		carry - set if element qualifies
+;	Destroyed:
+;		ax, bx, cx, dx, si, di - destroyed
+
+global ElementArrayTokenToUsedIndex:far
+;
+; Get the index of an element *with respect to used elements* given its token
+; in the array. Can be used to implement alternative numbering schemes for
+; array elements by filtering elements through the callback routine.
+;
+; Pass:
+;	*ds:si - element array
+;	ax - token
+;	bx:di - callback routine to further qualify elements (bx = 0 for none)
+; Return:
+;	ax - index
+; Destroyed:
+;	none
+;
+;	Callback:
+;	Pass:
+;		*ds:si - array
+;		ds:di - array element being enumerated
+;		cx, dx - data for callbcak
+;	Return:
+;		carry - set if element qualifies
+;	Destroyed:
+;		ax, bx, cx, dx, si, di - destroyed
+
+;----------------------------------------------------------------------------
+;		Macros for faster access to chunk arrays and element arrays
+;----------------------------------------------------------------------------
+
+;
+;	CAElementToPtr -- Inline version of ChunkArrayElementToPtr
+;
+;	seg - segment register
+;	chk - chunk handle
+;	element - element number ot get
+;	dest - destination register
+;	options - TRASH_AX_DX to destroy ax and dx
+;
+;	Destroys: element
+;
+CAElementToPtr	macro	seg, chk, element, dest, options
+if	ERROR_CHECK
+ifdif	<seg>, <ds>
+	push	ds
+	segmov	ds, seg
+endif
+ifdif	<chk>, <si>
+	xchg	si, chk
+endif
+	call	ECCheckChunkArray
+ifdif	<chk>, <si>
+	xchg	si, chk
+endif
+ifdif	<seg>, <ds>
+	pop	ds
+endif
+endif
+
+ifdif	<element>, <ax>
+	xchg	ax, element
+endif
+ifdif	<options>, <TRASH_AX_DX>
+	push	ax, dx
+endif
+	mov	dest, seg:[chk]
+EC <	cmp	ax, seg:[dest].CAH_count				>
+EC <	ERROR_AE CHUNK_ARRAY_BAD_ELEMENT					>
+EC <	tst	seg:[dest].CAH_elementSize				>
+EC <	ERROR_Z	MACRO_REQUIRES_FIXED_SIZE_ELEMENTS			>
+	mul	seg:[dest].CAH_elementSize
+	add	dest, seg:[dest].CAH_offset
+	add	dest, ax
+ifdif	<options>, <TRASH_AX_DX>
+	pop	ax, dx
+endif
+ifdif	<element>, <ax>
+	xchg	ax, element
+endif
+endm
+
+;----------------------------------------------------------------------------
+;	Name arrays
+;----------------------------------------------------------------------------
+
+NAME_ARRAY_MAX_NAME_SIZE	= 256		;room for null in below
+if DBCS_PCGEOS
+NAME_ARRAY_MAX_NAME_LENGTH = 127		;room for null in above
+else
+NAME_ARRAY_MAX_NAME_LENGTH = 255		;room for null in above
+endif
+NAME_ARRAY_MAX_DATA_SIZE	= 64
+
+; Header for a name array
+
+NameArrayHeader	struct
+    NAH_meta		ElementArrayHeader
+    NAH_dataSize	word			;data size (in bytes)
+NameArrayHeader	ends
+
+NameArrayElement	struct
+    NAE_meta		RefElementHeader	;standard ElementArray stuff
+    NAE_data		label	byte		;data
+						;the name itsself immediately
+						;follows the data
+NameArrayElement	ends
+
+NameArrayMaxElement	struct
+    NAME_meta		RefElementHeader
+    NAME_data		byte NAME_ARRAY_MAX_DATA_SIZE dup (?)
+if DBCS_PCGEOS
+    NAME_name		wchar NAME_ARRAY_MAX_NAME_LENGTH dup (?)
+else
+    NAME_name		char NAME_ARRAY_MAX_NAME_LENGTH dup (?)
+endif
+NameArrayMaxElement	ends
+;---
+
+NameArrayAddFlags	record
+    NAAF_SET_DATA_ON_REPLACE:1		;If replacing an existing name set
+					;set data for the name to the data
+					;passed
+    :15
+NameArrayAddFlags	end
+
+global NameArrayCreate:far
+;
+; Create a new element array with 0 elements
+;
+; Pass:
+;	ds - block for new array
+;	bx - data size (to store with each name; excludes NAE_meta field of
+;	     NameArrayElement structure that comes at the start of your
+;	     own element structure)
+;	cx - size for NameArrayHeader (this allows for reserving extra
+;	     space)  0 = default
+;	si - chunk to resize and use for name array (0 if you want to
+;	     allocate a new chunk)
+;	al - ObjChunkFlags to pass to LMemAlloc (if SI passed as 0)
+
+; Return:
+;	*ds:si - array
+; Destroyed:
+;	none
+
+global NameArrayAdd:far
+;
+; Add a name
+;
+; Pass:
+;	*ds:si - name array
+;	es:di - name to add
+;	cx - length of name (0 for null terminated)
+;	bx - flags (NameArrayAddFlags)
+;	dx:ax - data (don't include RefElementHeader)
+; Return:
+;	carry - set if name added
+;	ax - name token
+; Destroyed:
+;	none
+
+global NameArrayFind:far
+;
+; Find a name
+;
+; Pass:
+;	*ds:si - name array
+;	es:di - name to find
+;	cx - length of name (0 for null terminated)
+;	dx:ax - buffer to return data (excluding RefElementHeader)
+; Return:
+;	carry set if name found:
+;		ax - name token
+;	carry clear if name not found:
+;		ax - CA_NULL_ELEMENT
+; Destroyed:
+;	none
+
+global NameArrayChangeName:far
+;
+; Change a name
+;
+; Pass:
+;	*ds:si - name array
+;	ax - name token
+;	es:di - new name
+;	cx - length of name (0 for null terminated)
+; Return:
+;	none
+; Destroyed:
+;	none
+
+;----------------
+
+global CHUNKARRAYCREATE:far
+global CHUNKARRAYCREATEAT:far
+global CHUNKARRAYELEMENTTOPTR:far
+global CHUNKARRAYPTRTOELEMENT:far
+global CHUNKARRAYGETELEMENT:far
+global CHUNKARRAYAPPEND:far
+global CHUNKARRAYINSERTAT_OLD:far
+global CHUNKARRAYINSERTAT:far
+global CHUNKARRAYDELETE:far
+global CHUNKARRAYDELETERANGE:far
+global CHUNKARRAYGETCOUNT:far
+global CHUNKARRAYENUMRANGE:far
+global CHUNKARRAYENUM:far
+global CHUNKARRAYZERO:far
+global CHUNKARRAYELEMENTRESIZE:far
+global CHUNKARRAYSORT:far
+global ARRAYQUICKSORT:far
+global ELEMENTARRAYCREATE:far
+global ELEMENTARRAYCREATEAT:far
+global ELEMENTARRAYADDREFERENCE:far
+global ELEMENTARRAYADDELEMENT:far
+global ELEMENTARRAYREMOVEREFERENCE:far
+global ELEMENTARRAYDELETE:far
+global ELEMENTARRAYELEMENTCHANGED:far
+global ELEMENTARRAYGETUSEDCOUNT:far
+global ELEMENTARRAYUSEDINDEXTOTOKEN:far
+global ELEMENTARRAYTOKENTOUSEDINDEX:far
+global NAMEARRAYCREATE:far
+global NAMEARRAYCREATEAT:far
+global NAMEARRAYADD:far
+global NAMEARRAYFIND:far
+global NAMEARRAYCHANGENAME:far
+
+EndKernel

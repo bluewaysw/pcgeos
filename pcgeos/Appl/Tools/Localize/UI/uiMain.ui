@@ -1,0 +1,466 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PC GEOS
+ * MODULE:	  ResEdit
+ * FILE:	  uiMain.ui
+ *
+ * AUTHOR:  	  Cassie Hartzog, Sep 22, 1992
+ *
+ * REVISION HISTORY:
+ *	Name	  Date	    Description
+ *	----	  ----	    -----------
+ *	CH	9/22/92	  Initial version
+ *
+ * DESCRIPTION:
+ *	
+ *	This file contains the user interface description for the main
+ *      part of the resource editor.
+ *
+ * 	$Id: uiMain.ui,v 1.1 97/04/04 17:13:43 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#include "../Art/mkrResEdit.ui"
+
+start	AppResource;
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+ResEditApp = ResEditApplication vardataReloc {
+
+	moniker = list {
+		ResEditLCMoniker,
+		ResEditLMMoniker,
+		ResEditSCMoniker,
+		ResEditSMMoniker,
+		ResEditLCGAMoniker,
+		ResEditSCGAMoniker,
+		"ResEdit";
+	}
+
+	children =
+		ResEditPrimary;
+
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+		ResEditPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = 
+		ResEditDocumentControl;
+        gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = 
+		ResEditDocumentControl, 
+		ResEditDisplayControl;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+ 		ResEditPrintControl,
+		ResEditDocumentControl,
+		ResEditDisplayControl,
+		ResEditEditControl,
+		ResEditSearchReplaceControl;
+
+	hints = { 
+                ATTR_GEN_INIT_FILE_CATEGORY {
+                        char    "resedit", 0
+                },
+                ATTR_GEN_APPLICATION_PRINT_CONTROL { 
+			UN_OPTR ResEditPrintControl 
+		}
+	}
+}
+	
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+start PrimaryUI;
+
+ResEditPrimary = GenPrimary {
+	moniker = "Resource Editor";
+	children =
+		NewFileInteraction,
+		FileMenu,
+		EditMenu,
+		ProjectMenu, 
+		FilterMenu,
+		UtilitiesMenu,  
+		WindowMenu,
+		ResEditDisplayGroup;
+	hints = {
+		HINT_PRIMARY_FULL_SCREEN
+	}
+}
+
+/* ----------------------------------------------------------------------------
+        DisplayGroup
+-----------------------------------------------------------------------------*/
+
+ResEditDisplayGroup = GenDisplayGroup {
+	hints = {
+		HINT_DEFAULT_FOCUS, HINT_DEFAULT_TARGET,
+		HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE
+	}
+}
+
+/* ----------------------------------------------------------------------------
+        File menu
+-----------------------------------------------------------------------------*/
+
+FileMenu = GenInteraction {
+	children =
+		/* Import/export only for SBCS */
+		ResEditDocumentControl,
+#if !DO_DBCS
+		ResEditExportInteraction,
+		ExportAsciiFileUnmappedChars,
+		ResEditImportInteraction,
+		ImportAsciiFileItemsMissing,
+#endif /* !DO_DBCS */
+		FileMenuInteraction,
+		PrintSubGroup;
+	visibility = popup;
+        hints = { 
+		ATTR_GEN_INTERACTION_GROUP_TYPE { 
+			GenInteractionGroupType GIGT_FILE_MENU 
+		} 
+	}
+}
+
+/* ----------------------------------------------------------------------------
+        Edit menu
+-----------------------------------------------------------------------------*/
+
+EditMenu = GenInteraction {
+	children = ResEditEditControl,
+		   ResEditSearchReplaceControl; 
+	visibility = popup;
+        hints = { 
+		ATTR_GEN_INTERACTION_GROUP_TYPE { 
+			GenInteractionGroupType GIGT_EDIT_MENU 
+		} 
+	}
+}
+
+ResEditEditControl = GenEditControl vardataReloc {
+	visibility = subGroup;
+	output = "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask GECF_SELECT_ALL or mask GECF_DELETE or mask GECF_UNDO or mask GECF_CLIP_ART
+		},
+		ATTR_GEN_CONTROL_APP_UI {
+			UN_OPTR	EditUndo
+		},
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+EditUndo = GenTrigger vardataReloc {
+	UNDO_TRIGGER_VALUES
+	genStates = default -usable;
+	action = MSG_RESEDIT_DOCUMENT_REVERT_TO_ORIGINAL_ITEM, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+visMoniker SearchNextMoniker = 'F', "Forward";
+visMoniker SearchPrevMoniker = 'B', "Backward";
+
+ResEditSearchReplaceControl = SearchReplaceControl vardataReloc {
+	SEARCH_AND_REPLACE_TRIGGER_VALUES
+	genStates = default +enabled;
+	visibility = dialog;
+	output = "TO_APP_MODEL"; 
+	hints = {
+		ATTR_SEARCH_CONTROL_SET_FIND_NEXT_MONIKER {
+			word	offset SearchNextMoniker
+		},
+		ATTR_SEARCH_CONTROL_SET_FIND_PREV_MONIKER {
+			word	offset SearchPrevMoniker
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word  mask SRCF_REPLACE_ALL_IN_SELECTION
+		},
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+/* ----------------------------------------------------------------------------
+        Project menu
+-----------------------------------------------------------------------------*/
+
+ProjectMenu = GenInteraction {
+	moniker = 'P', "Project";
+	children =
+		SourceFileInteraction,
+		DestFileInteraction;
+	visibility = popup;
+}
+
+
+/* ----------------------------------------------------------------------------
+        Filter menu
+-----------------------------------------------------------------------------*/
+
+FilterMenu = GenInteraction {
+	moniker = 'i', "Filter";
+	children = ChunkTypeFilterList, ChunkStateInteraction;
+	visibility = popup;
+}
+
+ChunkTypeFilterList = GenBooleanGroup vardataReloc {
+	destination = "TO_APP_MODEL";
+	applyMsg = MSG_RESEDIT_DOCUMENT_SET_CHUNK_TYPE_FILTERS;
+	children = TypeItem1, TypeItem2, TypeItem3, TypeItem4, TypeItem5;
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+TypeItem1 = GenBoolean {
+	moniker = 'T', "Don't show Text";
+	identifier = "mask CT_TEXT";
+}
+
+TypeItem2 = GenBoolean {
+	moniker = 'M', "Don't show Monikers";
+	identifier = "mask CT_MONIKER";
+}
+
+TypeItem3 = GenBoolean {
+	moniker = 'G', "Don't show GStrings";
+	identifier = "mask CT_GSTRING";
+}
+
+TypeItem4 = GenBoolean {
+	moniker = 'B', "Don't show Bitmaps";
+	identifier = "mask CT_BITMAP";
+}
+
+TypeItem5 = GenBoolean {
+	moniker = 'O', "Don't show Objects";
+	identifier = "mask CT_OBJECT";
+}
+
+ChunkStateInteraction = GenInteraction {
+	children = ChunkStateFilterList;
+	visibility = subGroup;
+}
+
+ChunkStateFilterList = GenItemGroup vardataReloc {
+	behaviorType = exclusiveNone;
+	destination = "TO_APP_MODEL";
+	applyMsg = MSG_RESEDIT_DOCUMENT_SET_CHUNK_STATE_FILTERS;
+	children = StateItem1, StateItem2, StateItem3;
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+StateItem1 = GenItem {
+	moniker = 'c', "Show changed chunks";
+	identifier = CSE_CHANGED;
+}
+
+StateItem2 = GenItem {
+	moniker = 'n', "Show new chunks";
+	identifier = CSE_ADDED;
+}
+
+StateItem3 = GenItem {
+	moniker = 'd', "Show deleted chunks";
+	identifier = CSE_DELETED;
+}
+
+
+/* ----------------------------------------------------------------------------
+        Utilities menu
+-----------------------------------------------------------------------------*/
+
+UtilitiesMenu = GenInteraction {
+	moniker = 'U', "Utilities";
+	visibility = popup;
+	children = 
+		NavigationSubgroup,
+		WordCountTrigger,
+		WordCount;
+}
+
+/* ----------------------------------------------------------------------------
+        Word Count UI
+-----------------------------------------------------------------------------*/
+WordCountTrigger = GenTrigger vardataReloc {
+	moniker = 'W', "Word Count";
+	action = MSG_RESEDIT_DOCUMENT_COUNT_UNIQUE_WORDS, "TO_APP_MODEL";
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+WordCount = GenInteraction {
+	moniker = "Word Count";
+	children = 
+		UniqueWords,
+		TotalWords,
+/*		PrintWords, */
+		WordCountOKTrigger;
+	visibility = dialog;
+	attributes = notUserInitiatable, modal;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+WordCountOKTrigger = GenTrigger {
+	action = MSG_RESEDIT_DOCUMENT_DESTROY_WORD_COUNT_ARRAY, "TO_APP_MODEL";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_OK },
+	}
+}
+
+TotalWords = GenText {
+	moniker = "Total number of words in original: ";
+	text = "";
+	genAttributes = default +readOnly;
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 10>
+			SpecHeight <SST_LINES_OF_TEXT, 1>
+		}
+	}
+}
+
+UniqueWords = GenText {
+	moniker = "Number of unique words in original: ";
+	text = "";
+	genAttributes = default +readOnly;
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 10>
+			SpecHeight <SST_LINES_OF_TEXT, 1>
+		}
+	}
+}
+
+/*
+PrintWords = GenInteraction {
+	moniker = "Export words to file";
+	visibility = dialog;
+	attributes = default +modal; 
+	children = 
+		PrintFileName,
+		PrintWordsOKTrigger,
+		PrintWordsCancelTrigger;
+}
+
+PrintFileName = GenText {
+	moniker = "File Name: ";
+	text = "";
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, DOS_DOT_FILE_NAME_SIZE>
+			SpecHeight <SST_LINES_OF_TEXT, 1>
+		},
+		ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES
+	}
+}
+
+PrintWordsOKTrigger = GenTrigger {
+	moniker = "Export";
+	action = MSG_RESEDIT_DOCUMENT_PRINT_UNIQUE_WORDS, "TO_APP_MODEL";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_FOCUS
+	}
+}
+
+PrintWordsCancelTrigger = GenTrigger {
+	moniker = "Cancel";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS }
+	}
+}
+*/
+
+/* ----------------------------------------------------------------------------
+        Navigation SubGroup
+-----------------------------------------------------------------------------*/
+
+NavigationSubgroup = GenInteraction {
+	visibility = subGroup;
+	children = NextChunk, 
+		   PreviousChunk, 
+		   NextResource, 
+		   PreviousResource;
+	hints = {
+		HINT_DRAW_IN_BOX
+	}
+}
+
+NextChunk = GenTrigger vardataReloc {
+	moniker = "Next Chunk";
+	kbdAccelerator = specificUI control '.';
+	action = MSG_RESEDIT_DOCUMENT_KBD_NEXT_CHUNK, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+PreviousChunk = GenTrigger vardataReloc {
+	moniker = "Previous Chunk";
+	kbdAccelerator = specificUI control ',';
+	action = MSG_RESEDIT_DOCUMENT_KBD_PREV_CHUNK, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+NextResource = GenTrigger vardataReloc {
+	moniker = "Next Resource";
+	kbdAccelerator = specificUI control '>';
+	action = MSG_RESEDIT_DOCUMENT_KBD_NEXT_RESOURCE, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+PreviousResource = GenTrigger vardataReloc {
+	moniker = "Previous Resource";
+	kbdAccelerator = specificUI control '<';
+	action = MSG_RESEDIT_DOCUMENT_KBD_PREV_RESOURCE, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+/* ----------------------------------------------------------------------------
+	Window menu
+-----------------------------------------------------------------------------*/
+
+WindowMenu = GenInteraction {
+	children = ResEditDisplayControl;
+	visibility = popup;
+	hints = { 
+		ATTR_GEN_INTERACTION_GROUP_TYPE { 
+			GenInteractionGroupType GIGT_WINDOW_MENU 
+		}
+	}
+}
+
+ResEditDisplayControl = GenDisplayControl {
+	hints = {
+		HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE
+	}
+}
+
+end PrimaryUI;
+

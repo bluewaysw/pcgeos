@@ -1,0 +1,1263 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Graphics
+FILE:		graphicsMacro.def
+
+AUTHOR:		Tony Requist
+
+MACROS:
+	Neg32 - negate a 32-bit integer
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/88		Initial version
+	Jim	3/89		Added Neg32
+	Gene	5/89		added FastLockGStateFont, FastLockWinFont
+	Gene	8/89		changed FastLockFont, added FastUnlockFont
+
+DESCRIPTION:
+	This file contains macros local to the graphics module.
+
+	$Id: graphicsMacro.def,v 1.1 97/04/05 01:13:23 newdeal Exp $
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Neg32
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Negate a 32-bit integer
+
+ARGUMENTS:	low, high - low, high words of number
+
+RETURN:		low, high - low, high words of result
+
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	03/89		Initial version
+	Adam	8/89		Changed to use neg and cmc
+	Jim	3/91		Added NegDWFixed
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+Neg32	macro	low, high
+	neg	low		;; negate low, leaving CF in opposite state
+	not	high		;;  from that desired ('not' doesn't change CF)
+	cmc			;; Get CF to proper state (1 if low was 0)
+	adc	high, 0		;; Ripple carry to high to complete operation
+endm
+
+NegDWFixed	macro	intHigh, intLow, frac
+	neg	frac
+	not	intLow
+	not	intHigh
+	cmc
+	adc	intLow, 0
+	adc	intHigh, 0
+endm
+
+
+NegateFixed	macro	int,frac
+	neg	frac		;this junk negates a fixed point number
+	not	int
+	cmc
+	adc	int,0
+endm
+
+;this negates a 48 bit number
+NegFixed48 macro int,frachigh,fraclow
+	neg	fraclow			;sets carry (really borrow) if fraclow
+					;is non-zero
+	not	frachigh
+	not	int
+	cmc
+	adc	frachigh,0
+	adc	int,0
+endm
+
+Round	macro	int,frac
+local	R_10,R_20
+	cmp	frac,8000h
+	jb	R_20		;bra if frac less than .5, no inc
+	ja	R_10		;if frac > .5 must inc
+	tst	int		;if frac = .5 then only pos int must be inced
+	js	R_20		;bra on neg int
+R_10:
+	inc	int
+R_20:
+endm
+
+Average	macro	int1,frac1,int2,frac2
+	add	frac1,frac2		;get average
+	adc	int1,int2
+	sar	int1,1
+	rcr	frac1,1
+	Round	int1,frac1		;round that puppy
+endm
+
+;
+; round a WBFixed to a word
+;
+RoundWB_W       macro   int,frac
+local   R_10,R_20
+	cmp     frac, 0x80
+	jb      R_20            ;bra if frac less than .5, no inc
+	ja      R_10            ;if frac > .5 must inc
+	tst     int             ;if frac = .5 then only pos int must be inced
+	js      R_20            ;bra on neg int
+R_10:
+	inc     int
+R_20:
+endm
+
+;
+; divide by 2 (shift right 1)
+;
+Div2    macro   int, frac
+	sar     int, 1
+	rcr     frac, 1
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CheckDWordResult
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check a DWord coordinate transform result for overflow
+
+ARGUMENTS:	low, high - low, high words of number
+
+RETURN:		carry		- set on overflow
+				  else, low = result
+
+DESTROYED:	high
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	03/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+CheckDWordResult	macro	high, low
+		local	checkHiLo, overflow, done
+		tst	high		;; check high word		
+		jz	checkHiLo	;; looks OK so far, check signs
+		inc	high		;; check for -1
+		jnz	overflow	;; oops, overboard
+		dec	high
+checkHiLo:
+		xor	high, low	;; check signs of each result
+		jns	done		;; result OK & xor clears the carry
+overflow:
+		stc			;; signal problem
+done:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StartPatterns
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Start a definition of system patterns
+
+ARGUMENTS:	numPatterns	= The number of patterns to be defined
+
+RETURN:		Nothing
+
+DESTROYED:	Nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Don	03/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+StartPatterns	macro	numPatterns
+	
+	SysPatternLMemBlockHeader<{}, numPatterns>
+	_patternOffset	= $
+	_curPattern	= 0
+	_numPatterns	= numPatterns
+	org	$ + 2 * numPatterns
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefPattern
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Define a new pattern
+
+ARGUMENTS:	patternName	= Name of the pattern
+
+RETURN:		Nothing
+
+DESTROYED:	Nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Don	03/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DefPattern	macro	patternName
+
+	_original	= $
+	org		_patternOffset
+	nptr		patternName
+	_patternOffset	= $
+	org		_original
+	_curPattern	= _curPattern + 1
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EndPatterns
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	End the definition of patterns, ensuring everything is OK
+
+ARGUMENTS:	Nothing
+
+RETURN:		Nothing
+
+DESTROYED:	Nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Don	03/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+EndPatterns	macro
+
+	if	_curPattern ne _numPatterns
+	.err
+	PrintMessage <Error -- Incorrect # of patterns defined>
+	endif
+endm
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		qword math macros
+
+ARGUMENTS:
+	There are three classes of qword math macros: one-argument,
+	two-argument, and signed compare macros.  If stored in registers,
+	qwords are traditionally referred to by regHreg2reg3regL 
+	(eg. dxcxbxax), where the high word comes first.  If stored in
+	memory, remember the 80x86 machines store data LSB first, so it will
+	be stored regL...regH.
+
+	For one-argument functions, the destination can either a register
+	double-pair or memory:
+
+	dest
+	----
+	regdpair
+	memory
+
+	For two-argument functions, the arguments can either be a register
+	double-pair and memory, or a constant and a register pair:
+
+	dest		source
+	------		----
+	regdpair	memory
+	regdpair	constant
+	memory		regdpair
+	memory		constant
+	memory		memory		NOTE: requires trash register
+
+	Signed compare functions are necessary because for a signed qword,
+	the high word is signed, but the low word is not.  This means that
+	the 'cmpqw' macro will not work -- it will return flags for greater
+	than for both the high and low words, which will give incorrect
+	results.  As with the two-argument functions, the arguments can either
+	be a register double-pair and memory, or a constant and a register 
+	pair.  They also take a label to branch to if the specified
+	condition is true.
+
+EXAMPLES:
+	negdw	dxcxbxax
+	adddw	ds:[si], dxcxbxax
+	cmpdw	dxcxbxax, ss:[bp].MRVP_bounds.BigLeft
+	movde	dxcxbxax, 0x12345678
+	jgedw	ds:[si], dxcxbxax, aLabel
+
+NOTE:
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		_CheckQWordOneArg
+
+DESCRIPTION:	Check argument to one-arg qword macro
+
+ARGUMENTS:
+	dest - argument side
+	op - string to emit for error-identification
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+_CheckQWordOneArg	macro	dest, op, arg2
+ifnb <arg2>
+	ErrMessage	<Multiple arguments passed to op macro>
+else
+	ifnb <dest>
+	    dlen	sizestr	<&dest>
+	    if ((.TYPE &dest) AND 4)
+		ErrMessage <op : single argument cannot be constant>
+	    endif
+	else
+	    ErrMessage <op : missing argument>
+	endif
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		_CheckQWordTwoArg
+
+DESCRIPTION:	Check arguments to two-arg qword macro
+
+ARGUMENTS:
+	dest - left-hand side
+	src - right-hand side
+	op - string to emit for error-identification
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+_CheckQWordTwoArg	macro	dest, src, op
+
+ifnb	<src>
+    ifidn <dest>, <src>
+	ErrMessage <op : destination = source>
+    else
+	if ((.TYPE &dest) AND 4)
+	    ErrMessage <op : destination argument cannot be constant>
+	endif
+    endif
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		_ParseQWordArg
+
+DESCRIPTION:	Parse an argument to a qword math macro
+
+PASS:
+	arg - argument passed to macro
+	regcount - # of register-pair arguments
+	op - string to emit for error-identification
+RETURN:
+	rl - low part of arg
+	rh - high part of arg
+	regcount - # of register-pair or constant arguments
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+_ParseQWordArg	macro	arg, rl, r2, r3, rh, regcount, op
+
+alen	sizestr	<&arg>
+
+ifnb <arg>
+
+if (4 AND .TYPE (arg))
+    ; => is constant
+    rh catstr <((arg) SHR 48)>
+    r3 catstr <(((arg) SHR 32) AND 0xffff)>
+    r2 catstr <(((arg) SHR 16) AND 0xffff)>
+    rl catstr <((arg) AND 0xffff)>
+    regcount=regcount+1
+else
+    if (alen eq 8)
+	rh substr <arg>, 1, 2
+	r3 substr <arg>, 3, 2
+	r2 substr <arg>, 5, 2
+	rl substr <arg>, 7, 2
+
+	if (16 and .type (rl)) and (16 and .type (rh))
+	    regcount=regcount+1
+	else
+	    ; one of the pair isn't actually a register, so assume arg is var.
+	    rh catstr <arg>, <.HI_hi.high>
+	    r3 catstr <arg>, <.HI_hi.low>
+	    r2 catstr <arg>, <.HI_lo.high>
+	    rl catstr <arg>, <.HI_lo.low>
+	endif
+    else
+	rh catstr <arg>, <.HI_hi.high>
+	r3 catstr <arg>, <.HI_hi.low>
+	r2 catstr <arg>, <.HI_lo.high>
+	rl catstr <arg>, <.HI_lo.low>
+    endif
+endif
+
+else
+    ErrMessage <op : missing argument>
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		cmpqw
+
+DESCRIPTION:	Compare qwords
+
+ARGUMENTS:
+	dest, source - dest, source to compare
+	[trashreg] - re'qd if comparing memory to memory
+CAVEATS:
+	This is only valid for *unsigned* comparisons.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+cmpqw	macro	dest, source, trashreg
+	local	foo, drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <cmpqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <cmpqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <cmpqw>
+
+if (regargs gt 0)
+	cmp	drh, srh
+	jne	foo
+	cmp	dr3, sr3
+	jne	foo
+	cmp	dr2, sr2
+	jne	foo
+	cmp	drl, srl
+elseifnb <trashreg>
+	mov	trashreg, drh
+	cmp	trashreg, srh
+	jne	foo
+	mov	trashreg, dr3
+	cmp	trashreg, sr3
+	jne	foo
+	mov	trashreg, dr2
+	cmp	trashreg, sr2
+	jne	foo
+	mov	trashreg, drl
+	cmp	trashreg, srl
+else
+	ErrMessage <cmpqw : need trash register to compare mem, mem>
+endif
+
+foo:
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		jgeqw
+
+DESCRIPTION:	Signed compare and branch >= for qwords
+
+ARGUMENTS:
+	dest, source - dest, source to compare
+	blabel - label to branch to branch to if >=
+	[trashreg] - re'qd if comparing memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+jgeqw	macro	dest, source, blabel, trashreg
+	local	foo, drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <jgeqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <jgeqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <jgeqw>
+
+ifb <blabel>
+	ErrMessage <jgeqw : need label for branch>
+endif
+
+if (regargs gt 0)
+	cmp	drh, srh
+	jg	blabel
+	jl	foo
+	cmp	dr3, sr3
+	ja	blabel
+	jb	foo
+	cmp	dr2, sr2
+	ja	blabel
+	jb	foo
+	cmp	drl, srl
+	jae	blabel
+foo:
+elseifnb <trashreg>
+	mov	trashreg, drh
+	cmp	trashreg, srh
+	jg	blabel
+	jl	foo
+	mov	trashreg, dr3
+	cmp	trashreg, sr3
+	ja	blabel
+	jb	foo
+	mov	trashreg, dr2
+	cmp	trashreg, sr2
+	ja	blabel
+	jb	foo
+	mov	trashreg, drl
+	cmp	trashreg, srl
+	jae	blabel
+foo:
+else
+	ErrMessage <jgeqw : need trash register to compare mem, mem>
+endif
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		jgqw
+
+DESCRIPTION:	Signed compare and branch > for qwords
+
+ARGUMENTS:
+	dest, source - dest, source to compare
+	blabel - label to branch to branch to if >
+	[trashreg] - re'qd if comparing memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+jgqw	macro	dest, source, blabel, trashreg
+	local	foo, drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <jgqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <jgqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <jgqw>
+
+ifb <blabel>
+	ErrMessage <jgqw : need label for branch>
+endif
+
+if (regargs gt 0)
+	cmp	drh, srh
+	jg	blabel
+	jl	foo
+	cmp	dr3, sr3
+	ja	blabel
+	jb	foo
+	cmp	dr2, sr2
+	ja	blabel
+	jb	foo
+	cmp	drl, srl
+	ja	blabel
+foo:
+elseifnb <trashreg>
+	mov	trashreg, drh
+	cmp	trashreg, srh
+	jg	blabel
+	jl	foo
+	mov	trashreg, dr3
+	cmp	trashreg, sr3
+	ja	blabel
+	jb	foo
+	mov	trashreg, dr2
+	cmp	trashreg, sr2
+	ja	blabel
+	jb	foo
+	mov	trashreg, drl
+	cmp	trashreg, srl
+	ja	blabel
+foo:
+else
+	ErrMessage <jgqw : need trash register to compare mem, mem>
+endif
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		jleqw
+
+DESCRIPTION:	Signed compare and branch <= for qwords
+
+ARGUMENTS:
+	dest, source - dest, source to compare
+	blabel - label to branch to branch to if <=
+	[trashreg] - re'qd if comparing memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+jleqw	macro	dest, source, blabel, trashreg
+	local	foo, drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <jleqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <jleqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <jleqw>
+
+ifb <blabel>
+	ErrMessage <jleqw : need label for branch>
+endif
+
+if (regargs gt 0)
+	cmp	drh, srh
+	jl	blabel
+	jg	foo
+	cmp	dr3, sr3
+	jb	blabel
+	ja	foo
+	cmp	dr2, sr2
+	jb	blabel
+	ja	foo
+	cmp	drl, srl
+	jbe	blabel
+foo:
+elseifnb <trashreg>
+	mov	trashreg, drh
+	cmp	trashreg, srh
+	jl	blabel
+	jg	foo
+	mov	trashreg, dr3
+	cmp	trashreg, sr3
+	jb	blabel
+	ja	foo
+	mov	trashreg, dr2
+	cmp	trashreg, sr2
+	jb	blabel
+	ja	foo
+	mov	trashreg, drl
+	cmp	trashreg, srl
+	jbe	blabel
+foo:
+else
+	ErrMessage <jleqw : need trash register to compare mem, mem>
+endif
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		jlqw
+
+DESCRIPTION:	Signed compare and branch < for qwords
+
+ARGUMENTS:
+	dest, source - dest, source to compare
+	blabel - label to branch to branch to if <
+	[trashreg] - re'qd if comparing memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+jlqw	macro	dest, source, blabel, trashreg
+	local	foo, drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <jlqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <jlqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <jlqw>
+
+ifb <blabel>
+	ErrMessage <jlqw : need label for branch>
+endif
+
+if (regargs gt 0)
+	cmp	drh, srh
+	jl	blabel
+	jg	foo
+	cmp	dr3, sr3
+	jb	blabel
+	ja	foo
+	cmp	dr2, sr2
+	jb	blabel
+	ja	foo
+	cmp	drl, srl
+	jb	blabel
+foo:
+elseifnb <trashreg>
+	mov	trashreg, drh
+	cmp	trashreg, srh
+	jl	blabel
+	jg	foo
+	mov	trashreg, dr3
+	cmp	trashreg, sr3
+	jb	blabel
+	ja	foo
+	mov	trashreg, dr2
+	cmp	trashreg, sr2
+	jb	blabel
+	ja	foo
+	mov	trashreg, drl
+	cmp	trashreg, srl
+	jb	blabel
+foo:
+else
+	ErrMessage <jlqw : need trash register to compare mem, mem>
+endif
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		tstqw
+
+DESCRIPTION:	Sets the Z flag if the qword is zero.
+		Does NOT set the "s" flag correctly (unlike "tst").
+
+ARGUMENTS:
+	dest - memory or register pair to test
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+tstqw	macro	dest, arg2
+
+	local	foo, drl, dr2, dr3, drh, regargs
+
+regargs = 0
+
+
+_CheckQWordOneArg	<dest>, <tstqw>, <arg2>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <tstqw>
+
+	tst	drh
+	jnz	foo
+	tst	dr3
+	jnz	foo
+	tst	dr2
+	jnz	foo
+	tst	drl
+foo:
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		pushqw
+
+DESCRIPTION:	Push a qword
+
+ARGUMENTS:
+	dest - memory or register pair to push
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+pushqw	macro	dest, arg2
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <pushqw>, <arg2>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <pushqw>
+
+	push	drh
+	push	dr3
+	push	dr2
+	push	drl
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		popqw
+
+DESCRIPTION:	Pop a qword
+
+ARGUMENTS:
+	dest - memory or register pair to pop into
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+popqw	macro	dest, arg2
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <popqw>, <arg2>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <popqw>
+
+	pop	drl
+	pop	dr2
+	pop	dr3
+	pop	drh
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		notqw
+
+DESCRIPTION:	Not a qword
+
+ARGUMENTS:
+	dest - memory or register pair to not
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+notqw	macro	dest, arg2
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <notqw>, <arg2>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <notqw>
+
+	not	drl
+	not	dr2
+	not	dr3
+	not	drh
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		negqw
+
+DESCRIPTION:	Negate a qword
+
+ARGUMENTS:
+	dest - memory or register pair to not
+	[zeroreg] - if you have a register = 0, this is quicker
+CAVEATS:
+	Does not set flags the same as the 'neg' instruction
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+negqw	macro	dest, zeroreg
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <negqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <negqw>
+
+					;cycles/bytes (registers)
+	not	drh			;3/2
+	not	dr3			;3/2
+	not	dr2			;3/2
+	not	drl			;3/2
+	add	drl, 1
+ifnb	<zeroreg>
+	adc	dr2, zeroreg		;3/2
+	adc	dr3, zeroreg		;3/2
+	adc	drh, zeroreg		;3/2
+else
+	adc	dr2, 0			;4/3
+	adc	dr3, 0			;4/3
+	adc	drh, 0			;4/3
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		incqw
+
+DESCRIPTION:	Increment a qword
+
+ARGUMENTS:
+	dest - memory or register pair to inc
+CAVEATS:
+	Does not set flags same as 'inc' instruction,
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+incqw	macro	dest, arg2
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <incqw>, <arg2>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <incqw>
+
+	add	drl, 1			;3 bytes / 3 cycles
+	adc	dr2, 0			;3 bytes / 3 cycles
+	adc	dr3, 0			;3 bytes / 3 cycles
+	adc	drh, 0			;3 bytes / 3 cycles
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		decqw
+
+DESCRIPTION:	Decrement a qword
+
+ARGUMENTS:
+	dest - memory or register pair to dec
+CAVEATS:
+	Does not set flags same as 'dec' instruction,
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+decqw	macro	dest, arg2
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <decqw>, <arg2>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <decqw>
+
+	sub	drl, 1
+	sbb	dr2, 0
+	sbb	dr3, 0
+	sbb	drh, 0
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		movqw
+
+DESCRIPTION:	Move a qword
+
+ARGUMENTS:
+	dest - memory or register pair for destination
+	source - memory or register pair for source
+	[trashreg] - re'qd if moving memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+movqw	macro	dest, source, trashreg
+	local	drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <movqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <movqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <movqw>
+
+if (regargs gt 0)
+	mov	drh, srh
+	mov	dr3, sr3
+	mov	dr2, sr2
+	mov	drl, srl
+elseifnb <trashreg>
+	mov	trashreg, srh
+	mov	drh, trashreg
+	mov	trashreg, sr3
+	mov	dr3, trashreg
+	mov	trashreg, sr2
+	mov	dr2, trashreg
+	mov	trashreg, srl
+	mov	drl, trashreg
+else
+	ErrMessage <movqw : need trash register to move mem, mem>
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		xchgqw
+
+DESCRIPTION:	Exchange two qwords
+
+ARGUMENTS:
+	dest - memory or register pair for destination
+	source - memory or register pair for source
+	[trashreg] - re'qd if moving memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+xchgqw	macro	dest, source, trashreg
+	local	drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <xchgqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <xchgqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <xchgqw>
+
+if (regargs gt 0)
+	xchg	drh, srh
+	xchg	dr3, sr3
+	xchg	dr2, sr2
+	xchg	drl, srl
+elseifnb <trashreg>
+	mov	trashreg, srh
+	xchg	drh, trashreg
+	mov	srh, trashreg
+	mov	trashreg, sr3
+	xchg	dr3, trashreg
+	mov	sr3, trashreg
+	mov	trashreg, sr2
+	xchg	dr2, trashreg
+	mov	sr2, trashreg
+	mov	trashreg, srl
+	xchg	drl, trashreg
+	mov	srl, trashreg
+else
+	ErrMessage <xchgqw : need trash register to xchg mem, mem>
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		addqw
+
+DESCRIPTION:	Add a qword
+
+ARGUMENTS:
+	dest - memory or register pair for destination
+	source - memory or register pair for source
+	[trashreg] - re'qd if adding memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+addqw	macro	dest, source, trashreg
+	local	drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <addqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <addqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <addqw>
+
+if (regargs gt 0)
+	add	drl, srl
+	adc	dr2, sr2
+	adc	dr3, sr3
+	adc	drh, srh
+elseifnb <trashreg>
+	mov	trashreg, srl
+	add	drl, trashreg
+	mov	trashreg, sr2
+	adc	dr2, trashreg
+	mov	trashreg, sr3
+	adc	dr3, trashreg
+	mov	trashreg, srh
+	adc	drh, trashreg
+else
+	ErrMessage <addqw : need trash register to add mem, mem>
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		adcqw
+
+DESCRIPTION:	Add with carry a qword
+
+ARGUMENTS:
+	dest - memory or register pair for destination
+	source - memory or register pair for source
+	[trashreg] - re'qd if adding memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+adcqw	macro	dest, source, trashreg
+	local	drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <adcqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <adcqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <adcqw>
+
+if (regargs gt 0)
+	adc	drl, srl
+	adc	dr2, sr2
+	adc	dr3, sr3
+	adc	drh, srh
+elseifnb <trashreg>
+	mov	trashreg, srl
+	adc	drl, trashreg
+	mov	trashreg, sr2
+	adc	dr2, trashreg
+	mov	trashreg, sr3
+	adc	dr3, trashreg
+	mov	trashreg, srh
+	adc	drh, trashreg
+else
+	ErrMessage <adcqw : need trash register to adc mem, mem>
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		subqw
+
+DESCRIPTION:	Subtract a qword
+
+ARGUMENTS:
+	dest - memory or register pair for destination
+	source - memory or register pair for source
+	[trashreg] - re'qd if adding memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+subqw	macro	dest, source, trashreg
+	local	drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <subqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <subqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <subqw>
+
+if (regargs gt 0)
+	sub	drl, srl
+	sbb	dr2, sr2
+	sbb	dr3, sr3
+	sbb	drh, srh
+elseifnb <trashreg>
+	mov	trashreg, srl
+	sub	drl, trashreg
+	mov	trashreg, sr2
+	sbb	dr2, trashreg
+	mov	trashreg, sr3
+	sbb	dr3, trashreg
+	mov	trashreg, srh
+	sbb	drh, trashreg
+else
+	ErrMessage <subqw : need trash register to sub mem, mem>
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		sbbqw
+
+DESCRIPTION:	Subtract with borrow a qword
+
+ARGUMENTS:
+	dest - memory or register pair for destination
+	source - memory or register pair for source
+	[trashreg] - re'qd if adding memory to memory
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+sbbqw	macro	dest, source, trashreg
+	local	drl, dr2, dr3, drh, srl, sr2, sr3, srh, regargs
+
+regargs = 0
+_CheckQWordTwoArg	<dest>, <source>, <sbbqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <sbbqw>
+_ParseQWordArg	<source>, srl, sr2, sr3, srh, regargs, <sbbqw>
+
+if (regargs gt 0)
+	sbb	drl, srl
+	sbb	dr2, sr2
+	sbb	dr3, sr3
+	sbb	drh, srh
+elseifnb <trashreg>
+	mov	trashreg, srl
+	sbb	drl, trashreg
+	mov	trashreg, sr2
+	sbb	dr2, trashreg
+	mov	trashreg, sr3
+	sbb	dr3, trashreg
+	mov	trashreg, srh
+	sbb	drh, trashreg
+else
+	ErrMessage <sbbqw : need trash register to sbb mem, mem>
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		clrqw
+
+DESCRIPTION:	Clear a qword
+
+ARGUMENTS:
+	dest - memory or register pair to clear
+	[zeroreg] - if you have a register = 0, this is quicker
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+clrqw	macro	dest, zeroreg
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <clrqw>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <clrqw>
+
+ifnb	<zeroreg>
+	mov	drh, zeroreg
+	mov	dr3, zeroreg
+	mov	dr2, zeroreg
+	mov	drl, zeroreg
+elseif (regargs gt 0)
+	clr	drh
+	mov	dr3, drh
+	mov	dr2, drh
+	mov	drl, drh
+else
+	clr	drh
+	clr	dr3
+	clr	dr2
+	clr	drl
+endif
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		sarqw
+
+DESCRIPTION:	Arithmetic shift right for qword
+
+ARGUMENTS:
+	dest - memory or register pair to shift right
+CAVEATS:
+	Does not set flags the same as the 'sar' instruction
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+sarqw	macro	dest, arg2
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <sarqw>, <arg2>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <sarqw>
+
+	sar	drh, 1
+	rcr	dr3, 1
+	rcr	dr2, 1
+	rcr	drl, 1
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		shrqw
+
+DESCRIPTION:	Logical shift right for qword
+
+ARGUMENTS:
+	dest - memory or register pair to shift right
+CAVEATS:
+	Does not set flags the same as the 'shr' instruction
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+shrqw	macro	dest, arg2
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <shrqw>, <arg2>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <shrqw>
+
+	shr	drh, 1
+	rcr	dr3, 1
+	rcr	dr2, 1
+	rcr	drl, 1
+
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		shlqw, salqw
+
+DESCRIPTION:	Logical/Arithmetic shift left for qword
+
+ARGUMENTS:
+	dest - memory or register pair to shift left
+CAVEATS:
+	Does not set flags the same as the 'shl/sal' instruction
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+shlqw	macro	dest, arg2
+	local	drl, dr2, dr3, drh, regargs
+
+regargs = 0
+_CheckQWordOneArg	<dest>, <shlqw>, <arg2>
+_ParseQWordArg	<dest>, drl, dr2, dr3, drh, regargs, <shlqw>
+
+	shl	drl, 1
+	rcl	dr2, 1
+	rcl	dr3, 1
+	rcl	drh, 1
+
+endm
+
+salqw	macro	dest
+	shlqw	dest
+endm
+
+
+

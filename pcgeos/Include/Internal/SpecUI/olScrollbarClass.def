@@ -1,0 +1,258 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	SPUI
+MODULE:		
+FILE:		olScrollbarClass.def
+
+AUTHOR:		David Litwin, Oct  6, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	10/ 6/94		Initial revision
+
+
+DESCRIPTION:
+	Definition of OLScrollbarClass.
+
+	OLScrollbar is the OPEN LOOK Scrollbar object.  It is
+	subclassed off of GenRange and is typically used as the
+	output of GenView's.  
+	 
+	MSG_REPEAT_SCROLL: This method can be used to make the
+			scrollbar continue scrolling if the user is
+			holding down the mouse button.  Usually this
+			results from the contents of a view being
+			redrawn, but you can "fake" it here.
+
+	$Id: olScrollbarClass.def,v 1.2 98/03/11 06:10:58 joon Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+OLScrollbarClass 	class	VisClass
+	uses	GenValueClass		
+			
+			
+if	_OL_STYLE
+MSG_STOP_SHIFTING_MOUSE	message
+
+; Tells the scrollbar to stop shifting the mouse.  The scrollbar will start
+; shifting the mouse if the elevator jumps without the mouse being on the
+; elevator.
+;
+; Pass:		cx -- amount to remove from the mouse shift
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+endif
+
+MSG_SET_ORIENTATION	message
+;
+; Sets the orientation for the scrollbar.  (Temporary, until we have a 
+; generic method for such a thing.)
+;
+; Pass:	     cl -- clear if horizontal, 0ffh if vertical
+; Return:    nothing
+; Destroyed: ax, cx, dx, bp
+;
+	
+MSG_REPEAT_SCROLL	message
+;
+; This method is sent to the scrollbar to repeat the previous scroll action
+; if the button that started it is still pressed.  It originates in the 
+; port window as a result of a MSG_META_WIN_UPDATE_COMPLETE.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_SPEC_SCROLLBAR_SUPPRESS_DRAW	message
+;
+; Suppresses draw on the next call of MSG_GEN_VALUE_SET_VALUE or MSG_GEN_-
+; VALUE_SET_RANGE_LENGTH.  Maybe this should be generic too, but there it is.
+; 
+; 	Pass:	cx -- non-zero to suppress draw, zero to unsuppress.
+;	Return:	nothing
+;		ax, cx, dx, bp preserved
+
+
+;-----------------------------------------------------------------------
+;	Structures
+;-----------------------------------------------------------------------
+
+OLScrollbarAttrs record 
+
+if SLIDER_INCLUDES_VALUES
+if DRAW_STYLES
+	OLSA_NO_FRAME:1,
+;		Set to not draw frame.
+endif
+	OLSA_READ_ONLY:1,
+;		Copy of GA_READ_ONLY for easy access.
+endif
+
+if SPINNER_GEN_VALUE
+	OLSA_SPINNER:1
+;		Set for spinner.
+endif
+
+ 	OLSA_TEXT_TOO:1
+;		Only valid when OLSA_SLIDER is set, causes the text for the
+;		value to be included in the drawing.
+
+	OLSA_SUPPRESS_DRAW:1, 
+; 		Can be set before a MSG_GEN_VALUE_SET_VALUE is called, to 
+; 		suppress the draw.  Is always cleared after MSG_GEN_VALUE_SET-
+;		VALUE is handled.
+		
+	OLSA_VERTICAL:1, 
+; 		Gives us the orientation of the scrollbar.
+		
+	OLSA_UPDATE_DURING_DRAGS:1,
+;		Flag to allow constant updating during drags, rather than a
+; 		single update after a drag release.
+;
+	OLSA_SLIDER:1, 
+;		Special flag for testing if we're a slider.
+;
+	OLSA_STUPID:1, 
+; 		Will be used as a dumb gadget that sends out up/down methods.
+; 		This can only work with a minimum scrollbar.   Used for spin
+;		gadgets.
+		
+	OLSA_TWISTED:1, 
+; 		The twisty little scrollbar does special nasty things while
+;		drawing to make the arrows point the wrong way.  Only really
+; 		works on the horizontal scrollbar.  Used for spin gadgets.
+		
+	OLSA_ENABLED:1,  
+; 		Whether the scrollbar is active or not.  Set by looking at the
+; 		generic enabled status of the parent directly.
+		
+	OLSA_DRAWN_ENABLED:1,
+;		Whether the scrollbar has been drawn enabled, so we'll know
+;		whether to white the background out.
+
+end
+	
+
+;
+; Eventually will be moved to generic UI.
+;
+DownFlags etype byte
+OLSS_NOTHING 		enum DownFlags		;nothing pressed
+OLSS_BEG_ANCHOR 	enum DownFlags		;top of document pressed
+OLSS_PAGE_UP 		enum DownFlags		;page up pressed
+OLSS_INC_UP 		enum DownFlags		;increment up pressed
+OLSS_DRAG_AREA 		enum DownFlags		;drag area, or thumb pressed
+OLSS_INC_DOWN 		enum DownFlags		;increment down pressed
+OLSS_PAGE_DOWN 		enum DownFlags		;page down pressed
+OLSS_END_ANCHOR 	enum DownFlags		;bottom of document pressed
+
+OLSS_BOGUS 	equ	OLSS_END_ANCHOR + 1	;illegal value
+
+
+OLScrollbarState record 
+	OLSS_SPLITTER_ON:1,
+; 		Set when the splitting xor region is on, so we know to
+; 		stop it and split the port on a release.
+		
+	OLSS_INVALID_IMAGE:1, 
+; 		Tells use that at the next draw, we need to redraw
+; 		everything.  This happens when we press on part of the
+; 		scrollbar, release it, or need to change the arrow patterns on 
+;		the elevator (at top or bottom).  
+		
+	OLSS_AT_TOP:1, 
+; 		An optimization flag which tells us we're at the top of
+; 		the scrollbar.  Set when we change the document offset or 
+;		change the document size.
+		
+	OLSS_AT_BOTTOM:1, 
+; 		An optimization flag which tells us we're at the bottom of
+; 		the scrollbar.  Set when we change the document offset or 
+;		change the document size.
+		
+	OLSS_INVALID_OFFSETS:1, 
+; 		Tells us that something has happened, like a resize
+; 		of the scrollbar, that requires a recalculation of various 
+;		offsets the next time it's drawn.  Also set if the page size
+;		changes.
+		
+	OLSS_DOWN_FLAGS:3=DownFlags
+; 		Tells which part of the scrollbar is currently depressed.
+		
+OLScrollbarState end
+
+		 
+OLScrollbarOptFlags record
+	OLSOF_REPEAT_SCROLL_PENDING:1,
+;		Set on a scroll to help decide when to repeat the scroll.
+;		Both the repeat-scroll and the timer-expired methods have 
+;		to come through.
+		
+	OLSOF_TIMER_EXPIRED_PENDING:1,
+;		Set on a scroll to help decide when to repeat the scroll.
+;		Both the repeat-scroll and the timer-expired methods have 
+;		to come through.
+	:6
+OLScrollbarOptFlags end
+;
+;
+
+;-----------------------------------------------------------------------
+;	Instance data
+;-----------------------------------------------------------------------
+
+    	OLSBI_drawnDocRatio	dword		; offset currently drawn
+    	OLSBI_elevOffset	sword		; offset of thumb
+MO   <	OLSBI_elevLen		sword		; length of thumb		>
+ISU <	OLSBI_elevLen		sword		; length of thumb		>
+OLS  <	OLSBI_propIndOffset	sword		; offset of proportional indctr>
+OLS  <	OLSBI_propIndLen	sword		; size of proportional indctr>
+    	OLSBI_scrArea		sword		; length of scrollable bar
+	OLSBI_mousePos		sword		; mouse pos
+    	OLSBI_clickXOff		sword		; x offset to original press
+    	OLSBI_clickYOff		sword		; y offset to original press
+    	OLSBI_attrs		OLScrollbarAttrs    ; attributes
+    	OLSBI_state		OLScrollbarState    ; state flags
+   	OLSBI_optFlags		OLScrollbarOptFlags ; optimization flags
+OLS < 	OLSBI_shift		sword		    ; amt of mouse pos shift   >
+CUAS < 	OLSBI_startState 	OLScrollbarState    ; state at initial press   >
+CUAS <	OLSBI_xorElevOff	sword		    ; position of xor elevator >
+CUAS <						    ;   (or -1 if none)        >
+CUAS <	OLSBI_xorDocRatio	dword		    ; doc offset during xor    >
+	OLSBI_arrowSize		word		    ; size of an arrow
+
+if SLIDER_INCLUDES_VALUES and DRAW_STYLES
+	OLSBI_drawStyle		DrawStyle	; draw style
+endif
+
+OLScrollbarClass	endc
+
+;-----------------------------------------------------------------------------
+;	FloatingScrollerClass
+;-----------------------------------------------------------------------------
+;
+;  This class is used for the floating scroller areas in the Odie
+;  specific UI.
+;
+
+if FLOATING_SCROLLERS
+
+FloatingScrollerClass	class	MetaClass
+    FSI_window		hptr
+    FSI_windowRegion	nptr
+    FSI_bitmap		nptr
+    FSI_selectedBitmap	nptr
+    FSI_scrollbar	lptr
+FloatingScrollerClass	endc
+
+endif

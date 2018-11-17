@@ -1,0 +1,737 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992-1994 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  uiHelpEdit.ui
+ * FILE:	  uiHelpEdit.ui
+ *
+ * AUTHOR:  	  Gene Anderson: Sep 16, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	9/16/92	  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	UI for Help Editor functions
+ *
+ *
+ * 	$Id: uiHelpEdit.ui,v 1.1 97/04/04 14:40:30 newdeal Exp $
+ *
+ ***********************************************************************/
+
+start	HelpTempUI;
+
+GenerateFileNotificationTemplate = GenInteraction ignoreDirty {
+	genStates = default -usable;
+	attributes = default +notUserInitiatable, 
+		     +initiatedViaUserDoDialog;
+	visibility = dialog;
+	type = organizational;
+	children = NotificationText;
+}
+
+NotificationText = GenText ignoreDirty {
+	text = "Creating file ";
+	genAttributes = readOnly;
+	textDisplayAttributes = dontScrollToChanges;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE,
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_90>
+			SpecHeight <0, 0>
+		},
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 4*72>
+			SpecHeight <SST_LINES_OF_TEXT, 2>
+		}
+	}
+}
+
+end	HelpTempUI;
+
+/*-----------------------------------------------------------------------------
+	Help Edit menu
+-----------------------------------------------------------------------------*/
+
+start HelpEditUI;
+
+/*
+ * Content File Stuff
+ */
+
+GenerateContentFileTrigger = GenTrigger vardataReloc {
+	moniker = "Generate Content File";
+	action = MSG_STUDIO_DOCUMENT_GENERATE_HELP_FILE, "TO_APP_MODEL";
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD StudioDocumentClass },
+		ATTR_GEN_TRIGGER_ACTION_DATA { word 0 } 
+	}
+}
+
+GenerateHelpFileTrigger = GenTrigger vardataReloc {
+	moniker = "Generate Help File";
+	action = MSG_STUDIO_DOCUMENT_GENERATE_HELP_FILE, "TO_APP_MODEL";
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD StudioDocumentClass },
+		ATTR_GEN_TRIGGER_ACTION_DATA { word mask HFF_HELP_FILE } 
+	}
+}
+
+
+BookNameStatusBarInteraction = GenInteraction {
+	children = BookNameStatusBar;
+	hints = {
+		HINT_TOOLBOX,
+		HINT_NO_WIDER_THAN_CHILDREN_REQUIRE,
+		HINT_NO_TALLER_THAN_CHILDREN_REQUIRE,
+	}
+}
+
+BookNameStatusBar = GenText {
+	moniker = "Current Book:";
+	maxLength = "FILE_LONGNAME_LENGTH";
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+/**************************************************************************
+		Content File Dialog
+**************************************************************************/
+
+GenerateContentFileDialog = GenInteraction {
+	attributes = default +modal, +notUserInitiatable, 
+		     +initiatedViaUserDoDialog;
+	visibility = dialog;
+	type = command;
+	children = CompressOptionsList,
+		   BitmapFormatItemGroup,
+		   BitmapResolutionInteraction, 
+		   OKTrigger;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_INTERACTION_RELATED_PROPERTIES,
+		ATTR_GEN_HELP_CONTEXT { char "dbGenerateFile", 0}
+	}
+}
+
+CompressOptionsList = GenBooleanGroup vardataReloc {
+	moniker = "Compression Options:";
+	children = TextCompressionBoolean, GraphicsCompressionBoolean;
+	selectedBooleans = "mask HO_COMPRESS_TEXT or mask HO_COMPRESS_GRAPHICS"; 
+	destination = "TO_APP_TARGET";
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD StudioApplicationClass },
+		ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG {
+		  word	MSG_STUDIO_APPLICATION_COMPRESS_OPTIONS_CHANGED
+		},
+	}
+}
+
+TextCompressionBoolean = GenBoolean {
+	moniker = "Compress Text";
+	identifier = "mask HO_COMPRESS_TEXT"; 
+}
+
+GraphicsCompressionBoolean = GenBoolean {
+	moniker = "Compress Graphics";
+	identifier = "mask HO_COMPRESS_GRAPHICS"; 
+}
+
+BitmapResolutionInteraction = GenInteraction {
+	children = 
+		BitmapResolutionItemGroup,
+		BitmapCustomResolutionValue;
+	moniker = "Resolution:";
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_BOTTOM_JUSTIFY_CHILDREN
+	}
+}
+
+BitmapResolutionItemGroup = GenItemGroup vardataReloc {
+	children = 
+		Dpi72Item,
+		Dpi300Item,
+		DpiCustomItem;
+	selection = 72;
+	destination = "TO_APP_TARGET";
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD StudioApplicationClass },
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+		  word	MSG_STUDIO_APPLICATION_BITMAP_RESOLUTION_CHANGED
+		},
+	}
+}
+
+Dpi72Item = GenItem {
+	moniker = '7', "72 dpi";
+	identifier = 72;
+}
+
+Dpi300Item = GenItem {
+	moniker = '3', "300 dpi";
+	identifier = 300;
+}
+
+DpiCustomItem = GenItem {
+	moniker = 'C', "Custom dpi";
+	identifier = 0;
+	hints = {
+		ATTR_GEN_FEATURE_LINK {
+			word offset BitmapCustomResolutionValue
+		}
+	}
+}
+
+BitmapCustomResolutionValue = GenValue {
+	genStates = default -enabled;
+	value = 72;
+	minimum = 1;
+	maximum = 2400;
+}
+
+BitmapFormatItemGroup = GenItemGroup {
+	moniker = "Bitmap Format:";
+	selection = "BMF_MONO";
+	children =
+		MonoItem,
+		Color4BitItem;
+/*		Color8BitItem;  */
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+MonoItem = GenItem {
+	moniker = 'M', "Monochrome";
+	identifier = "BMF_MONO";
+}
+
+Color4BitItem = GenItem {
+	moniker = '1', "16 Color";
+	identifier = "BMF_4BIT";
+}
+
+/* 
+ * Removed this because converting to 256 color format doesn't
+ * work on 2.01 system software.  (Cassie 11/18/94)
+ *
+Color8BitItem = GenItem {
+	moniker = '2', "256 Color";
+	identifier = BMF_8BIT;
+}
+ */
+
+OKTrigger = GenTrigger {
+	moniker = "OK";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR, 
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { 
+			word IC_CREATE_HELP
+		}
+
+	}
+}
+
+
+/**************************************************************************
+		Book File Setup Dialog
+**************************************************************************/
+
+BookFileSetupDialog = GenInteraction {
+	moniker = "Set Up Book";
+	children =
+		DefineBookTrigger,
+		ManageFilesTrigger,
+		BookOptionsTrigger,
+		LoadBookTrigger,
+		BookResetTrigger,
+		DefineBookSubgroup,
+		ManageFilesSubgroup,
+		BookOptionsSubgroup,
+		BookLoadSubgroup;
+	visibility = popup;
+	hints = {
+		HINT_NO_WIDER_THAN_CHILDREN_REQUIRE,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+	}
+}
+
+DefineBookTrigger = GenTrigger {
+	moniker = 'D', "Define Book";
+	action = MSG_GEN_INTERACTION_INITIATE, DefineBookSubgroup;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+BookOptionsTrigger = GenTrigger {
+	moniker = 'O', "Book Options";
+ 	genStates = default -enabled; 
+	action = MSG_GEN_INTERACTION_INITIATE, BookOptionsSubgroup;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+ManageFilesTrigger = GenTrigger {
+	moniker = 'F', "Manage Files";
+ 	genStates = default -enabled; 
+	action = MSG_GEN_INTERACTION_INITIATE, ManageFilesSubgroup;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+LoadBookTrigger = GenTrigger {
+	moniker = 'L', "Load Book";
+	action = MSG_GEN_INTERACTION_INITIATE, BookLoadSubgroup;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+BookResetTrigger = GenTrigger vardataReloc {
+	moniker = 'R', "Reset";
+	action = MSG_STUDIO_APPLICATION_RESET_BOOK_INFO, "TO_APP_TARGET";
+	hints = {
+		HINT_SEEK_REPLY_BAR, 
+		ATTR_GEN_DESTINATION_CLASS { UN_DD StudioApplicationClass },
+	}
+}
+
+/************************************************************************
+ *		Define Book Interaction
+ ************************************************************************/
+DefineBookSubgroup = GenInteraction {
+	moniker = "Define Book";
+	children = DefineBookText,
+		   BookNameText,
+		   BookPathFileSelector,
+		   BookDefineOKTrigger;
+	attributes = default +notUserInitiatable;
+	type = command;
+	visibility = dialog;
+	hints = {
+		HINT_PRESERVE_FOCUS,
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT { char "dbDefineBook", 0}
+	}
+}
+
+DefineBookText = GenText {
+	genAttributes = default +readOnly;
+	text = "Enter the name of the Book as it should appear in the "
+		"application, and select the path where the Book's content "
+		"file will reside.";
+}
+
+
+BookNameText = GenText vardataReloc {
+	moniker = "Book Name:";
+	maxLength = "FILE_LONGNAME_LENGTH";
+	textDisplayAttributes = default +singleLineText;
+	genAttributes = default +signalInteractionComplete, +notifyVisibility;
+	applyMsg = MSG_STUDIO_PROCESS_DEFINE_BOOK;
+	destination = process;
+	hints = {
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_STUDIO_APPLICATION_BOOK_NAME_TEXT_VISIBILITY
+		},
+		HINT_DEFAULT_TARGET,
+		HINT_DEFAULT_FOCUS,
+		ATTR_GEN_TEXT_LEGAL_FILENAMES,
+		ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+			UN_OPTR BookDefineOKTrigger
+		}
+	}	
+}
+
+BookPathFileSelector = GenFileSelector {
+	moniker = "Content File Location:";
+	fileCriteria = dirs, geosNonExecutables; 
+	attributes = default +showFilesDisabled, +useVirtualRoot,
+			-hasChangeDriveList, -hasChangeDirectoryList,
+			-hasDocumentButton;
+	action = MSG_STUDIO_PROCESS_PATH_SELECTION_CHANGED, process;
+	hints = {
+		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_USER_DATA, <>>
+		},
+		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT { 
+			GenFilePath <SP_USER_DATA, <>>
+		}
+	}
+}
+
+BookDefineOKTrigger = GenTrigger {
+	moniker = "OK";
+	genStates = default -enabled;
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_STUDIO_PROCESS_DEFINE_BOOK, process;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_OK },
+		HINT_SEEK_REPLY_BAR,
+	}
+}
+
+
+/**********************************************************************
+		Book Options Interaction
+ **********************************************************************/
+BookOptionsSubgroup = GenInteraction {
+	moniker = "Book Options";
+	children = BookOptionsText,
+		   MainFileList,
+		   FirstPageContextName,
+		   ViewerToolsSubgroup,
+		   BookOptionsOKTrigger;
+	attributes = default +notUserInitiatable;
+	visibility = dialog;
+	type = command;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT { char "dbBookOptions", 0 }
+	}
+}
+
+BookOptionsText = GenText {
+	genAttributes = default +readOnly;
+	text = "Select the file which should be loaded when the Book "
+	       "is opened, and enter the name of the page which should "
+	       "be displayed first.";
+}
+
+MainFileList = GenDynamicList vardataReloc {
+	moniker = "Main File:";
+	queryMsg = MSG_STUDIO_PROCESS_GET_CONTENT_FILE_MONIKER;
+	destination = process;
+	behaviorType = exclusive;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+			word	5
+		},
+	}
+}
+
+
+FirstPageContextName = GenText vardataReloc {
+	moniker = "First Page:";
+	textDisplayAttributes = default +singleLineText;
+	maxLength = "MAX_CONTEXT_NAME_SIZE";
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+			UN_OPTR BookOptionsOKTrigger
+		}
+	}	
+}
+
+
+BookOptionsOKTrigger = GenTrigger {
+	moniker = "Commit";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_STUDIO_PROCESS_SAVE_BOOK_OPTIONS, process;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_OK },
+		HINT_SEEK_REPLY_BAR,
+	}
+}
+
+/*************************************************************************
+		Viewer Tools Interaction
+ *************************************************************************/
+ViewerToolsSubgroup = GenInteraction {
+	moniker = "Options";
+	children = ViewerFeaturesList, ViewerToolsList;
+	visibility = dialog;
+	type = properties;
+	hints = {
+		HINT_NO_WIDER_THAN_CHILDREN_REQUIRE,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_INTERACTION_COMPLEX_PROPERTIES,
+		ATTR_GEN_HELP_CONTEXT { char "dbBookOptionsMore", 0 }
+	}
+}
+
+ViewerFeaturesList = GenBooleanGroup {
+	moniker = "Book Reader Menu Items:";
+	children = ViewerFeatureMainPageBoolean,
+		   ViewerFeatureBackBoolean,
+		   ViewerFeatureHistoryListBoolean,
+		   ViewerFeaturePrevNextPageBoolean,
+		   ViewerFeatureSendBoolean, 
+		   ViewerFeatureFindBoolean, 
+		   ViewerFeatureBookTitleBoolean;
+	selectedBooleans = DEFAULT_VIEWER_FEATURES;
+	destination = process;
+	hints = { 
+		ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG {
+		  word	MSG_STUDIO_PROCESS_BOOK_FEATURES_CHANGED
+		},
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_NO_WIDER_THAN_CHILDREN_REQUIRE,
+		HINT_ORIENT_CHILDREN_VERTICALLY, 
+		HINT_DRAW_IN_BOX  
+	}
+}
+
+ViewerFeatureBookTitleBoolean = GenBoolean {
+	moniker = "Book Title";
+	identifier = "mask BFF_BOOK_TITLE"; 
+}
+ViewerFeatureSendBoolean = GenBoolean {
+	moniker = "Send";
+	identifier = "mask BFF_SEND"; 
+}
+ViewerFeatureFindBoolean = GenBoolean {
+	moniker = "Find";
+	identifier = "mask BFF_FIND"; 
+}
+ViewerFeatureHistoryListBoolean = GenBoolean {
+	moniker = "Pages You've Seen";
+	identifier = "mask BFF_HISTORY";
+}
+ViewerFeatureMainPageBoolean = GenBoolean {
+	moniker = "Go to Beginning";
+	identifier = "mask BFF_MAIN_PAGE"; 
+}
+ViewerFeaturePrevNextPageBoolean = GenBoolean {
+	moniker = "Page Forward/Back";
+	identifier = "mask BFF_PREV_NEXT";
+}
+ViewerFeatureBackBoolean = GenBoolean {
+	moniker = "Go Back";
+	identifier = "mask BFF_BACK";
+}
+
+
+ViewerToolsList = GenBooleanGroup {
+	moniker = "Book Reader Tools:";
+	children = ViewerToolMainPageBoolean,
+		   ViewerToolBackBoolean,
+		   ViewerToolHistoryListBoolean,
+		   ViewerToolPrevNextPageBoolean,
+		   ViewerToolSendBoolean, 
+		   ViewerToolFindBoolean; 
+	selectedBooleans = DEFAULT_VIEWER_TOOLS;
+	hints = { 
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_VERTICALLY, 
+		HINT_DRAW_IN_BOX  
+	}
+}
+
+ViewerToolSendBoolean = GenBoolean {
+	genStates = default -enabled; 
+	moniker = "Send Tool";
+	identifier = "mask BFF_SEND"; 
+}
+ViewerToolFindBoolean = GenBoolean {
+	genStates = default -enabled;
+	moniker = "Find Tool";
+	identifier = "mask BFF_FIND"; 
+}
+ViewerToolHistoryListBoolean = GenBoolean {
+	genStates = default -enabled;
+	moniker = "Revisit Tool";
+	identifier = "mask BFF_HISTORY";
+}
+ViewerToolPrevNextPageBoolean = GenBoolean {
+	genStates = default -enabled;
+	moniker = "Page Forward/Back Tool";
+	identifier = "mask BFF_PREV_NEXT";
+}
+ViewerToolBackBoolean = GenBoolean {
+	genStates = default -enabled;
+	moniker = "Go Back Tool";
+	identifier = "mask BFF_BACK";
+}
+ViewerToolMainPageBoolean = GenBoolean {
+	genStates = default -enabled;
+	moniker = "Begin Tool";
+	identifier = "mask BFF_MAIN_PAGE";
+}
+
+/**********************************************************************
+		Manage Files Dialog
+ **********************************************************************/
+
+ManageFilesSubgroup = GenInteraction {
+	moniker = "Manage Files";
+	children = ManageFilesText,
+		   BookContentFileList,
+		   ContentFileNameText,
+		   BookContentFileAddTrigger,
+		   BookContentFileRemoveTrigger,
+		   BookContentFileCommitTrigger,
+		   BookContentFileCloseTrigger;
+	attributes = default +notUserInitiatable;
+	type = command;
+	visibility = dialog;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT { char "dbManageFiles", 0 }
+	}
+}
+
+ManageFilesText = GenText {
+	genAttributes = default +readOnly;
+	text = "This list of content files is stored in the Book file, "
+	       "and is used for operations on the Book in the "
+	       "Book Reader application.";
+}
+
+ContentFileNameText = GenText vardataReloc {
+	moniker = "Content File Name:";
+	maxLength = "FILE_LONGNAME_LENGTH";
+	textDisplayAttributes = default +singleLineText;
+	genAttributes = default +notifyVisibility, -signalInteractionComplete;
+	hints = {
+		ATTR_GEN_VISIBILITY_MESSAGE {
+			word MSG_STUDIO_APPLICATION_SET_CONTENT_FILE_NAME
+		},
+		ATTR_GEN_TEXT_LEGAL_FILENAMES,
+		ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+			UN_OPTR BookContentFileAddTrigger
+		}
+	}	
+}
+
+BookContentFileList = GenDynamicList vardataReloc {
+	moniker = "This Book's Content Files:";
+	queryMsg = MSG_STUDIO_PROCESS_GET_CONTENT_FILE_MONIKER;
+	applyMsg = MSG_STUDIO_PROCESS_CONTENT_SELECTION_CHANGED;
+	destination = process;
+	behaviorType = extendedSelection;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+			word	5
+		},
+	}
+}
+
+BookContentFileAddTrigger = GenTrigger {
+	moniker = 'A', "Add";
+	genStates = default -enabled;
+	action = MSG_STUDIO_PROCESS_ADD_CONTENT_FILE, process;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_TARGET,
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_DEFAULT_FOCUS
+	}
+}
+
+BookContentFileRemoveTrigger = GenTrigger {
+	moniker = 'R', "Remove";
+	genStates = default -enabled;
+	action = MSG_STUDIO_PROCESS_REMOVE_CONTENT_FILE, process;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+BookContentFileCommitTrigger = GenTrigger {
+	moniker = "Commit";
+	action = MSG_STUDIO_PROCESS_SAVE_BOOK_OPTIONS, process;
+	genAttributes = default +signalInteractionComplete; 
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+	}
+}
+
+BookContentFileCloseTrigger = GenTrigger {
+	moniker = "Close";
+	genAttributes = default +signalInteractionComplete; 
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS },
+	}
+}
+
+/*************************************************************************
+		Book Load Dialog
+ *************************************************************************/
+
+BookLoadSubgroup = GenInteraction {
+	children = BookLoadText,
+		   BookFileSelector,
+		   BookLoadTrigger;
+	type = command;
+	visibility = dialog;
+	attributes = default +notUserInitiatable;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT { char "dbLoadBook", 0 }
+	}
+}
+
+BookLoadText = GenText{
+	genAttributes = default +readOnly;
+	text = "After loading a book, all content files will be "
+	       "created in the directory specified as the content "
+	       "file location in the Define Book dialog box.";
+}
+
+BookFileSelector = GenFileSelector {
+	fileCriteria = dirs, geosNonExecutables; 
+	attributes = default +useVirtualRoot, 
+			-hasChangeDriveList, -hasDocumentButton;
+	action = MSG_STUDIO_PROCESS_LOAD_BOOK, process;
+	hints = {
+		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_DOCUMENT, <>>
+		},
+		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT { 
+			GenFilePath <SP_DOCUMENT, <>>
+		},
+		ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH {
+			GeodeToken <"cntb", MANUFACTURER_ID_GEOWORKS>
+		},
+
+	}
+}
+
+BookLoadTrigger = GenTrigger vardataReloc {
+	moniker = "OK";
+	action = MSG_STUDIO_APPLICATION_LOAD_BOOK, "TO_APP_TARGET";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD StudioApplicationClass },
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_OK },
+		ATTR_GEN_TRIGGER_ACTION_DATA { lptr BookFileSelector },
+		HINT_SEEK_REPLY_BAR,
+	}
+}
+
+end 	HelpEditUI;
+

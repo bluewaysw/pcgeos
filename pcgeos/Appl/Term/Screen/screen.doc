@@ -1,0 +1,142 @@
+***************************************************************************
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Screen
+FILE:		screen.doc
+
+AUTHOR:		Dennis Chow, September 8, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dc       9/ 8/89        Initial revision.
+
+DESCRIPTION:
+	Documentation for the screen module.	
+
+	$Id: screen.doc,v 1.3.40.1 97/03/29 09:44:30 canavese Exp $
+
+****************************************************************************
+screenContents:
+
+screenGoals	- Goals for the screen module.
+screenRoutines	- Routines accessible outside of this module.
+screenInternal	- Routines available only inside this module.
+
+*******************************************************************************
+screenGoals:
+see also [ screenContents ]
+
+The screen module is intended to 
+*******************************************************************************
+screenRoutines:
+see also [ screenContents ]
+*******************************************************************************
+screenInternal:
+see also [ screenContents ]
+*******************************************************************************
+
+Scrolling
+---------
+There is a problem with the cursor and scrolling.  Currently if the window
+size is not exactly a multiple of the line height then when the window
+is scrolled there will be cursor garbage left on the screen.  The problem
+is that when the window is scrolled and we attempt to draw the cursor
+the only area that will be updated is the 'masked' region.  If area we
+want to draw in lies entirely in the masked region then theres no problem.
+However if the space we draw in is only partially in the 'masked' region
+then only that portion will be displayed.  Moreover, when we try to 
+erase the cursor, we won't know that only part of it was displayed and
+thus when inverting the cursor region we'll leave some areas blacked out.
+
+The fix is to maintain the window size to be exactly a multiple of
+the lineheight.
+
+Window Sizes
+------------
+Vi seems to be able to handle variable sized xterm windows so why
+can't we?  What xterm does is set variables in the terminal driver
+to reflect its current size.  VI looks at these values first and
+if they're reasonable uses them instead of the	termcap entry
+to get terminal sizes.  The size info can be viewed by 'stty size'.
+So xterm has a ptty or something that it talks to and its able to
+tell this driver thing to update its size when it gets changed.
+I don't know if we're able to tell unix when our window changes.
+
+Adam mentioned something about how pcwin has some kind of
+client/server relationship between the PC and Unix.  If I has
+something on Unix monitoring a line then I could tell this thing
+when my window size changed.  I'd also be able to have this "thing" 
+spawn off different shells for each window I open.  I'd also be able to
+run different processes in these windows and the "thing" would be
+able to determine what output corresponds to what window.
+
+Storing Graphical Attributes
+----------------------------
+There is a problem with the way we currently store the screen data.  Our 
+screen buffer only stores the ascii data and thus we're not able to
+properly redraw characters with bold or reverse video attributes.
+
+Three strategies for storing attributes were suggested.  
+	1) Store the graphical bits inside the screen buffer.  So that
+	   when attempting to print text we would have the graphical
+	   escape sequences directly available.  
+
+	   This strategy would require the graphic and buffer routines
+	   to change since graphical characters would have to be parsed
+	   out of the text.
+
+	2) Store in a separate table the graphical attributes for each line.
+	   The text object uses a similar strategy, where they store the
+	   character posistion and the attriubte set.  This Run Length
+	   encoded scheme says bytes since attributes are stored for
+	   every character, just those necessary to delineate a sequence.
+
+	   However, there is a lot of overhead involved in maintaining
+	   these run length encoded sequences.  The run length encoded 
+	   sequences should be stored in a sequential order.  Thus
+	   sequences depicting columns 15-20, should occur before sequences
+	   affecting 40-50.  Thus whenever, a graphical attribute is
+	   detected, the graphical sequences for that line must be
+	   scanned and reorder if the sequence to insert occurs before
+	   exsting sequneces.
+
+	3) The last method is a bit encoded scheme.  Each character would
+	   have four bits used to store graphical attributes about this 
+	   character.  No ordering is done and finding out graphical
+	   attributes is much simpler.  
+	   
+	   The major drawback would be the fixed about of memory needed
+	   to store what potentially could be a very limited amount of
+	   character data.  80 columns * 4 bits = 320 bits = 40 bytes.
+
+Maximize window
+---------------
+Maximizing the window is something that Eric has been bugging me about.
+He thinks that all applications should have the Maximize button.  I didn't
+want to put it in because my view needs to be a specific size 24x80 so
+why have the view take up the whole screen when the screen isn't used?
+
+Well eric wanted it and I talked to chris about it and we tried to implement 
+it, but its more trouble than its worth.  Eric, thinks that the MAXIMIZE
+should max the window but the view could stay 24x80.  In addition, I have
+to ensure that the window size is always a multiple of the current font
+width and font height.  To do this I intercept METHOD_SUBVIEW_SIZE_CHANGED 
+and check that the new view size is a multiple of the current font.  If the
+new view isn't a multiple then I make the new view a multiple of the font
+size and then set the OPEN_SIZE for the view and then send a RESET_WIN_GEOMETRY
+to the primary.  This tells the geometry manager to reset the geometry as if
+the application was coming up for the first time.  
+
+This scheme kind of works but one big problem is with MAXIMIZE.  If I maximize
+the application while in SMALL_FONT mode then the geometry manager wants to 
+make the view as tall as the screen, 25 lines (since the view height is 
+bounded by the document height).  I only want the screen to be 24 lines so
+I reset the geometry.  When I reset the geometry I shrink the window and
+though the window thinks its maximized the window no longer occupies the
+full screen.  Because of time constraints I'm just removing the maximize for
+now.  See Chris if the problems with MAXIMIZE were not made clear.
+
+

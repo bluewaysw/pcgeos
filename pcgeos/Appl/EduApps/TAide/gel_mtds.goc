@@ -1,0 +1,1035 @@
+/***************************************************************************
+ *  FILE:			gel_mtds.goc
+ *  PROJECT:		Breadbox Teacher's Aide
+ *  DESCRIPTION:	This file has methods for grades elements set-up stuff
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "taide.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+Boolean g_isNewGTypeOrElem = FALSE;
+
+/*
+ ***************************************************************************
+ *		Code for grade elements set up stuff
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * FUNCTION:	AddGradeElement
+ *
+ * DESCRIPTION:	Adds a new grade element to the ch array
+ *
+ *
+ ***********************************************************************/
+word AddGradeElement(char dateString[12],
+				 char typeString[NAME_SIZE],
+				 FileHandle fileHandle,
+				 word curGradePd,
+				 ChunkHandle gradeElemChunkArray,
+				 word numElements)
+{
+ VMBlockHandle		vmbh;
+ MemHandle		mh;
+ GradeElementStruct *element;
+ GradeElementStruct *testElement;
+ char			string[GRADE_DESCRIPT];
+ word			i, insertPos;
+ dword			weight, newDateNum, testDateNum;
+ TimerDateAndTime	date;
+ Boolean			inserted;
+
+
+    /* get the list */
+    vmbh = VMFind(fileHandle, NullHandle, GRADE_ELEM_1 + curGradePd);
+    VMLock(fileHandle, vmbh ,&mh);
+
+    inserted = FALSE;
+    if (numElements) {
+	  /* parse the new date string */
+	  LocalParseDateTime(dateString, DTF_SHORT, &date);
+	  /* convert date to comparison number */
+	  newDateNum = ((dword)(date.TDAT_year) * (dword)10000) +
+				   ((dword)(date.TDAT_month) * (dword)100) +
+				   (dword)date.TDAT_day;
+	  /* put new one in the right place */
+	  for (i = 0; i < numElements; i++)  {
+		testElement = ChunkArrayElementToPtrHandles(
+				   mh,
+				   gradeElemChunkArray,
+				   i,
+				   0);
+		/* parse the new date string */
+		LocalParseDateTime(testElement->GES_date, DTF_SHORT, &date);
+		/* convert date to comparison number */
+		testDateNum = ((dword)(date.TDAT_year) * (dword)10000) +
+				   ((dword)(date.TDAT_month) * (dword)100) +
+				   (dword)date.TDAT_day;
+		/* compare the dates */
+		if (newDateNum < testDateNum) {
+		   /* insert new element here */
+		   element = ChunkArrayInsertAtHandle(
+					 gradeElemChunkArray,
+					 testElement,
+					 0);
+		   insertPos = i;
+		   inserted = TRUE;
+		   i = numElements;
+		   }  /* end of inserted if */
+		} /* end of loop thru elements for */
+	  } /* end of elements to compare with if */
+    if (!inserted) {
+	  /* just append it */
+	  element = ChunkArrayAppendHandles(
+			 mh,
+			 gradeElemChunkArray,
+			 0);
+	  insertPos = numElements;
+	  }
+
+    /* OK - now save the info */
+    strcpy(element->GES_type, typeString);
+    strcpy(element->GES_date, dateString);
+    @call GSUEGradeDescript::MSG_VIS_TEXT_GET_ALL_PTR(string);
+    strcpy(element->GES_description, string);
+    @call GSUEGradeWeight::MSG_VIS_TEXT_GET_ALL_PTR(string);
+    if (!string[0] || (string[0] == ' ')) {
+	  element->GES_weight = EQUAL_WEIGHT;
+	  }
+    else {
+	  UtilAsciiToHex32(string, &weight);
+	  element->GES_weight = (word) weight;
+	  }
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    return (insertPos);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	DeleteGradeElement
+ *
+ * DESCRIPTION:	deletes the grade element from the ch array, students
+ *                  and grids
+ *
+ ***********************************************************************/
+void DeleteGradeElement(word selection,
+				    FileHandle fileHandle,
+				    word curGradePd,
+				    ChunkHandle gradeElemChunkArray,
+				    dword numStudents,
+				    VMBlockHandle stuDBHan,
+				    VMBlockHandle curStuIndex,
+				    MemHandle display,
+				    Boolean saveGrades,
+				    ChunkHandle gradeTypesChunkArray,
+				    word numElements,
+				    word numTypes)
+{
+ VMBlockHandle		vmbh;
+ MemHandle		mh;
+ GradeElementStruct*    element;
+ GradeTypeStruct*    gradeTypePtr;
+ word			i, j, typeNum;
+ BasicDBFieldID	gradeFieldID, sumFieldID;
+ BasicDBRecordID	recordID;
+ BasicDBError		error;
+ byte			grades[MAX_ELEMENTS];
+ char			typeString[NAME_SIZE];
+ Boolean			needReCalc;
+ dword          	gradeSum[MAX_GRADE_TYPES];
+ WWFixedAsDWord	avg;
+
+ 
+    /* get the list */
+    vmbh = VMFind(fileHandle, NullHandle, GRADE_ELEM_1 + curGradePd);
+    VMLock(fileHandle, vmbh ,&mh);
+    element = ChunkArrayElementToPtrHandles(
+			  mh,
+			  gradeElemChunkArray,
+			  selection,
+			  0);
+    strcpy(typeString, element->GES_type);
+    /* delete this item */
+    ChunkArrayDeleteHandle(gradeElemChunkArray, element);
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* get the type number (may not need it but don't want to do
+	* this inside the loop */
+    vmbh = VMFind(fileHandle, NullHandle, GRADE_TYPES);
+    VMLock(fileHandle, vmbh ,&mh);
+    for (j = 0; j < numTypes; j++)  {
+	  gradeTypePtr = ChunkArrayElementToPtrHandles(
+				  mh,
+				  gradeTypesChunkArray,
+				  j,
+				  0);
+	  if (!strcmp(gradeTypePtr->GTS_type, typeString)) {
+		typeNum = j;
+		j = numTypes;
+		}
+	  }
+    VMUnlock(mh);
+
+    /* tell the list */
+    @call GSUGradeElementsList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(selection, 1);
+    @call GSUGradeElementsList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /* the students grades */
+    for (i = 0; i < numStudents; i++)  {
+	  needReCalc = FALSE;
+	  /* get the student record */
+	  error = BasicDBGetRecordByIndex(fileHandle,
+					   stuDBHan,
+					   curStuIndex,
+					   i,
+					   &mh);
+	  /* now the grades field */
+	  gradeFieldID = BasicDBGetFieldID(mh,
+					BDBFHE_CATEGORY,
+					STU_GRADES_1  + curGradePd,
+					1);
+	  BasicDBGetFieldData(mh, gradeFieldID, grades, MAX_ELEMENTS);
+	  /* get the summary field */
+	  sumFieldID = BasicDBGetFieldID(mh,
+				   BDBFHE_CATEGORY,
+				   STU_GRADE_SUM_1  + curGradePd,
+				   1);
+	  BasicDBGetFieldData(mh, sumFieldID, gradeSum, (MAX_GRADE_TYPES * sizeof(dword)));
+
+	  /* if we need to save the grades for a re-sort */
+	  if (saveGrades)  {
+		grades[MAX_ELEMENTS - 1] = grades[selection];
+		}
+
+	  /* do we need to recalc the type? */
+	  if (!saveGrades && (grades[selection] != NO_GRADE)) needReCalc = TRUE;
+
+	  /* shuffle the effected grade elements down 1 */
+	  for (j = selection; j < (numElements - 1); j++) {
+		grades[j] = grades[j + 1];
+		}
+
+	  /* and initialize the vacated element */
+	  grades[numElements - 1] = NO_GRADE;
+
+	  /* set the new field data */
+	  error = BasicDBSetFieldData(mh, gradeFieldID, grades, MAX_ELEMENTS);
+
+	  /* recalc summary grades if we need to */
+	  if (needReCalc) {
+		/* recalc the given type's avg */
+		avg = CalcTypeAvg (numElements - 1,
+			   fileHandle,
+			   curGradePd,
+			   typeString,
+			   gradeElemChunkArray,
+			   grades);
+
+
+		/* and put the avg into the array */
+		gradeSum[typeNum] = avg;
+
+		/* now recalculate the final for that grade period */
+		avg = CalcGPFinal (numTypes,
+						  fileHandle,
+						  curGradePd,
+						  gradeTypesChunkArray,
+						  gradeSum);
+
+		/* and put the final into the array */
+		if (avg) gradeSum[numTypes] = avg;
+		else gradeSum[numTypes] = NO_SUMMARY;
+
+		/* force the avg grade cell & final cell to redraw */
+		@call ConstructOptr(display, OptrToChunk(@MCGradesGrid))::
+				 MSG_VIS_GRID_INVALIDATE_CELL_RANGE(
+				   numElements + typeNum, i,
+				   numElements + typeNum, i);
+		@call ConstructOptr(display, OptrToChunk(@MCGradesGrid))::
+				 MSG_VIS_GRID_INVALIDATE_CELL_RANGE(
+				   numElements + numTypes, i,
+				   numElements + numTypes, i);
+
+		/* set the new summary data */
+		error = BasicDBSetFieldData(mh, sumFieldID, gradeSum, (MAX_GRADE_TYPES * sizeof(dword)));
+		} /* end of recalc if */
+
+
+	  /* and store the record */
+	  error = BasicDBSaveRecord(fileHandle,
+					   stuDBHan,
+					   mh,
+					   StudentsCallback,
+					   &recordID);
+	  } /* end of cycle thru students for */
+
+    /* and we gotta delete it from the grids */
+    @call ConstructOptr(display, OptrToChunk(@TADisplay))::
+			    MSG_META_SUSPEND();
+    @call ConstructOptr(display, OptrToChunk(@MCGradeTitlesGrid))::
+				    MSG_VIS_GRID_DELETE_COLUMN(selection);
+    @call ConstructOptr(display, OptrToChunk(@MCGradesGrid))::
+				    MSG_VIS_GRID_DELETE_COLUMN(selection);
+    @call ConstructOptr(display, OptrToChunk(@TADisplay))::
+			    MSG_META_UNSUSPEND();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_GRADE_ELEMENT_SETUP for TADocumentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_OPEN_GRADE_ELEMENT_SETUP
+{
+ ChunkHandle		chunk;
+ MemHandle		mem;
+ GStateHandle		gstate;
+ char			titleString[50], gpString[12];
+
+
+    /* put up the title with grade period */
+    UtilHex32ToAscii(gpString,
+				 (sdword) (pself->TADI_curGradePd + 1),
+				 UHTAF_NULL_TERMINATE);
+    MemLock (OptrToHandle(@GrdElemPeriodHdr));
+    strcpy(titleString, LMemDeref(@GrdElemPeriodHdr));
+    strcat(titleString, gpString);
+    @call GradeESetUpGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                         titleString, VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* draw the dlist title */
+    /* set up the mem and gstate */
+    mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0);
+    gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+    GrDrawText(gstate, 0, 0, LMemDeref(@GrdElemTypeHdr), 0);
+    GrDrawText(gstate, 105, 0, LMemDeref(@GrdElemDescrHdr), 0);
+    GrDrawText(gstate, 330, 0, LMemDeref(@GrdElemDateHdr), 0);
+    GrDrawText(gstate, 430, 0, LMemDeref(@GrdElemWeightHdr), 0);
+    MemUnlock (OptrToHandle(@GrdElemPeriodHdr));
+    GrEndGString(gstate) ;
+
+    @call GSUGradeElementsHeader::MSG_GEN_REPLACE_VIS_MONIKER(
+				  VUM_NOW,
+				  g_sysPointSize + 2,	/* height */
+				  550,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk));
+
+    /* and 86 the gstate and mem */
+    GrDestroyGString(gstate, gstate, GSKT_KILL_DATA) ;
+    MemFree(mem) ;
+
+    /* and initialize the list */
+    @call GSUGradeElementsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+						pself->TADI_numElements[pself->TADI_curGradePd]);
+    @call GSUGradeElementsList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /* disable the edit & delete buttons */
+    @call GSUGEEditButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @call GSUGEDeleteButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* Open the dialog box */
+    @call GradeESetUpGroup::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_GRADE_ELEMENT for TADocumentClass
+ *                 (word column)
+ * DESCRIPTION:  called by new, edit and dbl click on elem title in grid
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_OPEN_GRADE_ELEMENT
+{
+ VMBlockHandle		vmbh;
+ MemHandle		mh;
+ GradeElementStruct *element;
+ char			string[5], typeString[NAME_SIZE];
+ word			selection, i;
+ GradeTypeStruct	*gradeTypePtr;
+ BasicDBFieldID	fieldID;
+ BasicDBError		error;
+ byte			grades[MAX_ELEMENTS];
+ word			count, high, low, sum, place;
+ WWFixedAsDWord	avg;
+
+
+    if (column == NEW_ELEM) {
+	  g_isNewGTypeOrElem = TRUE;
+	  @call GSUElementDBox::MSG_GEN_USE_VIS_MONIKER(
+						   OptrToChunk(@NewElementMoniker),
+						   VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    else {
+	  g_isNewGTypeOrElem = FALSE;
+	  @call GSUElementDBox::MSG_GEN_USE_VIS_MONIKER(
+						   OptrToChunk(@SumElementMoniker),
+						   VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+
+    /* bail out if we've maxed elements */
+    if (g_isNewGTypeOrElem) {
+	  if (pself->TADI_numElements[pself->TADI_curGradePd] >= (MAX_ELEMENTS - 1)) {
+		NotifyDBox(0, @GrdElemMaxedMsg);
+		return;
+		}
+	  }
+
+    /* show the grading period */
+    UtilHex32ToAscii(string, (dword) (pself->TADI_curGradePd + 1), UHTAF_NULL_TERMINATE);
+    @call GSUEGradePeriod::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+    if (!g_isNewGTypeOrElem) {
+	  if (column == EDIT_ELEM) {
+		selection = @call GSUGradeElementsList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+		@send GSUEOKButton::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send GSUESummaryGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	  else  {
+		selection = column;
+		@send GSUEOKButton::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send GSUESummaryGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		/* and grab the grade data for that element */
+		count = 0;
+		high = 0;
+		low = 100;
+		sum = 0;
+		for (i = 0; i < pself->TADI_numStudents; i++)  {
+		   /* get the student record */
+		   error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   pself->TADI_stuDBHan,
+					   pself->TADI_curStuIndex,
+					   i,
+					   &mh);
+		   /* now the grades field */
+		   fieldID = BasicDBGetFieldID(mh,
+					BDBFHE_CATEGORY,
+					STU_GRADES_1  + pself->TADI_curGradePd,
+					1);
+		   BasicDBGetFieldData(mh, fieldID, grades, MAX_ELEMENTS);
+		   BasicDBDiscardRecord(mh);
+
+		   /* grab the grade for this element - if any */
+		   if (grades[selection] != NO_GRADE) {
+			 count++;
+			 sum += grades[selection];
+			 if (grades[selection] > high) high = grades[selection];
+			 if (grades[selection] < low) low = grades[selection];
+			 }
+		   } /* end of cycle thru students for */
+		/* show the results */
+		if (count) {
+		   UtilHex32ToAscii(string, (dword) count, UHTAF_NULL_TERMINATE);
+		   @call GSUESNum::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+		   avg = GrUDivWWFixed(MakeWWFixed(sum), MakeWWFixed(count));
+		   LocalFixedToAscii(string, avg, 3);
+		   /* since this routine doesn't work for 1 or 2 frac digits
+		    * we'll do a little truncating to 2 dec places */
+		   place = 0;
+		   while ((string[place] != '.') && (place < strlen(string))) {
+			 place++;
+			 }
+		   if ((strlen(string) - place) > 3) {
+			 /* OK there was a decimal point and > 2 dec digits */
+			 string[place + 3] = 0;
+			 }
+		   /* done truncating to 2 places */
+		   @call GSUESAvg::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+		   UtilHex32ToAscii(string, (dword) high, UHTAF_NULL_TERMINATE);
+		   @call GSUESHigh::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+		   UtilHex32ToAscii(string, (dword) low, UHTAF_NULL_TERMINATE);
+		   @call GSUESLow::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+		   }
+		else {
+		   @call GSUESNum::MSG_VIS_TEXT_REPLACE_ALL_PTR("0\0", 0);
+		   @send GSUESAvg::MSG_VIS_TEXT_DELETE_ALL();
+		   @send GSUESHigh::MSG_VIS_TEXT_DELETE_ALL();
+		   @send GSUESLow::MSG_VIS_TEXT_DELETE_ALL();
+		   }
+		} /* end of called from dbl click else */
+	  /* show the selected element */
+	  vmbh = VMFind(pself->GDI_fileHandle, NullHandle, GRADE_ELEM_1 + pself->TADI_curGradePd);
+	  VMLock(pself->GDI_fileHandle, vmbh ,&mh);
+	  element = ChunkArrayElementToPtrHandles(
+			  mh,
+			  pself->TADI_gradeElemChunkArray[pself->TADI_curGradePd],
+			  selection,
+			  0);
+	  strcpy(typeString, element->GES_type);
+	  @call GSUEGradeDescript::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+										element->GES_description, 0);
+	  @call GSUEGradeDate::MSG_VIS_TEXT_REPLACE_ALL_PTR(element->GES_date, 0);
+	  if (element->GES_weight == EQUAL_WEIGHT) string[0] = 0;
+	  else UtilHex32ToAscii(string, (dword) (element->GES_weight), UHTAF_NULL_TERMINATE);
+	  @call GSUEGradeWeight::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+	  VMUnlock(mh);
+	  }
+    else {/* clean things up */
+	  @send GSUEOKButton::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send GSUESummaryGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	  @call GSUEGradeDescript::MSG_VIS_TEXT_DELETE_ALL();
+	  @call GSUEGradeDate::MSG_VIS_TEXT_DELETE_ALL();
+	  @call GSUEGradeWeight::MSG_VIS_TEXT_DELETE_ALL();
+	  }
+
+    /* find out which type to set the list to */
+    vmbh = VMFind(pself->GDI_fileHandle, NullHandle, GRADE_TYPES);
+    VMLock(pself->GDI_fileHandle, vmbh ,&mh);
+    if (!g_isNewGTypeOrElem) {
+	  for (i = 0; i < pself->TADI_numTypes; i++)  {
+		gradeTypePtr = ChunkArrayElementToPtrHandles(
+				  mh,
+				  pself->TADI_gradeTypesChunkArray,
+				  i,
+				  0);
+		if (!strcmp(gradeTypePtr->GTS_type, typeString)) {
+		   selection = i;
+		   i = pself->TADI_numTypes;
+		   }
+		}
+	  } /* end of edit if */
+    else selection = 0;
+    VMUnlock(mh);
+
+    /* and initialize the list */
+    @call GSUEGradeTypeList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->TADI_numTypes);
+    @call GSUEGradeTypeList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, FALSE);
+
+    /* Open the dialog box */
+    @call GSUElementDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_GRADE_ELEMENT for TADocumentClass
+ *
+ * DESCRIPTION:	Saves a new grade element
+ *                  modifies an existing one
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_NEW_GRADE_ELEMENT
+{
+ VMBlockHandle		vmbh, vmbht;
+ MemHandle		mh, dbmh, mht;
+ GradeElementStruct *element;
+ char			string[GRADE_DESCRIPT], typeString[NAME_SIZE];
+ char			oldTypeString[NAME_SIZE], wtString[5];
+ char			dateString[12];
+ GradeTypeStruct	*gradeTypePtr;
+ word			selection, i, insertPos, j;
+ dword			weight;
+ Boolean			needReCalcT, needReCalcW, needReSort;
+ BasicDBFieldID	gradeFieldID, sumFieldID;
+ BasicDBRecordID	recordID;
+ BasicDBError		error;
+ byte			grades[MAX_ELEMENTS];
+ WWFixedAsDWord	avg;
+ word			oldTypeNum, typeNum, cellUpdate;
+ dword          	gradeSum[MAX_GRADE_TYPES];
+ word			startDateNum, endDateNum;
+ dword			elemDateNum;
+ VMMapStruct		*VMmapPtr;
+
+
+    needReCalcT = FALSE;
+    needReCalcW = FALSE;
+    needReSort = FALSE;
+
+    /* check the date for validity */
+    @call GSUEGradeDate::MSG_VIS_TEXT_GET_ALL_PTR(dateString);
+    if (!DateCheck(dateString)) {
+	  @call GSUEGradeDate::MSG_VIS_TEXT_SELECT_ALL();
+	  @call GSUEGradeDate::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+
+    /* WARN HERE IF DATE OUT OF GRADE PERIOD */
+    /* get this GP's dates from VMmap block */
+    vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+    VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+    startDateNum = VMmapPtr->VMMS_gpStart[pself->TADI_curGradePd];
+    endDateNum = VMmapPtr->VMMS_gpEnd[pself->TADI_curGradePd];
+    VMUnlock(mh);
+    FloatStringGetDateNumber(dateString);
+    elemDateNum = FloatFloatToDword();
+    if((((word)elemDateNum) > endDateNum)
+                      || (((word)elemDateNum) < startDateNum)) {
+	  if (AckDBox (0, 0, @GrdElemOutOfGP) == ACK_NO) {
+		/* return user to the date field */
+		@call GSUEGradeDate::MSG_VIS_TEXT_SELECT_ALL();
+		@call GSUEGradeDate::MSG_META_GRAB_FOCUS_EXCL();
+		return;
+		}
+       }
+
+    /* get the type selection */
+    typeNum = @call GSUEGradeTypeList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    vmbh = VMFind(pself->GDI_fileHandle, NullHandle, GRADE_TYPES);
+    VMLock(pself->GDI_fileHandle, vmbh ,&mh);
+    gradeTypePtr = ChunkArrayElementToPtrHandles(
+			    mh,
+			    pself->TADI_gradeTypesChunkArray,
+			    typeNum,
+			    0);
+    strcpy(typeString, gradeTypePtr->GTS_type);
+    VMUnlock(mh);
+
+    /* dismiss the dbox */
+    @call GSUElementDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /* mark app busy */
+    @send TAApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    if (!g_isNewGTypeOrElem)  {
+	  selection = @call GSUGradeElementsList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	  /* get the list */
+	  vmbh = VMFind(pself->GDI_fileHandle, NullHandle, GRADE_ELEM_1 + pself->TADI_curGradePd);
+	  VMLock(pself->GDI_fileHandle, vmbh ,&mh);
+	  element = ChunkArrayElementToPtrHandles(
+			  mh,
+			  pself->TADI_gradeElemChunkArray[pself->TADI_curGradePd],
+			  selection,
+			  0);
+	  /* do we need to re-calc due to type change? */
+	  if (strcmp(element->GES_type, typeString)) {
+		strcpy(oldTypeString, element->GES_type);
+		/* now grab the old type number */
+		vmbht = VMFind(pself->GDI_fileHandle, NullHandle, GRADE_TYPES);
+		VMLock(pself->GDI_fileHandle, vmbht, &mht);
+		for (i = 0; i < pself->TADI_numTypes; i++)  {
+		   gradeTypePtr = ChunkArrayElementToPtrHandles(
+					   mht,
+					   pself->TADI_gradeTypesChunkArray,
+					   i,
+					   0);
+		   if (!strcmp(oldTypeString, gradeTypePtr->GTS_type)) {
+			 /* found it */
+			 oldTypeNum = i;
+			 i = pself->TADI_numTypes;
+			 }
+		   }
+		VMUnlock(mht);
+		needReCalcT = TRUE;
+		}
+	  @call GSUEGradeWeight::MSG_VIS_TEXT_GET_ALL_PTR(wtString);
+	  if (!wtString[0] || (wtString[0] == ' '))  weight = EQUAL_WEIGHT;
+	  else  UtilAsciiToHex32(wtString, &weight);
+	  /* do we need to re-calc due to weight change? */
+	  if (((word)weight) != element->GES_weight) needReCalcW = TRUE;
+	  /* do we need to re-sort? */
+	  if (strcmp(element->GES_date, dateString)) {
+		/* delete it and add as new */
+		VMUnlock(mh);
+		needReSort = TRUE;
+		/* delete it from list, students and grid */
+		DeleteGradeElement(selection,
+				    pself->GDI_fileHandle,
+				    pself->TADI_curGradePd,
+				    pself->TADI_gradeElemChunkArray[pself->TADI_curGradePd],
+				    pself->TADI_numStudents,
+				    pself->TADI_stuDBHan,
+				    pself->TADI_curStuIndex,
+				    pself->GDI_display,
+				    needReSort,
+				    pself->TADI_gradeTypesChunkArray,
+				    pself->TADI_numElements[pself->TADI_curGradePd],
+				    pself->TADI_numTypes);
+		}
+	  else { /* don't need re-sort so we won't delete it */
+		@call GSUEGradeDescript::MSG_VIS_TEXT_GET_ALL_PTR(string);
+		strcpy(element->GES_description, string);
+		if (needReCalcT) strcpy(element->GES_type, typeString);
+		if (needReCalcW) element->GES_weight = (word) weight;
+		VMDirty(mh);
+		VMUnlock(mh);
+		}
+	  } /* end of existing element if */
+
+    if (g_isNewGTypeOrElem || needReSort)  {
+	  /* add it to the array */
+	  insertPos = AddGradeElement(dateString,
+				 typeString,
+				 pself->GDI_fileHandle,
+				 pself->TADI_curGradePd,
+				 pself->TADI_gradeElemChunkArray[pself->TADI_curGradePd],
+				 pself->TADI_numElements[pself->TADI_curGradePd]);
+	  if (g_isNewGTypeOrElem) pself->TADI_numElements[pself->TADI_curGradePd]++;
+	  } /* end of new element or needs re-sorted if */
+
+    /* now tell the objects that need to know about it */
+    if (g_isNewGTypeOrElem || needReSort || needReCalcT || needReCalcW)  {
+	  /* the students grades array */
+	  for (i = 0; i < pself->TADI_numStudents; i++)  {
+		/* get the student record */
+		error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   pself->TADI_stuDBHan,
+					   pself->TADI_curStuIndex,
+					   i,
+					   &dbmh);
+		/* now the grades field */
+		gradeFieldID = BasicDBGetFieldID(dbmh,
+					BDBFHE_CATEGORY,
+					STU_GRADES_1  + pself->TADI_curGradePd,
+					1);
+		BasicDBGetFieldData(dbmh, gradeFieldID, grades, MAX_ELEMENTS);
+		/* get the summary field */
+		sumFieldID = BasicDBGetFieldID(dbmh,
+				   BDBFHE_CATEGORY,
+				   STU_GRADE_SUM_1  + pself->TADI_curGradePd,
+				   1);
+		BasicDBGetFieldData(dbmh, sumFieldID, gradeSum, (MAX_GRADE_TYPES * sizeof(dword)));
+
+		if (g_isNewGTypeOrElem || needReSort)  {
+		   /* shuffle the effected grade elements up 1 */
+		   for (j = pself->TADI_numElements[pself->TADI_curGradePd]; j > insertPos; j--) {
+			 grades[j] = grades[j - 1];
+			 }
+
+		   /* and initialize the new element */
+		   if (needReSort) {
+			 grades[insertPos] = grades[MAX_ELEMENTS - 1];
+			 grades[MAX_ELEMENTS - 1] = NO_GRADE;
+			 }
+		   else grades[insertPos] = NO_GRADE;
+		   } /* end of new or needs resort if */
+
+		/* recalc if we need to */
+		if (needReCalcT || needReCalcW)  {
+		   /* recalc the given type's avg */
+		   avg = CalcTypeAvg (pself->TADI_numElements[pself->TADI_curGradePd],
+			   pself->GDI_fileHandle,
+			   pself->TADI_curGradePd,
+			   typeString,
+			   pself->TADI_gradeElemChunkArray[pself->TADI_curGradePd],
+			   grades);
+
+		   /* and put it into the array */
+		   gradeSum[typeNum] = avg;
+
+		   /* do the old type if necessary */
+		   if (needReCalcT) {
+			 /* recalc the given type's avg */
+			 avg = CalcTypeAvg (pself->TADI_numElements[pself->TADI_curGradePd],
+				  pself->GDI_fileHandle,
+				  pself->TADI_curGradePd,
+				  oldTypeString,
+				  pself->TADI_gradeElemChunkArray[pself->TADI_curGradePd],
+				  grades);
+
+			 /* and put it into the array */
+			 gradeSum[oldTypeNum] = avg;
+			 }
+
+		   /* now recalculate the final for that grade period */
+		   avg = CalcGPFinal (pself->TADI_numTypes,
+						  pself->GDI_fileHandle,
+						  pself->TADI_curGradePd,
+						  pself->TADI_gradeTypesChunkArray,
+						  gradeSum);
+
+
+		   /* and put the final into the array */
+		   if (avg) gradeSum[pself->TADI_numTypes] = avg;
+		   else gradeSum[pself->TADI_numTypes] = NO_SUMMARY;
+
+		   /* force the avg grade cell & final cell to redraw */
+		   if (g_isNewGTypeOrElem || needReSort) cellUpdate = pself->TADI_numElements[pself->TADI_curGradePd] - 1;
+		   else cellUpdate = pself->TADI_numElements[pself->TADI_curGradePd];
+		   @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+				 MSG_VIS_GRID_INVALIDATE_CELL_RANGE(
+				   cellUpdate + typeNum, i,
+				   cellUpdate + typeNum, i);
+		   if (needReCalcT) {
+			 @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+				    MSG_VIS_GRID_INVALIDATE_CELL_RANGE(
+					 cellUpdate + oldTypeNum, i,
+					 cellUpdate + oldTypeNum, i);
+			 }
+		   @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+				 MSG_VIS_GRID_INVALIDATE_CELL_RANGE(
+				   cellUpdate + pself->TADI_numTypes, i,
+				   cellUpdate + pself->TADI_numTypes, i);
+		   } /* end of recalc if */
+
+		/* set the new field data */
+		error = BasicDBSetFieldData(dbmh, gradeFieldID, grades, MAX_ELEMENTS);
+		/* set the new summary data */
+		error = BasicDBSetFieldData(dbmh, sumFieldID, gradeSum, (MAX_GRADE_TYPES * sizeof(dword)));
+		/* and store the record */
+		error = BasicDBSaveRecord(pself->GDI_fileHandle,
+					   pself->TADI_stuDBHan,
+					   dbmh,
+					   StudentsCallback,
+					   &recordID);
+		} /* end of cycle thru students for */
+
+	  if (g_isNewGTypeOrElem || needReSort)  {
+		/* and add the column to the grids */
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_SUSPEND();
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+				    MSG_VIS_GRID_ADD_COLUMN(insertPos, GRADE_WIDTH);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+				    MSG_VIS_GRID_ADD_COLUMN(insertPos, GRADE_WIDTH);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_UNSUSPEND();
+		@call self::MSG_TADOC_UPDATE_GRID_CONTENTS();
+		/* scroll to make this column visible */
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@TAMainView))::
+			MSG_GEN_VIEW_SCROLL_SET_X_ORIGIN(insertPos * GRADE_WIDTH);
+		}
+	  } /* end of new or resorted if */
+    /* this is not an else since we may need some redraw of recalc'd stuff */
+    if (!g_isNewGTypeOrElem || !needReSort || needReCalcT || needReCalcW)  {
+	  /* and redraw the column in the grids */
+	  @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+			MSG_VIS_GRID_INVALIDATE_CELL_RANGE(selection,
+										0,
+										selection,
+										0);
+	  @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+			MSG_VIS_GRID_INVALIDATE_CELL_RANGE(selection,
+										0,
+										selection,
+										pself->TADI_numStudents - 1);
+	  }
+
+
+    /* to update any new total weights */
+    @call GSUGradeElementsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->TADI_numElements[pself->TADI_curGradePd]);
+    if (g_isNewGTypeOrElem || needReSort)
+	   @call GSUGradeElementsList::
+			 MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(insertPos, FALSE);
+    else
+	   @call GSUGradeElementsList::
+			 MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, FALSE);
+
+    /* save the new numElements */
+    vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+    VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+    VMmapPtr->VMMS_numElements[pself->TADI_curGradePd] = pself->TADI_numElements[pself->TADI_curGradePd];
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* mark app  not busy */
+    @send TAApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    @call GradeESetUpGroup::MSG_META_GRAB_FOCUS_EXCL();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_GRADE_ELEMENT for TADocumentClass
+ *
+ * DESCRIPTION:	deletes the grade element 
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_DELETE_GRADE_ELEMENT
+{
+ word			selection;
+ VMMapStruct		*VMmapPtr;
+ VMBlockHandle		vmbh;
+ MemHandle		mh;
+
+ 
+    /* put up an are you sure dbox */
+    if (AckDBox(0, 0, @ConfMsgDeleteGElement) == ACK_NO) return;
+
+    /* get the selection */
+    selection = @call GSUGradeElementsList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /* mark app busy */
+    @send TAApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* delete it from list, students and grid */
+    DeleteGradeElement(selection,
+				    pself->GDI_fileHandle,
+				    pself->TADI_curGradePd,
+				    pself->TADI_gradeElemChunkArray[pself->TADI_curGradePd],
+				    pself->TADI_numStudents,
+				    pself->TADI_stuDBHan,
+				    pself->TADI_curStuIndex,
+				    pself->GDI_display,
+				    FALSE,
+				    pself->TADI_gradeTypesChunkArray,
+				    pself->TADI_numElements[pself->TADI_curGradePd],
+				    pself->TADI_numTypes);
+
+    /* set the instance */
+    pself->TADI_numElements[pself->TADI_curGradePd]--;
+
+    /* disable the edit & delete buttons */
+    @call GSUGEEditButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @call GSUGEDeleteButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    @call self::MSG_TADOC_UPDATE_GRID_CONTENTS();
+
+    /* mark app not busy */
+    @send TAApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    /* save the new numElements */
+    vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+    VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+    VMmapPtr->VMMS_numElements[pself->TADI_curGradePd] = pself->TADI_numElements[pself->TADI_curGradePd];
+    VMDirty(mh);
+    VMUnlock(mh);
+
+
+}
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GE_DLIST_APPLY for TADocumentClass
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * DESCRIPTION:	Handles an apply of user selection in the grade elem list.
+ *                  Enables edit & delete buttons
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_GE_DLIST_APPLY
+{
+
+
+    @call GSUGEEditButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @call GSUGEDeleteButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GE_DLIST_MONIKER_QUERY for TADocumentClass
+ *
+ * DESCRIPTION:	Queries for monikers for grade elements list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *  
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_GE_DLIST_MONIKER_QUERY
+{
+ VMBlockHandle		vmbh;
+ MemHandle		mh, mem;
+ GradeElementStruct*    element;
+ ChunkHandle		chunk;
+ GStateHandle		gstate;
+ word			width, numChars, eWidth, weight, totalWeight, i;
+ char			string[GRADE_DESCRIPT], dStr[DATE_SIZE], tStr[NAME_SIZE];
+ char			twStr[DATE_SIZE];
+ Boolean			propWeight;
+
+    
+    /* set the ellipsis width depending on font size */
+    if (g_sysPointSize == 10) eWidth = 8;
+    else if (g_sysPointSize == 12) eWidth = 10;
+    else  eWidth = 12;
+
+    /* get the list */
+    vmbh = VMFind(pself->GDI_fileHandle, NullHandle, GRADE_ELEM_1 + pself->TADI_curGradePd);
+    /* get the requested item */
+    VMLock(pself->GDI_fileHandle, vmbh ,&mh);
+    element = ChunkArrayElementToPtrHandles(
+		   mh,
+		   pself->TADI_gradeElemChunkArray[pself->TADI_curGradePd],
+		   item,
+		   0);
+    strcpy(tStr, element->GES_type);
+    strcpy(string, element->GES_description);
+    strcpy(dStr, element->GES_date);
+    weight = element->GES_weight;
+
+    /* get the total of weights for this type & gp */
+    totalWeight = 0;
+    propWeight = FALSE;
+    for (i = 0; i < pself->TADI_numElements[pself->TADI_curGradePd]; i++) {
+	  element = ChunkArrayElementToPtrHandles(
+		   mh,
+		   pself->TADI_gradeElemChunkArray[pself->TADI_curGradePd],
+		   i,
+		   0);
+	  if (!strcmp(tStr, element->GES_type)) {
+		if (element->GES_weight != EQUAL_WEIGHT)
+		   totalWeight += element->GES_weight;
+		else propWeight = TRUE;
+		}
+	  }
+    VMUnlock(mh);
+
+    mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0);
+    gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+    /* type */
+    GrDrawText(gstate, 2, 0, tStr, 0);
+    /* description */
+    width = GrTextWidth(gstate, string, strlen(string));
+    if(width > 205)  {
+	  /* truncate text and add ellipsis */
+	  while (width > (170 - eWidth)) {
+		numChars = strlen(string);
+		string[numChars - 1] = 0;
+		width = GrTextWidth(gstate, string, strlen(string));
+		}
+	  strcat(string, "...");
+	  }
+    GrDrawText(gstate, 105, 0, string, 0);
+    /* date */
+    GrDrawText(gstate, 330, 0, dStr, 0);
+    /* weight */
+    if (weight == EQUAL_WEIGHT) strcpy(string, "=");
+    else UtilHex32ToAscii(string, (dword) weight, UHTAF_NULL_TERMINATE);
+    strcat(string, " / ");
+    if (propWeight && (totalWeight <= 100)) strcpy(twStr, "100");
+    else UtilHex32ToAscii(twStr, (dword) totalWeight, UHTAF_NULL_TERMINATE);
+    strcat(string, twStr);
+    GrDrawText(gstate, 435, 0, string, 0);
+    GrEndGString(gstate);
+
+    /* and tell the DList */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+				  item,
+				  0,
+				  g_sysPointSize + 4,	/* height */
+				  550,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk)) ;
+
+    /* and 86 the gstate and mem */
+    GrDestroyGString(gstate, gstate, GSKT_KILL_DATA) ;
+    MemFree(mem) ;
+
+}
+
+

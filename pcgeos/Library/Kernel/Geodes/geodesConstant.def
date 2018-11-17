@@ -1,0 +1,90 @@
+COMMENT }----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Geode
+FILE:		geodeConstant.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	4/88		Initial version
+
+DESCRIPTION:
+	This file contains constants local to the GEODE module.
+
+	$Id: geodesConstant.def,v 1.1 97/04/05 01:12:21 newdeal Exp $
+
+------------------------------------------------------------------------------}
+
+PRIV_DATA_SLOT_INCREMENT	= 8	;Must be multiple of 8
+FIRST_GEODE_PRIV_OFFSET		= 2	;
+MAX_SYSTEM_DRIVERS		= 20
+
+STACK_SPACE_FOR_LOAD_RELOCATIONS = 350	;Stack space reserved for File routines
+					;when loading relocations
+
+MIN_RELOCATIONS			= 10	;Minimum number of relocations to do
+					;at one time
+
+if	RECORD_MODULE_CALLS
+
+RecordModuleCallHeader	struct
+    RMCH_unused		word		; Number of unused entries in table
+    RMCH_used		word		; Number of used entries in tabel
+    RMCH_overflow	dword		; Number of calls not recorded
+RecordModuleCallHeader	ends
+
+RecordModuleCallEntry	struct
+    RMCE_handle		hptr		; Handle of called routine
+    RMCE_offset		word		; Offset of called routine
+    RMCE_count		dword		; Count of times called
+RecordModuleCallEntry	ends
+
+NUM_RECORDED_MODULE_CALLS	equ 500
+
+endif
+
+if USE_PATCHES
+
+; At boot-up time, the kernel builds a list of patch files with this header:
+
+PatchFileListHeader	struct
+    PFLH_count	word
+    PFLH_files	label	char
+PatchFileListHeader	ends
+
+; This is the header of the block that's allocated if a geode is patched.
+
+PatchDataHeader		struct
+    PDH_fileHandle	hptr
+    PDH_newResCount 	word
+    ; Number of "new" resources (ie, resources that didn't exist in
+    ; the original geode
+
+    PDH_origResCount	word
+    ; Number of resources that existed in the original geode.
+
+    PDH_count			word
+    PDH_resources		label	PatchedResourceEntry
+PatchDataHeader		ends
+
+endif
+
+
+GEODE_REQUEST_SPACE_RETRY_WAIT_TIME = 60	; Request for space
+						; failed..  lets wait
+						; a sec..
+
+if	TRACK_INTER_RESOURCE_CALLS and FULL_EXECUTE_IN_PLACE
+	;
+	; We are tracking the number of calls between any two
+	; different resources. Obviously there are many combinations
+	; (ie. (number of resources in image)^2) and we are going to
+	; keep 1000 such mappings. If we run out of space, we will
+	; discard those mappings that happen only once.
+	;
+	RESOURCE_MAPPING_STAT_SIZE	equ	1000
+	PURGE_LOW_FREQUENCY_SLOTS	enum	Warnings
+endif

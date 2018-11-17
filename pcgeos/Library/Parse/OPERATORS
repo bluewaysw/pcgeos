@@ -1,0 +1,90 @@
+Directions for adding new built-in functions to the parser.
+		 3/ 4/91 -jw
+
+$Id: OPERATORS,v 1.2.35.1 97/03/29 03:48:31 canavese Exp $
+-----------------------------------------------------------
+
+First you need to define a constant for the operator. You do this by
+adding the operator to the OperatorType enum in Include/parse.def.
+
+There are tables that depend on the order in which these are defined
+so I suggest that you add your new operator to the end of the list.
+Not actually at the very end. There are two operator types which are
+used in the scanner temporarily and are never used elsewhere. As a
+result you should add your new operator to the end of the list, but
+before these two. There are warnings in parse.def so you won't do the
+wrong thing.
+
+Now you get to modify the operator related tables...
+
+There are three tables in parseVariables.asm:
+  operator(2)IDTable:
+	These contain lists of the operators and strings that the scanner
+	can use to recognize the operators when it encounters them.
+
+  opFormatTable:
+	This is used for formatting the operators for display. It
+	contains one offset to a string for each operator. The
+	strings are defined with the size of the string first
+	followed by the text of the string. Some of them contain
+	spaces because I think they look better that way. 
+
+  opPrecedenceTable:
+	This is used to define the precedence for each operator.
+	Currently all the operators are defined from highest
+	precedence to lowest precedence. That's why the numbers in
+	this table are ordered. You don't need to worry about it
+	though. Choose a precedence value which is appropriate for
+	your new operator. The higher the number the higher the
+	precedence.
+
+There is a table in parseDepend.asm:
+  opArgCountTable:
+	This defines the correct number of arguments for each operator.
+	This is actually only used by the dependency generating code.
+	The reason that the entry for OpRangeSeparator is -1 is because
+	there is special case code to handle this operator. Add a
+	line for your operator that tells how many arguments it takes.
+
+There is a table in parseEval.asm:
+  operatorHandlers:
+	This defines the routine that handles each operator.
+	You should just be able to add an entry to the bottom of this
+	list.
+
+Now that you've added this entry to the operatorHandlers table you
+can go and write the routine itself.
+
+The routine should go in the file parseOperators.asm. All the
+operator handlers are in the EvalCode segment. At some time we may
+want to move them into separate segments, but for now we are doing it
+this way.
+
+The operator handler is defined as:
+    PASS:	es:bx	= Pointer to top of argument stack
+		ss:bp	= Pointer to EvalParameters on the stack.
+    RETURN:	es:bx	= Pointer to new top of argument stack
+		carry set on error
+			al = error code
+    DESTROYED:	ax
+
+For more information see one of the functions that is already defined
+(eg: OpAddition).
+
+If the arguments to the operator are numbers they will already be on
+the floating-point stack so you should just be able to manipulate
+them there.
+
+If you are writing a numeric function you should leave the result on
+the floating-point stack. You should also leave the evaluator
+argument stack in a reasonable state.
+
+If you take 2 numeric arguments and return 1 numeric result you will
+be passed the evaluator argument stack holding 2 number place-holders
+and you need to return it holding 1. You can do this by using PopNArgs():
+	mov	cx, 1		; Pop 1 argument
+	call	PopNArgs	; Remove 1 argument of 2, leaving 1
+				; on the stack to act as the result.
+
+See the document FUNCTIONS for information on type-checking and how to
+propogate errors. (This is important information).

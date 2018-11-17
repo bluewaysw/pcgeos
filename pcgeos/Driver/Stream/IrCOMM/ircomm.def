@@ -1,0 +1,239 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	GEOS	
+MODULE:		IrCOMM
+FILE:		ircomm.def
+
+AUTHOR:		Greg Grisco, Dec  4, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	grisco	12/ 4/95   	Initial revision
+
+
+DESCRIPTION:
+	IrCOMM definitions file
+		
+	$Id: ircomm.def,v 1.1 97/04/18 11:46:13 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+include	ircommIrcomm.def
+
+;-------------------------------------------------------------------------
+; 			IrCommProcessClass
+;-------------------------------------------------------------------------
+;
+; A subclass of ProcessClass is needed so that we have an object to
+; send timer events to.  The timer is used for forcing data to be sent
+; without waiting for the stream to fill.
+;
+IrCommProcessClass	class	ProcessClass
+
+MSG_IRCOMM_SEND_DATA_NOW	message
+
+MSG_IRCOMM_DISCONNECT		message
+
+IrCommProcessClass	endc
+
+
+;-------------------------------------------------------------------------
+; 			Compile-Time flags
+;-------------------------------------------------------------------------
+
+NOTIFY_WHEN_SNE_MODEM_CHANGED	equ	TRUE	
+;
+; set TRUE if the notify routine should be called immediately after
+; being set so it can get the initial modem settings.
+;
+
+HANDLE_JEOPARDY_CASE		equ	FALSE	
+;
+; set TRUE if ircomm should block read/writes while the connection is
+; in jeopardy. IrCOMM will also block when there are no bytes to read
+; to allow jeopardy to be detected.
+;
+; 5/22/96 - turned off for now.  Was causing certain apps to block
+; too long while trying to read from an empty stream, instead
+; expecting to return with zero bytes read on a NO_BLOCK call.
+; Really, the blocking while in jeopardy code should not be in here
+; since we are emulating the serial driver which does not handle the
+; connection being lost for any period of time.
+
+;-------------------------------------------------------------------------
+; 			Constants
+;-------------------------------------------------------------------------
+
+;
+; The size of the control parameter length (part of every IrCOMM data
+; frame format.
+;
+CONTROL_LENGTH_SIZE		equ 1
+
+
+;-------------------------------------------------------------------------
+; 			IrSerialPortData struct
+;-------------------------------------------------------------------------
+
+IrSerialPortData	struct
+    ;
+    ; Connection data
+    ;
+    ISPD_iasClient	word			; Registered for IAS query
+    ISPD_passive	SerialPassiveStatus 0	; Flags for passive connections
+    ;
+    ; Stream stuff
+    ;
+    ISPD_inStream	sptr.StreamData	-1	; Stream that manages incoming
+						;  data for us
+    ISPD_outStream	sptr.StreamData	-1	; Stream that manages outgoing
+						;  data for us
+
+    ISPD_inStreamSize	word			; size of input stream
+    ISPD_outStreamSize	word			; size of output stream
+    ISPD_highWater	word			; High-water mark for input
+    						;  stream at which XOFF must be
+						;  sent.
+SERIAL_MARGIN	equ	64	; Amount below total size at which to set
+				;  high water mark for a port.
+    ISPD_lowWater	word			; Low-water mark to which input
+    						;  stream must drain before an
+						;  XON is sent.
+    ;
+    ; Serial stuff
+    ;
+    ISPD_mode		SerialMode	SM_COOKED
+
+    ISPD_flow		SerialFlow <
+	1, 1,					; flow control active both ways
+	0, 0,					; Neither XON nor XOFF pending
+	0, 0,					; Not stopped by hardware or
+						;  software
+	1,					; Use software FC by default
+	0					; Don't use hardware as we dont
+						;  know what signals to obey
+    >
+    ISPD_stopCtrl SerialModem	mask SMC_RTS	; Signal to drop in hardware FC
+						;  when we want the other side
+						;  to shut up.
+    ISPD_stopSignal SerialModemStatus mask SMS_CTS; Signal(s) whose lowering we
+						;  should take as a signal to
+						;  shut up for a bit.
+    ISPD_dataEvent	StreamNotifier		; Saved notifier for SNE_DATA
+    ISPD_errorEvent	StreamNotifier		; Saved notifier for SNE_ERROR
+    ISPD_modemEvent	StreamNotifier		; Notifier for SNE_MODEM
+    ISPD_passiveEvent	StreamNotifier		; Notifier for SNE_PASSIVE
+    ISPD_modemStatus	SerialModemStatus	; status to be passed in
+						;  modem notifier
+    ISPD_error		SerialError		; error to be generated
+
+    ISPD_curState	SerialPortState		; current state
+    ISPD_clientRole	SerialRole	SR_DTE	; DTE or DCE?
+    ISPD_peerRole	SerialRole	SR_DTE	; assumed to be another DTE
+
+    ISPD_procHandle	hptr
+    ISPD_timerHandle	word			; For timer which is set to 
+    ISPD_timerID	word			;  tell us to send data
+    ;
+    ; IrCOMM related fields
+    ;
+    ISPD_serviceType	IrCommServiceType	; 3-wire or 9-wire
+    ISPD_state		IrCommFsmState		; current IrCOMM state
+    ISPD_client		word		-1	; TinyTP client handle
+    ISPD_packetDataSize	word			; negotiated out packet size
+    ISPD_packetDataSizeIn word			; negotatied in packet size
+    ISPD_receive	IrCommReceiveFlag 0	; ok to receive?
+    ISPD_send		IrCommSendFlag 0	; various send flags
+    ISPD_dteSetting	IrCommDTESetting 0xf	; current DTE setting
+    ISPD_dceSetting	IrCommDCESetting 0xff	; current DCE setting
+    ISPD_irlapStatus	IrlapStatusIndicationType; current irlap status
+    ;
+    ; TinyTP credit tracking
+    ;
+    ISPD_bytesDealtWith		word	; 
+					; Keep track of bytes read by the
+					; client, so that we know when to 
+					; advance a TTP credit.
+
+					; We advance credits to TinyTP assuming
+					; that we will be receiving full data
+					; packets.  When we receive a shorter
+					; data frame, we can keep track of the
+					; extra space that accumulates in the
+					; input stream, and advance a TTP 
+					; credit when that space becomes big 
+					; enough to fit a full data frame.
+IrSerialPortData	ends
+
+
+;-------------------------------------------------------------------------
+; 			Fatal Errors
+;-------------------------------------------------------------------------
+IRCOMM_ILLEGAL_FUNCTION				enum	FatalErrors
+; The Serial Driver function is not supported
+
+IRCOMM_ILLEGAL_STATE				enum 	FatalErrors
+; FSM is in an invalid state.
+
+IRCOMM_COULDNT_LOCK_BLOCK			enum	FatalErrors
+; Couldn't lock the block
+
+IRCOMM_ILLEGAL_PARAMETER			enum	FatalErrors
+; Someone tried to use a control parameter that is not defined for
+; 3-wire or 9-wire, or the parameter values passed are bad.
+
+IRCOMM_ILLEGAL_NOTIFY_EVENT			enum	FatalErrors
+; The SerialNotifyEvent passed is invalid
+
+IRCOMM_BAD_MODEM_FLAGS				enum	FatalErrors
+; Someone tried to set illegal modem-control flags
+
+IRCOMM_ILLEGAL_ROLE				enum	FatalErrors
+; The role must be DCE or DTE
+
+IRCOMM_CANNOT_DESTROY_HUGELMEM			enum	FatalErrors
+; The HugeLMem still contains chunks which have not been freed.
+
+;IRCOMM_BLOCK_SHOULD_NOT_EXIST			enum	FatalErrors
+; The HugeLMem block should not exist yet since a connection has yet
+; to be established.
+
+IRCOMM_ILLEGAL_UNIT_NUMBER			enum	FatalErrors
+; Caller tried to pass a unit number which is either out of range or
+; is not the beginning of an array element
+
+IRCOMM_ILLEGAL_CONTROL_LENGTH			enum	FatalErrors
+; The control length must be greater than zero and must match the
+; length of the encoded control parameters.
+
+IRCOMM_SERVICE_TYPE_NOT_SUPPORTED		enum	FatalErrors
+; The 3-wire raw service type, specifically, is not yet supported.
+
+IRCOMM_HANDSHAKING_NOT_SUPPORTED		enum	FatalErrors
+; The requested handshaking type is not supported
+
+IRCOMM_STREAM_TOO_BIG				enum	FatalErrors
+; The stream being created is too large.  Maybe the stream size was
+; trashed.
+
+;-------------------------------------------------------------------------
+; 			Warnings
+;-------------------------------------------------------------------------
+
+IRCOMM_UNSUPPORTED_PARAMETER_RECEIVED		enum	Warnings
+; The peer has sent us a parameter through the control channel which
+; we don't recognize.
+
+IRCOMM_DATA_LOST				enum	Warnings
+; For one reason or another, data was not accepted by TinyTP.
+
+IRCOMM_PASSIVE_SHOULDNT_WRITE			enum	Warnings
+; The passive connection should not attempt to write to the port.
+; This means no setting of control parameters.

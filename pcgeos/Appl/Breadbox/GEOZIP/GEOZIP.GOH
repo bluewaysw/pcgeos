@@ -1,0 +1,436 @@
+/*---------------------------------------------------------------------------
+ *
+ *	Header-File fÅr Geozip-Applikattion
+ *
+ ---------------------------------------------------------------------------*/
+
+#include "unzip.h"	/* QuickLocateParams */
+
+@define debugFlag 0
+
+
+/* Sprachdefinition: 1: Deutsch, 0: Englisch */
+//@if 0
+//@define German 1
+//@define GE(a,b) a
+//@define GE2(a,b,ea,eb) a , b
+//@define BUBBLE(a,b) ATTR_GEN_HELP_CONTEXT = a
+
+//@elseif
+//@define German 0
+//@define GE(a,b) b
+//@define GE2(a,b,ea,eb) ea , eb
+//@define BUBBLE(a,b) ATTR_GEN_HELP_CONTEXT = b
+//@endif
+
+
+/*---------------------------------------------------------------------------
+ Definitions taken form rainer.goh (because this file is not included)
+ ---------------------------------------------------------------------------*/
+@define GetDocUIOptr(obj)	ConstructOptr(pself->GDI_display,ChunkOf(obj))
+
+
+/*---------------------------------------------------------------------------
+ Globale Konstanten und Typen
+ ---------------------------------------------------------------------------*/
+#define GEOS_HEADER_MAGIC (dword)1405175239
+
+#define GZIP_DOC_TEMP_PATH_SIZE	40
+/* GZIP_DOC_TEMP_PATH_SIZE  mu· mind. sein: sizeof(ViewTempDirName) +16 */
+
+#define IC_CANCEL	IC_CUSTOM_START+1
+#define IC_SKIP		IC_CUSTOM_START+2
+#define IC_ALL		IC_CUSTOM_START+3
+#define IC_DEL		IC_CUSTOM_START+4
+#define IC_DETAIL	IC_CUSTOM_START+5
+#define IC_VIEW		IC_CUSTOM_START+6
+#define IC_EXECUTE	IC_CUSTOM_START+7
+#define IC_OPEN		IC_CUSTOM_START+8
+
+
+#define MAX_FILE_SIZE_IN_ZIP 1024
+#define MAX_VIEW_SIZE 12288
+#define READ_BUF_SIZE 4*1024
+
+/* GlobalExtractFlags -
+   Beim temporÑren Auspacken werden alle Flags zurÅckgesetzt ! */
+#define	GEF_CREATE_ROOT		1
+#define GEF_DIRNAME_OVERWRITE 	2
+#define GEF_DIRNAME_IGNORE	4
+#define	GEF_DIRNAME_CANCEL	8
+#define GEF_OVERWRITE_ALL	16
+#define GEF_OVERWRITE_RO_TOO	32
+#define GEF_USE_OLD_DOS_NAME_FOR_GEOS_FILES	64
+
+// allgemeiner Fehler beim Auspacken oder sonstwo
+#define GZIP_NO_ERROR		0
+/* (-1) == UNZ_ERROR_NO , (-2) ... (-20) sicherheitshalber frei*/
+#define GZIP_EXTRACT_ERROR		(-21)
+#define GZIP_EXTRACT_DISK_FULL_ERROR	(-22)
+#define GZIP_EXTRACT_NOT_FOUND_ERROR	(-23)
+#define GZIP_DIRNAME_FOUND_BREAK	(-24)
+#define GZIP_INVALID_ZIP_FILE		(-25)
+#define GZIP_UNSUPPORTED_ZIP_METHOD	(-26)
+#define GZIP_ENCRYPTED_FILES_FOUND	(-27)
+#define GZIP_UNKNOWN_METHODS_FOUND	(-28)
+#define	GZIP_FILE_IS_ENCRYPTED		(-29)
+#define	GZIP_COMMON_FILE_ERROR		(-30)
+#define	GZIP_SHORT_VIEW			(-31)
+#define	GZIP_CREATE_PATH_ERROR		(-32)
+
+#define	GZIP_OPEN_FOR_ZIP_ERROR		(-35)
+#define	GZIP_WRITE_TO_ZIP_ERROR		(-36)
+#define	GZIP_OPEN_DRIVE_ERROR		(-37)
+#define	GZIP_OPEN_PATH_ERROR		(-38)
+
+#define	GZIP_APP_NOT_FOUND_ERROR	(-39)
+#define	GZIP_APP_NOT_EXECUTABLE_ERROR	(-40)
+
+
+
+
+typedef struct FIZ_S {
+	dword compressedSize;       /* compressed size (in bytes) */
+	dword uncompressedSize;     /* uncompressed size (in bytes) */
+	FileDateAndTime modDate;    /* date/time of last change - use FDAT...() */
+	Byte	fileAttrs;	/* FA_xx ... */
+	word pathLen;		/* offset to first name charcter witout path */
+				/* used to calculate String for List-entry */
+	Boolean isDir;		/* True if entry is not a File */
+	QuickLocateParams quickLocateParams; /* minzip-Paramete um eine Datei
+						schnell zu lokalisieren */
+	dword   textIndex;	// Index im GZDI_textArray fÅr Anzeigetexte
+	word	versionNeed;
+	word 	versionMadeBy;
+	word 	sizeLocalExtraField;
+	word	sizeComment;
+	Boolean isEncrypted;
+	word 	compressionMethod;
+
+	char name[MAX_FILE_SIZE_IN_ZIP];
+	} FileInZip;
+
+
+/* Alle Informationen, die von DocumentClass zu Aufbau eines Archives benîtigt
+	werden, sind in einer Struktur gespeichert */
+typedef struct {
+	GenFilePath	nzbi_path;
+	MemHandle 	nzbi_fileListHandle;
+	optr		nzbi_liste;
+	int		nzbi_itemsInList,	/* anzahl dargestelleter
+						EintrÑge in Liste */
+			nzbi_startOffset,	/* erster gÅltiger Eintrag in
+						der Liste, um evt Parent
+						auszublenden */
+			nzbi_offsetOffset;	/* Umrechnungswert: Offset in
+						der Liste - Offset im MemBlock
+						*/
+	Boolean         nzbi_allSelected,	/* Nichts == alles! */
+			nzbi_compressDirname,
+			nzbi_recurseSubdirs;
+	}	NewzipBuildInfo;
+
+/* Der Text in der Dateiliste der DocumentClass wird einmalig erzeugt und
+   in einem HugeArray (GZDI_textArray) in Einzelteilen aufbewahrt.
+   In der Query-Msg der Liste wird der gesamttext, je nach AnzeigeFlags,
+   zusammengebastelt
+   */
+
+// Konstanten zur Steuerung, ob im ExtraArray ein Eintrag vorhanden ist
+//#define EXTRA_DATA_NO		(dword)(-1)
+//#define EXTRA_DATA_NOT_TRIED	(dword)(-2)
+
+// Konstanten zur Steuerung der Grî·e der EintrÑge und der anzufordernden Puffer
+#define EXTRA_STRING_MAX_LEN		(dword)(400)
+#define FILE_LIST_MAX_TEXT_SIZE		EXTRA_STRING_MAX_LEN+sizeof(ListStringHeader)
+				// da in sizeof(..) bereits 4 Byte fÅr den extra-
+				// string enthalten sind, kann man da direkt zum
+				// anfordern von Speicher nutzen
+
+
+typedef struct {
+	char dosName[16];
+	char sizeStr[16];
+	char dateStr[16];
+	char timeStr[16];
+	char attrStr[10];
+	char extraStr[4];	// Letztes Feld, wird VerlÑngert!
+	}	ListStringHeader;
+
+typedef struct {
+	word displayFlags,
+	     scanOptions;
+	     viewOptions;
+	} GZipOptions;
+
+/*typedef struct {
+	char 	bugFullPath[400];
+	char 	bugFileName[40];
+	char	curFullPath[400];
+	} DirkBugStuff;
+/*
+
+typedef struct {
+	Bitmap bitmapHeader;
+	unsigned char bitmapData[200];
+} SymbolBmp;
+
+*/
+
+
+
+
+@include "dirlist.goh"
+
+
+#define ErrorBox(info) UserStandardDialogOptr ( 0,0,0,0,info,\
+	(( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) | \
+	 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) )
+
+#define InfoBox(info) UserStandardDialogOptr ( 0,0,0,0,info,\
+	(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+	 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) )
+
+#define DisplayShareBox(info,hctx)  { int retValue; MemLock(HandleOf(hctx)); \
+	do { retValue = UserStandardDialogOptr ( (optr)LMemDeref(hctx), \
+	   0,0,0,info, (( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+	   ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) ); \
+	   } while ( retValue == IC_HELP); \
+	 MemUnlock(HandleOf(hctx)); }
+
+
+#define InfoParamBox(info,param) { char * i; UserStandardSound(SST_NOTIFY);\
+	MemLock(HandleOf(info)); i = LMemDeref(info); \
+	UserStandardDialog ( 0,0,0,param,i,\
+	(( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | \
+	 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) );\
+	 MemUnlock(HandleOf(info));}
+
+#define WarningParamBox(info,param) { char * i; \
+	MemLock(HandleOf(info)); i = LMemDeref(info); \
+	UserStandardDialog ( 0,0,0,param,i,\
+	(( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) | \
+	 ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)) );\
+	 MemUnlock(HandleOf(info));}
+
+#define GetMem( size ) 	MemAlloc( size, HF_SWAPABLE, HAF_ZERO_INIT)
+#define GetLockedMem( size ) 	MemAlloc( size, HF_SWAPABLE, HAF_ZERO_INIT|HAF_LOCK)
+
+
+/*---------------------------------------------------------------------------
+ Klassendefinition GZipProcessClass  : die Prozess-Klasse der Applikation
+ ---------------------------------------------------------------------------*/
+@class GZipProcessClass, GenProcessClass;
+
+	@message void MSG_GZIP_EXTRACT_CREATE_SUBDIR();
+	@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_GZIP_EXTRACT_DIR_SELECTED;
+  //	@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_GZIP_EXTRACT_FLAGS_CHANGED;
+
+	@message void MSG_GZIP_SELECTED_COUNT_CHANGED(int count, int curFileCount);
+		/* ermîglicht Prozess UI-Objekte zu enablen / disablen, die davon
+		   abhÑngen */
+
+	@message void MSG_GZIP_SAVE_OPTIONS();
+	@message void MSG_GZIP_LOAD_OPTIONS();
+
+  //	@message void MSG_GZIP_REGISTER();
+
+  //	@message void MSG_GZIP_TEST();
+@endc /* GZipProcessClass */
+
+
+
+/*---------------------------------------------------------------------------
+ Klassendefinition GZipDisplayClass  :
+ ---------------------------------------------------------------------------*/
+@class GZipDisplayClass, GenDisplayClass;
+@endc
+
+@class GZipDisplayGroupClass, GenDisplayGroupClass;
+@endc;
+
+/*---------------------------------------------------------------------------
+ Klassendefinition GZipDocumentGroupClass  :
+ ---------------------------------------------------------------------------*/
+@class GZipDocumentGroupClass, GenDocumentGroupClass;
+	@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_GZIP_DOCGROUP_NEW_DISPLAY_FLAGS;
+  //	@message void MSG_GZIP_DOCGROUP_START_RESCAN();
+@endc
+/*---------------------------------------------------------------------------
+ Klassendefinition GZipDocumentClass  : Jedes Archiv wird von einem Objekt
+					dieser Klasse Verwaltet
+ ---------------------------------------------------------------------------*/
+
+@class GZipDocumentClass, GenDocumentClass;
+	@instance MemHandle GZDI_unzDesc = 0;
+	@instance VMFileHandle GZDI_tempFile;
+	@instance VMBlockHandle GZDI_entryArray;
+	@instance VMBlockHandle GZDI_indexArray;
+	@instance VMBlockHandle GZDI_textArray;
+
+	@instance dword GZDI_currentIndex;
+	@instance dword GZDI_totalSizeAtLevel = 0;
+	@instance word GZDI_totalFilesAtLevel = 0;
+
+	@instance dword GZDI_selectedSize = 0;
+	@instance dword GZDI_selectedCount = 0;
+	@instance dword GZDI_curFileCount = 0;
+	@instance word GZDI_displayFlags;
+
+	@instance char GZDI_tempFilePath[GZIP_DOC_TEMP_PATH_SIZE] = "";
+	@instance Boolean GZDI_savedOnce = FALSE;
+	@instance Boolean GZDI_hasParent = FALSE;
+	@instance Boolean GZDI_new = FALSE;
+
+	@message (GEN_ITEM_GROUP_APPLY_MSG)	MSG_GZIP_DOC_FILE_SELECTED;
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG)	MSG_GZIP_DOC_QUERY_FILE_FOR_LIST;
+	@message (DCDL_CUSTOM_DOUBLE_PRESS_MSG)	MSG_GZIP_DOC_FILE_DOUBLE_CLICKED;
+	@message Boolean MSG_GZIP_DOC_CREATE_FILE_LIST();
+	@message void MSG_GZIP_DOC_DISPLAY_LIST();
+	@message void MSG_GZIP_DOC_DISPLAY_LEVEL(dword index);
+	@message void MSG_GZIP_DOC_SET_DISPLAY_FLAGS(word flags);
+
+	@message void MSG_GZIP_DOC_START_EXTRACT();
+  //	@message void MSG_GZIP_DOC_REQUEST_HOME();
+	@message void MSG_GZIP_DOC_VIEW_FILE();
+	@message void MSG_GZIP_DOC_DO_EXTRACT();
+  //	@message void MSG_GZIP_DOC_TEST_FILES();
+  //	@message void MSG_GZIP_DOC_SHOW_INFO();
+
+	@message void MSG_GZIP_DOC_NOTIFY_PROCESS();
+
+	@message void MSG_GZIP_DOC_INVALID_ARCHIV();
+	@message int  MSG_GZIP_DOC_BUILD_NEW_ARCHIVE(NewzipBuildInfo *info);
+ //	@message void MSG_GZIP_CREATE_DIRK_BUG_STUFF();
+ //	@message void MSG_GZIP_DESTROY_DIRK_BUG_STUFF();
+
+	/* Tools */
+ /*	@message void MSG_GZIP_DOC_SELECT_ALL();
+	@message void MSG_GZIP_DOC_SELECT_NONE();
+	@message void MSG_GZIP_DOC_REVERSE_SELECTIONS();
+ */
+ //	@message void MSG_GZIP_DOC_RESCAN_NOW();
+
+	@message void MSG_GZIP_SET_SAVE_ONCE();
+	@message Boolean MSG_GZIP_GET_SAVE_ONCE();
+
+@endc /* GZipDocumentClass */
+
+/*---------------------------------------------------------------------------
+ Klassendefinition GZipDocumentControlClass:
+	Eigene Klasse um dem FileSelector beim ôffnen beizubiegen, da· nur
+	ZIP-Files angezeigt werden sollen.
+ ---------------------------------------------------------------------------*/
+@class GZipDocumentControlClass, GenDocumentControlClass;
+/*
+ * Es wird nur eine geerbte Methode Åberschrieben
+ */
+	@message void MSG_GZDC_TEST();
+@endc /* GZipDocumentControlClass */
+
+
+/*@class SharewareGlyphClass, GenGlyphClass;
+	@instance word SWGI_count = 0;
+	@message  void MSG_SWARE_SWITCH_TEXT();
+@endc;
+
+/*---------------------------------------------------------------------------
+ Klassendefinition OpenNewInfoClass: Dialogbox: ôffne Archiv
+ ---------------------------------------------------------------------------*/
+@class OpenNewInfoClass, GenInteractionClass;
+	@default GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	@default GII_visibility = GIV_DIALOG;
+
+	@message void MSG_ONI_INITIATE(char * archivName, dword archivSize ,dword numberEntrys);
+	@message void MSG_ONI_INC_COUNTER();
+	@message void MSG_ONI_ENDE();
+	@message void MSG_ONI_INITIATE_NEW();
+	@message void MSG_ONI_NEW_FILE(char * file);
+	@message void MSG_ONI_NEW_SUBDIR(char * dir);
+	@message void MSG_ONI_STOP_OPEN();
+	@message void MSG_ONI_STOP_NEW();
+@endc  /*OpenNewInfoClass */
+
+/*---------------------------------------------------------------------------
+ Klassendefinition ExtractArchiveInfoClass: Dialogbox: Extrahiere Dateien
+ ---------------------------------------------------------------------------*/
+@class ExtractArchiveInfoClass, GenInteractionClass;
+	@default GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	@default GII_visibility = GIV_DIALOG;
+	@instance dword EAII_archivSize = 0;
+	@instance dword EAII_fileSize = 0;
+	@instance dword EAII_archivExtracted = 0;
+	@instance dword EAII_fileExtracted = 0;
+
+	@message void MSG_EAI_INITIATE( char * archivName, dword toExtractSize );
+	@message void MSG_EAI_NEW_FILE( char * fileName, dword fileSize );
+	@message void MSG_EAI_BYTES_EXTRACTED( dword anz );
+	@message void MSG_EAI_STOP();	/* Stop-Schalter betÑtigt */
+	@message void MSG_EAI_ENDE();
+
+@endc  /*ExtractArchiveInfoClass */
+
+
+#define NZ_OPT_COMPRESS_DIRNAME  1
+#define NZ_OPT_SHOW_DIRS 	2
+
+#define GZOPT_FILE_FLAGS_MASK	0xFF
+#define GZOPT_DIR_FLAGS_MASK	0xFF00
+
+#define GZOPT_DISP_SIZE		1
+#define GZOPT_DISP_DATE		2
+#define GZOPT_DISP_TIME		4
+#define GZOPT_DISP_ATTRS	8
+#define GZOPT_DISP_LONGNAME_1ST	16
+
+#define GZOPT_DISP_FILES 		0x100
+#define GZOPT_DISP_DIR_SIZE 		0x200
+#define GZOPT_DISP_SUBDIRS		0x400
+#define GZOPT_DISP_DIR_LONGNAME_1ST	0x800
+
+
+#define GZOPT_SCAN_ALLWAYS	1
+#define GZOPT_SCAN_SPECIAL      2
+#define GZOPT_SCAN_NEVER        3
+
+
+// die Items der Drive-List haben als Identifier ihre Laufwerksnummer.
+// Ausnahme ist der Eintrag "Root"
+#define CND_LIST_ID_ROOT	0x100
+
+@class NewZipInteractionClass, GenInteractionClass;
+	@instance GenFilePath NZII_filePath = {SP_DOCUMENT,"."};
+	@instance Boolean NZII_newCanceled;
+	@instance MemHandle NZII_fileListHandle = 0;
+	@instance int	NZII_dirCount=0;
+	@instance int	NZII_entryCount=0;
+	@instance Boolean NZII_listHasParent = FALSE;
+	@instance Boolean NZII_showDirs = TRUE;
+	@instance FileLongName NZII_listParentName = "";
+    @instance Boolean NZII_availableDrives[26] ;
+
+  //	@message void	MSG_NEWZIP_CREATE_DRIVE_AND_HISTORY_LIST();
+  //	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_NEWZIP_NEW_DRIVE;
+	@message void MSG_NEWZIP_TO_DOCUMENT();
+	@message void MSG_NEWZIP_TO_FLOPPY();
+  //	@message void MSG_NEWZIP_TO_ROOT();
+  //	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_NEWZIP_SET_FROM_HISTORY;
+  //	@message void MSG_NEWZIP_UPDATE_HISTORY(char * path);
+
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG)	MSG_NEWZIP_QUERY_FILE_FOR_LIST;
+	@message (GEN_ITEM_GROUP_APPLY_MSG)	MSG_NEWZIP_FILE_SELECTED;
+  //	@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_NEWZIP_OPTIONS_CHANGED;
+
+	@message (DCDL_CUSTOM_DOUBLE_PRESS_MSG)	MSG_NEWZIP_FILE_DOUBLE_CLICKED;
+	@message void MSG_NEWZIP_READ_AND_DISPLAY_DIR(Boolean updateHistory);
+	@message void MSG_NEWZIP_DISPLAY_DIR();
+
+	@message void MSG_NEWZIP_CANCEL();
+	@message void MSG_NEWZIP_DO_CREATE();
+	@message Boolean MSG_NEWZIP_GET_RESULT(NewzipBuildInfo * info);
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_NEWZIP_QUERY_DRIVE ;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_NEWZIP_SELECTED_DRIVE ;
+@endc
+
+
+

@@ -1,0 +1,178 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Hilton
+MODULE:		Desktop Connect Library
+FILE:		dtconn.goh
+
+AUTHOR:		Robert Greenwalt, Dec 10, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	robertg	12/10/96   	Initial version.
+
+DESCRIPTION:
+
+	
+
+	$Id: dtconn.goh,v 1.1 97/04/04 16:00:01 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@deflib dtconn
+
+
+#include <geos.h>
+@include <stdapp.goh>
+#include <lmem.h>
+#include <library.h>
+#include <sem.h>
+#include <thread.h>
+#include <heap.h>
+@include <iacp.goh>
+@include <pccom.goh>
+@include <datax.goh>
+
+/*******************************************************************
+		Enumerated Types
+*******************************************************************/
+
+#define	DTCRT_NO_ERROR 		0
+#define	DTCRT_BUSY		1
+#define	DTCRT_NOT_CONNECTED	2
+#define DTCRT_MEM_ALLOC_ERROR	3
+
+
+#define DTCCT_SERIAL		0
+#define DTCCT_IR		1
+
+#define	DTCCS_CONNECTING	1
+#define	DTCCS_CONNECTED		2
+#define DTCCS_CONNECT_FAILED 	3
+#define	DTCCS_DISCONNECTING	4
+#define	DTCCS_DISCONNECTED	5
+#define DTCCS_DISCONNECT_FAILED 6
+#define DTCCS_PIPE_OPENING	7
+#define DTCCS_PIPE_OPENED	8
+#define DTCCS_PIPE_OPEN_FAILED	9
+#define DTCCS_PIPE_CLOSING	10
+#define DTCCS_PIPE_CLOSED	11
+#define DTCCS_PIPE_CLOSE_FAILED 12
+
+typedef word DTCReturnType;
+typedef word DTCConnectionType;
+typedef word DTCConnectionStatus;
+
+
+/******************************************************************* 
+ * 		PCCom <----> DTConnect Interface Header 
+ *******************************************************************/
+typedef struct {
+	dword		PDPH_dataPipeSignature;
+	DXInfoWord	PDPH_infoWord;
+	dword		PDPH_miscInfo;
+	word		PDPH_bufferSize;	/* sizeof data */
+	DXFlags		PDPH_flags;
+	word		pad;
+} PCComDataPipeHeader;
+
+#define PDPH_data(p)	((char *)p+sizeof(PCComDataPipeHeader))
+
+typedef struct {
+	word		PDIR_protoMajor;
+	word		PDIR_protoMinor;
+	dword		PDIR_deviceID;
+} PCComDeviceIDResponse;
+
+/*******************************************************************
+		Exported DTCApplication Class
+*******************************************************************
+
+Notes:
+	Handles both the DataX tasks and the PCComData Notification
+	 stuff
+
+*******************************************************************/
+
+@class	DTCApplicationClass, DataXApplicationClass;
+
+@message (PCCOM_DATA_NOTIFICATION_MSG) MSG_DTCA_INCOMING_DATA;
+@message PCComFullReturnType MSG_DTCA_OUTGOING_DATA(MemHandle data, word size);
+@message DTCReturnType MSG_DTCA_OPEN_CONNECTION(DTCConnectionType connType=bp,
+						SerialPortNum port=dx,
+						SerialBaud baud=cx);
+@message DTCReturnType MSG_DTCA_CLOSE_CONNECTION();
+@message DTCReturnType MSG_DTCA_SHUTDOWN();
+@message void MSG_DTCA_CONNECTION_STATUS(DTCConnectionStatus status);
+
+@instance MemHandle customDataBlockHandle;
+
+@endc	/* DTCApplicationClass */
+
+/*******************************************************************
+		Exported functions
+*******************************************************************/
+
+/*
+ * Desc:	Start listening to the port.  Don't know if anyone's 
+ *		out there, but we might as well.
+ *
+ *		Returns immediately.
+ *
+ *		pass	a notification optr
+ *			a notification msg
+ *			a connection type
+ *			a baud rate
+ *			a port number
+ *		returns	a DTCReturnType
+ */
+extern	DTCReturnType	_cdecl DTConnConnect(optr notificationOptr, 
+					     Message notificationMsg, 
+					     DTCConnectionType connType, 
+					     SerialBaud baud, 
+					     SerialPortNum port);
+
+/*
+ * Desc:	Stop listening to the port.  Abort if needed.
+ *
+ *		Returns when disconnected
+ *
+ *		pass	nothing
+ *
+ *		returns a DTCReturnType
+ */
+extern	DTCReturnType	_cdecl	DTConnDisconnect(void);
+
+@endlib
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

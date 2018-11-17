@@ -1,0 +1,521 @@
+/***********************************************************************
+ *
+ *	Copyright (c) New Deal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mailImport.goc
+ *
+ * AUTHOR:  	  Gene Anderson: 9/23/99
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	9/23/99   gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	MailListClass for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+
+@classdecl MailImporterClass;
+@classdecl MailImportSelectorClass;
+
+@ifdef MBX_IMPORT_SUPPORT
+
+
+
+/***********************************************************************
+ *	MailImportFilterNetscape
+ ***********************************************************************
+ * SYNOPSIS:	    filter routine for Netscape mailbox files
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	9/26/99		Initial Revision
+ *
+ ***********************************************************************/
+
+Boolean _pascal MailImportFilterNetscape(optr oself, FileEnumCallbackData *fecd, word frame)
+{
+    TCHAR *filename, *ext;
+    MailImportSelectorInstance *pself;
+    FileAttrs *fap;
+
+    pself = ObjDerefGen(oself);
+    /*
+     * for Netscape, don't accept any files with extensions
+     */
+    if (pself->MISI_app == MIA_NETSCAPE) {
+	fap = FileEnumLocateAttr(fecd, FEA_FILE_ATTR, NULL);
+	if (!(*fap & FA_SUBDIR)) {
+	    filename = FileEnumLocateAttr(fecd, FEA_NAME, NULL);
+	    ext = strchr(filename, '.');
+	    if (ext) {
+		return(TRUE);
+	    }
+	}
+    }
+    return(FALSE);
+}
+
+@method MailImportSelectorClass, MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE
+{
+    filter->filterRoutine = &MailImportFilterNetscape;
+    filter->filterAttrs = NULL;
+}
+
+
+/***********************************************************************
+ *	MSG_MAIL_IMPORT_SELECTOR_APP_SELECTED
+ ***********************************************************************
+ * SYNOPSIS:	    A file is selected
+ * PASS:            entryNum - entry #
+ *                  entryFlags - GenFileSelectorEntryFlags
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	9/23/99		Initial Revision
+ *
+ ***********************************************************************/
+
+#define EUDORA_IMPORT_PATH "C:\\EUDORA\\."
+#define EUDORA_IMPORT_MASK "*.MBX"
+#define NETSCAPE_IMPORT_SUBPATH "C:\\PROGRA~1\\NETSCAPE\\USERS\\"
+#define NETSCAPE_IMPORT_PATH_TAIL "\\MAIL\\."
+#define NETSCAPE_IMPORT_MASK "*"
+
+@method MailImportSelectorClass, MSG_MAIL_IMPORT_SELECTOR_APP_SELECTED
+{
+    MemHandle bufHan;
+    PathName pathName;
+    TCHAR *dirName;
+    word numDirs;
+    MailImportApp app;
+
+    /*
+     * if we've been called before, don't reset the directory
+     */
+    app = @call ImportAppList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (app != pself->MISI_app) {
+	pself->MISI_app = app;
+	if (app == MIA_EUDORA) {
+	    /*
+	     * Eudora
+	     */
+	    @call oself::MSG_GEN_FILE_SELECTOR_SET_MASK(EUDORA_IMPORT_MASK);
+	    @call oself::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(EUDORA_IMPORT_PATH, 0);
+	} else {
+	    @call oself::MSG_GEN_FILE_SELECTOR_SET_MASK(NETSCAPE_IMPORT_MASK);
+	    strcpy(pathName, NETSCAPE_IMPORT_SUBPATH);
+	    FilePushDir();
+	    FileSetCurrentPath(0, pathName);
+	    bufHan = GetDirNames(&numDirs);
+	    FilePopDir();
+	    if (numDirs == 1) {
+		dirName = MemLock(bufHan);
+		strcat(pathName, dirName);
+		strcat(pathName, NETSCAPE_IMPORT_PATH_TAIL);
+	    } else {
+		strcat(pathName, ".");
+	    }
+	    @call oself::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(pathName, 0);
+	    MemFree(bufHan);
+	}
+    }
+    @call ImportDialog2::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+    @call ImportDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/***********************************************************************
+ *	MSG_MAIL_IMPORT_SELECTOR_FILE_SELECTED
+ ***********************************************************************
+ * SYNOPSIS:	    the user has selected a file
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	9/24/99		Initial Revision
+ *
+ ***********************************************************************/
+
+@method MailImportSelectorClass, MSG_MAIL_IMPORT_SELECTOR_FILE_SELECTED
+{
+    FileLongName fname;
+    TCHAR *p;
+
+    /*
+     * get the name of the file
+     */
+    @call oself::MSG_GEN_FILE_SELECTOR_GET_SELECTION(fname);
+
+    if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) {
+	/*
+	 * if we're opening the file, close the dialog and import it
+	 */
+	if (entryFlags & GFSEF_OPEN) {
+	    @call ImportDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	    @send oself::MSG_MAIL_IMPORT_SELECTOR_IMPORT_MAILBOX();
+	} else {
+	    /*
+	     * we're just selecting the file; enable the appropriate UI
+	     */
+	    @call ImportFolderName::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	    @call ImportImport::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	    /*
+	     * convert the filename (*.MBX) into a folder name (mixed case)
+	     */
+	    LocalDowncaseString(fname+1, 0);
+	    p = strrchr(fname, '.');
+	    if (p) {
+		p[0] = 0;
+	    }
+	    @call ImportFolderName::MSG_VIS_TEXT_REPLACE_ALL_PTR(fname, 0);
+	}
+    } else {
+	/*
+	 * a folder or something else; disable the appropriate UI
+	 */
+	@call ImportFolderName::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	@call ImportImport::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    }
+}
+
+
+/***********************************************************************
+ *	MSG_MAIL_IMPORT_SELECTOR_IMPORT_MAILBOX
+ ***********************************************************************
+ * SYNOPSIS:	    import the currently selected mailbox
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	9/23/99		Initial Revision
+ *
+ ***********************************************************************/
+
+@method MailImportSelectorClass, MSG_MAIL_IMPORT_SELECTOR_IMPORT_MAILBOX
+{
+    PathName pname;
+    FileHandle mboxFile;
+    DiskHandle diskHan;
+    TCHAR *p, *folderName;
+    MemHandle dirBlk;
+    FileError err;
+    MailFolderID mboxID;
+
+    FileBatchChangeNotifications();
+    FilePushDir();
+    /*
+     * make sure the destination folder exists
+     */
+    GotoMailDirectory(NULL);
+    dirBlk = @call ImportFolderName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    folderName = MemLock(dirBlk);
+    err = FileCreateDir(folderName);
+    if (err && err != ERROR_FILE_EXISTS) {
+	goto done;
+    } else if (!err) {
+	/*
+	 * if the folder didn't exist, re-init the folder name array
+	 * so we can find the new folder later, and create a msglist file
+	 */
+	@call TheFolderList::MSG_FOLDER_LIST_INIT_NAME_ARRAY();
+	@call TheFolderList::MSG_FOLDER_LIST_INIT_MSGLIST();
+    }
+
+    /*
+     * get the mailbox file and open it
+     */
+    diskHan = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(@call oself::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pname));
+    p = strrchr(pname, C_BACKSLASH);
+    if (!p) {
+	goto done;
+    }
+    p[0] = 0;
+    FileSetCurrentPath(diskHan, pname);
+    mboxFile = FileOpen(p+1, FILE_DENY_W|FILE_ACCESS_R);
+
+    /*
+     * handle any error
+     */
+    if (!mboxFile) {
+	ReportError(@importFileOpenErr, p+1);
+	goto done;
+    }
+
+    /*
+     * go to the new folder
+     */
+    GotoMailDirectory(folderName);
+
+    /*
+     * finally import the messages
+     */
+    mboxID = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NUM(folderName);
+    @send ImportObj::MSG_MAIL_IMPORTER_IMPORT_MESSAGES(mboxFile, mboxID);
+    /*
+     * Set the folder list to the new folder
+     * the message list cache implementation is keerap!
+     */
+    @call TheFolderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(mboxID, 0);
+done:
+    MemFree(dirBlk);
+    FilePopDir();
+    FileFlushChangeNotifications();
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        ImpReadLine
+ * DESCRIPTION:     Read a line from the source file
+ *
+ * PASS:            srcFile - file handle to read from
+ *                  buf - ptr to buffer (MESSAGE_BUF_LEN + sizeof(TCHAR))
+ * RETURN:          # of bytes read
+ *                  buf - contents updated as needed
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      9/23/99     Initial Revision
+ ***************************************************************/
+
+word
+HexTo(TCHAR c)
+{
+    if (LocalIsDigit(c)) {
+	return(c - '0');
+    }
+    return(c - 'A' + 10);
+}
+
+word
+ImpReadLine(FileHandle srcFile, TCHAR *buf, Boolean isQuotedPrintable)
+{
+    word i, nb;
+    TCHAR curChar;
+    Boolean endOfLine = FALSE;
+
+    i = 0;
+    while (!endOfLine) {
+	nb = FileRead(srcFile, buf+i, 1, FALSE);
+	if (!nb) {
+	    endOfLine = TRUE;
+	} else {
+	    curChar = buf[i];
+	    if (curChar == C_LINEFEED) {
+		/*
+		 * convert CR+LF to CR and exit
+		 */
+		endOfLine = TRUE;
+	    } else if (curChar == C_EQUAL && isQuotedPrintable) {
+		FileRead(srcFile, buf+i+1, 2, FALSE);
+		/*
+		 * convert '='+CR+LF to nothing for quoted printable
+		 * and convert =HH to a character.
+		 */
+		if (LocalIsXDigit(buf[i+1])) {
+		    buf[i] = HexTo(buf[i+1])*16 + HexTo(buf[i+2]);
+		    i++;  /* skip character we added */
+		} else if (buf[i+1] != C_CR) {
+		    i += 3; /* skip '=' and two more */
+		}
+	    } else {
+		i++;
+	    }
+	}
+    }
+    buf[i] = 0;
+    /*
+     * convert from Latin-1 to GEOS
+     */
+    LocalCodePageToGeos(buf, i, CODE_PAGE_LATIN_1, '.');
+    return(i);
+}
+
+FileHandle
+CreateImportFile(TCHAR *filename)
+{
+    FileHandle newHan;
+
+    filename[0] = 0;
+    newHan = FileCreateTempFile(filename, FCF_NATIVE|FILE_CREATE_ONLY|FA_WRITE_ONLY|FILE_DENY_R, 0);
+    return(newHan);
+}
+
+void
+CloseImportFile(FileHandle oldHan, MailFolderID mboxID, TCHAR *filename)
+{
+    if (oldHan) {
+	FileClose(oldHan, FALSE);
+	InsertMessageListArray(mboxID, filename);
+    }
+}
+
+#define MBX_FROM_STR "From ???@??? "
+#define MBX_FROM_LEN 13
+#define NET_FROM_STR "From - "
+#define NET_FROM_LEN 7
+#define IMPORT_DATE_FORMAT "|SW| |SM| |SD| |Zh|:|Zm|:|Zs| |LY|\r"
+
+Boolean IsFromSeparator(TCHAR *buf)
+{
+    TimerDateAndTime time;
+    word timeOff = 0;
+
+    if (!LocalCmpStrings(buf, MBX_FROM_STR, MBX_FROM_LEN)) {
+	timeOff = MBX_FROM_LEN;
+    } else if (!LocalCmpStrings(buf, NET_FROM_STR, NET_FROM_LEN)) {
+	timeOff = NET_FROM_LEN;
+    }
+    if (timeOff && LocalCustomParseDateTime(buf + timeOff, IMPORT_DATE_FORMAT, &time) == 0xffff) {
+	return(TRUE);
+    }
+    return(FALSE);
+}
+
+
+/***********************************************************************
+ *	MSG_MAIL_IMPORT_IMPORT_MESSAGES
+ ***********************************************************************
+ * SYNOPSIS:	    import the messages in the specified mailbox
+ * PASS:            mboxFile - handle of mailbox file
+ *                  dirName - handle of block with directory name
+ *                  $cwd - set to destination folder
+ * RETURN:          none
+ *
+ * Messages are separated by:
+ *     From ???@??? <day> <month> <date> <time> <year>  (Eudora .MBX)
+ * or:
+ *     From - <day> <month> <date> <time> <year> (Netscape)
+ *
+ * Also need to deal with quoted printable
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	9/23/99		Initial Revision
+ *
+ ***********************************************************************/
+
+#define QUOTED_PRINTABLE "Content-Transfer-Encoding: quoted-printable"
+#define QP_LEN 43
+
+@method MailImporterClass, MSG_MAIL_IMPORTER_IMPORT_MESSAGES
+{
+    MemHandle bufHan;
+    TCHAR *buf;
+    FileHandle messFile = NullHandle;
+    word numBytes, numMsgs;
+    Boolean isQuotedPrintable;
+    dword fileSize, pos;
+    FileLongName filename;
+
+    FilePushDir();
+    /*
+     * go to the correct directory
+     */
+    bufHan = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(mboxID);
+    buf = MemLock(bufHan);
+    GotoMailDirectory(buf);
+    MemFree(bufHan);
+
+    /*
+     * allocate a buffer and prepare to use it
+     */
+    bufHan = MemAlloc(MESSAGE_BUF_LEN+sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD|HAF_LOCK);
+    if (!bufHan) {
+	goto exitError;
+    }
+    buf = MemDeref(bufHan);
+
+    /*
+     * init progress display
+     */
+    @call MailAppObj::MSG_GEN_APPLICATION_MARK_BUSY();
+    @call ImportProgressValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, 0);
+    @call ImportProgressNumMsgs::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, 0);
+    @call ImportProgressDialog::MSG_GEN_INTERACTION_INITIATE();
+
+    numMsgs = 0;
+    fileSize = FileSize(mboxFile);
+
+    /*
+     * read a line at a time until we get to a "From " line
+     */
+    numBytes = ImpReadLine(mboxFile, buf, FALSE);
+
+    while (numBytes && numMsgs < 500) {
+	if (IsFromSeparator(buf)) {
+	    /*
+	     * update the progress display
+	     */
+	    pos = FilePos(mboxFile, 0, FILE_POS_RELATIVE);
+	    @call ImportProgressNumMsgs::MSG_GEN_VALUE_SET_INTEGER_VALUE(numMsgs, 0);
+	    @call ImportProgressValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(pos*100/fileSize, 0);
+	    /*
+	     * found "From " line; skip it, close the old file
+	     * if any and create a new file
+	     */
+	    CloseImportFile(messFile, mboxID, filename);
+	    messFile = CreateImportFile(&filename);
+	    if (!messFile) {
+		ReportError(@importFileCreateErr, NULL);
+		break;
+	    }
+	    isQuotedPrintable = FALSE;
+	    numMsgs++;
+	} else {
+	    if (!LocalCmpStrings(buf, QUOTED_PRINTABLE, QP_LEN)) {
+		isQuotedPrintable = TRUE;
+	    }
+	    /*
+	     * write out the line, unless we haven't started a message yet
+	     */
+	    if (messFile) {
+		FileWrite(messFile, buf, numBytes, FALSE);
+	    }
+	}
+	numBytes = ImpReadLine(mboxFile, buf, isQuotedPrintable);
+    }
+
+    /*
+     * all done, clean up
+     */
+    CloseImportFile(messFile, mboxID, filename);
+
+    /*
+     * close progress display
+     */
+    @call ImportProgressDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+    @call MailAppObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    MemFree(bufHan);
+    FileClose(mboxFile, FALSE);
+
+    RebuildFolderList(MFID_LEAVE_SELECTION, TRUE);
+
+exitError:
+    FilePopDir();
+}
+
+@endif

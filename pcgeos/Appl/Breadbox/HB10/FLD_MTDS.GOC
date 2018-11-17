@@ -1,0 +1,508 @@
+/*
+ **************************************************************************
+ *  FILE:		fld_mtds.goc
+ *  PROJECT:		Breadbox HomeBase
+ *  DESCRIPTION:	This file has methods for field management
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include "hbase.goh"
+
+/*
+ ***************************************************************************
+ *		External Objects
+ ***************************************************************************
+ */
+
+ @extern object ChangeNameDB;
+ @extern object ChangeNumberDB;
+ @extern object NumberToShow;
+ @extern object CName1;
+ @extern object CName2;
+ @extern object CName3;
+ @extern object CName4;
+ @extern object CName5;
+ @extern object CName6;
+ @extern object CName7;
+ @extern object CName8;
+ @extern object CName9;
+ @extern object CName10;
+ @extern object Field1;
+ @extern object Field2;
+ @extern object Field3;
+ @extern object Field4;
+ @extern object Field5;
+ @extern object Field6;
+ @extern object Field7;
+ @extern object Field8;
+ @extern object Field9;
+ @extern object Field10;
+ @extern object IndexDList;
+ @extern object FieldsGroup;
+ @extern object HBaseApp;
+
+ @extern chunk DelDataMsg;
+
+/*
+ ***************************************************************************
+ *		Code for HBaseProcessClass   field management
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * FUNCTION:	DeleteField for HBaseProcessClass
+ *              (word newNum)
+ * CALLED BY:	
+ *      	
+ *
+ * STRATEGY:    deletes data from fields chopped by reducing #
+ *		of fields in display
+ *
+ ***********************************************************************/
+
+void DeleteField (word newNum)
+{
+char		charBuffer[1];
+word		length, i, fieldSelect;
+RecordStruct	*record;
+GroupStruct	*group;
+DBItem		*index;
+DBMapStruct* 	mapPtr;
+DBItem		recordItem, indexItem;
+DBGroup		groupGroup;
+MemHandle	mh;
+word		j, currentGroup, currentGroupRec;
+word		bufCount, fieldCount, currentNumGroupRecs;
+char		fieldString[DATA_LEN];
+char		strBuffer[(10 * DATA_LEN)]; /* original record */
+char		recordBuffer[(12 * DATA_LEN)]; /* new record */
+
+
+    /* mark app busy */
+    @send HBaseApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* cycle through the records */
+    for (i = 0; i < numRecords; i++)  {
+       /* first get the cG and cGR based on currentRecord */
+       GetGroupAndGrpRec (i,
+		          &currentGroup,
+		          &currentGroupRec,
+		          &currentNumGroupRecs);
+
+       /* Get the record info */
+       mapPtr = DBLockMap(HBFile);
+       group = (GroupStruct *) (mapPtr + 1);
+       groupGroup = group[currentGroup].GS_group;
+       /* Extract the item handle for the record. */
+       indexItem = group[currentGroup].GS_indexStart;
+       DBUnlock(mapPtr);
+
+       /* get the index array address */
+       index = DBLock(HBFile, groupGroup, indexItem);
+       recordItem = index[currentGroupRec];
+       DBUnlock(index);
+
+       /* get the record struct address */
+       record = DBLock(HBFile, groupGroup, recordItem);
+       /* copy the record to the buffer */
+       strcpy(strBuffer, record->RS_data);
+
+       /* now cycle the data into the recordBuffer */
+       bufCount = 0;
+       recordBuffer[0] = NULL;
+       /* first copy the newNum # of fields */
+       for (j = 1; j <= newNum; j++)  {
+          for (fieldCount = 0; fieldCount < DATA_LEN; fieldCount++)  {
+	     if (strBuffer[bufCount] != '~')  {  /* fill fieldStr */
+	        fieldString[fieldCount] = strBuffer[bufCount];
+	        bufCount++;
+                }
+	     else  {   /* end of field */
+	        fieldString[fieldCount] = NULL;
+		bufCount++;
+
+		strcat (recordBuffer, fieldString);
+                /* add end of field marker */
+		strcat (recordBuffer, "~");
+
+		fieldCount = DATA_LEN; /* force exit loop */
+	        }  /* end field else */
+
+	     } /* end this field for */
+
+          } /* end copy fields for */
+
+       /* now null the deleted fields */
+       for (j = newNum + 1; j <= numFields; j++)  {
+          for (fieldCount = 0; fieldCount < DATA_LEN; fieldCount++)  {
+	     if (strBuffer[bufCount] != '~')  { 
+	        /* just keep counting */
+	        bufCount++;
+                }
+	     else  {   /* end of field */
+	        fieldString[0] = NULL;
+		bufCount++;
+
+		strcat (recordBuffer, fieldString);
+                /* add end of field marker */
+		strcat (recordBuffer, "~");
+
+		fieldCount = DATA_LEN; /* force exit loop */
+	        }  /* end field else */
+
+	     } /* end this field for */
+
+          } /* end deleted fields for */
+
+       /* now put new record back */
+       strcpy(record->RS_data, recordBuffer);
+       DBUnlock(record);
+
+       /* resize the truncated record DBItem */
+       DBReAlloc(HBFile, groupGroup, recordItem, (strlen(recordBuffer) + 2));
+
+       /* re-init the buffer */
+       recordBuffer[0] = NULL;
+
+    } /* end of loop thru records for */
+
+    @send HBaseApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    return;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_CHANGE_NAME for HBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	Called to initialize Field Name Change DB.
+ *              
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_OPEN_CHANGE_NAME
+{
+    VMBlockHandle	vmbh;
+    VMMapStruct		*VMmapPtr;
+    MemHandle		mh;
+
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(HBFile);
+    VMmapPtr = (VMMapStruct *) VMLock(HBFile, vmbh, &mh);
+
+    /* get the field names */
+    @call CName1::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn1, 0);
+    @call CName2::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn2, 0);
+    @call CName3::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn3, 0);
+    @call CName4::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn4, 0);
+    @call CName5::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn5, 0);
+    @call CName6::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn6, 0);
+    @call CName7::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn7, 0);
+    @call CName8::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn8, 0);
+    @call CName9::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn9, 0);
+    @call CName10::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMS_fn10, 0);
+  
+    VMUnlock(mh);
+
+    /* Open the dialog box */
+    @call ChangeNameDB::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CHANGE_NAME for HBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	Changes the field names.
+ *              
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_CHANGE_NAME
+{
+    VMBlockHandle	vmbh;
+    VMMapStruct		*VMmapPtr;
+    MemHandle		mh;
+
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(HBFile);
+    VMmapPtr = (VMMapStruct *) VMLock(HBFile, vmbh, &mh);
+
+    /* store the new field names */
+    @call CName1::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn1);
+    @call CName2::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn2);
+    @call CName3::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn3);
+    @call CName4::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn4);
+    @call CName5::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn5);
+    @call CName6::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn6);
+    @call CName7::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn7);
+    @call CName8::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn8);
+    @call CName9::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn9);
+    @call CName10::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMS_fn10);
+  
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* show the new names */
+    @send process::MSG_DISPLAY_NAMES();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_CHANGE_NUMBER for HBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	Called to initialize Field Number Change DB.
+ *              
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_OPEN_CHANGE_NUMBER
+{
+    /* set the starting number */
+    @call NumberToShow::MSG_GEN_VALUE_SET_INTEGER_VALUE((word) numFields, FALSE);
+
+    /* Open the dialog box */
+    @call ChangeNumberDB::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CHANGE_NUMBER for HBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	Changes the number of fields displayed.
+ *              
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_CHANGE_NUMBER
+{
+    VMBlockHandle	vmbh;
+    VMMapStruct		*VMmapPtr;
+    MemHandle		mh;
+    word		newNumFields;
+
+
+    /* get the user's input */
+    newNumFields = @call NumberToShow::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+    /* are there fewer fields? */
+    if (newNumFields < numFields)  {
+       /* yup - ask if they want to delete data */
+       if (AckDBox(NULL, @DelDataMsg) == ACK_YES) {
+	  /* call the delete field routine */
+	  DeleteField(newNumFields);
+	  }
+
+       }
+
+    numFields = newNumFields;
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(HBFile);
+    VMmapPtr = VMLock(HBFile, vmbh, &mh);
+
+    /* store the new number of fields*/
+    VMmapPtr->VMS_numFields = numFields;
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* Show the fields */
+    @call process::MSG_DISPLAY_FIELDS(numFields);
+
+    /* update field data - if any */
+    if (numRecords == 0) return;  /* no records */
+    if (currentRecord == numRecords) return;  /* new record showing */
+    ShowData();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DISPLAY_NAMES for HBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	Displays the field names.
+ *              
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_DISPLAY_NAMES
+{
+    VMBlockHandle	vmbh;
+    VMMapStruct		*VMmapPtr;
+    MemHandle		mh;
+
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(HBFile);
+    VMmapPtr = (VMMapStruct *) VMLock(HBFile, vmbh, &mh);
+
+    /* display the field names */
+    @call Field1::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn1,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 2)
+       @call Field2::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn2,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 3)
+       @call Field3::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn3,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 4)
+       @call Field4::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn4,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 5)
+       @call Field5::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn5,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 6)
+       @call Field6::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn6,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 7)
+       @call Field7::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn7,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 8)
+       @call Field8::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn8,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 9)
+       @call Field9::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn9,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 10)
+       @call Field10::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    VMmapPtr->VMS_fn10,
+		    VUM_DELAYED_VIA_APP_QUEUE);
+  
+    VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DISPLAY_FIELDS for HBaseProcessClass
+ *              (int number)
+ *
+ * DESCRIPTION:	Displays the proper number of fields.
+ *              
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_DISPLAY_FIELDS
+{
+    Boolean		isUsable;
+
+
+    /* display the fields */
+    if (number <= 1) {
+       isUsable = @call Field2::MSG_GEN_GET_USABLE();
+       if (isUsable) 
+	  @send Field2::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       isUsable = @call Field2::MSG_GEN_GET_USABLE();
+       if (!isUsable) 
+	  @send Field2::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+    if (number <= 2) {
+       isUsable = @call Field3::MSG_GEN_GET_USABLE();
+       if (isUsable) 
+	  @send Field3::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       isUsable = @call Field3::MSG_GEN_GET_USABLE();
+       if (!isUsable) 
+	  @send Field3::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+    if (number <= 3) {
+       isUsable = @call Field4::MSG_GEN_GET_USABLE();
+       if (isUsable) 
+	  @send Field4::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       isUsable = @call Field4::MSG_GEN_GET_USABLE();
+       if (!isUsable) 
+	  @send Field4::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+    if (number <= 4) {
+       isUsable = @call Field5::MSG_GEN_GET_USABLE();
+       if (isUsable) 
+	  @send Field5::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       isUsable = @call Field5::MSG_GEN_GET_USABLE();
+       if (!isUsable) 
+	  @send Field5::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+    if (number <= 5) {
+       isUsable = @call Field6::MSG_GEN_GET_USABLE();
+       if (isUsable) 
+	  @send Field6::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       isUsable = @call Field6::MSG_GEN_GET_USABLE();
+       if (!isUsable) 
+	  @send Field6::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+    if (number <= 6) {
+       isUsable = @call Field7::MSG_GEN_GET_USABLE();
+       if (isUsable) 
+	  @send Field7::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       isUsable = @call Field7::MSG_GEN_GET_USABLE();
+       if (!isUsable) 
+	  @send Field7::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+    if (number <= 7) {
+       isUsable = @call Field8::MSG_GEN_GET_USABLE();
+       if (isUsable) 
+	  @send Field8::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       isUsable = @call Field8::MSG_GEN_GET_USABLE();
+       if (!isUsable) 
+	  @send Field8::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+    if (number <= 8) {
+       isUsable = @call Field9::MSG_GEN_GET_USABLE();
+       if (isUsable) 
+	  @send Field9::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       isUsable = @call Field9::MSG_GEN_GET_USABLE();
+       if (!isUsable) 
+	  @send Field9::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+    if (number <= 9) {
+       isUsable = @call Field10::MSG_GEN_GET_USABLE();
+       if (isUsable) 
+	  @send Field10::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       isUsable = @call Field10::MSG_GEN_GET_USABLE();
+       if (!isUsable) 
+	  @send Field10::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+
+    /* force a redraw to get the list
+     * to resize to the new number of fields
+     */
+    @send FieldsGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    @send FieldsGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+}

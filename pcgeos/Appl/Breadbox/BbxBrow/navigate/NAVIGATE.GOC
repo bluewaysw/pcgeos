@@ -1,0 +1,1249 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          navigate.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *		Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+#include <library.h>
+#include <resource.h>
+
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <ansi\stdlib.h>
+#include <geomisc.h>                    /* various unix-like goodies */
+
+@include <fixes.goh>
+
+@include "htmlview.goh"
+#include <htmlfstr.h>
+@include "urlfetch.goh"
+@include <dialogt.goh>
+@include "glbanim.goh"
+@include <sem.h>
+#ifdef UNSUPPORTED_EXTS
+#include "initfile.h"
+#endif
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+@include <parentc.goh>
+extern Boolean G_pcBypassed;
+@endif
+
+@ifdef DIALOG_ERROR
+extern Boolean G_dialogNotice;
+@endif
+
+@extern object HTMLVApp;
+
+@extern object SettingsBoolGroup;
+@extern object homePageName;
+
+@extern object DownloadDlg;
+@extern object DownloadFileSel;
+@extern object DownloadNameText;
+
+@extern object NavigateStop;
+@extern object NavigateStopBut;
+@extern object NavigateStopBut2;
+
+@extern object SpinningLogo ;
+
+@start  HTMLResource, data;
+@ifdef GLOBAL_INTERNET_BUILD
+  @visMoniker Untitled = "WebMagick 3.0";
+@else
+  @visMoniker Untitled = "untitled";
+@endif
+
+  @chunk TCHAR MsgNoEdit[] = _TEXT("No text editor has been defined. \1");
+  @chunk TCHAR MsgBadEdit[] = _TEXT("Invalid file name for text editor. \1");
+  @chunk TCHAR MsgEditInfo[] = _TEXT("From the HTML menu, choose Define Editor "
+                              "to specify a program.");
+  @chunk TCHAR MsgBadFile[] = _TEXT("URL could not be opened for editing.");
+
+@ifdef GLOBAL_INTERNET_BUILD
+  @chunk TCHAR MsgLoading[] = _TEXT("Formatting Page.");
+  @chunk TCHAR MsgLoadCache[] = _TEXT("Loading Page (from Cache).");
+  @chunk TCHAR MsgCaching[] = _TEXT("Storing Page to Cache.");
+@else
+  @chunk TCHAR MsgLoading[] = _TEXT("Formatting Document.");
+  @chunk TCHAR MsgLoadCache[] = _TEXT("Loading Document (from Cache).");
+  @chunk TCHAR MsgCaching[] = _TEXT("Storing Document to Cache.");
+@endif
+  @chunk TCHAR MsgLoadImg[] = _TEXT("Loading Image.");
+
+  @chunk TCHAR MsgNoViewer[] = _TEXT(
+    "<! error1.htm>"
+    "<H1>Unknown resource type</H1>"
+    "There is no driver registered for this URL's resource type.");
+  @chunk TCHAR MsgViewerError[] = _TEXT(
+    "<! error2.htm>"
+    "<H1>Error loading URL driver</H1>"
+    "The driver for this resource type could not be loaded.");
+  @chunk TCHAR MsgLoadError[] = _TEXT(
+    "<! error3.htm>"
+    "<H1>Error Loading File</H1>"
+    "The specificied URL could not be loaded. Please check if the "
+    "file is available and located in the correct directory.");
+  @chunk TCHAR MsgAborted[] = _TEXT(
+    "<! error4.htm>"
+    "<H1>Aborted</H1>"
+    "Loading of the specified URL was aborted.");
+  @chunk TCHAR MsgAuthorize[] = _TEXT(
+    "<! error5.htm>"
+    "<H1>Authroization required</H1>"
+    "Please specify the correct username and/or password for the URL by "
+    "including them as <CODE>username:password\x40hostname</CODE>. For example:"
+    "<PRE>  http://myname:secret\x40www.protected.dom/document.htm</PRE>");
+
+  @chunk TCHAR MsgFileExists[] = _TEXT("File exists! Did you wish to overwrite?");
+  @chunk TCHAR MsgCannotSave[] = _TEXT("File could not be saved to destination.");
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+  @chunk TCHAR MsgLocalPageLimit[] = _TEXT(
+    "A maximum of 15 pages can be stored at the same time. Please delete "
+    "an existing page before saving a new one.");
+@endif
+
+  @chunk TCHAR MsgSavedFile[] = _TEXT(
+    "<! error6.htm><! %s>"
+    "<H1>File successfully saved</H1>"
+    "The file has been saved under the name <CODE>%s</CODE> "
+    "to the location you specified.");
+  @chunk TCHAR MsgMimeAlias[] = _TEXT(
+    "<TITLE>Image Viewer</TITLE><IMG SRC=\"%s\">");
+
+  @chunk TCHAR MsgSubdir[] = _TEXT(
+    "<TITLE>%s</TITLE><H1>Directory Listing</H1>"
+    "<UL><LI><A href=\"..\">up</A></UL>");
+@ifdef COMPILE_OPTION_EARTH_LINK_SUBSCRIBE
+  @chunk TCHAR MsgRegistered[] = _TEXT(
+    "<H1>Registration complete</H1>"
+    "Earthlink subscription information has been transferred.  "
+    "Please reset the machine for the changes to be completed.") ;
+@endif
+  @chunk TCHAR MsgBlank[] = _TEXT("");
+@ifdef GLOBAL_INTERNET_BUILD
+  @chunk TCHAR StatusLineLoading = _TEXT("Loading page.") ;
+  @chunk TCHAR StatusLineDone = _TEXT("Page done.") ;
+@else
+  @chunk TCHAR StatusLineLoading = _TEXT("Loading document.") ;
+  @chunk TCHAR StatusLineDone = _TEXT("Document done.") ;
+@endif
+/* we should never really see this as it is only returned for inline items */
+  @chunk TCHAR MsgConnectionError[] = _TEXT(
+    "<H1>Check connection</H1>"
+    "Could not establish a connection. "
+    "Check Internet settings and phone line.");
+
+  /*
+   * Definitions for the confirmation dialog for "Reset Browser Memory".
+   */
+  @chunk TCHAR MsgClearCache = _TEXT("This will remove all the pages and images "
+                              "currently stored in the memory cache, "
+                              "freeing up disk space for new pages and "
+                              "graphics and for other computer documents.") ;
+  @visMoniker ClearCacheReset = "Empty Cache";
+  @visMoniker ClearCacheDont = "Don't Empty Cache";
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+  @chunk TCHAR MsgPCBlocked[] = _TEXT(
+    "<! error18.htm><! %s>"
+    "<H1>KidGuard: Access denied</H1>"
+    "KidGuard does not allow access to <CODE>%s</CODE>. ");
+@endif
+@ifdef CHECK_ISP
+  @chunk TCHAR MsgNoISP[] = _TEXT(
+@if defined(PRODUCT_NDO2000)
+    "<! error19.htm>"
+    "<H1>Could not establish a connection.</H1>"
+    "<PRE>"
+    "Please check Internet settings and hardware. \r"
+    "Make sure your dial-up configuration is correct. \r"
+    "Make sure your phone line or network cable "
+    "is plugged in and working.\r\r"
+	 "Open Dial-up & Configure.\r"
+    "- Ensure an ISP is entered using Add New ISP from the ISPs menu.\r"
+    "- A default ISP is not selected. Select the ISP you want as\r the "
+    "default ISP and click \'Set as the default ISP\' check box.\r"
+    "</PRE>");
+@else
+    "<! error19.htm>"
+    "<H1>Check Internet settings</H1>"
+    "<PRE>"
+    "There is a problem with the Internet dial-up configuration.\r"
+    "Open Dial-up & Configure.\r"
+    "- Ensure an ISP is entered using Add New ISP from the ISPs menu.\r"
+    "- A default ISP is not selected. Select the ISP you want as the "
+    "default ISP and click \'Set as the default ISP\' check box."
+    "</PRE>");
+@endif
+@endif
+@ifdef EMAIL_ACCT_CMD
+  @chunk TCHAR EmailAcctErr[] = _TEXT(
+    "There was an error with the email account.  Please write "
+    "down the email account name and password and contact customer "
+    "service.\r\rError code: \1");
+@endif
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+  /* should all be in same resource */
+  @chunk TCHAR DownloadProgressFilenameTemplate[] = _TEXT("Downloading \"%s\"");
+  @chunk TCHAR DownloadProgressPercentageTemplate[] = _TEXT("%d%% of %ldK downloaded");
+  @chunk TCHAR DownloadProgressPercentageDecimalTemplate[] = _TEXT("%d.%d%% of %ldK downloaded");
+  @chunk TCHAR DownloadProgressNoPercentageTemplate[] = _TEXT("%ldK downloaded");
+  @chunk TCHAR DownloadProgressTimePastTemplate[] = _TEXT("%d:%02d:%02d");
+  @chunk TCHAR DownloadProgressTimeLeftTemplate[] = _TEXT("%d:%02d:%02d");
+  @chunk TCHAR DownloadProgressNoTimeLeftTemplate[] = _TEXT("-");
+  @chunk TCHAR DownloadProgressFilenameTemplateUpload[] = _TEXT("Uploading \"%s\"");
+  @chunk TCHAR DownloadProgressPercentageTemplateUpload[] = _TEXT("%d%% of %ldK uploaded");
+  @chunk TCHAR DownloadProgressPercentageDecimalTemplateUpload[] = _TEXT("%d.%d%% of %ldK uploaded");
+  @chunk TCHAR DownloadProgressNoPercentageTemplateUpload[] = _TEXT("%ldK uploaded");
+@endif
+@ifdef JAVASCRIPT_SUPPORT
+  @chunk TCHAR MsgScriptError[] = _TEXT("Script error:\r\r\1");
+@ifdef DO_DBCS
+  @chunk TCHAR MsgScriptStatusError[] = _TEXT("Page done...");  /* ellipsis */
+@else
+  @chunk TCHAR MsgScriptStatusError[] = _TEXT("Page done\311");  /* ellipsis */
+@endif
+  @chunk TCHAR MsgRunawayScript[] = _TEXT("A script on this page is running slowly. Do you want to stop the script?");
+@endif
+  @chunk TCHAR UnknownFileString[] = _TEXT("The item cannot be displayed. Do you want to save it instead?");
+@ifdef COMPILE_OPTION_ENABLE_NUMCONN_OPTION
+  @chunk TCHAR MsgChangeRequiresRestart[] = _TEXT("This change will only take affect after restarting Skipper.");
+@endif
+@end    HTMLResource;
+
+
+/***************************************************************************
+ *              LRU list management
+ ***************************************************************************/
+
+void HistoryUpdateLRU(optr frameSet, NameToken name)
+{
+    word i;
+
+    NamePoolUseToken(namePool, name);   /* token will still be referenced after
+                                           returning from this routine */
+
+    for(i=0; i<HTML_LRUSIZE; i++)       /* check if name already in list */
+      if( LRUBuffer[i].name==name )
+        break;
+
+    if( i>=HTML_LRUSIZE )               /* not found in list? */
+      i = HTML_LRUSIZE-1;               /* last one must fall */
+
+    if( LRUBuffer[i].frameSet )
+    {                                   /* discard entry to be overwritten */
+      FreeArrayNameTokens(LRUBuffer[i].frameSet, namePool,
+        TOKEN_FIELDS_FRAME_REC);
+      LMemFree(LRUBuffer[i].frameSet);
+      NamePoolReleaseToken(namePool, LRUBuffer[i].name);
+                                        /* free memory of doomed entry */
+    }
+
+    for(; i>0; i--)                     /* shift URLs to make room */
+      LRUBuffer[i] = LRUBuffer[i-1];
+
+    LRUBuffer[0].frameSet = frameSet;
+    LRUBuffer[0].name = name;           /* store new URL at top of list */
+}
+
+word HistoryGetEntryNum(void)
+{
+    word i,n=0;
+
+    for(i=0; i<HTML_LRUSIZE; i++)       /* count used entries */
+      if( LRUBuffer[i].frameSet != NAME_POOL_NONE )
+        n++;
+    return n;                           /* return number of entries */
+}
+
+NameToken HistoryGetEntryName(word item)
+{
+    NamePoolUseToken(namePool, LRUBuffer[item].name);
+    return LRUBuffer[item].name;
+}
+
+optr HistoryGetEntryFrames(word item)
+{
+    return LRUBuffer[item].frameSet;
+}
+
+/* Empty all the history items:  LES 10/28/99 */
+void HistoryClear(void)
+{
+    word i ;
+    MemHandle mem ;
+
+    for (i=0; i<HTML_LRUSIZE; i++)  {
+        if(LRUBuffer[i].frameSet)
+        {                                   /* discard entry to be overwritten */
+          FreeArrayNameTokens(LRUBuffer[i].frameSet, namePool,
+            TOKEN_FIELDS_FRAME_REC);
+          mem = OptrToHandle(LRUBuffer[i].frameSet) ;
+          ObjLockObjBlock(mem) ;
+          LMemFree(LRUBuffer[i].frameSet);
+          NamePoolReleaseToken(namePool, LRUBuffer[i].name);
+          LRUBuffer[i].frameSet = NullHandle ;
+          LRUBuffer[i].name = NAME_POOL_NONE ;
+          MemUnlock(mem) ;
+        }
+    }
+}
+
+/***************************************************************************
+ *      Handling of MIME types / graphics
+ ***************************************************************************/
+
+SemaphoreHandle MimeDriverSemaphore = NullHandle;
+TCHAR lastMimeName[FILE_LONGNAME_BUFFER_SIZE];
+GeodeHandle lastMimeDriver = NullHandle;
+
+void IdentifyMimeType(TCHAR *name, TCHAR *mimeType)
+{
+    TCHAR *p, curExt[4];
+
+    *mimeType = 0;                      /* default: not found anything */
+
+    p = ToolsFindExtension(name);       /* find last dot indicating extension */
+    if(p)                               /* found one */
+    {
+      xstrncpy(curExt,p,4);             /* copy up to three characters */
+      strupr(curExt);                   /* extension should be upper case */
+
+      NameAssocFindAssociation(assocExtType, curExt, mimeType,
+        MIME_MAXBUF*sizeof(TCHAR), TRUE, NULL);       /* find mime type for extension */
+    }
+}
+
+void SuggestMimeExtension(TCHAR *mimeType,TCHAR *ext)
+{
+    *ext = 0;                           /* default: not found anything */
+
+    NameAssocFindAssociation(assocExtType, mimeType, ext, 4*sizeof(TCHAR), FALSE, NULL);
+                                        /* find extension for mime type */
+}
+
+void LoadNewMimeDriver(TCHAR *driver)
+{
+    GeodeLoadError err;
+
+    if(lastMimeDriver)                  /* release old driver */
+      GeodeFreeLibrary(lastMimeDriver);
+
+    xstrncpy(lastMimeName, driver, sizeof(lastMimeName)/sizeof(TCHAR));
+                                        /* remember driver type */
+
+    FileSetCurrentPath(SP_IMPORT_EXPORT_DRIVERS, _TEXT("."));
+    err = -1;                           /* this is not an error code */
+    lastMimeDriver = GeodeUseLibrary(
+        driver,
+        MIME_DRV_PROTOMAJOR,
+        MIME_DRV_PROTOMINOR, &err);     /* load import library */
+
+    /* Check for result of GeodeLoad - checking the contents of err is
+       necessary because at least some versions of Geos will not return
+       NullHandle if GeodeLoad fails. */
+
+    if(err != -1)
+      lastMimeDriver = NullHandle;
+}
+
+optr SaveUnknownFile(TCHAR *file, NameToken url)
+{
+    Boolean      repeatRequest, doSave;
+    FileLongName saveFile;
+    PathName     savePath;
+    DiskHandle   hDisk;
+    FileHandle   hFile;
+    TCHAR         *filename, *ext, *defaultExtension;
+    TCHAR         urlbuf[HTML_STATIC_BUF], *urlp;
+    optr         ret;
+    word         i;
+    InteractionCommand res;
+
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+    /* done loading */
+    @SendUpdateProgress(PI_DONE, 0);
+@endif
+
+    /* ask if user wants to save it (don't use filename since it could be non-
+       human readable */
+    MemLock(OptrToHandle(@UnknownFileString));
+    res = UserStandardDialog(0, 0, 0, 0, LMemDeref(@UnknownFileString),
+			     (CDT_WARNING<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_AFFIRMATION<<CDBF_INTERACTION_TYPE_OFFSET));
+    MemUnlock(OptrToHandle(@UnknownFileString));
+    if (res != IC_YES) return NullOptr;
+
+    /* Determine where the file name and extension are in the whole thing */
+    defaultExtension = ToolsFindExtension(file);
+
+    NamePoolCopy(namePool, urlbuf, sizeof(urlbuf), url, &urlp);
+
+    /* Find the filename from the end. */
+    for (i=strlen(urlp)-1; i != ((word)-1); i--)
+    {
+      if (urlp[i] == '\\' || urlp[i] == '/')
+        break;
+    }
+    filename = urlp + (i + 1);
+
+    /* Change the filename in the dialog box. */
+    @call DownloadNameText::
+      MSG_VIS_TEXT_REPLACE_ALL_PTR(filename, strlen(filename));
+
+    NamePoolDestroyIfDynamic(urlp);
+
+    do {
+      /* Assume that the user will not want to be asked for a */
+      /* download location and file over and over */
+      repeatRequest = doSave = FALSE ;
+
+      /* Ask where to store this file. */
+      if(UserDoDialog(@DownloadDlg) != IC_OK)
+        break;
+
+      /* get disk handle. */
+      hDisk = @call DownloadFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+      /* get path name. */
+      @call DownloadFileSel::MSG_GEN_PATH_GET(savePath, PATH_BUFFER_SIZE);
+
+      /* get file name. */
+      @call DownloadNameText::MSG_VIS_TEXT_GET_ALL_PTR(saveFile);
+
+
+      if(*saveFile)                     /* re-ask if no file name entered. */
+      {
+        // add default extension or truncate extension if necessary
+        ext = strchr(saveFile, '.');
+        if(ext)                         /* extension specified? */
+        {
+#ifndef GLOBAL_INTERNET_BUILD  /* allow DOS longnames */
+          if(strlen(ext)>4)             /* yes: truncate oversized extensions */
+            ext[4] = 0;
+#endif
+        }
+        else                            /* no: add default extension, if any */
+        {
+          if(defaultExtension && *defaultExtension &&
+            strlen(saveFile)+strlen(defaultExtension)+2<sizeof(saveFile))
+              strcat(strcat(saveFile, _TEXT(".")), defaultExtension);
+        }
+
+        /* Does the file exist? */
+        FilePushDir();
+        FileSetCurrentPath(hDisk, (TCHAR *) savePath);
+        hFile = FileOpen((TCHAR *) saveFile, FILE_ATTR_NORMAL | FILE_DENY_NONE);
+        if (hFile)
+        {
+          if(UserStandardDialogOptr(0, 0, 0, 0, @MsgFileExists,
+               (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+                 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+             != IC_YES)
+          {
+            /* User does not want to overwrite */
+            /* Go back to asking the filename name and location */
+            repeatRequest = TRUE ;
+          }
+          else
+            doSave = TRUE;
+
+          /* In all cases, close the opened file. */
+          FileClose(hFile, FALSE) ;
+        }
+        else
+          doSave = TRUE;
+
+        if(doSave)                      /* file should be saved */
+        {
+          if(FileCopy(file, saveFile, 0, 0))
+          {                             /* attempt to move/copy */
+            UserStandardDialogOptr(0, 0, 0, 0, @MsgCannotSave,
+              (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+            repeatRequest = TRUE;       /* failed: notify user, redo */
+          }
+        }
+
+        FilePopDir();
+      }
+      else
+        repeatRequest = TRUE;           /* no filename specified: repeat */
+    } while (repeatRequest == TRUE) ;
+
+    if(doSave) {
+      ret = ToolsFormatMessage(@MsgSavedFile, saveFile);
+@ifdef DIALOG_ERROR
+      G_dialogNotice = TRUE;
+@endif
+    } else
+      ret = NullOptr;                   /* display nothing, stay on page */
+
+    return ret;
+}
+
+dword ImportTextByNative(NameToken url, TCHAR *mtype, TCHAR *file, TCHAR *driver,
+  VMFileHandle vmf, TextAdditionalData *tad, dword *usedMem)
+{
+    dword ret;
+    void *ImportText;
+    GeodeHandle drv;
+    TCHAR urlbuf[HTML_STATIC_BUF], *p;
+
+    ThreadPSem(MimeDriverSemaphore);    /* permission to load/release drivers */
+
+    if(lastMimeDriver==NullHandle || strcmp(driver, lastMimeName))
+    {                                   /* load mime driver if not loaded */
+      LoadNewMimeDriver(driver);        /* load driver for this mime type */
+
+      if(!lastMimeDriver)               /* still no driver loaded */
+      {                                 
+        ThreadVSem(MimeDriverSemaphore);/* finished with drivers  */
+	/* error loading driver, just do nothing (no message returned) */
+	tad->TAD_type = TAD_TYPE_NOP;
+        return 0;                       /* nothing imported */
+      }
+    }
+
+    drv = lastMimeDriver;               /* handle to driver we just loaded */
+    GeodeAddReference(drv);             /* we're using this driver now... */
+
+    ThreadVSem(MimeDriverSemaphore);    /* finished with drivers  */
+
+    ImportText = ProcGetLibraryEntry(drv, MIME_ENTRY_TEXT);
+                                        /* get entry point in library */
+    LOG(LogPrintfLine(">I");)
+
+    NamePoolCopy(namePool, urlbuf, sizeof(urlbuf), url, &p);
+
+    ret = ((pcfm_MimeDrvText *)ProcCallFixedOrMovable_pascal)
+      (p, mtype, file, vmf, tad, G_allocWatcher, usedMem, ImportText);
+                                        /* call library to handle URL */
+
+    NamePoolDestroyIfDynamic(p);
+
+    LOG(LogPrintfLine("<I");)
+
+    GeodeRemoveReference(drv);          /* we're using this driver now... */
+
+    return ret;                         /* pass back return data */
+}
+
+optr AliasUnknownFile(NameToken url)
+{
+    TCHAR urlbuf[HTML_STATIC_BUF], *urlp;
+    optr ret;
+
+    /* create HTML text to embed image reference */
+    NamePoolCopy(namePool, urlbuf, sizeof(urlbuf), url, &urlp);
+    ret = ToolsFormatMessage(@MsgMimeAlias, urlp);
+    NamePoolDestroyIfDynamic(urlp);
+
+    return ret;
+}
+
+optr HandleUnknownType(TCHAR *file, NameToken url, TCHAR *mimeType,
+  VMFileHandle vmf, VMBlockHandle *item, dword *memUsed)
+{
+    PathName driver;
+    optr htmlMsg;
+    dword ret;
+    TextAdditionalData tad;
+
+@ifdef COMPILE_OPTION_EARTH_LINK_SUBSCRIBE
+    if (strcmpi(mimeType, _TEXT("application/x-brother-1-setup")) == 0)  {
+        /* Make sure the old registration file is gone */
+        FileDelete(_TEXT("F:\\GEOWORKS\\DOCUMENT\\reg.txt")) ;
+
+        /* Copy over the real file */
+        FileCopy(file, _TEXT("F:\\GEOWORKS\\DOCUMENT\\REG.TXT"), 0, 0) ;
+
+        ret = ToolsFormatMessage(@MsgRegistered, NULL);
+        return ret ;
+    }
+@endif
+    if(!NameAssocFindAssociation(assocTypeDriver,
+         mimeType, driver, sizeof(driver), TRUE, NULL))
+    {                                   /* see if any driver handles this */
+      htmlMsg = SaveUnknownFile(file, url);
+    }
+    else
+    {
+      ret = ImportTextByNative(url, mimeType, file, driver, vmf, &tad, memUsed);
+
+      switch(tad.TAD_type)
+      {
+        case TAD_TYPE_NOP:              /* do nothing: return nothing... */
+          htmlMsg = 0;
+          *item = 0;
+          break;
+
+        case TAD_TYPE_HTML_OPTR:        /* HTML message in buffer */
+          htmlMsg = (optr)ret;          /* return optr to buffer */
+          *item = 0;
+          break;
+
+        case TAD_TYPE_ITEM:             /* Transfer item */
+          htmlMsg = 0;
+          *item = (VMBlockHandle)ret;
+          break;
+
+        case TAD_TYPE_REQUEST_IMG:      /* Redirect to IMG tag */
+          htmlMsg = AliasUnknownFile(url);
+          break;
+      }
+    }
+
+    return htmlMsg;
+}
+
+void URLDecode(TCHAR *p)
+{
+    TCHAR *q;
+
+    q = p;
+    while (*p) {
+	if (*p == '%') {
+	    int c;
+	    p++;
+	    if (*p >= '0' && *p <= '9') {
+		c = (*p-'0') * 16;
+	    } else if (*p >= 'A' && *p <= 'F') {
+		c = ((*p-'A')+10) * 16;
+	    } else if (*p >= 'a' && *p <= 'f') {
+		c = ((*p-'a')+10) * 16;
+	    }
+	    p++;
+	    if (*p >= '0' && *p <= '9') {
+		c += *p-'0';
+	    } else if (*p >= 'A' && *p <= 'F') {
+		c += (*p-'A')+10;
+	    } else if (*p >= 'a' && *p <= 'f') {
+		c += (*p-'a')+10;
+	    }
+	    p++;
+	    *q++ = (char)c;
+	} else if (*p == '+') {
+	    *q++ = ' ';
+	    p++;
+	} else {
+	    *q++ = *p++;
+	}
+    }
+    *q = C_NULL;
+}
+
+@ifdef EMAIL_ACCT_CMD
+
+void IsolateArg(TCHAR *p)
+{
+    TCHAR *q = p;
+
+    if (p) {
+	while (*p && *p!= '&') p++;
+	*p = 0;
+    }
+    URLDecode(q);
+}
+
+void EmailChangeAccount(TCHAR *acctname, Boolean notify)
+{
+    /* set default account in .ini file */
+    InitFileWriteString("mail", "defacct", acctname);
+    if (notify) {
+	/* notify email app */
+	MailSendNotification(MDBCT_ACCOUNT_SELECTED, acctname);
+    }
+}
+
+Boolean EmailClearDefault(TCHAR *acctname)
+{
+    char defAcct[MAIL_NAME_MAX];
+    word defSize;
+    Boolean deleteDefault = FALSE;
+
+    /* delete default if it matches */
+    if (!InitFileReadStringBuffer("mail", "defacct", defAcct, MAIL_NAME_MAX,
+				  &defSize)) {
+	if (strcmp(defAcct, acctname) == 0) {
+	    InitFileDeleteEntry("mail", "defacct");
+	    deleteDefault = TRUE;
+	}
+    }
+    return deleteDefault;
+}
+
+MemHandle G_pendingEmailDelete = 0;
+
+MailAccountError EmailDeleteAccountWithPassword(TCHAR *acctname, TCHAR *password)
+{
+    GeodeHandle gpcmail;
+    optr gpcmailAppObj;
+    MailAccountError mae = MAE_NO_ERROR;
+    PendingEmailDeleteAcctData *deleteData;
+    Boolean deleted = FALSE;
+
+    /* if deleting default, clear it and quit email before deleting acct */
+    /* clear default */
+    EmailClearDefault(acctname);
+    /* shutdown email before actual account deletion */
+    gpcmail = GeodeFind("email   ", GEODE_NAME_SIZE, GA_PROCESS|GA_APPLICATION, 0);
+    if (gpcmail) {
+	gpcmailAppObj = GeodeGetAppObject(gpcmail);
+	if (gpcmailAppObj) {
+	    /* ignore previous one, if any */
+	    if (G_pendingEmailDelete) {
+		MemFree(G_pendingEmailDelete);
+	    }
+	    G_pendingEmailDelete = MemAlloc(
+		sizeof(PendingEmailDeleteAcctData),
+		HF_DYNAMIC, HAF_STANDARD);
+	    if (G_pendingEmailDelete) {
+		deleteData = MemLock(G_pendingEmailDelete);
+		deleteData->geode = gpcmail;
+		strcpy(deleteData->acctname, acctname);
+		strcpy(deleteData->password, password);
+		GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), 0),
+			   MANUFACTURER_ID_GEOWORKS, GCNSLT_APPLICATION);
+		/* no params needed for MSG_META_QUIT to app obj */
+		@send, forceQueue gpcmailAppObj::MSG_META_QUIT();
+		deleted = TRUE;
+	    } else {
+		mae = MAE_MEMORY_ERROR;
+	    }
+	}
+    }
+    if ((mae == MAE_NO_ERROR) && !deleted) {
+	/* delete acct now */
+	mae = MailDeleteAccountWithPassword(acctname, password);
+    }
+    return mae;
+}
+
+void EmailAccountError(MailAccountError mae)
+{
+    TCHAR errCodeString[5];
+
+    sprintf(errCodeString, _TEXT("%d"), mae);
+    MemLock(OptrToHandle(@EmailAcctErr));
+    /* report error */
+    @call application::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+	0, 0,  /* ack msg, optr */
+	0,  /* help context */
+	0,  /* custom triggers */
+	0, errCodeString,  /* args */
+	LMemDeref(@EmailAcctErr),  /* string */
+	(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+    MemUnlock(OptrToHandle(@EmailAcctErr));
+}
+
+/*
+ * passed string can be modified
+ */
+void HandleEmailAcctCmd(TCHAR *emailCmd)
+{
+    TCHAR *args, *name, *pw, *new, *smtp, *pop, *realname;
+    TCHAR acctname[20], *aP, *nP;
+    MailAccountError mae = MAE_NO_ERROR;
+
+    /* find args */
+    args = strchr(emailCmd, '?');
+    if (args) {
+	/* point to args */
+	args++;
+    } else {
+	/* no args, do nothing */
+	return;
+    }
+    name = strstr(args, _TEXT("name="));
+    if (name) {
+	name += 5;
+	/* generate acctname for email app/library */
+	acctname[0] = 0;
+	aP = acctname; nP = name;
+	while (*nP && *nP != '@' && *nP != '&') *aP++ = *nP++; *aP = 0;
+	URLDecode(acctname);
+    }
+    pw = strstr(args, _TEXT("pw="));
+    if (pw) pw += 3;
+    new = strstr(args, _TEXT("new="));
+    if (new) new += 4;
+    smtp = strstr(args, _TEXT("smtp="));
+    if (smtp) smtp += 5;
+    pop = strstr(args, _TEXT("pop="));
+    if (pop) pop += 4;
+    realname = strstr(args, _TEXT("realname="));
+    if (realname) realname += 9;
+    /* parse command */
+    if (strncmp(emailCmd, _TEXT("change?"), 7) == 0) {
+	/* parse arguments: name= & pw= */
+	IsolateArg(pw);
+	if (*acctname && pw && *pw) {
+	    mae = MailVerifyAccountPassword(acctname, pw);
+	    if (mae == MAE_NO_ERROR) {
+		EmailChangeAccount(acctname, TRUE);
+	    }
+	}
+    } else if (strncmp(emailCmd, _TEXT("add?"), 4) == 0) {
+	/* parse arguments: name= & pw= & smtp= & pop= &realname= */
+	IsolateArg(name); IsolateArg(pw); IsolateArg(smtp); IsolateArg(pop); IsolateArg(realname);
+	/* realname is optional */
+	if (name && *name && pw && *pw && smtp && *smtp && pop && *pop && *acctname) {
+	    mae = MailAddAccount(acctname, acctname, pw, name,
+				 realname, smtp, pop,
+				 MAIL_DEFAULT_APP_OPTIONS|MAO_PORTAL_ACCOUNT);
+	    if (mae == MAE_NO_ERROR) {
+		/* portal says: add implies change (MailAddAccout already
+		   sends notification, so we don't need to do it again) */
+		EmailChangeAccount(acctname, FALSE);
+	    }
+	}
+    } else if (strncmp(emailCmd, _TEXT("remove?"), 7) == 0) {
+	/* parse arguments: name= & pw= */
+	IsolateArg(pw);
+	if (*acctname && pw && *pw) {
+	    /* handle account deletion */
+	    mae = EmailDeleteAccountWithPassword(acctname, pw);
+	}
+    } else if (strncmp(emailCmd, _TEXT("changepw?"), 9) == 0) {
+	/* parse arguments: name= & pw= & new= */
+	IsolateArg(pw); IsolateArg(new);
+	if (*acctname && pw && *pw && new && *new) {
+	    mae = MailChangeAccountPassword(acctname, pw, new);
+	}
+    } else if (strncmp(emailCmd, _TEXT("changeinfo?"), 11) == 0) {
+	/* parse arguments: name= & pw= & new= & smtp= & pop= & realname= */
+	IsolateArg(pw); IsolateArg(new); IsolateArg(smtp); IsolateArg(pop); IsolateArg(realname);
+	/* only name and pw and one of the others is required */
+	if (*acctname && pw && *pw && ((new && *new) || (smtp && *smtp) || (pop && *pop) || (realname && *realname))) {
+	    mae = MailChangeAccountInfo(acctname, pw, new, smtp, pop, realname);
+	}
+    }
+    if (mae != MAE_NO_ERROR) {
+	EmailAccountError(mae);
+    }
+}
+
+@endif
+
+/***************************************************************************
+ *      Loading and resolution of URLs in child threads
+ ***************************************************************************/
+
+TCHAR lastURLType[URL_MAX_TYPE];
+GeodeHandle lastURLDriver = NullHandle;
+TCHAR lastURLDriverName[FILE_LONGNAME_LENGTH+1];
+GeodeHandle httpDrv = NullHandle;
+
+/*
+ * Load HTTP driver to keep cookies alive across URL driver changes
+ */
+void InitURLDrivers()
+{
+    PathName driver;
+    GeodeLoadError err = -1;
+
+    if (NameAssocFindAssociation(assocSchemeDriver,
+				 _TEXT("HTTP"), driver, sizeof(driver), TRUE, NULL)) {
+	FileSetCurrentPath(URL_DRV_SP, URL_DRV_DIR);
+	httpDrv = GeodeUseLibrary(driver,
+				  URL_DRV_PROTOMAJOR,
+				  URL_DRV_PROTOMINOR, &err);
+	if (err != -1) {
+	    httpDrv = NullHandle;
+	}
+    }
+}
+
+void DeInitURLDrivers()
+{
+    if (httpDrv) {
+	GeodeFreeLibrary(httpDrv);
+	httpDrv = NullHandle;
+    }
+}
+
+Boolean LoadNewDriver(TCHAR *type)
+{
+    PathName driver;      /* only required temporarily */
+    GeodeLoadError err;
+
+    if(!NameAssocFindAssociation(assocSchemeDriver,
+         type, driver, sizeof(driver), TRUE, NULL))
+    {                                   /* attempt to get driver name */
+      return FALSE;                     /* no drive defined */
+    }
+
+#ifdef DO_DBCS_XXX
+    /* DBCS HACK: limit driver name length */
+    if (strrchr(driver, '\\')) {
+	*(strrchr(driver, '\\')+1+FILE_LONGNAME_LENGTH) = C_NULL;
+    } else {
+	driver[FILE_LONGNAME_LENGTH] = C_NULL;
+    }
+#endif
+
+    strcpy(lastURLType, type);          /* remember URL type */
+
+    if(strcmp(lastURLDriverName, driver) == 0)
+	return TRUE;                    /* driver already loaded */
+    xstrncpy(lastURLDriverName, driver, sizeof(lastURLDriverName)/sizeof(TCHAR));
+
+    if(lastURLDriver) {                   /* release old driver */
+      FlushURLData();
+      GeodeFreeLibrary(lastURLDriver);
+    }
+
+    FileSetCurrentPath(URL_DRV_SP, URL_DRV_DIR);
+    err = -1;                           /* this is not an error code */
+    lastURLDriver = GeodeUseLibrary(
+        driver,
+        URL_DRV_PROTOMAJOR,
+        URL_DRV_PROTOMINOR, &err);      /* load URL driver library */
+
+      /* Check for result of GeodeLoad - checking the contents of err is
+         necessary because at least some versions of Geos will not return
+         NullHandle if GeodeLoad fails. */
+
+    if(err != -1) {
+      lastURLDriver = NullHandle;
+      *lastURLDriverName = C_NULL;
+    }
+
+    return TRUE;                        /* attempted to load driver */
+}
+
+word LoadFILEURL(TCHAR *url, TCHAR *tempname, TCHAR *mime, dword *ret)
+{
+    TCHAR curPathBuf[HTML_STATIC_BUF], *curPath, ext[4];
+    TCHAR *p;
+    word i;
+    FileAttrs fa;
+    word type;
+    Boolean trailingSlash;
+
+                                        /* max size is url */
+    if (!NamePoolInitializeDynamic(curPathBuf, sizeof(curPathBuf), url, &curPath))
+	return URLRequestMakeRet(URL_RET_NO_MEMORY) | URB_RF_NOCACHE;
+    ToolsParseURL(url, NULL, NULL, curPath);
+
+    xstrncpy(tempname, curPath+((*curPath=='/')?1:0), PATH_BUFFER_SIZE/sizeof(TCHAR));
+                                        /* store current filename */
+    NamePoolDestroyIfDynamic(curPath);
+
+    /* convert URL filename back from unencoded format */
+    URLDecode(tempname);
+
+    for(i=0; tempname[i]; i++)          /* normalize slashes */
+      if(tempname[i] == '/')
+        tempname[i] = '\\';
+      else if(tempname[i] == '|')       /* some use this for drive letters */
+        tempname[i] = ':';
+
+    /* remove trailing slash, if any */
+    if(i && tempname[i-1] == '\\')
+    {
+      tempname[i-1] = 0;
+      trailingSlash = TRUE;
+    }
+    else
+      trailingSlash = FALSE;
+
+    if(@call SettingsBoolGroup::
+      MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & HTMLV_TRUNC_NAMES)
+    {                                   /* name truncation enabled */
+      /* truncate extension to 3 characters */
+      p = ToolsFindExtension(tempname); /* identify extension */
+      if(p)                             /* preserve extension, if present */
+        xstrncpy(ext, p, sizeof(ext)/sizeof(TCHAR));
+      else
+        *ext = 0;
+
+      /* truncate filename to 8 characters */
+      p = strrchr(tempname, '\\');      /* find last element */
+      if(p)                             /* go to start of first element */
+        p++;
+      else
+        p = tempname;
+
+      for(i=0; i<8 && p[i] && p[i]!='.'; i++)
+        ;
+
+      p[i] = '.';                       /* truncate name after max. 8 chars */
+      strcpy(p+i+1, ext);               /* add extension */
+    }
+
+    fa = FileGetAttributes(tempname);
+
+    if(0 == ThreadGetError() && (fa & FA_SUBDIR))
+    {
+      if(trailingSlash)
+      {
+        *ret = ToolsFormatMessage(@MsgSubdir, tempname);
+        type = URLRequestMakeRet(URL_RET_MESSAGE);
+                                        /* generated HTML message */
+      }
+      else
+      {
+        strcat(tempname, "\\");         /* append slash and retry */
+        ToolsMakeURL(_TEXT("FILE"), NULL, tempname, url);
+	/* convert URL filename back from unencoded format */
+	URLDecode(tempname);
+        type = URLRequestMakeRet(URL_RET_URL_REDIR);
+                                        /* URL entered by user was modified */
+      }
+    }
+    else
+    {
+      IdentifyMimeType(tempname, mime); /* guess mime type from extension */
+      type = URLRequestMakeRet(URL_RET_FILE) | URB_RF_FILE_REDIR;
+                                        /* not passing back a message */
+    }
+
+    return type;
+}
+
+/*
+ * Redirection: properly redirect name token in *url to new URL specified
+ * in urlP (may be relative).
+ */
+/* urlP must be pointer to dynamic NamePool buffer */
+void RedirectURL(NameToken *url, TCHAR **urlP, NameToken *anchor)
+{
+     TCHAR purl[HTML_STATIC_BUF], *prevURL;
+     NameToken oldURL;
+
+EC_ERROR_IF(!NamePoolIsDynamic(*urlP), -1);
+
+     /* remove any anchor, if any, and return it */
+     /* (can re-use prevURL at this time) */
+     prevURL = strrchr(*urlP, '\x23');
+     if (prevURL) {
+	 /* tokenize anchor (skipping delimiter) */
+	 if (anchor && *(prevURL+1)) {
+	     *anchor = NamePoolTokenize(namePool, prevURL+1, TRUE);
+	 }
+	 /* remove anchor from URL */
+	 *prevURL = C_NULL;
+     }
+
+     NamePoolCopy(namePool, purl, sizeof(purl), *url, &prevURL);
+     /* max possible length is sum of prevURL and *urlP + URL_MAX_TYPE */
+     if (NamePoolResizeDynamic(urlP, (strlen(prevURL)+strlen(*urlP)+URL_MAX_TYPE)*sizeof(TCHAR)))
+	 ToolsMakeURLAbsolute(prevURL, *urlP, *urlP);
+     NamePoolDestroyIfDynamic(prevURL); /* now release buffer, if any */
+
+     /* make sure that *url now refers to the ultimate relocation target */
+     oldURL = *url;
+     *url = NamePoolTokenize(namePool, *urlP, TRUE);
+#if PROGRESS_DISPLAY
+     /* match usage/release in LoadURLToFile */
+     NamePoolUseToken(namePool, *url);
+#endif
+     NamePoolReleaseToken(namePool, oldURL);
+}
+
+void RenameCacheFile(TCHAR *tempname, dword id, TCHAR *curExt)
+{
+     PathName curPath;
+     TCHAR tempname2[13];
+
+     strcpy(curPath, tempname);
+                                        /* store temp name used */
+     CreateTempName(id, curExt, tempname);
+                                        /* final name with path */
+     FileDelete(tempname);              /* Delete old file, if any */
+     sprintf(tempname2, _TEXT("%08lx.%s"), id, curExt);
+                                        /* final cache file name w/o path */
+     FileRename(curPath, tempname2);    /* Rename temporary name to final */
+}
+
+#ifdef UNSUPPORTED_EXTS
+Boolean UnSupportedExt(TCHAR *urlP)
+{
+    Boolean res = FALSE;
+    TCHAR *ext, *unExts, *unExtsEnd;
+    word extLen;
+
+    /* point at extension */
+    ext = strrchr(urlP, C_PERIOD);
+    if (ext > strrchr(urlP, '/')) {
+	ext++;  /* skip period to extension */
+	extLen = strlen(ext);
+    } else {
+	/* last C_PERIOD, not in final component, no extension */
+	ext = NULL;
+    }
+    /* check if in list of unsupported extensions */
+    if (unSupportedExts) {
+	unExts = MemLock(unSupportedExts);
+	if (unExts) {
+	    /* XXX: this doesn't support no-extension as unsupported
+	       extension */
+	    if (ext && extLen) {
+		unExtsEnd = strchr(unExts, C_NULL);
+		while (unExts && *unExts) {
+		    if ((LocalCmpStringsNoCase(ext, unExts, extLen) == 0) &&
+			/* terminated by next entry */
+			((unExts[extLen] == C_SPACE) ||
+			 /* terminated by end of list */
+			 (unExts + extLen == unExtsEnd))) {
+			res = TRUE;
+			break;
+		    }
+		    /* get next unsupported extension */
+		    unExts = strchr(unExts, C_SPACE);
+		    if (unExts) unExts++;  /* skip space, if any */
+		}
+	    }
+	    MemUnlock(unSupportedExts);
+	}
+    }
+    return res;
+}
+#endif
+
+@ifdef CHECK_ISP
+/* ensure access point is available, instead of using AccessPoint
+   library, we'll go straight to .ini file */
+Boolean CheckNoISP(void)
+{
+    word activeAP;
+    Boolean apError = TRUE;
+    TCHAR apCat[20];
+    word datasize;
+
+    if (!InitFileReadInteger("accpnt", "active1", &activeAP)) {
+	if (activeAP) {
+@ifdef DO_DBCS
+	    sprintfsbcs((char *)apCat, "accesspoint%04x", activeAP);
+@else
+	    sprintf(apCat, "accesspoint%04x", activeAP);
+@endif
+	    if (!InitFileReadStringBuffer(apCat, "phone",
+					  apCat, sizeof(apCat), &datasize)) {
+		apError = FALSE;
+	    }
+	}
+    }
+    return apError;
+}
+
+Boolean CheckConnected(void)
+{
+    struct Caveat {
+        /* Used to force the order of the following two items */
+        SocketAddress sa;
+        TcpAccPntResolvedAddress xa; /* Must follow SocketAddress */
+    };
+    struct Caveat ca;
+    word casize = sizeof(TcpAccPntResolvedAddress);
+    MediumAndUnit mau;
+    TCHAR tcpDomain[] = _TEXT("TCPIP");
+    Boolean notConnected;
+
+    ca.sa.SA_port.SP_port = 80;
+    ca.sa.SA_port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    ca.sa.SA_domainSize = sizeof(tcpDomain)-1*sizeof(TCHAR);
+    ca.sa.SA_domain = tcpDomain;
+    ca.sa.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+    ca.xa.TAPRA_linkSize = 3;
+    ca.xa.TAPRA_linkType = LT_ID;
+    ca.xa.TAPRA_accPntID = 1;
+    if (SocketGetAddressMedium(&ca, &mau)) {
+        notConnected = TRUE;
+    } else {
+        notConnected = SocketCheckMediumConnection(tcpDomain,
+                                              &(ca.xa),
+                                              &casize,
+                                              &mau);
+    }
+    return(!notConnected) ;
+}
+@endif
+
+void FlushURLData(void)
+{
+    void *FlushURL;
+
+    if (lastURLDriver) {
+	FlushURL = ProcGetLibraryEntry(lastURLDriver, URL_ENTRY_FLUSH);
+	((pcfm_URLDrvFlush *)ProcCallFixedOrMovable_pascal)(FlushURL);
+    }
+}
+
+/***************************************************************************
+ *              Home page management
+ ***************************************************************************/
+
+/*
+ *  Get home URL.
+ */
+Boolean NavigateGetHome(MemHandle *buf)
+{
+    MemHandle mh;
+    TCHAR *bufP;
+    Boolean ret = FALSE;
+#ifdef SECURE_INI_URLS
+    TCHAR iniHome[] = SECURE_INI_HOME;
+    int secureFlag = 0;
+#endif
+
+    mh = @call homePageName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    bufP = MemLock(mh);
+    ret = (*bufP != 0);
+    MemUnlock(mh);
+#ifdef SECURE_INI_URLS
+    InitFileReadInteger(HTMLVIEW_CATEGORY, SECURE_INI_KEY, &secureFlag);
+    if (secureFlag != SECURE_INI_FLAG) {
+	if (MemReAlloc(mh, strlen(iniHome)+1, HAF_STANDARD)) {
+	    bufP = MemLock(mh);
+	    strcpy(bufP, iniHome);
+	    MemUnlock(mh);
+	    ret = TRUE;
+	} else {
+	    ret = FALSE;
+	}
+    }
+#endif
+    if (!ret && mh) {
+	/* clean-up on error */
+	MemFree(mh);
+	mh = 0;
+    }
+    *buf = mh;
+    return ret;
+}
+
+/*
+ *  Set new home URL.
+ */
+void NavigateSetHome(TCHAR *p)
+{
+    @call homePageName::MSG_VIS_TEXT_REPLACE_ALL_PTR(p, 0);
+#ifdef SECURE_INI_URLS
+    InitFileWriteInteger(HTMLVIEW_CATEGORY, SECURE_INI_KEY, SECURE_INI_FLAG);
+#endif
+}

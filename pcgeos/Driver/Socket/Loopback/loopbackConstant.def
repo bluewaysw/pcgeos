@@ -1,0 +1,188 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Serial/IR communication protocol
+MODULE:		constant definitions
+FILE:		LoopbackConstant.def
+
+AUTHOR:		Steve Jang, May 26, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	9/8/94   	Initial revision
+
+DESCRIPTION:
+	Structures for loopback driver
+		
+	$Id: loopbackConstant.def,v 1.1 97/04/18 11:57:21 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+; CONSTANTS
+;-----------------------------------------------------------------------------
+LOOPBACK_CLIENT_HANDLE			equ	1
+LOOPBACK_THREAD_STACK_SIZE		equ	512
+
+;-----------------------------------------------------------------------------
+; ETYPES
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+; STRUCTURES
+;-----------------------------------------------------------------------------
+LoopbackInfoHeader	struct
+	LIH_lmemHeader	LMemBlockHeader
+	LIH_connection	nptr.LoopbackConnection	; first connection entry
+	LIH_domainName	nptr			; domain name of this driver
+LoopbackInfoHeader	ends
+
+LoopbackConnectionStatus record
+	LCS_dead:1				; cannot transmit data 
+	LCS_pending:1				; pending for DR_SOCKET_ATTACH
+	LCS_reserved:14
+LoopbackConnectionStatus end
+
+LoopbackConnection	struct
+	LC_status		LoopbackConnectionStatus
+	LC_connectionSem	word
+	LC_localPort		word		; used for data link only
+	LC_remotePort		word		; used for data link only
+	LC_remoteConnection	nptr		; remote connection handle
+	LC_next			nptr		; next connection entry
+LoopbackConnection	ends
+
+RegisterSetStruct	struct
+	RSS_ax		word
+	RSS_bx		word
+	RSS_cx		word
+	RSS_dx		word
+	RSS_si		word
+	RSS_di		word
+	RSS_bp		word
+	RSS_es		word
+	RSS_ds		word
+RegisterSetStruct	ends
+
+;-----------------------------------------------------------------------------
+; RESOURCES
+;-----------------------------------------------------------------------------
+LoopbackInfoResource	segment	lmem	LMEM_TYPE_GENERAL, 0
+LoopbackInfoHeader	<
+	{},
+	0,					; there is no connection
+	0
+>
+	dummy		chunk.char	"DUMMY", 0
+
+LoopbackInfoResource	ends
+ForceRef	dummy
+
+;-----------------------------------------------------------------------------
+; IDATA
+;-----------------------------------------------------------------------------
+idata		segment
+
+	DriverTable	SocketDriverInfoStruct <
+			<LoopbackStrategy,
+			<>,
+			DRIVER_TYPE_SOCKET>,
+			0,
+			(mask SDPO_CUSTOM_UI), 
+			0
+	>
+
+	;
+	; client
+	;
+	clientStrategy		fptr.far	0
+	domainHandle		word		0
+	driverType		SocketDriverType 0
+
+idata		ends
+ForceRef DriverTable
+
+;-----------------------------------------------------------------------------
+; UDATA
+;-----------------------------------------------------------------------------
+udata		segment
+
+udata		ends
+
+Resident	segment	resource
+	global	LoopbackStrategy:far
+Resident	ends
+
+;-----------------------------------------------------------------------------
+; MACRO
+;-----------------------------------------------------------------------------
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SCOIndication
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Calls client strategy routine
+PASS:		all registers
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	9/ 7/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SCOIndication	macro
+		mov	ss:[TPD_dataAX], ax
+		mov	ss:[TPD_dataBX], bx
+		push	ds
+		mov	bx, handle dgroup
+		call	MemDerefDS
+		movdw	bxax, ds:clientStrategy
+		pop	ds
+		call	ProcCallFixedOrMovable
+		endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SCOIndication_newThread
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Calls client strategy routine with new thread
+
+PASS:		all registers
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	2/23/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SCOIndicationNew	macro
+	;
+	; Create a buffer to store all the registers
+	;
+		push	ds
+		push	ax, bx, cx
+		mov	ax, size RegisterSetStruct
+		mov	cx, (mask HAF_LOCK) shl 8 or mask HF_SHARABLE or mask HF_SWAPABLE
+		call	MemAlloc	; bx = block handle ; ax = segment
+		mov	ds, ax
+		pop	ds:RSS_ax, ds:RSS_bx, ds:RSS_cx
+		mov	ds:RSS_dx, dx
+		mov	ds:RSS_bp, bp
+		mov	ds:RSS_di, di
+		mov	ds:RSS_si, si
+		mov	ds:RSS_es, es
+		pop	ds:RSS_ds
+		call	MemUnlock
+	;
+	; create a thread and pass in the buffer handle
+	;
+		mov	al, PRIORITY_STANDARD
+		mov	cx, segment LoopbackNewThread
+		mov	dx, offset LoopbackNewThread
+		mov	di, LOOPBACK_THREAD_STACK_SIZE
+		mov	bp, handle 0
+		call	ThreadCreate
+		endm

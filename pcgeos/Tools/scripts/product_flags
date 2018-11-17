@@ -1,0 +1,444 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1995 -- All Rights Reserved
+#
+# PROJECT:	Do not use this anymore - use the perl version
+# MODULE:	Do not use this anymore - use the perl version
+# FILE: 	product_flags
+# AUTHOR: 	Adam de Boor, Feb 23, 1995
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ardeb	2/23/95		Initial Revision
+#
+# DESCRIPTION:
+#	A simple script to produce additional flags for a tool based on the
+#	product being made. This is normally invoked by things in geos.mk.
+#
+#   	The additional flags needed for using the tool to create something
+#   	for the product are echoed to standard output, there to be captured
+#   	by the shell's command substitution mechanism and fed to the tool
+#   	in question.
+#
+# USAGE:
+#	product_flags <tool> <product> [<tool-specific args>]
+#
+#	$Id: product_flags,v 1.46 96/11/19 17:00:48 jacob Exp $
+#
+###############################################################################
+
+# 
+# README README README README README README README README README README 
+# README README README README README README README README README README 
+# README README README README README README README README README README 
+#
+# Do not modify this file.  It has been replaced with
+# /staff/pcgeos/Tools/scripts/perl/product_flags.
+#
+# README README README README README README README README README README 
+# README README README README README README README README README README 
+# README README README README README README README README README README 
+#
+
+case "$-" in *x* ) x=x ;; esac
+
+#
+# Set some defaults for the variables we use at the end of the case:
+#   ht	    = hardware type; will be defined as the value for the HARDWARE_TYPE
+#	      variable (or concatenated to HARDWARE_TYPE_ if the tool doesn't
+#	      do string comparisons of constants in its conditionals)
+#   flags   = flags to pass; in Esp/C syntax
+#   product = name of the product; defaults to passed name, but some things
+#	      override (e.g. to go back to non-xip name)
+#   xip	    = if product is full execute-in-place; set to "yes" if so, but
+#	      initially empty
+#
+ht=PC flags= product=$2 xip= lobj=
+#
+# Now the specific additional flags go into the $flags variable.
+#
+# The case at the end will take care of removing any flags that aren't
+# appropriate for a tool, or transforming them into ones the tool can use. So
+# don't be afraid to put -2 in $flags if it's a DBCS product, or
+# -DSOMETHING=STRING (where STRING is non-numeric) if you need to. The -2 will
+# be removed, and the = converted to _ as appropriate.
+#
+# You can, of course, look at $1 to determine what tool you're producing flags
+# for and base your setting of $flags on that. As you wish...
+#
+
+
+# "preprocess" the product directory name to detect and strip out
+# features that could be applied to any product.  The variable
+# postFlags contains flags for this feature that should be tacked on
+# after we figure out the normal product's flags
+#
+
+postFlags=
+thisFeature=dummyFeature
+while [ "$thisFeature" ] ; do
+    # As long as there are possibly more features to process,
+    # process them.
+    #
+    case "$product" in
+	*SSPROFILE )
+	    # Enable Single-step profiling for this product
+	    postFlags="$postFlags -DSINGLE_STEP_PROFILING=TRUE"
+	    thisFeature=SSPROFILE
+	    ;;
+	*WIN32 )
+	    # Enable Win32 support for this product
+	    postFlags="$postFlags -DWIN32"
+	    thisFeature=WIN32
+	    ;;
+	* )
+	    thisFeature=
+	    ;;
+    esac
+    if [ "$thisFeature" ] ; then
+	case $product in *_$thisFeature) underscore="_";; esac
+	product=`expr $product : '\(.*\)'$underscore$thisFeature$`
+    fi
+    underscore=
+done
+
+#
+# Continue processing the basic product directory
+#
+case "$product" in
+    XIP )
+	xip=yes
+	flags="-DEMM_XIP"
+	;;
+    Bullet )
+    	product=Bullet
+	ht=BULLET
+	;;
+    BulletXIP )
+    	product=Bullet
+	ht=BULLET
+	xip=yes
+	flags="-DBULLET_XIP"
+	;;
+    JediXIP )
+    	product=JEDI
+	ht=JEDI
+	xip=yes
+	flags="-DJEDI_XIP"
+	;;
+    JediXIPDbg )
+    	product=JEDI
+	ht=JEDI
+	xip=yes
+	flags="-DJEDI_XIP -DXIP_DEBUGGING_VERSION=TRUE"
+	;;
+    Jedi )
+    	product=JEDI
+	ht=JEDI
+	;;
+    JEDI )
+	ht=JEDI
+	;;
+    DWP )
+	;;
+    MULTILANG )
+	product=MULTILANG
+	;;
+    NIKE )
+	ht=NIKE
+	;;
+    NIKE_XIP )
+	ht=NIKE_XIP
+	xip=yes
+	;;
+    NIKE_EUROPE )
+	product=NIKE
+	flags="-DNIKE_EUROPE"
+	;;
+    NIKE_UK )
+	product=NIKE
+	flags="-DNIKE_EUROPE -DNIKE_UK"
+	;;
+    NIKE_GERMAN )
+	product=NIKE
+	flags="-DNIKE_EUROPE -DNIKE_GERMAN"
+	;;
+    NIKE_DUTCH )
+	product=NIKE
+	flags="-DNIKE_EUROPE -DNIKE_DUTCH"
+	;;
+    NIKE_GERMAN_XIP )
+	ht=NIKE_XIP
+	product=NIKE_XIP
+	flags="-DNIKE_EUROPE -DNIKE_GERMAN"
+	xip=yes
+	;;
+    NIKE_DUTCH_XIP )
+	ht=NIKE_XIP
+	product=NIKE_XIP
+	flags="-DNIKE_EUROPE -DNIKE_DUTCH"
+	xip=yes
+	;;
+    NIKE_GERMAN_DUTCH )
+	product=NIKE
+	flags="-DNIKE_EUROPE -DNIKE_GERMAN_DUTCH -DNIKE_GERMAN -DNIKE_DUTCH"
+	;;
+    DBCS )
+	flags="-2 -DDO_DBCS"
+	lobj=DBCS
+	;;
+    DBCSXIP )
+	flags="-2 -DDO_DBCS -DEMM_XIP"
+	xip=yes
+	lobj=DBCS
+	;;
+    PIZZA )
+	flags="-2 -DDO_DBCS -DDO_PIZZA"
+	lobj="PIZZA DBCS"
+	;;
+    DOVE )
+	flags="-2 -DDO_DBCS -DDO_DOVE"
+	lobj="DBCS"
+	;;
+    DOVEXIP )
+	flags="-2 -DDO_DBCS -DDO_DOVE -DEMM_XIP"
+	xip=yes
+	lobj="DBCS"
+	;;
+    PCV )
+	flags="-2 -DDO_DBCS -DDO_PIZZA"
+	lobj="PIZZA DBCS"
+	;;
+    Profile )
+	;;
+    ZoomerXIP )
+    	product=Zoomer
+	ht=ZOOMER
+	xip=yes
+	flags="-DZOOMER_XIP"
+	;;
+    Zoomer )
+    	ht=ZOOMER
+	;;
+    RESPG2 )
+	lobj="RESPONDER"
+	product="RESPONDER"
+	ht="RESPG2"
+	;;
+    RESPG2XIP )
+    	xip=yes
+	lobj="RESPONDER"
+	product="RESPONDER"
+	ht="RESPG2"
+	;;
+    RESPONDER )
+    	lobj="RESPONDER"
+	ht="RESPONDER"
+    	;;
+    RESPXIP_SF)
+	# for ease in creating a "send-forever" version of the mailbox library
+	# for responder testing
+	ht="RESPONDER"
+	lobj="RESPONDER"
+	product="RESPONDER"
+	flags="-DRESP_XIP -DPERPETUAL_SEND"
+	xip=yes
+	;;
+    RESPONDER_SF)
+	# for ease in creating a "send-forever" version of the mailbox library
+	# for responder testing
+	ht="RESPONDER"
+	lobj="RESPONDER"
+	product="RESPONDER"
+	flags="-DRESP_XIP -DPERPETUAL_SEND"
+	;;
+    RESPDEMO )
+	lobj="RESPONDER"
+	product="RESPONDER"
+	;;	
+    RESPDEMOXIP )
+    	xip=yes
+	flags="-DEMM_XIP"
+	lobj="RESPONDER"
+	product="RESPONDER"
+	;;	
+    RESPXIP )
+	ht="RESPONDER"
+	lobj="RESPONDER"
+	product="RESPONDER"
+	flags="-DRESP_XIP"
+	xip=yes
+	;;
+    RESPXIPDBG )
+	ht="RESPONDER"
+	lobj="RESPONDER"
+	product="RESPONDER"
+	flags="-DRESP_XIP -DXIP_DEBUGGING_VERSION=TRUE"
+	xip=yes
+	;;
+    LAPTOP )
+	;;
+    Gulliver )
+	ht=GULLIVER
+	;;
+    GulliverXIP )
+	xip=yes
+	ht=GULLIVER
+	flags="-DGULLIVER_XIP"
+	product=Gulliver
+	;;
+    PENELOPE )
+	ht=PENELOPE
+	lobj="PENELOPE"
+	;;
+    PENEXIP )
+	ht="PENELOPE"
+	lobj="PENELOPE"
+	product="PENELOPE"
+	flags="-DPENE_XIP -DPENELOPE_XIP"
+	xip=yes
+	;;
+    PENEXIPDBG )
+	ht="PENELOPE"
+	lobj="PENELOPE"
+	product="PENELOPE"
+	flags="-DPENE_XIP -DPENELOPE_XIP -DXIP_DEBUGGING_VERSION=TRUE"
+	xip=yes
+	;;
+    BOR1 )
+	ht=BOR1
+	lobj="BOR1"
+	;;
+    FULL_SCREEN | "" )
+    	# default non-product...
+	;;
+    *XIP)
+	# If we have a miscellaneous XIP target, try to use some default
+	# rules to get the right behavior.
+
+	# Create rootname which contains everything but the XIP or _XIP,
+	# all in lower case.  This is used to create the other variables.
+	case $product in *_XIP) underscore="_";; esac
+	rootname=`expr $product : '\(.*\)'$underscore'XIP$' | tr 'A-Z' 'a-z'`
+
+	xip=yes
+	ht=`echo $rootname | tr 'a-z' 'A-Z'`
+	flags="-D${ht}_XIP"
+	product=`expr $ht : '\(.\)'``expr $rootname : '.\(.*\)$'`
+	;;
+    *DBCS)
+	# If we have a miscellaneous DBCS target, try to use some default
+	# rules to get the right behavior.
+
+	# Create rootname which contains everything but the DBCS or _DBCS,
+	# all in lower case.  This is used to create the other variables.
+	case $product in *_DBCS) underscore="_";; esac
+	rootname=`expr $product : '\(.*\)'${underscore}DBCS | tr 'A-Z' 'a-z'`
+
+	lobj=DBCS
+	ht=`echo $rootname | tr 'a-z' 'A-Z'`
+	flags="-2 -DDO_DBCS"
+	product=`expr $ht : '\(.\)'``expr $rootname : '.\(.*\)$'`
+	;;
+    * )
+#	no more warnings.. so don't forget to add new products, bucko.
+#    	echo warning: $0: unknown product \"$product\" 1>&2
+	;;
+esac
+
+flags="$flags $postFlags"
+#
+# Now put out the flags in the proper format for the tool:
+#
+#   esp:    can handle string comparison in conditionals, so we
+#	    define PRODUCT and HARDWARE_TYPE to contain the strings
+#	    in our $product and $ht variables. FULL_EXECUTE_IN_PLACE
+#	    we set to TRUE if $xip is non-empty
+#
+#   glue, uic:
+#   	    can only check for things being defined, so append $product
+#	    to PRODUCT_ and $ht to HARDWARE_TYPE_. FULL_EXECUTE_IN_PLACE
+#	    just gets defined, if $xip is non-empty.
+#
+#   highc, goc:
+#   	    like glue and uic, but also doesn't know what to do with the -2
+#	    flag, so strip that out
+#
+#   loc:
+#   	    only understands about the -2 flag, no -D flags
+#
+case $1 in
+    esp )
+    	if [ "$xip" ]; then
+	    flags="$flags -DFULL_EXECUTE_IN_PLACE=TRUE -D_FXIP=TRUE"
+    	else
+	    flags="$flags -D_FXIP=FALSE"
+    	fi
+
+        echo -DPRODUCT=$product $flags -DHARDWARE_TYPE=$ht
+    	;;
+    highc | goc )
+    	if [ "$xip" ]; then
+	    flags="$flags -DFULL_EXECUTE_IN_PLACE"
+    	fi
+    	set -$x -DPRODUCT_$product $flags -DHARDWARE_TYPE_$ht
+	for i do
+	    case $i in
+	    	-2) 	: do nothing
+		    	;;
+		-D*=[A-Za-z]*)
+		    	echo -n "$i " | tr = _
+			;;
+    	    	*)  	echo -n "$i "
+		    	;;
+    	    esac
+    	done
+	echo
+    	;;
+    glue )
+    	if [ "$xip" ]; then
+	    flags="$flags -DFULL_EXECUTE_IN_PLACE"
+    	fi
+    	echo -DPRODUCT_$product $flags -DHARDWARE_TYPE_$ht
+	#
+	# Put out the -L flag for product-specific .ldf files.
+	# $3 is the development include directory, $4 is the installed
+	# ldf directory. $lobj is the set of product names to use...
+	#
+	if [ "$lobj" ]; then
+	    for l in $lobj; do
+		echo -L$3/$l -L$4/$l
+	    done
+	fi
+	#
+	# Tell Glue where to put the .ldf file, if subdir exists. (Some
+	# geodes are entirely product-specific and so we'll have the
+	# product name, but no subdir for ldf or rsc files...)
+	#
+	if [ "$product" -a -d "$product" ]; then
+	    echo -F$product
+	fi
+	;;
+    uic )
+    	if [ "$xip" ]; then
+	    flags="$flags -DFULL_EXECUTE_IN_PLACE"
+    	fi
+    	echo -DPRODUCT_$product $flags -DHARDWARE_TYPE_$ht
+	;;
+    loc )
+	for i in $flags; do
+	    case $i in
+	    	-D*)	: do nothing
+		    	;;
+    	    	*)  	echo -n "$i "
+		    	;;
+    	    esac
+    	done
+	echo
+    	;;
+esac
+
+
+

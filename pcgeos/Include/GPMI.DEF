@@ -1,0 +1,125 @@
+; GPMI Services
+
+
+GPMIInfoType etype word
+; Size of largest free block (in bytes)
+GPMI_INFO_LARGEST_FREE_BLOCK		enum	GPMIInfoType
+
+; Size of one page (in bytes)
+GPMI_INFO_SIZE_PAGE			enum	GPMIInfoType
+
+; Number of linear memory pages available
+GPMI_INFO_SIZE_NUM_LINEAR_PAGES		enum	GPMIInfoType
+
+; Returns number of pages in paging file
+GPMI_INFO_SIZE_PAGING_FILE		enum	GPMIInfoType
+
+
+; Flags returned by GPMIMakePresent
+GPMI_MAKE_PRESENT_ORIGINALLY_DATA_BLOCK	= 0
+GPMI_MAKE_PRESENT_ORIGINALLY_CODE_BLOCK	= 1
+
+; The following maps one to one to the vector table.  Use
+; the following assembly to call the GPMI:
+;     call [GPMIVectorTable][GPMI_CALL_xxx]
+
+GPMICallType etype word, 0, size fptr
+GPMI_CALL_STARTUP       		enum	GPMICallType
+GPMI_CALL_ALLOCATE_BLOCK		enum	GPMICallType
+GPMI_CALL_FREE_BLOCK			enum	GPMICallType
+GPMI_CALL_RESIZE_BLOCK			enum	GPMICallType
+GPMI_CALL_ALIAS				enum	GPMICallType
+GPMI_CALL_FREE_ALIAS			enum	GPMICallType
+GPMI_CALL_CONVERT_TO_CODE_BLOCK		enum	GPMICallType
+GPMI_CALL_ACCESS_REAL_SEGMENT		enum	GPMICallType
+GPMI_CALL_GET_EXCEPTION_HANDLER		enum	GPMICallType
+GPMI_CALL_SET_EXCEPTION_HANDLER		enum	GPMICallType
+GPMI_CALL_GET_INTERRUPT_HANDLER		enum	GPMICallType
+GPMI_CALL_SET_INTERRUPT_HANDLER		enum	GPMICallType
+GPMI_CALL_MAP_PHYSICALL_ADDRESS		enum	GPMICallType
+GPMI_CALL_GET_DESCRIPTOR		enum	GPMICallType
+GPMI_CALL_SET_DESCRIPTOR		enum	GPMICallType
+GPMI_CALL_GET_INFO			enum	GPMICallType
+GPMI_CALL_MAKE_NOT_PRESENT		enum	GPMICallType
+GPMI_CALL_MAKE_PRESENT			enum	GPMICallType
+GPMI_CALL_ALLOCATE_NOT_PRESENT_BLOCK	enum	GPMICallType
+GPMI_CALL_RELEASE_SEGMENT_ACCESS   	enum	GPMICallType
+GPMI_CALL_IS_SELECTOR_16_BIT		enum	GPMICallType
+GPMI_CALL_SELECTOR_GET_LIMIT		enum	GPMICallType
+GPMI_CALL_SELECTOR_CHECK_LIMITS		enum	GPMICallType
+
+GPMIExceptionType etype byte, 0, size byte
+GPMI_EXCEPTION_DIVIDE_BY_ZERO		enum	GPMIExceptionType
+GPMI_EXCEPTION_DEBUG			enum	GPMIExceptionType
+GPMI_EXCEPTION_NMI			enum	GPMIExceptionType
+GPMI_EXCEPTION_BREAKPOINT		enum	GPMIExceptionType
+GPMI_EXCEPTION_INTO_OVERFLOW		enum	GPMIExceptionType
+GPMI_EXCEPTION_BOUND_RANGE_EXCEEDED	enum	GPMIExceptionType
+GPMI_EXCEPTION_INVALID_OPCODE		enum	GPMIExceptionType
+GPMI_EXCEPTION_NO_COPROCESSOR		enum	GPMIExceptionType
+GPMI_EXCEPTION_DOUBLE_FAULT		enum	GPMIExceptionType
+GPMI_EXCEPTION_COPROCESSOR_SEG_OVERRUN	enum	GPMIExceptionType
+GPMI_EXCEPTION_INVALID_TSS		enum	GPMIExceptionType
+GPMI_EXCEPTION_SEGMENT_NOT_PRESENT	enum	GPMIExceptionType
+GPMI_EXCEPTION_STACK_FAULT		enum	GPMIExceptionType
+GPMI_EXCEPTION_GENERAL_PROTECTION_ERROR	enum	GPMIExceptionType
+GPMI_EXCEPTION_PAGE_FAULT		enum	GPMIExceptionType
+GPMI_EXCEPTION_RESERVED			enum	GPMIExceptionType
+GPMI_EXCEPTION_COPROCESSOR_ERROR	enum	GPMIExceptionType
+
+PMCodeFlags     record
+        PMCF_granularity:1              ; 0=limit in bytes, 1=limit multiplied by 4096
+        PMCF_code32:1                   ; 0=16-bit code, 1=32-bit code
+        PMCF_reserved:1                 ; always 0
+        PMCF_available:1                ; General bit (for GEOS, we don't use it, leave it alone)
+        PMCF_limit:4                    ; bits 16 - 19 of limit
+
+        PMCF_present:1                  ; 1=segment present, 0=segment not present
+        PMCF_DPL:2                      ; Data priviledge level
+        PMCF_system:1                   ; 0=system segment (call gates, etc.), 1=data segment
+                                        ;   (should always be 1 for a data selector)
+        PMCF_dataOrCode:1               ; 0=data, 1=code  (Should be 0)
+        PMCF_conforming:1               ; 0=non-conforming, 1=conforming
+        PMCF_readable:1                 ; 0=execute only, 1=execute and readable
+        PMCF_accessed:1                 ; 0=not accessed, 1=accessed (since last cleared)
+PMCodeFlags     end
+
+PMCodeDescriptor        struct
+        PMCD_limit      word
+        PMCD_base       word
+        PMCD_base16     byte
+        PMCD_flags      PMCodeFlags
+        PMCD_base24     byte
+PMCodeDescriptor        ends
+
+PMDataFlags     record
+        PMDF_granularity:1              ; 0=limit in bytes, 1=limit multiplied by 4096
+        PMDF_stackSPSize:1              ; 0=16-bit stack (only SP), 1=32-bit (full ESP)
+        PMDF_reserved:1                 ; always 0
+        PMDF_available:1                ; General bit (for GEOS, we don't use it, leave it alone)
+        PMDF_limit:4                    ; bits 16 - 19 of limit
+
+        PMDF_present:1                  ; 1=segment present, 0=segment not present
+        PMDF_DPL:2                      ; Data priviledge level
+        PMDF_system:1                   ; 0=system segment (call gates, etc.), 1=data segment
+                                        ;   (should always be 1 for a data selector)
+        PMDF_dataOrCode:1               ; 0=data, 1=code  (Should be 0)
+        PMDF_expandDown:1               ; Limit goes up or down.  For data, always 0
+        PMDF_writeEnable:1              ; 1=read/write, 0=read only
+        PMDF_accessed:1                 ; 0=not accessed, 1=accessed (since last cleared)
+PMDataFlags     end
+
+PMDataDescriptor        struct
+        PMDD_limit      byte                 ; bits 0 - 15 of limit
+        PMDD_base       word                 ; bits 0 - 15 of base address
+        PMDD_base16     byte                 ; bits 16-23 of base address
+        PMDD_flags      PMDataFlags 
+        PMDD_base24     byte                 ; bits 24-31 of base address
+PMDataDescriptor        ends
+
+PMDescriptor    union
+        PMD_code        PMCodeDescriptor        
+        PMD_data        PMDataDescriptor        
+PMDescriptor    end
+
+

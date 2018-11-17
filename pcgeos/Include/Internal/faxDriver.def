@@ -1,0 +1,509 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1994.  All rights reserved.
+			GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		class1fax.def
+
+AUTHOR:		Steve Kertes, Dec 16, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SK	12/16/94   	Initial revision
+
+
+DESCRIPTION:
+
+	all the common fax definitions needed for the in and out drivers
+		
+	the class1 and class2 in/out drivers all include this file, so be
+	careful if you change things....  :)
+
+	$Id: faxDriver.def,v 1.1 97/04/04 14:14:54 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetDef __FAXDVR
+
+; This PASTA variable exists in order to get the Geos 2.0 PASTA fax
+; solution to compile under 3.0
+ifndef	PASTA
+	PASTA	equ	0
+endif
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;	Class1 Frame Stuff 	;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; /* FROM tx to rx  pg 110 t.30 */
+
+Class1FrameAddress	etype	byte
+ADDRESS_FIELD		enum Class1FrameAddress, 0xFF	; precedes all frames
+
+Class1FrameControl	etype	byte
+CONTROL_FIELD_NON_FINAL enum Class1FrameControl, 0x03	; not last frame
+CONTROL_FIELD_FINAL     enum Class1FrameControl, 0x13	; last frame
+
+ADD_DIS_MASK	equ	0x01				; add _DIS to FrameType
+STRIP_DIS_MASK	equ	0xFE				; remove _DIS
+
+Class1FrameType		etype	byte
+DIS_NODIS	enum	Class1FrameType, 128
+CSI		enum	Class1FrameType, 64
+TSI_DIS     	enum	Class1FrameType, 67
+DCN_NODIS	enum	Class1FrameType, 250
+DCN_DIS		enum	Class1FrameType, 251
+DCS_DIS		enum	Class1FrameType, 131
+DCS_NODIS	enum	Class1FrameType, 130
+
+;
+; pre message response signals (receiver to transmitter)
+;
+CFR_DIS		enum	Class1FrameType, 133	; confirm receive
+CFR_NODIS	enum	Class1FrameType, 132	; confirm receive
+FTT_DIS     	enum	Class1FrameType, 69	; fail to train
+FTT_NODIS     	enum	Class1FrameType, 68	; fail to train
+
+;
+; post page messages (transmitter to receiver)
+;
+MPS_DIS		enum	Class1FrameType, 79
+EOM_DIS		enum	Class1FrameType, 143
+EOM_NODIS	enum	Class1FrameType, 142
+EOP_DIS		enum	Class1FrameType, 47
+EOP_NODIS	enum	Class1FrameType, 46
+PPS_NULL_DIS	enum	Class1FrameType, 0
+PRI_MPS_DIS	enum	Class1FrameType, 95
+PRI_EOM_DIS	enum	Class1FrameType, 159
+PRI_EOP_DIS	enum	Class1FrameType, 63
+
+;
+; ECM STUFF
+;
+PPS_DIS		enum	Class1FrameType, 0xbf	; ECM, Partial Page Signal
+PPR_NODIS	enum	Class1FrameType, 0xbc	; ECM, Partial Page Request
+
+EOR_DIS		enum	Class1FrameType, 0xcf	; ECM, End Of Retransmission
+ERR_NODIS	enum	Class1FrameType, 0x1c	; ECM, EOR response
+
+RR_DIS		enum	Class1FrameType, 0x6f	; ECM, Receiver Ready?
+RNR_NODIS	enum	Class1FrameType, 0xec	; ECM, Receiver Not Ready.
+
+CTC_DIS		enum	Class1FrameType, 0x31	; ECM, Continue To Correct
+CTR_NODIS	enum	Class1FrameType, 0xc4	; ECM, Confirm CTC
+
+;
+; post page message responces (receiver to transmitter)
+;
+MCF_NODIS	enum	Class1FrameType, 140	; msg confirmed
+RTP_NODIS	enum	Class1FrameType, 204	; retrain, positive
+RTN_NODIS	enum	Class1FrameType,  76	; retrain, negative
+PIP_NODIS	enum	Class1FrameType, 172	; procedure interrupt, postive
+PIN_NODIS	enum	Class1FrameType,  44	; procedure interrupt, negative
+
+;
+; the bit order on the next two frames is reversed from all the others,
+; but that's ok.
+;
+FCD_FCF		enum	Class1FrameType, 60h	; ECM frame, image data
+RCP_FCF		enum	Class1FrameType, 61h	; ECM frame, return to control
+
+HDLCHeader		struct
+	HDLCH_address	byte			; ADDRESS_FIELD
+	HDLCH_control	byte			; CONTROL_FIELD_{NON_}FINAL
+	HDLCH_type	byte			; TSI, CSI, DIS, DCS...
+HDLCHeader		ends
+
+;
+; do NOT make the CSI frame DBCS!!!!
+;
+CSI_STRING_SIZE		equ	20
+CSIStringBuffer		type	CSI_STRING_SIZE dup (char)
+
+CSI_Frame		struct
+	CSIF_head	HDLCHeader
+	CSIF_string	CSIStringBuffer			; bytes are reversed
+CSI_Frame		ends
+
+;
+; do NOT make the TSI fram DBCS!!!!
+;
+TSI_STRING_SIZE		equ	20
+TSIStringBuffer		type	TSI_STRING_SIZE dup (char)
+
+TSI_Frame		struct
+	TSIF_head	HDLCHeader
+	TSIF_string	TSIStringBuffer			; bytes are reversed
+TSI_Frame		ends
+
+
+DCS_INFO_BUFFER_SIZE	equ	4
+DCSInfoBuffer		type	DCS_INFO_BUFFER_SIZE dup (byte)
+DCS_Frame		struct
+	DCSF_head	HDLCHeader
+	DCSF_info	DCSInfoBuffer			; opaque data
+DCS_Frame		ends
+
+
+DIS_INFO_BUFFER_SIZE	equ	4
+DISInfoBuffer		type	DIS_INFO_BUFFER_SIZE dup (byte)
+DIS_Frame		struct
+	DISF_head	HDLCHeader
+	DISF_info	DISInfoBuffer			; opaque data
+DIS_Frame		ends
+
+FTT_Frame		struct
+	FTTF_head	HDLCHeader
+FTT_Frame		ends
+	
+;
+; Facsimile coded data frames come in two sizes:
+;
+
+FCD64_IMAGE_BUFFER_SIZE		equ	64
+FCD256_IMAGE_BUFFER_SIZE	equ	256
+
+FCDImageBuffer64	type	FCD64_IMAGE_BUFFER_SIZE dup (byte)
+FCDImageBuffer256	type	FCD256_IMAGE_BUFFER_SIZE dup (byte)
+
+FCD_Frame		struct
+	FCDF_head	HDLCHeader
+	FCDF_id		byte
+FCD_Frame		ends
+
+FCD_Frame64		struct
+	FCDF64_head		HDLCHeader
+	FCDF64_id		byte
+	FCDF64_imageData	FCDImageBuffer64
+FCD_Frame64		ends
+
+FCD_Frame256		struct
+	FCDF256_head		HDLCHeader
+	FCDF256_id		byte
+	FCDF256_imageData	FCDImageBuffer256
+FCD_Frame256		ends
+
+;
+; a PPS frame is the ECM version of the regular PPM frame
+;
+PPS_Frame		struct
+	PPSF_head	HDLCHeader
+	PPSF_ppm	Class1FrameType		; a PPM type, we hope :)
+	PPSF_page	byte			; page count	  (mod 256)
+	PPSF_block	byte			; block just sent (mod 256)
+	PPSF_frames	byte			; frame count - 1 (255 max)
+PPS_Frame		ends
+
+;
+; EOR is a PPM frame that we use when we get tired of resending frames
+; we expect a ERR frame to be sent back to us. (ECM)
+;
+EOR_Frame		struct
+	EORF_head	HDLCHeader
+	EORF_ppm	Class1FrameType
+EOR_Frame		ends
+
+
+;
+;
+; The simple frame is for things like FTT, DCN, EOP, MCF.... anything that
+; has no extra information attached to it.
+;
+Simple_Frame		struct
+	SF_head		HDLCHeader
+Simple_Frame		ends
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;	Class1 Modulations 	;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; the following record descirbes the legal carriers to use with the
+; AT+ { FTM FRM FTH FRH } commands.  _ST_ means short training
+; (from section 8.1 of EIA/TIA-578)
+;
+; order is very very important, since the c code that parses the numbers
+; does not know about this record.
+;
+
+Class1ModemSpeeds	record
+	:3
+	C1MS_V17_ST_14400:1
+	C1MS_V17_14400:1
+	C1MS_V17_ST_12000:1
+	C1MS_V17_12000:1
+	C1MS_V17_ST_9600:1
+	C1MS_V17_9600:1
+	C1MS_V29_9600:1
+	C1MS_V17_ST_7200:1
+	C1MS_V17_7200:1
+	C1MS_V29_7200:1
+	C1MS_V27_4800:1
+	C1MS_V27_2400:1
+	C1MS_V21_300:1
+Class1ModemSpeeds	end
+
+CLASS1_SUPPORTED_MODEM_SPEEDS equ	mask C1MS_V29_9600 or \
+					mask C1MS_V29_7200 or \
+					mask C1MS_V27_4800 or \
+					mask C1MS_V27_2400 or \
+					mask C1MS_V21_300
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;	Class2 Things	 	;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; These are the possible valued returned by the modem in the <ppr> field
+; of the following report (which occurs at the end of a page):
+;
+; +FPTS:<ppr>,<lc>,[,<blc>,<cblc>],[,<lbc>]
+;
+; BTW: we can only handle FCF and RTN right now.
+;
+
+if not PASTA
+Class2PostPageResponse	etype	char, 0, 1
+C2PPR_PPR		enum	Class2PostPageResponse ; partial page errors
+C2PPR_MCF		enum	Class2PostPageResponse ; page good
+C2PPR_RTN		enum	Class2PostPageResponse ; page bad, retrain
+C2PPR_RTP		enum	Class2PostPageResponse ; page good, retrain
+C2PPR_PIN		enum	Class2PostPageResponse ; page bad, interrupt
+C2PPR_PIP		enum	Class2PostPageResponse ; page good, interrupt
+C2PPR_ERR		enum	Class2PostPageResponse ; partial page reception
+						       ; failed aver 4 retries
+						       ; (ECM only)
+C2PPR_CTR		enum	Class2PostPageResponse ; ack a CTC message
+						       ; (ECM only)
+
+endif ; not PASTA
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;  Things every driver should know  ;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;End of page <DLE><ETX>.
+;
+DLE		equ	0x10				; Data Link Escape
+ETX		equ	0x03				; End of TeXt
+
+
+;
+; post page messages (+FET: n)
+;
+
+FETMessage			etype byte, 0
+FET_NEW_PAGE_SAME_DOC		enum FETMessage
+FET_NEW_DOC			enum FETMessage
+FET_NO_MORE_PAGES_OR_DOCS	enum FETMessage
+FET_NEW_PARTIAL_PAGE		enum FETMessage
+;
+; the following three messages request a procedure interrupt
+;
+FET_NEW_PAGE_PRI		enum FETMessage
+FET_NEW_DOC_PRI			enum FETMessage
+FET_ALL_DONE_PRI		enum FETMessage
+
+;
+; The following modulation types are the different options for fax
+; transmissions (in class1 you have to tell the modem what to use).
+; They more or less follow the Class1ModemSpeeds record.
+;
+MT_STRING_LENGTH		equ	3
+
+ModulationType			etype	word, 0, 3
+MT_24				enum	ModulationType
+MT_48				enum	ModulationType
+MT_72				enum	ModulationType
+MT_73				enum	ModulationType
+MT_74				enum	ModulationType
+MT_96				enum	ModulationType
+MT_97				enum	ModulationType
+MT_98				enum	ModulationType
+MT_121				enum	ModulationType
+MT_122				enum	ModulationType
+MT_145				enum	ModulationType
+MT_146				enum	ModulationType
+
+
+;
+; time between 'blocked' write attempts, and number of attempts to make
+; before giving up
+;
+
+SERIAL_WRITE_DELAY		equ	6	; in ticks
+if not PASTA
+MAX_SERIAL_WRITE_ATTEMPTS	equ	120	; 12 seconds
+
+FAX_WARNING_SERIAL_WRITE_DID_NOT_WRITE_ALL_BYTES	enum	Warnings
+endif
+
+
+;--------------------------------
+;	T30Response
+;--------------------------------
+
+;
+; all the following etypes are for the parts of the T30Response struct
+;
+
+;
+; vertical resolution
+;
+FaxVerticalRes			etype byte, 0, 1
+	FVR_NORMAL		enum	FaxVerticalRes
+	FVR_FINE		enum	FaxVerticalRes
+
+;
+; Data transfer speed
+;
+FaxBitsPerSec			etype byte, 0, 1
+	FBPS_2400		enum	FaxBitsPerSec
+	FBPS_4800		enum	FaxBitsPerSec
+	FBPS_7200		enum	FaxBitsPerSec
+	FBPS_9600		enum	FaxBitsPerSec
+	FBPS_12000		enum	FaxBitsPerSec
+	FBPS_14400		enum	FaxBitsPerSec
+
+;
+; Minimum number of bytes per scan line for sending at various speeds.  This
+; should ensure that we never underflow our modem while sending over a fast
+; connection, or overwhelm the recipient if it's a slow fax machine.
+;
+FAX_PAD_2400	equ		12
+FAX_PAD_4800	equ		24
+FAX_PAD_7200	equ		36
+FAX_PAD_9600	equ		48
+FAX_PAD_12000	equ		60
+FAX_PAD_14400	equ		72
+
+;
+;Page width in millimeters.
+;
+FaxPageWidth			etype byte, 0
+	FPW_215			enum FaxPageWidth
+	FPW_255			enum FaxPageWidth
+	FPW_303			enum FaxPageWidth
+	FPW_151			enum FaxPageWidth
+	FPW_107			enum FaxPageWidth
+
+;
+; Page length is in millimeters.
+;
+FaxPageLength			etype byte, 0
+	FPL_297			enum FaxPageLength
+	FPL_364			enum FaxPageLength
+	FPL_UNLIMITED		enum FaxPageLength
+
+;
+; compression formats
+;
+FaxDataCompressionFormat	etype byte, 0
+	FDCF_1D_MODIFIED_HUFFMAN	enum FaxDataCompressionFormat
+	FDCF_2D_MODIFIED_READ		enum FaxDataCompressionFormat
+	FDCF_2D_UNCOMPRESSED		enum FaxDataCompressionFormat
+	FDCF_2D_MODIFIED_MODIFIED_READ	enum FaxDataCompressionFormat
+
+;
+; error correction
+;
+FaxErrorCorrection		etype byte, 0
+	FEC_DISABLE_ECM		enum FaxErrorCorrection
+	FEC_ENABLE_ECM64	enum FaxErrorCorrection
+	FEC_ENABLE_ECM256	enum FaxErrorCorrection
+
+;
+; BinaryFileTransfer stuff
+;
+FaxBinaryFileTransfer		etype byte, 0
+	FBFT_DISABLE_XFER	enum FaxBinaryFileTransfer
+	FBFT_ENABLE_XFER	enum FaxBinaryFileTransfer
+
+;
+; minimum time for scanlines, first number is for normal, second is for fine
+; (times are in ms)
+;
+FaxScanTimePerLine		etype byte, 0
+	FSTPL_ZERO		enum FaxScanTimePerLine
+	FSTPL_FIVE		enum FaxScanTimePerLine
+	FSTPL_TEN_FIVE		enum FaxScanTimePerLine
+	FSTPL_TEN		enum FaxScanTimePerLine
+	FSTPL_TWENTY_TEN	enum FaxScanTimePerLine
+	FSTPL_TWENTY		enum FaxScanTimePerLine
+	FSTPL_FORTY_TWENTY	enum FaxScanTimePerLine
+	FSTPL_FORTY		enum FaxScanTimePerLine
+	
+;
+; This structure contains info about a given fax device's capabilities.
+; It is based on the Class 2 spec
+;
+T30Response		struct
+	T30R_VR		FaxVerticalRes		; vertical resolution (0-1)
+	T30R_BR		FaxBitsPerSec		; bit rate (0-5)
+	T30R_WD		FaxPageWidth		; page width (0-4)
+	T30R_LN		FaxPageLength		; page length (0-2)
+	T30R_DF		FaxDataCompressionFormat; data compression fmt (0-3)
+	T30R_EC		FaxErrorCorrection	; error correction (0-2)
+	T30R_BF		FaxBinaryFileTransfer	; binary file trans (0-1)
+	T30R_ST		FaxScanTimePerLine	; scan time/line (0-7)
+T30Response		ends
+
+;
+; System defaults for the T30Response structure.
+;
+T30_DEFAULT_VR	equ	FVR_NORMAL
+T30_DEFAULT_BR	equ	FBPS_14400
+T30_DEFAULT_WD	equ	FPW_215
+T30_DEFAULT_LN	equ	FPL_297
+T30_DEFAULT_DF	equ	FDCF_2D_MODIFIED_READ
+T30_DEFAULT_EC	equ	FEC_DISABLE_ECM
+T30_DEFAULT_BF	equ	FBFT_DISABLE_XFER
+T30_DEFAULT_ST	equ	FSTPL_ZERO
+
+;
+; this record can be used to show which entries in the T30Response are vaild
+; (so you can leave defaults alone when setting the connect paramaters)
+;
+T30ResponseFlags	record
+	T30RF_ST:1	; scan time
+	T30RF_BF:1	; binary file transfer
+	T30RF_EC:1	; error correction
+	T30RF_DF:1	; data compression format
+	T30RF_LN:1	; page length
+	T30RF_WD:1	; page width
+	T30RF_BR:1	; bit rate
+	T30RF_VR:1	; vertical resolution
+T30ResponseFlags	end
+
+.assert (offset T30RF_VR) eq (offset T30R_VR)
+.assert (offset T30RF_BR) eq (offset T30R_BR)
+.assert (offset T30RF_WD) eq (offset T30R_WD)
+.assert (offset T30RF_LN) eq (offset T30R_LN)
+.assert (offset T30RF_DF) eq (offset T30R_DF)
+.assert (offset T30RF_EC) eq (offset T30R_EC)
+.assert (offset T30RF_BF) eq (offset T30R_BF)
+.assert (offset T30RF_ST) eq (offset T30R_ST)
+
+
+;
+; the T30_DO_NOT_CARE_VALUE can be used in a T30Response structure whenever
+; the corasponding T30ResponseFlags are clear.
+;
+T30_DO_NOT_CARE_VALUE	equ	0xFF
+
+;
+; Wait this long when initing the modem, then flush the input steam, then
+; continue on with the initilization.  This is to make sure that no old
+; responses can mess us up
+;
+TICKS_TO_WAIT_BEFORE_FLUSHING_INPUT_STREAM	equ	60
+
+
+;
+; only allow this many attempts to train:
+;
+MAX_RETRAIN_ATTEMPTS	equ	4

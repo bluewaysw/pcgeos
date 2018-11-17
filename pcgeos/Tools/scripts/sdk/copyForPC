@@ -1,0 +1,183 @@
+#!/usr/public/perl --	# -*- perl -*-
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1993 -- All Rights Reserved
+#
+# PROJECT:	PC SDK
+# MODULE:	copyForPC
+# FILE: 	copyForPC
+# AUTHOR: 	Paul DuBois, Dec 17, 1993
+#
+# USAGE:
+# 	copyForPC [-u] <srcdir>+ <destRoot>
+#
+# DESCRIPTION:
+#	Somewhat like copy_for_sdk.
+#	Copies directories; requires the file <srcdir>/SDK/pcMap to
+#	exist for all source directories given; this file specifies
+#	the mapping between long names and 8.3 names.
+#	
+#	'copyForPC Mouse Printer /n/intl_disks/pcgeos/ddk'
+#	would create the subtrees /n/intl_disks/pcgeos/ddk/Mouse and
+#	/n/intl_disks/pcgeos/ddk/Printer, and populate them with the
+#	files specified in Mouse/SDK/pcMap and Printer/SDK/pcMap.
+#	
+#	This pcMap files have the form:
+#	<SUBDIR>*
+#	unix_name	pc_name		script*
+#	+
+#	
+#	For each <SUBDIR>, the destination directory
+#	<destRoot>/<srcdir>/<SUBDIR> will be created.  You only need to do
+#	this if pc_name has any path components.  See the example.
+#	
+#	Fields are separated by whitespace.  The script field is optional.
+#	copyForPC will do: cp <srcdir>/<unix_name> <destRoot>/<srcdir>/<pc_name>
+#	If any scripts are given (they should be absolute pathnames, or relative
+#	to the SDK directory) then they will be run on the copy of the file.
+#	They will usually be sed or perl scripts... don't forget to make them
+#	executable.
+#	
+#	If -u is specified on the command line, unix2dos will be run on all the
+#	copied files.
+#	
+#	Example pcMap Mouse/SDK/pcMap:
+#
+#AbsGen GenMouse BullPen		# ensure that these dirs are created
+#mouseCommon.asm	common.asm
+#mouseSerCommon.asm	sercom.asm
+#AbsGen/absGen.gp	AbsGen/absGen.gp
+#AbsGen/absGen.asm			# default is to use the same name
+#GenMouse/genMouse.asm	genMouse.asm	hackIncludes
+#GenMouse/genMouse.gp
+#BullPen/ ... etc ...
+#	
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	dubois	12/17/93   	Initial Revision
+#
+#	$Id: copyForPC,v 1.1 94/01/07 18:07:49 dubois Exp $
+#
+###############################################################################
+
+{
+    #
+    # parse command-line options
+    #
+    $unix2dos = 0;
+    while (($#ARGV >= 0) && ($ARGV[0] =~ "-")) {
+	$arg = shift(@ARGV);
+	$unix2dos = 1 if $arg eq "-u";
+	# other tests go here
+    }
+
+    if ($#ARGV < 1) {
+	die "Usage: copyForPC [ -u ] <srcdir>+ <destRoot>\n";
+    }
+
+    $destRoot = pop(@ARGV);		# snarf the last argument
+    &chopTrailer($destRoot);
+
+    #
+    # $srcdir gets set to each argument on the command line.
+    # For each file X specified in $srcdir/SDK/pcMap, do:
+    # 	cp $srcdir/$X $destRoot/$srcdir/$X
+    # If a script is associated with the file, run it on the new copy
+    #
+    while ($srcdir = shift(@ARGV)) {
+	die "$srcdir/SDK does not exist.\n" unless (-d "$srcdir/SDK");
+	&chopTrailer($srcdir);
+	$destdir = "$destRoot/$srcdir";
+
+	print "==================================================\n";
+	print "copyForPC: Copying $srcdir to $destdir ...\n";
+	print "==================================================\n";
+
+	#
+	# Read first line from SDK/pcMap (required subdirectories)
+	# and make sure the proper directories get created.
+	#
+	print "Ensuring existence of $destdir ...\n";
+	if ( ! -d $destdir ) {
+	    $err = `mkdir -p $destdir`;
+	    print "$err\n" if ($? >> 8);
+	}
+
+	$mapFile = "$srcdir/SDK/pcMap";
+	open(MAP, $mapFile) || die "Can't open $mapFile\n";
+
+	while (<MAP>) {		# Skip initial comments
+	    last unless /^#/;
+	}
+	@dirs = split;		# Split the line we just read
+	foreach $dir (@dirs) {
+	    print "Ensuring existence of $destdir/$dir ... \n";
+	    if ( ! -d "$destdir/$dir" ) {
+		$err = `mkdir -p $destdir/$dir`;
+		print "$err\n" if ($? >> 8);
+	    }
+	}
+
+	#
+	# Start copying files over
+	#
+	$destFiles = "";	# use this to unix2dos the files, later.
+	while (<MAP>) {
+	    next if /^#/;	# skip comments
+	    next if /^[ \t]*$/;	# skip blank lines
+	    chop;
+	    ($srcName, $destName, $scripts) = split(' ',$_,3);
+	    last unless $srcName;
+	    $destName = $srcName if ( ! $destName );
+
+	    print "Copying [src]/$srcName to [dest]/$destName";
+	    system "cp $srcdir/$srcName $destdir/$destName";
+	    chmod( 0664, "$destdir/$destName" );
+	    $destFiles .= "$destdir/$destName ";
+
+	    #
+	    # Run the scripts on the file, if any were specified.
+	    #
+	    if ( $scripts ) {
+		print "...\n  Running ";
+		foreach $script (split(' ',$scripts)) {
+		    if ( substr($script, 0, 1) ne "/" ) {
+			$scriptpath = "$srcdir/SDK/$script";
+		    }
+		    print "$script..";
+		    $err = `$scriptpath $destdir/$destName`;
+		    if ($? >> 8) {
+			print "(failed: $err) ";
+		    } else {
+			print "(OK) ";
+		    }
+		}
+	    }
+	    print "\n";
+	}
+
+	#
+	# unix2dos the whole group of files instead of one at a time
+	#
+	if ( $unix2dos ) {
+	    print "Running unix2dos on $destFiles\n";
+	    system("/usr/public/unix2dos $destFiles");
+	}
+    }	    
+}
+
+#
+# Little subroutines to snip off or add a trailing slash
+#
+sub addTrailer {
+    if ( substr($_[0], -1) ne "/" ) {
+	$_[0] .= "/";
+    }
+}
+
+sub chopTrailer {
+    if ( substr($_[0], -1) eq "/" ) {
+	chop $_[0];
+    }
+}

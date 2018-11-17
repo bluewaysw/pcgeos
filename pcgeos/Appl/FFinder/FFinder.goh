@@ -1,0 +1,128 @@
+/*
+ ***************************************************************************
+ *              Constants and structures
+ ***************************************************************************
+*/
+
+/* for whichListDisplay global */
+#define WLD_SEARCH 1
+#define WLD_RECENT 2
+
+/*
+ * Custom defined filter types are listed below. The filtering routine
+ * will filter out different files in the file selector, depending on
+ * these values. 
+ */
+typedef ByteEnum FilterTypes;
+#define FT_ALL 0
+#define FT_FILES 1
+#define FT_DIRS 2
+#define FT_BATCH 3
+#define FT_DOS_EXECS 4
+#define FT_GEOS_EXECS 5
+
+#define MAX_INPUT_LEN PATH_LENGTH
+#define MAX_FILE_DIR_LEN PATH_LENGTH
+#define NUM_OF_VISIBLE_RESULT_ITEMS 6
+
+/*
+ *  Define the current mode of the search engine.
+ */
+typedef ByteEnum SearchMode;
+#define SEARCH_END         0
+#define SEARCH_IN_PROGRESS 1
+
+typedef ByteEnum FileSelectType;
+#define SEARCH_IN_DOCUMENT         0
+#define SEARCH_IN_ARCHIVE          1
+#define SEARCH_IN_FLOPPY           2
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/*
+ *  Internally used subclass of ProcessClass for launching applications.
+ *  This can't be done on the global UI thread (which runs most 
+ *  ExpressMenuControls),  because it needs to use IACP stuff, which 
+ *  blocks during IACPConnect waiting for the newly-launched server to 
+ *  register.
+ */
+@class FFThreadClass, ProcessClass;
+
+@message void MSG_FFT_THREAD_LAUNCH_APPLICATION
+    (GeodeToken geodeToken, MemHandle launchHan);
+
+@endc
+
+/*
+ *  The Gen Process Class
+ */
+@class	FFinderProcessClass, GenProcessClass;
+
+@message void MSG_FFP_FIND_FILES();
+@message void MSG_FFP_DISPLAY_RECENT_OPEN_FILES();
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FFP_SET_FILE_SELECTOR;
+
+@endc   /* end of class definition */
+
+/*
+ * This is our subclass of the GenFileSelectorClass. You must declare
+ * a subclass of GenFileSelectorClass if you wish to write your own
+ * custom filtering routine. This subclass uses the previously defined
+ * custom filtering types and also defines a message to choose the
+ * filtering type from a list of options within a GenItemGroup.
+ * Initially, the file selector is set to accept all files (FT_ALL).
+ */
+
+@class	FilterFileSelectorClass, GenFileSelectorClass;
+
+@message void MSG_FFS_UPDATE_UI_CURRENT_PATH();
+
+@endc
+
+
+/*
+ *  Scrolling list class for the search result.
+ */
+@class FFResultListClass, GenDynamicListClass;
+
+@message (GEN_DYNAMIC_LIST_QUERY_MSG)MSG_FFRL_QUERY_MONIKER;
+@message word MSG_FFRL_ADD_MONIKER(word pos, 
+				   FileAttrs type,
+				   const char *text, 
+				   StandardPath token, const char *path);
+@message void MSG_FFRL_CLEAN_LIST();
+@message (GEN_ITEM_GROUP_APPLY_MSG)MSG_FFRL_OPEN_DOCUMENT;
+@message void MSG_FFRL_OPEN_DOCUMENT_FROM_TRIGGER();
+@message void MSG_FFRL_FIND_FILES();
+@message void MSG_FFRL_DISPLAY_RECENT_OPEN_FILES();
+@message void MSG_FFRL_STORE_CURRENT_PATH(char *fullPath);
+@message void MSG_FFRL_SAVE_LIST();
+@message void MSG_FFRL_RESTORE_LIST();
+@message void MSG_FFRL_CLEAN_SAVED_LIST();
+    /*
+     *  Internal data structure to store all search results.
+     *  Used to update the moniker entries in search result list.
+     */
+    @instance ChunkHandle FFRL_monikerChunk;
+    /*
+     *  the full path the file selector is currently set in.
+     */
+    @instance char FFRL_fullPath[MAX_FILE_DIR_LEN];
+    /*
+     *  Internal data structure to store a saved
+     *  search parameters.
+     */
+    @instance ChunkHandle FFRL_storedMonikerChunk;
+    @instance word FFRL_storedEntryCount;
+    @instance ChunkHandle FFRL_storedSearchText;
+
+
+@endc
+
+
+@class FFSearchTextClass, GenTextClass;
+@endc;

@@ -1,0 +1,671 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	Sample Applications
+ * MODULE:	DOS-file Document Sample
+ * FILE:	dosfile.goc
+ * AUTHOR:	Tony Requist: August 3, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	Name	    Description
+ *	----	----	    -----------
+ *	8/3/92	tony	    Initial version
+ *
+ * DESCRIPTION:
+ *	This is one of the sample applications that demonstrate the use
+ *	of the GenDocumentControl object. This particular one shows how
+ *	to use a DOS file, rather than a GEOS VM file, for the document.
+ *	The biggest difference is that the document control cannot
+ *	automatically provide save/revert functionality for you. It will
+ *	tell you when the user requests those functions, but you must
+ *	do the work.
+ *
+ *	(Throughout this file you will see references like this: [Con 7.2.1]
+ *	This is a reference to chapter 7, section 7.2.1 of the Concepts
+ *	manual. [Obj 7.2.1] is a reference to chapter 7, section 7.2.1 of the
+ *	Objects manual. You should use these references to locate further
+ *	information about the topic being discussed if anything is unclear.)
+ *
+ *	While the same information is stored in these documents (a pair
+ *	of coordinates) as for those of the other document-control sample
+ *	applications, it is stored without the benefit of the VM file
+ *	support in the kernel.
+ *
+ *		      Document Control Overview [Obj 13]
+ *
+ *	The document-control system of GEOS is made from three object
+ *	classes that work together to produce an harmonious whole (sorry,
+ *	got carried away there). The responsibilities are divide as follows:
+ *
+ *	GenDocumentControl  	is responsible for providing what you might
+ *				consider the UI of the document control. It
+ *				produces menus, submenus, and dialog boxes
+ *				with which the user interacts when s/he wishes
+ *				to open, close, create, or save a document.
+ *				It usually is run by the UI thread of an
+ *				application, to provide fast feedback to
+ *				the user.
+ *
+ *	GenDocument 	    	is the low-level object that deals with a
+ *				single document file. It does all the work
+ *				of interacting with the file and VM systems
+ *	    	    	    	to save/revert/auto-save/revert the document
+ *				itself.
+ *
+ *	GenDocumentGroup    	is a conduit between the GenDocumentControl
+ *				and the GenDocument objects. It is responsible
+ *				for creating, managing, and destroying the
+ *				GenDocument objects, selecting a single object
+ *				as the current document, etc. GenDocumentGroup
+ *	    	    	    	instantiates a separate GenDocument object
+ *				for each document it's told by the
+ *				GenDocumentControl to manage.
+ *
+ *	$Id: dosfile.goc,v 1.1 97/04/04 16:36:58 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+/*
+ ***************************************************************************
+ *		Constants and structures
+ ***************************************************************************
+ */
+
+/*
+ * Define the extent of the coordinate space on our document. It's specified
+ * in terms of points, so our document is 20 inches by 20 inches.
+ */
+#define DOCUMENT_WIDTH		(20*72)
+#define DOCUMENT_HEIGHT		(20*72)
+
+#define INITIAL_X_POS		20
+#define INITIAL_Y_POS		20
+
+/*
+ ***************************************************************************
+ *		Global variables
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class	DFProcessClass, GenProcessClass ;
+
+@endc   /* end of class definition */
+
+/*
+ * DFDocument class is our subclass of GenDocument that we use to add
+ * behavior to the GenDocument
+ */
+
+@class	DFDocumentClass, GenDocumentClass ;
+
+/*
+ * These are the messages sent out when the user fiddles with the GenValue
+ * objects. Their parameters are taken from the GEN_VALUE_APPLY_MSG prototype
+ * defined in gValueC.goh, but the message number is all our own.
+ */
+@message(GEN_VALUE_APPLY_MSG) MSG_DF_DOCUMENT_X_CHANGE;
+@message(GEN_VALUE_APPLY_MSG) MSG_DF_DOCUMENT_Y_CHANGE;
+
+    /*
+     * For the purposes of save/revert support, this instance variable is
+     * effectively our "new version" that gets made the current version during
+     * a save. When we revert to the last-saved version of the document, we
+     * need only read the file contents into this instance variable.
+     */
+    @instance Point DFDI_position = {0, 0};
+
+@endc
+
+@classdecl	DFProcessClass, neverSaved ;
+@classdecl	DFDocumentClass ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ *		Application Object
+ */
+
+@start	AppResource ;
+
+@object GenApplicationClass DFApp = {
+    GI_visMoniker = list { @DFTextMoniker }
+    GI_comp = @DFPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @DFPrimary;
+    /*
+     * The GenDocumentControl object must be on the "active list" so it can
+     * have access to the AppLaunchBlock, passed with MSG_META_ATTACH, that
+     * contains the data file the application is supposed to open.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @DFDocumentControl;
+    /*
+     * The GenDocumentControl object must also be on the "application startup"
+     * list so the application can manipulate documents when started as a
+     * server for another application (NOTE: it must be on this list even if
+     * you don't ever expect your application to act as such a server).
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @DFDocumentControl;
+    /*
+     * The GenDocumentControl will load its saved options from the .ini file
+     * itself, but needs to be told when to save them.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+	@DFDocumentControl;
+    /*
+     * Specify the INI file category [Con 6.3] under which to save all options
+     * for this application.
+     */
+    ATTR_GEN_INIT_FILE_CATEGORY = "dosfile";
+}
+
+@visMoniker DFTextMoniker = "C DosFile Sample Application";
+
+@end	AppResource
+
+/*
+ *		Primary window
+ */
+
+@start	Interface		/* this resource is for misc UI objects */ ;
+
+@object GenPrimaryClass DFPrimary  = {
+    GI_comp = @DFFileMenu, @DFValueX, @DFValueY;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+
+    /*
+     * Let's say we want a floating keyboard to come up on pen-based
+     * systems to allow keyboard input to the GenValue children of this
+     * primary. As of Dec. 1993, GenValues cause keyboards to come up
+     * automatically, but to get this behavior on the original Zoomer
+     * release, we must tell the parent of a GenValue to override the
+     * default no-keyboard behavior.
+     */
+    ATTR_GEN_WINDOW_KBD_OVERRIDE = (KO_KEYBOARD_REQUIRED);
+}
+
+@object GenInteractionClass DFFileMenu = {
+    /*
+     * Turn this thing into the File menu for the application. In an ideal
+     * world, we could just turn the GenDocumentControl object into the
+     * File menu and be done with it (it is a subclass of GenInteraction,
+     * after all). Sadly, due to implementation details, GenDocumentControl
+     * can only be a GIV_ORGANIZATIONAL interaction, so we have a separate
+     * GIV_POPUP interaction to contain it.
+     */
+    GI_comp = @DFDocumentControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+/*
+ *	GenDocumentControl
+ *
+ * There are a few things to keep in mind when deciding in what resource to
+ * place the GenDocumentControl object:
+ *	1) because it must be on the application's MGCNLT_ACTIVE_LIST list,
+ *	   the resource that contains it will always be brought in on start-up.
+ *	   If that resource is particularly large, it could slow down the
+ *	   application's start-up.
+ *	2) it is actually used only rarely, when the user wishes to open, close
+ *	   or save a document.
+ *	3) it creates a number of different objects (triggers for the File
+ *	   menu, dialog boxes, etc.) that could make the resource in which
+ *	   it sits become somewhat bloated.
+ * If there were more elements of the File menu (for example, a
+ * SpoolPrintControl object), you might put all the elements into a single
+ * FileMenu resource. For this example, however, we're just going to put it
+ * in the Interface resource, as there's not much else for this app to do.
+ */
+
+@object GenDocumentControlClass DFDocumentControl = {
+    /*
+     * Special attributes for working with DOS files. By default, the document
+     * control is set to manipulate VM files with full support. In our case,
+     * we need to not only turn off GDCA_VM_FILE, but also set GDCA_NATIVE, to
+     * indicate we are dealing with files in the native format of the
+     * filesystem, rather than the virtual filesystem (with 32-character names,
+     * etc.) that GEOS provides.
+     *
+     * Turn off various features we don't feel like supporting (user-settable
+     * empty document) or that we figure the filesystem can't support (templates
+     * and shared documents, which rely on extended attributes and the VM
+     * system, respectively).
+     */
+    GDCI_attrs = (@default | GDCA_NATIVE) & ~GDCA_VM_FILE;
+    GDCI_features = @default & ~(GDCF_SUPPORTS_TEMPLATES |
+				 GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT |
+				 GDCF_SUPPORTS_USER_MAKING_SHARED_DOCUMENTS);
+    /*
+     * Text to display in the header area of the primary when no
+     * document is open.
+     */
+    GDCI_noNameText = "No Document";
+    /*
+     * Pointer to the GenDocumentGroup
+     */
+    GDCI_documentGroup = DFDocumentGroup;
+    /*
+     * List of objects to enable/disable based on whether or not a
+     * document exists. For us, this is the two GenValues that show the
+     * coordinates.
+     */
+    GDCI_enableDisableList = DFUIEnableList;
+}
+
+@chunk optr DFUIEnableList[] = {
+    @DFValueX, @DFValueY
+};
+
+@end Interface
+
+/*
+ *	Document Group
+ *
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread. It is responsible for creating and administering
+ * the various GenDocument objects (one per document), coordinating its actions
+ * with the GenDocumentControl object.
+ *
+ * Because we do not give a value for the GDGI_genView instance variable,
+ * the GenDocumentGroup will not attempt to hook the GenDocument (actually
+ * DUIDocument) objects it creates to a GenView; it assumes the document
+ * has some other means of displaying its data rather than acting as a
+ * VisContent for a GenView.
+ */
+
+@start DocumentUI ;
+
+@object GenDocumentGroupClass DFDocumentGroup = {
+    /*
+     * Special attributes for working with DOS files. As for the
+     * GenDocumentControl, we need to indicate we work with files in the format
+     * native to the filesystem that aren't VM files. We also don't want to
+     * support autosave, and there's no need to look for changes made by
+     * other people who have the document open (that is needed only for a
+     * multi-user document, which we don't support). We also won't get notified
+     * automatically that the file has become dirty, as that's a service
+     * provided by the VM system. As you can see, we give up a good deal to
+     * store things in DOS files.
+     */
+    GDGI_attrs = (@default | GDGA_NATIVE) & ~(GDGA_VM_FILE |
+					      GDGA_SUPPORTS_AUTO_SAVE |
+					      GDGA_AUTOMATIC_CHANGE_NOTIFICATION|
+					      GDGA_AUTOMATIC_DIRTY_NOTIFICATION);
+    /*
+     * Name for untitled documents
+     */
+    GDGI_untitledName = "blank";
+    /*
+     * Class for document objects. We specify our own subclass of GenDocument
+     * as we wish to add behaviour to the document object.
+     */
+    GDGI_documentClass = &DFDocumentClass;
+    /*
+     * Pointer to the GenDocumentControl
+     */
+    GDGI_documentControl = DFDocumentControl;
+}
+
+@end DocumentUI;
+
+/*
+ *		UI objects used to display the document
+ *
+ * Both objects specify their destination as TO_APP_MODEL, with a destination
+ * class of GenDocumentClass. The objects themselves end up recording their
+ * normal output and sending the handle of that recorded message as an
+ * argument in a MSG_META_SEND_CLASSED_EVENT message to the application object,
+ * which is the root of the three input hierarchies [Con 12.5]. From there
+ * it travels down the "model" hierarchy, checking at each level to see if
+ * the object is a subclass of GenDocumentClass. The first object that is
+ * a subclass of GenDocument has the recorded message sent to it. The
+ * usual path will be GenValue -> GenApplication -> GenDocumentControl ->
+ * GenDocumentGroup -> DFDocument.
+ */
+
+@start Interface ;
+
+@object GenValueClass DFValueX = {
+    GI_visMoniker = 'X', "X Coordinate:";
+    /*
+     * All objects in the enableDisable list of the GenDocumentControl
+     * must start life disabled.
+     */
+    GI_states = @default & ~GS_ENABLED;
+
+    GVLI_minimum = MakeWWFixed(0);
+    GVLI_maximum = MakeWWFixed(DOCUMENT_WIDTH-1);
+
+    GVLI_applyMsg = MSG_DF_DOCUMENT_X_CHANGE;
+    GVLI_destination =  (TO_APP_MODEL);
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&GenDocumentClass };   
+}
+
+@object GenValueClass DFValueY = {
+    GI_visMoniker = 'Y', "Y Coordinate:";
+    /*
+     * All objects in the enableDisable list of the GenDocumentControl
+     * must start life disabled.
+     */
+    GI_states = @default & ~GS_ENABLED;
+
+    GVLI_minimum = MakeWWFixed(0);
+    GVLI_maximum = MakeWWFixed(DOCUMENT_HEIGHT-1);
+
+    GVLI_applyMsg = MSG_DF_DOCUMENT_Y_CHANGE;
+    GVLI_destination =  (TO_APP_MODEL);
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&GenDocumentClass };   
+}
+
+@end Interface
+
+/*
+ ***************************************************************************
+ *		Code for DFDocumentClass
+ ***************************************************************************
+ */
+
+
+
+/***********************************************************************
+ *	MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE for DFDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize a newly-created document file.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    DFDI_position is set.
+ *
+ * STRATEGY:	    Just initialize the position in our instance data.
+ *		    We don't actually write the data to the file until
+ *		    the document control tells us to.
+ *
+ *	    	    The GenDocument always performs an initial save after
+ *		    initializing a new document, so we need only set up
+ *		    our instance data; we don't need to write the coordinate
+ *		    out to the file.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/ 3/92		Initial Revision
+ *
+ ***********************************************************************/
+@method DFDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+{
+    pself->DFDI_position.P_x = INITIAL_X_POS;
+    pself->DFDI_position.P_y = INITIAL_Y_POS;
+    return(FALSE);		/* Return no error */
+}
+
+
+
+/***********************************************************************
+ *		WriteDataToFile
+ ***********************************************************************
+ * SYNOPSIS:	    Write the contents of the document to a file.
+ * SIDE EFFECTS:    File contents are overwritten.
+ *
+ * STRATEGY:	    Seek to the start of the file and write the position
+ *		    out.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/ 3/92		Initial Revision
+ *
+ ***********************************************************************/
+Boolean WriteDataToFile(
+    optr oself,			/* Document object */
+    FileHandle file,		/* file */
+    word *error)		/* error code */
+{
+    DFDocumentInstance *pself;
+
+    pself = ObjDerefGen(oself);
+    /*
+     * Reposition to the start of the file.
+     */
+    (void) FilePos(file, 0L, FILE_POS_START);
+
+    if (FileWrite(file,
+		  &pself->DFDI_position,
+		  sizeof(Point), FALSE) != sizeof(Point))
+    {
+	/*
+	 * Couldn't write out the position, so return the error code in
+	 * *error and return TRUE to signal the error.
+	 */
+	*error = ThreadGetError();
+	return(TRUE);
+    } else {
+	/*
+	 * Everything's ok, so return FALSE (no error).
+	 */
+	return(FALSE);
+    }
+}
+
+/***********************************************************************
+ *		MSG_GEN_DOCUMENT_PHYSICAL_SAVE for DFDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Write the contents of the document to the file, nuking
+ *		    any backup version that might be hanging around.
+ * PARAMETERS:	    Boolean (word *error)
+ * SIDE EFFECTS:    File contents are overwritten.
+ *
+ * STRATEGY:	    Seek to the start of the file and write the position
+ *		    out.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/ 3/92		Initial Revision
+ *
+ ***********************************************************************/
+@method DFDocumentClass, MSG_GEN_DOCUMENT_PHYSICAL_SAVE,
+			 MSG_GEN_DOCUMENT_PHYSICAL_UPDATE
+{
+    /*
+     * Call our general routine to write data to a file, passing our
+     * file handle.
+     */
+    return(WriteDataToFile(oself, pself->GDI_fileHandle, error));
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE
+ *						for DFDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Write the contents of the document to a new file.
+ * PARAMETERS:	    Boolean (word *error, FileHandle file)
+ * SIDE EFFECTS:    File contents are overwritten.
+ *
+ * STRATEGY:	    Seek to the start of the file and write the position
+ *		    out.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/ 3/92		Initial Revision
+ *
+ ***********************************************************************/
+@method DFDocumentClass, MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE
+{
+    /*
+     * Call our general routine to write data to a file, passing the
+     * new file handle.
+     */
+    return(WriteDataToFile(oself, file, error));
+}
+
+/***********************************************************************
+ *		MSG_GEN_DOCUMENT_PHYSICAL_REVERT for DFDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return to the backup version of the file from
+ *		    immediately after the most-recent save.
+ * PARAMETERS:	    Boolean (word *error)
+ * SIDE EFFECTS:    DFDI_position is overwritten
+ *
+ * STRATEGY:	    Since no modifications get written to the file until
+ *	    	    the user saves it, our instance data is always the
+ *		    new version of the file, and the file is its own
+ *		    backup copy. So all we have to do to revert to the
+ *		    backup is seek to the start of the file and read the
+ *		    position out.
+ *
+ *	    	    We don't need to reset the GenValue objects that
+ *		    display our document as we'll soon be receiving
+ *		    a MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	8/ 5/92		Initial Revision
+ *
+ ***********************************************************************/
+@method DFDocumentClass, MSG_GEN_DOCUMENT_PHYSICAL_REVERT
+{
+    FileHandle file;
+
+    /*
+     * Reposition to the start of the file.
+     */
+    file = pself->GDI_fileHandle;
+    (void) FilePos(file, 0L, FILE_POS_START);
+
+    if (FileRead(file,
+		 &pself->DFDI_position,
+		 sizeof(Point), FALSE) != sizeof(Point))
+    {
+	/*
+	 * Couldn't read out the position, so return the error code in
+	 * *error and return TRUE to signal the error.
+	 */
+	*error = ThreadGetError();
+	return(TRUE);
+    } else {
+	/*
+	 * Everything's ok, so return FALSE (no error).
+	 */
+	return(FALSE);
+    }
+}
+
+
+/***********************************************************************
+ *	MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT for DFDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Generate whatever UI objects are needed to display
+ *		    this just-opened or just-created document.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    The position is read from the document.
+ *
+ * STRATEGY:	    We don't have to create any UI objects, but we do
+ *	    	    need to initialize our instance data to hold the
+ *	    	    coordinate stored in the file.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/ 3/92		Initial Revision
+ *
+ ***********************************************************************/
+@method DFDocumentClass, MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT
+{
+    FileHandle file;
+
+    /*
+     * Seek to the start of the file and read the position from there.
+     */
+    file = pself->GDI_fileHandle;
+    (void) FilePos(file, 0L, FILE_POS_START);
+    (void) FileRead(file, &(pself->DFDI_position), sizeof(Point), FALSE);
+}
+
+
+/***********************************************************************
+ *	MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT for DFDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Make our UI objects display the contents of the
+ *		    document.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the values displayed by DFValueX and DFValueY are
+ *		    set to the coordinates in the document.
+ *
+ * STRATEGY:	    none in particular.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/ 3/92		Initial Revision
+ *
+ ***********************************************************************/
+@method DFDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+{
+    sword   y = pself->DFDI_position.P_y;   /* Fetch Y coord now so we don't
+					     * have to dereference our instance
+					     * data again after setting the
+					     * value for DFValueX */
+
+    @send GeodeGetOptrNS(@DFValueX)::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+				    pself->DFDI_position.P_x, FALSE);
+    @send GeodeGetOptrNS(@DFValueY)::MSG_GEN_VALUE_SET_INTEGER_VALUE(y, FALSE);
+}
+
+
+/***********************************************************************
+ *		MSG_DF_DOCUMENT_X_CHANGE and
+ *		MSG_DF_DOCUMENT_Y_CHANGE for DFDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Note a change in one of the coordinates stored in
+ *		    the document.
+ * PARAMETERS:	    void (WWFixedAsDWord value, word stateFlags)
+ * SIDE EFFECTS:    The appropriate coordinate is updated and the
+ *		    document marked dirty.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/3/92		Initial Revision
+ *
+ ***********************************************************************/
+@method DFDocumentClass, MSG_DF_DOCUMENT_X_CHANGE,
+    	    	    	 MSG_DF_DOCUMENT_Y_CHANGE
+{
+    /*
+     * Adjust the appropriate coordinate, based on which message we're
+     * handling. We just ignore the fractional portion of the value, since
+     * we can't store it anywhere.
+     */
+    if (message == MSG_DF_DOCUMENT_X_CHANGE) {
+	pself->DFDI_position.P_x = IntegerOf(value);
+    } else {
+	pself->DFDI_position.P_y = IntegerOf(value);
+    }
+    /*
+     * There's no one else to tell us the document is dirty (unlike with
+     * a VM file), so we have to do it ourselves.
+     */
+    @send self::MSG_GEN_DOCUMENT_MARK_DIRTY();
+}

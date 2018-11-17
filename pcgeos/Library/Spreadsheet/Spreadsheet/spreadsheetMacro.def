@@ -1,0 +1,196 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		GeoCalc
+FILE:		spreadsheetMacro.def
+
+AUTHOR:		Gene Anderson, Jun  5, 1991
+
+MACROS:
+	Name			Description
+	----			-----------
+	TestResult16		Verify 32-bit number is actually 16-bit
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eca	6/ 5/91		Initial revision
+
+
+DESCRIPTION:
+	Macros for Spreadsheet library.
+		
+	$Id: spreadsheetMacro.def,v 1.1 97/04/07 11:14:19 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+TestResult16	macro	low, high
+	local	noDeath
+if ERROR_CHECK
+	cmp	high, 0xffff
+	je	noDeath
+	tst	high
+	ERROR_NZ	VALUE_NOT_16_BIT
+endif
+noDeath:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RoundToByte
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Round a value to the next byte multiple
+
+PASS:		width - value to round
+
+PSEUDO CODE/STRATEGY:
+	The idea behind rounding a value to a byte multiple is used for
+	column widths, as it makes horizontal scrolling about 33% faster.
+	So column widths are forced to byte mutiples because it good.
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	gene	8/27/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+RoundToByte		macro width
+	andnf	width, 0xfff8
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SpreadsheetCellLock
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Lock a cell's data, if it exists
+
+PASS:		ds:si - ptr to Spreadsheet instance
+		(ax,cl) - (r,c) of cell
+
+RETURN:		*es:di - ptr to cell data, if it exists
+		carry - set if cell exists
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	gene	8/22/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SpreadsheetCellLock		macro
+EC <	call	ECCheckInstancePtr		;>
+	call	CellLock
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SpreadsheetCellGetDBItem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Get the DB item and group of a cell
+
+PASS:		ds:si - ptr to Spreadsheet instance
+		(ax,cl) - (r,c) of cell
+
+RETURN:		ax, di - group,item of the cell
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	gene	8/22/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SpreadsheetCellGetDBItem		macro
+EC <	call	ECCheckInstancePtr		;>
+	call	CellGetDBItem
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SpreadsheetCellUnlock
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Unlock a cell's data
+
+PASS:		es - seg addr of cell data
+
+PSEUDO CODE/STRATEGY:
+	Calls DBUnlock() directly -- this is an action supported by the
+	cell library
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	NOTE: preserves the flags
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	gene	8/22/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SpreadsheetCellUnlock		macro
+	call	DBUnlock
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SpreadsheetCellDirty
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Mark a cell's data as dirty
+
+PASS:		es - seg addr of cell data
+
+PSEUDO CODE/STRATEGY:
+	Calls DBDirty() directly -- this is an action supported by the
+	cell library.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	gene	8/22/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SpreadsheetCellDirty		macro
+	call	DBDirty
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SpreadsheetCellReplaceAll
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Replace all data for a cell
+
+PASS:		ds:si - ptr to Spreadsheet instance
+		ax - row #
+		cl - column #
+		es:di - pointer to the data to replace with
+		dx - size of the data to replace with
+		     0 to free the cell.
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	gene	8/22/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SpreadsheetCellReplaceAll		macro
+EC <	call	ECCheckInstancePtr		;>
+	call	CellReplace
+endm

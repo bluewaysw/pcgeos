@@ -1,0 +1,1252 @@
+/**********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:        Mail	
+ * MODULE:	   BBXMail
+ * FILE:	   smtp.goc
+ * 
+ * DESCRIPTION:
+ *     Do the SMTP send mail thing
+ * 
+ ****************************************************************************/
+
+@include <stdapp.goh>
+@include <bbxmlib.goh>
+@include <socket.goh>
+#include <chunkarr.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <file.h>
+
+@include "mailfatals.goh"
+
+extern SocketError _pascal
+MSMTPSendMsg(OUTBOX boxHandle, MailMessage *msg/*, FileHandle logHan*/);
+
+
+/*@ifdef PRODUCT_NDO2000 */
+static char domain[] ="my.computer.com";
+/*@else
+static char domain[] ="myturn.com";
+/*@endif */
+
+#define MAX_BUFFER_SIZE 32768
+
+/* 
+ * Misc. headers terminators and folding. The notations are:
+ * CM - COMMA
+ * CR - Carriage Return
+ * LF - Line Fee
+ * BR - Bracket, can mean < or >
+ * FOLD - Folding to a new line with spaces after CRLF
+ * QUOTE - "
+ * SP - Whitespace
+ * QT - ?
+ */
+
+char ENDDATAESCAPE[] = {CR,LF,'.','.',0};
+
+char qEncodeTable[] = "0123456789ABCDEF";
+
+/*
+ * Strings for parsing the message header
+ */
+char toString[] ="TO";
+char fromString[] ="FROM";
+char ccString[] ="CC";
+char bccString[] = "BCC";
+
+/* SMTP response parseState */
+#define SCAN_CODE         0      /* Parsing of status code */
+#define LAST_LINE         1      /* Parsing last line */
+#define INTERMEDIATE_LINE 2      /* Parsing intermediate line */
+#define FCR_LAST          3      /* Found CR of last line */
+#define FCR_INTERMEDIATE  4      /* Found CR of intermediate line */
+#define PARSE_DONE        5      /* Done parsing a response */
+
+
+
+/***********************************************************************
+ *		MailoutOpen
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Opens a connection to the email server
+ *              serverName = name of the email server,
+ *                           can be either numeric or name format.
+ *              proto = currently ignored, the protocol is assumed to
+ *                      be smtp
+ *              obox =  Handle to outbox structure.  Opened socket is saved in
+ *                     this structure
+ *              
+ *
+ * RETURN:	SocketError
+ ***********************************************************************/
+SocketError _pascal
+MailoutOpen(char *serverName, OutboxProtocol proto, char *clientName,
+				char *password, OUTBOX *boxHandle, word accPntID)
+{
+    Socket sock;
+    SocketError rcode;
+    SocketPort port;
+    OutboxStruct *obox;
+
+    
+    *boxHandle = MemAlloc(sizeof(OutboxStruct), HF_SWAPABLE | HF_SHARABLE, HAF_LOCK);
+
+    obox = MemDeref(*boxHandle);
+    port.SP_port = SMTP;
+    port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+
+    rcode = MailSocketConnect(serverName, &sock, port, accPntID);
+    if (rcode == SE_NORMAL) {
+		obox->OB_socket = sock;
+		strcpy(obox->OB_clientName, clientName);
+		strcpy(obox->OB_password, password);
+		}
+    MemUnlock(*boxHandle);
+
+    return rcode;
+}
+
+
+/***********************************************************************
+ *		UpdateProgressSend
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ ***********************************************************************/
+Boolean _pascal
+UpdateProgressSend (MailMessage *msg)
+{
+    dword pos = 0;
+    int percent;
+    Boolean stop;
+
+    FilePos(msg->MM_bodyFile,pos,FILE_POS_RELATIVE);
+    msg->MM_remainingSize = msg->MM_size - pos;
+    if (msg->MM_progressRoutine) {
+	percent = ((msg->MM_size - msg->MM_remainingSize) * 100) / 
+	    msg->MM_size;
+	ProcCallFixedOrMovable_pascal(MakeWWFixed(percent),(char *)NULL,
+				      &stop,msg->MM_progressRoutine);
+    }
+    return stop;
+}	/* End of UpdateProgressSend	*/
+
+/***********************************************************************
+ *		SMTPNextState
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Based on the command executed in currentState and the 
+ *              responseCode from server, decide what state to go to.
+ * CALLED BY:	MSG_HT_STREAM_PUT_BLOCK
+ * RETURN:	HTSMTPState
+ *	
+ * STRATEGY:	If in Command Mode, use the Command State Diagram (the 
+ *              first state diagram) in RFC821. 
+ *
+ *              If in Data Mode, use the Data State Diagram (the second
+ *              state diagram) in RFC821.
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 6/97   	Initial Revision
+ *	
+ ***********************************************************************/
+static MSMTPState _pascal
+SMTPNextState (MSMTPState nextState, int responseCode)
+{
+
+	switch (responseCode) {
+		case 211:                       /* System status */
+			return nextState;
+		case 214:                       /* Help message */
+			return nextState;
+		case 220:                       /* Service ready */
+			return nextState;
+		case 221:                       /* Service closing transmission */
+			return nextState;
+		case 235:                       /* Successful authentication */
+			return nextState;
+		case 250:                       /* Action okay */
+			return nextState;
+		case 251:                       /* User not local, will forward */
+			return nextState;
+		case 334:                       /* Authentication challenge */
+			return nextState;
+		case 354:                       /* Start email input, end <CRLF>.<CRLF> */
+			return nextState;
+		case 421:                       /* Closing transmission */
+			return MAILSMTP_CONNECTION_CLOSED;
+		case 450:                       /* Mailbox busy/unavailable */
+			return MAILSMTP_MAILBOX_NOT_FOUND;
+		case 451:                       /* Aborted, local error in processing */
+			return MAILSMTP_ERROR;
+		case 452:                       /* Insufficient system storage */
+			return MAILSMTP_SERVER_OUT_OF_SPACE;
+		case 500:                       /* Command syntax error */
+			return MAILSMTP_COMMAND_ERROR;
+		case 501:                       /* Bad arguments */
+			return MAILSMTP_COMMAND_ERROR;
+		case 502:                       /* Command not implemented */
+			return MAILSMTP_ERROR;
+		case 503:                       /* Bad sequence of commands */
+			return MAILSMTP_COMMAND_ERROR;
+		case 504:                       /* Command parameter not implemented */
+			return MAILSMTP_ERROR;
+		case 550:                       /* Mailbox not found/unavailable */
+			return MAILSMTP_MAILBOX_NOT_FOUND;
+		case 551:                       /* User not local, try <forward-path> */
+			return MAILSMTP_MAILBOX_NOT_FOUND;
+		case 552:                       /* Aborted, exceed storage allocation */
+			return MAILSMTP_SERVER_OUT_OF_SPACE;
+		case 553:                       /* Mailbox syntax incorrect/not allowed */
+			return MAILSMTP_MAILBOX_NOT_FOUND;
+		case 554:                       /* Transaction failed, huh? */
+			return MAILSMTP_ERROR;
+		default:
+			EC_ERROR(MAILSMTP_RESPONSE_NOT_HANDLED);
+			return MAILSMTP_ERROR;
+		}
+
+}	/* End of SMTPNextState.	*/
+
+
+/***********************************************************************
+ *		GetFileHdr
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ ***********************************************************************/
+MailError _pascal
+GetFileHdr (MailMessage *msg, FileHandle fHan)
+{
+    MemHandle headerHandle;
+    char *headerPtr, c;
+    int len = 0, i, matchLen;
+    char match[] = {CR,CR,0};
+    MailError ret = ME_NONE;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    /* read the message header until you get to CRLF CRLF.  We don't 
+     * have to worry about getting a false start on the match, so we
+     * only have to do a simplified string search.
+     */
+    msg->MM_header = 0;
+    matchLen = strlen(match);
+
+    if (!(headerHandle = MemAlloc(MAX_HEADER_SIZE+sizeof(TCHAR), 
+		 HF_SWAPABLE | HF_SHARABLE, HAF_LOCK))) {
+	ret = ME_OUT_OF_MEMORY;
+    } else {
+	headerPtr = MemDeref(headerHandle);
+	i = 0;
+	while ((len < MAX_HEADER_SIZE) && (i < matchLen)) {
+	    if (!FileRead(fHan, &c, 1, FALSE)) {
+		break;
+	    }
+	    if (c == match[i]) {
+		++i;
+	    } else {
+		i = 0;
+	    }
+	    headerPtr[len] = c;
+	    ++len;
+	}
+	headerPtr[len] = NULL;
+	if (len >= MAX_HEADER_SIZE) {
+	    MemUnlock(headerHandle);
+	    MemFree(headerHandle);
+	    ret = ME_POP3_HEADER_TOO_LARGE;
+	} else {
+	    msg->MM_bodyOffset = len;
+	    MemReAlloc(headerHandle, len, HAF_NO_ERR);
+	    MemUnlock(headerHandle);
+	    msg->MM_header = headerHandle;
+	}
+
+    }
+    POPDS;
+    return ret;
+}	/* End of GetHdr.	*/
+
+
+/***********************************************************************
+ *		MailoutLoadHeader
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Takes the filename passed in fileName and copies the 
+ *              the header into a block for further use.  Also 
+ *              opens the message body file for further use.
+ *              Go through the header for the message and parse out
+ *              the fields into seperate strings and store those strings
+ *              in msg structure.
+ * CALLED BY:	Global
+ * RETURN:	Initialized fields in msg structure
+ ***********************************************************************/
+MailError _pascal 
+MailoutLoadHeader(MailMessage *msg, char *fileName )
+{
+    char *field, *bufferPtr, *data;
+    MemHandle buffer, mem;
+    FileHandle msgHandle;
+    ChunkHandle chunk;
+    MailError ret = ME_NONE;
+    Boolean stop;
+    TCHAR *afn;
+
+    /* Open the file with the message in it
+     */
+    FilePushDir();
+    FileSetStandardPath(SP_PRIVATE_DATA);
+    msgHandle = FileOpen(fileName,FILE_DENY_RW | FILE_ACCESS_RW);
+    /* save the size of the file so we can measure our progress
+     */
+    FilePopDir();
+    if (!msgHandle) {
+	ThreadGetError();
+	return ME_COULD_NOT_OPEN_FILE;
+    } else {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+	msg->MM_bodyFile = msgHandle;
+	/* this doesn't work in all fs drivers (only ms4) so we'll go with...
+	FileGetHandleExtAttributes(msgHandle, FEA_SIZE, &(msg->MM_size), sizeof(dword));
+	/* this more generic routine. jfh 6/7/04 */
+	msg->MM_size = FileSize(msgHandle);
+
+	msg->MM_remainingSize = msg->MM_size;
+	stop = UpdateProgressSend(msg);
+	if (!stop) {
+	    ret = GetFileHdr(msg,msgHandle);
+	    stop = UpdateProgressSend(msg);
+	}
+	if (stop) {
+	    ret = ME_USER_INTERRUPTED;
+	}
+	POPDS;
+     	if (!ret) {
+	    data = MemLock(msg->MM_header);
+	} else {
+	    FileClose(msgHandle,FILE_NO_ERRORS);
+	    return ret;
+	}
+    } 
+
+    if (!msg->MM_header) {
+	return ME_COULD_NOT_OPEN_FILE;
+    }
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    /* Allocate a buffer to pass to GetHdrValue
+     */
+    buffer = MemAlloc(FIELD_BUFFER_BLOCK_SIZE, HF_SWAPABLE | HF_SHARABLE, 
+		      HAF_LOCK );
+    if (buffer) {
+	bufferPtr = MemDeref(buffer);
+
+	if (msgHandle) {
+	    data = MemLock(msg->MM_header);
+
+	    /* Lock down the LMemHeap to hold the strings for all of 
+	     * the fields 
+	     */
+	    mem = msg->MM_storageBlock;
+	    MemLock(mem);
+
+	    /* Copy the data from the message header fields to the 
+	     * appropriate fields in the MailMessage structure
+	     */
+	    MailGetHdrValue(toString, bufferPtr, FIELD_BUFFER_BLOCK_SIZE ,data);
+	    if (bufferPtr[0]) {
+		chunk = LMemAlloc(mem, strlen(bufferPtr)+1);
+		field = (char *)LMemDerefHandles(mem, chunk);
+		strcpy(field, bufferPtr);
+		msg->MM_to = chunk;
+	    }
+
+	    MailGetHdrValue(fromString, bufferPtr, FIELD_BUFFER_BLOCK_SIZE ,data);
+	    if (bufferPtr[0]) {
+		chunk = LMemAlloc(mem, strlen(bufferPtr)+1);
+		field = (char *)LMemDerefHandles(mem, chunk);
+		strcpy(field, bufferPtr);
+		msg->MM_from = chunk;
+	    }
+
+	    MailGetHdrValue(ccString, bufferPtr, FIELD_BUFFER_BLOCK_SIZE ,data);
+	    if (bufferPtr[0]) {
+		chunk = LMemAlloc(mem, strlen(bufferPtr)+1);
+		field = (char *)LMemDerefHandles(mem, chunk);
+		strcpy(field, bufferPtr);
+		msg->MM_cc = chunk;
+	    }
+
+	   afn = MailLockStdString(MSS_ATTACH_FIELD_NAME);
+	   MailGetHdrValue(afn, bufferPtr, FIELD_BUFFER_BLOCK_SIZE ,data);
+	   MailUnlockStdString(MSS_ATTACH_FIELD_NAME);
+	    if (bufferPtr[0]) {
+		chunk = LMemAlloc(mem, strlen(bufferPtr)+1);
+		field = (char *)LMemDerefHandles(mem, chunk);
+		strcpy(field, bufferPtr);
+		msg->MM_attachment = chunk;
+	    }
+
+	    MailGetHdrValue(bccString, bufferPtr, FIELD_BUFFER_BLOCK_SIZE, data);
+	    if (bufferPtr[0]) {
+		chunk = LMemAlloc(mem, strlen(bufferPtr)+1);
+		field = (char *)LMemDerefHandles(mem, chunk);
+		strcpy(field, bufferPtr);
+		msg->MM_bcc = chunk;
+	    }
+	    
+	    MemUnlock(msg->MM_header);
+	    MemUnlock(mem);
+	} else {
+	    ret = ME_OUT_OF_MEMORY;
+	}
+	MemUnlock(buffer);
+	MemFree(buffer);
+    } else /* buffer allocation failed */ {
+	ret = ME_OUT_OF_MEMORY;
+	if (msg->MM_bodyFile) {
+	    FileClose(msg->MM_bodyFile,FILE_NO_ERRORS);
+	}
+    }
+
+    POPDS;
+    
+    return ret;
+}
+
+/***********************************************************************
+ *	
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Receive a block of data from HTSocket (i.e., server).
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    Changes @self->HTSMTPI_currentState.
+ *
+ * STRATEGY:	    The reply may be more than one line. The format of 
+ *                  multiline response requires that every line, except
+ *                  the last, begin with the reply code, followed imme-
+ *                  diately by hyphen, '-' (aka minus), followed by
+ *                  text. The last line will begin with the reply code,
+ *                  followed immediately by <SP>, optionally some text,
+ *                  and <CRLF>. For example
+ * 
+ *                     123-First line
+ *                     123-Second line
+ *                     123-234 text beginning with numbers
+ *                     123 The last line
+ *
+ *                  In the current implementation, we simply scan for 
+ *                  the reply code with a <SP>, text, and <CRLF>. We
+ *                  ignore all previous lines. We do not use the 
+ *                  information provided in reply text.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/ 5/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _pascal
+ParseSMTPReturnCode(char *data,int len)
+{
+    int parseState = SCAN_CODE;
+    int responseCode = 0;
+    char codeBuf[4] = {0,0,0,0};
+    int codeIndex = 0;
+
+    while (len-- > 0) {
+	if (parseState == SCAN_CODE) {
+	    /* 
+	     * Look for response code in the first three digits,
+	     * follow by a '-' or <SP>.
+	     */
+	    if (ISWHITE(*data)) {
+		parseState = LAST_LINE;
+	    } else if (*data == '-') {
+		parseState = INTERMEDIATE_LINE;
+	    } else if (ISDIGIT(*data)) {
+		/* Save the response code if it is not already saved */
+		if (codeIndex < 3) {
+		    codeBuf[codeIndex++]=*data;
+		    codeBuf[codeIndex]=0;
+		    if (codeIndex == 3)
+			responseCode = atoi(codeBuf);
+		}
+	    } else {
+		/* EC_WARNING(HTSMTP_CORRUPTED_RESPONSE); */
+		/* 
+		 * Based on the SMTP commands we use, this is more likely 
+		 * to be the last line than intermediate line.
+		 */
+		parseState = LAST_LINE;
+	    }
+
+	} else if (parseState == INTERMEDIATE_LINE) {
+	    /* Ignore text data, scan for end of line, <CRLF> */
+	    if (*data == CR) 
+		parseState = FCR_INTERMEDIATE;
+	    else if (*data ==  LF) 
+		parseState = SCAN_CODE;
+	    
+	} else if (parseState == FCR_INTERMEDIATE) {
+	    if (*data == LF) 
+		parseState = SCAN_CODE;
+
+	} else if (parseState == LAST_LINE) {
+	    /* Ignore text data, scan for end of line, <CRLF> */
+	    if (*data == CR)
+		parseState = FCR_LAST;
+	    else if (*data == LF) {
+		parseState = PARSE_DONE;
+		break;     /* Done parsing, ignore the rest of data */
+	    }
+
+	} else if (parseState == FCR_LAST) {
+	    if (*data == LF) {
+		parseState = PARSE_DONE;
+		break;     /* Done parsing, ignore the rest of data */
+	    }
+	}
+
+	data++;
+    }
+
+    return responseCode;
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+
+/***********************************************************************
+ *		ParseAddressString
+ ***********************************************************************
+ * SYNOPSIS:	Convert a string of addresses into a chunk array 
+ *              of address strings
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ ***********************************************************************/
+
+optr _pascal
+ParseAddressString(TCHAR *data)
+{
+    MemHandle mem;
+
+    mem = MailParseAddressString(data);
+    return(MPARC_ADDRESSES(mem));
+}
+
+
+/***********************************************************************
+ *		MSMTPSendMailFrom
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Push: MAIL <SP> FROM:<reverse-path> <CRLF>
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	Assume that the storage block is already locked.
+ ***********************************************************************/
+static SocketError _pascal
+MSMTPSendMailFrom (OUTBOX boxHandle, optr addressList, FileHandle logHan)
+{
+ SocketError ret;
+ Socket sock;
+ char address[MAX_IP_ADDR_STRING_LENGTH_ZT];
+#if ERROR_CHECK
+ int count;
+#endif
+ OutboxStruct *box;
+ char logString[50];
+
+	box = MemLock(boxHandle);
+	sock = box->OB_socket;
+	MemUnlock(boxHandle);
+
+	MemLock(OptrToHandle(addressList));
+
+#if ERROR_CHECK
+	count = ChunkArrayGetCount(addressList);
+	if (count != 1) {
+		EC_ERROR(MAILSMTP_TOO_MANY_FROM);
+		}
+#endif	
+	ChunkArrayGetElement(addressList, 0, address);
+	MemUnlock(OptrToHandle(addressList));
+
+	ret = SocketSend(sock, (void *)"MAIL FROM:<", 11, 0,(SocketAddress *)0);
+	if (logHan) {
+		strcpy(logString, "\r\nClient Sending -- MAIL FROM:<");
+		FileWrite(logHan, logString, strlen(logString), FALSE);
+		}
+	if (ret != SE_NORMAL)  return ret;
+
+	ret = SocketSend(sock, address, strlen(address), 0,(SocketAddress *)0);
+	if (logHan) {
+		strcpy(logString, "\r\nClient Sending -- ");
+		FileWrite(logHan, logString, strlen(logString), FALSE);
+		FileWrite(logHan, address, strlen(address), FALSE);
+		}
+	if (ret != SE_NORMAL)  return ret;
+
+	ret = SocketSend(sock, (void *)BRCRLF, 3, 0, (SocketAddress *)0);
+	if (logHan) {
+		strcpy(logString, "\r\nClient Sending -- BRCRLF");
+		FileWrite(logHan, logString, strlen(logString), FALSE);
+		}
+
+
+	return ret;
+
+}	/* End of SMTPPushMailFrom.	*/
+
+/***********************************************************************
+ *		MSMTPSendRcpTo
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Put: RCPT <SP> TO:<forward-path> <CRLF>
+ * CALLED BY:
+ * RETURN:	
+ *              
+ *	
+ * STRATEGY:	Put one receiver at a time. SMTP! Argh!!!
+ ***********************************************************************/
+static SocketError _pascal
+MSMTPSendRcptTo (OUTBOX boxHandle, optr addressList, FileHandle logHan)
+{
+    SocketError ret;
+    Socket sock;
+    char address[MAX_IP_ADDR_STRING_LENGTH_ZT];
+    int count,i, responseCode,numBytes;
+    OutboxStruct *box;
+    MemHandle dataHandle;
+	 byte *dataPtr;
+	 char logString[50];
+
+    box = MemLock(boxHandle);
+    sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+    MemLock(OptrToHandle(addressList));
+
+    if ((count = ChunkArrayGetCount(addressList)) < 1) {
+	EC_WARNING(MAILSMTP_TOO_FEW_TO);
+	ret = ME_NO_RECIPIENTS;
+    }
+
+    for (i=0;i<count; i++) {
+	ret = SocketSend(sock, (void *)"RCPT TO:<", 9, 0,
+		     (SocketError *)0);
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- RCPT TO:<");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+	if (ret != SE_NORMAL)
+	    break;
+
+	ChunkArrayGetElement(addressList, i, address);
+
+	ret = SocketSend(sock, address, strlen(address), 0,
+			 (SocketAddress *)0);
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- ");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			FileWrite(logHan, address, strlen(address), FALSE);
+			}
+
+	if (ret != SE_NORMAL) 
+	    break;
+
+	ret = SocketSend(sock, (void *)BRCRLF, 3, 0, (SocketAddress *)0);
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- BRCRLF");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+	if (ret != SE_NORMAL)
+	    break;
+
+	dataHandle = MailGetReturnData(sock,&numBytes);
+	responseCode = 550;
+	if (dataHandle) {
+	    dataPtr = MemLock(dataHandle);
+		if (logHan) {
+			strcpy(logString, "Server Response -- ");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			FileWrite(logHan, (char*)dataPtr, numBytes, FALSE);
+			}
+		 responseCode = ParseSMTPReturnCode((char *)dataPtr,numBytes);
+	    MemFree(dataHandle);
+	} 
+	if ((responseCode != 250) && (responseCode != 251)) {
+	    ret = SocketSend(sock, (void *)"RSET", 9, 0, (SocketError *)0);
+	    ret = SocketSend(sock, (void *)CRLF, 3, 0, (SocketAddress *)0);
+	    dataHandle = MailGetReturnData(sock,&numBytes);
+	    MemFree(dataHandle);
+
+	    /* return the address in the OUTBOX struct so the application
+	     * can report which address was bad.
+	     */
+	    dataHandle = MemAlloc(strlen(address)+sizeof(TCHAR), HF_SWAPABLE | HF_SHARABLE, HAF_LOCK);
+	    dataPtr = MemDeref(dataHandle);
+		 strcpy((char*)dataPtr, address);
+		 MemUnlock(dataHandle);
+	    box = MemLock(boxHandle);
+	    box->OB_errorData = dataHandle;
+	    MemUnlock(boxHandle);
+
+	    ret = ME_SOME_BAD_RECIPIENTS;
+	    break;
+	}
+    }
+
+    MemUnlock(OptrToHandle(addressList));
+
+    return ret;
+}
+
+
+
+/***********************************************************************
+ *		MailoutSendMail
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Run the SMTP finite state machine. 
+ * PARAMETERS:	    int (HTNetThread *net)
+ *                  If we return anything other than HT_OK, the protocol
+ *                  will be killed by the HTNetScheduler in HTCore.
+ *
+ *                  Possible return codes:
+ *                  HT_OK
+ *                     - generic success
+ *                  HT_ERROR, HT_NO
+ *                     - unrecoverable programming error.
+ *                  HT_SOCKET_ERROR
+ *                     - unrecoverable socket error.
+ *                  HT_CANNOT_RESOLVE_HOST_NAME
+ *                     - could not resolve host.
+ *                  HT_CANNOT_CONNECT
+ *                     - could not connect to server.
+ *                  HT_LINK_FAILED
+ *                     - low level link failed. Usually bad "ini" settings
+ *                       or some low level protocol not working. Reboot!
+ *                  HT_CONNECTION_CLOSED
+ *                     - connection closed prematurely by server or some 
+ *                       interference.
+ *		    HT_INTERRUPTED
+ *                     - interrupted by HTRequestKill or HTRequestKillAll.
+ *                  HT_SERVER_OUT_OF_MEMORY
+ *                     - server out of memory. Either message to send
+ *                       too big or try later.
+ *                  HT_OUT_OF_MEMORY
+ *                     - system out of memory.
+ *                  
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    HTSMTP is implemented as an FSM. This means that 
+ *                  this protocol handler exits if has nothing useful
+ *                  to do and enter later to resume execution from the 
+ *                  previous state.
+ *
+ *                  HTSMTP Finite state machine runs in two modes:
+ *                   1. Command Mode.
+ *                   2. Data Mode.
+ *        
+ *                  In Command Mode, HTSMTPClass interacts with an SMTP
+ *                  server using SMTP commands. These are all the SMTP
+ *                  commands other than DATA.
+ *
+ *                  In Data Mode, HTSMTPClass is used to push data to 
+ *                  server in using DATA command.
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	4/30/97   	Initial Revision
+ *	
+ ***********************************************************************/
+#define CONNECT_GREATING_SZ 1024
+SocketError _pascal
+MailoutSendMail(OUTBOX boxHandle, MailMessage *msg, FileHandle logHan,
+                Boolean auth)
+{
+	 MSMTPState currentState = MAILSMTP_BEGIN;
+    MSMTPState previousState = MAILSMTP_BEGIN;
+    MSMTPState nextState = MAILSMTP_BEGIN;
+    SocketError rcode = SE_NORMAL;
+    int numBytes, responseCode;
+    MemHandle dataHandle;
+    byte *dataPtr;
+    optr addressList;
+    OutboxStruct *box;
+    Socket sock;
+	 char logString[50], encodedStr[50];
+	 word	num;
+	 word challenge;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    box = MemLock(boxHandle);
+	 sock = box->OB_socket;
+    MemUnlock(boxHandle);
+
+
+    /* 
+     * Now jump into the state machine. We know the state from the 
+     * previous run. This is one big switch loop.
+     */
+    while (1) {
+
+	switch (currentState) {
+
+	case MAILSMTP_BEGIN:
+	{
+		/* Alread Connected */
+
+		/*
+		 * Create a MIME (RFC1521, RFC1522) / Internet Text
+		 * Message (RFC822) parser/checker (which we call 
+		 * SMTPMessage) and bind it to input stream stack.
+		 * 
+		 * HTSocket <-- SMTPMessage
+		 */
+	    currentState = MAILSMTP_CONNECT;
+	}
+	break;
+
+	case MAILSMTP_CONNECT:
+	{
+		/* There is a greeting left over from when we connected
+		 * so we need to swallow that in MAILSMTP_CHECK_COMMAND_RESPONSE
+		 * before we can move on to Helo
+		 */
+	    previousState = MAILSMTP_CONNECT;
+	    /* it seems that some servers are returning data
+	     * when the connect, and some are not.  We don't 
+	     * really care, so lets just get any data that is there
+	     * and throw it away 
+	     */
+	    previousState = MAILSMTP_CONNECT;
+	    currentState = MAILSMTP_CHECK_COMMAND_RESPONSE;
+	    nextState = MAILSMTP_HELO;
+	}
+	break;
+
+	case MAILSMTP_HELO:
+	    /* 
+	     * Put: HELO <SP> <domain> <CRLF>
+	     */
+	    /* 
+	     * The first command in a session must be the HELO command. 
+		  * This state is entered before we begin sending a new email.
+		  * jfh - try EHLO
+	     */
+	{
+		 rcode = SocketSend(sock, (void *)"EHLO ",
+					 5, 0, (SocketAddress *)0);
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- EHLO ");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+		 if ( rcode != SE_NORMAL) {
+		goto popexit;
+		 }
+
+		 rcode = SocketSend(sock, (void *)domain,
+			       strlen(domain), 0, (SocketAddress *)0);
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- ");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			FileWrite(logHan, domain, strlen(domain), FALSE);
+			}
+		 if ( rcode != SE_NORMAL) {
+		goto popexit;
+	    }
+
+		 rcode = SocketSend(sock, (void *)CRLF, 2,
+					 0, (SocketAddress *)0);
+
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- CRLF");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+		 if (rcode != SE_NORMAL) goto popexit;
+
+		 previousState = MAILSMTP_HELO;
+		 currentState = 	MAILSMTP_CHECK_COMMAND_RESPONSE;
+		 if (auth) nextState = MAILSMTP_AUTH;
+		 else nextState = MAILSMTP_MAIL;
+
+	}
+	break;
+
+	case MAILSMTP_MAIL:
+		/*
+		 * Put: MAIL <SP> FROM:<reverse-path> <CRLF>
+		 */
+
+		/* convert the from from field to a list of addresses that we
+		 * we can send
+		 */
+		MemLock(msg->MM_storageBlock);
+		dataPtr = LMemDerefHandles(msg->MM_storageBlock,msg->MM_from);
+		addressList = ParseAddressString((char *)dataPtr);
+		if (!addressList) {
+			rcode = SE_INTERNAL_ERROR;
+			MemUnlock(msg->MM_storageBlock);
+			goto popexit;
+			}
+		MemUnlock(msg->MM_storageBlock);
+
+		rcode = MSMTPSendMailFrom(boxHandle, addressList, logHan);
+		MemFree(OptrToHandle(addressList));
+		if (rcode != SE_NORMAL)
+			goto popexit;
+
+		previousState = MAILSMTP_MAIL;
+		currentState = MAILSMTP_CHECK_COMMAND_RESPONSE;
+		nextState = MAILSMTP_RCPT;
+
+		break;
+
+
+	case MAILSMTP_AUTH:
+		/*
+		 * Put: AUTH LOGIN<CRLF>
+		 * Tell the server we're ready to authenticate
+		 */
+
+		rcode = SocketSend(sock, (void *)"AUTH LOGIN",
+					 10, 0, (SocketAddress *)0);
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- AUTH LOGIN");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+		if ( rcode != SE_NORMAL)  goto popexit;
+
+		rcode = SocketSend(sock, (void *)CRLF, 2,
+					 0, (SocketAddress *)0);
+
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- CRLF");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+		 if (rcode != SE_NORMAL) goto popexit;
+
+		previousState = MAILSMTP_AUTH;
+		currentState = MAILSMTP_CHECK_COMMAND_RESPONSE;
+		nextState = MAILSMTP_AUTH_REPLY;
+		challenge = 1;
+
+		break;
+
+	case MAILSMTP_AUTH_REPLY:
+		/*
+		 * Put: <username> or <password><CRLF>
+		 * Reply to the challenge with base64 encoded username or password
+		 * depending which pass thru this is.  ASSUMING the first pass is
+		 * username and the second is password (like Verizon)
+		 */
+
+		if (challenge == 1)  {
+			/* base64 encode the login and send it */
+			box = MemLock(boxHandle);
+			num = MailB64EncodePtr((byte*)(box->OB_clientName),
+										  strlen(box->OB_clientName), (byte*)encodedStr);
+			encodedStr[num] = 0;
+			MemUnlock(boxHandle);
+			rcode = SocketSend(sock, (void *)encodedStr,
+								 num, 0, (SocketAddress *)0);
+			if (logHan) {
+				strcpy(logString, "\r\nClient Sending login -- ");
+				FileWrite(logHan, logString, strlen(logString), FALSE);
+				FileWrite(logHan, encodedStr, num, FALSE);
+				}
+			if ( rcode != SE_NORMAL)  goto popexit;
+
+			rcode = SocketSend(sock, (void *)CRLF, 2, 0, (SocketAddress *)0);
+			if (logHan) {
+				strcpy(logString, "\r\nClient Sending -- CRLF");
+				FileWrite(logHan, logString, strlen(logString), FALSE);
+				}
+			if ( rcode != SE_NORMAL)  goto popexit;
+			}
+
+		if (challenge == 2)  {
+			/* base64 encode the password and send it */
+			box = MemLock(boxHandle);
+			num = MailB64EncodePtr((byte*)(box->OB_password),
+										  strlen(box->OB_password), (byte*)encodedStr);
+			encodedStr[num] = 0;
+			MemUnlock(boxHandle);
+			rcode = SocketSend(sock, (void *)encodedStr,
+								 num, 0, (SocketAddress *)0);
+			if (logHan) {
+				strcpy(logString, "\r\nClient Sending password -- ");
+				FileWrite(logHan, logString, strlen(logString), FALSE);
+				FileWrite(logHan, encodedStr, num, FALSE);
+				}
+			if ( rcode != SE_NORMAL)  goto popexit;
+
+			rcode = SocketSend(sock, (void *)CRLF, 2, 0, (SocketAddress *)0);
+			if (logHan) {
+				strcpy(logString, "\r\nClient Sending -- CRLF");
+				FileWrite(logHan, logString, strlen(logString), FALSE);
+				}
+			if ( rcode != SE_NORMAL)  goto popexit;
+			}
+
+		previousState = MAILSMTP_AUTH_REPLY;
+		currentState = MAILSMTP_CHECK_COMMAND_RESPONSE;
+		if (challenge == 1) {
+			challenge++;
+			nextState = MAILSMTP_AUTH_REPLY;
+			}
+		else nextState = MAILSMTP_MAIL;
+
+		break;
+
+
+	case MAILSMTP_RCPT:
+
+	    /* TO: List */
+	    if (msg->MM_to) {
+		MemLock(msg->MM_storageBlock);
+		dataPtr = LMemDerefHandles(msg->MM_storageBlock,msg->MM_to);
+		addressList = ParseAddressString((char *)dataPtr);
+		MemUnlock(msg->MM_storageBlock);
+
+		/*
+		 * Put: RCPT <SP> TO:<forward-path> <CRLF>
+		 */
+		rcode = MSMTPSendRcptTo(boxHandle,addressList, logHan);
+		MemFree(OptrToHandle(addressList));
+		if (rcode != SE_NORMAL) {
+		    goto popexit;
+		}
+
+	    }
+
+	    /* CC: List */
+	    if (msg->MM_cc) {
+		MemLock(msg->MM_storageBlock);
+		dataPtr = LMemDerefHandles(msg->MM_storageBlock,msg->MM_cc);
+		addressList = ParseAddressString((char *)dataPtr);
+		MemUnlock(msg->MM_storageBlock);
+
+		/*
+		 * Put: RCPT <SP> TO:<forward-path> <CRLF>
+		 */
+		rcode = MSMTPSendRcptTo(boxHandle,addressList, logHan);
+		MemFree(OptrToHandle(addressList));
+		if (rcode != SE_NORMAL) {
+		    goto popexit;
+		}
+	    }
+	    
+	    /* BCC: List */
+	    if (msg->MM_bcc) {
+		MemLock(msg->MM_storageBlock);
+		dataPtr = LMemDerefHandles(msg->MM_storageBlock,msg->MM_bcc);
+		addressList = ParseAddressString((char *)dataPtr);
+		MemUnlock(msg->MM_storageBlock);
+
+		/*
+		 * Put: RCPT <SP> TO:<forward-path> <CRLF>
+		 */
+		rcode = MSMTPSendRcptTo(boxHandle,addressList, logHan);
+		MemFree(OptrToHandle(addressList));
+		if (rcode != SE_NORMAL) {
+		    goto popexit;
+		}
+		 }
+
+	    /* MSMTPSendRcptTo checks the response, so we do not need
+	     * to check for a command response in this state.
+	     */
+	    previousState = MAILSMTP_RCPT;
+	    currentState = MAILSMTP_DATA;
+	    break;
+
+	case MAILSMTP_DATA:
+	    /* 
+	     * Put: DATA <CRLF>
+	     */
+		 rcode = SocketSend(sock, (void *)"DATA", 4,0,
+			     (SocketAddress *)0);
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- DATA CRLF");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+		 if (rcode != SE_NORMAL)
+		goto popexit;
+
+	    rcode = SocketSend(sock, (void *)CRLF, 2,0,
+			     (SocketAddress *)0);
+	    if (rcode != SE_NORMAL)
+		goto popexit;
+
+		 previousState = MAILSMTP_DATA;
+	    currentState = MAILSMTP_CHECK_COMMAND_RESPONSE;
+	    nextState = MAILSMTP_DATAI;
+	    break;
+
+	case MAILSMTP_DATAI:
+	    /* 
+	     * Put message to server. Transparency of "<CRLF>.<CRLF>" is 
+	     * ensured by SMTPMessageClass.
+	     */
+		 rcode = MSMTPSendMsg(boxHandle,msg/*, logHan*/);
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- the email");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+		 if (rcode != SE_NORMAL)
+		goto popexit;
+
+	    /* Put end of message */
+		 rcode = SocketSend(sock, (void*)ENDDATA, 5, 0,
+			       (SocketAddress *)0 );
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- ENDDATA");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+		 if (rcode != SE_NORMAL)
+		goto popexit;
+
+	    previousState = MAILSMTP_DATAI;
+	    currentState = MAILSMTP_CHECK_COMMAND_RESPONSE;
+		 nextState = MAILSMTP_QUIT;
+	    break;
+
+	case MAILSMTP_QUIT:
+	    /*
+	     * Put: QUIT <CRLF>
+	     *
+	     * @@@
+	     * Actually, I can allow for more messages to be sent
+	     * in one session before quitting. Will see what Ericsson 
+	     * think.
+	     */
+	    SocketSend(sock, (void *)"QUIT", 4, 0, 
+		       (SocketAddress *)0);
+	    SocketSend(sock, (void *)CRLF, 2, 0,
+		       (SocketAddress *)0);
+		if (logHan) {
+			strcpy(logString, "\r\nClient Sending -- QUITCRLF");
+			FileWrite(logHan, logString, strlen(logString), FALSE);
+			}
+		 /*
+	     * Don't even bother getting response as we are 
+	     * terminating the socket after this.
+	     */
+	    goto popexit;
+
+
+	    
+	case MAILSMTP_CHECK_COMMAND_RESPONSE:
+		/*
+		 * Get the response from the SMTP server,
+		 *
+		 */
+		dataHandle = MailGetReturnData(sock,&numBytes);
+		if (dataHandle) {
+			dataPtr = MemLock(dataHandle);
+			if (logHan) {
+				strcpy(logString, "\r\nServer Response -- ");
+				FileWrite(logHan, logString, strlen(logString), FALSE);
+				FileWrite(logHan, (char*)dataPtr, numBytes, FALSE);
+				}
+			responseCode = ParseSMTPReturnCode((char *)dataPtr,numBytes);
+			MemUnlock(dataHandle);
+			MemFree(dataHandle);
+			/* see if the server wants auth */
+/*			if (responseCode == 553) {
+				if (previousState == MAILSMTP_MAIL)
+					/* Yup - most likely */
+/*					currentState = MAILSMTP_AUTH;
+				}
+			else */ currentState = SMTPNextState(nextState, responseCode);
+			} 
+		else {  /* something's wrong */
+			switch(previousState) {
+				case MAILSMTP_CONNECT:
+					rcode = ME_SMTP_SERVER_FAILED_TO_RESPOND;
+					break;
+				default:
+					rcode = ME_UNEXPECTED_VALUE;
+					break;
+				}
+			goto popexit;
+			}
+		break;
+ 
+	case MAILSMTP_MAILBOX_NOT_FOUND:
+	    rcode = ME_LOGIN_FAILED;
+	    goto popexit;
+
+	case MAILSMTP_ERROR:
+	    
+	case MAILSMTP_COMMAND_ERROR:
+
+	default:
+	    rcode = SE_INTERNAL_ERROR;
+	    goto popexit;
+	}
+    }
+
+popexit:
+
+    MailMessageClose(msg);
+    POPDS;
+    return rcode;
+
+
+
+}
+
+
+
+/***********************************************************************
+ *		MailoutClose
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Close the socket for box
+ * CALLED BY:	
+ * RETURN:	
+ ***********************************************************************/
+void _pascal
+MailoutClose (OUTBOX boxHandle)
+{
+    OutboxStruct *box;
+
+    box = MemLock(boxHandle);
+    SocketClose(box->OB_socket);
+    MemFree(boxHandle);
+    
+}	/* End of MailoutClose.	*/
+
+#if 0
+void _pascal
+MailoutCloseFast (OUTBOX boxHandle)
+{
+    OutboxStruct *box;
+
+    box = MemLock(boxHandle);
+    SocketCloseSend(box->OB_socket);
+    SocketReset(box->OB_socket);
+    SocketClose(box->OB_socket);
+    MemFree(boxHandle);
+    
+}	/* End of MailoutClose.	*/
+#endif

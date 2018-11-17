@@ -1,0 +1,706 @@
+
+/*
+ *
+ * Project:	PC GEOS
+ * Module:	desktop
+ * File:	UI/uiDisk.ui
+ *
+ * Author:	Brian Chin
+ *
+ *	This file contains the user Interface description for the
+ * desktop.
+ *
+ *	$Id: cuiDisk.ui,v 1.2 98/06/03 13:48:29 joon Exp $
+ *
+ */
+
+
+start DiskMenuResource, notDetachable;
+
+/*-----------------------------------------------------------------------------
+	DiskMenu dialog boxes
+-----------------------------------------------------------------------------*/
+
+#ifndef GEOLAUNCHER		/* only Format for GEOLAUNCHER */
+
+/*
+ *	disk copy box
+ */
+
+DiskCopyBox = GenInteraction ignoreDirty {
+	moniker = "Copy Disk";
+	children = DiskCopyChoicesPrompt,
+		   DiskCopyChoices,
+		   DiskCopyGreedyOption,
+		   DiskCopyCopy;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		HINT_DISMISS_WHEN_DISABLED,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_HELP_CONTEXT { char "dCpDisk",0 } 
+	}
+}
+
+DiskCopyChoicesPrompt = GenText ignoreDirty {
+#if _GMGR
+	text = "Select source and destination for disk copy:";
+#endif		/* if _GMGR */
+#if _NEWDESK
+	text = "Select destination for disk copy:";
+#endif		/* if _NEWDESK */
+	genAttributes = readOnly;
+	textDisplayAttributes = DESK_SINGLE_LINE_DISPLAY_ATTRIBUTES;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+DiskCopyChoices = GenInteraction ignoreDirty {
+	children =	
+#if _GMGR
+			DiskCopySourceListGroup,
+#endif		/* if _GMGR */
+			DiskCopyDestListGroup;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_ON_MONIKERS
+	}
+}
+
+#if _GMGR
+DiskCopySourceListGroup = GenInteraction ignoreDirty {
+	moniker = 'S', "Source:";
+	children = DiskCopySourceList;
+}
+#endif		/* if _GMGR */
+
+DiskCopySourceList = DriveList ignoreDirty {
+	applyMsg = MSG_DISK_COPY_SOURCE_DRIVE;
+	destination = process;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+			word 0
+		}
+	}
+}
+
+DiskCopyDestListGroup = GenInteraction ignoreDirty {
+	moniker = 'D', "Destination:";
+	children = DiskCopyDestList;
+}
+DiskCopyDestList = DriveList ignoreDirty {
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+			word 0
+		}
+	}
+}
+
+DiskCopyGreedyOption = GenItemGroup ignoreDirty {
+	moniker = 'M', "Memory Usage:";
+#if _NEWDESKBA
+	genStates = default -usable;
+#endif		/* if _NEWDESKBA */
+	children = DiskCopyGreedyOn, DiskCopyGreedyOff;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+	selection = "mask DCF_GREEDY";
+}
+
+DiskCopyGreedyOn = GenItem {
+	moniker = 'H', "High (Fast)";
+	identifier = "mask DCF_GREEDY";
+}
+
+DiskCopyGreedyOff = GenItem {
+	moniker = 'L', "Low (Slower)";
+	identifier = "0";
+}
+
+DiskCopyCopy = GenTrigger ignoreDirty {
+	moniker = 'C', "Copy";
+	action = MSG_DISK_COPY_COPY, process;
+	genAttributes = signalInteractionComplete;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+/*
+ *	disk copy status
+ */
+CopyStatusBox = GenInteraction ignoreDirty {
+	children = CopyStatusGroup, CopyStatusCancel;
+	type = progress;
+	visibility = dialog;
+	attributes = default +modal;
+}
+CopyStatusGroup = GenInteraction ignoreDirty {
+	moniker = " ";
+	/* dummy moniker moniker set on the fly */
+	children = CopyStatusPercentage;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+CopyStatusPercentage = GenText ignoreDirty {
+	genAttributes = readOnly;
+	moniker = "        Percent Complete:";
+	textDisplayAttributes = DESK_SINGLE_LINE_DISPLAY_ATTRIBUTES;
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 1*72>
+			SpecHeight <>
+		  },
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+
+}
+CopyStatusCancel = CancelTrigger ignoreDirty {
+	moniker = 'S', "Stop Disk Copy";
+	hints = {
+		HINT_TRIGGER_DESTRUCTIVE_ACTION,	/* no focus, please */
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_STOP}
+	}
+}
+
+visMoniker CopyStatusReadingMoniker = "Reading...";
+visMoniker CopyStatusWritingMoniker = "Writing...";
+visMoniker CopyStatusFormatMoniker = "Formatting...";
+
+#endif
+
+/*
+ *	disk format box
+ */
+
+DiskFormatBox = GenInteraction ignoreDirty {
+#if !_ZMGR
+	moniker = "Format Disk";
+#else
+	moniker = "Format Card";
+#endif
+	children = DiskFormatChoicesPrompt,
+		   DiskFormatChoices,
+#if _NEWDESKBA
+		   DiskFormatFormat,
+		   DiskFormatCancel;
+#else
+		   DiskFormatFormat;
+#endif
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		HINT_DISMISS_WHEN_DISABLED,
+		ATTR_GEN_HELP_CONTEXT { char "dFormat",0 } 
+	}
+}
+
+DiskFormatChoicesPrompt = GenText ignoreDirty {
+#if _GMGR
+	text = "Select drive and size for format:";
+#endif		/* #if _GMGR */
+#if _NEWDESK
+	text = "Insert the diskette into the disk drive and select the formatting options:";
+#endif		/* #if _NEWDESK */
+	genAttributes = readOnly;
+	textDisplayAttributes = DESK_SINGLE_LINE_DISPLAY_ATTRIBUTES;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+DiskFormatChoices = GenInteraction ignoreDirty {
+	children =
+#if _GMGR
+			DiskFormatSourceListGroup,
+#endif		/* #if _GMGR */
+			DiskFormatMediaListGroup,
+			DiskFormatQuickMode;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_ON_MONIKERS
+	}
+}
+
+#if _GMGR
+DiskFormatSourceListGroup = GenInteraction ignoreDirty {
+	moniker = 'D', "Drive:";
+	children = DiskFormatSourceList;
+}
+DiskFormatSourceList = DriveList ignoreDirty {
+	applyMsg= MSG_DISK_FORMAT_SOURCE_DRIVE;
+	destination = process;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		/*HINT_ORIENT_CHILDREN_HORIZONTALLY,*/
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+			word 0
+		}
+	}
+}
+#endif		/* #if _GMGR */
+
+DiskFormatMediaListGroup = GenInteraction ignoreDirty {
+	moniker = 'S', "Size:";
+	children = DiskFormatMediaList;
+}
+DiskFormatMediaList = GenItemGroup ignoreDirty {
+	children =	DiskFormatMedia2M88,
+			DiskFormatMedia1M44,
+#ifdef DO_PIZZA
+			DiskFormatMedia1M232,
+#endif
+			DiskFormatMedia1M2,
+			DiskFormatMedia720,
+#ifdef DO_PIZZA
+			DiskFormatMedia640,
+#endif
+			DiskFormatMedia360,
+			DiskFormatMedia320,
+			DiskFormatMedia180,
+			DiskFormatMedia160,
+			DiskFormatMediaFixed,
+	/* Always include SRAM & ATA here, as they can be formatted without
+	 * special support... */
+			DiskFormatMediaSRAM,
+			DiskFormatMediaATA,
+#if	_PCMCIA_FORMAT
+			DiskFormatMediaFLASH,
+#endif
+			DiskFormatMediaCustom;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+			word 0
+		}
+	}
+}
+DiskFormatMediaCustom = GenItem ignoreDirty {
+	moniker = "Default";
+	identifier = MEDIA_CUSTOM;
+	genStates = default -usable;
+}
+
+DiskFormatMediaFixed = GenItem ignoreDirty {
+	moniker = "Fixed Disk";
+	identifier = MEDIA_FIXED_DISK;
+	genStates = default -usable;
+}
+DiskFormatMedia160 = GenItem ignoreDirty {
+	/*moniker = '6', "160K (Rarely Used)";*/
+	moniker = '6', "160K";
+	identifier = MEDIA_160K;
+	genStates = default -usable;
+}
+DiskFormatMedia180 = GenItem ignoreDirty {
+	/*moniker = '8', "180K (Rarely Used)";*/
+	moniker = '8', "180K";
+	identifier = MEDIA_180K;
+	genStates = default -usable;
+}
+DiskFormatMedia320 = GenItem ignoreDirty {
+	/*moniker = '2', "320K (Rarely Used)";*/
+	moniker = '2', "320K";
+	identifier = MEDIA_320K;
+	genStates = default -usable;
+}
+DiskFormatMedia360 = GenItem ignoreDirty {
+	/*moniker = '3', "360K (Low Density)";*/
+	moniker = '3', "360K";
+	identifier = MEDIA_360K;
+	genStates = default -usable;
+}
+DiskFormatMedia720 = GenItem ignoreDirty {
+	/*moniker = '7', "720K (Low Density)";*/
+	moniker = '7', "720K";
+	identifier = MEDIA_720K;
+	genStates = default -usable;
+}
+DiskFormatMedia1M2 = GenItem ignoreDirty {
+	/*moniker = '1', "1.2M (Requires High Density Diskette)";*/
+	moniker = '1', "1.2M";
+	identifier = MEDIA_1M2;
+	genStates = default -usable;
+}
+/* these two can have same mnemonic as they can't be simultaneous */
+DiskFormatMedia1M44 = GenItem ignoreDirty {
+	/*moniker = '1', "1.44M (Requires High Density Diskette)";*/
+	moniker = '1', "1.44M";
+	identifier = MEDIA_1M44;
+	genStates = default -usable;
+}
+
+/* can have same mnemonic as 320K as they can't be simultaneous */
+DiskFormatMedia2M88 = GenItem ignoreDirty {
+	/*moniker = '2', "2.88M (Requires High Density Diskette)";*/
+	moniker = '2', "2.88M";
+	identifier = MEDIA_2M88;
+	genStates = default -usable;
+}
+
+#ifdef DO_PIZZA
+/* same kbd-moniker as 160K b/c cannot occur with 160K */
+DiskFormatMedia640 = GenItem ignoreDirty {
+	moniker = '6', "640K";
+	identifier = MEDIA_640K;
+	genStates = default -usable;
+}
+/* same kbd-moniker as 360K b/c cannot occur with 360K */
+DiskFormatMedia1M232 = GenItem ignoreDirty {
+	moniker = '3', "1.232M";
+	identifier = MEDIA_1M232;
+	genStates = default -usable;
+}
+#endif
+
+DiskFormatMediaSRAM = GenItem ignoreDirty {
+	moniker =  "SRAM";
+	identifier = MEDIA_SRAM;
+	genStates = default -usable;
+}
+
+DiskFormatMediaATA = GenItem ignoreDirty {
+	moniker =  "ATA";
+	identifier = MEDIA_ATA;
+	genStates = default -usable;
+}
+
+#if	_PCMCIA_FORMAT
+
+DiskFormatMediaFLASH = GenItem ignoreDirty {
+	moniker =  "FLASH";
+	identifier = MEDIA_FLASH;
+	genStates = default -usable;
+}
+
+#endif
+
+DiskFormatQuickMode = GenItemGroup ignoreDirty {
+	moniker = 'Q', "Quick Format:";
+	children = DiskFormatQuickYes, DiskFormatQuickNo;
+	numSelections = 1;
+	selection = "mask DFF_CALLBACK_PCT_DONE";
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+			word 0
+		}
+	}
+}
+
+DiskFormatQuickYes = GenItem ignoreDirty {
+	moniker = 'I', "If Possible";
+	identifier = "mask DFF_CALLBACK_PCT_DONE";	/* DiskFormatFlags */
+}
+
+DiskFormatQuickNo = GenItem ignoreDirty {
+	moniker = 'N', "No";
+							/* DiskFormatFlags */
+	identifier = "mask DFF_CALLBACK_PCT_DONE or mask DFF_FORCE_ERASE";
+}
+
+
+DiskFormatFormat = GenTrigger ignoreDirty {
+	moniker = "OK";
+	action = MSG_DISK_FORMAT_FORMAT, process;
+	genAttributes = signalInteractionComplete;
+	hints = {
+#if !_NEWDESKBA
+		HINT_DEFAULT_DEFAULT_ACTION,
+#endif		/* if !_NEWDESKBA */
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+#if _NEWDESKBA
+DiskFormatCancel = GenTrigger ignoreDirty {
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word IC_DISMISS
+		},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+#endif		/* if _NEWDESKBA */
+
+
+/*
+ * prompt for volume name for disk to be formatted
+ */
+FormatVolumeBox = GenInteraction ignoreDirty {
+	children =	FormatVolumeText,
+			FormatVolumeEntry,
+#if _NEWDESKBA
+			FormatVolumeOK,
+			FormatVolumeCancel;
+#else
+			FormatVolumeOK;
+#endif
+	type = command;
+	visibility = dialog;
+	attributes = default +modal,
+			+initiatedViaUserDoDialog;
+#if _GMGR
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dVolName",0 }
+	}
+#endif
+}
+FormatVolumeText = GenText ignoreDirty {
+	genAttributes = readOnly;
+	text = "Enter volume name for format:";
+}
+FormatVolumeEntry = GenText ignoreDirty {
+	textDisplayAttributes = DESK_SINGLE_LINE_EDIT_ATTRIBUTES;
+	maxLength = "VOLUME_NAME_LENGTH";
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		ATTR_GEN_TEXT_LEGAL_DOS_VOLUME_NAMES,
+		ATTR_GEN_TEXT_ALLOW_SPACES,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+FormatVolumeOK = GenTrigger ignoreDirty {
+	moniker = 'F', "Format";
+	genAttributes = signalInteractionComplete;
+	hints = {
+#if !_NEWDESKBA
+		HINT_DEFAULT_DEFAULT_ACTION,
+#endif		/* if !_NEWDESKBA */
+		HINT_SEEK_REPLY_BAR,
+					/* for UserDoDialog response */
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word OKCANCEL_OK}
+	}
+}
+
+#if _NEWDESKBA
+FormatVolumeCancel = GenTrigger ignoreDirty {
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word IC_DISMISS
+		},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+#endif		/* if _NEWDESKBA */
+
+
+
+/*
+ * status of format
+ */
+FormatStatusBox = GenInteraction ignoreDirty {
+	children = FormatStatusGroup, FormatStatusCancel;
+	type = progress;
+	visibility = dialog;
+	attributes = default +modal;
+}
+FormatStatusGroup = GenInteraction ignoreDirty {
+	moniker = "Formatting...";
+	children = FormatStatusPercentage;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+FormatStatusPercentage = GenText ignoreDirty {
+	genAttributes = readOnly;
+	moniker = "        Percent Complete:";
+	textDisplayAttributes = DESK_SINGLE_LINE_DISPLAY_ATTRIBUTES;
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 1*72>
+			SpecHeight <>
+		  },
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+FormatStatusCancel = CancelTrigger ignoreDirty {
+#if _ZMGR
+	moniker = 'S', "Stop Format";
+#else
+	moniker = 'S', "Stop Disk Format";
+#endif
+	hints = {
+		HINT_TRIGGER_DESTRUCTIVE_ACTION,	/* no focus, please */
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_STOP}
+	}
+}
+
+FormatDoneBox = GenInteraction ignoreDirty {
+	children = FormatSizeGroup;
+	type = notification;
+	visibility = dialog;
+	attributes = default +modal;
+}
+FormatSizeGroup = GenInteraction ignoreDirty {
+	moniker = "Format Complete:";
+	children = FormatSizesText1, FormatSizesText2, FormatSizesText3;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_CENTER_CHILDREN_ON_MONIKERS
+	}
+}
+FormatSizesText1 = GenText ignoreDirty {
+	genAttributes = readOnly;
+#if _ZMGR
+	moniker = "Total Bytes of Space:";
+#else
+	moniker = "Total Bytes of Disk Space:";
+#endif
+	textDisplayAttributes = DESK_SINGLE_LINE_DISPLAY_ATTRIBUTES;
+	hints = {
+		  HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 10+26>
+			SpecHeight <>
+		  },
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+FormatSizesText2 = GenText ignoreDirty {
+	genAttributes = readOnly;
+	moniker = "Bytes in Bad Sectors:";
+	textDisplayAttributes = DESK_SINGLE_LINE_DISPLAY_ATTRIBUTES;
+	hints = {
+		  HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 10+22>
+			SpecHeight <>
+		  },
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+FormatSizesText3 = GenText ignoreDirty {
+	genAttributes = readOnly;
+#if _ZMGR
+	moniker = "Bytes Available:";
+#else
+	moniker = "Bytes Available on Disk:";
+#endif
+	textDisplayAttributes = DESK_SINGLE_LINE_DISPLAY_ATTRIBUTES;
+	hints = {
+		  HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 10+24>
+			SpecHeight <>
+		  },
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+#ifndef GEOLAUNCHER		/* only Format for GEOLAUNCHER */
+
+/*
+ *	disk rename box
+ */
+
+DiskRenameBox = FileOperationBox ignoreDirty {
+#if !_ZMGR
+	moniker = "Rename Disk";
+#else
+	moniker = "Rename Card";
+#endif
+	children =
+#if _GMGR
+		   DiskRenameChoices,
+#endif
+		   DiskRenameSrcName,
+		   DiskRenameDestName,
+		   DiskRenameRename;
+#if _GMGR
+	hints = {
+		HINT_DISMISS_WHEN_DISABLED,
+		ATTR_GEN_HELP_CONTEXT { char "dRenDisk",0 }
+	}
+#endif
+}
+
+#if _GMGR
+DiskRenameChoices = GenInteraction ignoreDirty {
+#if !_ZMGR
+	moniker = "Select drive for disk rename:";
+#else
+	moniker = "Select drive for rename:";
+#endif
+	children = DiskRenameDriveList;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+DiskRenameDriveList = DriveList ignoreDirty {
+	/* children added later */
+	applyMsg = MSG_DISK_RENAME_DRIVE;
+	destination = process;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED,
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+			word 0
+		}
+	}
+}
+#endif		/* if _GMGR */
+
+DiskRenameSrcName = GenText ignoreDirty {
+	genAttributes = readOnly;
+	moniker = "From:";
+	textDisplayAttributes = DESK_SINGLE_LINE_DISPLAY_ATTRIBUTES;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+DiskRenameDestName = GenText ignoreDirty {
+	moniker = "To:";
+	textDisplayAttributes = DESK_SINGLE_LINE_EDIT_ATTRIBUTES;
+	maxLength = "VOLUME_NAME_LENGTH";
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		ATTR_GEN_TEXT_LEGAL_DOS_VOLUME_NAMES,
+		ATTR_GEN_TEXT_ALLOW_SPACES,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+DiskRenameRename = GenTrigger ignoreDirty {
+	moniker = 'R', "Rename";
+	action = MSG_DISK_RENAME, process;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+#endif
+
+
+end DiskMenuResource;
+
+
+

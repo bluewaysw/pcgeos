@@ -1,0 +1,252 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  ffRCPValue.goc
+ * FILE:	  ffRCPValue.goc
+ *
+ * AUTHOR:  	  Jeremy Dashe : Oct 28, 1992
+ *
+ * DESCRIPTION:
+ *	This file contains the declaration and handlers for the
+ *	RCPValueClass, which is used in the flat file database
+ *	library's record control panel controller.  Whew.
+ *
+ * RCS STAMP:
+ *	$Id: ffRCPValue.goc,v 1.1 97/04/04 18:03:33 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/***********************************************************************
+			    Include Files
+ ***********************************************************************/
+
+#include <geos.h>
+#include <geode.h>
+@include <stdapp.goh>			/* Standard PC/GEOS.	*/
+
+#include <geoworks.h>			/* GeoWorks.	*/
+
+#include <Ansi/stdio.h>			/* Standard C.	*/
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
+
+@include <Objects/FlatFile/ffRcpVC.goh>
+
+
+/***********************************************************************
+			       Externs
+ ***********************************************************************/
+@extern object @FFRCPNewRecordString;
+
+/***********************************************************************
+			  Class Declaration
+ ***********************************************************************/
+
+@classdecl	FFRCPValueClass;
+
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_VALUE_GET_VALUE_TEXT for FFRCPValueClass
+ *
+ * DESCRIPTION:	We intercept this message to check to display if we're
+ *	    	about to display a 0, in which case we really want to
+ *	    	display "New" (or whatever we use to show that this is
+ *	    	a new record).
+ *
+ * PARAMETERS:
+ *	void (TCHAR *buffer, GenValueType valueType);  
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/28/92	Initial version
+ *
+ ***********************************************************************/
+@method FFRCPValueClass, MSG_GEN_VALUE_GET_VALUE_TEXT
+{
+    if ((valueType == GVT_VALUE) && (pself->GVLI_value == 0)) {
+	/*
+	 * Return the "New" string.
+	 */
+	MemLock(OptrToHandle(@FFRCPNewRecordString));
+	strcpy (buffer, LMemDeref (@FFRCPNewRecordString));
+	MemUnlock (OptrToHandle (@FFRCPNewRecordString));
+    } else {
+	@callsuper();
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_VALUE_GET_TEXT_FILTER for FFRCPValueClass
+ *
+ * DESCRIPTION:	We want the user to be able to type in all
+ *	    	alphanumeric characters, so we set the text filter
+ *	    	here.
+ *
+ * PARAMETERS:
+ *	VisTextFilters ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/30/92		Initial version
+ *
+ ***********************************************************************/
+@method FFRCPValueClass, MSG_GEN_VALUE_GET_TEXT_FILTER
+{
+    return VTF_NO_SPACES | VTF_NO_TABS | VTFC_ALPHA_NUMERIC;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_VALUE_SET_VALUE_FROM_TEXT for FFRCPValueClass
+ *
+ * DESCRIPTION:	We intercept this message to check if "New" was typed
+ *	    	in the text area.
+ *
+ * PARAMETERS:
+ *	void (TCHAR *text, GenValueType valueType)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/28/92	Initial version
+ *
+ ***********************************************************************/
+@method FFRCPValueClass, MSG_GEN_VALUE_SET_VALUE_FROM_TEXT
+{
+#define NEW_STRING_LENGTH 20
+    TCHAR newstring[NEW_STRING_LENGTH];
+    int textLen, newLen;
+    Message *newMsg;
+    optr destination;
+    EventHandle event;
+
+    MemLock(OptrToHandle(@FFRCPNewRecordString));
+    strcpy (newstring, LMemDeref (@FFRCPNewRecordString));
+    MemUnlock (OptrToHandle (@FFRCPNewRecordString));
+
+    textLen = strlen(text);
+    newLen =  strlen(newstring);
+    
+    if (!LocalCmpStringsNoCase(newstring, text, (textLen < newLen ?
+						 textLen : newLen))) {
+	/*
+	 * The user typed in the "new" string.  Send a message to
+	 * our parent/owner/god.
+	 */
+	destination = pself->GVLI_destination;
+	@call oself::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, 0);
+
+	newMsg = ObjVarFindData(oself, ATTR_FFRCP_VALUE_NEW_RECORD_MSG);
+	if (newMsg) {
+	    event = @record {FFRCP_VALUE_NEW_RECORD_MSG_PROTOTYPE} NullOptr::
+		  (*newMsg)();
+	    @send oself::MSG_GEN_OUTPUT_ACTION(event, destination);
+	}
+    } else {
+	@callsuper();
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_VALUE_INCREMENT for FFRCPValueClass
+ *
+ * DESCRIPTION:	We intercept this message to deal with when we're
+ *	    	currently editing a new record.  Basically, we attempt
+ *	    	to enter the record into the database, then go to the
+ *	    	first record in the database.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/30/92	Initial version
+ *
+ ***********************************************************************/
+@method FFRCPValueClass, MSG_GEN_VALUE_INCREMENT
+{
+    optr destination;
+    EventHandle event;
+    Message *newMsg;
+
+    if (pself->GVLI_value == 0) {
+	/*
+	 * We're currently editing a new record.  Tell our owner to
+	 * jump to the first record in the database, if there's a message
+	 * that will let us do this.
+	 */
+	destination = pself->GVLI_destination;
+	newMsg = ObjVarFindData(oself, ATTR_FFRCP_VALUE_JUMP_TO_RECORD_MSG);
+	if (newMsg) {
+	    event = @record {FFRCP_VALUE_JUMP_TO_RECORD_MSG_PROTOTYPE}NullOptr::
+		  (*newMsg)(FFRCPV_FIRST_RECORD);
+	    @send oself::MSG_GEN_OUTPUT_ACTION(event, destination);
+	}
+    } else {
+	@callsuper();
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_VALUE_DECREMENT for FFRCPValueClass
+ *
+ * DESCRIPTION:	We intercept this message to deal with when we're
+ *	    	currently editing a new record.  Basically, we attempt
+ *	    	to enter the record into the database, then go to the
+ *	    	last record in the database.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/30/92	Initial version
+ *
+ ***********************************************************************/
+@method FFRCPValueClass, MSG_GEN_VALUE_DECREMENT
+{
+    optr destination;
+    EventHandle event;
+    Message *newMsg;
+
+    if (pself->GVLI_value == 0) {
+	/*
+	 * We're currently editing a new record.  Tell our owner to
+	 * jump to the last record in the database, if there's a message
+	 * that will let us do this.
+	 */
+	destination = pself->GVLI_destination;
+	newMsg = ObjVarFindData(oself, ATTR_FFRCP_VALUE_JUMP_TO_RECORD_MSG);
+	if (newMsg) {
+	    event = @record {FFRCP_VALUE_JUMP_TO_RECORD_MSG_PROTOTYPE}NullOptr::
+		  (*newMsg)(FFRCPV_LAST_RECORD);
+	    @send oself::MSG_GEN_OUTPUT_ACTION(event, destination);
+	}
+    } else if (pself->GVLI_value != MakeWWFixed(1.0)) {
+	/*
+	 * Ignore requests to go lower than one.
+	 */
+	@callsuper();
+    }
+}

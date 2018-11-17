@@ -1,0 +1,303 @@
+/*
+ * Project:	GeoWrite
+ * File:	UI/uiPageSetup.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user interface description for the page
+ * setup dialog box.
+ *
+ *	$Id: uiPageSetup.ui,v 1.1 97/04/04 15:55:49 newdeal Exp $
+ *
+ */
+
+/*
+ * Page Size
+ */
+
+start FileMenuUI;
+
+WritePageSizeControl = PageSizeControl vardataReloc {
+	moniker = 'z', "Page Size";
+	pageSizeAttrs = "mask PZCA_ACT_LIKE_GADGET";
+	genAttributes = default +notifyVisibility;
+	output = "TO_APP_MODEL";
+	type = properties;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		ATTR_GEN_VISIBILITY_DATA { word 0, mask GV_PAGE_SIZE },
+		ATTR_GEN_DESTINATION_CLASS { UN_DD WriteDocumentClass }
+	}
+}
+
+/*
+ * Page Setup
+ */
+
+WritePageSetupDialog = GenInteraction {
+	moniker = 'g', "Page Setup";
+	visibility = dialog;
+	type = properties;
+	children =
+		LayoutSectionNameText,
+#if !_SIMPLIFIED_PAGE_NUMBERING
+		LayoutFirstPageGroup,
+#endif
+		LayoutMasterPageList,
+		LayoutColumnsGroup,
+		LayoutMarginsGroup,
+		PageSetupApplyTrigger;
+	genAttributes = default +notifyVisibility;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		ATTR_GEN_VISIBILITY_DATA { word 0, mask GV_PAGE_SETUP },
+		ATTR_GEN_HELP_CONTEXT { char "dbPgSet", 0 }
+	}
+}
+
+end FileMenuUI;
+
+start PageSetupUI;
+
+LayoutSectionNameText = GenText {
+	genAttributes = readOnly;
+	moniker = "Section Name:";
+	textDisplayAttributes = default +singleLineText;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+#if !_SIMPLIFIED_PAGE_NUMBERING
+LayoutFirstPageGroup = GenInteraction {
+	moniker = "Page Numbering:";
+#if _ALLOW_STARTING_PAGE
+	children = LayoutFirstPageValue;
+#else
+	children = LayoutFirstPageValue, LayoutFirstBooleanGroup;
+#endif
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+LayoutFirstPageValue = GenValue vardataReloc {
+	moniker = "Start with";
+	value = 1;
+}
+
+#if !_ALLOW_STARTING_PAGE
+LayoutFirstBooleanGroup = GenBooleanGroup {
+	moniker = " or";
+	children = FollowLastSectionBoolean;
+	destination = WriteApp;
+	hints = {
+		ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG {
+			word MSG_WRITE_APPLICATION_UPDATE_UI_FOR_FIRST_PAGE
+		}
+	}
+}
+
+FollowLastSectionBoolean = GenBoolean {
+	moniker = "Follow Last Section";
+	identifier = "mask SF_PAGE_NUMBER_FOLLOWS_LAST_SECTION";
+}
+#endif /* !_ALLOW_STARTING_PAGE */
+#endif /* !_SIMPLIFIED_PAGE_NUMBERING */
+
+LayoutColumnsGroup = GenInteraction {
+	moniker = "Columns:";
+	children = 
+		LayoutColumnsValue,
+		LayoutColumnSpacingDistance,
+		LayoutColumnRuleWidthDistance;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+LayoutColumnsValue = GenValue {
+	minimum = 1;
+	maximum = MAXIMUM_NUMBER_OF_COLUMNS;
+	destination = WriteApp;
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {
+			word MSG_WRITE_APPLICATION_UPDATE_UI_FOR_COLUMNS
+		}
+	}
+}
+
+LayoutColumnSpacingDistance = GenValue ignoreDirty {
+	genStates = default -enabled;
+	moniker = "Spacing:";
+	displayFormat = inchesOrCentimeters;
+#if DO_PIZZA
+	minimum = "MINIMUM_COLUMN_SPACING_INT";
+	minimumFrac = "MINIMUM_COLUMN_SPACING_FRAC";
+	maximum = "MAXIMUM_COLUMN_SPACING_INT";
+	maximumFrac = "MAXIMUM_COLUMN_SPACING_FRAC";
+#else
+	minimum = "MINIMUM_COLUMN_SPACING/8";
+	maximum = "MAXIMUM_COLUMN_SPACING/8";
+#endif
+	increment = 9;
+}
+
+LayoutColumnRuleWidthDistance = GenValue ignoreDirty {
+	genStates = default -enabled;
+	moniker = "Rule Width:";
+	displayFormat = pointsOrMillimeters;
+	value = "0";
+	minimum = "0";
+	maximum = "MAXIMUM_RULE_WIDTH/8";
+	increment = 1;
+}
+
+/***/
+
+LayoutMasterPageList = GenItemGroup {
+	moniker = "Master Pages:";
+	children = LayoutMPOneEntry, LayoutMPTwoEntry;
+	selection = 0;
+	numSelections = 1;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+LayoutMPOneEntry = GenItem ignoreDirty {
+	moniker = "One";
+	identifier = 0;
+}
+
+LayoutMPTwoEntry = GenItem ignoreDirty {
+	moniker = "Two (Left and Right)";
+	identifier = 1;
+}
+
+LayoutMarginsGroup = GenInteraction {
+	moniker = "Margins:";
+	children =
+	    LayoutMarginsLeftGroup,
+	    LayoutMarginsRightGroup;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_ELSE,
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+LayoutMarginsLeftGroup = GenInteraction {
+	children =
+		LayoutMarginLeftDistance,
+		LayoutMarginTopDistance;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS
+	}
+}
+
+LayoutMarginsRightGroup = GenInteraction {
+	children =
+		LayoutMarginRightDistance,
+		LayoutMarginBottomDistance;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS
+	}
+}
+
+LayoutMarginLeftDistance = GenValue ignoreDirty {
+	moniker = "Left:";
+	displayFormat = inchesOrCentimeters;
+#if	_DWP
+	minimum = "MINIMUM_LEFT_MARGIN_SIZE/8";
+#else
+#ifdef DO_PIZZA
+	minimum = "MINIMUM_MARGIN_SIZE_INT";
+	minimumFrac = "MINIMUM_MARGIN_SIZE_FRAC";
+#else
+	minimum = "MINIMUM_MARGIN_SIZE/8";
+#endif
+#endif
+#ifdef DO_PIZZA
+	maximum = "MAXIMUM_MARGIN_SIZE_INT";
+	maximumFrac = "MAXIMUM_MARGIN_SIZE_FRAC";
+#else
+	maximum = "MAXIMUM_MARGIN_SIZE/8";
+#endif
+	increment = 9;
+}
+
+LayoutMarginTopDistance = GenValue ignoreDirty {
+	moniker = "Top:";
+	displayFormat = inchesOrCentimeters;
+#if	_DWP
+	minimum = "MINIMUM_TOP_MARGIN_SIZE/8";
+#else
+#ifdef DO_PIZZA
+	minimum = "MINIMUM_MARGIN_SIZE_INT";
+	minimumFrac = "MINIMUM_MARGIN_SIZE_FRAC";
+#else
+	minimum = "MINIMUM_MARGIN_SIZE/8";
+#endif
+#endif
+#ifdef DO_PIZZA
+	maximum = "MAXIMUM_MARGIN_SIZE_INT";
+	maximumFrac = "MAXIMUM_MARGIN_SIZE_FRAC";
+#else
+	maximum = "MAXIMUM_MARGIN_SIZE/8";
+#endif
+	increment = 9;
+}
+
+LayoutMarginRightDistance = GenValue ignoreDirty {
+	moniker = "Right:";
+	displayFormat = inchesOrCentimeters;
+#if	_DWP
+	minimum = "MINIMUM_RIGHT_MARGIN_SIZE/8";
+#else
+#ifdef DO_PIZZA
+	minimum = "MINIMUM_MARGIN_SIZE_INT";
+	minimumFrac = "MINIMUM_MARGIN_SIZE_FRAC";
+#else
+	minimum = "MINIMUM_MARGIN_SIZE/8";
+#endif
+#endif
+#ifdef DO_PIZZA
+	maximum = "MAXIMUM_MARGIN_SIZE_INT";
+	maximumFrac = "MAXIMUM_MARGIN_SIZE_FRAC";
+#else
+	maximum = "MAXIMUM_MARGIN_SIZE/8";
+#endif
+	increment = 9;
+}
+
+LayoutMarginBottomDistance = GenValue ignoreDirty {
+	moniker = "Bottom:";
+	displayFormat = inchesOrCentimeters;
+#if	_DWP
+	minimum = "MINIMUM_BOTTOM_MARGIN_SIZE/8";
+#else
+#ifdef DO_PIZZA
+	minimum = "MINIMUM_MARGIN_SIZE_INT";
+	minimumFrac = "MINIMUM_MARGIN_SIZE_FRAC";
+#else
+	minimum = "MINIMUM_MARGIN_SIZE/8";
+#endif
+#endif
+#ifdef DO_PIZZA
+	maximum = "MAXIMUM_MARGIN_SIZE_INT";
+	maximumFrac = "MAXIMUM_MARGIN_SIZE_FRAC";
+#else
+	maximum = "MAXIMUM_MARGIN_SIZE/8";
+#endif
+	increment = 9;
+}
+
+PageSetupApplyTrigger = GenTrigger vardataReloc {
+	action = MSG_WRITE_DOCUMENT_CHANGE_PAGE_SETUP, "TO_APP_MODEL";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY },
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD WriteDocumentClass }	
+	}
+}
+
+end PageSetupUI;

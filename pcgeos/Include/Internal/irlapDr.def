@@ -1,0 +1,850 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	Socket project
+MODULE:		IrLAP driver
+FILE:		irlapDr.def
+
+AUTHOR:		Cody Kwok, Mar 25, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	3/25/94   	Initial revision
+
+
+DESCRIPTION:
+	External IRLAP driver interface.
+		
+	$Id: irlapDr.def,v 1.1 97/04/04 14:16:54 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__IRLAPDR
+
+include	Internal/socketDr.def
+
+StartDriver irlap
+
+IRLAP_PROTO_MAJOR 	equ SOCKET_PROTO_MAJOR+1
+IRLAP_PROTO_MINOR	equ SOCKET_PROTO_MINOR+1
+
+;; following the Comm driver we define the following constants
+IRLAP_RECV_PRIORITY	= PRIORITY_UI
+IRLAP_RECV_STACK_SIZE	= 1024
+
+;
+; ============================================================================
+; The following addresses are reserved for special purposes
+; ( Socket library interface only )
+; ============================================================================
+
+IRLAP_CURRENT_LINK_ADDR		equ	<"CUR_LINK",0>
+IRLAP_CURRENT_ADDR_LEN		equ	9
+;
+; 1. Current link address(or any available address):
+;    During the time that there is a connection open, this address refers to
+;    the current connection.  If there is no current connection yet, and there
+;    is only one possible destination on air at the moment, then, this address
+;    refers to that device(e.g. when discovery procedure finds only one IrLAP
+;    station on air).
+;
+;    In case of datagrams, this address is interpreted as broadcasting address.
+;    The datagram will be broadcasted with this address, and everybody will
+;    receive the datagram.
+;
+
+IRLAP_INDEFINITE_ADDR_CHAR	equ	'?'
+;
+; 2. Indefinite address:
+;    If any address starts with a question mark, that address is interpreted
+;    as indefinite address.  If the user passes such address to 
+;    connection.request or datagram.request, IrLAP station will always bring
+;    up a dialog box and ask the user to choose the right address for the
+;    connection or packet.
+;
+
+; ============================================================================
+;
+;Socket Functions supported				    supported
+;
+;DR_SOCKET_REGISTER		enum    SocketFunction		*
+;DR_SOCKET_UNREGISTER		enum    SocketFunction		*
+;DR_SOCKET_LINK_CONNECT_REQUEST	enum    SocketFunction		*
+;DR_SOCKET_DATA_CONNECT_REQUEST	enum    SocketFunction
+;DR_SOCKET_DISCONNECT_REQUEST	enum	SocketFunction		*
+;DR_SOCKET_SEND_DATA		enum	SocketFunction		*
+;DR_SOCKET_SEND_DATAGRAM	enum	SocketFunction		*
+;DR_SOCKET_RESET_REQUEST	enum 	SocketFunction		*
+;DR_SOCKET_ATTACH               enum    SocketFunction
+;DR_SOCKET_REJECT               enum    SocketFunction
+;DR_SOCKET_GET_INFO             enum    SocketFunction		*
+;DR_SOCKET_LINK_ACTIVATED       enum    SocketFunction
+;DR_SOCKET_SET_OPTION           enum    SocketFunction
+;DR_SOCKET_GET_OPTION           enum    SocketFunction
+;DR_SOCKET_RESOLVE_ADDR		enum	SocketFunction		*
+;
+
+; ============================================================================
+;
+; Irlap Native Interface
+;
+;	Only native clients can use these functions.  Look for structure
+; definitions at the bottom.
+;
+; ============================================================================
+;
+; The following masks can be or'ed with NativeIrlapRequest to produce
+; desired side effects.
+;
+IRLAP_URGENT_REQUEST_MASK	equ	1000000000000000b
+;
+; This mask causes urgent processing of a request.
+; It can only be used with:
+;	NIR_CONNECT_REQUEST
+;	NIR_DATA_REQUEST while the client is Socket Library
+;
+
+;
+; Definitions of requests and responses
+;
+NativeIrlapRequest		etype	word, SOCKET_DR_FIRST_SPEC_FUNC, 2
+
+NIR_REGISTER_NATIVE_CLIENT	enum	NativeIrlapRequest
+NIR_REGISTER_SOCKET_CLIENT	enum	NativeIrlapRequest
+;
+;	Registers a native client(di=NIR_REGISTER_NATIVE_CLIENT) or register
+;	socket library(di=NIR_REGISTER_SOCKET_CLIENT) with IrLAP.
+;
+;	Pass:	ax	= serial port to use
+;		          (IRLAP_DEFAULT_PORT to read default from .ini file)
+;		cx:dx	= client entry point for indications
+;
+;		if NIR_REGISTER_SOCKET_CLIENT
+;			ds:si	= domain name
+;			bx	= domain handle
+;		otherwise( NIR_REGISTER_NATIVE_CLIENT )
+;			ds:si	= DiscoveryInfo
+;
+;	Return: bx	= client handle
+;		carry set on error
+;
+;	Destroyed: di
+;
+NIR_UNREGISTER			enum	NativeIrlapRequest
+;
+;	Unregisters with irlap driver.
+;
+;	Pass:	bx	= client handle
+;	Return: if socket client:
+;			bx	= domain handle
+;	Destroyed: di (bx also, if native client)
+;
+IRLAP_DEFAULT_PORT	equ	-1
+NIR_ADD_IRLAP_DOMAIN		enum	NativeIrlapRequest
+;
+;	Forces IrLAP to be added to socket library
+;	This is really a socket DR function
+;
+;	Pass:	cx = serial port to use
+;		     ( IRLAP_DEFAULT_PORT for default port )
+;	Return: nothing
+;	
+;
+NIR_DISCOVERY_REQUEST		enum	NativeIrlapRequest
+;
+;	Request discovery.  
+;	
+;	WARNING! You may think that after calling this you'll always get
+;	a NII_DISCOVERY_CONFIRMATION.  WRONG!!! If the discovery fails
+;	because there is ongoing IR traffic in the air, then you'll get
+;	a NII_DISCOVERY_INDICATION with DLF_MEDIA_BUSY set.  Better watch 
+; 	out for this, or you'll be waiting forever in some cases.
+;
+;	Pass:	bx	= client handle
+;		ch	= IrlapDiscoveryType
+;		cl	= IrlapUserTimeSlot
+;		if ch = IDT_ADDRESS_RESOLUTION
+;			dxbp	= target dev address
+;	Return:	nothing
+;	Destroyed: di
+;
+NIR_DISCOVERY_RESPONSE		enum	NativeIrlapRequest
+;
+;	Respond to discovery request from remote side
+;
+;	Pass:	bx	= client handle
+;		ds:si	= 32 byte DiscoveryInfo
+;	Return:	nothing
+;	Destroyed: di
+;
+NIR_UNITDATA_REQUEST		enum	NativeIrlapRequest
+;
+;	Send unit data
+;
+;	Pass:	ax	= data offset into buffer
+;		bx	= client handle
+;		cx	= number of bytes to send
+;		dxbp	= user data buffer ( HugeLMem optr )
+;	if socket library interface
+;		si	= seqInfo
+;	elsif client is native client
+;		si	= IrlapDataRequestType flag
+;
+;	Return:	carry set on error
+;		di	= IrlapError
+;	Destroyed: di
+;
+NIR_CONNECT_REQUEST		enum	NativeIrlapRequest
+;
+;	Request link connection
+;
+;	Pass:	ax	= IrlapConnectionFlags
+;		bx	= client handle
+;		ds:si	= QualityOfService structure
+;	Return:	nothing
+;	Destroyed: di
+;
+IrlapConnectionFlags	record
+	ICF_SNIFF:1
+	ICF_SOCKET_INIT:1
+	:14
+IrlapConnectionFlags	end
+
+NIR_CONNECT_RESPONSE		enum	NativeIrlapRequest
+;
+;	Respond to connection request from remote machine
+;
+;	Pass:	bx	= connection handle (= client handle)
+;		ds:si	= QualityOfService structure
+;	Return:	ds:si	= QualityOfService strucutre filled in
+;		carry set if negotiation failure
+;	Destroyed: di
+;
+NIR_SNIFF_REQUEST		enum	NativeIrlapRequest
+;
+;	Initiate sniff open procedure
+;
+;	Pass:	bx	= client handle
+;	Return:	nothing
+;	Destroyed: di
+;
+
+IrlapDataRequestType	record
+	:15
+	IDRT_EXPEDITED:1
+IrlapDataRequestType	end
+NIR_DATA_REQUEST		enum	NativeIrlapRequest
+;
+;	Send user data over connection
+;
+;	Pass:	ax	= data offset into buffer
+;		bx	= connection handle
+;		cx	= number of bytes to send
+;		dxbp	= user data buffer ( HugeLMem optr )
+;	if socket library interface
+;		si	= seqInfo
+;	elsif client is native client
+;		si	= IrlapDataRequestType flag
+;
+;	Return:	nothing
+;	Destroyed: di
+;
+NIR_STATUS_REQUEST		enum	NativeIrlapRequest
+;
+;	Query the status of a link ( see NII_STATUS_INDICATION/CONFIRMATION )
+;
+;	Pass:	bx	= connection handle (= client handle )
+;	Return:	nothing
+;	Destroyed: di
+;
+NIR_QOS_REQUEST			enum	NativeIrlapRequest
+;
+;	currently not supported
+;
+NIR_RESET_REQUEST		enum	NativeIrlapRequest
+;
+;	Send reset request
+;
+;	Pass:	bx	= connection handle (= client handle )
+;	Return:	nothing
+;	Destroyed: di
+;
+NIR_RESET_RESPONSE		enum	NativeIrlapRequest
+;
+;	Respond to reset request
+;
+;	Pass:	bx	= connection handle (= client handle )
+;	Return:	nothing
+;	Destroyed: di
+;
+NIR_DISCONNECT_REQUEST		enum	NativeIrlapRequest
+;
+;	Disconnect link connection
+;
+;	Pass:	bx	= connection handle (= client handle )
+;	Return:	nothing
+;	Destroyed: di
+;
+NIR_ABORT_SNIFF			enum	NativeIrlapRequest
+;
+; 	Abort a sniff procedure
+;	This works for both connect-to-sniffer and sniff-open procedure
+;	Pass:	bx	= client handle
+;	Return:	nothing
+;	Destroyed: di
+;
+NIR_SET_SNIFF_VARIABLES		enum	NativeIrlapRequest
+;
+;	Sets sniff variables
+;	Pass:	bx	= client handle
+;		ax	= sleep time in ticks(default = 2 seconds)
+;	Return: nothing
+;	Destroyed: di
+;
+NIR_FLUSH_DATA_REQUESTS		enum	NativeIrlapRequest
+;
+;	Flushes	all the pending data requests in the event queue
+;	Pass:	bx	= client handle
+;	Return:	nothing
+;	Destroyed:	di
+;
+NIR_PRIMARY_REQUEST		enum	NativeIrlapRequest
+;
+;	Try to obtain primary station status.
+;	Pass:	nothing
+;	Return:	nothing
+;
+NIR_PRIMARY_RESPONSE		enum	NativeIrlapRequest
+;
+;	Answer to the primary request from remote station.
+;	Local station can retain primary station status by passing
+;	PrimaryXchgFlag with RXF_DENIED set.
+; 	Pass:	cx = PrimaryXchgFlag
+;	Return: nothing
+;
+
+;
+; Definitions of indications and confirmations
+; ( calls from IRLAP driver to client callback routine )
+;
+NativeIrlapIndication		etype	word, 0, 2
+NII_DISCOVERY_INDICATION	enum	NativeIrlapIndication
+;
+;	Remote machine requested discovery
+;
+;	Pass:	ax	= DiscoveryLogFlags
+;		bx	= client handle
+;	     	if DiscoveryLogFlags has DLF_REMOTE or DLF_SNIFF set
+;			es:di	= DiscoveryLog from remote machine
+;	Return:	nothing
+;
+NII_DISCOVERY_CONFIRMATION	enum	NativeIrlapIndication
+;
+;	Discovery procedure has been completed
+;
+;	Pass:	bx	= client handle
+;		dx	= handle to mem block of type DiscoveryLogBlock
+;	                  (*) the user may keep this block around and access it
+;			      but should never free it.  Once another discovery
+;			      is carried out, this handle becomes invalid.
+;	Return:	nothing
+;
+NII_UNITDATA_INDICATION		enum	NativeIrlapIndication
+;
+;	Unit data has arrived
+;
+;	Pass:	bx	= client handle
+;		cx	= size of data
+;		si	= offset into the buffer
+;		dx:bp	= data buffer
+;	if socket interface,
+;		ax	= seqInfo
+;	Return:	nothing
+;
+NII_CONNECT_INDICATION		enum	NativeIrlapIndication
+;
+;	Remote machine requested connection
+;
+;	Pass:	bx	= connection handle(= client handle )
+;		cxdx	= 32 bit remote device address
+;
+;	If (client = socket library)
+;		ax	= IrlapConnectionFlags
+;		es:si	= remote address string
+;	else (client = native client)
+;		es:si	= IrlapConnectionParams struct
+;
+;	Return:	nothing
+;
+NII_CONNECT_CONFIRMATION	enum	NativeIrlapIndication
+;
+;	Connection has been established
+;
+;	Pass:	bx	= connection handle (= client handle )
+;		ds:si	= IrlapConnectionParams struct
+;	Return:	nothing
+;
+NII_DATA_INDICATION		enum	NativeIrlapIndication
+;
+;	Data has arrived
+;
+;	Pass:	bx	= connection handle (= client handle )
+;		cx	= size of data
+;		si	= offset into the buffer
+;		dx:bp	= data buffer
+;	if socket interface,
+;		ax	= seqInfo
+;	else
+;		ax	= IrlapDataRequestType
+;	Return:	nothing
+;
+NII_STATUS_INDICATION		enum	NativeIrlapIndication
+;
+;	Remote device requested status, or current connection is in jeopardy
+;
+;	Pass:	bx	= connection handle (= client handle )
+;		cx	= IrlapStatusIndicationType
+;	Return:	nothing
+;
+NII_STATUS_CONFIRMATION		enum	NativeIrlapIndication
+;
+;	Received connection status from remote side
+;
+;	Pass:	bx	= connection handle (= client handle )
+;		cx	= ConnectionStatus
+;	Return:	nothing
+;
+NII_QOS_INDICATION		enum	NativeIrlapIndication
+;
+;	Currently not supported
+;
+NII_RESET_INDICATION		enum	NativeIrlapIndication
+;
+;	Remote machine requested connection reset
+;
+;	Pass:	bx	= connection handle (= client handle )
+;		cx	= IrlapResetIndicationType
+;	Return:	nothing
+;
+NII_RESET_CONFIRMATION		enum	NativeIrlapIndication
+;
+;	Connection has been reset
+;
+;	Pass:	bx	= connection handle (= client handle )
+;	Return:	nothing
+;
+NII_DISCONNECT_INDICATION	enum	NativeIrlapIndication
+;
+;	Remote machine closed the connection
+;
+;	Pass:	ax	= IrlapCondition
+;			  (IC_CONNECTION_FAILURE, IC_CONNECTION_TIMEOUT,
+;			   IC_REMOTE_DISCONNECTION, IC_MEDIA_BUSY,
+;			   IC_PRIMARY_CONFLICT)
+;		bx	= connection handle
+;		cx	= IrlapUnackedData mem handle
+;			  :    see structure definition below.  The user should
+;			    free this block after using it.  The user may want
+;			    to read unacked data but should never free any of
+;			    the optrs in UF_optr field.
+;	Return:	nothing
+;
+NII_PRIMARY_INDICATION		enum	NativeIrlapIndication
+;
+;	Remote station requested to become the primary station.
+;	Pass:	nothing
+;	Return: nothing
+;
+NII_PRIMARY_CONFIRM		enum	NativeIrlapIndication
+;
+;	PRIMARY_REQUEST returned with one of the 3 results:
+;		1) request granted( PXF_DENIED clear )
+;		2) request denied( PXF_DENIED set )
+;		3) request timed out( PXF_TIMEOUT set )
+;	Pass:	cx	= PrimaryXchgFlag( PXF_DENIED set if request denied )
+;	Return:	nothing
+;
+
+; .............................................................................
+;
+; Structures for parameters
+;
+; .............................................................................
+
+; -----------------------------------------------------------------------------
+; DISCOVERY
+; -----------------------------------------------------------------------------
+
+IrlapUserTimeSlot	etype	byte
+	IUTS_1_SLOT 	enum	IrlapUserTimeSlot, 00000000b	; 0
+	IUTS_6_SLOT 	enum	IrlapUserTimeSlot, 00000001b	; 1
+	IUTS_8_SLOT	enum	IrlapUserTimeSlot, 00000010b	; 2
+	IUTS_16_SLOT	enum	IrlapUserTimeSlot, 00000011b	; 3
+
+IrlapDiscoveryType	etype	byte, 0, 1
+  IDT_DISCOVERY		 enum	IrlapDiscoveryType	; normal discovery
+  IDT_ADDRESS_RESOLUTION enum	IrlapDiscoveryType	; address resolution
+
+; From IrLMP spec: "It should be noted that the total number of bytes in
+; the deviceInfo field must not exceed 23 bytes even though the IrLAP 
+; specification allows up to 32 bytes.  This is to prevent the XID process
+; from spilling over into the next slot.
+;
+;DiscoveryInfo	TYPE	32 dup (byte)
+DiscoveryInfo	TYPE	23 dup (byte)
+
+DiscoveryLogFlags	record
+	DLF_VALID:1		; 1 if discovery success / 0 if failure
+	DLF_SOLICITED:1		; Solicited discovery?
+	DLF_SNIFF:1		; Sniffing device?
+	DLF_MEDIA_BUSY:1	; Discovery failed because media is busy
+	DLF_ABORTED:1		; Discovery aborted
+	DLF_REMOTE:1		; See NII_DISCOVERY_INDICATION
+	:1
+	DLF_INFO_SIZE:5		; number of valid bytes in DL_info
+	DLF_INDEX:4		; INTERNAL USE
+DiscoveryLogFlags	end
+
+;
+;	DL_flags and DL_deviceAddr can only be filled in by the driver
+;	(so the client should not worry about them)
+;
+DiscoveryLog	struct
+	DL_flags	DiscoveryLogFlags
+	DL_devAddr	dword		; 32 bit device address
+	DL_info		DiscoveryInfo	; 32 byte discovery information
+DiscoveryLog	ends
+
+DiscoveryBlockFlags	record
+	DBF_LOG_RCVD:1		; is set if any log has been received
+	:7
+DiscoveryBlockFlags	end
+
+DiscoveryLogBlock	struct
+	DLB_blockHandle	hptr			; block handle
+	DLB_flags	DiscoveryBlockFlags	; 
+	DLB_lastIndex	byte			; last log index = numLogs
+	DLB_log		label	DiscoveryLog	; 
+DiscoveryLogBlock	ends
+
+; -----------------------------------------------------------------------------
+; QUALITY OF SERVICE
+; -----------------------------------------------------------------------------
+
+;; Baud rate negotiation param in bps
+IrlapParamBaudRate	record
+	IPBR_RESERVED:2=00b	; reserved and cleared
+	IPBR_115200BPS:1
+	IPBR_57600BPS:1
+	IPBR_38400BPS:1
+	IPBR_19200BPS:1
+	IPBR_9600BPS:1
+	IPBR_2400BPS:1
+IrlapParamBaudRate	end
+
+;; Maximum Turnaround time
+IrlapParamMaxTurnAround	record
+	IPMTA_RESERVED:1=0
+	IPMTA_5MS:1		; Only valid at 115200 bps
+	IPMTA_10MS:1		; Only valid at 115200 bps
+	IPMTA_25MS:1		; Only valid at 115200 bps
+	IPMTA_50MS:1		; Only valid at 115200 bps
+	IPMTA_100MS:1
+	IPMTA_250MS:1
+	IPMTA_500MS:1			
+IrlapParamMaxTurnAround	end
+
+;; Data size negotiation param in bytes
+IrlapParamDataSize	record
+	IPDS_RESERVED:2 = 00b	; reserved and cleared
+	IPDS_2048BYTES:1
+	IPDS_1024BYTES:1
+	IPDS_512BYTES:1
+	IPDS_256BYTES:1
+	IPDS_128BYTES:1
+	IPDS_64BYTES:1
+IrlapParamDataSize	end
+
+;; Window size negotiation param in frames
+IrlapParamWindowSize	record
+	IPWS_RESERVED:1=0b	; reserved and cleared
+	IPWS_7FRAME:1
+	IPWS_6FRAME:1
+	IPWS_5FRAME:1
+	IPWS_4FRAME:1
+	IPWS_3FRAME:1
+	IPWS_2FRAME:1
+	IPWS_1FRAME:1		; (lsb, transmitted first)
+IrlapParamWindowSize	end
+
+;; number of additional BOF at 115200 
+IrlapParamNumBof	record
+	IPNB_0BOF:1
+	IPNB_1BOF:1
+	IPNB_2BOF:1
+	IPNB_3BOF:1
+	IPNB_5BOF:1
+	IPNB_12BOF:1
+	IPNB_24BOF:1
+	IPNB_48BOF:1
+IrlapParamNumBof	end
+
+IrlapParamMinTurnaround	record
+	IPMT_0MS:1	; 0ms	
+	IPMT_001MS:1	; 0.01ms
+	IPMT_005MS:1	; 0.05ms
+	IPMT_01MS:1	; 0.1ms
+	IPMT_05MS:1	; 0.5ms
+	IPMT_1MS:1
+	IPMT_5MS:1
+	IPMT_10MS:1
+IrlapParamMinTurnaround	end
+
+;; Link Disconnect/threshold Time: 6.6.11 
+IrlapParamLinkDisconnect	record
+	IPLTT_40SEC:1	; (thresholdequ3sec)
+	IPLTT_30SEC:1	; (thresholdequ3sec)
+	IPLTT_25SEC:1	; (thresholdequ3sec)
+	IPLTT_20SEC:1	; (thresholdequ3sec)
+	IPLTT_16SEC:1	; (thresholdequ3sec)
+	IPLTT_12SEC:1	; (thresholdequ3sec)
+	IPLTT_8SEC:1	; (thresholdequ3sec)
+	IPLTT_3SEC:1	; (thresholdequ0)
+IrlapParamLinkDisconnect	end
+
+;; connection parameter structure within station structure
+;; NOTE: the ordering of fields is critical( see NegotiateParameter routine )
+;
+; ICP_baudRate and ICP_linkDisconnect are "type 0" parameters that must
+; be negotiated to the same value for both stations involved in a connection.
+; Other parameters are of "type 1", and are negotiated independently for 
+; both stations involved in a connection.
+;
+IrlapConnectionParams	struct
+	ICP_baudRate		IrlapParamBaudRate
+	ICP_maxTurnAround	IrlapParamMaxTurnAround
+	ICP_dataSize		IrlapParamDataSize
+	ICP_windowSize		IrlapParamWindowSize
+	ICP_numBof		IrlapParamNumBof
+	ICP_minTurnAround	IrlapParamMinTurnaround
+	ICP_linkDisconnect	IrlapParamLinkDisconnect
+	ICP_dataSizeIn		IrlapParamDataSize
+	ICP_windowSizeIn	IrlapParamWindowSize
+	align	word
+IrlapConnectionParams	ends
+
+QualityOfServiceFlags	record
+	QOSF_DEFAULT_PARAMS:1
+	:15
+QualityOfServiceFlags	end
+
+QualityOfService	struct
+	QOS_param	IrlapConnectionParams
+	QOS_devAddr	dword	; address to connect to
+	QOS_flags	QualityOfServiceFlags
+QualityOfService	ends
+
+; -----------------------------------------------------------------------------
+; STATUS
+; -----------------------------------------------------------------------------
+
+ConnectionStatus	record
+	CS_IMPENDING_DISCONNECTION:1	; connection is in jeopardy
+	CS_UNACKED_DATA:1		; there are unacked data in send buffer
+	:14
+ConnectionStatus	end
+
+IrlapStatusIndicationType	etype	word, 1, 1
+ISIT_CONNECTED		enum	IrlapStatusIndicationType, 1
+;
+; irlap connection established
+;
+ISIT_BLOCKED		enum	IrlapStatusIndicationType, 2
+;
+; there is interference in the medium, we may face disconnection soon
+;
+ISIT_OK			enum	IrlapStatusIndicationType, 3
+;
+; interference has been cleared; we are connected normally
+;
+ISIT_DISCONNECTED	enum	IrlapStatusIndicationType, 4
+;
+; link was disconnected due to severe interference in the medium
+;
+
+; -----------------------------------------------------------------------------
+; RESET
+; -----------------------------------------------------------------------------
+
+IrlapResetIndicationType	etype	word, 1, 1
+IRIT_LOCAL			enum	IrlapResetIndicationType, 1
+IRIT_REMOTE			enum	IrlapResetIndicationType, 2
+
+; -----------------------------------------------------------------------------
+; STATION EXCHANGE
+; -----------------------------------------------------------------------------
+
+PrimaryXchgFlag		record
+	PXF_DENIED:1
+	PXF_TIMEOUT:1
+	:14
+PrimaryXchgFlag		end
+
+; -----------------------------------------------------------------------------
+; DISCONNECTION
+; -----------------------------------------------------------------------------
+
+UnackedFrame	struct
+	UF_dataOffset	word		; offset to data within buffer
+	UF_size		word		; # bytes of data starting at offset
+	UF_optr		optr		; hugelmem handle to buffer
+	UF_seqInfo	word		; only relevant to SocketInterface
+UnackedFrame	ends
+
+IrlapUnackedFrameArray	TYPE	8 dup (UnackedFrame)
+
+IrlapUnackedData	struct
+	IUD_numUnackedFrames	word		; number of unacked frames
+	IUD_optrArray		IrlapUnackedFrameArray
+				; this array stores optrs
+IrlapUnackedData	ends
+
+; .............................................................................
+;
+; IRLAP CONDITION
+;
+; .............................................................................
+IrlapCondition		etype	word
+	IC_PRIMARY_CONFLICT             enum	IrlapCondition
+	;
+	; Disconnect.Indication: There is another primary out there that
+	;			 interferes with our connection
+	;
+  	IC_MEDIA_BUSY                   enum	IrlapCondition
+	;
+	; : operation canceled because media is busy
+	;
+	IC_CONNECTION_FAILURE		enum	IrlapCondition
+	;
+	; Disconnect.indication: Connection attempt failed
+	;
+	IC_SNIFF_CONNECTION_FAILURE	enum	IrlapCondition
+	;
+	; Disconnect.indication: Sniff connection attempt failed
+	;
+	IC_CONNECTION_TIMEOUT_P		enum	IrlapCondition
+	;
+	; Disconnect.indication: Connection timed out ( primary )
+	;
+	IC_CONNECTION_TIMEOUT_S		enum	IrlapCondition
+	;
+	; Disconnect.indication: Connection timed out ( secondary )
+	;
+	IC_REMOTE_DISCONNECTION		enum	IrlapCondition
+	;
+	; Disconnect.Indication: Remote station sent a disconnection notice
+	;
+	IC_INSUFFICIENT_MEMORY		enum	IrlapCondition
+	;
+	; ditto
+	;
+	IC_REMOTE_RESET                 enum	IrlapCondition
+	;
+	;
+	;
+  	IC_LOG                          enum	IrlapCondition
+	;
+	;
+	;
+ 	IC_DISCOVERY_ABORTED            enum	IrlapCondition
+	;
+	;
+	;
+  	IC_REMOTE_QUERY                 enum	IrlapCondition
+	;
+	;
+	;
+	IC_MISDELIVERED_FRAME		enum	IrlapCondition
+	;
+	; ConnAddr of a frame does not match ours
+	;
+	IC_CRC_CORRUPT_FRAME		enum	IrlapCondition
+	;
+	; The check sum of frame received is incorrect
+	;
+	IC_FRAME_ABORTED		enum	IrlapCondition
+	;
+	; Incoming packet is aborted packet
+	;
+	IC_BAD_FRAMING			enum	IrlapCondition
+	;
+	; BOF was received before EOF for frame was received
+	;
+	IC_FRAME_TOO_LARGE		enum	IrlapCondition
+	;
+	; Incoming frame is larger than expected 
+	;
+	IC_FRAME_TOO_SMALL		enum	IrlapCondition
+	;
+	; Icoming frame is too small
+	;
+	IC_PORT_CLOSED			enum	IrlapCondition
+	;
+	; Serial/IR port was closed while reading a frame
+	;
+
+; .............................................................................
+;
+; Error messages
+;
+; .............................................................................
+
+IrlapError	etype	word, 0, 2
+
+IE_DATA_FRAME_TOO_SMALL			enum	IrlapError
+;
+; cause:	Data size is 0
+; solution:	Send data with some data at least
+;
+
+IE_DATA_FRAME_TOO_BIG			enum	IrlapError
+;
+; cause:	Data size is bigger than the size negotiated in connection
+;		procedure
+; solution:	Send data in smaller packet
+;
+
+IE_MEM_ALLOC_ERROR			enum	IrlapError
+;
+; cause: 	Error allocating memory
+; solution:	Try to unload other applications, or free other memory
+;
+
+IE_OUT_OF_SEQUENCE_FRAME		enum	IrlapError
+;
+; cause:	Fragment arrived out of sequence
+; solution:	Reset connection
+;
+
+IE_SHORT_OF_RESOURCE			enum	IrlapError
+;
+; cause:	We are short of system resource
+; solution:	Abort action
+;
+
+IE_CANNOT_ALLOCATE_CLIENT		enum	IrlapError
+;
+; cause:	We ran out of space to allocate another client
+; solution:	Quit other clients
+;
+
+IE_INITIALIZATION_ERROR			enum	IrlapError
+;
+; cause:	Irlap could not initialize internal data strucutures or
+;		resources
+; solution:	???
+;
+
+EndDriver	irlap

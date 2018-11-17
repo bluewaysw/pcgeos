@@ -1,0 +1,337 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1996 -- All Rights Reserved
+ *	GEOWORKS CONFIDENTIAL
+ *
+ * PROJECT:	  
+ * MODULE:	  
+ * FILE:	  modemC.goh
+ *
+ * AUTHOR:  	  Chris Thomas: Aug 27, 1996
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CT	8/27/96   	Initial version
+ *
+ * DESCRIPTION:
+ *
+ * 	$Id: modemC.goh,v 1.1 97/04/04 15:59:28 newdeal Exp $
+ *
+ *	C interface for the modem driver.
+ *
+ *
+ *
+ * A client is any geode which is using the modem driver.  The modem driver
+ * can only have one client at a time to prevent multiple clients from 
+ * sending conflicting commands to the modem during a single communications
+ * session. 
+ *
+ * Clients open the serial port by calling ModemOpen(), which also serves
+ * to inform the modem driver that it has a client.  If the modem driver
+ * already has a client, it will return an error.  Clients "unregister" by 
+ * calling ModemClose() which will also close the serial port.
+ *
+ * Clients are responsible for configuring the serial port.  Clients read 
+ * and write data directly to the port.  The modem driver receives all 
+ * serial data notifications.  Clients may register for data notification
+ * through the modem driver, but only data arriving during data mode
+ * will be passed to the client.
+ *
+ * Data mode can only occur after a CONNECT has been received.  The modem
+ * driver's default mode is command mode.  Once a connection has been 
+ * established, the modem stays in data mode until the client has issued
+ * a hangup command.  A modem driver cannot detect a NO CARRIER arriving
+ * in the middle of data, so it does not know when to switch back to command
+ * mode.  
+ *
+ * If clients may use direct serial connections or the modem driver, the 
+ * code must handle both cases and set up data notitifications correctly.
+ *
+ * Normally, clients will not see any of the modem commands or response 
+ * strings.  If the client has registered to be notified of modem responses, 
+ * then each response will be passed to the client.
+ *
+ * Each modem driver function will not return until the command has been
+ * completed.  The result of the command will be returned.  If no response
+ * from the modem is received after a given amount of time, the driver will
+ * return with a timeout error to avoid blocking the client forever.
+ *
+ ***********************************************************************/
+
+@ifndef _MODEMC_GOH_
+@define _MODEMC_GOH_
+
+#include <driver.h>
+#include <streamC.h>
+
+/*
+ * Error codes returned from modem functions
+ */
+
+typedef enum {
+	MRC_NOT_SUPPORTED = 1,
+	MRC_DRIVER_IN_USE,
+	MRC_TIMEOUT,
+	MRC_UNKNOWN_RESPONSE,
+	MRC_OK,
+	MRC_ERROR,
+	MRC_BUSY,
+	MRC_NO_DIALTONE,
+	MRC_NO_ANSWER,
+	MRC_NO_CARRIER,
+	MRC_CONNECT,
+	MRC_CONNECT_1200,
+	MRC_CONNECT_2400,
+	MRC_CONNECT_4800,
+	MRC_CONNECT_9600,
+	MRC_BLACKLISTED,
+	MRC_DELAYED,
+} ModemResultCode;
+
+/*
+ * ModemOpen()
+ *
+ * Opens the serial port to be used for a modem connection, and
+ * places modem driver in command mode.
+ *
+ * Returns TRUE on error (port could not be opened)
+ */
+
+extern  Boolean 
+       	_pascal ModemOpen(GeodeHandle driver,     /* Handle of serial driver */
+			  SerialPortNum port,	  /* Serial port number */
+			  StreamOpenFlags flags,  /* Flags for SerialOpen() */
+			  word inBuffSize,	  /* input buffer size */
+			  word outBuffSize,	  /* output buffer size */
+			  word timeout);	  /* timeout if SOF_TIMEOUT */
+
+/*
+ * ModemClose()
+ *
+ * Close the serial port being used for the modem connection.
+ * Does not attempt to hang up an existing call.  Use
+ * ModemHangup() for that.
+ */
+
+extern void
+	_pascal ModemClose(SerialPortNum port,	  /* Serial port number */
+			   StreamLingerMode linger); /* StreamClose linger mode */
+
+/*
+ * ModemSetRoutineDataNotify()
+ *
+ * Registers a routine to be called when data is received
+ * from the modem while a call is active.
+ * As with the serial driver's data notification, further
+ * notifications will not be sent until the serial port
+ * has been read.
+ */
+
+typedef void _pascal
+	(*ModemDataNotifyRoutinePtr)(word data);
+
+extern void
+	_pascal ModemSetRoutineDataNotify(SerialPortNum port,
+					  word data, /* data param passed
+							to callback */
+					  ModemDataNotifyRoutinePtr callback);
+
+/*
+ * ModemSetMessageDataNotify()
+ *
+ * Registers a message to be sent when data is received
+ * from the modem while a call is active.
+ * As with the serial driver's data notification, further
+ * notifications will not be sent until the serial port
+ * has been read.
+ */
+
+@prototype void MODEM_DATA_NOTIFICATION();
+	/* Message prototype of the data notification message */
+
+extern void
+	_pascal ModemSetMessageDataNotify(SerialPortNum port,
+					  Message msg,
+					  optr destination);
+
+/*
+ * ModemSetRoutineResponseNotify()
+ *
+ * Registers a routine to be called when a response is received
+ * from the modem (while in command mode).
+ *
+ */
+
+typedef void _pascal	
+	(*ModemResponseNotifyRoutinePtr)(word data,
+					 word responseSize,
+					 char *response);
+
+extern void
+	_pascal ModemSetRoutineResponseNotify(SerialPortNum port,
+					      word data,
+					      ModemResponseNotifyRoutinePtr callback);
+
+/*
+ * ModemSetMessageResponseNotify()
+ *
+ * Registers a message to be sent when a response is received
+ * from the modem (while in command mode).  Response is passed
+ * in a Memory block, which should be freed by the message handler.
+ */
+
+@prototype void MODEM_RESPONSE_NOTIFICATION(word responseSize = cx,
+					    MemHandle response = dx);
+	/* Message prototype of response notification */
+
+extern void
+	_pascal ModemSetMessageResponseNotify(SerialPortNum port,
+					      Message msg,
+					      optr destination);
+
+/*
+ * ModemDial()
+ *
+ * Sends the modem's dial command to dial a particular number, and
+ * returns after a connection has been established, or an error has
+ * occurred.
+ *
+ * Returns non-zero if an error occurred.
+ * Modem response returned in result parameter.
+ */
+
+extern Boolean
+	_pascal ModemDial(SerialPortNum port,
+			  word strLen,		/* length of dialStr (not
+						 * including null	  */
+			  const char *dialStr,  /* Phone number to dial */
+			  ModemResultCode *result); /* 
+
+/*
+ * ModemAnswerCall()
+ *
+ * Answers an incoming data call.
+ * Returns after a connection has been established, or an error has
+ * occurred.
+ *
+ * Returns non-zero if an error occurred.
+ * Modem response returned in result parameter.
+ */
+
+extern Boolean
+	_pascal ModemAnswerCall(SerialPortNum port, ModemResultCode *result);
+
+/*
+ * ModemHangup()
+ *
+ * Hangs up an existing data call.
+ * Returns after successfuly hanging up, or an error has
+ * occurred.
+ *
+ * Returns non-zero if an error occurred.
+ * Modem response returned in result parameter.
+ */
+
+extern Boolean
+	_pascal ModemHangup(SerialPortNum port, ModemResultCode *result);
+
+/*
+ * ModemReset()
+ *
+ * Switches to command mode, and resets the modem.
+ * Returns after successfuly resetting, or an error has occurred.
+ *
+ * Returns non-zero if an error occurred.
+ * Modem response returned in result parameter.
+ */
+
+extern Boolean
+	_pascal ModemReset(SerialPortNum port, ModemResultCode *result);
+
+/*
+ * ModemFactoryReset()
+ *
+ * Restores the factory settings of the modem.  Must be in command mode
+ * to use this function.
+ * Returns after successfuly resetting, or an error has occurred.
+ *
+ * Returns non-zero if an error occurred.
+ * Modem response returned in result parameter.
+ */
+
+extern Boolean
+	_pascal ModemFactoryReset(SerialPortNum port, ModemResultCode *result);
+
+/*
+ * ModemInitModem()
+ *
+ * Initializes the modem with a modem command string.  A leading 'AT'
+ * need not be supplied.  Must be in command mode to use this function.
+ * Returns after successfuly initializing, or an error has occurred.
+ *
+ * Returns non-zero if an error occurred.
+ * Modem response returned in result parameter.
+ */
+
+extern Boolean
+	_pascal ModemInitModem(SerialPortNum port, word strLen,
+			       const char *initStr,
+			       ModemResultCode *result);
+/*
+ * ModemAutoAnswer()
+ *
+ * Sets up the mode to auto-answer future incoming calls.
+ * Must be in command mode to use this function.
+ * This function does not wait for a call to come in, but 
+ * returns immediately after successfuly setting the modem to auto-answer,
+ * or an error occurrs doing so.
+ *
+ * Returns non-zero if an error occurred.
+ * Modem response returned in result parameter.
+ */
+
+extern Boolean
+	_pascal ModemAutoAnswer(SerialPortNum port, word numRings,
+				ModemResultCode *result);
+
+
+/*
+ * ModemSetMessageEndCallNotify()
+ *
+ * Registers an object to receive a message if the call has been ended
+ * for any reason.  This may not be supported on all platforms.
+ * To unregister notification, pass optr=NullOptr.
+ *
+ * Returns non-zero if not supported
+ *
+ */
+
+@prototype void MODEM_END_CALL_NOTIFICATION();
+	/* Message prototype of end-call notification */
+
+extern Boolean
+	_pascal ModemSetMessageEndCallNotify(SerialPortNum port,
+					     Message msg,
+					     optr destination);
+
+
+#ifdef __HIGHC__
+
+pragma	Alias (ModemOpen, "MODEMOPEN");
+pragma	Alias (ModemClose, "MODEMCLOSE");
+pragma	Alias (ModemSetRoutineDataNotify, "MODEMSETROUTINEDATANOTIFY");
+pragma	Alias (ModemSetMessageDataNotify, "MODEMSETMESSAGEDATANOTIFY");
+pragma	Alias (ModemSetRoutineResponseNotify, "MODEMSETROUTINERESPONSENOTIFY");
+pragma	Alias (ModemSetMessageResponseNotify, "MODEMSETMESSAGERESPONSENOTIFY");
+pragma	Alias (ModemDial, "MODEMDIAL");
+pragma	Alias (ModemAnswerCall, "MODEMANSWERCALL");
+pragma	Alias (ModemHangup, "MODEMHANGUP");
+pragma	Alias (ModemReset, "MODEMRESET");
+pragma	Alias (ModemFactoryReset, "MODEMFACTORYRESET");
+pragma	Alias (ModemInitModem, "MODEMINITMODEM");
+pragma	Alias (ModemAutoAnswer, "MODEMAUTOANSWER");
+pragma	Alias (ModemSetMessageEndCallNotify, "MODEMSETMESSAGEENDCALLNOTIFY");
+#endif /* __HIGHC__ */
+
+@endif /* _MODEMC_GOH_ */

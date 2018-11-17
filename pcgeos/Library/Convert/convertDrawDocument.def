@@ -1,0 +1,135 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Convert
+FILE:		convertDrawDocument.def
+
+AUTHOR:		Jon Witort
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	jon		2 sept 1992	initial revision
+
+DESCRIPTION:
+	$Id: convertDrawDocument.def,v 1.1 97/04/04 17:52:34 newdeal Exp $
+
+	This file contains constants from the 1.X version of GeoDraw
+	to make the conversion code more legible.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+;  2.0 document (from GeoDraw/drawDocument.def)
+;
+DrawMapBlock	struct
+	DMB_bodyRulerGOAM	word	; VM block handle containing
+					; GrObjBody, GrObjAttributeManager
+					; and rulers
+	DMB_width		dword	; Document width in points
+	DMB_height		dword	; Document height in points
+	DMB_orientation		PageLayout
+	DMB_margins		Rectangle
+	DMB_leftGuideline	word	; Token of left margin guidleline
+	DMB_topGuideline	word
+	DMB_rightGuideline	word
+	DMB_bottomGuideline	word
+
+DrawMapBlock	ends
+
+XYSize1X	struc
+    XYS_1X_width	word
+    XYS_1X_height	word
+XYSize1X	ends
+
+DrawDocData1X	struc
+	DDD_1X_size	XYSize1X	; width/height of document
+	DDD_1X_orientation	PaperOrientation;
+	DDD_1X_orientationValid	byte	; non zero means valid. Since old
+					; documents didn't have either
+					; orientation field, but vm blocks
+					; are alloced to page boundaries and
+					; zeroed, if this field is non zero
+					; then the orientation has been set
+					; correctly.
+DrawDocData1X	ends
+
+;	Structure of the map block for saving the file
+;
+	
+DrawDocMap1X	struc
+	DDM_1X_documentData	word	; VM block of global info
+	DDM_1X_bodyBlock	word	; VM block of draw body, etc
+DrawDocMap1X	ends
+
+OLD_BODY_CHUNK_HANDLE		equ	24h
+OLD_VIS_MASTER_CLASS_OFFSET	equ	4
+OLD_BODY_MASTER_CLASS_OFFSET	equ	6
+OLD_GROBJ_MASTER_CLASS_OFFSET	equ	6
+
+OLD_VI_LINK_OFFSET		equ	13
+OLD_VCI_FIRST_CHILD_OFFSET	equ	17
+
+FIRST_EXPORTED_POSSIBLE_GROBJ_CLASS	equ	9
+
+THE_REST_OF_OI_CRAP equ	40
+
+OLD_OI_baseBounds	equ	23
+OLD_OI_drawPt		equ	OLD_OI_baseBounds + size Rectangle
+OLD_OI_rotateDegrees	equ	OLD_OI_drawPt + (4 * size WWFixed)
+OLD_OI_rotatePtOffset	equ	OLD_OI_rotateDegrees + size word
+OLD_OI_scaleX		equ	OLD_OI_rotatePtOffset + size PointWWFixed + \
+				(4 * size Point)
+OLD_OI_scaleY		equ	OLD_OI_scaleX + size WWFixed
+
+OLD_LA_foreAttr		equ	OLD_OI_scaleY + THE_REST_OF_OI_CRAP
+OLD_LA_backAttr		equ	OLD_LA_foreAttr + size LineAttrStruc1X
+OLD_AA_foreAttr		equ	OLD_LA_backAttr + size LineAttrStruc1X
+OLD_AA_backAttr		equ	OLD_AA_foreAttr + size AreaAttrStruc1X
+
+OLD_PI_baseLMem		equ	OLD_LA_backAttr + size LineAttrStruc1X
+OLD_PI_numPtsInBase	equ	OLD_PI_baseLMem + size lptr + size word
+
+OLD_PGI_baseLMem	equ	OLD_AA_backAttr + size AreaAttrStruc1X
+OLD_PGI_numPtsInBase	equ	OLD_PGI_baseLMem + size lptr + size word
+
+OLD_GSI_vmemBlockHandle	equ	OLD_OI_scaleY + THE_REST_OF_OI_CRAP
+OLD_BI_vmemBlockHandle	equ	OLD_AA_backAttr + size AreaAttrStruc1X
+
+AreaAttrStruc1X struct
+    AAS_1X_r		byte
+    AAS_1X_colorFlag	byte
+    AAS_1X_g		byte
+    AAS_1X_b		byte
+    AAS_1X_mapMode	byte	;MapColorToMono
+    AAS_1X_mask	byte	;DrawMasks
+    AAS_1X_drawMode	byte	;DrawModes
+    AAS_1X_areaInfo	byte	;AreaAttrInfoRecord
+	align		word
+AreaAttrStruc1X ends	
+
+AreaAttrInfoRecord1X	record
+	AAIR1X_filled:1
+	AAIR1X_transparent:1
+	AAIR1X_SOLID:1			;only know if mask is known
+	:5
+AreaAttrInfoRecord1X	end
+
+OFFSET_OLD_AAIR_transparent	equ	6
+
+LineAttrStruc1X struct
+    LAS_1X_r		byte
+    LAS_1X_colorFlag	byte
+    LAS_1X_g		byte
+    LAS_1X_b		byte
+    LAS_1X_end		byte	;LineEnds
+    LAS_1X_join		byte	;LineJoins
+    LAS_1X_width	word
+    LAS_1X_mapMode	byte	;MapColorToMono
+    LAS_1X_mask		byte	;DrawMasks
+    LAS_1X_style	byte	;LineStyles
+    LAS_1X_drawMode	byte	;DrawModes
+	align		word
+LineAttrStruc1X ends	

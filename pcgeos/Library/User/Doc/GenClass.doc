@@ -1,0 +1,1241 @@
+COMMENT `CLASS DESCRIPTION-----------------------------------------------------
+
+				GenClass
+
+$Id: GenClass.doc,v 1.1.34.1 97/03/29 03:37:40 canavese Exp $
+
+Synopsis
+--------
+	GenClass is the parent of all generic UI objects and provides
+	behavior (via messages and instance data) common to all generic
+	objects.  Generic objects inheriently have no visual representation,
+	but are implemented via the specific user interface.  GenClass
+	provides lots of default behavior for creating a hierarchy of generic
+	objects, specifying "visual monikers" with which generic objects can
+	represent themselves, specifying keyboard shortcuts to activate
+	generic objects, specifying "hints" to suggest different
+	implementations by the specific user interface, and dynamically
+	adding to and removing from generic object hierarchies.  The generic
+	user interface is composed of mechanisms and generic objects that
+	inherit behavior from GenClass.  Applications can subclass this
+	behavior to change it for their own uses and can even create custom
+	generic objects.
+
+Limitations/Alternatives
+------------------------
+	As GenClass has no inherient visible representation, it may not be
+	able to provide the exact visual structure you need.  In this case,
+	you may be able to use the visual objects directly.
+
+Implementation Status
+---------------------
+	<This documentation needs Hint information - both in general and
+	in the specific sections (i.e. there are Hints related to Visual
+	Monikers).>
+
+See Also
+--------
+	GenActiveListClass, GenAppDocumentControlClass, GenApplicationClass,
+	GenContentClass, GenDataTriggerClass <going away>, GenDisplayClass,
+	GenDisplayControlClass, GenDocumentClass, GenFieldClass,
+	GenFileSelectorClass, GenGadgetClass, GenGlyphDisplayClass,
+	GenInteractionClass, GenListClass, GenListEntryClass, GenPrimaryClass,
+	GenRangeClass, GenScreenClass, GenSpinGagetClass,
+	GenSystemClass, GenTextDisplayClass, GenTextEditClass, GenTriggerClass,
+	GenUIDocumentControlClass, GenViewClass - generic objects
+	(see gen*Class.asm)
+		Subclasses of GenClass that provide much of the general
+		user interface related functionality needed by applications.
+		Some are for use by the system only and are not needed by
+		applications.
+	SpecClass (see visSpec.asm)
+		Handles various tasks needed for implementing generic objects
+		in the visual world.
+	VisClass (see visClass.asm)
+		Implements all generic objects in the visual world.
+
+;------------------------------------------------------------------------------
+;	Description
+;------------------------------------------------------------------------------
+
+Terminology
+-----------
+	Focus -
+	GUP -
+		prefix added to those GenClass messages that travel up the
+		generic tree until someone can handle the message.
+	Hint -
+	Specifically built/Visibly built -
+	Target -
+	Visual moniker -
+		text or graphics string assoicated with an object.  GenClass
+		provides messages to deal with them.
+
+Relationships/Context
+---------------------
+	GenClass is the parent of all generic UI objects.  An application
+	can also use it as the parent class for custom gadgets.
+
+	GenClass provides composite behavior, so any Generic object can have
+	Generic children.  In order for a generic object to be specifically
+	built into a visible object, it must be attached to some parent
+	generic object.  For example, a simple application might have a
+	generic object tree like this:
+
+				GenApplication
+				       |
+				       |
+				  GenPrimary
+				       |
+		         +-------------+-------------+
+			 |			     |
+		      GenView		       GenInteraction
+						     |
+					  +----------+----------+
+					  |			|
+				      GenTrigger	    GenTrigger
+
+	Note that the visible object tree may be quite different depending
+	on how the specific user interface implements the generic objects
+	and on what states the generic objects are in (usable, not usable,
+	minimized, maximized, etc.).
+
+Conceptual Overview
+-------------------
+	Generic objects are created statically in .goc files by entries
+	giving the object name, generic class, and any relevant instance
+	data.  A generic object includes linkage information, a visual
+	moniker, a keyboard accelerator, hints, attributes, and state
+	information.  For example a GenTrigger:
+
+		@object GenTriggerClass MyOKTrigger = {
+		    /* the following is GenClass instance data */
+		    GI_visMoniker = "OK";
+		    GI_attrs = @default | GA_COMPLETES_INTERACTION;
+		    GI_states = @default & ~GS_ENABLED;
+		    /* the following is GenTriggerClass instance data */
+		    GTI_destination = process;
+		    GTI_actionMsg = METHOD_MYPROCESS_OK;
+		}
+
+	Generic objects can also be created dynamically in several ways (see
+	Generic Tree Construction/Destruction section below).
+
+	GenClass provides messages and library routines to set and retrieve
+	GenClass instance data, and to interact with the other mechanisms it
+	provides (see individual Usage sections below).
+
+Warnings
+--------
+
+Usage:  Generic States
+----------------------
+	Generic objects can be in several states that affect its visible
+	representation by the specific user interface:
+
+	GS_USABLE -
+		indicates whether the entire generic branch starting with this
+		object should be considered part of the application's user
+		interface.  If the generic object is not usable, then the
+		object nor any of its children will appear or may be interacted
+		with.  The specific and visual state of any object that is made
+		not usable will be destroyed, and the object treated as if it
+		were in generic form only, with no visual representation.
+
+	GS_ENABLED -
+		indicates if object will allow user to interact with it or not.
+		Used in objects to show options as not available, which is
+		typically represented by the specific user interface by
+		"greying out" the object.
+
+	The default GenStates for an object are GS_USABLE and
+	GS_ENABLED.  These can be changed in the static object definition
+	or dynamically.  For example, to define an object as not enabled to
+	indicate that the option it represents is unavailable:
+
+		@object GenTriggerClass = MyTrigger {
+		    <other instance data>
+		    GI_states = @default & ~GS_ENABLED;
+		}
+
+	Or more typically, to indicate that the function represented by an
+	object HAS JUST BECOME unavailable:
+
+		@call MyTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+	or HAS JUST BECOME available:
+
+		@call MyTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+	The following messages can be used to set/query the Generic States:
+
+		MSG_GEN_SET_ENABLED
+		MSG_GEN_SET_NOT_ENABLED
+		MSG_GEN_GET_ENABLED
+
+		MSG_GEN_SET_USABLE
+		MSG_GEN_SET_NOT_USABLE
+		MSG_GEN_GET_USABLE
+
+	The SET messages take one parameter, an update mode flag, that
+	specifies how the visual update, if any, of the object should occur.
+	See VisUpdateMode documentation for more information.  The GET
+	messages require no parameters.
+
+	In additional the states described above, there is also the fully
+	enabled and fully usable states.  An object is considered fully
+	enabled/fully usable if it is marked as GS_ENABLED/GS_USABLE,
+	and all generic parents of the object are markeds as GS_ENABLED/
+	GS_USABLE.  An object that is not fully USABLE is not considered
+	part of the interface of an application, and may not appear on-screen.
+	This becomes important when you need to set a generic branch not
+	usable -- you need only set the top-level object not usable, you don't
+	need to set the children not usable.  As a corollary, if both a child
+	object and its parent object are not usable, setting the parent usable
+	is not enough make the child part of the application's interface.  The
+	child must also be set usable.
+	
+	The fully enabled and fully usable states can be checked with the
+	MSG_GEN_CHECK_IF_FULLY_ENABLED and MSG_GEN_CHECK_IF_FULLY_USABLE
+	messages for the GenCheckIfFullyEnabled and GenCheckIfFullyUsable
+	library routines.  There are no corresponding messages or routines to
+	set the fully enabled and fully usable states, you must ensure that
+	parent objects are in the correct states yourself.
+
+	See the definitions for the above messages for more information about
+	the GenStates.
+
+Usage:  Generic Attributes
+--------------------------
+	There are several attributes that affects the behavior of a generic
+	object:
+
+	GA_SIGNAL_INTERACTION_COMPLETE -
+		indicates that when this generic object is activated it
+		indicates that the user has finished interaction with the
+		dialog it is in.  Results in a MSG_GEN_GUP_INTERACTION_COMMAND
+		with IC_INTERACTION_COMPLETE being sent to the generic parent
+		of object.  This travels up the generic tree until the
+		appropriate dialog is found.
+
+	GA_INITIATES_BUSY_STATE -
+		indicates that this generic object starts a long enough
+		operation that we'd like to change the cursor to show busy.
+		Input is accepted as usual.  Results in MSG_GEN_APPLICATION_MARK_BUSY
+		being sent to the application object for this generic object,
+		followed by a MSG_GEN_APPLICATION_MARK_NOT_BUSY being sent to the
+		application object, but delayed via the application's queue.
+
+		This only affects the application for the generic object marked
+		with GA_INITIATES_BUSY_STATE.  Other applications are not
+		affected.
+
+	GA_INITIATES_INPUT_HOLD_UP -
+		indicates that this generic object invokes an action that
+		results in the application thread modifying the UI gadgetry
+		slightly (typically enabling and disabling options).  This
+		causes input to be held up until the application has completed
+		whatever its response it, so that the user can't click twice
+		on something that the application will disable after processing
+		the first click.
+
+		Results in a MSG_GEN_APPLICATION_HOLD_UP_INPUT being sent to the
+		application object for this generic object, followed by a
+		MSG_GEN_APPLICATION_RESUME_INPUT being sent to the application object,
+		but delayed via the application's queue.
+
+		This only affects the application for the generic object marked
+		with GA_INITIATES_INPUT_HOLD_UP.  Other applications are not
+		affected.
+
+	GA_INITIATES_INPUT_IGNORE -
+		indicates that this generic object starts a long enough
+		operation that we want to change the cursor to show that the
+		application is busy and can't accept input.  Enters the
+		application modal state even if there isn't an application-
+		modal dialog box up (i.e. all button activity is eaten with a
+		beep).  Results in a MSG_GEN_APPLICATION_IGNORE_INPUT being sent to the
+		application object for this generic object, followed by a
+		MSG_GEN_APPLICATION_ACCEPT_INPUT being sent to the application object,
+		but delayed via the application's queue.
+
+		This only affects the application for the generic object marked
+		with GA_INITIATES_INPUT_IGNORE.  Other applications are not
+		affected.
+
+	GA_HIDE_IF_APP_NOT_OPEN <not used> -
+		indicates that this generic branch should not become visible
+		if the application is not "opened".
+
+	GA_KBD_SEARCH_PATH (internal) -
+		indicates that this generic branch contains objects with
+		keyboard accelerators or shortcuts and should be searched
+		when evaluating such events.  Normally handled internally by
+		the generic UI, so there is no need for applications to deal
+		with this.
+
+	The default for generic objects is to have none of these set.  If
+	one or more are needed, they are normally set statically in an
+	object's definition like this:
+
+		@object GenTriggerClass MyTrigger = {
+		    <other instance data>
+		    GI_attrs = @default | GA_COMPLETES_INTERACTION;
+		}
+
+	For cases where an object is dynamically created and needs to have
+	one or more GenAttrs set, MSG_GEN_SET_ATTRS can be
+	used:
+
+		@call MyTrigger::MSG_GEN_SET_ATTRS(
+					GA_COMPLETES_INTERACTION, 0);
+
+	MSG_GEN_SET_ATTRS takes a bitmask of bits to set and a bitmask
+	of bits to clear.  Note that the new attributes will not take effect
+	until the object is activated.
+
+	The GenAttrs for an object can be retrieved with
+	MSG_GEN_GET_ATTRIBUTES:
+
+		byte myAttrs;
+		myAttrs = @call MyTrigger::MSG_GEN_GET_ATTRIBUTES();
+
+	Currently only GenTriggerClass, GenDataTriggerClass <going away>,
+	GenListEntryClass, GenListClass (when sending out action descriptor),
+	and GenViewClass (only for MSG_META_END_MOVE_COPY) support the
+	GA_COMPLETES_INTERACTION, GA_INITIATES_BUSY_STATE,
+	GA_INITIATES_INPUT_HOLD_UP, and GA_INITIATES_INPUT_IGNORE
+	attributes.
+
+	See GenInteraction documentation for more about
+	GA_COMPLETES_INTERACTION.  See GenApplicationClass documentation
+	for more about GA_INITIATES_BUSY_STATE, GA_INITIATES_INPUT_HOLD_UP,
+	and GA_INITIATES_INPUT_IGNORE.
+
+Usage:  Visual Monikers
+-----------------------
+	A visual moniker is a text or graphics string associated with a generic
+	object.  For some objects, like GenGlyphDisplays and GenTriggers, the
+	visual moniker is the main visual representation of the object.  For
+	others, like GenLists and GenInteractions, the visual moniker is a
+	title or header for other visual information.  For others, like
+	GenDisplays or GenPrimarys, the visual moniker appears in just the
+	title bar of a window.  Of course, the specific user interface has
+	control of how monikers are used for the various generic objects.
+
+	In addition to text or graphic strings, a visual moniker may also be
+	a moniker list.  A moniker list is just a group of regular text and/or
+	graphic string monikers.  Typically, moniker lists are used to store
+	different graphics string monikers for different video displays --
+	monochrome or color, different aspect ratios, etc.
+
+	In addition to text, a text moniker can also have a mnemonic.
+	Mnemonics are characters that can be typed to navigate to different
+	UI gadgetry faster.  Menus, menu items, and dialog box gadgets should
+	have a mnemonic associated with them, usually the first letter of the
+	text moniker for the gadget or some other meaningful letter in the
+	text moniker.  The mnemonic character is underlined in the text
+	moniker.  If the character is not in the name itself, it is put at
+	the end in parenthesis.  Examples:
+
+		File		Display Header		Kill (x)
+		-			-		      -
+
+	Mnemonics are activated by typing the letter, or ALT and the letter.
+
+	GenClass provides the storage for a generic object's visual moniker
+	and messages to manipulate that moniker.  A visual moniker for an
+	object must be stored in an lmem chunk in the object block of the
+	generic object it is associated with.  A moniker lists are stored as
+	an lmem chunks containing an array of structures that hold information
+	about (including the chunk handles of) the actual monikers in the
+	moniker list.
+
+	Visual monikers can be defined as part of a generic object:
+	
+		@object GenTriggerClass FileTrigger {
+		    GI_visMoniker = 'F', "File";
+		}
+
+	Or as a free standing structure:
+
+		@visMoniker DHMoniker = 'H', "Display Header";
+
+	Note that the mnemonic is specified by preceding the moniker text
+	with a single character.  It can be omitted if there is no mnemonic
+	or you can specify the actual position of the mnemonic within the
+	text moniker:
+
+		@visMoniker DHMoniker = 8, "Display Header";
+
+	This will have the same effect as the DHMoniker defined above.
+
+	Case matters when specifying a mnemonic character.  If the character
+	doesn't occur in the text moniker, a parenthetical mnemonic will be
+	created:
+
+		@visMoniker KillMoniker = 'x', "Kill";
+
+	<defining moniker lists>
+
+	Once monikers are defined, there are several functions that can
+	operate on them dynamically.
+
+	MSG_GEN_GET_VIS_MONIKER is used get the chunk handle of the visual
+	moniker chunk:
+
+		ChunkHandle visMon;
+		visMon = @call MyObject::MSG_GEN_GET_VIS_MONIKER();
+
+	MSG_GEN_USE_VIS_MONIKER is used to set the visual moniker of a generic
+	object to the passed chunk.  This only switches the moniker to the
+	specified one (which must exist in the same block as the object), it
+	does not destroy to existing moniker, if any.  This is useful for
+	toggling between two monikers.  For example, a GenGlyph can be
+	used to show some state information:
+
+		@visMoniker OnMoniker = "On";
+		@visMoniker OffMoniker = "Off";
+
+		@object GenGlyphDisplayClass OnOffIndicator {
+		}
+
+		...
+
+		if (stateIsOn) {
+		    @call OnOffIndicator::MSG_GEN_USE_VIS_MONIKER(
+					OptrToChunk(OnMoniker), VUM_NOW);
+		} else {
+		    @call OnOffIndicator::MSG_GEN_USE_VIS_MONIKER(
+					OptrToChunk(OffMoniker), VUM_NOW);
+		}
+
+	MSG_GEN_CREATE_VIS_MONIKER and MSG_GEN_REPLACE_VIS_MONIKER are high-
+	level messages used to create a free standing moniker or replace the
+	moniker of an object.  It allows creating the visual moniker from one
+	of several different sources, an existing visual moniker, a visual
+	moniker list, a text string, a graphics string, or a token.db token.
+	The source may be referenced by an optr, an hptr, or an fptr.  When a
+	text string or graphics string is passed, a visual moniker structure
+	is created for it.  See definitions for more information.
+
+	For example, MSG_GEN_REPLACE_VIS_MONIKER can be used to overwrite the
+	existing moniker of a GenTrigger:
+
+		@object GenTriggerClass MyTrigger = {
+		    GI_visMoniker = "Old";
+		}
+
+		...
+
+		@call MyTrigger::MSG_GEN_REPLACE_VIS_MONIKER(VUM_NOW,
+					0, 0, 0,
+					VMDT_STRING, VMST_FPTR,
+					"New");
+
+	As setting a new moniker from a null-terminated text string is fairly
+	common, a simple message exists for doing this:
+
+		@call MyTrigger::
+			MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+					"New", VUM_NOW);
+
+	Or to set a moniker from a moniker template without destroying the
+	existing moniker:
+
+		@start Interface;
+
+		@visMoniker MonikerTemplate = "New";
+
+		@object GenTriggerClass MyTrigger = {
+		    GI_visMoniker = "Old";
+		}
+
+		@end Interface
+
+		...
+
+		ChunkHandle newMoniker;
+		/* create new moniker chunk from MonikerTemplate */
+		newMoniker = @call MyTrigger::MSG_GEN_CREATE_VIS_MONIKER(
+					CVMF_DIRTY,
+					0, 0, 0,
+					VMDT_VIS_MONIKER, VMST_OPTR,
+					(dword) &MonikerTemplate);
+		/* use the new moniker w/o destroying old moniker */
+		@call Mytrigger::MSG_GEN_USE_VIS_MONIKER(newMoniker, VUM_NOW);
+
+	Note that if the object's visual moniker is changed, an update mode
+	is needed to specify how the visual update should occur.  See the
+	VisUpdateMode documentation for more information on this.  Also,
+	the CVMF_DIRTY flag is passed.  This indicates that the new Visual
+	Moniker chunk is to be marked dirty, and will thus be saved to state
+	file when the application is detached (see documentation about state
+	saving).  MSG_GEN_USE_VIS_MONIKER and MSG_GEN_REPLACE_VIS_MONIKER
+	always mark the object and the new moniker chunk dirty.
+
+	In addition to the basic set and get functionality, GenClass provides
+	a few additional messages and routines for lower level access to
+	a generic object's Visual Moniker:
+
+		MSG_GEN_DRAW_MONIKER
+		MSG_GEN_GET_MONIKER_POS
+		MSG_GEN_GET_MONIKER_SIZE
+		MSG_GEN_FIND_MONIKER
+		MSG_GEN_RELOC_MONIKER_LIST
+
+	MSG_GEN_DRAW_MONIKER, MSG_GEN_GET_MONIKER_POS, MSG_GEN_GET_MONIKER_SIZE
+	are probably useful for custom gadgets.
+	
+	MSG_GEN_FIND_MONIKER and MSG_GEN_RELOC_MONIKER_LIST are used for
+	moniker lists.  MSG_GEN_RELOC_MONIKER_LIST is used internally to
+	relocate moniker lists and should not be needed by applications.
+	MSG_GEN_FIND_MONIKER is used to search a moniker list for a
+	moniker matching (or most closely matching) the passed criteria.
+	It may be useful in some custom gadget work.
+	
+	See the message definitions for information about these.
+
+	For more information about Visual Monikers, see the VisClass
+	documentation.  For more about the mechanisms GenClass provides for
+	dealing with Visual Monikers, see the documentation for the above
+	messages.
+
+Usage:  Keyboard Accelerators
+-----------------------------
+	Keyboard accelerators are key sequences that the user types
+	to automatically perform a commonly used function.  The sequence
+	consists of one or more modifiers and a key.  Examples:
+
+		ALT-T
+		CTRL-A
+		ALT SHIFT ESCAPE
+		F10
+
+	Valid modifiers are "alt", "control", "ctrl", and "shift".  Valid
+	keys are any alpha-numeric characters, and the following:
+
+		NUMPAD_0		SPACE		UP
+		NUMPAD_1		TAB		DOWN
+		NUMPAD_2		ESCAPE		RIGHT
+		NUMPAD_3		F1		LEFT
+		NUMPAD_4		F2		HOME
+		NUMPAD_5		F3		END
+		NUMPAD_6		F4		PAGEUP
+		NUMPAD_7		F5		PAGEDOWN
+		NUMPAD_8		F6		INSERT
+		NUMPAD_9		F7		DELETE
+		NUMPAD_PLUS		F8		BACKSPACE
+		NUMPAD_MINUS		F9
+		NUMPAD_DIV		F10		MINUS
+		NUMPAD_MULT		F11		ENTER
+		NUMPAD_PERIOD		F12
+		NUMPAD_ENTER
+
+	Note that for alpha characters, case is ignored and lower-case is
+	assumed.  For upper case, use the "shift" modifier.
+
+	Applications should use the control keys (i.e. CTRL-A, except CTRL-I,
+	H, L, M).  for keyboard accelerators.  Alt-ascii and Alt-shift-ascii
+	are available, but they are likely to interfere with mnemonics,
+	especially those assigned by the specific UI's.  So they should just
+	be used as a last resort.  This should not be a problem, as mnemonics
+	should cover all the menu items.  Keyboard accelerators should only be
+	needed for very heavily used commands meriting a single keystroke, and
+	functions not really available through keyboard navigation, such as
+	toolbox items.
+
+	A keyboard accelerator can be added to an object by adding a
+	initializing the GI_kbdAccelerator field of your generic object.
+	The object must be in your application's generic tree for the
+	accelerator to take effect.  Some examples of allowable ones:
+	
+		GI_kbdAccelerator = control 'a';
+		GI_kbdAccelerator = alt 'z';
+		GI_kbdAccelerator = alt shift '2';
+		GI_kbdAccelerator = alt shift 'A';
+	 
+	If you're lucky enough to be the specific UI, you can get at other
+	shortcuts by putting the "specificUI" keyword in your .goc file,
+	outside of any object definition:
+	
+		specificUI;
+		
+	Some specific UI examples:
+	
+		GI_kbdAccelerator = F6;
+		GI_kbdAccelerator = shift F11;
+		GI_kbdAccelerator = control shift ESCAPE;
+		GI_kbdAccelerator = shift alt F5;
+		GI_kbdAccelerator = alt shift DELETE;
+		
+	You can also override the can't-be-used-by-application rule on an
+	individual basis by adding "specificUI" at the beginning of the
+	shortcut:
+	
+		GI_kbdAccelerator = specificUI alt shift DELETE;
+
+	Dynamically, a generic object's keyboard accelerator can be retreived
+	with MSG_GEN_GET_KBD_ACCELERATOR:
+
+		word accel;
+		accel = @call MyTrigger::MSG_GEN_GET_KBD_ACCELERATOR();
+
+	The keyboard accelerator can be set MSG_GEN_SET_KBD_ACCELERATOR.  For
+	example to set a GenTrigger's accelerator to CTRL-T:
+
+		@call MyTrigger::MSG_GEN_SET_KBD_ACCELERATOR(
+					(KS_CTRL |
+					(CS_BSW << KS_CHAR_SET_OFFSET) |
+					('t' << KS_CHAR_OFFSET)),
+					VUM_NOW);
+
+	Note that since the visual appearance of the GenTrigger might be
+	changed to show the new keyboard accelerator, an updateMode is passed.
+
+	Alternately, MSG_GEN_CHANGE_ACCELERATOR allows more flexible
+	modification of the existing keyboard accelerator.
+
+	Finally, a caveat:  the specific user interface has final control over
+	whether keyboard accelerators are shown, and for which objects they
+	are allowed.  Currently, keyboard accelerators only work for menu items.
+
+Usage:  Help
+------------
+	<no Help yet?>
+
+	<MSG_GEN_GET_HELP, MSG_GEN_SET_HELP>
+
+Usage:  Hints
+-------------
+	<see seperate Hint documentation?>
+
+Usage:  Generic Composites
+--------------------------
+	GenClass provides composite support so any generic object can have
+	generic children.  Two GenClass instance data fields provide this
+	support:  GI_comp and GI_link.  GI_comp contains the optr of the first
+	child of this generic object, if any.  GI_link holds the optr of the
+	next sibling of this generic object (i.e this object's parent's next
+	child) or the optr of this object's parent if there is no next
+	sibling.  In the former case, the parent can be found by following
+	the GI_link's of successive next siblings until the last one.  This
+	is signal by the LP_IS_PARENT bit being set in the GI_link optr.
+	This indicates that that optr is not the next sibling but the parent.
+	(Of course, the LP_IS_PARENT bit must be cleared before the optr can
+	be used.)  GenClass also provides mechanisms to interact with these
+	linkages and with the objects they point to.
+
+	To statically define a generic object with children, simply initialize
+	the GI_comp field of the parent with the optrs of the children in your
+	object definitions:
+
+		@object GenListEntryClass MyList = {
+		     GI_comp = EntryOne, EntryTwo, EntryThree;
+		}
+		@object GenListEntry EntryOne = {
+		    GI_visMoniker = "One";
+		}
+		@object GenListEntry EntryTwo = {
+		    GI_visMoniker = "Two";
+		}
+		@object GenListEntry EntryThree = {
+		    GI_visMoniker = "Three";
+		}
+
+	The GI_link fields do not need to be initialized as they are set up
+	automatically by GOC.
+
+	Generic composites can also be created and modified dynamically (see
+	next section).
+
+	Given a generic composite, there are several GenClass operations that
+	can be performed:
+	
+		/*
+		 * call parent object to find the 0-based position of a child
+		 * object given the optr of the child
+		 */
+		word childPos;
+		childPos = @call MyList::MSG_GEN_FIND_CHILD(&EntryTwo);
+
+		...
+
+		/*
+		 * call parent object to find the optr of a child object
+		 * given the 0-based position of the child
+		 */
+		optr firstChild;
+		firstChild = @call MyList::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+
+		...
+
+		/*
+		 * call parent object to count the number of children it has
+		 */
+		word childCount;
+		childCount = @call MyList::MSG_GEN_COUNT_CHILDREN();
+
+		...
+
+		/*
+		 * call child object to get optr of its parent
+		 */
+		optr parentOptr;
+		parentOptr = @call EntryTwo::MSG_GEN_FIND_PARENT();
+
+	Using the find-child and get-parent functions, it is possible to send
+	messages to the parent and children of generic objects.  However,
+	because generic trees can change and cause stored optrs to become
+	invalid, it is bad practice to fetch an object's optr and then, at a
+	later time, send messages to it.  To avoid this, GenClass provides
+	functionality to directly communicate with objects in a generic tree:
+	
+		/*
+		 * get moniker of parent object
+		 */
+
+		ChunkHandle parentMoniker;
+		EventHandle myEvent;
+
+			/* create MSG_GEN_GET_MONIKER event,
+			   valid for GenClass objects */
+		myEvent = @record GenClass::MSG_GEN_GET_MONIKER();
+			/* have child send event to parent */
+		parentMoniker = @call (MSG_GEN_GET_MONIKER)
+					EntryTwo::MSG_GEN_CALL_PARENT(myEvent);
+
+		...
+
+		/*
+		 * disable all children
+		 */
+
+		EventHandle myEvent;
+
+			/* create MSG_GEN_SET_NOT_ENABLED event,
+			   valid for GenClass objects */
+		myEvent = @record GenClass::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+			/* have parent send event to all children */
+		@call MyList::MSG_GEN_SEND_TO_CHILDREN(myEvent);
+
+	Note the distinction between MSG_GEN_CALL_PARENT and
+	MSG_GEN_SEND_TO_CHILDREN -- MSG_GEN_CALL_PARENT allows getting return
+	values from the method handler while MSG_GEN_SEND_TO_CHILDREN does
+	not.  There is a MSG_GEN_SEND_TO_PARENT but no CALL version of
+	MSG_GEN_SEND_TO_CHILDREN because it is not meaningful to get return
+	values from ALL of the children.
+
+	Note also that these messages take classed events (see Classed Event
+	documentation).  If developing in assembly language, and if this code
+	is being executed in a method handler for the object (i.e. *ds:si
+	points to the object instance), you can use the GenCallParent and
+	GenSendToChildren (there is no GenSendToParent) library routines, which
+	take the method and method data directly.  If developing in C, and if
+	this code is being executed in a method handler for the object (i.e.
+	the variable 'oself' is the optr of the object), you can use this
+	GOC syntax:
+
+		/*
+		 * get moniker of parent object
+		 */
+		parentMoniker = @call @genParent::MSG_GEN_GET_MONIKER();
+
+		...
+
+		/*
+		 * disable all children
+		 */
+		@call @genChildren::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	
+	<Other library routines?>
+
+	There is another set of messages that provide an extension of the
+	parent operations described above:
+	
+		MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
+		MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS
+
+	These can be used to send messages (again in the form of classed
+	events) to the first object of a given class encountered while
+	travelling up the generic tree starting from the object to which
+	these messages are sent (see GUP).  For example to request that the
+	field object begin the "Exit to DOS" sequence:
+
+		/*
+		 * create MSG_GEN_FIELD_EXIT_TO_DOS event, valid for
+		 * GenFieldClass objects
+		 */
+		myEvent = @record GenFieldClass::MSG_GEN_FIELD_EXIT_TO_DOS();
+
+		/*
+		 * since we know that our application object (MyApp) has a
+		 * field object as its parent, we can "GUP" for it
+		 */
+		@send MyApp::MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS(myEvent);
+
+	Note that even though the field object is the immediate parent of the
+	application object, this doesn't need to be the case for these messages
+	to work:
+
+		/*
+		 * create MSG_GEN_FIELD_EXIT_TO_DOS event, valid for
+		 * GenFieldClass objects
+		 */
+		myEvent = @record GenFieldClass::MSG_GEN_FIELD_EXIT_TO_DOS();
+
+		/*
+		 * since we know that our primary (MyPrimary) is a child of
+		 * our application object and that our application object has
+		 * a field object as its parent, we can "GUP" for it
+		 */
+		@send MyPrimary::MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS(myEvent);
+
+	Two additional messages can be used to search up the generic tree for
+	an object of a given class and to return the optr of an object "gup"
+	above in the generic tree:
+
+		MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS
+		MSG_GEN_GUP_FIND_OBJECT_OF_CLASS
+
+	See "Generic Upward Queries" for a general purpose mechanism like this.
+
+	In addition to being able to send messages to the parent and children
+	of a generic object, there are functions to send messages to specific
+	destinations:
+
+		message				destination
+		-------				-----------
+		MSG_GEN_CALL_APPLICATION	application object
+		MSG_GEN_SENT_TO_PROCESS		process thread
+		MSG_GEN_CALL_SYSTEM		UI system object
+
+	See the message definitions for more information about these.
+
+Usage:  Generic Tree Construction/Destruction
+---------------------------------------------
+	It is often useful to be able to dynamically (i.e. at runtime)
+	construct a new tree of generic objects or to augment an existing
+	tree.  GenClass provides the mechanisms to do this.
+
+	If an generic object needs to be made the child of another generic
+	object, you can just define the actual objects in your .ui file,
+	leaving the child unconnected and marking the child object as
+	NOT_USABLE.  When your application needs the new object, just add it
+	by sending MSG_GEN_ADD_CHILD to the parent, passing the optr of the
+	child object.  Set any other object attributes, then bring it on-screen
+	with MSG_GEN_SET_USABLE.  For example, to add a GenListEntry to a
+	GenList:
+
+		@object GenListClass MyList = {
+		}
+
+		@object GenListEntryClass MyListEntry = {
+		    GI_states = @default & ~GS_USABLE; /* not usable */
+		}
+
+		...
+
+		/* add MyListEntry to MyList */
+
+		@call MyList::MSG_GEN_ADD_CHILD(
+			@MyListEntry,			/* child to add */
+			(CCF_MARK_DIRTY | CCO_FIRST));	/* CompChildFlags */
+
+		/* ...set other object attributes, like moniker... */
+
+		@call MyListEntry::MSG_GEN_SET_USABLE(VUM_NOW);
+
+	The CCF_MARK_DIRTY and CCO_FIRST flags are also passed to
+	MSG_GEN_ADD_CHILD.  The CCF_MARK_DIRTY flag indicates that the
+	linkage should be marked dirty and that the new child object will
+	be saved to the state file when the application is detached.  The
+	CCO_FIRST flag indicates that the child will be added as the first
+	child of the object.  Other options include adding as the last child,
+	or as the child at a 0-based position.  See CompChildFlags for more
+	information.
+
+	If you need to add or create several copies of the same object or
+	tree of objects, an object "template" is a good solution.  The first
+	step is to define a tree of one or more objects in your .ui file.
+	Make sure that the top-level object in the tree is marked as
+	NOT_USABLE.  This will be a "template" that is copied and attached to
+	the rest your application's UI.  The simplest way to copy this
+	template and attach it is with MSG_GEN_COPY_TREE.  This is sent to
+	the top-level object of the tree, passing the object to attach the
+	tree to (i.e. the parent object).  To make the new objects appear
+	on-screen, send MSG_GEN_SET_USABLE to the top-level object in the
+	tree.  For example, a GenListEntry template can be copied and added
+	to a GenList:
+
+		@start Template;
+		@object GenListEntryClass TemplateListEntry = {
+		    GI_states = @default & ~GS_USABLE; /* not usable */
+		}
+		@end Template;
+
+		...
+
+		@start Interface;
+		@object GenListClass MyList = {
+		}
+		@end Interface;
+
+		...
+
+		optr newListEntry;
+
+		/* copy and add new GenListEntry to GenList */
+		newListEntry = @call TemplateListEntry::MSG_GEN_COPY_TREE(
+			OptrToHandle(@MyList),		/* dest block */
+			OptrToChunk(@MyList),		/* parent */
+			(CCF_MARK_DIRTY | CCO_FIRST));	/* CompChildFlags */
+
+		/* ...set other object attributes, like moniker */
+
+		@call newListEntry::MSG_GEN_SET_USABLE(VUM_NOW);
+
+	Another way to add a tree of objects via a "template" is to use the
+	ObjDuplicateResource kernel routine.  This routine duplicates an whole
+	resource block of objects.  By defining a single tree of objects in
+	its own block, ObjDuplicateResource can be used to duplicate this
+	entire "template" block and MSG_GEN_ADD_CHILD can be used to add the
+	newly created object tree to the rest of your application's UI.  As
+	with MSG_GEN_COPY_TREE, the top-level object should be marked as
+	NOT_USABLE in your .ui file and set usable with MSG_GEN_SET_USABLE,
+	after connnection.  The new object block handle is returned by
+	ObjDuplicateResource and the chunk handles of the objects in the new
+	block are the same as they are in the template block, so optrs of the
+	new objects are easily constructed.  This method of generic tree
+	construction is useful with object templates that are fairly complex
+	because it allows easily placing the new objects into a new object
+	block instead of adding them to existing object blocks, keeping
+	block sizes managable.
+
+	When a tree of objects is copied, it is often useful to have the
+	action descriptors or outputs of the various objects in the tree set
+	to a particular optr.  If this optr is same for all copies of the
+	tree, then it can just be set up in the template and left alone.
+	However, if the optr is different for each copy of the tree, it can
+	be quite a bit of work to set up, sending messages to the individual
+	objects.  GenClass provides MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT
+	to make this easier.  To use it, initialize all the action descriptors
+	and outputs with a constant you define.  Then send this message to the
+	top object in the tree, passing the constant and the optr to replace
+	the constant with.  This will initialize all the desired action
+	descriptors and outputs with your optr.  The method actually just sets
+	up some parameters and calls the more general purpose
+	MSG_GEN_BRANCH_REPLACE_PARAMS to do the work.  Currently, the action
+	descriptors and outputs of GenList, GenView, GenRange,
+	GenText, and GenTrigger objects can be changed with this mechanism.
+
+	See MSG_GEN_COPY_TREE, MSG_GEN_SET_USABLE, MSG_GEN_ADD_CHILD,
+	MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT, and
+	MSG_GEN_BRANCH_REPLACE_PARAMS for more information.
+
+	While object trees that are constructed in these ways will be saved
+	to state file (assuming the state mechanism is not bypassed), it is
+	often more appropriate to tear down the constructed trees in order
+	save space in the state file or because the trees will be
+	re-constructed when restarting.
+
+	Template object trees created with MSG_GEN_COPY_TREE can be destroyed
+	with a MSG_GEN_DESTROY sent to the top-level object of the tree to
+	be destroyed.  MSG_GEN_DESTROY will set the object tree not usable,
+	remove it from its parent, and free the memory used by the objects:
+
+		@call newListEntry::MSG_GEN_DESTROY(VUM_NOW, CCF_MARK_DIRTY);
+
+	As when creating the links, we indicate that the destroyed links
+	should be marked as dirty, so any changes get saved to state file.
+	Also we pass the updateMode to use when showing the visual change.
+
+	Objects added with MSG_GEN_ADD_CHILD can be removed with
+	MSG_GEN_REMOVE_CHILD.  The top-level object to be removed must be
+	brought off-screen with MSG_GEN_SET_NOT_USABLE before removing.
+
+	If ObjDuplicateResource was used to duplicate a template block,
+	MSG_META_BLOCK_FREE can be sent to any object in the block to free
+	that block.  The block will be freed only after the event queue
+	has been flushed.
+
+	See MSG_GEN_SET_NOT_USABLE, MSG_GEN_REMOVE_CHILD, and MSG_GEN_DESTROY
+	for more information about generic branch destruction.
+
+	In addition to adding and removing children, a child object can also
+	be moved within its parent:
+
+		/* move list-entry to the the end of the list */
+		@call MyList::MSG_GEN_MOVE_CHILD(
+			@EntryOne,			/* child to move */
+			(CCF_MARK_DIRTY | CCO_LAST));	/* CompChildFlags */
+
+	<upward link, MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY>
+
+Usage:  Focus and Target
+------------------------
+	<These mechanisms are being changed?>
+
+	The focus object or window is the place which keyboard information
+	goes to at any given time.  Basically, keyboard information geos
+	first to a focus window, and then on down to a focus object.
+
+	The target object is an object that contains data which the user
+	may select, and then operate on, typically via a menu item or dialog
+	box.  For instance, if an application has two text objects, each
+	showing a seperate document, inside of a single display, and the user
+	selects text from one of them, and then selects "BOLD" from a menu
+	item, the first thing the application sees in this whole sequence is
+	a MSG_BOLD.  It did not have any part in the act of selecting the
+	text, and so it does not know which text object was just interacted
+	with.  To solve this, the system keeps track of the current target
+	object and gives a way for the application to determine which one this
+	is.  The concept had to be seperated out from the that of focus, since
+	a specific user interface might allow a command window to be pinned up,
+	having a text field in it where you type "bold<CR>", which would cause
+	the currently selected target to become bold.  In order to get this
+	to work, you mark the text objects displaying the document as
+	TARGETABLE, and don't mark the text entry field for style this way.
+	The system will then remember that the document text object is the
+	current target while you use the other text object to type in "bold".
+
+	<see seperate Focus/Target documentation for more information?>
+
+	The system manages changing the focus and target objects on user
+	actions and when dialog boxes or menus come on-screen or off-screen.
+	When this happens, notification messages are sent to the various
+	new and old focus and target objects at the various object heirarchy
+	levels.  In addition, you can use MetaClass' MSG_GET_TARGET to
+	determine the target object at a given level in the heirarchy, and
+	GenClass provides several messages to allow applications to give or
+	take the focus and target to and from generic objects:
+
+		MSG_META_GRAB_FOCUS_EXCL
+		MSG_META_RELEASE_FOCUS_EXCL
+		MSG_META_GRAB_TARGET_EXCL
+		MSG_META_RELEASE_TARGET_EXCL
+
+	<Focus/Target hints>
+	
+	Besides these, there are two higher level functions --
+	MSG_GEN_BRING_TO_TOP and MSG_GEN_LOWER_TO_BOTTOM that affect the
+	the focus and target.  MSG_GEN_BRING_TO_TOP causes an object to be
+	raised to the top within the window level that the object belongs to.
+	MSG_GEN_LOWER_TO_BOTTOM does the opposite.  Useful for GenDisplays,
+	dialog GenInteractions, GenApplications,
+	GenFields, etc.
+
+Usage:  Window Sizing/Positioning and Object Geometry
+-----------------------------------------------------
+	Once a window (GenPrimary, GenDisplay, dialog
+	GenInteraction) is on-screen, the user usually has
+	control of positioning and sizing the window.  GenClass provides
+	messages to postion and size these windows for applications to use:
+
+		MSG_GEN_SET_WIN_POSITION
+		MSG_GEN_SET_WIN_SIZE
+		MSG_GEN_RESET_TO_INITIAL_SIZE
+		MSG_GEN_SET_WIN_CONSTRAIN
+
+	In addition, the geometry information of any generic object can be
+	gotten and set with these messages:
+
+		MSG_GEN_SET_INITIAL_SIZE
+		MSG_GEN_SET_MINIMUM_SIZE
+		MSG_GEN_SET_MAXIMUM_SIZE
+		MSG_GEN_SET_FIXED_SIZE
+		MSG_GEN_GET_INITIAL_SIZE
+		MSG_GEN_GET_MINIMUM_SIZE
+		MSG_GEN_GET_MAXIMUM_SIZE
+		MSG_GEN_GET_FIXED_SIZE
+
+	<related hints>
+
+	See Geometry Manager documentation for more information about these.
+
+Usage:  Generic Visual Update
+-----------------------------
+	Many of the GenClass messages that cause visual changes require
+	an updateMode to indicate how those visual changes should be done.
+	It is not always good to use VUM_NOW as making several such changes
+	in succession could cause undesirable flashing (redrawing) of the
+	affected visual areas.  Two other updateModes, VUM_DELAYED_VIA_APP_QUEUE
+	and VUM_DELAYED_VIA_UI_QUEUE are designed to help alleviate this.
+	At the extreme is VUM_MANUAL which indicates that no visual update
+	should occur until you specifically request one.  MSG_GEN_UPDATE_VISUAL
+	is used for this.
+	
+	See the message definition for more about this methods.  See the
+	VisClass documentation for more about Visual Updates.
+
+Usage:  Gadget Apply/Reset/Activate
+-----------------------------------
+	GenClass provides MSG_GEN_ACTIVATE that when sent to GenTriggers,
+	GenRanges, GenListEntrys, or other similar gadgets will cause them
+	to activate.  For example, when a GenTrigger detects that its keyboard
+	shortcut sequence has been entered by the user, it sends a
+	MSG_GEN_ACTIVATE to itself to activate the action associated with the
+	trigger.  This message can be used directly by applications to simulate
+	user activation of gadgets (complete with the visual feedback that
+	the user normally gets when they activate a gadget).
+
+	Generic gadgets can operate in either immediate mode or delayed mode.
+	In immediate mode, only one copy of the gadget's state is kept.  Any
+	changes by the user directly affect that state.  For example, a list
+	in a menu would be immediate mode.  Selecting any of the list entries
+	has the immediate effect of that list item.  In delayed mode, two
+	copies of the gadget's state is kept -- the actual state and the user
+	state.  The actual state is the long-term state stored by the gadget.
+	The user state, while also stored by the gadget, is the state that
+	the user has temporarily set for the gadget.  Delayed gadgets are
+	often used in dialog boxes that allow setting multiple attributes for
+	some selected item.  When the user makes are change to these gadgets,
+	they are changes in the user state.  These dialog boxes provide an
+	"Apply" trigger that will transfer the user state to the actual state
+	and a "Reset" trigger that will restore the user state from the actual
+	state.  This allows the user to play with all the attributes before
+	hitting "Apply" to make them all permanent.  At any time before that,
+	the user can hit "Reset" to restore the attributes to what they were
+	before they started changing them.  The GenClass methods MSG_GEN_APPLY
+	and MSG_GEN_RESET are sent the the "Apply" and "Reset" triggers,
+	respectively.  Applications can send these to the gadgets directly
+	to achieve the same results.  Or the messages can be sent to the dialog
+	box (dialog GenInteraction), which
+	will forward to message to all the gadgets in the them.
+
+	Another feature of these Apply/Reset dialog boxes is that the "Apply"
+	and "Reset" triggers will be disable until the user makes some change
+	to the gadgets in the dialog box.  When the user hits "Apply" or
+	"Reset", they will again be disabled to indicate that they are not
+	available options.  This is handled automatically by the system.  One
+	problem with this is that when an application brings up such a dialog
+	box, it needs to the set gadgetry to reflect the attributes of the
+	currently selected item.  When it does this, it may have the side
+	effect of enabling the "Apply" and "Reset" triggers because the gadgets
+	have changed state.  To get around this, GenClass allows an
+	application to manually disable or enable the "Apply" and "Reset"
+	buttons with MSG_GEN_MAKE_NOT_APPLYABLE and MSG_GEN_MAKE_APPLYABLE.
+
+	See MSG_GEN_ACTIVATE, MSG_GEN_APPLY, MSG_GEN_RESET,
+	MSG_GEN_MAKE_NOT_APPLYABLE, and MSG_GEN_MAKE_APPLYABLE for more
+	information.
+
+Usage:  Generic Upward Queries
+------------------------------
+	In addition to the GUP messages described above, GenClass provides a
+	general purpose message, MSG_GEN_GUP_QUERY, that can query up the
+	generic tree.  Query types are defined by both the generic UI and
+	by the specific UI.  MSG_GEN_GUP_QUERY is extensible in that the
+	specific UI may add new query types.  GUQT_FIELD and GUQT_SCREEN are
+	two useful query types.  <C interface/availability is not defined/
+	decided yet.>
+
+See Also
+--------
+	Gen*Class (all generic objects), VisClass
+
+;------------------------------------------------------------------------------
+;	Assembling & Debugging
+;------------------------------------------------------------------------------
+
+Sample Code/Programming Tips
+----------------------------
+	Appl/SDK_C/GenAttrs -
+		This sample application demonstrates how to set generic
+		objects' GenStates and GenAttrs flags.
+
+	Appl/SDK_C/GenMoniker -
+		This sample application demonstrates various ways of using
+		MSG_GEN_USE_VIS_MONIKER, MSG_GEN_CREATE_VIS_MONIKER and
+		MSG_GEN_REPLACE_VIS_MONIKER to modify a generic object's visual
+		moniker.
+
+	Appl/SDK_C/GenTree -
+		This sample application demonstrates different ways of building
+		and tearing down generic object trees with MSG_GEN_ADD_CHILD,
+		MSG_GEN_REMOVE_CHILD, MSG_GEN_COPY_TREE, MSG_GEN_DESTROY,
+		ObjDuplicateResource, and MSG_META_BLOCK_FREE.
+
+Include Files Needed
+--------------------
+	Include/Objects/genC.def (for assembly language)
+	CInclude/Objects/genC.goh (for C)
+
+Assembly Tips
+-------------
+
+Debugging Tools & Tips
+----------------------
+	pobject -
+		prints all the instance data for an object
+	pgen -
+		prints out an element of an object's generic instance data
+	gentree -
+		prints the entire generic object tree starting from a given
+		object.  Shows the moniker, if any, for each object.  You can
+		also specify an instance data field to print for each object.
+	gup -
+		prints an object and all its generic ancestors.  Shows
+		the moniker, if any, for each object.  You can also specify
+		an instance data field to print for each object.
+
+See Also
+--------
+
+;------------------------------------------------------------------------------
+;	Implemenation Notes
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;	Most frequently asked questions
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;	Inheritance
+;------------------------------------------------------------------------------
+
+MetaClass
+---------
+	
+	@instance MetaBase	MI_base;
+    
+    
+MSG_META_NULL			- per MetaClass
+MSG_META_DUMMY			- per MetaClass
+MSG_META_INITIALIZE		- Sets up various default instance variables
+				  (sets GS_ENABLED).  Will often be
+				  subclassed.
+MSG_META_ATTACH			- per MetaClass
+MSG_META_DETACH			- Calls specific-UI if built-out.
+MSG_META_DETACH_COMPLETE	- per MetaClass
+MSG_META_FORCED_DETACH		- per MetaClass
+MSG_META_DETACH_ABORT		- Cleans up after detach.
+MSG_META_ACK			- per MetaClass
+MSG_META_GET_CLASS		- per MetaClass
+MSG_META_IS_OBJECT_IN_CLASS	- per MetaClass
+MSG_META_BLOCK_FREE		- Pass message over specific-UI classes so
+				  they don't get built out.
+MSG_META_OBJ_FREE		- Pass message over specific-UI classes so
+				  they don't get built out.
+MSG_META_FINAL_OBJ_FREE		- Frees GI_visualMoniker chunk.
+MSG_META_RESOLVE_VARIANT_SUPERCLASS			- per MetaClass
+MSG_META_RELOCATE		- Relocates visual moniker list, if any.
+MSG_META_UNRELOCATE		- Unrelocates visual moniker list, if any.
+MSG_META_LEAVE_DISPLAY		- per MetaClass
+MSG_META_LEAVE_CONSTRAIN	- per MetaClass
+MSG_META_SET_FLAGS		- per MetaClass
+MSG_META_GET_FLAGS		- per MetaClass
+MSG_META_VM_FILE_DIRTY		- per MetaClass
+MSG_META_QUIT			- per MetaClass
+MSG_META_QUIT_ACK		- per MetaClass
+MSG_META_DISPATCH_EVENT		- per MetaClass
+MSG_META_SEND_CLASSED_EVENT	- Handles TO_GEN_PARENT.
+MSG_META_GET_OPTR		- per MetaClass
+MSG_GET_TARGET			- per MetaClass
+
+				
+Imported Messages Handled
+-------------------------
+none
+
+------------------------------------------------------------------------------`

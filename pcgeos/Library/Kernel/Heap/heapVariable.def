@@ -1,0 +1,160 @@
+COMMENT }----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Heap
+FILE:		heapVariable.def
+
+AUTHOR:		Tony Requist, Jim DeFrisco
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	4/88		Initial version
+
+DESCRIPTION:
+	This file contains the variables for the Heap module.
+
+	$Id: heapVariable.def,v 1.1 97/04/05 01:14:02 newdeal Exp $
+
+------------------------------------------------------------------------------}
+
+idata	segment
+
+heapSem		ThreadLock	<>	; Lock for accessing major heap
+					;  structures
+
+idata	ends
+
+;------------------------------------------------------------------------------
+;		  Variables for throwing out blocks
+;------------------------------------------------------------------------------
+
+udata	segment
+
+tobId		word	0	;counter upped each time tobTable is filled.
+				; Used by the scrub thread to decide if the
+				; tobTable it obtained is still valid after
+				; it has released and re-grabbed the heap
+				; semaphore..
+tobTable	ThrowOutBlock	TOB_ARRAY_SIZE dup (<>)
+
+if ERROR_CHECK
+startOfOddityList	hptr	20 dup (?)
+				; 19 entries and a semaphore handle..
+handleBeingForceMoved	hptr	; serves a different master, but a similar
+				;  purpose. This records the handle of the
+				;  block being moved by MemForceMove so
+				;  VMCheckDSHeader can adjust its resident
+				;  count should it be called while a VM block
+				;  is being force-moved, thus appearing to
+				;  be non-resident
+
+endif
+
+udata	ends
+
+; table of swap drivers. initialized to keep anything from being called if
+; there are no swap drivers loaded.
+
+; adding "+1" to the max swap drivers supports the dummy-driver hack at the end
+; of ThrowOutBlocks.  mevissen, 3/98
+
+idata	segment
+
+swapTable	SwapDriver	MAX_SWAP_DRIVERS+1 dup(<
+	SS_REALLY_SLOW,mask SDF_FULL,SysEmptyRoutine
+>)
+
+swapNumDrivers	byte		0
+swapNext	nptr.SwapDriver	swapTable
+
+; variable to keep SegmentToHandle from whining b/c segment is unlocked or has
+; no address or whatever...the name says it all, I think.
+handleBeingSwappedDontMessWithIt hptr
+
+lastLowHandleNotice 	word 0		; low word of system counter when notice
+					;  was last given.
+
+lastSwapFullNotice	word	0	; low word of system counter when notice
+					;  of full swap device was last given.
+
+; Semaphore on which the scrub thread blocks
+scrubSem	Semaphore	<0,0>
+
+if	IDLE_UPDATE_ASYNC_VM
+
+heapAsyncVMQueue	hptr	0
+
+endif	; IDLE_UPDATE_ASYNC_VM
+
+if LOG_BLOCK_MOVEMENT
+	BLOCK_LOG_LENGTH	equ	1000	; number of handles to track
+
+	BlockMovementOperation	etype	word, 0, 2
+		BMO_UNLOCK	enum	BlockMovementOperation
+		BMO_MOVE	enum	BlockMovementOperation
+		BMO_FREE	enum	BlockMovementOperation
+		BMO_RESIZE	enum	BlockMovementOperation
+
+	BlockMovementEntry	struct
+		BME_handle	hptr
+		BME_address	sptr
+		BME_size	word
+		BME_op		BlockMovementOperation
+	BlockMovementEntry	ends
+
+	blockMovementHead	word	0
+
+endif ; LOG_BLOCK_MOVEMENT
+
+idata	ends
+
+;------------------------------------------------------------------------------
+;			SegmentToHandle cache
+;------------------------------------------------------------------------------
+
+udata	segment
+
+sthCacheSegment		sptr	0
+sthCacheHandle		hptr	0
+
+if	KERNEL_EXECUTE_IN_PLACE or FULL_EXECUTE_IN_PLACE
+xipHandleTopBlock	hptr	0
+endif
+
+if 	TRACK_FINAL_FREE
+lastFreeBlock		hptr		; handle of the free block with the
+					;  highest segment address, as the
+					;  place from which to start searching
+endif
+
+if	INI_SETTABLE_HEAP_THRESHOLDS
+minSpaceForInitialCompaction		word	0
+minSpaceToThrowOut			word	0
+endif
+
+
+if	ERROR_CHECK and FULL_EXECUTE_IN_PLACE
+xipChecksumPage				word	0
+xipChecksum				word	0
+endif
+
+if	not NEVER_ENFORCE_HEAPSPACE_LIMITS
+heapSpaceLimitsEnforced		BooleanWord	BW_FALSE    ; 0 if don't care,
+							    ; non-0 if enforced
+heapSize			word	0		; =heap+(X*swap) in K..
+							; X is 3/4 now
+endif	; not NEVER_ENFORCE_HEAPSPACE_LIMITS
+if LOG_BLOCK_MOVEMENT
+
+	blockMovementLog	BlockMovementEntry BLOCK_LOG_LENGTH dup (<>)
+
+endif ; LOG_BLOCK_MOVEMENT
+
+udata	ends
+
+	even
+
+

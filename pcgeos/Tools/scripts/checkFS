@@ -1,0 +1,373 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1994 -- All Rights Reserved
+#
+# FILE: 	checkFS, a SH script
+# AUTHOR: 	Jim Guggemos, Nov 22, 1994
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	JimG	11/22/94   	Initial Revision
+#
+# DESCRIPTION:
+#	Attempts to correct permission problems in the Installed directory
+#	and ensure consistency between the Installed directory and the
+#	source directory.  This is meant to be run from the top of a branch
+#	source tree (or the trunk source tree).
+#
+#	$Id: checkFS,v 1.3 94/11/30 09:52:43 guggemos Exp $
+#
+###############################################################################
+
+cwd=`pwd`
+
+if [ $# -gt 0 ]; then
+   for i do
+      case "$i" in
+	 -n)	printOnly=1;;
+	 
+	 *)	echo "Unknown option $i"
+	 	echo "Usage: checkFS [-n]"
+		exit 1;;
+      esac
+   done
+fi
+	 	
+
+echo
+echo
+echo "checkFS running on $cwd by $USER on `hostname`"
+echo "checkFS Started: `date`"
+if [ "$printOnly" ]; then
+   echo "checkFS running in \"print only\" mode - no action taken."
+fi
+
+echo
+echo "*************************************************************************"
+echo Looking at structure of this tree...
+echo "*************************************************************************"
+
+if [ ! -d Installed ]; then
+   echo "No Installed directory"
+   exit 1
+
+else
+   instDir=`cd Installed; /usr/bin/pwd`
+fi
+
+srcDirs="Include Appl Driver Library"
+
+for i in $srcDirs; do
+   if [ ! -d $i ]; then
+      echo "$i doesn't exist.."
+      exit 1
+   fi
+
+   links="`find $i/* -prune -type l -print`"
+   if [ "$links" ]; then
+      for j in $links; do
+	 dest="`ls -l $j | awk '{print $NF}'`"
+	 if expr "$dest" : '/n/' > /dev/null ; then
+	    echo $j is a link to $dest
+	    extras="$extras `cd $j; /usr/bin/pwd`"
+	 fi
+      done
+   fi
+
+   if [ ! -d $instDir/$i ]; then
+      echo "$instDir/$i doesn't exist.."
+      exit 1
+   fi
+
+   links="`find $instDir/$i/* -prune -type l -print`"
+   if [ "$links" ]; then
+      for j in $links; do
+	 dest="`ls -l $j | awk '{print $NF}'`"
+	 if expr "$dest" : '/n/' > /dev/null ; then
+	    echo $j is a link to $dest
+	    instExtras="$instExtras `cd $j; /usr/bin/pwd`"
+	 fi
+      done
+   fi
+done
+
+srcDirs="$srcDirs $extras"
+instDirs="$instDir $instExtras"
+
+echo "Installed directory: $instDir"
+echo "Source subdirectories: $srcDirs"
+echo "Installed directory & subdirectories: $instDirs"
+
+doMKDIR() {
+   echo "MKDIR $1"
+
+   if [ ! "$printOnly" ]; then
+      mkdir $1
+      chmod ug+r+w+x $1
+      chgrp pcgeos $1
+   fi
+}
+
+doIt() {
+   echo "doIt: $@"
+   if [ ! "$printOnly" ]; then
+      $@
+   fi
+}
+
+#
+# getMakefileProducts <path>
+#
+# Returns the list of products from the Makefile specified by <path>.
+# Handles backslash continuation of Makefile lines.
+#
+getMakefileProducts() {
+    nawk '( NF > 0 && continuation ) {
+	gsub( "[ 	]+", " " );
+	if ( $0 ~ /\\$/ )
+	{
+	    continuation = 1;
+	    sub( "\\\\$", "" );
+	}
+	else
+	    continuation = 0;
+	
+	printf( " %s", $0 );
+	if ( ! continuation )
+	{
+	    printf( "\n" );
+	    exit( 0 );
+	}
+    }
+
+    ( $0 ~ /^PRODUCTS[ 	]*=/ ) {
+	gsub( "[ 	]+", " " );
+	sub( "^PRODUCTS[ 	]*=[ 	]*", "" );
+	if ( $0 ~ /\\$/ )
+	{
+	    continuation = 1;
+	    sub( "\\\\$", "" );
+	}
+	
+	printf( "%s", $0 );
+    }' < $1
+}
+
+
+#
+# SKIP THIS FOR NOW.. I THINK IT MAY DO TOO MUCH.
+#
+
+#echo
+#echo "Comparing file structure of source tree to installed tree:"
+
+#find $srcDirs -type d -print | while read line; do
+#   if [ -f $line/Makefile -a ! -d $instDir/$line ]; then
+#      doMKDIR $instDir/$line
+#   fi
+#done
+
+echo
+echo "*************************************************************************"
+echo "Checking PRODUCTS and local.mk's for XIP:"
+echo "*************************************************************************"
+
+find $srcDirs \
+\( \
+   -name "local.mk" -o \
+   -name "Makefile" -o \
+   -name "IS_A_PRODUCT" \
+\) -print | while read line; do
+
+   # Don't care about SDK shme
+   if [ "`expr $line : '.*/SDK_C'`" != "0" ]; then continue; fi
+
+   base="`basename $line`"
+   dir="`expr $line : '\(.*\)/[^/][^/]*$'`"
+
+   # If the local.mk contains XIP, then the Installed directory should contain
+   # an XIP directory.
+   if [ "$base" = "local.mk" ]; then
+      if grep -s XIP $line; then
+	 instt=$instDir/$dir
+	 if [ ! -d $instt/XIP ]; then
+	    doMKDIR $instt/XIP
+	 fi
+      fi
+
+   # If the Makefile contains a PRODUCTS line, then check to see if all of
+   # the IS_A_PRODUCT files and their directories really exist.  If not,
+   # the Makefile should be remade.
+   elif [ "$base" = "Makefile" ]; then
+      products="`getMakefileProducts $line`"
+      if [ "$products" ]; then
+	 set $products
+	 while [ $# -gt 0 ]; do
+	    if [ ! -d $dir/$1 ]; then
+	       echo "Makefile in $dir needs to be remade"
+	       echo "  -- No product directory exists for $1, but Makefile says it should"
+	    elif [ ! -f $dir/$1/IS_A_PRODUCT ]; then
+	       echo "Makefile in $dir needs to be remade"
+	       echo "  -- No IS_A_PRODUCT file exists for $1, but Makefile says it should"
+	    fi
+	    shift
+	 done
+      fi
+
+   # Check the Makefile to make sure that all the products that are supposed
+   # to be there (according to the IS_A_PRODUCT files) are actually there.
+   # Also, make sure the product directory exists in the Installed tree.
+   elif [ "$base" = "IS_A_PRODUCT" ]; then
+      productName="`basename $dir`"
+      prevDir="`expr $dir : '\(.*\)/[^/][^/]*$'`"
+      if [ -f $prevDir/Makefile ]; then
+	 products="`getMakefileProducts $prevDir/Makefile`"
+	 if echo $products | grep -s '\<'$productName'\>'; then
+	    : Coolness
+	 else
+	    echo "Makefile in $prevDir needs to be remade"
+	    echo "  -- No product $productName exists in Makefile, but $productName/IS_A_PRODUCT exists"
+	 fi
+      fi
+
+      if [ ! -d $instDir/$dir ]; then
+	 doMKDIR $instDir/$dir
+      fi
+   fi
+done
+
+echo
+echo "*************************************************************************"
+echo "Checking Installed for file and directory directory permissions:"
+echo "*************************************************************************"
+
+find $instDirs \
+\( \
+   \( \
+      -name "tags" -o \
+      -name "*.eobj" -o \
+      -name "*.geo" -o \
+      -name "*.ldf" -o \
+      -name "*.obj" -o \
+      -name "*.rdef" -o \
+      -name "*.rsc" -o \
+      -name "*.sym" -o \
+      -name "*.vm" \
+   \) \
+   -type f \! -perm -660 \
+   -print \
+\) \
+-o \
+\( \
+   -type d \! -perm -770 \
+   \! -name "lost+found" \
+   -print \
+\) | while read line; do
+
+   ls -lagFd $line
+   
+   doIt chmod ug+r+w+X $line
+
+done
+
+echo
+echo "*************************************************************************"
+echo "Checking Installed for make related files that shouldn't exist and"
+echo "  ensuring that Makefile links exist in the Installed tree:"
+echo "*************************************************************************"
+
+find $instDirs \
+\( \
+   -type f \
+   \( \
+      -name "Makefile" -o \
+      -name "dependencies.mk" -o \
+      -name "local.mk" \
+   \) \
+   -print \
+\) \
+-o \
+\( \
+   -type d \
+   -print \
+\) | while read line; do
+
+   # Don't care about SDK shme
+    if [ "`expr $line : '.*/SDK_C'`" != "0" ]; then continue; fi
+
+    if [ -d $line ]; then
+	dir=1
+	pathTail=`expr $line : '.*/Installed/\(.*\)$'`
+	fileBase=
+    else
+	dir=
+        pathTail=`expr $line : '.*/Installed/\(.*\)/[^/]*$'`
+	fileBase=`basename $line`
+    fi
+
+    # Make sure srcPath contains "/staff/pcgeos/..." instead of
+    # "/n/utah/pcgeos/..." (or something similar) so that when we make
+    # links, if the file system gets moved to another partition, the
+    # links will still work
+
+    srcPath=/staff/pcgeos/`expr $cwd/$pathTail : '.*/pcgeos/\(.*\)$'`
+
+    # If this is a directory, then make sure that if a Makefile exists in
+    # the equivalent source path, that a link exists in the Installed path
+    # (if nothing is there currently).  If a real file is in the Installed
+    # path, that will be taken care of when the find gets to the "Makefile".
+    #
+    if [ "$dir" ]; then
+	if [ -f $srcPath/Makefile -a ! -f $line/Makefile ]; then
+	    echo "Linking Makefile for $line"
+	    doIt ln -s $srcPath/Makefile $line/Makefile
+	fi
+    
+    else
+
+	# if pathTail was empty, then the file probably existed in
+	# Installed itself, which is okay because we don't want to mess with
+	# the Installed/Makefile!
+
+	if [ "$pathTail" ]; then
+	    echo "Make related file exists: $line"
+
+	    if [ -f $srcPath/$fileBase ]; then
+		echo "  Renaming $fileBase since it exists in $srcPath"
+		doIt mv $line $line.nuke
+
+		if [ "$fileBase" = "Makefile" ]; then
+		    echo "  Making symbolic link to Makefile in $srcPath"
+		    doIt ln -s $srcPath/$fileBase $line
+		fi
+	    else
+		echo "  CANNOT FIX SINCE $fileBase DOES NOT EXIST IN $srcPath"
+	    fi
+	fi
+    fi
+done
+
+echo
+echo "*************************************************************************"
+echo "Checking Installed for group not pcgeos or staff:"
+echo "*************************************************************************"
+
+# Don't change group information on a file that has been set up with
+# set user or group ID on execution (4000 and 2000, respectively).
+# Also, don't mess with lost+found.
+
+find $instDirs \
+\( \
+   \! -type l \! \( -group pcgeos -o -group staff \) \
+   \! -perm -4000 \! -perm -2000 \
+   \! -name "lost+found" \
+\) | while read line; do
+   
+   ls -lagF $line
+   doIt chgrp pcgeos $line
+
+done
+
+echo "checkFS Ended: `date`"

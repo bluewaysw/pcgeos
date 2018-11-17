@@ -1,0 +1,93 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		deckMap.def
+
+AUTHOR:		Adam de Boor, Nov  9, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	11/ 9/90	Initial revision
+
+
+DESCRIPTION:
+	Structures defining various blocks of a card deck datafile.
+		
+	$Id: deckMap.def,v 1.1 97/04/04 14:24:02 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;
+; Current revision of these definitions. This is the protocol number given
+; to a card deck datafile that uses these structures. The protocol is checked
+; by the Cards library before the deck is used.
+;
+; NOTE: The make used to parse this file and extract these constants to
+; pass to glue.  But that was back in the Unix days, and we don't have
+; such a smart shell in NT, so they're currently hard-coded in local.mk.
+; Make sure if the protocol is changed here that it's changed there
+; as well. -dhunter 2/11/2000
+
+DECK_PROTO_MAJOR = 6
+DECK_PROTO_MINOR = 0
+
+; Structure describing a particular supported device resolution.
+; DRS_displayType is matched exactly against the DisplayType of the game's
+; video driver.
+DeckResStruct	struct
+    DRS_displayType	DisplayType	; Resolution/color of expected display
+    DRS_fontSize	word		; Suggested point size for things like
+					;  score, winnings, etc.
+    DRS_downSpreadX	word		; For face-down cards that spread
+					;  horizontally, the amount of space
+					;  to put between each.
+    DRS_downSpreadY	word		; For face-down cards that spread
+					;  vertically, the amount of space to
+					;  put between each.
+    DRS_upSpreadX	word		; For face-up cards that spread
+					;  horizontally, the amount of space
+					;  to put between each.
+    DRS_upSpreadY	word		; For face-up cards that spread
+					;  vertically, the amount of space to
+					;  put between each.
+    DRS_deckSpreadX	word		; For face-up cards that spread
+					;  horizontally, the amount of space
+					;  to put between each.
+    DRS_deckSpreadY	word		; For face-up cards that spread
+					;  vertically, the amount of space to
+					;  put between each.
+    DRS_mapBlock	word		; VM Block handle of map block
+					;  containing DeckMapStruct for that
+					;  resolution.
+DeckResStruct	ends
+
+; The structure at the start of the file's map block giving overall information
+; about the deck.
+DeckDirectoryStruct	struct
+    DDS_arrayLength	word		; number of resolutions supported
+    DDS_DRS		label	DeckResStruct	; array of resolution maps
+DeckDirectoryStruct	ends
+
+
+; Structure of a block that gives all necessary information about a chosen
+; deck once the resolution has been decided on.
+DeckMapStruct	struct
+    DMS_cards		fptr	54 dup(?); VM block handle and offset for each
+					 ;  card bitmap. Cards are ordered by
+					 ;  suit (diamond, heart, club, spade)
+					 ;  and by rank (ace through king, then
+					 ;  ace then joker) within  the suit.
+
+    DMS_frame		nptr.Region	; Region to draw to frame each card
+    DMS_interior	nptr.Region	; Region inside the frame for clearing
+					;  it out.
+    DMS_winBack		fptr		; Card back to be used if the game is
+					;  won, if appropriate
+    DMS_numBacks	word		; Number of card backs in the deck.
+    DMS_backs		label	fptr	; Array of VM far pointers to the
+					;  different card backs.
+DeckMapStruct	ends
+

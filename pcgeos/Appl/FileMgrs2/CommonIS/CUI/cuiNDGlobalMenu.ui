@@ -1,0 +1,930 @@
+/*
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS 
+ * MODULE:	
+ * FILE:	uiNDGlobalMenu.ui
+ *
+ * AUTHOR:	David Litwin
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dlitwin	7/27/92   	Initial version.
+ *
+ * DESCRIPTION:
+ *	This is the Huge menu that is the pop-up menu.  Every pop-up
+ *	menu is this menu with non-applicable items set non-usable.
+ *	Because of this, this menu has to have every possible pop-up
+ *	menu item possible for ANY pop-up menu in the entire system.
+ *	BA specific menu items are of course conditionalled out and
+ *	their items will be on the end of the tables of UI objects
+ *	(pop-up menu items) to be set usable/non-usable.
+ *
+ *
+ * 	$Id: cuiNDGlobalMenu.ui,v 1.4 98/06/03 13:16:41 joon Exp $
+ *
+ */
+
+start	GlobalMenuResource, notDetachable;
+
+/******************************  GlobalMenu  ******************************/
+GlobalMenu = NDSortViewPopupMenu ignoreDirty {
+	sortViewParent = GlobalMenuOther;
+	sortViewPosition = 2;
+	visibility = popup;
+	attributes = default +notUserInitiatable;
+	children =	GlobalMenuHelp,
+			GlobalMenuWastebasket,
+			GlobalMenuDrive,
+			GlobalMenuPrinter,
+#if _NEWDESKBA
+			GlobalMenuHomeFolder,
+			GlobalMenuClassesFolder,
+			GlobalMenuClassFolder,
+			GlobalMenuAddStudent,
+			GlobalMenuMakeStudentUtilDrive,
+			GlobalMenuBookmarks,
+			GlobalMenuDistribute,
+			GlobalMenuRemoveFiles,
+			GlobalMenuLogoutGroup,
+#else
+			GlobalMenuLogout,
+#endif
+			GlobalMenuFile,
+			GlobalMenuOther,
+			GlobalMenuClose;
+	hints = {
+		HINT_INFREQUENTLY_USED,			/* not pinnable */
+		HINT_AVOID_MENU_BAR,
+		HINT_KEEP_INITIALLY_ONSCREEN
+	}
+}
+
+
+GlobalMenuOpen = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'O', "Open";
+	action = MSG_OPEN_SELECT_LIST, process;
+}
+
+GlobalMenuHelp = GenTrigger ignoreDirty {
+	moniker = 'H', "Help";
+	genStates = default -usable;
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+#if 0
+		ATTR_GEN_DEFAULT_MONIKER {
+			word GDMT_HELP
+		},
+#endif
+		ATTR_GEN_TRIGGER_ACTION_DATA { 
+			word MSG_ND_FOLDER_HELP
+		}
+	}
+}
+
+
+/*---- GlobalMenuWastebasket ----*/
+GlobalMenuWastebasket = GenInteraction ignoreDirty {
+	genStates = default -usable;
+	children =	GlobalMenuEmptyWastebasket;
+}
+
+GlobalMenuEmptyWastebasket = GenTrigger ignoreDirty {
+	moniker = 'E', "Empty Wastebasket";
+	action = MSG_EMPTY_WASTEBASKET, process;
+}
+
+
+/*---- GlobalMenuDrive ----*/
+GlobalMenuDrive = GenInteraction ignoreDirty {
+	genStates = default -usable;
+	children =	GlobalMenuRenameDisk,
+			GlobalMenuCopyDisk,
+			GlobalMenuFormatDisk,
+			GlobalMenuDriveRescanDrive;
+}
+
+GlobalMenuRenameDisk = GenTrigger ignoreDirty {
+	moniker = 'a', "Rename Disk";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_ND_DRIVE_RENAME
+		}
+	}
+}
+
+GlobalMenuCopyDisk = GenTrigger ignoreDirty {
+	moniker = 'D', "Copy Disk";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_ND_DRIVE_COPY
+		}
+	}
+}
+
+GlobalMenuFormatDisk  = GenTrigger ignoreDirty {
+	moniker = 'r', "Format Disk";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_ND_DRIVE_FORMAT
+		}
+	}
+	
+}
+
+GlobalMenuDriveRescanDrive = GenTrigger ignoreDirty {
+	genStates = default -usable;	
+	moniker = 'n', "Rescan Drive";
+	action = MSG_WINDOWS_REFRESH_ALL, process;
+}
+
+
+/*---- GlobalMenuPrinter ----*/
+GlobalMenuPrinter = GenInteraction ignoreDirty {
+	genStates = default -usable;
+#if _NEWDESKBA
+	children =	GlobalMenuPrinterOptions,
+			GlobalMenuNetworkPrinterConsole;
+#else
+	children = 	GlobalMenuPrinterOptions;
+#endif
+}
+
+GlobalMenuPrinterOptions = GenTrigger ignoreDirty {
+	genAttributes = default +initiatesBusyState;
+	moniker = 'P', "Printer Options";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA { 
+			word MSG_ND_PRINTER_DO_OPTIONS_DIALOG
+		}
+	}
+}
+
+#if _NEWDESKBA
+GlobalMenuNetworkPrinterConsole = GenTrigger ignoreDirty {
+	moniker = 'N', "Network Printer Console";
+	action = MSG_ND_PRINTER_RUN_PCONSOLE, NDPrinterDummy;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+/*---- GlobalMenuDistribute ----*/
+GlobalMenuDistribute = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'i', "Distribute to Students";
+	action = MSG_BA_DISTRIBUTE_FILES, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+#endif		/* if _NEWDESKBA */
+
+GlobalMenuGetInfo = GenTrigger ignoreDirty {
+	moniker = 'I', "File Info";
+	action = MSG_FM_GET_INFO, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+GlobalMenuAttributes = GenTrigger ignoreDirty {
+	moniker = 'A', "Attributes";
+	action = MSG_FM_START_CHANGE_ATTR, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+
+#if _NEWDESKBA
+/*---- GlobalMenuChangeIcon ----*/
+GlobalMenuChangeIcon = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'C', "Change Icon";
+	action = MSG_FM_START_CHANGE_TOKEN, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+#endif		/* if _NEWDESKBA */
+
+/*---- GlobalMenuFile ----*/
+GlobalMenuFile = GenInteraction ignoreDirty {
+#if _NEWDESKONLY
+	children =	GlobalMenuOpen,
+			GlobalMenuCopy,
+			GlobalMenuMove,
+			GlobalMenuDuplicate,
+			GlobalMenuRename,
+			GlobalMenuDelete,
+			GlobalMenuThrowAway,
+			GlobalMenuGetInfo,
+			GlobalMenuPrint,
+#if INSTALLABLE_TOOLS
+			GlobalMenuRecover,
+			ToolGroup;
+#else
+			GlobalMenuRecover;
+#endif
+#endif				/* if _NEWDESKONLY */
+#if _NEWDESKBA
+	children =	GlobalMenuCopy,
+			GlobalMenuMove,
+			GlobalMenuChangeIcon,
+			GlobalMenuRename,
+			GlobalMenuDelete,
+			GlobalMenuThrowAway,
+			GlobalMenuRecover,
+			GlobalMenuRemoveStudent,
+			GlobalMenuRemoveClass,
+			GlobalMenuGenericDelete
+			ToolGroup;
+#endif				/* if _NEWDESKBA */
+}
+
+GlobalMenuCopy = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'y', "Copy";
+	action = MSG_FM_START_COPY, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+GlobalMenuMove = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'M', "Move";
+	action = MSG_FM_START_MOVE, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+GlobalMenuDuplicate = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = "Duplicate";
+	action = MSG_FM_START_DUPLICATE, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+GlobalMenuRename = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'R', "Rename";
+	action = MSG_FM_START_RENAME, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+GlobalMenuDelete = GenTrigger ignoreDirty {
+	genStates = default -usable;
+#if _NEWDESKBA
+	moniker = 'R', "Remove";
+#endif		/* if _NEWDESKBA */
+#if _NEWDESKONLY
+	moniker = 'D', "Delete";
+#endif		/* if _NEWDESKONLY */
+	action = MSG_FM_START_DELETE, process;
+}
+
+GlobalMenuThrowAway = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'D', "Delete";
+	action = MSG_FM_START_THROW_AWAY, process;
+}
+
+GlobalMenuPrint = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'P', "Print";
+	action = MSG_FM_START_PRINT, process;
+}
+
+GlobalMenuRecover = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'e', "Recover Item";
+	action = MSG_FM_START_RECOVER, process;
+}
+
+/*	TEACHER_GEOS_COURSEWARE_HIGH has the GMBH_DEL_STUDENT flag which
+	enables this trigger.  It does this because this trigger sends
+	the MSG_FM_START_THROW_AWAY message and has the "Remove" moniker.
+	If either of these change be sure to re-evaluate the constant, 
+	which is located in ./Appl/FileMgrs/CommonND/cNewDeskConstant.def
+*/
+#if _NEWDESKBA
+GlobalMenuRemoveStudent = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'R', "Remove";
+	action = MSG_FM_START_THROW_AWAY, process;
+}
+
+GlobalMenuRemoveClass = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'D', "Delete";
+	action = MSG_FM_START_THROW_AWAY, process;
+}
+
+GlobalMenuGenericDelete = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'R', "Remove/Throw Away";
+	action = MSG_FM_START_THROW_AWAY, process;
+}
+#endif		/* if _NEWDESKBA */
+
+/*---- GlobalMenuOther ----*/
+GlobalMenuOther = GenInteraction ignoreDirty {
+	children =	GlobalMenuSelectAll,
+			GlobalMenuCreateFolder,
+			GlobalMenuSortAndView;
+}
+
+GlobalMenuSelectAll = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'S', "Select All";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_SELECT_ALL
+		}
+	}
+}
+
+/*---- GlobalMenuCreateFolder ----*/
+GlobalMenuCreateFolder = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'F', "Create Folder";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_FM_START_CREATE_DIR
+		}
+	}
+}
+
+
+/*---- GlobalMenuClose ----*/
+GlobalMenuClose = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'C', "Close";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_FOLDER_CLOSE
+		}
+	}
+}
+
+
+#if _NEWDESKBA
+/*---- GlobalMenuLogoutGroup ----*/
+GlobalMenuLogoutGroup = GenInteraction ignoreDirty {
+	genStates = default -usable;
+	children =	GlobalMenuLogout,
+			GlobalMenuChangePassword;
+}
+
+/*---- GlobalMenuChangePassword ----*/
+GlobalMenuChangePassword = GenTrigger ignoreDirty {
+	moniker = 'n', "Change Password";
+	action = MSG_DESKTOP_CHANGE_PASSWORD, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+#endif		/* if _NEWDESKBA */
+
+/*---- GlobalMenuLogout ----*/
+GlobalMenuLogout = GenTrigger ignoreDirty {
+#if _NEWDESKONLY
+	genStates = default -usable;
+#endif		/* _NEWDESKONLY */
+	moniker = 'L', "Logout Now";
+#if _NEWDESKBA
+	action = MSG_DESKTOP_CONFIRM_LOGOUT, process;
+#else
+	action = MSG_META_QUIT, Desktop;
+#endif
+}
+
+
+
+#if _NEWDESKBA		/* These pop-up menu items are for BA objects only */
+
+/*---- GlobalMenuHomeFolder ----*/
+GlobalMenuHomeFolder = GenInteraction ignoreDirty {
+	genStates = default -usable;
+	children =	GlobalMenuHomeAddCourseware,
+			GlobalMenuHomeAddSpecUtils,
+			GlobalMenuHomeAddOfficeApplications;
+}
+
+GlobalMenuHomeAddCourseware = GenTrigger ignoreDirty {
+	moniker = 'u', "Add Courseware";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_ADD_COURSEWARE
+		}
+	}
+}
+
+GlobalMenuHomeAddSpecUtils = GenTrigger ignoreDirty {
+	moniker = 'p', "Add Special Utilities";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_ADD_SPECIAL_UTIL
+		}
+	}
+}
+
+GlobalMenuHomeAddOfficeApplications = GenTrigger ignoreDirty {
+	moniker = 'A', "Add Office Applications";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_THOME_ADD_OFFICE_APP
+		}
+	}
+}
+
+
+/*---- GlobalMenuClassesFolder ----*/
+GlobalMenuClassesFolder = GenInteraction ignoreDirty {
+	genStates = default -usable;
+	children =	GlobalMenuCreateClass,
+			GlobalMenuListClassesStdsProgs;
+}
+
+GlobalMenuCreateClass = GenTrigger ignoreDirty {
+	moniker = 'e', "Create Class";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_NDBA_CLASSES_CREATE_CLASS
+		}
+	}
+}
+
+GlobalMenuListClassesStdsProgs = GenTrigger ignoreDirty {
+	moniker = 'l', "List Classes/Students/Courseware";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_NDBA_CLASSES_RUN_LIST_APP
+		}
+	}
+}
+
+/*---- GlobalMenuClassFolder ----*/
+GlobalMenuClassFolder = GenInteraction ignoreDirty {
+	genStates = default -usable;
+	children =	GlobalMenuClassReports,
+			GlobalMenuAutoLogin,
+			GlobalMenuClassAddCourseware,
+			GlobalMenuClassAddSpecUtils,
+			GlobalMenuClassAddFromFile,
+			GlobalMenuModifyClass;
+}
+
+GlobalMenuClassReports = GenTrigger ignoreDirty {
+	moniker = 'e', "Reports";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_NDBA_CLASS_REPORTS
+		}
+	}
+}
+
+GlobalMenuAutoLogin = GenTrigger ignoreDirty {
+	moniker = 'g', "Autologin";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_NDBA_AUTO_LOGIN
+		}
+	}
+}
+
+GlobalMenuClassAddCourseware = GenTrigger ignoreDirty {
+	moniker = 'u', "Add Courseware";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_ADD_COURSEWARE
+		}
+	}
+}
+
+GlobalMenuClassAddSpecUtils = GenTrigger ignoreDirty {
+	moniker = 'p', "Add Special Utilities";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_ADD_SPECIAL_UTIL
+		}
+	}
+}
+
+
+GlobalMenuClassAddFromFile = GenInteraction ignoreDirty {
+	visibility = popup;
+	moniker = 'A', "Add From File";
+	children = GlobalMenuClassAddCoursewareFromFile,
+		   GlobalMenuClassAddSpecialUtilitiesFromFile;
+	hints = {
+		HINT_INFREQUENTLY_USED			/* not pinnable */
+	}
+}
+
+	GlobalMenuClassAddCoursewareFromFile = GenTrigger ignoreDirty {
+		moniker = 'r', "Courseware";
+		action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+		hints = {
+			HINT_TRIGGER_BRINGS_UP_WINDOW,
+			ATTR_GEN_TRIGGER_ACTION_DATA {
+				word	MSG_BA_ADD_COURSEWARE_FROM_FILE
+			}
+		}
+	}
+
+	GlobalMenuClassAddSpecialUtilitiesFromFile = GenTrigger ignoreDirty {
+		moniker = 'l', "Special Utilities";
+		action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+		hints = {
+			HINT_TRIGGER_BRINGS_UP_WINDOW,
+			ATTR_GEN_TRIGGER_ACTION_DATA {
+				word	MSG_BA_ADD_SPECIAL_UTIL_FROM_FILE
+			}
+		}
+	}
+
+
+GlobalMenuModifyClass = GenTrigger ignoreDirty {
+	moniker = 'y', "Modify Class";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_TEACHER_COURSE_MODIFY_CLASS
+		}
+	}
+}
+
+GlobalMenuAddStudent = GenInteraction ignoreDirty {
+	genStates = default -usable;
+	children = GlobalMenuAddStudentToClass, GlobalMenuAddStudentFromFile;
+}
+
+/*---- GlobalMenuAddStudent ----*/
+GlobalMenuAddStudentToClass = GenTrigger ignoreDirty {
+	moniker = 'u', "Add Student to Class";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_ROSTER_ADD_STUDENT
+		}
+	}
+}
+
+/*---- GlobalMenuAddStudentFromFile ----*/
+GlobalMenuAddStudentFromFile = GenTrigger ignoreDirty {
+	moniker = 'i', "Add Students From File";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_ROSTER_ADD_STUDENT_FROM_FILE
+		}
+	}
+}
+
+/*---- GlobalMenuMakeStudentUtilDrive ----*/
+GlobalMenuMakeStudentUtilDrive = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'U', "Make Student Utility Drive";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_CREATE_STUDENT_UTILITY_DRIVE
+		}
+	}
+}
+
+
+/*---- GlobalMenuRemoveFiles ----*/
+GlobalMenuRemoveFiles = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'm', "Remove Old Files";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_BA_REMOVE_OLD_FILES
+		}
+	}
+}
+
+
+/*---- GlobalMenuBookmarks ----*/
+GlobalMenuBookmarks = GenTrigger ignoreDirty {
+	genStates = default -usable;
+	moniker = 'B', "Set Bookmark";
+	action = MSG_NDBA_SET_BOOKMARK, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+#endif				/* if _NEWDESKBA */
+
+end GlobalMenuResource;
+
+
+
+/*		The GlobalSortViewMenuResource is a tree of UI that 	*/
+/*	is included in every pop up menu dynamically, whether it is 	*/
+/*	the GlobalMenu or a drop down system menu.  It defaults to be	*/
+/*	a child of the GlobalMenuOther because it needs an initial	*/
+/*	in case it is set usable before it is grabbed by someone.	*/
+/*		dlitwin 3/24/93						*/
+
+start GlobalSortViewMenuResource, notDetachable;
+
+GlobalMenuSortAndView = GenInteraction ignoreDirty {
+	genStates = default -usable;	
+	children =	GlobalMenuViewMode,
+			GlobalMenuSortContents;
+	hints = { HINT_SAME_CATEGORY_AS_PARENT }
+}
+
+GlobalMenuSortContents = GenInteraction ignoreDirty {
+	visibility = popup;
+	moniker = 't', "Sort Contents";
+	children =	GlobalMenuDisplaySortByList;
+	hints = {
+		HINT_INFREQUENTLY_USED			/* not pinnable */
+	}
+}
+
+GlobalMenuDisplaySortByList = GenItemGroup ignoreDirty {
+	children =	GlobalMenuDisplaySortByName,
+			GlobalMenuDisplaySortByExt,
+			GlobalMenuDisplaySortByDate,
+			GlobalMenuDisplaySortByCreation,
+			GlobalMenuDisplaySortBySize,
+			GlobalMenuDisplaySortByDOS;
+
+	applyMsg = MSG_SET_SORT_MODE;
+	destination = process;
+	genAttributes = default +initiatesBusyState;
+	hints = {
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION
+	}
+}
+
+GlobalMenuDisplaySortByName = GenItem ignoreDirty {
+	moniker = 'N', "Name";
+	identifier = "mask FIDS_NAME";
+}
+
+GlobalMenuDisplaySortByExt = GenItem ignoreDirty {
+	moniker = 'x', "Extension";
+	identifier = "mask FIDS_EXT";
+}
+
+GlobalMenuDisplaySortByDate = GenItem ignoreDirty {
+	moniker = 'D', "Date and Time";
+	identifier = "mask FIDS_DATE";
+}
+
+GlobalMenuDisplaySortByCreation = GenItem ignoreDirty {
+	moniker = 'C', "Creation Date and Time";
+	identifier = "mask FIDS_CREATION";
+}
+
+GlobalMenuDisplaySortBySize = GenItem ignoreDirty {
+	moniker = 'S', "Size";
+	identifier = "mask FIDS_SIZE";
+}
+
+GlobalMenuDisplaySortByDOS = GenItem ignoreDirty {
+	moniker = 'O', "DOS Order";
+	identifier = "mask FIDS_DOS";
+}
+
+/*---- GlobalMenuViewMode ----*/
+GlobalMenuViewMode = GenInteraction ignoreDirty {
+	visibility = popup;
+	moniker = 'V', "View";
+	children =	GlobalMenuDisplayViewModes,
+			GlobalMenuDisplayOptions;
+	hints = {
+		HINT_INFREQUENTLY_USED			/* not pinnable */
+	}
+}
+
+GlobalMenuDisplayViewModes = GenItemGroup ignoreDirty {
+	children =	GlobalMenuDisplayNamesOnly,
+			GlobalMenuDisplayFullFileDetails,
+			GlobalMenuDisplayLargeIcons;
+	applyMsg = MSG_SET_VIEW_MODE;
+	destination = process;
+	genAttributes = default +initiatesBusyState;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {char "viewMode", 0}
+	}
+}
+GlobalMenuDisplayNamesOnly = GenItem ignoreDirty {
+	moniker = 'a', "Names Only";
+	identifier = "mask FIDM_SHORT";
+}
+GlobalMenuDisplayFullFileDetails = GenItem ignoreDirty {
+	moniker = 't', "Names and Details";
+	identifier = "mask FIDM_FULL";
+}
+GlobalMenuDisplayLargeIcons = GenItem ignoreDirty {
+	moniker = 'I', "Icons";
+	identifier = "mask FIDM_LICON";
+}
+
+GlobalMenuDisplayOptions = GenInteraction ignoreDirty {
+	children = GlobalMenuDisplayOptionsList;
+	hints = {
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+GlobalMenuDisplayOptionsList = GenBooleanGroup ignoreDirty {
+	children = GlobalMenuDisplayOptionsHidden;
+	applyMsg = MSG_SET_VIEW_OPTIONS;
+	destination = process;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {char "displayOptions", 0}
+	}
+}
+GlobalMenuDisplayOptionsHidden = GenBoolean ignoreDirty {
+	moniker = 'H', "Show Hidden Files";
+	identifier = "mask FIDA_HIDDEN";
+}
+
+end GlobalSortViewMenuResource;
+
+/* Resource changed to keep GlobalMenuResource from being loaded on
+startup */
+
+start PrimaryInterface;
+
+/*--------------------------  NDDesktopMenu  -----------------------------*/
+
+NDDesktopMenu = NDSortViewPopupMenu ignoreDirty {
+	sortViewParent = DesktopMenuOther;
+	sortViewPosition = 2;
+	sortViewFlags = "mask NDSVPMF_NO_VIEW";
+	visibility = popup;
+	attributes = default +notUserInitiatable;
+	children =	DesktopMenuHelp,
+			/* DesktopMenuControlPanel, */
+			OptionsMenu,
+			DesktopMenuUpdateWindows,
+#if _NEWDESKONLY
+			DesktopMenuLogout,
+#endif		/* if _NEWDESKONLY */
+#if _NEWDESKBA
+			DesktopMenuLogoutGroup,
+#endif		/* if _NEWDESKBA */
+			DesktopMenuOther;
+	hints = {
+		HINT_INFREQUENTLY_USED,			/* not pinnable */
+		HINT_AVOID_MENU_BAR
+	}
+}
+
+DesktopMenuHelp = GenTrigger ignoreDirty {
+	moniker = 'H', "Help";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+#if 0
+		ATTR_GEN_DEFAULT_MONIKER {
+			word GDMT_HELP
+		},
+#endif
+		ATTR_GEN_TRIGGER_ACTION_DATA { 
+			word MSG_ND_FOLDER_HELP
+		}
+	}
+}
+
+DesktopMenuControlPanel = EMCControlPanel ignoreDirty {
+	hints = {
+		ATTR_GEN_CONTROL_REQUIRE_UI {
+			word	mask EMCF_CONTROL_PANEL or \
+				mask EMCF_UTILITIES_PANEL
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask EMCF_GEOS_TASKS_LIST or \
+				mask EMCF_DESK_ACCESSORY_LIST or \
+				mask EMCF_MAIN_APPS_LIST or \
+				mask EMCF_OTHER_APPS_LIST or \
+				mask EMCF_DOS_TASKS_LIST or \
+				mask EMCF_EXIT_TO_DOS
+		}
+	}
+}
+
+DesktopMenuUpdateWindows = GenTrigger ignoreDirty {
+	moniker = 'i', "Update Open Windows";
+	action = MSG_WINDOWS_REFRESH_ALL, process;
+}
+
+#if _NEWDESKBA
+DesktopMenuLogoutGroup = GenInteraction ignoreDirty {
+	children =	DesktopMenuLogout,
+			DesktopMenuChangePassword;
+}
+
+DesktopMenuChangePassword = GenTrigger ignoreDirty {
+	moniker = 'n', "Change Password";
+	action = MSG_DESKTOP_CHANGE_PASSWORD, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+#endif		/* if _NEWDESKBA */
+
+DesktopMenuLogout = GenTrigger ignoreDirty {
+	moniker = 'L', "Logout Now";
+#if _NEWDESKBA
+	action = MSG_DESKTOP_CONFIRM_LOGOUT, process;
+#else
+	action = MSG_META_QUIT, Desktop;
+#endif
+}
+
+
+DesktopMenuOther = GenInteraction ignoreDirty {
+	children =	DesktopMenuSelectAll,
+			DesktopMenuCreateFolder;
+
+}
+
+DesktopMenuSelectAll = GenTrigger ignoreDirty {
+	moniker = 'S', "Select All";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_SELECT_ALL
+		}
+	}
+}
+
+/*---- DesktopMenuCreateFolder ----*/
+DesktopMenuCreateFolder = GenTrigger ignoreDirty {
+	moniker = 'F', "Create Folder";
+	action = MSG_ND_FOLDER_SEND_FROM_POPUP, process;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	MSG_FM_START_CREATE_DIR
+		}
+	}
+}
+
+NDNoPopUpMenuItems = GenInteraction ignoreDirty {
+	children = NDNoPopUpMenuItemsText;
+	visibility = dialog;
+	type = notification;
+	attributes = default +modal;
+}
+
+NDNoPopUpMenuItemsText = GenText ignoreDirty {
+	genAttributes = readOnly;
+	text =	"The selected items have no menu commands in common, or any menu items that are common don't apply to multiple selections. Because of this no pop-up menu can be shown. To see the pop-up menus, select the items individually.";
+}
+
+end	PrimaryInterface;

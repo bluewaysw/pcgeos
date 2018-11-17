@@ -1,0 +1,99 @@
+#!/bin/sh
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Shell scripts
+# FILE: 	global
+# AUTHOR: 	Chris Boyke, Aug  6, 1992
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	CB	8/ 6/92		Initial Revision
+#
+# DESCRIPTION:
+#
+# make a global change to all of the specified files
+#
+# Usage:
+#
+# 	global	old new <filelist>
+#
+# OR
+#	global -f <filename> <filelist>
+#
+#
+# Examples:
+#	
+#	global	foo bar *.asm  
+# will change all occurences of "foo" to "bar" in the passed files
+# 
+#	global -f <filename> *.asm
+#
+# will use the file <filename>, which is assumed to be several lines,
+# each line containing 2 words.  for each file in (*.asm), every
+# occurrence of the first word will be changed to the second word.
+#
+#
+# Each file that is modified is backed up -- the backup version has
+# the same name as the original file, with a ~ at the end.
+#
+#	$Id: global,v 1.2 94/08/25 09:13:40 chrisb Exp $
+#
+#
+if [ "$1" = "-f" ]; then
+
+	shift
+
+	#
+	# Create a SED file out of the data in the source file
+	#
+
+	awk ' BEGIN {
+			OFS = "/" ; ORS = "\n"
+		}
+		{ print "s", $1, $2, "g" }
+	' < $1 > /tmp/globalf.tmp
+
+	shift
+
+	#
+	# Now, run the sed file on each file in the argument list.
+	# If no files, use "fui"
+	#
+
+	if [ $# = 0 ]; then
+		set - `fui`
+	fi
+
+	for file do 
+		if [ -f $file ]; then
+			cp $file $file~
+			sed -f /tmp/globalf.tmp < $file~ > $file
+		fi
+	done
+	/bin/rm -f /tmp/globalf.tmp
+
+else
+
+	before=$1
+	after=$2
+	shift 2
+
+	if [ $# = 0 ]; then
+		set - `fui`
+	fi
+
+	for file do
+		if [ -f $file ]; then
+			if ( egrep "$before" $file ) then
+				echo "File: $file"
+				cp $file $file~
+				sed -e "s/$before/$after/g" < $file~ > $file
+			fi
+		fi
+	done
+fi
+

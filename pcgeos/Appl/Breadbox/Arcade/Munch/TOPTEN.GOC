@@ -1,0 +1,328 @@
+@include <stdapp.goh>
+/*#include <stdlib.h>  */
+#include <gstring.h>
+#include <graphics.h>
+#include <sound.h>
+/*#include <math.h>  */
+#include <file.h>
+#include <time.h>
+#include <timedate.h>
+#include <localize.h>
+#include <sem.h>
+@include "max.goh"
+@include "sprites.goh"
+@include "bgegner.goh"
+
+extern word pillenzahl;
+extern byte laby[20*11];
+
+
+/*word punktliste[10];
+char namensliste[10][4];
+TimerDateAndTime datumsliste[10];
+char name[4];*/
+dword punkte=0; /*scores*/
+byte  leben,level,maxLevel=0; /*Anzahl der Leben,Levelnr.,...*/
+byte  restartLevel;
+int startX,startY;
+Boolean ton=TRUE,spur=TRUE,hintergrund=TRUE;
+
+
+void korrigiereStartrichtungen(void)
+{
+	Boolean free=FALSE;
+
+	if (geg1Act) do
+	{
+		if (geg1Dir==0)
+			if (geg1X==0)
+			{
+				free=FALSE;geg1Dir++;
+			}
+			else
+			{
+				if (istHindernis(geg1X-31,geg1Y))
+				{
+					geg1Dir++;free=FALSE;
+				}
+				else
+					free=TRUE;
+			}
+
+		if (geg1Dir==1)
+			if (geg1Y==0)
+			{
+				free=FALSE;geg1Dir++;
+			}
+		else
+		{
+			if (istHindernis(geg1X,geg1Y-29))
+			{
+				geg1Dir++;free=FALSE;
+			}
+			else
+				free=TRUE;
+		}
+
+		if (geg1Dir==2)
+			if (geg1X==maxX-31)
+			{
+				free=FALSE;geg1Dir++;
+			}
+		else
+		{
+			if (istHindernis(geg1X+31,geg1Y))
+			{
+				geg1Dir++;free=FALSE;
+			}
+			else
+				free=TRUE;
+		}
+
+		if (geg1Dir==3)
+			if (geg1Y==maxY-29)
+			{
+				free=FALSE;geg1Dir++;
+			}
+		else
+		{
+			if (istHindernis(geg1X,geg1Y+29))
+			{
+				geg1Dir++;free=FALSE;
+			}
+			else
+				free=TRUE;
+		}
+
+	geg1Dir=geg1Dir%4;
+	} while (!free);
+
+	free=FALSE;
+	if (geg2Act) do
+	{
+		if (geg2Dir==0)
+			if (geg2Y==maxY-29)
+			{
+				free=FALSE;geg2Dir++;
+			}
+		else
+		{
+			if (istHindernis(geg2X,geg2Y+29))
+			{
+				geg2Dir++;free=FALSE;
+			}
+			else
+				free=TRUE;
+		}
+
+	if (geg2Dir==1)
+		if (geg2X==maxX-31)
+		{
+			free=FALSE;
+			geg2Dir++;
+		}
+		else
+		{
+			if (istHindernis(geg2X+31,geg2Y))
+			{
+				geg2Dir++;
+				free=FALSE;
+			}
+			else
+				free=TRUE;
+		}
+	if (geg2Dir==2)
+		if (geg2Y==0)
+		{
+			free=FALSE;
+			geg2Dir++;
+		}
+		else
+		{
+			if (istHindernis(geg2X,geg2Y-29))
+			{
+				geg2Dir++;
+				free=FALSE;
+			}
+			else
+				free=TRUE;
+		}
+
+	if (geg2Dir==3)
+		if (geg2X==0)
+		{
+			free=FALSE;
+			geg2Dir++;
+		}
+		else
+		{
+			if (istHindernis(geg2X-31,geg2Y))
+			{
+				geg2Dir++;
+				free=FALSE;
+			}
+			else
+				free=TRUE;
+		}
+
+	geg2Dir=geg2Dir%4;
+	} while (!free);
+
+	free=FALSE;
+	if (geg3Act) do
+	{
+		if (geg3Dir==0)
+			if (geg3X==0)
+			{
+				free=FALSE;
+				geg3Dir++;
+			}
+		else
+		{
+			if (istHindernis(geg3X-31,geg3Y))
+			{
+				geg3Dir++;
+				free=FALSE;
+			}
+			else
+				free=TRUE;
+		}
+		if (geg3Dir==1)
+			if (geg3Y==0)
+			{
+				free=FALSE;
+				geg3Dir++;
+			}
+		else
+		{
+			if (istHindernis(geg3X,geg3Y-29))
+			{
+				geg3Dir++;
+				free=FALSE;
+			}
+			else
+				free=TRUE;
+		}
+
+	if (geg3Dir==2)
+	if (geg3X==maxX-31) {free=FALSE;geg3Dir++;}
+		else
+	{ if (istHindernis(geg3X+31,geg3Y))
+		   {geg3Dir++;free=FALSE;}
+		  else free=TRUE;
+		};
+	if (geg3Dir==3)
+	if (geg3Y==maxY-29) {free=FALSE;geg3Dir++;}
+		else
+	{ if (istHindernis(geg3X,geg3Y+29))
+		   {geg3Dir++;free=FALSE;}
+		  else free=TRUE;
+		};
+	geg3Dir=geg3Dir%4;
+  } while (!free);
+
+  free=FALSE;
+  if (geg4Act) do
+  { if (geg4Dir==0)
+	if (geg4Y==maxY-29) {free=FALSE;geg4Dir++;}
+		else
+	{ if (istHindernis(geg4X,geg4Y+29))
+		   {geg4Dir++;free=FALSE;}
+		  else free=TRUE;
+		};
+	if (geg4Dir==1)
+	if (geg4X==maxX-31) {free=FALSE;geg4Dir++;}
+		else
+	{ if (istHindernis(geg4X+31,geg4Y))
+		   {geg4Dir++;free=FALSE;}
+		  else free=TRUE;
+		};
+	if (geg4Dir==2)
+	if (geg4Y==0) {free=FALSE;geg4Dir++;}
+		else
+	{ if (istHindernis(geg4X,geg4Y-29))
+		   {geg4Dir++;free=FALSE;}
+		  else free=TRUE;
+		};
+	if (geg4Dir==3)
+	if (geg4X==0) {free=FALSE;geg4Dir++;}
+		else
+	{ if (istHindernis(geg4X-31,geg4Y))
+		   {geg4Dir++;free=FALSE;}
+		  else free=TRUE;
+		};
+	geg4Dir=geg4Dir%4;
+  } while (!free);
+}
+
+Boolean loadLevel(byte nr)  /* nr blijkt het level nr te zijn ? */
+{ Boolean erg=FALSE;
+  FileHandle levelf;
+  byte x,y;
+  byte xw[10]; /* geen idee wat dit hier doet */
+
+/*  initSprites();*/
+  geg1Act=FALSE;
+  geg2Act=FALSE;
+  geg3Act=FALSE;
+  geg4Act=FALSE;
+  pillenzahl=0;
+
+  FilePushDir();
+  FileSetCurrentPath(SP_USER_DATA,"MunchData");
+  levelf=FileOpen("Level.dat", (FILE_ACCESS_RW | FILE_DENY_RW));
+  if (levelf)
+  { erg=TRUE;
+	FilePos(levelf,(nr-1)*(10+20*11),FILE_POS_START);
+
+	for (y=0; y<11; y++)
+	  for (x=0; x<20; x++)
+	  { FileRead(levelf,&laby[x+y*20],1,FALSE);
+		switch(laby[x+y*20])
+		{
+		 case istMuncher:munchX=31*x;startX=31*x;munchY=29*y;startY=29*y;laby[x+y*20]=istLeer;break;
+	 case istGegner1:geg1X=31*x;geg1Y=29*y;geg1Act=TRUE;laby[x+y*20]=istLeer;break;
+	 case istGegner2:geg2X=31*x;geg2Y=29*y;geg2Act=TRUE;laby[x+y*20]=istLeer;break;
+	 case istGegner3:geg3X=31*x;geg3Y=29*y;geg3Act=TRUE;laby[x+y*20]=istLeer;break;
+	 case istGegner4:geg4X=31*x;geg4Y=29*y;geg4Act=TRUE;laby[x+y*20]=istLeer;break;
+		 case istPille  :pillenzahl++;break;
+		}
+	  }
+
+	FileRead(levelf,&xw,10,FALSE);
+	FileClose(levelf,FALSE);
+  }
+  FilePopDir();
+
+/* Door Peter tijdelijk uitgeschakeld; heeft waarschijnlijk
+   geen effect op het verloop, vermits het bestand reeds
+   gesloten werd */
+/*  if (levelf)
+  { initHintergrund(xw[0]);
+	initRoteG(xw[1]);
+	initGrueneG(xw[2]);
+  }*/
+
+  korrigiereStartrichtungen();
+
+  return(erg);  /* 'erg' is een Boolean die aangeeft of een level
+				   gekozen werd */
+};
+
+byte numOfLevel(void)
+{ FileHandle levelf;
+  byte erg=0;
+
+  FilePushDir();
+  FileSetCurrentPath(SP_USER_DATA,"MunchData");
+  levelf=FileOpen("Level.dat", (FILE_ACCESS_RW | FILE_DENY_RW));
+  if (levelf)
+  { FilePos(levelf,0,FILE_POS_START);
+	erg=(byte)((FilePos(levelf,0,FILE_POS_END)/(10+20*11)));
+	FileClose(levelf,FALSE);
+  }
+  FilePopDir();
+
+  return(erg);
+};
+

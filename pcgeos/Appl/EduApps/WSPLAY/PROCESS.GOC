@@ -1,0 +1,799 @@
+/* -----------------------------------------------------------------
+ *   converting the maker into a player
+ *
+ *   7/25/00	jfh    
+ * -----------------------------------------------------------------*/
+
+@include <wsplay.goh>
+@include <externs.goh>
+
+@classdecl WSPProcessClass, neverSaved;
+@classdecl WSPGenViewClass;
+@classdecl WSPDocumentControlClass;
+
+/***************************************************************************
+ * Globals declared in the header
+ **************************************************************************/
+
+VMFileHandle g_fhDocument = NullHandle;
+optr g_oDocument = NullHandle;
+VMBlockHandle g_bhDocHeap = NullHandle;
+ChunkHandle g_chDocWordList = NullChunk;
+ChunkHandle g_chDocWordSearch = NullChunk;
+ChunkHandle g_chDocAnswers = NullChunk;
+word g_whichAns = 0;
+word g_whichAnsLtr = 0;
+word g_numWordsFound = 0;
+Boolean g_showAnswers = FALSE;
+optr g_wordsFoundArray = NullHandle;
+optr g_ltrsFoundArray = NullHandle;
+word g_sysPointSize = 12;
+word g_numWords = 0;
+
+/***************************************************************************
+ * WSPProcessClass methods
+ **************************************************************************/
+ 
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for WSPProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *      
+ *
+ ***********************************************************************/
+@method WSPProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+Boolean	initError;
+
+
+    /* get the system font size */
+    initError = InitFileReadInteger("ui", "fontsize", &g_sysPointSize);
+    if (initError) g_sysPointSize = 12;
+
+	 /* see if we should show the WSM menu item or not */
+	 if (!WSPCheckForWSM())  {
+		 /* don't show it */
+		 @send WSPWSMTrig::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		 }
+
+
+	 @callsuper();
+
+    /* needed to install app tiny token on E menu */
+    @call WSPApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+}
+
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to setup UI for the doc.
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Setup the document UI.
+ *
+ **************************************************************************/
+@method WSPProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+MemHandle			mhMapBlock = NullHandle, mhHeap, mem;
+ChunkHandle		chunk;
+VMBlockHandle		bhMapBlock;
+WSPDocumentMap		*pMap;
+RectDWord			docBounds;
+VisUpdateModeAsWord vumaw = { VUM_MANUAL, 0 };
+WordSearchHeader	*pwsh;
+char 			infoString[25], tempString[13];
+word				i;
+byte                *p_found;
+
+
+    /* Load in the map block. */
+    bhMapBlock = VMGetMapBlock(file);
+    if (bhMapBlock != NullHandle)
+    {
+        pMap = VMLock(file, bhMapBlock, &mhMapBlock);
+
+        /* Set global variables so we can quickly reference certain data. */
+	   g_fhDocument = file;
+		g_bhDocHeap = pMap->WSPDM_heapBlock;
+	   g_chDocWordList = pMap->WSPDM_wordListChunk;
+	   g_chDocWordSearch = pMap->WSPDM_wordSearchChunk;
+	   g_chDocAnswers = pMap->WSPDM_answersChunk;
+	   VMUnlock(mhMapBlock);
+    }
+
+    if (g_bhDocHeap != NullHandle && g_chDocWordList != NullChunk)
+    {
+	   VMLock(file, g_bhDocHeap, &mhHeap);
+
+		/* Retrieve the size of the word list and initialize its UI. */
+	   g_numWords = ChunkArrayGetCount(ConstructOptr(mhHeap, g_chDocWordList));
+	   @send WSPWordList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(g_numWords);
+
+	   /* set up our found words array */
+	   mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+	   MemLock(mem) ;
+	   chunk = ChunkArrayCreate(mem, 1, 0, 0) ;
+	   g_wordsFoundArray = ConstructOptr(mem, chunk) ;
+	   MemUnlock(mem) ;
+	   /* and initialize it */
+	   MemLock(OptrToHandle(g_wordsFoundArray));
+	   for (i = 0; i < g_numWords; i++) {
+		 p_found = ChunkArrayAppend(g_wordsFoundArray, 0);
+		 *p_found = 0;
+		 }
+	   MemUnlock(OptrToHandle(g_wordsFoundArray));
+
+	   /* Retrieve the size of the word search and set the view's
+           document bounds. */
+		pwsh = LMemDerefHandles(mhHeap, g_chDocWordSearch);
+	   WSPGetDocBounds(pwsh, &docBounds);
+		@send WSPDocumentView::MSG_GEN_VIEW_SET_DOC_BOUNDS(docBounds.RD_bottom,
+			   docBounds.RD_right, docBounds.RD_top, docBounds.RD_left);
+
+		/* show board size, difficulty level and crossing in info dbox */
+	   UtilHex32ToAscii(infoString, (dword)pwsh->WSH_width, UHTAF_NULL_TERMINATE);
+	   strcat(infoString, "x");
+	   UtilHex32ToAscii(tempString, (dword)pwsh->WSH_height, UHTAF_NULL_TERMINATE);
+	   strcat(infoString, tempString);
+		@call WSPInfoSize::MSG_VIS_TEXT_REPLACE_ALL_PTR(infoString, 0);
+		MemLock(OptrToHandle(@EasyStr));
+		if (pwsh->WSH_level == 0)
+			strcpy(infoString, LMemDeref(@EasyStr));
+		else if (pwsh->WSH_level == 1)
+			strcpy(infoString, LMemDeref(@MedStr));
+		else
+			strcpy(infoString, LMemDeref(@HardStr));
+		@call WSPInfoLevel::MSG_VIS_TEXT_REPLACE_ALL_PTR(infoString, 0);
+
+		if (pwsh->WSH_settings & WSMS_INTERSECT)
+			strcpy(infoString, LMemDeref(@YesStr));
+		else
+			strcpy(infoString, LMemDeref(@NoStr));
+		@call WSPInfoCrossing::MSG_VIS_TEXT_REPLACE_ALL_PTR(infoString, 0);
+		MemUnlock(OptrToHandle(@EasyStr));
+
+	   /* set up our found letters array */
+	   mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+	   MemLock(mem) ;
+	   chunk = ChunkArrayCreate(mem, 1, 0, 0) ;
+	   g_ltrsFoundArray = ConstructOptr(mem, chunk) ;
+	   MemUnlock(mem) ;
+	   /* and initialize it */
+	   MemLock(OptrToHandle(g_ltrsFoundArray));
+	   for (i = 0; i < (pwsh->WSH_width * pwsh->WSH_height); i++) {
+		 p_found = ChunkArrayAppend(g_ltrsFoundArray, 0);
+		 *p_found = 0;
+		 }
+	   MemUnlock(OptrToHandle(g_ltrsFoundArray));
+
+	   /* Unlock the heap. */
+        VMUnlock(mhHeap);
+    }
+
+    /* don't show answers */
+    g_showAnswers = FALSE;
+    @send WSPSettingsOther::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+				   WSPS_ANSWERS, FALSE);
+
+    /* init some other globals */
+    g_whichAns = 0;
+    g_whichAnsLtr = 0;
+    g_numWordsFound = 0;
+
+    /* Set scaling attributes for the view now; otherwise, it will
+       shrink to nothing with the initial zero bounds. */
+    @send WSPDocumentView::MSG_GEN_VIEW_SET_ATTRS(GVA_SCALE_TO_FIT, 0, vumaw);
+
+    /* Force the document view to scale and draw itself. */
+    @send WSPDocumentView::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
+    @send WSPDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+    
+    /* fill in found & left to find */
+    @call WSPWordsToFind::MSG_GEN_VALUE_SET_VALUE(MakeWWFixed(g_numWords), FALSE);
+    @call WSPWordsFound::MSG_GEN_VALUE_SET_VALUE(MakeWWFixed(0), FALSE);
+
+    /* Cache the document's object descriptor. */
+    g_oDocument = document;
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to break down UI for the doc.
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Break down the document UI.
+ *
+ **************************************************************************/
+@method WSPProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+    /* Empty the word list UI. */
+    @send WSPWordList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+
+    /* Set the answer selector to off. */
+    @send WSPSettingsOther::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+				   WSPS_ANSWERS, FALSE);
+
+    /* Destroy global variables. */
+    g_chDocWordSearch = NullChunk;
+    g_chDocWordList = NullChunk;
+    g_bhDocHeap = NullHandle;
+    g_fhDocument = NullHandle;
+    g_oDocument = NullHandle;
+
+    /* Force the document view to empty. */
+    @send WSPDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+}
+
+/***************************************************************************
+ * MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+ ***************************************************************************
+ * SYNOPSIS:    Called to allow special configuration of the file selector
+ *              used by the document control.
+ *
+ * PARAMETERS:  optr fileSelector,
+ *              word flags
+ *
+ * STRATEGY:    See if our default folder is there and go there
+ *              If not go to Document
+ *              Set the file selector's path to the path.
+ *
+ **************************************************************************/
+@method WSPDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+{
+ Boolean		notThere;
+
+
+    @callsuper();
+
+    /* see if our default folder is in Document */
+	 MemLock (OptrToHandle(@WSFolderTxt));
+	 notThere = @call fileSelector::MSG_GEN_PATH_SET
+					 (LMemDeref(@WSFolderTxt),
+					 SP_DOCUMENT);
+	 MemUnlock (OptrToHandle(@WSFolderTxt));
+
+    /* if it was there we're all set - if not just go to Document */
+    if(notThere)  {
+		 @call fileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+		 }
+
+}
+
+/***************************************************************************
+ * MSG_WSP_PROCESS_QUERY_WORD_LIST
+ ***************************************************************************
+ * SYNOPSIS:    Called by dynamic WSPWordList to define its items.
+ *
+ * PARAMETERS:  optr        list,
+ *              word        item
+ *
+ * STRATEGY:    Retrieve the word from the list and call the replace method.
+ *
+ **************************************************************************/
+@method WSPProcessClass, MSG_WSP_PROCESS_QUERY_WORD_LIST
+{
+optr			oWordList = NullOptr;
+MemHandle		mhHeap, mem;
+char			*pWord;
+ChunkHandle	chunk;
+GStateHandle	gstate;
+word			width;
+byte           *p_found;
+
+    /* Ensure that no handles are null. */
+    if (g_fhDocument != NullHandle && g_bhDocHeap != NullHandle
+      && g_chDocWordList != NullChunk)
+    {
+        /* Lock the word list. */
+        VMLock(g_fhDocument, g_bhDocHeap, &mhHeap);
+	   oWordList = ConstructOptr(mhHeap, g_chDocWordList);
+
+	   /* Ensure that the requested item is in the array. */
+	   if (item < g_numWords)
+	   {
+		  /* Locate the requested item and set it in the dynamic list. */
+		  pWord = ChunkArrayElementToPtr(oWordList, item, 0);
+
+		   mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0);
+		   gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+
+		   width = GrTextWidth(gstate, pWord, strlen(pWord));
+
+		   /* if a found word show it with a line thru */
+		   MemLock(OptrToHandle(g_wordsFoundArray));
+		   p_found = ChunkArrayElementToPtr(
+							    g_wordsFoundArray, item, 0);
+		   if (*p_found) {
+		    //	 GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(g_sysPointSize));
+			 /* draw strike thru */
+			 GrSetLineWidth(gstate, MakeWWFixed(1));
+			 GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+			 GrDrawHLine(gstate, 2, g_sysPointSize/2+2, width+2);  /* L, B, R */
+
+			 }
+		   MemUnlock(OptrToHandle(g_wordsFoundArray));
+
+		//   width = GrTextWidth(gstate, pWord, strlen(pWord));
+		   GrDrawText(gstate, 2, 0, pWord, 0);
+		   GrEndGString(gstate);
+		   /* and tell the DList */
+		   @call WSPWordList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+							 item,
+							 0,
+							 g_sysPointSize + 2,
+							 width + 5,
+							 0,
+							 VMDT_GSTRING,
+							 VMST_OPTR,
+							 ConstructOptr(mem, chunk));
+		   /* and 86 the gstate and mem */
+		   GrDestroyGString(gstate, gstate, GSKT_KILL_DATA);
+		   MemFree(mem);
+
+        }
+        VMUnlock(mhHeap);
+    }
+}
+
+
+/***************************************************************************
+ * MSG_WSP_PROCESS_APPLY_SETTINGS_OTHER
+ ***************************************************************************
+ * SYNOPSIS:    Sent when changes are made to the WSPSettingsOther object.
+ *
+ * PARAMETERS:  word selectedBooleans,
+ *              word indeterminateBooleans,
+ *              word modifiedBooleans
+ *
+ * STRATEGY:    Write the settings to the document.
+ *              Queue a recalculation of the word search if WSPS_INTERSECT
+ *                has been changed.
+ *              Queue a redraw of the view if WSPS_ANSWERS has been changed.
+ *
+ **************************************************************************/
+@method WSPProcessClass, MSG_WSP_PROCESS_APPLY_SETTINGS_OTHER
+{
+
+
+    /* set the global */
+    if (selectedBooleans &  WSPS_ANSWERS) g_showAnswers = TRUE;
+    else g_showAnswers = FALSE;
+
+    /* Redraw the grid if WSPS_ANSWERS has been modified. */
+    if (modifiedBooleans & WSPS_ANSWERS)
+		  @send, forceQueue, checkDuplicate
+					 WSPDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/***************************************************************************
+ * MSG_META_EXPOSED
+ ***************************************************************************
+ * SYNOPSIS:    Called by WSPDocumentView to redraw the word search display.
+ *
+ * PARAMETERS:  WindowHandle    win
+ *
+ * STRATEGY:    Call appropriate drawing functions to render the display.
+ *
+ **************************************************************************/
+@method WSPProcessClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    gstate = GrCreateState(win);    /* Create a temporary GState. */
+    GrBeginUpdate(gstate);          /* Start a window update. */
+    WSPDrawWordSearch(gstate, DRAW_GRID_MARGINS, DRAW_GRID_MARGINS, 0, 0, FALSE);
+    GrEndUpdate(gstate);            /* We are done with the window update. */
+    GrDestroyState(gstate);         /* Destroy the temporary GState. */
+}
+
+/***************************************************************************
+ * MSG_PRINT_START_PRINTING
+ ***************************************************************************
+ * SYNOPSIS:    Sent by the print control whenever it wants to print.
+ *
+ * PARAMETERS:  optr            printCtrlOD,
+ *              GStateHandle    gstate
+ *
+ * STRATEGY:    Call appropriate drawing functions to print the document.
+ *
+ **************************************************************************/
+@method WSPStartPrinting, WSPProcessClass, MSG_PRINT_START_PRINTING
+{
+    /* Print the header. */
+    WSPDrawHeader(gstate);
+    
+    /* Print the word search. */
+    WSPDrawWordSearch(gstate, PRINT_GRID_BOUNDS_LEFT, PRINT_GRID_BOUNDS_TOP, 
+      PRINT_GRID_BOUNDS_RIGHT, PRINT_GRID_BOUNDS_BOTTOM, TRUE);
+
+    /* Print the word list. */
+    WSPDrawWordList(gstate);
+
+	/* End with a form feed. */
+	GrNewPage(gstate, PEC_FORM_FEED);
+
+	@send printCtrlOD::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}
+
+/***************************************************************************
+ * WSPGetRowCol
+ ***************************************************************************
+ * SYNOPSIS:    Figures out row/col based on mouse position
+ *              called from MSG_META_START_SELECT
+ *
+ * STRATEGY:    apply the scale factor to get row/col
+ *
+ *
+ *
+ **************************************************************************/
+word WSPGetRowCol(sword xypos, WWFixedAsDWord scale)
+{
+word		rowCol, iScalePos;
+WWFixedAsDWord		scalePos;
+
+
+    /* get the row or column*/
+    scalePos = GrUDivWWFixed(MakeWWFixed(xypos), scale);
+    iScalePos = WWFixedToInt(scalePos);
+    if (iScalePos < DRAW_GRID_MARGINS)
+	  rowCol = 0;
+    else if (iScalePos < DRAW_GRID_MARGINS + DRAW_GRID_TEXT_SIZE + 3)
+	  rowCol = 1;
+    else
+	  rowCol = ((iScalePos - DRAW_GRID_MARGINS - DRAW_GRID_TEXT_SIZE - 3)
+									    / DRAW_GRID_SPACE_SIZE) + 2;
+
+    return(rowCol);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_START_SELECT for WSPGenViewClass
+ *
+ *      MouseReturnParams 		*retVal
+ *	   sword 					xPosition
+ *	   sword 					yPosition
+ *	   word 					inputState
+ *
+ * DESCRIPTION:	view has just been clicked
+ *
+ *
+ ***********************************************************************/
+@method WSPGenViewClass, MSG_META_START_SELECT
+{
+word				row, col, lastRow, lastCol, x, y, xoff, i, nAnswers;
+word				angle, rowOffset, colOffset;
+WWFixedAsDWord		scale;
+MemHandle			mh;
+WordSearchHeader	*pHeader;
+optr				oWordSearch, oAns;
+char				c;
+GStateHandle		gstate;
+WindowHandle		win;
+WordSearchAnswerElement *pAns;
+Boolean			foundIt = FALSE, endWord = FALSE;
+byte				*p_found;
+
+
+    /* get the scale factor */
+    scale = WWFixedToInt(pself->GVI_scaleFactor.PF_y);
+    scale = scale << 16;
+    scale += WWFixedToFrac(pself->GVI_scaleFactor.PF_y);
+
+    /* get the row & column */
+    row = WSPGetRowCol(yPosition, scale);
+    col = WSPGetRowCol(xPosition, scale);
+
+    /* get the # of rows & cols */
+    VMLock(g_fhDocument, g_bhDocHeap, &mh);
+    pHeader = LMemDerefHandles(mh, g_chDocWordSearch);
+    lastCol = pHeader->WSH_width;
+    lastRow = pHeader->WSH_height;
+
+    if (row > lastRow) row = 0;
+    if (col > lastCol) col = 0;
+
+    if (row && col) {
+	  /* redraw the letter in bold if it is the start (or next letter)
+	   * of an answer */
+	  oAns = ConstructOptr(mh, g_chDocAnswers);
+	  if (!g_whichAns) {
+		/* is it the first letter of an answer? */
+		nAnswers = ChunkArrayGetCount(oAns);
+		for (i = 0; i < nAnswers; i++) {
+		   pAns = ChunkArrayElementToPtr(oAns, i, 0);
+		   if ((pAns->WSAE_row == row - 1) && (pAns->WSAE_column == col - 1)) {
+			 /* make sure we're not starting same word again */
+			 MemLock(OptrToHandle(g_ltrsFoundArray));
+			 p_found = ChunkArrayElementToPtr(
+					 g_ltrsFoundArray, ((row - 1) * lastCol + col - 1), 0);
+			 if (!*p_found) {
+			    foundIt = TRUE;
+			    g_whichAns = i + 1;
+			    g_whichAnsLtr = 1;
+			    }
+			 MemUnlock(OptrToHandle(g_ltrsFoundArray));
+			 }
+		   if (foundIt) break;
+		   }
+		}
+	  else {
+		/* see if it is a following letter */
+		pAns = ChunkArrayElementToPtr(oAns, g_whichAns - 1, 0);
+		angle = IntegerOf(WSPDirectionToAngle(pHeader->WSH_level,
+						  pAns->WSAE_direction));
+		rowOffset = 0;
+		colOffset = 0;
+		switch (angle) {
+		   case 0:
+			 colOffset += g_whichAnsLtr;
+			 break;
+		   case 45:
+			 rowOffset -= g_whichAnsLtr;
+			 colOffset += g_whichAnsLtr;
+			 break;
+		   case 90:
+			 rowOffset -= g_whichAnsLtr;
+			 break;
+		   case 135:
+			 rowOffset -= g_whichAnsLtr;
+			 colOffset -= g_whichAnsLtr;
+			 break;
+		   case 180:
+			 colOffset -= g_whichAnsLtr;
+			 break;
+		   case 225:
+			 rowOffset += g_whichAnsLtr;
+			 colOffset -= g_whichAnsLtr;
+			 break;
+		   case 270:
+			 rowOffset +=  g_whichAnsLtr;
+			 break;
+		   case 315:
+			 rowOffset += g_whichAnsLtr;
+			 colOffset += g_whichAnsLtr;
+			 break;
+		   } /* end angle switch */
+		if ((pAns->WSAE_row + rowOffset == row - 1) &&
+						(pAns->WSAE_column + colOffset == col - 1)) {
+		   foundIt = TRUE;
+		   if (g_whichAnsLtr + 1 == pAns->WSAE_length) {
+			 /* we found the last letter */
+			 endWord = TRUE;
+			 g_whichAnsLtr = 0;
+			 g_numWordsFound++;
+			 }
+		   else g_whichAnsLtr++;
+		   }  /* end of found following letter if */
+		}  /* end of following letter else */
+
+	  if (foundIt) {
+		/* grab the letter */
+		oWordSearch = ConstructOptr(mh, g_chDocWordSearch);
+		c = WSPGetLetter(oWordSearch, col - 1, row - 1);
+		/* Setup the gstate. */
+		win = @call self::MSG_GEN_VIEW_GET_WINDOW();
+		gstate = GrCreateState(win);
+		GrSetFont(gstate, DRAW_GRID_TEXT_FONT,
+					    MakeWWFixed(DRAW_GRID_TEXT_SIZE));
+          /* invert the text */
+	 //	GrSetTextColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+		GrSetDefaultTransform(gstate);
+		GrApplyTranslation(gstate, MakeWWFixed(DRAW_GRID_MARGINS),
+					   MakeWWFixed(DRAW_GRID_MARGINS));
+		y = ((DRAW_GRID_SPACE_SIZE - DRAW_GRID_TEXT_SIZE) / 2) +
+					  ((row - 1) * DRAW_GRID_SPACE_SIZE);
+		x = (col - 1) * DRAW_GRID_SPACE_SIZE;
+		xoff = (DRAW_GRID_SPACE_SIZE -
+				    IntegerOf(GrCharWidth(gstate, c))) / 2;
+		/* do background */
+		GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0);
+		GrFillEllipse(gstate, x + xoff -2, y, x + xoff + (2*xoff), y+(2*xoff)+3);
+		/* draw the letter */
+		GrDrawChar(gstate, x + xoff, y, c);
+		GrDestroyState(gstate);
+
+		/* and mark it in the array */
+		MemLock(OptrToHandle(g_ltrsFoundArray));
+		p_found = ChunkArrayElementToPtr(
+					 g_ltrsFoundArray, ((row - 1) * lastCol + col - 1), 0);
+		/* mark it with a 2 meaning it has a background that will
+			need to be cleared */
+		*p_found = 2;
+		MemUnlock(OptrToHandle(g_ltrsFoundArray));
+
+		if (endWord) {
+		   /* mark it as found */
+		   MemLock(OptrToHandle(g_wordsFoundArray));
+		   p_found = ChunkArrayElementToPtr(
+							    g_wordsFoundArray, g_whichAns - 1, 0);
+		   *p_found = 1;
+		   MemUnlock(OptrToHandle(g_wordsFoundArray));
+
+		   /* redraw the word in the list */
+		   @send process::MSG_WSP_PROCESS_QUERY_WORD_LIST(@WSPWordList,
+												g_whichAns - 1);
+
+		   /* un-reverse the found letters */
+		   win = @call self::MSG_GEN_VIEW_GET_WINDOW();
+		   gstate = GrCreateState(win);
+	   //	   GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+		   GrSetFont(gstate, DRAW_GRID_TEXT_FONT,
+					    MakeWWFixed(DRAW_GRID_TEXT_SIZE));
+		   GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+		   MemLock(OptrToHandle(g_ltrsFoundArray));
+		   y = (DRAW_GRID_SPACE_SIZE - DRAW_GRID_TEXT_SIZE) / 2 +
+		                 DRAW_GRID_SPACE_SIZE;
+		   for (row = 0; row < lastRow; row++) {
+			 x = DRAW_GRID_SPACE_SIZE;
+			 for (col = 0; col < lastCol; col++) {
+			    /* reversed? */
+			    p_found = ChunkArrayElementToPtr(
+					 g_ltrsFoundArray, (row * lastCol + col), 0);
+			    if (*p_found == 2) {
+				  c = WSPGetLetter(oWordSearch, col, row);
+				  xoff = (DRAW_GRID_SPACE_SIZE -
+							  IntegerOf(GrCharWidth(gstate, c))) / 2;
+				  GrFillEllipse(gstate, x + xoff -2, y,
+							   x + xoff + (2*xoff), y+(2*xoff)+3);
+				  GrDrawChar(gstate, x + xoff, y, c);
+				  *p_found = 1;
+				  }
+			    x += DRAW_GRID_SPACE_SIZE;
+			    }
+			 y += DRAW_GRID_SPACE_SIZE;
+			 }
+		   MemUnlock(OptrToHandle(g_ltrsFoundArray));
+   //		   GrDestroyState(gstate);
+
+		   /* circle the word */
+		   WSPDrawAnswers(gstate, oAns, pHeader, g_whichAns - 1);
+
+		   GrDestroyState(gstate);
+
+		   /* clean up */
+		   endWord = FALSE;
+		   g_whichAns = 0;
+
+		   /* fill in found & left to find */
+		   @call WSPWordsToFind::MSG_GEN_VALUE_DECREMENT();
+             @call WSPWordsFound::MSG_GEN_VALUE_INCREMENT();
+
+		   /* make a sound */
+		   UserStandardSound(SST_NOTIFY);
+
+		   /* are we done with the puzzle? */
+		   if (g_numWordsFound == g_numWords) {
+			 /* congrats */
+			 UserStandardDialogOptr(0, 0, 0, 0,
+				 @CongratsStr,
+				 ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+				 (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+			 /* re-initialize the letters list */
+			 MemLock(OptrToHandle(g_ltrsFoundArray));
+			 for (i = 0; i < (lastRow * lastCol); i++) {
+			    p_found = ChunkArrayElementToPtr(g_ltrsFoundArray, i, 0);
+			    *p_found = 0;
+			    }
+			 MemUnlock(OptrToHandle(g_ltrsFoundArray));
+			 /* show the board with answers */
+			 g_showAnswers = TRUE;
+			 @send WSPSettingsOther::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+					 WSPS_ANSWERS, TRUE);
+			 @send WSPSettingsOther::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_INDETERMINATE_STATE(
+					 WSPS_ANSWERS, FALSE);
+			 @send, forceQueue, checkDuplicate
+					 WSPDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+			 /* re-initialize the word list */
+			 MemLock(OptrToHandle(g_wordsFoundArray));
+			 for (i = 0; i < g_numWords; i++) {
+			    p_found = ChunkArrayElementToPtr(g_wordsFoundArray, i, 0);
+			    *p_found = 0;
+			    }
+			 MemUnlock(OptrToHandle(g_wordsFoundArray));
+                                        
+			 /* and redraw the list */
+			 @send WSPWordList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(g_numWords);
+			 /* reset globals - user may want to play again */
+			 g_numWordsFound = 0;
+			 g_whichAns = 0;
+			 g_whichAnsLtr = 0;
+			 }
+		   }
+		} /* end of found it if */
+
+	  }  /* end of in bounds if */
+    VMUnlock(mh);
+
+    retVal->flags = MRF_PROCESSED;
+
+}
+
+/***************************************************************************
+ * MSG_WSP_OPEN_MAKER
+ ***************************************************************************
+ * SYNOPSIS:    Opens Word Search Maker (was gonna live in sysappl on GPC)
+ *
+ * PARAMETERS:
+ *
+ * STRATEGY:
+ *
+ **************************************************************************/
+@method WSPProcessClass, MSG_WSP_OPEN_MAKER
+{
+ GeodeToken		WSMToken = { "BWSM" , 16431 };
+ GeodeHandle		WSMHandle;
+ MemHandle		HALWSM;
+ word			numServers;
+ IACPConnection	iacpConnectionToken;
+ EventHandle		hToTop;
+ word			connectionFlags = 0;
+
+
+    /* check to see if WSM is running already */
+    WSMHandle = GeodeFind("wsm",GEODE_NAME_SIZE,0,0);
+    
+    if(WSMHandle == NullHandle)  {  /* it is not running */
+      /* set up a launch block for it */
+	 HALWSM = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+
+      /* start it */
+      iacpConnectionToken = IACPConnect(
+		 &WSMToken,
+		 IACPCF_OBEY_LAUNCH_MODEL||IACPSM_USER_INTERACTIBLE,
+		 HALWSM,
+		 0,
+		 &numServers);
+
+      /* check to see if it got started */
+      if (numServers != 1)
+        {
+        /* it didn't so bail out... */
+        return;
+        }
+
+      /* and close the IACP connection */
+      IACPShutdown(iacpConnectionToken, NullOptr);
+
+      }  /* end of not running if */
+
+    else  {  /* it is already running */
+      /* connect to it */
+      iacpConnectionToken = IACPConnect(
+		   &WSMToken,
+		   connectionFlags,
+		   NULL,
+		   NullOptr,
+		   &numServers);
+
+	 /* encapsulate a message telling WSM to come to the top */
+      hToTop = @record GenApplicationClass::MSG_GEN_BRING_TO_TOP();
+
+
+      /* send our message to calc */
+      IACPSendMessage(
+	    iacpConnectionToken,
+	    hToTop,
+	    TO_MODEL,
+	    NullHandle,  /* no return msg needed */
+	    IACPS_CLIENT);
+
+      /* close the connection */
+      IACPShutdown(iacpConnectionToken, NullOptr);
+
+      }  /* end of found it running else */
+
+
+}
+
+

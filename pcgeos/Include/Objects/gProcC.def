@@ -1,0 +1,782 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Objects
+FILE:		gProcC.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	5/92		Initial version
+
+DESCRIPTION:
+	Object definitions for GenProcessClass.   
+
+	$Id: gProcC.def,v 1.1 97/04/04 14:19:32 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__GPROCC
+
+StartLibrary	ui
+
+include ui.def
+include alb.def
+
+GenProcessClass	class	ProcessClass
+
+;------------------------------------------------------------------------------
+;	Methods which are exported & may be sent to any GenProcessClass process
+;------------------------------------------------------------------------------
+;
+; MSG_META_ATTACH	(Declared in metaClass.def, copied here for reference)
+;
+; MSG_META_ATTACH is sent to any Geode which has a process, when it is
+; first loaded.  It is also used in the object world to notify objects on
+; an "active list" that the application has been brought back up from a 
+; state file.  As the method is used for different purposes, the data
+; passed varies based on usage:
+;
+; As sent automatically by GeodeLoad when loading a geode in which 
+; GA_APPLICATION IS set (cx, dx values passed to GeodeLoad in di, bp):
+;
+; Context:	Attach/Detach mechanism
+; Source:	Kernel (GeodeLoad)
+; Destination:	Description here is for message being sent to GenProcessClass
+; Interception:	Often intercepted as a convenient place to perform general
+;		application initialization that should occur whether just
+;		being launched, coming back from state, or being launched in
+;		engine mode.  Note that the interface of the
+;		application will not be on screen (in fact, won't even be
+;		linked into the system wide generic tree) until the superclass
+;		is called.
+; Pass: 	dx	- Block handle to block of structure AppLaunchBlock
+;		  (MUST BE PASSED)
+; Return: 	nothing
+;		ax, cx, dx, bp - may be destroyed
+
+
+;MSG_META_DETACH	(Declared in metaClass.def, copied here for reference)
+;
+; MSG_META_DETACH is used to sever the links between an object and the
+; rest of the world.  The exact meaning of this depends on the type of object
+; being detached.  Sending a MSG_META_DETACH to an application causes the
+; application to exit.  Sending a MSG_META_DETACH to a generic object causes
+; the visual world to be broken down and links with the world to be severed.
+;
+; Context:	Attach/Detach mechanism
+; Source:	Unrestricted, though generally comes from Field as part of
+;		shutdown, or from process itself from within MSG_META_QUICK
+;		mechanism if no objections can be found to shutting the 
+;		application down.
+; Destination:	Description here is for message being sent to GenProcessClass
+; Interception:	May be intercepted to further delay the MSG_META_DETACH, by
+;		simply not calling the superclass with the passed data until
+;		later.
+; Pass: 	cx - caller's ID
+;		dx:bp - OD to send MSG_META_ACK to
+; Return: 	nothing
+;		ax, cx, dx, bp - may be destroyed
+;
+
+;------------------------------------------------------------------------------
+; Methods which may be intercepted & handled by subclasses of GenProcessClass
+;------------------------------------------------------------------------------
+
+MSG_GEN_PROCESS_RESTORE_FROM_STATE		message
+;
+; This is sent to the process itself from MSG_META_ATTACH, whenever the
+; application is being invoked as in RESTORE_FROM_STATE mode.
+; Data passed is the same as that in MSG_META_ATTACH.
+; The default handler fetches the application mode method,
+; currently MSG_GEN_PROCESS_OPEN_APPLICATION, as saved in the application
+; object, & sends that method to the process.
+; Note that the blocks passed need not be freed, as this is done by the
+; caller upon return of this routine.
+;
+; Context:	Attach/Detach mechanism
+; Source:	Default GenProcessClass handler for MSG_META_ATTACH
+; Destination:	self
+; Interception:	Intercepted generally only so that application can retrieve
+;		previously saved data out of the state block passed.
+; Pass: 	cx	- AppAttachFlags
+;		dx	- Handle of AppLaunchBlock, or 0 if none.
+;			  This block contains the name of any document file
+;			  passed into the application on invocation.
+;		bp	- Handle of extra state block, or 0 if none.
+;			  This is the same block as returned from
+;			  MSG_GEN_PROCESS_CLOSE_APPLICATION, in some previous
+;			  MSG_META_DETACH
+; Return: 	nothing
+;		AppLaunchBlock - preserved
+;		extra state block - preserved
+
+
+MSG_GEN_PROCESS_OPEN_APPLICATION		message
+;
+; This is sent to the process itself from MSG_META_ATTACH, whenever the
+; application is being restored to mode APPLICATION, or whenever it is being
+; invoked as in APPLICATION mode.  Data passed is the same as that in
+; MSG_META_ATTACH.  The default handler sets the GenApplication object USABLE,
+; and brings the UI up on screen.
+; This method may be intercepted to open up any data file passed, before
+; the UI for the application is actually set USABLE.  Note that the
+; blocks passed need not be freed, as this is done by the caller upon
+; return of this routine.
+;
+; Context:	This is the primary message to intercept if you want to
+;		know when your application is first coming up, after
+;		MSG_META_ATTACH itself (Is called from within MSG_META_ATTACH
+;		handler)
+; Source:	GenProcessClass default handler for MSG_META_ATTACH only.
+; Destination:	same object
+; Interception:	Frequently intercepted by an application's own process class
+;		to find out when an application is first coming alive in 
+;		the system.  You MUST pass this message on to the superclass,
+;		or the application will never come up.  Be aware that the
+;		entire UI tree for the application is the equivalent of
+;		NOT_USABLE before the superclass is called, & is USABLE &
+;		up on screen visually after it is called.  Thus, it is best
+;		to do non-UI related things, and changing of generic
+;		attributes & hints BEFORE calling the superclass.  You must
+;		wait until AFTER calling the superclass do perform any
+;		operations which require that objects be full USABLE to
+;		function, such as bringing up a dialog box.
+; Pass: 	cx	- AppAttachFlags
+;		dx	- Handle of AppLaunchBlock, or 0 if none.
+;		  	  This block contains the name of any document file
+;			  passed into the application on invocation.  Block
+;			  is freed by caller.
+;		bp	- Handle of extra state block, or 0 if none.
+;		  	  This is the same block as returned from
+;		  	  MSG_GEN_PROCESS_CLOSE_APPLICATION, in some previous
+;			  MSG_META_DETACH.  Block is freed by caller.
+; Return: 	nothing
+;		AppLaunchBlock - preserved
+;		extra state block - preserved
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_PROCESS_OPEN_ENGINE		message
+;
+; This is sent to the process itself from MSG_META_ATTACH, whenever the
+; application is being restored to mode ENGINE, or whenever it is being
+; invoked as in ENGINE mode.  Data passed is the same as that in
+; MSG_META_ATTACH.  There is no default handler.
+; This method may be intercepted to open up any data file passed, before
+; any ENGINE commands are delivered to the process.
+; Note that the blocks passed need not be freed, as this is done by the
+; caller upon return of this routine.
+;
+; Context:	Attach/Detach mechanism
+; Source:	GenProcessClass default handler for MSG_META_ATTACH only.
+; Destination:	same object
+; Interception:	Generally unecessary, though can be intercepted if notification
+;		of going into this mode is necessary.
+; Pass: 	cx	- AppAttachFlags
+;		dx	- Handle of AppLaunchBlock, or 0 if none.
+;			  This block contains the name of any document file
+;			  passed into the application on invocation.
+; Return: 	nothing
+;		AppLaunchBlock - preserved
+;		extra state block - preserved
+;
+
+MSG_GEN_PROCESS_CLOSE_APPLICATION	message
+; This method is sent to the app process from MSG_META_DETACH if
+; the application had been opened in application mode.
+;
+; Context:	Attach/Detach mechanism
+; Source:	GenProcessClass default handler for MSG_META_DETACH only
+; Destination:	Self
+; Interception:	Convenient place for code that needs to be executed before
+;		app exits, for non-engine mode cases.  Superclass should
+;		not be called, as the extra state block handle should be
+;		returned.  The default handler returns 0, for no extra
+;		state block.
+; Pass:		nothing
+; Return:	cx - handle of block to save (or 0 for none)
+;		     (*must* be unlocked, and *must* be swappable)
+
+
+MSG_GEN_PROCESS_CLOSE_ENGINE	message
+; This method is sent to the app process from MSG_META_DETACH if
+; the application had been opened in engine mode.
+;
+; Context:	Attach/Detach mechanism
+; Source:	GenProcessClass default handler for MSG_META_DETACH only
+; Destination:	Self
+; Interception:	Convenient place for code that needs to be executed before
+;		app exits, for engine mode cases. Superclass must be
+;		called.
+; Pass:		nothing
+; Return:	nothing
+
+MSG_GEN_PROCESS_CLOSE_CUSTOM	message
+; This method is sent to the app process from MSG_META_DETACH if
+; the application had been opened in some mode that is not APPLICATION or
+; ENGINE.  This is provided in case the application uses some custom mode
+; that GenProcessClass doesn't know about.  Note that if application object
+; is attached, you'll get two MSG_GEN_PROCESS_CLOSE_CUSTOM messages.  The
+; state block will only be used for the first one, it is ignored for the
+; second (state block can be harmlessly return to both).
+;
+; NOTE:  Early 2.0 versions required the following to be returned (If you are
+;	 dependent only on a version of the library dated before 5/14/93,
+;	 you will need to return this info):
+;
+; 		cx - handle of block to save (or 0 for none)
+;
+; Context:	Attach/Detach mechanism
+; Source:	GenProcessClass default handler for MSG_META_DETACH only
+; Destination:	Self
+; Interception:	Convenient place for code that needs to be executed before
+;		app exits, for custom application mode cases.
+; Pass:		nothing
+; Return:	nothing
+
+
+MSG_GEN_PROCESS_ATTACH_TO_PASSED_STATE_FILE	message
+;
+; Default method for attaching process to a passed state file.  This
+; message is sent when either restoring from state, or when detaching.
+; May be subclassed to provide forced state behavior.
+;
+; Context:	Attach/Detach mechanism
+; Source:	GenProcessClass default handler for MSG_META_ATTACH
+; Destination:	self
+; Interception:	May be intercepted to force use of a particular state file
+;		(by changing the name of the state file to use before calling
+;		superclass.)
+; Pass: 	cx - AppAttachMode (matches that in AppLaunchBlock)
+;		dx - Block handle to block of structure AppLaunchBlock
+; Return: 	ax - handle of extra block of state data (0 for none)
+;		AppLaunchBlock - preserved
+;
+
+MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE	message
+;
+; Default method for creating a new state file name, opening the
+; new file & stuffing the name back into the AppAttachBlock.  Called
+; from within UI_AttachToStateFile if no state file was passed.  Can
+; be subclassed to provide forced state file usage/different naming scheme,
+; etc.
+;
+; Context:	Attach/Detach mechanism
+; Source:	GenProcessClass default handler for MSG_META_DETACH, if not
+;		quitting.
+; Destination:	self
+; Interception:	May be intercepted to change name of state file to create
+; Pass: 	dx - Block handle to block of structure AppInstanceReference
+;		CurPath	- Set to state directory
+; Return: 	ax - VM file handle (0 if you want no state file)
+;
+
+MSG_GEN_PROCESS_INSTALL_TOKEN		message
+;
+; This is sent by the desktop to a process to get that process to install
+; its token and moniker list into the token database
+;
+; Context:	Token Database support message
+; Source:	Generally whatever geode launched this application in 
+;		engine mode (Will commonly be GeoManager)
+; Destination:	GenProcessClass object of any geode launched in engine mode.
+; Interception:	May be intercepted to install additional tokens.  Default
+;		behavior installs only application icon.
+; Pass:		nothing
+; Return:	nothing
+;
+
+GenProcessMessages = GenProcessMessages+1
+
+MSG_GEN_PROCESS_GET_PARENT_FIELD	message
+;
+; This is sent by process-libraries (like the spooler) to find out which field
+; to start up on (the same field as their first client).
+;
+; Context:	GenProcessClass utility message
+; Source:	Unrestricted
+; Destination:	GenProcessCLass object
+; Interception:	Not necessary, as default behavior implements utility.
+; Pass: 	nothing
+; Return: 	^lcx:dx - parent field
+;
+
+MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST	message
+;
+; Sends message passed to GenApplication GCNList specified.  The handler here
+; merely sends the request on to GenApplication using MSG_META_GCN_LIST_SEND.
+; Controllers should use this message, however, over direct communication
+; with the application object, to ensure orderly updating of the list status
+; event.  One such failure case which is fixed is two target text objects,
+; one run by the process thread in a view, the other a GenText run by the
+; ui thread.  If the GenText has the target, & the user clicks quickly on
+; view then GenText, the GenText may process both LOST & GAINED
+; messages before the process text object gets the GAINED & LOST pair.  If
+; both objects were to send MSG_META_GCN_LIST_SEND directly to the
+; GenApplication object, the GenText's status would be wiped out by the
+; subsequent reporting by the process text object.  This problem is avoided
+; by having both process & UI objects call here to pass status update info.
+; This works because target changes start out ordered in the UI thread, & that
+; order is passed on to the process thread in either of the two cases.
+;
+; Context:	UI Controller Update mechanism
+; Source:	Any object wishing to update an application GCNList.
+; 		Don't use queue-order altering flags such as MF_PLACE_IN_FRONT
+;		when sending this message.   As a convention must be
+;		established for the  flag MF_FORCE_QUEUE in order to ensure
+;		orderly results, the convention  in use is this:
+;		Don't pass it.  A typical call should use only the MF_STACK,
+;		MF_FIXUP_DS, and/or FIXUP_ES flags, if needed.
+; Destination:	GenProcessClass (app process) only
+; Interception:	Should not generally be intercepted, as GenProcessClass provides 
+;		correct behavior.  If intercepted & not sent onto superclass,
+;		event passed must be destroyed & data block reference count
+;		decremented, to avoid leaving junk around on the heap.
+; Pass:		dx	- size GCNListMessageParams
+; 		bp	- ptr to GCNListMessageParams
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+;------------------------------------------------------------------------------
+;	Private methods to GenProcessClass
+;------------------------------------------------------------------------------
+
+MSG_GEN_PROCESS_REAL_DETACH		message	private
+;
+; Used internally to the UI only!
+;
+; MSG_GEN_PROCESS_REAL_DETACH is used by UI_ack to flush the event queue before
+; calling ObjDisassocVMFile.
+;
+; Context:	Attach/Detach mechanism
+; Source:	Self, from within default handler for MSG_META_ACK 
+; Destination:	Self
+; Interception:	Not a good idea.  This is a private message & may not exist
+;		in future versions of the UI library.
+; Pass:		dx:bp - original ackOD sent to MSG_META_DETACH
+; Return:	nothing
+;		ax, cx, dx, bp - may be destroyed
+
+MSG_GEN_PROCESS_FINAL_DETACH		message	private
+;
+; Used internally to the UI only!
+;
+; MSG_GEN_PROCESS_FINAL_DETACH is sent after we have done all our state file
+; nonsense, and checks to see if we are the last app, and if so, shuts down
+; the system.
+;
+; Context:	Attach/Detach mechanism
+; Source:	Self, from within default handlers for, depending on situation,
+;		MSG_META_QUIT_ACK, MSG_GEN_PROCESS_REAL_DETACH or MSG_META_ACK.
+; Destination:	Self
+; Interception:	Not a good idea.  This is a private message & may not exist
+;		in future versions of the UI library.
+; Pass:		dx:bp	- original ackOD sent to MSG_META_DETACH
+; Return:	nothing
+;		ax, cx, dx, bp - may be destroyed
+
+
+
+;------------------------------------------------------------------------------
+;	Methods to implement undo functionality in GenProcessClass
+;------------------------------------------------------------------------------
+
+MSG_GEN_PROCESS_UNDO_START_CHAIN	message
+;
+;	This message notifies the process of the start of an undoable
+;	action. Note that all this message do is increment a count --
+;	a new undoable action is created when the count goes from
+;	0 to 1. This allows a function to perform a number of undoable
+;	actions, but to have them all grouped as a single undoable action.
+;
+;	Context: Undo mechanism
+;	Source:  Any object wanting to register an action for undo.
+;	Destination: GenProcessClass (app process) only
+;	Interception: In general, should not be intercepted
+;	Pass:   ss:bp - StartUndoableActionStruct
+;	Return: nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+StartUndoChainStruct	struct
+	SUCS_owner		optr
+	; The owner of this action
+
+	SUCS_title		optr
+	; The null-terminated title of this action.
+	;
+	; If null, then the title of the undo action will be the title
+	; passed with the next UNDO_START_CHAIN.
+
+StartUndoChainStruct	ends
+
+MSG_GEN_PROCESS_UNDO_END_CHAIN	message
+;
+;	This message notifies the process of the end of an undoable
+;	action. Note that all this message does is decrement a count
+;	the current undo action is terminated when the count goes from
+;	1 to 0. This allows a function to perform a number of undoable
+;	actions, but to have them all grouped as a single undoable action.
+;
+;	Context: Undo mechanism
+;	Source:  Any object wanting to register an action for undo.
+;	Destination: GenProcessClass (app process) only
+;	Interception: In general, should not be intercepted
+;	Pass:	cx - non-zero if you want to delete the chain if it has
+;		     	no actions 
+;		     zero if the chain is OK without actions (actions will
+;			be added later	
+;	Return: nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_PROCESS_UNDO_ADD_ACTION		message
+;
+;	This message adds a new undo action to the current undo chain.
+;
+;	Context: Undo mechanism
+;	Source: Any object wanting to register an action for undo
+;	Destination: GenProcessClass
+;	Interception: In general, should not be intercepted
+;	Pass:	ss:bp - ptr to AddUndoActionStruct
+;	Return:
+;		if ignoring undo messages
+;			AX.BP - 0
+;		else if UAS_dataType = UADT_PTR, UADT_VMCHAIN
+;			AX.BP - VMChain/DBItem created
+;		else
+;			nothing (ax, bp destroyed)
+;
+;		cx, dx - destroyed
+;
+
+UndoActionDataType	etype	word,0,2
+	UADT_FLAGS	enum	UndoActionDataType
+	; The passed data is of type UndoActionFlags
+
+	UADT_PTR	enum	UndoActionDataType
+	; The passed data is of type UndoActionDataPtr
+
+	UADT_VM_CHAIN	enum	UndoActionDataType
+	; The passed data is of type UndoActionVMChain
+
+	UADT_OPTR	enum	UndoActionDataType
+	; This is not a valid type to pass to MSG_GEN_PROCESS_ADD_ACTION -
+	; it is used by the undo code when playing back an action of type
+	; UADT_PTR.
+	;
+	; If MSG_GEN_PROCESS_UNDO_ADD_ACTION is called with an action of
+	; type UADT_PTR, if the action is played back, the data will
+	; be returned to the object with type UADT_OPTR (via MSG_META_UNDO)
+	;
+	; Calling MSG_GEN_PROCESS_ADD_ACTION can cause previously-sent
+	; actions to move, so the optr should be re-dereferenced after
+	; sending this message.	
+
+UndoActionDataFlags	struct
+	UADF_flags	dword
+	UADF_extraFlags	word
+UndoActionDataFlags	ends
+
+UndoActionDataPtr	struct
+	UADP_ptr	fptr
+	UADP_size	word
+UndoActionDataPtr	ends
+
+UndoActionDataVMChain	struct
+	UADVMC_vmChain	dword
+	UADVMC_file	hptr
+	; This is filled in by the undo code for MSG_META_UNDO.
+	; VM Chains passed to MSG_GEN_PROCESS_UNDO_ADD_ACTION should lie
+	; in the undo file (which can be obtained by sending
+	; MSG_GEN_PROCESS_UNDO_GET_FILE)
+UndoActionDataVMChain	ends
+
+UndoActionDataOptr	struct
+	UADO_optr	optr
+UndoActionDataOptr	ends
+
+UndoActionDataUnion	union
+	UADU_flags	UndoActionDataFlags
+	UADU_ptr	UndoActionDataPtr
+	UADU_vmChain	UndoActionDataVMChain
+	UADU_optr	UndoActionDataOptr
+UndoActionDataUnion	ends
+
+UndoActionStruct	struct
+	UAS_dataType	UndoActionDataType
+	; The type of data passed in UndoActionDataUnion
+
+	UAS_data	UndoActionDataUnion
+	; The data to be stored with the action
+
+	UAS_appType	dword		;Type of action we are undoing
+	; Two extra words of data to be sent with MSG_META_CLIPBOARD_UNDO.
+	; This is usually used by objects to identify the type of
+	; action they are supposed to undo.
+
+UndoActionStruct	ends
+AddUndoActionFlags	record
+	AUAF_NOTIFY_BEFORE_FREEING:1
+	; Set if you want to be notified when (before) the associated action is
+	; freed.
+	AUAF_NOTIFY_IF_FREED_WITHOUT_BEING_PLAYED_BACK:1
+	; Set if you want to be notified if the action is freed without being
+	; played back.
+	:14
+AddUndoActionFlags	end
+AddUndoActionStruct	struct
+	AUAS_data	UndoActionStruct	<>
+	AUAS_output	optr
+	; The object to be sent MSG_META_UNDO
+
+	AUAS_flags	AddUndoActionFlags	<>
+	even
+AddUndoActionStruct	ends
+
+MSG_GEN_PROCESS_UNDO_GET_FILE		message
+;
+;	Get the file handle of the undo VM file. This is useful for accessing
+;	an existing undo item.
+;
+;	Context: Undo mechanism
+;	Source: Any object wanting to access the undo file
+;	Interception: Should not be intercepted
+;	Pass: nothing
+;	Return: ax - File handle of VM file with undo information
+;		cx, dx, bp - unchanged
+;
+
+global	GENPROCESSUNDOGETFILE:far
+GenProcessUndoGetFile	equ	GENPROCESSUNDOGETFILE
+;
+;	Returns the handle of the file that holds undo information.
+;
+;	Pass: nothing
+;	Returns: ax = file handle of VM file that holds undo actions
+;
+
+MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS	message
+;
+;	This message flushes the current undo chain (frees all undo
+;	actions, notifies edit control that there is no undo item).
+;
+;	Context: Undo mechanism
+;	Source: Any object using undo 
+;	Interceptions: Should not be intercepted
+;	Pass: nothing
+;	Return: nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+NULL_UNDO_CONTEXT		equ	0
+MSG_GEN_PROCESS_UNDO_SET_CONTEXT	message
+;
+;	This message sets the current undo context. This allows the
+;	application to have separate undo chains associated with
+;	various documents or modes. This should be sent out before any
+;	other undo related messages.
+;
+;	NOTE: Passing NULL_CONTEXT as the new context will trigger some
+;	      zealous EC code if any other undo messages are sent while
+;	      the context is NULL.
+;	
+;	Context: Undo mechanism
+;	Source: Any object using undo
+;	Interceptions: Generally, should not be intercepted. Apps wanting
+;		       to override the default behavior should at least
+;		       flush out the current undo actions, as they will
+;		       probably not be valid in the new context.
+;	Pass: cx.dx - new context (this has no meaning to the undo mechanism
+;				   -- it's just a value)
+;	Return: cx.dx - old context
+;		ax, bp - destroyed
+
+MSG_GEN_PROCESS_UNDO_GET_CONTEXT	message
+;
+;	This message gets the current undo context. 
+;
+;	Context: Undo mechanism
+;	Source: Any object using undo
+;	Interceptions: Should not be intercepted
+;	Pass: nothing
+;	Return: cx.dx - current context
+;		ax, bp - destroyed
+
+MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN	message
+;
+;	This message plays back the current undo chain, one action at a time.
+;	It simultaneously creates a "redo" chain, so the undone action can
+;	be redone.
+;
+;	Context: Undo mechanism
+;	Source: Edit control
+;	Interceptions: Should not be intercepted
+;	Pass: nothing
+;	Return: nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS	message
+;
+;  	This message causes a process to not accept any undo messages.
+;
+;	Context: Undo mechanism
+;	Source: Any object
+;	Interceptions: Should not be intercepted
+;	Pass: cx - non-zero if you want to flush the queue
+;	Return: nothing
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS	message
+;
+;  	This message causes a process to accept undo messages again.
+;
+;	Context: Undo mechanism
+;	Source: Any object
+;	Interceptions: Should not be intercepted
+;	Pass: nothing
+;	Return: nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING	message
+;
+;	This message checks to see if the system is currently ignoring
+;	undo actions.
+;
+;	Context: Undo mechanism
+;	Source: Any object
+;	Interceptions: Should not be intercepted
+;	Pass: nothing
+;	Return: ax - non-zero if ignoring
+;		cx, dx, bp - unchanged
+;
+
+MSG_GEN_PROCESS_UNDO_ABORT_CHAIN	message
+;
+;	This message aborts the current undo chain, which means that all
+;	the actions already added to the current chain will be nuked,
+;	and "ignore" will be turned on until the chain is ended (we may
+;	be deep within nested undo chains, so it ignores until the outermost
+;	undo chain is ended).
+;
+;	This has no effect if you are ignoring undo actions.
+;
+;	Context: Undo mechanism
+;	Source: Any object
+;	Interceptions: Should not be intercepted
+;	Pass: nothing
+;	Return: nothing
+;	Destroyed: ax, cx, dx, bp
+;
+;
+
+global	GENPROCESSUNDOCHECKIFIGNORING:far
+GenProcessUndoCheckIfIgnoring	equ	GENPROCESSUNDOCHECKIFIGNORING
+;
+;	Returns ax non-zero if currently ignoring actions
+;
+;	Pass: nothing
+;	Return: ax - 0 if not ignoring
+;		     non-zero if ignoring
+;	Destroyed: nothing
+;
+
+;MSG_META_UNDO				message	MetaUIMessages
+;MSG_META_UNDO_FREEING_ACTION		message	MetaUIMessages
+;
+; see documentation in ui.def
+
+;------------------------------------------------------------------------------
+;	Methods added out of place to avoid having to up the UI protocol
+;------------------------------------------------------------------------------
+
+protominor UINewForZoomer
+
+MSG_GEN_PROCESS_TRANSITION_FROM_ENGINE_TO_APPLICATION_MODE	message
+;
+; This is sent to the process when, yes, it has been determined that it should
+; transition from ENGINE to APPLICATION mode.  The existance of
+; TEMP_GEN_APPLICATION_EXTRA_STATE_BLOCK causes the ensuing 
+; MSG_GEN_PROCESS_OPEN_APPLICATION to have the AAF_RESTORING_FROM_STATE bit
+; set, & the extra state block passed.  Note that the blocks passed need
+; not be freed, as this is done by the caller of this method.
+;
+; Context:	Part of app mode mechanism
+; Source:	Application object when it's been determined that the app
+;		should transition to app mode.
+; Destination:	process
+; Interception:	Not intended to be intercepted.  Default GenProcessClass
+;		handling is simply to retrieve any saved state block, set
+;		the AppAtachFlags, & issue a MSG_GEN_PROCESS_OPEN_APPLICATION.
+; Pass: 	cx	- AppAttachFlags
+;		dx	- Handle of AppLaunchBlock, or 0 if none.
+;		  	  This block contains the name of any document file
+;			  passed into the application on invocation.  Block
+;			  is freed by caller.
+; Return: 	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+protoreset
+
+;------------------------------------------------------------------------------
+;	Constants & Structures
+;------------------------------------------------------------------------------
+
+;
+; Flags passed in MSG_GEN_PROCESS_RESTORE_FROM_STATE, MSG_GEN_PROCESS_OPEN_APPLICATION,
+; MSG_GEN_PROCESS_OPEN_ENGINE:
+;
+AppAttachFlags	record
+	AAF_RESTORING_FROM_STATE:1
+	; Set if the application is coming up with "state", i.e. it is either
+	; restoring from a given state file, or re-entering application mode
+	; after having been there before in the same session.  The UI trees
+	; will be in whatever state they were left in, which may or may not
+	; match the compiled UI tree, depending on what the app does with
+	; its UI tree during run-time.  Test this flag for FALSE to see if
+	; starting up "fresh", i.e. without any existing state.  If TRUE,
+	; the application should try to just pick up where it left off, using
+	; the current state of its object as a guideline.  The UI supports
+	; this flag by not calling MSG_META_LOAD_OPTIONS, and ignoring
+	; "ON_STARTUP" hints.
+
+	AAF_STATE_FILE_PASSED:1
+        ; Set if the application is being restoring from the state file passed
+	; in AppLaunchBlock.  This happens if the appMode passed MSG_META_ATTACH
+	; is MSG_GEN_PROCESS_RESTORE_FROM_STATE, in which case the passed state
+	; file is attached to, & the actual appMode restored from the appMode
+	; instance data of the application object.  If set, the flag
+	; AAF_RESTORING_FROM_STATE will also be set.
+
+	AAF_DATA_FILE_PASSED:1
+	; Set if the passed AppLaunchBlock contains the name of a data file
+	; that should be opened.
+
+	AAF_RESTORING_FROM_QUIT:1
+	; Set if application was in the process of quitting, got to engine
+	; mode, & is now being started back up into application mode again.
+	; If set, the AAF_RESTORING_FROM_STATE bit will also be set, since we
+	; generally would like to come back up in whatever state were were in,
+	; & deal with any extra state block returned in the CLOSE_APPLICATION,
+	; etc.  This bit is sometimes needed, however, to distinguish this
+	; case, as the act of QUITTING itself reverts some UI to is virgin
+	; state -- such as is the case with the document control & open
+	; documents -- after a QUIT, there are no open documents.  The
+	; document control therefore responds to this bit being set by
+	; starting up documents just as it would were this a fresh launch.
+
+	:12
+AppAttachFlags	end
+
+
+GenProcessClass	endc
+
+EndLibrary	ui

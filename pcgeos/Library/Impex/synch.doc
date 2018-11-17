@@ -1,0 +1,140 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		synch.doc
+
+AUTHOR:		jimmy lefkowitz
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	8/ 9/91		Initial version.
+
+DESCRIPTION:	this file is a description of the synchronization
+		issues that are dealt with in the impex library
+
+	$Id: synch.doc,v 1.1.36.1 97/03/29 04:02:53 canavese Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+	Here is the chain of events for a normal translation:
+
+		a) spawn an event driven thread
+	
+		b) send off message to do the translation
+			after each step is done the next message
+			is sent on with a FORCE_QUEUE do to the
+			next step unless errors occured
+
+		c) when the last step is don e a MSG_DETACH is sent to the
+			thread 
+
+		d) when the thread has exited a MSK_ACK is sent to 
+			the impex object 
+
+		e) MSG_DETACH_COMPLETE is sent to the Impex Object
+			all memory and stuff is freed and we are done
+
+	trouble starts up when the Impex Object gets a MSG_DETACH while
+	we are in the middle of a translation, there are many
+	possible senarios, most of which have straight forward solutions.
+
+	here's what happens:
+
+		a) spawn an event driven thread
+
+		b) start up the translation
+
+		c) Impex Object gets a MSG_DETACH
+			{
+			/*this Init routine allcoates a local memory
+			 *chunk, and keeps track of the detach count
+			 *whici it initialized to 1 */
+				ObjInitDetach 
+				for each thread still running under that app
+				{
+					send that thread a MSG_DETACH
+					ObjIncDetach /*increment detach count*/
+				}
+				ObjEnableDetach /*decrement detach count*/
+			}
+
+		d) as each thread cleans up and detaches a MSG_ACK is
+			sent to the Impex Object and when the number
+			or ACKs recieved equals the number of DETACHes
+			sent out in step c) above, the Impex Object getes
+			a MSG_DETACH_COMPLETE
+
+
+	this is all pretty straight forward, but there are some ugly
+	senarios too.
+
+	if, at the moment the Impex Object recieves a MSG_DETACH
+	one of its threads is in the middle of its own DETACH then
+	we have to be careful not to send a DETACH to that thread
+	after it has exited and before we get the ACK
+
+	we also have to be careful not to send the ACK to the superclass
+	of ImpexClass if we are just DETACHing a thread without 
+	DETACHing the ImpexObject itself which is the normal case of running
+	a translation all the way through without the App DETACHing
+
+	I used two state variables for this purpose and I use
+	MemPLock and MemUnlockV when setting these state
+	variables, they are ITS_APP_DETACH and ITS_THREAD_DETACH
+
+	if the ITS_APP_DETACH bit is set (for any given thread), 
+	this means that we are doing a DETACH of the ImpexObject and 
+	that thread must send the its MSG_ACK to the superclass, if the
+	ITS_THREAD_DETACH bit is set, then we have gotton to the
+	MSG_DETACH through the normal chain of events rather than
+	an interreupted one, so the routine at c) knows not to
+	send on an additional MSG_DETACH (I'm not 100% sure this is a
+	problem, but I have a hunch :), in the ACK routine I call off to the
+	superclass if and only if the ITS_APP_DETACH bit is on for that thread.
+
+
+	this all works great if i just shut down the App
+	while threads are still running, but I seem to have
+	problems when I use the express menu to exit PC/GEOS
+	while threads are still running 
+	
+		 CANNOT_UNRELOCATE_UNKNOWN_RESOURCE_HANDL
+
+	is what i get.
+
+
+	helpful hints for debugging:
+
+		use the freeze commonad to make a thread very low priority
+		so that you can see what happens if the threads exit in
+		different orders
+
+		put break points at MSG_DETACH handlers for both the
+		thread and the object, and at MSG_DETACH_COMPLETE and
+		at MSG_ACK handlers and watch and see what order things
+		are happening in. The MAG_DETACH_COMPLETE should not happen
+		until all the MSG_ACKs have been processed
+
+		it you send the MSK_ACK on to the superclass before you
+		have called ObjInitDetach you will get an LMEM_CHUNK_NOT_FOUND
+		(or something like that) because a chunk  hasn't been allocated
+		 if you try to send a thread a message and thread has exited 
+		then you get an ILLEGAL_HANDLE in the call to ObjMessage
+
+		if you don't send out enough ACKs, that is, one for each call
+		to ObjIncDetach that was made, to the superclass the system
+		will hang because the MSG_DETACH_COMPLETE cannot be sent out
+		until it gets all the ACKs and the system does not die but
+		just hangs (Deadlock is a bad thing)
+
+		if the MSG_DETACH_COMPLETE finishes before the last thread
+		exits, the system will die when it tries to send the ACK
+		out to the Object that has already exited (I believe the
+		usual error in this case is BAD_CLASS, although you could
+		also get ILLEGAL_HANDLE or some such since the OD to which
+		the ACK is being sent is no good).

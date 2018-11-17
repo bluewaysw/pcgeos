@@ -1,0 +1,495 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Tools/scripts -- File Installation
+#
+# FILE: 	
+# AUTHOR: 	Adam de Boor, July 24, 1989
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ardeb	7/24/89		Initial Revision
+#	jcw	 8/17/92	Changes for remote installation
+#
+# DESCRIPTION:
+#	This shell script checks files back in again.
+#
+# This is just a test of the ginstall stuff
+#
+#
+#	$Id: x,v 1.5 92/08/21 14:55:43 root Exp $
+#
+###############################################################################
+BINDIR=/usr/public
+case "$-" in *x*) x=x;; esac
+#
+# Common code -- more trouble than it's worth to keep it in a separate
+# file.
+#
+cwd=`pwd`
+rootdir=`expr "$cwd" : '^\(.*/'${ROOTDIR-pcgeos}'\).*$'`
+idir=$rootdir/`expr "$cwd" : $rootdir'/[^/]*/\(.*\)$'`
+ddir=$rootdir/`expr "$cwd" : $rootdir'/\([^/]*\)'`
+
+#
+# Define the directory where the files to update will be located
+#
+# Here's what it is on carbon
+#
+rdir=/staff/pcgeos/RInstall
+
+if [ "$remote" ]; then
+    #
+    # Here's what it is on remote systems
+    #
+    rdir=/n/carbon/pcgeos/RInstall
+fi
+
+if [ -f $ddir/BRANCH ]; then
+    read branch < $ddir/BRANCH
+    branchinparens=" (branch $branch)"
+fi
+
+files="" args="" nomsg="" backmerge="" notrunkmerge=""
+for i in "$@"; do
+    case $i in
+    	-m*|-r*) args="$args '$i'"
+	    	;;
+	-b*)	backmerge="`expr x$i : x-b'\(.*\)$'`"
+		;;
+	-x)	x=x; set -x
+		;;
+	-M)	notrunkmerge=yes
+		;;
+    	-*) 	args="$args '$i'"
+	    	nomsg="$nomsg '$i'"
+	    	;;
+	*)  	files="$files $i"
+	    	;;
+    esac
+done
+
+#
+# This is the program to run to perform lock add/remove/lookup
+#
+if [ "$remote" ]; then
+    #
+    # Use the remote-mounted file-system
+    # Strip the /staff off the front and replace it with /n/carbon
+    #
+    idir=/n/carbon`expr "$idir" : '.*\(/pcgeos/.*\)$'`
+
+    echo "Install from remote location."
+    echo "    Installing to: $idir"
+    
+    #
+    # Use the remote one in order to get paths fixed up
+    #
+    glog=rglog
+fi
+
+for i in $files; do
+    if [ ! -r $i ]; then
+	echo "File $i does not exist"
+    else
+    	#
+	# Separate passed filename into file and directory components w.r.t.
+	# the installed copy. This makes various manipulations later easier.
+	# $tail is the file portion, $dir is the directory in the installed
+	# tree in which the file will go. $subdir is used if working on a branch
+	# and contains the portion of the installed path below the root.
+	#
+	case $i in
+	    */*) tail=`basename $i ""`
+		 dir=$idir/`expr $i : '\(.*\)/[^/]*$'`
+		 ;;
+	    *)	 tail=$i
+		 dir=$idir
+		 ;;
+	esac
+
+    	subdir=`expr "$dir" : $rootdir/'\(.*\)$'`
+	rcsfile=$dir/RCS/$tail,v
+	lockfile=$dir/$tail-LOCK
+
+	if [ ! -f $rcsfile ]; then
+	    #
+	    # If the RCS file doesn't exist, this is the first time the
+	    # thing has been checked in, so do it in style.
+	    #
+	    case $tail in
+		dependencies.mk | Makefile )
+		    #
+		    # A generated makefile or dependencies file -- just
+		    # move it to the installed directory.
+		    #
+		    mv -f $i $dir/$tail
+		    chmod -w $dir/$tail
+		    ;;
+		* )
+		    #
+		    # See if the thing was generated from a template. If
+		    # so, the Id string will be for a .temp file, not a .def
+		    #
+		    if egrep -s '\$ *Id: [^ ]+\.temp,v' $i; then
+			mv -f $i $dir/$tail
+			chmod -w $dir/$tail
+		    elif egrep -s '\$ *Id[:$]' $i; then
+			if eval "ci $args $rcsfile $i"; then
+			    co $rcsfile $idir/$i
+			    if [ "$branch" ]; then
+				#
+				# Working on a branch -- create a named
+				# branch as well. cannot use -n option to
+				# ci as that names the revision, not the
+				# branch.
+				#
+				ci -f1.1.1 -m"Initial revision for $branch" $idir/$i $rcsfile
+				rcs -n$branch:1.1.1 $rcsfile
+				co $rcsfile $idir/$i
+			    fi
+			fi
+		    else
+			echo "$0: $i has no Id token in it and will wreak"
+			echo "havok later on. Please add one now"
+		    fi
+		    ;;
+	    esac
+
+	    if [ "$remote" ]; then
+	    	#
+		# Special handling for install from a remote syste
+		#
+		q=q
+	    else
+	        #
+		# It's not an install done from a remote system
+		#
+
+		#
+		# We can't handle branches right now
+		#
+		if [ "$branch" ]; then
+		    #
+		    # Something special to handle installs on a branch
+		    #
+		    q=q
+		else
+		    #
+		    # Check for the network connection being down. If it is 
+		    # then we want to touch a file that has a name which 
+		    # indicates what needs to be copied over.
+		    #
+		    netup=`/usr/etc/ping tungsten 2`
+		    netup=`expr match "$netup" .*alive`
+
+		    if [ "$netup" ]; then
+		    	#
+			# The network is up, copy the file...
+			#
+			tdir=/n/tungsten`expr "$dir" : '.*\(/pcgeos/.*\)$'`
+
+			echo "Updating remote host: tungsten..."
+			echo "    Installing: $tdir/$tail"
+			rm -f $tdir/$tail
+			cp -p $dir/$tail $tdir/$tail
+		    else
+			#
+			# Place a signal in the remote-site update directory 
+			# noting that this file has changed.
+			#
+			echo "Remote host down: tungsten..."
+			echo "    Queuing install for later: $dir/$tail"
+
+			iname=$rdir/`echo $dir/$tail | tr '/' '\!'`
+			touch $iname
+		    fi
+		fi
+	    fi
+	#
+	# See if the lock file exists for the file we're
+	# trying to install. If not, we're OK and can proceed.
+	#
+	elif $BINDIR/lockdir $lockfile < /dev/null >&2; then
+	    rmfiles=$lockfile
+	    trap 's=$?; rm -f $rmfiles; echo $0: aborting install ; trap 0; exit $s' 0 1 2 3 15
+	    trap "rm -f $rmfiles; trap 0 1 2 3 15 31; continue" 31
+	    continue="kill -31 $$"
+
+	    head="`(IFS=' 	;'; read q id; echo $id) < $rcsfile`"
+
+	    if [ "$branch" ]; then
+		realhead=$head
+		head=`rlog -r$branch $rcsfile | egrep '^revision' | (read q id; echo $id)`
+	    fi
+	    id="`egrep '\\$ *Id:' $i`"
+	    if [ ! "$id" ]; then
+		echo "No Id token in $i."
+		echo -n "Install as head revision? [yn](n) "
+		read ans
+		case "$ans" in
+		    [yY]*)  ;;
+		    *)	    echo "Install of $i aborted."; $continue ;;
+		esac
+		rev="$head"
+	    else
+		rev=`expr "$id" : '.*Id: [^ ]* \([0-9.]*\) '`
+	    fi
+	    #
+	    # Find anyone else who has the thing checked out and notify
+	    # them of its installation. 
+	    #
+	    others=`${glog-glog} lookup $i`
+	    #
+	    # If glog failed, we need to tell the user whatever message
+	    # came back and move on to the next file
+	    #
+	    if [ "$?" -ne 0 ]; then
+		echo $others
+		$continue
+	    fi
+	    #
+	    # Nuke the user from the list of people with locks on the file
+	    #
+	    others=`echo $others | sed -e s/$USER//`
+	    if [ "$others" ]; then
+		    echo "
+This message brought to you by ginstall
+
+$USER" | mail -s "$dir/$tail installed${branchinparens}. Merge thyself" $others
+	    fi
+	    if [ "$rev" != "$head" ]; then
+		#
+		# Need to merge the sucker. Do so explicitly w/o checking
+		# the thing in on a branch. We can then determine if there
+		# are overlaps and allow the user to clear them out before
+		# we check the file in finally.
+		#
+    	    	${BINDIR}/mergeAndEdit $rcsfile $i $rev $head
+    	    	case $? in
+		    0) ;;
+		    *) $continue ;;
+    	    	esac
+	    fi
+	    #
+	    # We've either got the head revision or merged in any changes
+	    # to get to it from where we were -- check the thing
+	    # in. Note that we've got to lock the thing to be able
+	    # to check it in.
+	    #
+	    if rcs -l$branch $rcsfile; then
+		if eval "ci $args $rcsfile $i"; then
+		    : true
+		else
+		    #check-in unsuccessful -- unlock the thing
+		    rcs -u$branch $rcsfile
+		    if [ ! -f $i ]; then
+			# check-in failed because no changes were made, so
+			# remove the lock on the thing.
+			${glog-glog} remove $i
+		    fi
+		    $continue
+		fi
+    	    else
+	    	$continue
+	    fi
+
+	    #
+	    # If all that went ok, check the thing back out into the
+	    # installed-source directory.
+	    #
+	    if [ ! "$notrunkmerge" -a "$branch" ]; then
+		#
+		# A bit more work to do if we were operating on a
+		# branch, as we need to merge the changes into the
+		# trunk. XXX: look for errors here?
+		#
+		IFS="."; set -$x $rev; IFS=" 	"
+
+    	    	# extract the new revision again, returning the ID # to the
+		# common ancestor's ID so we don't get bogus overlaps...
+		# need to use head -1 to deal with initial revision on branch
+		# having the ancestor's $Id when it was created
+    	    	newrev=$1.$2.$3.`expr $4 + 1`
+		idstring=`egrep '\\$Id.* '$1'\.'$2' ' $rcsfile | head -1`
+    	    	co -r$branch -p $rcsfile |
+		    sed -e '/\$Id/s|^.*$|'"$idstring"'|' > $i
+
+		${BINDIR}/mergeAndEdit $rcsfile $i $1.$2 $realhead
+		case $? in
+		    0)  if rcs -l $rcsfile; then
+			    if ci -m"incorporating changes from $newrev" $i $rcsfile; then
+				: true
+			    else
+				rcs -u $rcsfile
+				$continue
+			    fi
+			else
+			    $continue
+    	    	    	fi
+			#
+			# If the file exists in the branch-installed tree,
+			# check it out there as well.
+			#
+			if [ -f $rootdir/$branch/$subdir/$tail ]; then
+			    co -r$branch $rcsfile $rootdir/$branch/$subdir/$tail
+			fi
+			;;
+    	    	    *)
+		    	$continue
+			;;
+		esac
+		co $rcsfile $idir/$i
+	    elif [ "$branch" ]; then
+		# XXX: mark the file so the changes don't get merged in
+		# later on...
+		if [ -f $rootdir/$branch/$subdir/$tail ]; then
+		    co -r$branch $rcsfile $rootdir/$branch/$subdir/$tail
+		fi
+	    else
+		co $rcsfile $idir/$i
+	    fi
+	    
+	    ${glog-glog} remove $i
+
+    	    #
+	    # If the dickhead has requested back-merging to another branch,
+	    # deal with it now.
+	    #
+	    if [ "$backmerge" ]; then
+    	    	#
+    	    	# Locate the head of the branch we're merging back to
+		#
+		bhead=`rlog -r$backmerge $rcsfile | egrep '^revision' | (read q id; echo $id)`
+    	    	#
+		# Locate the head of the trunk.
+		#
+	    	head="`(IFS=' 	;'; read q id; echo $id) < $rcsfile`"
+
+		#
+		# We can't deal with selective backmerges, so if the previous
+		# revision doesn't actually match the head revision on the
+		# branch (ignoring RCS strings), we refuse to allow the
+		# backmerge.
+		#
+		IFS="."; set -$x $head; IFS=" 	"
+    	    	prev=$1.`expr $2 - 1`
+
+		rmfiles="$rmfiles /tmp/$tail.1 /tmp/$tail.2"
+    	    	co -p$prev  $rcsfile | egrep -v '\$Id' > /tmp/$tail.1
+    	    	co -p$bhead $rcsfile | egrep -v '\$Id' > /tmp/$tail.2
+
+		if cmp -s /tmp/$tail.1 /tmp/$tail.2; then
+    	    	    #
+		    # All systems are go. Check out the head revision of the
+		    # trunk, making sure its id string matches the common
+		    # ancestor's to avoid bogus overlaps, then merge the
+		    # changes on the trunk into the branch.
+		    #
+		    IFS="."; set -$x $bhead; IFS=" 	"
+		    idstring=`egrep '\\$Id.* '$1'\.'$2' ' $rcsfile | head -1`
+		    sed -e '/\$Id/s|^.*$|'"$idstring"'|' $idir/$i > $i
+		    ${BINDIR}/mergeAndEdit $rcsfile $i $1.$2 $bhead		
+		    case $? in
+			0)  
+    	    	    	    #
+			    # Merge was successful -- lock the branch and check
+			    # in the final product as the head of the branch
+			    #
+			    if rcs -l$backmerge $rcsfile; then
+				if ci -r$backmerge -m"incorporating changes from $head" $i $rcsfile; then
+				    : true
+				else
+    	    	    	    	    # check-in failed, so unlock the branch
+				    rcs -u$backmerge $rcsfile
+				    $continue
+				fi
+			    else
+				$continue
+			    fi
+			    #
+			    # If the file exists in the branch-installed tree,
+			    # check it out there as well.
+			    #
+			    if [ -f $rootdir/$backmerge/$subdir/$tail ]; then
+				co -r$backmerge $rcsfile $rootdir/$backmerge/$subdir/$tail
+			    fi
+			    ;;
+			*)
+			    $continue
+			    ;;
+		    esac
+    	    	else
+    	    	    echo $0: revisions $prev and $bhead of $i do not match. back-merge aborted
+    	    	    $continue
+    	    	fi
+	    fi
+		
+	    #
+	    # We're done with this file, so remove the lock
+	    # file to let other people install.
+	    #
+	    rm -f $rmfiles; trap 0 1 2 3 15 31
+	    
+	    if [ "$remote" ]; then
+	    	#
+		# Special handling for install from a remote syste
+		#
+		q=q
+	    else
+	        #
+		# It's not an install done from a remote system
+		#
+
+		#
+		# We can't handle branches right now
+		#
+		if [ "$branch" ]; then
+		    #
+		    # Something special to handle installs on a branch
+		    #
+		    q=q
+		else
+		    #
+		    # Check for the network connection being down. If it is 
+		    # then we want to touch a file that has a name which 
+		    # indicates what needs to be copied over.
+		    #
+		    netup=`/usr/etc/ping tungsten 2`
+		    netup=`expr match "$netup" .*alive`
+
+		    if [ "$netup" ]; then
+		    	#
+			# The network is up, copy the file...
+			#
+			tdir=/n/tungsten`expr "$dir" : '.*\(/pcgeos/.*\)$'`
+
+			echo "Updating remote host: tungsten..."
+			echo "    Installing: $tdir/$tail"
+			rm -f $tdir/$tail
+			cp -p $dir/$tail $tdir/$tail
+		    else
+			#
+			# Place a signal in the remote-site update directory 
+			# noting that this file has changed.
+			#
+			echo "Remote host down: tungsten..."
+			echo "    Queuing install for later: $dir/$tail"
+
+			iname=$rdir/`echo $dir/$tail | tr '/' '\!'`
+			touch $iname
+		    fi
+		fi
+	    fi
+	else
+	    #
+	    # The lock file exists. Tell the user to wait.
+	    #
+	    echo $0: $i busy -- try again later
+	fi
+    fi # file exists
+done # for

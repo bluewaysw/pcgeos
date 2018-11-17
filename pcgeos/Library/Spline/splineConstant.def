@@ -1,0 +1,866 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS 
+MODULE:		VisSpline object
+FILE:		splineInternal.def
+
+AUTHOR:		Chris Boyke
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CDB	4/91		Initial version
+
+DESCRIPTION:	Definition of all the INTERNAL spline data structures,
+	constants, etc.  For definition of any EXTERNAL stuff (methods,
+	instance data, etc)., see /staff/pcgeos/Include/spline.def.
+
+	$Id: splineConstant.def,v 1.1 97/04/07 11:10:01 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;			CONSTANTS
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;------------------------------------------------------------------------------
+;  FULL_EXECUTE_IN_PLACE : Indicates that the spline lib is going to
+;	be used in a system where all geodes (or most, at any rate)
+;	are to be executed out of ROM.  
+;------------------------------------------------------------------------------
+ifndef FULL_EXECUTE_IN_PLACE
+	FULL_EXECUTE_IN_PLACE		equ	FALSE
+endif
+
+;------------------------------------------------------------------------------
+;  The .GP file only understands defined/not defined;
+;  it can not deal with expression evaluation.
+;  Thus, for the TRUE/FALSE conditionals, we define
+;  GP symbols that _only_ get defined when the
+;  condition is true.
+;-----------------------------------------------------------------------------
+if	FULL_EXECUTE_IN_PLACE
+	GP_FULL_EXECUTE_IN_PLACE	equ	TRUE
+endif
+
+if (size AreaAttr and 1) eq 1
+	AREA_ATTR_SIZE equ size AreaAttr+1
+endif
+
+if (size LineAttr and 1) eq 1
+	LINE_ATTR_SIZE equ size LineAttr+1
+endif
+
+; quick constant for updating all controllers.
+
+UPDATE_ALL = SplineGenerateNotifyFlags
+
+MAX_AUTO_SMOOTH_CONTROL_DISTANCE equ 100
+
+SRT_OUTSIDE equ 3	; point outside the drag rectangle
+SRT_INSIDE equ 0	; Code used when a point is inside the drag rectangle
+
+; BBFixed representation of handle size
+INIT_HANDLE_SIZE equ (4 shl 8)
+LARGE_HANDLE_SIZE equ (8 shl 8)
+		
+MOVE_FORWARD equ 1	; amount to add to ax to get next point
+MOVE_BACK equ -1		; amount to add to ax to get prev point
+
+; The maximum allowable number of spline points in a single object.
+
+SPLINE_MAX_POINT equ		0cdbh
+
+; Distance mouse has to be from the point to be considered "on" it.
+SPLINE_POINT_MOUSE_TOLERANCE equ 4
+
+; Distance a control point has to be from an anchor to be deleted
+;
+;  ** I've removed this in favor of SPLINE_POINT_MOUSE_TOLERANCE -jon 12/21/92
+;
+;SPLINE_POINT_TOLERANCE equ 8
+
+SPLINE_LOOP_COUNT equ 16
+DELTA_T equ 65536/SPLINE_LOOP_COUNT
+
+ALMOST_ONE	equ 0ffffh		; fractional value in WWFixed notation.
+
+SPLINE_GSTRING_BUFFER_SIZE	equ 100	; one hundred bytes (?)
+
+; These flags are used when the spline copies itself
+SPLINE_COPY_FLAGS equ mask SIF_RESET_LINKAGES
+
+
+MARKER_STD_SIZE	equ	12
+
+MAX_SUSPEND_COUNT equ 128
+
+;***************************************************************************
+; ERROR CONSTANTS
+;***************************************************************************
+
+EXPECTED_CARRY_SET_HERE				enum FatalErrors 
+SPLINE_HAS_NO_ATTR_CHUNKS			enum FatalErrors 
+SPLINE_OBJ_BLOCK_AND_POINT_BLOCK_IDENTICAL	enum FatalErrors 
+BAD_SQUARE_ROOT_ARG				enum FatalErrors
+ILLEGAL_MODIFY_FLAGS				enum FatalErrors 
+CANNOT_EXCHANGE_DIFFERENT_SIZED_CHUNKS		enum FatalErrors
+DS_SI_NOT_SPLINE_POINTS				enum FatalErrors 
+CORRUPT_SELECTED_POINTS_LIST			enum FatalErrors
+DI_NOT_POINTING_TO_SCRATCH_CHUNK		enum FatalErrors
+ES_BP_NOT_POINTING_TO_VIS_SPLINE_CLASS_OBJECT	enum FatalErrors
+EXPECTED_AN_ANCHOR_POINT			enum FatalErrors
+EXPECTED_A_CONTROL_POINT			enum FatalErrors
+EXPECTED_ZERO_VALUE				enum FatalErrors	
+ILLEGAL_CALL_TABLE_VALUE			enum FatalErrors
+ILLEGAL_SPLINE_POINT_NUMBER			enum FatalErrors
+ILLEGAL_UNDO					enum FatalErrors
+ILLEGAL_FLAGS					enum FatalErrors
+ILLEGAL_ACTION_TYPE				enum FatalErrors
+ILLEGAL_POINT_INFO_RECORD			enum FatalErrors
+ILLEGAL_ADVANCED_EDIT_STATE			enum FatalErrors
+ILLEGAL_SPLINE_MODE				enum FatalErrors
+LMEM_BLOCK_AT_INCORRECT_ADDRESS			enum FatalErrors
+LMEM_BLOCK_NOT_LOCKED				enum FatalErrors
+POINT_IS_ALREADY_IN_UNDO_ARRAY			enum FatalErrors
+SCRATCH_CHUNK_NOT_ALLOCATED			enum FatalErrors
+SPLINE_POINTER_AND_CHUNK_HANDLE_DONT_MATCH	enum FatalErrors
+TOO_MANY_CREATE_GSTATE_CALLS			enum FatalErrors
+TOO_MANY_SPLINE_POINTS				enum FatalErrors
+UNDO_POINTS_ARRAY_NOT_INITIALIZED		enum FatalErrors
+BAD_SCRATCH_CHUNK_REF_COUNT			enum FatalErrors 
+OBJECT_BLOCK_AND_LENGTH_BLOCK_IDENTICAL		enum FatalErrors 
+WRONG_MEM_HANDLE				enum FatalErrors 
+ILLEGAL_ELEMENT_NUMBER				enum FatalErrors 
+DS_SI_WRONG_CLASS				enum FatalErrors
+ILLEGAL_VALUE					enum FatalErrors
+
+ILLEGAL_SUSPEND_COUNT				enum FatalErrors 
+; Suspend count has gone over MAX_SUSPEND_COUNT, or less than zero
+SPLINE_BAD_SPLINE_GENERATE_NOTIFY_FLAGS		enum FatalErrors
+; SplineUpdateUI expected a SplineGenerateNotifyFlags, but bits
+; not in the record were set.
+
+;***************************************************************************
+;INITIALIZATION CONSTANTS
+;***************************************************************************
+
+INIT_FLAGS	equ mask SIF_INTERNAL
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;			STRUCTURES/RECORDS/ENUMS
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;******************************************************************************
+; PointInfoFlags - common bits for both control and anchor points
+;******************************************************************************
+PointInfoFlags	record
+	PIF_CONTROL:1
+	PIF_FILLED_HANDLE:1
+	PIF_TEMP:1
+	:5
+PointInfoFlags	end
+
+; This is an element in the gstring parse table.  the offsets are
+; offsets into the gstring data where the point data resides.  The
+; info is the point type described by that point.
+GStringParseElement	struc
+	GSPE_xOffset	byte
+	GSPE_yOffset	byte
+	GSPE_info	PointInfoFlags
+GStringParseElement	ends
+
+
+;******************************************************************************
+; ControlPointInfoFlags - used for controls only (if PIF_CONTROL is
+; set) 
+; NOTE: If these flags are changed, please change
+; ECSplineControlPoint, as it does a check to make sure the last 3
+; bits are zero.
+;******************************************************************************
+ControlPointInfoFlags	record
+	:3			; reserved space for PIF_
+	CPIF_PREV:1
+	CPIF_CONTROL_LINE:1
+	:3			; should always be zero!
+ControlPointInfoFlags	end
+
+;******************************************************************************
+; AnchorPointInfoFlags - used when PIF_CONTROL is CLEAR 
+;******************************************************************************
+AnchorPointInfoFlags	record
+	:3			; reserved space for PIF_
+	APIF_HOLLOW_HANDLE:1
+	APIF_IM_CURVE:1
+	APIF_SELECTED:1
+	APIF_SMOOTHNESS SmoothType:2
+AnchorPointInfoFlags	end
+
+PointInfo	union
+	PI_common	PointInfoFlags		<>
+	PI_control	ControlPointInfoFlags	<>
+	PI_anchor	AnchorPointInfoFlags	<>
+PointInfo	end
+
+
+;***************************************************************************
+; SOME STANDARD POINT TYPES:
+;***************************************************************************
+SPT_PREV_CONTROL equ mask PIF_CONTROL or mask CPIF_PREV
+SPT_NEXT_CONTROL equ mask PIF_CONTROL
+SPT_ANCHOR_POINT equ 0
+
+;******************************************************************************
+; A less-commonly used enum for spline point types
+;******************************************************************************
+SplinePointTypeEnum	etype	byte
+	SPTE_ANCHOR_POINT enum	SplinePointTypeEnum
+	SPTE_NEXT_CONTROL enum	SplinePointTypeEnum
+	SPTE_PREV_CONTROL enum	SplinePointTypeEnum
+
+
+;***************************************************************************
+;Some FIND types - used by SplineGotoPointCommon
+;***************************************************************************
+FIND_CONTROL equ (mask PIF_CONTROL shl 8) or mask PIF_CONTROL
+
+FIND_NEXT_CONTROL equ (mask PIF_CONTROL or mask CPIF_PREV) shl 8 or \
+		mask PIF_CONTROL
+
+FIND_PREV_CONTROL equ (mask PIF_CONTROL or mask CPIF_PREV) shl 8 or \
+		mask PIF_CONTROL or mask CPIF_PREV
+
+FIND_ANCHOR  equ (mask PIF_CONTROL shl 8) or 0
+
+; This is the structure for each point in the point array.
+
+SplinePointStruct	struct
+	SPS_point	PointWBFixed
+	SPS_info	PointInfo	<>
+SplinePointStruct	ends
+
+;***************************************************************************
+; The EXPANDED points go into this convenient curve structure.  This
+; structure used to reference 4 points of a single curve, or 7 points
+; of 2 adjacent curves (in the case of subdivision).
+;***************************************************************************
+
+CurveStruct	struct
+	CS_P0	Point
+	CS_P1	Point
+	CS_P2	Point
+	CS_P3	Point
+	CS_P4	Point
+	CS_P5	Point
+	CS_P6	Point
+CurveStruct	ends
+
+;***************************************************************************
+;Structure of coefficients used to calculate spline polynomials
+;***************************************************************************
+DWordCoeffs	struct
+	DWC_A	sdword
+	DWC_B	sdword
+	DWC_C	sdword
+	DWC_D	sdword
+DWordCoeffs	ends
+
+CoeffStruct	struct
+	CS_X	DWordCoeffs
+	CS_Y	DWordCoeffs
+CoeffStruct	ends
+
+;***************************************************************************
+; structure used to hold a subdivided Bezier curve
+;***************************************************************************
+
+WBCurveStruct	struct
+	WBCS_P0	PointWBFixed
+	WBCS_P1 PointWBFixed
+	WBCS_P2 PointWBFixed
+	WBCS_P3 PointWBFixed
+WBCurveStruct	ends
+
+; Don't try to understand this structure without looking at 
+; the Spline Object Specification
+
+SubdivideStruct	struct
+	SS_V0	PointWBFixed
+	SS_V01	PointWBFixed
+	SS_V02	PointWBFixed
+	SS_V03	PointWBFixed
+	SS_V12	PointWBFixed
+	SS_V21	PointWBFixed
+	SS_V3	PointWBFixed
+	SS_V1	PointWBFixed
+	SS_V11	PointWBFixed
+	SS_V2	PointWBFixed
+SubdivideStruct	ends
+
+MidpointSubdivideStruct	struct
+	MSS_S0	PointWBFixed
+	MSS_S1	PointWBFixed
+	MSS_S2	PointWBFixed
+	MSS_S3	PointWBFixed		; S3 = T0
+	MSS_T1	PointWBFixed
+	MSS_T2	PointWBFixed
+	MSS_T3	PointWBFixed
+MidpointSubdivideStruct	ends
+
+BezierPoints	union	
+	BP_curveStruct	CurveStruct	; the 4 points of a Bezier curve
+	BP_wbCurveStruct	WBCurveStruct	; WBFixed representation of
+					; same
+	BP_subdivideStruct SubdivideStruct ; used for subdividing a
+					 ; curve.
+	BP_midpointSubdivideStruct MidpointSubdivideStruct
+					; used for midpoint subdivision.
+
+BezierPoints	ends
+
+;***************************************************************************
+; DATA STRUCTURE FOR THE "SELECTED POINTS" ARRAY
+;***************************************************************************
+
+SelectedListEntry	struct
+	SLE_pointNum		word		; point number
+SelectedListEntry 	ends
+
+;***************************************************************************
+;***************************************************************************
+;  				UNDO  STUFF                                    
+;***************************************************************************
+;***************************************************************************
+
+;***************************************************************************
+; UNDO array data structure
+;***************************************************************************
+
+UndoArrayElement	struct
+	UAE_pointNum	word		; point number
+	UAE_data		SplinePointStruct ; point data
+UndoArrayElement	ends
+
+;***************************************************************************
+; SplineDrawFlags - flags to decide what type of selection
+; information to draw
+;***************************************************************************
+
+SplineDrawFlags	record
+	SDF_CONTROL_LINES:1		; control lines
+	SDF_FILLED_HANDLES:1		; filled (anchor or control) handles
+	SDF_HOLLOW_HANDLES:1		; hollow anchor handles
+	SDF_USE_UNDO_INSTEAD_OF_TEMP:1	; use UNDO data if the point
+					; is  TEMP
+	SDF_CURVE:1			; draw curve
+	SDF_IM_CURVE:1			; draw "invert-mode" curve
+	SDF_MARKER:1			; marker
+	:1
+
+SplineDrawFlags	end
+
+;******************************************************************************
+; Common combinations of the above
+;******************************************************************************
+
+SDT_MOVE_CONTROL equ mask SDF_IM_CURVE or \
+			mask SDF_CONTROL_LINES 
+
+SDT_NORMAL_SELECTED_STUFF equ mask SDF_FILLED_HANDLES or \
+				mask SDF_CONTROL_LINES
+
+;******************************************************************************
+; SplineWhichPointFlags - specify which points (curves) are to be operated
+; on during an OperateOnPoints operation.  These flags are arranged in
+; such a way that during SplineModifyWhichPointFlags, the flag to be
+; RESET is immediately to the left of its counterpart.  DO NOT
+; REARRANGE THESE FLAGS.
+;******************************************************************************
+
+SplineWhichPointFlags	record
+
+
+	;
+	; These first 6 points are OUTER points, and are used rarely. 
+	;
+
+	
+	SWPF_2ND_NEXT_ANCHOR:1			; 2nd next anchor - not used
+	SWPF_2ND_NEXT_FAR_CONTROL:1
+	SWPF_2ND_NEXT_CONTROL:1
+	SWPF_2ND_PREV_CONTROL:1
+	SWPF_2ND_PREV_FAR_CONTROL:1
+	SWPF_2ND_PREV_ANCHOR:1
+	:2
+
+
+	;
+	; These points must remain in this order for
+	; SplineSetFirstPoint to work
+	;
+
+
+	SWPF_NEXT_ANCHOR:1
+	SWPF_NEXT_FAR_CONTROL:1
+	SWPF_NEXT_CONTROL:1
+	SWPF_ANCHOR_POINT:1
+	SWPF_PREV_CONTROL:1
+	SWPF_PREV_FAR_CONTROL:1
+	SWPF_PREV_ANCHOR:1		; previous anchor point
+	:1
+SplineWhichPointFlags	end
+
+;******************************************************************************
+; Additional  SplineWhichPoint types (combinations of SWPF stuff)
+;******************************************************************************
+
+SWP_CONTROLS equ 	mask SWPF_NEXT_CONTROL or mask SWPF_PREV_CONTROL
+
+SWP_ALL_CONTROLS equ mask SWPF_NEXT_CONTROL or \
+		mask SWPF_PREV_CONTROL or \
+		mask SWPF_NEXT_FAR_CONTROL or \
+		mask SWPF_PREV_FAR_CONTROL
+
+SWP_ANCHOR_AND_CONTROLS equ mask SWPF_PREV_CONTROL or \
+			mask SWPF_NEXT_CONTROL or \
+			mask SWPF_ANCHOR_POINT
+
+SWP_ANCHOR_CONTROLS_AND_CURVES equ SWP_ANCHOR_AND_CONTROLS or \
+			mask SWPF_PREV_ANCHOR
+
+SWP_ANCHOR_ALL_CONTROLS_AND_CURVES equ SWP_ANCHOR_CONTROLS_AND_CURVES or \
+		mask SWPF_NEXT_FAR_CONTROL or \
+		mask SWPF_PREV_FAR_CONTROL
+
+SWP_ALL	equ 	SWP_ANCHOR_AND_CONTROLS or\
+		mask SWPF_NEXT_FAR_CONTROL or \
+		mask SWPF_PREV_FAR_CONTROL
+ 
+SWP_SEGMENT equ mask SWPF_NEXT_CONTROL or \
+		mask SWPF_NEXT_FAR_CONTROL or \
+		mask SWPF_ANCHOR_POINT
+
+SWP_BOTH_CURVES equ mask SWPF_ANCHOR_POINT or \
+			mask SWPF_PREV_ANCHOR
+
+SWP_OUTER_POINTS equ 	mask SWPF_2ND_NEXT_FAR_CONTROL or \
+		mask SWPF_2ND_NEXT_CONTROL or \
+		mask SWPF_2ND_PREV_CONTROL or \
+		mask SWPF_2ND_PREV_FAR_CONTROL or \
+		mask SWPF_2ND_PREV_ANCHOR
+
+;
+; In certain beginner-mode operations, changes affect the anchor, its
+; immediate neighbors, and the ones beyond those.
+;
+SWP_ANCHOR_ALL_CONTROLS_BEGINNER equ SWP_ANCHOR_AND_CONTROLS or \
+	mask SWPF_NEXT_FAR_CONTROL or \
+	mask SWPF_PREV_FAR_CONTROL or \
+	mask SWPF_2ND_NEXT_CONTROL or \
+	mask SWPF_2ND_PREV_CONTROL
+
+SWP_ALL_ANCHORS_BEGINNER equ	mask SWPF_ANCHOR_POINT or \
+		mask SWPF_NEXT_ANCHOR or \
+		mask SWPF_PREV_ANCHOR or \
+		mask SWPF_2ND_NEXT_ANCHOR or \
+		mask SWPF_2ND_PREV_ANCHOR
+
+SWP_ALL_BEGINNER equ SWP_ANCHOR_ALL_CONTROLS_BEGINNER or \
+		SWP_ALL_ANCHORS_BEGINNER
+;***************************************************************************
+; SplineOperateType - an enumerated type of all the various operations
+; done to the poor spline points
+;***************************************************************************
+
+SplineOperateType	etype	byte,0,2
+
+	SOT_ADD_DELTAS		enum SplineOperateType
+	; Add mouse deltas to the points in question
+
+	SOT_UPDATE_CONTROLS_FROM_ANCHOR	enum SplineOperateType
+	; Update the control points based on the anchor's position and type.
+
+	SOT_UPDATE_AUTO_SMOOTH_CONTROLS enum SplineOperateType
+	; Update control points in "auto-smooth" fashion
+	
+	SOT_DRAW_FOR_SELECTION_RECTANGLE enum SplineOperateType
+	; Update the points based on the position of the "selection" rectangle
+	; and the mouse flags
+
+	SOT_ADD_TO_BOUNDING_BOX enum SplineOperateType
+	; Add this point's coordinates to the SD_boundingBox
+	; structure stored in the ScratchData.  Before this
+	; enumeration is performed, SDF_BOUNDING_BOX_INITIALIZED flag
+	; should be cleared.  
+	;
+	; PASS:	cl - BoundingBoxIncrement -- max of line width, handle
+	; size, etc.
+
+	SOT_DRAW		enum SplineOperateType
+	; Draw the point based on the passed SplineDrawFlags
+	; Pass SplineDrawFlags in AH (BH) when using this type
+
+	SOT_ERASE		enum SplineOperateType
+	; Erase the point based on SplineDrawFlags
+	; Pass SplineDrawFlags in AH (BH) when using this type
+
+	SOT_INVALIDATE		enum SplineOperateType
+	; Inval the curve starting with the current anchor.
+	; IMPORTANT:  When passing this value in AL (or BL), make sure
+	; to either SET or CLEAR the SWPF_USE_UNDO_INSTEAD_OF_TEMP
+	; flag in AH (or BH).
+
+	SOT_DRAW_AS_DRAWN	enum SplineOperateType
+	; Draw the current point in accordance with its drawn flags
+
+	SOT_CHECK_BEGINNER_ANCHOR_MOVE	enum SplineOperateType
+	; Erase this point's curve if the proper conditions are met
+	; during a beginner-mode anchor move
+
+	PTR_CODE_OPERATE_TYPES equ SplineOperateType
+
+;******************************************************************************
+; These operations call code in the SplineOperateCode segment.  These
+; calls are going to be slower than the ones above because they
+; require at least one far call (ResourceCallInt) for each point
+; operated on.
+;******************************************************************************
+
+	SOT_OPERATE_CODE_TYPES equ PTR_CODE_OPERATE_TYPES
+
+	SOT_MODIFY_INFO_FLAGS	enum SplineOperateType,
+	; modify each point's "info" field
+	; CH contains bits to SET 
+	; CL contains bits to RESET
+						SOT_OPERATE_CODE_TYPES
+
+	SOT_DELETE		enum SplineOperateType
+	; When using this operation, caller CANNOT delete anchor and
+	; controls at the same time.  Delete controls first, and then
+	; make another call to delete the anchor point.
+
+	SOT_COPY_TO_UNDO	enum SplineOperateType	
+
+	SOT_SUBDIVIDE_CURVE	enum SplineOperateType
+	; Subdivide the selected curves
+
+	SOT_SELECT_ANCHORS_WITH_FILLED_HANDLES	enum SplineOperateType
+	; select points only if FILLED_HANDLE_DRAWN flag is set
+
+	SOT_ADD_NEXT_CONTROL	enum SplineOperateType
+	; Add a "next control" to the selected anchor points
+
+	SOT_ADD_PREV_CONTROL	enum SplineOperateType	
+	; add a "previous control" to the selected anchor points
+
+	SOT_CHECK_MOUSE_HIT_SEGMENT	enum SplineOperateType
+	; Check if mouse hits one of the selected segments
+
+	SOT_CHECK_MOUSE_HIT	enum SplineOperateType	
+	; See if mouse hits the point.  Mouse will be in (CX, DX)
+
+	SOT_SELECT_POINT		enum SplineOperateType	
+	; Add point to selected list.  NOTE:  Before this operation is
+	; used, it's a good idea to UNSELECT all the points.  This
+	; operation does NOT draw selected points.
+
+	SOT_TRANSFORM_POINT		enum SplineOperateType 
+	; Apply a translation (TMatrix) to the point
+
+	SOT_ADD_TO_NEW	enum SplineOperateType
+	; Add point to NEW points list
+
+	SOT_STORE_LENGTH_IN_ARRAY 	enum SplineOperateType 
+	; Store the length of the current curve in the passed array.
+
+	SOT_REMOVE_EXTRA_CONTROLS	enum SplineOperateType
+	; Remove control points if they're very close to their anchors.
+
+	SOT_INSERT_IN_ARRAY		enum SplineOperateType
+	; Insert the point into the passed array
+	; PASS: cx - chunk handle of array of SplinePointStruct
+	; structures 
+	; 	dx - point number to insert before
+
+	SOT_TOGGLE_INFO_FLAGS		enum SplineOperateType
+	; Toggle the passed flags.  Only used right now by
+	; SplineReversePoints, which toggles the "PREV" control point
+	; flag.
+
+	; PASS:	cl - flags to toggle.
+
+	SOT_GET_SMOOTHNESS	enum SplineOperateType
+	; Return the "smoothness" of the selected points
+	; 	PASS: dx = TRUE if a point has been seen before
+	;		cl = current SmoothType
+	;	RETURN: dx = TRUE
+	;		cl = same, or -1 if different
+
+	SOT_GET_NUM_CONTROLS	enum SplineOperateType
+	; Return the # control points that this anchor point has
+	; data is returned in SD_paramCX
+	; 	PASS: dx = TRUE if a point has been seen before
+	;		cl = current # controls
+	;	RETURN: dx = TRUE
+	;		cl = same, or -1 if different
+
+
+	SOT_ADD_CONTROLS_CONFORM enum SplineOperateType
+	; Add control points (if they don't already exist), trying to
+	; minimize disruption of the curve's shape.
+	
+;***************************************************************************
+; UndoType - type of operation to be undone
+;***************************************************************************
+UndoType	etype word, 0, 2
+	UT_NONE			enum	UndoType
+	UT_LINE_ATTR		enum	UndoType
+	UT_AREA_ATTR		enum	UndoType
+	UT_MOVE			enum	UndoType
+	UT_UNDO_MOVE		enum	UndoType
+	UT_SUBDIVIDE 		enum  	UndoType
+	UT_UNDO_SUBDIVIDE 	enum 	UndoType
+	UT_INSERT_ANCHORS 	enum	UndoType
+	UT_UNDO_INSERT_ANCHORS	enum	UndoType
+	UT_DELETE_ANCHORS	enum	UndoType
+	UT_UNDO_DELETE_ANCHORS	enum	UndoType
+	UT_INSERT_CONTROLS	enum	UndoType
+	UT_DELETE_CONTROLS	enum 	UndoType
+	UT_UNDO_DELETE_CONTROLS	enum	UndoType
+	UT_ADD_POINT		enum	UndoType
+	UT_OPEN_CURVE		enum	UndoType
+	UT_CLOSE_CURVE		enum	UndoType
+
+;***************************************************************************
+; SplineOperateOnUndoType -- If the order of these is changed, be sure
+; to change the jump table "SplineOperateOnUndoCalls"
+;***************************************************************************
+SplineOperateOnUndoType		etype
+
+	SOUT_COPY_TO_POINTS 	enum SplineOperateOnUndoType
+	; Copy undo to normal points
+
+
+	SOUT_INSERT_IN_POINTS enum SplineOperateOnUndoType
+	; insert undo point before the point with the same number
+
+	SOUT_ADD_DELTAS		enum SplineOperateOnUndoType
+
+	SOUT_MAKE_SELECTED	enum SplineOperateOnUndoType
+	; For every point in the undo list, make it's corresponding
+	; "real" point selected.
+
+	SOUT_EXCHANGE_WITH_POINTS enum SplineOperateOnUndoType
+
+
+	SOUT_ADD_TO_NEW		enum SplineOperateOnUndoType
+	; Add this UNDO point to the NEW points list.  This should
+	; ONLY be done if the UNDO point numbers correspond directly
+	; with REAL points!
+
+
+DistCoeffStruct	struct
+	distCoeffA	sdword
+	distCoeffB	sdword
+	distCoeffC	sdword
+	distCoeffD	sdword
+	distCoeffE	sdword
+	distCoeffF	sdword
+DistCoeffStruct	ends
+
+ScratchDataFlags	record
+
+	SDF_DRAW_CONTINUOUS:1
+	; Set if the spline is being drawn to a path in order to be
+	; filled later.
+
+	SDF_BOUNDING_BOX_INITIALIZED:1 
+	; Set if the bounding box has been initialized.  Should be
+	; cleared before calling SOT_ADD_POINT_TO_BOUNDING_BOX
+
+	SDF_BOUNDING_BOX_CHANGED:1
+
+	SDF_STOP_ENUMERATION:1	
+
+	
+ScratchDataFlags	end
+
+;******************************************************************************
+; ScratchData - a "scratch chunk" that keeps track of some data during
+; interactive move operations.  Basically, we want to keep track of 
+; mouse pointer movement between PTR events, distances between
+; the anchor and controls, 
+;******************************************************************************
+
+ScratchData	struct
+	SD_refCount	byte
+	; SD_refCount - keep track of how many times the Scratch Block
+	; has been locked.
+
+
+	SD_splineChunkHandle	lptr
+	; Chunk handle of the VisSpline object.  Kept in memory so
+	; that I can keep the pointer to the spline's instance data in
+	; registers.
+
+	SD_startRect	Point
+	; startRect is the first coordinate of the drag-select
+	; rectangle, used with SD_mouse.
+
+	SD_mouse	Point
+	; SD_mouse stores the mouse position during Start-Select and
+	; Ptr events
+
+
+	SD_lastMouse	Point
+	; Where the mouse USED to be
+
+
+	SD_mouseFlags	word
+	; SD_mouseFlags stores (what else?)
+
+	SD_deltas	Point
+	; SD_deltas -- x and y deltas - used to measure movement, etc.
+
+	SD_distance	WWFixed
+	; distance stores anchor-control distance during SEMI-SMOOTH
+	; move operations as well as lengths during calc-length
+	; procedures
+
+
+	SD_boundingBox	Rectangle
+	; bounding - used for recalculation of vis bounds & certain
+	; INVALIDATE operations. Values are stored in spline's
+	; INTERNAL coordinate system
+
+	SD_flags	ScratchDataFlags
+	; Flags to keep track of various things
+
+	SD_coeffs	CoeffStruct	
+	;Coefficients used to calculate a Bezier Curve.
+
+	SD_distCoeffs		DistCoeffStruct
+	; distance coefficients used in the distance-curve-to-point
+	; calculations
+
+	SD_derivDistCoeffs	DistCoeffStruct
+
+
+	SD_anchor	word	
+	; Several operations require the maintenance of a current
+	; anchor point number -- this number may change during deletes
+	; and inserts.
+
+
+	SD_pointNum	word
+	; A miscellaneous point number, used for a variety of things.
+
+	SD_paramCX	word
+	SD_paramDX	word
+	; These params are used in the "SplineOperate..." ops as
+	; temporary storage.
+
+	SD_subdivideParam	word
+	; Parameter used for curve subdivision
+
+
+	SD_bezierPoints		BezierPoints
+	; BezierPoints - used for storing the points of a Bezier curve
+	; during draw and subdivision operations.
+
+	SD_gstringBuffer	byte SPLINE_GSTRING_BUFFER_SIZE dup (?)
+
+	SD_oldGState	hptr.GState
+	; During MSG_SPLINE_DRAW_BASE_OBJECT and
+	; MSG_SPLINE_DRAW_EVERYTHING_ELSE, I want to temporarily store
+	; the spline's "old" gstate, if it exists...
+
+
+	SD_firstPoint	word
+	SD_lastPoint	word
+	; variables for SplineOperateOnRange
+
+	SD_lastDrawPoint	Point
+	; This is used during draw operations to store the position of
+	; the last point drawn, so that filled splines will draw
+	; correctly. Why this isn't done in the graphics system is
+	; beyond me!
+
+ScratchData	ends
+
+
+UpdateTableEntry	struct
+	UTE_routine	nptr.near
+	UTE_size	word
+	UTE_gcnListType	word
+	UTE_notificationType word
+UpdateTableEntry	ends
+
+SplineCombineFlags	record
+	:6
+	SCF_MULTIPLE_POINTS:1
+	SCF_FOUND:1
+SplineCombineFlags	end
+ 
+SplineNotifyBlockHeader	struct
+	SNBH_flags	SplineCombineFlags
+SplineNotifyBlockHeader	ends
+
+
+MarkerNotificationBlock	struct
+	MNB_header		SplineNotifyBlockHeader
+	MNB_markerShape		MarkerShape
+MarkerNotificationBlock	ends
+
+SplinePointNotificationBlock	struct
+	SPNB_header	SplineNotifyBlockHeader	<>
+	SPNB_mode	SplineMode		<>
+	SPNB_actionType	ActionType		<>
+	SPNB_smoothness	SmoothType		<>
+	SPNB_numSelected 	word	; # selected points
+	SPNB_numControls	byte	; 0, 1, or 2
+SplinePointNotificationBlock	ends
+
+SplineOpenCloseNotificationBlock	struct
+	SOCNB_state	SplineState
+	SOCNB_stateDiffs	SplineState
+SplineOpenCloseNotificationBlock	ends
+
+
+SplineVMChainHeader	struct
+	SVMCH_header	VMChainLink
+	SVMCH_protocol		word
+	SVMCH_spline		nptr
+	SVMCH_points		nptr
+	SVMCH_lineAttr		nptr
+	SVMCH_areaAttr		nptr
+	SVMCH_endOfData		nptr
+SplineVMChainHeader	ends
+
+SPLINE_VM_CHAIN_PROTOCOL	equ 1
+
+;-----------------------------------------------------------------------------
+;	Structures used by controllers:		
+;-----------------------------------------------------------------------------
+
+SplineControlUpdateUIParams	struct
+	SCUUIP_params	nptr.GenControlUpdateUIParams
+	SCUUIP_flags	byte
+	SCUUIP_table	nptr
+	SCUUIP_tableEnd	nptr
+SplineControlUpdateUIParams	ends
+
+
+EnableDisableEntry	struct	
+	EDE_child	lptr
+	EDE_tool	lptr
+EnableDisableEntry	ends
+

@@ -1,0 +1,445 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT: Breadbox Outliner
+ * FILE:        proc.goc
+ * AUTHOR:  John F. Howard,   05/03
+ *
+ * DESCRIPTION:
+ *  This file has the process class code for the application.
+ *  And DList, RepeatTrig & CardGenText class stuff
+ *
+ ***********************************************************************/
+
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+@include "oliner.goh"
+@include "art/docicons.goh"
+
+@extern object OLApp;
+@extern object OLDocumentGroup;
+@extern object MainWindow;
+@extern object OLCardInfo;
+@extern object MainToolbar;
+@extern object CardWinOptTrigger;
+@extern object ToolBarOptTrigger;
+@extern object ListDateDisplay;
+@extern object DateStampOptTrigger;
+@extern object ContractTopicsTool;
+@extern object ContractTopicsTrigger;
+@extern object ExpandTopicsTool;
+@extern object ExpandTopicsTrigger;
+
+@extern visMoniker ShowCardWinMoniker;
+@extern visMoniker HideCardWinMoniker;
+@extern visMoniker ShowToolBarMoniker;
+@extern visMoniker HideToolBarMoniker;
+@extern visMoniker ShowDateStampMoniker;
+@extern visMoniker HideDateStampMoniker;
+
+@classdecl  OLProcessClass, neverSaved;
+
+FileHandle g_curDocHan = 0;
+ChunkHandle g_indexCArray = 0;
+Boolean g_cardMayHaveChanged = FALSE;
+Boolean g_docClosing = FALSE;
+Boolean g_tools = TRUE;
+Boolean g_date = TRUE;
+Boolean g_cardWin = TRUE;
+word g_sysPointSize = 0;
+
+
+/* ----------------------------------------------------------------------------
+	OLProcessClass Code
+-----------------------------------------------------------------------------*/
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_PROCESS_OPEN_APPLICATION for OLProcessClass
+ *
+ * DESCRIPTION:  do some opening stuff
+ *
+ *
+ ***********************************************************************/
+@method OLProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ Boolean			initError;
+
+
+	/* get the options settings */
+	initError = InitFileReadBoolean("Outliner", "Card", &g_cardWin);
+	if (initError || g_cardWin) {
+		@send CardWinOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@HideCardWinMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send OLCardInfo::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send CardWinOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@ShowCardWinMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send OLCardInfo::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	initError = InitFileReadBoolean("Outliner", "ToolBar", &g_tools);
+	if (initError || g_tools) {
+		@send ToolBarOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@HideToolBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send MainToolbar::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send ToolBarOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@ShowToolBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send MainToolbar::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	initError = InitFileReadBoolean("Outliner", "DateStamp", &g_date);
+	if (initError || g_date) {
+		@send DateStampOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@HideDateStampMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send ListDateDisplay::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send DateStampOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@ShowDateStampMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send ListDateDisplay::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	/* get the fontsize info for the list metrics */
+	initError = InitFileReadInteger("ui", "fontsize", &g_sysPointSize);
+	if (initError) g_sysPointSize = 10;
+
+
+	@callsuper();
+
+	/* needed to install app tiny token in newUI */
+	@call application::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+	/* needed to install doc token */
+	@call process::MSG_GEN_PROCESS_INSTALL_TOKEN();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_PROCESS_CLOSE_APPLICATION for OLProcessClass
+ *
+ * DESCRIPTION:  do some closing stuff
+ *
+ *
+ ***********************************************************************/
+@method OLProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+
+	 @callsuper();
+
+	 return NULL;
+
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_PROCESS_INSTALL_TOKEN for OLProcessClass
+ *
+ * DESCRIPTION: Associates token with docs
+ *
+ *              needs token.h include
+ ***********************************************************************/
+@method OLProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+ dword   tokenChars;
+ TokenFlags  tokenFlags;
+
+	@callsuper();
+
+	tokenChars = TOKEN_CHARS('O', 'L', (dword) 'd', (dword) '1');
+	/* it won't work w/o the two casts */
+	if (!TokenGetTokenInfo(tokenChars, 16431, &tokenFlags))
+		TokenDefineToken(tokenChars, 16431, @OLDocIconMonikerList, 0);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_OLINER_PROC_TOGGLE_CARD_WINDOW for OLProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method OLProcessClass, MSG_OLINER_PROC_TOGGLE_CARD_WINDOW
+{
+
+
+	if (g_cardWin) {
+		@send CardWinOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@ShowCardWinMoniker), VUM_NOW);
+		g_cardWin = FALSE;
+		@send OLCardInfo::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+	else  {
+		@send CardWinOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@HideCardWinMoniker), VUM_NOW);
+		g_cardWin = TRUE;
+		@send OLCardInfo::MSG_GEN_SET_USABLE(VUM_NOW);
+		}
+
+	InitFileWriteBoolean("Outliner", "Card", g_cardWin);
+	InitFileCommit();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_OLINER_PROC_TOGGLE_TOOL_BAR for OLProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method OLProcessClass, MSG_OLINER_PROC_TOGGLE_TOOL_BAR
+{
+
+
+	if (g_tools) {
+		@send ToolBarOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@ShowToolBarMoniker), VUM_NOW);
+		g_tools = FALSE;
+		@send MainToolbar::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+	else  {
+		@send ToolBarOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@HideToolBarMoniker), VUM_NOW);
+		g_tools = TRUE;
+		@send MainToolbar::MSG_GEN_SET_USABLE(VUM_NOW);
+		}
+
+	InitFileWriteBoolean("Outliner", "ToolBar", g_tools);
+	InitFileCommit();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_OLINER_PROC_TOGGLE_DATE_STAMP for OLProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method OLProcessClass, MSG_OLINER_PROC_TOGGLE_DATE_STAMP
+{
+
+
+	if (g_date) {
+		@send DateStampOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@ShowDateStampMoniker), VUM_NOW);
+		g_date = FALSE;
+		@send ListDateDisplay::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+	else  {
+		@send DateStampOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@HideDateStampMoniker), VUM_NOW);
+		g_date = TRUE;
+		@send ListDateDisplay::MSG_GEN_SET_USABLE(VUM_NOW);
+		}
+
+	InitFileWriteBoolean("Outliner", "DateStamp", g_date);
+	InitFileCommit();
+
+}
+
+/* ----------------------------------------------------------------------------
+	OLDynamicListClass Code
+-----------------------------------------------------------------------------*/
+
+@classdecl  OLDynamicListClass;
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_DYNAMIC_LIST_INITIALIZE for OLDynamicListClass
+ *             word             numItems
+ *
+ * DESCRIPTION:   looks for and sets a flag for any vertical connector
+ *                lines that need to be drawn by the query method
+ *                also sets the open closed topics tools & triggers
+ *
+ ***********************************************************************/
+@method OLDynamicListClass, MSG_GEN_DYNAMIC_LIST_INITIALIZE
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ IndexStruct		*indexElement;
+ word					i, j;
+ word					connector;
+ word					numRecs[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+ word					bits[] = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512};
+ Boolean				openTopics = FALSE, closedTopics = FALSE;
+
+
+	@callsuper();
+
+	if (numItems) {
+		vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+		VMLock(g_curDocHan, vmbh ,&mh);
+		for (i = 0; i < numItems; i++) {
+			connector = 0;
+			indexElement = ChunkArrayElementToPtrHandles(
+					mh, g_indexCArray, i, 0);
+			if (indexElement->ISS_type == T_CLOSED_TOPIC) 
+				closedTopics = TRUE;
+			else if (indexElement->ISS_type == T_OPEN_TOPIC) {
+				openTopics = TRUE;
+				/* sets the numRecs for the open topic at this level */
+				numRecs[indexElement->ISS_level] = indexElement->ISS_numRecs;
+				}
+			/* now check all levels lower than me for a value in numRecs[]
+				then we'll change connector to reflect a hit that needs the
+				vert connector line drawn such that a 1 in the 1s bit shows
+				that we need a connector at level 0, in the 2s bit
+				that we need one at level 1, etc. */
+			if (indexElement->ISS_level) {
+				for (j = 0; j < indexElement->ISS_level; j++) {
+					if (numRecs[j]) {
+						if (j == indexElement->ISS_level - 1) {
+							/* we decrement here to prevent drawing connectors if
+                     	there are no more items below to connect to */
+							numRecs[j]--;
+							}
+						if (numRecs[j])
+							connector += bits[j];
+						}
+					}
+				}
+			indexElement->ISS_connector = connector;
+			} /* end of numItems for loop */
+		VMUnlock(mh);
+		}  /* end of numItems if */
+
+   /* set the exp/contr all triggers */
+	if (openTopics)  {
+		@send ContractTopicsTool::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send ContractTopicsTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send ContractTopicsTool::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send ContractTopicsTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	if (closedTopics)  {
+		@send ExpandTopicsTool::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send ExpandTopicsTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send ExpandTopicsTool::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send ExpandTopicsTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+}
+
+/* ----------------------------------------------------------------------------
+	RepeatingTriggerClass Code
+-----------------------------------------------------------------------------*/
+
+@classdecl	RepeatingTriggerClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_START_SELECT for RepeatingTriggerClass
+ *
+ * PARAMETERS:  
+ *                    
+ *
+ * DESCRIPTION:	sets instance data in RepeatingTriggerClass to get ready
+ *		for a possibly held down button
+ *
+ *
+ *
+ ***********************************************************************/
+@method RepeatingTriggerClass, MSG_META_START_SELECT
+{
+	 pself->RTI_wait = 20 ;
+    pself->RTI_held = TRUE ;
+    @send oself::MSG_REPEATING_TRIGGER_CLICK() ;
+    @callsuper() ;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_REPEATING_TRIGGER_CLICK for RepeatingTriggerClass
+ *
+ * PARAMETERS:  
+ *                    
+ *
+ * DESCRIPTION:	repeats trigger action if button held down
+ *
+ *
+ *
+ ***********************************************************************/
+@method RepeatingTriggerClass, MSG_REPEATING_TRIGGER_CLICK
+{
+
+    /* sends the button action MSG every 20/60s of a second */
+    if (pself->RTI_held == TRUE)  {
+       /* this adds a delay so a single click reacts right */
+	  if (pself->RTI_wait != 20)
+          @send oself::MSG_GEN_TRIGGER_SEND_ACTION(FALSE) ;
+	  if (pself->RTI_wait != 19)
+	  pself->RTI_wait-- ;
+	  pself->RTI_timer = TimerStart(
+                                TIMER_EVENT_ONE_SHOT,
+                                oself,
+						  pself->RTI_wait,
+						  MSG_REPEATING_TRIGGER_CLICK,
+						  pself->RTI_wait,
+						  &pself->RTI_timerId);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LOST_MOUSE_EXCL for RepeatingTriggerClass
+ *
+ * PARAMETERS:  
+ *                    
+ *
+ * DESCRIPTION:	resets instance data in RepeatingTriggerClass
+ *
+ *
+ *
+ ***********************************************************************/
+@method RepeatingTriggerClass, MSG_META_LOST_MOUSE_EXCL
+{
+    pself->RTI_held = FALSE ;
+    @callsuper() ;
+}
+
+/* ----------------------------------------------------------------------------
+	CardGenTextClass Code
+-----------------------------------------------------------------------------*/
+
+@classdecl	CardGenTextClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_TEXT_SET_USER_MODIFIED for CardGenTextClass
+ *
+ * PARAMETERS:  
+ *                    
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@method CardGenTextClass, MSG_VIS_TEXT_SET_USER_MODIFIED
+{
+
+	g_cardMayHaveChanged = TRUE;
+
+	@callsuper();
+
+}
+
+

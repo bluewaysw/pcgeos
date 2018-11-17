@@ -1,0 +1,587 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		heapInt.def
+
+AUTHOR:		Tony Requist
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	4/88		Initial version
+
+DESCRIPTION:
+	This file contains definitions for the internals of the heap.  It is
+	intended for the kernel and the loader only.
+
+	$Id: heapInt.def,v 1.1 97/04/04 14:13:10 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__HEAP_INTERNAL
+
+include heap.def
+include Internal/semInt.def
+include sysstats.def
+
+ifdef _FXIP
+if _FXIP
+include Internal/xip.def
+endif
+endif
+
+StartKernel
+
+MOVABLE_CORE_BLOCKS	=	TRUE
+
+ifndef	SUPPORT_32BIT_DATA_REGS
+SUPPORT_32BIT_DATA_REGS	=	FALSE
+endif
+
+ifndef	UTILITY_MAPPING_WINDOW
+UTILITY_MAPPING_WINDOW	=	FALSE
+endif
+
+;------------------------------------------------------------------------------
+;
+;			  HANDLE DEFINITIONS
+;
+;------------------------------------------------------------------------------
+
+NULL_SEGMENT	=	0xA000
+;
+; When a locked segment becomes unlocked, and EC SEGMENT is on, then
+; either DS or ES will be set to this value if they had previously
+; pointed to a block that was locked.  This normally occurs when calls
+; to MemUnlock, VMUnlock, or DBUnlock are made.  This segment value
+; "just happens" to point to video memory on most systems, so that
+; subsequent attempts to write to memory pointed to by one of these
+; registers will result in garbage being displayed on the screen.
+; This is meant as an aid in debugging, and not a clever way to bypass
+; our graphics system :)
+;
+
+MAX_SEGMENT	equ	SIG_NON_MEM shl 8;Largest value a segment can be. used
+					;several places to distinguish between
+					;a handle >> 4 and a segment of a fixed
+					;block. This is, of course, one more
+					; than the maximum allowed segment.
+
+SIG_NON_MEM	=	0f0h		;signature for first non memory handle
+
+HandleType 	etype byte, SIG_NON_MEM
+    HT_UNUSED_F0	enum HandleType
+    HT_UNUSED_F1 	enum HandleType
+    SIG_RESERVATION	enum HandleType ;signature for a heapspace reservation
+    SIG_FREE		enum HandleType	;Free handle (for EC)
+    SIG_QUEUE 		enum HandleType	;Event queue
+    SIG_UNUSED_F5	enum HandleType	;Disk volume
+    SIG_TIMER 		enum HandleType	;Timed action
+    SIG_EVENT_DATA 	enum HandleType	;Data for SIG_EVENT_STACK
+    SIG_EVENT_STACK 	enum HandleType	;Event with parameters on stack
+    SIG_EVENT_REG 	enum HandleType	;Event with parameters in reg
+    SIG_SAVED_BLOCK 	enum HandleType	;Signature of "saved" block
+						;handle created by
+						;ObjDuplicateResource and
+						;ObjSaveBlock to keep track of
+						;blocks to be written to the
+						;state file
+    SIG_SEMAPHORE	enum HandleType
+    SIG_VM 		enum HandleType	;signature for a VM handle (the
+						;thing that owns all the VM
+						;memory blocks)
+    SIG_FILE 		enum HandleType	;signature for a file
+    SIG_THREAD 		enum HandleType	;signature for a thread
+    SIG_UNUSED_FF	enum HandleType
+;
+; Generic handle -- useful when printing out a handle if you don't know what
+; type it is...Should also be used when deciding what type a handle is.
+;
+HandleGen	struct
+    HG_data1	byte			; Byte available for data
+    HG_type	HandleType		; Handle type
+    HG_owner	hptr			; Handle of owner
+    HG_data2	word	6 dup(?)	; Six words availble for data
+HandleGen	ends
+
+;	Note:	The HM_prev and HM_next fields wrap around.  Thus the first
+;		block in memory's HM_prev points to the last block and the
+;		last block in memory's HM_next points to the first block.
+
+;	Note:	The order of the first five fields (HM_addr, HM_size,
+;		HM_prev, HM_next and owner) is counted on by SwapHandles
+
+HandleMem	struct
+    HM_addr		sptr	?	;address of the block's data on heap
+					;0 = no memory associated
+					;f000-ffff = non memory handle.
+					; q.v. HandleType above
+    HM_owner		hptr		;handle of block's owner.
+    HM_size		dw	?	;size in paragraphs of block
+    HM_prev		nptr.HandleMem	;handle of prev block on heap
+    HM_next		nptr.HandleMem	;handle of next block on heap
+					;0 = free handle
+    HM_flags		HeapFlags
+    HM_lockCount	sbyte		;lock count
+    HM_usageValue	dw	?	;value of heapCounter the last time
+					;this block was used/unlocked
+    HM_otherInfo	dw	?	;use depends on block type
+					;code: module # ?
+					;vm block: grab queue
+					;general memory block: short semaphore
+					;fake block: 0xfcb0
+HandleMem	ends
+
+FAKE_BLOCK_CODE	equ	0xfcb
+
+;
+; Memory handle when its contents have been swapped out.
+;
+HandleSwappedMem struct
+    HSM_addr		sptr	0	; Always zero
+    HSM_owner		hptr		; Owner of the block
+    HSM_size		word		; Size of block when resident
+    HSM_swapDriver	nptr.SwapDriver	; Swap driver used to swap block out
+    HSM_swapID		word		; ID returned by said driver
+    HSM_flags		HeapFlags
+    HSM_lockCount	sbyte	0
+    HSM_usageValue	word
+    HSM_otherInfo	word
+HandleSwappedMem ends
+
+
+;	Structure of a handle to a file.
+;		MOVED TO fileInt.def FOR USE IN FS DRIVERS
+;				-- ardeb 4/11/90
+
+;
+;	Structure used by object code to record blocks that need saving
+;	on the linked list headed by PH_savedBlockPtr
+;
+HandleSavedBlock	struct
+    			db	?	;
+    HSB_handleSig	HandleType	;handle's signature
+    HSB_owner		hptr	?
+    HSB_handle		hptr		;handle of block to save
+    HSB_next		hptr.HandleSavedBlock
+    HSB_vmID		dw	?	;VM block ID
+			word	3 dup(?)
+HandleSavedBlock	ends
+
+;
+;	Handle of an event
+;
+
+HandleEvent	struct
+    HE_callingThreadHigh db	?	;high byte of calling thread
+    HE_handleSig	HandleType	;signature
+    HE_cx		dw	?
+    HE_dx		dw	?
+    HE_method		dw	?
+    HE_bp		dw	?	;if MF_STACK then this is the
+					;first HandleEventData
+    HE_OD		optr
+    HE_next		hptr.HandleEvent ;link to next event
+					;low 4 bits are high 4 bits of low
+					; byte of calling thread
+HandleEvent	ends
+
+;
+;	Handle of event data. As many of these as necessary are chained together
+;	to hold all data passed on the stack of the caller.
+;
+
+HandleEventData	struct
+    			db	?
+    HED_handleSig	HandleType	;signature SIG_EVENT_DATA
+    HED_next		hptr.HandleEventData	;next data handle
+    HED_word0		dw	?
+    HED_word1		dw	?
+    HED_word2		dw	?
+    HED_word3		dw	?
+    HED_word4		dw	?
+    HED_word5		dw	?
+HandleEventData	ends
+
+;
+;	Handle of a timer action.  Kept in a linked list by the Timer/ code.
+;
+
+HandleTimer	struct
+    HTI_type		byte		;Type (TimerType, but don't declare
+					; it that way, as TimerType is a
+					; word...)
+    HTI_handleSig	HandleType	;signature SIG_TIMER
+    HTI_owner		hptr		;Owning geode
+    HTI_next		hptr.HandleTimer;next data handle
+    HTI_timeRemaining	sword	?	;time until time out
+    HTI_intervalOrID	sword	?	;interval (for continual timer)
+					;or ID (for one shots)
+    HTI_OD		optr	?	;OD (for TIMER_MSG_?)
+					;routine (for TIMER_ROUTINE_?)
+    HTI_method		dw	?	;method (for TIMER_MSG_?)
+					;data (for TIMER_ROUTINE_?)
+					;thread han (for TIMER_SLEEP)
+HandleTimer	ends
+
+;
+;	Handle of an event queue.
+;
+
+HandleQueue	struct
+    			db	?	;
+    HQ_handleSig	HandleType	;signature SIG_QUEUE
+    HQ_owner		hptr
+
+    HQ_frontPtr		hptr.HandleEvent ;first event on the queue
+    HQ_backPtr		hptr.HandleEvent ;last event on the queue
+    HQ_thread		hptr	?	;handle of associated thread
+					;(if any)
+    HQ_semaphore	Semaphore <>
+    HQ_counter		dw	?	;used for synchronization. upped
+					;each time an event is added
+HandleQueue	ends
+
+;	Structure of a handle to a thread.  Note that some routines take
+;	advantage of the fact that HT_basePriority and HT_cpuUsage are in the
+;	same word
+
+HandleThread	struct
+    HT_curPriority	db	?	;combination of base prio and CPU usage
+    HT_handleSig	HandleType	;handle's signature
+    HT_owner		hptr
+    HT_saveSP		dw	?	;saved value of SP
+    HT_saveSS		dw	?	;saved value of SS
+    HT_nextQThread 	nptr.HandleThread	;next thread on queue
+    HT_basePriority	db	?	;thread's base priority
+    HT_cpuUsage		db	?
+    HT_next		nptr.HandleThread
+    HT_eventQueue	hptr		;event queue for thread
+HandleThread	ends
+
+
+
+;
+;	A VM file handle is a handle in the handle table with this structure
+;
+InternalVMFlags	record
+    IVMF_BLOCK_LEVEL_SYNC:1	;Block level syncronization is used, and shared
+				;memory can be used for multiple open's
+    IVMF_DEMAND_PAGING:1	;Can demand page block in, can discard
+				;clean blocks
+	:1			;unused
+    IVMF_INVALID_FILE:1		;One or more blocks have been written
+				;out to disk, but the entire file has
+				;not been updated
+    IVMF_FILE_LOCAL:1		;File cannot be opened remotely and thus only
+				;local synchronization is needed
+    IVMF_NEED_FILE_LOCK:1	;Byte range lock needed for exclusive mechanism
+    IVMF_FILE_MODIFIED:1	;Set if file modifed since last update
+    IVMF_NOTIFY_OWNER_ON_DIRTY:1 ;Notify owner on dirty of the file
+InternalVMFlags	end
+
+HandleVM	struct
+    HVM_flags		InternalVMFlags	;internal flags
+    HVM_signature	HandleType	;SIG_VM
+    HVM_execThread	hptr.HandleThread	;thread that executes objects
+						;in VM file, since need
+						;otherInfo field of blocks for
+						;grab/release
+    HVM_headerHandle	hptr.VMHeader	;handle of header block, 0 if not loaded
+    HVM_relocRoutine	fptr.far	;address of relocation routine
+				    	; to be called when a block is
+				    	; loaded or written out.
+					;note: 
+					;      when accessing, write
+					;segment before offset
+					;      when checking for, read
+					;segment only (non-z if exisits)
+					;      sharing space with
+					;dirty size in VMFiles
+						
+    HVM_fileHandle	hptr	?	;Handle to use for reading/writing the
+					; file.
+    HVM_refCount	dw	?	;reference count
+    HVM_semaphore	dw	?	;short semaphore, use
+					; HandleP/HandleV. Needed to prevent two
+					; threads from loading in the header
+					; block at once.
+HandleVM	ends
+
+;
+; Handle of a semaphore
+;
+HandleSem	struct
+    			byte
+    HS_type		HandleType		; Handle type
+    HS_owner		hptr			; Owner of the semaphore
+    HS_moduleLock	ThreadLock
+    			word	2 dup (?)
+HandleSem	ends
+
+;
+; Handle of a heapspace reservation
+;
+HandleReservation	struct
+			byte
+	HR_type		HandleType		; Handle type - SIG_RESERVATION
+	HR_owner	hptr			; owner of reservation
+	HR_size		dw			; amount of heapspace
+						; reserved
+			word	5 dup (?)
+HandleReservation	ends
+
+
+;
+; This threshold should be greater than
+; FREE_HANDLE_DESPERATION_THRESHOLD.  It can be used to decide when to
+; attempt to minimize the allocation of new handles because we are
+; running out of handles.  The first use of it is in
+; GenApplicationGCNListSend.
+;	
+LOW_ON_FREE_HANDLES_THRESHOLD	equ	400
+
+
+;------------------------------------------------------------------------------
+;		Structure at the base of each thread stack
+;
+; NOTE: Glue depends on this structure to pass the stackBot for the initial
+; thread to the kernel. DO NOT CHANGE IT WITHOUT CHANGING THE DEFINITION IN
+; Tools/glue/geo.c
+;------------------------------------------------------------------------------
+
+THREAD_PRIVATE_SIZE	equ	64
+
+ThreadPrivateData	struct
+    TPD_blockHandle	hptr	?	;handle of this block
+if	MOVABLE_CORE_BLOCKS
+    TPD_processHandle	hptr	?	;handle of associated core block
+else
+    TPD_processSegment	hptr	?	;handle of associated core block
+endif
+    TPD_dgroup		sptr	?	;segment of associated dgroup
+    TPD_threadHandle	hptr	?	;handle of associated thread
+
+    TPD_classPointer	fptr	?	;class to handle events
+
+    TPD_callVector	fptr.far ?	;for ProcCallModuleRoutine (segment
+					; portion used by Int21)
+    TPD_callTemporary	dw	?	;for ProcCallModuleRoutine/Int21
+
+    TPD_stackBot	nptr	?	;limit for the stack in the block
+    ;
+    ; Fields after this may be altered w/o changing Glue, so long as the
+    ; overall size of the structure remains the same.
+    ;
+    TPD_dataAX		word		;Used by ProcCallModuleRoutine
+    TPD_dataBX		word		;Used by ProcCallModuleRoutine
+					; (dataAX and dataBX must be in this
+					; order for ProcCallFixedOrMovable
+					; to work)
+
+    TPD_curPath		hptr.FilePath	;Thread's current directory
+    ;
+    ; Exception handlers (inherited during thread creation)
+    ;
+    TPD_exceptionHandlers sptr		;sptr to ThreadExceptionHandlers
+
+; if	(AUTO_BUSY)			;Not being used...
+;    TPD_dispatchTime	dword	?	;system time at last dispatch, or -1
+;					;if thread is idle (Used for performance
+;					;measurement, auto-busy cursor, etc.)
+; endif
+
+    TPD_error		word	?	;value returned by ThreadGetError()
+    ;
+    ; Filesystem-related info.
+    ; 
+    TPD_exclFSIRLocks	byte	0	;number of exclusive locks of the
+					; FSIR by this thread
+    TPD_sharedFSIRLocks	byte	0	;number of shared locks of the FSIR
+					; by this thread.
+
+    TPD_fsNotifyBatch	hptr	0 	;current collection of notifications
+					; waiting to be flushed (pointer to
+					; FileChangeBatchNotificationData, but
+					; having the type there makes printing
+					; out this structure painful...)
+    ;
+    ; Fields used to automatically update 'pself' in C message handlers.
+    ;
+    TPD_cmessageFrame	nptr	0	;offset on the stack of the most recent
+					; C message frame.
+    TPD_stackBorrowCount word	0	;number of ThreadBorrowStackSpace calls
+					; made since last C message.
+
+    TPD_dynamicObjBlock	hptr	0	;first object block in a linked list of
+					; object blocks containing objects
+					; dynamically allocated for this thread
+
+    ;
+    ; small "heap" of words that may be allocated by geodes. The allocation
+    ; of the heap is tracked in the kernel thread's ThreadPrivateData, with
+    ; each word containing the geode handle of the geode that owns the space,
+    ; or 0 if the space is free.
+    ;
+			align	word
+    TPD_heap		hptr	(THREAD_PRIVATE_SIZE - \
+					size ThreadPrivateData)/2 dup(0)
+ThreadPrivateData	ends
+
+ThreadExceptionHandlers	struct
+    TEH_handle		hptr	?	;handle of ThreadExceptionHandlers blk
+    TEH_referenceCount	word	?	;number of threads that refer to this
+					; ThreadExceptionHandlers block
+    TEH_divideByZero	fptr	?	;handler for divide-by-zero exception
+    TEH_overflow	fptr	?	;handler for arithmetic overflow (INTO)
+    TEH_bound		fptr	?	;handler for BOUND exception
+    TEH_fpuException	fptr	?	;handler for general floating-point
+					; exception
+    TEH_singleStep	fptr	?	;handler for single-step exception
+    TEH_breakPoint	fptr	?	;handler for breakpoint exception
+ThreadExceptionHandlers	ends
+
+
+;--------------------------------------------------------------------------
+;			Structure of a blocked thread
+;--------------------------------------------------------------------------
+
+ThreadBlockState struct
+ifdef	_FXIP
+	if	_FXIP
+	    TBS_xipPage	dw	?	;Save
+	if	_TRACK_RESOURCE_CALLS
+	    TBS_resourceHandle dw ?	;Save
+	endif
+	endif
+endif
+
+if	UTILITY_MAPPING_WINDOW
+;
+; This needs to be included for any products whose kernel has the
+; UTILITY_MAPPING_WINDOW feature turned on.
+;
+
+;
+; maximum number of windows that can be provided
+;
+UTIL_WINDOW_MAX_NUM_WINDOWS	equ	4
+
+    TBS_utilWindow	dw	UTIL_WINDOW_MAX_NUM_WINDOWS dup(?)
+
+endif	; UTILITY_MAPPING_WINDOW
+
+if	SUPPORT_32BIT_DATA_REGS
+    TBS_bp	dw	?	; Saved EBP
+    TBS_ebpHigh	dw	?
+    TBS_gs	dw	?	;  GS
+    TBS_fs	dw	?	;  FS
+    TBS_es	dw	?	;  ES
+    TBS_ebxHigh	dw	?	;  EBX.high
+    TBS_eaxHigh	dw	?	;  EAX.high
+    TBS_dx	dw	?	;  EDX
+    TBS_edxHigh	dw	?
+    TBS_flags	dw	?	;  Flags
+    TBS_cx	dw	?	;  ECX
+    TBS_ecxHigh	dw	?
+    TBS_di	dw	?	;  EDI
+    TBS_ediHigh	dw	?
+    TBS_si	dw	?	;  ESI
+    TBS_esiHigh	dw	?
+    TBS_ds	dw	?	;  DS
+else
+    TBS_bp	dw	?	; Saved BP
+    TBS_es	dw	?	;  ES
+    TBS_dx	dw	?	;  DX
+    TBS_flags	dw	?	;  Flags
+    TBS_cx	dw	?	;  CX
+    TBS_di	dw	?	;  DI
+    TBS_si	dw	?	;  SI
+    TBS_ds	dw	?	;  DS
+endif	; SUPPORT_32BIT_DATA_REGS
+
+    TBS_ret	dw	?	; NEAR return address (in kcode)
+ThreadBlockState ends
+
+;------------------------------------------------------------------------------
+;	Additional parameters to SysGetInfo
+;------------------------------------------------------------------------------
+
+SysGetInfoTypeInternal	=	0x8000
+SysGetInfoType	equ	SysGetInfoTypeInternal
+
+SGIT_HANDLE_TABLE_START		enum	SysGetInfoType
+SGIT_HANDLE_TABLE_SEGMENT	enum	SysGetInfoType
+SGIT_LAST_HANDLE		enum	SysGetInfoType
+SGIT_BIOS_LOCK			enum	SysGetInfoType
+SGIT_INITIAL_TEXT_MODE		enum	SysGetInfoType
+SGIT_DEFAULT_SIMPLE_GRAPHICS_MODE enum	SysGetInfoType
+SGIT_CURRENT_SIMPLE_GRAPHICS_MODE enum	SysGetInfoType
+SGIT_NUMBER_OF_FREE_HANDLES	enum	SysGetInfoType		;Added 6/14/93
+SGIT_ERROR			enum	SysGetInfoType
+; Return the kernel's errorFlag variable (-1 means no errors)
+SGIT_LAST_DISK_ACCESS		enum	SysGetInfoType
+SGIT_LOADER_VARS_ADDRESS	enum	SysGetInfoType
+SGIT_KCODE_SEGMENT		enum	SysGetInfoType
+SGIT_XIP_HEADER_SEGMENT		enum	SysGetInfoType
+
+SGIT_SWAP_FREE_SIZE		enum	SysGetInfoType
+; returns dx:ax - maximum amount of free swap space.  Actual amount
+; may be less, if, for example, the disk on which the swap file
+; resides contains less free space than the swap file might need.
+
+SGIT_HEAP_FREE_SIZE		enum	SysGetInfoType
+; returns dx:ax - number of bytes free
+
+;------------------------------------------------------------------------------
+;	Additional functions available to system software
+;------------------------------------------------------------------------------
+global MemGrabHeap:far
+global MemReleaseHeap:far
+
+global SysAddIdleIntercept:far
+;
+; Description:
+;	Add a routine to the list of routines to be called at idle time.  The
+;	routine called gets passed nothing, returns nothing and should
+;	destroy nothing.
+; Pass:
+;	dx:ax - routine to add
+; Return:
+;	carry - set if routine could not be added (table full)
+; Destroy:
+;	none
+
+global SysRemoveIdleIntercept:far
+;
+; Description:
+;	Remove a routine from the list of routines to be called at idle time
+; Pass:
+;	dx:ax - routine to remove
+; Return:
+;	carry - set if routine could not be found
+; Destroy:
+;	none
+
+global HeapGetOperatingSpace:far
+;
+; Description:
+;	Get space available on heap, total of free + non-locked discardable,
+;	plus swappable that can be swapped.
+; Pass:
+;	nothing
+; Return:
+;	ax - available space, in paragraphs
+
+global HeapGetOperatingSpaceUsedByGeode:far
+;
+; Description:
+;	Get non-discardable space on heap being used by application
+; Pass:
+;	nothing
+; Return:
+;	ax - space being used, in paragraphs
+
+EndKernel

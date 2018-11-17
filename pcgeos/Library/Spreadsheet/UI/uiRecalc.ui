@@ -1,0 +1,206 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  uiRecalc.ui
+ * FILE:	  uiRecalc.ui
+ *
+ * AUTHOR:  	  Gene Anderson: Aug  4, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	8/ 4/92	  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	UI for SSRecalcControl
+ *
+ *
+ * 	$Id: uiRecalc.ui,v 1.1 97/04/07 11:13:04 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#include "Art/mkrRecalc.ui"
+
+start SSRecalcUI, notDetachable;
+
+/****************************************************************************
+ *	"Calculate Now" trigger
+ ***************************************************************************/
+
+RecalcTrigger = GenTrigger {
+	genStates = default -usable;
+	moniker = 'N', "Calculate Now";
+	kbdAccelerator = specificUI control '=';
+	action = MSG_SSRC_RECALC_NOW, "TO_OBJ_BLOCK_OUTPUT";
+}
+
+/****************************************************************************
+ *	"Calculation" DB
+ ***************************************************************************/
+
+ConvergeDB = GenInteraction {
+	genStates = default -usable;
+#ifdef GPC_ONLY
+	moniker = 'l', "Calculations";
+#else
+	moniker = 'l', "Calculation";
+#endif
+	children =
+		RecalcApplyTrigger,
+#ifdef GPC_ONLY
+		RecalcCancelTrigger,
+#endif
+		RecalcAutoList,
+		IterationOptions;
+	visibility = dialog;
+	type = properties;
+	attributes = default +modal;
+	hints = {
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbRecalc", 0
+		}
+	}
+}
+
+RecalcApplyTrigger = GenTrigger {
+#ifdef GPC_ONLY
+	moniker = "Change";
+	genAttributes = default +signalInteractionComplete;
+#endif
+	action = MSG_SSRC_SET_RECALC, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY }
+	}
+}
+
+#ifdef GPC_ONLY
+RecalcCancelTrigger = GenTrigger {
+	moniker = "Don't Change";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_SSRC_SET_RECALC, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS }
+	}
+}
+#endif
+
+RecalcAutoList = GenItemGroup {
+#ifdef GPC
+	moniker = "Perform Cell Calculations";
+#endif
+	children =
+		AutoItemEntry,
+		ManualItemEntry;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+#ifdef GPC
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+#endif
+		HINT_DRAW_IN_BOX
+	}
+}
+
+AutoItemEntry = GenItem {
+#ifdef GPC
+	moniker = 'A', "Automatically";
+#else
+	moniker = 'A', "Automatic";
+#endif
+	identifier = 0;
+}
+
+ManualItemEntry = GenItem {
+#ifdef GPC
+	moniker = 'M', "Manually";
+#else
+	moniker = 'M', "Manual";
+#endif
+	identifier = "mask SF_MANUAL_RECALC";
+}
+
+IterationOptions = GenInteraction {
+#ifdef GPC
+	moniker = "Circular References";
+#endif
+	children =
+		IterationList,
+		IterationNumMax,
+		IterationChangeMax;
+	hints = {
+		HINT_DRAW_IN_BOX
+	}
+}
+
+IterationList = GenBooleanGroup {
+	children =
+		IterationEntry;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG { word MSG_SSRC_ITERATE_ON_OFF }
+	}
+}
+
+IterationEntry = GenBoolean {
+	moniker = 'I', "Allow Iteration";
+	identifier = "mask SF_ALLOW_ITERATION";
+}
+
+IterationNumMax = GenValue {
+	moniker = 't', "Maximum Iterations:";
+	value = 100;
+	minimum = 1;
+	maximum = 1000;
+	increment = 1;
+}
+
+IterationChangeMax = GenText {
+	moniker = 'C', "Maximum Change:";
+	textDisplayAttributes =
+		singleLineText,
+		useTabForNavigation;
+	maxLength = "MAX_CHARS_FOR_NORMAL_NUMBER-MAX_CHARS_FOR_NULL_TERM";
+	hints = {
+		ATTR_GEN_TEXT_SIGNED_DECIMAL,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 1*72>
+			SpecHeight <>
+		}
+	}
+}
+
+end SSRecalcUI;
+
+start SSRecalcToolUI, notDetachable;
+
+/****************************************************************************
+ *	"Calculate Now" tool
+ ***************************************************************************/
+
+RecalcTool = GenTrigger {
+	genStates = default -usable;
+	TOOL_MONIKER_LIST(Recalc)
+	action = MSG_SSRC_RECALC_NOW, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { ATTR_GEN_FOCUS_HELP { optr SSRCRecalcToolName } }
+}
+
+end SSRecalcToolUI;
+
+/****************************************************************************
+ *	Strings for controllers
+ ***************************************************************************/
+
+start ControlStrings, data;
+
+chunk SSRCName = "Recalculation";
+
+chunk SSRCRecalcName = "Calculate Now";
+chunk SSRCConvergeName = "Calculation";
+
+chunk SSRCRecalcToolName = "Calculate Now";
+
+end ControlStrings;

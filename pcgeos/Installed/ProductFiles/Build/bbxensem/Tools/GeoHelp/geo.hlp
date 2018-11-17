@@ -1,0 +1,747 @@
+
+@main_script
+call @set_defaults
+call @intro_text
+call @main_menu ; No returns from @main_menu
+quit
+
+@set_defaults
+set $bootdrive= "C:"
+set $printport= "PRN"
+set $segment = "0000"
+set $offset = "0000"
+return
+
+@intro_text
+text
+
+                     INTRODUCING GEOHELP
+
+GeoHelp is designed to help you solve problems running your 
+GeoWorks software.
+
+It will take you through some basic troubleshooting procedures,
+and it includes utilities for editing and viewing your system's 
+AUTOEXEC.BAT and CONFIG.SYS files and for viewing various
+hardware data.
+
+endtext
+wait
+return
+
+
+screen @main_menu
+clear
+text
+                  GEOHELP MAIN MENU
+
+Please use your up and down arrow keys to make a selection,
+then press Enter.
+endtext
+menu
+"Troubleshooting Your GeoWorks Software",               @main_1,
+"Before You Call Technical Support...",         @main_2,
+"Edit/View AUTOEXEC.BAT",                       @main_3,
+"Edit/View CONFIG.SYS",                         @main_4,
+"Display COM and LPT Port Addresses",           @main_5,
+"Display Basic Hardware Information",           @main_6,
+"Display BIOS Information",                     @main_7,
+"Display Video BIOS",                           @main_8,
+"Quit",                                 @main_9,
+endmenu
+
+@main_1
+call @compat_menu
+goto @main_menu
+
+@main_2
+call @support_text
+goto @main_menu
+
+@main_3
+set $file = "AUTOEXEC.BAT"
+set $path = "\"
+set $drive = $bootdrive
+call @file_ops
+goto @main_menu
+
+@main_4
+set $file = "CONFIG.SYS"
+set $path = "\"
+set $drive = $bootdrive
+call @file_ops
+goto @main_menu
+
+@main_5
+call @port_add_text
+sysinfo "ms","0040:0000,000f"
+goto @main_menu
+
+@main_6
+sysinfo
+goto @main_menu
+
+@main_7
+call @bios_info_text
+sysinfo "ms","f800:0000,01f0"
+sysinfo "ms","f000:0000,01f0"
+goto @main_menu
+
+@main_8
+call @vid_bios_text
+sysinfo "ms","c000:0000,01f0"
+goto @main_menu
+
+@main_9
+quit
+
+
+@compat_menu
+clear
+text
+                    GEOWORKS COMPATIBILITY MENU
+
+If you can't get Ensemble to run on your system, or if you experience 
+unexplainable crashes, lockups, or system errors,  we recommend that 
+you go through each item on this menu in sequence. 
+
+Additional sources of information include the file trouble.txt located 
+in the \GEOS20 directory and the GeoWrite file HELP ME! located in the 
+\GEOS20\DOCUMENT directory.
+endtext
+menu
+"1) Introduction--What Could Be Causing a Problem", @compat_1, 
+"2) Test for High Memory Conflicts",    @compat_2, 
+"3) Boot-from-a-Floppy-Disk Test",              @compat_3,
+"4) Serial Ports--Mice and Modems",             @compat_4,
+"5) Printing Problems",                 @compat_5,
+"6) Before You Call Technical Support...",      @compat_6,
+"Quit Compatibility Menu",              @yes,
+endmenu
+
+@compat_1
+call @gen_script
+goto @compat_menu
+
+@compat_2
+call @himem_script
+goto @compat_menu
+
+@compat_3
+call @floppy_boot_script
+goto @compat_menu
+
+@compat_4
+call @serial_script
+goto @compat_menu
+
+@compat_5
+call @printing_script
+goto @compat_menu
+
+@compat_6
+call @support_text
+goto @main_menu
+
+
+@support_text
+clear
+text
+             BEFORE YOU CALL TECHNICAL SUPPORT...
+
+So, you are apparently experiencing a compatibility problem
+running your GeoWorks software and have reached the point where 
+you need to contact technical support.  Here are some tips to make
+your call as productive as possible.
+endtext
+
+wait
+clear
+text
+BEFORE YOU CALL TECHNICAL SUPPORT, cont'd
+
+1) Make sure you've checked the file trouble.txt located in the
+   \GEOS20 directory and that you've gone through the Trouble-
+   shooting section of this program.  You may be able to solve 
+   the problem yourself.
+
+2) Be within reach of your computer when you call, if possible.
+
+3) If you are unable to be within reach of your computer, and you are
+   calling about system errors or crashing, print out your system 
+   information before you call.  To do this, exit to DOS, make sure 
+   your printer is ready, and type these commands:
+
+        C:
+        CD\GEOS20
+        PRINFO
+endtext
+wait
+return
+
+
+@file_ops
+clear
+text
+             FILE VIEWING/EDITING OPTIONS
+
+endtext
+menu    
+"View",                 @file_ops_1,
+"Line-edit",            @file_ops_3,
+"Edit",                 @file_ops_4,
+"Append a new line",            @file_ops_5,
+"Quit This Menu",               @yes,
+endmenu
+
+@file_ops_1
+viewfile $drive+$path+$file
+goto @file_ops
+
+@file_ops_3
+call @explain_remedit
+viewfile $drive+$path+$file, "r"
+goto @file_ops
+
+@file_ops_4
+clear
+text
+This procedure will allow you to edit existing lines in a file but
+not to add more lines.
+endtext
+wait
+viewfile $drive+$path+$file, "e"
+goto @file_ops
+
+@file_ops_5
+clear
+print "Enter the line of text you wish to append to " + $file
+getinput "","",$appendstring
+run "echo " + $appendstring + " >> " + $drive+$path+$file
+goto @file_ops
+
+
+@port_add_text
+clear
+text
+                 UNDERSTANDING PORT ADDRESSES
+
+When you start up your system, each parallel and serial port 
+reports its address, or location in memory.  All of these addresses
+are then put in a list, which appears at the location 0040:0000.
+
+On the next screen, you will see this address list displayed.  Here's
+how to interpret it:  
+f8 03 is the address for COM1:, f8 02 for COM2:, e8 03 for COM3:, 
+and e8 02 for COM4:.  
+Parallel port addresses appear on the second half of the line.  
+78 03 is usually LPT1:, 78 02 isusually LPT2:. Sometimes LPT1: 
+can have the address BC 03.
+
+If an address is missing, then either that port does not exist or its
+address has been overwritten by some other software, making it 
+inaccessible to GeoWorks.
+endtext
+wait
+return
+
+
+@bios_info_text
+clear
+text
+                 UNDERSTANDING BIOS INFORMATION
+
+BIOS is a program hard-coded into your computer that deals with low-
+level input/output operations such as keyboard and port interfacing.
+BIOS's can have bugs or quirks, just like any other program.
+
+If you are experiencing severe compatibility problems with GeoWorks (i.e.
+it won't run or it crashes a lot), it may be helpful for us to
+know what BIOS you're running.
+
+On the next few screens, we will display an area of BIOS in
+which trademark and version information is often displayed (this
+information may also appear on your screen when you boot up).
+Look in the column running down the right-hand side of the screen.
+If manufacturer information is included in your BIOS, it may appear 
+here in somewhat readable form.
+endtext
+wait
+return
+
+@vid_bios_text
+clear
+text
+                   UNDERSTANDING VIDEO BIOS
+
+Video BIOS is the program hard-coded into your video adapter that
+runs the video display.  If you are having video-related problems
+with GeoWorks, it may be helpful for us to know what type of video
+BIOS is on your system.
+
+On the next few screens, we will display an area of Video BIOS in
+which trademark and version information is often displayed (this
+information may also appear on your screen when you boot up).
+Look in the column running down the right-hand side of the screen.
+If manufacturer information is included in your BIOS, it may appear 
+here in somewhat readable form.
+endtext
+wait
+return
+
+
+
+@gen_script
+text
+               WHAT COULD BE CAUSING A PROBLEM
+
+There are three general categories of problem that will keep GeoWorks
+from running properly on a system:
+     1) Improper Installation or Damaged Files,
+     2) Software Conflicts, and
+     3) Hardware Conflicts.
+
+If you ran the INSTALL program from your GeoWorks disks and 
+got through the entire set, then it should be installed properly.
+
+If the software just doesn't work (particularly if it once did),
+it is possible that bad data has gotten into a program file, in 
+which case you may want to try re-installing.
+endtext
+wait
+clear
+text
+                 RE-INSTALLING THE SOFTWARE
+
+If you decide to re-install, just run INSTALL again from your GeoWorks 
+floppy disks, the same way you did originally.  You do not need to 
+erase anything from your hard drive; the INSTALL program will overwrite 
+the old files.  
+
+INSTALL will not overwrite documents you have created.
+endtext
+wait
+
+clear
+text
+                  WHAT'S A SOFTWARE CONFLICT?
+
+When you turn on your system, DOS looks for two files, CONFIG.SYS and 
+AUTOEXEC.BAT, and follows their instructions to load mouse drivers, 
+extra memory managers, and other utilities into memory.  These utilities 
+are designed to stay in memory while you run other programs and so 
+are called "Terminate-and-Stay-Resident" or TSR programs.  
+
+TSR's should generally be harmless, but in some cases, one might 
+conflict with GeoWorks, preventing it from working properly
+or causing system errors or crashes.
+endtext
+wait
+clear
+
+text
+WHAT'S A SOFTWARE CONFLICT, cont'd
+
+A software conflict ONLY results from software that's running in the
+background, that is, a TSR.  A standard application such as WordPerfect
+or Lotus 1-2-3 will NOT have any affect on GeoWorks unless it includes
+some TSR that gets launched in AUTOEXEC.BAT or CONFIG.SYS.
+
+The best way to test for a software conflict is to run the "Boot-from-a-
+Floppy-Disk" test included in GeoHelp.  If your system has any type of high
+memory (memory beyond 640K), you should also try the "Test for High Memory
+Conflicts."
+endtext
+wait
+clear
+text
+                   HARDWARE CONFLICTS
+
+There is no simple way to diagnose hardware conflicts.  A problem in the 
+video system, for example, may make the screen go blank--which seems 
+logical enough.  However, it may just cause the keyboard and mouse to 
+freeze up--which does not seem logical at all.
+
+Once isolated, hardware problems can also be difficult or expensive to fix.
+You may find that some component that functions adequately for one 
+program does not always work with another, and needs to be replaced.
+
+If we isolate some computer hardware that causes problems for GeoWorks, our 
+engineers can attempt to write a "fix" into the software to handle it.
+Such solutions can be quite time-consuming, however, and may not be 
+practical for one-of-a-kind systems or non-standard hardware.
+endtext
+wait
+clear
+text
+HARDWARE CONFLICTS, cont'd
+
+Basically, software conflicts are usually easier to fix than hardware
+conflicts.
+
+If you have gone through the "Boot-from-a-Floppy-Disk" test and the "Test
+for High Memory Conflicts," and your system still crashes or won't run
+at all, check through the list of known conflicts in the file trouble.txt
+located in the \GEOS20 directory.  If you find no help there, check the 
+section "Before You Call Technical Support" in this program and then 
+give tech support or your PC technician a call. 
+
+endtext
+wait
+return
+
+
+@himem_script
+call @nomem_text
+if $continue="false",@skip_nomem
+call @run_nomem
+call @if_nomem_worked
+@skip_nomem
+return
+
+@floppy_boot_script
+call @floppy_text
+if $continue="false", @skip_floppy
+call @create_sys_floppy
+call @if_floppy_worked
+@skip_floppy
+return
+
+@serial_script
+clear
+text
+                   SERIAL PORTS-MICE AND MODEMS
+
+Mouse and modem problems can be caused by incorrectly-configured
+serial ports.  We suggest that you try the following in the event
+of a mouse or modem problem:
+
+If it is a mouse problem, first try changing your mouse selection
+in GeoWorks. Be sure to try the selection "Nothing Else Works" in the
+GeoWorks mouse menu.  You can change mouse drivers either in Preferences
+or by running the command SETUP from the prompt in the GEOS20 directory.
+endtext
+wait
+clear
+text
+SERIAL PORTS-MICE AND MODEMS, cont'd
+
+For more complicated problems that cannot be resolved with the 
+"Nothing Else Works" mouse selection, check through the appropriate 
+sections in the file trouble.txt located in the \GEOS20 directory
+and the GeoWrite file HELP ME! located in \GEOS20\DOCUMENT.
+endtext
+wait
+return
+
+@printing_script
+clear
+text
+                       PRINTING PROBLEMS
+
+The GeoWrite file HELP ME! located in \GEOS20\DOCUMENT is the best 
+resource for dealing with printer problems.  The next screen describes 
+a few common problems (again, check HELP ME! for more details).
+endtext
+wait
+clear
+text
+   PROBLEM                TYPICAL CAUSE
+Prints "garbage"        Incorrect printer driver. Also could be a
+                        data transmission error. Set printer port 
+                        interface to BIOS (see below).
+
+Prints nothing at all   Port interface problem. Open Preferences, click
+                        on Computer, set LPT1: option to BIOS. If that
+                        doesn't work, set option to DOS.
+
+Crashes when printing   Compatibility problem. Try changing port
+                        interface, as above. Also try going through
+                        "High-Memory Conflict" and "Boot-From-Floppy-
+                        Disk" sections in GeoHelp Troubleshooting.
+endtext
+wait
+return
+
+
+@nomem_text
+text
+                  THE GEOWORKS /nomem TEST
+
+A simple test for software conflicts is to run GeoWorks using the 
+option /nomem, which tells it to run entirely in standard memory.
+This keeps it from using your system's extended or expanded 
+memory.  Many TSRs run in extended or expanded memory--this is often
+where conflicts occur.
+
+It is a good idea to try the /nomem option if your system has memory 
+greater than 640K and GeoWorks does not seem to be running properly.
+
+endtext
+wait
+
+clear
+text
+To try the /nomem option from the DOS prompt, type this command:
+
+        GEOS20  /nomem
+
+Or we can simply try it from here.
+endtext
+prompt "Do you want to test GeoWorks with the /nomem parameter?", @yes,@no
+
+@run_nomem
+text
+If GeoWorks does not run properly using the /nomem option,
+please continue through the rest of the GEOHELP program.
+endtext
+wait
+runexe $geosdrive+$geospath+"\loader", "/nomem"
+return
+
+@if_nomem_worked
+clear
+text
+                     IF THE /nomem OPTION WORKED
+
+If GeoWorks ran properly using the /nomem option, you may simply want to
+make the /nomem setting permanent.  (You can actually reverse this set-
+ting in GeoWorks' Preferences program). This will not affect the 
+operation of any programs outside GeoWorks. 
+
+Also, since all of the programs within GeoWorks are written to run
+efficiently within even 512K of memory, the performance of your
+GeoWorks programs should not be hampered severely.
+
+If you suspect a TSR program may be causing the problem and you would like
+to track it down, we suggest you try using the GEOHELP utilities to edit
+your CONFIG.SYS and AUTOEXEC.BAT files line-by-line until you isolate
+the culprit.
+endtext
+wait
+clear
+text
+To make the /nomem option permanent, follow these steps:
+
+        1) Run GeoWorks from the DOS prompt by typing this command:
+                
+                GEOS20 /nomem
+
+        2) Start the Preferences application
+
+        3) Click the Computer button
+
+        4) Under Extra Memory Type, click the None button
+
+        5) Click OK
+endtext
+wait
+return
+
+
+@floppy_text
+text
+                    "BOOT-FROM-A-FLOPPY-DISK" TEST
+
+An easy way to eliminate the possibility of TSR software conflicts is to 
+run without any TSR's.
+
+If you start up your machine using the DOS on a floppy disk, you can
+completely avoid any TSR's on your hard drive--without having to do
+anything to your hard drive at all.
+
+The procedure is explained in the file HELP ME!. For your 
+convenience, we have automated it in this program.
+endtext
+wait
+clear
+text
+"BOOT-FROM-A-FLOPPY-DISK" TEST, cont'd
+
+The TSR Conflict Test test has the following steps:
+
+1) We will format a floppy disk in your A: drive and copy the DOS
+   system files (but no TSR's) to it.
+
+2) We will restart the system using the DOS on this floppy disk.
+
+3) We will then try to run GeoWorks on the system with no TSR's loaded.
+
+The procedure does not affect any files or data on your hard disk.
+
+You will need a blank floppy disk or one with no important files on it 
+for re-formatting.
+endtext
+wait
+
+prompt "Do you want to try the TSR Conflict Test?",@yes,@no
+
+@create_sys_floppy
+text
+Please put a floppy disk in drive A:
+
+
+   *******************************************************************
+   *                                                                 *
+   *    WARNING: The floppy disk in A: will be re-formatted          *
+   *    and all files on it will be erased!  Use a blank disk or     *
+   *                one with no important files!                     *
+   *                                                                 *
+   *******************************************************************
+
+Press enter when the disk in drive A: is ready, hit esc to cancel.
+endtext
+wait
+
+@format_floppy
+text
+What type of disk is in your A: drive?  
+(5.25 inch drives are most common for drive A:)
+endtext
+menu
+"5.25 inch 360K standard or 'double density' floppy disk",      @format_360k,
+"5.25 inch 1.2M high density floppy disk",              @format_12M,
+"5.25 inch unknown density",                    @unknown_525,
+"5.25 inch double-density disk in a high-density drive", @format_360_in_high_density,
+"3.5 inch 720K standard microfloppy disk",              @format_720K,
+"3.5 inch 1.44M high density microfloppy disk",         @format_144M,
+"3.5 inch unknown density",                     @unknown_35,
+"Exit format procedure",                        @main_menu,
+endmenu
+
+@unknown_525
+print "We will try to format the disk as 360K.  Please watch for"
+print "error messages during formatting.  If any occur, try "
+print "selecting 5.25 inch 1.2M."
+wait
+goto @format_360K
+
+@unknown_35
+print "We will try to format the disk as 720K.  Please watch for"
+print "error messages during formatting.  If any occur, try "
+print "selecting 3.5 inch 1.44M."
+wait
+goto @format_720K
+
+@format_360K
+run "format A:/s"
+goto @format_successful
+
+@format_12M
+run "format A:/s"
+goto @format_successful
+
+@format_360_in_high_density
+run "format A:/4/s"
+goto @format_successful
+
+@format_720K
+run "format A:/n:9/t:80/s"
+goto @format_successful
+
+@format_144M
+run "format A:/t:80/s"
+goto @format_successful
+
+@format_successful
+prompt "Was the format successful?",@create_sysfiles
+text
+It may be that the FORMAT program is not in your current path or
+that you selected the wrong disk type of disk.  Please note what
+error messages appeared and either try again or skip this part
+of the GEOHELP program.
+endtext
+wait
+goto @format_floppy
+
+
+@create_sysfiles
+text
+Please leave the newly formatted disk in A: while we copy some files
+to it and restart the computer.
+endtext
+
+createfile "A:\CONFIG.SYS"
+"files = 30"
+"buffers = 30"
+endcreatefile
+
+createfile "A:\AUTOEXEC.BAT"
+"echo off"
+"cls"
+"prompt $p$g"
+"path c:\;c:\dos;"+$geosdrive+$geospath
+"echo ."
+"echo    We will now attempt to run GeoWorks.  If whatever problems"
+"echo    you experienced before do not recur, then they very likely were"
+"echo    caused by TSR's or utilities loaded by your hard drive's CONFIG.SYS"
+"echo    or AUTOEXEC.BAT files. "
+"echo . "
+"echo    If this is the case, we recommend you run GEOHELP again and use the "
+"echo    GEOHELP utilities to line-edit CONFIG.SYS and AUTOEXEC.BAT, in order "
+"echo    to isolate the problem."
+"echo ."
+"pause"
+$geosdrive
+"cd"+$geospath
+"loader"
+"geohelp"
+endcreatefile
+
+text
+We will now restart your computer.  Please leave the new system
+diskette in drive A:  If any problems occur, remove the diskette
+and restart your computer, then please return to the GEOHELP
+program.
+endtext
+reboot
+return
+
+@if_floppy_worked
+text
+If running GeoWorks after restarting with a floppy disk seemed to work, then
+its previous misbehavior was probably caused by a conflict with some
+TSR that loaded via your system's CONFIG.SYS or AUTOEXEC.BAT files.
+
+If this is the case, you may want to edit these files in order to
+track down and eliminate the conflicting program.
+
+To do this, we suggest you go back to the GEOHELP Main Menu and use 
+the GEOHELP Utilities.  If you isolate a TSR conflict, please let us
+know.
+
+If running from a floppy disk did not work, then we may be facing some 
+kind of hardware conflict.
+endtext
+wait
+return
+
+
+@yes
+set $continue = "true"
+
+return
+
+@no
+set $continue = "false"
+return
+
+
+
+@explain_remedit
+text
+              LINE-EDITING CONFIG.SYS AND AUTOEXEC.BAT
+
+This part of the GEOHELP program does not actually delete lines from
+your AUTOEXEC.BAT or CONFIG.SYS files.  Instead, it places "dummy"
+commands in front of each line you select which tell DOS to ignore
+those lines.  
+
+In AUTOEXEC.BAT, the dummy command is "REM", in CONFIG.SYS, the dummy
+command is "BREAK=ON".
+
+
+endtext
+wait
+return
+

@@ -1,0 +1,897 @@
+/*
+ * Project:	PC GEOS
+ * Module:	Black Jack
+ * File:	bjack.ui
+ *
+ * Author:	Bryan Chow
+ *
+ *	This file contains the user Interface description for this
+ * application.
+ *
+ * RCS STAMP: $Id: bjack.ui,v 1.1 97/04/04 15:20:17 newdeal Exp $
+ */
+
+#include "generic.uih"
+#include "cards.uih"
+#include "game.uih"
+/*#include "Art/mkrBJack.ui"
+*/
+#include "Art/mkbjack.ui"
+
+class	BJackGame = Game {
+	special = enumComp byte {
+		none,
+		doubleDown,
+		insurance
+	} : none;
+	cash = dwordComp : 0;
+	markers = wordComp : 1;
+	wager = wordComp : 0;
+	status = enumComp byte {
+		waitingForNewGame,
+		waitingToReplaceCards,
+		busy
+	} : waitingForNewGame;
+	haveName = wordComp : 0;
+}
+
+class	BJackHighScore = HighScore {
+}
+
+class	BJackInteraction = GenInteraction {
+	askedForLoanNameThisGame = wordComp : 0;
+}
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+start	AppResource;
+
+BJackApp = GenApplication vardataReloc {
+	moniker = list {
+		BJackTextMoniker,
+	  /*	BJackYMMoniker
+	  */
+		BJackAppMoniker,
+		BJackTinyMoniker
+	}
+	children = BJackPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+			BJackPrimary;
+	active_list = HallOfFame, HallOfShame;
+	gcnList (MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			BJackCardBackSelector;
+	hints = {
+	 /*	ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER {
+			UN_OPTR SaveOptionsTrigger
+		}, */
+		ATTR_GEN_HELP_FILE { char "bjack", 0 }
+	}
+}
+
+visMoniker BJackTextMoniker = "Black Jack";
+
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+start	Interface;		/* this resource is for misc UI objects */
+
+BJackPrimary = GenPrimary {
+	children = GameMenu, OptionsMenu, InstructionsLine, BJackView,
+		MoneyTriggers, BJackSummonsGroup, InsuranceSummons,
+		DoubleDown10Summons, DoubleDown11Summons, SplitSummons,
+		BJackBustedBox;
+	hints = {
+	/*	HINT_PRIMARY_FULL_SCREEN,  */
+	 	HINT_SIZE_WINDOW_AS_DESIRED, 
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_CENTER_WINDOW,
+		HINT_PRIMARY_NO_FILE_MENU,
+		/*
+		 * Motif will automatically add a help trigger and
+		 * place it in the title bar if ATTR_GEN_HELP_CONTEXT is
+		 * placed on the GenPrimary.
+		 */
+		ATTR_GEN_HELP_CONTEXT {
+			char "TOC", 0
+		},
+		ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT,
+		HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP,
+		ATTR_GEN_WINDOW_KBD_OVERRIDE {
+			word	KO_NO_KEYBOARD
+		}
+	}
+}
+
+BJackSummonsGroup = BJackInteraction {
+	attributes =  notUserInitiatable;
+	type = organizational;
+	visibility = dialog;
+	children = GetLoanBox;
+}
+
+
+end Interface;
+
+
+/*-----------------------------------------------------------------------------
+	UI Objects within Primary window
+-----------------------------------------------------------------------------*/
+
+/******************************************************************************
+				Deck
+******************************************************************************/
+start	Interface;
+
+GameMenu = GenInteraction {
+	visibility = popup;
+	moniker = 'G', "Game";
+	children =	BorrowTrigger,
+			CashOutTrigger,
+			HallOfFame,
+			HallOfShame;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_INTERACTION_GROUP_TYPE {
+			GenInteractionGroupType GIGT_FILE_MENU
+			}
+	}
+}
+
+BorrowTrigger = GenTrigger {
+	moniker = 'B', "Borrow 100";
+	action = MSG_BORROW_ONE_HUNDRED_DOLLARS, MyPlayingTable;
+}
+
+CashOutTrigger = GenTrigger {
+	moniker = 'C', "Cash Out";
+	action = MSG_CASH_OUT, MyPlayingTable;
+}
+HallOfFame = BJackHighScore {
+	fileName = "Black Jack Hall of Fame";
+	creator = {
+		<'BJAK'>, MANUFACTURER_ID_GEOWORKS
+	}
+	highScoreTitle = "The Big Shots";
+	scoreType = ST_MONEY;
+	hints = {
+		ATTR_HIGH_SCORE_SCORE_TITLE_MONIKER {
+			lptr WonString
+		},
+		ATTR_HIGH_SCORE_SHOW_SCORES_TRIGGER_MONIKER {
+			lptr ShowHallOfFame
+		}/*,
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP,
+		ATTR_GEN_HELP_CONTEXT {
+			char "Big Shot", 0
+		} */
+	}
+	highScoreLine2 = "You have one of the biggest payoffs ever!";
+	highScoreLine4 = "Please sign in the Hall of Fame:";
+}
+visMoniker ShowHallOfFame = 'F', "Hall Of Fame";
+chunk WonString = "Won";
+HallOfShame = BJackHighScore {
+	fileName = "Black Jack Hall of Shame";
+	creator = {
+		<'BJAK'>, MANUFACTURER_ID_GEOWORKS
+	}
+	highScoreTitle = "The Hit List";
+	scoreType = ST_MONEY;
+	hints = {
+		ATTR_HIGH_SCORE_SCORE_TITLE_MONIKER {
+			lptr OwesString
+		},
+		ATTR_HIGH_SCORE_SHOW_SCORES_TRIGGER_MONIKER {
+			lptr ShowHallOfShame
+		}/*,
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP,
+		ATTR_GEN_HELP_CONTEXT {
+			char "Hit List", 0
+		} */
+	}
+	highScoreLine1 = "Uh oh...";
+	highScoreLine2 = "You have one of the biggest debts ever!";
+	highScoreLine4 = "The boss insists that you sign your name:";
+}
+visMoniker ShowHallOfShame = 'S', "Hall Of Shame";
+chunk OwesString = "Owes";
+
+OptionsMenu = GenInteraction {
+	moniker = 'O', "Options";
+	visibility = popup;
+	children = BJackCardBackSelector, 
+			SoundInteraction, 
+/*			FadeInteraction, 		*/
+			RulesInteraction, 
+			SaveOptionsTrigger;
+}
+
+BJackCardBackSelector = CardBackSelector {
+	moniker = 'C', "Change Card Backs";
+	type = properties;
+	visibility = dialog;
+}
+
+/*
+
+FadeInteraction = GenInteraction {
+	children = FadeList;
+	visibility = subGroup;
+}
+
+FadeList = GenBooleanGroup {
+	children = FadeEntry;
+	applyMsg = MSG_SET_FADE_STATUS;
+	destination = MyPlayingTable;
+	selectedBooleans = 1;
+}
+
+FadeEntry = GenBoolean {
+	moniker = 'F', "Fade Cards";
+	identifier = 1;
+}
+
+*/
+
+SoundInteraction = GenInteraction {
+	visibility = popup;
+	moniker = 'S', "Sound";
+	children = SoundList;
+}
+
+SoundList = GenItemGroup {
+	children = SoundOnEntry, SoundOffEntry, SoundSystemDefaultEntry;
+	selection = "GSS_SOUND_USE_SYSTEM_DEFAULT";
+	numSelections = 1;
+}
+
+SoundOnEntry = GenItem {
+	moniker = 'S',"Sound On";
+	identifier = "GSS_SOUND_ON";
+}
+
+SoundOffEntry = GenItem {
+	moniker = 'O',"Sound Off";
+	identifier = "GSS_SOUND_OFF";
+}
+
+SoundSystemDefaultEntry = GenItem {
+	moniker = 'P', "Use System Preference";
+	identifier = "GSS_SOUND_USE_SYSTEM_DEFAULT";
+}
+
+RulesInteraction = GenInteraction {
+	moniker = 'R', "House Rules";
+	visibility = dialog;
+	type = command;
+	children = DealerStayRule, AcesSplitRule, DoubleDownRule;
+	hints = {
+		HINT_DIVIDE_WIDTH_EQUALLY
+	}
+}
+
+DoubleDownRule = GenItemGroup {
+	moniker = "Double Down Allowed On";
+	children = DoubleDownTenAndEleven, DoubleDownEleven;
+	selection = "DOUBLE_DOWN_TEN_AND_ELEVEN";
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+
+DoubleDownEleven = GenItem {
+	moniker = "Eleven Only";
+	identifier = "DOUBLE_DOWN_ELEVEN";
+}
+
+DoubleDownTenAndEleven = GenItem {
+	moniker = "Ten or Eleven";
+	identifier = "DOUBLE_DOWN_TEN_AND_ELEVEN";
+}
+
+DealerStayRule = GenItemGroup {
+	moniker = "Dealer Stays On";
+	children = DealerStayHardSeventeen, DealerStaySoftSeventeen;
+	selection = "DEALER_STAY_HARD_SEVENTEEN";
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DRAW_IN_BOX,
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+DealerStayHardSeventeen = GenItem {
+	moniker = "Hard Seventeen Only";
+	identifier = "DEALER_STAY_HARD_SEVENTEEN";
+}
+
+DealerStaySoftSeventeen = GenItem {
+	moniker = "Any Seventeen";
+	identifier = "DEALER_STAY_SOFT_SEVENTEEN";
+}
+
+AcesSplitRule = GenItemGroup {
+	moniker = "Split Allowed On";
+	children = AllSplit, AcesOnlySplit;
+	selection = "ALL_SPLIT";
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DRAW_IN_BOX,
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+AllSplit = GenItem {
+	moniker = "Any Pair";
+	identifier = "ALL_SPLIT";
+}
+
+AcesOnlySplit = GenItem {
+	moniker = "Pair of Aces Only";
+	identifier = "ACES_ONLY_SPLIT";
+}
+
+SaveOptionsTrigger = GenTrigger {
+	moniker = 'O', "Save Options";
+	action = MSG_BJACK_SAVE_OPTIONS, process;
+}
+
+InstructionsLine = GenText {
+	genAttributes = default +readOnly;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DRAW_IN_BOX,
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 2>
+		},
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		},
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+
+
+
+MoneyTriggers = GenInteraction {
+	children = MoneyTextInteraction, PlusTriggersInteraction,
+		MinusTriggersInteraction;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+			HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ELSE,
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+			HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+MoneyTextInteraction = GenInteraction {
+	children = CashTextDisplay, BetTextDisplay;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+CashTextDisplay = GenText {
+	textDisplayAttributes = default +singleLineText, +noWordWrapping;
+	genAttributes = default +readOnly;
+
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_FIXED_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 14>
+				SpecHeight <>
+			},
+		HINT_ELSE,
+			HINT_FIXED_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 17>
+				SpecHeight <>
+			},
+		HINT_ENDIF
+	}
+}
+
+chunk CashText = {Cash : }
+
+BetTextDisplay = GenText {
+	textDisplayAttributes = default +singleLineText, +noWordWrapping;
+	genAttributes = default +readOnly;
+
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_FIXED_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 12>
+				SpecHeight <>
+			},
+		HINT_ELSE,
+			HINT_FIXED_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 10>
+				SpecHeight <>
+			},
+		HINT_ENDIF
+
+	}
+}
+
+chunk BetText = {Bet : }
+
+
+PlusTriggersInteraction = GenInteraction {
+	children = 	OneDollarTrigger,
+			FiveDollarTrigger,
+			TwentyFiveDollarTrigger, 
+			OneHundredDollarTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+MinusTriggersInteraction = GenInteraction {
+	children = 	MinusOneDollarTrigger,
+			MinusFiveDollarTrigger,
+			MinusTwentyFiveDollarTrigger, 
+			MinusOneHundredDollarTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+
+
+OneDollarTrigger = GenTrigger {
+	moniker = " +1";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	1
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+
+FiveDollarTrigger = GenTrigger {
+	moniker = " +5";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	5
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+TwentyFiveDollarTrigger = GenTrigger {
+	moniker = "+25";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	25
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+OneHundredDollarTrigger = GenTrigger {
+	moniker = "+100";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	100
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 4>
+			SpecHeight <>
+		}
+	}
+}
+MinusOneDollarTrigger = GenTrigger {
+	moniker = " -1";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	-1
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+
+MinusFiveDollarTrigger = GenTrigger {
+	moniker = " -5";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	-5
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+MinusTwentyFiveDollarTrigger = GenTrigger {
+	moniker = "-25";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	-25
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+MinusOneHundredDollarTrigger = GenTrigger {
+	moniker = "-100";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	-100
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 4>
+			SpecHeight <>
+		}
+	}
+}
+
+
+
+chunk YouWonText = {You Won : }
+chunk YouLostText = {You Lost : }
+
+
+BJackBustedBox	= GenInteraction {
+	visibility = dialog;
+	type = multipleResponse;
+	attributes = notUserInitiatable;
+	children = BrokeText,BrokeBorrowOneHundredTrigger,BrokeCashOutTrigger;
+}
+
+BrokeText = GenText {
+	genAttributes = readOnly;
+	text = "You are broke, busted, spent, strapped, penniless, empty handed, wiped out, sans cash and otherwise destitute. \\\r\\\rWhat would you like to do?";
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+BrokeCashOutTrigger = GenTrigger {
+	moniker = "Cash Out";
+	action = MSG_CASH_OUT_SET_WAITING_FOR_NEW_GAME, MyPlayingTable;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+BrokeBorrowOneHundredTrigger = GenTrigger {
+	moniker = "Borrow 100";
+	action = MSG_BORROW_ONE_HUNDRED_DOLLARS_SET_WAITING_FOR_NEW_GAME, MyPlayingTable;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+
+BJackView = GenView {
+	output = MyPlayingTable;
+	backColorR = C_TABLE;
+	horizAttributes = default +noLargerThanContent;
+	vertAttributes = default +noLargerThanContent;
+	hints = {
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 620>
+			SpecHeight<SST_PIXELS, 300>
+		},
+		HINT_DEFAULT_TARGET
+	}
+}
+
+GetLoanBox = GenInteraction {
+        attributes = default +modal, +initiatedViaUserDoDialog;
+	type = notification;
+	visibility = dialog;
+	children = GetLoanTitle1, GetLoanTitle2, LoanSpaceGlyph,
+		   GetLoanGlyph, GetLoanText;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+	}
+}
+
+GetLoanTitle1 = GenGlyph {
+	moniker = "Your loan has been approved.";
+}
+GetLoanTitle2 = GenGlyph {
+	moniker = "We trust that repayment will be swift...";
+}
+
+LoanSpaceGlyph = GenGlyph {
+	moniker = " ";
+}
+
+GetLoanGlyph = GenGlyph {
+	moniker = "Please sign here";
+}
+
+GetLoanText = GenText {
+	maxLength = 32;
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		HINT_DEFAULT_FOCUS
+	}
+}
+
+InsuranceSummons = GenInteraction {
+	moniker = "Insurance";
+	type = affirmation;
+	visibility = dialog;
+	attributes = notUserInitiatable, modal, initiatedViaUserDoDialog;
+	children = InsuranceText;
+	hints = {
+/*
+		HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT {
+			SpecWinSizePair < mask SWSS_RATIO or PCT_10,
+					  mask SWSS_RATIO or PCT_35>
+		},
+*/
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbInsurance", 0
+		}
+	}
+}
+
+InsuranceText = GenText {
+	genAttributes = default +readOnly;	
+	text = "The Dealer is showing an Ace! Would you like to buy Insurance?";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		}
+	}
+}
+
+
+
+
+DoubleDown10Summons = GenInteraction {
+	moniker = "Double Your Pleasure";
+	type = affirmation;
+	visibility = dialog;
+	attributes = notUserInitiatable, modal, initiatedViaUserDoDialog;
+	children = DoubleDown10Text;
+	hints = {
+/*		HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT {
+			SpecWinSizePair < mask SWSS_RATIO or PCT_10,
+					  mask SWSS_RATIO or PCT_35>
+		},
+*/
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbDouble", 0
+		}
+	}
+}
+
+DoubleDown10Text = GenText {
+	genAttributes = default +readOnly;	
+	text = "Your total is 10! \\\rWould you like to Double Down?";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		}
+	}
+}
+
+
+DoubleDown11Summons = GenInteraction {
+	moniker = "Double Your Pleasure";
+	type = affirmation;
+	visibility = dialog;
+	attributes = notUserInitiatable, modal, initiatedViaUserDoDialog;
+	children = DoubleDown11Text;
+	hints = {
+/*		HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT {
+			SpecWinSizePair < mask SWSS_RATIO or PCT_10,
+					  mask SWSS_RATIO or PCT_35>
+		},
+*/
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbDouble", 0
+		}
+	}
+}
+
+DoubleDown11Text = GenText {
+	genAttributes = default +readOnly;	
+	text = "Your total is 11! \\\rWould you like to Double Down?";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		}
+	}
+}
+
+SplitSummons = GenInteraction {
+	moniker = "Split Decision";
+	type = affirmation;
+	visibility = dialog;
+	attributes = notUserInitiatable, modal, initiatedViaUserDoDialog;
+	children = SplitText;
+	hints = {
+/*
+		HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT {
+			SpecWinSizePair < mask SWSS_RATIO or PCT_10,
+					  mask SWSS_RATIO or PCT_35>
+		},
+*/
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbSplit", 0
+		}
+	}
+}
+
+SplitText = GenText {
+	genAttributes = default +readOnly;	
+	text = "You certainly have a pair! \\\rWould you like to Split?";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		}
+	}
+}
+
+end Interface;
+
+start StuffResource;
+
+MyPlayingTable = BJackGame {
+	view = BJackView;
+	children = 	MyHand,
+			Deck1,
+			Deck2,
+			Deck3,
+			DiscardDeck,
+			HandInstructions, 
+			Deck1Instructions, 
+			Deck2Instructions, 
+			Deck3Instructions;
+	hand = MyHand;
+	left = 0;
+	top = 0;
+	right = 620;
+	bottom = 300;
+
+	visCompGeoAttrs = default +customManageChildren;
+
+	initialFadeMask = SDM_100;		/* no fading */
+}
+
+MyHand = Hand {
+}
+
+class	MyDeck = Deck {
+}
+
+Deck1 = MyDeck {
+}
+
+Deck2 = MyDeck {
+}
+
+Deck3 = MyDeck {
+}
+
+chunk DealText = "Deal Me!";
+chunk BlankText = "";
+chunk StayText = "Stay";
+chunk HitText = "Hit";
+chunk BustedText ="Busted";
+
+DiscardDeck = MyDeck {
+}
+
+HandInstructions = VisText {
+	text = "Deal Me!";
+	washColor = {
+	     redOrIndex = "C_GREEN";
+		}
+}
+
+Deck1Instructions = VisText {
+	text = "Dealer";
+	washColor = {
+	     redOrIndex = "C_GREEN";
+		}
+}
+Deck2Instructions = VisText {
+	text = "";
+	washColor = {
+	     redOrIndex = "C_GREEN";
+		}
+}
+
+Deck3Instructions = VisText {
+	text = "";
+	washColor = {
+	     redOrIndex = "C_GREEN";
+		}
+}	
+
+chunk	WonMoneyText = data {
+	char "After paying off your debt to the house, you had ", C_CTRL_A,
+	" left over. The boss ain't gonna like this...", 0;
+}
+
+chunk	EvenMoneyText = "After paying off your debts, you came out exactly even. Consider yourself lucky, and better luck next time...";
+
+chunk	LostMoneyText = data {
+	char "After emptying your pockets to repay your debt, you find yourse",
+	"lf ", C_CTRL_A," short. I think you'd better make a run for it...", 0;
+}
+
+chunk WelcomeText = "Welcome to Black Jack! \\\rClick on the 'Deal Me!' card to start.";
+chunk PlayText = "Play your hand...";
+chunk Play2Text = "Play your second hand...";
+chunk IPlayText = "Dealer plays: ";
+chunk IHitText = "Dealer Hits...";
+chunk IStayText = "Dealer Stays.";
+chunk IBustText = "Dealer Busts!!!";
+chunk BlackJackText = "You have Black Jack!!";
+chunk LostInsuranceText = "Cool: The Dealer doesn't have Black Jack. \\\rDrag: You lost your insurance money.";
+chunk DealerText = "Dealer";
+
+chunk FirstHandWinsText = "Your hand wins!";
+chunk SecondHandWinsText = " Your second hand wins!";
+chunk FirstHandPushText = "Your hand draws.";
+chunk SecondHandPushText = " Your second hand draws.";
+chunk DealerWins1Text = "Dealer Wins.";
+chunk DealerWins2Text = " Dealer Wins.";
+chunk DealerBlackJackText = "Dealer has Black Jack!";
+chunk BeingShuffledText = "The deck is being shuffled.";
+chunk HasBeenShuffledText = "The deck has been shuffled.";
+chunk PlayOtherHandText = ""; 
+chunk YouPushText = "You Push";
+end StuffResource;
+
+
+
+
+

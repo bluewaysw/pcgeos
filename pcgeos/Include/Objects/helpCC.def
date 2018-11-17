@@ -1,0 +1,432 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		helpCC.def
+
+AUTHOR:		Gene Anderson, Sep 15, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Gene	9/15/92		Initial revision
+
+
+DESCRIPTION:
+	Definition for HelpControl class
+		
+	$Id: helpCC.def,v 1.1 97/04/04 14:18:05 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__HELP
+
+StartLibrary	ui
+
+include ui.def
+
+;------------------------------------------------------------------------------
+;	Utility routines exported by library
+;------------------------------------------------------------------------------
+
+global	HelpSendHelpNotification:far
+;
+; Send a help notification
+;
+; PASS:		ds:si - ptr to help context name (NULL-terminated)
+;		es:di - ptr to help file name (NULL-terminated)
+;		al - HelpType
+; RETURN:	none
+;
+global	HelpSendFocusNotification:far
+;
+; Send a focus help notification
+;
+; PASS:		^lbx:si - OD of text to use
+; RETURN:	none
+;
+
+;------------------------------------------------------------------------------
+;	C versions
+;------------------------------------------------------------------------------
+global	HELPSENDHELPNOTIFICATION:far
+
+
+MAX_CONTEXT_NAME_LENGTH		equ	20
+MAX_CONTEXT_NAME_LENGTH_ZT	equ	MAX_CONTEXT_NAME_LENGTH+1
+
+if not DBCS_PCGEOS
+CONTEXT_NAME_BUFFER_SIZE	equ (MAX_CONTEXT_NAME_LENGTH_ZT+1) ;word-align
+endif
+
+if DBCS_PCGEOS
+ContextName	type	MAX_CONTEXT_NAME_LENGTH_ZT dup (wchar)
+else
+ContextName	type	CONTEXT_NAME_BUFFER_SIZE dup (char)
+endif
+
+;----------------------------------------------------------------------
+;		HelpControlClass
+;----------------------------------------------------------------------
+	
+HelpControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		MESSAGES
+;-----------------------------------------------------------------------------
+
+MSG_HELP_CONTROL_FOLLOW_LINK						message
+;
+; Follow a link in a help file
+;
+; PASS:		cx - token of link name
+;		dx - token of link file
+; RETURN:	none
+
+MSG_HELP_CONTROL_GET_POINTER_IMAGE					message
+;
+; Get the pointer image to use for help.  The default behavior is to check
+; for ATTR_HELP_CUSTOM_POINTER_IMAGE and use any pointer provided there.
+; If that is absent, the default pointer images are used.
+
+; Interception:  A help viewer application may wish to subclass this
+; and return its own pointer images if they are dynamic, or simply use
+; ATTR_HELP_CUSTOM_POINTER_IMAGE if they are static.  If you subclass
+; this to change the pointer, there is no need to call the superclass
+;
+; PASS:		cx - (-1) if not over a link
+; RETURN:	ax - MouseReturnFlags with MRF_SET_POINTER_IMAGE
+;		^lcx:dx - OD of pointer image (if MRF_SET_POINTER_IMAGE)
+;
+
+
+;-----------------------------------------------------------------------------
+;		INTERNAL MESSAGES
+;-----------------------------------------------------------------------------
+
+MSG_HC_GO_BACK								message
+;
+; Go back to the previous help text (if any)
+;
+; PASS:		none
+; RETURN:	none
+;
+MSG_HC_FIRST_AID_GO_BACK						message
+;
+; Go back to the previous answer
+;
+; PASS:		none
+; RETURN:	none
+;
+MSG_HC_GET_HISTORY_LIST_MONIKER						message
+;
+; Get a moniker to display in the history list
+;
+; PASS:		^lcx:dx - list requesting moniker
+;		bp - position of item
+; RETURN:	none
+;
+MSG_HC_GOTO_HISTORY							message
+;
+; Goto selected history item
+;
+; PASS:		cx - current selection
+; RETURN:	none
+;
+
+MSG_HC_BRING_UP_TOC							message
+;
+; Bring up the table of contents for the current application
+;
+; PASS:		none
+; RETURN:	none
+;
+MSG_HC_CHOOSE_FIRST_AID							message
+;
+; The user has selected one of Topic/Question/Answer
+;
+; PASS:		cx - VisTextContextType
+; RETURN	none
+;
+MSG_HC_BRING_UP_HELP							message
+;
+; Bring up help on help
+;
+; PASS:		none
+; RETURN:	none
+;
+
+protominor UINewFor21
+
+MSG_HC_GET_LINK_NAME						message
+;
+; Return the name of the link.  This message is provided for
+; applications that want to subclass HelpControlClass.  This message
+; should ONLY be sent to the HelpControlClass object by itself when it
+; receives a MSG_HELP_CONTROL_FOLLOW_LINK (before calling the
+; superclass), as that's the only time that the tokens will be valid.
+;
+; PASS:		cx:dx - pointer to GetLinkNameParams
+; RETURN:	GLNP_linkName and GLNP_fileName filled in
+; DESTROYED:	ax, cx, dx, bp
+;
+GetLinkNameParams	struct
+    GLNP_linkToken	word
+    GLNP_fileToken	word
+    GLNP_linkName	ContextName
+    GLNP_fileName	FileLongName
+GetLinkNameParams	ends
+
+protoreset
+
+protominor UINewForResponder
+
+MSG_HELP_CONTROL_SET_HELP_TYPE					message
+;
+; Set help type for HelpControl.  Can only be used when HelpControl is
+; not usable.
+;
+; Pass:		cl - HelpType
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+MSG_HELP_CONTROL_GET_CURRENT_CONTEXT				message
+;
+; Get current help context.
+;
+; Pass:		cx:dx - pointer to GetContextParams
+; Return:	GetCurrentContextParams filled in
+; Destroyed:	ax, cx, dx, bp
+;
+GetCurrentContextParams	struct
+	GCCP_contextName	ContextName
+	GCCP_fileName		FileLongName
+GetCurrentContextParams	ends
+
+MSG_HELP_CONTROL_GET_CURRENT_TITLE				message
+;
+; Get the current title (first line of text).
+;
+; Pass:		^hcx	= block in which to allocate text chunk
+; Return:	^lcx:dx	= title text
+; Destroyed:	ax, cx, dx, bp
+;
+
+protoreset
+
+protominor UINewForGPC
+
+MSG_HC_JUMP_TO_VERSION_INFO					message
+;
+; Display any version information that is built into the help file
+; (for debugging purposes only)
+;
+; PASS:		none
+; RETURN:	none
+;
+
+MSG_HC_DISPLAY_CONTEXT_INFO					message
+;
+; Display information about the help file & context for the help
+; that is currently displayed (for debugging purposes only)
+;
+; PASS:		none
+; RETURN:	none
+;
+
+protoreset
+
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+;
+; One of the following should be specified for a given help controller.
+; This controls both the appearance of the UI as well as the type of
+; help notifications that the controller will respond to.
+;
+HelpType	etype	byte
+HT_NORMAL_HELP		enum HelpType
+;
+; "normal" help with History, Go Back and scrollable hyperlinked help text.
+;
+HT_FIRST_AID		enum HelpType
+;
+; "First Aid" help with Topics/Questions/Answers and scrollable help text.
+; Hyperlinks in the answers are optional; the connection between
+; Topics/Questions/Answers are hyperlinks.
+;
+HT_STATUS_HELP		enum HelpType
+;
+; Assistance or status help.  Several lines of non-scrollable, 
+; non-hyperlinked help text.  Normally always on-screen, so no "Close"
+; button is provided.
+;
+HT_SIMPLE_HELP		enum HelpType
+;
+; Simple, non-hyperlinked scrollable help.
+;
+HT_SYSTEM_HELP		enum HelpType
+;
+; Type for system-wide help object.  NOTE: applications should not
+; mark their help objects with this type -- it is reserved.
+;
+HT_SYSTEM_MODAL_HELP	enum HelpType
+;
+; Type for system-wide help object for system modal dialog boxes.
+; NOTE: applications should avoid system modal dialog boxes, but if they
+; use them and want help in those dialogs, the help type should be set
+; using ATTR_GEN_HELP_TYPE.
+;
+
+
+; features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+;
+; NOTE: HPCF_TEXT must be present, because various GenControl routines
+; optimize updates out of existance if no features are present.
+; HPCF_TEXT makes sure we have at least one feature.
+;
+
+HPCFeatures	record
+    :7
+    HPCF_HELP:1			;help trigger for help
+    HPCF_TEXT:1			;the text itself...
+    HPCF_CONTENTS:1		;go to table of contents
+    HPCF_HISTORY:1		;history list
+    HPCF_GO_BACK:1		;go back (simple history)
+    HPCF_CLOSE:1		;close/exit button
+    HPCF_INSTRUCTIONS:1		;instructions on current mode
+    HPCF_FIRST_AID_GO_BACK:1	;go back for first-aid
+    HPCF_FIRST_AID:1		;first-aid style topics/questions/answers
+HPCFeatures	end
+
+;
+; Notification structure
+;
+NotifyHelpContextChange	struct
+    NHCC_type		HelpType	;type of help (status, normal, etc.)
+    NHCC_context	ContextName	;context name to link to
+    NHCC_filename	FileLongName	;file name to link to
+    NHCC_filenameTOC	FileLongName	;file name to get TOC from
+NotifyHelpContextChange	ends
+
+
+
+;-----------------------------------------------------------------------------
+;		Attrs & Hints
+; NOTE: you should probably be setting one the help types above so
+; your help is standard with help in other applications.  The hints
+; here are provided for special cases only.
+; NOTE: in addition to the hints listed here, you can also supply window
+; hints directly to the controller (if visibility = dialog) or the dialog
+; box the controller is in.
+;-----------------------------------------------------------------------------
+
+ATTR_HELP_SUPPRESS_INITIATE			vardata
+;
+; New help status normally initiates the interaction it is in; setting
+; this attribute supresses this behavior.
+;
+
+ATTR_HELP_INITIAL_HELP				vardata char
+;
+; Initial help text to bring up.  This should only be used by help
+; viewer applications, as help is normally brought up by a Help trigger.
+; eg:
+;	ATTR_HELP_INITIAL_HELP {
+;		char "TOC", 0
+;	}
+;
+
+ATTR_HELP_CUSTOM_POINTER_IMAGE			vardata optr
+;
+; Optr to custom pointer for when the mouse is over a link.
+;
+; eg:
+;	hints = {
+;		ATTR_HELP_CUSTOM_POINTER_IMAGE {
+;			optr customPointer
+;		}
+;	}
+;
+; NOTE: the pointer image should be in a sharable, non-duplicated block.
+; NOTE: if it is not, use UN_OPTR and and add vardataReloc to the object.
+;
+
+
+HINT_HELP_TEXT_FIXED_SIZE			vardata
+;
+; Set a HINT_FIXED_SIZE on the text object for help.
+;
+
+HINT_HELP_NOT_RESIZABLE				vardata
+;
+; Normally help with visibility = dialog is resizable.  Add this hint if
+; the desired behavior is to have the help window not resizable.
+;
+
+
+ATTR_HELP_INITIAL_HELP_FILE			vardata char
+;
+; Help file for initial help text to bring up.  This should only be used
+; by help view applications, as help is normally brought up by a Help
+; trigger.
+;
+; NOTE: This attribute only applies if ATTR_HELP_INITIAL_HELP is also used.
+; NOTE: If this attribute is absent, the normal query is done to get the
+; help file to use, which may conflict with help for the application.
+;
+; eg:
+;	ATTR_HELP_INITIAL_HELP_FILE {
+;		char "My Info", 0
+;	}
+;
+
+
+;-----------------------------------------------------------------------------
+;		Internal vardata
+;-----------------------------------------------------------------------------
+
+TEMP_HELP_ERROR_FILENAME			vardata TCHAR
+;
+; Internal only: If this exists, it contains the filename the HelpControl
+; last tried to open but was unable to.  Only used for HT_STATUS_HELP.
+;
+
+TEMP_HELP_TOC_FILENAME				vardata TCHAR
+;
+; Internal only: If this exists, it contains the filename the HelpControl
+; should get the TOC from.  Usually the help file for the app that brought
+; up help.
+;
+
+TEMP_HELP_DETACH_RECEIVED			vardata
+;
+; Internal only: If this exists, the controller has received MSG_META_DETACH
+; and will ignore any updates received after this.
+;
+
+TEMP_HELP_HEAPSPACE_TOKEN			vardata hptr
+;
+; Internal only: If this exists, it contains the token returned
+; by GeodeRequestSpace for allocating room for the compress library.
+;
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+    HCI_helpType	HelpType		;type of help to display
+    HCI_curFile		hptr			;handle of current file
+    HCI_historyBuf	hptr			;handle of history buffer
+    HCI_nameArrayVM	word			;VM handle of name array
+    HCI_compressLib	hptr			;handle of compress lib
+
+HelpControlClass	endc
+
+EndLibrary	ui

@@ -1,0 +1,206 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		Objects/winC.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines MetaWindowMessages imported methods
+
+	$Id: winC.def,v 1.1 97/04/04 14:18:46 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__WINC
+
+StartKernel
+
+include object.def
+include win.def
+include Objects/metaC.def
+
+
+
+;------------------------------------------------------------------------------
+;	  Messages sent to Individual Window's ExposureObj
+;------------------------------------------------------------------------------
+;
+MSG_META_EXPOSED	method	MetaWindowMessages
+;
+; MSG_META_EXPOSED is sent to a Window's ExposureObj anytime a portion of
+; the window is visible on screen, has become invalid, and needs to be
+; redrawn.  Correct response is to create a GState on the passed window,
+; call GrBeginUpdate with it, redraw the window, & finish by calling
+; GrEndUpdate.  Drawing will be clipped to the invalid area of the window
+; a the time that GrBeginUpdate is called.  Invalidations occuring during
+; the redraw will result in the reduction in the size of the update region,
+; & result in another MSG_META_EXPOSED being generated, to repair the new
+; "invalid" area.
+;
+; Context:	Window system
+; Source:	Window system
+; Destination:	Individual Window's ExposureObj
+; Interception:	Required, in order for window to be properly updated.  Note
+;		that VisCompClass provides default handler which creates
+;		GState, calls GrBeginUpdate, calls MSG_VIS_DRAW on itself,
+;		then calls GrEndUpdate.
+; Pass:		^hcx - Window
+; Return:	none
+
+MSG_META_EXPOSED_FOR_PRINT	method	MetaWindowMessages
+;
+; MSG_META_EXPOSED_FOR_PRINT is sent for printing
+;
+; Context:
+; Source:
+; Destination:
+; Interception:
+; Pass:		^lcx:dx - OD to send MSG_PRINTING_COMPLETED to
+;		^hbp - gstring
+; Return:	none
+
+
+;------------------------------------------------------------------------------
+;	  Messages sent to Individual Window's InputObj
+;------------------------------------------------------------------------------
+;
+
+MSG_META_WIN_UPDATE_COMPLETE	method	MetaWindowMessages
+;
+; Sent to a Window's InputObj to notify it that a MSG_META_EXPOSED sequence
+; has successfully completed, & the window's image is now up to date.
+;
+; Context:	Window system
+; Source:	Window system
+; Destination:	Individual Window's InputObj
+; Interception: Used by GenView object while auto-scrolling to know when
+;		previous redraw is complete, & next scroll can be performed.
+;		May be intercepted for similar purposes.
+; Pass:		^hcx - Window
+; Return:	none
+
+
+MSG_META_WIN_UNUSED_2	method	MetaWindowMessages ; NUKE when convenient
+
+
+;------------------------------------------------------------------------------
+;	  Methods sent to various objects further up the Input hierarchy
+;------------------------------------------------------------------------------
+;
+
+MSG_META_WIN_CHANGE	method	MetaWindowMessages
+;
+; Sent to the System InputObj (Normally the UI's GenSystem obj), when
+; the ptr position, as passed to the window system in calls to WinMovePtr,
+; has possibly moved outside of the window that it was in.  The object
+; should respond by calling WinChangeAck, which will cause Enter/Leave
+; events to be generated for all windows affected by the pointer's change.
+;
+; Context:	Window system
+; Source:	Window system (WinMovePtr)
+; Destination:	System Input object (usually the GenSystem object)
+; Interception: Must be handled via call to WinChangeAck
+; Pass:		nothing
+; Return:	nothing
+
+MSG_META_IMPLIED_WIN_CHANGE	method	MetaWindowMessages
+;
+; Sent to the System InputObj (Normally the UI's GenSystem obj) in response
+; to a call to WinChangeAck, to inform it which window the mouse has moved
+; into.  The System InputObj is responsible for passing this message on
+; to the InputObj of affected applications/geodes.
+;
+; Context:	Window system
+; Source:	Window system (WinChangeAck)
+; Destination:	Initially System InputObj (usually the GenSystemClass object),
+;		though is relayed on to Geode InputObj (usually a
+;		GenApplicationClass object).
+; Interception: Default handling in System object, Application object,
+;		& VisContentClass implements the "ImpliedGrab" concept, in
+;		which mouse data by default is passed on to the app/window/
+;		object that it is over.  May be intercepted for observation
+;		purposes, though the superclass should always with data
+;		intact, unless the intent is to full the superclass as to
+;		the state of the world.
+; Pass:		^lcx:dx	- InputObj of window having implied grab
+;				(or 0 if no implied grab)
+;		^hbp	- Window that ptr is in
+; Return:	nothing
+;
+
+
+MSG_META_RAW_UNIV_ENTER	method	MetaWindowMessages
+MSG_META_RAW_UNIV_LEAVE	method	MetaWindowMessages
+;MSG_META_RAW_VIS_ENTER	method	MetaWindowMessages
+;MSG_META_RAW_VIS_LEAVE	method	MetaWindowMessages
+;
+; Enter/Leave methods are generated by the window system whenever the mouse
+; crosses into or out of a window.  The methods are sent to the Window's
+; InputObj The methods with the word "RAW" in them are sent whenever the
+; ptr crosses a window boundary.  The ones without are sent unless there
+; is a window grab in progress.  "UNIV" means the entire area of the
+; window, including children, but excluding any covered areas.  "VIS" means
+; only the visible part of the window, excluding children.
+;
+; Context:	Window system
+; Source:	Window system (WinChangeAck)
+; Destination:	Initially System InputObj (usually the GenSystemClass object),
+;		though is relayed on to Geode InputObj (usually a
+;		GenApplicationClass object), & finally onto individual 
+;		Window's InputObj.
+; Interception: May be intercepted to track current status of whether mouse
+;		is within window or not.  Secific UI's rely on these messages
+;		to control auto-raise, click-to-raise arming, & correct
+;		implied & active mouse grab interaction behavior.
+; Pass:		^lcx:dx	- InputObj of window method refers to
+;		^hbp	- Window that method refers to
+; Return:	nothing
+
+
+
+MSG_META_UNUSED_1	method	MetaWindowMessages	; NUKE when convenient
+
+
+;------------------------------------------------------------------------------
+;	  Methods sent to UI process (Internal stuff)
+;------------------------------------------------------------------------------
+;
+MSG_META_INVAL_TREE	method	MetaWindowMessages
+;
+; Method employed by kernel to invalidate an area of a screen that used to
+; contain a lawless error-notification window. Sent to ui because 
+; the invalidation should happen on some known thread where a block
+; won't be fatal to system operation (this rules out im and kernel).
+; The user interface responds by calling WinInvalTree with the
+; root window and the bounds of the error window. Nothing else
+; should ever receive this method.
+;
+; Context:	Kernel UI support
+; Source:	Kernel (SysNotify)
+; Destination:	User Interface process
+; Interception: Must be handled by UI process to implement requested behavior
+; Pass:		^hcx 	= error Window
+;		^hdx	= root Window
+; Return:	Nothing
+
+
+MSG_META_INVAL_BOUNDS	method	MetaWindowMessages
+;
+; Method employed by the input manager to invalidate an area of a
+; screen that currently has ink written all over it. It does pretty
+; much the same thing as MSG_META_INVAL_TREE, but it takes screen bounds
+; instead of a window.
+;
+; Context:	Kernel UI support
+; Source:	Kernel (Pen code in Input Manager)
+; Destination:	User Interface process
+; Interception: Must be handled by UI process to implement requested behavior
+; Pass: 	^lcx - root Window to invalidate
+;	      	ss:bp - Rectangle to invalidate
+; Return:	nothing
+;
+
+EndKernel

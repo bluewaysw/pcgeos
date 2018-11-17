@@ -1,0 +1,1252 @@
+/*-------------------------------------------------------------------------
+ | Project:  GeoCon 3.0
+ |           Copyright (c) 1997 Breadbox Computer Company
+ *-----------------------------------------------------------------------*/
+
+@include <stdapp.goh>
+@include <Objects\colorc.goh>
+/*
+@include "art\conscico.goh"
+@include "art\consmico.goh"
+@include "art\concgico.goh"
+*/
+@include "source\uimacros.goh"
+@include "source\titemc.goh"
+@include "source\titemsc.goh"
+@include "source\geocon.goh"
+@include "source\iniguard.goh"
+@include "source\startlst.goh"
+@include "source\tokenlst.goh"
+
+@include "art/buttons.goh"
+/*
+@include "art/breadbox.mon"
+*/
+/*@start BREADBOXMONIKERRESOURCE, data ;
+@include "art/bluebb.goh"
+@include "art/blackbb.goh"
+@end BREADBOXMONIKERRESOURCE ;
+*/
+@start GEODEICON, data ;
+/*@ifdef BREADBOX_VERSION
+/*@else  */
+@include "art/config_1.goh"
+@include "art/config_2.goh"
+@include "art/config_3.goh"
+/*@endif  */
+@end GEODEICON ;
+
+@extern object GuardStartupList ;
+@extern object GuardTokenList ;
+
+/***************************************************************************
+ *		UI Objects
+ ***************************************************************************/
+
+
+/*=========================================================================*/
+
+
+@start	AppResource ;
+    /*---------------------------------------------------------------------*/
+    @object GeoConApplicationClass GeoConApp = {
+        GI_visMoniker = list { @GeoConTextMoniker,
+										 @GeoConIconEGA,
+                               @GeoConIconHGC,
+										 @GeoConIconCGA,
+										 @GeoConTinyIcon } ;
+        GI_comp       = @GeoConPrimary ;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS)
+                      = @GeoConPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS)
+                      = @ColorSelector;
+        HINT_APP_IS_PRODUCTIVITY_ORIENTED;
+		  ATTR_GEN_HELP_FILE = "GeoCon Help" ;
+	 }
+    /*---------------------------------------------------------------------*/
+    @visMoniker GeoConTextMoniker =
+@ifdef BREADBOX_VERSION
+        "GeoCon 3.0" ;
+@else
+        "Configure" ;
+@endif
+    /*---------------------------------------------------------------------*/
+@end	AppResource
+
+
+/*=========================================================================*/
+
+
+@start Interface;
+    /*---------------------------------------------------------------------*/
+    @object GenPrimaryClass GeoConPrimary = {
+		  GI_comp = @FileMenu,
+						@ButtonView,
+                  @UIGroupAndTriggerGroup,
+              //    @AboutDialog,
+                  @Dialogs ;
+        ATTR_GEN_HELP_CONTEXT = "TOC";
+		  ATTR_GEN_INIT_FILE_CATEGORY = "GeoCon";
+        HINT_PRIMARY_NO_FILE_MENU;
+        HINT_SIZE_WINDOW_AS_DESIRED;
+        HINT_DISPLAY_NOT_RESIZABLE;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+@object GenInteractionClass FileMenu = {
+	 GI_comp = @AboutGroup;
+	 GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenInteractionClass AboutGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@include "art/bbxreg.goh"
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @AppName, @By, @BreadBoxLogo,
+				  @Visit, @Web, @AboutSpacer1,
+				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "GeoCon 3.0";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 36, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "by";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+@object GenGlyphClass AboutSpacer1 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2002";
+}
+@object GenGlyphClass BBoxLLC = {
+  GI_visMoniker = "Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Rights = {
+  GI_visMoniker = "All Rights Reserved";
+}
+@object GenGlyphClass AboutSpacer2 = {
+  GI_visMoniker = "   ";
+}
+	 /*---------------------------------------------------------------------*/
+    @object GenInteractionClass UIGroupAndTriggerGroup = {
+        GI_comp = @UIGroup,
+                  @TriggerGroup ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+
+        HINT_IF_SYSTEM_ATTRS = SA_TINY;
+            HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_ELSE ;
+            HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_ENDIF ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Dialogs = {
+        GI_comp = @StartupFileDialog,
+                  @SelectIconDialog,
+                  @AddFilenameMaskDialog,
+                  @ChangeExecDialog,
+                  @ChangeParamDialog ;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+        GII_visibility = GIV_DIALOG ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenViewClass ButtonView = {
+        GI_attrs = (@default & (~GA_TARGETABLE)) ;
+        GVI_attrs = ((@default | GVA_GENERIC_CONTENTS) & (~GVA_FOCUSABLE)) ;
+        GVI_horizAttrs = @default |
+                         GVDA_NO_SMALLER_THAN_CONTENT |
+                         GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_vertAttrs  = @default |
+                         GVDA_NO_LARGER_THAN_CONTENT |
+                         GVDA_NO_SMALLER_THAN_CONTENT;
+        GVI_content = @ButtonContent;
+        GVI_color = { C_DARK_GRAY, 0, 0, 0 };
+        ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenContentClass ButtonContent = {
+        GCI_genView = @ButtonView;
+        GI_comp = @ButtonItemGroup;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass ButtonItemGroup = {
+        GI_comp = @ColorItem,
+@ifdef EXPRESS_MENU_OPTIONS
+                  @ExpressItem,
+@endif
+                  @OtherItem,
+                  @SystemItem,
+                  @LaunchItem,
+                  @StartupItem,
+                  @ExitItem ;
+        GIGI_behaviorType = GIGBT_EXCLUSIVE;
+        GIGI_selection = COLOR;
+        GIGI_numSelections = 1;
+
+        GIGI_destination = process;
+        GIGI_applyMsg = MSG_GEOCON_PROCESS_SELECT_PANEL ;
+
+        HINT_ITEM_GROUP_TOOLBOX_STYLE;
+/*
+        HINT_GADGET_BACKGROUND_COLORS = {7, 7, 3, 3};
+        HINT_GADGET_TEXT_COLOR = 0;
+*/
+    }
+    /*---------------------------------------------------------------------*/
+    @defPanelButton(
+        ColorItem,
+        "Colors",
+        @ColorButtonMonikerEGA,
+        @ColorButtonMonikerCGA,
+        @ColorButtonMonikerHGC,
+        COLOR);
+    /*---------------------------------------------------------------------*/
+    @defPanelButton(
+        ExpressItem,
+        "Express",
+        @ExpressButtonMonikerEGA,
+        @ExpressButtonMonikerCGA,
+        @ExpressButtonMonikerHGC,
+        EXPRESS);
+    /*---------------------------------------------------------------------*/
+    @defPanelButton(
+        LaunchItem,
+        "DOS Files",
+        @DOSButtonMonikerEGA,
+        @DOSButtonMonikerCGA,
+        @DOSButtonMonikerHGC,
+        LAUNCH);
+    /*---------------------------------------------------------------------*/
+    @defPanelButton(
+        OtherItem,
+        "Interface",
+        @UIButtonMonikerEGA,
+        @UIButtonMonikerCGA,
+        @UIButtonMonikerHGC,
+        OTHER);
+    /*---------------------------------------------------------------------*/
+    @defPanelButton(
+        SystemItem,
+        "System",
+        @SystemButtonMonikerEGA,
+        @SystemButtonMonikerCGA,
+        @SystemButtonMonikerHGC,
+        SYSTEM);
+    /*---------------------------------------------------------------------*/
+    @defPanelButton(
+        StartupItem,
+        "Startup",
+        @StartupButtonMonikerEGA,
+        @StartupButtonMonikerCGA,
+        @StartupButtonMonikerHGC,
+        STARTUP);
+    /*---------------------------------------------------------------------*/
+    @defPanelButton(
+        ExitItem,
+        "Exit",
+        @ExitButtonMonikerEGA,
+        @ExitButtonMonikerCGA,
+        @ExitButtonMonikerHGC,
+        EXIT);
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass UIGroup = {
+        GI_comp = @InitialScreen ;
+        HINT_MINIMUM_SIZE = {385, 100, 0};
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass InitialScreen = {
+        GI_comp = @InitialMessage ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass InitialMessage = {
+        GI_visMoniker = "Please wait ... examining system" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TriggerGroup = {
+        GI_comp = /* @AboutTrigger, */
+                  @RestoreDefaultsTrigger,
+                  @DiscardChangesTrigger,
+                  @ApplyChangesTrigger
+/*@ifdef BREADBOX_VERSION
+                  , @BreadboxLogo
+/*@endif */
+                  ;
+        HINT_IF_SYSTEM_ATTRS = SA_TINY;
+            HINT_ORIENT_CHILDREN_VERTICALLY ;
+            HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+            HINT_DRAW_IN_BOX ;
+            HINT_CENTER_CHILDREN_HORIZONTALLY ;
+            HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY ;
+        HINT_ELSE ;
+            HINT_ORIENT_CHILDREN_HORIZONTALLY;
+            HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+            HINT_DRAW_IN_BOX;
+            HINT_CENTER_CHILDREN_VERTICALLY;
+            HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+            HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+        HINT_ENDIF ;
+    }
+    /*---------------------------------------------------------------------*/
+/*
+    @object GenTriggerClass AboutTrigger = {
+        GI_visMoniker = "About GeoCon";
+        GTI_destination = @AboutDialog;
+        GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+    }
+*/
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass RestoreDefaultsTrigger = {
+        GI_visMoniker = "Restore Defaults";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_GEOCON_PROCESS_RESTORE_DEFAULTS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DiscardChangesTrigger = {
+        GI_visMoniker = "Discard Changes";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_GEOCON_PROCESS_DISCARD_CHANGES;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ApplyChangesTrigger = {
+        GI_visMoniker = "Apply Changes";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_GEOCON_PROCESS_APPLY_CHANGES;
+    }
+    /*---------------------------------------------------------------------*/
+/*    @object GenInteractionClass AboutDialog = {
+        GI_comp = @AboutPicture, @AboutView;
+        GII_visibility = GIV_DIALOG;
+        GII_type = GIT_NOTIFICATION;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
+    /*---------------------------------------------------------------------*/
+/*    @object GenGlyphClass AboutPicture = {
+        GI_visMoniker = list {
+                           @GeoConIconEGA,
+                           @GeoConIconHGC,
+                           @GeoConIconCGA } ;
+    }
+    /*---------------------------------------------------------------------*/
+/*    @object GenViewClass AboutView = {
+        GVI_attrs = @default | GVA_GENERIC_CONTENTS | GVA_SAME_COLOR_AS_PARENT_WIN;
+        GVI_content = @AboutContent;
+        GVI_horizAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT;
+        GVI_vertAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT;
+    }
+    /*---------------------------------------------------------------------*/
+/*    @object GenContentClass AboutContent = {
+        GI_comp = @Line1, @Line2, @Line3, @Line4;
+        GCI_genView = @AboutView;
+    }
+    /*---------------------------------------------------------------------*/
+/*@ifdef BREADBOX_VERSION
+    @defGlyph(Line1, " GeoCon 3.0 ");
+/*@else
+    @defGlyph(Line1, " Configure ");
+/*@endif
+    @defGlyph(Line2, " GEOS.INI configuration utility ");
+    @defGlyph(Line3, " Copyright (c) 1997 Breadbox Computer Company ");
+    @defGlyph(Line4, " All rights reserved. ");
+    /*---------------------------------------------------------------------*/
+/*    @object GenTriggerClass BreadboxLogo = {
+        GI_visMoniker = @list { /* @BreadBoxMonikerBW, @BreadBoxMonikerColor */
+/*                                @BlueBreadbox, @BlackBreadbox } ;
+        GTI_destination = @AboutDialog;
+        GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+/*
+        HINT_GADGET_BACKGROUND_COLORS = { C_WHITE, C_WHITE, C_BLACK, C_BLACK } ;
+
+	 }
+    /*---------------------------------------------------------------------*/
+
+@end Interface;
+
+
+/*=========================================================================*/
+
+
+@start InterfaceColor ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ColorPanel = {
+        GI_comp = @ColorPanelTitle, @ColorItems ;
+        GI_states = @default & ~GS_USABLE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @defPanelTitle(
+        ColorPanelTitle,
+        "Options to change window colors") ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ColorItems = {
+        GI_comp = @ColorSelGroup, @ColorViewInter ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_IF_SYSTEM_ATTRS = SA_TINY;
+            HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_ELSE ;
+            HINT_ORIENT_CHILDREN_VERTICALLY ;
+            HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_ENDIF ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ColorSelGroup = {
+        GI_comp = @ColorChoices,
+                  @ColorSelector ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object ColorItemGroupClass ColorChoices = {
+        GI_comp = @TitleItem,
+                  @DarkItem,
+                  @LightItem ;
+        GIGI_behaviorType = GIGBT_EXCLUSIVE;
+        GIGI_selection = 0;
+        GIGI_numSelections = 1;
+        GIGI_destination = process;
+        ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_COLOR_ITEM_STATUS;
+    }
+    /*---------------------------------------------------------------------*/
+    @defItem(TitleItem, "Titles", 0);
+    @defItem(DarkItem, "Dark items", 1);
+    @defItem(LightItem, "Light items", 2);
+    /*---------------------------------------------------------------------*/
+    @object ColorSelectorClass ColorSelector = {
+        GCI_output = process;
+        ATTR_GEN_CONTROL_PROHIBIT_UI =
+           (~CSF_INDEX) ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ColorViewInter = {
+        GI_comp = @ColorView ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenViewClass ColorView = {
+        GVI_attrs = @default
+                    | GVA_NO_WIN_FRAME
+                    | GVA_SAME_COLOR_AS_PARENT_WIN;
+        GVI_content = process;
+        ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_FIXED_SIZE = {220, 130, 0};
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceColor
+
+
+/*=========================================================================*/
+
+
+@start InterfaceDOS ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSPanel = {
+        GI_comp = @DOSPanelTitle, @DOSItems ;
+        GI_states = @default & ~GS_USABLE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @defPanelTitle(
+        DOSPanelTitle,
+        "Setup DOS based icons and actions") ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSItems = {
+        GI_comp = @DOSItems2 ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSItems2 = {
+        GI_comp = @DOSListContainer, @DOSOptions ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSListContainer = {
+        GI_comp = @DOSList, @DOSTriggers ;
+        HINT_MINIMUM_SIZE = { SST_PIXELS | 200, SST_PIXELS | 50, 0 } ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenDynamicListClass DOSList = {
+        GI_visMoniker = "Filename masks:" ;
+
+        GIGI_selection = 0 ;
+        GDLI_queryMsg = MSG_INI_TOKEN_LIST_QUERY ;
+        GIGI_destination = GuardTokenList ;
+        ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_INI_TOKEN_HIGHLIGHT_MASK ;
+
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_ITEM_GROUP_SCROLLABLE;
+        HINT_PLACE_MONIKER_ABOVE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSTriggers = {
+        GI_comp = @DOSTriggerAdd, @DOSTriggerRemove ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DOSTriggerAdd = {
+        GI_visMoniker = 'A', "Add" ;
+        GTI_destination = AddFilenameMaskDialog ;
+        GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DOSTriggerRemove = {
+        GI_visMoniker = 'R', "Remove" ;
+        GTI_destination = GuardTokenList ;
+        GTI_actionMsg = MSG_INI_TOKEN_LIST_REMOVE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSOptions = {
+        GI_comp = @DOSTokenGlyph,
+                  @DOSTokenTrigger,
+                  @DOSExecEntry,
+                  @DOSParamEntry ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @defGlyph(DOSTokenGlyph, "Token:") ;
+    /*---------------------------------------------------------------------*/
+    @object DOSTokenTriggerClass DOSTokenTrigger = {
+        GI_visMoniker = @list { @GeoConIconEGA,
+                                @GeoConIconHGC,
+                                @GeoConIconCGA } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_WHITE, C_WHITE, C_BLACK, C_BLACK } ;
+        GTI_destination = @SelectIconDialog ;
+        GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE ;
+        HINT_MINIMUM_SIZE = { SST_PIXELS | 48,
+                              SST_PIXELS | 30,
+                              0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSExecEntry = {
+        GI_comp = @DOSExecGlyph,
+                  @DOSExecTextGroup ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @defGlyph(DOSExecGlyph, "Executable to run:") ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSExecTextGroup = {
+        GI_comp = @DOSExecText, @DOSExecChangeTrigger ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass DOSExecText = {
+         GI_attrs = @default | GA_READ_ONLY ;
+         GTXI_attrs = @default
+                      | GTA_SINGLE_LINE_TEXT
+                      | GTA_NO_WORD_WRAPPING
+                      | GTA_ALLOW_TEXT_OFF_END ;
+         HINT_TEXT_FRAME;
+         HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DOSExecChangeTrigger = {
+        GI_visMoniker = "Change" ;
+        GTI_destination = GuardTokenList ;
+        GTI_actionMsg = MSG_INI_TOKEN_LIST_OPEN_FILE_SELECTOR ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSParamEntry = {
+        GI_comp = @DOSParamGlyph,
+                  @DOSParamTextGroup ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @defGlyph(DOSParamGlyph, "Parameters to pass:") ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DOSParamTextGroup = {
+        GI_comp = @DOSParamText, @DOSParamChangeTrigger ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass DOSParamText = {
+         GI_attrs = @default | GA_READ_ONLY ;
+         GTXI_attrs = @default
+                      | GTA_SINGLE_LINE_TEXT
+                      | GTA_NO_WORD_WRAPPING
+                      | GTA_ALLOW_TEXT_OFF_END ;
+         HINT_TEXT_FRAME;
+         HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DOSParamChangeTrigger = {
+        GI_visMoniker = "Change" ;
+        GTI_destination = GuardTokenList ;
+        GTI_actionMsg = MSG_INI_TOKEN_LIST_OPEN_PARAM_DIALOG ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceDOS
+
+
+/*=========================================================================*/
+
+
+@start InterfaceSystem ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SystemPanel = {
+        GI_comp = @SystemPanelTitle, @SystemItems ;
+        GI_states = @default & ~GS_USABLE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @defPanelTitle(
+        SystemPanelTitle,
+        "Options to customize system wide features") ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SystemItems = {
+        GI_comp = @SystemItems2 ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SystemItems2 = {
+        GI_comp = @SystemList1, @SystemList2;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanGroupClass SystemList1 = {
+/*
+        GI_visMoniker = "General System Options:" ;
+*/
+        GI_comp = @BypassNewOpenDialog,
+                  @AddOpenToFileMenu,
+                  @AutoResetAfterCrash,
+                  @ConfirmShutdown,
+                  @RebootOnCtrlAltDel,
+                  @ClickSounds,
+                  @EnableHelpEditor,
+                  @DeskAccessoriesOnTop,
+                  @LeftHandedMouse,
+                  @DisableBDrive ;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass BypassNewOpenDialog = {
+        GI_visMoniker = "Bypass new/open file dialog" ;
+        GBI_identifier = 1 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass AddOpenToFileMenu = {
+        GI_visMoniker = "Add OPEN item to file menu" ;
+        GBI_identifier = 2 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass AutoResetAfterCrash = {
+        GI_visMoniker = "Automatically reset after crash" ;
+        GBI_identifier = 4 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass ConfirmShutdown = {
+        GI_visMoniker = "Confirm shutdown" ;
+        GBI_identifier = 8 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass RebootOnCtrlAltDel = {
+        GI_visMoniker = "Reboot when press CTRL-ALT-DEL" ;
+        GBI_identifier = 16 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass ClickSounds = {
+        GI_visMoniker = "Click sounds" ;
+        GBI_identifier = 32 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass EnableHelpEditor = {
+        GI_visMoniker = "Enable help editor" ;
+        GBI_identifier = 64 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass DeskAccessoriesOnTop = {
+        GI_visMoniker = "Desk accessories always stay on top" ;
+        GBI_identifier = 128 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass LeftHandedMouse = {
+        GI_visMoniker = "Left handed mouse" ;
+        GBI_identifier = 256 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass DisableBDrive = {
+        GI_visMoniker = "Disable B: drive" ;
+        GBI_identifier = 512 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass SystemList2 = {
+        GI_visMoniker = "Launch model:";
+        GI_comp = @LaunchSingle,
+                  @LaunchPrompt,
+                  @LaunchMultiple;
+        GIGI_behaviorType = GIGBT_EXCLUSIVE;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass LaunchSingle = {
+        GI_visMoniker = "Single instance" ;
+        GII_identifier = 1 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass LaunchPrompt = {
+        GI_visMoniker = "Prompt user" ;
+        GII_identifier = 2 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass LaunchMultiple = {
+        GI_visMoniker = "Multiple instance" ;
+        GII_identifier = 3 ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceSystem
+
+
+/*=========================================================================*/
+
+@start InterfaceUI ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass UIPanel = {
+        GI_comp = @UIPanelTitle, @UIItems ;
+        GI_states = @default & ~GS_USABLE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @defPanelTitle(
+        UIPanelTitle,
+        "Options to customize user interface features") ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass UIItems = {
+        GI_comp = @UIItems2 ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass UIItems2 = {
+        GI_comp = @UIList1, @UIList2;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanGroupClass UIList1 = {
+        GI_visMoniker = "User Interface Options:" ;
+        GI_comp = @MaxWindows,
+                  @RemoveMinMax,
+                  @OneClickClose,
+                  @PinnableMenus,
+                  @DisableHelpButtons,
+                  @KeyboardAccelKeys,
+						@BlinkingCursor/*,
+                  @FloatingKeyboard */;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @defBool(MaxWindows, "Start applications maximized", 1) ;
+    @defBool(RemoveMinMax, "Remove min/max buttons", 2) ;
+    @defBool(OneClickClose, "One click close buttons", 4) ;
+    @defBool(PinnableMenus, "Turn off pinnable menus", 8) ;
+    @defBool(DisableHelpButtons, "Disable help buttons", 16) ;
+    @defBool(KeyboardAccelKeys, "Disable keyboard accelerator keys", 32) ;
+    @defBool(BlinkingCursor, "Blinking cursor", 64) ;
+ /*   @defBool(FloatingKeyboard, "Floating keyboard", 128) ; */
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass UIList2 = {
+        GI_visMoniker = "Variable Features:" ;
+        GI_comp = @ScrollRepeatRateGlyph,
+                  @ScrollRepeatRate,
+                  @ScrollBarWidthGlyph,
+                  @ScrollBarWidth,
+                  @FileManagerSizeFontGlyph,
+                  @FileManagerSizeFont ;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ScrollRepeatRateGlyph = {
+        GI_visMoniker = "Scrolling repeat rate" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass ScrollRepeatRate = {
+        GI_comp = @ScrollRateSlow,
+                  @ScrollRateMedium,
+                  @ScrollRateFast ;
+        HINT_ITEM_GROUP_MINIMIZE_SIZE;
+        HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    }
+    /*---------------------------------------------------------------------*/
+    @defItem(ScrollRateSlow, "Slow", 24) ;
+    @defItem(ScrollRateMedium, "Medium", 18) ;
+    @defItem(ScrollRateFast, "Fast", 10) ;
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ScrollBarWidthGlyph = {
+        GI_visMoniker = "Scrolling bar width" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass ScrollBarWidth = {
+        GI_comp = @ScrollBarWidthTiny,
+                  @ScrollBarWidthSmall,
+                  @ScrollBarWidthMedium,
+                  @ScrollBarWidthLarge ;
+        HINT_ITEM_GROUP_MINIMIZE_SIZE;
+        HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    }
+    /*---------------------------------------------------------------------*/
+    @defItem(ScrollBarWidthTiny, "Tiny", 8) ;
+    @defItem(ScrollBarWidthSmall, "Small", 10) ;
+    @defItem(ScrollBarWidthMedium, "Medium", 12) ;
+    @defItem(ScrollBarWidthLarge, "Large", 14) ;
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass FileManagerSizeFontGlyph = {
+@ifdef NEW_DEAL_VERSION
+        GI_visMoniker = "NewManager font size" ;
+@else
+        GI_visMoniker = "GeoManager font size" ;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass FileManagerSizeFont = {
+        GI_comp = @FileManagerFontVeryTiny,
+                  @FileManagerFontTiny,
+                  @FileManagerFontSmall,
+                  @FileManagerFontMedium,
+                  @FileManagerFontLarge,
+                  @FileManagerFontHuge ;
+        HINT_ITEM_GROUP_MINIMIZE_SIZE;
+        HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    }
+    /*---------------------------------------------------------------------*/
+    @defItem(FileManagerFontVeryTiny, "Very tiny", 8) ;
+    @defItem(FileManagerFontTiny, "Tiny", 10) ;
+    @defItem(FileManagerFontSmall, "Small", 12) ;
+    @defItem(FileManagerFontMedium, "Medium", 14) ;
+    @defItem(FileManagerFontLarge, "Large", 18) ;
+    @defItem(FileManagerFontHuge, "Huge", 24) ;
+    /*---------------------------------------------------------------------*/
+@end InterfaceUI
+
+
+/*=========================================================================*/
+
+
+@start InterfaceExpress ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ExpressPanel = {
+        GI_comp = @ExpressPanelTitle, @ExpressItems ;
+        GI_states = @default & ~GS_USABLE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @defPanelTitle(
+        ExpressPanelTitle,
+        "Options to change the express menu") ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ExpressItems = {
+        GI_comp = @ExpressItems2 ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ExpressItems2 = {
+        GI_comp = @ExpressList1, @ExpressList2;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanGroupClass ExpressList1 = {
+        GI_visMoniker = "Express Menu Options:" ;
+        GI_comp = @GotoGeoManager,
+                  @RunningApplications,
+                  @DeskAccessories,
+                  @WorldApplications,
+                  @WorldSubdirs,
+                  @ControlPanel,
+                  @RunningDOSApps,
+                  @Utilities,
+                  @ExitToDOS ;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NEW_DEAL_VERSION
+    @defBool(GotoGeoManager, "Go to NewManager", 1) ;
+@else
+    @defBool(GotoGeoManager, "Go to GeoManager", 1) ;
+@endif
+
+    @defBool(RunningApplications, "Running applications", 2) ;
+    @defBool(DeskAccessories, "Desk accessories", 4) ;
+    @defBool(WorldApplications, "World applications", 8) ;
+    @defBool(WorldSubdirs, "World subdirectories", 16) ;
+    @defBool(ControlPanel, "Control panel", 32) ;
+    @defBool(RunningDOSApps, "Running DOS Applications", 64) ;
+    @defBool(Utilities, "Utilities", 128) ;
+    @defBool(ExitToDOS, "Exit to DOS", 256) ;
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanGroupClass ExpressList2 = {
+        GI_visMoniker = "Express Submenus:" ;
+        GI_comp = @RunningAppsSubmenu,
+                  @WorldAppsSubmenu,
+                  @OtherSubmenu ;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @defBool(RunningAppsSubmenu, "Running applications submenu", 1) ;
+    @defBool(WorldAppsSubmenu, "World applications submenu", 2) ;
+    @defBool(OtherSubmenu, "World subdirectories submenu", 4) ;
+    /*---------------------------------------------------------------------*/
+@end InterfaceExpress
+
+
+/*=========================================================================*/
+
+
+@start InterfaceStartup ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass StartupPanel = {
+        GI_comp = @StartupPanelTitle, @StartupItems ;
+        GI_states = @default & ~GS_USABLE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef ENSEMBLE_BUILD
+    @defPanelTitle(
+        StartupPanelTitle,
+        "List of programs that startup in GEOS") ;
+@endif
+@ifdef NEWDEAL98_BUILD
+    @defPanelTitle(
+        StartupPanelTitle,
+        "List of programs that startup in Newdeal") ;
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass StartupItems = {
+        GI_comp = @StartupList, @StartupTriggers ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_MINIMUM_SIZE = { SST_PIXELS | 200, SST_PIXELS | 50, 0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenDynamicListClass StartupList = {
+        GIGI_selection = 0 ;
+        GI_visMoniker = "Programs:" ;
+        GDLI_queryMsg = MSG_INI_STARTUP_LIST_QUERY ;
+        GIGI_destination = GuardStartupList ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_ITEM_GROUP_SCROLLABLE;
+        HINT_PLACE_MONIKER_ABOVE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass StartupTriggers = {
+        GI_comp = @StartupAdd, @StartupRemove ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass StartupAdd = {
+        GI_visMoniker = 'A', "Add" ;
+        GTI_destination = GuardStartupList ;
+        GTI_actionMsg = MSG_INI_STARTUP_LIST_OPEN_FILE_SELECTOR ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass StartupRemove = {
+        GI_visMoniker = 'R', "Remove" ;
+        GTI_destination = GuardStartupList ;
+        GTI_actionMsg = MSG_INI_STARTUP_LIST_REMOVE ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceStartup
+
+
+/*=========================================================================*/
+
+@start DialogText ;
+
+@chunk char DialogTextAskSave[] = "Do you wish to save your changes?" ;
+@chunk char DialogTextReboot[] = "Rebooting GEOS to make changes take effect." ;
+
+@end DialogText
+
+/*=========================================================================*/
+
+@start StartupFileDialogRes ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass StartupFileDialog = {
+        GI_visMoniker = "Add Startup Executable" ;
+        GII_visibility = GIV_DIALOG ;
+        GII_type = GIT_COMMAND ;
+        GI_comp = @StartupFileSelectorGroup ;
+        GII_attrs = @default |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG |
+                    GIA_MODAL;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass StartupFileSelectorGroup = {
+        GI_comp = @StartupFileSelector,
+                  @StartupFileSelectorReplyBar;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenFileSelectorClass StartupFileSelector = {
+        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+
+        /* Only want dirs and executables */
+        GFSI_fileCriteria = FSFC_DIRS | FSFC_GEOS_EXECUTABLES ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass StartupFileSelectorReplyBar = {
+        GI_comp = @StartupFileSelectorAddTrigger,
+                  @StartupFileSelectorGoToWorld ;
+        HINT_MAKE_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass StartupFileSelectorAddTrigger = {
+        GI_visMoniker = 'A', "Add";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = GuardStartupList ;
+        GTI_actionMsg = MSG_INI_STARTUP_LIST_ADD ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass StartupFileSelectorGoToWorld = {
+        GI_visMoniker = 'W', "Go to World";
+        GTI_destination = GuardStartupList ;
+        GTI_actionMsg = MSG_INI_STARTUP_LIST_GO_TO_WORLD ;
+    }
+    /*---------------------------------------------------------------------*/
+@end StartupFileDialogRes
+
+
+/*=========================================================================*/
+
+
+@start SelectIconDialogRes ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SelectIconDialog = {
+        GI_visMoniker = "Choose Icon" ;
+        GII_visibility = GIV_DIALOG ;
+        GII_type = GIT_PROPERTIES ;
+        GI_comp = @SelectIconList ;
+        GII_attrs = @default |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG |
+                    GIA_MODAL;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenDynamicListClass SelectIconList = {
+        GIGI_selection = 0 ;
+        GDLI_queryMsg = MSG_INI_TOKEN_LIST_QUERY_ICON ;
+        GIGI_applyMsg = MSG_INI_TOKEN_LIST_SELECTED_ICON ;
+        GIGI_destination = GuardTokenList ;
+        HINT_ITEM_GROUP_SCROLLABLE ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_MINIMUM_SIZE = { SST_PIXELS | 384, SST_PIXELS | 48, 8 } ;
+        HINT_CENTER_MONIKER;
+    }
+    /*---------------------------------------------------------------------*/
+@end SelectIconDialogRes
+
+
+/*=========================================================================*/
+
+
+@start AddFilenameMaskDialogRes ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass AddFilenameMaskDialog = {
+        GI_visMoniker = "Add Filename Mask" ;
+        GI_comp = @AddFilenameMaskText,
+                  @AddFilenameTrigger ;
+        GII_visibility = GIV_DIALOG ;
+        GII_type = GIT_COMMAND ;
+        GII_attrs = @default |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG |
+                    GIA_MODAL;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass AddFilenameMaskText = {
+        GI_visMoniker = "Mask: " ;
+        GTXI_maxLength = 12 ;
+        GTXI_attrs = @default
+                      | GTA_SINGLE_LINE_TEXT
+                      | GTA_NO_WORD_WRAPPING
+                      | GTA_ALLOW_TEXT_OFF_END ;
+        HINT_DEFAULT_FOCUS ;
+        ATTR_GEN_TEXT_MAKE_UPPERCASE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass AddFilenameTrigger = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = GuardTokenList;
+        GTI_actionMsg = MSG_INI_TOKEN_LIST_ADD ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+        HINT_DEFAULT_DEFAULT_ACTION ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*---------------------------------------------------------------------*/
+@end AddFilenameMaskDialogRes
+
+
+/*=========================================================================*/
+
+
+@start ChangeExecDialogRes ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ChangeExecDialog = {
+        GI_visMoniker = "Choose Executable:" ;
+        GII_visibility = GIV_DIALOG ;
+        GII_type = GIT_COMMAND ;
+        GI_comp = @ChangeExecFileSelectorGroup ;
+        GII_attrs = @default |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG |
+                    GIA_MODAL;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ChangeExecFileSelectorGroup = {
+        GI_comp = @ChangeExecFileSelector,
+                  @ChangeExecFileSelectorReplyBar;
+    }
+    /*---------------------------------------------------------------------*/
+    @object ChangeExecFileSelectorClass ChangeExecFileSelector = {
+        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+
+        /* Only want dirs and executables */
+        GFSI_fileCriteria = FSFC_DIRS |
+                            FSFC_GEOS_EXECUTABLES |
+                            FSFC_NON_GEOS_FILES  |
+                            FSFC_FILE_FILTER |
+                            FSFC_FILTER_IS_C ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ChangeExecFileSelectorReplyBar = {
+        GI_comp = @ChangeExecFileSelectorAddTrigger,
+                  @ChangeExecFileSelectorGoToWorld ;
+        HINT_MAKE_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ChangeExecFileSelectorAddTrigger = {
+        GI_visMoniker = 'U', "Use";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = GuardTokenList ;
+        GTI_actionMsg = MSG_INI_TOKEN_LIST_USE_EXEC ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ChangeExecFileSelectorGoToWorld = {
+        GI_visMoniker = 'W', "Go to World";
+        GTI_destination = GuardTokenList ;
+        GTI_actionMsg = MSG_INI_TOKEN_LIST_GO_TO_WORLD ;
+    }
+    /*---------------------------------------------------------------------*/
+@end ChangeExecDialogRes
+
+
+/*=========================================================================*/
+
+@start ChangeParamDialogRes ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ChangeParamDialog = {
+        GI_visMoniker = "Change Parameters" ;
+        GI_comp = @ChangeParamText,
+                  @ChangeParamTrigger ;
+        GII_visibility = GIV_DIALOG ;
+        GII_type = GIT_COMMAND ;
+        GII_attrs = @default |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG |
+                    GIA_MODAL;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass ChangeParamText = {
+        GI_visMoniker = "Parameters: " ;
+        GTXI_maxLength = 80 ;
+        GTXI_attrs = @default
+                      | GTA_SINGLE_LINE_TEXT
+                      | GTA_NO_WORD_WRAPPING
+                      | GTA_ALLOW_TEXT_OFF_END ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ChangeParamTrigger = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = GuardTokenList ;
+        GTI_actionMsg = MSG_INI_TOKEN_LIST_CHANGE_PARAMETERS ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+        HINT_DEFAULT_DEFAULT_ACTION ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*---------------------------------------------------------------------*/
+@end ChangeParamDialogRes
+
+/*=========================================================================*/

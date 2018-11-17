@@ -1,0 +1,245 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1995 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		appt.def
+
+AUTHOR:		Adam de Boor, Sep 26, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	9/26/95		Initial revision
+
+
+DESCRIPTION:
+	Definition of the structure of a generic appointment 
+	(MANUFACTURER_ID_GEOWORKS:GMDFID_APPOINTMENT)
+	
+	The structure allows one or more than one appointment to be transmitted
+	in a message body. Each appointment is in its own VM block. Use the
+	MANUFACTURER_ID_GEOWORKS:GMSID_VM_TREE storage driver
+		
+	To send more than one appointment, use a tree block to refer to the
+	individual appointments. I figure it's easier to code this way, as
+	you can have a routine that converts one of your appointments into
+	an MBAppointment block and call that for each of the appointments
+	you want to send, storing the handles into the tree block you've 
+	allocated.
+	
+	Receivers of GMDFID_APPOINTMENT should examine the MBA_meta.VMCL_next
+	field to see if it's VM_CHAIN_TREE. If it is, they've got a list of
+	appointments to add. Again, a routine can be called to process each
+	block in turn. If the field isn't VM_CHAIN_TREE, just call the routine
+	on the first block of the message body and you're done.
+
+	$Id: appt.def,v 1.1 97/04/04 14:20:24 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__MBAPPT
+
+;------------------------------------------------------------------------------
+;
+; Pre-event Alarm Information
+;
+; This says how long before the event the user should be notified of its
+; impending arrival.
+;
+MBAlarmIntervalType	etype	byte
+    MBAIT_MINUTES	enum	MBAlarmIntervalType
+    MBAIT_HOURS		enum	MBAlarmIntervalType
+    MBAIT_DAYS		enum	MBAlarmIntervalType
+
+MBAlarmInfo	record
+    MBAI_TYPE MBAlarmIntervalType:2
+    MBAI_HAS_ALARM:1
+    MBAI_INTERVAL:13
+MBAlarmInfo	end
+
+;------------------------------------------------------------------------------
+;
+; Repeating Event Information
+;
+; These things tell the recipient how the event is supposed to be repeated.
+; It should cover all the bases. If you cannot handle some mode of repeating
+; the event, tell the user, but register the initial event so the user can
+; possibly duplicate it and place it in the proper place by hand.
+;
+MBRepeatDuration	etype	byte
+    MBRD_FOREVER	enum	MBRepeatDuration	; no additional data
+    MBRD_UNTIL		enum	MBRepeatDuration	; MBRepeatEndDate
+    MBRD_LENGTH		enum	MBRepeatDuration	; MBRepeatLength
+
+MBRepeatLengthUnitType	etype	byte
+    MBRLUT_DAY		enum	MBRepeatLengthUnitType
+    MBRLUT_WEEK		enum	MBRepeatLengthUnitType
+    MBRLUT_MONTH	enum	MBRepeatLengthUnitType
+    MBRLUT_YEAR		enum	MBRepeatLengthUnitType
+
+MBRepeatLength	record
+    MBRL_UNIT MBRepeatLengthUnitType:2
+    MBRL_COUNT:14		; number of those units, *including* the
+				;  initial event day. thus an event repeating
+				;  every day for 3 days set for 12/15 would
+				;  have the event 12/15, 12/16, and 12/17
+MBRepeatLength	end
+
+MBRepeatDurationData	union
+    MBRDD_until		FileDate
+    MBRDD_length	MBRepeatLength
+MBRepeatDurationData	ends
+
+MBRepeatWeekday		etype	byte
+    MBRW_SUNDAY		enum	MBRepeatWeekday
+    MBRW_MONDAY		enum	MBRepeatWeekday
+    MBRW_TUESDAY	enum	MBRepeatWeekday
+    MBRW_WEDNESDAY	enum	MBRepeatWeekday
+    MBRW_THURSDAY	enum	MBRepeatWeekday
+    MBRW_FRIDAY		enum	MBRepeatWeekday
+    MBRW_SATURDAY	enum	MBRepeatWeekday
+
+MBRepeatIntervalType	etype	byte
+    MBRIT_DAILY			enum	MBRepeatIntervalType
+    MBRIT_WEEKLY		enum	MBRepeatIntervalType
+    MBRIT_MONTHLY_WEEKDAY	enum	MBRepeatIntervalType
+    MBRIT_MONTHLY_DATE		enum	MBRepeatIntervalType
+    MBRIT_YEARLY_WEEKDAY	enum	MBRepeatIntervalType
+    MBRIT_YEARLY_DATE		enum	MBRepeatIntervalType
+    MBRIT_MON_TO_FRI		enum	MBRepeatIntervalType ; every Mon-Fri
+    MBRIT_MON_TO_SAT		enum	MBRepeatIntervalType ; every Mon-Sat
+
+MBRepeatInterval	record
+    MBRI_WEEK : 3
+    MBRI_DAY MBRepeatWeekday:3
+    ; for MBRIT_MONTHLY_WEEKDAY or MBRIT_MONTHLY_DATE or MBRIT_YEARLY_WEEKDAY
+    ; (month for that last is the same as the event; data indicates which
+    ; weekday of which week within the month the event should repeat)
+    
+    MBRI_COUNT:7
+    ; number of units between events.
+    
+    MBRI_TYPE MBRepeatIntervalType:3
+MBRepeatInterval	end
+
+MBRepeatInfo	struct
+    MBRI_interval	MBRepeatInterval	; how long between events?
+    MBRI_duration	MBRepeatDuration	; how long shall we keep this
+						;  up?
+    MBRI_durationData	MBRepeatDurationData	; more details of same
+    MBRI_numExceptions	word			; number of exception dates
+    MBRI_exceptions	label FileDate	; array of dates on which event
+						;  is *not* to take place
+MBRepeatInfo	ends
+
+;------------------------------------------------------------------------------
+;
+; Appointment Description Formats
+;
+; An appointment description can be textual, ink, or...? Note that not all
+; receivers will be able to handle all formats. For example, a single-byte
+; system cannot properly handle a Unicode textual description. If you get such
+; an appointment, you need to tell the user why you can't handle it and then
+; drop the whole thing on the floor.
+;
+MBAppointmentDescType	etype	byte
+    MBADT_GEOS_TEXT	enum	MBAppointmentDescType
+    ; Description is a null-terminated, single-byte text string in the GEOS
+    ; character set.
+    
+    MBADT_UNICODE	enum	MBAppointmentDescType
+    ; Description is a null-terminated, double-byte text string in the Unicode
+    ; character set.
+    
+    MBADT_INK		enum	MBAppointmentDescType
+    ; Description is digital ink. Number of points can be determined from
+    ; MBA_descSize
+
+ifdef 	InkPoint	; defined in hwr.def. Include that file if you want
+			;  to handle digital ink in appointments
+MBInkInfo	struct
+    MBII_count		word
+    MBII_data		label	InkPoint
+MBInkInfo	ends
+
+endif	; InkPoint
+
+;------------------------------------------------------------------------------
+;
+; Escape Table Definitions
+;
+; The idea behind escapes is to allow schedulers to include additional
+; information about the appointment that is beyond the scope of a generic
+; appointment. This allows them, if they are the recipient, to duplicate
+; the original appointment exactly. If the recipient doesn't understand the
+; escape, however, the appointment is still useful.
+;
+; Each escape contains the ManufacturerID of the developer who has defined the
+; contents of the escape.
+; 
+MBEscapeInfo	struct
+    MBEI_size		word		; size of the escape, including the
+					;  MBEscapeInfo header
+    MBEI_manufacturer	ManufacturerID	; manufacturer who defined the
+					;  contents of the escape
+    MBEI_data		label	byte	; start of the data, in format
+					;  determined by the manufacturer.
+MBEscapeInfo	ends
+
+MBEscapeTable	struct
+    MBET_numEscapes	word
+    MBET_escapes	label	MBEscapeInfo
+MBEscapeTable	ends
+
+;------------------------------------------------------------------------------
+;
+; The Appointment Itself (finally)
+;
+; This structure appears at the start of the VM block. The description of
+; the appointment follows immediately thereafter. All other optional
+; information follows the description as you see fit.
+; 
+MB_NO_TIME		equ	(-1)		; value in FDAT_time if
+						;  the event is not for a
+						;  specific time of the day
+;
+; When creating to-do item, pass MBA_start.FDAT_date = MB_NO_TIME, and
+; MBA_start.FDAT_time to be one of the following:
+;
+MB_TODO_NORMAL_PRIORITY	equ	(102h)		; value in FDAT_time if
+						;  the event is actually a 
+						;  to-do item, normal priority.
+MB_TODO_HIGH_PRIORITY	equ	(101h)		; value in FDAT_time if
+						;  the event is actually a 
+						;  to-do item, high priority.
+
+MBAppointment	struct
+    MBA_meta		VMChainLink	<0>
+    MBA_start		FileDateAndTime		; start date & time
+    MBA_end		FileDateAndTime		; end date & time
+    MBA_alarmInfo	MBAlarmInfo		; description of when alarm
+						;  should be generated. 0 if
+						;  no alarm
+    MBA_repeatInfo	nptr.MBRepeatInfo	; description of how event
+						;  should be repeated. 0 if
+						;  one-time thing
+    MBA_escapes		nptr.MBEscapeTable	; pointer to manufacturer-
+						;  specific information to be
+						;  processed by those apps
+						;  that understand it. Might
+						;  include formatting info,
+						;  for example.
+    MBA_descSize	word			; number of bytes in the
+						;  description
+    MBA_descType	MBAppointmentDescType	MBADT_GEOS_TEXT
+						; type of data that make up the
+						;  appointment description
+    MBA_description	label	byte		; start of the description
+
+MBAppointment	ends

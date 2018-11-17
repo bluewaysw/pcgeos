@@ -1,0 +1,1952 @@
+
+@define ITEM(NAME, IDENTIFIER, MONIKER) \
+@object GenItemClass NAME = { \
+		  GI_visMoniker = MONIKER; \
+		  GII_identifier = IDENTIFIER; \
+}
+
+@include <stdapp.goh>
+//@include <ui.goh>
+@include <spool.goh>
+@include <Objects/Text/tctrlc.goh>
+@include "homeapp.goh"
+@include "homeicon.goh"
+#include <gstring.h>
+/*@include "breadbox.goh" */
+@include "bboxreg.goh"
+
+VMFileHandle document = NullHandle;
+TimerHandle Timer;
+Handle X10Driver = NullHandle;
+MemHandle statusBlock;
+
+@classdecl HomeProcessClass, neverSaved;
+@classdecl HomeDocumentClass;
+@classdecl IconClass;
+@classdecl HomeItemClass, neverSaved;
+@classdecl HomeGroupClass, neverSaved;
+@classdecl HomeUnitClass, neverSaved;
+@classdecl HomeRoomClass, neverSaved;
+@classdecl HomeValueClass;
+@classdecl HomeBooleanGroupClass;
+
+/*******************************************************************************
+* UI OBJECTS                                                                   *
+*******************************************************************************/
+
+@start AppResource;
+
+@object GenApplicationClass HomeApp = {
+	GI_visMoniker = list { @HomeAutomationMoniker, @HATinyMoniker, @HomeTextMoniker };
+	GI_comp = @HomePrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @HomePrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @HomeDocumentControl,
+					@HomeViewControl, @HomePrintControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @HomeDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) = @HomeDocumentControl,
+					 @HomeViewControl, @HomePrintControl, @HomeIconColorSelector,
+					 @UnitTextPointSize, @UnitTextFont, @RoomTextPointSize,
+					 @RoomTextFont;
+/*	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_CONTROLLED_GEN_VIEW_OBJECTS) =
+																						@HomeView;*/
+	ATTR_GEN_INIT_FILE_CATEGORY = "HomeAutomation";
+	ATTR_GEN_APPLICATION_PRINT_CONTROL = @HomePrintControl;
+	ATTR_GEN_HELP_FILE = "HAHelp";
+}
+
+@visMoniker HomeTextMoniker = "Home Automation";
+
+@end AppResource;
+
+
+@start Interface;
+
+@object GenPrimaryClass HomePrimary  = {
+	GI_comp = @HomeFileMenu, @HomeViewMenu, @HomeObjectsMenu,
+				 @HomeIconsMenu, @HomeSettingsMenu, @HomeGadgetsAndView,
+				 @InvisibleDialogs;
+   ATTR_GEN_HELP_CONTEXT = "TOC";
+	HINT_PRIMARY_FULL_SCREEN;
+}
+
+@object GenInteractionClass HomeGadgetsAndView = {
+	GI_comp = @HomeCommands, @HomeViewAndDate;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass HomeCommands = {
+	GI_comp = @HomeUnitCommandClump;
+	GI_states = @default & ~GS_ENABLED;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+	HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenInteractionClass HomeViewAndDate = {
+	GI_comp = @HomeTimeDate, @HomeView;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenViewClass HomeView = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GI_states = @default & ~GS_ENABLED;
+	GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_vertAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_attrs = @default | GVA_CONTROLLED;
+	GVI_docBounds = {0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT};
+	ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+	HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+	HINT_DEFAULT_FOCUS;
+}
+
+@object GenInteractionClass HomeFileMenu = {
+	GI_comp = @HomeDocumentControl, @AboutDBox, @HomePrintGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+/*---------------------------------------------------------------------------*/
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'b', "About";
+	 GI_comp = @AppName, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Home Automation";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2002 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+/*---------------------------------------------------------------------------*/
+
+@object GenInteractionClass HomeViewMenu = {
+	GI_comp = @HomeViewControl, @ViewEventsByDay, @ViewEventsByItem;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_VIEW_MENU);
+}
+
+@object GenInteractionClass HomeObjectsMenu = {
+	GI_visMoniker = 'O', "Objects";
+	GI_comp = @HomeNewItemMenu, @HomeDeleteUnit, @HomeItemSettingsTrigger,
+				 @HomeItemEventsTrigger;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass HomeNewItemMenu = {
+   GI_visMoniker = 'N', "New";
+   GI_comp = @HomeNewUnit, @HomeNewRoom, @HomeNewGroup;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass HomeIconsMenu = {
+	GI_visMoniker = 'I', "Icons";
+	GI_comp = @HomeIconsDialog, @HomeExportImportIcons;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass HomeSettingsMenu = {
+	GI_visMoniker = 'S', "Settings";
+	GI_comp = @HomeUnitOptionsBox, @HomeDriverSettingsBox;
+	GII_visibility = GIV_POPUP;
+}
+
+/*@object GenGlyphClass HomeBreadboxButton = {
+	GI_visMoniker = list {@BreadboxmonikerBW, @BreadboxmonikerColor};
+}*/
+
+@object GenInteractionClass HomeUnitCommandClump = {
+	GI_visMoniker = "Object Commands";
+	GI_comp = /*@HomeBreadboxButton, */@HomeGroupList,
+             @HomeUnitCommandNameText, @HomeUnitSettingsBlock,
+				 @HomeUnitCenterGroup, @HomeUnitButtonGroup;
+	GII_visibility = GIV_POPOUT;
+	HINT_SEEK_LEFT_OF_VIEW;
+	ATTR_GEN_INTERACTION_POPOUT_NOT_CLOSABLE;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_DRAW_IN_BOX;
+/*	HINT_PLACE_MONIKER_ABOVE;*/
+}
+
+@object GenInteractionClass HomeUnitCenterGroup = {
+	GI_comp = @HomeUnitLeftGroup, @HomeUnitDimGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass HomeUnitLeftGroup = {
+	GI_comp = @HomeUnitOnOffGroup, @HomeUnitLockGroup;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass HomeUnitButtonGroup = {
+	GI_comp = @HomeItemSettingsDialog, @HomeItemEventsDialog;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass HomeTimeDate = {
+	GI_visMoniker = list {@TimeMoniker};
+	HINT_SEEK_TOP_OF_VIEW;
+}
+
+@object GenInteractionClass InvisibleDialogs = {
+	GI_comp = @HomeNewUnitDialog, @HomeNewRoomDialog, @HomeGroupDialog,
+				@HomeEventDialog,
+				@DeleteEventBox, @HomeIconEditor, @EventsWindow,
+				@HomeExportImportIconFileList, @HomeExportIconDialog,
+				@HomeImportIconDialog;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+@visMoniker TimeMoniker = "";
+
+@end Interface;
+
+/*******************************************************************************
+* FILE MENU RESOURCE                                                           *
+*******************************************************************************/
+
+@start FileMenu;
+
+@object GenDocumentControlClass HomeDocumentControl = {
+	GDCI_documentToken = { "HOMD", 16431 };
+	GDCI_noNameText = "No Document";
+	GDCI_templateDir = "Home Automation Templates";
+	GDCI_documentGroup = HomeDocumentGroup;
+	GDCI_enableDisableList = HomeUIEnableList;
+}
+
+@chunk optr HomeUIEnableList[] = {
+	@HomeView, @HomeCommands
+};
+
+@object GenInteractionClass HomePrintGroup = {
+	GI_comp = @HomePrintControl;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object PrintControlClass HomePrintControl = {
+	GI_states = @default | GS_ENABLED;
+	PCI_attrs = @default & ~(PCA_PAGE_CONTROLS | PCA_VERIFY_PRINT);
+	PCI_startUserPage = 1;
+	PCI_endUserPage = 1;
+	PCI_output = (TO_APP_MODEL);
+	PCI_docNameOutput = HomeDocumentGroup;
+	PCI_docSizeInfo = {DOCUMENT_WIDTH, DOCUMENT_HEIGHT, 0, {0, 0, 0, 0}};
+	ATTR_GEN_CONTROL_REQUIRE_UI = PRINTCF_PRINT_TRIGGER;
+};
+
+@end FileMenu;
+
+/*******************************************************************************
+* DOCUMENT UI BLOCK                                                                                                                                                              *
+*******************************************************************************/
+@start DocumentUI;
+
+@object GenDocumentGroupClass HomeDocumentGroup = {
+	GDGI_untitledName = "Home Untitled";
+	GDGI_documentClass = &HomeDocumentClass;
+	GDGI_genView = HomeView;
+	GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+	GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+	GDGI_documentControl = HomeDocumentControl;
+}
+
+@end DocumentUI;
+
+/******************************************************************************
+* MENU AND OTHER UI RESOURCE BLOCK                                            *
+*******************************************************************************/
+@start MenuResource ;
+
+@object GenViewControlClass HomeViewControl = {
+	GCI_output = @HomeView;
+	GVCI_attrs = (@default) & ~GVCA_APPLY_TO_ALL;
+}
+
+@object GenTriggerClass ViewEventsByDay = {
+	GI_visMoniker = 'D', "Events by Day";
+	GTI_actionMsg = MSG_PROCESS_LIST_EVENTS_BY_DAY;
+	GTI_destination = process;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass ViewEventsByItem = {
+	GI_visMoniker = 'I', "Events by Item";
+	GTI_actionMsg = MSG_DOC_LIST_EVENTS_BY_ITEM;
+	GTI_destination = (TO_APP_MODEL);
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass HomeItemSettingsTrigger = {
+	GI_visMoniker = 'S', "Object Settings";
+	GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+	GTI_destination = @HomeItemSettingsDialog;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass HomeItemEventsTrigger = {
+	GI_visMoniker = 'E', "Object Events";
+	GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+	GTI_destination = @HomeItemEventsDialog;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass HomeUnitOptionsBox = {
+	GI_comp = @HomeUnitOptionsText, @ObjectOptionsGroup, @UnitTextGroup,
+				 @RoomTextGroup;
+	GI_visMoniker = 'O', "Objects";
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+   ATTR_GEN_HELP_CONTEXT = "ObjectOptionsDialog";
+}
+
+@object GenTextClass HomeUnitOptionsText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "These settings affect the way objects look and act in Home Automation.";
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+}
+
+@object GenInteractionClass ObjectOptionsGroup = {
+	GI_visMoniker = "Miscellaneous";
+	GI_comp = @HomeObjectOptionsGroup, @HomeGridSizeGroup, @RoomScaleFactorGroup;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_LEFT_JUSTIFY_CHILDREN;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_DRAW_IN_BOX;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenBooleanGroupClass HomeObjectOptionsGroup = {
+	GI_comp = @UnitMovesWithRoom, @AlignWithGrid;
+	GBGI_destination = (TO_APP_MODEL);
+	GBGI_applyMsg = MSG_DOC_OBJECT_OPTIONS_CHANGED;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_LEFT_JUSTIFY_CHILDREN;
+}
+
+@object GenInteractionClass HomeGridSizeGroup = {
+	GI_comp = @HomeGridSize, @HomeGridSizeText;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenValueClass HomeGridSize =  {
+	GI_visMoniker = "Grid Size:";
+	GVLI_value = MakeWWFixed(15.0);
+	GVLI_minimum = MakeWWFixed(3.0);
+	GVLI_maximum = MakeWWFixed(79.0);
+	GVLI_increment = MakeWWFixed(1.0);
+	GVLI_destination = (TO_APP_MODEL);
+	GVLI_applyMsg = MSG_DOC_GRID_SIZE_CHANGED;
+}
+
+@object GenGlyphClass HomeGridSizeText = {
+	GI_visMoniker = "points";
+}
+
+@object GenBooleanClass UnitMovesWithRoom={
+	GI_visMoniker = 'L', "Locked units move with room";
+	GBI_identifier = HOO_UNIT_MOVES_WITH_ROOM;
+}
+
+@object GenBooleanClass AlignWithGrid = {
+	GI_visMoniker = 'A', "Align objects to grid";
+	GBI_identifier = HOO_ALIGN_OBJECTS_TO_GRID;
+}
+
+@object GenInteractionClass RoomScaleFactorGroup = {
+	GI_comp = @RoomScaleFactor, @ScaleFactorText;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenValueClass RoomScaleFactor = {
+	GI_visMoniker = "Room Scale Factor:";
+	GVLI_value = MakeWWFixed(15.0);
+	GVLI_minimum = MakeWWFixed(3.0);
+	GVLI_maximum = MakeWWFixed(79.0);
+	GVLI_increment = MakeWWFixed(1.0);
+	GVLI_destination = (TO_APP_MODEL);
+	GVLI_applyMsg = MSG_DOC_ROOM_SCALE_FACTOR_CHANGED;
+}
+
+@object GenGlyphClass ScaleFactorText = {
+	GI_visMoniker = "points = 1 foot";
+}  
+
+@object GenInteractionClass UnitTextGroup = {
+	GI_visMoniker = "Unit text";
+	GI_comp = @UnitTextFontGroup, @UnitTextPointSize, @UnitSampleText;
+	GII_type = GIT_PROPERTIES;
+	HINT_DRAW_IN_BOX;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass UnitTextFontGroup = {
+	GI_comp = @UnitSampleTextFontName, @UnitTextFont;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass UnitSampleTextFontName = {
+	GI_visMoniker = "Font:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "URW Sans";
+}
+
+@object FontControlClass UnitTextFont = {
+	GI_states = @default | GS_ENABLED;
+	GCI_output = @UnitSampleText;
+	ATTR_GEN_CONTROL_REQUIRE_UI = FCF_LONG_LIST;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = FCF_SHORT_LIST;
+}
+
+@object PointSizeControlClass UnitTextPointSize = {
+	GI_visMoniker = 'P', "Point size";
+	GI_states = @default | GS_ENABLED;
+	GCI_output = @UnitSampleText;
+	ATTR_GEN_CONTROL_REQUIRE_UI = (PSCF_SMALLER | PSCF_LARGER |
+														PSCF_CUSTOM_SIZE);
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (PSCF_9 | PSCF_10 | PSCF_12
+			| PSCF_14 | PSCF_18 | PSCF_24
+			| PSCF_36 | PSCF_54 | PSCF_72);
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass UnitSampleText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "Sample unit text.";
+	GTXI_destination = (TO_APP_MODEL);
+	GTXI_applyMsg = MSG_DOC_OBJECT_TEXT_OPTIONS_CHANGED;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_10 << VTDCA_SIZE_OFFSET) |
+												  VTDF_URW_SANS);
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_DOC_OBJECT_TEXT_STATUS_CHANGED;
+}
+
+@object GenInteractionClass RoomTextGroup = {
+	GI_visMoniker = "Room text";
+	GI_comp = @RoomTextFontGroup, @RoomTextPointSize, @RoomSampleText;
+	GII_type = GIT_PROPERTIES;
+	HINT_DRAW_IN_BOX;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass RoomTextFontGroup = {
+	GI_comp = @RoomSampleTextFontName, @RoomTextFont;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass RoomSampleTextFontName = {
+	GI_visMoniker = "Font:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "URW Roman";
+}
+
+@object FontControlClass RoomTextFont = {
+	GI_states = @default | GS_ENABLED;
+	GCI_output = @RoomSampleText;
+	ATTR_GEN_CONTROL_REQUIRE_UI = FCF_LONG_LIST;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = FCF_SHORT_LIST;
+}
+
+@object PointSizeControlClass RoomTextPointSize = {
+	GI_visMoniker = 'P', "Point size";
+	GI_states = @default | GS_ENABLED;
+	GCI_output = @RoomSampleText;
+	ATTR_GEN_CONTROL_REQUIRE_UI = (PSCF_SMALLER | PSCF_LARGER |
+														PSCF_CUSTOM_SIZE);
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (PSCF_9 | PSCF_10 | PSCF_12
+			| PSCF_14 | PSCF_18 | PSCF_24
+			| PSCF_36 | PSCF_54 | PSCF_72);
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass RoomSampleText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "Sample room text.";
+	GTXI_destination = (TO_APP_MODEL);
+	GTXI_applyMsg = MSG_DOC_OBJECT_TEXT_OPTIONS_CHANGED;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_14 << VTDCA_SIZE_OFFSET) |
+												  VTDF_URW_ROMAN);
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_DOC_OBJECT_TEXT_STATUS_CHANGED;
+}
+
+@object GenInteractionClass HomeDriverSettingsBox = {
+	GI_comp = @PortSelectText, @PortSelectList;
+	GI_visMoniker = 'P', "X-10 Port";
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+   ATTR_GEN_HELP_CONTEXT = "DriverSettingsDialog";
+}
+
+@object GenGlyphClass PortSelectText = {
+	GI_visMoniker = "Choose the port to which the X-10 controller is attached.";
+}
+
+@object GenItemGroupClass PortSelectList = {
+	GI_comp = @PortNone, @PortCOM1, @PortCOM2, @PortCOM3, @PortCOM4;
+	GIGI_applyMsg = MSG_PROCESS_CHANGE_DRIVER_PORT;
+	GIGI_destination = process;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@ITEM(PortNone, 0, "None");
+@ITEM(PortCOM1, 1, "COM1");
+@ITEM(PortCOM2, 2, "COM2");
+@ITEM(PortCOM3, 3, "COM3");
+@ITEM(PortCOM4, 4, "COM4");
+
+@object GenInteractionClass HomeUnitSettingsBlock = {
+	GI_visMoniker = "Unit";
+	GI_comp = @HomeUnitHouseList, @HomeUnitNumberList;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_DRAW_IN_BOX;
+}
+
+@object GenItemGroupClass HomeUnitHouseList = {
+		  GI_comp = @HouseA, @HouseB, @HouseC, @HouseD, @HouseE,
+											@HouseF, @HouseG, @HouseH, @HouseI, @HouseJ,
+											@HouseK, @HouseL, @HouseM, @HouseN, @HouseO,
+											@HouseP;
+		  GIGI_selection = HOUSE_A;
+		  GIGI_applyMsg = MSG_UNIT_CHANGE_HOUSE_CODE;
+		  GIGI_destination = (TO_APP_TARGET);
+		  HINT_ITEM_GROUP_MINIMIZE_SIZE;
+		  HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemGroupClass HomeUnitNumberList = {
+		  GI_comp = @Unit1, @Unit2, @Unit3, @Unit4,
+											@Unit5, @Unit6, @Unit7, @Unit8,
+											@Unit9, @Unit10, @Unit11, @Unit12,
+											@Unit13, @Unit14, @Unit15, @Unit16;
+		  GIGI_selection = UNIT_1;
+		  GIGI_applyMsg = MSG_UNIT_CHANGE_UNIT_NUMBER;
+		  GIGI_destination = (TO_APP_TARGET);
+		  HINT_ITEM_GROUP_MINIMIZE_SIZE;
+		  HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenBooleanGroupClass HomeUnitLockGroup = {
+		  GI_comp = @HomeUnitLockButton;
+		  GBGI_applyMsg = MSG_ITEM_LOCK;
+		  GBGI_destination = (TO_APP_TARGET);
+}
+
+		  @object GenBooleanClass HomeUnitLockButton = {
+					 GI_visMoniker = list{@LockMoniker, @LockBWMoniker};
+					 GBI_identifier = 1;
+		  }
+
+@object GenItemGroupClass HomeUnitOnOffGroup = {
+		  GI_comp = @HomeUnitOnButton, @HomeUnitOffButton, @HomeUnitDimButton;
+		  GIGI_applyMsg = MSG_ITEM_CHANGE_STATUS;
+		  GIGI_destination = (TO_APP_TARGET);
+		  HINT_ORIENT_CHILDREN_VERTICALLY;
+		  HINT_ITEM_GROUP_TOOLBOX_STYLE;
+}
+
+		  @object GenItemClass HomeUnitOnButton = {
+					 GI_visMoniker = list {@UnitOnMoniker, @UnitOnBWMoniker};
+					 GII_identifier = HUS_ON;
+		  }
+
+		  @object GenItemClass HomeUnitOffButton = {
+					 GI_visMoniker = list {@UnitOffMoniker, @UnitOffBWMoniker};
+					 GII_identifier = HUS_OFF;
+		  }
+
+		  @object GenItemClass HomeUnitDimButton = {
+					 GI_visMoniker = list {@UnitDimMoniker};
+					 GII_identifier = HUS_DIM;
+		  }
+
+@object GenDynamicListClass HomeGroupList = {
+   GI_visMoniker = "Groups";
+	GIGI_selection = 0;
+	GIGI_destination = (TO_APP_MODEL);
+	GIGI_applyMsg = MSG_DOC_GROUP_SELECTED;
+	GDLI_numItems = 1;
+	GDLI_queryMsg = MSG_DOC_GET_GROUP_NAME;
+	HINT_ITEM_GROUP_MINIMIZE_SIZE;
+/*	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;*/
+    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+}
+
+@object GenTriggerClass HomeNewUnit = {
+	GI_visMoniker = 'U', "New Unit";
+	GTI_actionMsg = MSG_DOC_CREATE_NEW_UNIT;
+	GTI_destination = (TO_APP_MODEL);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&HomeDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass HomeDeleteUnit = {
+	GI_visMoniker = 'D', "Delete";
+	GTI_actionMsg = MSG_ITEM_DESTROY;
+	GTI_destination = (TO_APP_TARGET);
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass HomeNewRoom = {
+	GI_visMoniker = 'R', "New Room";
+	GTI_actionMsg = MSG_DOC_CREATE_NEW_ROOM;
+	GTI_destination = (TO_APP_MODEL);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&HomeDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass HomeNewGroup = {
+	GI_visMoniker = 'G', "New Group";
+	GTI_actionMsg = MSG_DOC_CREATE_NEW_GROUP;
+	GTI_destination = (TO_APP_MODEL);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&HomeDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass HomeIconsDialog = {
+	GI_visMoniker = 'D', "Icon Database";
+	GI_comp = @HomeIconList, @HomeNewIcon, @HomeEditIcon, @HomeDeleteIcon;
+	GII_type = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+   ATTR_GEN_HELP_CONTEXT = "IconsDialog";
+}
+
+@object GenDynamicListClass HomeIconList = {
+	GDLI_queryMsg = MSG_ICON_VIEW_QUERY_ICON_MONIKER;
+	GIGI_destination = @LargeIcon;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_MINIMUM_SIZE = {SST_PIXELS | 30, SST_PIXELS | 30, 1};
+}
+
+@object GenTriggerClass HomeNewIcon = {
+	GI_visMoniker = 'N', "New";
+	GTI_actionMsg = MSG_ICON_VIEW_NEW_ICON;
+	GTI_destination = @LargeIcon;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass HomeEditIcon = {
+	GI_visMoniker = 'E', "Edit";
+	GTI_actionMsg = MSG_ICON_VIEW_EDIT_ICON;
+	GTI_destination = @LargeIcon;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass HomeDeleteIcon = {
+	GI_visMoniker = 'D', "Delete";
+	GTI_actionMsg = MSG_ICON_VIEW_DELETE_ICON;
+	GTI_destination = @LargeIcon;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass HomeExportImportIcons = {
+	GI_comp = @HomeExportIcons, @HomeImportIcons;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass HomeImportIcons = {
+	GI_visMoniker = 'I', "Import";
+	GTI_actionMsg = MSG_ICON_VIEW_IMPORT_ICONS;
+	GTI_destination = @LargeIcon;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass HomeExportIcons = {
+	GI_visMoniker = 'E', "Export";
+	GTI_actionMsg = MSG_ICON_VIEW_EXPORT_ICONS;
+	GTI_destination = @LargeIcon;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTextClass HomeUnitCommandNameText = {
+		  GTXI_maxLength = 32;
+		  GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_ALLOW_TEXT_OFF_END |
+																GTA_TAIL_ORIENTED;
+		  GTXI_applyMsg = MSG_ITEM_CHANGE_NAME;
+		  GTXI_destination = (TO_APP_TARGET);
+		  HINT_TEXT_WHITE_WASH_COLOR;
+		  HINT_MAXIMUM_SIZE = {
+								SST_AVG_CHAR_WIDTHS | 20,
+								SST_LINES_OF_TEXT | 1,
+								0};
+}
+
+@object GenInteractionClass HomeUnitDimGroup = {
+		  GI_comp = @HomeUnitDimOnButton, @HomeUnitDimValue, @HomeUnitDimOffButton;
+		  HINT_RIGHT_JUSTIFY_CHILDREN;
+}
+
+@object GenTriggerClass HomeUnitDimOnButton = {
+		  GI_visMoniker = list {@DimOnMoniker};
+		  GTI_actionMsg = MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM;
+		  GTI_destination = @HomeUnitDimValue;
+}
+
+@object HomeValueClass HomeUnitDimValue = {
+		  GVLI_value = MakeWWFixed(1.0);
+		  GVLI_minimum = MakeWWFixed(1.0);
+		  GVLI_maximum = MakeWWFixed(22.0);
+		  GVLI_increment = MakeWWFixed(1.0);
+/*		  GVLI_destination = (TO_APP_TARGET);*/
+/*		  ATTR_GEN_VALUE_STATUS_MSG = MSG_ITEM_SET_DIM_LEVEL;*/
+		  GVLI_destination = process;
+ 		  ATTR_GEN_VALUE_STATUS_MSG = MSG_PROCESS_SET_ITEM_DIM_LEVEL_DELAYED;
+		  HINT_VALUE_ANALOG_DISPLAY;
+		  HINT_VALUE_ORIENT_VERTICALLY;
+		  HINT_VALUE_DISPLAY_INTERVALS = {8, 2};
+}
+
+@object GenTriggerClass HomeUnitDimOffButton = {
+		  GI_visMoniker = list {@DimOffMoniker};
+		  GTI_actionMsg = MSG_GEN_VALUE_SET_VALUE_TO_MINIMUM;
+		  GTI_destination = @HomeUnitDimValue;
+}
+
+@object GenInteractionClass HomeItemEventsDialog = {
+   GI_visMoniker = "Events";
+	GI_comp = @HomeItemEventsList, @AddEventButton, @EditEventButton,
+	          @DeleteEventButton;
+   GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+   ATTR_GEN_HELP_CONTEXT = "EventsListDialog";
+}
+
+@object GenDynamicListClass HomeItemEventsList = {
+		  GIGI_destination = (TO_APP_TARGET);
+		  GDLI_queryMsg = MSG_QUERY_EVENT_MONIKER;
+		  GDLI_numItems = 0;
+		  HINT_ITEM_GROUP_SCROLLABLE;
+		  HINT_INITIAL_SIZE = {
+					 (SST_AVG_CHAR_WIDTHS | 45),
+					 (SST_LINES_OF_TEXT | 4),
+					 4 };
+}
+
+@object GenTriggerClass AddEventButton = {
+		  GI_visMoniker = "Add";
+		  GTI_actionMsg = MSG_ITEM_ADD_EVENT;
+		  GTI_destination = (TO_APP_TARGET);
+		  HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass EditEventButton = {
+		  GI_visMoniker = "Edit";
+		  GTI_actionMsg = MSG_ITEM_EDIT_EVENT;
+		  GTI_destination = (TO_APP_TARGET);
+		  HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass DeleteEventButton = {
+		  GI_visMoniker = "Delete";
+		  GTI_actionMsg = MSG_ITEM_DELETE_EVENT;
+		  GTI_destination = (TO_APP_TARGET);
+		  HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass HomeItemSettingsDialog = {
+	GI_visMoniker = "Settings";
+	GI_comp = @HomeUnitTypeList, @HomeUnitIconGroup,
+             @HomeGroupMemberList2,
+				 @HomeRoomDimensions, @HomeItemTextVisibleGroup,
+             @HomeEditGroupButton;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+   ATTR_GEN_HELP_CONTEXT = "ItemSettingsDialog";
+	HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+	HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenDynamicListClass HomeGroupMemberList2 = {
+   GI_visMoniker = "Members";
+	GIGI_destination = (TO_APP_TARGET);
+	GDLI_queryMsg = MSG_GROUP_GET_MEMBER_NAME;
+	GDLI_numItems = 0;
+   HINT_PLACE_MONIKER_ABOVE;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_INITIAL_SIZE = {
+			 (SST_AVG_CHAR_WIDTHS | 45),
+			 (SST_LINES_OF_TEXT | 4),
+			 4 };
+}
+
+@object GenTriggerClass HomeEditGroupButton = {
+   GI_visMoniker = "Edit";
+   GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_GROUP_EDIT_MEMBER_LIST;
+	GTI_destination = (TO_APP_TARGET);
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenItemGroupClass HomeUnitTypeList = {
+		  GI_comp = @HomeUnitTypeLamp, @HomeUnitTypeAppliance;
+		  GIGI_applyMsg = MSG_UNIT_CHANGE_TYPE;
+		  GIGI_destination = (TO_APP_TARGET);
+}
+
+		  @object GenItemClass HomeUnitTypeLamp = {
+					 GI_visMoniker = "Lamp";
+					 GII_identifier = HUT_LAMP;
+		  }
+
+		  @object GenItemClass HomeUnitTypeAppliance = {
+					 GI_visMoniker = "Appliance";
+					 GII_identifier = HUT_APPLIANCE;
+		  }
+
+@object GenBooleanGroupClass HomeItemTextVisibleGroup = {
+		  GI_comp = @HomeItemTextVisibleButton;
+		  GBGI_applyMsg = MSG_ITEM_CHANGE_TEXT_VISIBILITY;
+		  GBGI_destination = (TO_APP_TARGET);
+}
+
+		  @object GenBooleanClass HomeItemTextVisibleButton = {
+					 GI_visMoniker = "Draw Name";
+					 GBI_identifier = 1;
+		  }
+
+@object GenInteractionClass HomeUnitIconGroup = {
+		  GI_visMoniker = "Icon";
+		  GI_comp = @HomeUnitIconGlyphGroup, @HomeUnitIconButtonGroup;
+		  HINT_DRAW_IN_BOX;
+		  HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_ORIENT_CHILDREN_VERTICALLY;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass HomeUnitIconGlyphGroup = {
+		  GI_comp = @HomeUnitIconOnGlyph, @HomeUnitIconOffGlyph;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_WRAP_AFTER_CHILD_COUNT = 2;
+}
+
+		  @object GenTriggerClass HomeUnitIconOnGlyph = {
+					 GI_visMoniker = "On";
+		  }
+
+		  @object GenTriggerClass HomeUnitIconOffGlyph = {
+					 GI_visMoniker = "Off";
+		  }
+
+@object GenInteractionClass HomeUnitIconButtonGroup = {
+		  GI_comp = @HomeUnitChangeIconButton, @HomeUnitEditIconButton;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass HomeUnitChangeIconButton = {
+	GI_visMoniker = "Change";
+	GTI_actionMsg = MSG_UNIT_CHANGE_ICON;
+	GTI_destination = (TO_APP_TARGET);
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass HomeUnitEditIconButton = {
+	GI_visMoniker = "Edit";
+	GTI_actionMsg = MSG_UNIT_EDIT_ICON;
+	GTI_destination = (TO_APP_TARGET);
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass HomeRoomDimensions = {
+	GI_visMoniker = "Dimensions";
+	GI_comp = @HomeRoomHeightGroup, @HomeRoomWidthGroup;
+	HINT_DRAW_IN_BOX;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass HomeRoomHeightGroup = {
+	GI_comp = @HomeRoomHeight, @HomeRoomHeightGlyph;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenValueClass HomeRoomHeight = {
+	GI_visMoniker = "Length:";
+	GVLI_minimum = MakeWWFixed(1.0);
+	GVLI_maximum = MakeWWFixed(79.0);
+	GVLI_increment = MakeWWFixed(1.0);
+	GVLI_destination = (TO_APP_TARGET);
+	GVLI_applyMsg = MSG_ROOM_CHANGE_HEIGHT;
+}
+
+@object GenGlyphClass HomeRoomHeightGlyph = {
+	GI_visMoniker = "feet";
+}
+
+@object GenInteractionClass HomeRoomWidthGroup = {
+	GI_comp = @HomeRoomWidth, @HomeRoomWidthGlyph;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenValueClass HomeRoomWidth = {
+	GI_visMoniker = "Width:";
+	GVLI_minimum = MakeWWFixed(1.0);
+	GVLI_maximum = MakeWWFixed(61.0);
+	GVLI_increment = MakeWWFixed(1.0);
+	GVLI_destination = (TO_APP_TARGET);
+	GVLI_applyMsg = MSG_ROOM_CHANGE_WIDTH;
+}
+
+@object GenGlyphClass HomeRoomWidthGlyph = {
+	GI_visMoniker = "feet";
+}
+
+@end MenuResource;
+
+/*******************************************************************************
+* NON-USER-INITIATED DIALOGS, ETC.                                             *
+*******************************************************************************/
+@start InvisDialogResource;
+
+@object GenInteractionClass HomeGroupDialog = {
+	GI_visMoniker = "Create/Edit Group";
+	GI_comp = @HomeGroupNameText, @HomeGroupMemberList, @HomeGroupOK, @HomeGroupCancel;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+   ATTR_GEN_HELP_CONTEXT = "CreateEditGroupDlg";
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass HomeGroupNameText = {
+	GI_visMoniker = "Name:";
+	GTXI_maxLength = 32;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_TEXT_WHITE_WASH_COLOR;
+   HINT_DEFAULT_FOCUS;
+}
+
+@object GenDynamicListClass HomeGroupMemberList = {
+	GIGI_destination = (TO_APP_MODEL);
+	GDLI_queryMsg = MSG_DOC_GET_GROUP_MEMBER_NAME;
+	GDLI_numItems = 0;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_INITIAL_SIZE = {
+			 (SST_AVG_CHAR_WIDTHS | 45),
+			 (SST_LINES_OF_TEXT | 4),
+			 4 };
+}
+
+@object GenTriggerClass HomeGroupCancel = {
+	GI_visMoniker = 'C', "Cancel";
+	GTI_actionMsg = MSG_DOC_EDIT_CREATE_GROUP_CANCELLED;
+	GTI_destination = (TO_APP_MODEL);
+   ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+   HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass HomeGroupOK = {
+	GI_visMoniker = 'O', "OK";
+   GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_DOC_EDIT_CREATE_GROUP_COMPLETED;
+	GTI_destination = (TO_APP_MODEL);
+	HINT_SEEK_REPLY_BAR;
+   HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenInteractionClass HomeNewRoomDialog = {
+   GI_visMoniker = "Create New Room";
+	GI_comp = @HomeNewRoomNameText, @HomeNewRoomDimensions;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+   ATTR_GEN_HELP_CONTEXT = "NewRoomDialog";
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass HomeNewRoomNameText = {
+	GI_visMoniker = "Name:";
+	GTXI_maxLength = 32;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+   HINT_TEXT_WHITE_WASH_COLOR;
+   HINT_DEFAULT_FOCUS;
+}
+
+@object GenInteractionClass HomeNewRoomDimensions = {
+	GI_visMoniker = "Dimensions";
+	GI_comp = @HomeNewRoomHeightGroup, @HomeNewRoomWidthGroup;
+	HINT_DRAW_IN_BOX;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass HomeNewRoomHeightGroup = {
+	GI_comp = @HomeNewRoomHeight, @HomeNewRoomHeightGlyph;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenValueClass HomeNewRoomHeight = {
+	GI_visMoniker = "Length:";
+	GVLI_value = MakeWWFixed(10.0);
+	GVLI_minimum = MakeWWFixed(1.0);
+	GVLI_maximum = MakeWWFixed(79.0);
+	GVLI_increment = MakeWWFixed(1.0);
+}
+
+@object GenGlyphClass HomeNewRoomHeightGlyph = {
+	GI_visMoniker = "feet";
+}
+
+@object GenInteractionClass HomeNewRoomWidthGroup = {
+	GI_comp = @HomeNewRoomWidth, @HomeNewRoomWidthGlyph;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenValueClass HomeNewRoomWidth = {
+		  GI_visMoniker = "Width:";
+		  GVLI_value = MakeWWFixed(10.0);
+		  GVLI_minimum = MakeWWFixed(1.0);
+		  GVLI_maximum = MakeWWFixed(61.0);
+		  GVLI_increment = MakeWWFixed(1.0);
+}
+
+@object GenGlyphClass HomeNewRoomWidthGlyph = {
+	GI_visMoniker = "feet";
+}
+
+@visMoniker UnitDialogCreateMoniker = "Create New Unit";
+@visMoniker UnitDialogChangeMoniker = "Change Icon";
+@object GenInteractionClass HomeNewUnitDialog = {
+	GI_visMoniker = UnitDialogCreateMoniker;
+	GI_comp = @HomeNewUnitNameText, @HomeNewUnitNumberAndType, @HomeNewUnitIconList;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+   ATTR_GEN_HELP_CONTEXT = "NewUnitDialog";
+	HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenTextClass HomeNewUnitNameText = {
+	GI_visMoniker = "Name:";
+	GTXI_maxLength = 32;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_TEXT_WHITE_WASH_COLOR;
+   HINT_DEFAULT_FOCUS;
+}
+
+@object GenInteractionClass HomeNewUnitNumberAndType = {
+		  GI_comp = @HomeNewUnitHouseNumber,
+											@HomeNewUnitTypeList;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass HomeNewUnitHouseNumber = {
+		  GI_visMoniker = "Unit:";
+		  GI_comp = @HomeNewUnitHouseList, @HomeNewUnitNumberList;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenItemGroupClass HomeNewUnitHouseList = {
+		  GI_comp = @NewHouseA, @NewHouseB, @NewHouseC, @NewHouseD, @NewHouseE,
+											@NewHouseF, @NewHouseG, @NewHouseH, @NewHouseI, @NewHouseJ,
+											@NewHouseK, @NewHouseL, @NewHouseM, @NewHouseN, @NewHouseO,
+											@NewHouseP;
+		  GIGI_selection = HOUSE_A;
+		  GIGI_destination = process;
+		  HINT_ITEM_GROUP_MINIMIZE_SIZE;
+		  HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemGroupClass HomeNewUnitNumberList = {
+		  GI_comp = @NewUnit1, @NewUnit2, @NewUnit3, @NewUnit4, @NewUnit5, @NewUnit6,
+											@NewUnit7, @NewUnit8, @NewUnit9, @NewUnit10, @NewUnit11, @NewUnit12,
+											@NewUnit13, @NewUnit14, @NewUnit15, @NewUnit16;
+		  GIGI_selection = UNIT_1;
+		  GIGI_destination = process;
+		  HINT_ITEM_GROUP_MINIMIZE_SIZE;
+		  HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemGroupClass HomeNewUnitTypeList = {
+		  GI_comp = @HomeNewUnitTypeLamp, @HomeNewUnitTypeAppliance;
+		  GIGI_selection = HUT_LAMP;
+}
+
+		  @object GenItemClass HomeNewUnitTypeLamp = {
+					 GI_visMoniker = "Lamp";
+					 GII_identifier = HUT_LAMP;
+		  }
+
+		  @object GenItemClass HomeNewUnitTypeAppliance = {
+					 GI_visMoniker = "Appliance";
+					 GII_identifier = HUT_APPLIANCE;
+		  }
+
+@object GenDynamicListClass HomeNewUnitIconList = {
+	GDLI_queryMsg = MSG_ICON_VIEW_QUERY_ICON_MONIKER;
+	GIGI_destination = @LargeIcon;
+	GIGI_selection = 1;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_MINIMUM_SIZE = {SST_PIXELS | 30, SST_PIXELS | 30, 1};
+}
+
+@object GenInteractionClass HomeEventDialog = {
+   GI_visMoniker = "Event";
+	GI_comp = @HomeEventDaysGroup, @HomeEventTimeGroup, @HomeEventFunctionList;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+   ATTR_GEN_HELP_CONTEXT = "EventDialog";
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass DeleteEventBox = {
+		  GI_comp = @DeleteEventText;
+		  GII_visibility = GIV_DIALOG;
+		  GII_type = GIT_AFFIRMATION;
+		  GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+}
+
+@object GenGlyphClass DeleteEventText = {
+		  GI_visMoniker = "Are you sure you want to delete this event?";
+}
+
+@object GenInteractionClass EventsWindow = {
+	GI_visMoniker = "Events";
+	GI_comp = @EventsPrint, @EventsText;
+	GII_type = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+   ATTR_GEN_HELP_CONTEXT = "PrintEventsWindow";
+}
+
+@object GenTextClass EventsText = {
+	GI_attrs = @default | GA_READ_ONLY; /* so text isn't editable... */
+	GTXI_attrs = @default | GTA_INIT_SCROLLING | GTA_ALLOW_TEXT_OFF_END |
+					 GTA_DONT_SCROLL_TO_CHANGES;
+	ATTR_GEN_TEXT_SELECTABLE;  /* ...but it IS selectable. */
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_12 << VTDCA_SIZE_OFFSET) |
+												  VTDF_URW_MONO);
+	ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = ((VTDDT_INCH << VTDPA_DEFAULT_TABS_OFFSET) |
+												 (J_LEFT << VTDPA_JUSTIFICATION_OFFSET));
+	ATTR_GEN_TEXT_ALLOW_COLUMN_BREAKS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MINIMUM_SIZE = {(SST_AVG_CHAR_WIDTHS | 85),
+								(SST_LINES_OF_TEXT | 20),
+								0};
+}
+
+@object GenTriggerClass EventsPrint = {
+	GI_visMoniker = 'P', "Print";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_CUSTOM_START;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/*******************************************************************************
+* ImpEx UI Stuff                                                              *
+*******************************************************************************/
+@visMoniker ImportText = "Import Icons";
+@visMoniker ExportText = "Export Icons";
+@object GenInteractionClass HomeExportImportIconFileList = {
+	GI_comp = @HomeExImGlyph, @HomeExImFileList, @HomeExImOKTrigger,
+				 @HomeExImFileNameText;
+	GII_type = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	ATTR_GEN_HELP_CONTEXT = "IconImpEx";
+}
+
+@visMoniker SelectImportText = "Select the file containing the icons to import.";
+@visMoniker SelectExportText = "Select the path and file name to use for export.";
+@object GenGlyphClass HomeExImGlyph = {
+}
+
+@object GenFileSelectorClass HomeExImFileList = {
+	GFSI_attrs = @default | FSA_SHOW_FILES_DISABLED;
+	GFSI_notificationMsg = MSG_ICON_VIEW_ENTRY_SELECTED;
+	GFSI_destination = @LargeIcon;
+	ATTR_GEN_PATH_DATA = SP_DOCUMENT;
+}
+
+@object GenTextClass HomeExImFileNameText = {
+	GI_visMoniker = "Filename:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
+	GTXI_maxLength = 32;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+}
+
+@object GenTriggerClass HomeExImOKTrigger = {
+	GI_visMoniker = "Ok";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_ICON_VIEW_OPEN_FILE_FOR_IMPORT;
+	GTI_destination = @LargeIcon;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenInteractionClass HomeExportIconDialog = {
+	GI_visMoniker = "Export Icons";
+	GI_comp = @HomeExportIconGlyph, @HomeExportIconList,
+				 @HomeDoExport, @HomeExportCancel;
+	GII_type = GIT_MULTIPLE_RESPONSE;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	ATTR_GEN_HELP_CONTEXT = "IconImpEx";
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass HomeExportIconGlyph = {
+	GI_visMoniker = "Select the icons to export.";
+}
+
+@object GenDynamicListClass HomeExportIconList = {
+	GDLI_queryMsg = MSG_ICON_VIEW_QUERY_ICON_MONIKER;
+	GIGI_destination = @LargeIcon;
+	GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_MINIMUM_SIZE = {SST_PIXELS | 30, SST_PIXELS | 30, 1};
+}
+
+@object GenTriggerClass HomeDoExport = {
+	GI_visMoniker = "Export";
+//	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_ICON_VIEW_EXPORT_SELECTED_ICONS;
+	GTI_destination = @LargeIcon;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass HomeExportCancel = {
+	GI_visMoniker = "Cancel";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_ICON_VIEW_CANCEL_EXPORT_ICONS;
+	GTI_destination = @LargeIcon;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass HomeImportIconDialog = {
+	GI_visMoniker = "Import Icons";
+	GI_comp = @HomeImportIconGlyph, @HomeImportIconList,
+				 @HomeDoImport, @HomeImportCancel;
+	GII_type = GIT_MULTIPLE_RESPONSE;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	ATTR_GEN_HELP_CONTEXT = "IconImpEx";
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass HomeImportIconGlyph = {
+	GI_visMoniker = "Select the icons to import.";
+}
+
+@object GenDynamicListClass HomeImportIconList = {
+	GDLI_queryMsg = MSG_ICON_VIEW_QUERY_IMPORT_MONIKER;
+	GIGI_destination = @LargeIcon;
+	GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_MINIMUM_SIZE = {SST_PIXELS | 30, SST_PIXELS | 30, 1};
+}
+
+@object GenTriggerClass HomeDoImport = {
+	GI_visMoniker = "Import";
+//	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_ICON_VIEW_IMPORT_SELECTED_ICONS;
+	GTI_destination = @LargeIcon;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass HomeImportCancel = {
+	GI_visMoniker = "Cancel";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_ICON_VIEW_CANCEL_IMPORT_ICONS;
+	GTI_destination = @LargeIcon;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@end InvisDialogResource;
+
+/*******************************************************************************
+* DROP-DOWN LISTS                                                              *
+*******************************************************************************/
+@start DropDownLists;
+@ITEM(HouseA, HOUSE_A, "A")
+@ITEM(HouseB, HOUSE_B, "B")
+@ITEM(HouseC, HOUSE_C, "C")
+@ITEM(HouseD, HOUSE_D, "D")
+@ITEM(HouseE, HOUSE_E, "E")
+@ITEM(HouseF, HOUSE_F, "F")
+@ITEM(HouseG, HOUSE_G, "G")
+@ITEM(HouseH, HOUSE_H, "H")
+@ITEM(HouseI, HOUSE_I, "I")
+@ITEM(HouseJ, HOUSE_J, "J")
+@ITEM(HouseK, HOUSE_K, "K")
+@ITEM(HouseL, HOUSE_L, "L")
+@ITEM(HouseM, HOUSE_M, "M")
+@ITEM(HouseN, HOUSE_N, "N")
+@ITEM(HouseO, HOUSE_O, "O")
+@ITEM(HouseP, HOUSE_P, "P")
+
+@ITEM(Unit1, UNIT_1, "1")
+@ITEM(Unit2, UNIT_2, "2")
+@ITEM(Unit3, UNIT_3, "3")
+@ITEM(Unit4, UNIT_4, "4")
+@ITEM(Unit5, UNIT_5, "5")
+@ITEM(Unit6, UNIT_6, "6")
+@ITEM(Unit7, UNIT_7, "7")
+@ITEM(Unit8, UNIT_8, "8")
+@ITEM(Unit9, UNIT_9, "9")
+@ITEM(Unit10, UNIT_10, "10")
+@ITEM(Unit11, UNIT_11, "11")
+@ITEM(Unit12, UNIT_12, "12")
+@ITEM(Unit13, UNIT_13, "13")
+@ITEM(Unit14, UNIT_14, "14")
+@ITEM(Unit15, UNIT_15, "15")
+@ITEM(Unit16, UNIT_16, "16")
+
+@ITEM(NewHouseA, HOUSE_A, "A")
+@ITEM(NewHouseB, HOUSE_B, "B")
+@ITEM(NewHouseC, HOUSE_C, "C")
+@ITEM(NewHouseD, HOUSE_D, "D")
+@ITEM(NewHouseE, HOUSE_E, "E")
+@ITEM(NewHouseF, HOUSE_F, "F")
+@ITEM(NewHouseG, HOUSE_G, "G")
+@ITEM(NewHouseH, HOUSE_H, "H")
+@ITEM(NewHouseI, HOUSE_I, "I")
+@ITEM(NewHouseJ, HOUSE_J, "J")
+@ITEM(NewHouseK, HOUSE_K, "K")
+@ITEM(NewHouseL, HOUSE_L, "L")
+@ITEM(NewHouseM, HOUSE_M, "M")
+@ITEM(NewHouseN, HOUSE_N, "N")
+@ITEM(NewHouseO, HOUSE_O, "O")
+@ITEM(NewHouseP, HOUSE_P, "P")
+
+@ITEM(NewUnit1, UNIT_1, "1")
+@ITEM(NewUnit2, UNIT_2, "2")
+@ITEM(NewUnit3, UNIT_3, "3")
+@ITEM(NewUnit4, UNIT_4, "4")
+@ITEM(NewUnit5, UNIT_5, "5")
+@ITEM(NewUnit6, UNIT_6, "6")
+@ITEM(NewUnit7, UNIT_7, "7")
+@ITEM(NewUnit8, UNIT_8, "8")
+@ITEM(NewUnit9, UNIT_9, "9")
+@ITEM(NewUnit10, UNIT_10, "10")
+@ITEM(NewUnit11, UNIT_11, "11")
+@ITEM(NewUnit12, UNIT_12, "12")
+@ITEM(NewUnit13, UNIT_13, "13")
+@ITEM(NewUnit14, UNIT_14, "14")
+@ITEM(NewUnit15, UNIT_15, "15")
+@ITEM(NewUnit16, UNIT_16, "16")
+
+@end DropDownLists;
+/*******************************************************************************
+* EVENT DIALOG BOX                                                             *
+*******************************************************************************/
+@start EventDialog;
+@object GenItemGroupClass HomeEventFunctionList = {
+		  GI_visMoniker = "Function";
+		  GI_comp = @HomeEventFunctionOn, @HomeEventFunctionOff, @HomeEventFunctionBrighter,
+											@HomeEventFunctionDimmer, @HomeEventFunctionDimTo;
+		  GIGI_selection = FUNCTION_ON;
+		  HINT_DRAW_IN_BOX;
+		  HINT_PLACE_MONIKER_ABOVE;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+		  @object GenItemClass HomeEventFunctionOn = {
+					 GI_visMoniker = "On";
+					 GII_identifier = FUNCTION_ON;
+		  }
+
+		  @object GenItemClass HomeEventFunctionOff = {
+					 GI_visMoniker = "Off";
+					 GII_identifier = FUNCTION_OFF;
+		  }
+
+		  @object GenItemClass HomeEventFunctionBrighter = {
+					 GI_visMoniker = "Brighter";
+					 GII_identifier = FUNCTION_BRIGHTER;
+		  }
+
+		  @object GenItemClass HomeEventFunctionDimmer = {
+					 GI_visMoniker = "Dimmer";
+					 GII_identifier = FUNCTION_DIMMER;
+		  }
+
+		  @object GenItemClass HomeEventFunctionDimTo = {
+					 GI_visMoniker = "Dim to Preset";
+					 GII_identifier = FUNCTION_DIM_TO_LEVEL;
+		  }
+
+@object GenInteractionClass HomeEventDaysGroup = {
+		  GI_visMoniker = "Days";
+		  GI_comp = @DaysGroup, @OnceOnly, @SpecialDaysGroup;
+		  HINT_DRAW_IN_BOX;
+		  HINT_PLACE_MONIKER_ABOVE;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object HomeBooleanGroupClass DaysGroup = {
+		  GI_comp = @Sunday, @Monday, @Tuesday, @Wednesday, @Thursday,
+											@Friday, @Saturday;
+		  ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG = MSG_CHECK_ONCE;
+		  GBGI_destination = DaysGroup; /* we use DaysGroup because it's in the UI thread and already subclassed. */
+}
+
+		  @object GenBooleanClass Sunday = {
+					 GI_visMoniker = "Sun";
+					 GBI_identifier = D_SUNDAY;
+		  }
+
+		  @object GenBooleanClass Monday = {
+					 GI_visMoniker = "Mon";
+					 GBI_identifier = D_MONDAY;
+		  }
+
+		  @object GenBooleanClass Tuesday = {
+					 GI_visMoniker = "Tues";
+					 GBI_identifier = D_TUESDAY;
+		  }
+
+		  @object GenBooleanClass Wednesday = {
+					 GI_visMoniker = "Wed";
+					 GBI_identifier = D_WEDNESDAY;
+		  }
+
+		  @object GenBooleanClass Thursday = {
+					 GI_visMoniker = "Thur";
+					 GBI_identifier = D_THURSDAY;
+		  }
+
+		  @object GenBooleanClass Friday = {
+					 GI_visMoniker = "Fri";
+					 GBI_identifier = D_FRIDAY;
+		  }
+
+		  @object GenBooleanClass Saturday = {
+					 GI_visMoniker = "Sat";
+					 GBI_identifier = D_SATURDAY;
+		  }
+
+@object GenBooleanGroupClass OnceOnly = {
+		  GI_comp = @OnceButton;
+		  ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG = MSG_SET_ONCE;
+		  GBGI_destination = DaysGroup; /* we use DaysGroup because it's in the UI thread and already subclassed. */
+}
+
+		  @object GenBooleanClass OnceButton = {
+					 GI_visMoniker = "Once Only";
+					 GBI_identifier = 1;
+		  }
+
+@object GenInteractionClass SpecialDaysGroup = {
+	GI_comp = @Weekdays, @Weekends, @Today, @Tomorrow;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass Weekdays = {
+	GI_visMoniker = "Weekdays";
+	GTI_actionMsg = MSG_SET_DAYS;
+	GTI_destination = DaysGroup;
+	ATTR_GEN_TRIGGER_ACTION_DATA = D_WEEKDAYS;
+}
+
+		  @object GenTriggerClass Weekends = {
+					 GI_visMoniker = "Weekends";
+					 GTI_actionMsg = MSG_SET_DAYS;
+					 GTI_destination = DaysGroup;
+					 ATTR_GEN_TRIGGER_ACTION_DATA = D_WEEKENDS;
+		  }
+
+		  @object GenTriggerClass Today = {
+					 GI_visMoniker = "Today";
+					 GTI_actionMsg = MSG_SET_DAYS;
+					 GTI_destination = DaysGroup;
+					 ATTR_GEN_TRIGGER_ACTION_DATA = D_TODAY;
+		  }
+
+		  @object GenTriggerClass Tomorrow = {
+					 GI_visMoniker = "Tomorrow";
+					 GTI_actionMsg = MSG_SET_DAYS;
+					 GTI_destination = DaysGroup;
+					 ATTR_GEN_TRIGGER_ACTION_DATA = D_TOMORROW;
+		  }
+
+@object GenInteractionClass HomeEventTimeGroup = {
+		  GI_visMoniker = "Time";
+		  GI_comp = @TimeGroup, @TimeRandomGroup;
+		  HINT_ORIENT_CHILDREN_VERTICALLY;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_DRAW_IN_BOX;
+		  HINT_PLACE_MONIKER_ABOVE;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass TimeGroup = {
+		  GI_comp = @TimeHour, @TimeMinute, @TimeAMPMGroup;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+		  @object GenValueClass TimeHour = {
+					 GI_visMoniker = "Hours:";
+					 GVLI_value = MakeWWFixed(1.0);
+					 GVLI_minimum = MakeWWFixed(1.0);
+					 GVLI_maximum = MakeWWFixed(12.0);
+		  }
+
+		  @object GenValueClass TimeMinute = {
+					 GI_visMoniker = "Minutes:";
+					 GVLI_maximum = MakeWWFixed(59.0);
+		  }
+
+		  @object GenItemGroupClass TimeAMPMGroup = {
+					 GI_comp = @TimeAM, @TimePM;
+		GIGI_selection = 0;
+		  }
+
+					 @object GenItemClass TimeAM = {
+								GI_visMoniker = "AM";
+								GII_identifier = 0;
+					 }
+
+@object GenItemClass TimePM = {
+	GI_visMoniker = "PM";
+	GII_identifier = 1;
+}
+
+@object GenInteractionClass TimeRandomGroup = {
+		  GI_comp = @TimeRandomSwitchGroup, @TimeValueAndGlyphsGroup;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenBooleanGroupClass TimeRandomSwitchGroup = {
+	GI_comp = @TimeRandomSwitch;
+	ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG = MSG_SET_RANDOM;
+	GBGI_destination = DaysGroup; /* we use DaysGroup because it's in the UI thread and already subclassed. */
+}
+
+@object GenBooleanClass TimeRandomSwitch = {
+	GI_visMoniker = 'R', "Random:";
+	GBI_identifier = 1;
+}
+
+@object GenInteractionClass TimeValueAndGlyphsGroup = {
+		  GI_comp = @TimeRandomGlyph, @TimeRandomValue, @TimeMinutesGlyph;
+	GI_states = @default & ~GS_ENABLED;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass TimeRandomGlyph = {
+		  GI_visMoniker = "plus or minus";
+}
+
+@object GenValueClass TimeRandomValue = {
+	GVLI_minimum = MakeWWFixed(2.0);
+		  GVLI_maximum = MakeWWFixed(120.0);
+		  GVLI_value = MakeWWFixed(2.0);
+}
+
+@object GenGlyphClass TimeMinutesGlyph = {
+		  GI_visMoniker = "minutes";
+}
+
+@end EventDialog;
+
+/*******************************************************************************
+* ICON EDITOR                                                                  *
+*******************************************************************************/
+@start IconEditor;
+
+@object GenInteractionClass HomeIconEditor = {
+	GI_visMoniker = "Icon";
+	GI_comp = @IconLargeViewAndTools, @IconSmallView, @SaveIconButton, @SaveAsIconButton,
+				 @CopyButton, @UndoButton;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+   ATTR_GEN_HELP_CONTEXT = "IconEditor";
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+}
+
+@object GenInteractionClass IconLargeViewAndTools = {
+	GI_comp = @HomeIconTools, @IconLargeView;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass HomeIconTools = {
+	GI_comp = @HomeIconToolGroup, @HomeIconColorSelector;
+	GII_visibility = GIV_POPOUT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenItemGroupClass HomeIconToolGroup = {
+	GI_comp = @BrushTool, @EraserTool;
+	GIGI_selection = 0;
+	HINT_ITEM_GROUP_TOOLBOX_STYLE;
+}
+
+@object GenItemClass BrushTool = {
+	GI_visMoniker = list {@BrushMoniker};
+	GII_identifier = 0;
+}
+
+@object GenItemClass EraserTool = {
+	GI_visMoniker = list {@EraserMoniker};
+	GII_identifier = 1;
+}
+
+@object ColorSelectorClass HomeIconColorSelector = {
+	GI_states = @default | GS_ENABLED;
+	GCI_output = @LargeIcon;
+	ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_INDEX);
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_FILLED_LIST | CSF_RGB | CSF_DRAW_MASK | CSF_PATTERN);
+}
+
+@object GenViewClass IconLargeView = {
+	 GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT |
+																	GVDA_NO_SMALLER_THAN_CONTENT;
+	 GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT |
+																	GVDA_NO_SMALLER_THAN_CONTENT;
+	 GVI_content = @LargeIcon;
+	 GVI_docBounds = {0, 0, 240, 240};
+	 ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@object GenViewClass IconSmallView = {
+	GI_comp = @IconSelectGroup;
+	GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT |
+																  GVDA_NO_SMALLER_THAN_CONTENT;
+	GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT |
+																  GVDA_NO_SMALLER_THAN_CONTENT;
+	GVI_attrs = @default | GVA_DONT_SEND_PTR_EVENTS;
+	GVI_content = @SmallIcon;
+	GVI_docBounds = {0, 0, 30, 30};
+	ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@object GenItemGroupClass IconSelectGroup = {
+	GI_comp = @IconOnButton, @IconOffButton;
+	GIGI_applyMsg = MSG_ICON_VIEW_CHANGE_DISPLAYED_ICON;
+	GIGI_destination = @LargeIcon;
+	HINT_SEEK_TOP_OF_VIEW;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_ITEM_GROUP_TOOLBOX_STYLE;
+}
+
+@object GenItemClass IconOnButton = {
+	GI_visMoniker = list {@UnitOnMoniker, @UnitOnBWMoniker};
+	GII_identifier = 0;
+}
+
+@object GenItemClass IconOffButton = {
+	GI_visMoniker = list {@UnitOffMoniker, @UnitOffBWMoniker};
+	GII_identifier = 1;
+}
+
+@object GenTriggerClass SaveIconButton = {
+	GI_visMoniker = "Save";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_ICON_VIEW_SAVE_ICON;
+	GTI_destination = @LargeIcon;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass SaveAsIconButton = {
+	GI_visMoniker = "Save As New";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_ICON_VIEW_SAVE_AS_NEW_ICON;
+	GTI_destination = @LargeIcon;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@visMoniker CopyOffButtonMoniker = "Copy \"Off\" Icon";
+@visMoniker CopyOnButtonMoniker = "Copy \"On\" Icon";
+
+@object GenTriggerClass CopyButton = {
+	GI_visMoniker = CopyOffButtonMoniker;
+	GTI_actionMsg = MSG_ICON_VIEW_COPY_OTHER_ICON;
+	GTI_destination = @LargeIcon;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass UndoButton = {
+	GI_visMoniker = "Undo Changes";
+	GTI_actionMsg = MSG_ICON_VIEW_UNDO_CHANGES;
+	GTI_destination = @LargeIcon;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object IconClass LargeIcon = {
+	VI_bounds = {0, 0, 240, 240};
+	VCI_geoAttrs = VCGA_CUSTOM_MANAGE_CHILDREN;
+	IC_scaleFactor = 3;
+}
+
+@object IconClass SmallIcon = {
+	VI_bounds = {0, 0, 30, 30};
+	VCI_geoAttrs = VCGA_CUSTOM_MANAGE_CHILDREN;
+	IC_scaleFactor = 0;
+}
+
+@end IconEditor;
+
+@start StringsResource, data;
+@chunk char MsgNoControllerOnPort[] = "Home Automation could not find an X-10 controller on the selected port. You will need to choose a new port from the Settings menu.";
+@chunk char MsgX10FailedToLoad[] = "The X-10 driver failed to load properly. The document will now close. (Error = %d)";
+@chunk char MsgNoPortSpecified[] = "There is no port specified for the X-10 Controller. You will need to choose a port from the Settings menu.";
+@chunk char NewGroupStr[] = "New Group...";
+@chunk char MsgCantConvertIcon[] = "The icon could not be converted to 16-colors and cannot be edited.";
+@chunk char MsgConfirmDeleteIcon[] = "Are you sure you want to delete this icon?";
+@chunk char MsgCantOpenIconFile[] = "The selected file could not be opened.";
+@chunk char MsgNotIconFile[] = "The selected file is not an icon export file.";
+@chunk char MsgIconImportDone[] = "Icon import is complete.";
+@chunk char MsgCantCreateIconFile[] = "The icon file could not be created.";
+@chunk char MsgIconExportDone[] = "Icon export is complete.";
+@chunk char MsgIconExportNoSelections[] = "Please select an icon (or icons) to export.";
+@chunk char MsgIconImportNoSelections[] = "Please select an icon (or icons) to import.";
+@chunk char MsgConfirmDeleteItem[] = "Are you sure you want to delete this item?";
+@chunk char MsgConfirmPortCorrect[] = "Please make sure the port you have selected is not in use by other hardware, such as a mouse or modem. Are you sure the port is correct?";
+@chunk char MsgConfirmMouseUsingPort[] = "The port you have specified appears to be in use by the mouse. Are you sure the port is correct?";
+@chunk char MsgSelectAnotherPort[] = "Home Automation cannot find a controller on the specified port. Please make another selection.";
+@chunk char SundayStr[] = "Sunday\r======\r";
+@chunk char MondayStr[] = "Monday\r======\r";
+@chunk char TuesdayStr[] = "Tuesday\r=======\r";
+@chunk char WednesdayStr[] = "Wednesday\r=========\r";
+@chunk char ThursdayStr[] = "Thursday\r========\r";
+@chunk char FridayStr[] = "Friday\r======\r";
+@chunk char SaturdayStr[] = "Saturday\r========\r";
+@chunk char TurnOnStr[] = " Turn On";
+@chunk char TurnOffStr[] = " Turn Off";
+@chunk char DimmerStr[] = " Dimmer";
+@chunk char BrighterStr[] = " Brighter";
+@chunk char NullStr[] = "";
+@chunk char PresetStr[] = "Preset Dim";
+@chunk char MinStr[] = " min.";
+@chunk char OnceStr[] = " ONCE";
+@chunk char SundayInitStr[] = "S";
+@chunk char MondayInitStr[] = "M";
+@chunk char TuesdayInitStr[] = "T";
+@chunk char WednesdayInitStr[] = "W";
+@chunk char ThursdayInitStr[] = "T";
+@chunk char FridayInitStr[] = "F";
+@chunk char SaturdayInitStr[] = "S";
+@chunk char StarStr[] = "*";
+
+@end StringsResource;
+
+/*******************************************************************************
+*  CODE DECLARATIONS                                                           *
+*******************************************************************************/
+@extern method HomeProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN;
+@extern method HomeProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION;
+@extern method HomeProcessClass, MSG_NOTIFY_DATE_TIME_CHANGE;
+@extern method HomeProcessClass, MSG_PROCESS_TIMER_CLICK;
+@extern method HomeProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION;
+@extern method HomeProcessClass, MSG_PROCESS_CHANGE_DRIVER_PORT;
+@extern method HomeProcessClass, MSG_PROCESS_ADD_EVENT_TO_SYSTEM_LIST;
+@extern method HomeProcessClass, MSG_PROCESS_SYSTEM_EVENT_CHANGED;
+@extern method HomeProcessClass, MSG_PROCESS_DELETE_SYSTEM_EVENT;
+@extern method HomeProcessClass, MSG_PROCESS_EVENT_BLOCK_DELETED;
+@extern method HomeProcessClass, MSG_PROCESS_LIST_EVENTS_BY_DAY;
+@extern method HomeProcessClass, MSG_PRINT_START_PRINTING;
+@extern method HomeProcessClass, MSG_PROCESS_SET_ITEM_DIM_LEVEL_DELAYED;
+@extern method HomeProcessClass, MSG_PROCESS_SET_ITEM_DIM_LEVEL;
+
+@extern method HomeValueClass, MSG_GEN_VALUE_SET_VALUE;
+
+@extern method HomeBooleanGroupClass, MSG_SET_DAYS;
+@extern method HomeBooleanGroupClass, MSG_SET_RANDOM;
+@extern method HomeBooleanGroupClass, MSG_SET_ONCE, MSG_CHECK_ONCE;
+
+@extern method HomeDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE;
+@extern method HomeDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT;
+@extern method HomeDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT;
+@extern method HomeDocumentClass, MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT;
+@extern method HomeDocumentClass, MSG_META_EXPOSED;
+@extern method HomeDocumentClass, MSG_VIS_DRAW;
+@extern method HomeDocumentClass, MSG_VIS_RECALC_SIZE;
+@extern method HomeDocumentClass, MSG_DOC_GET_GROUP_NAME;
+@extern method HomeDocumentClass, MSG_DOC_GET_GROUP_MEMBER_NAME;
+@extern method HomeDocumentClass, MSG_DOC_GROUP_SELECTED;
+@extern method HomeDocumentClass, MSG_DOC_SELECT_ITEMS_FOR_GROUP;
+@extern method HomeDocumentClass, MSG_DOC_CREATE_NEW_GROUP;
+@extern method HomeDocumentClass, MSG_DOC_EDIT_GROUP;
+@extern method HomeDocumentClass, MSG_DOC_EDIT_CREATE_GROUP_CANCELLED;
+@extern method HomeDocumentClass, MSG_DOC_EDIT_CREATE_GROUP_COMPLETED;
+@extern method HomeDocumentClass, MSG_DOC_GROUP_BOX_ITEM_SELECTED;
+@extern method HomeDocumentClass, MSG_DOC_CREATE_NEW_UNIT;
+@extern method HomeDocumentClass, MSG_ALL_LIGHTS_ON;
+@extern method HomeDocumentClass, MSG_ALL_LIGHTS_OFF;
+@extern method HomeDocumentClass, MSG_ALL_UNITS_OFF;
+@extern method HomeDocumentClass, MSG_DOC_CREATE_NEW_ROOM;
+@extern method HomeDocumentClass, MSG_PRINT_START_PRINTING;
+@extern method HomeDocumentClass, MSG_DOC_OBJECT_OPTIONS_CHANGED;
+@extern method HomeDocumentClass, MSG_DOC_OBJECT_TEXT_OPTIONS_CHANGED;
+@extern method HomeDocumentClass, MSG_DOC_OBJECT_TEXT_STATUS_CHANGED;
+@extern method HomeDocumentClass, MSG_DOC_ROOM_SCALE_FACTOR_CHANGED;
+@extern method HomeDocumentClass, MSG_DOC_GRID_SIZE_CHANGED;
+@extern method HomeDocumentClass, MSG_DOC_LIST_EVENTS_BY_ITEM;
+@extern method HomeDocumentClass, MSG_DOC_FIND_GROUP_BLOCK;
+
+@extern method IconClass, MSG_ICON_VIEW_OPEN_ICON_DB;
+@extern method IconClass, MSG_ICON_VIEW_CLOSE_ICON_DB;
+@extern method IconClass, MSG_ICON_VIEW_SET_FILE_HANDLE;
+@extern method IconClass, MSG_ICON_VIEW_GET_FILE_HANDLE;
+@extern method IconClass, MSG_ICON_VIEW_QUERY_ICON_MONIKER;
+@extern method IconClass, MSG_ICON_VIEW_QUERY_IMPORT_MONIKER;
+@extern method IconClass, MSG_ICON_VIEW_REPLACE_ICON_MONIKER;
+@extern method IconClass, MSG_ICON_VIEW_NEW_ICON;
+@extern method IconClass, MSG_ICON_VIEW_EDIT_ICON;
+@extern method IconClass, MSG_ICON_VIEW_DELETE_ICON;
+@extern method IconClass, MSG_ICON_VIEW_SHOW_ICON;
+@extern method IconClass, MSG_VIS_DRAW;
+@extern method IconClass, MSG_META_START_SELECT;
+@extern method IconClass, MSG_META_DRAG_SELECT, MSG_META_PTR;
+@extern method IconClass, MSG_META_END_SELECT;
+@extern method IconClass, MSG_ICON_VIEW_UPDATE_BITMAP;
+@extern method IconClass, MSG_META_COLORED_OBJECT_SET_COLOR;
+@extern method IconClass, MSG_ICON_VIEW_SAVE_ICON;
+@extern method IconClass, MSG_ICON_VIEW_SAVE_AS_NEW_ICON;
+@extern method IconClass, MSG_ICON_VIEW_COPY_OTHER_ICON;
+@extern method IconClass, MSG_ICON_VIEW_UNDO_CHANGES;
+@extern method IconClass, MSG_ICON_VIEW_CHANGE_DISPLAYED_ICON;
+@extern method IconClass, MSG_ICON_VIEW_IMPORT_ICONS;
+@extern method IconClass, MSG_ICON_VIEW_OPEN_FILE_FOR_IMPORT;
+@extern method IconClass, MSG_ICON_VIEW_IMPORT_SELECTED_ICONS;
+@extern method IconClass, MSG_ICON_VIEW_EXPORT_ICONS;
+@extern method IconClass, MSG_ICON_VIEW_SELECT_ICONS_FOR_EXPORT;
+@extern method IconClass, MSG_ICON_VIEW_EXPORT_SELECTED_ICONS;
+@extern method IconClass, MSG_ICON_VIEW_CANCEL_EXPORT_ICONS;
+@extern method IconClass, MSG_ICON_VIEW_CANCEL_IMPORT_ICONS;
+@extern method IconClass, MSG_ICON_VIEW_ENTRY_SELECTED;
+
+@extern method HomeItemClass, MSG_ITEM_CHECK_POSITION_AND_DOC_SIZE;
+@extern method HomeItemClass, MSG_ITEM_DESTROY;
+@extern method HomeItemClass, MSG_VIS_DESTROY;
+@extern method HomeItemClass, MSG_ITEM_LOCK;
+@extern method HomeItemClass, MSG_ITEM_CHANGE_TEXT_VISIBILITY;
+@extern method HomeItemClass, MSG_ITEM_SET_DIM_LEVEL;
+@extern method HomeItemClass, MSG_ITEM_CLEAR_SELECTION;
+@extern method HomeItemClass, MSG_ITEM_DO_FUNCTION;
+@extern method HomeItemClass, MSG_META_START_SELECT;
+@extern method HomeItemClass, MSG_ITEM_ADD_EVENT;
+@extern method HomeItemClass, MSG_ITEM_EDIT_EVENT;
+@extern method HomeItemClass, MSG_ITEM_DELETE_EVENT;
+@extern method HomeItemClass, MSG_ITEM_DELETE_PASSED_EVENT;
+@extern method HomeItemClass, MSG_QUERY_EVENT_MONIKER;
+@extern method HomeItemClass, MSG_ITEM_BUILD_EVENT_STRING;
+@extern method HomeItemClass, MSG_ITEM_GET_NAME;
+@extern method HomeItemClass, MSG_ITEM_GET_NUM_EVENTS;
+@extern method HomeItemClass, MSG_ITEM_ALLOC_OR_ATTACH_EVENT_BLOCK;
+@extern method HomeItemClass, MSG_ITEM_DEC_OR_DELETE_EVENT_BLOCK;
+@extern method HomeItemClass, MSG_ITEM_GET_EVENT_BLOCK;
+@extern method HomeItemClass, MSG_ITEM_SWITCH_BY_ID;
+
+@extern method HomeUnitClass, MSG_UNIT_SWITCH;
+@extern method HomeUnitClass, MSG_UNIT_SWITCH_IN_ROOM;
+@extern method HomeUnitClass, MSG_ITEM_CHANGE_STATUS;
+@extern method HomeUnitClass, MSG_ITEM_DIM_OR_BRIGHTEN;
+@extern method HomeUnitClass, MSG_UNIT_CHANGE_HOUSE_CODE;
+@extern method HomeUnitClass, MSG_UNIT_CHANGE_UNIT_NUMBER;
+@extern method HomeUnitClass, MSG_UNIT_CHANGE_TYPE;
+@extern method HomeUnitClass, MSG_VIS_DRAW;
+@extern method HomeUnitClass, MSG_META_START_SELECT;
+@extern method HomeUnitClass, MSG_META_DRAG_SELECT;
+@extern method HomeUnitClass, MSG_META_PTR;
+@extern method HomeUnitClass, MSG_META_END_SELECT;
+@extern method HomeUnitClass, MSG_VIS_LOST_GADGET_EXCL;
+@extern method HomeUnitClass, MSG_ITEM_SET_ATTRS;
+@extern method HomeUnitClass, MSG_ITEM_GET_ATTRS_FROM_FILE;
+@extern method HomeUnitClass, MSG_UNIT_IS_IN_ROOM;
+@extern method HomeUnitClass, MSG_ITEM_CHANGE_NAME;
+@extern method HomeUnitClass, MSG_UNIT_RECALC_SIZE;
+@extern method HomeUnitClass, MSG_UNIT_CALC_SIZE;
+@extern method HomeUnitClass, MSG_UNIT_GET_NUMBER_AND_HOUSE;
+@extern method HomeUnitClass, MSG_UNIT_MOVE_EVENTS;
+@extern method HomeUnitClass, MSG_UNIT_EDIT_ICON;
+@extern method HomeUnitClass, MSG_UNIT_CHANGE_ICON;
+@extern method HomeUnitClass, MSG_ITEM_ICON_CHANGED;
+@extern method HomeUnitClass, MSG_ITEM_ICON_DELETED;
+@extern method HomeUnitClass, MSG_UNIT_ROOM_HAS_MOVED;
+
+@extern method HomeRoomClass, MSG_ITEM_SET_ATTRS;
+@extern method HomeRoomClass, MSG_ITEM_GET_ATTRS_FROM_FILE;
+@extern method HomeRoomClass, MSG_VIS_DRAW;
+@extern method HomeRoomClass, MSG_META_START_SELECT;
+@extern method HomeRoomClass, MSG_META_DRAG_SELECT;
+@extern method HomeRoomClass, MSG_META_PTR;
+@extern method HomeRoomClass, MSG_META_END_SELECT;
+@extern method HomeRoomClass, MSG_VIS_LOST_GADGET_EXCL;
+@extern method HomeRoomClass, MSG_ITEM_CHANGE_STATUS;
+@extern method HomeRoomClass, MSG_ROOM_IS_UNIT_INSIDE;
+@extern method HomeRoomClass, MSG_ITEM_CHANGE_NAME;
+@extern method HomeRoomClass, MSG_ROOM_REDRAW;
+@extern method HomeRoomClass, MSG_ROOM_CHANGE_HEIGHT, MSG_ROOM_CHANGE_WIDTH;
+@extern method HomeRoomClass, MSG_ROOM_CHANGE_SCALE_FACTOR;
+
+@extern method HomeGroupClass, MSG_ITEM_SET_ATTRS;
+@extern method HomeGroupClass, MSG_ITEM_GET_ATTRS_FROM_FILE;
+@extern method HomeGroupClass, MSG_GROUP_SET_GROUP_SELECTED;
+@extern method HomeGroupClass, MSG_GROUP_UPDATE_GROUP_PROPERTIES;
+@extern method HomeGroupClass, MSG_GROUP_GET_MEMBER_NAME;
+@extern method HomeGroupClass, MSG_GROUP_EDIT_MEMBER_LIST;
+@extern method HomeGroupClass, MSG_ITEM_CHANGE_NAME;
+@extern method HomeGroupClass, MSG_ITEM_CHANGE_STATUS;
+

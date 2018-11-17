@@ -1,0 +1,370 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Shell scripts
+# FILE: 	makebull
+# AUTHOR: 	Chris Boyke, Aug  13, 1993
+#
+# DESCRIPTION:
+#
+#	Do all the cruft necessary to create a bullet image for the 
+#	prototypes.
+#
+#
+# USAGE:
+# 	makebull
+#
+#	Makebull will prompt the user for the values of the following
+#	variables.   Certain questions will not show up for ISVs, as 
+#	they do not apply.
+#	
+#	doROM (y/n) - If "yes", makebull will copy the Loader, BFS,
+#	    and other files to the romdisk directory so that you can
+#	    login to Novell, and run MKDISK on the PC.
+#
+#
+#	romSource (directory) - Source directory for ROM.IMG.  For
+#		ISVs, this defaults to ".", as the rom image is
+#		already in the distribution directory.
+#
+#	romFilename - either ROM-DEV.IMG or ROM-PRO.IMG
+#
+#	makeKernel (y/n) - If "yes", makebull will make a kernel in
+#	    your local tree.  Otherwise, it will use the installed
+#	    bullet kernel in Library/Kernel/Bullet.  In either case,
+#	    it will XIP the kernel, and copy it to the distDir
+#	    directory. 
+#
+#	doGFS (y/n) - If "yes", creates the bullet GFS which consists
+#	    of the shipped executables and data files.  Necessary
+#	    whenever the contents of shipDir change.
+#
+#	splitMeg (y/n) - If "yes", splits the bullet image into 1-meg
+#	    sized files for use with the Bullet samples.
+#
+#	splitOddEven (y/n) - If "yes", splits the bullet image into
+#	    2-meg odd/even files for use with the SRAM prototypes.
+#
+#	destDir (directory) - destination for split files.
+#	    This is normally a directory on Novell which can be
+#	    accessed for loading the image onto the SRAM cards, etc.
+#
+# 	$Id: makebull,v 1.19 93/11/29 17:30:28 chrisb Exp $
+#
+# Directories used:
+#
+# $shipDir - For Geoworks in-house, this is /n/xx/bullet, where xx is
+# your machine name.  For ISVs, this is
+# /staff/pcgeos/Release20X/Installed/ProductFiles/Bullet/ship. 
+# machine name
+#
+# $distDir -- this is where the final ROM image resides.  For Geoworks
+# in-house, this is /n/xx/bulldist.  For ISVs, this is
+# /staff/pcgeos/Release20X/Installed/ProductFiles/Bullet/dist 
+#
+
+#
+# This is the file in the user's home directory where makebull
+# defaults are stored.  If more variables are added, then this
+# filename should be changed
+
+makebullDefault=$HOME/.makebull4
+
+#
+# See if we have any arguments
+#
+
+# Ask the user what to do.  See if settings have been
+# saved in the user's home directory from a previous run.
+
+if [ -f $makebullDefault ]; then
+    read doROM romSource romFilename makeKernel doGFS splitMeg \
+	splitOddEven destDir  < $makebullDefault
+else
+    doROM="n"
+    if [ "$ISV" = "true" ]; then
+	romSource="."
+	romFilename="rom-pro.img"
+	splitMeg="y"
+	splitOddEven="n"
+    else
+	romSource="/n/company/bullet/rd"
+	romFilename="rom-dev.img"
+	splitMeg="n"
+	splitOddEven="y"
+    fi
+    makeKernel="n"
+    doGFS="y"
+    destDir="."
+fi
+
+if [ "$ISV" != "true" ]; then
+
+    #
+    # ISVs won't be remaking the rom image, the kernel, or doing a
+    # ship
+    #
+
+    echo -n "Make the ROM image? (y/n), default = "$doROM": "
+    read r_doROM
+    echo -n "Source for ROM image (default = "$romSource") "
+    read r_romSource
+    echo -n "Filename of ROM image (default = "$romFilename") "
+    read r_romFilename
+    echo -n "Make your local Kernel? (y/n), default = "$makeKernel": "
+    read r_makeKernel
+fi
+
+echo -n "Make the GFS? (y/n), default = "$doGFS": "
+read r_doGFS
+echo -n "Split bullet.img for Bullet Samples? (y/n), default = "$splitMeg": "
+read r_splitMeg
+echo -n "Split bullet.img for SRAM prototypes? (y/n), default = "\
+$splitOddEven": "
+read r_splitOddEven
+echo -n "Destination for image files (default = "$destDir") " 
+read r_destDir
+
+#
+# Set the variables from the prompted-for values, if they exist:
+#
+
+doROM=${r_doROM:-$doROM}
+romSource=${r_romSource:-$romSource}
+romFilename=${r_romFilename:-$romFilename}
+makeKernel=${r_makeKernel:-$makeKernel}
+doGFS=${r_doGFS:-$doGFS}
+splitMeg=${r_splitMeg:-$splitMeg}
+splitOddEven=${r_splitOddEven:-$splitOddEven}
+destDir=${r_destDir:-$destDir}
+
+echo $doROM $romSource $romFilename $makeKernel $doGFS $splitMeg \
+	$splitOddEven $destDir  > $makebullDefault
+
+
+set -x
+
+######################################################################
+# Set some variables.
+#
+
+installed=/staff/pcgeos/Bullet/Installed
+
+#
+# Figure out the shipDir and distDir directories
+#
+if [ "$ISV" = "true" ]; then
+	shipDir=$installed/ProductFiles/Bullet/ship
+	distDir=$installed/ProductFiles/Bullet/dist
+else
+	#
+	# Put ship and distribution stuff on user's machine
+	#
+	cd /staff/$USER/..
+	machineName=${machineName-`pwd`}
+	shipDir=$machineName/bullet
+	distDir=$machineName/bulldist
+fi
+
+
+#
+# userTree is used to decide where to make the kernel.
+#
+userTree=${USER_TREE-/staff/pcgeos/$USER}
+
+
+
+######################################################################
+#
+# Remake the ROM image
+#
+case "$doROM" in 
+ [Yy]*)
+
+    romdisk=$romSource/../romdisk
+
+    #
+    # Copy the local.INI and net.INI to the romdisk directory, and
+    # then convert from unix to DOS (convert LFs to CR-LFs).
+    # 
+#    cp $installed/ProductFiles/Bullet/local.ini $romdisk/geoworks
+#    cp $installed/ProductFiles/Bullet/net.ini $romdisk/geoworks
+#    unix2dos $romdisk/geoworks/local.ini
+#    unix2dos $romdisk/geoworks/local.ini
+
+    cp $installed/Loader/Bullet/loader.exe $romdisk/geoworks
+    cp $installed/Driver/IFS/DOS/MS3/ms3.geo $romdisk/geoworks
+    cp $installed/Driver/IFS/GEOS/BullFS/bfs.geo $romdisk/geoworks
+    cp $installed/DOSAppl/CardCS/cardcs.bin $romdisk/pcmcia
+
+    set +x
+    echo 'To make the ROM image, you must go to a DOS machine logged'
+    echo 'in to NOVELL, and CD to the BULLET\RD directory on drive G:'
+    echo 'To make the DEVELOPMENT rom image, type:'
+    echo ' MKDEV'
+    echo
+    echo 'To make the PRODUCTION rom image, type:'
+    echo ' MKPRO'
+    echo 
+    echo -n 'Press RETURN when finished. ' 
+    read foo
+    set -x
+    ;;
+  *)
+    ;;
+esac
+
+
+######################################################################
+# Make the kernel
+#
+xipArgs="dc000 4000 c0000 10000 90000 24000 -w8ec00 -fbc000 -h9c4 -dx"
+
+case "$makeKernel" in 
+    [Yy]*)
+	cd $userTree/Library/Kernel
+
+	if [ -d Bullet ]; then
+	    if pmake -J16 Bullet; then
+		xip Bullet/geos.geo $xipArgs
+		cp Bullet/geos.c? Bullet/geos.w $distDir
+	    else
+		exit 1
+	    fi
+	elif pmake -J 16 geos.geo XASMFLAGS="-DHARDWARE_TYPE=BULLET"; then
+        	xip geos.geo $xipArgs
+        	cp geos.c? geos.w $distDir
+    	else
+        	exit 1
+    	fi
+    ;;
+
+    #
+    # Otherwise, use the installed kernel.  Assume it's already been
+    # made, but re-xip it (in-house, that is).
+    #
+
+    *)
+	if [ "$ISV" != "true" ]; then
+
+	    	cd $installed/Library/Kernel/Bullet
+    		xip geos.geo $xipArgs
+	    	cp geos.c? geos.w $distDir
+	fi
+    ;;
+esac
+# 
+# If the xip values change (because the size of the kernel
+# changes), the "merge" will also have to change.  The numbers
+# passed to merge specify the location of each file in the
+# final image.  If rom.img, geos.c1 or geos.w grows or shrinks
+# (geos.c0 should always be 64K), all the offsets would have
+# to be updated.  If the location of bull.gfs in bullet.img
+# changes, you must re-xip the kernel with the new offset
+# passed in -f.
+#
+
+
+######################################################################
+# Ship the stuff -- No longer done, since we need to Crunch everything
+# after shipping -- just ship by hand
+#
+#
+#case "$doShip" in 
+# [Nn]*)
+#    ;;
+# *)
+#    # Note -- the "pcs" script uses the PWD variable instead of
+#    # `pwd` to get the current directory.  Don't ask me why --
+#    # just make sure they match.
+#
+#    cd $installed
+#    export PWD
+#    PWD=`pwd`
+#    ship BULLET_GFS
+#
+#
+#
+#    #
+#    # Touch everything to make sure all the files have the same
+#    # date.  XXX: Why?
+#    #
+#
+#    cd $shipDir
+#    find . \( -name \* \) -print | xargs touch
+#
+#
+#    ;;
+#esac
+
+######################################################################
+# Create the gfs file.
+#
+
+case "$doGFS" in 
+ [Nn]*)
+    ;;
+ *)
+    gfs create -a -d"Bullet System Software" -vSystem -s538000 \
+        -hworld/desk_acc.000/alarm.geo \
+        -hsystem \
+        -hsystem/sysappl \
+        $distDir/bull.gfs \
+        $shipDir
+    ;;
+esac
+
+
+
+######################################################################
+# Create BULLET.IMG
+
+
+cd $distDir
+
+#
+# For ISVs, geoshwr.bin is already in the dist directory.  In-house,
+# it's on the Novell network
+#
+if [ "$ISV" = "true" ]; then
+	hwrDir="."
+else
+	hwrDir="/n/company/bullet/palmprnt"
+fi
+
+#
+# Merge everything together into bullet.img
+#
+
+/staff/pcgeos/Tools/misc/merge/sparc.md/merge 	\
+    bullet.img $romSource/$romFilename:0 \
+    geos.c0:78000 geos.c1:7c000 geos.c2:8c000 geos.w:b0000 \
+    bull.gfs:bc000 \
+    $hwrDir/geoshwr.bin:5f4000
+
+
+######################################################################
+#
+
+case "$splitMeg" in 
+ [Nn]*)
+    ;;
+ *)
+    /staff/pcgeos/Tools/misc/split/sparc.md/split bullet.img $destDir
+    ;;
+esac
+
+
+######################################################################
+#
+
+case "$splitOddEven" in 
+ [Nn]*)
+    ;;
+ *)
+    /staff/pcgeos/Tools/misc/split/sparc.md/split -o bullet.img $destDir
+    ;;
+esac

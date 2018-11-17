@@ -1,0 +1,280 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) Berkeley Softworks 1990 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	scripts
+# FILE: 	newbranch
+# AUTHOR: 	Adam de Boor, Aug 26, 1990
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ardeb	8/26/90		Initial Revision
+#	eds	11/28/92	Changes for PC/GEOS 2.0
+#
+# DESCRIPTION:
+#	A script to perform all the necessary actions to create a new RCS branch
+#	in our development tree. Be very careful in using this script, as you
+#	can screw up a whole lot things.
+#
+#	Arguments to pass:
+#		-nec	: don't include EC files in the new branch
+#		-n	: don't up the protocol in the base branch
+#		-t	: make the branch bud off the trunk even though
+#			  the source being used comes from another branch.
+#		-s	: don't display all sorts of interesting output
+#		-bXXX	: indicates the base branch to use, where XXX is
+#			  that branch name (eg Release10X)
+#		-xI	: excludes the copying of installed objects
+#		-xb	: allow specific directory trees (below /staff/pcgeos)
+#			  to be excluded from the RCS makebranch stuff
+#		-xM	: don't make the new /arch/pcgeos/XX directory
+#		-dDDD	: specifies filesystem on which to create the
+#			  new branch directory. Should not include pcgeos,
+#			  just be something like /arch3 or /arch
+#		YYY	: name of the branch to be created
+#
+#	Note: the -x flags are useful when the making of a branch dies
+#	      in the middle, and one needs to restart where it was left off.
+#
+#	If you are creating a milestone branch, you want to do the following:
+#
+#		cd /staff/pcgeos
+#		newbranch -n -bRelease10X Release104
+#
+#	which would create a milestone branch named "Release104", and would
+#	base this branch on the "Release10X" development branch.
+#
+#	If you have questions, ask Adam before trying something new!
+#
+#	$Id: newbranch,v 1.23 92/12/22 17:45:15 steve Exp $
+#
+###############################################################################
+
+ecfilter=""
+verbose="yes"
+mbargs=""
+mbexclude=""
+branchdir=/arch
+rootdir=/staff/pcgeos
+while [ $# -gt 0 ]; do
+    case $1 in
+    	-nec)	ecfilter="-e '/ec\./d'";;
+	-n)	mbargs="$mbargs -n";;
+    	-s) 	verbose="";;
+	-b*)	base=`expr x$1 : 'x-b\(.*\)$'`
+		rootdir=$rootdir/$base
+    	    	mbargs="$mbargs $1"
+    	    	;;
+	-xI)	excludeInstalled=yes;;
+	-xb*)	mbexclude="$mbexclude `expr x$1 : 'x-xb\(.*\)'`";;
+	-xM)	excludeInitialMkdir=yes;;
+	-t)	mbargs="$mbargs -t";;
+	-d*)	branchdir=`expr x$1 : 'x-d\(.*\)$'`
+		if [ ! -d $branchdir/pcgeos ]; then
+		    echo "$0: $branchdir/pcgeos doesn't exist"
+		    exit 1
+		fi
+		;;
+	-*) 	echo "$0: unknown flag $1 ignored";;
+	*)  	branch=$1;;
+    esac
+    shift
+done
+
+#
+# Error-check the arguments
+#
+if [ ! "$branch" ]; then
+    echo "Usage: $0 [-nec] [-s] <branch>"
+    exit 1
+fi
+
+#
+# Flesh out the directory in which the branch will be placed, beyond just the
+# filesystem name...
+#
+branchdir=$branchdir/pcgeos/$branch
+
+if [ ! "$excludeInitialMkdir" ]; then
+    if [ -f /staff/pcgeos/$branch -o -d /staff/pcgeos/$branch ]; then
+	echo "$0: branch $branch already exists"
+	exit 1
+    fi
+
+    #
+    # PART 1: Create the branch directory on the /arch partition and create a
+    # link for it in /staff/pcgeos.
+    #
+    if [ "$verbose" ]; then
+	echo Creating $branchdir and /staff/pcgeos/$branch
+    fi
+    mkdir $branchdir
+    ln -s $branchdir /staff/pcgeos/$branch
+fi
+
+#
+# PART 2: Copy all ec and non-ec geodes, executables, symbol files and library
+# definition files to the new branch
+#
+if [ ! "$excludeInstalled" ]; then
+    if [ "$base" ]; then
+	inst=$base/Installed
+    else
+	inst=Installed
+    fi
+    if [ "$verbose" ]; then
+	echo Copying $inst tree to $branchdir/Installed
+    fi
+    cd /staff/pcgeos/$inst
+    (find Appl Bitmaps ClipArt ComdexStuff DOSAppl DemoFiles Document Driver Include Library Loader SampleDocuments -type d -print) |
+	while read dir; do
+	    files="`echo $dir/*.bat $dir/*.cfg $dir/*.vap $dir/*.ini $dir/*.txt $dir/*.nlm $dir/*.sym $dir/*.geo $dir/*.exe $dir/*.com $dir/*.ldf $dir/*.vm $dir/*.bin $dir/*.dat $dir/*.tab $dir/*.[0-9][0-9][0-9] | 
+		    tr ' ' '\012' |
+		    sed -e '/\*\./d' $ecfilter |
+		    tr '\012' ' '`"
+	    bidir=$branchdir/Installed/$dir
+	    if [ "$files" ]; then
+		echo copy $files to $bidir
+		mkdir -p $bidir
+		cp -p $files $bidir
+	    fi
+	done
+fi
+
+#
+# PART 3: To make life easier, copy all interesting files from
+# /staff/pcgeos/Include to the branch's Include directory.
+#
+
+#
+# Utility routine for copying over stuff from Include, CInclude, and
+# Installed/ProductFiles. It copies over only files, creating subdirectories
+# in the destination as necessary. It also takes care of looking in $mbexclude
+#
+# Usage:
+#   cpinc <directory> [<mbexclude-key>]
+#
+# <directory> is path under /staff/pcgeos (or /staff/pcgeos/$base, if making
+# branch off a base branch) in which to look for files.
+#
+# <mbexclude-key> is the word for which to look in $mbexclude to decide whether
+# to skip this step. If none given, <directory> is what is used.
+#
+cpinc() {
+    #
+    # default <mbexclude-key> to <directory> if none given.
+    #
+    if [ $# -eq 1 ]; then set - $1 $1; fi
+
+    if [ `expr " $mbexclude " : ".* $2 "` -ne 0 ]; then
+	echo $1 not copied
+    else
+	if [ "$verbose" ]; then
+	    echo Copying files to $branchdir/$1
+	fi
+	(
+	    # Go to the proper source directory
+	    cd $rootdir/$1
+    	    #
+	    # Locate all files that are neither RCS files nor LOCKS files
+    	    #
+	    find . -type f ! -name \*,v ! -name LOCKS -print
+	) | while read file; do 
+	    #
+	    # Make sure the proper subdirectory exists for the file being
+	    # copied.
+	    #
+	    subdir=`expr /$file : '\(.*\)/[^/]$'`
+	    mkdir -p $branchdir/$1$subdir
+	    #
+	    # Copy the file over, preserving its access time, etc.
+	    #
+	    cp -p $rootdir/$1/$file $branchdir/$1$subdir
+	done
+    fi
+}
+	
+cpinc Include
+#
+# PART 3.5: Copy all interesting files from
+# /staff/pcgeos/CInclude to the branch's CInclude directory.
+#
+
+cpinc CInclude
+
+#
+# PART 3.6: Copy all interesting files from
+# /staff/pcgeos/Installed/ProductFiles to the branch.
+#
+
+cpinc Installed/ProductFiles ProductFiles
+
+#
+# PART 3.7: Copy the math.lib file for HighC to the branch.
+#
+if [ `expr " $mbexclude " : ".* math.lib "` -ne 0 ]; then
+    echo math.lib not copied
+else
+    if [ "$verbose" ]; then
+	echo Copying math.lib to $branchdir/Library/Math/Compiler/HighC/math.lib
+    fi
+    mkdir -p $branchdir/Library/Math/Compiler/HighC
+    cp -p $rootdir/Library/Math/Compiler/HighC/math.lib \
+		$branchdir/Library/Math/Compiler/HighC
+fi
+	
+    
+#
+# PART 4: Update ALL rcs files with the label for this revision level
+#
+makeb() {
+    if [ `expr " $mbexclude " : ".* $1 "` -ne 0 ]; then
+	    echo $1 excluded from makebranch
+    else
+	if [ "$verbose" ]; then
+	    echo "Running makebranch in /staff/pcgeos/$1"
+	fi
+	cd /staff/pcgeos/$1
+	/staff/pcgeos/Tools/scripts/makebranch $mbargs $branch
+    fi
+}
+
+makeb Installed
+makeb Include
+makeb CInclude
+makeb Loader
+makeb Library
+makeb Driver
+makeb Appl
+makeb Management
+
+if [ `expr " $mbexclude " : ".* Tools "` -ne 0 ]; then
+    echo Tools excluded from makebranch
+else
+    if [ "$verbose" ]; then
+	echo "Running makebranch for various tools"
+    fi
+    cd /staff/pcgeos/Tools
+    for i in goc swat esp glue nim2pc scripts com43 include utils uic; do
+	(cd $i; /staff/pcgeos/Tools/scripts/makebranch $mbargs $branch)
+    done
+fi
+
+#
+# PART 5: Create a BRANCH file in the root of the new branch directory so
+# makes can be performed in its Installed directory to recreate things.
+#
+if [ "$verbose" ]; then
+    echo Setting up $branchdir as a branch directory for compiles
+fi
+echo $branch > $branchdir/BRANCH
+
+#
+# BRANCH COMPLETE
+#
+if [ "$verbose" ]; then
+    echo Branch $branch complete.
+fi

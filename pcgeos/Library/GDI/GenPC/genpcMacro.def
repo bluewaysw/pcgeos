@@ -1,0 +1,81 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+
+PROJECT:	
+MODULE:		
+FILE:		genpcMacro.def
+
+AUTHOR:		Ronald Braunstein, Sep 05, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ron	9/05/96   	Initial revision
+
+DESCRIPTION:
+
+
+	
+		
+	$Id: genpcMacro.def,v 1.1 97/04/04 18:03:59 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;
+; Pass:
+;	ax - MouseFuncs		which mouse interrupt to call
+; Return:
+;	depends, but bx can't be used.
+SendToMouseDriver	macro
+	local	noCall
+if  not NT_DRIVER
+	int	51
+else
+	push	bp, bx		; assume bp isn't used by any of the mouse funcs
+				; bx gets trashed by DispatchCall, so we can't use
+				; that as a return value.  Where needed we will fix
+				; this up.
+	push	ds
+	mov	bp, ax		; bp <- MouseFuncs, ax gets trashed so we can make
+				; the calls.
+				; see int 33h for details of what bp means
+	segmov	ds, dgroup, ax
+	mov	bx, VDD_FUNC_MOUSE_FUNC	; mouse function
+	mov	ax, ds:[vddHandle]
+	pop	ds
+	cmp	ax, 0
+	je	noCall
+	DispatchCall
+noCall:
+	pop	bp, bx
+endif
+endm
+
+		
+
+; This is the inc file for isvbop.h.
+; Please refer to isvbop.h for comments and notes on these interfaces
+;
+BOP_3RDPARTY	EQU	58H
+BOP_UNSIMULATE	EQU	0FEH
+
+RegisterModule macro
+    .inst db  0C4h, 0C4h, BOP_3RDPARTY, 0
+endm
+
+UnRegisterModule macro
+    .inst db  0C4h, 0C4h, BOP_3RDPARTY, 1
+endm
+
+DispatchCall macro
+    .inst db  0C4h, 0C4h, BOP_3RDPARTY, 2
+endm
+ 
+VDDUnSimulate16 macro
+    .inst db	0C4h, 0C4h, BOP_UNSIMULATE
+endm
+ 

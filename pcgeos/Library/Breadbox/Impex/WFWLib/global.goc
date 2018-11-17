@@ -1,0 +1,195 @@
+/****************************************************************************
+ *
+ * ==CONFIDENTIAL INFORMATION== 
+ * COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ * ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ * NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * Project: Word For Windows Core Library
+ * File:    global.goc
+ *
+ ***************************************************************************/
+
+/*  Structures in this file are global and are therefore placed in dgroup.
+    There is no provision for performing two simultaneous translations. */
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+@include <impex.goh>
+#include "warnings.h"
+#include "global.h"
+#include "text.h"
+
+/*********************************************************/
+/******************* GLOBAL VARIABLES ********************/
+/*********************************************************/
+
+TransError G_WFWError;
+Boolean G_WFW8;
+
+FileHandle hInputFile;
+StgDocfile hInputDoc;
+StgStorage hInputRootStg;
+StgStream hInputDocStream;
+StgStream hInputTextStream;
+StgStream hInputTableStream;
+StgStream hInputDataStream;
+ushort hInputStyle;
+CHP sInputStyleChp;
+SEP sGlobalSep;
+
+/*********************************************************/
+/***************** TEXT INSERTION BUFFER *****************/
+/*********************************************************/
+
+#define TEXT_BUFFER_LEN 128
+
+typedef struct
+    {
+    byte TBS_nCount;     /* current # of chars in buffer */
+    char TBS_cData[TEXT_BUFFER_LEN];      /* text storage */
+    }
+TextBufferStruct;
+
+TextBufferStruct    TextBuffer;
+
+/*  TextBufferInit initializes the text buffer. The byte count and all of
+    the buffer storage are zeroed. */
+
+void TextBufferInit(void)
+    {
+    char *pc = TextBuffer.TBS_cData;
+    char *pEnd = &TextBuffer.TBS_cData[TEXT_BUFFER_LEN - 1];
+
+    TextBuffer.TBS_nCount = 0;
+    for (; pc <= pEnd; pc++)
+        *pc = '\0';
+    }
+
+/*  TextBufferIsEmpty is used to test the empty state of the buffer. */
+
+Boolean TextBufferIsEmpty(void)
+    {
+    return (TextBuffer.TBS_nCount == 0);
+    }
+
+/*  TextBufferAddChar is used to append a single character to the buffer.
+    If the character cannot be added because the buffer is full, the
+    buffer will first be emptied via TextBufferDump(). */
+
+void TextBufferAddChar(char c)
+    {
+    if (TextBuffer.TBS_nCount == TEXT_BUFFER_LEN - 1)
+        TextBufferDump();
+    TextBuffer.TBS_cData[TextBuffer.TBS_nCount++] = c;
+//    if (GetDestMode() == DM_NO_BUFFER)
+//        TextBufferDump();
+    }
+
+void TextBufferAddString(char* p)
+{
+    while (*p != '\0')
+        TextBufferAddChar(*(p++));
+}
+
+/*  TextBufferDump empties the buffer into the current destination. */
+
+void TextBufferDump(void)
+    {
+    if (!TextBufferIsEmpty())
+        {
+        char *pc = &TextBuffer.TBS_cData[TextBuffer.TBS_nCount - 1];
+
+//        EmitTextToCurrentDestination (TextBuffer.TBS_cData,
+//          TextBuffer.TBS_nCount);
+        TextAppendText(TextBuffer.TBS_cData);
+        for (; pc >= TextBuffer.TBS_cData; pc--)
+            *pc = '\0';
+        TextBuffer.TBS_nCount = 0;
+        }
+    }
+
+/*  TextBufferFree frees any resources used by the text buffer.
+    In the static allocation case, nothing needs to happen. */
+
+void TextBufferFree(void)
+    {
+    }
+
+
+/*********************************************************/
+/**** DEFAULT PARAGRAPH/CHARACTER/DOCUMENT PROPERTIES ****/
+/*********************************************************/
+
+void DefaultGetCharAttrs(CHP *pChp)
+{
+    memset(pChp, 0, sizeof(CHP));
+    pChp->hps = 20;
+    pChp->fcPic = -1;
+    pChp->istd = 10;
+    pChp->lidDefault = pChp->lidFE = 0x0400;
+    pChp->wCharScale = 100;
+    pChp->fUsePgsuSettings = -1;
+}
+
+void DefaultGetParaAttrs(PAP *pPap)
+{
+    memset(pPap, 0, sizeof(PAP));
+    pPap->fWidowControl = 1;
+    pPap->lspd.fMultLinespace = 1;
+    pPap->lspd.dyaLine = 240;
+    pPap->lvl = 9;
+}
+
+void DefaultGetSepAttrs(SEP *pSep)
+{
+    memset(pSep, 0, sizeof(SEP));
+    pSep->dmOrientPage = 1;
+    pSep->xaPage = 12240;
+    pSep->yaPage = 15840;
+    pSep->dxaLeft = pSep->dxaRight = 1800;
+    pSep->dyaTop = pSep->dyaBottom = 1440;
+    pSep->fEvenlySpaced = 1;
+    pSep->dxaColumns = 720;
+}
+
+void GlobalGetPageSetup(PageSetupInfo *psi)
+{
+    memset(&psi->PSI_meta, 0, sizeof(psi->PSI_meta));
+    psi->PSI_page.XYS_width = TWIPS_TO_POINTS(sGlobalSep.xaPage);
+    psi->PSI_page.XYS_height = TWIPS_TO_POINTS(sGlobalSep.yaPage);
+    psi->PSI_layout.PL_paper = (((sGlobalSep.dmOrientPage) ?
+      PO_PORTRAIT : PO_LANDSCAPE) * PLP_ORIENTATION) | PT_PAPER;
+    psi->PSI_numColumns = sGlobalSep.ccolM1 + 1;
+    psi->PSI_columnSpacing = TWIPS_TO_133(sGlobalSep.dxaColumns);
+    psi->PSI_ruleWidth = (sGlobalSep.fLBetween) ? (1 * 8) : 0;
+    psi->PSI_leftMargin = TWIPS_TO_133(sGlobalSep.dxaLeft);
+    psi->PSI_rightMargin = TWIPS_TO_133(sGlobalSep.dxaRight);
+    psi->PSI_topMargin = TWIPS_TO_133(sGlobalSep.dyaTop);
+    psi->PSI_bottomMargin = TWIPS_TO_133(sGlobalSep.dyaBottom);
+}
+
+/*
+ * Utility Routines
+ */
+
+Boolean SetErrorStg(StgError error)
+{
+    if (error == STGERR_NONE)
+	return TRUE;
+    
+    if (error == STGERR_FILE_ERROR)
+	SetError(TE_FILE_ERROR);
+    else if (error == STGERR_MEMORY_ERROR)
+	SetError(TE_OUT_OF_MEMORY);
+    else if (error == STGERR_FORMAT_ERROR)
+	SetError(TE_INVALID_FORMAT);
+    else
+	SetError(TE_IMPORT_ERROR);
+    return FALSE;
+}

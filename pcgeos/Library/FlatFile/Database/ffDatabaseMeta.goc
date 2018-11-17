@@ -1,0 +1,2393 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PC/GEOS
+ * MODULE:	  ffDatabaseMeta.goc
+ * FILE:	  ffDatabaseMeta.goc
+ *
+ * AUTHOR:  	  Jeremy Dashe : Aug  7, 1992
+ *
+ * DESCRIPTION:
+ *	This file contains the META handlers for the flat file database
+ *	library.
+ *
+ * RCS STAMP:
+ *	$Id: ffDatabaseMeta.goc,v 1.1 97/04/04 18:03:14 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#ifdef __HIGHC__
+pragma Code ("DATABASEMETAHANDLERS");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg DATABASEMETAHANDLERS
+#endif
+
+@include <stdapp.goh>
+#include <system.h>
+
+#include <geoworks.h>
+@include <Objects/Text/tCtrlC.goh>
+
+@include <ffile.goh>
+@include <Objects/FlatFile/ffileC.goh>
+@include <Objects/FlatFile/ffTextC.goh>
+#include <Database/ffdExtrn.h>
+#include <ffFatal.h>
+
+#define FFD_CURRENT_RECORD(x)   (x->FFI_showOnlyMarked ? \
+				 x->FFI_currentMarkedRecord : \
+				 x->SSI_active.CR_row)
+
+/***********************************************************************
+ *
+ * MESSAGE:	reloc
+ *
+ * DESCRIPTION:	Handle relocation and unrelocation of flatfile object
+ *
+ * PARAMETERS: 	Pass:	word vmRelocType
+ *			word frame
+ *		Return:	FALSE if error
+ *			TRUE otherwise
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	10/1/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, _reloc
+{
+    VisContentInstance *vis;
+
+    /*
+     * If the flatfile is being relocated after being read from the
+     * file then it can't have a parent or a window and it can't be
+     * realized. Also, it can no longer be the target
+     */
+    if (vmRelocType == VMRT_RELOCATE_AFTER_READ) {
+	pself->SSI_cellParams.CFP_file = 0;
+	pself->SSI_ancestorList = 0;
+	pself->SSI_childList = 0;
+	pself->SSI_finalList = 0;
+	pself->SSI_gstate = 0;
+
+	pself->documentHandle = 0;
+	pself->FFI_focusExcl.HG_OD = (optr) 0;
+	pself->FFI_targetExcl.HG_OD = (optr) 0;
+	pself->FFI_focusExcl.HG_flags = 0;
+	pself->FFI_targetExcl.HG_flags = 0;
+
+	/*
+	 * We need to clear the class pointer for the GrObjTool.  We can
+	 * do this because the only time we're relocated is when
+	 * we're opening up an existing file (which isn't always the case
+	 * with all applications).
+	 */
+	pself->FFI_designModeGrObjTool = (ClassStruct *) 0;
+
+        /*
+         * Clear out parent and window
+         */
+        vis = ObjDerefVis(oself);
+        vis->VCI_window = 0;
+        vis->VI_link.LP_next = (optr) 0;
+	/*
+	 * Make sure the flatfile acts as a focus/target node
+	 */
+	vis->VI_typeFlags |= VTF_IS_INPUT_NODE;
+    }
+
+    return(@callsuper());
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_INITIALIZE for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Perform any init necessary on the database object
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	doug	2/9/93		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_INITIALIZE
+{
+    VisCompInstance *vis;
+
+    @callsuper();
+
+    vis = ObjDerefVis(oself);
+
+    /*
+     * We now need to OR in VTF_IS_INPUT_NODE, so that we'll get
+     * MSG_META_MUP_ALTER_FTVMC_EXCL -- Doug 2/9/93
+     */
+
+    vis->VI_typeFlags |= VTF_IS_INPUT_NODE;
+
+}
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_KBD_CHAR
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (word character = cx, 
+ *		      word flags = dx, 
+ *		      word state = bp)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/14/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_KBD_CHAR
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Pass the character along to our first child, which is a GrObj body.
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_KBD_CHAR(character, flags, state);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_FUP_KBD_CHAR for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	We intercept this message to determine if we need to
+ *	    	do some sort of keyboard shortcut fun.  Returns a TRUE
+ *	    	if we handle the shortcut.
+ *
+ * PARAMETERS:	Boolean MSG_META_FUP_KBD_CHAR(
+ *	    	    word character,
+ *	    	    word flags,
+ *	    	    word state);
+ *	
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/24/93		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_FUP_KBD_CHAR
+{
+    ShortcutCode  shortcut;
+    KeyboardShortcut shortcutTable[] = {
+	FF_SHORTCUT_TABLE
+     };
+#define	NUM_TABLE_SHORTCUTS (sizeof(shortcutTable) / sizeof(KeyboardShortcut))
+
+    /*
+     * If we're not in data entry mode, or if this is a keyboard
+     * release, leave immediately. 
+     */
+    if ((pself->FFI_currentMode != MT_DATA_ENTRY) || 
+	((byte) flags & CF_RELEASE))  {
+	    return @callsuper();
+    }
+    
+    /*
+     * The key was pressed.  Check to see if this is a key we're
+     * interested in.
+     */
+    shortcut = FlowCheckKbdShortcut(shortcutTable, NUM_TABLE_SHORTCUTS,
+					character, flags, state);
+    if (shortcut < 0) {
+	/*
+	 * No record navigation was necessary.  Let the superclass
+	 * deal with it.
+	 */
+	return @callsuper();
+    } else switch (shortcut) {
+    case SC_NEW_RECORD:
+    case SC_NEW_RECORD_2:
+	@call oself::
+	    MSG_FFD_RECORD_CONTROL(FFRCR_CREATE_NEW_RECORD, 0);
+	break;
+	
+    case SC_PREVIOUS_RECORD:
+	@call oself::
+	    MSG_FFD_RECORD_CONTROL(FFRCR_GOTO_PREVIOUS_RECORD, 0);
+	break;
+	
+    case SC_NEXT_RECORD:
+	@call oself::
+	    MSG_FFD_RECORD_CONTROL(FFRCR_GOTO_NEXT_RECORD, 0);
+	break;
+	
+    case SC_FIRST_RECORD:
+	@call oself::
+	    MSG_FFD_RECORD_CONTROL(FFRCR_GOTO_FIRST_RECORD, 0);
+	break;
+	
+    case SC_LAST_RECORD:
+	@call oself::
+	    MSG_FFD_RECORD_CONTROL(FFRCR_GOTO_LAST_RECORD, 0);
+	break;
+	
+    case SC_MARK_RECORD:
+	if (FFDGetRecordMarkStatus(pself, TEMP_DATA_ROW)) {
+	    @call oself::
+		MSG_FFD_RECORD_CONTROL(FFRCR_UNMARK_CURRENT_RECORD, 0);
+	} else {
+	    @call oself::
+		MSG_FFD_RECORD_CONTROL(FFRCR_MARK_CURRENT_RECORD, 0);
+	}
+	break;
+	
+    case SC_COMMIT_RECORD:
+	@call oself::
+	    MSG_FFD_RECORD_CONTROL(FFRCR_COMMIT_CURRENT_RECORD, 0);
+	break;
+	
+    default:
+	/*
+	 * Not a shortcut we can handle here.  Let the superclass
+	 * deal with it.
+	 */
+	return @callsuper();
+    }
+
+    /*
+     * Leave with a "we've handled it" flag.
+     */
+    return TRUE;
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFDIsInvalidAreaWithinBounds
+ *
+ * DESCRIPTION: Checks whether the area currently invalidated on the
+ *		screen is within the bounds passed. 
+ *
+ * PARAMETERS: 	pass: 	*bounds - check if invalidated area extends within
+ *					these bounds
+ *			gstate - GStateHandle from VIS_DRAW
+ *		return: TRUE if invalidated area overlaps the bounds
+ *			FALSE otherwise
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	11/5/92		Initial version  
+ *
+ ***********************************************************************/
+Boolean
+FFDIsInvalidAreaWithinBounds(RectDWord *bounds, GStateHandle gstate)
+{
+    RectDWord invalidBounds;
+
+    GrGetMaskBoundsDWord(gstate, &invalidBounds);
+
+    if ((bounds->RD_left < invalidBounds.RD_right) &&
+	(bounds->RD_right > invalidBounds.RD_left) &&
+	(bounds->RD_top < invalidBounds.RD_bottom) &&
+	(bounds->RD_bottom > invalidBounds.RD_top)) {
+  	return(TRUE);
+    }
+    else {
+	return(FALSE);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFDCalcFirstRecordToDisplay
+ *
+ * DESCRIPTION: Calculates which record to display first in a multi-record
+ *		display. 
+ *		Basically the position of the current (active) record is
+ *		calculated, and then the number of the first record is
+ *		calculated back from there.
+ *		This routine also sets the current page number in flatfile's
+ *		instance data.
+ *
+ * PARAMETERS: 	pass: 	oself - optr to flatfile database object
+ *			numRecordsOnPage - number of record layouts 
+ *						that fit on the page
+ *			currentActiveRecord - the record # which is currently
+ *					   	active; -1 for new record.
+ *			*activeRecordPosition - record number of active
+ *						record _on this page_
+ *						Filled in by this routine
+ *		return: number of record to display first
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	9/1/92		Initial version  
+ *	anna	2/18/93		Added stuff for marked records
+ *
+ ***********************************************************************/
+word
+FFDCalcFirstRecordToDisplay(optr oself, word numRecordsOnPage, 
+					word currentActiveRecord,
+					word *activeRecordPosition,
+					word *numRecordsToDisplay)
+{
+    FlatFileDatabaseInstance *pself;
+    word topRecord;
+    word recordNumberToDisplay;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Is this a new record? If so, we want to display it at the end.
+     */
+    if (currentActiveRecord == -1) {
+	recordNumberToDisplay = pself->FFI_numRecords;
+    }
+    else {
+	recordNumberToDisplay = FFD_CURRENT_RECORD(pself);
+    }
+
+    *activeRecordPosition = recordNumberToDisplay % numRecordsOnPage;
+
+    topRecord = (recordNumberToDisplay / numRecordsOnPage) * 
+						numRecordsOnPage;
+    /*
+     * Store the current page number
+     */
+    pself->FFI_currentPage = topRecord / numRecordsOnPage;
+
+    if (pself->FFI_showOnlyMarked) {
+        *numRecordsToDisplay = pself->FFI_numMarkedRecords - topRecord;
+	pself->FFI_currentMarkedRecord = topRecord;
+	topRecord = FFDGetNthMarkedRecord(oself, topRecord + 1);
+    }
+    else {
+	*numRecordsToDisplay = pself->FFI_totalNumRecordsInDatabase - 
+						topRecord;
+    }
+     
+    if (currentActiveRecord == -1) {
+    	*numRecordsToDisplay = *numRecordsToDisplay + 1;
+    }
+     
+    /*
+     * The number of records to display is actually the smaller number of
+     * numRecordsToDisplay and numRecordsOnPage
+     */
+    if (numRecordsOnPage < *numRecordsToDisplay) {
+	*numRecordsToDisplay = numRecordsOnPage;
+    }
+
+    return (topRecord);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFDDrawMultiRecordDataEntryGrid
+ *
+ * DESCRIPTION: Turn off the draw lock for the record layout boundary,
+ *		draw it, and put the lock back on.
+ *
+ *		Yes I know this routine is long and hard to read, but
+ *		it also gets run very often and the loop may be executed
+ *		many times so speed is of utmost importance (i.e. we
+ *		can't afford to be pushing arguments in order to call
+ *		subroutines).
+ *
+ * PARAMETERS: 	pass: 	oself - optr to flatfile database object
+ *			drawFlags passed on from VIS_DRAW
+ *		      	gstate - gstate passed on from VIS_DRAW
+ *			recordLayout - width & height of the layout
+ *			recordLayoutGrObjBody - optr to what you'd think
+ *			numHorizontalRecords - how many record layouts fit
+ *						on the page horizontally
+ *			numVerticalRecords - how many record layouts fit
+ *						on the page vertically
+ *			startRecord - record at which to start drawing
+ *					pass -1 here if you just want
+ *					to start at the top
+ *
+ *		return: nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	8/27/92		Initial version  
+ *
+ ***********************************************************************/
+void
+FFDDrawMultiRecordDataEntryGrid(optr oself, word drawFlags, 
+				GStateHandle gstate,
+				LayoutSize recordLayout,
+				optr recordLayoutGrObjBody,
+				word numHorizontalRecords,
+				word numVerticalRecords,
+				word startRecord)
+{
+    RectDWord recordLayoutBounds;
+    FlatFileDatabaseInstance *pself;
+    word i, j, outerLoopStart, innerLoopStart, numOuterLoop, 
+	 numInnerLoop, activeRecordPosition,
+	 numRecordsOnPage, currentRecordPosition, currentActiveRow;
+    Boolean done, dirtyRecord, needToDrawBody, grabTarget;
+    sdword boundaryXCoord, boundaryYCoord;
+    word numRecordsToDisplay;
+    GrObjDrawFlags grobjDrawFlags;
+    optr focusField;
+    EditRecordType editRecordType;
+
+    pself = ObjDerefGen(oself);
+
+    numRecordsOnPage = numHorizontalRecords * numVerticalRecords;
+
+    /*
+     * It's possible that we are in the process of editing a new
+     * record which is dirty. However, if we display previous records
+     * then the dirty flag will get reset. So let's save it here so 
+     * that it can be checked later on
+     */
+    dirtyRecord = pself->FFI_dirtyRecord;
+
+    /*
+     * Save the row which is currently active; if we're editing a "new"
+     * record right now, indicate it by setting currentActiveRow to -1
+     */
+    if (pself->FFI_editingNewRecord) {
+	currentActiveRow = -1;
+	/*
+	 * Just in case we're just re-drawing this new record
+	 * let's save its data off into our temporary row (from whence
+	 * it will subsequently be read in
+	 */
+	@call oself::MSG_FFD_COMMIT_TEMP_DATA_ROW_TO_DATABASE(FALSE,
+					NRT_LOAD_FROM_TEMP_VISUAL_UPDATE_ROW);
+    } 
+    else {
+        currentActiveRow = FFD_CURRENT_RECORD(pself);
+    }
+
+    /*
+     * Calculate which record to display first
+     */
+    pself = ObjDerefGen(oself);
+    pself->SSI_active.CR_row = FFDCalcFirstRecordToDisplay(
+						oself, 
+						numRecordsOnPage,
+						currentActiveRow,
+						&activeRecordPosition,
+						&numRecordsToDisplay);
+
+    FFDGetPageLayoutBoundaryStartingOffset(oself, &boundaryXCoord,
+					   &boundaryYCoord);
+
+    /* Only reset the bounds if we're starting at the top of the page */
+    if (startRecord == -1) {
+        recordLayoutBounds.RD_left = boundaryXCoord;
+        recordLayoutBounds.RD_top = boundaryYCoord;
+        recordLayoutBounds.RD_right = recordLayoutBounds.RD_left + 
+	    	    	    	  recordLayout.LS_width;
+        recordLayoutBounds.RD_bottom = recordLayoutBounds.RD_top + 
+				   recordLayout.LS_height;
+    }
+    else {
+        /* Calculate the position of the record we're starting at */
+        startRecord = startRecord % (numRecordsOnPage);
+	@call recordLayoutGrObjBody::MSG_GB_GET_BOUNDS(&recordLayoutBounds);
+    }
+
+    /* Determine if we're going left->right & top->bottom, or vice versa */
+    if (pself->FFI_recordOrder == ROO_TOP_TO_BOTTOM) {
+	numOuterLoop = numHorizontalRecords;
+	numInnerLoop = numVerticalRecords;
+	if (startRecord == -1) {
+	    outerLoopStart = innerLoopStart = 0;
+	}
+	else {
+	    innerLoopStart = startRecord % numVerticalRecords;
+	    outerLoopStart = startRecord / numVerticalRecords;
+	}
+    }
+    else {
+	numOuterLoop = numVerticalRecords;
+	numInnerLoop = numHorizontalRecords;
+	if (startRecord == -1) {
+	    outerLoopStart = innerLoopStart = 0;
+	}
+	else {
+	    innerLoopStart = startRecord % numHorizontalRecords;
+	    outerLoopStart = startRecord / numHorizontalRecords;
+	}
+    }
+
+    /*
+     * Find out what the grobj draw flags are
+     */
+    grobjDrawFlags =  @call recordLayoutGrObjBody::
+			MSG_GB_GET_GROBJ_DRAW_FLAGS(drawFlags);
+
+    /* Initialize variables */
+    done = FALSE;
+    currentRecordPosition = 0;
+
+    for (j = outerLoopStart; j < numOuterLoop; j++) {
+	for (i = innerLoopStart; i < numInnerLoop; i++) {
+
+	    /*
+	     * Is the area invalidated in this grobj body?
+	     */
+	    needToDrawBody = FFDIsInvalidAreaWithinBounds(
+					&recordLayoutBounds, gstate);
+	    if (needToDrawBody) {
+                @call recordLayoutGrObjBody::
+		   MSG_GB_SET_BOUNDS_WITHOUT_MARKING_DIRTY(&recordLayoutBounds);
+
+                /*
+                 * We want a MSG_VIS_OPEN to be sent to the GrObjBody
+                 */
+	        if (startRecord == -1) {
+                    @call recordLayoutGrObjBody::
+			MSG_VIS_MARK_INVALID(VOF_WINDOW_INVALID, VUM_NOW);
+	        }
+	    }
+
+            /* 
+             * Load the current record's data to screen 
+     	     */
+	    pself = ObjDerefGen(oself);
+
+	    /*
+	     * See if this is the last grobjbody we'll be stamping
+	     */
+	    if (pself->FFI_recordOrder == ROO_TOP_TO_BOTTOM) {
+	        if (i + (numVerticalRecords * j) == (numRecordsToDisplay -1)) {
+		    done = TRUE;
+	        }
+	    }
+	    else {
+	        if (i + (numHorizontalRecords * j) == (numRecordsToDisplay -1)){
+		    done = TRUE;
+	        }
+	    }
+
+	    if (needToDrawBody) {
+		/*
+		 * If this is the current record, it may be dirty
+		 * so we may want to load the info from the visual
+		 * update row
+		 */
+		if ((currentRecordPosition == activeRecordPosition) 
+			&& (dirtyRecord)) {
+		    editRecordType = ERT_LOAD_FROM_TEMP_VISUAL_UPDATE_ROW;
+		}
+		else {
+		    editRecordType = ERT_REGULAR;
+		}
+
+	        /*
+	         * If this is the first record we're displaying, bring up
+	         * the current record
+	         */
+		if ((pself->FFI_showOnlyMarked) &&
+	                ((i == 0) && (j == 0) && 
+				(pself->FFI_numMarkedRecords != 0))) {
+		            (void) FFDRCGotoRecord (oself, FFRCR_GOTO_RECORD,
+				(FFDDetermineMarkedPosition(oself, 
+					pself->SSI_active.CR_row)-1), FALSE,
+					CRT_VISUAL_UPDATE_COMMIT,
+					editRecordType,
+					FALSE);
+		}
+		else {
+	            if ((!pself->FFI_showOnlyMarked) && 
+				((i == 0) && (j == 0) && 
+				(pself->FFI_numRecords != 0))) {
+		            (void) FFDRCGotoRecord (oself, FFRCR_GOTO_RECORD,
+					pself->SSI_active.CR_row, FALSE,
+					CRT_VISUAL_UPDATE_COMMIT,
+					editRecordType,
+					FALSE);
+		    }
+	            else {
+		        /*
+		         * If we're not already on the last record, go to 
+		         * the next record
+		         */
+			if (((!pself->FFI_showOnlyMarked) &&
+		               (pself->SSI_active.CR_row != 
+					(pself->FFI_numRecords-1))
+				&& (pself->FFI_numRecords != 0)) ||
+			        ((pself->FFI_showOnlyMarked) &&
+			        (pself->FFI_currentMarkedRecord != 
+					(pself->FFI_numMarkedRecords - 1))
+				&& (pself->FFI_numMarkedRecords != 0))) {
+		            (void) FFDRCGotoRecord (oself, 
+						FFRCR_GOTO_NEXT_RECORD, 
+						0, FALSE, 
+						CRT_VISUAL_UPDATE_COMMIT,
+						editRecordType,
+						FALSE);
+			}
+		        else {
+			    @call oself::MSG_FFD_EDIT_NEW_RECORD(FALSE,
+							NRT_REGULAR,
+							FALSE);
+		        }
+		    }
+	        }
+
+	        if (startRecord == -1) {
+		    /*
+		     * Set the clip rectangle so we don't draw things outside
+		     * of the grobj body bounds
+		     */
+		    GrSaveState(gstate);
+		    GrSetClipRect(gstate, PCT_INTERSECTION, 
+					 (word) recordLayoutBounds.RD_left,
+					 (word) recordLayoutBounds.RD_top,
+					 (word) recordLayoutBounds.RD_right,
+					 (word) recordLayoutBounds.RD_bottom);
+
+		    /*
+		     * If we're the actual active record, we want the grobj body
+		     * to draw normally, and include the focus box
+		     */
+
+		    if (currentRecordPosition == activeRecordPosition) {
+			/*
+			 * Clear GODF_DRAW_OBJECTS_ONLY bit 
+			 *
+			 */
+			grobjDrawFlags &= ~GODF_DRAW_OBJECTS_ONLY;
+		    }
+		    else {
+			/*
+			 * Set GODF_DRAW_OBJECTS_ONLY bit 
+			 */
+			grobjDrawFlags |= GODF_DRAW_OBJECTS_ONLY;
+		    }
+
+                    @call recordLayoutGrObjBody::MSG_GB_DRAW(gstate,
+							     drawFlags,
+							     grobjDrawFlags);
+
+		    GrRestoreState(gstate);
+	        }
+
+	    }
+	    else {
+ 	        /*
+	         * If we didn't need to redraw this body, just increment the
+	         * counter (unless it's the first record)
+	         */
+		if ((i != 0) || (j != 0)) {
+		    if (pself->FFI_showOnlyMarked) {
+			pself->SSI_active.CR_row = FFDGetNextMarkedRecord(
+					   oself, pself->SSI_active.CR_row);
+			pself->FFI_currentMarkedRecord = 
+				FFDDetermineMarkedPosition(oself,
+						pself->SSI_active.CR_row)-1;
+		    }
+		    else {
+		        pself->SSI_active.CR_row++;
+		    }
+		}
+	    }
+
+	    currentRecordPosition++;
+
+	    /*
+	     * Change the boundaries for the next grobj body depending on
+	     * the record order
+	     */
+	    pself = ObjDerefGen(oself);
+	    if (pself->FFI_recordOrder == ROO_TOP_TO_BOTTOM) {
+	        recordLayoutBounds.RD_top += recordLayout.LS_height;
+	        recordLayoutBounds.RD_bottom += recordLayout.LS_height;
+	    }
+	    else {
+	        recordLayoutBounds.RD_left += recordLayout.LS_width;
+	        recordLayoutBounds.RD_right += recordLayout.LS_width;
+	    }
+
+	    if (done) {
+	        break;
+	    }
+        }
+
+	if (done) {
+	    break;
+	}
+
+	/* 
+	 * Reset the bounds, depending on the record order
+	 */
+	if (pself->FFI_recordOrder == ROO_TOP_TO_BOTTOM) {
+	    recordLayoutBounds.RD_top = boundaryYCoord;
+	    recordLayoutBounds.RD_bottom = recordLayoutBounds.RD_top +
+					   recordLayout.LS_height;
+	    recordLayoutBounds.RD_left += recordLayout.LS_width;
+	    recordLayoutBounds.RD_right += recordLayout.LS_width;
+ 	}
+	else {
+	    recordLayoutBounds.RD_left = boundaryXCoord;
+	    recordLayoutBounds.RD_right = recordLayoutBounds.RD_left +
+					  recordLayout.LS_width;
+	    recordLayoutBounds.RD_top += recordLayout.LS_height;
+	    recordLayoutBounds.RD_bottom += recordLayout.LS_height;
+	}
+
+	i = 0;
+    }
+
+    /*
+     * Reset the current active row
+     */
+    pself = ObjDerefGen(oself);
+    if (pself->FFI_showOnlyMarked) {
+	pself->FFI_currentMarkedRecord = currentActiveRow;
+	pself->SSI_active.CR_row = FFDGetNthMarkedRecord(oself, 
+						currentActiveRow + 1);
+    }
+    else {
+        pself->SSI_active.CR_row = currentActiveRow;
+    }
+
+    /*
+     * Reset the editingNewRecord  & dirty flags
+     */
+    if (currentActiveRow == -1) {
+	pself->FFI_editingNewRecord = TRUE;
+    }
+
+    /*
+     * Move the grObjBody to be over the active record
+     */
+    FFDCalculateBoundsForActiveRecordAndSetGrObjBody(oself,
+					    recordLayoutGrObjBody,
+					    currentActiveRow,
+					    numHorizontalRecords,
+					    numVerticalRecords);
+    /*
+     * Does someone have the focus/target already? If so, we won't need
+     * to grab it. If no one has the focus, we want the first field in
+     * the layout to grab the focus
+     */
+    (void) @call recordLayoutGrObjBody::MSG_META_GET_FOCUS_EXCL(&focusField);
+
+    if (focusField) {
+	grabTarget = FALSE;
+    }
+    else {
+	grabTarget = TRUE;
+    }
+
+    /*
+     * Redraw the record; this might seem superfluous, but if there
+     * are 4 records, and the active one is the 3rd, then the grObjbody
+     * fields now think they contain the text of the 4th record
+     */
+    if (currentActiveRow != -1) {
+	@call recordLayoutGrObjBody::MSG_META_GRAB_TARGET_EXCL();
+	pself = ObjDerefGen(oself);
+	/*
+	 * If this record is dirty, we don't want to wipe out the
+	 * fields that are filled in
+	 */
+	if (!dirtyRecord) {
+	    (void) FFDRCGotoRecord (oself, FFRCR_GOTO_RECORD,
+				FFD_CURRENT_RECORD(pself),
+				FALSE,
+				CRT_VISUAL_UPDATE_COMMIT,
+				ERT_REGULAR,
+				grabTarget);
+	}
+	else {
+	    (void) FFDRCGotoRecord (oself, FFRCR_GOTO_RECORD,
+				FFD_CURRENT_RECORD(pself),
+				FALSE,
+				CRT_VISUAL_UPDATE_COMMIT,
+				ERT_LOAD_FROM_TEMP_VISUAL_UPDATE_ROW,
+				grabTarget);
+	}
+    }
+    /*
+     * If we've redrawn and have a new record, we want to make sure 
+     * that the temp row contains the proper data 
+     */
+    else {
+	/*
+	 * If this record is already dirty, we don't want to
+	 * wipe out the fields that are filled in
+	 */
+        pself->FFI_dirtyRecord = dirtyRecord;
+	if (!dirtyRecord) {
+	    @call oself::MSG_FFD_EDIT_NEW_RECORD(FALSE, 
+						NRT_REGULAR,
+						grabTarget);
+	}
+	else {
+	    @call oself::MSG_FFD_EDIT_NEW_RECORD(FALSE, 
+				NRT_LOAD_FROM_TEMP_VISUAL_UPDATE_ROW,
+				grabTarget);
+	}
+    }
+
+    pself = ObjDerefGen(oself);
+    pself->FFI_dirtyRecord = dirtyRecord;
+
+    /*
+     * Now draw the boundary for the active record, if it needs to be
+     * redrawn
+     */
+    @call recordLayoutGrObjBody::MSG_GB_GET_BOUNDS(&recordLayoutBounds);
+
+    if (FFDIsInvalidAreaWithinBounds(&recordLayoutBounds, gstate)) {
+        if (numRecordsOnPage > 1) {
+	    FFDDrawRecordLayoutBoundaryForMultiRecord(gstate, 
+						      drawFlags,
+						      recordLayoutGrObjBody);
+	}
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFDCalculateNumRecordsPerPage
+ *
+ * DESCRIPTION:	Calculates how many records will fit on the page layout.
+ *
+ * PARAMETERS: 	pass: 	oself - optr to flatfile database object
+ *			*numHorizontalRecords, *numVerticalRecords -
+ *				optional pointers to the number of records
+ *				that fit down the page horizontally and
+ *				vertically. Pass 0 if you don't care.
+ *		return: number of records per page
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	9/11/92		Broke into routine 
+ *
+ ***********************************************************************/
+word
+FFDCalculateNumRecordsPerPage(optr oself, word *numHorizontalRecords,
+						word *numVerticalRecords)
+{
+    word numHRecords, numVRecords;
+    LayoutSize singleRecordBounds, multiRecordBounds;
+
+    /*
+     * Find out the size of the page layout boundary
+     */
+    @call oself::MSG_FFD_GET_MULTI_RECORD_BOUNDS(&multiRecordBounds);
+
+    /* 
+     * Get its boundary and adjust bounds of the GrObjBody
+     */
+    @call oself::MSG_FFD_GET_SINGLE_RECORD_BOUNDS(&singleRecordBounds);
+
+    /*
+     * Are we about to divide by 0?  Let's catch that.  In fact, if the
+     * singleRecordBounds are screwed up, make an attempt to fix
+     * things up.
+     */
+    if (singleRecordBounds.LS_width == 0) {
+ 	#if ERROR_CHECK
+	    EC_ERROR(ABOUT_TO_DIVIDE_BY_ZERO);
+ 	#else /* ERROR_CHECK */
+	    singleRecordBounds.LS_width = multiRecordBounds.LS_width;
+    	#endif /* ERROR_CHECK */
+    }
+
+    if (singleRecordBounds.LS_height == 0) {
+ 	#if ERROR_CHECK
+	    EC_ERROR(ABOUT_TO_DIVIDE_BY_ZERO);
+ 	#else /* ERROR_CHECK */
+	    singleRecordBounds.LS_height = multiRecordBounds.LS_height;
+    	#endif /* ERROR_CHECK */
+    }
+
+    /*
+     * The width and height of the multi-record bounds must always be
+     * at least the same as the single-record bounds.  If they are not, then
+     * reset the silly things.
+     */
+    if (multiRecordBounds.LS_width < singleRecordBounds.LS_width) {
+	multiRecordBounds.LS_width = singleRecordBounds.LS_width;
+    }
+
+    if (multiRecordBounds.LS_height < singleRecordBounds.LS_height) {
+	multiRecordBounds.LS_height = singleRecordBounds.LS_height;
+    }
+
+    numHRecords = multiRecordBounds.LS_width / singleRecordBounds.LS_width;
+    numVRecords = multiRecordBounds.LS_height / singleRecordBounds.LS_height;
+
+    if (numHorizontalRecords) {
+	*numHorizontalRecords = numHRecords;
+    }
+
+    if (numVerticalRecords) {
+	*numVerticalRecords = numVRecords;
+    }
+
+    return(numHRecords * numVRecords);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFDDrawRecordLayoutBoundaryForMultiRecord
+ *
+ * DESCRIPTION: Draw a rectangle around the active record. 
+ *		Since this inverts the area under the record boundary,
+ *		it can be used to "draw" and "erase" the box.
+ *
+ * PARAMETERS: 	pass: 	gstate - gstate passed on from VIS_DRAW
+ *			drawFlags - drawFlags passed on from VIS_DRAW
+ *			recordLayoutGrObjBody - optr to what you'd think
+ *		return: nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	8/27/92		Initial version  
+ *
+ ***********************************************************************/
+void
+FFDDrawRecordLayoutBoundaryForMultiRecord(GStateHandle gstate, 
+				word drawFlags,
+				optr recordLayoutGrObjBody)
+{
+    RectDWord recordLayoutBounds;
+
+    if (drawFlags & DF_PRINT) {
+	return;
+    }
+    else {
+        @call recordLayoutGrObjBody::MSG_GB_GET_BOUNDS(&recordLayoutBounds);
+
+        GrSetLineWidth(gstate, MakeWWFixed(DEFAULT_RECORD_BOUNDARY_LINE_WIDTH));
+        GrSetLineStyle(gstate, LS_DASHED, 0, 0, 0);
+
+	GrSetMixMode(gstate, MM_INVERT);
+
+        GrDrawRect(gstate,
+	 	    recordLayoutBounds.RD_left, 
+		    recordLayoutBounds.RD_top, 
+		    recordLayoutBounds.RD_right, 
+		    recordLayoutBounds.RD_bottom);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFDVisDrawMultiRecDataEntryMode
+ *
+ * DESCRIPTION:	Deals with drawing the right things when we are in Data Entry
+ *		mode, and displaying multiple records.
+ *		First draws the GrObjBody for the page layout itself,
+ *		then "stamps" as many record layouts as will fit withing
+ *		the Page Layout Repeater Box (also known as the page
+ *		layout boundary)
+ *
+ * PARAMETERS: 	pass: 	oself - optr to flatfile database object
+ *			drawFlags passed on from VIS_DRAW
+ *		      	gstate - gstate passed on from VIS_DRAW
+ *		return: nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	8/27/92		Broke into routine 
+ *
+ ***********************************************************************/
+void
+FFDVisDrawMultiRecDataEntryMode(optr oself, word drawFlags, GStateHandle gstate)
+{
+    optr recordLayoutGrObjBody, pageLayoutGrObjBody;
+    LayoutSize recordLayoutBounds, pageLayoutBounds;
+    FlatFileDatabaseInstance *pself;
+    word numHorizontalRecords, numVerticalRecords;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * We need to draw the GrObjBody; change the bounds and
+     * draw as many record layouts as will fit within the
+     * page layout boundary
+     * 
+     * First, get GrObjBody for page layout, and send it a VIS_DRAW
+     */
+
+    pageLayoutGrObjBody = @call oself::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(
+						pself->FFI_currentLayout,
+						LT_MULTI_RECORD);
+    @call pageLayoutGrObjBody::MSG_VIS_DRAW(drawFlags, gstate);
+
+    /*
+     * Get GrObjBody for the record layout
+     */
+    pself = ObjDerefGen(oself);
+    recordLayoutGrObjBody = @call oself::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(
+						pself->FFI_currentLayout, 
+						LT_SINGLE_RECORD);
+
+    /*
+     * Find out the size of the page layout boundary
+     */
+    FFDGetMultiRecordBounds(oself, &pageLayoutBounds);
+
+    /* 
+     * Get its boundary and adjust bounds of the GrObjBody
+     */
+    FFDGetSingleRecordBounds(oself, &recordLayoutBounds);
+
+    numHorizontalRecords = (word) (pageLayoutBounds.LS_width /
+	    	    	   			recordLayoutBounds.LS_width);
+    numVerticalRecords = (word) (pageLayoutBounds.LS_height /
+	    	    	 			recordLayoutBounds.LS_height);
+
+    FFDDrawMultiRecordDataEntryGrid(oself, drawFlags, gstate,
+				    recordLayoutBounds,
+				    recordLayoutGrObjBody, 
+				    numHorizontalRecords,
+				    numVerticalRecords,
+				    -1);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFDVisDrawMultiRecDesignForPrinting
+ *
+ * DESCRIPTION:	Deals with drawing the right things when we are printing
+ *		in Design mode, and displaying multiple records.
+ *		First draws the GrObjBody for the page layout itself,
+ *		then "stamps" as many empty record layouts as will fit within
+ *		the Page Layout Repeater Box (also known as the page
+ *		layout boundary)
+ *
+ * PARAMETERS: 	pass: 	oself - optr to flatfile database object
+ *			drawFlags passed on from VIS_DRAW
+ *		      	gstate - gstate passed on from VIS_DRAW
+ *		return: nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	11/5/92		Initial version  
+ *
+ ***********************************************************************/
+void
+FFDVisDrawMultiRecDesignForPrinting(optr oself, word drawFlags, 
+					GStateHandle gstate)
+{
+    optr singleRecordLayout, multiRecordLayout;
+    word currentLayout;
+    word i, j, numHorizontalRecords, numVerticalRecords;
+    LayoutSize recordLayoutSize, pageLayoutSize;
+    FlatFileDatabaseInstance *pself;
+    sdword boundaryXCoord, boundaryYCoord;
+    RectDWord recordLayoutBounds, originalRecordLayoutBounds;
+
+    pself = ObjDerefGen(oself);
+    currentLayout = pself->FFI_currentLayout;
+
+    /*
+     * Get the grobj bodies for both types of layout
+     */
+    multiRecordLayout = @call oself::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(
+						currentLayout,
+						LT_MULTI_RECORD);
+    singleRecordLayout = @call oself::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(
+						currentLayout,
+						LT_SINGLE_RECORD);
+    /*
+     * Draw the multi-record layout
+     */
+    @call multiRecordLayout::MSG_VIS_DRAW(drawFlags, gstate);
+
+    /*
+     * Temporarily attach the single-record layout so it will draw
+     */
+    @call oself::MSG_VIS_ADD_CHILD(singleRecordLayout, 0);
+
+    /*
+     * Make sure the grobjects know which mode they're in
+     */
+    pself = ObjDerefGen(oself);
+    SwitchLayoutModeIfNecessary(oself, pself->FFI_currentLayout, 
+				LT_SINGLE_RECORD);
+
+    pself = ObjDerefGen(oself);
+    @call singleRecordLayout::MSG_GB_ATTACH_UI(pself->FFI_grObjHeadOptr);
+
+    /*
+     * Find out the size of the page layout boundary
+     */
+    FFDGetMultiRecordBounds(oself, &pageLayoutSize);
+
+    /* 
+     * Get its boundary and adjust bounds of the GrObjBody
+     */
+    FFDGetSingleRecordBounds(oself, &recordLayoutSize);
+
+    numHorizontalRecords = (word) (pageLayoutSize.LS_width /
+	    	    	   			recordLayoutSize.LS_width);
+    numVerticalRecords = (word) (pageLayoutSize.LS_height /
+	    	    	 			recordLayoutSize.LS_height);
+
+    FFDGetPageLayoutBoundaryStartingOffset(oself, &boundaryXCoord,
+					   &boundaryYCoord);
+
+    /* Set the bounds */
+    recordLayoutBounds.RD_left = boundaryXCoord;
+    recordLayoutBounds.RD_top = boundaryYCoord;
+    recordLayoutBounds.RD_right = recordLayoutBounds.RD_left + 
+	    	    	    	  recordLayoutSize.LS_width;
+    recordLayoutBounds.RD_bottom = recordLayoutBounds.RD_top + 
+				   recordLayoutSize.LS_height;
+
+    /* Save the original bounds */
+    originalRecordLayoutBounds.RD_left = 0;
+    originalRecordLayoutBounds.RD_top = 0;
+    originalRecordLayoutBounds.RD_right = recordLayoutSize.LS_width;
+    originalRecordLayoutBounds.RD_bottom = recordLayoutSize.LS_height;
+     
+    /*
+     * Now loop through and stamp out the single record grobj bodies
+     */
+    for (i = 0; i < numHorizontalRecords; i++) {
+	for (j = 0; j < numVerticalRecords; j++) {
+            @call singleRecordLayout::
+		MSG_GB_SET_BOUNDS_WITHOUT_MARKING_DIRTY(&recordLayoutBounds);
+            @call singleRecordLayout::MSG_VIS_DRAW(drawFlags, gstate);
+
+	    /*
+	     * Move the bounds down to stamp the next one
+	     */
+	    recordLayoutBounds.RD_top += recordLayoutSize.LS_height;
+	    recordLayoutBounds.RD_bottom += recordLayoutSize.LS_height;
+	}
+	/*
+	 * Reset the vertical bounds to the top. Move the horizontal
+	 * bounds over
+	 */
+	recordLayoutBounds.RD_top = boundaryYCoord;
+	recordLayoutBounds.RD_bottom = recordLayoutBounds.RD_top +
+					   recordLayoutSize.LS_height;
+	recordLayoutBounds.RD_left += recordLayoutSize.LS_width;
+	recordLayoutBounds.RD_right += recordLayoutSize.LS_width;
+    }
+
+    /*
+     * Reset the bounds to their original position
+     */
+    @call singleRecordLayout::MSG_GB_SET_BOUNDS_WITHOUT_MARKING_DIRTY(&originalRecordLayoutBounds);
+
+    /*
+     * Now detach the single record layout
+     */
+    @call singleRecordLayout::MSG_VIS_REMOVE(VUM_MANUAL);
+    @call singleRecordLayout::MSG_GB_DETACH_UI();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFD_DRAW_MARGINS for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message draws a margin border if we're currently
+ *	    	in multi-record design mode.
+ *
+ * PARAMETERS:
+ *	void (GStateHandle gstate)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	10/15/92	Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_DRAW_MARGINS
+{
+    PageSizeReport psr;
+
+    /*
+     * If we're in single-record mode or in data entry mode, leave.
+     */
+    if ((pself->FFI_currentLayoutType != LT_MULTI_RECORD) ||
+	(pself->FFI_currentMode != MT_DESIGN)) {
+	return;
+    }
+
+    /*
+     * Multi-record design mode: draw the margins.
+     *
+     * Get the page and margins size.
+     */
+    FFDGetPageBounds(oself, &psr);
+
+    /*
+     * We'll be messing with the current gstate, so save it off first.
+     */
+    GrSaveState(gstate);
+
+    /*
+     * Draw the rectangle.
+     */
+    GrSetLineWidth(gstate, 0);
+    GrSetLineMaskSys(gstate, SDM_50 | SDM_INVERSE);
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrDrawRect(gstate,
+	       psr.PSR_margins.PCMP_left,
+	       psr.PSR_margins.PCMP_top,
+	       psr.PSR_width - psr.PSR_margins.PCMP_right,
+	       psr.PSR_height - psr.PSR_margins.PCMP_bottom);
+    
+    /*
+     * Clean up and leave.
+     */
+    GrRestoreState(gstate);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_DRAW
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (word drawFlags = cl, GStateHandle gstate = bp)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/12/92		Initial version
+ *	anna	8/25/92		Handle drawing multiple GrObjBodies
+ *				in Data Entry mode.
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_VIS_DRAW
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * DON'T call the superclass to pass MSG_VIS_DRAW on to the children.
+     * In the spreadsheet, all it does in engine mode is:
+     *	(a) pass it on to VisComp to call the children
+     *	(b) loads in a ~10K resource
+     * By calling our child ourself (which we need to do in multi-record
+     * mode anyway), we save 10K of code.
+     */
+    pself = ObjDerefGen(oself);
+
+    GrSaveState(gstate);
+    GrSetTextColorMap(gstate, CMT_DITHER);
+
+    /*
+     * If we're in multi-record data entry, we have a lot of special
+     * treatment
+     */
+    if ((pself->FFI_currentMode == MT_DATA_ENTRY) &&
+		(pself->FFI_currentLayoutType == LT_MULTI_RECORD)) {
+
+	FFDVisDrawMultiRecDataEntryMode(oself, drawFlags, gstate);
+	GrRestoreState(gstate);
+	return;
+    }
+
+    /*
+     * If we're printing in multi-record design mode, we actually
+     * want to tile the single record layouts, so we take care of
+     * that separately
+     */
+    if ((drawFlags & DF_PRINT) && (pself->FFI_currentMode == MT_DESIGN) &&
+		(pself->FFI_currentLayoutType == LT_MULTI_RECORD)) {
+
+	FFDVisDrawMultiRecDesignForPrinting(oself, drawFlags, gstate);
+	GrRestoreState(gstate);
+	return;
+    }
+
+    /*
+     * All other cases, send the draw message on to our first child,
+     * which is a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_VIS_DRAW(drawFlags, gstate);
+
+    GrRestoreState(gstate);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	FFDPassMetaLargeStartSelectToChild
+ *
+ * DESCRIPTION:	Pass MSG_META_LARGE_START_SELECT along to our GrObjBody child
+ *
+ * PARAMETERS: 	oself -- optr to flatFile object
+ *		*retVal -- from MSG_META_LARGE_START_SELECT
+ *		*largeMouseDataStruct -- from MSG_META_LARGE_START_SELECT
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	9/21/92		Initial version
+ *
+ ***********************************************************************/
+void FFDPassMetaLargeStartSelectToChild(optr oself, 
+					MouseReturnParams *retVal,
+					LargeMouseData *largeMouseDataStruct)
+{
+    optr childOptr;
+    VisContentInstance *vis;
+
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    /*
+     * If we have a child, pass it on. If not, set return flags to zero
+     */
+    if (childOptr) {
+        @call childOptr::MSG_META_LARGE_START_SELECT(
+					retVal, largeMouseDataStruct);
+    }
+    else {
+	retVal->flags = 0;
+    }
+
+    return;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	FFDAdjustMouseEvents
+ *
+ * DESCRIPTION:	Adjusts the largeMouseDataStruct according to the
+ *		position of the grobj body.
+ *
+ * PARAMETERS: 	oself -- optr to flatFile object
+ *		*retVal -- from MSG_META_LARGE_START_SELECT 
+ *		*largeMouseDataStruct -- from MSG_META_LARGE_START_SELECT 
+ *		*done -- set to TRUE if no further action is necessary
+ *			after this routine; FALSE otherwise
+ *
+ *	Returns: newRecord
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	2/2/93		Broke into routine 
+ *
+ ***********************************************************************/
+word FFDAdjustMouseEvents(optr oself, 
+			  MouseReturnParams *retVal,
+			  LargeMouseData *largeMouseDataStruct,
+			  Boolean *done)
+{
+    sdword boundaryXCoord, boundaryYCoord;
+    word yPositionInRecords, xPositionInRecords;	/* how many records
+							over are the x, y pos */
+    word numHorizontalRecords, numVerticalRecords, newActiveRecordPosition,
+			newRecord, numRecordsPerPage;
+    RectDWord bounds;
+    LayoutSize singleRecordBounds;
+    FlatFileDatabaseInstance *pself;
+    optr recordLayoutGrObjBody;
+
+    /*
+     * If we're in multi-record data entry mode, we want to find out
+     * which record layout grObjBody we're over, if any.
+     * First get the starting offset for the page repeater box.
+     */
+    FFDGetPageLayoutBoundaryStartingOffset(oself, &boundaryXCoord,
+					   		&boundaryYCoord);
+
+    FFDGetSingleRecordBounds(oself, &singleRecordBounds);
+    FFDCalculateNumRecordsPerPage(oself, &numHorizontalRecords,
+						&numVerticalRecords);
+
+    yPositionInRecords = 
+	  (largeMouseDataStruct->LMD_location.PDF_y.DWF_int - boundaryYCoord) /
+			singleRecordBounds.LS_height;
+    xPositionInRecords = 
+	  (largeMouseDataStruct->LMD_location.PDF_x.DWF_int - boundaryXCoord) /
+			singleRecordBounds.LS_width;
+
+    /*
+     * See if the mouse press is even within the boundary of the
+     * page repeater box at all. If not, just pass the message along.
+     */
+    if ((largeMouseDataStruct->LMD_location.PDF_y.DWF_int < boundaryYCoord)
+  	|| (yPositionInRecords > (numVerticalRecords -1)) 
+	  ||(largeMouseDataStruct->LMD_location.PDF_x.DWF_int < boundaryXCoord)
+	  || (xPositionInRecords > (numHorizontalRecords -1))) {
+
+        FFDPassMetaLargeStartSelectToChild(oself, retVal, 
+						largeMouseDataStruct);
+
+	/*
+	 * Signal that no more work need be done
+	 */
+	*done = TRUE;
+        return(0);
+    }
+
+    pself = ObjDerefGen(oself);
+
+    if (pself->FFI_recordOrder == ROO_TOP_TO_BOTTOM) {
+        newActiveRecordPosition = xPositionInRecords * numVerticalRecords 
+					+ yPositionInRecords;
+    }
+    else {
+        newActiveRecordPosition = yPositionInRecords * numHorizontalRecords 
+					+ xPositionInRecords;
+    }
+
+    recordLayoutGrObjBody = @call oself::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(
+						pself->FFI_currentLayout, 
+						LT_SINGLE_RECORD);
+	
+    /*
+     * Load the appropriate record back into the grObjBody; remember
+     * the grObjbody contains all the info for the old record
+     */
+    pself = ObjDerefGen(oself);
+
+    numRecordsPerPage = numHorizontalRecords * numVerticalRecords;
+    newRecord = (pself->FFI_currentPage * numRecordsPerPage) +
+					newActiveRecordPosition;
+
+    /*
+     * Adjust the mouse click according to the top left of the grobjbody
+     * before passing it on
+     */
+    @call recordLayoutGrObjBody::MSG_GB_GET_BOUNDS(&bounds);
+
+    largeMouseDataStruct->LMD_location.PDF_x.DWF_int -= bounds.RD_left;
+    largeMouseDataStruct->LMD_location.PDF_y.DWF_int -= bounds.RD_top;
+
+    *done = FALSE;
+    return(newRecord);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_PTR
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/12/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_PTR
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    /*
+     * Do we have a child? If so, pass on to child. If not, return 0
+     */
+    if (childOptr) {
+        @call childOptr::MSG_META_LARGE_PTR(retVal, largeMouseDataStruct);
+    }
+    else {
+	retVal->flags = 0;
+    }
+
+    return;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_START_SELECT
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/12/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_START_SELECT
+{
+    word newRecord;
+    optr recordLayoutGrObjBody;
+    Boolean done;
+    word numRecords, curRecord;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    if ((pself->FFI_currentMode == MT_DESIGN) || 
+		(pself->FFI_currentLayoutType == LT_SINGLE_RECORD)) {
+	FFDPassMetaLargeStartSelectToChild(oself, retVal, 
+						largeMouseDataStruct);
+	return;
+    }
+    else {
+        newRecord = FFDAdjustMouseEvents(oself, 
+					   retVal,
+					   largeMouseDataStruct,
+					   &done);
+
+	if (done) {
+	    return;
+	}
+
+	pself = ObjDerefGen(oself);
+
+	if (pself->FFI_showOnlyMarked) {
+	    curRecord = pself->FFI_currentMarkedRecord;
+	    numRecords = pself->FFI_numMarkedRecords;
+	}
+	else {
+	    curRecord = pself->SSI_active.CR_row;
+	    numRecords = pself->FFI_numRecords;
+	}
+	/*
+	 * If we clicked on the already active record, just pass the
+	 * mouse click along to the grObjBody
+	 */
+	if (!pself->FFI_editingNewRecord && (newRecord == curRecord)) {
+	    FFDPassMetaLargeStartSelectToChild(oself, retVal, 
+						largeMouseDataStruct);
+	    return;
+	}
+
+	/*
+	 * If we clicked on the new record that we're already editing, just
+	 * pass the mouse click along to the grobjbody
+	 */
+	pself = ObjDerefGen(oself);
+	if (pself->FFI_editingNewRecord && (newRecord == numRecords)) {
+	    FFDPassMetaLargeStartSelectToChild(oself, retVal, 
+						largeMouseDataStruct);
+	    return;
+	}
+
+	/*
+	 * Check if we've clicked w/in the page repeater box, but in an
+	 * area where there's no record
+	 */
+	if (!pself->FFI_editingNewRecord && (newRecord >= numRecords))  {
+	    FFDPassMetaLargeStartSelectToChild(oself, retVal, 
+						largeMouseDataStruct);
+	    return;
+	}
+
+        recordLayoutGrObjBody = @call oself::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(
+						pself->FFI_currentLayout, 
+						LT_SINGLE_RECORD);
+
+	/*
+	 * Tell the current grobj body to lose the target, so the text
+	 * focus box gets erased
+	 */
+	/*@call recordLayoutGrObjBody::MSG_META_RELEASE_TARGET_EXCL();*/
+
+	pself = ObjDerefGen(oself);
+	if ((pself->FFI_editingNewRecord) 
+				&& (newRecord == numRecords)) {
+	    @call oself::MSG_FFD_RECORD_CONTROL(FFRCR_CREATE_NEW_RECORD, 0);
+	}
+	else {
+	    @call oself::MSG_FFD_RECORD_CONTROL(FFRCR_GOTO_RECORD, newRecord);
+	}
+
+	/*
+	 * Pass on the mouse click to the grobj body
+	 */
+	@call recordLayoutGrObjBody::MSG_META_LARGE_START_SELECT(
+					retVal, largeMouseDataStruct);
+
+
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_END_SELECT
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_END_SELECT
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_LARGE_END_SELECT(retVal, largeMouseDataStruct);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_START_MOVE_COPY
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_START_MOVE_COPY
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::
+	MSG_META_LARGE_START_MOVE_COPY(retVal, largeMouseDataStruct);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_END_MOVE_COPY
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_END_MOVE_COPY
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_LARGE_END_MOVE_COPY(retVal, largeMouseDataStruct);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_START_FEATURES
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_START_FEATURES
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::
+	MSG_META_LARGE_START_FEATURES(retVal, largeMouseDataStruct);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_END_FEATURES
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_END_FEATURES
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_LARGE_END_FEATURES(retVal, largeMouseDataStruct);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_START_OTHER
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_START_OTHER
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_LARGE_START_OTHER(retVal, largeMouseDataStruct);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_END_OTHER
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_END_OTHER
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_LARGE_END_OTHER(retVal, largeMouseDataStruct);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_DRAG_SELECT
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_DRAG_SELECT
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_LARGE_DRAG_SELECT(retVal, largeMouseDataStruct);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_DRAG_FEATURES
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_DRAG_FEATURES
+{
+    VisContentInstance *vis;
+    optr childOptr;
+    LargeMouseData *lmds;
+    
+    lmds = largeMouseDataStruct;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_LARGE_DRAG_FEATURES(retVal, lmds);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_DRAG_MOVE_COPY
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_DRAG_MOVE_COPY
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::
+	MSG_META_LARGE_DRAG_MOVE_COPY(retVal, largeMouseDataStruct);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LARGE_DRAG_OTHER
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (MouseReturnParams *retVal,
+ *			LargeMouseData *largeMouseDataStruct)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_LARGE_DRAG_OTHER
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_LARGE_DRAG_OTHER(retVal, largeMouseDataStruct);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void (@stack WindowHandle viewWindow,
+ *			WWFixedAsDWord yScaleFactor,
+ *			WWFixedAsDWord xScaleFactor)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED(
+					viewWindow,
+					yScaleFactor, 
+					xScaleFactor);
+}
+
+#if 0
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_CONTENT_TRACK_SCROLLING
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Pass this message along to our GrObjBody child
+ *
+ * PARAMETERS: 	void ()
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/13/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_CONTENT_TRACK_SCROLLING
+{
+    VisContentInstance *vis;
+    optr childOptr;
+
+    /*
+     * Send the Pointer message on to our first child, which is
+     * a GrObj body
+     */
+    vis = ObjDerefVis(oself);
+
+    childOptr = vis->VCI_comp.CP_firstChild;
+
+    @call childOptr::MSG_META_CONTENT_TRACK_SCROLLING();
+}
+#endif
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_MUP_ALTER_FTVMC_EXCL
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Need to intercept this message in order to make the
+ *		FlatFile database object a target & focus node. We want 
+ *		it to be a target node, so that the GrObj can sit below it,
+ *		and get the keyboard/mouse inputs.
+ *
+ * PARAMETERS: 	void (optr objectWantingControl, 
+ *			MetaAlterFTVMCExclFlags flags)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/08/92		Initial version
+ *	anna	6/11/92		Made FlatFile a focus node as well
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_MUP_ALTER_FTVMC_EXCL
+{
+	/*
+	 * If the objectWantingControl is the same as this target
+	 * node, clear the bit telling us this and send it on
+	 * to the superclass
+	 */
+	if (flags & MAEF_NOT_HERE) {
+	    flags &= ~MAEF_NOT_HERE;
+	    @callsuper();
+	    return;
+	}
+
+	/*
+	 * Since we're a focus/target node, check to see if this request 
+	 * includes a change to the focus/target hierarchy
+	 */
+	if (!(flags & MAEF_TARGET) && !(flags & MAEF_FOCUS)) {
+	    @callsuper();	/* if not, skip and send to the superclass */
+	    return;
+	}
+
+	/* 
+	 * Are we passing on the target request?
+	 */
+	if (flags & MAEF_TARGET) {
+	    FlowAlterHierarchicalGrab(oself, 
+		 MSG_META_GAINED_TARGET_EXCL,
+		 word_offsetof(SpreadsheetBase, Spreadsheet_offset),
+		 word_offsetof(FlatFileDatabaseInstance, FFI_targetExcl),
+		 objectWantingControl,
+		 flags & (MAEF_GRAB | MAEF_TARGET));
+	    /*
+	     * Now that we've updated the target node, clear that portion
+	     * of the request from the flags
+	     */
+  	    flags &= ~MAEF_TARGET;
+	}
+
+	/* 
+	 * Are we passing on the focus request?
+	 */
+	if (flags & MAEF_FOCUS) {
+	    FlowAlterHierarchicalGrab(oself, 
+		 MSG_META_GAINED_FOCUS_EXCL,
+		 word_offsetof(SpreadsheetBase, Spreadsheet_offset),
+		 word_offsetof(FlatFileDatabaseInstance, FFI_focusExcl),
+		 objectWantingControl,
+		 flags & (MAEF_GRAB | MAEF_FOCUS));
+	    /*
+	     * Now that we've updated the focus node, clear that portion
+	     * of the request from the flags
+	     */
+  	    flags &= ~MAEF_FOCUS;
+	}
+
+	/*
+	 * If request was also to grab/release on other nodes,
+	 * pass on request
+	 */
+	if (flags & MAEF_MASK_OF_ALL_HIERARCHIES) {
+	    /*
+	     * Pass message on to superclass for handling outside 
+	     * of this class
+	     */
+	    @callsuper();
+	}
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_GAINED_TARGET_EXCL
+ * MESSAGE:	MSG_META_GAINED_SYS_TARGET_EXCL
+ * MESSAGE:	MSG_META_LOST_SYS_TARGET_EXCL
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Need to intercept this message in order to make the
+ *		FlatFile database object a target node. We want it to
+ *		be a target node, so that the GrObj can sit below it,
+ *		and get the keyboard/mouse inputs.
+ *		Activate the Search controller.
+ *
+ * PARAMETERS: 	void (optr objectWantingControl, 
+ *			MetaAlterFTVMCExclFlags flags)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/08/92		Initial version.
+ *	JDM	92.06.25	Added search controller support.
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_GAINED_TARGET_EXCL,
+					MSG_META_GAINED_SYS_TARGET_EXCL,
+					MSG_META_LOST_SYS_TARGET_EXCL
+{
+    FlowUpdateHierarchicalGrab(oself,
+		   MSG_META_GAINED_TARGET_EXCL,
+		   word_offsetof(SpreadsheetBase, Spreadsheet_offset),
+		   word_offsetof(FlatFileDatabaseInstance, FFI_targetExcl),
+		   message);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LOST_TARGET_EXCL
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Need to intercept this message in order to make the
+ *		FlatFile database object a target node. We want it to
+ *		be a target node, so that the GrObj can sit below it,
+ *		and get the keyboard/mouse inputs.
+ *		Deactivate the search controller.
+ *
+ * PARAMETERS: 	void (optr objectWantingControl, 
+ *			MetaAlterFTVMCExclFlags flags)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/08/92		Initial version
+ *	JDM	92.06.25	Added search controller support.
+ *	JDM	92.07.22	Added Record Control Panel support.
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass,MSG_META_LOST_TARGET_EXCL
+{
+    FFRecordControlStatusMessageBlock ffrcpsmb;
+
+    FlowUpdateHierarchicalGrab (oself,
+		  MSG_META_GAINED_TARGET_EXCL,
+		  word_offsetof(SpreadsheetBase, Spreadsheet_offset),
+		  word_offsetof(FlatFileDatabaseInstance, FFI_targetExcl),
+		  message);
+
+    /* Deactivate the Record Control Panel.	*/
+    FFRCPSMB_DISABLE_RCP (ffrcpsmb);
+    FFDSendRCPNotification (oself, &ffrcpsmb);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_GET_TARGET_EXCL
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Need to intercept this message in order to make the
+ *		FlatFile database object a target node. We want it to
+ *		be a target node, so that the GrObj can sit below it,
+ *		and get the keyboard/mouse inputs.
+ *		
+ *		Simply return the current grab within this level, as
+ *		stored in the HierarchicalGrab structure.
+ *
+ * PARAMETERS: 	Boolean (optr *targetObject)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/08/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_GET_TARGET_EXCL
+{
+    *targetObject = pself->FFI_targetExcl.HG_OD;
+    return(TRUE);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_GAINED_FOCUS_EXCL
+ * MESSAGE:	MSG_META_LOST_FOCUS_EXCL
+ * MESSAGE:	MSG_META_GAINED_SYS_FOCUS_EXCL
+ * MESSAGE:	MSG_META_LOST_SYS_FOCUS_EXCL
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Need to intercept this message in order to make the
+ *		FlatFile database object a focus node. We want it to
+ *		be a focus node, so that the GrObj can sit below it,
+ *		and get the keyboard/mouse inputs.
+ *
+ * PARAMETERS: 	void (optr objectWantingControl, 
+ *			MetaAlterFTVMCExclFlags flags)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	6/11/92		Initial version
+ *	doug	9/3/92		Combined, update for API changes
+ *
+ ***********************************************************************/
+
+@extern method FlatFileDatabaseClass, MSG_META_GAINED_FOCUS_EXCL,
+					MSG_META_LOST_FOCUS_EXCL,
+					MSG_META_GAINED_SYS_FOCUS_EXCL,
+					MSG_META_LOST_SYS_FOCUS_EXCL
+{
+    FlowUpdateHierarchicalGrab(oself,
+		   MSG_META_GAINED_FOCUS_EXCL,
+		   word_offsetof(SpreadsheetBase, Spreadsheet_offset),
+		   word_offsetof(FlatFileDatabaseInstance, FFI_focusExcl),
+		   message);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_GET_FOCUS_EXCL
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Need to intercept this message in order to make the
+ *		FlatFile database object a focus node. We want it to
+ *		be a target node, so that the GrObj can sit below it,
+ *		and get the keyboard/mouse inputs.
+ *		
+ *		Simply return the current grab within this level, as
+ *		stored in the HierarchicalGrab structure.
+ *
+ * PARAMETERS: 	Boolean (optr *focusObject)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	6/11/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_GET_FOCUS_EXCL
+{
+    *focusObject = pself->FFI_focusExcl.HG_OD;
+    return(TRUE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_SEND_CLASSED_EVENT
+ *		for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Need to intercept this message in order to make the
+ *		FlatFile database object a target node. We want it to
+ *		be a target node, so that the GrObj can sit below it,
+ *		and get the keyboard/mouse inputs.
+ *		
+ *		Target requests should be redirected to the OD stored
+ *		in the HierarchicalGrab.
+ *
+ * PARAMETERS: 	void (EventHandle event = cx,
+ *			TravelOption whereTo = dx)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	5/08/92		Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_META_SEND_CLASSED_EVENT
+{
+    MessageReturnValues mrv;
+
+	/*
+	 * We need to intercept the TO_TARGET travel option
+	 */
+	switch (whereTo) {
+	    case TO_TARGET:
+	        /*
+	         * Call handling utility routine to pass on ClassedEvent,
+	         * deliver here if no object to pass on to, or if
+	         * can't deliver here because of class requirement, destroy
+	         * the ClassEvent
+	         */
+	        FlowDispatchSendOnOrDestroyClassedEvent(&mrv,
+						oself,
+						MSG_META_SEND_CLASSED_EVENT,
+						event,
+						whereTo,
+						pself->FFI_targetExcl.HG_OD,
+						0);
+		
+		break;
+	    case TO_FOCUS:	
+	        /*
+	         * Call handling utility routine to pass on ClassedEvent,
+	         * deliver here if no object to pass on to, or if
+	         * can't deliver here because of class requirement, destroy
+	         * the ClassEvent
+	         */
+	        FlowDispatchSendOnOrDestroyClassedEvent(&mrv,
+						oself,
+						MSG_META_SEND_CLASSED_EVENT,
+						event,
+						whereTo,
+						pself->FFI_focusExcl.HG_OD,
+						0);
+		
+		break;
+	    default:
+	        @callsuper();
+		break;
+	}
+
+}

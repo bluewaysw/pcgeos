@@ -1,0 +1,481 @@
+$Id: full,v 1.1.14.1 97/03/29 08:05:39 canavese Exp $
+
+This document describe in details how the state machine of IRLAP is 
+implemented.
+
+IRLAP state machine
+-------------------
+
+- IRLAP state machine requires all unrecognized events be queued up,  and
+  handled when they are recognized.
+
+
+IMPL
+----
+
+- all states are represented by an etype enumeration.
+- The IRLAP state machine uses same states for primary and secondary xfers.
+  The actions are different,  and therefore they are different states.  I
+  use suffixes in their names to differentiate these states.
+- naming convention:
+  * All states are named according to the IRLAP spec-ed name, except
+	xfer procedures.  Their names has "_P" or "_S" suffixes representing
+	primary and secondary role in xfer respectively.
+  * In IRLAP spec each event is associated with a set of action.  The set
+	of actions are implemented as a procedure in GEOS IRLAP drvr.  The
+	name of the procedure follows roughly to the event's name attached
+	to the state name.  For example the set of action corresponding to
+	receipt of S frame response type RR in state RECV_S would be named
+	RecvRrRspRECV_S.  (all commands are abbrev as cmd,  responses rsp)
+- event code:
+	All events are represented as a word sized code.  Local events are
+  	events that are created by local layer,  currently are: requests for
+  	sending data and local busy.  External events are events generated
+	on receipt of a packet.
+	The first (high) byte of the word represents the local/external
+	type of the event as well as special flags (e.g. a special flag
+	for external event if the sequence of the received packet is invalid).
+	For external event the most significant bit (msb) of this byte is 
+	also the command/response (CR) bit.
+	The second (low) byte of the word is the type specific data.
+	It is not used by local event,  and is used by external events to
+	hold the control (C) field of the packet.
+	=> C field is most essential info and almost everything about the
+	packet can be known from it,  so we pass it around.
+	
+	This word sized code is being searched and matched against tables
+	to decide the procedure (action set) to call.
+
+- the state machine
+	The exotic nature of the state machine requires modifications to the
+	geos event handling scheme.  
+	The IRLAP state machines uses the geos event queues and message passing
+	as the basic blocks.  The event handler is different.
+	The event handler will get a message from the queue,  check to
+	see if the event is applicable.  If it is applicable,  its appropriate
+	procedure is called and event is destroyed,  all through MessageProcess
+	and our customized MessageProcess callback (note: we call
+	MessageProcess only because we want the parameters in cx, dx and bp.
+	MessageProcess's callback is the only way to get at these data w/o
+	accessing the kernel).
+	If the event is not applicable to the state,  it is being ignored
+	and the event handle is pushed onto the stack (thus preserved), and
+	next event is inspected,  until a suitable event is dispatched,
+	after which all events previously ignored and resided on the stack
+	are being popped and prepend back to the queue (thru MF_INSERT_AT_FRONT
+	of QueuePostMessage).
+	Notice that it is important the order of the events be preserved.
+	=> possbily problem with stack overflow.  There should not be
+	many unrecognized events though.  Currently I use a stack size of 
+	1024 bytes.
+
+- action sets
+	* unless otherwise stated,  all external event associated action
+	sets passes cx as the control field and dx:bp as the optr to the
+	packet gotten.  The first word of the packet is the size of it.
+	ax, bx passed in are garbage (some comments are misleading).
+	* All U and S type packets are for local info passing and are not
+	store across events, i.e. they are destroyed once the event is
+	dispatched.  They are destroyed in the MessageProcessCallback.
+
+- actions
+	I have tried to make each action in the IRLAP spec to be a procedure.
+	Many are simple procedure,  and probably doesn't worth the call,
+	but they are made into procedure for readability as well as reduced
+	code size.
+	most action procedure depends on cx (control header of packet) 
+	for operation.  For efficiency reason many of them return
+	useless values (aka destroy the registers) in ax, bx and probably
+	dx and bp.  ds:si are always passed as the station.
+
+- freeing packets
+	
+	The state machine will free all U and S frames.
+ 	u:UI should not	be freed however.  I've modified the event handler 
+	to handle UI do this but it's not debugged yet since I don't send
+	UI packets.
+
+- misc (peculiars):
+- Generate Connection Addr is done by generating 8 bit random number and
+	shr once.  (Thus 7 low bit addr).
+	The conn addr stored in the state machine,  however,  is not trully
+	the addr,  but the addr or'ed with the CR-bit depending on the
+	role of the station in xfer procedures.  This makes sending packets
+	easy (no need to set the CR bit everytime),  and when receiving 
+	packets,  the CR bit is masked out and only the conn addr is verified.
+
+IRLAP internals
+---------------
+
+
+packets
+-------
+- sequencing
+
+	The station keeps Vs and Vr as in IRLAP.  These are 3-bit numbers,
+	and one byte can keep 2 such numbers.  
+	Based on the property of IRLAP control headers,  I decided to store
+	Vs and Vr in a byte exactly as in the IRLAP control header.
+	This has the advantage of testing equality of 4 numbers in one 
+	instruction w/o jumping around.  Also this makes sending out I frames
+	easy (just plug this byte into the outgoing packet control header).
+	Special macros are used to increment Vs and Vr since they are not
+	incrementable by simple inc instruction (see irlapMacro.def,  IncVs and
+	IncVr).
+	To obtain a real number for Vs and Vr, the usual technique is
+	copy the byte to another reg,  shl 3 times the register s.t. 
+	Vr is on the high byte of the word,  and shr on low byte of the other
+	reg.  
+	
+* Invalid and unexpected sequence
+
+	IRLAP's sliding window allows up to 8 frames to be sent before
+	polling for an acknowledgement.  It is thus different from
+	sliding windows as in TCP/IP in that the window shifts once
+	the window capacity is met (or possibly before that*).
+
+	The sequence number runs from 0 to 7.  The window is a contiguous range
+	in this set of numbers, possibly wrapping around the boundaries,
+	i.e. a window of size 3 that consists of 7, 0, 1 is possible.
+	
+	It is necessary that incoming and outgoing packets observe these
+	window boundaries (there are two: for Vs (outgoing) and Vr (incoming)).
+	If they don't,  the link is corrupted and needs to be reset.
+
+	Unexpected sequeunce on the other hand is not fatal error for the link,
+	but rather an error in getting an out-of-sequence frame.  This can
+	be corrected in one of two ways: resending the single frame (using
+	s:srej type of frame),  or resenting the offending frame and all 
+	frames after it (using s:rr or s:rej frames).  IRLAP does
+	not specify which strategy should one use.  I have chosen to use
+	s:rr.
+
+	To check that the incoming sequence numbers (known as Nr and Ns;
+	Nr is matched against Vs and Ns against Vr) observe the window
+	bounds (but not necessary matches Vs and Vr),  we keep two window
+	boundaries,  one for incoming (Ns) and one for outgoing (Nr).
+	These boundaries are represented as a byte.  All bit slots within
+	the window is set.  All bits not valid are cleared.
+
+	To check for validity,  the bits from the control header of the packet
+	representing Nr/Ns is extracted out,  and the bit in a byte register 
+	representing the window slot Nr/Ns represent is set.  By
+	test <byte register>,  <window boundaries>,  if the result is not
+	zero,  then the frame is within the window bounds and is valid.
+
+* When sliding of windows occur:
+
+	The IRLAP documentation does not specify when the window should
+	move its boundaries.  I have come up with an algorithm but by
+	no mean is it bug-free or would work corretly in all cases.
+
+	When to slide the outgoing window:  The window is not slided in this
+	case.  Initially, the 0-bit in the window boundary is marked because 
+	0 is an initial	valid sequence.  When data requests events are
+	processed, an outgoing sequence number is assigned by IRLAP and the 
+	bit corresponding to the number is marked in the windowBoundary.
+	When the SendDataWithPBitSet action is executed,  that means either
+	there are no more data to be sent or the window is full.  In that
+	case a special state variable (a bit in IS_status of 
+	IrlapStation) ISS_resetVsWindow is set.  Next time a data request 
+	is processed,  the ISS_resetVswindow variable is checked.  If it 
+	is set,  the window boundary is cleared.  IRLAP requires that no 
+	data request be processed until all the current packets are 
+	acknowledged,  so we can be sure the window boundaries are valid
+	when remote station send acknowledgement to us.
+	
+	When to slide the incoming window:  The window is slided (rotated).
+	Initially the window boundary byte has 0th to (max window - 1)th
+	bits set.  When we receive an I frame with poll/final bit on,  
+	this means we correctly received a batch of data.  But this may
+	not imply a full window (see above).  
+	We thus have to keep track of sequence number at which we start
+	the current window.  This is the IS_lastVrWindow value.  When
+	a poll bit I frame is obtained, we subtract this value from 
+	Nr of the packet,  and add one (counting the starting sequence number).
+	We then rotate the window boundary this many bits.
+	
+
+* TODO:
+
+Basic engine changes:
+---------------------
+
+These are of medium priority.  Driver would function w/o them, but they 
+should be done sometime.
+
+- allocate < 30 byte of buffer for U and S type packet.
+- make the driver allocate space for incoming packet WITH CONSIDERATION
+OF EXTRA HEADER.  Right now it just allocate some fixed size buffer.
+- allocate negotiated buffer size for I packets. (w/o negotiation we can
+	assume a size for now).
+- resize the incoming packet to reduce space usage.
+
+IRLAP proper:
+-------------
+
+high priority stuff:
+--------------------
+
+
+- IS_store should NOT store optr to lmem block.  
+It should store the fptr to it.  Thus the block is locked on the heap
+before it's acknowledged/discardable.
+Reason:  a buffer can be arbitrary size,  not limited to IRLAP's maximum.
+So it is possible IS_store (8 slots) will store identical things.  We then
+have problem deallocating them.
+One way is use GEOS primitives to manipulate the reference count in lmem
+block.  I don't know this exists.
+The other way is do reference counting ourselves.  
+IS_store, IS_storeSize and IS_packetOffset (doesn't exists right now)
+are contiguous memory of IrlapStation.  They are true arrays.
+1. The buffer header would contain this reference count (a byte would 
+suffice).  When this count is 0 the buffer can be deallocated.  
+2. IS_storeSize is the size of the packet sent (currently it just store the
+	raw size of the packet).
+3. IS_packetOffset should be added.  It's an array of 8 words.  
+4. It's best if we don't change IrlapSendPacket to handle this.
+Instead DataRequest???? action sets and/or SendDataWithPBit???? action 
+procedures should be modified.  
+In order we can free the packet however,  we have to have the optr handle
+to the lmem block.  This is store in the buffer header.
+The current implementation treats each data request as an event.  If this
+implementation is adopted,  then we need to divide up the packet before
+delivering events.  
+So when user called the DR_REQUEST_DATA (bad name,  it means send),  the
+buffer should be 
+1. locked down - not needed if people send us a fptr.
+2. A simple packet division algorithm would be:
+
+input: bufferFptr, bufferSize(including header), header size/offset to 
+real data (hSize), IRLAPpacketSize (determined thru negotiation), bufferOptr
+
+bufferFptr.packetOptr := bufferOptr	-- save the optr for destruction
+currSize := bufferSize - hSize  --the header is not part of packet
+curOffset := bufferFptr.offset + hSize
+while (currSize > IRLAPpacketSize) {
+	DataRequest(bufferFptr, currOffset, IRLAPpacketSize)
+	bufferFptr.referenceCount++
+	currOffset += IRLAPpacketSize
+	currSize -= IRLAPpacketSize
+}
+DataRequest(bufferFptr, currOffset, currSize)
+
+DataRequest = ObjMessage with MF_FORCE_QUEUE
+
+Of course a major problem with this algorithm is that DataRequest
+cannot take 4 word-sized parameters.  (bufferFptr = size fptr)
+One solution is not to pass the packet size.  So cx = offset, dx:bp = buffer 
+fptr.  The size can be figured out by offset:
+offset = max((bufferFptr.offset + bufferSize - passed_offset), IRLAPpacketSize)
+
+related functions: SendDataWithPBitSet/Clear, DataRequestXMIT_S/P, 
+DR_IRLAP_REQUEST_DATA, and some others.
+
+low priority/optional stuff:
+---------------------------
+
+- sniffing: this is the opposite of lurker and it's doubtful whether we need it
+
+- secondary/primary xchg: see appendix of IRLAP.  Hey it said it's optional :-)
+
+- negotiation: striaght forward
+	GEOS supports a subset of the parameters given in section 6.6.
+	It isn't really worth the effort of doing it right now.
+
+- allocate driver "on the fly",  in a lmem block.
+
+	right now the state machine data structures reside in the dgroup.
+	This is obviously not good for multiple state machine implementation.
+	There should be a max of 8 state machines,  each corresponding
+	to a serial port, since GEOS supports 8 serial ports.
+
+	Reason I don't do this right now is I don't have a good way to
+	specify which state machine a particular message goes to.
+	This probably should be done together with the driver interface.
+	
+	The whole structure would be:
+	All state machines (IrlapStation) reside on one lmem block.
+	The max # of state machines would be 8.
+	The lmem block is locked all the time.
+
+	idata holds an array of double-dword referring to these stations.
+	Each entry is IrlapStationHandle.
+
+	The upper layer has some way to specify which state machine to send
+
+	This can be the first thing to do after IRLAP is completed/when
+	multiple ports needs to be tested.
+
+	Just make sure we don't assume ds = dgroup (sorry I made this
+	assumption and left them unchecked at some places) in IRLAP
+	action sets.
+
+- address conflict resolution
+	
+	This deals with stations generating same address.
+	This is the discovery state machine.  The only difference is the 
+	XID frame has a bit set.  
+	Again this is a really rare case (generating same address for
+	a 32-bit number????).  Moreover minimum requirement (p.95)
+	says this is not required, although it is recommended.
+	This can be implemented at the last stage of the project.
+
+- checking media busy
+
+	This is implemented right now as checking if there are any bits
+	received from the serial line.  The IRLAP uses a seemingly complicated
+	algorithm to decide if media is busy,  but in a nutshell (I think)
+	it says "during the 500ms period, if you received a valid IRLAP packet,
+	the media is not busy; if you received anything else,  you're busy;
+	if you received nothing,  you're not busy".
+
+	This can be part of the lurker code.
+
+- ui packets states (see above)
+
+
+	
+
+socket lib interface
+--------------------
+
+	This part is documented separately.
+	
+misc
+----
+
+- lurker
+	
+	The only thing we need to do is to separate the function calls
+	for a minimum driver,  while minimizing unnecessary cross resource
+	calls.
+	We also need to invoke the socket lib once the lurker is awake.
+
+- serial line
+
+	This should probably be one of the last thing to do.  The conversion
+	is easy,  but it is best if we stay with stream as long as possible
+	since it's easiest way to debug.
+
+Known bugs
+----------
+
+- we should never get invalid sequence in our current implementation.
+	But we do, very rarely.
+
+
+IRLAP extensions
+----------------
+---
+>
+>BTW,  the !@$ state machine does not handle unconnected packets when it's
+>unconnected.  It should (because the spec said so and the author also
+>told me in email on a related subject).  I would like to tweak around
+>and add an event to it.  Reason is we need to use these data packets
+>for transferring names of station after discovery.
+
+>This limitation also makes datagrams really big mess.  
+
+proposed IRLAP changes to make datagrams work:
+- add to the state stable:
+Current 
+State	Event		Action			Next State
+------------------------------------------------------------
+NDM	Recv u:ui:x:x 	UnitData-indication	NDM
+
+- GEOS IRLAP UI packets have src dev addr and dest dev addr attached to them.
+So the I field of these ui packets have
+
+src_dev_addr (4bytes) + dest_dev_addr (4bytes) + Information
+
+For a first implementation,  we don't check if these packets are for us
+(i.e. if the dest_dev_addr matches the local dev addr) in the basic engine.  
+Instead we deliver the event,  and let the event check that.  This 
+leaves the basic engine unchanged.
+
+This will work fine for unconnected case.  It'd be messier to send datagrams
+when the station is connected (and is not good over an IR link either).
+This is because the IR link performance is affected.  Also the
+state machine is forced to perform tasks not related to the connected
+stations,  and thus will cause mysterious timeouts.
+
+
+Recommendations
+---------------
+
+The debugged-ness of my code is:
+- basic engine: quite debugged,  should not get corrupt packets over stream
+	right now.
+	Escaping/Transprencies seems to work fine.
+	FCS seems to work fine.
+	If we get oversized packet,  we should treat it as corrupted.  
+	I haven't tested if this works.
+
+	The basic engine inherits most characteristics of the Comm driver,
+	routines are borrowed from it.  The "Flush" routine is probably
+	unnecessary though!  I just put that in because Comm has it.
+
+	The routines in basic engine are the most messy and that's why
+	usually I try not to change things inside it.
+
+- IRLAP proper: it's just copy and pasting lines in the spec :-)
+		The actions are the real meat.
+
+		All timer timing with special values ("notes" entries 
+		in the state machine) are not taken cared of.  
+		They can be just cut and pasted from the Start??Timer
+		procedures,  with changes in timer duration values.
+
+- IRLAP actions: I've spent most time with correcting sequencing, but
+	I still am not sure it work correctly in all cases.
+	ResendRejFrames/ResendSrejFrames seems to have problems,  I haven't
+	checked.  That's because I've been working on full reliable/error-free
+	link.
+
+	* The secondary transfer is somewhat weird.  The primary on receipt
+	of I frames will not reply,  but will StartPTimer and wait.
+	This causes WD timer of secondary to expired too (unless my
+	timer timing is wrong, which is likely).  And this wreaks havoc.
+
+	recommended debugging for unreliable link:  this looks painful
+	but is the easiest way (how logical :-).  Just brk in 
+	IrlapSendPacket where it does the FCS,  and "assign ax 0",  
+	and it'll corrupt the packet.  Corrupted packets are as though
+	nothing is received.  
+
+	One can use the example scenarios in IRLAP for debugging.
+
+SWAT stuff
+----------
+
+Almost every action is associated with a warning (yikes :-).  This makes
+it possible to trace out the actions.
+The event and the associated action set is named according to the procedure,
+and each action is named according to the associated procedure,  plus
+an underscore before it.
+
+
+Station
+-------
+
+Each station is associated with a stream/serial/physical port.  The station
+is also an IRLAP state machine.  It contains all the state variables defined
+in IRLAP as well as internal data structures.
+The station as mentioned should be stored in a lmem block.  Since they
+are accessed frequently they are always locked on the heap.  But using lmem
+block instead of dgroup would allow making new stations (normally a geos
+device would probably has a max of 2 serial ports open,  but then we 
+allow a max of 8).
+Each station also has 2 threads.  One thread loops and receive packets from
+the serial line.  One thread is a GEOS event thread that runs events.
+The event thread receive events from the receive thread as well as from the
+socket library (or possibly external applications).
+The event thread differs from the normal thread in that it has an associated
+event queue.  IRLAP driver uses part of the GEOS messaging mechanism.
+(using ObjMessage-MF_FORCE_QUEUE to send events to the thread)
+
+Currently the driver hard codes a local station and a remote station in 
+the driver to simulate 2 stations.  This is easy to test.  They 
+both reside in dgroup.
+

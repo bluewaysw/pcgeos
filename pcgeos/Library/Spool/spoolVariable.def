@@ -1,0 +1,111 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Print Spooler
+FILE:		spoolVariable.def
+
+AUTHOR:		Jim DeFrisco, 13 March 1990
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	3/13/90		Initial revision
+
+
+DESCRIPTION:
+	This file contains the variable definitions as needed by the
+	print spooler
+		
+	$Id: spoolVariable.def,v 1.1 97/04/07 11:11:54 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;--------------------------------------------------------------------------
+;	Initialized data
+;--------------------------------------------------------------------------
+
+idata	segment
+
+queueHandle	hptr.PrintQueue	0		; block handle of print queues
+
+queueSemaphore	Semaphore <>			; semaphore that synchronizes
+						; access to PrintQueue between
+						; threads of the spooler and
+						; any application thread that
+						; calls the library routines
+
+errorBoxCount	word	0			; Flag used to detect
+						; reentrancy in SpoolErrorBox.
+
+spoolStateFlags	SpoolerState	0		; a variety of flags
+						; signifying different
+						; states the spooler
+						; can reside.
+
+		; we need addresses of the strategy routines for error 
+		; handling purposes.  The routines that handle opening the
+		; ports copy the strategy routine address here as well as
+		; to the printing thread's local stack.
+
+parallelStrategy	fptr.far	0
+serialStrategy		fptr.far	0
+fileStrategy		fptr.far	0
+
+
+		; the name of the "state" file
+SBCS <stateFile	char	"spoolsta.dat",0				>
+DBCS <stateFile	wchar	"spoolsta.dat",0				>
+
+		; define the classes
+SpoolProcClass		mask CLASSF_NEVER_SAVED
+SpoolApplicationClass
+SpoolEMOMClass
+
+pageSizeDataHandle		hptr	0	; handle of PageSizeData
+pageSizeDataSem			Semaphore <>
+
+idata	ends
+
+;--------------------------------------------------------------------------
+;	Uninitialized data
+;--------------------------------------------------------------------------
+
+udata	segment
+
+spoolAckID			word	(?)	; ID of DETACH sender
+spoolAckOD			optr	(?)	; OD to send ACK to
+
+nextJobID			word	(?)	; # use for next JobID
+customQueueID			word	(?)	; # use for CPP_unit for next
+						;  created PPT_CUSTOM queue
+
+uiOptions			SpoolUIOptions
+
+if _CONTROL_PANEL
+printerControlPanelBlock	hptr	(?)
+monikerHeight			word	(?)	; height in PrintControlPanel
+avgFontWidth			word	(?)	; average font width
+timerHandle			word	(?)	; control panel timer
+endif
+
+spoolConfirmBox			optr	(?)	; current suspend/shutdown
+						; confirmation box.
+controlPanelReserve		hptr	(?)	; token for GeodeRequestSpace
+
+errorThreadLock		hptr.ThreadLock	(?)	; ThreadLock that
+						; synchronizes use of
+						; the SpoolErrorBox
+						; code.
+
+						; This is neccesary
+						; due to a few chunks
+						; in the ErrorBoxesUI
+						; resource that are
+						; shared by all
+						; printing threads.
+
+udata	ends
+

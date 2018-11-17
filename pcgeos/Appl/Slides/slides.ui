@@ -1,0 +1,868 @@
+/*
+ *
+ * Project:	NDO2000
+ *
+ *	$Id$
+ *
+ */
+
+
+#include "generic.uih"
+#include "impex.uih"
+#include "Objects/Text/tCtrl.uih"
+#include "Objects/colorC.uih"
+
+start AppSCMonikerResource, data;
+#include "Art/mkrSlides.ui"
+#include "Art/mkrTinyApp.ui"
+#include "Art/mkrSlidesDoc.ui"
+#include "Art/mkrTinyDoc.ui"
+end AppSCMonikerResource;
+
+start PrimaryInterface;
+#include "Art/mkrPrev.ui"
+#include "Art/mkrNext.ui"
+end PrimaryInterface;
+
+/*---------------------------------------------------------------------------
+	CONSTANTS DEFINITIONS
+---------------------------------------------------------------------------*/
+
+
+#define HEADER_CHECKING  1
+#define NO_BACKUP  0
+
+
+/* user level stuff */
+#define RESOURCE_FOR_STRINGS 			ScrapStrings
+
+
+class ScrapbookApplication = GenApplication {
+	default appFeatures = "DEFAULT_FEATURES";
+}
+
+class ScrapBookList = GenDynamicList {
+}
+
+#if NO_BACKUP
+class ScrapBookDocumentClass = GenDocument {
+}
+#endif
+
+class SlideShow = Vis {
+    static hptrComp : null; /* SSI_window */
+    static wordComp : 0;    /* SSI_trans */
+    SSI_color = typeComp "ColorQuad" : "0,CF_INDEX,0,0";
+}
+
+
+start AppInterface;
+
+ScrapBookApp = ScrapbookApplication vardataReloc {
+	moniker = list {
+		SlidesTextMoniker,
+		SlidesMoniker,
+		TinyAppMoniker
+	}
+	children = ScrapBookPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = ScrapBookPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		ScrapUIDocControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		ScrapUIDocControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		ScrapUIDocControl, ScrapBookImporter;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+	    SlideTransList;
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char	"slideshow", 0
+		},
+		ATTR_GEN_HELP_FILE { char "slides", 0 }
+	}
+}
+
+visMoniker SlidesTextMoniker = "Slide Show";
+
+end AppInterface;
+
+
+start DatafileMonikerListResource, data;
+
+/* moniker list for datafile */
+
+visMoniker DatafileMonikerList = list {
+        SlidesDocMoniker,
+	TinyDocMoniker
+}
+
+end DatafileMonikerListResource;
+
+
+start PrimaryInterface;
+
+ScrapBookPrimary = GenPrimary {
+	children = FileMenu,
+			EditMenu,
+	                ViewMenu,
+			ScrapBody,
+			ScrapControls,
+#if NO_BACKUP
+	                CompressStatus,
+#endif
+			ScrapNameBox;
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		HINT_CENTER_WINDOW,
+		HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT {
+			SpecWinSizePair < mask SWSS_RATIO or PCT_85, \
+					  mask SWSS_RATIO or PCT_70 >
+		},
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, 1>
+		},
+		ATTR_GEN_HELP_CONTEXT {
+			char	"TOC", 0
+		}
+	}
+}
+
+end PrimaryInterface;
+
+
+start UIDocCtrlInterface;
+
+ScrapUIDocControl = GenDocumentControl {
+	documentTokenChars = "'slid'";
+	documentTokenID = 0;
+	dcAttributes = mode sharedSingle, vmFile,
+			supportsSaveAsRevert, forceDemandPaging,
+			currentTask open;
+	features = default -supportsTemplates,
+			   -supportsUserSettableEmptyDocument,
+			   +supportsUserSettableDefaultDocument;
+	noNameText = "No Slide Show";
+
+	defaultFile = "Default Slide Show";
+
+	appDC = ScrapAppDocControl;
+	dialogOpenDefaultText = "Open Startup:\\\r"
+				"Open the Slide Show startup document\\\r"
+				"(normally \\\"Default Slide Show\\\").";
+
+	dialogNewText = "New:\\\rCreate a blank, empty slide show.";
+	dialogOpenText = "Open:\\\rOpen an existing slide show.";
+}
+
+
+
+end UIDocCtrlInterface;
+
+
+start ScrapRunByAppUI;
+
+ScrapAppDocControl = GenDocumentGroup {
+	defaultName = "Slide Show Untitled";
+#if NO_BACKUP
+	documentClass = "ScrapBookDocumentClass";
+#endif
+	output = process;
+	uiDC = ScrapUIDocControl;
+	/* new datafile format */
+	protocolMajor = 2;
+	protocolMinor = 0;
+}
+
+end ScrapRunByAppUI;
+
+
+start PrimaryInterface;
+
+/*
+ *	main menu bar
+ */
+
+FileMenu = GenInteraction {
+	children = ScrapUIDocControl, 
+		   ScrapBookImportGroup;
+	visibility = popup;
+	hints = {
+		ATTR_GEN_INTERACTION_GROUP_TYPE {GenInteractionGroupType GIGT_FILE_MENU}
+	}
+}
+
+EditMenu = GenInteraction {
+	children = CutTrigger, CopyTrigger,
+			PasteTrigger, PasteAtEndTrigger,
+			DeleteTrigger;
+	visibility = popup;
+	hints = {
+		ATTR_GEN_INTERACTION_GROUP_TYPE {GenInteractionGroupType GIGT_EDIT_MENU}
+	}
+}
+
+end PrimaryInterface;
+
+
+start MenuInterface;
+
+/*
+ *	importer
+ */
+
+ScrapBookImportGroup = GenInteraction {
+	children = ScrapBookImporter;
+}
+
+ScrapBookImporter = ImportControl {
+	moniker = 'I', "Import Slide";
+	importAttrs = default +nonDocumentImport;
+	importMessage = MSG_SCRAPBOOK_IMPORT;
+	importDestination = process;
+	importDataClasses = text, graphics;
+	genStates = default -enabled;
+	hints = {
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP
+	}
+}
+
+/*
+ *	edit menu items
+ */
+
+CutTrigger = GenTrigger {
+	CUT_TRIGGER_VALUES
+	action = MSG_META_CLIPBOARD_CUT, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+}
+
+CopyTrigger = GenTrigger {
+	COPY_TRIGGER_VALUES
+	action = MSG_META_CLIPBOARD_COPY, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+}
+
+PasteTrigger = GenTrigger {
+	PASTE_TRIGGER_VALUES
+	action = MSG_META_CLIPBOARD_PASTE, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+}
+
+PasteAtEndTrigger = GenTrigger {
+	moniker = 'E', "Paste at End";
+	action = MSG_SCRAPBOOK_PASTE_AT_END, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+}
+
+DeleteTrigger = GenTrigger {
+	moniker = 'D', "Delete";
+	action = MSG_META_DELETE, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+}
+
+ViewMenu = GenInteraction {
+    moniker = 'V', "View";
+    children =
+	ViewPageToggle,
+	ViewFullScreen,
+	SlideShowOptions;
+    visibility = popup;
+}
+
+ViewPageToggle = GenItemGroup
+{
+    children = ShowPageList;
+    behaviorType = exclusiveNone;
+    destination = process;
+    applyMsg = MSG_SCRAPBOOK_TOGGLE_PAGE_LIST;
+}
+
+ViewFullScreen = GenTrigger {
+    moniker = 'S', "Start Slide Show";
+    action = MSG_SLIDE_SHOW_START, SlideControl;
+}
+
+SlideControl = SlideShow {
+}
+
+SlideShowOptions = GenInteraction {
+    moniker = 'O', "Slide Show Options";
+    visibility = dialog;
+    type = properties;
+    children =
+	SlideColorControl,
+	SlideTransGroup;
+    hints = {
+	HINT_CENTER_CHILDREN_ON_MONIKERS
+    }
+}
+
+SlideColorControl = ColorSelector {
+    moniker = 'B', "Background:";
+    hints = {
+	ATTR_GEN_CONTROL_PROHIBIT_UI { word mask CSF_FILLED_LIST or \
+					 mask CSF_DRAW_MASK or \
+					 mask CSF_PATTERN}
+    }
+    output = SlideControl;
+}
+
+SlideTransGroup = GenInteraction {
+    moniker = 'T', "Transition:";
+    children =
+	SlideTransList;
+}
+
+SlideTransList = GenItemGroup {
+    children =
+	STLClear,
+	STLCornerWipe,
+	STLEdgeWipe,
+	STLFade;
+    hints = {
+	HINT_ITEM_GROUP_MINIMIZE_SIZE,
+	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+	ATTR_GEN_INIT_FILE_KEY {char "transition", 0}
+    }
+    selection = SSTT_CLEAR;
+    numSelections = 1;
+    destination = SlideControl;
+    applyMsg = MSG_SLIDE_SHOW_SET_TRANSITION;
+}
+
+STLClear = GenItem {
+    moniker = "Clear";
+    identifier = SSTT_CLEAR;
+}
+
+STLCornerWipe = GenItem {
+    moniker = "Wipe from corner";
+    identifier = SSTT_CORNER_WIPE;
+}
+
+STLEdgeWipe = GenItem {
+    moniker = "Wipe from edge";
+    identifier = SSTT_EDGE_WIPE;
+}
+
+STLFade = GenItem {
+    moniker = "Fade";
+    identifier = SSTT_FADE;
+}
+
+ShowPageList = GenItem
+{
+    moniker = 'H', "Hide Page List";
+    identifier = 0;
+}
+
+end MenuInterface;
+
+
+start ScrapViewAreaUI;
+
+/*
+ *	scrap viewing area
+ */
+
+ScrapBody = GenInteraction {
+	children = ScrapNameList,  ScrapText, ScrapGString;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DEFAULT_FOCUS,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+ScrapText = GenText ignoreDirty {
+	genAttributes = readOnly;
+	text = ScrapTextText;
+	textDisplayAttributes = default +initScrolling, +dontScrollToChanges;
+	hints = {
+		ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS {
+			word ScrapCharAttrRuns
+		},
+		ATTR_GEN_TEXT_MULTIPLE_PARA_ATTR_RUNS {
+			word ScrapParaAttrRuns
+		},
+		ATTR_GEN_TEXT_STYLE_ARRAY {
+			word ScrapStyles
+		},
+		ATTR_GEN_TEXT_GRAPHIC_RUNS {
+			word ScrapGStringRuns
+		},
+		ATTR_GEN_TEXT_ALLOW_COLUMN_BREAKS,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DEFAULT_FOCUS
+	}
+}
+
+/* text */
+
+chunk ScrapTextText = "" ;	/* An empty text string */
+
+
+/* char attr */
+
+chunk ScrapCharAttrRuns = data {
+	RUN_ARRAY_HEADER(2, ScrapCharAttrElements)
+	TextRunArrayElement TRAE_ALL(SCRAP_STANDARD_CHAR_ATTR),
+	TRAE_END
+}
+
+chunk ScrapCharAttrElements = data {
+    CHAR_ATTR_ELEMENT_ARRAY_HEADER(1)
+SCRAP_STANDARD_CHAR_ATTR = 0
+#if DO_PIZZA
+    CHAR_ATTR_SS_FONT_SIZE_STYLE_COLOR(SCRAP_STYLE_NORMAL, 2, FID_BITSTREAM_KANJI_HON_MINCHO, 16, 0, C_BLACK)
+#else
+    CHAR_ATTR_SS_FONT_SIZE_STYLE_COLOR(SCRAP_STYLE_NORMAL, 2, FID_DTC_URW_ROMAN, 12, 0, C_BLACK)
+#endif
+}
+
+/* para attr */
+
+chunk ScrapParaAttrRuns = data {
+    RUN_ARRAY_HEADER(2, ScrapParaAttrElements)
+    TextRunArrayElement TRAE_ALL(SCRAP_STANDARD_PARA_ATTR),
+    TRAE_END
+}
+
+chunk ScrapParaAttrElements = data {
+SPAE_base	label	byte
+	; Header
+    PARA_ATTR_ELEMENT_ARRAY_HEADER(1)
+	; Offsets
+    word SPAE_0-SPAE_base
+	; Data
+SCRAP_STANDARD_PARA_ATTR = 0
+SPAE_0	label	byte
+    PARA_ATTR_SS_JUST_LEFT_RIGHT_PARA_TABS(SCRAP_STYLE_NORMAL, 2, J_LEFT, 0, 0, 0, PIXELS_PER_INCH*8, 0)
+}
+
+/* styles */
+
+chunk ScrapStyles = data {
+SS_base	label	byte
+	; Header
+    NameArrayHeader <<<1, 0, 0, size NameArrayHeader>,
+			EA_FREE_LIST_TERMINATOR>,
+			((size StyleElementHeader)-(size NameArrayElement))+2*2>
+	; Offsets
+    word SS_0-SS_base
+	; Data
+SCRAP_STYLE_NORMAL = 0
+SS_0	label	byte
+    StyleElementHeader <<<<1, 0>>>, CA_NULL_ELEMENT,
+					mask SEF_DISPLAY_IN_TOOLBOX, 0>
+    word SCRAP_STANDARD_CHAR_ATTR, SCRAP_STANDARD_PARA_ATTR
+#if DO_DBCS
+    wchar "Normal"
+#else
+    char "Normal"
+#endif
+}
+
+/* gstrings */
+
+chunk ScrapGStringRuns = data {
+	RUN_ARRAY_HEADER(1, ScrapGStringElements)
+	TextRunArrayElement TRAE_END
+}
+
+chunk ScrapGStringElements = data {
+	GRAPHIC_ELEMENT_ARRAY_HEADER(0)
+}
+
+ScrapGString = GenView ignoreDirty {
+	output = process;
+	viewAttributes = default +dragScrolling, +sendAllKbdChars;
+	horizAttributes = default +scrollable;
+	vertAttributes = default +scrollable;
+	genStates = default -usable;
+}
+
+end ScrapViewAreaUI;
+
+
+start PrimaryInterface;
+
+/*
+ *	scrapbook controls
+ */
+
+ScrapControls = GenInteraction {
+	children = ScrapNameAndNumber, 
+#ifdef PRODUCT_NDO2000
+	           ScrapInsert,
+#endif
+	           ScrapNameBoxTrigger, 
+	           ScrapPreviousAndNext;
+	hints = {
+		 HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, 3>
+		 },
+		 HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		 HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+ScrapNameAndNumber = GenInteraction {
+	children = ScrapName, ScrapNumber;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_ELSE,
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+ScrapName = GenText ignoreDirty {
+	moniker = 'a', "Name:";
+	textDisplayAttributes = default +singleLineText;
+	maxLength = "CLIPBOARD_ITEM_NAME_LENGTH";
+	genStates = default -enabled;
+	/*gadgetAttrs = defaultAction applCustom;*/
+	applyMsg = MSG_SCRAPBOOK_SCRAPNAME_CR;
+	destination = process;
+	hints = {
+		ATTR_GEN_TEXT_STATUS_MSG {
+			word MSG_SCRAPBOOK_SCRAPNAME_CR
+		},
+		ATTR_GEN_PROPERTY,		/* behave in delayed mode */
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 2*73>
+			SpecHeight <>
+		}
+	}
+}
+
+ScrapNumber = GenText ignoreDirty {
+	genAttributes = readOnly;
+	text = "Empty Slide Show";
+	textDisplayAttributes = singleLineText, noWordWrapping,
+					useTabForNavigation,
+					dontScrollToChanges;
+	genStates = default -enabled;
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+ScrapNameBoxTrigger = GenTrigger {
+	moniker = 'G', "Go to Page";
+	action = MSG_SCRAPBOOK_NAMEBOX, process;
+	genStates = default -enabled, -usable;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+ScrapPreviousAndNext = GenInteraction {
+	children = ScrapPrevious, ScrapNext;
+	genStates = default -usable;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+   	        HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, 1>
+		}
+	}
+}
+
+ScrapPrevious = GenTrigger {
+	moniker = PrevMoniker;
+	action = MSG_SCRAPBOOK_PREVIOUS, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+}
+
+ScrapNext = GenTrigger {
+	moniker = NextMoniker;
+	action = MSG_SCRAPBOOK_NEXT, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+}
+
+/*
+ *  Master control
+ */
+#ifndef PRODUCT_NDO2000
+ScrapMasterControls = GenInteraction {
+    children = ScrapInsert, ScrapClose;
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_ORIENT_CHILDREN_HORIZONTALLY,
+	    HINT_CENTER_CHILDREN_HORIZONTALLY,
+	    HINT_MAKE_REPLY_BAR,
+	}
+}
+#endif
+
+ScrapInsert = GenTrigger {
+#ifdef PRODUCT_NDO2000
+        moniker = "Copy";
+#else
+	moniker = "Copy to Clipboard";
+#endif
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SCRAPBOOK_SEND_PASTE, process;
+}
+
+#ifndef PRODUCT_NDO2000
+
+ScrapClose = GenTrigger {
+	moniker = "Close";
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_META_QUIT, ScrapBookApp;
+}
+
+#endif
+
+end PrimaryInterface;
+
+
+start ScrapNameListInterface;
+
+/*
+ *	scrap name list box
+ */
+
+ScrapNameBox = GenInteraction {
+	moniker = "Go to Page";
+	children = ScrapNameControlShow;
+	attributes = default +notUserInitiatable;
+	type = command;
+	visibility = dialog;
+	genStates = default -enabled;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT {
+			char	"dbGoToPage",0
+		}
+	}
+}
+ScrapNameList = ScrapBookList {
+	moniker = "Select page to view:";
+	queryMsg = MSG_SCRAPBOOK_SCRAP_LIST_REQUEST_ENTRY_MONIKER;
+	destination = process;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 25>
+			SpecHeight <SST_LINES_OF_TEXT, 0>
+			word 	9
+		},
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word	MSG_SCRAPBOOK_SHOW_SCRAP_STATUS
+		},
+		ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED,
+		HINT_DEFAULT_FOCUS,
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS { 
+		    word MSG_SCRAPBOOK_SHOW_SCRAP
+		}
+		
+	}
+}
+ScrapNameControlShow = GenTrigger {
+	moniker = 'V', "View Page";
+	action = MSG_SCRAPBOOK_SHOW_SCRAP, process;
+	genAttributes = default +initiatesInputIgnore;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+end ScrapNameListInterface;
+
+
+#if NO_BACKUP
+
+start NoBackupUI;
+
+CompressStatus = GenInteraction {
+    moniker = "Deleting";
+    children = CompressStatusString, CompressStatusProgress,
+	CompressStatusCancel;
+    visibility = dialog;
+    type = multipleResponse;
+    genStates = default -usable;
+    attributes = default +notUserInitiatable, +modal;
+    hints = {
+	HINT_ORIENT_CHILDREN_VERTICALLY,
+	HINT_NOT_MOVABLE
+    }
+}
+
+CompressStatusString = GenText {
+    genAttributes = readOnly;
+    text = "Please wait while space is being freed...";
+    hints = {
+	HINT_FIXED_SIZE {
+	    SpecWidth <SST_PIXELS, 330>
+	    SpecHeight <>
+	}
+    }
+}
+
+CompressStatusProgress = GenValue {
+    genAttributes = default +readOnly;
+    value = 0;
+    minimum = 0;
+    maximum = 1;
+    displayFormat = integer;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	HINT_PLACE_MONIKER_ABOVE,
+	HINT_VALUE_ORIENT_HORIZONTALLY,
+	HINT_VALUE_SHOW_MIN_AND_MAX,
+	HINT_VALUE_ANALOG_DISPLAY,
+	HINT_VALUE_NO_DIGITAL_DISPLAY
+    }
+}
+
+CompressStatusCancel = GenTrigger {
+    moniker = "Cancel";
+    action = MSG_SCRAPBOOK_APPLICATION_CANCEL_COMPRESS, ScrapBookApp;
+    hints = {
+	HINT_SEEK_REPLY_BAR,
+	HINT_TRIGGER_DESTRUCTIVE_ACTION
+    }
+}
+
+end NoBackupUI;
+
+#endif
+
+
+/*
+ *	error strings
+ */
+
+start ScrapStrings, data;
+
+chunk InvalidScrapBookFileString =
+	"Invalid slide show file.\\\r\\\rError Code: SW-01" ;
+
+chunk UnsupportedScrapFormatString =
+	"This slide format cannot be viewed in Slide Show.\\\r\\\rError Code: SW-02." ;
+
+chunk NoPasteErrorString = 
+	"Not enough memory to paste slide. Close some windows or applications to free up memory.\\\r\\\rError Code: SW-03" ;
+
+chunk NoCutErrorString =
+	"Not enough memory to cut slide. Close some windows or applications to free up memory.\\\r\\\rError Code: SW-04" ;
+
+chunk NoCopyErrorString =
+	"Not enough memory to copy slide. Close some windows or applications to free up memory.\\\r\\\rError Code: SW-05" ;
+
+#if HEADER_CHECKING
+#if NO_BACKUP
+chunk ScrapSizeWarning = 
+"The document is getting large.  You should delete some items, or close this document and create a new one.  If you continue working with this document, you may experience problems accessing the data.  Do you want to continue the operation anyway?\\\r\\\rError Code: SW-06";
+#else
+/* has backup, deleting items won't help */
+chunk ScrapSizeWarning = 
+"The document is getting large.  You should close this document and create a new one.  If you continue working with this document, you may experience problems accessing the data.  Do you want to continue the operation anyway?\\\r\\\rError Code: SW-06";
+#endif
+
+chunk ScrapTooBigError =
+"The document has too much data.  The operation has been cancelled.\\\r\\\rError Code: SW-07";
+#endif
+
+
+/*  Strings are used to identify scrap in via title bar  */
+chunk EmptyScrapbookString =
+ 	"Empty Slide Show" ;
+
+chunk DefaultScrapName =
+ 	"Unnamed Slide" ;
+
+chunk SpreadsheetTypeString =
+	"<Spreadsheet Slide>" ;
+
+chunk InkTypeString =
+	"<Ink Slide>" ;
+
+chunk GrObjTypeString =
+	"<Graphics Object Slide>" ;
+
+chunk GeodexTypeString =
+	"<Address Book Slide>" ;
+
+chunk UnsupportedTypeString =
+	"<Unsupported Format Slide>" ;
+
+chunk TextOverflowString =
+	"\\\r\\\r\\\r<Remaining text not shown>" ;
+
+chunk NewMonikerString = "Insert";
+
+chunk OldMonikerString = "Copy";
+
+
+/*  This chunk is used by 'ShowScrapNumber'.  If changing this string,
+ *  be sure to fix up the buffer in this routine.
+ */
+chunk PageNumberString = data {
+	TCHAR	"Page ", 0x01, " of ", 0x02, 0
+}
+
+end ScrapStrings;
+
+
+start UserLevelUI;
+
+FeaturesList = GenBooleanGroup {
+	children =
+		GotoPageDialogEntry,
+		ImportingEntry,
+		PasteAtEndEntry;
+	selectedBooleans = "DEFAULT_FEATURES";
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+GotoPageDialogEntry = GenBoolean {
+	moniker = 'G', "Go to Page Dialog";
+	identifier = "mask SF_GOTO_PAGE_DIALOG";
+}
+
+ImportingEntry = GenBoolean {
+	moniker = 'I', "Importing";
+	identifier = "mask SF_IMPORTING";
+}
+
+PasteAtEndEntry = GenBoolean {
+	moniker = 'E', "Paste At End";
+	identifier = "mask SF_PASTE_AT_END";
+}
+
+end UserLevelUI;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

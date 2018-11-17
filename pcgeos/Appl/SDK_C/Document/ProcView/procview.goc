@@ -1,0 +1,764 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-92 -- All Rights Reserved
+ *
+ * PROJECT:	  Sample Applications
+ * MODULE:	  View-based Document Run By Process Sample
+ * FILE:	  procview.goc
+ *
+ * AUTHOR:  	  Tony Requist: September 4, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	9/4/91	  tony	    Initial version
+ *
+ * DESCRIPTION:
+ *	This is one of the sample applications that demonstrate the use
+ *	of the GenDocumentControl object. This particular one shows how
+ *	to use your process thread, rather than a subclass of GenDocumentClass
+ *	to display your document. The process thread, here, turns around
+ *	and draws things through a GenView to display the contents of the
+ *	document.
+ *
+ *	(Throughout this file you will see references like this: [Con 7.2.1]
+ *	This is a reference to chapter 7, section 7.2.1 of the Concepts
+ *	manual. [Obj 7.2.1] is a reference to chapter 7, section 7.2.1 of the
+ *	Objects manual. You should use these references to locate further
+ *	information about the topic being discussed if anything is unclear.)
+ *
+ *	All the sample applications in the Document subdirectory except
+ *      DosFile share a common document format: a VM file whose map block
+ *      stores the X and Y position, in document coordinates, of a small
+ *      blue square. Most of the applications, including this one, actually
+ *      display such a square; when you click the mouse in the view, the
+ *	coordinates of the square change to be where you clicked. 
+ *
+ *	You should understand about VM files [Con 19] and how to manipulate
+ *	them before reading on.
+ *
+ *		      Document Control Overview [Obj 13]
+ *
+ *	The document-control system of GEOS is made from three object
+ *	classes that work together to produce an harmonious whole (sorry,
+ *	got carried away there). The responsibilities are divide as follows:
+ *
+ *	GenDocumentControl  	is responsible for providing what you might
+ *				consider the UI of the document control. It
+ *				produces menus, submenus, and dialog boxes
+ *				with which the user interacts when s/he wishes
+ *				to open, close, create, or save a document.
+ *				It usually is run by the UI thread of an
+ *				application, to provide fast feedback to
+ *				the user.
+ *
+ *	GenDocument 	    	is the low-level object that deals with a
+ *				single document file. It does all the work
+ *				of interacting with the file and VM systems
+ *	    	    	    	to save/revert/auto-save/revert the document
+ *				itself.
+ *
+ *	GenDocumentGroup    	is a conduit between the GenDocumentControl
+ *				and the GenDocument objects. It is responsible
+ *				for creating, managing, and destroying the
+ *				GenDocument objects, selecting a single object
+ *				as the current document, etc. GenDocumentGroup
+ *	    	    	    	instantiates a separate GenDocument object
+ *				for each document it's told by the
+ *				GenDocumentControl to manage.
+ *
+ *	 Process- vs. GenDocument-controlled Document Display
+ *
+ *	The major difference between this sample application and all the
+ *	other document-control sample apps (except ProcView) is that all
+ *	the other samples actually subclass GenDocumentClass and respond
+ *	to messages in their subclass to implement the functionality of
+ *	the document (drawing it, responding to mouse clicks, etc.).
+ *
+ *	The GenDocument and GenDocumentGroup are set up so you can avoid
+ *	having to worry about LMem things and dereferencing object master
+ *	parts and similar complexities, using your ProcessClass and global
+ *	variables to simplify the display and management of your document.
+ *
+ *	The actual mechanism whereby the UI accomplishes this is described
+ *	in [Obj 13.1.3]. In brief, most messages a GenDocument object can
+ *	receive have a default handler that sends a corresponding message
+ *	from the MSG_META_DOC_OUTPUT family of messages to the object
+ *	specified by the GDGI_output instance variable of the GenDocumentGroup.
+ *	This will, in all but the most peculiar circumstances, be the
+ *	application thread (aka "process") for the application. You just
+ *	write a method for your ProcessClass for these messages, store
+ *	things in global variables, etc.
+ *
+ *	Note that you cannot have multiple documents open using this
+ *	"procedural" model of handling the document.
+ *
+ *	$Id: procview.goc,v 1.1 97/04/04 16:36:46 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+/*
+ ***************************************************************************
+ *		Constants and structures
+ ***************************************************************************
+ */
+
+/*
+ * The major and minor protocol number for the document file is an abstract
+ * thing, given meaning only with respect to other protocol numbers, as
+ * described in [Con 6.1.7] and [Obj 13.5.1]. In our case, we've never changed
+ * the format of our document, so our protocol number remains 1.0
+ */
+#define DOCUMENT_PROTOCOL_MAJOR	1
+#define DOCUMENT_PROTOCOL_MINOR	0
+
+/*
+ * Define the extent of the coordinate space on our document. It's specified
+ * in terms of points, so our document is 20 inches by 20 inches.
+ */
+#define DOCUMENT_WIDTH		(20*72)
+#define DOCUMENT_HEIGHT		(20*72)
+
+#define VIEW_BACKGROUND_COLOR	C_WHITE
+
+/*
+ * Initial position (in document coordinates) of our mystical blue square.
+ */
+#define INITIAL_X_POS		20
+#define INITIAL_Y_POS		20
+
+/*
+ * Dimensions (in document coordinates) of our blue square.
+ */
+#define BOX_WIDTH		10
+#define BOX_HEIGHT		10
+
+/*
+ * This is the structure of a datafile.  It is incredibly simple, storing just
+ * a x,y position of the center of the square in the VM file's map block.
+ */
+
+typedef	struct {
+    word	PVMB_xPos;
+    word	PVMB_yPos;
+} PVMapBlock;
+
+/*
+ ***************************************************************************
+ *		Global variables
+ ***************************************************************************
+ */
+
+FileHandle ourFile = NullHandle;    /* The handle of the document that's
+				     * currently open. */
+WindowHandle ourWindow = NullHandle;/* The handle of the window the GenView
+				     * opened for us to draw through */
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class	PVProcessClass, GenProcessClass ;
+@endc   /* end of class definition */
+
+
+@classdecl	PVProcessClass, neverSaved ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ *		Application Object
+ */
+
+@start	AppResource ;
+
+@object GenApplicationClass PVApp = {
+    GI_visMoniker = list { @PVTextMoniker }
+    GI_comp = @PVPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @PVPrimary;
+    /*
+     * The GenDocumentControl object must be on the "active list" so it can
+     * have access to the AppLaunchBlock, passed with MSG_META_ATTACH, that
+     * contains the data file the application is supposed to open.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @PVDocumentControl;
+    /*
+     * The GenDocumentControl object must also be on the "application startup"
+     * list so the application can manipulate documents when started as a
+     * server for another application (NOTE: it must be on this list even if
+     * you don't ever expect your application to act as such a server).
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @PVDocumentControl;
+    /*
+     * The GenDocumentControl will load its saved options from the .ini file
+     * itself, but needs to be told when to save them.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+	@PVDocumentControl;
+    /*
+     * Specify the INI file category [Con 6.3] under which to save all options
+     * for this application.
+     */
+    ATTR_GEN_INIT_FILE_CATEGORY = "procview";
+}
+
+@visMoniker PVTextMoniker = "C ProcView Sample Application";
+
+@end	AppResource
+
+/*
+ *		Primary window
+ */
+
+@start	Interface		/* this resource is for misc UI objects */ ;
+
+@object GenPrimaryClass PVPrimary = {
+    GI_comp = @PVFileMenu, @PVView;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenInteractionClass PVFileMenu = {
+    /*
+     * Turn this thing into the File menu for the application. In an ideal
+     * world, we could just turn the GenDocumentControl object into the
+     * File menu and be done with it (it is a subclass of GenInteraction,
+     * after all). Sadly, due to implementation details, GenDocumentControl
+     * can only be a GIV_ORGANIZATIONAL interaction, so we have a separate
+     * GIV_POPUP interaction to contain it.
+     */
+    GI_comp = @PVDocumentControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+/*
+ *	GenDocumentControl
+ *
+ * There are a few things to keep in mind when deciding in what resource to
+ * place the GenDocumentControl object:
+ *	1) because it must be on the application's MGCNLT_ACTIVE_LIST list,
+ *	   the resource that contains it will always be brought in on start-up.
+ *	   If that resource is particularly large, it could slow down the
+ *	   application's start-up.
+ *	2) it is actually used only rarely, when the user wishes to open, close
+ *	   or save a document.
+ *	3) it creates a number of different objects (triggers for the File
+ *	   menu, dialog boxes, etc.) that could make the resource in which
+ *	   it sits become somewhat bloated.
+ * If there were more elements of the File menu (for example, a
+ * SpoolPrintControl object), you might put all the elements into a single
+ * FileMenu resource. For this example, however, we're just going to put it
+ * in the Interface resource, as there's not much else for this app to do.
+ */
+
+@object GenDocumentControlClass PVDocumentControl = {
+    /*
+     * Document file's token
+     */
+    GDCI_documentToken = { "SAMP", MANUFACTURER_ID_GEOWORKS };
+    /*
+     * Text to display in the header area of the primary when no
+     * document is open.
+     */
+    GDCI_noNameText = "No Document";
+    /*
+     * Specify subdirectory of SP_TEMPLATE in which Use Template... should look.
+     */
+    GDCI_templateDir = "SAMPLE";
+    /*
+     * Pointer to the GenDocumentGroup
+     */
+    GDCI_documentGroup = PVDocumentGroup;
+    /*
+     * List of objects to enable/disable based on whether or not a
+     * document exists. For us, this is just the view.
+     */
+    GDCI_enableDisableList = PVUIEnableList;
+}
+
+@chunk optr PVUIEnableList[] = {
+    @PVView
+};
+
+@end Interface
+
+/*
+ *	Document Group
+ *
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread. It is responsible for creating and administering
+ * the various GenDocument objects (one per document), coordinating its actions
+ * with the GenDocumentControl object.
+ *
+ * Because we do not give a value for the GDGI_genView instance variable,
+ * the GenDocumentGroup will not attempt to hook the GenDocument (actually
+ * PUIDocument) objects it creates to a GenView; it assumes the document
+ * has some other means of displaying its data rather than acting as a
+ * VisContent for a GenView.
+ *
+ * Set GDGI_output to be our process so MSG_META_DOC_OUTPUT messages from
+ * the GenDocument objects the GenDocumentGroup (silently) creates will
+ * reach our process.
+ */
+
+@start DocumentUI ;
+
+@object GenDocumentGroupClass PVDocumentGroup = {
+    /*
+     * Name for untitled documents
+     */
+    GDGI_untitledName = "PV Untitled";
+    /*
+     * Document protocol for current document version.
+     */
+    GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+    /*
+     * Object to send notification messages to (send them to the process)
+     */
+    GDGI_output = process;
+    /*
+     * Pointer to the GenDocumentControl
+     */
+    GDGI_documentControl = PVDocumentControl;
+}
+
+@end DocumentUI;
+
+/*
+ *		GenView object
+ */
+
+@start Interface ;
+
+@object GenViewClass PVView = {
+    /*
+     * All objects in the enableDisable list of the GenDocumentControl
+     * must start life disabled.
+     */
+    GI_states = @default & ~GS_ENABLED;
+
+    /*
+     * Specify the bounds of the document the view will be displaying to be
+     * the dimensions of the documents we create.
+     */
+    GVI_docBounds = {0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT};
+
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+
+    /*
+     * Specify the process thread as the content object that displays things
+     * within the view.
+     */
+    GVI_content = process;
+
+    /*
+     * This view will not take text input, so specify that no floating
+     * keyboard should come up. Otherwise, we would get a floating
+     * keyboard by default on pen-based systems.
+     */
+     ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@end Interface
+
+/*
+ ***************************************************************************
+ *		Code for PVProcessClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *				DrawDocument
+ ***********************************************************************
+ * SYNOPSIS:	    Draw the document into the view.
+ * CALLED BY:	    (INTERNAL) ClearAndDrawDocument,
+ *			       PVProcess::META_EXPOSED
+ * RETURN:	    nothing
+ * SIDE EFFECTS:    attributes of the gstate are altered
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/31/91		Initial Revision
+ *
+ ***********************************************************************/
+static void
+DrawDocument(GStateHandle gstate)
+{
+    VMBlockHandle mapBlock; /* VM block handle of the file's map block,
+			     * which holds the coordinates of the mystic
+			     * square. */
+    PVMapBlock *mapPtr;     /* The locked map block */
+    MemHandle mem;  	    /* Memory handle of the locked map block,
+			     * for unlocking it */
+
+    if (ourFile != NullHandle) {
+	/*
+	 * Draw the square in blue.
+	 */
+	GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_BLUE, 0, 0);
+	/*
+	 * Get position from data file
+	 */
+	mapBlock = VMGetMapBlock(ourFile);
+	mapPtr = VMLock(ourFile, mapBlock, &mem);
+	GrFillRect(gstate,
+		   mapPtr->PVMB_xPos - BOX_WIDTH/2,
+		   mapPtr->PVMB_yPos - BOX_HEIGHT/2,
+		   mapPtr->PVMB_xPos + BOX_WIDTH/2,
+		   mapPtr->PVMB_yPos + BOX_HEIGHT/2);
+	VMUnlock(mem);
+    }
+}
+
+
+/***********************************************************************
+ *				ClearAndDrawDocument
+ ***********************************************************************
+ * SYNOPSIS:	    Clear out the entire view and draw the document
+ *		    into it.
+ * CALLED BY:	    (INTERNAL) PVProcess::META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT,
+ *			       PVProcess::META_START_SELECT
+ * RETURN:	    nothing
+ * SIDE EFFECTS:    none, other than the obvious.
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/31/91		Initial Revision
+ *
+ ***********************************************************************/
+static void
+ClearAndDrawDocument(void)
+{
+    GStateHandle gstate;
+
+    if (ourWindow != NullHandle) {
+	/*
+	 * Create a graphics state open to the view's window through which
+	 * we can draw.
+	 */
+	gstate = GrCreateState(ourWindow);
+	/*
+	 * Fill the entire document space with the appropriate background
+	 * color.
+	 */
+	GrSetAreaColor(gstate, CF_INDEX, VIEW_BACKGROUND_COLOR, 0, 0);
+	GrFillRect(gstate, MIN_COORD, MIN_COORD, MAX_COORD, MAX_COORD);
+	/*
+	 * Draw the document itself.
+	 */
+	DrawDocument(gstate);
+	/*
+	 * Get rid of the graphics state, now drawing is complete.
+	 */
+	GrDestroyState(gstate);
+    }
+}
+
+
+
+/***********************************************************************
+ *	MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE for PVProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize a newly-created document file.
+ * PARAMETERS:	    void (optr document, FileHandle file)
+ * SIDE EFFECTS:    A map block is allocated, initialized, and set for
+ *		    the file.
+ *
+ * STRATEGY: 	    Handle this message by creating our version of an empty
+ *		    document, which is a map block with the PVMapBlock
+ *		    structure in it and initialized to default values.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	9/4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method PVProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+{
+    VMBlockHandle mapBlock; /* VM block handle of the file's map block,
+			     * which holds the coordinates of the mystic
+			     * square. */
+    PVMapBlock *mapPtr;    /* The locked map block */
+    MemHandle mem;  	    /* Memory handle of the locked map block,
+			     * for marking the block dirty */
+
+    /*
+     * Allocate a block, make it the map block and initialize it
+     */
+    mapBlock = VMAlloc(file, sizeof(PVMapBlock), 0);
+    VMSetMapBlock(file, mapBlock);
+
+    /*
+     * Lock the newly created block so that we can use it.  Since we
+     * are modifying the contents of the block it is essential that we
+     * call VMDirty to let the VM code know that the block is modified,
+     * and do it *before* we call VMUnlock (else the block might be
+     * thrown out before we can mark it dirty).
+     */
+    mapPtr = VMLock(file, mapBlock, &mem);
+    mapPtr->PVMB_xPos = INITIAL_X_POS;
+    mapPtr->PVMB_yPos = INITIAL_Y_POS;
+    VMDirty(mem);
+    VMUnlock(mem);
+    return(FALSE);		/* Return no error */
+}
+
+/***********************************************************************
+ *	MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT for PVProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    The document has been opened, and any UI required
+ *		    has been created, so initialize the UI itself.
+ * PARAMETERS:	    void (optr document, FileHandle file)
+ * SIDE EFFECTS:    ourFile is set to the handle of the document that
+ *		    is now our current document.
+ *
+ * STRATEGY:	    Since our UI always stay the same we just need to
+ *		    save the file handle and redraw our window to
+ *		    reflect the document that we are now attached to.
+
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	9/ 4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method PVProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+    ourFile = file;
+    ClearAndDrawDocument();
+}
+
+
+/***********************************************************************
+ *	MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT for PVProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    The document is about to be closed, so we need to
+ *		    disconnect it from the UI gadgetry being used to
+ *		    display it.
+ * PARAMETERS:	    void (optr document, FileHandle file)
+ * SIDE EFFECTS:    ourFile is set to 0, to signal we have no current
+ *		    document.
+ *
+ * STRATEGY:	    Just 0 ourFile; we can leave the UI gadgets alone,
+ *		    as the GenDocumentControl will disable them once the
+ *		    document is gone.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	9/ 4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method PVProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+    /*
+     * Detach ourselves from the document by severing our only link to it,
+     * our storage of the file handle
+     */
+    ourFile = NullHandle;
+}
+
+/***********************************************************************
+ *	MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED for PVProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Note that the document is now residing in a different
+ *		    file and can be reached via a different file handle.
+ *	    	    As the name implies, this is sent after a Save As
+ *		    has been performed.
+ * PARAMETERS:	    void (optr document, FileHandle file)
+ * SIDE EFFECTS:    ourFile is changed to the passed FileHandle
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	9/ 4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method PVProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+{
+    /*
+     * "save as" causes a new file to be created and causes the file
+     * handle to change.  Therefore we must store the new file handle
+     */
+    ourFile = file;
+}
+
+
+/***********************************************************************
+ *		MSG_META_EXPOSED for PVProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Refresh an invalid area of the view.
+ * PARAMETERS:	    void (WindowHandle win)
+ * SIDE EFFECTS:    invalid region for the window is cleared
+ *
+ * STRATEGY:	    Create a graphics state for drawing and tell the
+ *		    system we're updating the invalid region.
+ *
+ *	    	    Draw the document.
+ *
+ *	    	    Destroy the graphics state.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/31/91		Initial Revision
+ *
+ ***********************************************************************/
+@method PVProcessClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    /*
+     * Get a default gstate for drawing and tell the system we're about to
+     * update the invalid portion of the window.
+     */
+    gstate = GrCreateState(win);
+    GrBeginUpdate(gstate);
+
+    DrawDocument(gstate);
+
+    /*
+     * Now indicate that we are done drawing to the invalid part of the
+     * window and free the gstate.
+     */
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}
+
+
+/***********************************************************************
+ *		MSG_META_CONTENT_VIEW_WIN_OPENED for PVProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Take note that the view has opened the window we'll
+ *		    be using.
+ * PARAMETERS:	    void (word viewWidth,
+ *			  word viewHeight,
+ *			  WindowHandle viewWindow)
+ * SIDE EFFECTS:    ourWindow is set to the passed window handle
+ *
+ * STRATEGY:	    save the handle. There's no need to call our superclass
+ *		    as we inherit none of our content behaviour from
+ *		    our superclass.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/31/91		Initial Revision
+ *
+ ***********************************************************************/
+@method PVProcessClass, MSG_META_CONTENT_VIEW_WIN_OPENED
+{
+    ourWindow = viewWindow;
+}
+
+
+/***********************************************************************
+ *		MSG_META_CONTENT_VIEW_WIN_CLOSED for PVProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Take note that the view has closed the window we
+ *		    were using, so we don't try and draw to it or
+ *		    invalidate it any more.
+ * PARAMETERS:	    void (WindowHandle viewWindow)
+ * SIDE EFFECTS:    ourWindow is set to NullHandle
+ *
+ * STRATEGY:	    none. Again, there's no need to call our superclass,
+ *		    as we inherit none of our content behaviour from
+ *		    our superclass.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/31/91		Initial Revision
+ *
+ ***********************************************************************/
+@method PVProcessClass, MSG_META_CONTENT_VIEW_WIN_CLOSED
+{
+    ourWindow = NullHandle;
+}
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for PVProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Field a mouse click in the view, changing the
+ *	    	    coordinate of our mystic square to match.
+ * PARAMETERS:	    void (MouseReturnParams *retVal,
+ *			  sword xPosition,
+ *			  sword yPosition,
+ *			  word inputState)
+ * SIDE EFFECTS:    coordinates in map block of document change
+ *	    	    document is marked dirty.
+ *
+ * STRATEGY:	    Lock down the map block and store the pointer
+ *		    position (which is already in document coordinates)
+ *		    into it, marking the block dirty.
+ *
+ *	    	    Call our utility routine to redraw the entire document.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/31/91		Initial Revision
+ *
+ ***********************************************************************/
+@method PVProcessClass, MSG_META_START_SELECT
+{
+    if (ourFile != NullHandle) {
+	VMBlockHandle mapBlock;
+	PVMapBlock *mapPtr;
+	MemHandle mem;
+	
+	/*
+	 * Fetch and lock down the map block for the file.
+	 */
+	mapBlock = VMGetMapBlock(ourFile);
+	mapPtr = VMLock(ourFile, mapBlock, &mem);
+
+	/*
+	 * Store the click position as the new center of the mystic square.
+	 */
+	mapPtr->PVMB_xPos = xPosition;
+	mapPtr->PVMB_yPos = yPosition;
+
+	/*
+	 * Mark the map block dirty and unlock it. This will notify the document
+	 * object that the document is dirty.
+	 */
+	VMDirty(mem);
+	VMUnlock(mem);
+
+	/*
+	 * Redraw the entire document.
+	 */
+	ClearAndDrawDocument();
+    }
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}

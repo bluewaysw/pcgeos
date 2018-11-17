@@ -1,0 +1,614 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/**************************************************************************
+ *      Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <initfile.h>
+#include <fileEnum.h>
+#include <sysStats.h>
+#include <sem.h>
+
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <ansi\stdlib.h>
+#include <geomisc.h>
+
+@include <fixes.goh>
+@include "htmlview.goh"
+@ifdef COMPILE_OPTION_BOOKMARKS
+@include "bookmark.goh"
+@endif
+@ifdef COMPILE_OPTION_FAVORITES
+@include "favorite.goh"
+@endif
+@include "urlfetch.goh"
+@include "importg.goh"
+@include "expire.goh"
+@include "stattext.goh"
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+@include <Objects/gSysC.goh>
+@extern object PCToggleOnDlg ;
+@extern object PCToggleOffDlg ;
+@extern object PCStatusLight ;
+@extern object PCStatusLightOnMoniker ;
+@extern object PCStatusLightOffMoniker ;
+@extern object PCToggleOff ;
+@extern object PCToggleOn ;
+@extern object PCToggle ;
+@extern object PCRoot ;
+@endif
+
+@ifdef COMPILE_OPTION_AUTO_BROWSE
+@extern object AutoBrowseOptions ;
+@endif
+
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+/* TRUE if we are using the progress indicator to show download status */
+extern Boolean G_progressStatus;
+@extern object ProgressIndicator ;
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+extern Boolean G_fileDownload;
+extern Boolean G_fileUpload;
+extern Boolean G_allowFileDownloadStatus;
+extern void UpdateDownloadProgressDialogTimes(void);
+@endif
+@endif
+
+
+@extern object CurrentURLText ;
+@extern object HTMLSettingsBoolGroup ;
+@extern object SimpleURLToolbar ;
+@extern object StatusBar ;
+@extern object HTMLVApp ;
+@extern object MsgBlank;
+@extern object HTMLVPrimary ;
+@extern object LinkStatus;
+
+/* pulled out of local scope so we can access to initialize to fix lazarus */
+StatusTextID G_statusIds[HTML_STATUS_TYPE_UNKNOWN] = {
+    STATUS_TEXT_ID_BAD,
+    STATUS_TEXT_ID_BAD,
+    STATUS_TEXT_ID_BAD,
+    STATUS_TEXT_ID_BAD,
+    STATUS_TEXT_ID_BAD,
+    STATUS_TEXT_ID_BAD,
+} ;
+
+
+/**************************************************************************
+ *      Local UI objects
+ **************************************************************************/
+
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+
+@start DownloadProgressDialogResource;
+
+@object GenInteractionClass DownloadProgressDialog = {
+    GI_states = @default & ~GS_USABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+                         | GIA_MODAL;
+    GI_comp = @DownloadProgressFilename,
+              @DownloadProgressBar,
+              @DownloadProgressPercentageGroup,
+              @DownloadProgressTimePastGroup,
+              @DownloadProgressTimeLeftGroup,
+              @DownloadProgressStop;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@visMoniker DownloadProgressMoniker = "Downloading";
+@visMoniker UploadProgressMoniker = "Uploading";
+
+@object GenGlyphClass DownloadProgressFilename = {
+    /* moniker set dynamically */
+    HINT_CAN_CLIP_MONIKER_WIDTH;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenValueClass DownloadProgressBar = {
+    GI_visMoniker = "Progress:";
+    GI_attrs = @default | GA_READ_ONLY;
+    GVLI_value = 0;
+    GVLI_minimum = 0;
+    GVLI_maximum = MakeWWFixed(1000);  /* tenth of percent accuracy */
+    GVLI_displayFormat = GVDF_INTEGER;
+    HINT_VALUE_ORIENT_HORIZONTALLY;
+    HINT_VALUE_SHOW_MIN_AND_MAX;
+    HINT_VALUE_ANALOG_DISPLAY;
+    HINT_VALUE_NO_DIGITAL_DISPLAY;
+    HINT_FIXED_SIZE = {SST_PIXELS|400, SST_PIXELS|5};
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenInteractionClass DownloadProgressPercentageGroup = {
+    GI_comp = @DownloadProgressPercentage;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass DownloadProgressPercentage = {
+    /* moniker set dynamically */
+    HINT_CAN_CLIP_MONIKER_WIDTH;
+}
+
+@object GenTriggerClass DownloadProgressStop = {
+    GI_visMoniker = "Cancel";
+    GTI_destination = @HTMLVApp;
+    GTI_actionMsg = MSG_HMLVA_STOP_TRIGGER;
+    HINT_TRIGGER_DESTRUCTIVE_ACTION;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass DownloadProgressTimePastGroup = {
+    GI_comp = @DownloadProgressTimePastTitle,
+              @DownloadProgressTimePast;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+@object GenGlyphClass DownloadProgressTimePastTitle = {
+    GI_visMoniker = "Time Elapsed: ";
+}
+@object GenGlyphClass DownloadProgressTimePast = {
+    /* moniker set dynamically */
+}
+
+@object GenInteractionClass DownloadProgressTimeLeftGroup = {
+    GI_comp = @DownloadProgressTimeLeftTitle,
+              @DownloadProgressTimeLeft;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+@object GenGlyphClass DownloadProgressTimeLeftTitle = {
+    GI_visMoniker = "Time Remaining: ";
+}
+@object GenGlyphClass DownloadProgressTimeLeft = {
+    /* moniker set dynamically */
+}
+
+@end DownloadProgressDialogResource;
+
+@endif
+
+
+/* UI Related Browser stuff that is hit more often */
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+@extern method HTMLVProcessClass, MSG_META_NOTIFY
+{
+    AccessFlags oldAccess;
+
+    if (manufID == MANUFACTURER_ID_GEOWORKS &&
+	notificationType == GWNT_PARENTAL_CONTROL_CHANGE) {
+	PCIndicateStatus();
+	oldAccess = G_pcAccess;
+	G_pcAccess = ParentalControlGetAccessInfo();
+	if ((G_pcAccess & (AF_WWWBROWSING | AF_WWWLIMITED)) &&
+	    !(oldAccess & (AF_WWWBROWSING | AF_WWWLIMITED))){
+	    /* parental control turned on, clear object cache in
+	       case cached sites are now disallowed */
+	    ObjCacheClear();
+	}
+    }
+    if (manufID == MANUFACTURER_ID_GEOWORKS &&
+	notificationType == GWNT_PARENTAL_CONTROL_WEBSITE_LIST_CHANGE &&
+	(data == PCWLCT_DELETE || data == PCWLCT_MODIFY)) {
+	/* clear object cache in case cached sites are now disallowed */
+	ObjCacheClear();
+    }
+    /* let superclass clean up */
+    @callsuper();
+}
+@endif
+
+
+@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
+@extern object AllocWatcherReadout;
+
+@extern method HTMLVProcessClass, MSG_HMLVP_UPDATE_ALLOC_WATCHER_READ_OUT
+{
+    dword amount ;
+    TCHAR buffer[20] ;
+    TCHAR diskfree[20] = "" ;
+#ifdef YAGO_2_BUILD
+    DiskHandle disk ;
+    DiskInfoStruct info ;
+
+    disk = DiskRegisterDisk(3);
+    DiskGetVolumeInfo(disk, &info);
+    sprintf(diskfree, _TEXT("%ldb"), info.DIS_freeSpace) ;
+#endif
+
+    amount = AllocWatcherGetRemaining(G_allocWatcher) ;
+    if (amount > 10000L)
+        sprintf(buffer, _TEXT("[%ldK] %s"), amount/1000L, diskfree) ;
+    else
+        sprintf(buffer, _TEXT("[%ldb] %s"), amount, diskfree) ;
+
+    @call AllocWatcherReadout::MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0) ;
+}
+@endif
+
+Boolean UserAbortCheck(void)
+{
+    extern Boolean G_stopped ;
+
+    return G_stopped;
+}
+
+@extern method HTMLVApplicationClass, MSG_HMLVA_SET_CONNECTION_ERROR
+{
+    pself->HVAI_connectionError = TRUE;
+}
+
+@extern method HTMLVApplicationClass, MSG_HMLVA_CLEAR_CONNECTION_ERROR
+{
+    pself->HVAI_connectionError = FALSE;
+}
+
+@extern method HTMLVApplicationClass, MSG_HMLVA_CHECK_CONNECTION_ERROR
+{
+    return(pself->HVAI_connectionError);
+}
+
+/**************************************************************************
+ *              more HTMLVApplicationClass
+ **************************************************************************/
+
+@extern method HTMLVApplicationClass, MSG_META_PTR
+{
+    VisContentInstance *vcni;
+    WindowHandle grabWin;
+    optr grabObj;
+    Boolean clearLink = TRUE;
+
+    @callsuper();
+
+    /* clear URL link status unless over HTML page */
+    vcni = ObjDerefVis(oself);
+    grabWin = vcni->VCNI_impliedMouseGrab.VMG_gWin;
+    if (grabWin) {
+	WinGetInfo(grabWin, WIT_INPUT_OBJ, &grabObj);
+	if (grabObj &&
+	    ObjTestIfObjBlockRunByCurThread(OptrToHandle(grabObj)) &&
+	    @call grabObj::MSG_META_IS_OBJECT_IN_CLASS(&GenViewClass)) {
+	    clearLink = FALSE;
+	}
+    }
+    if (clearLink) {
+	@SendStatusUpdateOptr(@MsgBlank,
+	HTML_STATUS_TYPE_URL_HIGHLIGHT);
+    }
+
+    retVal->flags |= MRF_PROCESSED;
+}
+
+
+@ifdef UPDATE_ON_UI_THREAD
+@extern method HTMLVApplicationClass, MSG_HMLVA_STATUS_UPDATE
+@else
+@extern method HTMLVProcessClass, MSG_HMLVP_STATUS_UPDATE
+@endif
+{
+    static StatusTextPriority priorityTable[HTML_STATUS_TYPE_UNKNOWN] = {
+        HTML_STATUS_RECEIVING,          /* HTML_STATUS_TYPE_DOWNLOADING */
+        HTML_STATUS_URL_HIGHLIGHT,      /* HTML_STATUS_TYPE_URL_HIGHLIGHT */
+        HTML_STATUS_FORMATTING,         /* HTML_STATUS_TYPE_FORMATTING */
+        HTML_STATUS_IMPORTING,          /* HTML_STATUS_TYPE_IMPORTING */
+        HTML_STATUS_LOADING,            /* HTML_STATUS_TYPE_LOADING */
+        HTML_STATUS_COMLETED,           /* HTML_STATUS_TYPE_DONE */
+        HTML_STATUS_JAVASCRIPT,         /* HTML_STATUS_TYPE_JAVASCRIPT */
+        HTML_STATUS_JAVASCRIPT_DEFAULT, /* HTML_STATUS_TYPE_JAVASCRIPT_DEFAULT */
+        HTML_STATUS_JAVASCRIPT_ERROR    /* HTML_STATUS_TYPE_JAVASCRIPT_ERROR */
+    } ;
+    static Boolean isStatusLineOff = 2 ;
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+    TCHAR *p;
+@endif
+
+    if (isStatusLineOff == 2)  {
+        isStatusLineOff = FALSE ;
+        InitFileReadBoolean(
+            HTMLVIEW_CATEGORY,
+            "statusLineOff",
+            &isStatusLineOff) ;
+    }
+
+    if (isStatusLineOff)
+        return ;
+
+    EC_ERROR_IF(type >= HTML_STATUS_TYPE_UNKNOWN, -1) ;
+
+    /* Are we clearing or changing/adding? */
+    HWChecksumCheck() ;
+    if (text[0] == '\0')  {
+        if (G_statusIds[type] != STATUS_TEXT_ID_BAD)  {
+            @call LinkStatus::MSG_STATUS_TEXT_DESTROY_MESSAGE(G_statusIds[type]) ;
+            G_statusIds[type] = STATUS_TEXT_ID_BAD ;
+        }
+    } else {
+        /* create or change? */
+        if (G_statusIds[type] == STATUS_TEXT_ID_BAD)  {
+            /* Create a new message */
+            G_statusIds[type] =
+                @call LinkStatus::MSG_STATUS_TEXT_CREATE_MESSAGE(
+                          text,
+                          priorityTable[type]) ;
+
+        } else {
+            /* Change an old message */
+            @call LinkStatus::MSG_STATUS_TEXT_CHANGE_MESSAGE(
+                      G_statusIds[type],
+                      text) ;
+        }
+    }
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+     if (G_progressStatus && (type == HTML_STATUS_TYPE_DOWNLOADING)) {
+	 p = strstr(text, _TEXT("%"));
+	 if (p > text+3) {
+	     while(--p && (*p >= '0') && (*p <= '9'));
+	     @SendUpdateProgress(PI_SET_VALUE, atoi(p+1));
+	 }
+     }
+@endif
+    HWChecksumCheck() ;
+}
+
+@ifdef UPDATE_ON_UI_THREAD
+@extern method HTMLVApplicationClass, MSG_HMLVA_STATUS_UPDATE_OPTR
+@else
+@extern method HTMLVProcessClass, MSG_HMLVP_STATUS_UPDATE_OPTR
+@endif
+{
+    MemLock(OptrToHandle(text)) ;
+    @CallStatusUpdate(LMemDeref(text), type) ;
+    MemUnlock(OptrToHandle(text)) ;
+}
+
+@ifdef UPDATE_ON_UI_THREAD
+@extern method HTMLVApplicationClass, MSG_HMLVA_STATUS_UPDATE_BLOCK
+@else
+@extern method HTMLVProcessClass, MSG_HMLVP_STATUS_UPDATE_BLOCK
+@endif
+{
+    TCHAR *p;
+
+    p = (TCHAR *)MemLock(text);
+    @CallStatusUpdate(p, type) ;
+    MemFree(text);
+}
+
+@ifdef UPDATE_ON_UI_THREAD
+@extern method HTMLVApplicationClass, MSG_HMLVA_STATUS_GET_PTR
+@else
+@extern method HTMLVProcessClass, MSG_HMLVP_STATUS_GET_PTR
+@endif
+{
+    *p_message = '\0' ;
+
+    EC_ERROR_IF(type >= HTML_STATUS_TYPE_UNKNOWN, -1) ;
+    if (G_statusIds[type] != STATUS_TEXT_ID_BAD)  {
+        @call LinkStatus::MSG_STATUS_TEXT_GET(G_statusIds[type], p_message, limit) ;
+    }
+}
+
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+
+#define PI_START_VALUE 1
+#define PI_TIMER_VALUE 20
+#define PI_ITEMS_VALUE 70
+#define PI_ALMOST_DONE_VALUE (PI_TIMER_VALUE + PI_ITEMS_VALUE)
+#define PI_DONE_ITEM_VALUE 5
+#define PI_DONE_VALUE 100
+
+#define PROGRESS_BLINK_WIDTH 4
+
+@ifdef UPDATE_ON_UI_THREAD
+@extern method HTMLVApplicationClass, MSG_HMLVA_PROGRESS_TIMER
+@else
+@extern method HTMLVProcessClass, MSG_HMLVP_PROGRESS_TIMER
+@endif
+{
+    @SendUpdateProgress(PI_TIMER, 0);
+}
+
+@ifdef UPDATE_ON_UI_THREAD
+@extern method HTMLVApplicationClass, MSG_HMLVA_UPDATE_PROGRESS_INDICATOR
+@else
+@extern method HTMLVProcessClass, MSG_HMLVP_UPDATE_PROGRESS_INDICATOR
+@endif
+{
+    static word pageProgressNumItems=0;
+    static Boolean pageProgressGotFrames = FALSE;
+    static TimerHandle progressTimer = NullHandle;
+    static word progressTimerID;
+    static word progressValue = 0;
+    static word previousProgressValue = PI_DONE_VALUE;
+    static word invertState = 0;
+    static word progressDelay = 0;
+    static word percentFormatted = 0 ;
+    static word previousPercentFormatted = 0 ;
+    word valueToSend;
+
+    switch (state) {
+    case PI_START:
+	progressValue = PI_START_VALUE;
+        percentFormatted = 0 ;
+	pageProgressNumItems = 0;
+        previousPercentFormatted = 0 ;
+	pageProgressGotFrames = FALSE;
+	if (progressTimer) {
+	    TimerStop(progressTimer, progressTimerID);
+	    progressTimer = NullHandle;
+	}
+	progressTimer = TimerStart(TIMER_EVENT_CONTINUAL,
+@ifdef UPDATE_ON_UI_THREAD
+				   @HTMLVApp,
+				   30,  /* 1/2 second */
+				   MSG_HMLVA_PROGRESS_TIMER,
+@else
+				   ConstructOptr(GeodeGetProcessHandle(), 0),
+				   30,  /* 1/2 second */
+				   MSG_HMLVP_PROGRESS_TIMER,
+@endif
+				   30,  /* 1/2 second */
+				   &progressTimerID);
+	break;
+    case PI_TIMER:
+	progressDelay++;
+	if (!G_progressStatus && progressValue < (pageProgressGotFrames ?
+		     PI_ALMOST_DONE_VALUE : PI_TIMER_VALUE)) {
+	    progressValue++;
+	}
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+        UpdateDownloadProgressDialogTimes();
+@endif
+	break;
+    case PI_NUM_FRAMES:
+	pageProgressGotFrames = TRUE;
+	break;
+    case PI_NEW_ITEM:
+	pageProgressNumItems++;
+	break;
+    case PI_DONE_ITEM:
+	if (pageProgressGotFrames) {
+	    /* if we've got frames, we have no idea how many total items
+	       there'll be so just keep on with the timer */
+	    if (!progressTimer) {
+		progressTimer = TimerStart(TIMER_EVENT_CONTINUAL,
+@ifdef UPDATE_ON_UI_THREAD
+					   @HTMLVApp,
+					   30,  /* 1/2 second */
+					   MSG_HMLVA_PROGRESS_TIMER,
+@else
+					   ConstructOptr(
+					       GeodeGetProcessHandle(), 0),
+					   30,  /* 1/2 second */
+					   MSG_HMLVP_PROGRESS_TIMER,
+@endif
+					   30,  /* 1/2 second */
+					   &progressTimerID);
+	    }
+	} else {
+	    /* if no frames, we base the progress on the number of pending
+	       items */
+	    if (pageProgressNumItems) {
+		pageProgressNumItems--;
+	    }
+	    if (pageProgressNumItems) {
+		progressValue +=
+		    (PI_ALMOST_DONE_VALUE-progressValue)/pageProgressNumItems;
+	    } else {
+		/* near the beginning we may go to 0 pending items
+		   prematurely, so just up a fixed amount; if really near
+		   the end, we'll be getting PI_DONE soon */
+		progressValue += PI_DONE_ITEM_VALUE;
+	    }
+	}
+	if (progressValue > PI_ALMOST_DONE_VALUE)
+	    progressValue = PI_ALMOST_DONE_VALUE;
+	G_progressStatus = FALSE;
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+// don't need this for finished item as it causes problems when there are
+// still pending items when the download is started; PI_DONE should close
+// the dialog when everything is finished
+//	G_fileDownload = FALSE;
+//      G_allowFileDownloadStatus = FALSE;
+//	@send DownloadProgressDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+@endif
+	break;
+    case PI_DONE:
+	if (progressTimer) {
+	    TimerStop(progressTimer, progressTimerID);
+	    progressTimer = NullHandle;
+	}
+        percentFormatted = 100 ;
+	pageProgressGotFrames = FALSE;
+	progressValue = PI_DONE_VALUE;
+	G_progressStatus = FALSE;
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+	G_fileDownload = FALSE;
+        G_allowFileDownloadStatus= FALSE;
+	@send DownloadProgressDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+@endif
+	break;
+    case PI_SET_VALUE:
+	/* spread among formatting and non-formatting so we can use
+	   following 70/30 proportion */
+	progressValue = data;
+	percentFormatted = data;
+	if (data >= 99) {
+	    G_progressStatus = FALSE;
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+	    G_fileDownload = FALSE;
+            G_allowFileDownloadStatus = FALSE;
+            @send DownloadProgressDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	    /* Restart the indicator if we've just finished a file upload. */
+	    if (G_fileUpload)
+		progressValue = percentFormatted = 0;
+@endif
+	}
+	break;
+    case PI_FORMATTING:
+	if (data > percentFormatted)
+	    percentFormatted = data ;
+        break;
+    }
+
+    /* if no change for 5 seconds, start blinking */
+    if (state != PI_FORMATTING)  {
+	/* apply 70% and 30% to more accurately detect stalls */
+        if (((progressValue*7)/10 == (previousProgressValue*7)/10) && 
+              ((previousPercentFormatted*3)/10 == (percentFormatted*3)/10)) {
+	    if (progressDelay > 10) {
+	        valueToSend = ((++invertState)&1) ?
+		    ((progressValue > PROGRESS_BLINK_WIDTH) ?
+		     progressValue-PROGRESS_BLINK_WIDTH : 0) :
+		    progressValue;
+	    } else {
+	        valueToSend = progressValue;
+	    }
+        } else {
+	    progressDelay = 0;
+	    previousProgressValue = progressValue;
+            previousPercentFormatted = percentFormatted ;
+	    valueToSend = progressValue;
+        }
+    } else {
+        valueToSend = progressValue ;
+    }
+    /* Take 70% of the normal value and 30% of the formatting percentage */
+    if (valueToSend)
+        valueToSend = ((valueToSend * 7) + (percentFormatted * 3))/10 ;
+
+    @send ProgressIndicator::MSG_FAST_STATUS_SET_PROGRESS(valueToSend);
+}
+
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+@extern method HTMLVApplicationClass, MSG_HMLVA_UPDATE_DOWNLOAD_PROGRESS_DIALOG
+{
+    if (!UserAbortCheck()) {
+	char *updateP = MemLock(updateTxt);
+
+	@call DownloadProgressDialog::MSG_GEN_INTERACTION_INITIATE();
+	@call DownloadProgressStop::MSG_META_RELEASE_FOCUS_EXCL();
+	@call DownloadProgressPercentage::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+	    updateP, VUM_NOW);
+    }
+    MemFree(updateTxt);
+}
+@endif
+
+@endif  /* COMPILE_OPTION_PROGRESS_INDICATOR */

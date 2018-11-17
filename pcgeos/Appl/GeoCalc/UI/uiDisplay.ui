@@ -1,0 +1,254 @@
+/*
+ *
+ * Project:	PC GEOS
+ * Module:	GeoCalc
+ * File:	UI/uiDisplay.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user interface description for the resource
+ * duplicated to make displays
+ *
+ *	$Id: uiDisplay.ui,v 1.2 98/07/20 13:17:12 joon Exp $
+ *
+ */
+
+/***************************************/
+
+/*
+ * DisplayUI is the resource run by the UI duplicated to make displays
+ */
+
+start DisplayUI;
+
+DisplayDisplay = GeoCalcDisplay {
+	genStates = default -usable;
+	children = DisplayViewGroup;
+	attributes = default +userDismissable;
+	hints = {
+	    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE,
+	    ATTR_GEN_WINDOW_KBD_OVERRIDE {
+		word KO_NO_KEYBOARD
+	    },
+	    HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT {
+		 dw   mask SWSS_RATIO or PCT_80
+		 dw   mask SWSS_RATIO or PCT_80
+	    }
+	}
+}
+
+/****************************************************************************
+ *	Special Groups and Views for spacing
+ ***************************************************************************/
+
+DisplayViewGroup = GenInteraction {
+	children = TopViewGroup, 
+			MidViewGroup, 
+			BottomViewGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+TopViewGroup = GenInteraction {
+	children =
+		CornerView,
+		LeftColumnView,
+		RightColumnView;
+
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_TOOLBOX,
+		HINT_FIXED_SIZE {
+			SpecWidth <0, 0>
+			SpecHeight <SST_PIXELS, HEADER_HEIGHT>
+		}
+	}
+}
+
+
+MidViewGroup = GenInteraction {
+	genStates = default -usable;
+	children =
+		MidRowView,
+		MidLeftView,
+		MidRightView;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+BottomViewGroup = GenInteraction {
+	children =
+		BottomRowView,
+		BottomLeftView,
+		BottomRightView;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_MINIMIZE_CHILD_SPACING,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+CornerView = GenInteraction {
+	children =
+		CornerTrigger;
+	hints = {
+		HINT_FIXED_SIZE {
+		    /* for NewUI, use +4; for Motif, use +2 */
+			SpecWidth <SST_PIXELS, HEADER_WIDTH+4>
+			SpecHeight <SST_PIXELS, HEADER_HEIGHT+1>
+		}
+	}
+}
+
+CornerTrigger = GenTrigger {
+	action = MSG_SPREADSHEET_SET_SELECTION, "TO_APP_TARGET";
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			SpreadsheetRangeParams <
+				<
+				<SPREADSHEET_ADDRESS_DATA_AREA,
+				 SPREADSHEET_ADDRESS_DATA_AREA>,
+				<SPREADSHEET_ADDRESS_DATA_AREA,
+				 SPREADSHEET_ADDRESS_DATA_AREA>,
+				>,
+				<SPREADSHEET_ADDRESS_IN_SELECTION,
+				 SPREADSHEET_ADDRESS_IN_SELECTION>
+			>
+		}
+	}
+}
+
+/****************************************************************************
+ *	Column Numbers
+ ***************************************************************************/
+
+LeftColumnView = RulerView {
+	genStates = default -usable;
+	rulerAttrs = default +noScrollbar;
+	vertLink = MidLeftView;
+	docRight = DOCUMENT_WIDTH;
+	docBottom = HEADER_HEIGHT;
+}
+
+RightColumnView = RulerView {
+	docRight = DOCUMENT_WIDTH;
+	docBottom = HEADER_HEIGHT;
+	vertLink = MidRightView;
+}
+
+/****************************************************************************
+ *	Row Numbers
+ ***************************************************************************/
+
+MidRowView = RulerView {
+	rulerAttrs = default -horizontal, +noScrollbar;
+	docBottom = DOCUMENT_HEIGHT;
+	docRight = HEADER_WIDTH;
+	horizLink = MidLeftView;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, HEADER_WIDTH>
+			SpecHeight <0, 0>
+		}
+	}
+}
+
+BottomRowView = RulerView {
+	rulerAttrs = default -horizontal;
+	docBottom = DOCUMENT_HEIGHT;
+	docRight = HEADER_WIDTH;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, HEADER_WIDTH>
+			SpecHeight <0, 0>
+		}
+	}
+	horizLink = BottomLeftView;
+}
+
+/****************************************************************************
+ *	Spreadsheet Display
+ ***************************************************************************/
+
+MidLeftView = GeoCalcView {
+/*	geoCalcViewAttrs = default +ignoreDocTop, +ignoreDocLeft; */
+	genStates = default -usable;
+/*	horizLink = MidRowView;		*/
+/*	vertLink = LeftColumnView;	*/
+	horizLink = MidRightView;
+	vertLink = BottomLeftView;
+	viewAttributes = default -focusable, 
+			+controlled,
+			+windowCoordinateMouseEvents;
+	genAttributes = default -targetable;
+	docRight = "DOCUMENT_WIDTH";
+	docBottom = "DOCUMENT_HEIGHT";
+}
+
+MidRightView = GeoCalcView {
+	geoCalcViewAttrs = default +neverShowScrollbar;
+	viewAttributes = default -focusable, 
+			+controlled,
+			+windowCoordinateMouseEvents;
+	genAttributes = default -targetable;
+	vertAttributes = default +scrollable, +dontDisplayScrollbar;
+	horizAttributes = default +scrollable, +dontDisplayScrollbar;
+	docRight = "DOCUMENT_WIDTH";
+	docBottom = "DOCUMENT_HEIGHT";
+	hints = {
+		HINT_VIEW_LEAVE_ROOM_FOR_VERT_SCROLLER
+	}
+	horizLink = MidRowView;
+	vertLink = BottomRightView;
+}
+
+BottomLeftView = GeoCalcView {
+	genStates = default -usable;
+	geoCalcViewAttrs = default +neverShowScrollbar;
+	viewAttributes = default -focusable, 
+			+controlled,
+			+windowCoordinateMouseEvents;
+	genAttributes = default -targetable;
+	vertAttributes = default +scrollable, +dontDisplayScrollbar;
+	docRight = "DOCUMENT_WIDTH";
+	docBottom = "DOCUMENT_HEIGHT";
+	hints = {
+		HINT_VIEW_LEAVE_ROOM_FOR_HORIZ_SCROLLER
+	}
+	horizLink = BottomRightView;
+	vertLink = LeftColumnView;
+}
+
+BottomRightView = GeoCalcView {
+	geoCalcViewAttrs = default +dontPropagateDocBounds;
+	viewAttributes = default
+		+controlled,
+		+dontSendKbdReleases,
+		+dragScrolling,
+		+trackScrolling,
+		+windowCoordinateMouseEvents;
+	horizAttributes = default +scrollable;
+	vertAttributes = default +scrollable;
+	docRight = "DOCUMENT_WIDTH";
+	docBottom = "DOCUMENT_HEIGHT";
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		HINT_DEFAULT_TARGET
+	}
+	horizLink = BottomRowView;
+	vertLink = RightColumnView;
+}
+
+end DisplayUI;

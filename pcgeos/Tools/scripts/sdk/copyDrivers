@@ -1,0 +1,141 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1993 -- All Rights Reserved
+#
+# PROJECT:	PC SDK
+# MODULE:	DDK ship scripts
+# FILE: 	copyDrivers
+# AUTHOR: 	Paul DuBois, Dec 16, 1993
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	dubois	12/16/93   	Initial Revision
+#
+# DESCRIPTION:
+#	Copies files necessary for the DDK -- mostly stuff in
+#	/staff/pcgeos/Driver and /staff/pcgeos/Include/Internal.
+#
+# USAGE:
+#	copyDrivers -u Release20X /n/intl_disks/pcgeos/DDK
+#
+# STRATEGY:
+#	Check source directory (should be run from a development tree)
+#	Parse arguments
+#	Copy driver directories
+#		mouse, keyboard, sound, printer, pref, impex, PCMCIA, power
+#	Copy include files
+#	
+#	$Id: copyDrivers,v 1.5 94/02/07 16:18:39 jon Exp $
+#
+###############################################################################
+#
+# Include sdk scripts in our path so we can find makePlatformImage, et. al.
+#
+MAKETOOLPATH=/staff/pcgeos/Tools/scripts/sdk
+export MAKETOOLPATH
+
+#######################################################################
+#		Check source directory and parse args
+#######################################################################
+#
+unix2dos=""
+while [ $# -ge 0 ]; do
+    case $1 in
+	-u)	unix2dos=-u;;
+	-*)	echo $0: unknown flag $1
+		exit 1
+		;;
+	*)	break;;
+    esac
+    shift
+done
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage: copyDrivers [-u] <branch> <CD-Rom dir>"
+	echo "Ex.: copyToolFiles Release20X /n/intl_disks"
+	exit 1
+fi
+
+if ( cd /staff/pcgeos/$1/Driver ); then
+	cd /staff/pcgeos/$1/Driver
+	echo ""
+	echo "copyDrivers started on `hostname` at `date` running as $USER"
+else
+	echo "$1 is not a PC/GEOS development tree. (e.g., . or Release20X)"
+	exit 1
+fi
+
+echo "======================================================================"
+echo "Current dir is: `pwd`"
+mkdir -p $2
+echo "Copying to $2/pcgeos/Driver/SDK"
+echo "======================================================================"
+
+#######################################################################
+#		Using copy_for_sdk
+#######################################################################
+#
+#  Hold off on BTest for now until we get Appl/PCMCIA on the DDK also.
+#  Include/Internal files have been put into some other script by joon,
+#  but maybe they should eventually be moved here?
+#
+find	Mouse/AbsGen							\
+	Mouse/GenMouse							\
+	Mouse/CasioPen							\
+	Mouse/KBMouse							\
+	Mouse/LogiBus							\
+	Mouse/LogiSer							\
+\
+	PCMCIA/Common							\
+	PCMCIA/CID/CIDSer						\
+	PCMCIA/PSerial/Zoomer						\
+\
+	Power/Common							\
+	Power/NoPower							\
+	Power/NoPowerPCMCIA						\
+\
+    	-type d \( -name RCS -o -name \*.OLD \) -prune -o		\
+    	-type f								\
+    	\! \(								\
+    	    -name LOCKS -o  	-name Makefile -o			\
+    	    -name depend\* -o	-name \*.bak -o				\
+    	    -name \*.rev -o 	-name \*.geo				\
+    	\)								\
+	-exec $MAKETOOLPATH/copy_for_sdk $unix2dos {} $2/pcgeos/Driver/SDK \;
+
+$MAKETOOLPATH/copy_for_sdk $unix2dos Mouse/mouseCommon.asm $2/pcgeos/Driver/SDK \;
+$MAKETOOLPATH/copy_for_sdk $unix2dos Mouse/mouseSerCommon.asm $2/pcgeos/Driver/SDK \;
+
+
+#######################################################################
+#		Using copyForPC
+#######################################################################
+#
+# These are the directories which contain filenames too long to fit
+# in 8.3 format; use copyForPC instead.  Don't forget to create a
+# mapping file (see the documentation for copyForPC).
+#
+# Keyboard not ready for release yet (skarpi's KeyMap app needs
+# testing/debugging)
+
+/staff/pcgeos/Tools/scripts/sdk/copyForPC $unix2dos 			\
+\
+		Sound/Standard		\
+		PCMCIA/StartSnd		\
+		Sound/SoundBlaster	\
+\
+	$2/pcgeos/Driver/SDK
+
+#######################################################################
+#		Clean up and exit
+#######################################################################
+#
+cd ..
+
+echo "======================================================================"
+echo "Current dir is: `pwd`"
+echo "======================================================================"
+
+echo "copyDrivers ended on `hostname` at `date` running as $USER"

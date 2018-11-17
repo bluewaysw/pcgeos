@@ -1,0 +1,682 @@
+/***********************************************************************
+*     Copyright 1994-2002  Breadbox Computer Company LLC
+* PROJECT:	Anarchy
+* MODULE:	Spider
+*
+* FILE:		spidui.goc
+*
+* AUTHOR:	jfh 12/02
+*
+* TODOS:		- 
+*
+***********************************************************************/
+
+/* ----------------------------------------------------------------------------
+		Include files
+-----------------------------------------------------------------------------*/
+
+@include "spider.goh"
+@include "art\icons.goh"
+
+/*----------------------------------------------------------------------------
+		Application Object
+-----------------------------------------------------------------------------*/
+@start	AppResource;
+
+@object GenApplicationClass SpiderApp = {
+	GI_visMoniker = list {@LCAppMoniker, @TCAppMoniker,
+	                      @SpiderTextMoniker};
+	GI_comp = @SpiderPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @SpiderPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+				@SpiderCardBackSelector;
+	ATTR_GEN_HELP_FILE = "Spider Help";
+}
+
+@visMoniker SpiderTextMoniker = "Spider";
+
+@end	AppResource
+
+/* ----------------------------------------------------------------------------
+		Primary window.
+-----------------------------------------------------------------------------*/
+@start	Interface;
+
+@object GenPrimaryClass SpiderPrimary = {
+	GI_comp = @GameMenu, @OptionsMenu, @SpiderView,
+				 @FinishBox;
+//	ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+//	HINT_DISPLAY_NOT_RESIZABLE;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+		 SWSS_RATIO | 20,  SWSS_RATIO | PCT_5 };
+	/* The 20 above is about 1/2 way between PCT_0 (0) and PCT_5 (0x033) */
+}
+
+/*****  Game Menu  *****/
+@object GenInteractionClass GameMenu =  {
+	GI_visMoniker = 'G', "Game";
+	GI_comp = @UndoInteraction, @GameInteraction, @AboutGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+}
+
+@object GenInteractionClass UndoInteraction = {
+	GI_comp = @UndoTrigger;
+}
+@object GenTriggerClass UndoTrigger = {
+	GI_visMoniker = 'U', "Undo";
+	GI_kbdAccelerator = ctrl 'U';
+	GTI_destination = @MyPlayingTable;
+	GTI_actionMsg = MSG_SPIDER_UNDO;
+}
+
+@object GenInteractionClass GameInteraction = {
+	GI_comp = @NewGameTrigger;
+}
+@object GenTriggerClass NewGameTrigger = {
+	GI_visMoniker = 'N', "New Game";
+	GI_kbdAccelerator = ctrl 'N';
+	GTI_destination = @MyPlayingTable;
+	GTI_actionMsg = MSG_SPIDER_NEW_GAME_MENU_SELECT;
+}
+
+@object GenInteractionClass AboutGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@include "art\bbxreg.goh"
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @AppName, @By, @BreadBoxLogo,
+				  @Visit, @Web, @AboutSpacer1,
+				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Spider Solitaire";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 36, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "by";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+@object GenGlyphClass AboutSpacer1 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2003";
+}
+@object GenGlyphClass BBoxLLC = {
+  GI_visMoniker = "Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Rights = {
+  GI_visMoniker = "All Rights Reserved";
+}
+@object GenGlyphClass AboutSpacer2 = {
+  GI_visMoniker = "   ";
+}
+/*@object GenInteractionClass AboutInteraction = {
+	GI_comp = @AboutDBox;
+}
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @Line1, @Line2, @Line3,
+				  @Line4, @Line5, @Line6,
+				  @Line7, @Line8, @Line9,
+				  @Line10;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenGlyphClass Line1 = {
+  GI_visMoniker = "Spider -= beta 3 =-";
+}
+@object GenGlyphClass Line2 = {
+  GI_visMoniker = "This anarchy project was written in Goc with a modified";
+}
+@object GenGlyphClass Line3 = {
+  GI_visMoniker = "version of the cards.goh file that Nathan Fiedler";
+}
+@object GenGlyphClass Line4 = {
+  GI_visMoniker = "uploaded to the AOL Geos Forum back in 1996.";
+}
+@object GenGlyphClass Line5 = {
+  GI_visMoniker = "You can find my fixed (12/22/02) version of";
+}
+@object GenGlyphClass Line6 = {
+  GI_visMoniker = "Nate's header at ftp.breadbox.com";
+}
+@object GenGlyphClass Line7 = {
+  GI_visMoniker = "Send feature requests, comments, questions, etc.";
+}
+@object GenGlyphClass Line8 = {
+  GI_visMoniker = "to me at johnh@breadbox.com";
+}
+@object GenGlyphClass Line9 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Line10 = {
+  GI_visMoniker = "Copyright 1994-2003  Breadbox Computer Company LLC";
+}
+
+/*****  Options Menu  *****/
+@object GenInteractionClass OptionsMenu = {
+	GI_visMoniker = 'O', "Options";
+	GI_comp = @SpiderCardBackSelector, @ColorInteraction,
+				 @DifficultyDBox, @DragInteraction, @SpiderSoundOpt;
+	GII_visibility = GIV_POPUP;
+}
+
+@object CardBackSelectorClass SpiderCardBackSelector = {
+	GI_visMoniker = 'C', "Choose a Card Back";
+}
+
+@object GenInteractionClass ColorInteraction = {
+	GI_visMoniker = "Table Color";
+	GI_comp = @SpiderColorSelector;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+}
+
+@object ColorSelectorClass SpiderColorSelector = {
+	GCI_output = process;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN |
+												CSF_DRAW_MASK |
+												CSF_OTHER);
+}
+ 
+@object GenInteractionClass DifficultyDBox = {
+	GI_visMoniker = "Difficulty";
+	GI_comp = @DifficultyGroup;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	ATTR_GEN_HELP_CONTEXT = "DifficultyDB";
+}
+@object GenItemGroupClass DifficultyGroup = {
+	GI_comp = @EasyItem, @MediumItem, @DifficultItem;
+	GIGI_selection = D_EASY;
+	GIGI_destination = @MyPlayingTable;
+	GIGI_applyMsg = MSG_SPIDER_SET_DIFFICULTY;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+@object GenItemClass EasyItem =  {
+	GI_visMoniker = "Easy - One Suit";
+	GII_identifier = D_EASY;
+}
+@object GenItemClass MediumItem =  {
+	GI_visMoniker = "Medium - Two Suits";
+	GII_identifier = D_MED;
+}
+@object GenItemClass DifficultItem =  {
+	GI_visMoniker = "Difficult - Four Suits";
+	GII_identifier = D_DIFF;
+}
+
+@object GenInteractionClass DragInteraction = {
+	GI_comp = @DragItemGroup;
+}
+@object GenItemGroupClass DragItemGroup = {
+	GI_comp = @DragOutlineItem, @DragFullItem;
+	GIGI_selection = DRAG_OUTLINE;
+	GIGI_destination = @MyPlayingTable;
+	GIGI_applyMsg = MSG_SPIDER_SET_DRAG;
+}
+@object GenItemClass DragOutlineItem =  {
+	GI_visMoniker = "Outline Drag";
+	GII_identifier = DRAG_OUTLINE;
+}
+@object GenItemClass DragFullItem =  {
+	GI_visMoniker = "Full Drag";
+	GII_identifier = DRAG_FULL;
+}
+
+@object GenInteractionClass SpiderSoundOpt = {
+	GI_visMoniker = 'S', "Sound" ;
+	GI_comp = @SoundGroup;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass SoundGroup = {
+	GI_comp = @SoundOn, @SoundOff, @SystemPref ;
+	GIGI_selection = SOUND_SYSTEM ;
+	GIGI_destination = process ;
+	GIGI_applyMsg = MSG_SPIDER_SOUND_CHANGED ;
+}
+
+@object GenItemClass SoundOn = {
+	GI_visMoniker = 'S', "Sound On" ;
+	GII_identifier = SOUND_ON ;
+}
+
+@object GenItemClass SoundOff = {
+	GI_visMoniker = 'O', "Sound Off" ;
+	GII_identifier = SOUND_OFF ;
+}
+
+@object GenItemClass SystemPref = {
+	GI_visMoniker = 'P', "Use System Preference" ;
+	GII_identifier = SOUND_SYSTEM ;
+}
+
+/*****  SpiderView  *****/
+
+@object GenViewClass SpiderView = {
+	GVI_content = @MyPlayingTable;
+	GVI_color = {C_GREEN, 0, 0, 0};
+	GVI_horizAttrs   = @default |
+									GVDA_NO_SMALLER_THAN_CONTENT |
+									GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_vertAttrs    = @default |
+									GVDA_NO_SMALLER_THAN_CONTENT |
+									GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_docBounds    = {0, 0, TABLE_WIDTH, TABLE_HEIGHT};
+	HINT_DEFAULT_TARGET;
+	HINT_MINIMUM_SIZE = {
+					SST_PIXELS | TABLE_WIDTH,
+					SST_PIXELS | TABLE_HEIGHT,
+					0 };
+}
+
+@object GenInteractionClass FinishBox = {
+	GI_comp = @FinishGlyph1,
+				 @FinishGlyph2E, @FinishGlyph2E1, @FinishGlyph2M,
+				 @FinishGlyph2M1, @FinishGlyph2D, @FinishGlyph2D1,
+             @FinishGlyph3, @FinishGlyph4;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_AFFIRMATION;
+	GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG
+								| GIA_NOT_USER_INITIATABLE
+								| GIA_MODAL;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenGlyphClass FinishGlyph1 = {
+	GI_visMoniker = "Congratulations!!!";
+}
+@object GenGlyphClass FinishGlyph2E = {
+	GI_visMoniker = "You've won at the Easy Level!";
+}
+@object GenGlyphClass FinishGlyph2E1 = {
+	GI_visMoniker = "You might want to move up to Meduim Difficulty.";
+}
+@object GenGlyphClass FinishGlyph2M = {
+	GI_visMoniker = "You've won at the Medium Level!";
+}
+@object GenGlyphClass FinishGlyph2M1 = {
+	GI_visMoniker = "And this level is pretty tough!!!";
+}
+@object GenGlyphClass FinishGlyph2D = {
+	GI_visMoniker = "You've won at the Difficult Level!";
+}
+@object GenGlyphClass FinishGlyph2D1 = {
+	GI_visMoniker = "Wow!!!  Winning at this level is almost impossible!!";
+}
+@object GenGlyphClass FinishGlyph3 = {
+	GI_visMoniker = " ";
+}
+@object GenGlyphClass FinishGlyph4 = {
+	GI_visMoniker = "Would you like to play another game?";
+}
+
+@end Interface
+
+/*----------------------------------------------------------------------------
+		TableResource
+-----------------------------------------------------------------------------*/
+
+@start TableResource;
+
+@object SpiderClass MyPlayingTable = {
+	VCI_comp = @MyHand, @WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+				 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8,
+				 @WorkSpace9, @WorkSpace10,
+				 @DoneSpace1, @DoneSpace2, @DoneSpace3, @DoneSpace4,
+				 @DoneSpace5, @DoneSpace6, @DoneSpace7, @DoneSpace8,
+				 @DDeck1, @DDeck2, @DDeck3, @DDeck4, @DDeck5;
+	VCI_geoAttrs = @default | VCGA_CUSTOM_MANAGE_CHILDREN;
+	VCNI_view = @SpiderView;
+	VCNI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW |
+									VCNA_SAME_HEIGHT_AS_VIEW;
+	GI_hand = @MyHand;
+	GI_userMode = INTERMEDIATE_MODE; 
+	GI_initialFadeMask = SDM_100;      /* no fading */
+	GI_incrementalFadeMask = 0;
+	GI_undoTrigger = @UndoTrigger;  
+}
+
+@object HandClass MyHand = {
+}
+
+
+/*-----------  DDeck Declarations ----------------*/
+
+/*
+ *  Characteristics of the deal decks are:
+ *	1) empty:	- deck will not accept any cards
+ *	2) not empty:	- deck will not accept any cards
+ *	3) removing:	- cannot take any cards (we'll do that programatically)
+ */
+
+@object DealDeckClass DDeck1 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+	DI_upCardAC = (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+}
+
+@object DealDeckClass DDeck2 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+	DI_upCardAC = (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+}
+
+@object DealDeckClass DDeck3 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+	DI_upCardAC = (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+}
+
+@object DealDeckClass DDeck4 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+	DI_upCardAC = (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+}
+
+@object DealDeckClass DDeck5 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+	DI_upCardAC = (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+}
+
+
+/*-----------  DoneSpace Deck Declarations ----------------
+ *  Characteristics of the Foundation decks are:
+ *	1) empty:	- accept one card at a time
+ *			- this card can be any suit
+ *			- this card must be an ace
+ *	2) not empty:	- accept one card at a time
+ *			- this card must be of the same suite as previous card
+ *			- this card must be one greater than previous card
+ *	3) removing:	- can't take any card
+ */
+
+@object DoneDeckClass DoneSpace1 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+}
+
+@object DoneDeckClass DoneSpace2 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+}
+
+@object DoneDeckClass DoneSpace3 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+}
+
+@object DoneDeckClass DoneSpace4 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+}
+
+@object DoneDeckClass DoneSpace5 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+}
+
+@object DoneDeckClass DoneSpace6 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+}
+
+@object DoneDeckClass DoneSpace7 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+}
+
+@object DoneDeckClass DoneSpace8 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+}
+
+
+/*-------------- WorkSpace Deck Declarations -----------------
+ *  Characteristics of the WorkSpace decks are:
+ *	1) empty:	- accept one or more cards at a time
+ *			- this card can be any suit (spade)
+ *			- this card can be any rank
+ *	2) not empty:	- accept one or more cards at a time
+ *			- this card can be any suit
+ *			- this card must be one less than previous card
+ *	3) removing:	- can take any cards in order
+ */
+
+@object WorkDeckClass WorkSpace1 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace2 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace3 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace4 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace5 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace6 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace7 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace8 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace9 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace10 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+
+@end TableResource
+
+/*----------------------------------------------------------------------------
+		StringBlock
+-----------------------------------------------------------------------------*/
+@start	StringBlock, data;
+
+@chunk char TooSmallString[] = "We're sorry, to play Spider Solitaire your video resolution must be set to 800x600 or higher.";
+@chunk char ConfirmDealString[] = "Are you sure you want to end this game?";
+@chunk char ConfirmChangeDiffString[] = "If you change the difficulty level a new game will be started.  Continue with the change?";
+@chunk char EmptyWorkDeckString[] = "All work decks must have at least one card before you can deal.";
+@chunk char LostGameString[] = "It looks like you lost this game.  Better luck next time!";
+@end	StringBlock
+
+

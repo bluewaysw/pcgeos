@@ -1,0 +1,202 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		fmtool.def
+
+AUTHOR:		Adam de Boor, Aug 25, 1992
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	8/25/92		Initial revision
+
+
+DESCRIPTION:
+	Interface description for installable file-manager tools.
+		
+	$Id: fmtool.def,v 1.1 97/04/04 14:24:54 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Protocol number for this interface definition.
+; 
+FMTOOL_PROTO_MAJOR	equ	1
+FMTOOL_PROTO_MINOR	equ	0
+
+;
+; This is the superclass for all file manager applications that wish to support
+; installable tools. The file manager should subclass this for its own process
+; class definitions.
+; 
+FileManagerClass	class	GenProcessClass
+
+MSG_FM_GET_SELECTED_FILES	message
+; Fetch the block of files/directories selected by the user.
+;
+; Context:	Called by tools to determine on what files they should operate
+;		once the user has activated them.
+; Source:	Called by installable tool
+; Destination:  File manager process
+; Interception: not intercepted
+;
+; Pass:		nothing
+;
+; Return:
+;		ax - handle of block with FileQuickTransferHeader followed
+;		     by array of FileOperationInfoEntry structures (0 if
+;		     couldn't allocate block)
+;		cx, dx, bp - destroyed
+;
+
+MSG_FM_OPEN_FILES	message
+; Performs the same operation as the Open entry of the File menu of a typical
+; file manager, to wit: if the item is an application it is launched; if it's
+; a document, its creator is told to open it; if it's a directory, a folder
+; window is opened for it.
+;
+; Context:	Called by installable tool when it wants to display a file
+;		it has found, or the like.
+; Source:	Installable tool library
+; Destination:  File manager
+; Interception: not intercepted
+;
+; Pass:		cx - handle of first block with a FileQuickTransferHeader and
+;		     following array of FileOperationInfoEntry structures.
+;		     More than one block of files may be passed by linking
+;		     successive blocks through their FQTH_nextBlock fields.
+;		     The final block must have an FQTH_nextBlock of 0.
+;
+; Return:
+;		carry set on error (all things that could be opened will have
+;		    been opened, however)
+;		All blocks in the chain are freed, regardless of the success
+;		    of the operation.
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_FM_DUP_AND_ADD	message
+; Duplicates a template resource and adds an object in it as the last generic
+; child of a particular object in the file manager. The FileManagerParent
+; enumerated type defines the objects within the file manager to which a tool
+; is allowed to add objects.
+;
+; The duplicated resource is run by the same thread as its parent, as you'd
+; expect. The tool should not rely on which of the file manager's threads is
+; actually running the objects.
+;
+; If the duplicated resource uses subclasses defined in the tool library,
+; the resource must have LMF_DETACHABLE clear.
+; 
+; Context:	Called by a tool when it wishes to display UI to the user.
+; Source:	Installable tool.
+; Destination:  File manager process
+; Interception: Not intercepted, usually.
+;
+; Pass:		^lcx:dx	- object to add as generic child, after its resource
+;			  has been duplicated
+;		bp - FileManagerParent to which to add the duplicated object
+;			
+; Return:	^lcx:dx - duplicated object
+;		ax, bp - destroyed
+;
+
+FileManagerParent	etype	word
+    FMP_APPLICATION	enum	FileManagerParent	; GenApplication
+    FMP_DISPLAY_GROUP	enum	FileManagerParent	; GenDisplayGroup
+
+FileManagerClass	endc
+
+;
+; information about a file selected for a file operation
+;
+FileOperationInfoEntry	struct
+	FOIE_name	FileLongName		<>
+    	FOIE_type	GeosFileType		GFT_NOT_GEOS_FILE
+	FOIE_attrs	FileAttrs		<>
+	FOIE_flags	GeosFileHeaderFlags	<>
+	FOIE_pathInfo	DirPathInfo		<>
+	FOIE_creator	GeodeToken		<>
+	FOIE_info	word
+	; This is a generic word of info -- in Workplace Shell, this
+	; word contains the WShellObjectType of the file.
+FileOperationInfoEntry	ends
+
+;
+; direct manipulation packet header
+;	(packet is header followed by array of FileOperationInfoEntry's)
+;
+
+FQTHFlags	record	
+		FQTHF_UIFA	UIFunctionsActive:8
+		FQTHF_private	:8		; MUST be clear
+FQTHFlags	end
+;
+; The FQTHF_private bits are used internally by WShell & WShellBA for
+; special transfer operations.  For general purposes, these bits
+; should *always* be cleared.  See wshell.def for how the
+; FQTHF_private flags are used by WShellBA (BATransferType).
+;
+
+FileQuickTransferHeader	struct
+	FQTH_nextBlock	word			; next transfer data block
+	FQTH_UIFA	FQTHFlags	<>	; UIFA flags
+	FQTH_numFiles	word
+	FQTH_diskHandle	word
+	FQTH_pathname	PathName	<> 	; pathname of files
+	FQTH_files	label	FileOperationInfoEntry
+FileQuickTransferHeader	ends
+
+
+;
+; The interface from the file manager to the tool is completely driven by
+; a table that the library returns when it's asked for it.
+;
+; A tool may have multiple entries in the Tool menu. Each one is described
+; by an FMToolStruct descriptor. 
+; 
+FMToolFunction	etype	word
+    FMTF_FETCH_TOOLS	enum	FMToolFunction
+    ;	Desc:	Fetch the table of tools the library wishes to place in the
+    ;		menu.
+    ;	Pass:	nothing
+    ;	Return:	cx	= number of tools
+    ;		es:di	= array of FMToolStruct structures.
+    ;
+
+FMToolType	etype	byte
+    FMTT_TRIGGER	enum	FMToolType	; A trigger that performs the
+						;  tool's action immediately
+						;  upon selection.
+    FMTT_DIALOG		enum	FMToolType	; Something that brings up a
+						;  dialog box to gather further
+						;  information from the user.
+
+FMToolFlags	record
+    :12
+    FMTF_SELECTED_ONLY:1	; set if tool should be active only when there
+				;  are files selected
+    FMTF_TYPE FMToolType:3	; type of tool
+FMToolFlags	end
+
+FMToolStruct	struct
+    FMTS_moniker	optr.VisMoniker		; Moniker to use for the entry
+						;  in the Tool menu
+    FMTS_flags		FMToolFlags	<>	; Flags governing how it
+						;  builds, etc.
+    FMTS_routineNumber	word			; Library routine in tool
+						;  to call when entry
+						;  activated. Routine is
+						;  called:
+						;  PASS: cx = handle of file
+						;	      manager process
+						;	 dx = tool number
+						;	      within library
+FMToolStruct	ends

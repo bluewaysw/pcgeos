@@ -1,0 +1,169 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Nimbus Font Installer
+FILE:		ninfntNimbusConstant.def
+
+AUTHOR:		Gene Anderson, Apr 17, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eca	4/17/91		Initial revision
+
+DESCRIPTION:
+	Nimbus font format constants and structures.
+		
+	$Id: ninfntNimbusConstant.def,v 1.1 97/04/04 16:16:53 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;----------------------------------------------------------------------------
+;	file header info
+;----------------------------------------------------------------------------
+
+NIMBUS_TAG_V2		equ	1314310		;0x00140e06 = V2.2 Nimbus
+NIMBUS_TAG_V3		equ	18091526	;0x01140e06 = V3.0 Nimbus
+NIMBUS_TAG_ZSOFT	equ	2314310		;Nimbus font ID tag, ZSoft
+
+DTCFontHeader	struc
+    DTCFH_fontTag	dword	(?)		;font tag = 1314310
+    DTCFH_copyright	char	80 dup(?)	;copyright notice
+    DTCFH_fullname	char	80 dup(?)	;full name of font (URW Sans)
+    DTCFH_fontname	char	80 dup(?)	;name of font	(Sans)
+    DTCFH_family	char	80 dup(?)	;font family	(Serif)
+    DTCFH_weight	char	80 dup(?)	;weight		(Bold)
+    DTCFH_version	char	80 dup(?)	;version	(31 MAR 89)
+    DTCFH_characterSet	char	80 dup(?)	;char set	(Adobe Std)
+    DTCFH_italic	byte	8 dup(?)	;italic angle	(degrees)
+    DTCFH_fixed		word	(?)		;1 if fixed width chars
+    DTCFH_spaceWidth	word	(?)		;width of space	(font units)
+    DTCFH_underPos	word	(?)		;underline pos	(font units)
+    DTCFH_underThick	word	(?)		;underline size	(font units)
+    DTCFH_h_height	word	(?)		;top of "H"	(font units)
+    DTCFH_x_height	word	(?)		;top of "x"	(font units)
+    DTCFH_ascender	word	(?)		;top of "d"	(font units)
+    DTCFH_descender	word	(?)		;bottom of "p"	(font units)
+    DTCFH_numChars	word	(?)		;number of characters
+DTCFontHeader	ends
+
+;----------------------------------------------------------------------------
+;	structure for chararcter data
+;----------------------------------------------------------------------------
+
+DTCData struc
+    DTCD_width		sword	(?)	;character width
+    DTCD_xmin		sword	(?)	;x min
+    DTCD_ymin		sword	(?)	;y min
+    DTCD_xmax		sword	(?)	;x max
+    DTCD_ymax		sword	(?)	;y max
+DTCData ends
+
+DTCCommands etype word
+DTC_MOVE		enum DTCCommands		;=0
+DTC_LINE		enum DTCCommands		;=1
+DTC_BEZIER		enum DTCCommands		;=2
+DTC_DONE		enum DTCCommands		;=3
+DTC_ACCENT		enum DTCCommands, 0x5		;=5
+DTC_VERT_LINE		enum DTCCommands		;=6
+DTC_HORZ_LINE		enum DTCCommands		;=7
+DTC_REL_LINE		enum DTCCommands		;=8
+DTC_REL_CURVE		enum DTCCommands		;=9
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	Character Data Section
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	The character data section of the file consists of (num_chars)
+contiguous character images.  Each character image is an array of
+short integers (16 bits) containing setting, feature control and shape
+data.
+
+The setting data occupies the first five elements of the array:
+	data[0] - set width of the character image (ND_setwidth)
+	data[1,2,3,4] - bounding box of image (ND_[x,y][min,max])
+
+The feature control data occupies the next (2+3N+3M) elements:
+	data[5] - N, number of "x-triples"
+	data[6..6+3N] - x-triples data
+	data[6+3N] - M, number of "y-triples"
+	data[7+3N..7+3N+3M] - y-triples data
+
+	The shape data begins at data[7+3N+3M] and consists of one or
+more segments.  Each segment consists of a short integer (16 bits)
+indicating the data type, followed by zero or more short integers of
+data (DTCCommands):
+
+	type	data		interpretation
+	----	--------------	--------------
+	0	x,y		set current postion (CP) to <x,y>
+	1	x,y		draw a line from CP to <x,y>; set CP=<x,y>
+	2	x1,y1,x2,y2,x3	draw bezier curve from CP to <x3,y3>; set CP
+	3	-none-		end of character
+	4	** unused **
+	5	c1, x,y, c2	draw char 1, draw char 2 at (+x,+y)
+	6	d		vertical line to +d; set CP
+	7	d		horizontal line to +d; set CP
+	8	x:8,y:8		line to (+x,+y); set CP
+	9	x1:8,y1:8, x2:8,y2:8, x3:8,y3:8
+				bezier curve to (+x1,+y1)
+						(+x1+x2,+y1+y2)
+						(+x1+x2+x3,+y1+y2+y3); set CP
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DTCTuple	struc
+    DTCT_start	sword	(?)
+    DTCT_end	sword	(?)
+    DTCT_width	sword	(?)
+DTCTuple	ends
+
+DTCMoveData	struc
+    DTCMD_x	sword	(?)
+    DTCMD_y	sword	(?)
+DTCMoveData	ends
+
+DTCLineData	struc
+    DTCLD_x	sword	(?)
+    DTCLD_y	sword	(?)
+DTCLineData	ends
+
+DTCBezierData	struc
+    DTCBD_x1	sword	(?)
+    DTCBD_y1	sword	(?)
+    DTCBD_x2	sword	(?)
+    DTCBD_y2	sword	(?)
+    DTCBD_x3	sword	(?)
+    DTCBD_y3	sword	(?)
+DTCBezierData	ends
+
+DTCAccentData	struc
+    DTCAD_char1	word	(?)
+    DTCAD_x	sword	(?)
+    DTCAD_y	sword	(?)
+    DTCAD_char2	word	(?)
+DTCAccentData	ends
+
+DTCVertData	struc
+    DTCVD_length	sword	(?)
+DTCVertData	ends
+
+DTCHorizData	struc
+    DTCHD_length	sword	(?)
+DTCHorizData	ends
+
+DTCRelLineData	struc
+    DTCRLD_y	sbyte	(?)
+    DTCRLD_x	sbyte	(?)
+DTCRelLineData	ends
+
+DTCRelBezierData	struc
+    DTCRBD_y1	sbyte	(?)
+    DTCRBD_x1	sbyte	(?)
+    DTCRBD_y2	sbyte	(?)
+    DTCRBD_x2	sbyte	(?)
+    DTCRBD_y3	sbyte	(?)
+    DTCRBD_x3	sbyte	(?)
+DTCRelBezierData	ends

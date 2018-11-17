@@ -1,0 +1,1468 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		GeoDex/Database
+FILE:		dbRecord.asm
+
+AUTHOR:		Ted H. Kim
+
+ROUTINES:
+	Name			Description
+	----			-----------
+	BinarySearch		Performs binary search on main table
+	CompareKeys		Compares the key field of two records
+	CompareName		Compares the index field of two records
+	DeleteFromMainTable	Remove a record from the main table
+	InsertRecord		Insert a new record into the database file
+	InitRecord		Reads in text strings from text objects
+	InitPhone               Initializes phone entries
+	CopyPhone               Copies old phone numbers into new record
+	GetRecord		Gets text strings into several temp blocks
+	InsertIntoMainTable	Inserts new record into main table
+	FindLetter		Finds and displays the record for a given tab
+	FindEntryInCurTab	Finds record handle for a given letter tab ID 
+	ClearRecord		Clears all of the text edit fields 
+	ClearTextFields		Clears given number of text edit fields
+	ComparePhoneticName	Compares the phonetic field of two records
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	8/29/89		Initial revision
+	ted	3/3/92		Complete restructuring for 2.0
+	witt	2/7/94		Added sort mangling for Pizza/J
+
+DESCRIPTION:
+
+	This file contains various record level routines for managing database.
+
+	The term "sort mangling" refers to changing the first letter of
+	the 'sortBuffer' and each key to perform comparisons.  For instance,
+	if you wanted the letters to appear in reverse order, you would
+	write a routine that does:
+		if( chr is alpha), chr = 'Z' - toupper(chr).
+	This mangled value is then feed to the LocalCompareStringNoCase
+	function.  Since the mangled letter is used only for comparisions,
+	the 'toupper' trick above will work.  Only the first char needs
+	mangling.
+	    *****  To sure the letter tabs follow this order  *****
+
+
+	$Id: dbRecord.asm,v 1.1 97/04/04 15:49:43 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "cdex.goh"
+
+Boolean g_match = TRUE;
+MemHandle g_fieldHandles[NUM_TEXT_EDIT_FIELDS + 2] = {0};
+word g_fieldLengths[NUM_TEXT_EDIT_FIELDS + 4] = {0};
+
+/*CommonCode	segment	resource */
+
+@extern object LastNameField;
+@extern object AddrField;
+@extern object NoteText;
+@extern object PhoneNoTypeField;
+@extern object PhoneNoField;
+@extern object ScrollUpTrigger;
+@extern object ScrollDownTrigger;
+@extern object MyLetters;
+@extern object EditCopyRecord;
+@extern object EditUndo;
+@extern object SearchList;
+@extern object RolPrintControl;
+@extern object SortOptions;
+
+void InsertIntoMainTable(void);
+void InitPhone(void);
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		BinarySearch
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Performs binary search on main table.  Returns a matching
+		TableEntry pointer that points into the card database.
+
+CALLED BY:	UTILITY
+
+PASS:		ds - dgroup
+		ds:sortBuffer - key
+		cx - number of entries in table
+		es:si - points to the beginning of table to search for
+	GOC: (word numAlpha, TableEntry *entry)
+
+RETURN:		es:si - offset into the table to insert or delete
+		dx - offset to the end of table
+		carry set if es:si is equal to the key in sortBuffer
+	GOC: (word - offset from beginning of table IN TableEntries!!!!!!!)
+		 file global g_match set
+
+DESTROYED:	bx, cx, di
+
+PSEUDO CODE/STRATEGY:
+	size = number of entries * (size TableEntry)
+	bottom = size + top
+loop1:
+	middle =  (size / 2) + top
+	while top != middle
+		compare passed key to table key
+		if greater
+compare:
+			if middle = bottom exit
+			else middle = middle + (size TableEntry)
+			     top = middle
+			     if top = bottom exit
+			     else go to loop1
+		if less
+loop3:		
+			if middle = top exit
+			else middle = middle - (size TableEntry)
+			     bottom = middle
+			     if top = bottom exit
+			     else go to loop1
+		if equal
+			compare secondary key
+			if greater go to compare
+			if less go to lopp3
+			if equal, exit
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	8/29/89		Initial version
+	Ted	9/19/89		Now comparsions are done in upper cases
+	Ted	3/28/90		The 1st two letters of index are already in CAPS
+	witt	2/3/94		Works with 6 byte DBCS TableEntry size
+	witt	2/7/94		Pizza specific sort mangling
+
+	12/17/04 works when called from FindEntryInCurTab which was called
+				from MSG_ROLODEX_FIND_LETTER which responds to clicks on tabs
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+word BinarySearch(word numAlpha, TableEntry *entry)
+{
+
+	/*top		local	word	; ptr to top of current search area
+	middle		local	word	; ptr to middle of current search area
+	bottom		local	word	; ptr to bottom of current search area
+	endPtr		local	word	; ptr to the end of 'gmb.GMB_mainTable' */
+ TableEntry		*top, *middle, *bottom, *endPtr, *test;
+ Boolean			/*match, */loop = TRUE, specCase = FALSE;
+ sword			compK, compN;
+ word				delta;
+
+	
+	/* initialize local variables
+	mov	top, si			; save pointer to top entry
+	mov	middle, si		; initially middle = top
+	TableEntryIndexToOffset  cx	; cx - size
+	add	si, cx			; si - points to the bottom of table */
+	top = entry;
+	middle = entry;
+	/* the difference between 'bottom' and 'endPtr' is that 'endPtr'
+		is pointing to the end of table all the time, whereas 'bottom'
+		moves around as we keep halving the size of area to be searched.
+	mov	endPtr, si
+	mov	bottom, si */
+	endPtr = entry + numAlpha;
+	bottom = entry + numAlpha;
+
+	/*tst_clc	cx			; empty table?
+	LONG	je	exit		; exit if so */
+   if (!numAlpha)  return(FALSE);
+
+	while (loop) {
+	/*mainLoop:
+		; calculate 'middle' where middle =  (size / 2) + top.
+		;	cx = record offset
+
+		mov	si, top
+		shr	cx, 1				; divided in half
+		TableEntryOffsetMask	cx ; make sure the result be in multiples of 4
+		add	si, cx		; si - middle */
+		numAlpha = numAlpha/2;
+		test = top + numAlpha;
+
+		/*cmp	si, endPtr	; is middle = end?
+		jne	compare		; if not, skip */
+		if (test == endPtr) {
+
+			/* because I eliminate the middle entry from the search list
+			; on the next iteration, it is possible that the new list will
+			; contain only one item and have size value (= bottom - top) of
+			; sizeof(TableRecord).
+			; In this case, new middle value will be pointing at bottom,
+			; which is illegal.  So following adjustment is necessary.
+
+			sub	si, cx		; restore middle value */
+			test -= (numAlpha / 2);
+
+			}
+
+		/* compare the middle entry. if greater,
+		; check bottom half of the table.  if less, top half
+	compare:
+		mov	middle, si		; we have new value for 'middle' */
+		middle = test;
+
+		/*call	CompareKeys		; compare the key fields */
+		compK = CompareKeys(test);
+
+		/*je	equal			; if equal, check entire index field
+		ja	greater  */
+
+		if (compK == 0)  {
+			/* primary key fields match, now compare the entire index field
+		equal:
+			mov	bx, ds:[curRecord]	; bx - current record handle
+			cmp	bx, es:[si].TE_item	; compare DB item handles
+			je	exit			; if equal, exit */
+			if (g_curRecord != test->TE_item) {
+
+				/* compare the entire index field
+
+				call	CompareName */
+            compN = CompareName(test);
+
+				/*ja	greater			; if greater, check bottom half */
+				if (compN > 0)  compK = 1;
+
+				/*jb	less			; if less, check top half */
+				else if (compN < 0)  compK = -1;
+
+				else {
+					/*stc				; flag equality
+					jmp	exit */
+					g_match = TRUE;
+					}
+				}
+			else {
+				g_match = TRUE;  //since we're already on the test record
+				}
+			}
+
+		if (compK < 0) {
+			/* search the top half of the table
+		less:
+			mov	si, middle */
+			test = middle;
+			/*cmp	si, top			; middle = top?
+			je	specialCase		; if so, exit */
+			if (test == top) {
+				specCase = TRUE;
+				loop = FALSE;
+				}
+			else {
+				/* we don't have to include the entry pointed to by 'middle'
+				; in this search because it has already been compared
+
+				sub	si, size TableEntry */
+				test--;
+				/*mov	bottom, si		; si - new bottom */
+				bottom = test;
+				/*cmp	top, si			; is bottom >= top?
+				jae	specialCase		; if so, exit */
+				if (top >= bottom) {
+					specCase = TRUE;
+					loop = FALSE;
+					}
+				/*jmp	mainLoop		; if not, continue... */
+				}
+			}
+		if (compK > 0)  {
+			/* search the bottom half of the table
+		greater:
+			mov	si, middle */
+			test = middle;
+			/*cmp	si, bottom		; is middle = bottom?
+			je	specialCase		; if so, exit */
+			if (test == bottom) {
+				specCase = TRUE;
+				loop = FALSE;
+				}
+			else {
+				/* we don't have to include the entry pointed to by 'middle'
+				; in this search because it has already been compared
+
+				add	si, size TableEntry */
+				test++;
+				/*mov	top, si			; si - new top */
+				top = test;
+				/*mov	di, bottom */
+				/*cmp	top, di			; bottom >= top?
+				jae	specialCase		; if so, exit */
+				if (top >= bottom) {
+					specCase = TRUE;
+					loop = FALSE;
+					}
+				else {
+					/*sub 	di, top			; di = bottom - top */
+					delta = bottom - top;
+					/*mov	cx, di			; cx = new size */
+               numAlpha = delta / sizeof(TableEntry);
+					/*jmp	mainLoop		; continue searching */
+					}
+				}
+			}
+
+		}  /* end of while loop */
+
+	/* since the entry pointed to by "middle" gets eliminated
+	; on the next iteration from the current search area,
+	; it is possible that the record being compared can be less
+	; than "middle"(which no longer is in the list) but greater 
+	; than the last item in the new search list. (This is assuming
+	; the case where the top half of the table is selected
+	; for the next iteration of search.)  In this case,
+	; the pointer has to be pushed down one entry and point 
+	; to previous "middle", so the deletion or insertion can
+	; be performed properly.
+
+	; most likely there will be only one entry in the current 
+	; search area.  What we are trying to do here is to figure
+	; out whether the offset to insert at and delete from is 
+	; the current one or the one entry after */
+
+
+	if (specCase)  {
+	/*specialCase:
+		cmp	si, endPtr		; is it pointing to the last entry?
+		je	exit			; if so, exit (carry clear) */
+		if (test == endPtr) {
+			g_match = FALSE;
+			}
+		else {
+			/*call	CompareKeys		; compare the key fields */
+			compK = CompareKeys(test);
+
+			/*jb	exitNotEqual		; if less, no need for adjustment
+			ja	adjust			; if greater, adjust the offset */
+
+			if (compK == 0)  {
+				/*mov	bx, ds:[curRecord]	; bx - current record item number
+				cmp	bx, es:[si].TE_item	; compare the item numbers
+				je	exit			; if equal, exit */
+				if (g_curRecord == test->TE_item) {
+					g_match = TRUE;
+					}
+				else  {
+					/*call	CompareName		; compare the sort fields */
+					compN = CompareName(test);
+
+					/*jb 	exitNotEqual		; if not greater, no need for adjustment */
+					if (compN < 0)  compN = -1;
+
+					/*ja	adjust			; if greater, adjust the offset */
+					else if (compN > 0)  compN = 1;
+					else  {
+						/*stc				; flag equal (XXX: will this ever?)
+						jmp	exit */
+						g_match = TRUE;
+						}
+               }
+				}
+
+			if (compK > 0) {
+			/*adjust:
+				add	si, size TableEntry	; move the pointer to next entry */
+				test++;
+            compK = -1;  // so that we fall thru to the next if
+				}
+			if (compK < 0)  {
+			/*exitNotEqual:
+				clc				; flag es:si != sortBuffer */
+				g_match = FALSE;
+            }
+
+         }
+
+		}
+
+
+/*exit:
+	mov	dx, endPtr  */
+
+	return (test - entry);
+
+	/*.leave
+	ret
+BinarySearch	endp */
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CompareKeys
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Compares two key strings using localization driver.
+
+CALLED BY:	BinarySearch, FindEntryInCurTab
+
+PASS:		es:si - pointer to TableEntry with key string2 to compare
+		ds:sortBuffer - pointer to key string1 to compare
+		ds:curLetterLen - char count for string comparison
+		ds - dgroup
+	GOC:	(TableEntry entry)
+
+RETURN:		flags set with the results of compare (Less,Equal,Greater)
+	GOC:	sword -1, 0, or +1
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	1/11/91		Initial version
+	witt	2/7/94		DBCS conversion
+	jfh	12/17/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+sword CompareKeys(TableEntry *entry)
+{
+ char		keyBuffer[2];
+ word		key;
+
+
+	/* buffer string2 - the test string */
+	key = entry->TE_key;
+	keyBuffer[1] = (char)key;
+	keyBuffer[0] = (char)(key >> 8);
+
+	return(CompareUsingSortOptionNoCase(g_sortBuffer, keyBuffer, g_curLetterLen));
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CompareName
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Compares the sort fields of two records that have same
+		first two characters.
+
+CALLED BY:	BinarySearch, LinearSearch
+
+PASS:		es:si - points to the entry in main table to be compared 
+		sortBuffer - contains sort field of record to compare
+	GOC:	(TableEntry entry)
+
+RETURN:		zero flag and carry flag are set to reflect the result
+		of comparison
+	GOC:	sword -1, 0, or +1
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	9/6/89		Initial version
+	Ted	9/19/89		Now handles lower and upper cases
+	witt	2/7/94		Pizza specific sort mangling
+   jfh	12/17/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+sword CompareName(TableEntry *entry)
+{
+ DBItem			recHan;
+ DB_Record		*record;
+ char				*string;
+ sword		comp;
+
+
+	/* get the test string - last name from the record */
+	recHan = entry->TE_item;
+	record = DBLock(g_fileHandle, g_groupHandle, recHan);
+	record++;
+	string = record;
+
+	/* compare the two strings */
+	comp = CompareUsingSortOptionNoCase(g_sortBuffer, string, 0);
+
+	DBUnlock(record);
+   return(comp);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DeleteFromMainTable
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Deletes the current record from main table.
+
+CALLED BY:	UTILITY
+
+PASS:		ds - segment of core block
+		curRecord - record handle to delete
+		sortBuffer - index field text of current record
+
+RETURN:		gmb.GMB_numMainTab is updated		
+		the record item itself continues to live, just not in the
+			main table
+
+PSEUDO CODE/STRATEGY:
+	Locate the record handle from main table
+	Move the data below this entry up four bytes
+	Decrement the counter for main table
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	8/29/89		Initial version
+	ted	12/4/89		Added checks for non-alphabetical record
+	jfh	12/21/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void DeleteFromMainTable(void)
+{
+ TableEntry		*entry;
+ word				key;
+
+	/* do some extra work if we have the index name list up */
+	if (g_displayStatus != CARD_VIEW)  {
+		@send SearchList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(
+												 g_curOffset / sizeof(TableEntry), 1);
+		}
+
+	/* open the main table */
+	entry = DBLock(g_fileHandle, g_groupHandle, g_gmb.GMB_mainTable);
+	entry += g_curOffset / sizeof(TableEntry);
+	/*grab the 1st two letters of last name */
+	key = entry->TE_key;
+	DBUnlock(entry);
+
+	/* delete this entry from the main table */
+	DBDeleteAt(g_fileHandle, g_groupHandle, g_gmb.GMB_mainTable, g_curOffset,
+                                         sizeof(TableEntry));
+
+	/* update proper number of entry variables
+
+	/* was this non-alphabetic record? */
+	if (!(LocalIsAlpha((char)(key >> 8))))
+		/* update number of non-alpha records */
+		g_gmb.GMB_numNonAlpha--;
+	else
+		/* update offset */
+		g_gmb.GMB_offsetToNonAlpha -= sizeof(TableEntry);
+
+	/* decrement the main table counter */
+	g_gmb.GMB_numMainTab--;
+	MarkMapDirty();
+
+	if (!g_gmb.GMB_numMainTab)  {
+		/* if the database is empty, disable some menus */
+		@send EditCopyRecord::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send RolPrintControl::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send SortOptions::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		}
+
+	/* update GMB_endOffset */
+	g_gmb.GMB_endOffset -= sizeof(TableEntry);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InsertRecord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Inserts current record into database file. 
+
+CALLED BY:	UTILITY
+
+PASS:		ds - segment of core block
+			curRecord, gmb.GMB_curPhoneIndex, displayStatus
+
+RETURN:		nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	9/7/89		Initial version
+	ted	12/5/89		Doesn't create the new record
+	jfh	12/22/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void InsertRecord(void)
+{
+ DB_Record		*record;
+
+
+	/* open it */
+	record = DBLock(g_fileHandle, g_groupHandle, g_curRecord);
+	/* save current phone number counter */
+	record->DBR_phoneDisp = (byte) g_gmb.GMB_curPhoneIndex;
+	/* close it */
+	DBUnlock(record);
+
+	/* read in index field into sortBuffer */
+	GetLastName();
+	/* insert record into main table */
+   InsertIntoMainTable();
+
+	/* is card view up? */
+	if (g_displayStatus != CARD_VIEW)
+		/* insert the name to name list*/
+		@send SearchList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(
+		                                g_curOffset / sizeof(TableEntry), 1);
+
+	/* clear flag */
+	g_recStatus = g_recStatus & ~RSF_NEW;
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitRecord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Creates a new record entry and initialize it.
+		
+CALLED BY:	UTILITY
+
+PASS:		ds - segment of core block
+		ax - flag to indicate whether to (0) copy everything
+			  or (-1) just phone fields
+	GOC:	Boolean phoneOnly
+
+RETURN:		dx - handle of data block
+		cx - size of data block
+		carry set if error
+	GOC:	Boolean - TRUE if error
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	9/4/89		Initial version
+	jfh	12/31/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+Boolean InitRecord(Boolean phoneOnly)
+{
+ DB_Record		*record;
+
+
+	/* allocate a new data record */
+	g_curRecord = DBAlloc(g_fileHandle, g_groupHandle, sizeof(DB_Record));
+	record = DBLock(g_fileHandle, g_groupHandle, g_curRecord);
+
+	/* initialize the header */
+	record->DBR_notes = 0;
+	record->DBR_noPhoneNo = NUM_DEFAULT_PHONE_TYPES;
+	record->DBR_toAddr = sizeof(DB_Record);
+	record->DBR_toPhone = sizeof(DB_Record);
+	record->DBR_indexSize = 0;
+	record->DBR_addrSize = 0;
+	record->DBR_phoneDisp = (byte) g_gmb.GMB_curPhoneIndex;
+	DBUnlock(record);
+
+	/* if this is called by "UNDO" routine, then we need to copy
+		all the phone numbers into this new record.  So that when
+		this old record is deleted or modified again, we can still
+		reproduce all of the phone numbers from old record. This condition
+		is also met when a phone number has been changed and the user clicks
+		the phone up/down buttons. */
+	if ((g_undoAction >= UNDO_CHANGE) && g_undoItem) {
+		/* if so, copy over all phone numbers */
+		CopyPhone();
+		}
+	else {
+		/* initialize the phone # part of record */
+		InitPhone();
+		}
+
+	/* should only phone fields updated? */
+	if (!phoneOnly)  {
+		UpdateIndex();
+		UpdateAddr();
+		UpdateNotes();
+		}
+
+	/* phone field modified? */
+	if (g_dirtyFields & DFF_PHONE) {
+		/* update phone number field */
+      return(UpdatePhone());
+		}
+
+	return(FALSE);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitPhone
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Initializes phone number entries in a record. Builds
+		"NUM_DEFAULT_PHONE_TYPES" phones, all blank.
+
+CALLED BY:	InitRecord
+
+PASS:		curRecord - current record handle
+
+RETURN:		nothing
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	* The index field has not been stored,ie, routine assumes it can
+		use memory right after the DB_Record structure.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	12/7/89		Initial version
+	jfh	12/31/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void InitPhone(void)
+{
+ DB_Record		*record;
+ word				i;
+ PhoneEntry		*pEntry;
+
+
+	/* make room for phone numbers */
+	DBInsertAt(g_fileHandle, g_groupHandle, g_curRecord, sizeof(DB_Record),
+										sizeof(PhoneEntry) * NUM_DEFAULT_PHONE_TYPES);
+
+	/* pointer to beg. of record data */
+	record = DBLock(g_fileHandle, g_groupHandle, g_curRecord);
+	/* pointer to beg. of phone #'s */
+	record++;
+	pEntry = record;
+
+	/* fill in the default data */
+	for (i = 1; i < NUM_DEFAULT_PHONE_TYPES; i++) {
+		pEntry->PE_count = 0;
+		/* save phone number type */
+		pEntry->PE_type = i;
+		/* no phone number */
+		pEntry->PE_length = 0;
+		/* go to the next entry */
+		pEntry++;
+		}
+
+	DBUnlock(record);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CopyPhone
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Copies the phone number entries into a new record.   
+
+CALLED BY:	InitRecord
+
+PASS:		ds - dgroup
+		ds:[undoItem] - handle of undo record item
+
+RETURN:		nothing
+
+PSEUDO CODE/STRATEGY:
+	Calculate how many bytes need to be copied
+	Make room for the string
+	Copy the string into current record
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	12/8/89		Initial version
+	witt	1/21/94  	DBCS-ized
+	jfh	12/31/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void CopyPhone(void)
+{
+ DB_Record		*srcRec, *destRec;
+ char				*phStrPtr, *destPtr;
+ PhoneEntry		*pEntry;
+ word				i, totLen = 0;
+
+
+	/* open up this record */
+	srcRec = DBLock(g_fileHandle, g_groupHandle, g_undoItem);
+
+	/* pointer to beg. phone entry */
+	phStrPtr = srcRec;
+	phStrPtr += srcRec->DBR_toPhone;
+	pEntry = phStrPtr;
+
+	/* see how many bytes we'll need to insert */
+	for (i = 0; i < srcRec->DBR_noPhoneNo; i++) {
+		totLen += pEntry->PE_length;
+		phStrPtr += pEntry->PE_length;
+		totLen += sizeof(PhoneEntry);
+		phStrPtr += sizeof(PhoneEntry);
+		pEntry = phStrPtr;
+		}
+	DBUnlock(srcRec);
+
+	/* make room for phone entries */
+	DBInsertAt(g_fileHandle, g_groupHandle, g_curRecord, sizeof(DB_Record),
+										totLen);
+
+	/* open it up again */
+	srcRec = DBLock(g_fileHandle, g_groupHandle, g_undoItem);
+	/* source string */
+	phStrPtr = srcRec;
+	phStrPtr += srcRec->DBR_toPhone;
+
+	/* open up current record */
+	destRec = DBLock(g_fileHandle, g_groupHandle, g_curRecord);
+	/* save new total # of phone entries */
+	destRec->DBR_noPhoneNo = srcRec->DBR_noPhoneNo;
+	/* destination */
+	destPtr = destRec;
+	destPtr += destRec->DBR_toPhone;
+
+	/* copy the phone entries */
+	memcpy(destPtr, phStrPtr, totLen);
+
+	DBUnlock(destRec);
+	DBUnlock(srcRec);
+
+	/* set update flag */
+	g_recStatus |= RSF_UPDATE;
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetRecord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Reads in all the text strings into temporary buffers.
+
+CALLED BY:	UTILITY
+
+PASS:		ds - segment of core block
+		cx - number of fields to read in
+		di - offset to FieldTable (TEFO_xxx)
+	GOC:	(word number, word offset)
+
+RETURN:		ds:fieldHandles - table of handles to data blocks
+		ds:fieldLengths - table of lengths for each string
+
+PSEUDO CODE/STRATEGY:
+	Clear empty flags, cuz there is probably something to save.
+	For each text edit field 
+		read in each text string into a temporary buffer
+		if the text field empty
+			set the appropriate flag
+		else
+			save the handle to this buffer
+			save the number of chars in each field
+	Next field
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	If the text field is empty, zero is stored as block handle.
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	9/4/89		Initial version
+   jfh	12/19/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void GetRecord(word number, word offset)
+{
+ optr		field[5] = {@LastNameField, @AddrField, @NoteText,
+							@PhoneNoTypeField, @PhoneNoField};
+ word		i, len;
+ MemHandle		mh;
+
+
+	/* assume not empty  XXX - I still need to check thes settings out
+		clear field flags - assume none of the text fields is empty
+	andnf	ds:[recStatus], not mask RSF_PHONE_NO_EMPTY and \
+				not mask RSF_PHONE_EMPTY and \
+				not mask RSF_EMPTY */
+	g_recStatus = g_recStatus & ~RSF_PHONE_NO_EMPTY
+									  & ~RSF_PHONE_EMPTY
+									  & ~RSF_EMPTY;
+
+	/*cmp	cx, 2			; read in phone fields only?
+	jg	allFields		; if not, skip */
+	if (number <= 2)  {
+		/*ornf	ds:[recStatus], mask RSF_SORT_EMPTY or \
+				mask RSF_ADDR_EMPTY or \
+				mask RSF_NOTE_EMPTY
+		jmp	fieldLoop */
+		g_recStatus = g_recStatus | RSF_SORT_EMPTY
+										  | RSF_ADDR_EMPTY
+										  | RSF_NOTE_EMPTY;
+		}
+	else {
+		/*allFields:
+		andnf	ds:[recStatus], not mask RSF_SORT_EMPTY and \
+				not mask RSF_ADDR_EMPTY and \
+				not mask RSF_NOTE_EMPTY */
+		g_recStatus = g_recStatus & ~RSF_SORT_EMPTY
+										  & ~RSF_ADDR_EMPTY
+										  & ~RSF_NOTE_EMPTY;
+		}
+
+	for (i = offset; i < 5; i++) {
+		/* read the text into a mem block*/
+		mh = @call field[i]::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+		len = (word)@call field[i]::MSG_VIS_TEXT_GET_TEXT_SIZE();
+		/* is there an old text block to delete? */
+		if (g_fieldHandles[i])  {
+			/*free the block & clear the handle */
+			MemFree(g_fieldHandles[i]);
+			g_fieldHandles[i] = 0;
+			}
+
+		/*  is this field empty? */
+		if (!len)  {
+			/* clear the handle */
+			g_fieldHandles[i] = 0;
+			/* set the RSF_****_EMPTY flag for this field */
+			g_recStatus |= (1 << (5 - i));
+			}
+		else  {
+			/* save handle of text block */
+			g_fieldHandles[i] = mh;
+			/* add one for null terminator */
+			len++;
+			}
+
+		/* save length of string  */
+		g_fieldLengths[i] = len;
+
+		number--;
+		if (!number) break;
+		}
+
+	/* set the empty flag */
+	if ((g_recStatus & RSF_SORT_EMPTY) && (g_recStatus & RSF_ADDR_EMPTY)
+							&& (g_recStatus & RSF_NOTE_EMPTY)
+							&& (g_recStatus & RSF_PHONE_NO_EMPTY))
+		g_recStatus |= RSF_EMPTY;
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InsertIntoMainTable
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Inserts the new record into main table.
+
+CALLED BY:	(INTERNAL) InsertRecord
+
+PASS:		ds - segment addr of core block
+		curRecord - handle of new record
+
+RETURN:		gmb.GMB_numMainTab updated
+
+PSEUDO CODE/STRATEGY:
+	Locate a place to insert the new record
+	Move down all the entries below it
+	If first char of letter tab is non-alpha, incr non-alpha counter.
+	Insert the new record
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	9/7/89		Initial version
+	ted	12/5/89		Added checks for non-alphabetical records
+	witt	2/1/94		DBCS-ized
+	jfh	12/22/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void InsertIntoMainTable(void)
+{
+ TableEntry		insEntry, *entry;
+ word				offset;
+
+
+	/* find offset to insertion point w/in main table
+		!!!!! offset is # entries NOT bytes !!!!! */
+	offset = FindSortBufInMainTable(&insEntry);
+
+	/* make room for one new entry in 'gmb.GMB_mainTable' */
+	DBInsertAt(g_fileHandle, g_groupHandle, g_gmb.GMB_mainTable,
+									offset * sizeof(TableEntry), sizeof(TableEntry));
+
+	/* store the key and DB handle in 'gmb.GMB_mainTable' */
+	entry = DBLock(g_fileHandle, g_groupHandle, g_gmb.GMB_mainTable);
+	entry += offset;
+	entry->TE_item = g_curRecord;
+	entry->TE_key = insEntry.TE_key;
+	DBUnlock(entry);
+
+	/* update number of entry variables */
+	g_curOffset = offset * sizeof(TableEntry);
+
+	/* was this an alphabetical record? */
+	if (!(LocalIsAlpha((char)(insEntry.TE_key >> 8))))  {
+		/* update number of non-alpha */
+		g_gmb.GMB_numNonAlpha++;
+		}
+	else  {
+		/* update offset */
+		g_gmb.GMB_offsetToNonAlpha += sizeof(TableEntry);
+		}
+
+	/* increment main table counter */
+	g_gmb.GMB_numMainTab++;
+	MarkMapDirty();
+	if (g_gmb.GMB_numMainTab == 1) {
+		/* if the database was empty before this new entry was inserted
+			enable 'CopyRecord', 'Print', 'Sorting Options' menu. */
+		@send EditCopyRecord::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send RolPrintControl::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send SortOptions::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+
+	/* update the ptr to end */
+	g_gmb.GMB_endOffset += sizeof(TableEntry);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FindSortBufInMainTable
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Attempt to find the record whose index field is in
+		ds:[sortBuffer]
+
+CALLED BY:	(EXTERNAL) InsertIntoMainTable & impex
+
+PASS:		ds	= dgroup
+		sortBuffer	= index for which to search
+	GOC:	TableEntry insEntry (an empty struct)
+
+RETURN:		carry set if found record with identical index field
+		carry clear if found insertion point
+		dx	= offset into table of found record/insertion point
+		cx	= handle of item at that offset
+		ax	= key (first two letters of index)
+	GOC:	word (offset returned from BinarySearch IN TableEntries)
+			g_match set from BinarySearch (match or not)
+			filled in TableEntry
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	10/12/94	Initial version
+	jfh	12/22/04	Port to GOC
+			1/13/05  offset needed to be init to 0 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+word FindSortBufInMainTable(TableEntry *insEntry)
+{
+ TableEntry		*entry, *start;
+ word				key, number, offset = 0;
+
+
+	/* open up the main table */
+	entry = DBLock(g_fileHandle, g_groupHandle, g_gmb.GMB_mainTable);
+
+	/* fill in the key from the sortBuffer */
+	key = g_sortBuffer[0];
+	key = key << 8;
+	key += g_sortBuffer[1];
+
+	/* check for slim case of only 1 letter */
+	if (!g_sortBuffer[1])  g_curLetterLen = 1;
+	else  g_curLetterLen = 2;
+
+	/* we'll pass start to Binary search */
+	start = entry;
+
+	/*  if main table is empty, skip search */
+	if (g_gmb.GMB_numMainTab) {
+		/* figure out which area to search, non-alphabet or alphabet */
+		if (!(LocalIsAlpha((char)(key >> 8)))) {
+			start += g_gmb.GMB_offsetToNonAlpha / sizeof(TableEntry);
+			number = g_gmb.GMB_numNonAlpha;
+			}
+		else {
+			number = g_gmb.GMB_numMainTab - g_gmb.GMB_numNonAlpha;
+			}
+
+		/* perform the binary search - offset is in # entries NOT bytes!!!
+		call	BinarySearch		; returns es:si - ptr to insert */
+		offset = BinarySearch(number, start);
+		}
+
+	/* return stuff 
+	pop	dx			; dx - beg of table
+	mov	cx, es:[si].TE_item  */
+	insEntry->TE_item = 0;  // XXX this isn't needed in call from
+									// InsertIntoMainTable - maybe from impex?
+	insEntry->TE_key = key;
+	DBUnlock(entry);
+
+   return (offset);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FindLetter
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Finds the handle of the first record in sorted order
+		whose first letter in the last name field corresponds
+		to the given letter and displays it.
+
+CALLED BY:	(GLOBAL) MSG_ROLODEX_FIND_LETTER
+
+PASS:		ds - segment of core block
+		dl - letter tab ID
+	GOC:  (word letterID)
+
+RETURN:		nothing 
+
+PSEUDO CODE/STRATEGY:
+		Updates the current record, if modified
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		Depends on FindEntryInCurTab to determine "sorted ordering."
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	9/7/89		Initial version
+	jfh	12/17/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method RolodexProcessClass, MSG_ROLODEX_FIND_LETTER
+{
+ DBItem		recHan;
+
+
+	/* XXX update the currently display record if it is modified
+
+	push	dx
+	call	SaveCurRecord		
+	pop	dx  */
+
+	/* XXX was warning box up? */
+	if (g_recStatus & RSF_WARNING) {
+
+		/* If the record is not blank and index field is empty, a warning box
+		; should have been put up by 'SaveCurRecord'.  If the user click on YES,
+		; then exit this routine,  thereby giving the user one more chance
+		; to enter data into idnex field.  Otherwise, continue.
+
+		cmp	ax, IC_YES		; was YES selected?
+		je	exit			; if so, exit */
+		}
+	else  {
+		/* is database empty? if so, skip */
+		if (g_gmb.GMB_numMainTab)  {
+			/* get the handle of record that should be displayed */
+			recHan = FindEntryInCurTab(letterID);
+			if (recHan)  {
+				/* display this record */
+				g_recStatus = RSF_FIND_LETTER;
+				DisplayCurRecord(recHan);
+				g_searchFlag = g_searchFlag & ~SOF_NEW;
+				g_recStatus = g_recStatus & ~RSF_FIND_LETTER;
+
+				/* update the index list if it is enabled */
+				if (g_displayStatus != CARD_VIEW)  {
+					UpdateNameList();
+					}
+				@send EditCopyRecord::MSG_GEN_SET_ENABLED(VUM_NOW);
+				g_recStatus = 0;
+				}
+			else {
+				/* no record to display, just clear the record fields */
+				ClearRecord();
+				g_recStatus = RSF_EMPTY | RSF_NEW;
+				g_curRecord = 0;
+				if (g_displayStatus != CARD_VIEW)
+					SetNewExclusive();
+				}
+			} /* end of 'there are records' if */
+		else {
+			/* empty, do some housekeeping before exiting */
+			@send EditCopyRecord::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+			@send LastNameField::MSG_META_GRAB_FOCUS_EXCL();
+			}
+			/* no undoable action exists */
+			g_undoItem = 0;
+		} /* end of not warning else */
+
+	@send EditUndo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	g_ignoreInput = FALSE;
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FindEntryInCurTab
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Given the letter tab ID, it returns the handle of record
+		that starts with this letter.  Possible that no letter is
+		found, as user could have clicked on a blank.
+
+CALLED BY:	FindLetter, FindNextTabLetterWithEntry,
+		FindPrevTabLetterWithEntry
+
+PASS:		dl - letter tab ID (0-based)
+
+RETURN:		si - handle of record that should be displayed 
+		si = 0 if no entry under this letter tab
+
+DESTROYED:	bx, cx, si, di, es
+
+SIDE EFFECTS:	none
+
+PSEUDO CODE/STRATEGY:
+		This routine determines the "search order", if any.
+		Uses CompareKeys for equal/not-equal compare.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	THK	6/92		Initial revision
+
+	12/17/04 works when called from MSG_ROLODEX_FIND_LETTER (above)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+DBItem FindEntryInCurTab(word letterID)
+{
+ TableEntry		*entry, *retEntry;
+ DBItem			nextRec, savedCurRec;
+ Boolean			notFound = FALSE;
+ word				numAlpha, offset;
+ sword			comp;
+
+
+	/* is database empty? if so, skip  */
+	if (!g_gmb.GMB_numMainTab) return(0);
+
+	/* get the letter tab string for the current tab ...
+		g_sortBuffer has tab string,
+		g_curLetterLen has string length. */
+	@call MyLetters::MSG_LETTERS_GET_TAB_LETTER(letterID);
+
+	/* open up the main table */
+	entry = DBLock(g_fileHandle, g_groupHandle, g_gmb.GMB_mainTable);
+
+	/*cmp	ds:[curLetterLen], 1	; tab with only one letter?
+	jne	alphabet		; if not, skip
+	jb	notFound		; don't search empty letter tabs. */
+	if (g_curLetterLen)  {
+		/* if the tab letter string starts with a space character (or NULL)
+			then it is a blank tab.  Just ignore it. */
+		if (g_sortBuffer[0] == ' ' || !g_sortBuffer[0]) {
+			notFound = TRUE;
+			}
+		else {  /* a valid letter or '*' */
+			/* is it '*'?  if not, skip */
+			if (g_sortBuffer[0] == '*') {
+				/* the current entry is the "wildcard" entry */
+				g_curOffset = g_gmb.GMB_offsetToNonAlpha;
+				/* are there any records under '*'? */
+				if (g_gmb.GMB_numNonAlpha) {
+               /* grab the first one */
+					entry += g_curOffset/sizeof(TableEntry);
+					nextRec = entry->TE_item;
+					}
+				else {
+					notFound = TRUE;
+					}
+
+				}
+			else {  /* not the '*', must be a letter */
+			/*alphabet:
+				mov	cx, ds:[gmb.GMB_numMainTab]	; cx - number of records in main table
+				sub	cx, ds:[gmb.GMB_numNonAlpha]	; cx - # of alphabetical entries */
+				numAlpha = g_gmb.GMB_numMainTab - g_gmb.GMB_numNonAlpha;
+
+				/* search the gmb.GMB_mainTable to find the handle of record that matches
+				; the given letter tab string
+
+				push	si			; save the ptr to the beg of main table
+				push	ds:[curRecord]
+				clr	ds:[curRecord]
+				call	BinarySearch		; letter tabs always in ASCII order
+					; es:si - ptr to the entry found
+				pop	ds:[curRecord]
+				pop	bp			; bp - ptr to the beg. of main table */
+				savedCurRec = g_curRecord;
+				g_curRecord = 0;
+				offset = BinarySearch(numAlpha, entry);
+				g_curRecord = savedCurRec;
+
+				/* update the variable 'curOffset'
+
+				mov	cx, si			; cx - ptr to the current record
+				sub	cx, bp			; cx - offset to current record
+				mov	ds:[curOffset], cx	; save the offset */
+				g_curOffset = offset * sizeof(TableEntry);
+				retEntry = entry + offset;
+
+				/*cmp	si, dx			; is it the last entry?
+				je	notFound		; if so, no match */
+				if (retEntry == (entry + numAlpha)) {
+					notFound = TRUE;
+					}
+
+				/* make sure we have found the right entry
+
+				call	CompareKeys
+				mov	si, es:[si].TE_item	; si - record handle (assume OK)
+				je	exit			; skip if record with this lettter  */
+				comp = CompareKeys(retEntry);
+				nextRec = retEntry->TE_item;
+				if (comp) notFound = TRUE;
+
+
+				}  /* end of not the * else */
+			}  /*end of not a space or null else */
+		}  /* end of not an empty tab if */
+	else  {
+		notFound = TRUE;
+		}
+
+	if (notFound) {
+	/*notFound:
+		clr	si			; no record found  :-( */
+		nextRec = 0;
+      }
+
+/*exit:
+	call	DBUnlock		; close main table */
+	DBUnlock(entry);
+   return(nextRec);
+
+	/*.leave
+	ret
+FindEntryInCurTab	endp */
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ClearRecord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Clears all the text edit fields and display 'HOME' for
+		phone number type name.
+
+CALLED BY:	UTILITY
+
+PASS:		ds - segment addr of core block
+
+RETURN:		nothing
+
+PSEUDO CODE/STRATEGY:
+	Clear all of the text edit fields
+	Display phone type name as "HOME"
+	Set the flag
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	Setting the initial gmb.GMB_curPhoneIndex and curPhoneType is very touche!
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	9/21/89		Initial version
+	witt	1/31/94 	Use symbolc constants instead of numbers
+   jfh	12/09/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void ClearRecord(void)
+{
+
+
+	g_curPhoneType = PTI_HOME;
+	g_gmb.GMB_curPhoneIndex = 1;
+
+	/* clear all the text edit fields  */
+	ClearTextFields(NUM_TEXT_EDIT_FIELDS + 1, 0);
+
+	/* display phone number type name*/
+   DisplayPhoneType();
+
+	/* enable phone number scroll icons */
+	@send ScrollUpTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send ScrollDownTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+	/* set the record empty flag */
+	g_recStatus |= RSF_EMPTY;
+
+
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ClearTextFields
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Clears designated text edit fields.
+
+CALLED BY:	UTILITY
+
+PASS:		ds - segment addr of core block
+		cx - number of edit fields to clear
+		si - offset into FieldTable (word aligned)
+
+
+RETURN:		recStatus set accordingly
+
+PSEUDO CODE/STRATEGY:
+	For each text edit field
+		Display empty text string
+		Set the corresponding flag
+		Advance SI to next text string ptr
+	Next text edit field
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	12/5/89		Initial version
+	jfh	12/09/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void ClearTextFields(word number, word offset)
+{
+ optr		field[5] = {@LastNameField, @AddrField, @NoteText,
+							@PhoneNoTypeField, @PhoneNoField};
+ word		i;
+
+
+	for (i = offset; i < 5; i++) {
+		@send field[i]::MSG_VIS_TEXT_DELETE_ALL();
+		/* set the RSF_***_EMPTY flag */
+		g_recStatus |= (1 << (5 - i));
+		number--;
+		if (!number) break;
+		}
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ClearTextFieldsSelection
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Clears selection in all text edit fields.
+
+CALLED BY:	UTILITY
+
+PASS:		nothing
+
+RETURN:		nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Don	4/20/95		Initial version
+	jfh	12/11/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void ClearTextFieldsSelection(void)
+{
+ optr		field[5] = {@LastNameField, @AddrField, @NoteText,
+							@PhoneNoTypeField, @PhoneNoField};
+ word		i;
+
+
+	/* loop through all of the text fields, clearing the selection in each */
+	for (i = 0; i < NUM_TEXT_EDIT_FIELDS + 1; i++) {
+		@send field[i]::MSG_VIS_TEXT_SELECT_RANGE_SMALL(0, 0);
+		}
+
+}
+
+

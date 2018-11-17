@@ -1,0 +1,315 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT: Breadbox Outliner
+ * FILE:        ui.goc
+ * AUTHOR:  John F. Howard,   05/03
+ *
+ * DESCRIPTION:
+ *  This file has the UI for the application.
+ *
+ *
+ ***********************************************************************/
+
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+@include "oliner.goh"
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+@start	AppResource;
+
+@object GenApplicationClass OLApp =  {
+	GI_comp = @OLPrimary;
+	GI_visMoniker = list {@OLTextMoniker};
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @OLPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @OLDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @OLDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+																			@OLDocumentControl;
+	ATTR_GEN_INIT_FILE_CATEGORY = "outliner";
+	ATTR_GEN_HELP_FILE = "OL Help";
+}
+
+@visMoniker OLTextMoniker = "Outliner";
+
+@end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+@start	Interface;
+
+@object GenPrimaryClass OLPrimary =  {
+	GI_comp = @FileMenu, @MainWindow, @DialogGroup;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+
+@object GenInteractionClass FileMenu = {
+	GI_comp = @OLDocumentControl;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenInteractionClass DialogGroup = {
+//	GI_comp = @CreateTopicBox;
+	GII_type = GIT_ORGANIZATIONAL;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+
+/* ----------------------------------------------------------------------------
+	 UI Document Control
+-----------------------------------------------------------------------------*/
+@object GenDocumentControlClass OLDocumentControl = {
+	GDCI_documentToken = {"OLd0", 16431};
+	GDCI_noNameText = "No Document";
+	GDCI_features = @default & ~GDCF_SUPPORTS_TEMPLATES;
+	GDCI_documentGroup = OLDocumentGroup;
+	GDCI_enableDisableList = OLEnableList;
+}
+
+@chunk optr OLEnableList[] =  {
+			@MainWindow}; 
+
+@end Interface;
+
+/* ----------------------------------------------------------------------------
+	 App Document Control
+-----------------------------------------------------------------------------*/
+@start DocumentUI;
+
+@object GenDocumentGroupClass OLDocumentGroup = {
+	GDGI_untitledName = "Untitled Outline";
+	GDGI_documentClass = &OLDocumentClass;
+	GDGI_documentControl = OLDocumentControl;
+	GDGI_protocolMajor = 1;
+	GDGI_protocolMinor = 0;
+}
+
+@end DocumentUI;
+
+
+/* ----------------------------------------------------------------------------
+	 Main Window
+-----------------------------------------------------------------------------*/
+@start Interface;
+
+@object GenInteractionClass MainWindow = {
+	GI_comp = @OLListInfo, @OLCardInfo;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+//   HINT_DIVIDE_WIDTH_EQUALLY;
+}
+
+/* ----------------------------------------------------------------------------
+	 List Window
+-----------------------------------------------------------------------------*/
+
+@object GenInteractionClass OLListInfo = {
+	GI_comp = /*@TopicGroup, */@CardDList, @ListDateDisplay, @ListTools;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+/*@object GenInteractionClass TopicGroup = {
+	GI_comp = @TopicName;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass TopicName = {
+	GI_visMoniker = "Current Topic:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+*/
+/*@object GenDynamicListClass CardDList = {
+	GDLI_numItems = 0;
+	GDLI_queryMsg = MSG_OLINER_DOC_CARD_DLIST_MONIKER_QUERY;
+	GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	GIGI_destination = (TO_APP_MODEL);
+//	GIGI_applyMsg = MSG_NTAKER_DISPLAY_CHANGE_NOTE;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_OLINER_DOC_DLIST_STATUS;
+//	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS =
+//					          MSG_NTAKER_DISPLAY_CARD_LIST_DOUBLE_CLICK;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 40, 0, 0};
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+} */
+
+	/* Because the tree portion of the extui lib does not take
+		ATTR_GEN_DESTINATION_CLASS into account when forwarding the
+		EUITRI_attach/detachMsg messages, EUITI_destination is limited.
+		Might as well just keep it going to the process.
+	*/
+@object ExtUITreeClass CardDList = {
+	GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	EUITI_destination = process;
+	EUITI_drawMsg = MSG_OLINER_PROC_CARD_DLIST_DRAW_FIELD;
+	EUITI_infoMsg = MSG_OLINER_PROC_CARD_DLIST_INFO_FIELD;
+	EUITI_applyMsg = MSG_OLINER_PROC_CARD_DLIST_APPLY;
+	EUITI_columnDesc = @CardListColDesc;
+//	EUITI_doublePressMsg = MSG_NP_MAIN_LIST_DOUBLE_PRESS ;
+	EUITI_emptyStateText = "<There are no topics to display>";
+   EUITI_fontID = FID_DTC_URW_SANS;
+	EUITRI_attachMsg = MSG_OLINER_PROC_CARD_DLIST_NODE_ATTACH;
+	EUITRI_detachMsg = MSG_OLINER_PROC_CARD_DLIST_NODE_DETACH;
+	EUITRI_treeStep = 20;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_DEFAULT_FOCUS;
+}
+
+@chunk ExtUITableColumn CardListColDesc[] = {
+	{ EUITCA_LEFT_JUSTIFIED, EUITCW_EXPAND }
+};
+
+@object GenInteractionClass ListDateDisplay = {
+//	GI_states = @default & ~GS_USABLE;
+	GI_comp = @ListCreationDate, @ListModificationDate;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+	HINT_LEFT_JUSTIFY_MONIKERS;
+}
+
+@object GenTextClass ListCreationDate = {
+	GI_visMoniker = "Creation Date:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass ListModificationDate = {
+	GI_visMoniker = "Modification Date:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@object GenInteractionClass ListTools = {
+	GI_comp = @CreateTopicBox, @DeleteTrigger, @MoveBoxTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass CreateTopicBox = {
+	GI_visMoniker = 'T', "Create New Topic";
+	GI_comp = @TopicNameTextEdit, @CreateNewTopicTrigger;
+	GII_type = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = GIA_MODAL;
+	HINT_INTERACTION_SINGLE_USAGE;
+}
+@object GenTextClass TopicNameTextEdit = {
+	GI_visMoniker = "Enter the Name of the New Topic:";
+   GTXI_maxLength = MAX_TITLE_LENGTH;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @CreateNewTopicTrigger;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_DEFAULT_FOCUS;
+}
+@object GenTriggerClass CreateNewTopicTrigger = {
+	GI_visMoniker = 'C', "Create New Topic";
+	GI_states = @default & ~GS_ENABLED;
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_CREATE_FOLDER;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass DeleteTrigger = {
+	GI_visMoniker = 'D', "Delete";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_DELETE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+
+@object GenTriggerClass MoveBoxTrigger = {
+	GI_visMoniker = 'M', "Move";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+//	GTI_actionMsg = MSG_OLINER_DOC_OPEN_MOVE_BOX;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+/* ----------------------------------------------------------------------------
+	 card Window
+-----------------------------------------------------------------------------*/
+
+@object GenInteractionClass OLCardInfo = {
+	GI_comp = @CardTitle, @CardText, @CardButtons;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass CardTitle = {
+	GI_visMoniker = "Title:";
+	GI_attrs = @default & ~GA_TARGETABLE;
+	GTXI_maxLength = MAX_TITLE_LENGTH;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @SaveCardButton;
+//	GTXI_destination = (TO_OBJ_BLOCK_OUTPUT);
+//	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+//	ATTR_GEN_PROPERTY;
+//	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 25, 0, 0};
+}
+
+@object GenTextClass CardText = {
+	GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	HINT_TEXT_WHITE_WASH_COLOR ;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass CardButtons = {
+	GI_comp = @NewCardButton, @SaveCardButton;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass NewCardButton = {
+	GI_visMoniker = 'N', "New Card";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_NEW_CARD;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+
+@object GenTriggerClass SaveCardButton = {
+	GI_visMoniker = 'S', "Save Card";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SAVE_CARD;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+
+@end Interface;
+
+/* ----------------------------------------------------------------------------
+	 Various dialog boxes
+-----------------------------------------------------------------------------*/
+/*@start DialogUI;
+
+
+@end DialogUI;
+*/
+

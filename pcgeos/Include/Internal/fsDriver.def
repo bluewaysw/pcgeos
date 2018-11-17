@@ -1,0 +1,1033 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Interface Definition for FS driver
+FILE:		fsDriver.def
+
+AUTHOR:		Adam de Boor, Apr  6, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	4/ 6/90		Initial revision
+
+
+DESCRIPTION:
+	Interface definition for FileSystem drivers used by the kernel.
+		
+	$Id: fsDriver.def,v 1.1 97/04/04 14:15:12 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__FSDRIVER
+
+StartDriver	fsd
+
+include driver.def
+include Internal/fsd.def
+
+;
+; Protocol number for this interface. Adjust the final numbers, below, if the
+; interface is changed.
+;
+FS_PROTO_MAJOR equ DRIVER_EXT_PROTO_MAJOR+1
+FS_PROTO_MINOR equ DRIVER_EXT_PROTO_MINOR+0
+
+SFN		type	byte	; System File Numbers only take 1 byte
+
+FSDriverInfoStruct	struct
+    FSDIS_common	DriverExtendedInfoStruct <
+	<
+		0,		; DIS_strategy
+		<
+			1,	; DA_FILE_SYSTEM
+			0,	; DA_CHARACTER
+			1,	; DA_HAS_EXTENDED_INFO
+		>,
+		DRIVER_TYPE_FILE_SYSTEM
+	>,
+	0		; DEIS_resource
+    >
+    FSDIS_flags		FSDFlags	; Flags for the driver
+    FSDIS_altStrat	fptr.far	; Auxiliary strategy routine for
+					;  communication between drivers.
+					;  Hand-offs from secondary to primary
+					;  FSDs occur through this vector.
+					;  Likewise, when a primary must
+					;  contact the secondary to have it
+					;  do some work, it will call through
+					;  this vector of the secondary.
+    FSDIS_altProto	ProtocolNumber	; Protocol number to which the altStrat
+					;  routine conforms.
+FSDriverInfoStruct	ends
+
+FSFunction	etype	word, DriverExtendedFunction, 2
+;
+;	NOTES:
+;
+;	All functions are allowed to destroy di and bp. All other registers
+;	must be preserved unless they are returning a value or are explicitly
+;	noted as being destroyable.
+;
+
+;DR_INIT		enum	DriverFunction
+;
+;	Desc:	Initialize the driver
+;	Pass:	nothing
+;	Return:	nothing
+
+;DR_EXIT		enum	DriverFunction
+;
+;	Desc:	Exit the driver. Truncates the SFT to its original size, etc.
+;		THIS MUST BE CALLED SPECIALLY IF RemoveGeodes DOESN'T COMPLETE
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+;DRE_TEST_DEVICE		enum	DriverExtendedFunction
+;	PASS:		dx:si	= pointer to null-terminated device name string
+;	RETURN:		ax	= DevicePresent
+;			carry set if DP_INVALID_DEVICE, clear otherwise
+;	DESTROYS:	di
+;
+;	This function tests the existence of a particular device the driver
+;	supports.
+;
+;	FSD's don't actually get this call, as things currently stand. They are
+;	extended drivers simply so Preferences can get them into a list
+;	more easily. FSDs should always return carry clear and DP_PRESENT
+;
+
+;DRE_SET_DEVICE		enum	DriverExtendedFunction
+;	PASS:		dx:si	= pointer to null-terminated device name string
+;	RETURN:		nothing
+;	DESTROYS:	di
+;
+;	This function informs the driver which of its many devices it is to
+;	support.
+;
+;	FSD's don't actually get this call, as things currently stand. They are
+;	extended drivers simply so Preferences can get them into a list
+;	more easily. FSDs should ignore this call.
+;
+
+;------------------------------------------------------------
+; up-to-date function descriptions
+;------------------------------------------------------------
+
+;==============================================================================
+;			  DISK-RELATED CALLS
+;==============================================================================
+DR_FS_DISK_ID	enum	FSFunction
+;
+;	Desc:	Return the 32-bit ID for the disk currently in the passed
+;		drive.
+;	Pass:	es:si	= DriveStatusEntry for the drive
+;	Return:	carry set if ID couldn't be determined
+;		carry clear if it could:
+;			cx:dx	= 32-bit ID
+;			al	= DiskFlags for the disk
+;			ah	= MediaType for the disk
+;	Destroy:nothing
+;
+
+DR_FS_DISK_INIT	enum	FSFunction
+;
+;	Desc:	Initialize a new disk handle with the remaining pertinent
+;		information. The FSInfoResource is locked for shared access
+;		and its segment is passed in ES for use by the driver.
+;
+;		NOTE: The offset received by this routine is not the offset
+;		that will be returned to the application performing the
+;		disk registration; do not under any circumstances record the
+;		offset of either the descriptor or its private data.
+;
+;	Pass:	es:si	= DiskDesc for the disk, with all fields but
+;			  DD_volumeLabel filled in. DD_private points to a
+;			  chunk large enough to hold the private data for
+;			  all registered filesystem drivers.
+;		ah	= FSDNamelessAction to be passed to FSDGenNameless if
+;			  the disk has no volume label.
+;	Return:	carry set on failure
+;		carry clear on success
+;			es	= fixed up if a chunk was allocated by the FSD
+;			DD_volumeLabel filled in (space-padded, not
+;				null-terminated).
+;			DD_private chunk filled in if driver told the kernel
+;				it keeps private data for disks.
+;	Destroy:nothing
+;
+
+DR_FS_DISK_LOCK		enum	FSFunction
+;
+;	Desc:	Make sure the passed disk is in its drive, asking the user
+;		to insert it if necessary. If DR_FS_DISK_ID always returns
+;		with DF_ALWAYS_VALID set, this function of the FSD will never be
+;		called.
+;	Pass:	es:si	= DiskDesc for the disk to be locked in.
+;		al	= FILE_NO_ERRORS bit set if disk lock may not be
+;			  aborted by the user.
+;	Return:	carry set if disk could not be locked
+;	Destroy:ax
+;
+
+DR_FS_DISK_UNLOCK	enum	FSFunction
+;
+;	Desc:	Notifies the FSD that whatever I/O was being performed to the
+;		disk is now complete.
+;	Pass:	es:si	= DiskDesc for the disk being unlocked
+;	Return:	nothing
+;	Destroy:nothing (flags may be biffed)
+;
+	
+FSFormatArgs	struct
+    FSFA_drive		byte
+    FSFA_media		MediaType	; MediaType of desired format (checked
+					; for compatibility with formats
+					; supported by drive)
+    FSFA_callback	fptr.far	; callback routine, if FSFA_flags
+					;  indicates callback needed
+					;  (vfptr if XIP'ed)
+    FSFA_ds		sptr		; value to pass in DS
+    FSFA_volumeName	fptr.char	; new volume name for disk
+    FSFA_flags		DiskFormatFlags
+    FSFA_disk		word		; handle of disk in drive (0 if disk
+					;  known to be unformatted)
+    FSFA_dse		word		; offset of DriveStatusEntry
+FSFormatArgs	ends
+
+DR_FS_DISK_FORMAT	enum	FSFunction
+;
+;	Desc:	Format the disk currently in the passed drive to the passed
+;		format. NOTE: the FSInfoResource should *not* be locked for
+;		the duration of the format, as this will prevent disks in
+;		other drives from being registered. If the FSInfoResource must
+;		be consulted, lock it, get your data, and unlock it.
+;
+;	Pass:	ss:bx	= FSFormatArgs (contents may not be modified)
+;	Return:	carry set on failure:
+;			ax	= error code
+;			di, cx, dx = destroyed
+;		carry clear on success:
+;			ax:di	= bytes in good clusters
+;			dx:cx	= bytes in bad clusters
+;	Destroy:nothing
+
+DR_FS_DISK_FIND_FREE	enum	FSFunction
+;
+;	Desc:	Determine the number of bytes of free space available on
+;		the passed disk.
+;
+;	Pass:	es:si	= DiskDesc of disk whose free space is desired (disk
+;			  is locked into drive)
+;	Return:	carry set on  error:
+;			ax	= error code
+;		carry clear if ok:
+;			dx:ax	= # bytes free on the disk.
+;
+
+DR_FS_DISK_INFO		enum	FSFunction
+;
+;	Desc:	Return useful information about a disk all in one fell swoop
+;
+;	Pass:	bx:cx	= fptr.DiskInfoStruct
+;		es:si	= DiskDesc of disk whose info is desired (disk is
+;			  locked shared in the drive)
+;	Return:	carry set on error
+;			ax	= error code
+;		carry clear if successful
+;			buffer filled in.
+;
+
+DR_FS_DISK_RENAME	enum	FSFunction
+;
+;	Desc:	Change the volume name of the passed disk. The disk has been
+;		locked into its drive for exclusive access, and the FSIR is
+;		locked for shared access. FSD is expected to perform
+;		whatever mapping is necessary for its filesystem and copy the
+;		result into the DiskDesc if the rename is successful.
+;
+;	Pass:	es:si	= DiskDesc of disk to be renamed (locked for exclusive
+;			  access...)
+;		ds:dx	= new name for disk
+;	Return:	carry set on error:
+;			ax	= error code
+;		carry clear if successful
+;
+
+FSCopyArgs	struct
+    FSCA_source		word		; offset of source drive's DSE
+    FSCA_dest		word		; offset of dest drive's DSE
+    FSCA_disk		word		; handle of source disk
+    FSCA_callback	fptr.far	; callback function (vfptr if XIP'ed)
+    FSCA_flags		DiskCopyFlags
+FSCopyArgs	ends
+
+DR_FS_DISK_COPY		enum	FSFunction
+;
+;	Desc:	Copy from one disk in a drive managed by the FSD to a disk
+;		in another drive managed by the FSD.
+;
+;	Pass:	ss:bx	= FSCopyArgs
+;	Return:	carry set on error:
+;			ax	= DiskCopyError
+;		carry clear if ok:
+;			ax	= destroyed
+;
+
+DR_FS_DISK_SAVE		enum	FSFunction
+;
+;	Desc:	Append whatever private data the driver will require to
+;		restore the passed disk descriptor. The system portion
+;		(FSSavedDisk) will already have been filled in, with
+;		FSSD_private set to the offset at which the driver should
+;		store its information.
+;
+;		NOTE: The registers passed to this function are non-standard
+;		(the FSIR is in DS, not ES).
+;
+;	Pass:	ds:bx	= DiskDesc being saved (not locked; FSIR locked shared)
+;		es:dx	= place to store FSD's private data
+;		cx	= # bytes FSD may use
+;	Return:	carry clear if disk saved:
+;			cx	= # bytes actually taken by FSD-private data
+;		carry set if disk not saved:
+;			cx	= # bytes needed by FSD-private data (0 =>
+;				  other error)
+;
+
+DR_FS_DISK_RESTORE	enum	FSFunction
+;
+;	Desc:	Perform whatever actions are needed before the kernel attempts
+;		to restore a disk handle.
+;
+;		The main purpose of this function is for network FSDs that
+;		should ensure the drive about to be used is actually mapped
+;		to the same remote path it was mapped to when the disk was
+;		saved, or to mount the appropriate path if the kernel doesn't
+;		actually know what drive it will use.
+;
+;	Pass:	es	= FSIR locked exclusive
+;		ds:si	= FSSavedDisk structure.
+;		bx	= DriveStatusEntry for drive in which disk will be
+;			  sought; 0 if drive unknown
+;	Return:	carry set if disk couldn't be restored:
+;			ax	= DiskRestoreErrors
+;		carry clear if disk should be ok to restore:
+;			bx	= DriveStatusEntry where the disk should be.
+;		es	= fixed up to current location of FSIR
+;
+
+;==============================================================================
+
+DR_FS_CHECK_NET_PATH	enum	FSFunction
+;
+;	Desc:	Examine a network path (something beginning with \\) to see
+;		if it belongs to this network, returning a disk handle and
+;		a (possibly new) path for the file to be manipulated if so.
+;
+;	Pass:	ds:dx	= path to check
+;		es	= FSInfoResource locked shared.
+;	Return:	carry set if path belongs to this net but cannot be reached
+;			(e.g. not logged into the server)
+;		carry clear if call ok:
+;			bx	= disk handle to use, 0 if path not ours
+;			ds:dx	= file path to actually use (may be different,
+;				  but doesn't have to be)
+;			es	= new location of FSIR if disk handle had
+;				  to be allocated
+;	Destroy:nothing
+;
+
+;==============================================================================
+;			CURRENT-PATH FUNCTIONS
+;==============================================================================
+DR_FS_CUR_PATH_SET	enum	FSFunction
+;
+;	Desc:	Change the thread's current working directory to be that
+;		passed in, if the directory actually exists. If the change
+;		is successful, the driver should add whatever private data
+;		it needs at FP_private and point FP_path beyond that data.
+;
+;		Before doing so, the driver should call FSDInformOldFSDOfPath-
+;		Nukage to inform the previous filesystem driver for the path
+;		that it is losing control of the block, so it may clean up any
+;		state indicated by the private data it stored in the block.
+;		The only time it need not do this is when it, itself, is the
+;		previous driver and it has nothing to do on
+;		DR_FS_CUR_PATH_DELETE.
+;
+;		Once this is done, the driver has free rein of the block
+;		following FP_private.
+;
+;		It is the kernel's responsibility to copy in whatever
+;		logical path it sees fit to return to applications in
+;		light of the driver's success in setting the path.
+;
+;		NOTE: THE PRIMARY FSD MUST BE ABLE TO ACCEPT CALLS TO
+;		THIS FUNCTION (AND DR_FS_CUR_PATH_DELETE) FOR DRIVES THAT
+;		IT DOES NOT MANAGE.
+;
+;	Pass:	ds:dx	= path to set, w/o drive specifier (always absolute)
+;		es:si	= disk on which the path resides
+;	Return:	carry clear if directory-change was successful:
+;			TPD_curPath block altered to hold the private data
+;			required by the FSD. The FSD may have resized the block.
+;			FP_pathInfo must be set to FS_NOT_STANDARD_PATH
+;			FP_stdPath must be set to SP_NOT_STANDARD_PATH
+;		carry set if error:
+;			Either the directory to which the thread was
+;			attempting to change doesn't exist:
+;				ax	= ERROR_PATH_NOT_FOUND
+;				TPD_curPath may not be altered in any
+;				way.
+;
+;			OR: A link was encountered, which needs to be
+;			traversed by the kernel.
+;			    *** see NOTE 1 ***
+;
+; NOTE 1 -- LINKS:
+;
+; 	When the FS driver encounters a link as one of the components
+; in the path (or, perhaps, the only component), it should return the
+; error ERROR_LINK_ENCOUNTERED, and construct a block of data that the
+; kernel can use to traverse the link.  The reason traversal is done
+; in the kernel is that the link target may be on a different disk, 
+; run by a different FS driver, than the link.  The FS driver should
+; allocate a locked block whose header is the FSPathLinkData
+; structure, with the saved disk data coming after the header (at
+; FPLD_targetSavedDisk), and then the path of the target, followed by
+; any trailing components of the original path that weren't mapped by
+; the FS driver.  The FS driver should NOT attempt to restore the
+; disk, since a deadlock situation could occur if DiskRestore is
+; unable to grab the FSIR exclusive lock.
+;
+;	Destroy:nothing
+;
+FS_NOT_STANDARD_PATH	equ	DirPathInfo <1, 0, SP_NOT_STANDARD_PATH>
+
+DR_FS_CUR_PATH_GET_ID	enum	FSFunction
+;
+;	Desc:	Fetch the 32-bit ID number for the thread's current directory.
+;
+;	Pass:	es:si	= DiskDesc on which path is located (locked)
+;	Return:	cx:dx	= 32-bit ID
+;	Destroy:nothing
+;
+
+DR_FS_CUR_PATH_DELETE	enum	FSFunction
+;
+;	Desc:	The passed path block is being deleted by the kernel, or is
+;		being taken over by another FSD. Take whatever action is
+;		appropriate vis a vis the private data we've stored in it.
+;
+;		This routine may not cause the path block to be moved on
+;		the heap, should it be locked when this routine is called.
+;
+;		XXX: the function name is no longer appropriate.
+;
+;	Pass:	bx	= path handle
+;		es:si	= disk handle on which path is located
+;	Return:	nothing
+;	Destroy:si
+;
+
+DR_FS_CUR_PATH_COPY	enum	FSFunction
+;
+;	Desc:	The passed path block is being duplicated by the kernel
+;		Take whatever action is	appropriate vis a vis the private
+;		data we've stored in it (e.g. noting another reference to it
+;		so when DR_FS_CUR_PATH_DELETE is called, you don't actually
+;		delete the data).
+;
+;		This routine may not cause the path block to be moved on
+;		the heap, should it be locked when this routine is called.
+;
+;	Pass:	bx	= path handle (new block)
+;		cx	= path handle (old block)
+;		es:si	= disk handle on which path is located
+;	Return:	nothing
+;	Destroy:si
+;
+
+;==============================================================================
+;			 FILE/PATH OPERATIONS
+;==============================================================================
+DR_FS_HANDLE_OP		enum	FSFunction
+;
+;	Desc:	Perform an operation on a file handle. If appropriate, the
+;		disk on which the file is located will have been locked into
+;		its drive.
+;	Pass:	ah	= FSHandleOpFunction to perform
+;		bx	= handle of open file
+;		es:si	= DiskDesc (FSInfoResource and affected drive locked
+;			  shared)
+;		other parameters as appropriate.
+;	Return:	carry set on error:
+;			ax	= error code
+;		carry clear if successful:
+;			return values depend on subfunction
+;	Nuked:	bx
+;
+
+FSHandleOpFunction	etype	byte
+    FSHOF_READ		enum	FSHandleOpFunction
+    ;	Pass:	ds:dx	= buffer to which to read
+    ;		cx	= # bytes to read
+    ;	Return:	carry clear if successful:
+    ;			ax	= # bytes read
+
+    FSHOF_WRITE		enum	FSHandleOpFunction
+    ;	Pass:	ds:dx	= buffer from which to write
+    ;		cx	= # bytes to write
+    ;	Return:	carry clear if successful:
+    ;			ax	= # bytes written
+
+    FSHOF_POSITION	enum	FSHandleOpFunction
+    ;	Pass:	al	= FilePosMode
+    ;		cx:dx	= offset to use
+    ;	Return:	carry clear if successful:
+    ;			dx:ax	= new absolute file position
+
+    FSHOF_TRUNCATE	enum	FSHandleOpFunction
+    ;	Pass:	cx:dx	= size to which to truncate the file
+    ;	Return:	nothing (besides carry & error code)
+    ;
+
+    FSHOF_COMMIT	enum	FSHandleOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	nothing (besides carry & error code)
+
+    FSHOF_LOCK		enum	FSHandleOpFunction
+    ;	Pass:	ss:cx	= pointer to FSHLockUnlockFrame
+    ;	Return:	nothing (besides carry & error code)
+    ;	Nuked:	cx
+    ;
+
+    FSHOF_UNLOCK	enum	FSHandleOpFunction
+    ;	Pass:	ss:cx	= pointer to FSHLockUnlockFrame
+    ;	Return:	nothing (besides carry & error code)
+    ;	Nuked:	cx
+    ;
+FSHLockUnlockFrame	struct
+    FSHLUF_regionStart	dword
+    FSHLUF_regionLength	dword
+FSHLockUnlockFrame	ends
+
+    FSHOF_GET_DATE_TIME	enum	FSHandleOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	cx	= last modification time (FileTime record)
+    ;		dx	= last modification date (FileDate record)
+    ;
+
+    FSHOF_SET_DATE_TIME	enum	FSHandleOpFunction
+    ;	Pass:	cx	= new modification time (FileTime record)
+    ;		dx	= new modification date (FileDate record)
+    ;	Return:	nothing (besides carry & error code)
+    ;
+
+    FSHOF_FILE_SIZE	enum	FSHandleOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	dx:ax	= size of the file
+    ;
+
+    FSHOF_ADD_REFERENCE	enum	FSHandleOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	nothing extra
+    ;
+
+    FSHOF_CHECK_DIRTY	enum	FSHandleOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	ax	= non-zero if file is dirty.
+    ;
+    ;	Notes:	This is used by the FileClose code in the kernel to determine
+    ;		if it needs to lock the file's disk. IF THE FSD SAYS THE
+    ;		FILE IS NOT DIRTY, THE DISK WILL NOT BE LOCKED AND NO I/O FOR
+    ;		THE FILE MAY TAKE PLACE.
+    ;
+
+    FSHOF_CLOSE		enum	FSHandleOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	nothing extra
+    ;
+    ;	Notes:	As noted for FSHOF_CHECK_DIRTY, the disk will not be locked
+    ;		unless the previous call to FSHOF_CHECK_DIRTY returned that
+    ;		the file was dirty. If the disk is not locked, no I/O may
+    ;		take place on behalf of the file, not even to update its
+    ;		directory entry.
+    ;
+
+    FSHOF_GET_FILE_ID	enum	FSHandleOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	cx:dx	= file ID
+    ;
+
+    FSHOF_CHECK_NATIVE	enum	FSHandleOpFunction
+    ;	Pass:	ch	= FileCreateFlags
+    ;	Return:	carry set if file is compatible with the FCF_NATIVE flag
+    ;		passed in CH.
+    ;
+ 
+FSHandleExtAttrData	struct
+    FHEAD_attr		FileExtendedAttribute
+    FHEAD_buffer	fptr.byte
+FSHandleExtAttrData	ends
+
+    FSHOF_GET_EXT_ATTRIBUTES enum FSHandleOpFunction
+    ;	Pass:	ss:dx	= FSHandleExtAttrData
+    ;		cx	= size of FHEAD_buffer, or # entries in same if
+    ;			  FHEAD_attr is FEA_MULTIPLE
+    ;	Return:	nothing extra
+    
+    FSHOF_SET_EXT_ATTRIBUTES enum FSHandleOpFunction
+    ;	Pass:	ss:dx	= FSHandleExtAttrData
+    ;		cx	= size of FHEAD_buffer, or # entries in same if
+    ;			  FHEAD_attr is FEA_MULTIPLE
+    ;	Return:	nothing extra
+    
+    FSHOF_GET_ALL_EXT_ATTRIBUTES enum FSHandleOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	ax	= handle of locked block with array of FileExtAttrDesc
+    ;			  structures for all attributes possessed by the file,
+    ;			  except those that can never be set.  In any
+    ;			  event, FEA_NAME should never be returned.
+    ;		cx	= number of entries in that array.
+    ;
+
+    FSHOF_FORGET	 enum FSHandleOpFunction
+    ;
+    ;	Desc:	The file has been closed by the network, owing to something
+    ;		logging us in as someone else. The driver should forget any
+    ;		information it has about the file in question.
+    ;	Pass:	nothing extra
+    ;	Return:	nothing extra
+    ;
+
+    FSHOF_SET_FILE_NAME	enum	FSHandleOpFunction
+    ;
+    ; 	Desc:	Take note of the actual pathname of a file opened before
+    ;		the filesystem driver was loaded.
+    ;	Pass:	ds:dx	= absolute pathname (minus drive specifier)
+    ;	Return:	nothing extra
+    ;
+
+DR_FS_ALLOC_OP		enum	FSFunction
+;
+;	Desc:	Perform a filesystem operation that will allocate a new file
+;		handle.
+;	Pass:	al	= FullFileAccessFlags
+;		ah	= FSAllocOpFunction to perform.
+;		ds:dx	= path
+;		es:si	= DiskDesc on which the operation will take place,
+;			  locked into drive (FSInfoResource and affected drive
+;			  locked shared). si may well not match the disk handle
+;			  of the thread's current path, in which case ds:dx is
+;			  absolute.
+;
+;	Return:	Carry clear if operation successful:
+;			al	= SFN of open file
+;			ah	= non-zero if opened to device, not file.
+;			dx	= private data word for FSD
+;
+;		Carry set if operation unsuccessful:
+;			ax	= error code.  See NOTE 1 about links
+
+FSAllocOpFunction	etype byte
+    FSAOF_OPEN		enum	FSAllocOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	nothing extra
+    ;
+
+    FSAOF_CREATE		enum	FSAllocOpFunction
+    ;	Pass:	cl	= FileAttrs
+    ;		ch	= FileCreateFlags
+    ;	Return:	nothing extra
+    ;	Notes:	the passed file does not exist, according to the kernel, so
+    ;		the checking for disk writability that applies to FSAOF_OPEN
+    ;		does not apply here, for the simple reason that the kernel
+    ;		will have already checked it.
+    ;
+    ;		The driver should return an error if the file is found to
+    ;		actually exist, rather than truncating the existing file.
+    ;
+
+    FSAOF_REOPEN		enum	FSAllocOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	nothing extra
+    ;
+
+DR_FS_PATH_OP		enum	FSFunction
+;
+;	Desc:	Perform some other operation on a file path that doesn't
+;		involve the allocation of a file handle.
+;
+;		If the operation to be performed is destructive to the path
+;		on which it's to be performed, the FSD is responsible for
+;		ensuring the path is not actively in-use by any thread.
+;
+;		For a directory, this means it is not in the path stack of
+;		any thread (XXX: this is something of a bitch when std paths
+;		are involved). For a file, no handle may be open to the file.
+;
+;	Pass:	ah	= FSPathOpFunction to perform
+;		ds:dx	= path on which to perform the operation
+;		es:si	= DiskDesc for disk on which to perform it, locked
+;			  into drive (FSInfoResource and affected drive locked
+;			  shared). si may well not match the disk handle
+;			  of the thread's current path, in which case ds:dx is
+;			  absolute.
+;	Return:	carry clear if successful:
+;			return values vary by function
+;		carry set if unsuccessful:
+;			ax	= error code.  See NOTE 1 about links
+;
+
+FSPathOpFunction	etype	byte
+    FSPOF_CREATE_DIR	enum	FSPathOpFunction
+    FSPOF_DELETE_DIR	enum	FSPathOpFunction
+    ;	Pass:	path-modification semaphore grabbed
+    ;	Return:	nothing extra
+    ;
+    
+    FSPOF_DELETE_FILE	enum	FSPathOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	nothing extra
+
+    FSPOF_RENAME_FILE	enum	FSPathOpFunction
+    ;	Pass:	bx:cx	= new name for file (*not* path)
+    ;	Return:	nothing extra
+    ;
+    ;	Notes:	FSD is responsible for ensuring the source file or directory
+    ;		is not in-use before renaming it.
+
+FSMoveFileData	struct
+    FMFD_dest	fptr.char
+FSMoveFileData	ends
+
+    FSPOF_MOVE_FILE	enum 	FSPathOpFunction
+    ;	Pass:	es:cx	= DiskDesc of destination (locked)
+    ;		ss:bx	= FSMoveFileData
+    ;	Return:	nothing extra
+    ;
+    ;	Notes:	FSD is responsible for ensuring the source file or directory
+    ;		is not in-use before moving it.
+
+    FSPOF_GET_ATTRIBUTES enum	FSPathOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	cx	= FileAttrs
+
+    
+    FSPOF_SET_ATTRIBUTES enum	FSPathOpFunction
+    ;	Pass:	cx	= FileAttrs
+    ;	Return:	nothing extra
+
+FSPathExtAttrData	struct
+    FPEAD_attr		FileExtendedAttribute
+    FPEAD_buffer	fptr.byte
+FSPathExtAttrData	ends
+
+    FSPOF_GET_EXT_ATTRIBUTES enum FSPathOpFunction
+    ;	Pass:	ss:bx	= FSPathExtAttrData
+    ;		cx	= size of FPEAD_buffer, or # entries in same if
+    ;			  FPEAD_attr is FEA_MULTIPLE
+    ;	Return:	nothing extra
+    
+    FSPOF_GET_ALL_EXT_ATTRIBUTES enum FSPathOpFunction
+    ;	Pass:	nothing extra
+    ;	Return:	ax	= handle of locked block with array of FileExtAttrDesc
+    ;			  structures for all attributes possessed by the file,
+    ;			  except those that can never be set.  In any
+    ;			  event,  FEA_NAME should never be returned.
+    ;		cx	= number of entries in that array.
+    ;
+    
+    FSPOF_SET_EXT_ATTRIBUTES enum FSPathOpFunction
+    ;	Pass:	ss:bx	= FSPathExtAttrData
+    ;		cx	= size of FPEAD_buffer, or # entries in same if
+    ;			  FPEAD_attr is FEA_MULTIPLE
+    ;	Return:	nothing extra
+    
+    FSPOF_MAP_VIRTUAL_NAME enum FSPathOpFunction
+    ;	Pass:	bx:cx	= buffer in which to place the native path, in the
+    ;			  native character set, for the passed absolute
+    ;			  path name. This may be the same as ds:dx, so
+    ;			  the final copying must be delayed until the
+    ;			  input path has been processed.
+    ;	Return:	nothing extra
+    ;
+    ;	Notes:	this is a thinly-disguised utility routine for DosExec to
+    ;		fetch the DOS name of the program and working directory.
+    ;		If DOS will be unable to access files on this filesystem
+    ;		when PC/GEOS has shut down or been task-switched out,
+    ;		the FSD must return ERROR_UNSUPPORTED_FUNCTION.
+
+    FSPOF_MAP_NATIVE_NAME enum FSPathOpFunction
+    ;	Pass:	bx:cx	= buffer in which to put the virtual form of the
+    ;			  passed native path. This will not be the same
+    ;			  as ds:dx.
+    ;   Return:	nothing extra
+    ;
+    ;   Notes:	this is another utility routine for both DosExec and
+    ;		SysLocateFileInPath. Since DOS seems to know about the drive,
+    ;		however, there's no question of whether the FSD should
+    ;		support this function....
+
+FSPathLinkData	struct
+    FPLD_targetPath		fptr.PathName
+    FPLD_targetSavedDiskSize	word
+    ; size of the saved disk data -- 0 if none.
+
+    FPLD_targetSavedDisk	label	byte
+FSPathLinkData	ends
+
+    FSPOF_CREATE_LINK enum FSPathOpFunction
+    ;
+    ;   Pass:  	bx - handle of FSPathLinkData block containing target
+    ;   	path and saved disk
+    ;	Return:	nothing extra
+
+
+    FSPOF_READ_LINK enum FSPathOpFunction
+    ; Return the pathname and disk handle of a link.
+    ;
+    ; NOTE:  If this file is not a link, then the driver should return
+    ; the error ERROR_NOT_A_LINK. 
+    ;
+    ;   Pass:	nothing 
+    ;   Return: cx - handle of FSPathLinkData block (see NOTE 1)
+    ;
+
+FSPathLinkExtraDataParams	struct
+    FPLEDP_buffer	fptr
+FSPathLinkExtraDataParams	ends			
+
+    FSPOF_SET_LINK_EXTRA_DATA enum FSPathOpFunction
+    ; Set the "extra data" associated with a link file. 
+    ; NOTE:  If this file is not a link, then the driver should return
+    ; the error ERROR_NOT_A_LINK. 
+    ;
+    ;	Pass:	ss:bx - FSPathLinkExtraDataParams
+    ; 		   cx - size of FPLEDP_buffer
+    ;	Return: nothing extra
+    ;
+
+    FSPOF_GET_LINK_EXTRA_DATA enum FSPathOpFunction
+    ; Retrieve the extra data associated with a link file. 
+    ;
+    ; NOTE:  If this file is not a link, then the driver should return
+    ; the error ERROR_NOT_A_LINK. 
+    ;
+    ;	Pass:	ss:bx - FSPathLinkExtraDataParams
+    ; 		   cx - size of FPLEDP_buffer, or 0
+    ;	Return: cx - # of bytes read, or size of data if cx was zero.
+    ;
+
+    FSPOF_CREATE_DIR_WITH_NATIVE_SHORT_NAME	enum	FSPathOpFunction
+    ; On some strange file system that supports two (or more) namespaces,
+    ; this function tells the FS driver to create a directory with a native
+    ; name in its smaller namespace (or one of its smaller namespaces).
+    ; (E.g. MS-DOS 7 supports long names as well as 8.3 names, and this
+    ; function tells MSLF driver to create a directory with an 8.3 native
+    ; DOS name.
+    ;
+    ; NOTE: This function is not necessarily supported by all FS drivers.
+    ; Drivers that don't support this function should either map the function
+    ; to FSPOF_CREATE_DIR or return ERROR_UNSUPPORTED_FUNCTION.
+    ;
+    ;	Pass:	path-modification semaphore grabbed
+    ;	Return:	nothing extra
+    ;
+
+
+DR_FS_COMPARE_FILES	enum	FSFunction
+;
+;	Desc:	compare two open files (given their SFNs) to see if they
+;		refer to the same disk file. Note: one or both SFN may actually
+;		be invalid, owing to the lack of synchronization during
+;		the closing of a file. The driver must check for this and
+;		return that the two are unequal.
+;	Pass:	al	= SFN of first file
+;		bx	= private data of first file
+;		cl	= SFN of second file
+;		dx	= private data of second file
+;	Return:	ah	= flags byte (for sahf) that will allow je if the
+;			  two files refer to the same disk file (carry will be
+;			  clear after sahf).
+
+DR_FS_FILE_ENUM		enum	FSFunction
+;
+;	Desc:	Enumerate all files/dirs in the thread's current directory
+;		calling the kernel back for each one after gathering whatever
+;		extended file attributes are requested.
+;
+;	Pass:	cx:dx	= routine to call back  (vfptr if XIP'ed)
+;		ds	= segment of FileEnumCallbackData
+;		es:si	= DiskDesc of current path, with FSIR and drive locked
+;			  shared. Disk is locked into drive.
+;		ss:bx	= stack frame to pass to callback
+;	Return:	carry set if no files/dirs to enumerate:
+;			ax	= ERROR_NO_MORE_FILES
+;		else carry & registers as set by callback routine.
+;	Destroy:ax, bx, cx, dx may all be nuked before the callback is
+;		called, but not if it returns carry set.
+;		bp may be destroyed before & after the callback.
+;
+;	Notes:
+;		The callback function is called as:
+;			Pass:	ds	= segment of FileEnumCallbackData.
+;					  Any attribute descriptor for which
+;					  the file has no corresponding
+;					  attribute should have the
+;					  FEAD_value.segment set to 0. All
+;					  others must have FEAD_value.segment
+;					  set to DS when their value is stored.
+;				ss:bp	= ss:bx passed to FSD
+;			Return:	carry set to stop enumerating files:
+;					ax	= error code
+;			Destroy:es, bx, cx, dx, di, si
+;
+;		If the filesystem supports the "." and ".." special directories,
+;		they must *not* be passed to the callback routine.
+;
+;		FileEnumCallbackData isn't actually a defined structure, but
+;		is a concept. The start is an array of FileExtAttrDesc
+;		structures, terminated by one with FEA_END_OF_LIST as its
+;		attribute. After that comes the room for the attribute
+;		values. All the FEAD_value.offset fields are offsets into
+;		this single segment.
+;
+
+;==============================================================================
+;			 DRIVE-RELATED CALLS
+;==============================================================================
+
+DR_FS_DRIVE_LOCK	enum	FSFunction
+;
+;	Desc:	Informs the driver that a particular drive is being locked
+;		for exclusive access. If the more than one logical drive
+;		addresses the same physical drive, the driver should take
+;		the appropriate steps to ensure the other logical drives
+;		are not accessible until the corresponding DR_FS_DRIVE_UNLOCK
+;		call is received.
+;
+;	Pass:	es:si	= DriveStatusEntry for the drive being locked
+;	Return:	nothing
+;
+;
+
+DR_FS_DRIVE_UNLOCK	enum	FSFunction
+;
+;	Desc:	Informs the driver that a particular drive is no longer locked
+;		for exclusive access. If the more than one logical drive
+;		addresses the same physical drive, the driver should take
+;		the appropriate steps to ensure any threads blocked awaiting
+;		access to the other logical drives are freed to run again.
+;
+;	Pass:	es:si	= DriveStatusEntry for the drive being unlocked
+;	Return:	nothing
+;
+;
+
+if DBCS_PCGEOS
+;==============================================================================
+;			 STRING-CONVERSION CALLS
+;==============================================================================
+
+FSConvertStringArgs	struct
+    FSCSA_length	word		;length/size (0 for NULL-terminated)
+    FSCSA_codePage	DosCodePage	;code page to use (0=current)
+    FSCSA_source	fptr.char	;ptr to source string
+    FSCSA_dest		fptr.char	;ptr to dest buffer
+    FSCSA_defaultChar	word		;character to subsitute if necessary
+FSConvertStringArgs	ends
+
+DR_FS_CONVERT_STRING		enum	FSFunction
+;
+;	Desc:	Convert a string from GEOS to the native character set
+;		for the file system or vice versa.
+;	Pass:	ah	= FSConvertStringFunction to perform
+;		other parameters as appropriate.
+;	Return:	ax	= DosToGeosStringStatus
+;		carry clear if DTGSS_NO_ERROR
+;		return values depend on subfunction
+;
+
+FSConvertStringFunction	etype	byte, 0, 2
+
+    FSCSF_CHECK_CODE_PAGE_SUPPORTED	enum FSConvertStringFunction
+    ;	Pass:	bx	= DosCodePage to check
+    ;	Return:	ax	= DosToGeosStringStatus
+    ;			      FSCSS_NOT_SUPPORTED if code page not supported
+    ;			      & carry set
+    ;
+
+    FSCSF_GET_CURRENT_CODE_PAGE		enum FSConvertStringFunction
+    ;	Pass:	none
+    ;	Return:	ax	= DosToGeosStringStatus
+    ;		bx	= DosCodePage currently in use
+    ;
+
+    FSCSF_CONVERT_TO_DOS		enum	FSConvertStringFunction
+    ;	Pass:	ss:bx	= ptr to FSConvertStringArgs
+    ;			FSCSA_source - fptr to GEOS string
+    ;			FSCSA_dest - fptr to destination buffer for DOS string
+    ;			FSCSA_length - length of text
+    ;	Return:	carry	= set if error
+    ;		ax	= DosToGeosStringStatus
+    ;		cx	= new size of text
+    ;
+
+    FSCSF_CONVERT_TO_GEOS		enum	FSConvertStringFunction
+    ;	Pass:	ss:bx	= ptr to FSConvertStringArgs
+    ;			FSCSA_source - fptr to DOS string
+    ;			FSCSA_dest - fptr to destination buffer for GEOS string
+    ;			FSCSA_length - size of text
+    ;	Return:	carry	= set if error
+    ;		ax	= DosToGeosStringStatus
+    ;		cx	= new length of text
+    ;
+
+    FSCSF_CONVERT_TO_DOS_FILENAME	enum	FSConvertStringFunction
+    ;	Pass:	ss:bx	= ptr to FSConvertStringArgs
+    ;			FSCSA_source - fptr to GEOS string
+    ;			FSCSA_dest - fptr to destination buffer for DOS string
+    ;	Return:	carry	= set if error
+    ;		ax	= DosToGeosStringStatus
+    ;
+    ;	NOTE: In most FSDs, this does not produce the same results as
+    ;	FSCSF_CONVERT_TO_DOS as the text is upcased because most DOSs
+    ;	don't support lowercase for filenames.  In addition, various
+    ;	constraints on the length of the destination are imposed.
+    ;
+
+    FSCSF_CONVERT_TO_GEOS_FILENAME	enum	FSConvertStringFunction
+    ;	Pass:	ss:bx	= ptr to FSConvertStringArgs
+    ;			FSCSA_source - fptr to GEOS string
+    ;			FSCSA_dest - fptr to destination buffer for DOS string
+    ;	Return:	carry	= set if error
+    ;		ax	= DosToGeosStringStatus
+    ;
+    ;	NOTE: In most FSDs, this does not produce the same results as
+    ;	FSCSF_CONVERT_TO_GEOS.
+    ;
+
+    FSCSF_CONVERT_TO_DOS_CHAR		enum	FSConvertStringFunction
+    ;	Pass:	bx	= DosCodePage to use
+    ;		cx	= GEOS character
+    ;	Return:	carry	= set if error
+    ;		ax	= DosToGeosStringStatus
+    ;		cx	= DOS character (if DTGSS_NO_ERROR)
+    ;
+
+    FSCSF_CONVERT_TO_GEOS_CHAR		enum	FSConvertStringFunction
+    ;	Pass:	bx	= DosCodePage to use
+    ;		cx	= DOS character
+    ;	Return:	carry	= set if error
+    ;		ax	= DosToGeosStringStatus
+    ;		cx	= GEOS character (if DTGSS_NO_ERROR)
+    ;
+endif
+
+EndDriver	fsd

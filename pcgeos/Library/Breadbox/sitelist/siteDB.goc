@@ -1,0 +1,824 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ */
+
+/***************************************************************************
+ *  FILE:  siteDB.GOC
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Module:  Site List Database
+ *-------------------------------------------------------------------------
+ |
+ | Objective:
+ |    Encapsulates a commonly used library to hold a list of internet
+ |    sites be them IRC, FTP, HTTP, or other.  Each record holds:
+ |        * Title (a sorted list is provided this way)
+ |        * Site (assumed to be of form:  ftp.somewhere.com)
+ |        * Port (provided for whatever site needs the port)
+ |        * Entry type (password or anonymous entry)
+ |        * Username
+ |        * Password
+ |        * Other information (A VMChain to whatever else is needed)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+/***************************************************************************
+ *      Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects\treport.goh>
+@include <Ansi\String.h>
+@include <sitelist.goh>
+@include "internal.goh"
+
+#define listHANDLE  (p_list->SLB_meta.LMBH_handle)
+
+Boolean IRemoveFromSortList(T_siteListBlock *p_list, T_siteEntryID id) ;
+word IAddToSortList(
+         T_siteListBlock *p_list,
+         T_siteEntryID id,
+         char *p_title) ;
+
+/*=========================================================================*
+ *  ROUTINES FOR HANDLING SITE LIST DATABASE
+ *=========================================================================*/
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListOpen
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Opens a site list (or creates one).  If creation is necessary, it
+ |    sets up all the correct data.
+ |
+ | Inputs:
+ |    char *filename              -- Name of database to use
+ |
+ | Outputs:
+ |    T_siteList                  -- Site list handle for all future 
+ |                                   actions
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+T_siteList SiteListOpen(char *filename)
+{
+    VMFileHandle file ;
+    T_siteList list ;
+    VMBlockHandle map ;
+    MemHandle mem ;
+    T_siteListMapBlock *p_map ;
+    T_siteListBlock *p_list ;
+
+    EC_BOUNDS(filename) ;
+
+	 FilePushDir() ;
+	 FileSetStandardPath(SP_PRIVATE_DATA) ;
+	 file = VMOpen(
+              filename, 
+              VMAF_FORCE_READ_WRITE|VMAF_DISALLOW_SHARED_MULTIPLE, 
+              VMO_OPEN, 
+              0);
+
+    /* Didn't open it.  Must not exist.  Try creating */
+    if (!file)  {
+        file = VMOpen(
+                  filename,
+                  VMAF_FORCE_READ_WRITE|VMAF_DISALLOW_SHARED_MULTIPLE,
+                  VMO_CREATE_TRUNCATE,
+                  0) ;
+    }
+	 FilePopDir() ;
+
+    /* Ok, we have a file, get the basic info */
+    if (file)  {
+        /* Create the session block */
+        list = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(T_siteListBlock)) ;
+        p_list = MemLock(list) ;
+        strncpy(p_list->SLB_filename, filename, sizeof(p_list->SLB_filename)-1);
+        p_list->SLB_file = file ;
+        p_list->SLB_numLocks = 0 ;
+
+        /* Be sure to copy over the map block info (so we don't have */
+        /* to keep loading it.  NOTE:  We never change this info */
+        map = VMGetMapBlock(file) ;
+        if (!map)  {
+            /* Create the map block */
+            map = VMAlloc(file, sizeof(*p_map), 0);
+            p_map = VMLock(file, map, &mem) ;
+            p_map->SLMB_array = HugeArrayCreate(file, 0, 0) ;
+            p_map->SLMB_sortArray = HugeArrayCreate(
+                                        file, 
+                                        sizeof(T_siteEntryID), 
+                                        0) ;
+            p_map->SLMB_freeList = HugeArrayCreate(
+                                       file, 
+                                       sizeof(T_siteEntryID), 
+                                       0) ;
+            VMDirty(mem) ;
+            VMUnlock(mem) ;
+            VMSetMapBlock(file, map) ;
+            VMSave(file) ;
+        }
+        p_map = VMLock(file, map, &mem) ;
+        p_list->SLB_array =     p_map->SLMB_array ;
+        p_list->SLB_sortArray = p_map->SLMB_sortArray ;
+        p_list->SLB_freeList =  p_map->SLMB_freeList ;
+        VMUnlock(mem) ;
+
+        MemUnlock(list) ;
+    }
+
+    return list ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListClose
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Closes out a site list and deletes any related information.
+ |
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void SiteListClose(T_siteList list)
+{
+    T_siteListBlock *p_list ;
+
+    EC_ERROR_IF(list==SITE_LIST_BAD, SITE_LIST_BAD_SITE_LIST_HANDLE) ;
+    p_list = MemLock(list) ;
+
+    /* Close out the file (after saving the data) */
+    EC_ERROR_IF(p_list->SLB_numLocks > 0, SITE_LIST_STILL_HAS_LOCKED_ENTRIES) ;
+    VMUpdate(p_list->SLB_file) ;
+    VMSave(p_list->SLB_file) ;
+    VMClose(p_list->SLB_file, FALSE) ;
+    p_list->SLB_file = NullHandle ;
+
+    MemUnlock(list) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListGetFile
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Return the file handle to the currently opened file (usually for
+ |    creating VMChains).
+ | Inputs:
+ |    T_siteList list             -- List session block
+ | Outputs:
+ |    VMFileHandle                -- Handle to the VM file
+ *-----------------------------------------------------------------------*/
+VMFileHandle SiteListGetFile(T_siteList list)
+{
+    T_siteListBlock *p_list ;
+    VMFileHandle file ;
+
+    EC_ERROR_IF(list==SITE_LIST_BAD, SITE_LIST_BAD_SITE_LIST_HANDLE) ;
+    p_list = MemLock(list) ;
+    file = p_list->SLB_file ;
+    MemUnlock(list) ;
+    
+    return file ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListGetCount
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Count the number of sorted items in the database.
+ |    NOTE:  If someone did a SiteEntryCreate, it is not added to the list
+ |           until the entry is locked and unlocked.
+ |
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |
+ | Outputs:
+ |    word                        -- Number of sites in database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word SiteListGetCount(T_siteList list)
+{
+    word count = 0 ;
+    T_siteListBlock *p_list ;
+
+    EC_ERROR_IF(list==SITE_LIST_BAD, SITE_LIST_BAD_SITE_LIST_HANDLE) ;
+    p_list = MemLock(list) ;
+
+    /* Just count the number of items in the array */
+    count = HugeArrayGetCount(p_list->SLB_file, p_list->SLB_sortArray) ;
+
+    MemUnlock(list) ;
+
+    return count ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteListFindNth
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Find the Nth item in the sorted list.
+ |
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |    word n                      -- Nth item to find
+ |
+ | Outputs:
+ |    T_siteEntryID               -- Found ID in sorted list, or
+ |                                   SITE_ENTRY_ID_BAD if not found.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+T_siteEntryID SiteListFindNth(T_siteList list, word n)
+{
+    T_siteEntryID id = SITE_ENTRY_ID_BAD ;
+    word size ;
+    T_siteEntryID *p_id ;
+
+    T_siteListBlock *p_list ;
+
+    EC_ERROR_IF(list==SITE_LIST_BAD, SITE_LIST_BAD_SITE_LIST_HANDLE) ;
+    p_list = MemLock(list) ;
+    EC_ERROR_IF(n >= SiteListGetCount(list), SITE_LIST_BAD_SORT_INDEX) ;
+
+    HugeArrayLock(p_list->SLB_file, p_list->SLB_sortArray, n, &p_id, &size) ;
+    if (p_id)  {
+        id = *p_id ;
+        HugeArrayUnlock(p_id) ;
+    }
+    
+    MemUnlock(list) ;
+
+    return id ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteEntryCreate
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Create a brand new spanking site entry in the list.
+ |
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |
+ | Outputs:
+ |    T_siteEntryID               -- New ID to the site entry.    
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+T_siteEntryID SiteEntryCreate(T_siteList list)
+{
+    T_siteListBlock *p_list ;
+    T_siteEntryID id ;
+    T_siteEntryID *p_id ;
+    ChunkHandle entry ;
+    void *p_data ;
+    word size ;
+    MemHandle mem ;
+
+    EC_ERROR_IF(list==SITE_LIST_BAD, SITE_LIST_BAD_SITE_LIST_HANDLE) ;
+    p_list = MemLock(list) ;
+    mem = listHANDLE ;
+
+    /* First, create the standard chunk array element */
+    entry = ChunkArrayCreate(listHANDLE, 0, sizeof(T_siteEntryHeader), 0) ;
+
+    /* 0. SITE_FIELD_NAME: 0 length STRING */
+    p_data = ChunkArrayAppendHandles(mem, entry, 1) ;
+    *((char *)p_data) = '\0' ;
+
+    /* 1. SITE_FIELD_SITE: 0 length STRING */
+    p_data = ChunkArrayAppendHandles(mem, entry, 1) ;
+    *((char *)p_data) = '\0' ;
+
+    /* 2. SITE_FIELD_PORT: WORD */
+    p_data = ChunkArrayAppendHandles(mem, entry, sizeof(word)) ;
+    *((word *)p_data) = 0 ;
+
+    /* 3. SITE_FIELD_ENTRY_TYPE:  WORD */
+    p_data = ChunkArrayAppendHandles(mem, entry, sizeof(T_siteEntryType)) ;
+    *((T_siteEntryType *)p_data) = SITE_ENTRY_TYPE_ANONYMOUS ;
+
+    /* 4. SITE_FIELD_USERNAME: 0 length STRING */
+    p_data = ChunkArrayAppendHandles(mem, entry, 1) ;
+    *((char *)p_data) = '\0' ;
+
+    /* 5. SITE_FIELD_PASSWORD: 0 length STRING */
+    p_data = ChunkArrayAppendHandles(mem, entry, 1) ;
+    *((char *)p_data) = '\0' ;
+
+    /* 6. SITE_FIELD_PASSWORD:  VMCHAIN */
+    p_data = ChunkArrayAppendHandles(mem, entry, sizeof(VMChain)) ;
+    *((VMChain *)p_data) = NullHandle ;
+    p_list = MemDeref(list) ;
+
+    /* Now store this chunk array in the huge array */
+    /* If we have a free index, use that first */
+    if (HugeArrayGetCount(p_list->SLB_file, p_list->SLB_freeList))  {
+        /* Take the first item from the the free list */
+        HugeArrayLock(p_list->SLB_file, p_list->SLB_freeList, 0, &p_id, &size) ;
+        id = *p_id ;
+        HugeArrayUnlock(p_id) ;
+
+        /* Delete the first element */
+        HugeArrayDelete(p_list->SLB_file, p_list->SLB_freeList, 1, 0) ;
+
+        /* Now fill that record */
+        size = LMemGetChunkSizeHandles(listHANDLE, entry) ;
+        HugeArrayResize(
+            p_list->SLB_file, 
+            p_list->SLB_array,
+            id,
+            size) ;
+        HugeArrayLock(
+            p_list->SLB_file,
+            p_list->SLB_array,
+            id,
+            &p_data,
+            &size) ;
+        memcpy(p_data, LMemDerefHandles(listHANDLE, entry), size) ;
+        HugeArrayDirty(p_data);
+        HugeArrayUnlock(p_data) ;
+    } else {
+        /* No free list items, append to the end */
+        id = HugeArrayAppend(
+             p_list->SLB_file, 
+             p_list->SLB_array,
+             LMemGetChunkSizeHandles(listHANDLE, entry),
+             LMemDerefHandles(listHANDLE, entry)) ;
+    }
+
+    LMemFreeHandles(listHANDLE, entry) ;
+
+    MemUnlock(list) ;
+
+    return id ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteEntryDestroy
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Destroy an entry and put it on the free list.  Also make sure
+ |    it is no longer on the sort list.
+ |
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |    T_siteEntryID id            -- id of entry to destroy
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if removed from sort list, 
+ |                                   else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean SiteEntryDestroy(T_siteList list, T_siteEntryID id)
+{
+    Boolean isRemoved = FALSE ;
+    T_siteListBlock *p_list ;
+    VMChain chain ;
+    T_siteEntry entry ;
+
+    EC_ERROR_IF(list==SITE_LIST_BAD, SITE_LIST_BAD_SITE_LIST_HANDLE) ;
+    p_list = MemLock(list) ;
+
+    isRemoved = IRemoveFromSortList(p_list, id) ;
+    entry = SiteEntryLock(list, id) ;
+    SiteFieldGet(entry, SITE_FIELD_VMCHAIN, &chain, sizeof(chain)) ;
+    SiteEntryUnlock(entry) ;
+
+    /* Resize the record to zero and put on the free list */
+    p_list = MemDeref(list) ;
+    HugeArrayResize(p_list->SLB_file, p_list->SLB_array, id, 1) ;
+    p_list = MemDeref(list) ;
+    HugeArrayAppend(p_list->SLB_file, p_list->SLB_freeList, 1, &id) ;
+    p_list = MemDeref(list) ;
+    
+    /* Free the VM Chain (if there was any) */
+    if (chain)
+        VMFreeVMChain(p_list->SLB_file, chain) ;
+
+    MemUnlock(list) ;
+
+    return isRemoved ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteEntryLock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Lock the entry for accessing.
+ |
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |    T_siteEntryID id            -- id of entry to lock
+ |
+ | Outputs:
+ |    T_siteEntry                 -- Handle to a site
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+T_siteEntry SiteEntryLock(T_siteList list, T_siteEntryID id)
+{
+    T_siteListBlock *p_list ;
+    T_siteEntry entry = NullHandle ;
+    word size ;
+    ChunkHandle chunk ;
+    void *p_data = NULL ;
+    T_siteEntryHeader *p_entry ;
+
+    EC_ERROR_IF(list==SITE_LIST_BAD, SITE_LIST_BAD_SITE_LIST_HANDLE) ;
+    p_list = MemLock(list) ;
+
+    HugeArrayLock(
+        p_list->SLB_file,
+        p_list->SLB_array,
+        id,
+        &p_data,
+        &size) ;
+
+    /* If we found the data, allocate some data in our block and */
+    /* copy over the whole record (marking it not modified) */
+    if (p_data)  {
+        chunk = LMemAlloc(listHANDLE, size+1) ;
+        p_list = MemDeref(list) ;
+        p_entry = (T_siteEntryHeader *)LMemDerefHandles(listHANDLE, chunk) ;
+        memcpy(p_entry, p_data, size) ;
+        HugeArrayUnlock(p_data) ;
+        p_entry->SEH_isDirty = FALSE ;
+        p_entry->SEH_needsResort = FALSE ;
+        p_entry->SEH_id = id ;
+        entry = ConstructOptr(list, chunk) ;
+        p_list->SLB_numLocks++ ;
+    }
+
+    MemUnlock(list) ;
+
+    return entry ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteEntryUnlock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    We are done with this record.  Unlock it.
+ |
+ | Inputs:
+ |    T_siteList list             -- List session block
+ |    T_siteEntryID id            -- id of entry to lock
+ |
+ | Outputs:
+ |    T_siteEntry                 -- 
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word SiteEntryUnlock(T_siteEntry entry)
+{
+    T_siteListBlock *p_list ;
+    T_siteEntryHeader *p_entry ;
+    void *p_data ;
+    word size ;
+    word sortPosition = SITE_ENTRY_INDEX_BAD ;
+
+    EC_ERROR_IF(OptrToHandle(entry)==SITE_LIST_BAD, SITE_LIST_BAD_SITE_LIST_HANDLE) ;
+    p_list = MemLock(OptrToHandle(entry)) ;
+
+    /* Look at the entry and determine if we need to save the data */
+    p_entry = LMemDeref(entry) ;
+    if (p_entry->SEH_isDirty)  {
+        /* Yep, changes have been made.  Let's save it out */
+        size = LMemGetChunkSize(entry) ;
+        HugeArrayResize(
+            p_list->SLB_file,
+            p_list->SLB_array,
+            p_entry->SEH_id,
+            size) ;
+        HugeArrayLock(
+            p_list->SLB_file,
+            p_list->SLB_array,
+            p_entry->SEH_id,
+            &p_data,
+            &size) ;
+        memcpy(p_data, p_entry, size) ;
+        HugeArrayDirty(p_data) ;
+        HugeArrayUnlock(p_data) ;
+    }
+
+    /* Do we need to resort this entry? */
+    if (p_entry->SEH_needsResort)  {
+        /* Remove from the sort list and then add it back in */
+        IRemoveFromSortList(p_list, p_entry->SEH_id) ;
+        sortPosition = 
+            IAddToSortList(
+                p_list, 
+                p_entry->SEH_id, 
+                ChunkArrayElementToPtr(entry, SITE_FIELD_NAME, NULL)) ;
+    }
+
+    /* Now free the entry */
+    p_list->SLB_numLocks-- ;
+    LMemFree(entry) ;
+    MemUnlock(OptrToHandle(entry)) ;
+
+    return sortPosition ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteFieldGet
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Given a locked entry, access an individual item and copy over the
+ |    the data.
+ |
+ | Inputs:
+ |    T_siteEntry entry           -- Currently locked entry
+ |    T_siteField field           -- Field to copy out
+ |    char *buffer                -- Location to store data
+ |    word lenBuffer              -- Limit on buffer size (full)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void SiteFieldGet(
+         T_siteEntry entry, 
+         T_siteField field, 
+         char *buffer, 
+         word lenBuffer)
+{
+    char *p_field ;
+    word fieldLen ;
+    word len ;
+
+    EC_BOUNDS(buffer) ;
+    EC_ERROR_IF(field>=SITE_FIELD_UNKNOWN, SITE_LIST_ERROR_UNKNOWN_FIELD) ;
+
+    MemLock(OptrToHandle(entry)) ;
+    p_field = ChunkArrayElementToPtr(entry, field, &fieldLen) ;
+    len = lenBuffer ;
+    if (fieldLen < len)
+        len = fieldLen ;
+    buffer[0] = '\0' ;
+    memcpy(buffer, p_field, len) ;
+    MemUnlock(OptrToHandle(entry)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SiteFieldSet
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Given a locked entry, allow the caller to change the data in it.
+ |
+ | Inputs:
+ |    T_siteEntry entry           -- Currently locked entry
+ |    T_siteField field           -- Field to change
+ |    char *buffer                -- Location of new data
+ |    word lenBuffer              -- Size of new data to store, or pass
+ |                                   0 to determine for strings.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void SiteFieldSet(
+         T_siteEntry entry, 
+         T_siteField field, 
+         char *buffer, 
+         word lenBuffer)
+{
+    char *p_field ;
+    T_siteEntryHeader *p_entry ;
+
+    EC_BOUNDS(buffer) ;
+    EC_ERROR_IF(field>=SITE_FIELD_UNKNOWN, SITE_LIST_ERROR_UNKNOWN_FIELD) ;
+
+    if (lenBuffer == 0)
+        lenBuffer = strlen(buffer) ;
+    if ((field == SITE_FIELD_NAME) ||
+            (field == SITE_FIELD_USERNAME) ||
+                (field == SITE_FIELD_SITE) ||
+                    (field == SITE_FIELD_PASSWORD))  {
+        lenBuffer++ ;
+    }
+
+    MemLock(OptrToHandle(entry)) ;
+
+    ChunkArrayElementResize(entry, field, lenBuffer);
+    p_field = ChunkArrayElementToPtr(entry, field, NULL) ;
+    memcpy(p_field, buffer, lenBuffer) ;
+
+    p_entry = LMemDeref(entry) ;
+    p_entry->SEH_isDirty = TRUE ;
+    if (field == SITE_FIELD_NAME)
+        p_entry->SEH_needsResort = TRUE ;
+
+    MemUnlock(OptrToHandle(entry)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IRemoveFromSortList
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Get rid of the item from the sorted list (if found).
+ |
+ | Inputs:
+ |    T_siteListBlock *p_list     -- Currently locked block
+ |    T_siteEntryID id            -- ID to find
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if found and removed, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean IRemoveFromSortList(T_siteListBlock *p_list, T_siteEntryID id)
+{
+    Boolean isFound = FALSE ;
+    word count ;
+    word i ;
+    T_siteEntryID *p_id;
+    word size ;
+
+    /* Try to find it */
+    count = HugeArrayGetCount(p_list->SLB_file, p_list->SLB_sortArray) ;
+    for (i=0; i<count; i++)  {
+        HugeArrayLock(
+            p_list->SLB_file, 
+            p_list->SLB_sortArray,
+	    i, 
+            &p_id, 
+            &size);
+        if (*p_id == id)  {
+            HugeArrayUnlock(p_id) ;
+            HugeArrayDelete(p_list->SLB_file, p_list->SLB_sortArray, 1, i) ;
+            isFound = TRUE ;
+            break ;
+        }
+        HugeArrayUnlock(p_id) ;
+    }
+    return isFound ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IAddToSortList
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Add an item to the sort list, but do a correct insert sort for it.
+ |
+ | Inputs:
+ |    T_siteListBlock *p_list     -- Currently locked list block
+ |    T_siteEntryID id            -- ID to find
+ |    char *p_title               -- Title for this id
+ |
+ | Outputs:
+ |    word                        -- Position in sort list
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/99  Created
+ |    LES  11/12/99  Now return the sort list position as feedback
+ |
+ *-----------------------------------------------------------------------*/
+word IAddToSortList(
+         T_siteListBlock *p_list,
+         T_siteEntryID id,
+         char *p_title)
+{
+    word pos = 0xFFFF ;
+    word count ;
+    word i ;
+    T_siteEntryID *p_id;
+    word size ;
+    T_siteEntryID compareID ;
+    T_siteEntryHeader *p_entry ;
+    char *p_compareTitle ;
+    word *offsets ;
+    byte *p_element ;
+
+    /* First, find where to place the title */
+    count = HugeArrayGetCount(p_list->SLB_file, p_list->SLB_sortArray) ;
+    for (i=0; i<count; i++)  {
+        /* Walk through the sorted list */
+        HugeArrayLock(
+            p_list->SLB_file, 
+            p_list->SLB_sortArray,
+	    i, 
+            &p_id, 
+            &size);
+        compareID = *p_id ;
+        HugeArrayUnlock(p_id) ;
+
+        /* At each index, find the title (without using ChunkArray routines
+           because they require an optr -- which we don't have here),
+           and compare the titles to determine if we go before this one. */
+        HugeArrayLock(
+            p_list->SLB_file,
+            p_list->SLB_array,
+            compareID,
+            &p_entry,
+            &size) ;
+        offsets = (word *)(((byte *)p_entry) + (p_entry->SEH_meta.CAH_offset)) ;
+        p_element = ((byte *)p_entry) + offsets[SITE_FIELD_NAME] ;
+        p_compareTitle = (char *)p_element ;
+        if (LocalCmpStringsNoSpaceCase(p_compareTitle, p_title, 0) >= 0)  {
+            pos = i ;
+            HugeArrayUnlock(p_entry) ;
+            break ;
+        }
+
+        HugeArrayUnlock(p_entry) ;
+    }
+
+    if (pos == 0xFFFF)  {
+        /* Append directly to the end */
+        pos = HugeArrayGetCount(p_list->SLB_file, p_list->SLB_sortArray) ;
+        HugeArrayAppend(
+            p_list->SLB_file, 
+            p_list->SLB_sortArray,
+            1,
+            &id) ;
+    } else {
+        /* Insert it before that position */
+        HugeArrayInsert(
+            p_list->SLB_file, 
+            p_list->SLB_sortArray,
+            1, 
+            pos, 
+            &id);
+    }
+
+    return pos ;
+}
+
+/***************************************************************************
+ *  END OF FILE:  siteDB.GOC
+ ***************************************************************************/

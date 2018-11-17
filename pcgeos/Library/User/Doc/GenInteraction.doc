@@ -1,0 +1,2247 @@
+COMMENT `CLASS DESCRIPTION-----------------------------------------------------
+
+
+			  GenInteractionClass
+
+$Id: GenInteraction.doc,v 1.8.34.1 97/03/29 03:37:58 canavese Exp $
+
+Synopsis
+--------
+	GenInteraction is a high-level, general purpose, grouping object
+	that can be used to organize objects within a window or to create
+	new interface windows.  Specifically, a GenInteraction can be used
+	for visual grouping of other generic objects at various levels of the
+	visual hierarchy, for menus and sub-menus, and for independently
+	displayed dialog boxes such as command dialogs, property dialogs,
+	and warning and error message dialogs.
+
+	The specific UI will have some control over how each of these is
+	presented, but the application can specify which should be used and
+	can also make suggestions about how they should behave.
+
+	UserDoDialog, UserStandardDialog, and UserStandardDialogOptr provide
+	alternate ways to display dialogs.
+
+Limitations
+-----------
+
+Alternatives
+------------
+	The generic UI provides many high-level objects for dealing with
+	standard object properties like text font, text pointsize, text color,
+	graphics attributes, etc. and for high-level functions like file and
+	document management/selection.  These should be used whenever possible,
+	as they provide a consistent interface across applications for these
+	functions.
+
+	GenControlClass is a subclass of GenInteractionClass that provides
+	"UI controller" functionality.
+
+Implementation Status
+---------------------
+	XXX - not implemented yet: GIV_NO_PREFERENCE (acts as GIV_SUB_GROUP)
+	XXX - not implemented/documented yet: ATTR_GEN_INTERACTION_ON_TOP_OF_FIELD
+	XXX - not documented yet: GIV_CONTROL_GROUP usage
+	XXX - updated Properties documentation when gadgets are changed for 2.0
+
+See Also
+--------
+	high-level generic UI objects - various functions
+
+	GenControlClass - "UI controller" functionality
+
+;------------------------------------------------------------------------------
+;	Description
+;------------------------------------------------------------------------------
+
+Terminology
+-----------
+	command group - interaction used to set parameters for and to issue
+		commands.  A command group may appear as a dialog, as a popup,
+		or as a sub-group that is part of a larger window.
+
+	default trigger - trigger, usually in a dialog box, that will be
+		activated if the Default Action key (<ENTER> in most
+		specific UIs) is hit or if a UI gadget in the dialog box
+		requests the default action to be activated (double-clicking
+		in the gadget in most specific UIs).  The specific UI will
+		usually highlight the default trigger in some way.
+
+	dialog - an independent interface element (window) used to display
+		information and/or containing related UI gadgetry.  A dialog
+		may be modal or non-modal.
+
+	dismiss - bring off-screen
+
+	initiate - bring on-screen
+
+	menu - a grouping of related command triggers in the main application
+		window that appear and hide under pointer control
+
+	modal - when used to describe dialogs, refers to the fact that input
+		is blocked to all other areas of the application when a modal
+		dialog is displayed
+
+	pop-up - temporary dialog that stays on-screen only as long as user
+		holds mouse button or until next button press
+
+	property group - interaction used to display and set attributes of a
+		selected object or the current selection.  A property group
+		may appear as a dialog, as a popup, or as a sub-group that is
+		part of a larger window.
+
+	reply bar - control area that contain a dialog's main function
+		triggers.  For example, the apply/reset/close triggers of a
+		property dialog are in a reply bar.
+
+	sub-group - visual grouping of objects that appear in a larger window
+
+	sub-menu - a menu appearing under another menu
+
+	window - generic term referring to independently displayed interface
+		elements like dialogs and main application windows
+
+Relationships/Context
+---------------------
+	GenInteractions may be placed almost anywhere in the generic tree,
+	depending on how they are to be used.  And almost any of the generic
+	objects are legal children for a GenInteraction.
+
+	GenInteractions implementing dialogs can have special relationships
+	with GenTriggers.  This is described below.
+
+	All the normal GenClass mechanisms are supported.
+
+Conceptual Overview
+-------------------
+	GenInteractions are characterized by what they contain (and hence what
+	the interaction is or represents) and how they should appear to the
+	user.  The GenInteractionType stored in the GII_type instance data
+	field specifies the former and the GenInteractionVisibility stored in
+	the GII_visibility instance data field specifies the latter.  While
+	particular GenInteractionType values are often used with only certain 
+	GenInteractionVisibility types, the two together determine how the
+	GenInteraction appears and what its default behavior is.
+	GenInteractions are normally defined in a .ui or .goc file where the
+	type and visibility fields are set with GII_type and GII_visibility
+	fields.  However, the type and visibility can also be set dynamically
+	with MSG_GEN_INTERACTION_SET_TYPE and
+	MSG_GEN_INTERACTION_SET_VISIBILITY.  Additional information about a
+	GenInteraction is set with the GenInteractionAttrs in the GII_attrs
+	field.  This can be defined in the .ui or .goc file or set dynamically
+	with MSG_GEN_INTERACTION_SET_ATTRS.  Note that since the type,
+	visibility, and attributes are used when specifically resolving, these
+	messages can only be used when the GenInteraction is not usable.  The
+	current type, visibility, and attributes can be retrieved with
+	MSG_GEN_INTERACTION_GET_TYPE, MSG_GEN_INTERACTION_GET_VISIBILITY, and
+	MSG_GEN_INTERACTION_GET_ATTRS, respectively.
+
+	Visibility
+	----------
+	GIV_DIALOG specifies that a GenInteraction is to appear as a dialog
+	box.
+
+	GIV_SUB_GROUP specifies that a GenInteraction is to appear as part of
+	a larger window.
+
+	GIV_POPUP specifies that a GenInteraction is to appear as a popup (menu
+	or popup list).
+
+	GIV_CONTROL_GROUP specifies that a GenInteraction contains controls and
+	so cannot appear in a popup.  It will appear as either a sub-group
+	within a larger window (if placed under a GIV_DIALOG) or a separate
+	dialog box accessible from a trigger (if placed under a GIV_POPUP).
+
+	GIV_NO_PREFERENCE specifies that a GenInteraction has no appearance
+	constraints.  It will appear as a popup, as a sub-group within a larger
+	window or as separate dialog box depending on its location in generic
+	tree and on the visibility of its generic relatives.
+	<XXX:  NOT IMPLEMENTED YET -- always becomes sub-group>
+
+	GIV_POPOUT specifies a that a GenInteraction is to appear as a part
+	of a larger window, but which can be 'popped out' into a dialog box.
+	
+	For dialogs, standard response triggers may be provided by the specific
+	UI depending on the GenInteractionType.  The application may supply
+	response triggers to supplement or replace the specific UI response
+	triggers.
+
+	Type
+	----
+	GIT_ORGANIZATIONAL specifies that a GenInteraction is only used to
+	group its children.  There is no implicit meaning to the children
+	it contains.  This is primarily used to arrange a group of generic
+	objects in a horizontal or vertical fashion, or to specify some other
+	geometry behavior for the children objects.  Such a group may appear
+	in a menu, in a dialog, or in a sub-group that is part of a larger
+	window.  No standard response triggers are provided by the specific UI,
+	even if displayed as a dialog.
+
+	GIT_PROPERTIES specifies that a GenInteraction contains children that
+	are used to display properties.  Properties are attributes of an
+	object.  For example, color, pointsize and font style are some
+	properties of text.  A properties group shows the properties of the
+	currently selected object.  Users can change the UI gadgets in the
+	properties group to change the attributes of the selected object.  When
+	the user selects a different object, the UI gadgetry changes to reflect
+	the attributes of the new selection.  Properties may be shown in a
+	menu, in a dialog or in a sub-group that is part of a larger window.
+	If shown in a dialog, the specific UI may provide response triggers with
+	the IC_APPLY, IC_RESET, and IC_DISMISS interaction commands.  In Motif,
+	these may be labeled "Apply" or "OK", "Reset", and "Close" or "Cancel".
+	Example:
+
+	+---------------------------------------+
+	|	Size:  o 10  o 12  o 18  o 24	|
+	|	Color:  o R  o B  o  G		|
+	|					|
+	+---------------------------------------+
+	|	  Apply		Close		|
+	+---------------------------------------+
+
+	GIT_PROGRESS specifies that a GenInteraction contains progress
+	reporting gadgetry.  Progress may be show in a dialog or as part of
+	a larger window.  If displayed as a dialog, the specific UI will
+	provide a response trigger with the IC_STOP interaction command that
+	can be used to abort the operation in progress.  In Motif, this trigger
+	is labeled "Stop".  The specific UI will not supply a way to close the
+	dialog other than the IC_STOP trigger.  In Motif, this means the system
+	menu for a non-modal dialog will have its "Close" trigger disable.
+	Example:
+
+	+---------------------------------------+
+	|		Disk Format		|
+	|				 	|
+	|	complete: 44%			|
+	+---------------------------------------+
+	|		   Stop			|
+	+---------------------------------------+
+
+	GIT_COMMMAND specifies that a GenInteraction contains gadgetry to
+	set up parameters for and to issue commands.  For example, a rename
+	file command in a file manager application needs to request the new
+	name for the file from the user.  This can be done with a command dialog
+	that shows the file's current name and has a text entry field for the
+	file's new name.  A reply bar with a "Rename" action trigger is provided
+	to initiate the rename when the user has finished entering the new name.
+	Command interactions can appear as menus, as dialogs, or as sub-groups
+	within a larger window.  If displayed as a dialog, the specific UI will
+	provide a response trigger with the IC_DISMISS interaction command that
+	closes the dialog.  In Motif, this trigger is labeled "Close" or
+	"Cancel".  Example:
+
+	+---------------------------------------+
+	| Rename:  blah				|
+	|     To:				|
+	|					|
+	+---------------------------------------+
+	|	Rename		Cancel		|
+	+---------------------------------------+
+
+	GIT_NOTIFICATION specifies that a GenInteraction is a notice dialog.
+	This can be used to inform the user of some situation in which they
+	only need to acknowledge.  GIT_NOTIFICATIONs are normally displayed as
+	dialogs.  If so, the specific UI will add a response trigger that has
+	the IC_OK interaction command response that closes the dialog.  In
+	Motif, this trigger is labeled "OK".  The specific UI does not supply a
+	way to close the dialog without responding with this trigger.  In Motif,
+	this means the system menu for a non-modal dialog will also have its
+	"Close" trigger disabled.  Example:
+
+	+---------------------------------------+
+	| New mail has arrived.			|
+	|					|
+	+---------------------------------------+
+	|		  OK			|
+	+---------------------------------------+
+
+	GIT_AFFIRMATION specifies that a GenInteraction is an affirmation
+	dialog.  This is used to provide the user with a yes/no choice.
+	GIT_AFFIRMATIONs are normally displayed as dialogs.  If so, the
+	specific UI will add response triggers that have the IC_YES and IC_NO
+	interaction commands.  In Motif, the triggers are labeled "Yes" and
+	"No".  The specific UI does not supply a way to close the dialog
+	without responding to one of these.  In Motif, this also means the
+	system menu for a non-modal dialog will have its "Close" trigger
+	disabled.  Example:
+
+	+-----------------------------------------------+
+	| Are you sure you wish to delete this file?	|
+	|						|
+	+-----------------------------------------------+
+	|		Yes		No		|
+	+-----------------------------------------------+
+
+	GIT_MULTIPLE_RESPONSE specifies that a GenInteraction is a multiple
+	response interaction.  This type of interaction is normally used to
+	provide the user with a specific number of choices, one of which must
+	be made (there is no provision to just close or cancel the dialog,
+	ignoring the choice).  GIT_MULTIPLE_RESPONSEs are normally be displayed
+	as dialogs.  The application must supply all response triggers for this
+	type of dialog.  The specific UI supplies no standard triggers.  Also,
+	the specific UI will not supply a way to close the dialog.  In Motif,
+	this means the system menu for a non-modal dialog will have its "Close"
+	trigger disable.  Example:
+
+	+-----------------------------------------------+
+	| The file you are closing has been changed.	|
+	|						|
+	+-----------------------------------------------+
+	| Save changes    Ignore changes    Don't close |
+	+-----------------------------------------------+
+
+	Interaction control
+	-------------------
+	All GenInteractions support the normal GenClass operations like setting
+	usable and enabled states, moniker changing, generic tree manipulation
+	and communication, etc.
+
+	Initiating GenInteractions
+	--------------------------
+	Dialog GenInteractions appear in the application's interface as
+	triggers that must be activated to have the dialog appear.  As an
+	alternative, the GIA_NOT_USER_INITIATABLE attribute may be used to
+	prevent a trigger from appearing.  For these dialogs,
+	MSG_GEN_INTERACTION_INITIATE and MSG_GEN_INTERACTION_INITIATE_NO_DISTURB
+	can be used to bring the dialog on-screen.  MSG_GEN_INTERACTION_INITIATE
+	brings the dialog on-screen, to the front of its window layer, and
+	gives it the focus and target if it requests these (via hints on the
+	gadgets in the dialog).  MSG_GEN_INTERACTION_INITIATE_NO_DISTURB also
+	brings the dialog on-screen, but behind any other windows in the same
+	window layer, and does not shift the focus and target.
+	MSG_GEN_INTERACTION_INITIATE can also be used on GIV_POPUP
+	GenInteractions and GIV_CONTROL_GROUP GenInteractions that become
+	dialogs.  MSG_GEN_INTERACTION_INITIATE_NO_DISTURB can only be be used
+	on GIV_DIALOG GenInteractions and GIV_CONTROL_GROUP GenInteractions
+	that become dialogs.  If these messages are used on other
+	GenInteractions, they have no effect.  HINT_INITIATE_ON_STARTUP may be
+	placed on GenInteractions to have them automatically initiate
+	themselves (via MSG_GEN_INTERACTION_INITIATE) when the application
+	starts up.  If this is done, the dialog must also be placed on the
+	active list of the GenPrimary or GenApplication, as this is handled
+	at MSG_META_ATTACH time.
+
+	Subclassing MSG_GEN_INTERACTION_INITIATE
+	----------------------------------------
+	MSG_GEN_INTERACTION_INITIATE maybe be intercepted to determine when the
+	dialog is coming on-screen.  This is useful if UI gadgetry in the
+	dialog needs to be set up to show some initial status.  The gadgetry
+	should be set up before calling the superclass to bring the dialog
+	on-screen.  This avoids any unnecessary visual changes to the gadgets
+	once the dialog is on-screen.  The same may be done with
+	MSG_GEN_INTERACTION_INITIATE_NO_DISTURB if you know that it will be
+	used.  The specific UI doesn't use this to bring up dialogs, so it need
+	not be intercepted.
+
+	Dismissing GenInteractions
+	--------------------------
+	Dialogs and popups can be dismissed under application control by
+	sending MSG_GEN_GUP_INTERACTION_COMMAND with IC_DISMISS to them.  This
+	will force dialogs to be closed even if the user has it pinned (in
+	specific UIs that support pinning).  Also, dialogs will be dismissed by
+	the user when they activate certain reply bar response triggers.  This
+	involves the GA_SIGNAL_INTERACTION_COMPLETE attribute.  See below.
+
+	Intercepting GenInteraction dismissal
+	-------------------------------------
+	MSG_GEN_GUP_INTERACTION_COMMAND may be subclassed to determine when
+	a dialog is going to be dismissed.  The MSG_GEN_GUP_INTERACTION_COMMAND
+	handler should check the incoming InteractionCommand to make sure it
+	is IC_DISMISS before doing whatever work needed.  Any non-IC_DISMISS
+	InteractionCommand should be immediately passed to the superclass.
+	The superclass may or may not need to be called for IC_DISMISS,
+	depending on what behavior the handler is adding.
+
+	Menus
+	-----
+	Main menus (those opened from a primary's or a display's menu bar) are
+	defined with GenInteractions with GIV_POPUP visibility and
+	GIT_ORGANIZATIONAL, GIT_PROPERTIES, or GIT_COMMAND type that are
+	generic children of the GenPrimary or the GenDisplay.  Sub-menus are
+	GIV_POPUP GenInteractions that are children of the either a main menu
+	GenInteraction or another sub-menu GenInteraction.  The children of a
+	menu or sub-menu GenInteraction can be GenTriggers, GenLists, GIV_POPUP
+	GenInteractions (sub-menus), dialog (GIV_DIALOG, GIV_CONTROL_GROUP)
+	GenInteractions, or GIV_SUB_GROUP GenInteractions.  Dialog
+	GenInteractions will become a menu item triggers that bring up the 
+	dialog when activated.  Sub-menus will become menu item triggers that
+	open up the sub-menu.  Sub-group GenInteractions are a way to organize
+	a group of menu items within a menu.  The children of a sub-group
+	GenInteraction will be placed in the parent menu, but will be separated
+	from the other menu items by horizontal lines above the first and below
+	the last items of the sub-group.  HINT_SAME_CATEGORY_AS_PARENT can be
+	used eliminate the seperator lines.  This is useful when a sub-group is
+	used for application purposes (such as simplifying menu item enabling
+	and disabling) rather than for user clarification.  Legal children of
+	a menu sub-group GenInteraction are the same as those of a menu or
+	sub-menu GenInteraction.
+
+	Dialogs
+	-------
+	GIV_DIALOG visibility indicates that a GenInteraction is to appear as
+	an independently displayable interface element (window).  A
+	GIV_CONTROL_GROUP under a menu also has this effect.  The specific
+	UI will normally place such a GenInteraction into the application's
+	user inteface as a trigger that brings up the dialog when the trigger
+	is activated.  However, if the GIA_NOT_USER_INITIATABLE attribute is
+	set, no trigger will be created.   The dialog will not initially
+	appear as part of the application's interface and must be brought up
+	manually by sending MSG_GEN_INTERACTION_INITIATE (or
+	MSG_GEN_INTERACTION_INITIATE_NO_DISTURB) to it or by calling
+	UserDoDialog with it.  If GIA_NOT_USER_INITIATABLE is used, the
+	GenInteraction should either be a child of the GenPrimary (if the
+	dialog should be closed when the application is iconified) or of the
+	GenApplication (if the dialog should stay open when the application is
+	iconified).  Otherwise, the GenInteraction may be place where
+	appropriate in the generic tree (menus, other dialogs, etc.).  Whether
+	or not GIA_NOT_USER_INITIATABLE is set, the dialog can be automatically
+	brought on-screen when the application is started up by placing
+	HINT_INITIATE_ON_STARTUP on it.  If this is done, the dialog must
+	also be placed on the active list of the GenPrimary or GenApplication.
+	
+	Modality for dialogs
+	--------------------
+	By default, dialog GenInteractions are non-modal windows.  A modal
+	window may be specified by setting either the GIA_MODAL attribute in
+	the GIGI_attr instance data field or HINT_INTERACTION_MODAL in the object's
+	variable data area.  When a modal dialog is displayed, input to all
+	other parts of the application will be ignored until the dialog is
+	dismissed.  GIA_MODAL should be used when the application needs
+	a modal dialog because correct functioning of the application depends
+	on the user not being able to interact with other parts of the
+	application when the dialog is up.  For example, if a dialog shows
+	information about the current selection, but the application cannot
+	update that information if the user were to change the current
+	selection, GIA_MODAL should be used.  HINT_INTERACTION_MODAL should be for dialogs
+	that are modal because it simplifies the interface for the user or to
+	avoid user confusion.  For example, a dialog for setting obscure
+	options that is brought up from a command dialog might be marked
+	HINT_INTERACTION_MODAL so that the user is forced to set the options before
+	returning to the command dialog.  If the specific UI decided to do so,
+	it could substitute a dialog with HINT_INTERACTION_MODAL with a non-modal dialog.
+	
+	A modal dialog may also be displayed using UserDoDialog.  Such a dialog
+	must have the GIA_INITIATED_VIA_USER_DO_DIALOG and GIA_MODAL attributes
+	set.  In addition to input to other parts of the application being
+	blocked, UserDoDialog will block the calling thread until the dialog is
+	dismissed.  UserDoDialog is useful for displaying notifications where
+	the user's response is required before the application can continue.
+	See UserDoDialog documentation for more information.
+
+	Dialogs displayed by UserStandardDialog and UserStandardDialogOptr are
+	also modal.  It behaves like UserDoDialog in that it will block the
+	calling thread until the dialog is dismissed.  See the
+	UserStandardDialog/UserStandardDialogOptr documentation for more
+	information.
+
+	Dialog response triggers/HINT_SEEK_REPLY_BAR
+	--------------------------------------------
+	The specific UI provides standard response triggers for certain
+	GenInteractionTypes of dialog GenInteractions:
+
+	GIT_NOTIFICATION
+		- IC_OK, "OK" in Motif
+	GIT_AFFIRMATION
+		- IC_YES, "Yes" in Motif
+		- IC_NO, "No" in Motif
+	GIT_PROGRESS
+		- IC_STOP, "Stop" in Motif
+	GIT_COMMAND
+		- IC_DISMISS, "Close" in Motif for non-modal
+		- IC_DISMISS, "Cancel" in Motif for modal
+	GIT_PROPERTIES
+		- IC_APPLY, "Apply" in Motif for non-modal, delayed
+		- IC_APPLY, "OK" in Motif for modal or single-usage, delayed
+		- IC_RESET, "Reset" in Motif for complex, delayed
+		- IC_DISMISS, "Close" in Motif for non-modal, delayed
+		- IC_DISMISS, "Cancel" in Motif for modal, delayed
+
+	These standard response triggers are automatically placed in a reply
+	bar at the bottom of the dialog.  For some cases, this will be all that
+	is needed.  For others, you must either supply additional response
+	triggers or replace the existing response triggers.  Additional triggers
+	must be supplied for GIT_COMMAND and GIT_MULTIPLE_RESPONSE.  Existing
+	triggers may be replaced to customize their behavior or to change their
+	moniker.  Additional triggers may be placed in the reply bar by adding
+	GenTrigger objects as children dialog GenInteraction and adding the
+	HINT_SEEK_REPLY_BAR variable data to the GenTrigger.  If more than one
+	trigger is added, their order is the order they appear in under the
+	GenInteraction.  Any additional reply bar triggers will appear to the
+	right of any IC_OK, IC_YES, IC_STOP, or IC_APPLY trigger and to the
+	left of any IC_DISMISS, IC_RESET, and IC_NO trigger.  Triggers added to
+	the reply bar should be set up with a moniker and an action.
+
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND
+	------------------------------------
+	A specific-UI supplied trigger may be replaced by defining a GenTrigger
+	under the GenInteraction with the ATTR_GEN_TRIGGER_INTERACTION_COMMAND
+	variable data.  This variable data type takes a word of data that is the
+	InteractionCommand (IC_OK, IC_YES, IC_STOP, etc.) of the trigger to be
+	replaced.  HINT_SEEK_REPLY_BAR should also be used to place the
+	replacement trigger in the dialog's reply bar, though this isn't
+	required.  If there is no such hint, it will just appear in its
+	specified place in the body of the dialog.  The action for the trigger
+	should be set up to perform whatever action is required for the
+	function being replaced.  If necessary, the action handler should also
+	perform the default handling of the replaced trigger.  A moniker needn't
+	be supplied, the specific UI will use the appropriate moniker depending
+	on the InteractionCommand and the context of the dialog.  A moniker can
+	be supplied if a specific one is desired -- for example, a moniker that
+	explicitly defines the function provided by the dialog.  Actually,
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND can be used specifically to provide
+	a more explicit moniker for a specific-UI supplied standard trigger.
+	If ATTR_GEN_TRIGGER_INTERACTION_COMMAND (with an InteractionCommand) is
+	placed on a GenTrigger under the GenInteraction that has no action, it
+	will automatically have the default behavior of the replaced trigger.
+	It will just appear with the explicit moniker.
+
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND has a special function in dialogs
+	displayed with UserDoDialog.  When a UserDoDialog dialog is completed
+	by the user activating on of the response triggers, the data stored
+	with the ATTR_GEN_TRIGGER_INTERACTION_COMMAND of the trigger activated
+	by the user will be returned from UserDoDialog.  This can be used by
+	the caller to determine which trigger has been activated.  See the
+	UserDoDialog documentation for more information.
+
+	GA_SIGNAL_INTERACTION_COMPLETE
+	--------------------------------
+	The GenClass GA_SIGNAL_INTERACTION_COMPLETE attribute is used to
+	indicate that a response trigger completes user interaction with the
+	dialog that contains it.  Depending on the context (modality, type,
+	hints) of the dialog, it may or may not be dismissed.  For example,
+	though they both should have the GA_SIGNAL_INTERACTION_COMPLETE
+	attribute, the "Yes" trigger in a Motif GIT_AFFIRMATION dialog should
+	dismiss the dialog because the user has provided a response and doesn't
+	need to the see the dialog any longer, however the "Apply" trigger of a
+	Motif GIT_PROPERTIES dialog should not dismiss the dialog because it is
+	useful for the user to be able to use the dialog again to try different
+	properties.  All standard triggers provided by the specific UI with the
+	various GenInteractionTypes have this attribute except for the IC_RESET
+	trigger.  The IC_RESET trigger does not indicate the end of user
+	interaction with the dialog and thus should not dismiss the dialog.
+	In Motif, a trigger with GA_SIGNAL_INTERACTION_COMPLETE set will
+	dismiss the dialog containing the trigger if the dialog is not of
+	GenInteractionTypes GIT_PROPERTIES or GIT_COMMAND or if the dialog is
+	is modal.  A default non-modal GIT_PROPERTIES or GIT_COMMAND is not
+	dismissed when either their response triggers are activated.  If it
+	should be, because the properties or command will be infrequently
+	needed by the user, for example, HINT_INTERACTION_SINGLE_USAGE will
+	allow this.  The opposite HINT_INTERACTION_MULTIPLE_USAGE will allow a
+	dialog to stay up when one of its GA_SIGNAL_INTERACTION_COMPLETE
+	triggers is activated.  For application supplied response triggers with
+	their own actions, leaving out GA_SIGNAL_INTERACTION_COMPLETE on the
+	trigger is preferred over adding in HINT_INTERACTION_MULTIPLE_USAGE on
+	the dialog to gain manual control over the dismissal of the dialog
+	because the hint may be ignored by the specific UI while the lack of
+	the attribute will not.  When doing this to gain manual control of the
+	dialog's dismissal, it is important to handle dismissal of the dialog
+	with MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS) in the action handler,
+	if necessary.
+
+	InteractionCommand
+	------------------
+	The InteractionCommand enumerated type represents the actions that
+	can be performed on a GenInteraction.  The predefined commands are
+	as follows:
+
+		IC_NULL
+		IC_DISMISS
+		IC_INTERACTION_COMPLETE
+		IC_APPLY
+		IC_RESET
+		IC_OK
+		IC_YES
+		IC_NO
+		IC_STOP
+
+	IC_DISMISS, IC_APPLY, IC_RESET, IC_OK, IC_YES, IC_NO and IC_STOP
+	correspond to the standard triggers provided by the specific UI for
+	dialogs of the various GenInteractionTypes.  These are used with
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND to specify replacement triggers
+	for those supplied by the specific UI.  When used for UserDoDialog
+	response triggers and the response values for GIT_MULTIPLE_RESPONSE
+	UserStandardDialog triggers, the InteractionCommand used with
+	ATTR_GEN_INTERACTION_COMMAND isn't limited to these predefined values.
+	Any application-defined values can be used as long as they start at
+	IC_CUSTOM_START.  This is to avoid conflicting with the predefined
+	values, which have meaning to the dialog.  Using IC_CUSTOM_START-based
+	response values will allow them to pass through the dialog for return
+	from UserDoDialog.  IC_NULL is a special InteractionCommand that is
+	returned from UserDoDialog/UserStandardDialog/UserStandardDialogOptr if
+	the dialog is dismissed by system because it is shutting down.  IC_NULL
+	should not be used with ATTR_GEN_TRIGGER_INTERACTION_COMMAND nor should
+	it be sent with MSG_GEN_GUP_INTERACTION_COMMAND or
+	MSG_GEN_ACTIVATE_INTERACTION_COMMAND.  IC_INTERACTION_COMPLETE is a
+	special InteractionCommand that implements the
+	GA_SIGNAL_INTERACTION_COMPLETE functionality.  It should not be used
+	with ATTR_GEN_TRIGGER_INTERACTION_COMMAND or with
+	MSG_GEN_INTERACTION_ACTIVATE_COMMAND, but it may be used with
+	MSG_GEN_GUP_INTERACTION_COMMAND to defer dismissing of a dialog to the
+	specific UI and the dialog context (as explained in the documentation
+	for GA_SIGNAL_INTERACTION_COMPLETE).
+
+	Dialog control
+	--------------
+	There are two messages that are used with InteractionCommands,
+	MSG_GEN_GUP_INTERACTION_COMMAND and
+	MSG_GEN_INTERACTION_ACTIVATE_COMMAND.  The former is the more commonly
+	used.  It can be sent by applications to dismiss dialogs by using the
+	IC_DISMISS InteractionCommand.  It is sent by dialog response triggers
+	that have the ATTR_GEN_TRIGGER_INTERACTION_COMMAND variable data to
+	themselves if they have no action.  The message travels up to the first
+	dialog GenInteraction where it is handled.  Handling may include
+	unblocking and returning a UserDoDialog response value, applying or
+	resetting properties, and dismissing, depending on the
+	InteractionCommand.  In Motif, dialogs do the following with the various
+	InteractionCommands:
+
+		IC_DISMISS - dismisses dialog, resets gadgets if GIT_PROPERTIES
+				and modal (i.e. "Cancel" moniker in Motif)
+		IC_APPLY - applies gadgets (whether or not GIT_PROPERTIES),
+				then unblocks and returns UserDoDialog value
+		IC_RESET - resets gagdets (whether or not GIT_PROPERTIES),
+				then unblocks and returns UserDoDialog value
+		IC_INTERACTION_COMPLETE - dismisses, depending or dialog context
+		all others (predefined or not) - unblocks and returns
+						UserDoDialog value
+
+	Dialog GenInteractions handle MSG_GEN_GUP_INTERACTION_COMMAND with
+	any relevant InteractionCommands.  Menu GenInteractions only support
+	IC_DISMISS and IC_INTERACTION_COMPLETE, and will pass other
+	InteractionCommands up the generic tree.  Other GenInteractions will
+	pass MSG_GEN_GUP_INTERACTION_COMMAND up the generic tree.
+
+	MSG_GEN_INTERACTION_ACTIVATE_COMMAND is a higher-level function.  When
+	sent to a dialog GenInteraction with a relevant InteractionCommand, it
+	will find the standard trigger for that InteractionCommand and activate
+	it.  This can be a specific UI supplied trigger or a replacement trigger
+	supplied by the application.  If no such trigger exists,
+	MSG_GEN_GUP_INTERACTION_COMMAND is called with the InteractionCommand
+	to perform default handling.  This is only supported by dialog
+	GenInteractions.
+
+	UserDoDialog
+	------------
+	UserDoDialog is used to display GIV_DIALOG GenInterations in a special
+	way.  In addition to displaying the dialog, UserDoDialog will also
+	block the calling thread until a response triggers in the dialog is
+	activated by the user.  When this happens, UserDoDialog will return
+	with a response value representing the trigger activated.  The
+	GIV_DIALOG GenInteraction must have the GIA_INITIATED_VIA_USER_DO_DIALOG
+	and GIA_MODAL attributes set.  It can contain any UI objects, but must
+	have response triggers that the user can use to terminate the dialog.
+	These GenTriggers are placed under the GIV_DIALOG GenInteraction and
+	should have a null action descriptor and
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND in their variable data area.  The
+	InteractionCommand data word for ATTR_GEN_TRIGGER_INTERACTION_COMMAND
+	will be the response value returned by UserDoDialog when that trigger
+	is activated.  This can be one of the predefined InteractionCommands or
+	an application defined-one based on IC_CUSTOM_START.  The null action
+	descriptor will cause MSG_GEN_GUP_INTERACTION_COMMAND to be sent to the
+	dialog with the ATTR_GEN_TRIGGER_INTERACTION_COMMAND InteractionCommand.
+	If the action descriptor is not null, the action will be sent, as usual,
+	and no MSG_GEN_GUP_INTERACTION_COMMAND will be sent.  This is useful if
+	some special handling is required when the trigger is activated.
+	However, since the calling thread is blocked, the action cannot be
+	handled by the calling thread.  The handler for the action must be
+	running under a different thread.  The handler can send
+	MSG_GEN_GUP_INTERACTION_COMMAND with a response value to unblock the
+	calling thread.  The response GenTriggers should also have the
+	GA_SIGNAL_INTERACTION_COMMAND attribute set to ensure that the dialog
+	will be dismissed when they are activated.  This may be omitted to gain
+	manual control over dismissal of the dialog.  This can be handled in
+	two ways.  Either the calling thread dismisses the dialog when it is
+	unblocked and a response value is returned to it by one of the response
+	triggers, or an action handler for one the response triggers can dismiss
+	the dialog.  Again, if an action handler is set up to dismiss the dialog
+	, it must be run by a thread other than the calling thread.  Finally,
+	HINT_SEEK_REPLY_BAR will place the response triggers in the dialog's
+	reply bar, but this is not necessary.
+
+	Because the calling thread is blocked by UserDoDialog, views run by
+	that thread will not be updated when uncovered.
+
+	XXX:  UserDoDialog also works for GIV_POPUPs, though full support
+	(whatever that means for modal menus) isn't there.  Should we remove
+	this?
+
+	UserStandardDialog/UserStandardDialogOptr
+	-----------------------------------------
+	UserStandardDialog is used to display a standardized dialog box.  The
+	dialog is standardized in that has a text area, an icon glyph
+	representing the type of situation that caused the dialog to occur, and
+	one or more response triggers.  Like UserDoDialog, UserStandardDialog
+	blocks the calling thread until the user activates one of the response
+	triggers.  UserStandardDialog builds a dialog following the
+	specifications passed.  The simplest way to use UserStandardDialog is
+	to request one of the predefined StandardDialogBoxType.  These mainly
+	cover file related errors.  For most flexibility, a custom box can be
+	built.  The parameters for a custom dialog are as follows:
+
+	dialog type - this sets the icon glyph that represents the type of
+		situation that caused the dialog to be displayed.  The
+		available types are:
+		CDT_QUESTION - Ask the user a question
+		CDT_WARNING - Warn the user of a potential problem
+		CDT_NOTIFICATION - Notify the user of some event
+		CDT_ERROR - Report an error to the user.
+		The system will also issue a beep when a CDT_ERROR dialog is
+		displayed.
+
+	interaction type - this specifies what the response triggers
+		are.  This is a subset of the GenInteractionTypes.  The
+		available types are:
+		GIT_NOTIFICATION - Motif provides "OK" trigger with IC_OK
+					response value
+		GIT_AFFIRMATION - Motif provides "Yes" and "No" triggers with
+					IC_YES and IC_NO response values
+		GIT_MULTIPLE_RESPONSE - application must provide trigger
+					monikers and response values
+
+	dialog string - the string to display in the dialog box.  The string
+		can have up to two parameters.  These parameters are other
+		strings that are passed to UserStandardDialog.  They will
+		replace all occurrances of ASCII 1 and ASCII 2 in the dialog
+		string.  This is useful for including filenames or other
+		variable text in the dialog string.
+
+	response trigger monikers and values - if GIT_MULTIPLE_RESPONSE is
+		used, this determines how many and what labels and response
+		values the resposne triggers have.
+		XXX:  Currently, there is no way to control default focus on
+			these triggers, should we add a set of flags for this
+			and possibly other stuff (like manual dismiss control)?
+	
+	UserStandardDialogOptr is the same as UserStandardDialog except that
+	optrs to strings, and string parameters are passed instead of fptrs.
+	This is useful for localized strings stored in resource blocks.
+
+	Dialog layering/priority
+	------------------------
+	Windows have a specific UI defined layering and priority with respect
+	to other windows in the system.  For example, dialogs appear on top of
+	the parent primary, the application the user is interacting with appears
+	on top of other applications, and within an application, the dialog
+	the user is interacting with appears on top of other dialogs.
+	GenInteractions allow this default behavior to be modified somewhat.
+	While MSG_GEN_INTERACTION_INITIATE opens a dialog on top of other
+	dialogs and gives it the focus and target,
+	MSG_GEN_INTERACTION_INITIATE_NO_DISTURB opens a dialog under other
+	dialogs and doesn't give it the focus and target.  It is brought to
+	the top and given focus and target when the user interacts with it.
+	Placing HINT_INTERACTION_NO_DISTURB on the dialog will force it to
+	never take the focus and target, even when the user is interacting with
+	it.  It may still be initiated on top or under other dialogs with
+	MSG_GEN_INTERACTION_INITIATE or MSG_GEN_INTERACTION_INITIATE_NO_DISTURB.
+	MSG_GEN_BRING_TO_TOP and MSG_GEN_LOWER_TO_BOTTOM may be used to move
+	any of these dialogs to the top of or under other windows within the
+	parent primary (and give or take focus and target).
+	ATTR_GEN_INTERACTION_ON_TOP_OF_APPLICATION may be used to specify that a
+	dialog should always be on top of other windows within the parent
+	application.  MSG_GEN_LOWER_TO_BOTTOM will remove the focus and target
+	from such a dialog, but will not lower under other windows.  A more
+	global "on top" behavior can be had with
+	ATTR_GEN_INTERACTION_ON_TOP_OF_SCREEN.  This specifies that a dialog should
+	always be on top of other windows in the system.  The focus and target
+	will behave as usual, based on what application and what window within
+	that application the user is interacting with.
+
+	Variable data
+	-------------
+	These are the variable data types defined specifically for
+	GenInteraction objects:
+
+	HINT_INTERACTION_SINGLE_USAGE
+		- indicates that dialog should be dismissed when user
+			has completed one interaction with it
+	HINT_INTERACTION_FREQUENT_USAGE
+		- indicates that dialog should stay on-screen when user
+			has completed one interaction with it
+	HINT_INTERACTION_COMPLEX_PROPERTIES
+		- indicates that properties dialog should have "Reset" trigger
+	HINT_INTERACTION_SIMPLE_PROPERTIES
+		- indicates that properties dialog should not have "Reset"
+			trigger
+	HINT_INTERACTION_RELATED_PROPERTIES
+		- indicates that properties dialog should be run in delayed mode
+	HINT_INTERACTION_UNRELATED_PROPERTIES
+		- indicates that properties dialog should be run in immediate
+			mode
+	HINT_INTERACTION_SLOW_RESPONSE_PROPERTIES
+		- indicates that properties dialog should be run in delayed mode
+	HINT_INTERACTION_FAST_RESPONSE_PROPERTIES
+		- indicates that properties dialog should be run in immediate
+			mode
+	HINT_INTERACTION_REQUIRES_VALIDATION
+		- indicates that properties dialog should be run in delayed mode
+	HINT_INTERACTION_MAKE_RESIZABLE
+		- indicates that dialog should be resizable
+	HINT_INTERACTION_INITIATE_ON_STARTUP
+		- indicates that dialog should be initiated when application
+			is start (dialog must also be placed on primary's
+			active list)
+	HINT_INTERACTION_MODAL
+		- indicates that dialog should be application modal
+	ATTR_GEN_INTERACTION_ON_TOP_OF_APPLICATION
+		- indicates that dialog should always be on top of other
+			windows in application
+	ATTR_GEN_INTERACTION_ON_TOP_OF_FIELD
+		- indicates that dialog should be application modal
+		XXX:  Not implemented
+	ATTR_GEN_INTERACTION_ON_TOP_OF_SCREEN
+		- indicates that dialog should always be on top of other
+			windows in the system
+	TEMP_GEN_INTERACTION_WITH_ACTION_RESPONSE
+		- internal use only
+	HINT_INTERACTION_NO_DISTURB
+		- indicates that dialog should never take focus and target,
+			even if user is interacting with it
+
+	These variable data types are inherited from GenClass:
+
+	HINT_INFREQUENTLY_USED
+		- indicates that GIV_POPUP should not be pinnable
+	HINT_SYS_MENU
+		- internal use only
+	HINT_IS_EXPRESS_MENU
+		- internal use only
+	HINT_MAXIMIZABLE
+		- not supported for GenInteraction
+	HINT_NOT_MAXIMIZABLE
+		- not supported for GenInteraction
+	HINT_MINIMIZABLE
+		- not supported for GenInteraction
+	HINT_NOT_MINIMIZABLE
+		- not supported for GenInteraction
+	HINT_NOT_RESTORABLE
+		- not supported for GenInteraction
+	HINT_PREVENT_DEFAULT_OVERRIDES
+		- allows HINT_DEFAULT trigger to keep default across initiates
+			and dismisses of the dialog
+	HINT_GENERAL_CONSUMER_MODE
+		- not supported for GenInteraction
+	HINT_PRESERVE_FOCUS
+		- allows focus to stay on same object across initiates and
+			dismisses of the dialog
+	HINT_DO_NOT_PRESERVE_FOCUS
+		- allows focus to reset on dialog initiate
+	HINT_DISMISS_WHEN_DISABLED
+		- dimisses dialogs when GenInteraction is disabled
+	HINT_USE_INITIAL_BOUNDS_WHEN_RESTORED
+		- not supported for GenInteraction
+	HINT_KEEP_INITIALLY_VISIBLE
+		- XXX: ?
+	HINT_DONT_KEEP_INITIALLY_VISIBLE
+		- XXX: ?
+	HINT_DONT_KEEP_PARTIALLY_VISIBLE
+		- XXX: ?
+	HINT_KEEP_PARTIALLY_VISIBLE
+		- XXX: ?
+	HINT_KEEP_ENTIRELY_VISIBLE
+		- XXX: ?
+	HINT_KEEP_ENTIRELY_VISIBLE_WITH_MARGIN
+		- XXX: ?
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT
+		- XXX: ?
+	HINT_STAGGER_WINDOW
+		- affects initial placement of dialogs
+	HINT_CENTER_WINDOW
+		- affects initial placement of dialogs
+	HINT_TILE_WINDOW
+		- not implemented
+	HINT_POSITION_WINDOW_AT_MOUSE
+		- affects initial placement of dialogs
+	HINT_EXTEND_WINDOW_TO_BOTTOM_RIGHT
+		- not supported for GenInteraction
+	HINT_EXTEND_WINDOW_NEAR_BOTTOM_RIGHT
+		- not supported for GenInteraction
+	HINT_SIZE_WINDOW_AS_DESIRED
+		- XXX: ?
+	HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT
+		- XXX: ?
+	HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD
+		- XXX: ?
+	HINT_SAME_ORIENTATION_AS_PARENT
+		- see Geometry Manager documentation
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+		- see Geometry Manager documentation
+	HINT_NO_TALLER_THAN_CHILDREN_REQUIRE
+		- see Geometry Manager documentation
+	HINT_ALLOW_CHILDREN_TO_WRAP
+		- see Geometry Manager documentation
+	HINT_DONT_ALLOW_CHILDREN_TO_WRAP
+		- see Geometry Manager documentation
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY
+		- see Geometry Manager documentation
+	HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY
+		- see Geometry Manager documentation
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING
+		- see Geometry Manager documentation
+	HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING
+		- see Geometry Manager documentation
+	HINT_DONT_FULL_JUSTIFY_CHILDREN
+		- see Geometry Manager documentation
+	HINT_ORIENT_CHILDREN_VERTICALLY
+		- see Geometry Manager documentation
+	HINT_ORIENT_CHILDREN_HORIZONTALLY
+		- see Geometry Manager documentation.
+	HINT_TOP_JUSTIFY_CHILDREN
+		- see Geometry Manager documentation
+	HINT_CENTER_CHILDREN_VERTICALLY
+		- see Geometry Manager documentation
+	HINT_BOTTOM_JUSTIFY_CHILDREN
+		- see Geometry Manager documentation
+	HINT_LEFT_JUSTIFY_CHILDREN
+		- see Geometry Manager documentation
+	HINT_CENTER_CHILDREN_HORIZONTALLY
+		- see Geometry Manager documentation
+	HINT_RIGHT_JUSTIFY_CHILDREN
+		- see Geometry Manager documentation
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+		- see Geometry Manager documentation
+	HINT_NO_WIDER_THAN_CHILDREN_REQUIRE
+		- see Geometry Manager documentation
+	HINT_DO_NOT_USE_MONIKER
+		- only supported for subgroup GenInteractions, not for dialogs
+			or popups, or for menu item subgroups
+	HINT_PLACE_MONIKER_TO_LEFT
+		- only supported for subgroup GenInteractions, not for dialogs
+			or popups, or for menu item subgroups
+	HINT_PLACE_MONIKER_ABOVE
+		- only supported for subgroup GenInteractions, not for dialogs
+			or popups, or for menu item subgroups
+	HINT_DRAW_IN_BOX
+		- only supported for subgroup GenInteractions, not for dialogs
+			or popups, or for menu item subgroups
+	HINT_CENTER_CHILDREN_ON_MONIKERS
+		- see Geometry Manager documentation
+	HINT_LEFT_JUSTIFY_MONIKERS
+		- see Geometry Manager documentation
+	HINT_CUSTOM_CHILD_SPACING
+		- see Geometry Manager documentation
+	HINT_MAKE_REPLY_BAR
+		- causes this GenInteraction to become the parent dialog's
+			reply bar.  Can only have one such GenInteraction under
+			a dialog.
+	HINT_MINIMUM_SIZE
+		- see Geometry Manager documentation
+	HINT_FIXED_SIZE
+		- see Geometry Manager documentation
+	HINT_INITIAL_SIZE
+		- see Geometry Manager documentation
+	HINT_WRAP_AFTER_CHILD_COUNT
+		- see Geometry Manager documentation
+	HINT_TOOLBOX
+		- see Geometry Manager documentation
+
+Usage: Geometry Management
+--------------------------
+	A GenInteraction object can be used for geometry management.  The
+	default GenInteractionType of GIT_ORGANIZATIONAL and
+	GenInteractionVisibility of GIV_SUB_GROUP are set for this type of
+	usage.
+	
+	Simple geometry management
+	--------------------------
+	For example, to arrange a group of GenTriggers in a numeric keypad
+	layout:
+
+	@object GenInteractionClass Keypad = {
+	    GI_comp = Key7, Key8, Key9, Key4, Key5, Key6, Key1, Key2, Key3;
+	    /* use default GII_type and GII_visibility */
+	    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	    HINT_ALLOW_CHILDREN_TO_WRAP;
+	    HINT_WRAP_AFTER_CHILD_COUNT = { 3 };
+	}
+	@object GenTriggerClass Key1 = {
+	    ...
+	}
+	...
+
+	This will give the familiar 7 8 9 numeric keypad layout.
+				    4 5 6
+				    1 2 3
+
+	Nesting GenInteractions
+	-----------------------
+	An alternative is to use nested GenInteraction objects:
+
+	@object GenInteractionClass Keypad = {
+	    GI_comp = Keys789, Keys456, Keys123;
+	    HINT_ORIENT_CHILDREN_VERTICALLY;
+	}
+	@object GenInteractionClass Keys789 = {
+	    GI_comp = Key7, Key8, Key9;
+	    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	}
+	@object GenInteractionClass Keys456 = {
+	    GI_comp = Key4, Key5, Key6;
+	    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	}
+	@object GenInteractionClass Keys123 = {
+	    GI_comp = Key1, Key2, Key3;
+	    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	}
+	...
+
+	Miscellaneous behavior
+	----------------------
+	Different visual appearances can be acheived with hints.  For
+	example, the GenInteraction moniker can be used with HINT_DRAW_IN_BOX:
+
+	@object GenInteractionClass Keypad = {
+	    GI_visMoniker = "Keypad";
+	    GI_comp = Keys789, Keys456, Keys123;
+	    HINT_ORIENT_CHILDREN_VERTICALLY;
+	    HINT_DRAW_IN_BOX;
+	}
+
+	This will generate this:
+
+		+-- Keypad --+
+		|  7   8   9 |
+		|  4   5   6 |
+		|  1   2   3 |
+		+------------+
+
+	No actions need to be taken on GenInteractions used for geometry
+	management.  They come on-screen when their parent windows come
+	on-screen and come off-screen when their parent windows come
+	off-screen.  Geometry management GenInteractions will ignore
+	MSG_GEN__INTERACTION_INITIATE, MSG_GEN_GUP_INTERACTION_COMMAND and
+	MSG_GEN_INTERACTION_ACTIVATE_COMMAND.  They don't support modality or
+	InteractionCommands.  However, GenClass behavior such as setting
+	enabled/not-enabled or usable/not-usable can still be used.
+
+	See the Geometry Manager documentation for more geometry information.
+
+Usage: Menus and Sub-Menus
+--------------------------
+	Menus are defined with GIV_POPUP.  They may be one of
+	GIT_ORGANIZATIONAL, GIT_PROPERTIES, or GIT_COMMAND.
+	
+	Menu with just triggers
+	-----------------------
+	A simple edit menu with just cut, copy and paste triggers may be
+	defined like this:
+
+	@object GenInteractionClass EditMenu = {
+	    GI_visMoniker = 'E', "Edit";
+	    GI_comp = EditCut, EditCopy, EditPaste;
+	    /* default GII_type is GIT_ORGANIZATIONAL, though in this case,
+	       GIT_COMMAND may also be used as the children are commands */
+	    GII_visibility = GIV_POPUP;
+	}
+	@object GenTriggerClass EditCut = {
+	    GI_visMoniker = "Cut";
+	    ...
+	}
+	@object GenTriggerClass EditCopy = {
+	    GI_visMoniker = "Copy";
+	    ...
+	}
+	@object GenTriggerClass EditPaste = {
+	    GI_visMoniker = "Paste";
+	    ...
+	}
+
+	In Motif, this produces a menu like this:
+
+		+------+
+		| Edit |
+		+-------+
+		| Cut   |
+		| Copy	|
+		| Paste	|
+		+-------+
+
+	EditMenu should be a child of a GenPrimary to appear as "Edit" in the
+	primary's main menu bar.  The menu is initated and the "Cut", "Copy",
+	and "Paste" menu items become visible under user control, so the
+	application needs to do nothing additional to support this.
+
+	Sub-menus
+	---------
+	Sub-menus are defined by including a menu GenInteraction as a
+	child of another menu GenInteraction.  For example:
+
+	@object GenInteractionClass TextMenu = {
+	    GI_visMoniker = 'T', "Text";
+	    GI_comp = TextFontSubMenu, TextPointSizeSubMenu;
+	    GII_visibility = GIV_POPUP;
+	}
+	@object GenInteractionClass TextFontSubMenu = {
+	    GI_visMoniker = 'F', "Font";
+	    GI_comp = TextFontMono, TextFontRoman, TextFontSans;
+	    GII_visibility = GIV_POPUP;
+	}
+	@object GenInteractionClass TextFontSizeSubMenu = {
+	    GI_visMoniker = 'z', "Sizes";
+	    GI_comp = TextSize10, TextSize14, TextSize18;
+	    GII_visibility = GIV_POPUP;
+	}
+	...
+
+	In Motif, this produces a menu like this:
+
+		+------+
+		| Text |
+		+------------------+
+		| Font		-> |
+		| Sizes		-> |
+		+------------------+
+
+	Most specific UIs will indicate a sub-menu with some mark at the right
+	of the menu item trigger that opens the sub-menu.  In Motif, this is
+	a small right-pointing arrow.
+
+	Menus can be nested to an arbitrary number of levels.
+
+	Menu item sub-groups
+	--------------------
+	If a GIV_SUB_GROUP GenInteraction is included as a child of a menu
+	GenInteraction, a menu item sub-group is created.  For example:
+
+	@object GenInteractionClass TextMenu = {
+	    GI_visMoniker = 'T', "Text";
+	    GI_comp = TextFontSubMenu, TextPointSizeSubMenu,
+				TextJustificationGroup;
+	    GII_visibility = GIV_POPUP;
+	}
+	@object GenInteractionClass TextJustificationGroup = {
+	    GI_comp TextLeft, TextCenter, TextRight;
+	}
+	@object GenTriggerClass TextLeft = {
+	    GI_visMoniker = "Left Justify";
+	    ...
+	}
+	...
+
+	In Motif, this produces a menu like this:
+
+		+------+
+		| Text |
+		+------------------+
+		| Font		-> |
+		| Sizes		-> |
+		| ---------------- |
+		| Left Justify	   |
+		| Right Justify	   |
+		| Center Justify   |
+		+------------------+
+
+	Note that the TextJustificationGroup is seperated from the other menu
+	items by a horizontal line.  This can be eliminated by adding
+	HINT_SAME_CATEGORY_AS_PARENT to the TextJustificationGroup's variable
+	data area.
+
+	Menus with lists and interactions
+	---------------------------------
+	GenLists and dialog GenInteractions can also be placed directly in a
+	menu:
+
+	@object GenInteractionClass OptionsMenu = {
+	    GI_visMoniker = 'O', "Options";
+	    GI_comp = OptionsList, OptionsAdvancedOptions, OptionsSaveOptions;
+	    GII_visibility = GIV_POPUP;
+	}
+	@object GenListClass OptionsList = {
+	    /* As GenListEntries will form the menu items, no moniker is
+	       needed for the GenList */
+	    GI_comp = OptionsConfirmDelete, OptionsConfirmReadOnly,
+			OptionsConfirmReplace, OptionsMinimizeOnRun,
+			OptionsAskBeforeReturning;
+	}
+	/* The list entries will appear in the menu as menu items. */
+	@object GenListEntryClass OptionsConfirmDelete = {
+	    GI_visMoniker = 'D', "Confirm Delete";
+	    ...
+	}
+	...
+	/* A dialog GenInteraction placed in a menu GenInteraction will become
+	   a menu item that brings up the dialog box */
+	@object GenInteractionClass OptionsAdvancedOptions = {
+	    GI_visMoniker = 'A', "Advanced Options";
+	    GII_visibility = GIV_DIALOG;
+	    ...
+	}
+	/* A trigger will appear directly in the menu */
+	@object GenTriggerClass OptionsSaveOptions = {
+	    GI_visMoniker = 'S', "Save Options";
+	    ...
+	}
+
+	In Motif, this produces a menu like this:
+
+		+---------+
+		| Options |
+		+-------------------------+
+		| o Confirm Delete	  |
+		| o Confirm Read Only	  |
+		| o Confirm Replace	  |
+		| o Minimize on Run	  |
+		| o Ask Before Returning  |
+		| Advanced Options...	  |
+		| Save Options		  |
+		+-------------------------+
+
+	Lists will be placed directly in the menu while dialogs will become a
+	menu item that bring up the dialog when the menu trigger is
+	activated.  In Motif, the label of such triggers includes ellipsis
+	points to indicate the latter.
+
+	Properties in a menu
+	--------------------
+	A GenList in a GenInteraction can also be used to show object
+	properties in a menu.  For example, a text pointsize list:
+
+	@object GenInteractionClass PointSizeMenu = {
+	    GI_visMoniker = "Sizes";
+	    GI_comp = SizeList;
+	    GII_type = GIT_PROPERTIES;
+	    GII_visibility = GIV_POPUP;
+	}
+	@object GenListClass SizeList = {
+	    GI_comp = Size9, Size10, Size12, Size14, Size18;
+	    ...
+	    <XXX: for now, manually setup to work in immediate mode, will be
+	     done by GenInteraction later?>
+	}
+	@object GenListEntryClass Size9 = {
+	    GI_visMoniker = "9 point";
+	    ...
+	}
+
+	While this has no visual or functional benefit in Motif, in other
+	specific UIs, the information that this list is for properties might
+	be used.
+
+	Initiating and dismissing menus
+	-------------------------------
+	Although menus are opened and closed by the system under user control,
+	an application can open and close menus with
+	MSG_GEN_INTERACTION_INITIATE and MSG_GEN_GUP_INTERACTION_COMMAND with
+	IC_DISMISS.  In Motif, since menus may be pinned, a menu can be
+	dismissed only if it is not pinned by sending
+	MSG_GEN_GUP_INTERACTION_COMMAND with IC_INTERACTION_COMPLETE.
+
+Usage: Properties Dialog
+------------------------
+	A property dialog may be working in either delayed mode or immediate
+	mode.  When the UI gadgetry in an immediate properties box are changed,
+	the changes are reflected in the selected object immediately.  In a
+	delayed property box, the temporary changes that the user makes in the
+	UI gadgetry are not sent to the selected object until they are
+	"applied".  This is usually done with an apply trigger which makes the
+	change permanent.  Alternately, if after making some changes, the user
+	decides that those changes are unwanted, the user can "reset" the UI
+	gadgetry with a reset trigger.  This sets the UI gadgetry back to their
+	state before the user made the changes (or to their state after the
+	lastest apply).
+
+	There are two ways that an application can deal with the UI gadgetry in
+	a property dialog.  Either the application works completely off the
+	state change notification messages sent by the UI gadgetry when the
+	properties are changed or the application needs to do some extra work
+	before or after the properties are changed.  This extra work can
+	include checking for valid settings in the UI gadgetry, or querying
+	the UI gadgetry for their states, or dealing with the UI gadgetry as a
+	group rather than individually (fetching each of their states and using
+	them all at once to make a single change instead of making changes for
+	each).
+
+	"Simple" properties
+	-------------------
+	With the state change notification case, the properties may be working
+	in either delayed mode or in immediate mode.  However, the mode doesn't
+	affect how the application interacts with the properties dialog.  In
+	either mode, the application works off the state change notification
+	messages from the UI gadgetry.  This "simple" properties dialog can be
+	defined like this:
+
+	@object GenInteractionClass LineProperties = {
+	    GI_visMoniker = "Line Properties";
+	    GI_comp = LineWidth, LineStyle, LinePattern, LineColor;
+	    GII_type = GIT_PROPERTIES;
+	    GII_visibility = GIV_DIALOG;
+	}
+	@object GenListClass LineWidth = {
+	    ...
+	}
+	@object GenListClass LineStyle = {
+	    ...
+	}
+	@object GenListClass LinePattern = {
+	    ...
+	}
+	@object GenListClass LineColor = {
+	    ...
+	}
+
+	The GenList objects in the above example should be defined such that
+	they send out state-change notification messages when a change is
+	applied, and the application should handle these notification messages
+	by changing the appropriate attributes of the current selection.
+
+	Delayed/immediate mode
+	----------------------
+	The GIT_PROPERTIES interaction type and GIV_DIALOG visibility type
+	indicates that this is a property box.  The specific UI will determine
+	whether the properties will be running in immediate mode or delayed
+	mode.  As the application works completely through the UI gadgets'
+	state change notificiation, it will support either mode.  However,
+	there are good reasons for wanting the properties to work in one mode
+	or the other.  Hints can be provided to indicate these reasons:
+
+		HINT_INTERACTION_RELATED_PROPERTIES (delayed mode)
+		HINT_INTERACTION_UNRELATED_PROPERTIES (immediate mode)
+		HINT_INTERACTION_SLOW_RESPONSE_PROPERTIES (delayed mode)
+		HINT_INTERACTION_FAST_RESPONSE_PROPERTIES (immediate mode)
+		HINT_INTERACTION_REQUIRES_VALIDATION (delayed mode)
+
+	If the specific UI or the hints determine that the the properties box
+	should be run in delayed mode, an apply trigger will be supplied.  In
+	Motif, an "Apply" trigger will be placed in a reply bar along with a
+	"Close" trigger that dismisses the property box.  <XXX: For now, the UI
+	gadgets in the properties must be manually set up as delayed if these
+	hints are used.>
+
+	In Motif, properties dialog default to work in delayed mode, so the
+	LineProperties dialog appears list this:
+
+		+-------------------------------+
+		|	Line Properties		|
+		|				|
+		| Width  o 1  o 2  o 3  o 4	|
+		| Style  o A  o B  o C  o D	|
+		| Pattern  o X  o Y  o Z	|
+		| Color  o R  o G  o B		|
+		|				|
+		+-------------------------------+
+		|     Apply	      Close     |
+		+-------------------------------+
+
+	"Custom" properties
+	-------------------
+	If an application needs to do additional work for a property box, such
+	as validation of the attributes, a "custom" properties dialog should
+	be defined like this:
+
+	@object GenInteraction LineProperties = {
+	    GI_visMoniker = "Line Properties";
+	    GI_comp = LineWidth, LineStyle, LinePattern, LineColor,
+			LinePropertiesApply;
+	    GII_type = GIT_PROPERTIES;
+	    GII_visibility = GIV_DIALOG;
+	    HINT_INTERACTION_REQUIRES_VALIDATION;
+	}
+	@object GenListClass LineWidth = {
+	    ...
+	}
+	@object GenListClass LineStyle = {
+	    ...
+	}
+	@object GenListClass LinePattern = {
+	    ...
+	}
+	@object GenListClass LineColor = {
+	    ...
+	}
+	@object GenTriggerClass LinePropertiesApply = {
+	    /* moniker set by specific UI, if left blank */
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_MY_PROCESS_PROPERTIES_APPLY;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+	    HINT_SEEK_REPLY_BAR;
+	}
+
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND (IC_APPLY)
+	-----------------------------------------------
+	A GenTrigger object is provided as a replacement apply trigger.
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND and IC_APPLY indicates that this
+	trigger activates standard apply command.  This apply trigger will
+	replace the apply trigger that the specific UI would have supplied
+	otherwise.  HINT_SEEK_REPLY_BAR places the trigger in the property
+	dialog's reply bar.  In the GenInteraction itself,
+	HINT_INTERACTION_REQUIRES_VALIDATION ensures that the property dialog
+	will be working in delayed mode so the apply trigger can function
+	correctly.
+	<XXX: This hint will have no effect until the gadgets are updated.
+	For now, manually specify delayed mode for the gadgets if this hint is
+	used.>
+
+	The application-supplied trigger allows the application to define
+	whatever action descriptor it desires.  The action descriptor message
+	will be sent out when the trigger is activated (as per GenTriggers).
+	In the handler for this message, the application can do whatever is
+	necessary with the properties dialog, in this case, validation of the
+	attributes.  When validated, the application can either manually fetch
+	the state of the gadgetry or send MSG_GEN_GUP_INTERACTION_COMMAND with
+	IC_APPLY to the GenInteraction to have it do the default apply behavior
+	(sending MSG_GEN_APPLY to the UI gadgetry to have them send out their
+	normal state change notification messages).  This can be left out to
+	replace instead of supplement the default behavior.  Finally,
+	MSG_GEN_GUP_INTERACTION_COMMAND with IC_INTERACTION_COMPLETE can be
+	sent to notify the GenInteraction that the user has finished a usage
+	of the interaction.  Upon this notification, the specific UI will
+	decide if the GenInteraction should be dismissed.  Or IC_DISMISS may
+	be used if the dialog should always be dismissed.
+
+	Moniker for trigger
+	-------------------
+	The moniker for the application-supplied apply trigger may be set by
+	the application, or preferably, left blank so that the specific UI can
+	provide the appropriate moniker.  The specific UI uses the IC_APPLY
+	data in the ATTR_GEN_TRIGGER_INTERACTION_COMMAND vardata and any
+	properties hints to determine what moniker to use (in Motif, either
+	"Apply" or "OK").  If the application just wishes to supply a moniker
+	(for example, something more descriptive), but doesn't need to do any
+	additional work on apply, the trigger's output and action message may
+	be left blank.  Because the trigger is marked with
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND, if the output and message are
+	null, the trigger will send MSG_GEN_GUP_INTERACTION_COMMAND with the
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND data word to itself.  This will
+	travel up to the properties GenInteraction where it will be handled,
+	as usual.  In this case, GA_SIGNAL_INTERACTION_COMPLETE should be
+	placed on the GenTrigger so that the specific UI can determine whether
+	the dialog should be closed or not when the trigger is activated.  So
+	the definition would look like this:
+
+	@object GenTriggerClass LinePropertiesApply = {
+	    GI_visMoniker = "Set Line Properties";
+	    /* action descriptor left null, will automatically send
+	       MSG_GEN_GUP_INTERACTION_COMMAND with IC_APPLY */
+	    /* this is necessary if we don't have our own action descriptor */
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+	    HINT_SEEK_REPLY_BAR;
+	}
+
+	Subclassing MSG_GEN_GUP_INTERACTION_COMMAND
+	-------------------------------------------
+	An alternate way to supplement an apply trigger's default behavior is
+	to subclass the GenInteraction and intercept
+	MSG_GEN_GUP_INTERACTION_COMMAND.  If the interaction command sent is
+	IC_APPLY, the application's supplemental apply work can be done.  Then
+	call the superclass to finish with the default apply behavior.  Note
+	that this method cannot be used to override the default
+	GA_SIGNAL_INTERACTION_COMPLETE behavior as that is done separately
+	with MSG_GEN_GUP_INTERACTION_COMMAND and IC_INTERACTION_COMPLETE.
+
+	Reset trigger
+	-------------
+	For either simple or custom property dialogs, if the properties dialog
+	contains a lot of UI gadgetry to set attributes with, it may be useful
+	to add HINT_INTERACTION_COMPLEX_PROPERTIES to the GenInteraction.  This
+	tells the specific UI to run the properties in delayed mode and to add
+	a reset trigger to the standard apply and close triggers.  The reset
+	trigger can be used to "undo" any changes made in the UI gadgetry
+	before they are applied.  This is useful if the user decides that they
+	don't want to the change the current attributes after having already
+	changed some of the gadgets in the property box.
+
+	Adding HINT_INTERACTION_COMPLEX_PROPERTIES:
+
+	@object GenInteractionClass LineProperties = {
+	    GI_visMoniker = "Line Properties";
+	    GI_comp = LineWidth, LineStyle, LinePattern, LineColor;
+	    GII_type = GIT_PROPERTIES;
+	    GII_visibility = GIV_DIALOG;
+	    HINT_INTERACTION_COMPLEX_PROPERTIES;
+	}
+
+	gives this:
+
+		+-------------------------------+
+		|	Line Properties		|
+		|				|
+		| Width  o 1  o 2  o 3  o 4	|
+		| Style  o A  o B  o C  o D	|
+		| Pattern  o X  o Y  o Z	|
+		| Color  o R  o G  o B		|
+		|				|
+		+-------------------------------+
+		|  Apply      Reset      Close  |
+		+-------------------------------+
+	
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND (IC_RESET)
+	-----------------------------------------------
+	As ATTR_GEN_TRIGGER_INTERACTION_COMMAND and IC_APPLY can be used to
+	provide a custom apply trigger, ATTR_GEN_TRIGGER_INTERACTION_COMMAND
+	and IC_RESET can be used to provide a custom reset trigger.  This is
+	useful if the application needs to do some work when the user resets
+	or if the application wishes to override the default reset moniker
+	("Reset" in Motif).  The default reset behavior (sending MSG_GEN_RESET
+	to the UI gadgetry) can be performed by sending
+	MSG_GEN_GUP_INTERACTION_COMMAND with IC_RESET to the properties
+	GenInteraction.
+
+	HINT_INTERACTION_SINGLE_USAGE
+	-----------------------------
+	In Motif, both immediate and delayed properties will stay on-screen
+	when the user changes the attributes of the selected object.  This
+	allows the user to try several different changes or to change the
+	attributes for different objects.  If the user wishes, the properties
+	may be dismissed using the specific UI supplied close trigger.  However,
+	there may be some property dialogs that are used infrequently or that
+	make a change that is normally needed only once.
+	HINT_INTERACTION_SINGLE_USAGE can be used for these properties.  The
+	specific UI will dismiss the property dialog when the user applies a
+	change.  In Motif, the apply trigger moniker is changed from "Apply" to
+	"OK" to indicate this.
+
+Usage: Command Dialog
+---------------------
+	Command dialogs provide applications with a place to group related
+	commands or to provide UI gadgetry that allow the user to set up
+	additional parameters for commands.
+
+	Defining a command dialog
+	-------------------------
+	A command dialog is defined with a dialog GenInteraction with one or
+	more command triggers in the dialog reply bar:
+
+	@object GenInteractionClass RenameBox = {
+	    GI_visMoniker = "Rename";
+	    GI_comp = RenameSource, RenameDest, RenameRename;
+	    GII_type = GIT_COMMAND;
+	    GII_visibility = GIV_DIALOG;
+	}
+	@object GenTextDisplayClass RenameSource = {
+	    ...
+	}
+	@object GenTextClass RenameDest = {
+	    ...
+	}
+	@object GenTriggerClass RenameRename = {
+	    GI_visMoniker = "Rename";
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_MY_PROCESS_RENAME;
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    HINT_SEEK_REPLY_BAR;
+	}
+
+	GA_SIGNAL_INTERACTION_COMPLETE
+	--------------------------------
+	HINT_SEEK_REPLY_BAR is used to specify that the RenameRename command
+	trigger should be placed in the GenInteraction's reply bar (which is
+	created by specific UI).  The GA_SIGNAL_INTERACTION_COMPLETE
+	attribute on the command trigger indicates that when the user activates
+	this trigger, their use of the dialog is complete and the specific UI
+	may dismiss the dialog, if it desires.  This closing behavior may be
+	undesirable.  For example, if the destination name is invalid, it would
+	be convenient to leave the command dialog up to allow the user to try
+	another name.  To do this, just leave the
+	GA_SIGNAL_INTERACTION_COMPLETE attribute clear.  Then in the
+	MSG_MY_PROCESS_RENAME handler, after validating the name, manually
+	bring down the command dialog by sending
+	MSG_GEN_GUP_INTERACTION_COMMAND with IC_DISMISS to it.  Or
+	IC_INTERACTION_COMPLETE may be used to defer closing to the specific
+	UI since the specific UI might support pinning of dialogs, etc.  A
+	modal dialog is always dismissed on IC_INTERACTION_COMPLETE, so if the
+	dialog is modal, IC_DISMISS may always be used.
+	
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND (IC_DISMISS)
+	-------------------------------------------------
+	As with property dialogs, the specific UI will add a close trigger
+	that will dismiss the command dialog box.  If some action needs to be
+	taken when the command dialog is closed, HINT_SEEK_REPLY_BAR and
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND and IC_DISMISS can be used to
+	provide a custom close trigger:
+
+	@object GenInteractionClass RenameBox = {
+	    GI_visMoniker = "Rename";
+	    GI_comp = RenameSource, RenameDest, RenameRename, RenameClose;
+	    GII_type = GIT_COMMAND;
+	    GII_visibility = GIV_DIALOG;
+	}
+	@object GenTextDisplayClass RenameSource = {
+	    ...
+	}
+	@object GenTextClass RenameDest = {
+	    ...
+	}
+	@object GenTriggerClass RenameRename = {
+	    GI_visMoniker = "Rename";
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_MY_PROCESS_RENAME;
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    HINT_SEEK_REPLY_BAR;
+	}
+	@object GenTriggerClass RenameClose = {
+	    /* moniker set by specific UI */
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_MY_PROCESS_CLOSE_RENAME;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+	    HINT_SEEK_REPLY_BAR;
+	}
+
+	Note that GA_SIGNAL_INTERACTION_COMPLETE is not used on RenameClose.
+	The handler for MSG_MY_PROCESS_CANCEL_RENAME should do whatever extra
+	work it needs to, then send MSG_GEN_GUP_INTERACTION_COMMAND with
+	IC_DISMISS to the RenameBox GenInteraction to get the default close
+	behavior to happen.  Note that a moniker is not supplied the
+	RenameClose trigger.  Motif will supply the "Close" moniker.
+
+	Modal command dialog
+	--------------------
+	There are two ways to define a modal command dialog:
+
+	@object GenInteractionClass RenameBox = {
+	    GI_visMoniker = "Rename";
+	    GI_comp = RenameSource, RenameDest, RenameRename;
+	    GII_type = GIT_COMMAND;
+	    GII_visibility = GIV_DIALOG;
+	    GII_attrs = default +modal;
+	}
+
+	or:
+
+	@object GenInteractionClass RenameBox = {
+	    GI_visMoniker = "Rename";
+	    GI_comp = RenameSource, RenameDest, RenameRename;
+	    GII_type = GIT_COMMAND;
+	    GII_visibility = GIV_DIALOG;
+	    HINT_INTERACTION_MODAL;
+	}
+
+	In Motif, the dialog will appear with a thick border and will not be
+	movable.  Also, the "Rename" moniker will not appear.  The attribute
+	should be used if application code depends on the dialog being modal
+	to function correctly.  For example, the RenameSource field is not
+	updated if the currently file selection were to be changed by the user.
+	HINT_INTERACTION_MODAL may be used if modality just makes it clearer and simpler
+	for the user to use the dialog.  Making this distinction has the benefit
+	of being able, at a later time, to determine if the interface of the
+	application can revised to eliminate as many modal dialogs as possible,
+	for example.  The HINT_INTERACTION_MODAL ones may be changed to non-modal, but the
+	GIA_MODAL ones may not.
+
+Usage: Notification Dialog
+--------------------------
+	A notification dialog can be used to let the user know that something
+	has occured that may or may not immediately require his attention.
+	For example, notification that new e-mail has arrived:
+
+	@object GenInteractionClass NewMailNotice = {
+	    GI_visMoniker = "Mailbox";
+	    GI_comp = NewMailText;
+	    GII_type = GIT_NOTIFICATION;
+	    GII_visibility = GIV_DIALOG;
+	    ATTR_GEN_INTERACTION_ON_TOP_OF_SCREEN;
+	    HINT_INTERACTION_NO_DISTURB;
+	}
+	@object GenTextDisplayClass NewMailText = {
+	    GTI_text = "New mail has arrived."
+	}
+
+	In Motif this will provide a single response trigger as follows:
+
+	+---------------------------------------+
+	| New mail has arrived.			|
+	|					|
+	+---------------------------------------+
+	|		  OK			|
+	+---------------------------------------+
+
+	By default this trigger will just dismiss the dialog.  If some action
+	needs to be taken when this happens, a custom trigger can be provided
+	to replace the specific-UI supplied one:
+
+	@object GenInteractionClass NewMailNotice = {
+	    GI_visMoniker = "Mailbox";
+	    GI_comp = NewMailText, NewMailAcknowledge;
+	    GII_type = GIT_NOTIFICATION;
+	    GII_visibility = GIV_DIALOG;
+	    ATTR_GEN_INTERACTION_ON_TOP_OF_SCREEN;
+	    HINT_INTERACTION_NO_DISTURB;
+	}
+	@object GenTriggerClass NewMailAcknowledge = {
+	    /* specific UI supplies moniker */
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_PROCESS_NEW_MAIL_ACKNOWLEDGED;
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+	    HINT_SEEK_REPLY_BAR;
+	}
+
+	Note that the specific UI doesn't provide a way for the user to close
+	this non-modal dialog without using the acknowledgement trigger.  In
+	Motif, system menu's "Close" trigger will be disabled.
+
+	The ATTR_GEN_INTERACTION_ON_TOP_OF_SCREEN in this dialog ensures that it
+	will appear on top of any other windows in the system, so that the user
+	will be sure to see it.  HINT_INTERACTION_NO_DISTURB indicates that the
+	dialog should not take the focus or target.  This allows the dialog
+	to pop up while the user is working with another window, without
+	transferring the focus and target to the notification dialog.
+	MSG_GEN_INTERACTION_INITIATE_NO_DISTURB may instead be used to acheive
+	this effect.  This allows the dialog actually take the focus and target
+	when the user interacts with it.  HINT_INTERACTION_NO_DISTURB will never
+	allow the dialog to take the focus and target.
+
+	A modal notice dialog may be used for some error messages.
+
+Usage: Affirmation Dialog
+-------------------------
+	An affirmation dialog is allows the user to make a single yes/no choice,
+	without the option of ignoring the choice and closing the dialog.  This
+	type of dialog is normally used with UserDoDialog to block until the
+	user responds, at which time the caller will be unblocked and returned
+	the IC_YES or IC_NO response value (see UserDoDialog usage).
+	Alternately, you can supply replacement IC_YES or IC_NO (or both)
+	triggers which will send out messages when activated:
+
+	@object GenInteractionClass DeleteAffirmation = {
+	    GI_comp = DeleteAffirmationText,
+			DeleteAffirmationYes;
+			/* default IC_NO trigger just dismisses dialog */
+	    GII_type = GIT_AFFIRMATION;
+	    GII_visibility = GIV_DIALOG;
+	    GII_attrs = @default | GIA_MODAL;
+	}
+	@object GenTextDisplayClass DeleteAffirmationText = {
+	    GTI_text = "Are you sure you wish to delete this file?"
+	}
+	@object GenTriggerClass DeleteAffirmationYes = {
+	    /* moniker supplied by specific UI */
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_PROCESS_DELETE_FILE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_YES}
+	    HINT_SEEK_REPLY_BAR;
+	}
+
+	This has the advantage (over UserDoDialog) of allow any views that are
+	run by the process thread to be updated if they are uncovered by other
+	applications.
+
+Usage: Multiple Response Dialog
+-------------------------------
+	A GIT_MULTIPLE_RESPONSE dialog is basically a custom dialog that
+	provides no response triggers and no way for the user to close the
+	dialog.  Response triggers must be provided by the application.  If
+	not, the dialog will only be dismissable by the application, not by
+	the user.  This is normally used for providing the user several choices,
+	one of which must be taken:
+
+	@object GenInteractionClass DatabaseFragmentWarning {
+	    GI_comp = DBFragmentText,
+			DBFragmentCompact, DBFragmentContinue;
+	}
+	@object GenTextDisplayClass DBFragmentText = {
+	    GTI_text = "Database is getting fragmented."
+	}
+	@object GenTriggerClass DBFragmentCompact = {
+	    GI_visMoniker = "Run compaction utility";
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_PROCESS_DB_COMPACTION;
+	    HINT_SEEK_REPLY_BAR;
+	}
+	@object GenTriggerClass DBFragmentContinue = {
+	    GI_visMoniker = "Continue without Compacting";
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_PROCESS_DB_NO_CONTINUE;
+	    HINT_SEEK_REPLY_BAR;
+	}
+
+	As none of these are standard trigger replacements, there is no need to
+	use ATTR_GEN_TRIGGER_INTERACTION_COMMAND.
+
+Usage: Progress Dialog
+----------------------
+	A progress dialog is used to show the user the status of an on-going
+	operation.  It may be modal or non-modal, depending on the application
+	and the operation in progress.  The GenInteraction GIT_PROGRESS type is
+	designed to be used in cases where the application supports stopping
+	the in-progress operation.  While the specific UI will provide a IC_STOP
+	trigger in the reply bar for this, the trigger by itself does nothing.
+	The progress dialog must be set up with either a replacment IC_STOP
+	trigger or the GenInteraction must be subclassed to intercept
+	MSG_GEN_GUP_INTERACTION_COMMAND and IC_STOP.  Providing a replaced
+	IC_STOP is easiest:
+
+	@object GenInteractionClass FileTransferProgress = {
+	    GI_visMoniker = "File Transfer Status";
+	    GI_comp = FileTransferPktCount, FileTransferStop;
+	}
+	@object GenTextDisplayClass FileTransferPktCount = {
+	    GI_visMoniker = "Packets Sent:"
+	    GTI_text = "0";
+	}
+	@object GenTextDisplayClass FileTransferStop = {
+	    /* moniker set by specific UI */
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_PROCESS_ABORT_FILE_TRANSFER;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_STOP};
+	    HINT_SEEK_REPLY_BAR;
+	    HINT_TRIGGER_DESTRUCTIVE_ACTION;	/* don't place focus here */
+	}
+
+	An improvement would be to actually supply a moniker that is more
+	descriptive than the specific UI one:
+
+	@object GenTextDisplayClass FileTransferStop = {
+	    GI_visMoniker = "Abort File Transfer";
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_PROCESS_ABORT_FILE_TRANSFER;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_STOP};
+	    HINT_SEEK_REPLY_BAR;
+	    HINT_TRIGGER_DESTRUCTIVE_ACTION;	/* don't place focus here */
+	}
+
+	If the process thread cannot handle the stop request because it is,
+	doing the file transfer in a loop (instead of through message calls),
+	the UI thread can be used to set a stop flag located in some shared
+	memory, either by sending a method to some local UI object or by
+	subclassing the GIT_PROGRESS GenInteraction.
+
+Usage: Other Dialogs
+--------------------
+	Toolboxes
+	---------
+	Toolboxes can be defined with GenInteractionType of GIT_ORGANIZATIONAL
+	and GenInteractionVisibility of GIV_DIALOG:
+
+	@object GenInteractionClass ToolBox = {
+	    GI_visMoniker = "Tools";
+	    GI_comp = ToolList;
+	    GII_type = GIT_ORGANIZATIONAL;
+	    GII_visibility = GIV_DIALOG;
+	    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	    HINT_INTERACTION_INITIATE_ON_STARTUP;
+	}
+	@object GenListClass ToolList = {
+	    GI_comp = ToolPtr, ToolText, ToolLine, ToolPolygon, ToolRect,
+			ToolRotate, ToolEllipse, ToolPolyLine;
+	    ...
+	    HINT_IS_TOOLBOX;
+	}
+	...
+
+	This setup assumes that the application will interact with ToolList
+	directly.
+
+	The ToolBox GenInteraction is a child of the GenPrimary.  The
+	GIA_NOT_USER_INITIATABLE attribute is set because we don't want the
+	specific UI to create a trigger (in the primary) that will bring up
+	the toolbox.  Rather, HINT_INTERACTION_INITIATE_ON_STARTUP specifies
+	that the toolbox is should be brought up automatically when the
+	application starts.  Note that the ToolBox object must be on the
+	active list of the GenPrimary object for this hint to have effect.
+	The application can still use MSG_GEN_ITERACTION_INITIATE and
+	MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS) to bring up and take down
+	the dialog.  In Motif, the user can dismiss the toolbox by using the
+	system menu's "Close" trigger.  If the toolbox shouldn't be dismissable
+	by the user, the toolbox can be defined with the GIT_MULTIPLE_RESPONSE
+	type instead.  The specific UI will provide no way to close the dialog
+	for this type.  In Motif, the system menu's "Close" trigger will be
+	disabled.
+
+Usage: UserDoDialog
+-------------------
+	If an application is coded such that a user response from a dialog is
+	required before execution can continue, UserDoDialog can be used to
+	display a GIA_MODAL GIV_DIALOG GenInteraction.  (If the application just
+	needs to prevent input to other parts of the application while a
+	particular GenInteraction is on-screen, a GIA_MODAL or HINT_INTERACTION_MODAL dialog
+	can be displayed in the normal fashion.)  When the user responds to a
+	dialog brought on-screen with UserDoDialog by activating one of the
+	reply bar triggers, the call to UserDoDialog will return with the action
+	message of the trigger activated.  This can be used to determine what
+	action to take.  UserDoDialog can be used with GIT_NOTIFICATION and
+	GIT_AFFIRMATION most easily:
+
+	@object GenInteractionClass ConfirmDeleteBox = {
+	    GI_comp = ConfirmDeleteText;
+	    GII_type = GIT_AFFIRMATION;
+	    GII_visibility = GIV_DIALOG;
+	    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG |
+				GIA_MODAL;
+	}
+	@object GenTextDisplay ConfirmDeleteText = {
+	    GTI_text = "Are you sure you want to delete this file?";
+	}
+
+	The dialog is displayed with a call to UserDoDialog.  The response value
+	will be either IC_YES or IC_NO, depending on the user response:
+
+	if (UserDoDialog(ConfirmDeleteBox) == IC_YES) {
+	    /* delete file */
+	}
+	...
+
+	UserDoDialog may also return IC_NULL to indicate that the modal dialog
+	has been dismissed by the system, so it is always a good idea to check
+	for and act on the positive response.
+
+	A GIT_NOTIFICATION has only one response IC_OK, and so the response
+	value needn't be acted on:
+
+	@object GenInteractionClass BadDiskBox = {
+	    GI_comp = BadDiskText;
+	    GII_type = GIT_NOTIFICATION;
+	    GII_visibility = GIV_DIALOG;
+	    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG |
+				GIA_MODAL;
+	}
+	@object GenTextDisplay BadDiskText = {
+	    GTI_text = "Unable to find a formatted disk in the drive";
+	}
+	...
+	(void) UserDoDialog(BadDiskBox);
+
+	The ConfirmDeleteBox above can be customized by providing triggers
+	with more explicit monikers:
+
+	@object GenInteractionClass ConfirmDeleteBox = {
+	    GI_comp = ConfirmDeleteText, ConfirmDeleteYes, ConfirmDeleteNo;
+	    GII_type = GIT_AFFIRMATION;
+	    GII_visibility = GIV_DIALOG;
+	    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG |
+				GIA_MODAL;
+	}
+	...
+	@object GenTriggerClass ConfirmDeleteYes = {
+	    GI_visMoniker = "Delete this file";
+	    /* null action */
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_YES };
+	    HINT_SEEK_REPLY_BAR;
+	}
+	@object GenTriggerClass ConfirmDeleteNo = {
+	    GI_visMoniker = "Skip this file";
+	    /* null action */
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_NO };
+	    HINT_SEEK_REPLY_BAR;
+	}
+
+	The ATTR_GEN_TRIGGER_INTERACTION_COMMAND specifies that these triggers
+	replace the standard specific UI supplied triggers.  They will provide
+	the expected IC_YES/IC_NO response values to the caller of UserDoDialog.
+	GA_SIGNAL_INTERACTION_COMPLETE is needed to dismiss the dialog when
+	the triggers are activated.
+
+	If different responses are desired, they must be based on
+	IC_CUSTOM_START, to avoid conflicting with predefined
+	InteractionCommands:
+
+	#define SAVE_CHANGES	IC_CUSTOM_START+0
+	#define ABORT_CHANGES	IC_CUSTOM_START+1
+	#define CANCEL_CLOSE	IC_CUSTOM_START+2
+	...
+	@object GenInteractionClass CloseWithChangesBox = {
+	    GI_comp = CloseWithChangesText;
+	    GII_type = GIT_MULTIPLE_RESPONSE;
+	    GII_visibility = GIV_DIALOG;
+	    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG |
+				GIA_MODAL;
+	}
+	@object GenTextDisplay CloseWithChangesText = {
+	    GTI_text = "This file has been changed.";
+	}
+	@object GenTriggerClass CloseWithChangesSaveChanges = {
+	    GI_visMoniker = "Save Changes";
+	    /* null action */
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { SAVE_CHANGES };
+	    HINT_SEEK_REPLY_BAR;
+	}
+	@object GenTriggerClass CloseWithChangesAbandonChanges = {
+	    GI_visMoniker = "Abandon Changes";
+	    /* null action */
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { ABANDON_CHANGES };
+	    HINT_SEEK_REPLY_BAR;
+	}
+	@object GenTriggerClass CloseWithChangesCancelClose = {
+	    GI_visMoniker = "Cancel Close";
+	    /* null action */
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { CANCEL_CLOSE };
+	    HINT_SEEK_REPLY_BAR;
+	}
+	...
+	closeWithChangeResponse = UserDoDialog(CloseWithChangesBox);
+	switch (closeWithChangeResponse) {
+	    case SAVE_CHANGES:
+		...
+	    case ABORT_CHANGES:
+		...
+	    case CANCEL_CLOSE:
+		...
+	    case IC_NULL:
+		/* IC_NULL is always a potential response */
+		...
+	}
+
+Usage: UserStandardDialog/UserStandardDialogOptr
+------------------------------------------------
+	UserStandardDialog can be used to provide standardized dialogs.  For
+	example, the above dialogs can be done like so:
+
+	ConfirmDeleteBox
+	----------------
+	if (UserStandardDialog(
+		    /* not GIT_MULTIPLE_RESPONSE, no custom triggers */
+		    (char *)0,
+		    /* no string arguments */
+		    (char *)0, (char *)0,
+		    /* dialog string */
+		    "Are you sure you want to delete this file?",
+		    /* dialog flags */
+		        /* custom dialog */
+		    (SDBT_CUSTOM << CDBF_TYPE_OFFSET) |
+		        /* dialog type */
+		        (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		        /* interaction type - IC_YES/IC_NO */
+			(GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+		   == IC_YES) {
+	    /* delete file */
+	};
+
+	BadDiskBox
+	----------
+	(void) UserStandardDialog(
+		    /* not GIT_MULTIPLE_RESPONSE, no custom triggers */
+		    (char *)0,
+		    /* no string arguments */
+		    (char *)0, (char *)0,
+		    /* dialog string */
+		    "Unable to find a formatted disk in the drive.",
+		    /* dialog flags */
+		        /* custom dialog */
+		    (SDBT_CUSTOM << CDBF_TYPE_OFFSET) |
+		        /* dialog type */
+		        (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		    /* interaction type - IC_OK */
+			(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+	ConfirmDeleteBox with explicit monikers
+	---------------------------------------
+	For this case, since we want to provide explicit monikers, we must
+	use the GIT_MULTIPLE_RESPONSE interaction type.  Using this allows us
+	to pass in the monikers and response values for the response triggers
+	for the dialog.  This is done by passing a fptr to a table consisting
+	of the number of triggers in the dialog and a
+	StandardDialogResponseTriggerEntry for each trigger.  The entry
+	contains a optr of the moniker to use for the response trigger and
+	the response value for the trigger.  The moniker may a simple text or a
+	graphics string.  The response value may be one of the predefined
+	InteractionCommands or an application-defined value based on
+	IC_CUSTOM_START.
+
+	@visMoniker ConfirmYesMoniker = "Delete this file";
+	@visMoniker ConfirmNoMoniker = "Skip this file";
+	...
+	StandardDialog2ResponseTriggerTable confirmResponseTable = {
+	    2,			/* SD2RTT_numTriggers */
+				/* SD2RTT_trigger1 */
+	    {(optr)&ConfirmYesMoniker,		/* SDRTE_moniker */
+	     IC_YES},			/* SDRTE_responseValue */
+				/* SD2RTT_trigger2 */
+	    {(optr)&ConfirmNoMoniker,		/* SDRTE_moniker */
+	     IC_NO}			/* SDRTE_responseValue */
+	};
+
+	if (UserStandardDialog(
+		   /* use custom response triggers */
+		   (char *)&confirmResponseTable),
+		   /* no string arguments */
+		   (char *)0, (char *)0,
+		   /* dialog string */
+		   "Are you sure you want to delete this file?",
+		   /* dialog flags */
+		       /* custom dialog */
+		   (SDBT_CUSTOM << CDBF_TYPE_OFFSET) |
+		       /* dialog type */
+		       (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		       /* interaction type - application supplied triggers */
+		      (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET))
+		    == IC_YES) {
+	    /* delete file */
+	};
+
+	CloseWithChangesBox
+	-------------------
+	#define SAVE_CHANGES	IC_CUSTOM_START+0
+	#define ABORT_CHANGES	IC_CUSTOM_START+1
+	#define CANCEL_CLOSE	IC_CUSTOM_START+2
+	...
+	@visMoniker CloseSaveMoniker = "Save Changes";
+	@visMoniker CloseAbandonMoniker = "Abandon Changes";
+	@visMoniker CloseCancelMoniker = "Cancel Close";
+	...
+	StandardDialog3ResponseTriggerTable closeResponseTable = {
+	    3,			/* SD3RTT_numTriggers */
+				/* SD3RTT_trigger1 */
+	    {(optr)&CloseSaveMoniker,		/* SDRTE_moniker */
+	     IC_YES},			/* SDRTE_responseValue */
+				/* SD3RTT_trigger2 */
+	    {(optr)&CloseAbandonMoniker,	/* SDRTE_moniker */
+	     IC_YES},			/* SDRTE_responseValue */
+				/* SD3RTT_trigger3 */
+	    {(optr)&CloseCancelMoniker,	/* SDRTE_moniker */
+	     IC_NO}			/* SDRTE_responseValue */
+	};
+
+	closeWithChangeResponse = UserStandardDialog(
+		    /* custom response triggers */
+		    (char *)&closeResponseTable,
+		    /* no string arguments */
+		    (char *)0, (char *)0,
+		    /* dialog string */
+		    "This file has been changed.",
+		    /* dialog flags */
+		       /* custom dialog */
+		    (SDBT_CUSTOM << CDBF_DIALOG_TYPE) |
+		       /* dialog type */
+		       (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		       /* interaction type - application supplied triggers */
+		       (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET));
+	switch (closeWithChangeResponse) {
+	    case SAVE_CHANGES:
+		...
+	    case ABORT_CHANGES:
+		...
+	    case CANCEL_CLOSE:
+		...
+	    case IC_NULL:
+		/* IC_NULL is always a potential response */
+		...
+	};
+
+Usage: Organizing Dialogs Under a GenPrimary
+--------------------------------------------
+	If your application has many dialogs sitting under the GenPrimary
+	(typically with the GIA_NOT_USER_INITIATABLE attribute), it may become
+	inefficient when starting up because the system has to process each of
+	the dialogs and determine that a trigger shouldn't be created for them.
+	A better way to do this would be to have a single GenInteraction under
+	the GenPrimary with GIT_ORGANIZATIONAL, GIT_DIALOG, and
+	GIA_NOT_USER_INITITABLE.  Then place all the dialogs under this
+	GenInteraction.  When the application starts up, it only needs to
+	process this one GenInteraction.  Grouping dialogs in this way also
+	allows easily initiating or dismissing all the dialogs at once.  Simply
+	encapsulate MSG_GEN_INTERACTION_INITIATE or
+	MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS) and use
+	MSG_GEN_SEND_TO_CHILDREN on the one GenInteraction.
+
+In-Depth: HINT_SEEK_REPLY_BAR
+-----------------------------
+	HINT_SEEK_REPLY_BAR is used to place a trigger into a dialog reply
+	bar.  It can only be used with dialog GenInteractions.  In addition
+	to placing command triggers into a command dialog's reply bar and
+	placing replacement apply, reset, and close triggers into a dialog's
+	reply bar, it can be used to place a command trigger into a property
+	dialog's reply bar.  For example, in the LineProperties dialog above,
+	we may want a "Set Default" trigger that can be used to the set the
+	default attributes for any newly created lines:
+
+	@object GenInteraction LineProperties = {
+	    GI_visMoniker = "Line Properties";
+	    GI_comp = LineWidth, LineStyle, LinePattern, LineColor,
+			LineSetDefaults;
+	    GII_type = GIT_PROPERTIES;
+	    GII_visibility = GIV_DIALOG;
+	}
+	@object GenListClass LineWidth = {
+	    ...
+	}
+	@object GenListClass LineStyle = {
+	    ...
+	}
+	@object GenListClass LinePattern = {
+	    ...
+	}
+	@object GenListClass LineColor = {
+	    ...
+	}
+	@object GenTriggerClass LineSetDefaults = {
+	    GI_visMoniker = "Set Defaults";
+	    GTI_destination = process;
+	    GTI_actionMsg = MSG_MY_PROCESS_LINE_PROPERTIES_SET_DEFAULTS;
+	    HINT_SEEK_REPLY_BAR;
+	}
+
+	In Motif, this dialog would have the following reply bar:
+
+		|    Apply    Set Defaults    Close    |
+		+--------------------------------------+
+
+In-Depth: Default Trigger
+-------------------------
+	Normally, the default trigger for a GenInteraction with a reply bar
+	will be the first trigger in the reply bar.  This can be overridden
+	with a HINT_DEFAULT placed on the desired default trigger.  For
+	response triggers that it supplies, the specific UI gives HINT_DEFAULT
+	to these triggers:  IC_APPLY, IC_OK, and IC_YES (these are normally the
+	first triggers, anyway).  You may wish to follow these rules when using
+	a GenTrigger to replace a standard response trigger, placing
+	HINT_DEFAULT on these.
+
+	While this HINT_DEFAULT works the initial time the dialog box is brought
+	on-screen, activating any trigger in the reply bar will make it the
+	default trigger for the next time the dialog box is brought on-screen.
+	This can be avoided by placing HINT_PREVENT_DEFAULT_OVERRIDES on the
+	GenInteraction.  This will allow the HINT_DEFAULT trigger to always be
+	the default trigger.
+
+See Also
+--------
+	GenClass documentation for various messages and hints related to
+	GenInteractions.
+
+	GenTriggerClass for general usage documentation.
+
+	GenControlClass for general usage documentation.
+
+	Generic UI gadgetry classes for general usage documentation.
+
+;------------------------------------------------------------------------------
+;	Assembling & Debugging
+;------------------------------------------------------------------------------
+
+Sample Code/Programming Tips
+----------------------------
+	Sample app in Appl/SDK_C/GenInter
+
+Include Files Needed
+--------------------
+	Include/Objects/gInterC.def (for assembly)
+	CInclude/Objects/gInterC.goh (for C)
+	Include/uDialog.def (for UserDoDialog, UserStandardDialog in assembly)
+	CInclude/uDialog.h (for UserDoDialog, UserStandardDialog in C)
+
+Assembly Tips
+-------------
+
+Debugging Tools & Tips
+----------------------
+
+See Also
+--------
+	<Sample apps, related tools, other documentation>
+
+;------------------------------------------------------------------------------
+;	Implementation Notes
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;	Most frequently asked questions
+;------------------------------------------------------------------------------
+
+	<anytime someone asks you a question about this object, clear up
+	 the documentation above to explain it, or add an entry here>
+
+;------------------------------------------------------------------------------
+;	Declaration
+;------------------------------------------------------------------------------
+
+see Include/Objects/gInterC.def, CInclude/Objects/gInterC.goh for GenInteraction
+see Include/uDialog.def, CInclude/uDialog.h for UserDoDialog, UserStandardDialog
+
+------------------------------------------------------------------------------`

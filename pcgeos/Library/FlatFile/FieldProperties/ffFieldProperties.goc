@@ -1,0 +1,2934 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PC/GEOS
+ * MODULE:	  Flat file database library
+ * FILE:	  ffFieldProperties.goc
+ *
+ * AUTHOR:  	  Anna Lijphart : Feb, 1992
+ *
+ * DESCRIPTION:
+ *	The Flat File Field Properties UI controller definitions and code.
+ *
+ * RCS STAMP:
+ *	$Id: ffFieldProperties.goc,v 1.1 97/04/04 18:03:21 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <char.h>
+#include <gstring.h>
+
+#include <geoworks.h>
+#include <math.h>
+#include <parse.h>
+#include <system.h>
+
+@include <ffile.goh>
+#include <extern.h>
+@include <Objects/FlatFile/ffileC.goh>
+@include <Objects/FlatFile/ffFldPr.goh>
+@include <Objects/FlatFile/ffFpTxt.goh>
+#include <ffFatal.h>
+
+/*
+ ***************************************************************************
+ *		Constants and structures
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *		Forward Declarations
+ ***************************************************************************
+ */
+
+void FPGetFeaturesAndChildBlock(optr obj, MemHandle *childBlock, FFFieldPropertiesFeatures *features);
+
+FFD_attributes GetDataAttributes(byte dataType);
+
+Boolean CheckNumberAndDisplayMsg(FieldDataType dataType,
+				 MemHandle textBlock, 
+				 dword floatAddress,
+				 optr errorMessageChunk);
+
+Boolean CheckDateTimeAndDisplayMessage(FieldDataType dataType,
+				       MemHandle textBlock,
+				       dword floatAddress,
+				       optr errorMessageChunk);
+
+Boolean CheckMinMax(FloatNum *min, FloatNum *max, 
+		    optr dialogBoxOptr);
+
+Boolean CheckDefault(optr selfOptr, FloatNum *min, FloatNum *max, 
+		     FloatNum *defaultFloat, optr dialogBoxOptr);
+
+void FFFPStoreFieldInfo(optr oself,
+				Message messageToSendBack,
+				FieldID colNum);
+
+FieldDataType StoreDataTypeInStruct(word features,
+				    FFFieldPropertiesMessageBlock *fpmb,
+
+					MemHandle childBlock);
+void StoreFieldNameInStruct(FFFieldPropertiesMessageBlock *fpmb,
+					MemHandle childBlock);
+Boolean StoreMinMaxInStruct(FFFieldPropertiesMessageBlock *fpmb,
+					MemHandle childBlock,
+					optr selfOptr);
+void DisplayUserError(optr errorMessageChunk);
+
+void ConvertDateTimeToAscii(TCHAR *string,
+			    FloatNum *number,
+			    DateTimeFormat dtf);
+
+void ConvertMinMaxToAsciiAndDisplay(MemHandle childBlock,
+				   FieldDataType dataType,
+				   FloatNum *minValue,
+				   FloatNum *maxValue);
+
+void FFFPMarkNotBusyAcceptInput(FFFieldPropertiesInstance *pself);
+
+void FFFPSelectAllGrabFocus(optr obj);
+
+/*
+ * 	External objects
+ */
+@extern chunk @FFMemoryFullError;
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@classdecl FFFieldPropertiesClass ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start FFFieldPropertiesUI, notDetachable ;
+
+@visMoniker CreateNewFieldTitle = "Create New Field";
+@visMoniker FieldPropertiesTitle = "Edit a Field";
+
+@object GenInteractionClass FFFieldProperties = {
+    GI_visMoniker = FieldPropertiesTitle;
+    GI_states = @default & ~GS_USABLE;
+    GII_attrs = GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GI_comp = @FFFieldPropertiesNameAndTypeGroup,
+    	      @FFFieldPropertiesAttrsGroup,
+	      @FFFPBothReplyBars,
+	      @NotesInteraction;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_INTERACTION_SLOW_RESPONSE_PROPERTIES;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+
+    ATTR_GEN_HELP_CONTEXT = "dbFieldProps";
+}
+
+/*
+ * The Field Properties non-modal box has these triggers:
+ *
+ *	Apply     Reset     Close
+ */
+
+@object GenInteractionClass FFFPBothReplyBars = {
+    	GI_comp = @FFFPEditFieldReplyBar,
+	 	  @FFFPReplyBar;
+	HINT_MAKE_REPLY_BAR;
+}
+
+@object GenInteractionClass FFFPEditFieldReplyBar = {
+	GI_comp = @FFFieldPropertiesApply,
+	    	  @FFFieldPropertiesReset,
+	    	  @FFFieldPropertiesClose;
+}
+
+@object GenTriggerClass FFFieldPropertiesApply = {
+	/* specific UI supplies moniker */
+	GI_visMoniker = "Apply";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_actionMsg = MSG_FFFP_APPLY;
+
+	GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+} 
+
+@object GenTriggerClass FFFieldPropertiesReset = {
+	GI_states = @default & ~GS_ENABLED;
+
+	GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_RESET };
+	GTI_actionMsg = MSG_FFFP_RESET;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass FFFieldPropertiesClose = {
+	GI_states = @default;
+	/* dismiss box if pressed */
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_FFFP_CLOSE;
+
+	GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+	HINT_SEEK_REPLY_BAR;
+}
+
+/*
+ * The Create New Field modal box has these triggers:
+ *
+ *	    	    Create  Stop Creating
+ */
+@object GenInteractionClass FFFPReplyBar = {
+    	GI_states = @default;
+	GI_comp = @FFFieldPropertiesCreate,
+	    	  @FFFieldPropertiesCancel;
+}
+
+@object GenTriggerClass FFFieldPropertiesCreate = {
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE
+	    	    	    | GA_INITIATES_BUSY_STATE;
+	GI_states = @default & ~GS_ENABLED;
+	GI_visMoniker = 'C', "Create";
+
+	GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+
+	GTI_actionMsg = MSG_FFFP_CREATE_FIELD;
+        ATTR_GEN_TRIGGER_ACTION_DATA = {
+	    0
+        };
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass FFFieldPropertiesCancel = {
+	/* dismiss box if pressed */
+	GI_visMoniker = 'S',"Stop Creating";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+
+	GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+
+	GTI_actionMsg = MSG_FFFP_CANCEL;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/****************/
+
+@object GenInteractionClass FFFieldPropertiesNameAndTypeGroup = {
+    GI_comp = @FFFieldPropertiesNameDescription,
+	      @FFFieldNameAndTypeInteraction;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass FFFieldPropertiesNameDescription = {
+    GI_attrs = GA_READ_ONLY;
+    GTXI_text = "Please enter a field name. Every field you define should have a unique name. You can use this name later to refer to this field.";
+    HINT_FIXED_SIZE =
+    {
+        0, SST_LINES_OF_TEXT | 4, 0
+    };
+}
+
+@object GenInteractionClass FFFieldNameAndTypeInteraction = {
+    GI_comp = @FFFieldPropertiesFieldName,
+	      @FieldTypeInteraction;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+/*
+ * Legal field names can contain alphanumeric plus underscore.
+ */
+@chunk VisTextCustomFilterData FFFPNameFilter[] = {
+#ifdef DO_DBCS
+    {C_NULL, C_UNIT_SEPARATOR},
+    {C_EXCLAMATION_MARK, C_SLASH},
+    {C_COLON, C_COMMERCIAL_AT},
+    {C_OPENING_SQUARE_BRACKET, C_SPACING_CIRCUMFLEX},
+    {C_SPACING_GRAVE, C_SPACING_GRAVE},
+    {C_OPENING_CURLY_BRACKET, C_DELETE},
+    {C_SOFT_HYPHEN, C_SOFT_HYPHEN},
+    {C_SUPERSCRIPT_DIGIT_TWO, C_SUPERSCRIPT_DIGIT_THREE},
+    {C_DIVISION_SIGN, C_DIVISION_SIGN}
+#else
+    {C_NULL, C_OPTHYPHEN},
+    {C_EXCLAMATION, C_SLASH},
+    {C_COLON, C_AT_SIGN},
+    {C_LEFT_BRACKET, C_ASCII_CIRCUMFLEX},
+    {C_BACKQUOTE, C_BACKQUOTE},
+    {C_LEFT_BRACE, C_DELETE},
+    {C_NOTEQUAL, C_NOTEQUAL},
+    {C_LESSEQUAL, C_GREATEREQUAL},
+    {C_DIVISION, C_DIVISION}
+#endif
+};
+
+@object FFFPFieldTextClass FFFieldPropertiesFieldName = {
+    GI_visMoniker = "Field Name:";
+    GTXI_text = "";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = MAX_FIELD_NAME_LENGTH;
+    GTXI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+    ATTR_GEN_TEXT_CUSTOM_FILTER = @FFFPNameFilter;
+    ATTR_GEN_TEXT_EXTENDED_FILTER = VTEFT_CHARACTER_LEVELER_LEVEL;
+    HINT_FIXED_SIZE =
+    	{
+	    SST_AVG_CHAR_WIDTHS | 30, 0, 0
+    	};
+}
+
+@object GenInteractionClass FieldTypeInteraction = {
+    GI_visMoniker = "Field Type:";
+    GI_comp = @FieldTypeList;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_PLACE_MONIKER_TO_LEFT;
+}    
+    
+@object GenItemGroupClass FieldTypeList = 
+{
+    GI_comp = @GeneralTextEntry,
+	      @IntegerEntry,
+	      @RealEntry,
+	      @DateEntry,
+	      @TimeEntry,
+	      @ComputedEntry;
+    GIGI_selection = FDT_GENERAL_TEXT;
+    GIGI_numSelections = 1;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_FFFP_SET_DATA_TYPE_ATTRIBUTE_OPTIONS;
+
+    GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+/**************************/
+
+@object GenItemClass GeneralTextEntry =
+{
+    GI_visMoniker = "General/Text";
+    GII_identifier = FDT_GENERAL_TEXT;
+}
+
+@object GenItemClass IntegerEntry =
+{
+    GI_visMoniker = "Integer";
+    GII_identifier = FDT_INTEGER; 
+}
+
+@object GenItemClass RealEntry =
+{
+    GI_visMoniker = "Real Number";
+    GII_identifier = FDT_REAL; 
+}
+
+@object GenItemClass DateEntry =
+{
+    GI_visMoniker = "Date";
+    GII_identifier = FDT_DATE; 
+}
+
+@object GenItemClass TimeEntry =
+{
+    GI_visMoniker = "Time";
+    GII_identifier = FDT_TIME; 
+}
+
+@object GenItemClass ComputedEntry =
+{
+    GI_visMoniker = "Computed";
+    GII_identifier = FDT_COMPUTED; 
+}
+
+@object GenInteractionClass FFFieldPropertiesAttrsGroup = {
+    GI_comp =@FieldAttrsGroup,
+    	     @DataAttrsGroup;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass DataAttrsGroup =
+{
+    GI_visMoniker = "Data Attributes";
+    GI_comp = 	@MaxTextLength,
+		@MinValue,
+		@MaxValue;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_DRAW_IN_BOX;
+}
+
+/***********************/
+
+/*
+ * This trigger brings up the expression builder.
+ * We toggle between these two monikers, depending if
+ * the data type is "Computed" or not
+ */
+@visMoniker SetDefaultMoniker =  "Set Default...";
+@visMoniker SetComputedMoniker = "Set Expression...";
+
+@object GenTriggerClass SetDefaultOrComputedTrigger = {
+    GI_visMoniker = SetDefaultMoniker;
+    GTI_actionMsg = MSG_FFFP_EDIT_DEFAULT_OR_COMPUTED_EXPRESSION;
+    GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+    HINT_CENTER_MONIKER;
+    HINT_FIXED_SIZE =
+    	{
+	    SST_AVG_CHAR_WIDTHS | 16, 0, 0
+    	};
+}
+
+@object GenValueClass MaxTextLength =
+{
+    GI_visMoniker = "Length:";
+    GVLI_value   = MakeWWFixed(MAX_TEXT_FIELD_LENGTH);
+    GVLI_minimum = MakeWWFixed(1);
+    GVLI_maximum = MakeWWFixed(MAX_TEXT_FIELD_LENGTH);
+}
+
+@object GenTextClass MinValue =
+{
+    GI_visMoniker = "Min:";
+    GTXI_text = "";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = MIN_MAX_NUM_CHARS_ALLOWED;
+    GTXI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+    HINT_FIXED_SIZE =
+    {
+    	SST_AVG_CHAR_WIDTHS | MIN_MAX_NUM_CHARS_DISPLAYED, 0, 0 
+    }; 
+}
+
+@object GenTextClass MaxValue =
+{
+    GI_visMoniker = "Max:";
+    GTXI_text = "";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = MIN_MAX_NUM_CHARS_ALLOWED;
+    GTXI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+    HINT_FIXED_SIZE =
+    {
+    	SST_AVG_CHAR_WIDTHS | MIN_MAX_NUM_CHARS_DISPLAYED, 0, 0 
+    }; 
+}
+
+@object GenInteractionClass FieldAttrsGroup = {
+    GI_visMoniker = "Field Attributes";
+    GI_comp = @NotesTrigger,
+    	      @SetDefaultOrComputedTrigger;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTriggerClass NotesTrigger = {
+    GI_visMoniker = "Set Field Notes...";
+    GTI_actionMsg = MSG_FFFP_DISPLAY_NOTES;
+    GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+    HINT_CENTER_MONIKER;
+    HINT_FIXED_SIZE =
+    	{
+	    SST_AVG_CHAR_WIDTHS | 16, 0, 0
+    	};
+}
+
+@object GenInteractionClass NotesInteraction = {
+    GI_comp = @NotesText;
+    GI_visMoniker = "Set Field Notes";
+    GII_attrs = GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_PROPERTIES;
+    HINT_CENTER_WINDOW;
+    ATTR_GEN_HELP_CONTEXT = "dbFldNotes";
+}
+
+@object GenTextClass NotesText = {
+    GTXI_maxLength = MAX_NOTES_TEXT_LENGTH;
+    GTXI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    GTXI_applyMsg = MSG_FFFP_ACCEPT_NOTES;
+    GTXI_attrs = @default | GTA_INIT_SCROLLING;
+
+    HINT_DEFAULT_FOCUS;
+
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFFieldPropertiesClass};
+    HINT_FIXED_SIZE =
+    {
+    	SST_AVG_CHAR_WIDTHS | 50, SST_LINES_OF_TEXT | 5, 0
+    };
+
+    ATTR_GEN_HELP_CONTEXT = "dbFieldNotes";
+}
+
+@end FFFieldPropertiesUI
+
+/*
+ * Toolbox UI
+ */
+
+/* (NONE) */
+
+/*
+ * Strings for controllers
+ */
+@extern chunk @FFFieldPropertiesName;
+@extern chunk @FFFPFieldNameFeatureName;
+@extern chunk @FFFPFieldNameDescrFeatureName;
+@extern chunk @FFFPFieldTypeFeatureName;
+@extern chunk @FFFPComputedEntryName;
+@extern chunk @FFFPFieldAttrsFeatureName;
+@extern chunk @FFFPDataAttrsFeatureName;
+@extern chunk @FFFPCreateFeatureName;
+@extern chunk @FFFPCancelFeatureName;
+@extern chunk @FFFPEditFieldReplyBarFeatureName;
+
+/*
+ * Strings for error conditions 
+ */
+@extern chunk @FFFPBadDefaultValue;
+@extern chunk @FFFPBadMinDate;
+@extern chunk @FFFPBadMaxDate;
+@extern chunk @FFFPBadMinTime;
+@extern chunk @FFFPBadMaxTime;
+@extern chunk @FFFPBadMinInteger;
+@extern chunk @FFFPBadMaxInteger;
+@extern chunk @FFFPBadMinReal;
+@extern chunk @FFFPBadMaxReal;
+@extern chunk @FFFPMinGreaterThanMaxError;
+@extern chunk @FFFPMinGreaterThanDefaultError;
+@extern chunk @FFFPDefaultGreaterThanMaxError;
+@extern chunk @FFFPDuplicateFieldNameError;
+@extern chunk @FFFPTooManyFieldsError;
+@extern chunk @FFFPNoFieldNameError;
+
+/*
+ ***************************************************************************
+ *		Code for FFFieldPropertiesControlClass
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE: 	MSG_GEN_CONTROL_GET_INFO for FFFieldPropertiesControlClass
+ *
+ * DESCRIPTION:	Return information for building the controller
+ *
+ * PARAMETERS:
+ *	(GenControlBuildInfo *info)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	1/22/92		Initial revision
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_GEN_CONTROL_GET_INFO
+{
+
+#ifdef __HIGHC__
+_pragma_const_in_code;
+#endif
+
+    static const GCNListType FFFP_gcnList[] = {
+	{MANUFACTURER_ID_GEOWORKS, 
+	 GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_FIELD_PROPERTIES_STATUS_CHANGE}
+    };
+
+    static const NotificationType FFFP_notifyTypeList[] = {
+	{MANUFACTURER_ID_GEOWORKS, 
+	 GWNT_FLAT_FILE_FIELD_PROPERTIES_STATUS_CHANGE}
+    };
+
+    /* --- */
+
+    static const GenControlChildInfo FFFP_childList[] = {
+	{@FFFieldProperties,
+	 FFFP_FIELD_NAME_FEATURE | FFFP_FIELD_NAME_DESCR_FEATURE |
+	 FFFP_DATA_TYPE_FEATURE |
+	 FFFP_COMPUTED_DATA_TYPE_FEATURE | FFFP_FIELD_ATTRS_FEATURE |
+	 FFFP_DATA_ATTRS_FEATURE | FFFP_CREATE_TRIGGER_FEATURE |
+	 FFFP_CANCEL_TRIGGER_FEATURE |
+	 FFFP_APPLY_RESET_CLOSE_TRIGGER_FEATURE,
+	 0}
+    };
+
+    /*
+     * Careful, this table is in the *opposite* order as the record which
+     * it corresponds to.
+     */
+
+    static const GenControlFeaturesInfo FFFP_featuresList[] = {
+	{@FFFPEditFieldReplyBar, @FFFPEditFieldReplyBarFeatureName, 0},
+	{@FFFieldPropertiesCancel, @FFFPCancelFeatureName, 0},
+	{@FFFieldPropertiesCreate, @FFFPCreateFeatureName, 0},
+	{@DataAttrsGroup, @FFFPDataAttrsFeatureName, 0},
+	{@FieldAttrsGroup, @FFFPFieldAttrsFeatureName, 0},
+	{@ComputedEntry, @FFFPComputedEntryName, 0},
+	{@FieldTypeInteraction, @FFFPFieldTypeFeatureName, 0},
+	{@FFFieldPropertiesNameDescription, @FFFPFieldNameDescrFeatureName, 0},
+	{@FFFieldPropertiesFieldName, @FFFPFieldNameFeatureName, 0}
+    };
+
+    /* The ## denote fields filled in dynamically */
+
+    static const GenControlBuildInfo FFFP_dupInfo = {
+	0,				    /* GCBI_flags */
+	NULL,				    /* GCBI_initFileKey */
+	FFFP_gcnList,			    /* GCBI_gcnList */
+	ARRAY_LEN(FFFP_gcnList,GCNListType),/* GCBI_gcnCount */
+	FFFP_notifyTypeList,		    /* GCBI_notificationList */
+	ARRAY_LEN(FFFP_notifyTypeList, NotificationType),
+					    /* GCBI_notificationCount */
+	@FFFieldPropertiesName,		    /* GCBI_controllerName */
+
+	/* ## */ NullHandle,		    /* GCBI_dupBlock */
+	FFFP_childList,			    /* GCBI_childList */
+	ARRAY_LEN(FFFP_childList, GenControlChildInfo),
+					    /* GCBI_childCount */
+	FFFP_featuresList,		    /* GCBI_featuresList */
+	ARRAY_LEN(FFFP_featuresList, GenControlFeaturesInfo),
+					    /* GCBI_featuresCount */
+	FFFP_ADVANCED_FEATURES,	    /* GCBI_features */
+
+	NullHandle,			    /* GCBI_toolBlock */
+	0,				    /* GCBI_toolList */
+	0,				    /* GCBI_toolCount */
+	0,				    /* GCBI_toolFeaturesList */
+	0,				    /* GCBI_toolFeaturesCount */
+	0,				    /* GCBI_toolFeatures */
+	0   		    	    	    /* GCBI_helpContext */
+    };
+
+#ifdef __HIGHC__
+_pragma_end_const_in_code;
+#endif
+
+    /*
+     * Copy our structure which contains most of the correct
+     * fields (everything that can be correct given compiler limitations)
+     */
+    memcpy(info, MemLockFixedOrMovable(&FFFP_dupInfo),
+	   sizeof(GenControlBuildInfo));
+    MemUnlockFixedOrMovable(&FFFP_dupInfo);
+
+    /*
+     * Fill in the rest of the fields by hand
+     */
+    info->GCBI_dupBlock = HandleOf(@FFFieldPropertiesFieldName);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_TWEAK_DUPLICATED_UI for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	Tweak the UI for the field properties.
+ *
+ * PARAMETERS:
+ *	void (MemHandle childBlock, WordFlags features)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	1/30/92		Initial version
+ *	Doug	1/29/93		Converted from GENERATE to TWEAK handler for
+ *				optimization's sake.
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_GEN_CONTROL_TWEAK_DUPLICATED_UI
+{
+    void	*hintDataPtr;
+    optr    	fieldProperties;
+
+    fieldProperties = ConstructOptr(childBlock,
+				    (ChunkHandle) @FFFieldProperties);
+
+    /*
+     * Check our hints to see if dialog box should be modal
+     */
+    hintDataPtr = ObjVarFindData(oself, HINT_FFFP_MAKE_MODAL);
+
+    if (hintDataPtr) {
+        /*
+         * Yes, the hint was set; set the dialog modal.  Does not have to
+	 * be set not usable, because it's not yet in the generic tree & so
+	 * is not FULLY_USABLE.
+	 *
+         */
+
+	/*
+	 * Set the modal bit
+	 */
+        @call fieldProperties::MSG_GEN_INTERACTION_SET_ATTRS(GIA_MODAL, 0);
+
+	@call fieldProperties::
+	    MSG_GEN_INTERACTION_SET_TYPE(GIT_MULTIPLE_RESPONSE);
+    }
+
+
+    /*
+     * Set the box's moniker depending upon context. Don't visually update.
+     * (not in tree yet)
+     */
+    switch (pself->FFFP_context) {
+	case FFFPC_CREATE_NEW_FIELD:
+	    @call fieldProperties::
+		MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@CreateNewFieldTitle),
+					VUM_MANUAL);
+	    break;
+
+	case FFFPC_FIELD_PROPERTIES:
+	    @call fieldProperties::
+		MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@FieldPropertiesTitle),
+					VUM_MANUAL);
+	    break;
+
+	default:
+	    @call fieldProperties::
+		MSG_GEN_REPLACE_VIS_MONIKER_TEXT(_TEXT(""), VUM_MANUAL);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_CONTROL_UPDATE_UI for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	Handle notification of attributes change
+ *
+ * PARAMETERS:
+ *	void (MemHandle childBlock, word toolboxFeatures, word features,
+ *	      optr toolTree, MemHandle data, word changeID,
+ *	      ManufacturerID manufID)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	2/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_GEN_CONTROL_UPDATE_UI
+{
+    FFFieldPropertiesMessageBlock *fieldPropDataPtr;
+
+    fieldPropDataPtr = MemLock(data);
+
+#if 0
+#if ERROR_CHECK
+    if (pself->FFFP_computedFieldExpressionBuilderOptr == NullOptr ||
+	pself->FFFP_defaultValueExpressionBuilderOptr == NullOptr) {
+	EC_ERROR(BAD_EXPRESSION_BUILDER_OPTRS);
+    }
+#endif /* ERROR_CHECK */
+#endif
+
+#if ERROR_CHECK
+    /* 
+     * You can't have Apply/Close/Reset AND either Create or Cancel
+     * at the same time
+     */
+    if ((features & FFFP_APPLY_RESET_CLOSE_TRIGGER_FEATURE) &&
+	((features & FFFP_CREATE_TRIGGER_FEATURE) || 
+	(features & FFFP_CANCEL_TRIGGER_FEATURE))) {
+	EC_ERROR(CANT_HAVE_CANCEL_OR_CREATE_FEATURES_SET_IF_APPLY_FEATURE_SET);
+    }
+
+#endif
+
+    if (features & FFFP_DATA_TYPE_FEATURE) {
+        /* Set data type */
+        @call childBlock, (ChunkHandle)@FieldTypeList::
+           MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+					(word)fieldPropDataPtr->dataType,
+					 FALSE);
+        @call self::MSG_FFFP_SET_DATA_TYPE_ATTRIBUTE_OPTIONS(
+					fieldPropDataPtr->dataType, 1, 0);
+    }
+
+    /* if it's a new field, then ignore the update. */
+    pself = ObjDerefGen(oself);
+    if (pself->FFFP_context == FFFPC_CREATE_NEW_FIELD) {
+	MemUnlock(data);
+	return;
+    }
+
+
+    /*
+     * It's a request to edit a field's properties.
+     * First, copy the fieldname into our fieldname text edit object.
+     */
+    if (features & FFFP_FIELD_NAME_FEATURE) {
+        @call childBlock, (ChunkHandle)@FFFieldPropertiesFieldName::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR(fieldPropDataPtr->fieldName, 0);
+    }
+    
+    /* Set the column number in the instance data */
+    pself->FFFP_colNum = fieldPropDataPtr->colNum;
+
+    /* Copy the computed/default token stream into our data structure. */
+    if ((features & FFFP_DATA_TYPE_FEATURE) && 
+			(features & FFFP_FIELD_ATTRS_FEATURE)) {
+        pself->FFFP_fpis.FFFPIS_messageBlock.numTokensInTokenStream =
+	    fieldPropDataPtr->numTokensInTokenStream;
+        memcpy(pself->FFFP_fpis.FFFPIS_messageBlock.computedDefaultTokenStream,
+	       fieldPropDataPtr->computedDefaultTokenStream,
+	       fieldPropDataPtr->numTokensInTokenStream);
+    }
+
+    /* Copy the column number into our data structure */
+    pself->FFFP_fpis.FFFPIS_messageBlock.colNum = fieldPropDataPtr->colNum;
+
+    /* Copy the notes into our notes field. */
+    strcpy(pself->FFFP_fpis.FFFPIS_messageBlock.notes, fieldPropDataPtr->notes);
+    
+    if ((features & FFFP_DATA_TYPE_FEATURE) && 
+			(features & FFFP_DATA_ATTRS_FEATURE)) {
+        /* Copy the max length value into our Max Length object */
+        if (fieldPropDataPtr->dataType == FDT_GENERAL_TEXT) {
+            @call childBlock, (ChunkHandle) @MaxTextLength::
+	        MSG_GEN_VALUE_SET_INTEGER_VALUE(
+			fieldPropDataPtr->maxNumCharsAllowedInThisTextField,0);
+        }
+        else {
+            @call childBlock, (ChunkHandle) @MaxTextLength::
+	        MSG_GEN_VALUE_SET_INTEGER_VALUE(MAX_TEXT_FIELD_LENGTH, 0);
+        }
+
+        ConvertMinMaxToAsciiAndDisplay(childBlock,
+				       fieldPropDataPtr->dataType,
+				       &fieldPropDataPtr->minValue,
+				       &fieldPropDataPtr->maxValue);
+    }
+
+    MemUnlock(data);
+}
+
+#ifdef __HIGHC__
+pragma Code("FieldPropertiesAdvanced");
+#endif
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_INC_MARK_BUSY_COUNT for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:	Increments the instance data in the flatfile object,
+ *		which indicates how many times the app has been marked
+ *		busy..
+ *		When the field properties controller initiates, it
+ *		decrements this count and marks the app not busy.
+ *
+ * PARAMETERS:
+ *	void (byte markBusyCount)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	6/19/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_INC_MARK_BUSY_COUNT
+{
+    pself->FFFP_markBusyCount++; 
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_INTERACTION_INITIATE for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	Intercept this message so we can pass it on to the 
+ *		actual dialog box to be initiated.
+ *		If the application has been marked busy, mark it not
+ *		busy, and accept input.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	6/9/92		Initial version
+ *	anna	6/19/92		Added "mark not busy" stuff
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_GEN_INTERACTION_INITIATE
+{
+    FFFieldPropertiesFeatures	features;
+    MemHandle 	    	    	childBlock;
+
+    FFFPMarkNotBusyAcceptInput(pself);
+
+    @callsuper();	    	   
+
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+    @send childBlock, (ChunkHandle)@FFFieldProperties::
+					MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	StoreDataTypeInStruct 
+ *
+ * DESCRIPTION:	Get data type from Advanced dialog box and copy it into
+ *		passed FFFieldPropertiesMessageBlock structure.
+ *
+ *	    	If fpmb is NULL, the data type is returned instead.
+ *
+ * PARAMETERS:  word features - which UI features are set
+ *		FFFieldPropertiesMessageBlock *fpmb - pointer to data block
+ *		MemHandle childBlock
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	3/26/92		Initial Revision
+ *
+ **********************************************************************/
+FieldDataType
+StoreDataTypeInStruct(word features, FFFieldPropertiesMessageBlock *fpmb,
+				MemHandle childBlock)
+{
+    FieldDataType dataType;
+
+    if (features & FFFP_DATA_TYPE_FEATURE) {
+	dataType = (FieldDataType) @call childBlock,
+    	    (ChunkHandle) @FieldTypeList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    } else {
+	dataType = FDT_GENERAL_TEXT;
+    }
+
+    if (fpmb) {
+        fpmb->dataType = dataType;
+    }
+
+    return (dataType);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	StoreFieldNameInStruct 
+ *
+ * DESCRIPTION:	Get field name from Advanced dialog box and copy it into
+ *		passed FFFieldPropertiesMessageBlock structure. 
+ *
+ * PARAMETERS:  void (FFFieldPropertiesMessageBlock *fpmb,
+ *			MemHandle childBlock)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	3/26/92		Initial Revision
+ *
+ **********************************************************************/
+void
+StoreFieldNameInStruct(FFFieldPropertiesMessageBlock *fpmb,
+				MemHandle childBlock)
+{
+    MemHandle textBlock;
+
+    textBlock = @call childBlock, (ChunkHandle) @FFFieldPropertiesFieldName::
+					MSG_VIS_TEXT_GET_ALL_BLOCK((word) 0);
+
+    strcpy(fpmb->fieldName, MemLock(textBlock));
+    MemFree(textBlock);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	StuffFloatValueIntoAddress 
+ *
+ * DESCRIPTION:	Converts min/max for Real/Integer/Date/Time datatypes
+ *		into FloatNums and stuffs the result into the given
+ *		address.
+ *		Returns FALSE if not a valid entry.
+ *
+ * PARAMETERS:  Boolean (FieldDataType dataType,
+ *			MemHandle textBlock,
+ *			dword valueAddress,
+ *			optr errorMessageChunk)
+ *		Returns TRUE if no problems
+ *			FALSE otherwise
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	4/27/92		Broke out into function 
+ *
+ **********************************************************************/
+Boolean
+StuffFloatValueIntoAddress(FieldDataType dataType,  
+				MemHandle textBlock, dword valueAddress,
+				optr errorMessageChunk)
+{
+    switch(dataType) {
+        case FDT_REAL:
+        case FDT_INTEGER:
+	    if (!CheckNumberAndDisplayMsg(dataType,
+		 textBlock,
+		 valueAddress,
+		 errorMessageChunk)) {
+    	         /*
+     	          * If there's an error, then 
+	          * CheckNumberAndDisplayMsg frees up textBlock
+     	          */
+    	         return(FALSE);
+	    }
+	    break;
+        case FDT_TIME:
+        case FDT_DATE:
+	    if (!CheckDateTimeAndDisplayMessage(dataType,
+		 textBlock,
+		 valueAddress,
+		 errorMessageChunk)) {
+    	         /*
+     	          * If there's an error, then 
+	          * CheckDateTimeAndDisplayMessage frees up textBlock
+     	          */
+    	         return(FALSE);
+	    }
+	    break;
+    }
+    return(TRUE);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	StoreMinMaxInStruct 
+ *
+ * DESCRIPTION:	Get min/max from dialog box. Check that they're
+ *		valid numbers, and that min < default < max. If OK,
+ *		copy it into passed FFFieldPropertiesMessageBlock structure. 
+ *	    	If there was an error, select the text of the offending
+ *	    	value.
+ *
+ * PARAMETERS:  Boolean (FFFieldPropertiesMessageBlock *fpmb,
+ *			MemHandle childBlock)
+ *		Returns TRUE if no problems
+ *			FALSE otherwise
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	3/26/92		Initial Revision
+ *
+ **********************************************************************/
+Boolean
+StoreMinMaxInStruct(FFFieldPropertiesMessageBlock *fpmb,
+				MemHandle childBlock, optr selfOptr)
+{
+    MemHandle 	textBlock;
+    FloatNum	valueFloat;
+    dword	valueAddress;
+    FFFieldPropertiesInstance *pself;
+
+    optr minErrorMessageChunk, maxErrorMessageChunk;
+
+
+    pself = ObjDerefGen(selfOptr);
+    if (pself->FFFP_attrEnabled & FFD_ATTRIBUTES_MIN_VALUE) {
+
+        switch(fpmb->dataType) {
+	    case FDT_REAL:
+	        minErrorMessageChunk = @FFFPBadMinReal;
+	        maxErrorMessageChunk = @FFFPBadMaxReal;
+	        break;
+	    case FDT_INTEGER:
+	        minErrorMessageChunk = @FFFPBadMinInteger;
+	        maxErrorMessageChunk = @FFFPBadMaxInteger;
+	        break;
+	    case FDT_TIME:
+	        minErrorMessageChunk = @FFFPBadMinTime;
+	        maxErrorMessageChunk = @FFFPBadMaxTime;
+	        break;
+	    case FDT_DATE:
+	        minErrorMessageChunk = @FFFPBadMinDate;
+	        maxErrorMessageChunk = @FFFPBadMaxDate;
+	        break;
+        }
+
+        valueAddress = (dword) &valueFloat;
+
+        textBlock = @call childBlock, (ChunkHandle) @MinValue::
+					MSG_VIS_TEXT_GET_ALL_BLOCK((word) 0);
+
+ 	if (!StuffFloatValueIntoAddress(fpmb->dataType, 
+				   	textBlock,
+				   	valueAddress,
+					minErrorMessageChunk)) {
+	    /*
+	     * Bad min value.  Select the text in the min box.
+	     */
+	    FFFPSelectAllGrabFocus(ConstructOptr(childBlock,
+						 (ChunkHandle) @MinValue));
+	    return(FALSE);
+	}
+
+	fpmb->minValue = valueFloat;
+
+	/* 
+	 * Assume if there's a min defined, there's a max defined too 
+	 */
+        textBlock = @call childBlock, (ChunkHandle) @MaxValue::
+					MSG_VIS_TEXT_GET_ALL_BLOCK(textBlock);
+
+	if (!StuffFloatValueIntoAddress(fpmb->dataType,
+					textBlock,
+					valueAddress,
+					maxErrorMessageChunk)) {
+	    /*
+	     * Bad max value.  Select the text in the max box.
+	     */
+	    FFFPSelectAllGrabFocus(ConstructOptr(childBlock,
+						 (ChunkHandle) @MaxValue));
+	    return(FALSE);
+	}
+
+	fpmb->maxValue = valueFloat;
+
+	/*
+	 * Check that min value < max value 
+	 */
+	if (!CheckMinMax(&fpmb->minValue, 
+			 &fpmb->maxValue, 
+			 (optr) 0)) {
+	    /*
+	     * Bad values.  Select the text in the min box.
+	     */
+	    FFFPSelectAllGrabFocus(ConstructOptr(childBlock,
+						 (ChunkHandle) @MinValue));
+	    /*
+	     * If there's an error, then CheckMinMax frees up textBlock
+	     */
+	    return(FALSE);
+	}
+
+	MemFree(textBlock);
+    }
+    return(TRUE);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_CREATE_FIELD for FFFieldPropertiesClass 
+ *
+ * DESCRIPTION:	Calls MSG_FFFP_STORE_FIELD_INFO, with a flag
+ *		indicating we are creating (and not updating) a field.
+ *
+ * PARAMETERS: 	void (Message messageToSendBack)
+ *		     messageToSendBack is either MSG_FFFP_CLOSE or
+ *			MSG_FFFP_NEW_FIELD. (depending on whether this
+ *			was called by the OK button or the OK & Create
+ *			Another button)
+ *			The flat file database needs to send this 
+ *			message back after succesful insertion of field.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna    2/92		Initial Revision
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_CREATE_FIELD
+{
+    FFFPStoreFieldInfo(oself, messageToSendBack, CREATING_NEW_FIELD);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFFPStoreFieldInfo
+ *
+ * DESCRIPTION:	Checks inputs and stores them in database.
+ *		Call this routine both to create new fields and to
+ *		update existing fields.
+ *		If you are creating a field, pass colNum = 
+ *						CREATING_NEW_FIELD.
+ *
+ * PARAMETERS: 	oself - an optr to the current FFFieldProperties box.
+ *	    	messageToSendBack - either MSG_FFFP_CLOSE or
+ *			MSG_FFFP_NEW_FIELD. (depending on whether this
+ *			was called by the OK button or the OK & Create
+ *			Another button)
+ *			The flat file database needs to send this 
+ *			message back after succesful insertion of field.
+ *	        colNum - field to store.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	11/11/92	Initial version
+ *
+ ***********************************************************************/
+void
+FFFPStoreFieldInfo(optr oself, Message messageToSendBack, FieldID colNum)
+{
+    EventHandle msg; 
+    optr appObject;
+    MemHandle fpmbHandle;
+    FFFieldPropertiesFeatures features;
+    MemHandle childBlock;
+    FFFieldPropertiesMessageBlock *fpmb;
+    FFFieldPropertiesInstance *pself = ObjDerefGen(oself);
+
+    /*
+     * Hold up user input until we're done
+     */
+    pself->FFFP_markBusyCount++;
+    appObject = GeodeGetAppObject(0);
+    @call appObject::MSG_GEN_APPLICATION_MARK_BUSY();
+    @call appObject::MSG_GEN_APPLICATION_IGNORE_INPUT();
+
+    /* 
+     * Create structure of field properties 
+     */
+    fpmbHandle = MemAlloc(sizeof(FFFieldPropertiesMessageBlock), 
+				HF_SHARABLE, 
+				HAF_ZERO_INIT);
+    /*
+     * Was there enough memory? If not, notify the user and exit out
+     */
+    if (fpmbHandle == 0) {
+	DisplayUserError(@FFMemoryFullError);
+	/*
+	 * Have we been marked busy? If yes, decrement the busy count,
+	 * mark us not busy, and accept input
+	 */
+	FFFPMarkNotBusyAcceptInput(pself);
+ 	return;
+    }
+
+    fpmb = MemLock(fpmbHandle);
+
+    /* 
+     * Get the block of our UI items.  oself is sent to all messages. 
+     */
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+    /* 
+     * Fill in the field name info 
+     */
+    if (features & FFFP_FIELD_NAME_FEATURE) {
+        StoreFieldNameInStruct(fpmb, childBlock);
+    }
+
+    if (strlen(fpmb->fieldName) == 0) {
+	DisplayUserError(@FFFPNoFieldNameError);
+	@call childBlock, (ChunkHandle) @FFFieldPropertiesFieldName::
+	    MSG_META_GRAB_FOCUS_EXCL();
+	/*
+	 * Have we been marked busy? If yes, decrement the busy count,
+	 * mark us not busy, and accept input
+	 */
+	pself = ObjDerefGen(oself);
+	FFFPMarkNotBusyAcceptInput(pself);
+ 	return;
+    }
+
+    /*
+     * Fill in the data type
+     */
+    pself = ObjDerefGen(oself);
+    (void) StoreDataTypeInStruct(features, fpmb, childBlock);
+
+    pself->FFFP_attrEnabled = GetDataAttributes(fpmb->dataType);
+
+    if (features & FFFP_FIELD_ATTRS_FEATURE) {
+        /*
+         * Fill in default (or computed)
+         */
+        fpmb->numTokensInTokenStream =
+	    pself->FFFP_fpis.FFFPIS_messageBlock.numTokensInTokenStream;
+        memcpy(fpmb->computedDefaultTokenStream,
+	   pself->FFFP_fpis.FFFPIS_messageBlock.computedDefaultTokenStream,
+	   fpmb->numTokensInTokenStream);
+        /*
+         * Copy notes.
+         */
+        strcpy(fpmb->notes, pself->FFFP_fpis.FFFPIS_messageBlock.notes);
+    }
+
+    /*
+     * Fill in maximum length, and min/max
+     */
+    if (features & FFFP_DATA_ATTRS_FEATURE) {
+        if (pself->FFFP_attrEnabled & FFD_ATTRIBUTES_MAX_TEXT_LENGTH) {
+            fpmb->maxNumCharsAllowedInThisTextField =
+	        @call childBlock, (ChunkHandle) @MaxTextLength::
+		    MSG_GEN_VALUE_GET_INTEGER_VALUE();
+        }
+        /*
+         * Should we even bother to check min/max?
+         */
+        if (pself->FFFP_attrEnabled & FFD_ATTRIBUTES_MIN_VALUE) {
+            if (!StoreMinMaxInStruct(fpmb, childBlock, oself)) {
+	        /*
+	         * Have we been marked busy? If yes, decrement the busy count,
+	         * mark us not busy, and accept input
+	         */
+	        FFFPMarkNotBusyAcceptInput(pself);
+	        return;	   
+	    }
+        }
+    }
+    else {
+        /*
+	 * If this is not a UI feature, we want to set the values anyway,
+	 * in case a different UI level does include this feature
+	 */
+        fpmb->maxNumCharsAllowedInThisTextField = MAX_TEXT_FIELD_LENGTH;
+    }
+
+
+    /* 
+     * The message handler will free the locked data block (fpmb).
+     * The field will be created (hopefully) and immediately added to the
+     * current layout list.
+     */
+    if (colNum == (byte) CREATING_NEW_FIELD) {
+	/* It's a new field */
+	msg = @record FlatFileDatabaseClass::
+	    MSG_FFD_CREATE_NEW_FIELD_WITH_RESPONSE(
+			fpmbHandle,
+		     	oself,
+		     	messageToSendBack,
+		     	MSG_FFFP_FIELD_CREATION_DONE);
+    }
+    else {
+        msg = @record FlatFileDatabaseClass::
+	    MSG_FFD_CHANGE_FIELD_ATTRIBUTES_WITH_RESPONSE(
+		     	fpmbHandle, 
+		     	colNum,
+		     	oself,
+		     	messageToSendBack,
+		     	MSG_FFFP_FIELD_MODIFICATION_DONE);
+
+    }
+
+    @send oself::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
+
+    /*
+     * Turn off the "create" trigger and field name momentarily.
+     * Well, only turn off the name if this is the modal, create-sty;e
+     * dialog box.
+     */
+    pself = ObjDerefGen(oself);
+    if (features & FFFP_FIELD_NAME_FEATURE) {
+	if (pself->FFFP_context == FFFPC_CREATE_NEW_FIELD) {
+	    @call childBlock, (ChunkHandle) @FFFieldPropertiesFieldName::
+		MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	}
+    }
+    if (features & FFFP_CREATE_TRIGGER_FEATURE) {
+        @call childBlock, (ChunkHandle) @FFFieldPropertiesCreate::
+	    MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    /*
+     * If we got this far, the ACCEPT_INPUT calls will be made in
+     * FIELD_MODIFICATION_DONE or FIELD_CREATION_DONE.
+     */
+    return;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_STORE_FIELD_INFO for FFFieldPropertiesClass 
+ *
+ * DESCRIPTION:	Checks inputs and stores them in database.
+ *		Call this routine both to create new fields and to
+ *		update existing fields.
+ *		If you are creating a field, pass colNum = 
+ *						CREATING_NEW_FIELD.
+ *
+ * PARAMETERS: 	void (Message messageToSendBack,
+ *			byte colNum)
+ *		     messageToSendBack is either MSG_FFFP_CLOSE or
+ *			MSG_FFFP_NEW_FIELD. (depending on whether this
+ *			was called by the OK button or the OK & Create
+ *			Another button)
+ *			The flat file database needs to send this 
+ *			message back after succesful insertion of field.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna    2/92		Initial Revision
+ *	jdashe	11/11/92    	broke out to a function call
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_STORE_FIELD_INFO
+{
+    FFFPStoreFieldInfo(oself, messageToSendBack, colNum);
+} 
+
+
+void
+FPGetFeaturesAndChildBlock(optr obj, MemHandle *childBlock, FFFieldPropertiesFeatures *features)
+{
+    TempGenControlInstance *tptr;
+
+    tptr = ObjVarDerefData(obj, TEMP_GEN_CONTROL_INSTANCE);
+    *childBlock = tptr->TGCI_childBlock;
+    *features = tptr->TGCI_features;
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_CLOSE for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	Closes a non-modal Field Properties dialog box.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	3/10/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_CLOSE
+{
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+    @send childBlock, (ChunkHandle) @FFFieldProperties::
+    	    MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_CANCEL for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	Handle when the "Cancel" button is pressed. 
+ *	
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	2/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_CANCEL
+{
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+    @send childBlock, (ChunkHandle) @FFFieldProperties::
+    	    MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_GUP_INTERACTION_COMMAND for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	Send this message along to the advanced dialog box.
+ *		When we switch to Data Entry mode, we want to close
+ *		the Edit Field Properties box, if it is up.
+ *		(The Create New Field box is modal; therefore the 
+ *		user would not be able to
+ *		switch to Data Entry while they're up, so we don't
+ *		have to worry about closing them). 
+ *
+ * PARAMETERS:
+ *	void (word command)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	6/12/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_GEN_GUP_INTERACTION_COMMAND
+{
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+    @callsuper();
+
+    return (@call childBlock, (ChunkHandle) @FFFieldProperties::
+	        MSG_GEN_GUP_INTERACTION_COMMAND(command));
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	ConvertMinMaxToAsciiAndDisplay 
+ *
+ * DESCRIPTION:	Converts the given FloatNum expressions (for minimum
+ *		and maximum values) to ascii, and displays the
+ *		resulting strings in the Advanced Field Properties
+ *		dialog box.
+ *		For datatypes without min/max values, this routine
+ *		clears the min/max display fields.
+ *
+ * PARAMETERS:  void (MemHandle childBlock,
+ *      	        FieldDataType dataType,
+ *			FloatNum *minValue,
+ *			FloatNum *maxValue)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	4/29/92		Initial Revision
+ *
+ **********************************************************************/
+void
+ConvertMinMaxToAsciiAndDisplay(MemHandle childBlock,
+				   FieldDataType dataType,
+				   FloatNum *minValue,
+				   FloatNum *maxValue)
+{
+    TCHAR minString[FLOAT_TO_ASCII_NORMAL_BUF_LEN];
+    TCHAR maxString[FLOAT_TO_ASCII_NORMAL_BUF_LEN];
+    word numFractionalDigits;
+    TCHAR emptyString[1] = _TEXT("");
+    DateTimeFormat dtf = DTF_HM;    /* Default for time min/max. */
+
+    /*
+     * If it's an integer, we don't want fractional portion displayed
+     * for min/max.
+     */
+    switch(dataType) {
+	case FDT_INTEGER:
+	    numFractionalDigits = 0;
+	    break;
+	case FDT_REAL:
+	    numFractionalDigits = NUM_ASCII_FRACTIONAL_DIGITS;
+	    break;
+	case FDT_DATE:
+	    dtf = DTF_SHORT;
+	    /* fall through to FDT_TIME... */
+	case FDT_TIME:
+	    minString[0] = maxString[0] = _TEXT('\0');
+            if (FLOAT_EXPONENT(minValue) != FP_NAN) {
+	        ConvertDateTimeToAscii(minString, 
+				       minValue,
+				       dtf);
+	    }
+            if (FLOAT_EXPONENT(maxValue) != FP_NAN) {
+	        ConvertDateTimeToAscii(maxString,
+				       maxValue,
+				       dtf);
+	    }
+
+            /* Copy the min value into our min text edit object. */
+            @call childBlock, (ChunkHandle)@MinValue::
+	    	MSG_VIS_TEXT_REPLACE_ALL_PTR(minString, 0);
+
+            /* Copy the max value into our min text edit object. */
+            @call childBlock, (ChunkHandle)@MaxValue::
+	    	MSG_VIS_TEXT_REPLACE_ALL_PTR(maxString, 0);
+
+	    break;
+	default:
+	    /*
+	     * For datatypes which do not have min/max values,
+	     * clear out the min & max fields
+	     */
+            @call childBlock, (ChunkHandle)@MinValue::
+	    	MSG_VIS_TEXT_REPLACE_ALL_PTR(emptyString, 0);
+            @call childBlock, (ChunkHandle)@MaxValue::
+	    	MSG_VIS_TEXT_REPLACE_ALL_PTR(emptyString, 0);
+	    return;
+    }
+
+    if ((dataType == FDT_INTEGER) || (dataType == FDT_REAL)) {
+        if (FLOAT_EXPONENT(minValue) != FP_NAN) {
+            (void) FloatFloatToAscii_StdFormat(minString,
+					       minValue,
+					       FFAF_FROM_ADDR,
+					       NUM_ASCII_DIGITS,
+					       numFractionalDigits);
+
+            /* Copy the min value into our min text edit object. */
+            @call childBlock, (ChunkHandle)@MinValue::
+	    MSG_VIS_TEXT_REPLACE_ALL_PTR(minString, 0);
+        }
+    
+        if (FLOAT_EXPONENT(maxValue) != FP_NAN) {
+            (void) FloatFloatToAscii_StdFormat(maxString,
+					       maxValue,
+					       FFAF_FROM_ADDR,
+					       NUM_ASCII_DIGITS,
+					       numFractionalDigits);
+					
+            /* Copy the max value into our max text edit object. */
+            @call childBlock, (ChunkHandle)@MaxValue::
+	        MSG_VIS_TEXT_REPLACE_ALL_PTR(maxString, 0);
+        }
+    }					
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	ConvertDateTimeToAscii 
+ *
+ * DESCRIPTION:	Converts the given FloatNum Date/Time expression to
+ *		ascii, and stores the result in string.
+ *	    	Pass the format you require in dtf.  One could use
+ *	    	DTF_SHORT, for example, for a date format.
+ * 		Floating point stack already exists when this routine
+ *		is called.
+ *
+ * PARAMETERS:  void (TCHAR *string, FloatNum *Number, DateTimeFormat dtf)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	4/27/92		Initial Revision
+ *
+ **********************************************************************/
+void
+ConvertDateTimeToAscii(TCHAR *string, FloatNum *number, DateTimeFormat dtf)
+{
+    FFA_stackFrame stackFrame;
+
+    stackFrame.FFA_float.FFA_params.formatFlags = FFAF_FROM_ADDR;
+    stackFrame.FFA_float.FFA_params.totalDigits = NUM_ASCII_DIGITS;
+    stackFrame.FFA_float.FFA_params.decimalLimit = NUM_ASCII_FRACTIONAL_DIGITS;
+    stackFrame.FFA_float.FFA_params.decimalOffset = 0;
+    stackFrame.FFA_dateTime.FFA_dateTimeParams.FFA_dateTimeFlags = 
+		FFDT_DATE_TIME_OP | FFDT_FROM_ADDR | dtf;
+
+    FloatFloatToAscii(&stackFrame, string, number);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_APPLY for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	Handler for the "Apply" trigger in the Field Properties box.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	3/ 9/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_APPLY
+{
+    MemHandle childBlock;	    /* <- used to get to a UI item. */
+    FFFieldPropertiesFeatures features;
+    
+    
+    /* Get the block of our UI items.  oself is sent to all messages. */
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+    FFFPStoreFieldInfo(oself, (Message) 0, 
+			       pself->FFFP_fpis.FFFPIS_messageBlock.colNum);
+
+    @send childBlock, (ChunkHandle) @FFFieldProperties::
+	MSG_GEN_APPLY();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_RESET for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	Handler for the "Reset" trigger in the Field Properties box.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	4/15/92		Initial version
+ *	jdashe	1/27/93	    	Changed to ask the database for the reset.
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_RESET
+{
+    EventHandle msg;
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+    
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+    
+    /*
+     * Set the text object clean, so when it gets changed the Applyable
+     * buttons become enabled.
+     */
+    @send childBlock, (ChunkHandle) @FFFieldPropertiesFieldName::
+	MSG_GEN_TEXT_SET_MODIFIED_STATE(0);
+
+    /*
+     * Set the box as not applyable.
+     */
+    @call childBlock, (ChunkHandle) @FFFieldProperties::
+		MSG_GEN_MAKE_NOT_APPLYABLE();
+
+    /*
+     * Ask the database to re-send the editing request.
+     */
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_EDIT_FIELD_PROPERTIES(ABSOLUTE_COLUMN_NUMBER,
+				      pself->FFFP_colNum,
+				      oself);
+    @send self::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_DISPLAY_NOTES for FFFieldPropertiesClass
+ *
+ * DESCRIPTION: This method is sent out by the "Set field notes" trigger to
+ *	    	indicate that the set field notes interaction should be
+ *	    	displayed with the current set of field notes.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	11/16/92	Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_DISPLAY_NOTES
+{
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+    optr notesOptr;
+    
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+    notesOptr = ConstructOptr(childBlock, (ChunkHandle) @NotesText);
+    
+    /*
+     * Load up the notes text object with the current notes.
+     */
+    @call notesOptr::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	    pself->FFFP_fpis.FFFPIS_messageBlock.notes, 0);
+
+    /*
+     * Mark it not modified.
+     */
+    @call notesOptr::MSG_GEN_TEXT_SET_MODIFIED_STATE(0);
+
+    /*
+     * Bring the notes interaction up!
+     */
+    @call childBlock, (ChunkHandle) @NotesInteraction::
+	MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_ACCEPT_NOTES for FFFieldPropertiesClass
+ *
+ * DESCRIPTION: This method is sent out by the "Set field notes" text object
+ *	    	to indicate that the enclosed text should be used to replace
+ *	    	the current set of field notes.
+ *
+ * PARAMETERS:
+ *	void (word stateFlags = bp)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	11/16/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_ACCEPT_NOTES
+{
+
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+    
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+    
+
+    /*
+     * Copy the text on over.
+     */
+    @call childBlock, (ChunkHandle) @NotesText::
+	MSG_VIS_TEXT_GET_ALL_PTR(pself->FFFP_fpis.FFFPIS_messageBlock.notes);
+
+    /*
+     * Make the UI controller applyable.
+     */
+    @send childBlock, 
+    	(ChunkHandle)@FFFieldProperties::MSG_GEN_MAKE_APPLYABLE();
+    
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_SET_DATA_TYPE_ATTRIBUTE_OPTIONS 
+ *		for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	In the Advanced field properties box, when user chooses
+ *		the data type, set up the correct attributes.
+ *		For example, if user selects text, enable
+ *		the "length" attribute setting, and disable
+ *		the "min" and "max" attribute settings (they
+ *		refer to numbers only).
+ *
+ * PARAMETERS:  (word selection,
+ *	    	 word numSelections,
+ *	    	 byte stateFlags)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	12/91		Initial Revision
+ *	anna	4/8/92		Added code to toggle expression bldr moniker
+ *	jeremy	5/13/92	    	Updated to use GenItemGroup message
+ *
+ **********************************************************************/
+
+@method FFFieldPropertiesClass, MSG_FFFP_SET_DATA_TYPE_ATTRIBUTE_OPTIONS
+{
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+    
+    ChunkHandle currentMoniker, newMoniker;
+
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+    
+    pself->FFFP_attrEnabled = GetDataAttributes(selection);
+
+    /* Remember what the new type is. */
+    pself->FFFP_fpis.FFFPIS_messageBlock.dataType = selection;
+
+    /*
+     * If it's a computed field, set the moniker for the Expression
+     * Builder button to "Set Formula" instead of "Set Default"
+     */
+    if (features & FFFP_FIELD_ATTRS_FEATURE) {
+        currentMoniker = @call childBlock, 
+		(ChunkHandle) @SetDefaultOrComputedTrigger::
+				MSG_GEN_GET_VIS_MONIKER();
+
+        if (selection == FDT_COMPUTED) {
+	    if (currentMoniker != OptrToChunk(@SetComputedMoniker)) {
+       	        newMoniker = OptrToChunk(@SetComputedMoniker);
+       	        @call childBlock, (ChunkHandle) @SetDefaultOrComputedTrigger::
+				MSG_GEN_USE_VIS_MONIKER(newMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+	    }
+        } else {
+            if (currentMoniker != OptrToChunk(@SetDefaultMoniker)) {
+                newMoniker = OptrToChunk(@SetDefaultMoniker);
+                @call childBlock, (ChunkHandle) @SetDefaultOrComputedTrigger::
+				MSG_GEN_USE_VIS_MONIKER(newMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+	    }
+        }
+
+        /* Now, do the actual enabling, disabling of these items */
+        if (pself->FFFP_attrEnabled & FFD_ATTRIBUTES_DEFAULT) {
+	    @call childBlock, (ChunkHandle) @SetDefaultOrComputedTrigger::
+					MSG_GEN_SET_ENABLED(VUM_NOW);
+        } else {
+	    @call childBlock, (ChunkHandle) @SetDefaultOrComputedTrigger::
+					MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        }
+    }
+
+    if (features & FFFP_DATA_ATTRS_FEATURE) {
+        if (pself->FFFP_attrEnabled & FFD_ATTRIBUTES_MAX_TEXT_LENGTH) {
+	    @call childBlock, (ChunkHandle) @MaxTextLength::
+					MSG_GEN_SET_ENABLED(VUM_NOW);
+        } else {
+	    @call childBlock, (ChunkHandle) @MaxTextLength::
+					MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        }
+
+        if (pself->FFFP_attrEnabled & FFD_ATTRIBUTES_MIN_VALUE) {
+	    @call childBlock, (ChunkHandle) @MinValue::
+					MSG_GEN_SET_ENABLED(VUM_NOW);
+        } else {
+	    @call childBlock, (ChunkHandle) @MinValue::
+					MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        }
+
+        if (pself->FFFP_attrEnabled & FFD_ATTRIBUTES_MAX_VALUE) {
+	    @call childBlock, (ChunkHandle) @MaxValue::
+					MSG_GEN_SET_ENABLED(VUM_NOW);
+        } else {
+	    @call childBlock, (ChunkHandle) @MaxValue::
+					MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        }
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_NEW_FIELD for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	Clears out all fields in dialog box, except data type.
+ *	    	Also sets the dialog box not applyable until the unique
+ *	    	field name comes through.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	?   	    	Initial version
+ *	jeremy	9/8/92	    	Added delayed applyable stuff.
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_NEW_FIELD
+{
+    MemHandle 	childBlock;	    /* <- used to get to a UI item. */
+        FFFieldPropertiesFeatures features;
+    EventHandle msg;
+    TCHAR	emptyTextString[1];
+    
+    /* Get the block of our UI items. */
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+    /* Clear out all text edit fields */
+    emptyTextString[0] = _TEXT('\0');
+
+    /*
+     * Initialize Min/max values to "none"
+     */
+    FLOAT_EXPONENT((&(pself->FFFP_fpis.FFFPIS_messageBlock.minValue))) = FP_NAN;
+    FLOAT_EXPONENT((&(pself->FFFP_fpis.FFFPIS_messageBlock.maxValue))) = FP_NAN;
+
+    strcpy(pself->FFFP_fpis.FFFPIS_minString, emptyTextString);
+    strcpy(pself->FFFP_fpis.FFFPIS_maxString, emptyTextString);
+
+    /* These strings have to be locked for both novice & advanced */
+
+    /* Set the computed default token stream to "nil." */
+    pself->FFFP_fpis.FFFPIS_messageBlock.computedDefaultTokenStream[0] =
+	PARSER_TOKEN_END_OF_EXPRESSION;
+    pself->FFFP_fpis.FFFPIS_messageBlock.numTokensInTokenStream = 0;
+
+    /*
+     * Set field name / notes to emptyString
+     */
+    strcpy(pself->FFFP_fpis.FFFPIS_messageBlock.notes, emptyTextString); 
+    strcpy(pself->FFFP_fpis.FFFPIS_messageBlock.fieldName, emptyTextString); 
+
+    /*
+     * Even though it seems silly, these are "calls" instead of "sends"
+     * because we need them to happen right away...
+     */
+    /*
+     * Ask the database to load a unique field name into the
+     * NameText box.  The box will be made applyable when the name
+     * comes up.
+     */
+    @call childBlock, (ChunkHandle) @FFFieldProperties::
+		MSG_GEN_MAKE_NOT_APPLYABLE();
+    msg = @record FlatFileDatabaseClass::
+		MSG_FFD_REQUEST_UNIQUE_FIELD_NAME_WITH_RESPONSE(
+		    ConstructOptr(childBlock, @FFFieldPropertiesFieldName),
+		    NULL, NULL,
+		    oself, MSG_FFFP_ENABLE_TRIGGERS);
+
+    @send self::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
+
+    if (features & FFFP_DATA_ATTRS_FEATURE) {
+	@call childBlock, (ChunkHandle) @MinValue::
+		    MSG_VIS_TEXT_DELETE_ALL();
+	@call childBlock, (ChunkHandle) @MaxValue::
+		    MSG_VIS_TEXT_DELETE_ALL();
+        @call childBlock, (ChunkHandle) @MaxTextLength::
+	            MSG_GEN_VALUE_SET_INTEGER_VALUE(MAX_TEXT_FIELD_LENGTH, 0);
+    }
+    if (features & FFFP_FIELD_ATTRS_FEATURE) {
+	@call childBlock, (ChunkHandle) @NotesText::
+		    MSG_VIS_TEXT_DELETE_ALL();
+    }
+
+    /* Leave data type alone as it would probably be a nuisance if it
+       kept getting reset to "General/Text" */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_ENABLE_TRIGGERS for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	This method re-enables the dialog box's Create trigger
+ *	    	and gives the text the tagrget and focus.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	11/14/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_ENABLE_TRIGGERS
+{
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+    
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+
+    /*
+     * Re-enable the Create trigger.
+     */
+    if (features & FFFP_CREATE_TRIGGER_FEATURE) {
+        @call childBlock, (ChunkHandle) @FFFieldPropertiesCreate::
+	    MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+
+    /*
+     * Have we been marked busy? If yes, decrement the busy count,
+     * mark us not busy, and accept input
+     */
+    FFFPMarkNotBusyAcceptInput(pself);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	DisplayUserError 
+ *
+ * DESCRIPTION:	Derefences the errorMessage chunk passed in, and displays
+ *		it using the standard dialog box.
+ *
+ * PARAMETERS:  void (optr errorMessageChunk)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	4/1/92		Initial Revision
+ *
+ **********************************************************************/
+void
+DisplayUserError(optr errorMessageChunk)
+{
+    TCHAR *errorMessage;
+
+    (void) MemLock(OptrToHandle(errorMessageChunk));
+    errorMessage = LMemDeref(errorMessageChunk);
+
+    UserStandardDialog(
+	/* help context */
+	(TCHAR *) 0,
+	/* not GIT_MULTIPLE_RESPONSE, so no customTriggers */
+	(TCHAR *)0,
+	/* no string arguments */
+	(TCHAR *)0, (TCHAR *)0,
+	/* string */
+	errorMessage,
+	/* dialog type */
+	(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+	/* interaction type */
+	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+    MemUnlock(OptrToHandle(errorMessageChunk));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_FIELD_CREATION_DONE 
+ *			for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	After the field properties in the Field Name box 
+ *		for the new field have been checked/stored, this message 
+ *		is called. 
+ *		If there was a problem, it puts up an error message.
+ *		Otherwise,
+ *		(1) It makes the Advanced field properties
+ *		    box not applyable.
+ *		(2) It adds the new field to the layout list
+ *		    (which automatically creates the GrObjects
+ *		     for field and label)
+ *
+ *		This message is for newly created fields only. For
+ *		modification of existing fields, you'll want to use
+ *		MSG_FFFP_FIELD_MODIFICATION_DONE
+ *
+ * PARAMETERS:
+ *	void (FFFieldCreationResult fieldResult: was the field creation 
+ *						 successful?
+ *	      byte colNum: what was the column number we just created?)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	3/30/92		Initial version
+ *	anna	6/4/92		Add field to list and GrObjBody
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_FIELD_CREATION_DONE
+{
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+    EventHandle msg;
+    optr fieldName;
+
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+    switch (fieldResult) {
+	case FFD_NAME_OK:
+	    @call self::MSG_FFFP_NEW_FIELD();
+
+            /*
+             * Set the text object clean, so when it gets changed the Applyable
+             * buttons become enabled.
+             */
+            @send childBlock, (ChunkHandle) @FFFieldPropertiesFieldName::
+    	        MSG_GEN_TEXT_SET_MODIFIED_STATE(0);
+
+	    /*
+	     * Add the new field to the layout list
+	     */
+            msg = @record FlatFileDatabaseClass::
+	        MSG_FFD_ADD_NAME_TO_LAYOUT_LIST(colNum, 0);
+	    pself = ObjDerefGen(oself);
+    	    @send oself::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
+
+	    break;
+
+	case FFD_DUPLICATE_FIELD_NAME:
+	    FFFPMarkNotBusyAcceptInput(pself);
+
+            /*
+             * Display error 
+             */
+ 	    DisplayUserError(@FFFPDuplicateFieldNameError);
+	    
+	    fieldName = ConstructOptr(childBlock,
+				     (ChunkHandle) @FFFieldPropertiesFieldName);
+	    @call fieldName::MSG_GEN_TEXT_SET_MODIFIED_STATE(0);
+	    @call fieldName::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+	    @call childBlock, (ChunkHandle) @FFFieldPropertiesCreate::
+		MSG_GEN_SET_ENABLED(VUM_NOW);
+			      	   
+	    FFFPSelectAllGrabFocus(fieldName);
+	    break;
+
+	case FFD_TOO_MANY_FIELDS:
+	    /*
+	     * Resume user input to the process
+	     */
+	    FFFPMarkNotBusyAcceptInput(pself);
+
+            /*
+             * Display error 
+             */
+ 	    DisplayUserError(@FFFPTooManyFieldsError);
+	    break;
+    }
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFFPMarkNotBusyAcceptInput
+ *
+ * DESCRIPTION:	This function decrements the busy count, and mark not
+ *	    	busy if need be.
+ *
+ * PARAMETERS:	pself - a pointer to the current FFFieldPropertiesInstance.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	11/14/92    	Initial version
+ *
+ ***********************************************************************/
+void
+FFFPMarkNotBusyAcceptInput(FFFieldPropertiesInstance *pself)
+{
+    optr appObject = GeodeGetAppObject(0);
+
+    /*
+     * Have we been marked busy? If yes, decrement the busy count,
+     * mark us not busy, and accept input
+     */
+    if (pself->FFFP_markBusyCount != 0) {
+	pself->FFFP_markBusyCount--;
+	@call appObject::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	@call appObject::MSG_GEN_APPLICATION_ACCEPT_INPUT();
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_FIELD_MODIFICATION_DONE 
+ *			for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	After the field properties in the Field Name 
+ *		box for the modified field have been checked/stored, 
+ *		this message is called. 
+ *		If there was a problem, it puts up an error message.
+ *		Otherwise,
+ *		(1) It makes the Advanced field properties
+ *		    box not applyable.
+ *		(2) If there was a field name change, it notifies the 
+ *		    LAYOUT_NAME_LIST and NOT_IN_LAYOUT_NAME_LIST. 
+ *		(3) It notifies the database that the corresponding
+ *		    GrObjects may have changed as well.
+ *
+ *		This message is for modified fields only. For
+ *		newly created fields, you'll want to use
+ *		MSG_FFFP_FIELD_CREATION_DONE
+ *
+ * PARAMETERS:
+ *	void (FFFieldCreationResult fieldResult: was the field 
+ *						 modification successful?
+ *	      byte colNum: the column number of the field we just modified
+ *	      Boolean nameChanged: TRUE if the name was changed, FALSE
+ *					otherwise)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	6/4/92		Initial version 
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_FIELD_MODIFICATION_DONE
+{
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;    
+    FieldDataType dataType;
+    EventHandle msg;
+    optr output;
+
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+    output = pself->GCI_output;
+
+    switch (fieldResult) {
+	case FFD_NAME_OK:
+            /*
+             * Set the text object clean, so when it gets changed the Applyable
+             * buttons become enabled.
+             */
+            @send childBlock, (ChunkHandle) @FFFieldPropertiesFieldName::
+    	        MSG_GEN_TEXT_SET_MODIFIED_STATE(0);
+
+	    /*
+	     * See if the name changed; if so, notify the database and the
+	     * other list.
+	     */
+	    if (nameChanged) {
+	        msg = @record FlatFileDatabaseClass::
+		    MSG_FFD_CHANGE_NAME_IN_LAYOUT_LIST(colNum);
+	        @send oself::MSG_GEN_OUTPUT_ACTION(msg, output);
+
+                msg = @record FlatFileDatabaseClass::
+	            MSG_FFD_CHANGE_NAME_IN_NOT_IN_LAYOUT_LIST(colNum); 
+				     
+    	        @send oself::MSG_GEN_OUTPUT_ACTION(msg, output);
+	    }
+
+	    /*
+	     * Notify the Treasure Chest that the notes might have changed.
+	     */
+	    msg = @record FlatFileDatabaseClass::
+	        MSG_FFD_NOTIFY_ATTRIBUTE_CHANGES();
+
+    	    @send oself::MSG_GEN_OUTPUT_ACTION(msg, output);
+
+	    /*
+	     * Notify the screen GrObject that a change may have occurred 
+	     */
+    	    pself = ObjDerefGen(oself);
+	    dataType = StoreDataTypeInStruct(features,
+					     NULL,
+					     childBlock);
+	    msg = @record FlatFileDatabaseClass::
+		MSG_FFD_CHANGE_SCREEN_FIELD_ATTRIBUTES(colNum, dataType);
+				     
+    	    @send oself::MSG_GEN_OUTPUT_ACTION(msg, output);
+	    break;
+
+	case FFD_DUPLICATE_FIELD_NAME:
+            /*
+             * Display error 
+             */
+ 	    DisplayUserError(@FFFPDuplicateFieldNameError);
+	    break;
+
+	case FFD_TOO_MANY_FIELDS:
+            /*
+             * Display error 
+             */
+ 	    DisplayUserError(@FFFPTooManyFieldsError);
+	    break;
+    }
+
+    /*
+     * Resume user input to the process
+     */
+    pself = ObjDerefGen(oself);
+    FFFPMarkNotBusyAcceptInput(pself);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_INITIATE_INTERACTION for FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	This message causes the field properties interaction 
+ *	    	to come up.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	3/ 3/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_INITIATE_INTERACTION
+{
+    MemHandle 		childBlock;
+    FFFieldPropertiesFeatures features;    
+
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+    /* Initiate myself. */
+    @call childBlock, (ChunkHandle) @FFFieldProperties::
+	    MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_INITIATE_NEW_FIELD_INTERACTION for
+ *	    	FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	This message causes the field properties interaction 
+ *	    	to come up, ready to edit a new field.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	8/11/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_INITIATE_NEW_FIELD_INTERACTION
+{
+    /* Set up the dialogue box for a new field. */
+    @call self::MSG_FFFP_NEW_FIELD();
+
+    /* Initiate myself. */
+    @call self::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_EDIT_DEFAULT_OR_COMPUTED_EXPRESSION for
+ *	    	FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	
+ *	    	This message is sent by the
+ *	    	SetDefaultOrComputedTrigger in the Field Properties UI
+ *	    	controller.  It impiles that an expression builder
+ *	    	should come up to edit an expression.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/16/92		Initial version
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_EDIT_DEFAULT_OR_COMPUTED_EXPRESSION
+{
+    optr expressionBuilder;
+    byte *ts;
+    word numTokens;
+    MemHandle msg, tsHandle;
+
+    /* If there's a token stream to edit, get a handle for it. */
+    if (pself->FFFP_fpis.FFFPIS_messageBlock.numTokensInTokenStream) {
+	/*
+	 * A stream exists.  Copy it and request that it be edited.
+	 */
+	numTokens = pself->FFFP_fpis.FFFPIS_messageBlock.numTokensInTokenStream;
+	tsHandle = MemAlloc(numTokens, HF_SHARABLE | HF_DYNAMIC, HAF_NO_ERR);
+	ts = MemLock(tsHandle);
+	memcpy(ts,
+	       pself->FFFP_fpis.FFFPIS_messageBlock.computedDefaultTokenStream,
+	       numTokens);
+	MemUnlock(tsHandle);
+    } else {
+	numTokens = 0;
+	tsHandle = NullHandle;
+    }
+
+    /*
+     * Request that the stream be edited with the appropriate expression
+     * builder.
+     */
+    switch (pself->FFFP_fpis.FFFPIS_messageBlock.dataType) {
+	case FDT_COMPUTED:
+	    expressionBuilder = pself->FFFP_computedFieldExpressionBuilderOptr;
+	    break;
+        default:
+	    expressionBuilder = pself->FFFP_defaultValueExpressionBuilderOptr;
+	    break;
+    }
+
+    /*
+     * Now request that the expression builder come up, edit the expression,
+     * and return a new token stream.  The token stream will be returned
+     * in MSG_FFFP_SET_DEFAULT_OR_COMPUTED_EXPRESSION.
+     */
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_EDIT_EXPRESSION(tsHandle, expressionBuilder, oself,
+				MSG_FFFP_SET_DEFAULT_OR_COMPUTED_EXPRESSION);
+
+    /* Off it goes. */
+    @send oself::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFFP_SET_DEFAULT_OR_COMPUTED_EXPRESSION for
+ *	    	FFFieldPropertiesClass
+ *
+ * DESCRIPTION:	
+ *	This message is called from the outside after the fpUIC
+ *	sent out an expression request from MSG_FFFP_EDIT_DEFAULT_OR_
+ *	COMPUTED_EXPRESSION.  It (possibly) contains a handle to a new
+ *	token stream, and definitely has the number of tokens in the
+ *	token stream in numTokens.  If the handle is null, then the
+ *	expression is null.
+ *
+ * PARAMETERS:
+ *	void (MemHandle tokenStream, word numTokens)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/17/92		Initial version
+ *	jeremy	6/17/92	    	Added numTokens
+ *
+ ***********************************************************************/
+@method FFFieldPropertiesClass, MSG_FFFP_SET_DEFAULT_OR_COMPUTED_EXPRESSION
+{
+    byte *newStream;
+    MemHandle childBlock;
+    FFFieldPropertiesFeatures features;
+
+    FPGetFeaturesAndChildBlock(oself, &childBlock, &features);
+
+    /* If the token handle is null, then the expression is, too. */
+    if (tokenStream == NullHandle) {
+	/* Has the expression changed? */
+	if (pself->FFFP_fpis.FFFPIS_messageBlock.numTokensInTokenStream == 0) {
+	    /*
+	     * The stream hasn't changed.  Exit.
+	     */
+	    return;
+	} else {
+	    /*
+	     * The stream changed: it's now NULL.
+	     */
+	    pself->FFFP_fpis.FFFPIS_messageBlock.computedDefaultTokenStream[0] =
+		PARSER_TOKEN_END_OF_EXPRESSION;
+	    pself->FFFP_fpis.FFFPIS_messageBlock.numTokensInTokenStream = 0;
+	}
+    } else {
+	/*
+	 * Lock the new stream down and copy its contents into our struct.
+	 */
+	newStream = MemLock(tokenStream);
+	memcpy(pself->FFFP_fpis.FFFPIS_messageBlock.computedDefaultTokenStream,
+	       newStream, numTokens);
+	pself->FFFP_fpis.FFFPIS_messageBlock.numTokensInTokenStream = numTokens;
+	MemFree(tokenStream);
+    }
+
+    /*
+     * Tell our gadgetry to become applyable.
+     */
+    @send childBlock,
+	      (ChunkHandle)@FFFieldProperties::
+					MSG_GEN_MAKE_APPLYABLE();
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetDataAttributes 
+ *
+ * DESCRIPTION:	Given a data type, returns a byte indicating which
+ *		attributes are valid for the given data type.
+ *
+ * PARAMETERS:  pass: dataType (byte)
+ *		return: FFD_attributes
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	2/92		Initial Revision
+ *
+ **********************************************************************/
+
+FFD_attributes
+GetDataAttributes(byte dataType)
+{
+    FFD_attributes	attrEnabled;
+
+    switch(dataType) {
+
+    case FDT_GENERAL_TEXT:
+       attrEnabled = FFD_ATTRIBUTES_MAX_TEXT_LENGTH |
+		     FFD_ATTRIBUTES_DEFAULT;   
+       break;
+
+    case FDT_INTEGER:
+       attrEnabled = FFD_ATTRIBUTES_MIN_MAX_VALUE |
+		     FFD_ATTRIBUTES_DEFAULT;
+       break;
+
+    case FDT_REAL:
+       attrEnabled = FFD_ATTRIBUTES_MIN_MAX_VALUE |
+		     FFD_ATTRIBUTES_DEFAULT;
+       break;
+
+    case FDT_DATE:
+       attrEnabled = FFD_ATTRIBUTES_MIN_MAX_VALUE | \
+		     FFD_ATTRIBUTES_DEFAULT;
+       break;
+
+    case FDT_TIME:
+       attrEnabled = FFD_ATTRIBUTES_MIN_MAX_VALUE | \
+		     FFD_ATTRIBUTES_DEFAULT;
+       break;
+
+    case FDT_COMPUTED:
+    /*
+     * Computed values actually have formulas instead of defaults,
+     * but the interface (Expression Builder)  and storage are the same. 
+     */
+       attrEnabled = FFD_ATTRIBUTES_DEFAULT;
+       break;
+
+    }
+    return (attrEnabled);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	DoFieldPropError 
+ *
+ * DESCRIPTION:	Display summons dialog box with error message. 
+ *
+ * PARAMETERS:  void DoFieldPropError (
+ *			optr errorMessageChunk,
+ *			optr dialogBoxToDisplay)  
+ *						
+ *		
+ *
+ * STRATEGY:	display error message in standard dialog box
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	3/92		Initial Revision
+ *
+ **********************************************************************/
+void
+DoFieldPropError(optr errorMessageChunk, optr dialogBoxToDisplay)
+{
+    TCHAR *errorMessage;
+    optr appObject;
+
+    (void) MemLock(OptrToHandle(errorMessageChunk));
+    errorMessage = LMemDeref(errorMessageChunk);
+
+    /*
+     * We may want another dialog box to be there when the user
+     * has read the error message. So put it up now--it will sit
+     * behind the error message box. 
+     */
+    if (dialogBoxToDisplay) {
+        @send dialogBoxToDisplay::MSG_GEN_INTERACTION_INITIATE();
+
+    }
+
+    appObject = GeodeGetAppObject(0);
+
+    (void) @call appObject::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+	/* message to send back */
+	(word) 0,
+	/* who to send it to */
+	(optr) 0,
+	/* help context */
+	(TCHAR *) 0,
+	/* not GIT_MULTIPLE_RESPONSE, so no customTriggers */
+	(TCHAR *)0,
+	/* no string arguments */
+	(TCHAR *)0, (TCHAR *)0,
+	/* string */
+	errorMessage,
+	/* dialog type */
+	(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+	/* interaction type */
+	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+    MemUnlock(OptrToHandle(errorMessageChunk));
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	CheckNumberAndDisplayMsg 
+ *
+ * DESCRIPTION:	Check whether given text string is a legal number.  
+ *		If so, store the FloatNum at the given address.
+ *
+ * PARAMETERS:  Boolean CheckNumberAndDisplayMsg (
+ *			FieldDataType dataType,
+ *			MemHandle textBlock,
+ *			dword FloatAddress,
+ *			optr errorMessageChunk)
+ *
+ * STRATEGY:	
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	3/92		Initial Revision
+ *
+ **********************************************************************/
+Boolean
+CheckNumberAndDisplayMsg(FieldDataType dataType, 
+			 MemHandle textBlock, 
+			 dword floatAddress, optr errorMessageChunk)
+{
+
+    if (!CheckNumber(dataType, textBlock, floatAddress)) {
+	DisplayUserError(errorMessageChunk);
+	return(FALSE);
+    }
+    return(TRUE);
+
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	CheckDateTimeAndDisplayMessage
+ *
+ * DESCRIPTION:	Check whether given default text string is a 
+ *		legal date or time.  
+ *
+ * PARAMETERS:  Boolean CheckDateTimeAndDisplayMessage (
+ *			FieldDataType dataType,
+ *			MemHandle textBlock,
+ *			dword FloatAddress,
+ *			optr errorMessageChunk)	
+ *
+ *		returns TRUE if data's OK
+ *			FALSE otherwise
+ *
+ * STRATEGY:	
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	3/92		Initial Revision
+ *
+ **********************************************************************/
+
+Boolean
+CheckDateTimeAndDisplayMessage(FieldDataType dataType,  
+				MemHandle textBlock, dword floatAddress,
+				optr errorMessageChunk)
+{
+    if (!CheckDateTime(dataType, textBlock, floatAddress)) {
+	if (dataType == FDT_DATE) {
+	    DisplayUserError(errorMessageChunk);
+	}
+	else { 	/* dataType == FDT_TIME */
+	    DisplayUserError(errorMessageChunk);
+	}
+	return(FALSE);
+    }
+
+    return(TRUE);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	CheckMinMax
+ *
+ * DESCRIPTION:	Check that min < max   
+ *
+ * PARAMETERS:  Boolean CheckMinMax (
+ *			FloatNum *min,
+ *			FloatNum *max,
+ *			optr dialogBoxOptr)	
+ *
+ * STRATEGY:	
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	3/92		Initial Revision
+ *
+ **********************************************************************/
+Boolean
+CheckMinMax(FloatNum *min, FloatNum *max, optr dialogBoxOptr)
+{
+    /* 
+     * Check min < max; first make sure that both values exist
+     */
+    if ((FLOAT_EXPONENT(min) != FP_NAN) && (FLOAT_EXPONENT(max) != FP_NAN)) {
+        FloatPushNumber(min);
+        FloatPushNumber(max);
+        if (FloatComp() == 1) {
+            FloatPopNumber(max);
+            FloatPopNumber(min);
+	    DoFieldPropError(@FFFPMinGreaterThanMaxError,
+			     dialogBoxOptr);
+	    return(FALSE);
+        }
+        FloatPopNumber(max);
+        FloatPopNumber(min);
+     }
+
+    return(TRUE);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFFPSelectAllGrabFocus
+ *
+ * DESCRIPTION:	This function selects all the text in an object and
+ *	    	gives it the focus/target.
+ *
+ * PARAMETERS:	thing - optr to the object.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	12/14/92	Initial version
+ *
+ ***********************************************************************/
+void
+FFFPSelectAllGrabFocus(optr thing)
+{
+    @call thing::MSG_META_GRAB_FOCUS_EXCL();
+    @call thing::MSG_VIS_TEXT_SELECT_ALL();
+}
+
+#if 0
+/***********************************************************************
+ *
+ * FUNCTION:	CheckDefault 
+ *
+ * DESCRIPTION:	Check whether min < default < max  
+ *
+ * PARAMETERS:  Boolean CheckDefault (
+ *			optr selfOptr,
+ *			FloatNum *min,
+ *			FloatNum *max,
+ *			FloatNum *default,
+ *			optr dialogBoxOptr)	
+ *
+ * STRATEGY:	
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	anna	3/92		Initial Revision
+ *
+ **********************************************************************/
+Boolean
+CheckDefault(optr selfOptr, FloatNum *min, FloatNum *max, 
+				FloatNum *defaultFloat, optr dialogBoxOptr)
+{
+
+    /*
+     * Check default < max
+     */
+    if ((FLOAT_EXPONENT(max) != FP_NAN) && 
+	(FLOAT_EXPONENT(defaultFloat) != FP_NAN)) {
+        FloatPushNumber(defaultFloat);
+        FloatPushNumber(max);
+        if (FloatComp() == 1) {
+            FloatPopNumber(max);
+            FloatPopNumber(defaultFloat);
+	    DoFieldPropError(@FFFPDefaultGreaterThanMaxError,
+			     dialogBoxOptr);
+	    return(FALSE);
+        }
+        FloatPopNumber(max);
+        FloatPopNumber(defaultFloat);
+    }
+
+    /*
+     * Check min < default
+     */
+    if ((FLOAT_EXPONENT(min) != FP_NAN) && 
+	(FLOAT_EXPONENT(defaultFloat) != FP_NAN)) {
+        FloatPushNumber(min);
+        FloatPushNumber(defaultFloat);
+        if (FloatComp() == 1) {
+            FloatPopNumber(defaultFloat);
+            FloatPopNumber(min);
+	    DoFieldPropError(@FFFPMinGreaterThanDefaultError,
+			     dialogBoxOptr);
+	    return(FALSE);
+        }
+        FloatPopNumber(defaultFloat);
+        FloatPopNumber(min);
+    }
+    return(TRUE);
+}
+#endif

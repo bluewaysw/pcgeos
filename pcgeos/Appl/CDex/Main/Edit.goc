@@ -1,0 +1,658 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GeoDex
+MODULE:		Main
+FILE:		mainEdit.asm
+
+AUTHOR:		Ted H. Kim, 6/25/92
+
+ROUTINES:
+	Name			Description
+	----			-----------
+	RolodexCopyRecord	Copy a record to clipboard file
+	RolodexPasteRecord	Paste in a record from clipboard file
+	RolodexNotifyNormalTransferItemChanged
+				Enable or disable PasteRecord menu item
+	RolodexDelete		Delete a record of data
+	RolodexUndo		Undo whatever that needs to be undone
+	RolodexClear		Clear the uninserted record
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	6/92		Initial revision
+
+DESCRIPTION:
+	Contains message handlers for all edit menu items.
+	The copy/paste routines use a cell format (spreadsheet).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "cdex.goh"
+
+word g_numRecords = 0;
+word g_numFields = 0;
+Boolean g_indexEmpty = FALSE;
+
+void PasteFromSSMeta(SSMetaStruc *ssms);
+
+@extern object EditPasteRecord;
+@extern object EditUndo;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RolodexCopyRecord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Copies an entire record of data to the clipboard file.
+
+CALLED BY:	UI (=MSG_ROLODEX_COPY_RECORD)
+
+PASS:		nothing
+
+RETURN:		nothing (record copied into clipboard)
+		
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	6/92		Initial version
+   jfh	1/18/05	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method RolodexProcessClass, MSG_ROLODEX_COPY_RECORD
+{
+ SSMetaStruc	ssms;
+
+
+	/* check to see if current record is blank */
+	if (!g_curRecord) return;
+
+	SaveCurRecord();
+
+	/* initialize the stack frame for copying a transfer item */
+	SSMetaInitForCutCopy(&ssms, 0, 0);
+
+	/* set the transfer item size */
+	SSMetaSetScrapSize(&ssms, 1, GEODEX_NUM_FIELDS);
+
+	/* create the transfer item */
+	InitFieldSize();
+	/* this is a clipboard item */
+	g_exportFlag = IE_CLIPBOARD;
+	/* create a transfer item block */
+	ExportRecord(&ssms, 0);
+	/* export field names */
+   ExportFieldName(&ssms);
+
+	/* we are done */
+	SSMetaDoneWithCutCopy(&ssms);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RolodexPasteRecord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Paste in a record of data into GeoDex.
+
+CALLED BY:	UI (=MSG_ROLODEX_PASTE_RECORD)
+
+PASS:		nothing
+
+RETURN:		nothing 
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	6/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method RolodexProcessClass, MSG_ROLODEX_PASTE_RECORD
+{
+ SSMetaStruc	ssms;
+
+
+	/*RPR_SSMeta	local	SSMetaStruc
+	.enter
+
+	; initialize the stack frame for pasting in a transfer item
+
+	push	bp
+	mov	dx, ss				; SSMetaStruc => dx:bp
+	lea	bp, RPR_SSMeta
+	clr	bx				; bx - TransferItemFlags
+	call	SSMetaInitForPaste
+	pop	bp */
+	SSMetaInitForPaste(&ssms, 0);
+
+	/*call	PasteFromSSMeta */
+	PasteFromSSMeta(&ssms);
+
+	/* clean up the stack frame
+
+	push	bp
+	mov	dx, ss				; SSMetaStruc => dx:bp
+	lea	bp, RPR_SSMeta			; SSMetaStruc => dx:bp
+	call	SSMetaDoneWithPaste		; we are done pasting
+	pop	bp */
+	SSMetaDoneWithPaste(&ssms);
+
+	/*.leave
+	ret
+RolodexPasteRecord	endm */
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		PasteFromSSMeta
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Take a scrap and paste it into the database
+
+CALLED BY:	(EXTERNAL) RolodexPasteRecord
+PASS:		ss:bp	= inherited frame
+		ds	= dgroup
+RETURN:		nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	10/12/94	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void PasteFromSSMeta(SSMetaStruc *ssms)
+{
+ Boolean		error;
+ DBItem		savedRec;
+
+
+	/*RPR_SSMeta	local	SSMetaStruc
+	.enter	inherit far
+	push	bp
+	call	SaveCurRecord		; update the record if necessary
+	pop	bp  */
+	error = SaveCurRecord();
+	/*mov	ds:[undoAction], UNDO_NOTHING */
+	g_undoAction = UNDO_NOTHING;
+
+	/*LONG	jc	quit		; exit if error */
+	if (error) {
+		@send EditUndo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		return;
+		}
+
+	/*test	ds:[recStatus], mask RSF_WARNING ; was warning box up?
+	jne	done			; if so, exit */
+	if (g_recStatus & RSF_WARNING) {
+		g_recStatus = g_recStatus & ~RSF_WARNING;
+		@send EditUndo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		return;
+		}
+
+	/* get number of fields in the transfer item
+
+	mov	ax, RPR_SSMeta.SSMDAS_scrapRows	; ax - number of records
+	mov	ds:[numRecords], ax		; save it */
+	g_numRecords = ssms->SSMDAS_scrapRows;
+	/*mov	ax, RPR_SSMeta.SSMDAS_scrapCols	; ax - number of fields
+	mov	ds:[numFields], ax 		; save it */
+	g_numFields = ssms->SSMDAS_scrapCols;
+	/*cmp	ax, GEODEX_NUM_FIELDS		; more than 10 fields?
+	jle	okay				; if not, skip */
+	if (g_numFields > GEODEX_NUM_FIELDS)
+		/*mov	ds:[numFields], GEODEX_NUM_FIELDS ; read in only 10 fields */
+		g_numFields = GEODEX_NUM_FIELDS;
+/*okay:
+	; make it point to the 1st entry in DAS_CELL array
+
+	mov	RPR_SSMeta.SSMDAS_dataArraySpecifier, DAS_CELL	*/
+	ssms->SSMDAS_dataArraySpecifier = DAS_CELL;
+	/*push	bp
+	mov	dx, ss				; dx:bp - SSMetaStruc
+	lea	bp, RPR_SSMeta
+	call	SSMetaDataArrayResetEntryPointer
+	pop	bp	*/
+	SSMetaDataArrayResetEntryPointer(ssms);
+
+	/*call	ImportMetaFile			; JUST DO IT!!*/
+	error = ImportMetaFile(ssms);
+
+	/* unlock DAS_CELL data array
+
+	pushf
+	push	bp
+	mov	dx, ss				; dx:bp - SSMetaStruc
+	lea	bp, RPR_SSMeta
+	call	SSMetaDataArrayUnlock */
+	SSMetaDataArrayUnlock(ssms);
+	/*pop	bp
+	popf
+	jc	done				; skip if no error */
+	if (error) {
+		g_recStatus = g_recStatus & ~RSF_WARNING;
+		@send EditUndo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		return;
+		}
+
+	/* check to see if there were any records w/ empty index fields
+	; if there were, then display a DB with a warning message
+
+	call	CheckEmptyIndex
+	tst	ds:[indexEmpty]		; were there records w/o index fields? */
+	if (g_indexEmpty) {
+		/*mov	bp, ERROR_NO_INDEX_IMPORT   ; bp - error message constant
+		call	DisplayErrorBox		; put up an error dialog box */
+		DisplayErrorBox(ERROR_NO_INDEX_IMPORT);
+		}
+
+	/* update the index list and display current record
+
+	push	bp
+	mov	si, ds:[curRecord] */
+	savedRec = g_curRecord;
+	/*clr	ds:[curRecord]			; so new one will display */
+	g_curRecord = 0;
+	/*tst	si
+	je	exit */
+	if (savedRec)
+		/*call	DisplayCurRecord		; display this record */
+		DisplayCurRecord(savedRec);
+/*exit:
+	andnf	ds:[searchFlag], not mask SOF_NEW  ; clear search flag */
+	g_searchFlag = g_searchFlag & ~SOF_NEW;
+	/*call	UpdateNameList			; update SearchList */
+	UpdateNameList();
+	/*pop	bp
+	jmp	quit
+done:
+	andnf	ds:[recStatus], not mask RSF_WARNING ; clear warning flag
+quit:
+	call	DisableUndo			; no undoable action exists */
+	@send EditUndo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	return;
+
+	/*.leave
+	ret
+PasteFromSSMeta	endp */
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RolodexNotifyNormalTransferItemChanged
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Enables or disables Paste item depending on the availability
+		of a transfer item on the clipboard
+
+CALLED BY:	MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+
+PASS:		ds - segment of stack, dgroup, thread etc.
+
+RETURN:		nothing
+
+DESTROYED:	ax, bx, cx, dx, si, di, bp, es
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	6/92		Initial version
+   jfh	12/14/04	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method RolodexProcessClass,
+						    MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+{
+ Boolean		none;
+
+
+	/* check to see if there is a transfer item */
+	none = SSMetaSeeIfScrapPresent(0);
+
+	/*  now enable or disable Paste item accordingly */
+	if (none)
+		@send EditPasteRecord::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	else
+		@send EditPasteRecord::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RolodexClear
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Called to set up undo if user deletes a new record that has data
+				in it.
+
+CALLED BY:	RolodexDeleteLow
+
+PASS:		nothing
+
+RETURN:		nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	12/28/89	Initial version
+	jfh	1/17/05	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void RolodexClear(void)
+{
+
+	/* was there any record to be deleted? */
+	if (g_undoItem) {
+		NewDBFree(g_undoItem);
+		g_undoItem = 0;
+		}
+
+	/* has the record been modified? */
+	if (CompareRecord(NUM_TEXT_EDIT_FIELDS + 1, 0)) {
+		/* read in all text edit fields */
+     	GetRecord(NUM_TEXT_EDIT_FIELDS + 1, 0);
+		/* record data modified? if so, skip to handle it*/
+		if (g_curRecord) goto phone;
+		/* is record empty? if so, exit */
+		if (g_recStatus & RSF_EMPTY) goto done;
+		/* create a new record and initialize */
+      if (InitRecord(FALSE)) return;
+		}
+
+	/* is record empty? */
+	if (g_recStatus & RSF_EMPTY) goto done;
+
+setFlag:
+	g_undoItem = g_curRecord;
+	g_curRecord = 0;
+	ClearRecord();
+	g_recStatus = RSF_NEW | RSF_EMPTY;
+	g_undoAction = UNDO_OLD;
+	@send EditUndo::MSG_GEN_SET_ENABLED(VUM_NOW);
+	return;
+
+
+phone:
+	if (g_recStatus & RSF_EMPTY) goto update;
+	NewDBFree(g_curRecord);
+	g_curRecord = 0;
+
+done:
+	ClearRecord();
+	g_recStatus = RSF_NEW | RSF_EMPTY;
+	@send EditUndo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	return;
+
+update:
+	if (UpdateRecord(FALSE)) return;
+	else goto setFlag;
+
+
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RolodexDeleteLow
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Deletes the current record from database.
+
+CALLED BY:	MSG_ROLODEX_DELETE
+
+PASS:		ds - segment of core block
+
+RETURN:		carry set if error
+	GOC:	Boolean - TRUE if error
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	9/4/89		Initial version
+	jfh	1/15/05	Port to GOC   XXX I don't think this can ever return an error
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+Boolean RolodexDeleteLow(void)
+{
+ TableEntry 	*entry;
+ DBItem			recHan;
+
+
+	/* is it an existing record? */
+	if (!(g_recStatus & RSF_NEW)) {
+		/* undoable action is delete */
+		g_undoAction = UNDO_DELETE;
+		/* delete current record from main table */
+		DeleteFromMainTable();
+		/* did we delete the only record? */
+		if (!g_gmb.GMB_numMainTab) {
+			/* clear all the text fields */
+			ClearRecord();
+			/* set flags */
+			g_recStatus = RSF_NEW | RSF_EMPTY;
+			@send EditUndo::MSG_GEN_SET_ENABLED(VUM_NOW);
+			g_curRecord = 0;
+			}
+		else {
+			/* did the last (not only remaining, but last as opposed to first)
+				entry get deleted? */
+			if (g_curOffset == g_gmb.GMB_endOffset) {
+				/* point to new last entry */
+				g_curOffset -= sizeof(TableEntry);
+				}
+			/* open up the main table  */
+			entry = DBLock(g_fileHandle, g_groupHandle, g_gmb.GMB_mainTable);
+			/* point to next record */
+			entry += (g_curOffset / sizeof(TableEntry));
+			recHan = entry->TE_item;
+			DBUnlock(entry);
+			/* display the next record */
+			DisplayCurRecord(recHan);
+			/* clear search flag */
+			g_searchFlag = g_searchFlag & ~SOF_NEW;
+			/* update the name list */
+			UpdateNameList();
+			@send EditUndo::MSG_GEN_SET_ENABLED(VUM_NOW);
+			}
+		}
+	else {
+		/* it's a new record */
+      RolodexClear();
+		}
+
+/*exit:
+	clc				; exit with no error
+
+	ret */
+	return (FALSE);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RolodexDelete
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Deletes the current record from database.
+
+CALLED BY:	MSG_ROLODEX_DELETE
+
+PASS:		ds - segment of core block
+
+RETURN:		nothing
+
+DESTROYED:	ax, bx, cx, dx, si, di, bp, es
+
+PSEUDO CODE/STRATEGY:
+	Copy the data to a temporary block
+	Lock the map block
+		save the handle of temporary block
+	Unlock the map block
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	9/4/89		Initial version
+	jfh	1/15/05	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method RolodexProcessClass, MSG_ROLODEX_DELETE
+{
+ DBItem	recHan;
+
+
+	/* if new record, go striaght to the low level routine */
+	if (!(g_recStatus & RSF_NEW)) {
+		/* save current record handle */
+		recHan = g_curRecord;
+		/* set flag to indicate delete */
+		g_recStatus |= RSF_DELETE;
+		/* save current record if necessary. exit if error */
+		if (SaveCurRecord()) return;
+		/* clear delete flag */
+		g_recStatus = g_recStatus & ~RSF_DELETE;
+		/* save handle of deleted record  */
+		g_undoItem = recHan;
+		}
+
+	/* call the low level routine */
+	if (RolodexDeleteLow()) {
+		/* there was an error */
+		g_undoAction = UNDO_NOTHING;
+		@send EditUndo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		g_undoItem = 0;
+		}
+
+	return;
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RolodexUndo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Undoes any changes that were made to the current record
+		or restores a record if it has been deleted.
+
+CALLED BY:	MSG_ROLODEX_UNDO
+
+PASS:		ds - segment of core block
+
+RETURN:		nothing
+
+PSEUDO CODE/STRATEGY:
+	Get the handle of deleted or modified record from map block
+	If the changes can be recovered
+		read in the record from the database
+	else do nothing
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	If the user reads in a different record after he has made a change 
+	a record, that modified record can not be recovered.
+
+	At the beginning of each record changing routine
+	(i.e. RolodexPrevious, RolodexNext, etc ...), it clears
+	the DBM_undoItem in map block and actually deletes the old block
+	so that no "Undo" function can be performed.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	9/4/89		Initial version
+	jfh	1/17/05	Port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method RolodexProcessClass, MSG_ROLODEX_UNDO
+{
+ DBItem					item;
+ RecordStatusFlags	savedStatus;
+
+
+	/* was last action old? */
+	if (g_undoAction == UNDO_OLD) {
+		/* display old record */
+		DisplayCurRecord(g_undoItem);
+		g_searchFlag = g_searchFlag & ~SOF_NEW;
+		g_undoItem = 0;
+		g_undoAction = UNDO_NEW;
+		g_recStatus |= RSF_NEW;
+		@send EditUndo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		MarkMapDirty();
+		return;
+		}
+
+	/* was last action delete? */
+	if (g_undoAction == UNDO_DELETE) {
+		/* display deleted record */
+		DisplayCurRecord(g_undoItem);
+		g_searchFlag = g_searchFlag & ~SOF_NEW;
+		InsertRecord();
+		UpdateNameList();
+		g_undoItem = 0;
+		g_undoAction = UNDO_ADD;
+		MarkMapDirty();
+		return;
+		}
+
+	/* has the record been modified? */
+	if (CompareRecord(NUM_TEXT_EDIT_FIELDS + 1, 0))  {
+		/* was there an undo action? */
+		if (!(g_undoAction == UNDO_NOTHING)) {
+			/* set new undo action flag */
+			if (g_undoAction == UNDO_DELETE) goto skip;
+			}
+		/* save current record handle */
+		g_gmb.GMB_orgRecord = g_curRecord;
+		g_undoAction = UNDO_CHANGE;
+
+		skip:
+		/* has CopyPhone been called? */
+		if (!(g_recStatus & RSF_UPDATE)) {
+			if (g_undoItem)
+				/* delete this record */
+				NewDBFree(g_undoItem);
+			g_undoItem = g_curRecord;
+			GetRecord(NUM_TEXT_EDIT_FIELDS + 1, 0);
+			if (InitRecord(FALSE)) return;
+			}
+		else {
+			if (UpdateRecord(FALSE)) return;
+			}
+		}
+
+	else {
+		/* record not modified */
+		if (g_undoAction == UNDO_NOTHING)  return;
+		/* was last undoable action add? */
+		if (g_undoAction == UNDO_ADD) {
+			g_undoItem = g_curRecord;
+			if (RolodexDeleteLow()) {
+				@send EditUndo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+				g_undoItem = 0;
+				}
+			MarkMapDirty();
+			return;
+			}
+		}
+
+	item = g_undoItem;
+	g_undoItem = g_curRecord;
+	savedStatus = g_recStatus;
+	DisplayCurRecord(item);
+	g_searchFlag = g_searchFlag & ~SOF_NEW;
+	g_recStatus = savedStatus;
+	g_recStatus = g_recStatus & ~RSF_UPDATE;
+	if (g_undoAction == UNDO_RESTORE)
+		g_undoAction = UNDO_CHANGE;
+	else 
+		g_undoAction = UNDO_RESTORE;
+
+	MarkMapDirty();
+	return;
+
+}
+
+
+

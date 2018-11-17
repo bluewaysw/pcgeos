@@ -1,0 +1,415 @@
+/***********************************************************************
+ *
+ *	Copyright (c) New Deal 2000 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mailUIDL.goc
+ *
+ * AUTHOR:  	  Gene Anderson: 02/23/00
+ *
+ * DESCRIPTION:
+ *	routines for managing mail via UIDL
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+/*@include <mailhub.goh>  */
+/*@include <mailsmtp.goh>  */
+/*@include <mailpop3.goh>  */
+@include <bbxmlib.goh>
+#include <sem.h>
+
+ThreadLockHandle uidlLock = NULL;
+
+typedef struct {
+    TCHAR              *uidl;
+    MailOnServerStatus flags;
+    dword              elNum;
+} UIDLCheckCBData;
+
+
+#ifdef __BORLANDC__
+#pragma codeseg SendCode
+#endif
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    OpenUIDLFile
+ * PASS:            create - TRUE to create file if needed
+ * RETURN:	    VMFileHandle - handle of UIDL file
+ *                  vmb - VMBlockHandle of huge array
+ * DESCRIPTION:
+ *        Open the UIDL file, creating if necessary
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            2/23/00         Initial Revision
+ *
+ ***********************************************************************/
+
+VMFileHandle
+OpenUIDLFile(VMBlockHandle *vmb, Boolean create)
+{
+    VMFileHandle fh;
+
+    FilePushDir();
+    GotoMailDirectory(NULL);
+
+    fh = VMOpen("uidl", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+    if (!fh) {
+	if (create) {
+	    /*
+	     * file didn't exist; create it and init the huge array
+	     */
+	    fh = VMOpen("uidl", VMAF_FORCE_READ_WRITE, VMO_CREATE, 0);
+	    if (fh) {
+		*vmb = HugeArrayCreate(fh, 0, 0);
+		VMSetMapBlock(fh, *vmb);
+	    }
+	}
+    } else {
+	*vmb = VMGetMapBlock(fh);
+    }
+
+    FilePopDir();
+    return(fh);
+}
+
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    FindUIDL
+ * PASS:            cbData - ptr to UIDLCheckCBData
+ *                     .uidl - UIDL to find
+ *                  create - TRUE to create file if needed
+ * RETURN:	    TRUE if found
+ *                     .elEnum - element #
+ *                     .flags - filled in
+ *                  fh - VMFileHandle
+ *                  vmb - VMBlockHandle
+ * DESCRIPTION:
+ *        Find the specified UIDL
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            2/23/00         Initial Revision
+ *
+ ***********************************************************************/
+
+Boolean _pascal
+FindUIDLCB(void *element, void *enumData)
+{
+    MailOnServerStatus *el = element;
+    UIDLCheckCBData *cbData = enumData;
+    TCHAR *uidl = (TCHAR *)((byte *)el + sizeof(MailOnServerStatus));
+
+    if (!strcmp(uidl, cbData->uidl)) {
+	/*
+	 * if UIDLs match, return the flags
+	 */
+	cbData->flags = *el;
+	return(TRUE);
+    }
+    cbData->elNum++;
+    return(FALSE);
+}
+
+Boolean
+FindUIDL(UIDLCheckCBData *cbData, VMFileHandle *fh, VMBlockHandle *vmb, Boolean create)
+{
+    Boolean found;
+
+    cbData->elNum = 0;
+    *fh = OpenUIDLFile(vmb, create);
+    if (*fh) {
+	found = HugeArrayEnum(*fh, *vmb, FindUIDLCB, 0, -1, cbData);
+    } else {
+	found = FALSE;
+    }
+
+    return(found);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    UIDLCheckFlag
+ * PASS:            flags - MailOnServerStatus to check
+ *                  uidl - ptr to UIDL to check
+ * RETURN:	    TRUE if flags set for UIDL
+ * DESCRIPTION:
+ *        Check the specified flag(s) are set for the UIDL
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            2/23/00         Initial Revision
+ *
+ ***********************************************************************/
+
+Boolean
+UIDLCheckFlag(MailOnServerStatus flags, TCHAR *uidl)
+{
+    Boolean ret = FALSE;
+    UIDLCheckCBData cbData;
+    VMFileHandle fh;
+    VMBlockHandle vmb;
+
+    /*
+     * find the UIDL if it exists
+     */
+    cbData.uidl = uidl;
+	 uidlLock = ThreadAllocThreadLock();
+	 ThreadGrabThreadLock(uidlLock);
+    ret = FindUIDL(&cbData, &fh, &vmb, FALSE);
+    if (fh) {
+	VMClose(fh, FALSE);
+    }
+	 ThreadReleaseThreadLock(uidlLock);
+	 ThreadFreeThreadLock(uidlLock);
+	 uidlLock = NULL;
+
+    if (ret) {
+	/*
+	 * see if the flag(s) are set
+	 */
+	ret = (cbData.flags & flags);
+    }
+    return(ret);
+}
+
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    UIDLSetFlag
+ * PASS:            flags - MailOnServerStatus to set
+ *                  uidl - ptr to UIDL to set
+ *                  create - TRUE to create if doesn't exist
+ * RETURN:	    none
+ * DESCRIPTION:
+ *        set the specified flag(s) for the UIDL
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            2/23/00         Initial Revision
+ *
+ ***********************************************************************/
+
+void
+UIDLSetFlag(MailOnServerStatus flags, TCHAR *uidl, Boolean create)
+{
+    UIDLCheckCBData cbData;
+    VMFileHandle fh;
+    VMBlockHandle vmb;
+    MailOnServerStatus *el;
+    word eSize, elNum, ret;
+
+    eSize = sizeof(TCHAR)*strlen(uidl);
+    if (!eSize) {
+	return;
+    }
+    /*
+     * add space for flags and NULL
+     */
+    eSize += sizeof(MailOnServerStatus) + sizeof(TCHAR);
+
+    /*
+     * find the UIDL
+     */
+    cbData.uidl = uidl;
+	 uidlLock = ThreadAllocThreadLock();
+    ThreadGrabThreadLock(uidlLock);
+
+    ret = FindUIDL(&cbData, &fh, &vmb, create);
+    if (fh) {
+	if (!ret) {
+	    /*
+	     * entry not found, add a new one
+	     */
+	    elNum = HugeArrayAppend(fh, vmb, 1, NULL);
+	    HugeArrayResize(fh, vmb, elNum, eSize);
+	    HugeArrayLock(fh, vmb, elNum, &el, &eSize);
+	    strcpy((TCHAR *)((byte *)el+sizeof(MailOnServerStatus)), uidl);
+	    *el = flags;
+	} else {
+	    /*
+	     * set the flag(s)
+	     */
+	    HugeArrayLock(fh, vmb, cbData.elNum, &el, &eSize);
+	    *el = *el | flags;
+	}
+	/*
+	 * mark the element dirty and unlock it
+	 */
+	HugeArrayDirty(el);
+	HugeArrayUnlock(el);
+	VMClose(fh, FALSE);
+    }
+    EC_WARNING_IF(!fh, MAIL_UNABLE_TO_SET_UIDL_FLAG);
+
+	 ThreadReleaseThreadLock(uidlLock);
+	 ThreadFreeThreadLock(uidlLock);
+	 uidlLock = NULL;
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    UIDLDeleteEntry
+ * PASS:            uidl - ptr to UIDL to delete
+ * RETURN:	    none
+ * DESCRIPTION:
+ *        Delete the specified UIDL entry
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            2/23/00         Initial Revision
+ *
+ ***********************************************************************/
+
+void
+UIDLDeleteEntry(TCHAR *uidl)
+{
+    UIDLCheckCBData cbData;
+    VMFileHandle fh;
+    VMBlockHandle vmb;
+
+	 uidlLock = ThreadAllocThreadLock();
+	 ThreadGrabThreadLock(uidlLock);
+
+    /*
+     * find the UIDL and delete it if it's there
+     */
+    cbData.uidl = uidl;
+    if (FindUIDL(&cbData, &fh, &vmb, FALSE)) {
+	HugeArrayDelete(fh, vmb, 1, cbData.elNum);
+    }
+    VMClose(fh, FALSE);
+
+	 ThreadReleaseThreadLock(uidlLock);
+	 ThreadFreeThreadLock(uidlLock);
+	 uidlLock = NULL;
+}
+
+@ifdef LEAVE_MAIL_ON_SERVER
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    UIDLHasEntries
+ * PASS:            none
+ * RETURN:	    # of UIDL entries
+ * DESCRIPTION:
+ *        See if there are any entries in the UIDL list
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            2/25/00         Initial Revision
+ *
+ ***********************************************************************/
+
+Boolean
+UIDLHasEntries(void)
+{
+    VMFileHandle fh;
+    VMBlockHandle vmb;
+    Boolean hasEntries = FALSE;
+
+	 uidlLock = ThreadAllocThreadLock();
+    ThreadGrabThreadLock(uidlLock);
+    fh = OpenUIDLFile(&vmb, FALSE);
+    if (fh) {
+	hasEntries = (HugeArrayGetCount(fh, vmb) != 0);
+	VMClose(fh, FALSE);
+    }
+
+	 ThreadReleaseThreadLock(uidlLock);
+	 ThreadFreeThreadLock(uidlLock);
+	 uidlLock = NULL;
+    return(hasEntries);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    UIDLClean
+ * PASS:            none
+ * RETURN:	    none
+ * DESCRIPTION:
+ *        Clean any leftover MOSS_DELETE_FROM_SERVER entries
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            2/25/00         Initial Revision
+ *
+ ***********************************************************************/
+
+void
+UIDLClean(void)
+{
+    VMFileHandle fh;
+    VMBlockHandle vmb;
+    word count, i, j;
+    word eSize;
+    MailOnServerStatus flags, *el;
+
+	 uidlLock = ThreadAllocThreadLock();
+    ThreadGrabThreadLock(uidlLock);
+
+    fh = OpenUIDLFile(&vmb, FALSE);
+    if (fh) {
+	count = HugeArrayGetCount(fh, vmb);
+	/*
+	 * we can't use HugeArrayEnum(), because the callback is not
+	 * allowed to delete or resize elements, so we walk through
+	 * one at a time, updating our index (j) as needed.
+	 */
+	for (i = j = 0; i < count; i++) {
+	    HugeArrayLock(fh, vmb, j, &el, &eSize);
+	    flags = *el;
+	    HugeArrayUnlock(el);
+	    if (flags & MOSS_DELETE_FROM_SERVER) {
+		EC_WARNING(MAIL_UNREFERENCED_UIDL);
+		HugeArrayDelete(fh, vmb, 1, j);
+	    } else {
+		j++;
+	    }
+	}
+	VMClose(fh, FALSE);
+    }
+
+	 ThreadReleaseThreadLock(uidlLock);
+	 ThreadFreeThreadLock(uidlLock);
+	 uidlLock = NULL;
+}
+
+@endif  // LEAVE_MAIL_ON_SERVER
+

@@ -1,0 +1,225 @@
+/********************************************************************
+ *
+ *      Copyright (c) Geoworks 1996 -- All Rights Reserved.
+ *
+ * PROJECT:     GEOS Sample Applications
+ * MODULE:      GenContent
+ * FILE:        gcont.goc
+ *
+ * AUTHOR:      Nathan Fiedler: November 13, 1996
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      11/13/96        Initial version
+ *
+ * DESCRIPTION:
+ *      This sample illustrates how to have a lot of Gen objects
+ *      on the screen at once. Although they can't all physically
+ *      fit on the screen at once, we can have the user scroll the
+ *      objects up and down to make them visible.
+ *
+ *      This sample uses a GenView and GenContent to provide the
+ *      scrolling. By using the scrolling behavior of the GenView
+ *      you can scroll up or down to make different Gen objects
+ *      visible on the screen. To actually implement the scrolling
+ *      we'll need to intercept the PgUp and PgDn keys to make the
+ *      view scroll up and down. We do that by intercepting the
+ *      MSG_META_KBD_CHAR message at the GenView level. There we
+ *      can check which key was pressed and either scroll up,
+ *      scroll down, or send the keypress to another object to be
+ *      handled in the appropriate manner.
+ *
+ * RCS STAMP:
+ *      $Id: gcont.goc,v 1.1 97/04/04 16:41:45 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+
+/********************************************************************
+ *              Class Definitions
+ *******************************************************************/
+    @class GContProcessClass, GenProcessClass;
+    @endc;
+
+      /*
+       * Subclass this so we can intercept the
+       * keyboard presses and respond properly to
+       * the PgUp and PgDn keys.
+       */
+    @class GContViewClass, GenViewClass;
+    @endc;
+
+/********************************************************************
+ *              Class Declarations
+ *******************************************************************/
+    @classdecl GContProcessClass, neverSaved;
+    @classdecl GContViewClass;
+
+/********************************************************************
+ *              UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *              AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass GContApp = {
+    GI_visMoniker = list { @GContTextMoniker };
+    GI_comp = @GContPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @GContPrimary;
+}
+
+@visMoniker GContTextMoniker = "GenContent";
+
+@end AppResource;
+
+/********************************************************************
+ *              Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass GContPrimary = {
+    GI_comp = @GContView;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+  /*
+   * To have Gen objects in a scrolling "area"
+   * we'll need to use a GenView. It's content
+   * will be the GenContent below, which contains
+   * all of the Gen objects we want to be scrollable.
+   */
+@object GContViewClass GContView = {
+    GVI_content = @GContContent;
+      /*
+       * Set the flag for "generic contents" since we have
+       * Gen objects as the content of this view.
+       * Also set the flag so the view will be the same
+       * color as the primary window, for appearances only.
+       */
+    GVI_attrs = @default | GVA_GENERIC_CONTENTS
+                         | GVA_SAME_COLOR_AS_PARENT_WIN;
+    GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+}
+
+  /*
+   * This is the content object which contains
+   * all of the Gen objects that will be displayed
+   * in the GenView.
+   */
+@object GenContentClass GContContent = {
+    GI_comp = @GContText1,
+              @GContText2,
+              @GContText3,
+              @GContValue1,
+              @GContValue2,
+              @GContValue3,
+              @GContGlyph1,
+              @GContGlyph2,
+              @GContGlyph3;
+    GCI_genView = @GContView;
+}
+
+  /*
+   * These are just some example Gen objects
+   * that show that this concept really works.
+   */
+@object GenTextClass GContText1 = {
+    GI_visMoniker = "Text 1:";
+    GTXI_text = "Text in Text1 object.";
+}
+
+@object GenTextClass GContText2 = {
+    GI_visMoniker = "Text 2:";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Text in Text2 object. (Read only)";
+}
+
+@object GenTextClass GContText3 = {
+    GI_visMoniker = "Text 3:";
+    GTXI_text = "Text in Text3 object.";
+}
+
+@object GenValueClass GContValue1 = {
+    GI_visMoniker = "Value 1:";
+}
+
+@object GenValueClass GContValue2 = {
+    GI_visMoniker = "Value 2:";
+}
+
+@object GenValueClass GContValue3 = {
+    GI_visMoniker = "Value 3:";
+    GI_attrs = @default | GA_READ_ONLY;
+}
+
+@object GenGlyphClass GContGlyph1 = {
+    GI_visMoniker = "Glyph 1";
+}
+
+@object GenGlyphClass GContGlyph2 = {
+    GI_visMoniker = "Glyph 2";
+}
+
+@object GenGlyphClass GContGlyph3 = {
+    GI_visMoniker = "Glyph 3";
+}
+
+@end Interface;
+
+/********************************************************************
+ *              Code for GContViewClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_META_KBD_CHAR
+ ********************************************************************
+ * SYNOPSIS:     The user has pressed a key so lets see if it's the
+ *               PgUp and PgDn keys and handle those differently.
+ * PARAMETERS:   word character
+ *               word flags
+ *               word state
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Check if the character is the PgUp or PgDn key. If it
+ *               is then have the view scroll up or down. If it isn't
+ *               then call the superclass to handle it.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      11/13/96        Initial version
+ *******************************************************************/
+@method GContViewClass, MSG_META_KBD_CHAR
+{
+
+    switch ( (byte)character ) {
+          /*
+           * User pressed the "PgUp" key.
+           */
+        case VC_PREVIOUS :
+            @send self::MSG_GEN_VIEW_SCROLL_UP();
+            break;
+          /*
+           * User pressed the "PgDn" key.
+           */
+        case VC_NEXT :
+            @send self::MSG_GEN_VIEW_SCROLL_DOWN();
+            break;
+          /*
+           * User pressed some other key. Note that sending
+           * MSG_META_FUP_KBD_CHAR will not do the right thing
+           * in this case, so call the superclass instead.
+           */
+        default :
+            @callsuper();
+            break;
+    }
+} /* MSG_META_KBD_CHAR */
+

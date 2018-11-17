@@ -1,0 +1,129 @@
+
+COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+
+PROJECT:	PC GEOS
+MODULE:		Video driver
+FILE:		megaMacro.def
+
+AUTHOR:		Jeremy Dashe
+
+MACROS:
+	Name		Description
+	----		-----------
+	
+REVISION HISTORY:
+	Name	Date	Description
+	----	----	-----------
+	jeremy	5/9/91	Initial version.
+
+	$Id: megaMacro.def,v 1.1 97/04/18 11:42:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		BlastPatternByte
+
+DESCRIPTION:	Write out a pixel byte mask to the monochrome EGA screen.
+		Used exclusively in megaChars.asm.
+
+PASS:
+		ah - mask
+		bl - BITMASK
+		es:di - screen position
+
+RETURN:
+		pixels set.
+
+-------------------------------------------------------------------------------@
+
+BlastPatternByte macro
+	mov	al,bl
+	push	ax
+	and	ah,cs:[maskSetColor]
+	out	dx,ax
+	or	es:[di],al
+
+	ClearMEGAColor
+
+	pop	ax
+	and	ah,cs:[maskResetColor]
+	out	dx,ax
+	or	es:[di],al
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		SetMaskPattern
+
+DESCRIPTION:	Load up the maskSetColor with the appropriate line of the
+		patternBuffer and maskResetColor with its inverse.
+		Used exclusively in megaChars.asm.
+
+PASS:		word on stack - index into pattern buffer.
+
+DESTROYED:	ah
+
+-------------------------------------------------------------------------------@
+
+SetMaskPattern	macro
+	mov	ah, bl
+	pop	bx
+	mov	al,{byte}cs:[ditherMatrix][bx]
+	mov	cs:[maskSetColor],al
+	not	al
+	mov	cs:[maskResetColor],al
+	inc	bx
+	and	bx,0x7
+	push	bx
+	mov	bl,ah
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		PushPatternIndex
+
+DESCRIPTION:	Extends bh to a word  and pushes it on the stack.
+		Used exclusively in megaChars.asm.
+
+PASS:		bh - index into patternBuffer
+
+DESTROYED:	ah
+
+-------------------------------------------------------------------------------@
+
+PushPatternIndex	macro
+	mov	ah, bl
+	mov	bl, bh
+	clr	bh
+	push	bx
+	mov	bl, ah
+endm
+
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		SetMEGAColor
+		ResetMEGAColor
+
+DESCRIPTION:	Tell the monochrome EGA card to draw in the set or reset color.
+
+PASS:		dx - GR_CONTROL
+	
+DESTROYED:	ax
+-------------------------------------------------------------------------------@
+
+SetMEGAColor	macro
+	clr	al
+	mov	ah, 0xff
+	out	dx, ax	
+endm
+
+ClearMEGAColor	macro
+	clr	ax	
+	out	dx, ax	
+endm
+

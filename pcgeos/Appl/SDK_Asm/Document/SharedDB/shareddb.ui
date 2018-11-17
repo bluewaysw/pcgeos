@@ -1,0 +1,197 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	SharedDB (Sample PC/GEOS application)
+ * File:	shareddb.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user Interface description for this
+ * application. This file is written in a language called ESPIRE, which is
+ * compiled by the UIC compiler. See Spec/User/uic.doc for info.
+ *
+ * IMPORTANT NOTE:
+ *	This sample application is primarily intended to demonstrate a
+ *	model for handling documents.  Basic parts of a PC/GEOS application
+ *	are not documented heavily here.  See the "Hello" sample application
+ *	for more detailed documentation on the standard parts of a PC/GEOS
+ *	application.
+ *
+ * RCS STAMP:
+ *	$Id: shareddb.ui,v 1.1 97/04/04 16:33:19 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+#include "generic.uih"
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+start	AppResource;
+
+SDBApp = GenApplication {
+	children = SDBPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = SDBPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		SDBDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		SDBDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		SDBDocumentControl;
+	moniker = list {
+		SDBTextMoniker
+	}
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+		char	"shareddb", 0
+		}
+	}
+}
+
+visMoniker SDBTextMoniker = "SharedDB Sample Application";
+
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl must be a child of the primary, and must be
+ * on the active list.
+ */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+SDBPrimary = GenPrimary {
+	children = SDBFileMenu, SDBView;
+	hints = { ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, HINT_SIZE_WINDOW_AS_DESIRED }
+}
+
+SDBFileMenu = GenInteraction {
+	children = SDBDocumentControl;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_FILE_MENU } }
+}
+
+/* ----------------------------------------------------------------------------
+	 UI Document Control
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl should be put in the same resource as the
+ * GenPrimary (for efficiency).  The GenDocumentControl will build the
+ * file menu.
+ */
+
+SDBDocumentControl = GenDocumentControl {
+	/*
+	 * Document file's token
+	 */
+	documentTokenChars = "'S', 'A', 'M', 'P'";
+	documentTokenID = "MANUFACTURER_ID_GEOWORKS";
+	/*
+	 * Creator's file's token
+	 */
+	/*
+	 * Special attributes: work in shared multiple mode
+	 */
+	dcAttributes = default mode sharedMultiple;
+	/*
+	 * Text to display in the header area of the primary when no
+	 * document is open.
+	 */
+	noNameText = "No Document";
+	/*
+	 * Template directory
+	 */
+	templateDir = "SAMPLE";
+	/*
+	 * Pointer to the GenDocumentGroup
+	 */
+	appDC = SDBDocumentGroup;
+	/*
+	 * List of objects to enable/disable based on whether or not a
+	 * document exists
+	 */
+	enableDisableList = SDBUIEnableList;
+}
+
+chunk SDBUIEnableList = data {
+	UN_OPTR	SDBView
+}
+
+end Interface;
+
+/* ----------------------------------------------------------------------------
+	 Document Group
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread.
+ */
+
+start DocumentUI;
+
+SDBDocumentGroup = GenDocumentGroup {
+	/*
+	 * Name for untitled documents
+	 */
+	defaultName = "SDB Untitled";
+	/*
+	 * Class for document objects
+	 */
+	documentClass = "SDBDocumentClass";
+	/*
+	 * GenView to automatically connect documents to
+	 */
+	genView = SDBView;
+	/*
+	 * Document protocol
+	 */
+	protocolMajor = "DOCUMENT_PROTOCOL_MAJOR";
+	protocolMinor = "DOCUMENT_PROTOCOL_MINOR";
+	/*
+	 * Pointer to the GenDocumentControl
+	 */
+	uiDC = SDBDocumentControl;
+}
+
+end DocumentUI;
+
+/*-----------------------------------------------------------------------------
+	GenView object
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+SDBView = GenView {
+	/*
+	 * All objects in the enableDisable list of the GenDocumentControl
+	 * start life disbaled (by default)
+	 */
+	genStates = default -enabled;
+	docRight = "DOCUMENT_WIDTH";
+	docBottom = "DOCUMENT_HEIGHT";
+	horizAttributes = default +scrollable;
+	vertAttributes = default +scrollable;
+}
+
+end Interface;
+
+/*-----------------------------------------------------------------------------
+	Message strings
+-----------------------------------------------------------------------------*/
+
+start MessageStrings, notDetachable;
+
+chunk fileChangedString =
+	"The document has changed since you last edited it. Do you want"
+	" to make this change anyway?";
+
+end MessageStrings;

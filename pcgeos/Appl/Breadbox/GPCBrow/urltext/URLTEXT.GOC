@@ -1,0 +1,2283 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          URLText.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ ***********************************************************************/
+
+/* we need this for the callback... */
+#pragma option -WDE
+
+/**************************************************************************
+ *      Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+#include <geomisc.h>                    /* various unix-like goodies */
+
+#include <Ansi\string.h>
+#include <Ansi\stdio.h>
+#include <Ansi\stdlib.h>
+
+@include <fixes.goh>
+@include "htmlview.goh"
+@include "importg.goh"
+
+#if PROGRESS_DISPLAY
+#include <sem.h>
+#endif
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+@include <parentc.goh>
+@endif
+
+#define EC_PurgeES() EC(_asm{ push cs; pop es })
+
+@extern object HTMLVApp;
+@extern object SettingsBoolGroup;
+@extern object HTMLSettingsBoolGroup;
+
+@extern chunk MsgLoadImg;
+
+#define RoundWWF(wwf) (IntegerOf(wwf) + ((FractionOf(wwf) >= 0x8000) ? 1 : 0))
+
+/* abort handling */
+extern Boolean UserAbortCheck(void);
+extern void UserAbortEnd(void);
+
+/***************************************************************************
+ *              URL-aware HTML page class
+ ***************************************************************************/
+
+@classdecl URLTextClass;
+
+@extern method URLTextClass, MSG_META_CLIPBOARD_COPY ;
+@extern method URLTextClass, MSG_URL_TEXT_COPY_IMAGE_TO_CLIPBOARD ;
+
+@method URLTextClass, MSG_HTML_TEXT_INIT_STORAGE
+{
+    AddCacheFileReference();            /* we're using the shared cache file */
+    @callsuper();
+}
+
+@method URLTextClass, MSG_HTML_TEXT_DEINIT_STORAGE
+{
+    @callsuper();
+    RemoveCacheFileReference();         /* detach from cache file */
+}
+
+@method URLTextClass, MSG_HTML_TEXT_HOTSPOT_SELECT
+{
+    TCHAR linkbuf[HTML_STATIC_BUF], *linkName;
+    NameToken myLink, myTarget;
+
+    myLink = NamePoolTokenizeFromPool(namePool, pool, link, FALSE);
+                                        // Copy link token to local pool
+    myTarget = NamePoolTokenizeFromPool(namePool, pool, target, FALSE);
+                                        // Copy target token to local pool
+
+    /* if postData but no link, assume form submission, so use default path */
+    if (NamePoolInitializeDynamic(linkbuf, sizeof(linkbuf), 0, &linkName)) {
+    if (postData && !myLink) {
+    @call (pself->UTI_frame)::MSG_URL_FRAME_COMPLETE_URL(&linkName);
+    myLink = NamePoolTokenize(namePool, linkName, FALSE);
+    }
+    NamePoolDestroyIfDynamic(linkName);
+ 
+    /* Pass on message to associated frame which is the holder of the URL,
+     * so it knows how to handle this link.
+     */
+    @call (pself->UTI_frame)::MSG_URL_FRAME_HANDLE_LINK(myLink, myTarget,
+      postData, TRUE);
+    }
+
+    if(myTarget != NAME_POOL_NONE) 
+      NamePoolReleaseToken(namePool, myTarget);
+    if(myLink != NAME_POOL_NONE) 
+      NamePoolReleaseToken(namePool, myLink);
+
+    /* release token? */
+    @callsuper();
+}
+
+@method URLTextClass, MSG_HTML_TEXT_HOTSPOT_PTR
+{
+    NameToken myLink, myTarget;
+
+    myLink = NamePoolTokenizeFromPool(namePool, pool, link, FALSE);
+                                        // Copy link token to local pool
+    myTarget = NamePoolTokenizeFromPool(namePool, pool, target, FALSE);
+                                        // Copy target token to local pool
+
+    /* Pass on message to associated frame which is the holder of the URL,
+     * so it knows how to display this link.
+     */
+    @call (pself->UTI_frame)::MSG_URL_FRAME_HANDLE_LINK(myLink, myTarget,
+      NullHandle, FALSE);
+
+    if(myTarget != NAME_POOL_NONE) 
+      NamePoolReleaseToken(namePool, myTarget);
+    if(myLink != NAME_POOL_NONE) 
+      NamePoolReleaseToken(namePool, myLink);
+
+    @callsuper();
+}
+
+/* override busy cursor if we are setting HTML pointer image */
+@method URLTextClass, MSG_META_LARGE_PTR
+{
+    @callsuper();
+    if ((retVal->flags & MRF_SET_POINTER_IMAGE) &&
+@ifdef COMPILE_OPTION_IGNORE_INPUT_DURING_LOADING
+	(@call application::MSG_HMLVA_IGNORING_INPUT() == FALSE) &&
+@endif
+	(MemGetInfo(OptrToHandle(retVal->ptrImage),
+		    MGIT_OWNER_OR_VM_FILE_HANDLE) == G_Html4Par)) {
+	@call application::MSG_HMLVA_OVERRIDE_BUSY();
+    } else {
+	@call application::MSG_HMLVA_RESTORE_BUSY();
+    }
+}
+
+@ifdef COMPILE_OPTION_IGNORE_INPUT_DURING_LOADING
+@method URLTextClass, MSG_META_LARGE_START_SELECT
+{
+    if (@call application::MSG_HMLVA_IGNORING_INPUT() == FALSE) {
+	@callsuper();
+    } else {
+	/* eat it */
+	UserStandardSound(SST_NO_INPUT);
+	retVal->flags = MRF_PROCESSED;
+    }
+}
+@endif
+
+@ifndef COMPILE_OPTION_DRAG_COPY_WEB_PAGES
+/*
+ *  Only overload START_MOVE_COPY in non-NewDeal versions,
+ *  as it eliminates the drag copy web page feature. 
+*/
+@ifdef GLOBAL_INTERNET_BUILD
+@method URLTextClass, MSG_META_LARGE_START_MOVE_COPY
+{
+    word link, formElement, image;
+    dword p;
+    Point rel;
+    HTMLimageData *img;
+    TCHAR buf[80];
+    word size;
+
+    @call self::MSG_HTML_TEXT_HIT_FROM_COORD(largeMouseDataStruct,
+      &p, &rel, &link, &formElement, &image);
+
+    pself = ObjDerefVis(oself);
+
+    if(image != CA_NULL_ELEMENT)        /* hit an image? */
+    {
+      MemLock(OptrToHandle(pself->HTI_imageArray));
+
+      img = ChunkArrayElementToPtr(pself->HTI_imageArray, image, &size);
+
+      /* grab ALT attr, if any */
+      if (img->imageALT != NAME_POOL_NONE) {
+      NamePoolCopy(pself->HTI_namePool, buf, sizeof(buf),
+               img->imageALT, NULL);
+      @CallStatusUpdate(buf, HTML_STATUS_TYPE_URL_HIGHLIGHT);
+      }
+
+      MemUnlock(OptrToHandle(pself->HTI_imageArray));
+    }
+
+    /* processed, no need to call superclass handling */
+    retVal->flags = MRF_PROCESSED;
+}
+@endif
+@endif
+
+@ifdef PROGRESS_DISPLAY
+/*
+ * handle loading progress: start import thread
+ */
+@method URLTextClass, MSG_URL_TEXT_LOAD_GRAPHIC_PROGRESS
+{
+    static TCHAR nullName[] = _TEXT("");
+
+    if (loadProgressDataP) {
+    ImportThreadRequestImportGraphic(
+        oself,
+        loadProgressDataP->LPD_nameT,
+        loadProgressDataP->LPD_mimeType,
+        nullName,  /* have data stream, don't need filename */
+        FALSE, loadProgressDataP);
+    }
+}
+@endif
+
+void AssumeGraphic(TCHAR *mimeType)
+{
+    if (LocalCmpStringsNoCase(mimeType, _TEXT("image/"), 6) != 0) {
+	/* assume GIF, will fall through to JPG */
+	strcpy(mimeType, _TEXT("image/gif"));
+    }
+}
+
+@ifdef PROGRESS_DISPLAY
+
+extern void _pascal WakeUp(word *queueP);
+extern void _pascal Block(word *queueP, Boolean *flag);
+
+#ifdef ALLOW_FETCH_WHILE_IMPORTING
+/* if import thread is actively importing */
+extern Boolean G_importActive[];
+
+extern Boolean G_fetchWhileImport;
+#endif
+
+#define USE_MEM_STREAM
+
+#ifdef USE_MEM_STREAM
+/* MAX_FETCH_ENGINE_CHILDREN elements */
+MemHandle G_stream[2] = {0, 0};
+
+#define MEM_STREAM_BLOCK_SIZE 8192
+#define MEM_STREAM_INIT_BLKS 200  /* supports up to 1.6M files w/o growth */
+
+typedef struct {
+    dword head;
+    dword tail;
+    word maxBlk;
+    /* followed by block pointers */
+} MemStreamHeader;
+
+MemHandle MemStreamInit(MemHandle stream)
+{
+    MemStreamHeader *streamP;
+    MemHandle *blkP;
+    MemHandle ret = stream;
+    int i;
+
+    if (stream) {
+	streamP = MemPLock(stream);
+	(byte *)blkP = (byte *)streamP + sizeof(MemStreamHeader);
+	for (i = 0; i < streamP->maxBlk; i++) {
+	    if (!blkP[i]) break;
+	    MemFree(blkP[i]);
+	    blkP[i] = 0;
+	}
+	streamP->head = streamP->tail = 0;
+	MemUnlockV(stream);
+    } else {
+	ret = MemAlloc(sizeof(MemStreamHeader)+(MEM_STREAM_INIT_BLKS*sizeof(MemHandle)),
+		 HF_DYNAMIC, HAF_STANDARD|HAF_ZERO_INIT);
+	if (ret) {
+	    streamP = MemLock(ret);
+	    streamP->maxBlk = MEM_STREAM_INIT_BLKS;
+	    MemUnlock(ret);
+	}
+    }
+    return ret;
+}
+
+void MemStreamDelete(MemHandle stream, word bufSize, Boolean emptyLast)
+{
+    MemStreamHeader *streamP;
+    MemHandle *blkP;
+    int i, last;
+
+    streamP = MemPLock(stream);
+    /* advance head offset */
+    streamP->head += bufSize;
+    EC_ERROR_IF((streamP->head > streamP->tail), -1);
+    /* compute last one */
+    last = streamP->head/MEM_STREAM_BLOCK_SIZE;
+    if (emptyLast && (streamP->head == streamP->tail)) last++;
+    /* free blocks before head */
+    (byte *)blkP = (byte *)streamP + sizeof(MemStreamHeader);
+    for (i = 0; i < last; i++) {
+	if (blkP[i]) {
+	    MemFree(blkP[i]);
+	    blkP[i] = 0;
+	}
+    }
+    MemUnlockV(stream);
+}
+
+word MemStreamRead(MemHandle stream, void *buffer, word bufSize, word offset)
+{
+    MemStreamHeader *streamP;
+    MemHandle *blkP;
+    byte *dataP;
+    word blockOffset, dataOffset;
+    word bytesInFirstBlock, bytesInNextBlock;
+    word ret = 0;
+
+    streamP = MemPLock(stream);
+    if (bufSize > (streamP->tail - streamP->head)) {
+	bufSize = streamP->tail - streamP->head;
+    }
+    if (bufSize) {  /* handles no more data because of write overflow */
+	(byte *)blkP = (byte *)streamP + sizeof(MemStreamHeader);
+	/* copy from start block */
+	blockOffset = streamP->head/MEM_STREAM_BLOCK_SIZE;
+	if (blkP[blockOffset]) {
+	    dataP = MemLock(blkP[blockOffset]);
+	    dataOffset = streamP->head % MEM_STREAM_BLOCK_SIZE;
+	    dataP += dataOffset;
+	    bytesInFirstBlock = MEM_STREAM_BLOCK_SIZE-dataOffset;
+	    if (bufSize > bytesInFirstBlock) {
+		bytesInNextBlock = bufSize - bytesInFirstBlock;
+	    } else {
+		bytesInFirstBlock = bufSize;
+		bytesInNextBlock = 0;
+	    }
+	    memcpy(buffer, dataP + offset, bytesInFirstBlock);
+	    ret += bytesInFirstBlock;
+	    MemUnlock(blkP[blockOffset]);
+	    /* copy from next block, if needed */
+	    if (bytesInNextBlock && blkP[blockOffset+1]) {
+		dataP = MemLock(blkP[blockOffset+1]);
+		memcpy((byte *)buffer+bytesInFirstBlock, dataP, bytesInNextBlock);
+		ret += bytesInNextBlock;
+		MemUnlock(blkP[blockOffset+1]);
+	    }
+	}
+    }
+    MemUnlockV(stream);
+    return ret;
+}
+
+void MemStreamWrite(MemHandle stream, void *buffer, word bufSize)
+{
+    MemStreamHeader *streamP;
+    MemHandle *blkP;
+    byte *dataP;
+    word blockOffset, dataOffset;
+    word bytesInFirstBlock, bytesInNextBlock;
+
+    streamP = MemPLock(stream);
+    if ((streamP->tail + (dword)bufSize) < (dword)MEM_STREAM_BLOCK_SIZE*(dword)MEM_STREAM_INIT_BLKS) {
+	(byte *)blkP = (byte *)streamP + sizeof(MemStreamHeader);
+	/* copy to start block */
+	blockOffset = streamP->tail/MEM_STREAM_BLOCK_SIZE;
+	if (!blkP[blockOffset]) {
+	    blkP[blockOffset] = MemAlloc(MEM_STREAM_BLOCK_SIZE, HF_DYNAMIC, HAF_STANDARD);
+	}
+	if (blkP[blockOffset]) {
+	    dataP = MemLock(blkP[blockOffset]);
+	    dataOffset = streamP->tail % MEM_STREAM_BLOCK_SIZE;
+	    dataP += dataOffset;
+	    bytesInFirstBlock = MEM_STREAM_BLOCK_SIZE-dataOffset;
+	    if (bufSize > bytesInFirstBlock) {
+		bytesInNextBlock = bufSize - bytesInFirstBlock;
+	    } else {
+		bytesInFirstBlock = bufSize;
+		bytesInNextBlock = 0;
+	    }
+	    memcpy(dataP, buffer, bytesInFirstBlock);
+	    MemUnlock(blkP[blockOffset]);
+	    /* copy to next block, if needed */
+	    if (bytesInNextBlock) {
+		if (!blkP[blockOffset+1]) {
+		    blkP[blockOffset+1] = MemAlloc(MEM_STREAM_BLOCK_SIZE, HF_DYNAMIC, HAF_STANDARD);
+		}
+		if (blkP[blockOffset+1]) {
+		    dataP = MemLock(blkP[blockOffset+1]);
+		    memcpy(dataP, (byte *)buffer+bytesInFirstBlock, bytesInNextBlock);
+		    MemUnlock(blkP[blockOffset+1]);
+		}
+	    }
+	}
+	streamP->tail += bufSize;
+    }
+    MemUnlockV(stream);
+}
+
+#endif
+
+/*
+ * loading progress callback routine: notify text object
+ */
+proc_LoadProgressCallback LoadGraphicProgressCallback
+{
+    word returnVal = 0;  /* only used for LPCT_READ and LPCT_PEEK */
+    Boolean peek = FALSE;
+    Boolean preRead = FALSE;
+#ifdef USE_MEM_STREAM
+    word lt;
+#endif
+
+    if (loadProgressDataP) {
+#ifdef USE_MEM_STREAM
+    lt = loadProgressDataP->LPD_loadThread;
+#endif
+    switch (callbackType) {
+    case LPCT_OPEN:
+        loadProgressDataP->LPD_streamState = LPSS_EMPTY;
+	/* since we know this came from IMG tag, assume graphic */
+	AssumeGraphic(loadProgressDataP->LPD_mimeType);
+        /* only do progress display for JPEGs and GIFs */
+        if ((strcmp(loadProgressDataP->LPD_mimeType, _TEXT("image/jpeg")) == 0) ||
+        (strcmp(loadProgressDataP->LPD_mimeType, _TEXT("image/gif")) == 0)) {
+#ifndef USE_MEM_STREAM
+        dword streamCount;
+#endif
+
+#ifdef USE_MEM_STREAM
+	G_stream[lt] = MemStreamInit(G_stream[lt]);
+#else
+        /* this shouldn't be necessary, but it seems there are some
+           graphics that finish before using all their file data, so
+           it'll be left in the stream (or maybe there's still some
+           synchronization problem).  In any case, we'll clear the
+           stream here to avoid confusing the next stream user */
+        streamCount = HugeArrayGetCount(
+            loadProgressDataP->LPD_dataFile,
+            loadProgressDataP->LPD_dataStream);
+        if (streamCount) {
+            HugeArrayDelete(loadProgressDataP->LPD_dataFile,
+                    loadProgressDataP->LPD_dataStream,
+                    streamCount, 0);
+        }
+#endif
+#ifdef ALLOW_FETCH_WHILE_IMPORTING
+	if (G_fetchWhileImport) {
+	/* stop subsequent requests on the associated fetch thread from 
+	   using progressive display, as this import thread is busy */
+	G_importActive[loadProgressDataP->LPD_loadThread] = TRUE;
+	} else  /* encloses ThreadPSem only */
+#endif
+        /* starting import for load progress, prevent fetch thread
+           from handling new fetch requests until import finishes
+           (VSem in ImportThreadEngine's IMPORT_GRAPHIC handler) */
+        ThreadPSem(loadProgressDataP->LPD_importSync);
+        @send (loadProgressDataP->LPD_textObj)::MSG_URL_TEXT_LOAD_GRAPHIC_PROGRESS(loadProgressDataP);
+        /* initial update time */
+        loadProgressDataP->LPD_updateTime = TimerGetCount();
+        } else {
+        /* doesn't support progress loading, stop future callbacks */
+        loadProgressDataP->LPD_callback = 0;
+        }
+        break;
+    /* kind of several peeks */
+    case LPCT_PRE_READ:
+        preRead = TRUE;
+        /* fall through to LPCT_PEEK */
+    case LPCT_PEEK:
+        peek = TRUE;
+        /* fall through to LPCT_READ */
+    case LPCT_READ:
+    {
+        word sizeRead = 0;  /* in case of error */
+
+        ThreadPSem(loadProgressDataP->LPD_sem);
+        
+        /* wait until enough bytes are available */
+        while (((loadProgressDataP->LPD_bytesAvail - 
+                loadProgressDataP->LPD_preReadOffset) < bufSize) &&
+                            (loadProgressDataP->LPD_fileDone == FALSE)) {
+            
+            ThreadVSem(loadProgressDataP->LPD_sem);
+
+	        /* there is a timing hole right here, after we've checked fileDone,
+	           where the fetch thread could set fileDone and WakeUp no-one
+	           (since we aren't blocked yet); to catch this, we now atomically
+	           check fileDone and block */
+            Block(&(loadProgressDataP->LPD_emptyQueue),
+	                                &loadProgressDataP->LPD_fileDone);
+            ThreadPSem(loadProgressDataP->LPD_sem);
+        }
+
+#ifdef USE_MEM_STREAM
+    	if (G_stream[lt]) {
+#else
+        if (loadProgressDataP->LPD_dataStream) {
+
+            int thisRound, toCopy, toGo = bufSize;
+            void *dataP, *destP = buffer;
+            word elemSize;
+#endif
+
+            if (!peek && loadProgressDataP->LPD_streamState == LPSS_FIRST_PACKET) {
+
+                /* delete first data packet before getting next,
+                   we never get here for sub-bufSize streams,
+                   so always delete bufSize bytes */
+#ifdef USE_MEM_STREAM
+	            MemStreamDelete(G_stream[lt], bufSize + loadProgressDataP->LPD_preReadOffset, FALSE);
+#else
+                HugeArrayDelete(loadProgressDataP->LPD_dataFile,
+                    loadProgressDataP->LPD_dataStream,
+                    bufSize + loadProgressDataP->LPD_preReadOffset, 0);
+#endif
+                loadProgressDataP->LPD_streamState = LPSS_MORE_DATA;
+		loadProgressDataP->LPD_bytesAvail -= loadProgressDataP->LPD_preReadOffset;
+                loadProgressDataP->LPD_preReadOffset = 0;
+            }
+
+            /* loop to get desired #bytes from data stream */
+#ifdef USE_MEM_STREAM
+	        sizeRead = MemStreamRead(G_stream[lt], buffer, bufSize, loadProgressDataP->LPD_preReadOffset);
+	        
+            if (!peek && (loadProgressDataP->LPD_streamState == LPSS_MORE_DATA)) {
+	            
+                MemStreamDelete(
+                    G_stream[lt], sizeRead, loadProgressDataP->LPD_fileDone);
+	        }
+#else
+            while (toGo) {
+            
+                /* if firstData, need to skip bytes read last time */
+                thisRound = HAL_COUNT(HugeArrayLock(
+                            loadProgressDataP->LPD_dataFile, 
+                            loadProgressDataP->LPD_dataStream, 
+                            (loadProgressDataP->LPD_streamState == LPSS_EMPTY ? 
+                                (loadProgressDataP->LPD_preReadOffset + sizeRead) : 0), 
+                            &dataP, &elemSize));
+            
+                if (thisRound) {
+                
+                    toCopy = (toGo < thisRound) ? toGo : thisRound;
+                    memcpy(destP, dataP, toCopy);
+                    (char *)destP += toCopy;
+                    toGo = toGo - toCopy;
+                    sizeRead += toCopy;
+                    HugeArrayUnlock(dataP);
+
+                    /* delete used elements from data stream if not
+                       first packet and not LPCT_PEEK */
+                    if (!peek && 
+                        (loadProgressDataP->LPD_streamState == LPSS_MORE_DATA)) {
+                        
+                        HugeArrayDelete(loadProgressDataP->LPD_dataFile,
+                                loadProgressDataP->LPD_dataStream,
+                                toCopy, 0);
+                    }
+
+                } else {
+
+                    /* no more data available, stop */
+                    toGo = 0;
+                }
+            }
+#endif
+            /* got packet */
+            if (!peek && loadProgressDataP->LPD_streamState == LPSS_EMPTY) {
+            
+                loadProgressDataP->LPD_streamState = LPSS_FIRST_PACKET;
+            }
+        }
+        
+        if (!peek) {
+            
+            loadProgressDataP->LPD_bytesAvail -= sizeRead;
+        }
+   
+        if( preRead ) {
+        
+            loadProgressDataP->LPD_preReadOffset += sizeRead;
+        
+        } 
+        
+        /* return bytes read */
+        returnVal = sizeRead;
+        ThreadVSem(loadProgressDataP->LPD_sem);
+        break;
+    }
+
+    case LPCT_WRITE:
+        /* get exclusive access to loading progress data stream */
+        ThreadPSem(loadProgressDataP->LPD_sem);
+        /* append new data to stream */
+#ifdef USE_MEM_STREAM
+	/* ignore error */
+	MemStreamWrite(G_stream[lt], buffer, bufSize);
+#else
+        HugeArrayAppend(loadProgressDataP->LPD_dataFile,
+                loadProgressDataP->LPD_dataStream,
+                bufSize, buffer);
+#endif
+        loadProgressDataP->LPD_bytesAvail += bufSize;
+        ThreadVSem(loadProgressDataP->LPD_sem);
+        /* wake up reader, if time */
+        if (TimerGetCount() >=
+        loadProgressDataP->LPD_updateTime + progressLoadWait) {
+        WakeUp(&(loadProgressDataP->LPD_emptyQueue));
+        loadProgressDataP->LPD_updateTime = TimerGetCount();
+        }
+        break;
+    case LPCT_FLUSH_FIRST:
+        if (loadProgressDataP->LPD_streamState == LPSS_FIRST_PACKET) {
+#ifdef USE_MEM_STREAM
+        MemStreamDelete(G_stream[lt], bufSize, FALSE);
+#else
+        HugeArrayDelete(loadProgressDataP->LPD_dataFile,
+                loadProgressDataP->LPD_dataStream,
+                bufSize, 0);
+#endif
+        }
+        /* fall through to reset stream state */
+    case LPCT_RESET_STREAM_STATE:
+        loadProgressDataP->LPD_streamState = LPSS_EMPTY;
+        loadProgressDataP->LPD_preReadOffset = 0;
+        break;
+    case LPCT_CLOSE:
+	/* we don't need to atomically set fileDone and WakeUp here since
+	   we set fileDone before we try to WakeUp; the reader thread will
+	   see fileDone and not Block, or it will already be blocked and
+	   will be woken up */
+        ThreadPSem(loadProgressDataP->LPD_sem);
+        loadProgressDataP->LPD_fileDone = TRUE;
+        ThreadVSem(loadProgressDataP->LPD_sem);
+        /* make sure reader knows we're done */
+        WakeUp(&(loadProgressDataP->LPD_emptyQueue));
+        break;
+    }
+    }
+    return returnVal;
+}
+@endif
+
+typedef struct {
+    word index ;
+    NameToken nameT ;
+    Boolean objCache ;
+} URLTextRequestGraphic ;
+
+void IReplaceGraphic(optr oself, ObjCacheToken oct, HTMLimageData *p, word i, 
+		     word invalFrom, word invalTo);
+
+Boolean LOCAL ProcessSingleGraphic(HTMLimageData *p, optr oself, 
+                                   NameToken referer,
+                                   word i,
+                                   Boolean loadUnknownSize,
+                                   Boolean forceLoad, 
+                                   Boolean objCache,
+				   Boolean replaceLike)
+{
+    word nameT;
+    ObjCacheToken oct;
+    optr request ;
+    URLTextRequestGraphic *p_request ;
+#if PROGRESS_DISPLAY
+    /* get vfptr to callback routine */
+    static proc_LoadProgressCallback *loadProgressCallback = LoadGraphicProgressCallback;
+    LoadProgressData loadProgressData;
+#endif
+    Boolean ret = FALSE;
+    extern Boolean G_stopped ;
+
+    nameT = p->HID_resolvedURL;         /* fully resolved URL */
+    
+    /* The token will be released by either INTERNAL_REPLACE_LIKE_GRAPHICS
+       or by the fetch handling. */
+    NamePoolUseToken(namePool, nameT);
+
+    if(objCache && !forceLoad)          /* allowed to use cache? */
+    {         
+      oct = ObjCacheFindURL(OCT_GSTRING, nameT, TRUE, TRUE);
+                                        /* find out if object was cached */
+    }
+    else
+    {
+      oct = OCT_NULL;                   /* no image yet... */
+    }
+
+    if(oct != OCT_NULL)                 /* found in cache */
+    {
+     if (replaceLike)
+     {
+      /* Replace the images. Cache and Name token are released by receiver */
+      @call oself::MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS(oct, 
+        nameT, 0, 0xFFFF);
+     }
+     else			/* Replace just the one image */
+     {
+	 HTMLimageData dupP = *p;
+
+	 IReplaceGraphic(oself, oct, &dupP, i, 0, 0xFFFF);
+	 ObjCacheUnlockItem(oct);
+	 NamePoolReleaseToken(namePool, nameT);
+     }
+    }
+    else if ((loadUnknownSize || !p->size.XYS_height || !p->size.XYS_width) && (!G_stopped))
+    {                                   // possibly load even if size unknown
+      /* Do the actual request for the image */
+      @call oself::MSG_URL_TEXT_INC_PENDING() ;
+
+      request = URLFetchExtraMemoryAlloc(sizeof(URLTextRequestGraphic)) ;
+      URLFetchExtraMemoryLock(request) ;
+      p_request = URLFetchExtraMemoryDeref(request) ;
+      p_request->index = i ;
+
+EC(   NamePoolIsTokenValid(namePool, nameT, TRUE) ; )
+      p_request->nameT = nameT ;        /* Remember the _original_ name */
+
+      /* Token is released when request is finished */
+
+      p_request->objCache = objCache ;
+      URLFetchExtraMemoryUnlock(request) ;
+
+#if PROGRESS_DISPLAY
+      /* set up loading progress data and make fetch request */
+      loadProgressData.LPD_callback = loadProgressCallback;
+      loadProgressData.LPD_textObj = oself;
+      loadProgressData.LPD_nameT = nameT;
+      /* other fields are initialized by fetch thread */
+      URLFetchRequest(
+          nameT,
+          forceLoad? ULM_ALWAYS:ULM_CACHE,
+          NullHandle,
+	  referer,
+          oself,
+          MSG_URL_TEXT_GRAPHIC_FETCHED,
+          request,
+          /* no loading progress if not desired, or if background bitmap
+             or if image is fairly short (allow unsized ones to try
+             loading progress, will be rejected by http module if small) */
+          (!progressDisplay || (p->pos >= HTML_IMAGE_POS_RESERVED) ||
+           (p->size.XYS_height && (p->size.XYS_height < progressMinHeight)) ?
+           NULL : &loadProgressData)) ;
+#else
+      URLFetchRequest(
+          nameT,
+          forceLoad? ULM_ALWAYS:ULM_CACHE,
+          NullHandle,
+	  referer,
+          oself,
+          MSG_URL_TEXT_GRAPHIC_FETCHED,
+          request) ;
+#endif
+      ret = TRUE;
+    }
+
+    return ret;
+}
+
+@method URLTextClass, MSG_URL_TEXT_PROCESS_GRAPHICS
+{
+    word n,i,j,size;
+    TCHAR name[HTML_STATIC_BUF], *nP;
+    HTMLimageData *p, *image2;
+    Boolean objCache;
+    optr imageArray = pself->HTI_imageArray;
+    optr textPool = pself->HTI_namePool;
+    optr frame = pself->UTI_frame;
+    word pass;
+    NameToken referer = NAME_POOL_NONE;
+    optr realFrame = NullOptr;
+
+    @call self::MSG_URL_TEXT_INC_PENDING();
+
+    if(!imageArray)                     /* avoid indenting all this stuff... */
+    {
+      @call self::MSG_URL_TEXT_DEC_PENDING();
+      return;                           /* INC/DEC may generate a "frame complete" message */
+    }
+    
+    if (frame) {
+	realFrame = @call frame::MSG_URL_FRAME_FIND_REAL_FRAME();
+        /* set up referer (marked in-use by GET_URL) */
+    	referer = @call realFrame::MSG_URL_FRAME_GET_URL();
+    }
+
+    objCache = (@call SettingsBoolGroup::
+      MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & HTMLV_OBJECT_CACHE);
+                                        /* object cache enabled? */
+
+    MemLock(OptrToHandle(imageArray));
+    n = ChunkArrayGetCount(imageArray);
+
+    /*
+     * Resolve all image URLs at once to allow for fast compares further down.
+     */
+    for(i=0; i<n; i++)
+    {
+      p = ChunkArrayElementToPtr(imageArray, i, &size);
+      
+      if(!p->HID_resolvedURL)           /* name not resolved yet */
+      {
+        NamePoolCopy(textPool, name, sizeof(name), p->imageURL, &nP);
+
+        @call frame::MSG_URL_FRAME_COMPLETE_URL(&nP);
+                                        /* make it an absolute canonical name */
+
+        p->HID_resolvedURL = NamePoolTokenize(namePool, nP, FALSE);
+	NamePoolDestroyIfDynamic(nP);
+      }
+    }
+
+    /*
+     * Check all images and get them from the cache or initiate loading.
+     */
+    for(pass=1; pass<=2; pass++)
+    {
+      for(i=0; i<n; i++)
+      {
+        p = ChunkArrayElementToPtr(imageArray, i, &size);
+        if((p->flags & (HTML_IDF_RESOLVED|HTML_IDF_RESOLVING)))
+          continue;                     // Skip graphics that have been handled
+
+        if(ProcessSingleGraphic(p, oself, referer, i, 
+                                (pass==2), forceLoad, objCache, TRUE))
+        {
+          /* Mark this and all similar graphics further down */
+          for (j=i; j<n; j++)  {
+            image2 = ChunkArrayElementToPtr(imageArray, j, &size);
+
+            /* Only check images that are not resolved or are resolving */
+            if((image2->flags & (HTML_IDF_RESOLVED|HTML_IDF_RESOLVING))==0)  {
+                if (image2->HID_resolvedURL == p->HID_resolvedURL)
+                    @call self::MSG_HTML_TEXT_MARK_IMAGE_RESOLVING(j);
+            }
+          }
+        }
+      }
+    }
+
+    MemUnlock(OptrToHandle(imageArray));
+
+    @call self::MSG_URL_TEXT_DEC_PENDING() ;
+
+    /* When the frame is done, we can start the animations */
+    @send,forceQueue oself::MSG_HTML_TEXT_ANIMATIONS_ON() ;
+
+    /* release referer */
+    if (referer != NAME_POOL_NONE)
+      NamePoolReleaseToken(namePool, referer);
+}
+
+@method URLTextClass, MSG_URL_TEXT_MARK_VISITED_LINKS
+{
+    optr linkArray = pself->HTI_anchorArray;
+    optr textPool = pself->HTI_namePool;
+    optr frame = pself->UTI_frame;
+    ColorQuad vlinkColor = pself->HTI_vlinkColor,
+              linkColor = pself->HTI_linkColor;
+    word i,n,size;
+    HTMLanchorData *p;
+    TCHAR name[HTML_STATIC_BUF], *nP, *hash;
+    NameToken url;
+    TCHAR curExt[4],mime[MIME_MAXBUF];
+    dword id;
+    VisTextCharAttrDiffs diffs;
+    VisTextCharAttr attrs;
+#ifdef CACHE_VALIDATION
+    Boolean tryModified;
+    CompressedDateTime lastModDate;
+#endif
+
+    if(!linkArray)                      // avoid indenting all this stuff...
+      return;
+
+    MemLock(OptrToHandle(linkArray));
+    n = ChunkArrayGetCount(linkArray);
+    for(i=0; i<n; i++)
+    {
+      p = ChunkArrayElementToPtr(linkArray, i, &size);
+      if(!(p->flags & (HTML_ADF_NAME | HTML_ADF_MAP)))
+      {
+        NamePoolCopy(textPool, name, sizeof(name), p->linkOrName, &nP);
+
+        @call frame::MSG_URL_FRAME_COMPLETE_URL(&nP);
+                                        /* make it an absolute canonical name */       
+
+        /* Cut off anchor that specifies positions within the page */
+        hash = strchr(nP, '\x23');
+        if(hash)
+          *hash = 0;
+        
+        url = NamePoolTokenize(namePool, nP, FALSE);
+	NamePoolDestroyIfDynamic(nP);
+
+        /* Check if page is in the cache? */
+        if(SrcCacheFindURL(url, &id, curExt, mime CACHE_VAL_FIND_ARG))
+        {
+          @call self::MSG_VIS_TEXT_GET_CHAR_ATTR(0, &diffs, &attrs, 
+            p->pos+p->len, p->pos);
+
+          if(!(diffs.VTCAD_diffs & VTCAF_MULTIPLE_COLORS) &&
+             !memcmp(&attrs.VTCA_color, &linkColor, sizeof(ColorQuad)))
+          {                             // Mark if color has not been overridden
+            @call self::MSG_VIS_TEXT_SET_COLOR(vlinkColor,
+              p->pos+p->len, p->pos);
+          }
+        }
+	NamePoolReleaseToken(namePool, url);
+      }
+    }
+    MemUnlock(OptrToHandle(linkArray));
+}
+
+@method URLTextClass, MSG_URL_TEXT_SET_FRAME_OBJ
+{
+    pself->UTI_frame = frameObject;
+}
+
+@method URLTextClass, MSG_URL_TEXT_GET_FRAME_OBJ
+{
+    return (pself->UTI_frame);
+}
+
+@method URLTextClass, MSG_URL_TEXT_GRAPHIC_FETCHED
+{
+    URLTextRequestGraphic *p_request ;
+    URLTextRequestGraphic request ;
+    URLFetchResult *p_result ;
+    URLFetchResult result ;
+#ifdef CACHE_VALIDATION
+    ObjCacheToken oct ;
+#endif
+
+    /* Copy over the result data so we don't have to deal with */
+    /* memory deref problems. */
+    p_result = MemLock(urlFetchMem) ;
+    memcpy(&result, p_result, sizeof(result)) ;
+    MemUnlock(urlFetchMem) ;
+    MemFree(urlFetchMem) ;
+
+    /* since we know this came from IMG tag, assume graphic */
+    AssumeGraphic(result.mimeType);
+
+    /* Copy over the request data to avoid lock/unlock/deref problems. */
+    URLFetchExtraMemoryLock(result.extraData) ;
+    p_request = URLFetchExtraMemoryDeref(result.extraData) ;
+    memcpy(&request, p_request, sizeof(request)) ;
+    URLFetchExtraMemoryUnlock(result.extraData) ;
+    URLFetchExtraMemoryFree(result.extraData) ;
+EC( NamePoolIsTokenValid(namePool, request.nameT, TRUE) ; )
+
+#ifdef CACHE_VALIDATION
+    /* If the item has not been modified on the server, we can still
+       try to get it from the object cache rather than importing it
+       once again. */
+    if(URLRequestGetRet(result.retType) == URL_RET_FILE &&
+      result.retType & URB_RF_UNTOUCHED)// "Not modified"
+    {
+      /* Find out if object was cached. This time, we don't care about
+         expiration since we have an authoritative statement from the
+         server. */
+      oct = ObjCacheFindURL(OCT_GSTRING, request.nameT, TRUE, FALSE);
+    }
+    else
+      oct = OCT_NULL;                   // No existing item to reuse
+    
+    if(oct)
+    {
+      /* Replace the images. Cache and Name token are released by receiver */
+      @call oself::MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS(oct, 
+        request.nameT, 0, 0xFFFF);
+      @call oself::MSG_URL_TEXT_DEC_PENDING() ;
+    }
+    else
+#endif
+    if(URLRequestGetRet(result.retType) == URL_RET_FILE)
+    {                                   /* loaded image successfully */
+        /* Put in a request to import the image */
+#if PROGRESS_DISPLAY
+    /* URL_RET_FILE is returned for non-loading progress graphics, just
+       import without loading progress */
+        ImportThreadRequestImportGraphic(
+            oself,
+            request.nameT,
+            result.mimeType,
+            result.curHTML,
+            ((result.retType & URB_RF_NOCACHE)
+@ifdef CACHE_ALL
+	     && !G_cacheAll
+@endif
+	    ), NULL) ;
+    } else if (URLRequestGetRet(result.retType) == URL_RET_PROGRESS ||
+    URLRequestGetRet(result.retType) == URL_RET_PROGRESS_ABORT) {
+    /* nothing to do here */
+#else
+        ImportThreadRequestImportGraphic(
+            oself,
+            request.nameT,
+            result.mimeType,
+            result.curHTML,
+            ((result.retType & URB_RF_NOCACHE)
+@ifdef CACHE_ALL
+	     && !G_cacheAll
+@endif
+	    )) ;
+#endif
+    } else {
+        /* Does not appear to have come in correctly.  Release it */
+        /* If a message make sure we free the message block. We should */
+        /* NOT free a message that isn't located at the start of its own */
+        /* memory block, because it is stored in one of our string table */
+        /* resources, where message are held in localizable LMem chunks. */
+        if (URLRequestGetRet(result.retType) == URL_RET_MESSAGE)
+            if (OptrToHandle(result.htmlMsg) && OptrToChunk(result.htmlMsg)==0)
+                MemFree(OptrToHandle(result.htmlMsg)) ;
+        /* Mark image as broken */
+#ifdef GLOBAL_INTERNET_BUILD
+	/* only if not aborted (if aborted don't show red X) */
+	/* (URL_RET_MESSAGE and NullOptr means ignored user abort) */
+	if ((URLRequestGetRet(result.retType) != URL_RET_ABORTED) &&
+	    !((URLRequestGetRet(result.retType) == URL_RET_MESSAGE) &&
+	      (result.htmlMsg == NullOptr)))
+#endif
+        @call oself::MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS(OCT_NULL, 
+          request.nameT, 0, 0xFFFF);
+        @call oself::MSG_URL_TEXT_DEC_PENDING() ;
+    }
+
+    /* finished with URL */
+    NamePoolReleaseToken(namePool, result.url);
+}
+
+/* The pending count is used to determine when all requests for the page */
+/* have been processed.  Call MSG_URL_TEXT_INC_PENDING for each action */
+/* that will keep the URLText object to not be done. */
+/* Call MSG_URL_TEXT_DEC_PENDING for each completed task.  When the count */
+/* goes back down to zero, the post actions occur. */
+/* Be sure to avoid 1 0 1 0 1 0 bouncing that would cause multiple */
+/* post load updates to occur. */
+
+@method URLTextClass, MSG_URL_TEXT_INC_PENDING
+{
+    pself->UTI_numPendingRequests++;
+    ObjIncInUseCount(OptrToHandle(oself));
+    EC_ERROR_IF(pself->UTI_numPendingRequests >= MAX_NUM_REQUESTS, -1) ;
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+     @SendUpdateProgress(PI_NEW_ITEM, 0);
+@endif
+
+    /* Relay operation status to frame */
+    @call (pself->UTI_frame)::MSG_URL_FRAME_INC_PENDING();
+}
+
+@method URLTextClass, MSG_URL_TEXT_DEC_PENDING
+{
+    optr frame = pself->UTI_frame;
+
+    pself->UTI_numPendingRequests-- ;
+    ObjDecInUseCount(OptrToHandle(oself));
+    EC_ERROR_IF(pself->UTI_numPendingRequests >= MAX_NUM_REQUESTS, -1) ;
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+     @SendUpdateProgress(PI_DONE_ITEM, 0);
+@endif
+    if (pself->UTI_numPendingRequests == 0)  {
+        if(pself->UTI_doomed)           /* we have only been waiting for this */
+        {
+          @call self::MSG_URL_TEXT_SELF_DESTRUCT();
+        }
+        else
+        {
+          /* for now, force an update of the entire table structure */
+          @call oself::MSG_HTML_TEXT_CALCULATE_LAYOUT() ;
+
+          /* Inform the frame that we are done. */
+          @send frame::MSG_URL_FRAME_NOTIFY_FRAME_COMPLETE();
+
+          /* When the frame is done, we can start the animations */
+          @send,forceQueue oself::MSG_HTML_TEXT_ANIMATIONS_ON() ;
+        }
+    }
+
+    /* Relay operation status to frame */
+    @call frame::MSG_URL_FRAME_DEC_PENDING();
+}
+
+void URLTextInitializeImage(
+         HTMLimageData *p,
+         ImageAdditionalData *iad)
+{
+    p->HID_IADType = iad->IAD_type;
+
+    /*
+     * rescale image in horizontal direction if required, by
+     * putting the appropriate scaling factor into the
+     * transformation matrix for the GString
+     */
+    if(p->size.XYS_width && iad->IAD_size.XYS_width)
+    {
+      *(WWFixedAsDWord *)&p->HID_tmatrixE11 =
+          GrUDivWWFixed(
+            MakeWWFixed(p->size.XYS_width),
+            MakeWWFixed(iad->IAD_size.XYS_width));
+
+#ifdef COMPILE_OPTION_LIMIT_SCALING
+      /* Maximum scaling */
+      if (p->HID_tmatrixE11.WWF_int>=32)  {
+          p->HID_tmatrixE11.WWF_int = 32 ;
+          p->HID_tmatrixE11.WWF_frac = 0 ;
+      }
+#endif
+    }
+    else
+    {
+      *(WWFixedAsDWord *)&p->HID_tmatrixE11 = MakeWWFixed(1);
+    }
+
+    /*
+     * rescale image in vertical direction if required
+     */
+    if(p->size.XYS_height && iad->IAD_size.XYS_height)
+    {
+      *(WWFixedAsDWord *)&p->HID_tmatrixE22 =
+          GrUDivWWFixed(
+            MakeWWFixed(p->size.XYS_height),
+            MakeWWFixed(iad->IAD_size.XYS_height));
+
+#ifdef COMPILE_OPTION_LIMIT_SCALING
+      /* Maximum scaling */
+      if (p->HID_tmatrixE22.WWF_int>=32)  {
+          p->HID_tmatrixE22.WWF_int = 32 ;
+          p->HID_tmatrixE22.WWF_frac = 0 ;
+      }
+#endif
+    }
+    else                                /* no height given, maintain aspect */
+    {
+      p->HID_tmatrixE22 = p->HID_tmatrixE11;
+    }
+
+    if(!p->size.XYS_width)              /* no width given, maintain aspect */
+      p->HID_tmatrixE11 = p->HID_tmatrixE22;
+
+    /*
+     * actual size follows from scaling factor and raw image size
+     */
+    p->HID_size.XYS_width =
+      RoundWWF(GrMulWWFixed(
+        MakeWWFixed(iad->IAD_size.XYS_width),
+        *(WWFixedAsDWord *)
+          &p->HID_tmatrixE11));
+    if (p->HID_size.XYS_width == 0)
+        p->HID_size.XYS_width = 1 ;
+
+    p->HID_size.XYS_height =
+      RoundWWF(GrMulWWFixed(
+        MakeWWFixed(iad->IAD_size.XYS_height),
+        *(WWFixedAsDWord *)
+          &p->HID_tmatrixE22));
+    if (p->HID_size.XYS_height == 0)
+        p->HID_size.XYS_height = 1 ;
+
+    /*
+     * set origin of image
+     */
+    p->HID_drawOffset.XYO_x = -RoundWWF(GrMulWWFixed(
+      MakeWWFixed(iad->IAD_origin.P_x),
+      *(WWFixedAsDWord *)
+        &p->HID_tmatrixE11));
+
+    p->HID_drawOffset.XYO_y = -RoundWWF(GrMulWWFixed(
+      MakeWWFixed(iad->IAD_origin.P_y),
+      *(WWFixedAsDWord *)
+        &p->HID_tmatrixE22));
+
+    /* 
+     * set animation related fields 
+     */
+    p->HID_frame = HTML_ANIMATION_VAR_FRAME_NOT_STARTED ;
+    p->HID_loopCount = 0 ;              /* Not looped any */
+}
+
+void IReplaceGraphic(optr oself, ObjCacheToken oct, HTMLimageData *p, word i, 
+		     word invalFrom, word invalTo)
+{
+    VMFileHandle vmf;
+    VMChain vmc;
+    ImageAdditionalData iad;
+
+    /* Add reference to entry in cache */
+    ObjCacheLockItem(oct, &vmf, &vmc, &iad, sizeof(iad));
+    
+    p->HID_cacheToken = (dword)oct;
+    p->HID_vmf = vmf;
+    p->HID_vmb = VMCHAIN_GET_VM_BLOCK(vmc);
+    
+    URLTextInitializeImage(p, &iad) ;
+    @call oself::MSG_HTML_TEXT_RESOLVE_IMAGE(i, p, invalFrom, invalTo);
+@ifdef JAVASCRIPT_SUPPORT
+    @call oself::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_LOAD, 
+					 HTML_EVENT_OBJECT_IMAGE, i);
+@endif
+}
+
+@method URLTextClass, MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS
+{
+    word i, n, size ;
+    HTMLimageData p;
+    optr imageArray = pself->HTI_imageArray;
+
+    if(imageArray)                      // Guard against "stale" images
+    {
+      MemLock(OptrToHandle(imageArray));
+
+      n = ChunkArrayGetCount(imageArray);
+      for(i=0; i<n; i++)
+      {
+          p = *(HTMLimageData *)ChunkArrayElementToPtr(imageArray, i, &size);
+
+          if (url == p.HID_resolvedURL)   /* Found a match!  Replace image here */
+          {
+              /* Release previous cached item */
+              if(p.HID_cacheToken)
+                ObjCacheUnlockItem((ObjCacheToken)p.HID_cacheToken);             
+            
+              /* Do we have a graphic for this? */
+              if (oct != OCT_NULL)    
+		  IReplaceGraphic(oself, oct, &p, i, invalFrom, invalTo);
+              else
+              {
+                  @call oself::MSG_HTML_TEXT_MARK_IMAGE_BROKEN(i);
+                  p.HID_cacheToken = OCT_NULL;
+@ifdef JAVASCRIPT_SUPPORT
+                  @call self::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_ERROR, 
+                    HTML_EVENT_OBJECT_IMAGE, i);
+@endif
+              }
+          }
+      }
+
+      MemUnlock(OptrToHandle(imageArray));
+    }
+
+    if(oct!=OCT_NULL)                   // Unlock the item we got
+      ObjCacheUnlockItem(oct);
+  
+    NamePoolReleaseToken(namePool, url);// remove this reference to URL
+}
+
+@ifdef PROGRESS_DISPLAY
+/*
+ * handle import progress: invalidate newly imported portion of graphic,
+ * update layout if needed
+ */
+@method URLTextClass, MSG_URL_TEXT_IMPORT_GRAPHIC_PROGRESS
+{
+    _ImportProgressParams_;
+
+    if (importProgressData && pself->HTI_imageArray) {
+	ImportRemoveProgressDataFromQueue(importProgressData);
+	importProgressDataP = MemLock(importProgressData);
+	if (importProgressDataP) {
+          /* Give REPLACE_LIKE_GRAPHICS a reference to discard */ 
+          NamePoolUseToken(namePool, importProgressDataP->IPD_nameT);
+
+          @call self::MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS(
+            (ObjCacheToken)importProgressDataP->IPD_cacheItem,
+            importProgressDataP->IPD_nameT,
+            importProgressDataP->IPD_firstLine,
+            importProgressDataP->IPD_lastLine);
+	}
+	MemFree(importProgressData);
+    }
+}
+@endif
+
+/********************************************************************
+ *              MSG_PRINT_GET_DOC_NAME
+ ********************************************************************
+ * SYNOPSIS:     Sent by the PrintControl before it spools the
+ *               print job. Must send back a job "name" or it won't
+ *               print.
+ * CALLED BY:    PrintControl
+ * PARAMETERS:   optr printCtrlOD
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the name of the print job. If we don't handle
+ *               this message then the print job will be cancelled
+ *               by the spooler.
+ *******************************************************************/
+@method URLTextClass, MSG_PRINT_GET_DOC_NAME
+{
+    optr frame;
+    NameToken tok;
+    TCHAR title[80], *p;
+
+    frame = @call (pself->UTI_frame)::MSG_URL_FRAME_FIND_REAL_FRAME();
+
+    if(frame)
+    {
+      tok = @call frame::MSG_URL_FRAME_GET_TITLE();
+      if(tok == NAME_POOL_NONE)
+        tok = @call frame::MSG_URL_FRAME_GET_URL();
+    }
+    else
+      tok = NAME_POOL_NONE;
+
+    if(tok == NAME_POOL_NONE)           /* no title - use placeholder */
+    {
+      @call printCtrlOD::MSG_PRINT_CONTROL_SET_DOC_NAME(_TEXT("?"));
+    }
+    else
+    {
+      NamePoolCopy(namePool, title, sizeof(title), tok, &p);
+                                        /* get title */
+      @call printCtrlOD::MSG_PRINT_CONTROL_SET_DOC_NAME(p);
+      NamePoolDestroyIfDynamic(p);      /* release dynamic buffer, if any */
+
+      NamePoolReleaseToken(namePool, tok);  
+                                        /* free string token */
+    }
+}
+
+@method URLTextClass, MSG_URL_TEXT_RECALCULATE
+{
+    optr view = pself->HTI_myView ;
+
+    /* for now, force an update of the entire table structure */
+    @call oself::MSG_HTML_TEXT_INITIALIZE_LAYOUT();
+    @call oself::MSG_HTML_TEXT_RECALC_COLUMNS();
+    @call oself::MSG_HTML_TEXT_RECALC_PAGE();
+    @call view::MSG_GEN_VIEW_REDRAW_CONTENT();
+}
+
+
+sword DrawText(GStateHandle gstate, sword x, sword y, sword maxwidth,
+  TCHAR *buf, Boolean rightJustify)
+{
+    Rectangle bounds;
+    int len;
+    sword width;
+
+    if(maxwidth<=0) return 0;           /* no space - get off */
+
+    len = strlen(buf) + 1;
+
+    /* truncate string until it fits */
+    do {
+      --len;
+      GrGetTextBounds(gstate, buf, 0, 0, len, &bounds);
+      width = bounds.R_right - bounds.R_left;
+    } while(len > 0 && width > maxwidth);
+
+    if(rightJustify)
+      x += maxwidth - width;
+
+    GrDrawText(gstate, x, y, buf, len);
+
+    return width;
+}
+
+@method URLTextClass, MSG_HTML_TEXT_PRINT_PAGE_ORNAMENTS
+{
+    const LineAttr la = {CF_INDEX, {C_BLACK, 0, 0}, SDM_100, CMT_CLOSEST,
+      LE_BUTTCAP, LJ_MITERED, LS_SOLID, {32767, 0}};
+    const TextAttr ta = {{C_BLACK, CF_INDEX, 0, 0},
+      SDM_100, {PT_SOLID, 0},
+      0, TS_OUTLINE | TS_BOLD | TS_ITALIC | TS_SUPERSCRIPT | TS_SUBSCRIPT |
+        TS_STRIKE_THRU | TS_UNDERLINE,
+      TM_DRAW_BASE|TM_DRAW_ACCENT, TM_DRAW_OPTIONAL_HYPHENS,
+      {0,0}, FID_DTC_URW_ROMAN, {0,10}, 0, 100, 100};
+
+    optr frame;
+    TCHAR buf[80];
+    sword pageNrWidth;
+    NameToken tok;
+
+    frame = @call (pself->UTI_frame)::MSG_URL_FRAME_FIND_REAL_FRAME();
+
+    @callsuper();                       /* draw standard elements, if any */
+
+    /* Draw top and bottom delimiter */
+    GrSetLineAttr(gstate, &la);         /* set line attributes to defaults */
+    GrDrawHLine(gstate,
+      page->R_left, page->R_top + HTML_TEXT_ORNAMENT_MARGIN - 9,
+      page->R_right);
+    GrDrawHLine(gstate,
+      page->R_left, page->R_bottom - HTML_TEXT_ORNAMENT_MARGIN + 4,
+      page->R_right);
+
+    GrSetTextAttr(gstate, &ta);
+
+    /* print page number into header (right justified) */
+    sprintf(buf, _TEXT("%u/%u"), curPage+1, numPages);
+    pageNrWidth = DrawText(gstate,
+      page->R_left, page->R_top + 16, page->R_right - page->R_left, buf, TRUE);
+
+    /* print document title into remaining space of header */
+    tok = @call frame::MSG_URL_FRAME_GET_TITLE();
+    if(tok != NAME_POOL_NONE)
+    {
+      NamePoolCopy(namePool, buf, sizeof(buf), tok, NULL);
+      DrawText(gstate,
+        page->R_left, page->R_top + 16,
+        page->R_right - page->R_left - pageNrWidth - 10, buf, FALSE);
+      NamePoolReleaseToken(namePool, tok);  
+                                        /* free string token */
+    }
+
+    /* print URL into footer */
+    tok = @call frame::MSG_URL_FRAME_GET_URL();
+    if(tok != NAME_POOL_NONE)
+    {
+      NamePoolCopy(namePool, buf, sizeof(buf), tok, NULL);
+      DrawText(gstate,
+        page->R_left, page->R_bottom - 12,
+        page->R_right - page->R_left, buf, FALSE);
+      NamePoolReleaseToken(namePool, tok);
+                                        /* free string token */
+    }
+}
+
+@method URLTextClass, MSG_URL_TEXT_INCREASE_USED_MEMORY
+{
+    pself->UTI_usedMem += usedMem ;
+    @call process::MSG_HMLVP_UPDATE_ALLOC_WATCHER_READ_OUT() ;
+}
+
+@method URLTextClass, MSG_URL_TEXT_GET_MEMORY_AVAILABLE
+{
+    return pself->UTI_usedMem ;
+}
+
+@ifdef COMPILE_OPTION_AUTO_BROWSE
+
+#define JS_EMBEDDED_SCRIPT 0x0001
+#define JS_EXTERNAL_SCRIPT 0x0002
+#define JS_JAVASCRIPT_URLS 0x0004
+#define JS_EVENT_HANDLERS  0x00F0
+#define JS_EVENT_MOUSE     0x0010
+#define JS_EVENT_FORM      0x0020
+#define JS_EVENT_FOCUS     0x0040
+#define JS_EVENT_LOAD      0x0080
+#define JS_FEATURES        0xFFFFFF00L
+#define JS_DOCUMENT_WRITE  0x0100
+#define JS_WINDOW_OPEN     0x0200
+#define JS_DOCUMENT_WRITELN 0x0400
+#define JS_FORM_ACTION     0x0800
+/* this space available */
+#define JS_FRAMES          0x2000
+#define JS_DOCUMENT_APPLETS 0x4000
+#define JS_DOCUMENT_EMBEDS 0x8000
+#define JS_DOCUMENT_PLUGINS 0x10000L
+#define JS_LOCATION_HOST 0x20000L
+#define JS_LOCATION_HOSTNAME 0x40000L
+#define JS_LOCATION_PATHNAME 0x80000L
+#define JS_LOCATION_PORT 0x100000L
+#define JS_LOCATION_PROTOCOL 0x200000L
+#define JS_LOCATION_SEARCH 0x400000L
+#define JS_MIMETYPE 0x800000L
+#define JS_WINDOW_CLOSE 0x1000000L
+#define JS_WINDOW_FOCUS 0x2000000L
+#define JS_LAYERS 0x4000000L
+#define JS_STYLES 0x8000000L
+#define JS_NEW_OPTION 0x10000000L
+#define JS_INNERWIDTH 0x20000000L
+#define JS_INNERHEIGHT 0x40000000L
+
+typedef struct {
+    dword flag;
+    char *detectString;
+    char *logString;
+    word count;
+} FeatureEntry;
+
+extern sdword bulkTestCount;
+sdword errorPageCount = 0;
+
+/* this is in dgroup so we can write to the 'count' field */
+FeatureEntry featuresTable[] = {
+    {JS_DOCUMENT_WRITE, "document.write(", "document.write", 0},
+    {JS_WINDOW_OPEN, "document.open", NULL, 0},
+    {JS_DOCUMENT_WRITELN, "document.writeln(", "document.writeln", 0},
+    {JS_FORM_ACTION, ".action", "form.action", 0},
+    {JS_FRAMES, ".frames", "frames array", 0},
+    {JS_DOCUMENT_APPLETS, "document.applets", NULL, 0},
+    {JS_DOCUMENT_EMBEDS, "document.embeds", NULL, 0},
+    {JS_DOCUMENT_PLUGINS, "document.plugins", NULL, 0},
+    {JS_LOCATION_HOST, "location.host", NULL, 0},
+    {JS_LOCATION_HOSTNAME, "location.hostname", NULL, 0},
+    {JS_LOCATION_PATHNAME, "location.pathname", NULL, 0},
+    {JS_LOCATION_PORT, "location.port", NULL, 0},
+    {JS_LOCATION_PROTOCOL, "location.protocol", NULL, 0},
+    {JS_LOCATION_SEARCH, "location.search", NULL, 0},
+    {JS_MIMETYPE, "mimeType", NULL, 0},
+    {JS_WINDOW_CLOSE, "window.close", NULL, 0},
+    {JS_WINDOW_FOCUS, "window.focus", NULL, 0},
+    {JS_LAYERS, ".layers", "layers array", 0},
+    {JS_STYLES, ".style", "style sheets", 0},
+    {JS_NEW_OPTION, "new Option(", "new Option()", 0},
+    {JS_INNERWIDTH, "innerWidth", NULL, 0},
+    {JS_INNERHEIGHT, "innerHeight", NULL, 0}
+};
+/* these don't have table entries, but we want to keep count */
+word extScript = 0;
+word docWriteAndExtScript = 0;
+
+void CheckScript(char *script, dword *features)
+{
+    word i;
+
+    for (i = 0; i < (sizeof(featuresTable)/sizeof(FeatureEntry)); i++) {
+	if (strstr(script, MemLockFixedOrMovable(
+	    featuresTable[i].detectString)))
+	    *features |= featuresTable[i].flag;
+	MemUnlockFixedOrMovable(featuresTable[i].detectString);
+    }
+}
+
+static Boolean toFile;
+
+void fstrcat(char *buf, char *str)
+{
+@ifdef DO_DBCS
+    strcatsbcs(buf, str);
+    if (toFile) {
+	strcatsbcs(buf, "\n");
+    }
+@else
+    strcat(buf, str);
+    if (toFile) {
+	strcat(buf, "\n");
+    }
+@endif
+}
+
+@extern object AutoBrowseOptions;
+
+#ifdef DO_DBCS
+#define STRCPYSB(s,t) strcpysbcs(s,t)
+#define STRCATSB(s,t) strcatsbcs(s,t)
+#define SPRINTFSB sprintfsbcs
+#else
+#define STRCPYSB(s,t) strcpy(s,t)
+#define STRCATSB(s,t) strcat(s,t)
+#define SPRINTFSB sprintf
+#endif
+
+void ShowJSAnalysis(URLTextInstance *pself, VMFileHandle vmf, VMChain vmc)
+{
+    char buf[1024], *p;
+    dword features = 0;
+    optr array;
+    optr pool = pself->HTI_namePool;
+    word i,size;
+    HTMLeventData *p_eventData ;
+    HTMLanchorData *anchorArrayElement;
+    HypertextTransferBlockHeader *htbh;
+    MemHandle hypertextHeaderMem;
+    VMBlockHandle vmb;
+    char *script;
+    dword halret;
+    dword first, count;
+    char statBuf[15];
+    static sdword maxTestCount;
+    static sdword cleanCount;
+    static sdword noJSCount;
+@ifdef DO_DBCS
+    DosCodePage cp = G_codePage;
+    word status, backup;
+@endif
+
+    toFile = (@call AutoBrowseOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & AB_OPTION_JAVA_TO_LOG);
+
+    /* keep track of last one for totals */
+    if (bulkTestCount > 1) maxTestCount = bulkTestCount;
+    /* report previous totals once per list, or each time (if requested) */
+    if ((bulkTestCount == 1) || (@call AutoBrowseOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & AB_OPTION_JS_TOTALS_ON_EACH_PAGE)) {
+	STRCPYSB(buf, "\r\nJS feature totals:\r\n");
+	STRCATSB(buf, "   external .js files (not checked) ");
+	SPRINTFSB(statBuf, "(%d/%d)\r\n", extScript, (word)(maxTestCount-errorPageCount));
+	STRCATSB(buf, statBuf);
+	for (i = 0; i < (sizeof(featuresTable)/sizeof(FeatureEntry)); i++) {
+	    STRCATSB(buf, "   ");
+	    if (featuresTable[i].logString) {
+		strcat(buf, MemLockFixedOrMovable(featuresTable[i].logString));
+		MemUnlockFixedOrMovable(featuresTable[i].logString);
+	    } else {
+		strcat(buf, MemLockFixedOrMovable(featuresTable[i].detectString));
+		MemUnlockFixedOrMovable(featuresTable[i].detectString);
+	    }
+	    SPRINTFSB(statBuf, " (%d/%d)\r\n", featuresTable[i].count, (word)(maxTestCount-errorPageCount));
+	    STRCATSB(buf, statBuf);
+	}
+	STRCATSB(buf, "   both document.write & external scripts");
+	SPRINTFSB(statBuf, " (%d/%d)\r\n", docWriteAndExtScript, (word)(maxTestCount-errorPageCount));
+	STRCATSB(buf, statBuf);
+	STRCATSB(buf, "   page load errors: ");
+	SPRINTFSB(statBuf, "%d\r\n", (word)errorPageCount);
+	STRCATSB(buf, statBuf);
+	STRCATSB(buf, "   all good JS count: ");
+	SPRINTFSB(statBuf, "%d\r\n", (word)cleanCount);
+	STRCATSB(buf, statBuf);
+	STRCATSB(buf, "   no JS count: ");
+	SPRINTFSB(statBuf, "%d\r\n", (word)(noJSCount-errorPageCount));
+	STRCATSB(buf, statBuf);
+	ABLog(buf);
+    }
+    /* if looping around, now init counts */
+    if (bulkTestCount == 1) {
+	maxTestCount = 1;
+	cleanCount = 0; noJSCount = 0; errorPageCount = 0;
+    }
+
+    /* clear stats if restarting list */
+    if (bulkTestCount == 1) {  /* bulkTestCount starts at 1 */
+        /* then clear */
+	for (i = 0; i < (sizeof(featuresTable)/sizeof(FeatureEntry)); i++) {
+	    featuresTable[i].count = 0;
+	}
+	extScript = 0;
+	docWriteAndExtScript = 0;
+    }
+
+    /* Only evaluate if we have an array of event elements */
+    array = pself->HTI_eventArray;
+    if (array)  
+    {
+      /* See if the given position matches any of the event handlers */
+      MemLock(OptrToHandle(array)) ;
+      for (i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)  
+      {
+        p_eventData = ChunkArrayElementToPtr(array, i, &size) ;
+        switch(p_eventData->HED_evt)
+        {
+          case HTML_EVENT_ABORT:
+          case HTML_EVENT_ERROR: 
+          case HTML_EVENT_LOAD:
+          case HTML_EVENT_UNLOAD:
+            features |= JS_EVENT_LOAD;
+            break;
+
+          case HTML_EVENT_BLUR:
+          case HTML_EVENT_FOCUS:
+            features |= JS_EVENT_FOCUS;
+            break;
+  
+          case HTML_EVENT_CHANGE:
+          case HTML_EVENT_RESET:
+          case HTML_EVENT_SUBMIT:
+          case HTML_EVENT_SELECT:
+            features |= JS_EVENT_FORM;
+            break;
+
+          case HTML_EVENT_CLICK:
+          case HTML_EVENT_MOUSEOVER:
+          case HTML_EVENT_MOUSEOUT:
+            features |= JS_EVENT_MOUSE;
+            break;
+
+        }
+        NamePoolCopy(pool, buf, sizeof(buf), p_eventData->HED_code, NULL);
+        CheckScript(buf, &features);
+      }
+      MemUnlock(OptrToHandle(array)) ;
+    }
+
+    /* Only evaluate if we have an array of link elements */
+    array = pself->HTI_anchorArray;
+    if(array)
+    {
+      MemLock(OptrToHandle(array));
+      for(i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)
+      {
+        anchorArrayElement = ChunkArrayElementToPtr(array, i, &size);
+        if(!(anchorArrayElement->flags & (HTML_ADF_NAME | HTML_ADF_MAP)))
+        {
+          NamePoolCopy(pool, (TCHAR *)buf, sizeof(buf), anchorArrayElement->linkOrName, NULL);
+          if(LocalCmpStringsNoCase((TCHAR *)buf, "javascript:", 11)==0)
+          {
+            features |= JS_JAVASCRIPT_URLS;
+@ifdef DO_DBCS
+            /* convert JS URL code from Unicode to DOS for feature logging */
+            size = strlen(buf)+1;  /* include null */
+            LocalGeosToDos(buf, buf, &size, DEFCHAR, &cp, 0, &status, &backup);
+@endif
+            CheckScript(buf, &features);
+          }
+        }
+      }
+      MemUnlock(OptrToHandle(array));
+    }
+
+    /* Get info from transfer item */
+    htbh = VMLock(vmf, VMCHAIN_GET_VM_BLOCK(vmc), &hypertextHeaderMem);
+    vmb = VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode);
+    if(htbh->HTBH_other.HTBHO_fileInfo & HTML_FI_EXT_SCRIPT)
+      features |= JS_EXTERNAL_SCRIPT;
+    VMUnlock(hypertextHeaderMem);
+
+    /* check embedded script, if any */
+    if(vmb)
+    {
+      features |= JS_EMBEDDED_SCRIPT;
+
+      /* Allocate temporary block for script. We may as well use malloc as we
+         won't ever let it move during its lifetime anyway. */
+      count = HugeArrayGetCount(vmf, vmb);
+      script = malloc(count+1);
+    
+      /* Transfer contents from HugeArray into block on heap */
+      first = 0;
+      do {
+        halret = HugeArrayLock(vmf, vmb, first, &p, &size);
+        memcpy(script+first, p, HAL_COUNT(halret));
+	HugeArrayUnlock(p);
+        first += HAL_COUNT(halret);
+      } while(first<count);
+      script[count] = 0;
+      
+      CheckScript(script, &features);
+
+      free(script);
+    }
+
+    if(features)
+    {
+      if (toFile) {
+	  STRCPYSB(buf, "\r\n");
+      } else {
+	  STRCPYSB(buf, "");
+      }
+      fstrcat(buf, "JavaScript stored in:\r");
+      if(features & JS_EMBEDDED_SCRIPT) fstrcat(buf, " + <script>\r");
+      if(features & JS_JAVASCRIPT_URLS) fstrcat(buf, " + javascript: URLs\r");
+      if(features & JS_EVENT_HANDLERS) fstrcat(buf, " + event handlers\r");
+      if(features & JS_EVENT_MOUSE) fstrcat(buf, "   - mouse events\r");
+      if(features & JS_EVENT_FORM) fstrcat(buf, "   - form events\r");
+      if(features & JS_EVENT_FOCUS) fstrcat(buf, "   - focus events\r");
+      if(features & JS_EVENT_LOAD) fstrcat(buf, "   - load events\r");
+      if(features & JS_EXTERNAL_SCRIPT) {
+	  extScript++;
+	  STRCATSB(buf, " + external .js files (not checked) ");
+	  SPRINTFSB(statBuf, "(%d/%d)\r", extScript, (word)bulkTestCount);
+	  fstrcat(buf, statBuf);
+      }
+      if (!toFile) STRCATSB(buf, "\r");  /* spacer */
+      fstrcat(buf, "Special features used:\r");
+      if(features & JS_FEATURES)
+      {
+	for (i = 0; i < (sizeof(featuresTable)/sizeof(FeatureEntry)); i++) {
+	  if (features & featuresTable[i].flag) {
+	    featuresTable[i].count++;
+	    STRCATSB(buf, " + ");
+	    if (featuresTable[i].logString) {
+	      STRCATSB(buf, MemLockFixedOrMovable(featuresTable[i].logString));
+	      MemUnlockFixedOrMovable(featuresTable[i].logString);
+	    } else {
+	      STRCATSB(buf, MemLockFixedOrMovable(featuresTable[i].detectString));
+	      MemUnlockFixedOrMovable(featuresTable[i].detectString);
+	    }
+	    SPRINTFSB(statBuf, " (%d/%d)\r", featuresTable[i].count, (word)bulkTestCount);
+	    fstrcat(buf, statBuf);
+	  }
+	}
+	if ((features & JS_DOCUMENT_WRITE) &&
+	    (features & JS_EXTERNAL_SCRIPT)) {
+	    docWriteAndExtScript++;
+	    STRCATSB(buf, " + both document.write & external scripts");
+	    SPRINTFSB(statBuf, " (%d/%d)\r", docWriteAndExtScript, (word)bulkTestCount);
+	    fstrcat(buf, statBuf);
+	}
+      }
+      else
+        fstrcat(buf, " (none)\r");
+      if ((features & JS_FEATURES) == 0  &&
+	  (features & JS_EXTERNAL_SCRIPT) == 0)
+	  cleanCount++;
+
+      if (toFile) {
+	  ABLog(buf);
+      } else {
+@ifdef DO_DBCS
+        MemHandle bufH = MemAlloc(strlensbcs(buf)*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
+        TCHAR *bufP;
+        if (bufH) {
+	    bufP = MemLock(bufH);
+	    sprintf(_TEXT("%S"), buf);  /* cheap SBCS -> DBCS conversion */
+	    UserStandardDialog(0, 0, 0, 0, bufP,
+			       (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			       (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+	    MemFree(bufH);
+        }
+@else
+      UserStandardDialog(0, 0, 0, 0, buf,
+        (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+          (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+@endif
+      }
+    } else {
+      if (bulkTestCount) noJSCount++;
+    }   
+}
+
+@endif
+
+@extern chunk MsgBlank ;
+
+@method URLTextClass, MSG_HTML_TEXT_ATTACH_TO_ITEM
+{
+    word i,n,size;
+    HTMLimageData *p;
+
+#ifdef DO_DBCS
+    /* set code page */
+    pself->HTI_codePage = G_codePage;
+#endif
+
+    /* Reset the status bar for javascript messages */
+    @SendStatusUpdateOptr(
+              @MsgBlank,
+              HTML_STATUS_TYPE_JAVASCRIPT);
+    @SendStatusUpdateOptr(
+              @MsgBlank,
+              HTML_STATUS_TYPE_JAVASCRIPT_DEFAULT);
+
+    /* Free the supposedly attached memory */
+    AllocWatcherFree(G_allocWatcher, pself->UTI_usedMem) ;
+    pself->UTI_usedMem = 0 ;
+    @call process::MSG_HMLVP_UPDATE_ALLOC_WATCHER_READ_OUT() ;
+  
+    if(pself->HTI_imageArray)
+    {
+      MemLock(OptrToHandle(pself->HTI_imageArray));
+
+      /* Release image items in cache */
+      n = ChunkArrayGetCount(pself->HTI_imageArray);
+      for(i=0; i<n; i++)                  /* check all images */
+      {
+        p = ChunkArrayElementToPtr(pself->HTI_imageArray, i, &size);
+        if((p->flags & HTML_IDF_RESOLVED) && !(p->flags & HTML_IDF_BROKEN))
+                                          /* unlock resolved graphics */
+        {
+          if(p->HID_cacheToken)
+          {
+            ObjCacheUnlockItem((ObjCacheToken)p->HID_cacheToken);
+          }
+        }
+        NamePoolReleaseToken(namePool, p->HID_resolvedURL);
+                                          /* release fully resolved URL */
+      }
+
+      MemUnlock(OptrToHandle(pself->HTI_imageArray));
+    }
+
+    @callsuper() ;
+
+@ifdef COMPILE_OPTION_AUTO_BROWSE
+    /* In AutoBrowsing build, also show JS diagnostics if enabled */
+    if(vmf && @call HTMLSettingsBoolGroup::
+      MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & HTML_JAVASCRIPT)
+    {
+      pself = ObjDerefVis(oself);
+      ShowJSAnalysis(pself, vmf, vmc);
+    }
+@endif
+}
+
+@method URLTextClass, MSG_URL_TEXT_SELF_DESTRUCT
+{
+    /* if there are still pending requests, delay destruction until in-use
+       count reaches zero. This message will be called again by
+       DEC_PENDING... */
+
+    if(pself->UTI_numPendingRequests)
+    {
+      /* abort current operation quickly */
+      pself->UTI_doomed = TRUE;
+      @call self::MSG_HTML_TEXT_LAYOUT_STOP();
+      @AbortOperation(FALSE, FALSE, pself->UTI_frame);
+    }
+    else
+    {
+      @call self::MSG_HTML_TEXT_DEINIT_STORAGE();
+    }
+}
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+
+extern void PCAddRemoveHostFromURL(TCHAR *url, ParentalControlFlags *, Boolean add);
+
+@method URLTextClass, MSG_URL_TEXT_PC_ADD_EMBEDDED_SITES
+{
+    TCHAR url[HTML_STATIC_BUF], *p;
+    optr imageArray = pself->HTI_imageArray;
+    HTMLimageData *imageArrayElement;
+    int i;
+    word size;
+
+    if (imageArray) {
+    MemLock(OptrToHandle(imageArray));
+    for (i = 0; i < ChunkArrayGetCount(imageArray); i++) {
+        imageArrayElement = ChunkArrayElementToPtr(imageArray, i, &size);
+        /* get image URL */
+        NamePoolCopy(pself->HTI_namePool, url, sizeof(url),
+             imageArrayElement->imageURL, &p);
+        PCAddRemoveHostFromURL(p, pcFlags, TRUE);
+	NamePoolDestroyIfDynamic(p);
+    }
+    MemUnlock(OptrToHandle(imageArray));
+    }
+}
+
+@method URLTextClass, MSG_URL_TEXT_PC_REMOVE_EMBEDDED_SITES
+{
+    TCHAR url[HTML_STATIC_BUF], *p;
+    optr imageArray = pself->HTI_imageArray;
+    HTMLimageData *imageArrayElement;
+    int i;
+    word size;
+
+    if (imageArray) {
+    MemLock(OptrToHandle(imageArray));
+    for (i = 0; i < ChunkArrayGetCount(imageArray); i++) {
+        imageArrayElement = ChunkArrayElementToPtr(imageArray, i, &size);
+        /* get image URL */
+        NamePoolCopy(pself->HTI_namePool, url, sizeof(url),
+             imageArrayElement->imageURL, &p);
+        PCAddRemoveHostFromURL(p, pcFlags, FALSE);
+	NamePoolDestroyIfDynamic(p);
+    }
+    MemUnlock(OptrToHandle(imageArray));
+    }
+}
+
+@endif
+
+@method URLTextClass, MSG_HTML_TEXT_FORMATTING_STARTED
+{
+     @call oself::MSG_URL_TEXT_INC_PENDING() ;
+     @callsuper() ;
+}
+
+@method URLTextClass, MSG_HTML_TEXT_FORMATTING_ENDED
+{
+     @callsuper() ;
+     @call oself::MSG_URL_TEXT_DEC_PENDING() ;
+}
+
+@method URLTextClass, MSG_URL_TEXT_STOP
+{
+    @call oself::MSG_HTML_TEXT_LAYOUT_STOP() ;
+}
+
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+@method URLTextClass, MSG_HTML_TEXT_FORMATTING_STATUS
+/* (word numCells, word numFormatted) ; */
+{
+     word percent = 0 ;
+     if (numCells)
+         percent = (((dword)numFormatted) * 100L) / numCells ;
+     @SendUpdateProgress(PI_FORMATTING, percent);
+}
+@endif
+
+@method URLTextClass, MSG_HTML_TEXT_IDENTIFY_MIME_TYPE
+{
+    void IdentifyMimeType(TCHAR *name, TCHAR *mimeType) ;
+
+    /* Determine the file's mime type. */
+    IdentifyMimeType(name, mimeType);
+
+    if (mimeType[0] == '\0')		/* use default type if unknown */
+	@callsuper();
+}
+
+@ifdef JAVASCRIPT_SUPPORT
+/***************************************************************************
+ *              JS-related methods of URL Text Class
+ ***************************************************************************/
+@method URLTextClass, MSG_HTML_TEXT_HANDLE_EVENT
+{
+    NameToken myCode;
+    Boolean ret;
+
+    myCode = NamePoolTokenizeFromPool(namePool, pself->HTI_namePool, code, FALSE);
+                                        // Copy link token to local pool
+    
+    ret = @call (pself->UTI_frame)::MSG_URL_FRAME_HANDLE_EVENT(evt, type, obj, myCode);
+
+    if(myCode != NAME_POOL_NONE) 
+      NamePoolReleaseToken(namePool, myCode);
+
+    return ret;
+}
+
+@method URLTextClass, MSG_URL_TEXT_CHANGE_GRAPHIC
+{
+    word size;
+    TCHAR name[HTML_STATIC_BUF], *nP;
+    HTMLimageData *p;
+    Boolean objCache;
+    optr imageArray = pself->HTI_imageArray;
+    optr frame = pself->UTI_frame;
+    NameToken referer = NAME_POOL_NONE;
+    optr realFrame = NullOptr;
+
+    if(!imageArray)                     /* avoid indenting all this stuff... */
+      return;
+    
+    if (frame) {
+	realFrame = @call frame::MSG_URL_FRAME_FIND_REAL_FRAME();
+    }
+
+    MemLock(OptrToHandle(imageArray));
+
+    p = ChunkArrayElementToPtr(imageArray, i, &size);
+      
+    NamePoolCopy(namePool, name, sizeof(name), url, &nP);
+
+    @call frame::MSG_URL_FRAME_COMPLETE_URL(&nP);
+                                        /* make it an absolute canonical name */
+
+    /* Did the URL change? Otherwise we don't have to reload it */
+    if(!NamePoolTestEqual(namePool, p->HID_resolvedURL, nP))
+    {
+      p->HID_resolvedURL = NamePoolTokenize(namePool, nP, FALSE);
+
+      /* set up referer (marked in-use by GET_URL) */
+      if(frame)
+    	referer = @call realFrame::MSG_URL_FRAME_GET_URL();
+      
+      /* object cache enabled? */
+      objCache = (@call SettingsBoolGroup::
+        MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & HTMLV_OBJECT_CACHE);                                        
+
+      /* load graphic or get it from cache */
+      ProcessSingleGraphic(p, oself, referer, i,  TRUE, FALSE, objCache, FALSE);
+
+      /* release referer */
+      if (referer != NAME_POOL_NONE)
+        NamePoolReleaseToken(namePool, referer);
+    }
+    NamePoolDestroyIfDynamic(nP);
+
+    MemUnlock(OptrToHandle(imageArray));
+
+    /* We release this token here so the message can be safely sent */
+    NamePoolReleaseToken(namePool, url);
+}
+
+@method URLTextClass, MSG_URL_TEXT_PRELOAD_GRAPHIC
+{
+    TCHAR name[HTML_STATIC_BUF], *nP;
+    Boolean objCache;
+    optr frame = pself->UTI_frame;
+    NameToken referer = NAME_POOL_NONE, fullURL;
+    ObjCacheToken oct = NULL;
+    optr realFrame = NullOptr;
+    optr request;
+    URLTextRequestGraphic *p_request;
+
+    if (frame) {
+	realFrame = @call frame::MSG_URL_FRAME_FIND_REAL_FRAME();
+    }
+
+    NamePoolCopy(namePool, name, sizeof(name), url, &nP);
+
+                                     /* make it an absolute canonical name */
+    @call frame::MSG_URL_FRAME_COMPLETE_URL(&nP);
+
+    /* Did the URL change? Otherwise we don't have to reload it */
+    fullURL = NamePoolTokenize(namePool, nP, FALSE);
+
+    /* set up referer (marked in-use by GET_URL) */
+    if(frame)
+      referer = @call realFrame::MSG_URL_FRAME_GET_URL();
+      
+    /* object cache enabled? */
+    objCache = (@call SettingsBoolGroup::
+      MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & HTMLV_OBJECT_CACHE);                                        
+    /* load graphic if not already in cache */
+    if (objCache) {
+	/* non-locking so there is a chance that the item will be
+	   pushed out of the cache, or that the user will clear the
+	   cache before the image is used, oh well */
+	oct = ObjCacheFindURL(OCT_GSTRING, fullURL, FALSE, TRUE);
+    }
+    if (oct == NULL) {
+	/* decremented from acknowledge message handler */
+	@call oself::MSG_URL_TEXT_INC_PENDING();
+	request = URLFetchExtraMemoryAlloc(sizeof(URLTextRequestGraphic));
+	URLFetchExtraMemoryLock(request);
+	p_request = URLFetchExtraMemoryDeref(request);
+	p_request->index = 0;  /* not used */
+	p_request->nameT = fullURL;
+	p_request->objCache = objCache;
+	URLFetchExtraMemoryUnlock(request);
+	URLFetchRequest(
+	    fullURL,
+	    ULM_CACHE,  /* use src cache */
+	    NullHandle,
+	    referer,
+	    oself,
+	    MSG_URL_TEXT_GRAPHIC_PRELOADED,
+	    request,
+	    NULL);
+    } else {
+	NamePoolReleaseToken(namePool, fullURL);
+    }
+
+    /* release referer */
+    if (referer != NAME_POOL_NONE)
+      NamePoolReleaseToken(namePool, referer);
+
+    NamePoolDestroyIfDynamic(nP);
+
+    /* We release this token here so the message can be safely sent */
+    NamePoolReleaseToken(namePool, url);
+}
+
+@method URLTextClass, MSG_URL_TEXT_GRAPHIC_PRELOADED
+{
+    URLTextRequestGraphic *p_request ;
+    URLTextRequestGraphic request ;
+    URLFetchResult *p_result ;
+    URLFetchResult result ;
+
+    /* get result locally */
+    p_result = MemLock(urlFetchMem);
+    memcpy(&result, p_result, sizeof(result));
+    MemFree(urlFetchMem);
+
+    /* since we know this came from IMG tag, assume graphic */
+    AssumeGraphic(result.mimeType);
+
+    /* Copy over the request data to avoid lock/unlock/deref problems. */
+    URLFetchExtraMemoryLock(result.extraData) ;
+    p_request = URLFetchExtraMemoryDeref(result.extraData) ;
+    memcpy(&request, p_request, sizeof(request)) ;
+    URLFetchExtraMemoryUnlock(result.extraData) ;
+    URLFetchExtraMemoryFree(result.extraData);
+
+    /* import */
+    if(URLRequestGetRet(result.retType) == URL_RET_FILE &&
+       !(result.retType & URB_RF_UNTOUCHED)) {
+        ImportThreadRequestImportGraphic(
+            oself,
+            request.nameT,
+            result.mimeType,
+            result.curHTML,
+            ((result.retType & URB_RF_NOCACHE)
+@ifdef CACHE_ALL
+	     && !G_cacheAll
+@endif
+	    ), NULL) ;
+    } else {
+	@call oself::MSG_URL_TEXT_DEC_PENDING();
+    }
+
+    /* clean up some error messages */
+    if (URLRequestGetRet(result.retType) == URL_RET_MESSAGE) {
+	if (OptrToHandle(result.htmlMsg) && OptrToChunk(result.htmlMsg)==0)
+	    MemFree(OptrToHandle(result.htmlMsg));
+    }
+    
+    /* all done */
+    NamePoolReleaseToken(namePool, result.url);
+}
+
+#pragma codeseg URLTextJS
+#pragma option -dc-
+
+@method URLTextClass, MSG_URL_TEXT_FIND_LINK_FROM_NAME
+{
+    optr array = pself->HTI_anchorArray;
+    HTMLanchorData *anc;
+    word i, count, size;
+    word ret = 0xffff;
+
+    if (array) {
+	MemLock(OptrToHandle(array));
+	count = ChunkArrayGetCount(array);
+	if (count) anc = ChunkArrayElementToPtr(array, 0, &size);
+	for (i = 0; i < count; i++) {
+	    if ((anc->flags & (HTML_ADF_NAME | HTML_ADF_MAP)) == 0 && anc->linkOrName == nameT) {
+		/* found it */
+		ret = i;
+		break;
+	    }
+	    anc++;
+	}
+	MemUnlock(OptrToHandle(array));
+    }
+    return ret;
+}
+
+@method URLTextClass, MSG_URL_TEXT_FIND_IMAGE_FROM_NAME
+{
+    optr array = pself->HTI_imageArray;
+    HTMLimageData *img;
+    word i, count, size;
+    word ret = 0xffff;
+
+    if (array) {
+	MemLock(OptrToHandle(array));
+	count = ChunkArrayGetCount(array);
+	if (count) img = ChunkArrayElementToPtr(array, 0, &size);
+	for (i = 0; i < count; i++) {
+	    if (img->pos < HTML_IMAGE_POS_RESERVED && img->name == nameT) {
+		/* found it */
+		ret = i;
+		break;
+	    }
+	    img++;
+	}
+	MemUnlock(OptrToHandle(array));
+    }
+    return ret;
+}
+
+@method URLTextClass, MSG_URL_TEXT_FIND_FORM_FROM_NAME
+{
+    optr array = pself->HTI_formArray;
+    HTMLformData *frm;
+    word i, count, size;
+    word ret = 0xffff;
+
+    if (array) {
+	MemLock(OptrToHandle(array));
+	count = ChunkArrayGetCount(array);
+	if (count) frm = ChunkArrayElementToPtr(array, 0, &size);
+	for (i = 0; i < count; i++) {
+	    if (frm->HFD_itemType == HTML_FORM_HEADER && frm->HFD_prompt == nameT) {
+		/* found it */
+		ret = i;
+		break;
+	    }
+	    frm++;
+	}
+	MemUnlock(OptrToHandle(array));
+    }
+    return ret;
+}
+
+@method URLTextClass, MSG_URL_TEXT_FIND_ELEMENT_FROM_NAME
+{
+    optr array = pself->HTI_formArray;
+    HTMLformData *elm;
+    word i, count, size;
+    word ret = 0xffff;
+
+    if (array) {
+	MemLock(OptrToHandle(array));
+	count = ChunkArrayGetCount(array);
+	if (count) elm = ChunkArrayElementToPtr(array, 0, &size);
+	for (i = 0; i < count; i++) {
+	    if (elm->HFD_formNumber == head && elm->HFD_itemType != HTML_FORM_HEADER && elm->HFD_itemType != HTML_FORM_OPTION && elm->HFD_name == nameT) {
+		/* found it */
+		ret = i;
+		break;
+	    }
+	    elm++;
+	}
+	MemUnlock(OptrToHandle(array));
+    }
+    return ret;
+}
+
+#pragma codeseg
+#pragma option -dc
+
+@endif  /* JAVASCRIPT_SUPPORT */

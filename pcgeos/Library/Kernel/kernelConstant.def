@@ -1,0 +1,1102 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Kernel
+FILE:		kernelConstant.def
+
+AUTHOR:		Tony Requist
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	4/88		Initial version
+
+DESCRIPTION:
+	This file contains constants that are global to all modules of the
+	PC GEOS kernel.
+
+	$Id: kernelConstant.def,v 1.2 98/01/24 22:50:06 gene Exp $
+
+------------------------------------------------------------------------------@
+
+
+
+;--------------------------------------------------------------------------
+;		Kernel Functionality-Control Constants
+;--------------------------------------------------------------------------
+
+;Note that booting is actually slightly faster without this optimization,
+;but then loading apps will probably be slower (because by the time you
+;launch an app, many of the required libraries could be swapped out). EDS 2/93
+
+DELAY_LIBRARY_CORE_BLOCK_LOCK	equ	TRUE	;Don't lock the core blocks of
+						; all imported libraries at
+						; the start of relocating a
+						; block; lock each one each
+						; time you need to look in it.
+
+TRACK_FINAL_FREE		equ	FALSE	;Keep track of the handle of
+						; the last free block on the
+						; heap, to help speed searches
+						; for movable memory(needs more
+						; testing)
+
+AUTOMATICALLY_FIXUP_PSELF	equ	TRUE	;If this is TRUE, the pself
+						; local variable in C message
+						; handlers will automatically
+						; be fixed up by the kernel
+						; whenever it becomes invalid.
+
+CATCH_PROTECTION_FAULT		=	foo	;If this is *defined*, the
+						; kernel catches exception
+						; generated from protection
+						; fault on 286 processors or
+						; above after checking the
+						; processor type.
+
+CATCH_STACK_EXCEPTION		=	foo	;If this is *defined*, the
+						; kernel catches exception
+						; generated from stack
+						; operations in real/V86 mode
+						; on 386 processors or above
+						; after checking the processor
+						; type.
+
+;-----------------------------------------------------------------------------
+;		Kernel Hardware Support Constants
+;-----------------------------------------------------------------------------
+
+;
+;Define the hardware type of the kernel
+;Choices include:
+;       PC
+;       ZOOMER
+;       ZOOMERXIP
+;	BULLET
+;	REDWOOD
+;	NIKE_XIP
+
+ifndef HARDWARE_TYPE
+HARDWARE_TYPE			equ	<PC>
+endif
+
+;
+;  The HARDWARE_TYPE is used through-out the kernel to conditionally
+; compile code that depends upon hardware support.  For each of the
+; different HARDWARE_TYPEs, there are different hardware support
+; levels.  These hardware support levels are listed below:
+;
+;  KERNEL_EXECUTE_IN_PLACE : Defines whether or not the kernel is
+;	executing in place from ROM.  This meains all non-writable
+;	blocks (including the core block) are read only.  This allows
+;	XIP machines to have much larger heaps (as most of the
+;	to code doesn't need to loaded in RAM) and hence execute
+;	faster.
+;
+;  FULL_EXECUTE_IN_PLACE : Indicates that a kernel which is going to
+;	be used in a system where all geodes (or most, at any rate)
+;	are to be executed out of ROM.  It should not be used with
+;	KERNEL_EXECUTE_IN_PLACE, as FULL XIP entails a different
+;	scheme (The kernel executes out of banks, as opposed to
+;	occupying the lower part of conventional memory...) that
+;	affects the entire system, not just the kernel.
+;
+;  POQET_SUPPORT : Defines whether or not the kernel should include
+;	code to support Poqet and PoqetPad.
+;
+;  SMALL_SCREEN_SYS_NOTIFY : Indicates whether or not the kernel
+;	should use a small screen version of SysNotify.  For
+;	devices with low resolutions, this keeps a system
+;	notify box on screen and readable.
+;
+;  HARDWARE_RTC_SUPPORT : Indicates if hardware exists on the
+;	machine to support RTC timers.  On the base PC this
+;	is not available (usually), but on many machines it is.
+;	This is particularly useful for machine which use power
+;	management, as the RTC continues to function (usually)
+;	when we are in a suspended state, but our software RTC
+;	does not.
+;
+;  HARDWARE_TIMER_8253 : Defines whether or not the kernel will
+;	use code specific to Intel's 8253 Programable Timer, or
+;	some other code specific to the platform.
+;
+;  HARDWARE_INT_CONTROL_8259 : Defines whether or not the kernel
+;	will use code specific to the Intel's 8259 Programmable
+;	Interrupt Controller, or some other code specific to the
+;	platform.
+;
+;  HARDWARE_PC_KEYBOARD : Defines whether or not a standard PC
+;	keyboard will be available to the platform at all times.
+;	For laptops and palmtops where keyboard may not exist,
+;	this allows hardware specific considerations to be
+;	implemented.
+;
+;  NO_DOS : Determines whether or not DOS will be running independent of
+;	GEOS.  On PDA-type devices, the DOS implementation really only
+;	handles DOS file system calls and little else.  This means exiting
+;	GEOS and returning to a DOS prompt would be a very bad thing to let
+;	a user do (almost no other DOS apps would run and the user would
+;	be forced to reset).  If this flag is set, it ensures that GEOS never
+;	exits to DOS.
+;
+;  NO_ACTIONS_UNTIL_OLD_TIMER_RETURNS : prevent handling of GEOS timed
+;  	actions until the last handed-off timer interrupt returns. This
+;	works around problems with the miniscule stack found in the
+;	SystemSoft Card Services timer interrupt handler, where we would
+;	overrun the stack processing timed actions on system resume.
+;
+;  ALLOW_DOS_EXEC : determines whether DOS programs can be run from GEOS.
+;	if it's FALSE, DosExec will return ERROR_UNSUPPORTED_FUNCTION and
+;	nothing will be allowed to run a DOS program. This was intended to
+;	allow us to pay a lower royalty to DataLight, as it was originally
+;	$.25/unit if DOS programs couldn't be run and $.75/unit if they
+;	could...
+;
+;  KERNEL_IN_HMA : if TRUE, kcode resides at segment ffffh. This has
+;  	repercussions every place that MAX_SEGMENT or SIG_NON_MEM is used
+;	to decide if a handle is a memory handle, as kcode's handle will
+;	have an HM_addr such that its HG_type is >= SIG_NON_MEM, making it
+;	appear to be a non-memory handle. The HMA and NOHMA macros can be
+;	used to assemble code based on whether this flag is TRUE or FALSE
+;
+;  MOTIF_COLOR_ONLY_SYSTEM: if TRUE, we'll assume the system is color-only, and
+;	the UI is motiflike, so we can draw a nicer error box.   This
+;	nicer dialog box also requires that the kernel is xip'ed, as it
+;	calls kernel discardable resources, which is not good in a fatal error
+;	situation.
+;
+;	1/26/99 ayuen: Actually, I can't find any movable code being called
+;	when the MOTIF_COLOR_ONLY_SYSTEM code draws its graphics.  So it
+;	should also work in non-XIP as-is.  But anyway, just to be safe, the
+;	code is now modified in non-XIP to explicitly call into video driver
+;	fixed code instead of via GrDrawXXX/GrFillXXX.  As a result,
+;	MOTIF_COLOR_ONLY_SYSTEM can now be used in non-XIP as well.
+;
+;  DO_NOT_ANNOUNCE_UNNAMED_DISKS: if TRUE, we don't put up the dialog box
+; 	saying that we're calling
+;
+;  NO_FULL_SWAPFILE_NOTIFICATION: if TRUE, we won't warn the user when the
+;	swapfile fills up.   Good for very small swapfiles, where it can
+;	briefly fill up at any time, before GEOS starts to discard resources
+;	from memory.
+;
+;  SYSTEM_SHUTDOWN_CHAR: key char to cause a system shutdown, usually 
+;	VC_SYSTEM_RESET (ctrl-alt-delete).
+;
+;  NO_ABORT_IN_INSERT_DISK_DIALOG:  don't allow aborting for insert disk
+; 	dialog.  This is done because it can cause lots of crash situations,
+; 	and used in Redwood for that reason.  Unfortunately, removing abort
+;	gives the user no options, and is good as a crash if you don't have
+;	the disk to insert.
+;
+;  VG230_COMMON: set to TRUE is running on Vadem's VG-230 core.  This
+;	seemed like a good idea since we've done two products based on
+;	this hardware, and might very well do more...
+;
+;  STANDARD_EXCEPTION_HANDLING   exception handling is the same as on
+;  	the "normal" PC
+;
+;  VG230_FULL_XIP: Set to true if doing full-XIP on a VG230 system.
+;	If this flag is set, make sure that the full-XIP image is created
+;	with the "-v" option.
+;
+;  PRINT_FILE_COPY_BUFFER set to true mainly only for DWP machines
+;  	that have printer hardware, and thus, a large dedicated RAM
+;  	buffer, built in. Since these machines generally don't allow
+;  	disk accesses and printing simultaneously, this large buffer
+;  	can also be used for file copy operations.
+;
+;  VM_COMPACT_OFTEN set to TRUE moves the compaction threshold from
+; 	70 to 90.  This means VM files get compacted more often (taking
+;	time), but use significantly less space (saving, well, space).
+;
+;  FAULT_IN_EXECUTABLES_ON_FLOPPIES causes all resources of executables
+;	on removable media to be faulted in on load
+;
+;  NO_PEN_SUPPORT set to TRUE nukes the ~3K of pen code - used on systems
+;  that do not require pen support
+;
+;  VM_COMPACT_ON_UPDATE set to TRUE causes VM compaction to occur during
+;	VMUpdate.  If FALSE, there is the potential that compacted space
+;	won't actually be removed, leaving the file size unchanged.
+;
+;  IDLE_UPDATE_ASYNC_VM set to TRUE causes the scrub thread to be instructed
+;	to VMUpdate an asynchronous-update VM file when one of its blocks gets
+;	written out. This (a) reduces the vulnerability of async vm files,
+;	as they get updated soon after being made invalid, and (b) makes
+;	the heap easier to handle by making all the blocks of the file be
+;	discardable.
+;
+;  CONSUME_INPUT_IF_SCREEN_SAVER_ACTIVE set to true to discard any input
+;	used to unblank the screen.  See CombineInputMonitor.
+;
+;  SYS_NOTIFY_USE_REBOOT_IF_RESTART set to TRUE to map SST_RESTART to
+;  	SST_REBOOT in SysNotify. Restart usually fails when there is an
+;  	emergency. See SysNotify.
+;
+;  SYS_NOTIFY_REBOOT_ON_EXIT set to TRUE to reboot system instead of
+;	exiting to DOS when the user chooses Exit in SysNotify. This allows
+;	systems to still exit to DOS on a clean exit initiated by
+;	SysShutdown.
+;
+;  BACKUP_AND_RESTORE_INI_FILE set to TRUE if you want to validate the
+;       .INI file on each bootup and store a backup copy if the .INI file is
+;       OK, and restore from that backup copy the .ini is trashed somehow.
+;
+;  SINGLE_STEP_PROFILING set to TRUE if you want to use the single-step
+;       profiling kernel. This requires some obscene amount of memory,
+;       though.
+;
+;  COMPRESSED_XIP set to TRUE if you want to use a compressed XIP image.
+;	A compressed XIP image can be created by passing the -c flag to
+;	fullxip.  fullxip will then compress all writable and non-code-
+;	non-fixed resources.  You must also create and use a COMPRESSED_XIP
+;	version of Loader.
+;
+;  COMPRESSED_VM set to TRUE if you want compressed VM files.  If you use
+;	this, you should also set VM_COMPACT_ON_UPDATE to TRUE as well.
+;	Otherwise, some VM files may contain a lot of empty space.
+;
+;  PRIMARY_FSD_FOUND_IN_INTIFILE set to TRUE if you want to make the loading
+;	of the primary fs driver based on an .ini file setting rather than
+;	the value of 'ver' returned by dos.
+;
+;  AUTO_SEARCH_FOR_SECONDARIES set to TRUE if you want the kernel to look
+;	network and cdrom fs drivers even if they aren't specified in the
+;	.ini file (good for demos, bad for devices)
+;
+;  NO_REPROGRAMMABLE_TIMERS set to TRUE if you don't want the kernel to try
+;	and reprogram the timer for msec timers. (They'll occur at the next
+;	tick instead.
+;
+;  NEVER_ENFORCE_HEAPSPACE_LIMITS set to TRUE if you never use
+;	[heapspace]/heapSpaceLimitsEnforced = true.  This will exclude
+;	heapspace management code both to avoid locking down core blocks and
+;	allocating handles (which happen even when [heapspace]/
+;	heapSpaceLimitsEnforced is set to false), and to reduce code size.
+;
+;  USE_32BIT_STRING_INSTR set to TRUE if you want the heap code to use 32-bit
+;	string instructions, so that moving memory is faster.  This requires
+;	386 processors or above, and it won't actually speed things up on
+;	processors that have 16-bit data bus (e.g. 386SX, 486GX.)
+;	(NOTE: the code does not check what type of processor it is actually
+;	running on, so it will crash horribly on 286 processors or below.)
+;
+;  SUPPORE_32BIT_DATA_REGS set to TRUE if you want the kernel to save 32-bit
+;	registers as well as FS and GS during context-switching, so that
+;	geodes can be written to use 32-bit registers to make code smaller
+;	and faster.  This requires 386 processors or above.
+;	(NOTE: the code does not check what type of processor it is actually
+;	running on, so it will crash horribly on 286 processors or below.)
+;
+;	NOTE: This feature is set in Internal/product.def instead of in this
+;	file, because Internal/heapInt.def needs to use this constant, which
+;	is in turn because ThreadBlockState is public API for some reason.
+;	Sigh.
+;
+
+
+ifidn HARDWARE_TYPE, <PC>
+	KERNEL_EXECUTE_IN_PLACE		equ	FALSE
+    ifndef FULL_EXECUTE_IN_PLACE
+	FULL_EXECUTE_IN_PLACE		equ	FALSE
+    endif ;FULL_EXECUTE_IN_PLACE
+	COMPRESSED_XIP			equ	FALSE
+	COMPRESSED_VM			equ	FALSE
+	POQET_SUPPORT			equ	TRUE
+	SMALL_SCREEN_SYS_NOTIFY		equ	FALSE
+	HARDWARE_RTC_SUPPORT		equ	FALSE
+	HARDWARE_TIMER_8253		equ	TRUE
+	HARDWARE_INT_CONTROL_8259	equ	TRUE
+	HARDWARE_PC_KEYBOARD		equ	TRUE
+	NO_DOS				equ	FALSE
+	NO_ACTIONS_UNTIL_OLD_TIMER_RETURNS equ	FALSE
+	ALLOW_DOS_EXEC                  equ	TRUE
+	KERNEL_IN_HMA			equ	FALSE
+	USE_MOUSE_TO_REPLY_TO_SYS_ERROR_BOX	equ	FALSE
+	MOTIF_COLOR_ONLY_SYSTEM		equ	TRUE
+	DO_NOT_ANNOUNCE_UNNAMED_DISKS	equ	TRUE
+	NO_FULL_SWAPFILE_NOTIFICATION	equ	FALSE
+    ifndef GPC_ONLY
+    if DBCS_PCGEOS
+	SYSTEM_SHUTDOWN_CHAR		equ	C_SYS_SYSTEM_RESET
+    else
+	SYSTEM_SHUTDOWN_CHAR		equ	VC_SYSTEMRESET
+    endif ; DBCS_PCGEOS
+    endif ; not GPC_ONLY
+	NO_ABORT_IN_INSERT_DISK_DIALOG	equ	FALSE
+	VG230_COMMON			equ	FALSE
+	STANDARD_EXCEPTION_HANDLING	equ	TRUE
+	PRINT_FILE_COPY_BUFFER		equ	FALSE
+	VM_COMPACT_OFTEN		equ	FALSE
+	FAULT_IN_EXECUTABLES_ON_FLOPPIES equ	FALSE
+	NO_PEN_SUPPORT			 equ	FALSE
+	VM_COMPACT_ON_UPDATE		equ	FALSE
+	IDLE_UPDATE_ASYNC_VM		equ	TRUE
+	CONSUME_INPUT_IF_SCREEN_SAVER_ACTIVE equ FALSE
+	SYS_NOTIFY_USE_REBOOT_IF_RESTART equ	TRUE
+	BACKUP_AND_RESTORE_INI_FILE	equ	TRUE
+	NEVER_ENFORCE_HEAPSPACE_LIMITS	equ	TRUE
+    ifdef GPC
+	SYS_NOTIFY_REBOOT_ON_EXIT	equ	TRUE
+	USE_32BIT_STRING_INSTR		equ	TRUE
+    else
+	SYS_NOTIFY_REBOOT_ON_EXIT	equ	FALSE
+	USE_32BIT_STRING_INSTR		equ	FALSE
+    endif
+endif ; HARDWARE_TYPE, <PC>
+
+
+
+
+
+
+
+
+ifidn HARDWARE_TYPE, <GULLIVER>
+	GULLIVER_COMMON				equ	TRUE
+	KERNEL_EXECUTE_IN_PLACE			equ	FALSE
+    ifndef FULL_EXECUTE_IN_PLACE
+	FULL_EXECUTE_IN_PLACE			equ	FALSE
+    endif
+	COMPRESSED_XIP				equ	FALSE
+	COMPRESSED_VM				equ	FALSE
+	POQET_SUPPORT				equ	FALSE
+	SMALL_SCREEN_SYS_NOTIFY			equ	TRUE
+	HARDWARE_RTC_SUPPORT			equ	TRUE
+	HARDWARE_TIMER_8253			equ	TRUE
+	HARDWARE_INT_CONTROL_8259		equ	TRUE
+	HARDWARE_PC_KEYBOARD			equ	FALSE
+	NO_DOS					equ	TRUE
+	NO_ACTIONS_UNTIL_OLD_TIMER_RETURNS 	equ	TRUE
+	ALLOW_DOS_EXEC	                	equ	FALSE
+	KERNEL_IN_HMA				equ	FALSE
+	USE_MOUSE_TO_REPLY_TO_SYS_ERROR_BOX	equ	TRUE
+	MOTIF_COLOR_ONLY_SYSTEM			equ	FALSE
+	DO_NOT_ANNOUNCE_UNNAMED_DISKS		equ	FALSE
+	NO_FULL_SWAPFILE_NOTIFICATION		equ	FALSE
+	NO_ABORT_IN_INSERT_DISK_DIALOG		equ	FALSE
+	SYSTEM_SHUTDOWN_CHAR			equ	VC_SYSTEMRESET
+	VG230_COMMON				equ	FALSE
+	STANDARD_EXCEPTION_HANDLING		equ	TRUE
+	PRINT_FILE_COPY_BUFFER			equ	FALSE
+	VM_COMPACT_OFTEN			equ	TRUE
+	FAULT_IN_EXECUTABLES_ON_FLOPPIES	equ	FALSE
+	NO_PEN_SUPPORT			equ	FALSE
+	VM_COMPACT_ON_UPDATE		equ	FALSE
+	IDLE_UPDATE_ASYNC_VM		equ	TRUE
+	CONSUME_INPUT_IF_SCREEN_SAVER_ACTIVE equ FALSE
+	SYS_NOTIFY_USE_REBOOT_IF_RESTART	equ	FALSE
+	BACKUP_AND_RESTORE_INI_FILE	equ	FALSE
+endif
+
+
+
+
+	ZOOMER_XIP			equ	FALSE
+
+ifndef	EMM_XIP
+	EMM_XIP				equ	FALSE
+endif
+
+	BULLET_XIP			equ	FALSE
+
+	BULLET_COMMON			equ	FALSE
+
+	JEDI_XIP			equ	FALSE
+
+ifndef	GULLIVER_XIP
+	GULLIVER_XIP			equ	FALSE
+endif
+
+ifndef	GULLIVER_COMMON
+	GULLIVER_COMMON			equ	FALSE
+endif
+
+ifndef	VG230_FULL_XIP
+	VG230_FULL_XIP			equ	FALSE
+endif
+
+	PENELOPE_XIP			equ	FALSE
+
+	DOVE_XIP			equ	FALSE
+
+; If XIP_DEBUGGING_VERSION is set to TRUE, swat is notified when XIP resources
+; are banked in, so if the XIP image is writable, you will be able to set
+; breakpoints in movable resources.
+
+; HOWEVER, setting XIP_DEBUGGING_VERSION to TRUE makes the system run more
+; slowly, so you should make sure it is turned off for images that will
+; go into FLASH/ROM.
+;
+; For more information, try "grok -m1023"
+;
+if	ERROR_CHECK or EMM_XIP
+	ifndef	XIP_DEBUGGING_VERSION
+		XIP_DEBUGGING_VERSION		equ	TRUE
+	endif
+endif
+
+;---------------------------------------------------------------------------
+;		Misc constants
+;---------------------------------------------------------------------------
+	; CHAR_JUSTIFICATION: turns on or off support for character-level
+	; (as opposed to word-level) justification.  This also needs
+	; similar constants turned on in the text library and video drivers.
+ifdef DO_PIZZA
+	CHAR_JUSTIFICATION		equ	TRUE
+else
+	CHAR_JUSTIFICATION		equ	FALSE
+endif
+
+
+ifdef WIN32
+	PRIMARY_FSD_FOUND_IN_INITFILE	equ	TRUE
+	NO_REPROGRAMMABLE_TIMERS	equ	TRUE
+else
+  ifidn PRODUCT, <NDO>
+	PRIMARY_FSD_FOUND_IN_INITFILE	equ	TRUE
+  else
+	PRIMARY_FSD_FOUND_IN_INITFILE	equ	FALSE
+  endif
+	NO_REPROGRAMMABLE_TIMERS	equ	FALSE
+endif
+
+ifndef	HASH_INIFILE
+	HASH_INIFILE			equ	FALSE
+endif
+
+AUTO_SEARCH_FOR_SECONDARIES equ TRUE	; someone may want to set this to
+					; false for some product later
+
+
+	; UTILITY_MAPPING_WINDOW: turns on or off support for direct access
+	; to RAM or ROM above the normal 1 Meg address space.  Parts of that
+	; RAM or ROM are banked into the 1 Meg address space for access.
+	;
+	; If this is turned off, the API will still exist, but will have
+	; degenerate functionality.
+	;
+	; When this is turned on, a new swat stub must made such that
+	; ThreadBlockState in Include/Internal/heapInt.def is updated.
+	;
+	; NOTE: This feature is set in Internal/product.def instead of in this
+	; file, because Internal/heapInt.def needs to use this constant, which
+	; is in turn because ThreadBlockState is public API for some reason.
+	; Sigh.
+	;
+
+	; SJIS_SORTING: for DBCS, turns on SJIS sorting instead of Unicode
+	; sorting.  The ordering of various characters is different.
+if DBCS_PCGEOS
+ifdef DO_PIZZA
+	SJIS_SORTING			equ	TRUE
+else
+	SJIS_SORTING			equ	FALSE
+endif	; DO_PIZZA
+else
+	SJIS_SORTING			equ	FALSE
+endif	; DBCS_PCGEOS
+
+
+;-----------------------------------------------------------------------------
+;		Conditional .GP Flags
+;-----------------------------------------------------------------------------
+
+	;
+	;  The .GP file only understands defined/not defined;
+	;  it can not deal with expression evaluation.
+	;  Thus, for the TRUE/FALSE conditionals, we define
+	;  GP symbols that _only_ get defined when the
+	;  condition is true.
+
+if	FULL_EXECUTE_IN_PLACE
+	GP_FULL_EXECUTE_IN_PLACE		equ	TRUE
+ifndef	LOAD_GEODES_FROM_XIP_IMAGE_FIRST
+	LOAD_GEODES_FROM_XIP_IMAGE_FIRST	equ	TRUE
+	; Set to true if you want to load geodes from the XIP image
+endif
+ifndef	LOAD_GEODES_FROM_XIP_IMAGE_UNTIL_FIRST_APP_LOADED
+	LOAD_GEODES_FROM_XIP_IMAGE_UNTIL_FIRST_APP_LOADED	equ	FALSE
+endif
+
+else	;NOT FULL_EXECUTE_IN_PLACE
+	LOAD_GEODES_FROM_XIP_IMAGE_FIRST	equ	FALSE
+	LOAD_GEODES_FROM_XIP_IMAGE_UNTIL_FIRST_APP_LOADED	equ	FALSE
+endif
+
+if	NO_PEN_SUPPORT
+	GP_NO_PEN_SUPPORT			equ	TRUE
+endif
+
+if	MULTI_LANGUAGE and FULL_EXECUTE_IN_PLACE
+	DONT_ALLOCATE_FIXED_STRINGS_AS_FIXED	equ	TRUE
+endif
+
+;--------------------------------------------------------------------------
+;		Kernel-Debugging-Control Constants
+;--------------------------------------------------------------------------
+
+CATCH_MISSED_COM1_INTERRUPTS	equ	FALSE	;Test code to test interrupt
+						;latency
+
+INCLUDE_VMEM_EC			equ	TRUE	;EC code that canbe temporarily
+						;removed to make room for
+						;testing
+ANAL_VMEM_CHECKS		equ	FALSE	;anal-retentive vmem EC code
+if ANAL_VMEM_CHECKS
+%out ANAL VM CHECKING IS ON. DO YOU REALLY WANT THAT?
+endif
+
+TEST_DUPLICATE_LIST		equ	FALSE	;EC code to catch freeing of
+						;blocks on saved list
+
+HACK_STUFF_VIDEO		equ	FALSE	;Hack routines for stuffing
+						;video memory for testing
+
+TEST_WIN_SPEED			equ	FALSE
+TEST_FILE_ENUM_SPEED		equ	FALSE
+TEST_FONT_CACHE_ENUM_SPEED	equ	FALSE
+TEST_FILE_SET_STANDARD_PATH_SPEED equ	FALSE
+TEST_MULTI_THREADING		equ	FALSE
+
+TEST_TIMER_FREE			equ	FALSE	;EC code to make sure timer
+						; handles aren't freed by non-
+						; timer-related code in an
+						; attempt to track down a bug
+						; in solitaire.
+TRACK_INTERRUPT_SOURCES		equ 	FALSE	;Code to record who called
+						; SysEnterInterrupt during the
+						; current interrupt. q.v.
+						; SysEnterInterrupt
+
+TEST_TIMER_CODE			equ	FALSE	;EC code to test milisecond
+						;timer stuff
+
+TEST_IN_USE_CODE		equ	FALSE	;EC code to keep track of and
+						;test InUse and Interactible
+						;counts on a per-object basis
+						;NOTE:  has the side effect of
+						;causing documents to be
+						;dirtied on VIS_OPEN.
+
+TRACK_INTERRUPT_COUNT		equ	FALSE	;if you die with interruptCount
+						;non-zero, you can look at
+						;intCountStack and figure out
+						;on which thread the system was
+						;operating when it was 	
+						;initially interrupted.
+
+VERIFY_INTERRUPT_REGS		equ	FALSE	;Uses the stack to ensure that
+						; the registers are the same
+						; at SysExitInterrupt as they
+						; were at SysEnterInterrupt
+
+LOG_BLOCK_MOVEMENT		equ	FALSE	;Keeps a log of blocks
+						; that are moved or freed,
+						; to aid in finding scribbling
+						; bugs due to dangling pointers
+						; Useful when read/write
+						; checking isn't feasable.
+
+if	VERIFY_INTERRUPT_REGS
+%out ********** Warning: Verify interrupt register code compiled in **********
+endif
+
+if	LOG_BLOCK_MOVEMENT
+%out ********** Warning: Block movement logging compiled in **********
+endif
+
+ifndef CHECKSUM_DOS_BLOCKS
+	CHECKSUM_DOS_BLOCKS	equ	FALSE
+endif
+if	CHECKSUM_DOS_BLOCKS
+%out ********** Warning: DOS block checksum code compiled in **********
+endif
+
+;--------------------------------------------------------------------------
+;		Profiling Functionality-Control Constants
+;--------------------------------------------------------------------------
+
+ifndef SINGLE_STEP_PROFILING
+	SINGLE_STEP_PROFILING	equ	FALSE
+endif
+if SINGLE_STEP_PROFILING
+%out *********** Warning: Single-step profiling code compiled in ***********
+endif
+
+ifndef ANALYZE_WORKING_SET
+ANALYZE_WORKING_SET		equ	FALSE	;Working set analysis
+endif
+
+if	ANALYZE_WORKING_SET
+%out *********** Warning: Working set analysis code compiled in ***********
+endif
+
+ifndef TIMER_PROFILE
+TIMER_PROFILE			equ	FALSE	;Code in TimerInterrupt to
+endif						;implement a crude measure
+						;of where CPU time is going.
+if	TIMER_PROFILE
+%out *********** Warning: Timer Profile code compiled in ***********
+endif
+
+ifndef RECORD_MESSAGES
+NEC <RECORD_MESSAGES		equ	FALSE	;Code to record messages sent>
+EC <RECORD_MESSAGES		equ	FALSE	;Code to record messages sent>
+endif						; through ObjCallMethodTable,
+						; recording the class, message
+						; and count.
+if	RECORD_MESSAGES
+%out *********** Warning: Message recording code compiled in ***********
+endif
+
+ifndef TEST_RECORD_INT21
+TEST_RECORD_INT21		equ	FALSE	;Code to record the calls made
+endif						; to Int21h.
+
+if	TEST_RECORD_INT21
+%out *********** Warning: Int21h recording code compiled in ***********
+endif
+
+ifndef RECORD_MODULE_CALLS
+RECORD_MODULE_CALLS		equ	FALSE	;Code to record calls made
+endif						; between modules, noting callee
+						; and # of times called
+
+if	RECORD_MODULE_CALLS
+%out *********** Warning: Module call recording code compiled in ***********
+endif
+
+ifndef	PROFILE_LOG
+PROFILE_LOG			equ	FALSE	;Code to create a
+endif						;profiling log
+
+if 	PROFILE_LOG
+%out *********** Warning: Profile code compiled in***********
+endif
+
+ifndef	_TRACK_RESOURCE_CALLS
+_TRACK_RESOURCE_CALLS		equ	FALSE	;we must be making
+						;non-xip versions
+endif
+
+ifndef	TRACK_INTER_RESOURCE_CALLS
+if	_TRACK_RESOURCE_CALLS			;defined in xip.def
+TRACK_INTER_RESOURCE_CALLS	equ	TRUE	;Code to track inter-
+						;resource calls in XIP
+else
+TRACK_INTER_RESOURCE_CALLS	equ	FALSE
+endif
+endif
+
+if 	TRACK_INTER_RESOURCE_CALLS
+if	FULL_EXECUTE_IN_PLACE
+%out *********** Warning: Track inter-resource call code compiled in***********
+else
+%out *********** Warning: Track inter-resource call code in _XIP_ only***********
+TRACK_INTER_RESOURCE_CALLS	equ	FALSE	;Tracking done only in XIP
+endif
+endif
+
+;
+; Size of the maximum string that can be passed to SysShutdown
+;
+KERNEL_MESSAGE_SIZE	=	130
+
+
+;
+; Flag to allow heap and lmem thresholds to be settable via .ini entries.
+;	Examples (using defaults):
+;		[system]
+;		minSpaceForInitialCompaction = 2500
+;		minSpaceToThrowOut = 2500
+;		lmemMinAllocationPadding = 256
+;		lmemMaxAllocationPadding = 3500
+;		lmemForceCompactThreshold = 2000
+;		lmemForceToughThreshold = 5000
+;
+ifndef INI_SETTABLE_HEAP_THRESHOLDS
+NEC <INI_SETTABLE_HEAP_THRESHOLDS equ	FALSE				>
+EC  <INI_SETTABLE_HEAP_THRESHOLDS equ	FALSE				>
+endif
+
+;------------------------------------------------------------------------------
+;		Constants for time slices and context switches
+;------------------------------------------------------------------------------
+
+;	This determines how many timer interrupts (ticks) occur each second
+
+INTERRUPT_RATE	equ 60					;Normal = 60
+
+;	This determines how many time slice context switches are done
+;	per second
+
+CONTEXT_SWITCHES equ 10					;Normal = 10
+
+;	Number of ticks in a time slice
+
+TIME_SLICE	equ INTERRUPT_RATE / CONTEXT_SWITCHES	;Normal = 1/10th second
+
+;	Number of ticks between recalculating of thread priorities
+
+DECAY_TIME	equ INTERRUPT_RATE		;Normal is INTERRUPT_RATE
+
+;	Number of seconds of idle time allowed during dirty shutdown before
+;	we decide the system is hung and tell the user to power off.
+
+ifdef	GPC
+WATCHDOG_TIMER	equ	10
+else
+WATCHDOG_TIMER	equ	20
+endif	; GPC
+
+;------------------------------------------------------------------------------
+;		Constants for system operation
+;------------------------------------------------------------------------------
+
+MINIMUM_DISK_IDLE_TIME_FOR_APO	equ	10*60
+; Number of ticks that must elapse following the last DiskLock before
+; we will call the power management driver to perform a long-term idle.
+
+	;========================================================
+	; 	Stack constants
+	;========================================================
+
+THREAD_DEF_STACK_SIZE		equ	512
+; Default size for an arbitrary thread's stack (This is not the value used
+; for processes, nor the UI thread of an application, but rather threads that
+; are created using the utility message MSG_PROCESS_CREATE_EVENT_THREAD)
+
+STACK_RESERVED_FOR_INTERRUPTS	equ	100	;Bytes on stack reserved for interrupts
+
+RELOCATION_STACK_SIZE equ	256	;Don't do more than 256/4 = 64 relocations
+					;at a time
+
+OBJ_MESSAGE_MAX_STACK_SIZE equ 512	;Maximum stack args for ObjMessage
+			   
+	;========================================================
+	;	Heap constants
+	;========================================================
+
+	; This is the number of free handles below which ObjMessage will
+	; drop events (if the caller allows) and at which the user will be
+	; notified that the system is low on handles.
+
+FREE_HANDLE_DESPERATION_THRESHOLD	equ	200
+
+MAX_LOCKS	equ	254	;maximum number of times a block can be locked
+				;255 is reserved to signal a block that is
+				;supposed to be fixed but could not be allocated
+				;that way
+LOCK_COUNT_MOVABLE_PERMANENTLY_FIXED equ	255
+
+HEAP_DEFAULT_SPACE_REQUIRED_FOR_GEODE	equ	160000/16	; 160,000 bytes
+; Default value for "heapSpace", if NULL stored in file.
+
+HMA_SEGMENT	equ	0xffff	;segment of kcode when KERNEL_IN_HMA is TRUE
+
+	; These are the default heapspace values used in InitHeapSize.
+
+DOC_RESERVE_DEFAULT			equ	32		; 32k
+	; This is the amount of space per concurrent application that
+	; is reserved for documents.  You should monitor the space
+	; used by using the heapspace tcl script or some other
+	; tool and enter a value appropriate for your device and setup.
+
+EXEC_RESERVE_DEFAULT			equ	50		; 50k
+	; This is the amount of space per concurrent application that
+	; is reserved for execution overhead.  This space is generally
+	; defined as the total space used for locked blocks that
+	; otherwise would be discardable.  Monitor your system using
+	; heapspace or some other tool to determine this value.
+
+SYS_RESERVE_DEFAULT			equ	209		; 209k
+	; This is the amount of space reserved for system libraries
+	; (all the libraries at or before the Text), excluding the
+	; systems doc and exec space.
+
+CONCURRENCY_DEFAULT			equ	4
+	; This is roughly the maximum number of applications (plus one
+	; for the system) that you expect to be active at a time.
+	; This is used to determine the total amount of space to
+	; reserve:
+	; Reserved Space = concurrency * (docReserve + ExecReserve) + SysReserve
+
+	;========================================================
+	;	LMem constants
+	;========================================================
+
+LMemCompactionThreshhold	etype	word, 1
+LCT_COMPACT_IF_50_FREE	enum	LMemCompactionThreshhold
+LCT_COMPACT_IF_25_FREE	enum	LMemCompactionThreshhold
+LCT_COMPACT_IF_12_FREE	enum	LMemCompactionThreshhold
+LCT_COMPACT_IF_6_FREE	enum	LMemCompactionThreshhold
+LCT_ALWAYS_COMPACT	enum	LMemCompactionThreshhold
+
+	;========================================================
+	;	VM constants
+	;========================================================
+;	percentage of file dedicated to used blocks below which
+;	compaction is triggered, default value
+
+if VM_COMPACT_OFTEN
+VM_DEF_COMPACTION_THRESHOLD	equ	90
+else
+VM_DEF_COMPACTION_THRESHOLD	equ	70
+endif
+
+	;========================================================
+	;	Disk constants
+	;========================================================
+
+CHECK_DOS_BUFFERS	equ FALSE	; Set true to enable verification of
+					; DOS buffers before every DOS call.
+					; THIS SLOWS THINGS DOWN A LOT AND
+					; WILL ONLY WORK (currently) FOR THE
+					; DOS3 DRIVER.
+
+MSDOS_VOLUME_LABEL_LENGTH	equ	11
+
+;
+;	Structure of a disk handle.
+;	MOVED TO fileInt.def FOR USE BY KLIB VOLUME CODE.
+;			-- ardeb 4/11/90
+;
+
+kTPD	equ	({ThreadPrivateData}[0])
+
+;
+; FPU state pushed below the ThreadBlockState if the thread loses control of
+; the FPU.
+;
+FPUReg 		struct
+    FR_lsw	word	?	;mantissa bits 0-15
+    FR_lmsw	word	?	;mantissa bits 16-31
+    FR_hmsw	word	?	;mantissa bits 32-47
+    FR_msw	word	?	;mantissa bits 48-63
+    FR_expSign	word	?	;exponent (b0-b14) and sign (b15)
+FPUReg		ends
+
+FPUState	struct
+    FS_control	word		;control word
+    FS_status	word		;status word
+    FS_tag	word		;tag word
+    FS_ipLow	word		;low 16 bits of ip
+    FS_opIPHigh	word		;opcode (b0-10), high 4 bits of ip (b12-15)
+    FS_dataLow	word		;low 16 bits of data address
+    FS_dataHigh	word		;high 4 bits of data address (b12-15)
+    FS_regStack	FPUReg 8 dup(<>);register stack (from ST(0) to ST(7))
+FPUState	ends
+
+;	Flag for blocked in kernel init code
+
+KERNEL_INIT_BLOCK	equ	0ffffh
+
+;--------------------------------------------------------------------------
+;	TRACK_INTERRUPT_COUNT debugging stuff
+;--------------------------------------------------------------------------
+
+if TRACK_INTERRUPT_COUNT and ERROR_CHECK
+IntCountType	etype	byte
+INT_COUNT_SYS_ENTER_CRITICAL	enum	IntCountType
+INT_COUNT_SYS_ENTER_INTERRUPT	enum	IntCountType
+INT_COUNT_VM_LOCK		enum	IntCountType
+endif
+
+;--------------------------------------------------------------------------
+; 		Frame created by PushAll
+;
+; ss:sp points at the base of a PushAllFrame upon return from PushAll.
+;--------------------------------------------------------------------------
+	; WARNING: This structure must match the PushAll and PopAll routines.
+	; At least one routine, depends on the order of fields in this
+	; structure.
+
+PushAllFrame	struct
+    PAF_ax	word
+    PAF_bx	word
+    PAF_cx	word
+    PAF_dx	word
+    PAF_si	word
+    PAF_di	word
+    PAF_bp	word
+    PAF_ds	word
+    PAF_es	word
+    PAF_ret	nptr		; near return address.
+    PAF_fret	fptr		; far return address if PushAllFar called
+PushAllFrame	ends
+
+;------------------------------------------------------------------------------
+;      Frame created by EnterFile (used by Disk & Drive modules)
+;
+; ss:sp points to the base of an EFFrame upon "return" from EnterFile. EnterFile
+; is somewhat odd in that it's a co-routine, rather than a sub-routine. You
+; call it; it calls you back; you return to it; it returns for you.
+;------------------------------------------------------------------------------
+EFFrame		struct
+    EFF_retnInt		nptr.near	; return from caller to EnterFile
+    EFF_dx		word		; dx on entry
+    EFF_bp		word		; bp on entry
+    EFF_si		word		; si on entry
+    EFF_di		word		; di on entry
+    EFF_es		sptr		; es on entry
+    EFF_retnCaller	nptr.near	; return to caller of EnterFile (the
+					;  utility routine invoked)
+EFFrame		ends
+
+;------------------------------------------------------------------------------
+;	Default driver structure
+;------------------------------------------------------------------------------
+
+DefaultDriverTable	struct
+    DDT_fileSystem	hptr.GeodeHeader
+    DDT_keyboard	hptr.GeodeHeader
+    DDT_mouse		hptr.GeodeHeader
+    DDT_video		hptr.GeodeHeader
+    DDT_memoryVideo	hptr.GeodeHeader
+    DDT_power		hptr.GeodeHeader
+    DDT_task		hptr.GeodeHeader
+DefaultDriverTable	ends
+
+	CheckHack <offset DDT_fileSystem eq GDDT_FILE_SYSTEM>
+	CheckHack <offset DDT_keyboard eq GDDT_KEYBOARD>
+	CheckHack <offset DDT_mouse eq GDDT_MOUSE>
+	CheckHack <offset DDT_video eq GDDT_VIDEO>
+	CheckHack <offset DDT_memoryVideo eq GDDT_MEMORY_VIDEO>
+	CheckHack <offset DDT_power eq GDDT_POWER_MANAGEMENT>
+	CheckHack <offset DDT_task eq GDDT_TASK>
+	
+;------------------------------------------------------------------------------
+;	Kernel strings
+;------------------------------------------------------------------------------
+
+KernelStrings	etype	word
+
+	; This group of strings is in the FixedStrings resource
+
+FIRST_STRING_IN_FIXED_STRINGS		equ	KernelStrings
+
+;{--- This bracketed group of strings must correspond to the FatalError enum
+KS_TE_DIVIDE_BY_ZERO				enum	KernelStrings
+KS_TE_OVERFLOW					enum	KernelStrings
+KS_TE_BOUND					enum	KernelStrings
+KS_TE_FPU_EXCEPTION				enum	KernelStrings
+KS_TE_SINGLE_STEP				enum	KernelStrings
+KS_TE_BREAKPOINT				enum	KernelStrings
+KS_TIE_ILLEGAL_INST				enum	KernelStrings
+ifdef	CATCH_PROTECTION_FAULT
+KS_TIE_PROTECTION_FAULT				enum	KernelStrings 
+endif	; CATCH_PROTECTION_FAULT
+ifdef	CATCH_STACK_EXCEPTION
+KS_TIE_STACK_EXCEPTION				enum	KernelStrings
+endif	; CATCH_STACK_EXCEPTION
+
+KS_SYS_EMPTY_CALLED				enum	KernelStrings
+KS_ILLEGAL_HANDLE				enum	KernelStrings
+KS_BAD_MOVE_BLOCK				enum	KernelStrings
+KS_HANDLE_TABLE_FULL				enum	KernelStrings
+KS_CANNOT_ALLOC_LOCAL_MEM			enum	KernelStrings
+;This bracketed group of strings must correspond to the FatalError enum ---}
+
+KS_TE_SYSTEM_ERROR				enum	KernelStrings
+
+KS_FATAL_ERROR_IN				enum	KernelStrings
+KS_CODE_EQUALS					enum	KernelStrings
+KS_KERNEL					enum	KernelStrings
+
+ifdef GPC
+KS_FILE_ERROR					enum	KernelStrings
+else
+KS_UNRECOVERABLE_ERROR_IN			enum	KernelStrings
+KS_UNRECOVERABLE_ERROR_PART_TWO			enum	KernelStrings
+endif	; GPC
+KS_FILE_READ					enum	KernelStrings
+KS_FILE_WRITE					enum	KernelStrings
+KS_FILE_CLOSE					enum	KernelStrings
+KS_FILE_COMMIT					enum	KernelStrings
+KS_FILE_TRUNCATE				enum	KernelStrings
+
+ifdef	GPC
+KS_TOO_MUCH_AT_ONCE				enum	KernelStrings
+KS_TOO_MUCH_AT_ONCE_PART_TWO			enum	KernelStrings
+KS_MEMORY_FULL					enum	KernelStrings
+else
+KS_LOW_ON_HANDLES_1				enum	KernelStrings
+KS_LOW_ON_HANDLES_2				enum	KernelStrings
+KS_MEMORY_FULL					enum	KernelStrings
+KS_MEMORY_FULL2					enum	KernelStrings
+KS_SWAP_DEVICES_FULL				enum	KernelStrings
+KS_SWAP_DEVICES_FULL_PART_TWO			enum	KernelStrings
+endif	; GPC
+KS_SWAP_IN_ERROR				enum	KernelStrings
+
+KS_THE_DISK_IN_DRIVE				enum	KernelStrings
+KS_HAS_NO_NAME_AND				enum	KernelStrings
+KS_WILL_BE_REFERRED_TO_AS			enum	KernelStrings
+KS_PLEASE_INSERT_DISK				enum	KernelStrings
+KS_INTO_DRIVE					enum	KernelStrings
+KS_UNNAMED					enum	KernelStrings
+
+if CHECKSUM_DOS_BLOCKS
+KS_DOS_BLOCK_CHECKSUM_BAD			enum	KernelStrings
+endif
+
+	;This group of strings is in the MovableStrings resource
+
+FIRST_STRING_IN_MOVABLE_STRINGS		equ	KernelStrings
+
+KS_CANNOT_PRESERVE_VOLATILE_SWAP_DATA		enum	KernelStrings
+ifdef	GPC
+KS_CORRUPTED_INI_BUFFER				enum	KernelStrings
+KS_OBJ_LOAD_ERROR				enum	KernelStrings
+KS_OBJ_VM_LOAD_ERROR				enum	KernelStrings
+endif	; GPC
+
+	;This group of strings is in the InitStrings resource
+
+FIRST_STRING_IN_INIT_STRINGS		equ	KernelStrings
+
+	; These values MUST match FatalError in kernelError.def
+	; starting at FIRST_FATAL_ERROR_ONLY_IN_INIT
+
+KS_CANNOT_LOAD_MEMORY_VIDEO_DRIVER		enum	KernelStrings
+KS_CANNOT_LOAD_KEYBOARD_DRIVER			enum	KernelStrings
+KS_CANNOT_LOAD_UI				enum	KernelStrings
+KS_BAD_FONT_PATH				enum	KernelStrings
+KS_NO_FONT_FILES				enum	KernelStrings
+KS_DEFAULT_FONT_NOT_FOUND			enum	KernelStrings
+KS_UNSUPPORTED_DOS_VERSION			enum	KernelStrings
+KS_UNABLE_TO_REGISTER_TOP_LEVEL_DISK		enum	KernelStrings
+
+KS_FILE_SYSTEM_DRIVER_FOR_DRIVE			enum	KernelStrings
+KS_NOT_LOADED					enum	KernelStrings
+KS_PRIMARY_FSD_NOT_LOADED			enum	KernelStrings
+
+KS_ERROR_PREFIX					enum	KernelStrings
+
+if DBCS_PCGEOS
+;
+; For DBCS GEOS, we use the high bit to signify the destination is DBCS.
+;
+CheckHack <KernelStrings lt 128>
+KS_DBCS_DEST	equ	0x80
+endif
+
+;------------------------------------------------------------------------------
+;	Include Product-specific constants
+;------------------------------------------------------------------------------
+include Internal/prodFeatures.def
+
+;------------------------------------------------------------------------------
+;	Include kernel fatal error values
+;------------------------------------------------------------------------------
+include	kernelErrors.def
+
+if	FULL_EXECUTE_IN_PLACE
+LAST_XIP_RESOURCE_HANDLE	equ	<handle -1>
+endif
+

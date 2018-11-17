@@ -1,0 +1,739 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-96 -- All Rights Reserved.
+ *
+ * PROJECT:	Sample Applications
+ * MODULE:	Multiple GenPrimary Objects
+ * FILE:	multprim.goc
+ *
+ * AUTHOR:	Brian Chin: April 11, 1992
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      brianc  4/11/92         Initial version
+ *
+ * DESCRIPTION:
+ *	This application demonstrates what happens when an application
+ *      has more than one GenPrimary object, and what you can exploit
+ *      in such a situation. It also demonstrates a bit more of what
+ *      you can do to a GenPrimary, over and above what's demonstrated
+ *      in the GenDisp sample application.
+ *
+ *	(Throughout this file you will see references like this:
+ *      [Con 7.2.1]. This is a reference to chapter 7, section 7.2.1
+ *      of the Concepts manual. [Obj 7.2.1] is a reference to chapter 7,
+ *      section 7.2.1 of the Objects manual. You should use these
+ *      references to locate further information about the topic being
+ *      discussed if anything is unclear.)
+ *
+ *      This sample app assumes some basic knowledge of basic GEOS
+ *      programming. To see more commented examples of a GenView,
+ *      GenPrimary, GenApplication, etc., see SDK_C/Hello.
+ *
+ *	    	    	    	Overview
+ *
+ *	Most applications have a single GenPrimary object, which contains
+ *	nearly all of the interface to the application. If an application
+ *	needs to show multiple documents, it will normally use the
+ *      GenDocument and GenDisplay mechanisms, providing the same interface
+ *      to control multiple windows.
+ *
+ *	There are some applications, however, that display multiple over-
+ *	lapping windows that ought to be completely independent of each
+ *      other. For example, a debugger might have one window for
+ *      displaying/editing source, another for showing registers, and
+ *      another to serve as a command line. Each of these requires its
+ *      own set of controls. To accomplish this, one would use multiple
+ *      GenPrimary objects, each with its own set of generic children
+ *      to provide the requisite controls.
+ *
+ *	**NOTE** that it is not likely to be useful to have more than
+ *	one GenPrimary on Zoomer, and in fact the Zoomer UI is set up
+ *	to assume that there will be only one primary, which is
+ *	automatically maximized on startup.
+ *
+ *	This application therefore is not designed to work on Zoomer,
+ *	on which only the first primary will be visible.
+ *
+ * RCS STAMP:
+ *	$Id: multprim.goc,v 1.1 97/04/04 16:38:36 newdeal Exp $
+ *
+ **********************************************************************/
+
+/*
+ ***********************************************************************
+ *		Include files
+ ***********************************************************************
+ */
+
+@include <stdapp.goh>
+#include <gstring.h>
+
+/*
+ ***********************************************************************
+ *		Class & Message Definitions
+ ***********************************************************************
+ */
+
+
+@class	MultPrimProcessClass, GenProcessClass;
+
+@message void MSG_MULT_PRIM_REPLACE_LONG_TERM_MONIKER();
+@message void MSG_MULT_PRIM_CLEAR_LONG_TERM_MONIKER();
+@message void MSG_MULT_PRIM_SET_PRIMARY_ONE_MONIKER_TO_GSTRING();
+@message void MSG_MULT_PRIM_SET_PRIMARY_TWO_MONIKER_TO_GSTRING();
+
+@endc;
+
+/*
+ * This is our subclass of VisContent to demonstrate one way of coping
+ * with multiple views on different data in the absence of the
+ * GenDocument and GenDisplay mechanisms that normally take care of
+ * such things.
+ *
+ * This particular implementation simply stores the chunk handle of a
+ * graphics string that makes up the document and we draw that graphics
+ * string whenever our superclass or anyone else tells us to. In a more
+ * realistic application, we would likely have a straight VisContent
+ * object and create subclasses of Vis and VisComp, which we would
+ * form into a tree, using the Vis linkage, below the VisContent object.
+ *
+ * While it is possible to manage multiple views with your process thread
+ * being the content for the views, it is more difficult to decide when
+ * and what to draw, as all you get is a window handle, which you must
+ * map to a view by calling all the views you have to see whether the
+ * window is theirs (you can do this just once and store the result, but
+ * it's an ugly way to go no matter how you do it).
+ */
+@class MultPrimContentClass, VisContentClass;
+    /* Chunk of graphics string to draw inside the view. */
+    @instance ChunkHandle MPCI_graphic = 0;
+@endc;
+
+@classdecl MultPrimProcessClass, neverSaved;
+@classdecl MultPrimContentClass;
+
+/*
+ ***********************************************************************
+ *		Constants
+ ***********************************************************************
+ */
+
+#define	MONIKER_WIDTH	30
+#define	MONIKER_HEIGHT	20
+
+/*
+ ***********************************************************************
+ *		UI Objects
+ ***********************************************************************
+ */
+
+@start AppResource;
+
+@object GenApplicationClass MultPrimApp = {
+    GI_visMoniker = list { @MultPrimTextMoniker };
+    GI_comp = @MultPrimPrimaryOne,
+              @MultPrimPrimaryTwo;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+	@MultPrimPrimaryOne,
+	@MultPrimPrimaryTwo;
+};
+
+@visMoniker MultPrimTextMoniker = "C MultPrim Sample Application";
+
+@end AppResource;
+
+
+@start Interface;
+
+/*
+ *	    	    First Primary
+ *
+ * This is a basic GenPrimary that contains only a GenView; it has no other
+ * controls.
+ *
+ * Because we do not specify a VisMoniker for the primary, it will initially
+ * inherit its header (and the title below its icon) from the GenApplication
+ * object that is its parent. When you activate the
+ * SetPrimaryOneMonikerToGString trigger, these will change to match the
+ * text moniker specified in MultPrimOneMonikerList.
+ */
+
+@object GenPrimaryClass MultPrimPrimaryOne  = {
+    GI_comp = @MultPrimViewOne;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+};
+
+/*
+ * List used to implement MSG_MULT_PRIM_SET_PRIMARY_-
+ * ONE_MONIKER_TO_GSTRING. We include a text moniker here to give
+ * the primary something textual to display in its title bar (if
+ * it has one) and under its graphical icon (if it has one). In
+ * the case of the icon title, it will actually prefer a textual
+ * moniker that has been marked as abbrevText (as AbbrevTextMonikerOne
+ * is), while a regular text moniker is the preference for the title bar.
+ *
+ * Once you activate SetPrimaryOneMonikerToGString, the title for
+ * MultPrimPrimaryOne will change from "C MultPrim Sample Application"
+ * to "Primary One Title", while its icon will change to a small
+ * rectangle and the title of the icon will be "Primary One".
+ */
+@visMoniker MultPrimOneMonikerList = list {
+    @TextMonikerOne,
+    @AbbrevTextMonikerOne,
+    @GStringMonikerOne
+};
+
+@visMoniker TextMonikerOne = "Primary One Title";
+
+@visMoniker AbbrevTextMonikerOne = {
+    style = abbrevText;
+    "Primary One";
+};
+
+@visMoniker GStringMonikerOne = {
+    color = gray1;
+    aspectRatio = normal;
+    gstring {
+	GSSetAreaColorIndex( C_WHITE ),
+	GSFillRect( 0, 0, MONIKER_WIDTH, MONIKER_HEIGHT ),
+	GSSetAreaColorIndex( C_BLACK ),
+	GSFillRect( 2, 2, MONIKER_WIDTH - 2, MONIKER_HEIGHT - 2 ),
+	GSEndString()
+    }
+};
+
+/*
+ * View and content for the first primary. Standard stuff here, with the
+ * possible exception of the definition of the graphics string for use by
+ * MultPrimContentOne. Any standalone graphics string you define must be
+ * created with the @gstring keyword, unless you wish to break any text
+ * strings into a count word (in the proper byte order) followed by the
+ * individual characters (no null-terminator, please) yourself. Should you
+ * be so inclined, "hi mom" would need to be 6,0,'h','i',' ','m','o','m'
+ * for example.
+ */
+@object GenViewClass MultPrimViewOne = {
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_content = MultPrimContentOne;
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+};
+
+@gstring MultPrimContentOneGraphic = {
+    GSSetGStringBounds( 10, 10, 48, 64 ),
+    GSSetTextColorIndex( C_VIOLET ),
+    GSSetFont( FID_DTC_URW_SANS, 54.0 ),
+    GSSetTextStyle( TS_ITALIC, ~TS_ITALIC ),
+    GSDrawText( 10, 10 ), "1",
+    GSEndString()
+};
+
+@object MultPrimContentClass MultPrimContentOne = {
+    MPCI_graphic = MultPrimContentOneGraphic;
+};
+
+/*
+ *	    	    Second Primary
+ *
+ * This one contains a menu in its generic tree, in addition to
+ * the view that you see in Primary #1. The two primaries can be
+ * iconified independent of each other (though as of 9/29/92,
+ * iconifying one will cause the application, and thus the
+ * remaining uniconified primary, to drop to the back). More
+ * specifically, if the menu belonging to Primary #2 is pinned
+ * when Primary #1 is iconified, the menu will remain on-screen,
+ * in contrast to menus you're used to in single-primary applications.
+ *
+ * Because we provide a moniker for the primary here, it will not
+ * inherit the moniker from the GenApplication, unlike Primary #1.
+ */
+@object GenPrimaryClass MultPrimPrimaryTwo  = {
+    GI_visMoniker = "Primary Two";
+    GI_comp = @MultPrimTwoMenu,
+              @MultPrimViewTwo;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+};
+
+/*
+ * This primary is much more mundane than the first when it comes
+ * to its icon moniker list; just a regular text and a graphic
+ * moniker (this one has an ellipse, rather than a rectangle).
+ */
+@visMoniker MultPrimTwoMonikerList = list {
+    @TextMonikerTwo,
+    @GStringMonikerTwo
+};
+
+@visMoniker TextMonikerTwo = "Primary Two";
+
+@visMoniker GStringMonikerTwo = {
+    color = gray1;
+    aspectRatio = normal;
+    gstring {
+	GSSetAreaColorIndex( C_WHITE ),
+	GSFillEllipse( 0, 0, MONIKER_WIDTH, MONIKER_HEIGHT ),
+	GSSetAreaColorIndex(C_BLACK),
+	GSFillEllipse( 2, 2, MONIKER_WIDTH - 2, MONIKER_HEIGHT - 2 ),
+	GSEndString()
+    }
+};
+
+
+/*
+ * A GenPrimary may or may not have a menu.  This one does.
+ * The menu(s) are defined with one or more GIV_POPUP
+ * GenInteractions below the GenPrimary.
+ */
+@object GenInteractionClass MultPrimTwoMenu = {
+    GI_visMoniker = 'A', "Actions";
+    GI_comp = @ReplaceLongTermMoniker,
+              @SetPrimaryOneMonikerToGString,
+              @SetPrimaryTwoMonikerToGString;
+    GII_visibility = GIV_POPUP;
+};
+
+/*
+ * Each GenPrimary maintains a secondary "long-term" moniker in
+ * addition to its own. This can be used by the application for
+ * whatever purpose it desires. As its name implies, it's intended
+ * to display long-term status messages. For example, the
+ * GenDisplayControl has an attribute (GDCF_NAME_ON_PRIMARY) that
+ * causes it to store the moniker of the selected GenDisplay object
+ * as the long-term moniker of the GenPrimary object on which it
+ * finds itself. When used in concert with the GenDocumentControl
+ * this results in the title bar of the GenPrimary displaying both
+ * the name of the application (as inherited from the GenApplication
+ * object) and the name of the selected document (as inherited from
+ * the selected GenDisplay).
+ *
+ * The ReplaceLongTermMoniker dialog, below, allows you to change
+ * the long-term moniker for Primary #2 and see what the result is.
+ */
+@object GenInteractionClass ReplaceLongTermMoniker = {
+    GI_visMoniker = 'L', "Replace GenPrimary Long Term Moniker";
+    GI_comp = @MonikerTextEntry,
+              @ReplaceMonikerTrigger,
+              @ClearMonikerTrigger;
+    GII_type = GIT_COMMAND;
+    GII_visibility = GIV_DIALOG;
+};
+
+@object GenTextClass MonikerTextEntry = {
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+};
+
+@object GenTriggerClass ReplaceMonikerTrigger = {
+    GI_visMoniker = 'R', "Replace";
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_MULT_PRIM_REPLACE_LONG_TERM_MONIKER;
+};
+
+@object GenTriggerClass ClearMonikerTrigger = {
+    GI_visMoniker = 'C', "Clear";
+    HINT_SEEK_REPLY_BAR;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_MULT_PRIM_CLEAR_LONG_TERM_MONIKER;
+};
+
+/*
+ * Triggers to provide graphical icons to the two primaries. When
+ * they start up, they only have textual monikers, so that's all
+ * the specific UI can display (of course, some specific UIs may
+ * well choose to display a default graphic if the primary has
+ * none of its own). These messages tell the process to tell the
+ * primaries to use the moniker lists we've defined.
+ */
+@object GenTriggerClass SetPrimaryOneMonikerToGString = {
+   GI_visMoniker = 'O', "Set Icon for Primary One";
+   GTI_destination = process;
+   GTI_actionMsg = MSG_MULT_PRIM_SET_PRIMARY_ONE_MONIKER_TO_GSTRING;
+};
+
+@object GenTriggerClass SetPrimaryTwoMonikerToGString = {
+   GI_visMoniker = 'T', "Set Icon for Primary Two";
+   GTI_destination = process;
+   GTI_actionMsg = MSG_MULT_PRIM_SET_PRIMARY_TWO_MONIKER_TO_GSTRING;
+};
+
+/*
+ * View and content for the second primary. Another boring
+ * couple of objects.
+ */
+@object GenViewClass MultPrimViewTwo = {
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_content = MultPrimContentTwo;
+};
+
+@gstring MultPrimContentTwoGraphic = {
+    GSSetGStringBounds( 10, 10, 48, 64 ),
+    GSSetTextColorIndex( C_RED ),
+    GSSetFont( FID_DTC_URW_SANS, 54.0 ),
+    GSSetTextStyle( TS_ITALIC, ~TS_ITALIC ),
+    GSDrawText( 10, 10 ), "2",
+    GSEndString()
+};
+
+@object MultPrimContentClass MultPrimContentTwo = {
+    MPCI_graphic = MultPrimContentTwoGraphic;
+};
+
+@end Interface;
+
+/*
+ ***********************************************************************
+ *		Code for MultPrimProcessClass
+ ***********************************************************************
+ */
+
+
+/***********************************************************************
+ *	MSG_MULT_PRIM_REPLACE_LONG_TERM_MONIKER for MultPrimProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Replace the long-term moniker of the second primary
+ *		    with the contents of the text object in the dialog
+ *		    box.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the old long-term moniker is deleted and a new one
+ *		        created in its place. This may cause the primary
+ *			to recalculate its geometry, depending on the
+ *			specific UI.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/11/92		Initial Revision
+ *
+ **********************************************************************/
+@method MultPrimProcessClass, MSG_MULT_PRIM_REPLACE_LONG_TERM_MONIKER
+{
+    MemHandle textMonikerBlock;
+
+    /*
+     * Get the new moniker from the text edit.
+     */
+    textMonikerBlock = @call MonikerTextEntry::
+        MSG_VIS_TEXT_GET_ALL_BLOCK( 0 );
+EC( ECCheckMemHandle( textMonikerBlock ); )
+
+    if ( NullHandle != textMonikerBlock ) {
+	/*
+	 * Call the primary (do not use @send, since we wouldn't
+         * be sure the primary was done with the block of text
+         * before we freed it).
+	 */
+        @call MultPrimPrimaryTwo::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+	     /*
+	      * immediate visual update
+	      */
+	     VUM_NOW,
+	     /*
+	      * we are passing null-terminated text, so it'll
+              * figure the width and height of the moniker, as well
+              * as its length.
+	      */
+	     0, 0, 0,
+	     /*
+	      * set the moniker from text
+	      */
+	     VMDT_TEXT,
+	     /*
+	      * pass the heap block returned by
+              * MSG_VIS_TEXT_GET_ALL_BLOCK
+	      */
+	     VMST_HPTR,
+	     /*
+	      * Format for VMST_HPTR is handle:offset.
+              * We use offset=0;
+	      */
+	     (dword)( ConstructOptr( textMonikerBlock, 0 ) ) );
+	/*
+	 * Free the block holding the string.
+	 */
+        MemFree( textMonikerBlock );
+    }
+} /* MSG_MULT_PRIM_REPLACE_LONG_TERM_MONIKER */
+
+
+/***********************************************************************
+ *	MSG_MULT_PRIM_CLEAR_LONG_TERM_MONIKER for MultPrimProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Clear the long-term moniker stored with primary #2
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the old long-term moniker is deleted. This may cause
+ *		        the primary to recalculate its geometry,
+ *			depending on the specific UI.
+ *
+ * STRATEGY:	    Telling the primary to replace its long-term
+ *		        moniker with one of type VMDT_NULL does
+ *			just what we need it to do.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/11/92		Initial Revision
+ *
+ **********************************************************************/
+@method MultPrimProcessClass, MSG_MULT_PRIM_CLEAR_LONG_TERM_MONIKER
+{
+    @call MultPrimPrimaryTwo::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+	 /*
+	  * immediate visual update
+	  */
+	 VUM_NOW,
+	 /*
+	  * these not used for VMDT_NULL
+	  */
+	 0, 0, 0,
+	 /*
+	  * clear the moniker
+	  */
+	 VMDT_NULL,
+	 /*
+	  * these not used for VMDT_NULL
+	  */
+	 VMST_FPTR, (dword)0 );
+} /* MSG_MULT_PRIM_CLEAR_LONG_TERM_MONIKER */
+
+
+/***********************************************************************
+ *				MPPSetMoniker
+ ***********************************************************************
+ * SYNOPSIS:	    Set the moniker for a GenPrimary to the passed
+ *		    moniker list. The list should have a text moniker
+ *		    in it if you want the primary to have a unique
+ *		    text string under it (rather than acquiring its
+ *		    text string from its parent GenApplication object,
+ *		    if the specific UI requires it).
+ * CALLED BY:	    (INTERNAL) MultPrimProcess:MULT_PRIM_SET_PRIMARY_ONE_-
+ *			           MONIKER_TO_GSTRING
+ *			       MultPrimProcess:MULT_PRIM_SET_PRIMARY_TWO_-
+ *			           MONIKER_TO_GSTRING
+ * RETURN:	    nothing
+ * SIDE EFFECTS:    depending on the moniker list passed, the title
+ *		        of both the primary window and its icon may
+ *			change, as may the graphic displayed for the icon.
+ *
+ * STRATEGY:	    - relocate the passed moniker list
+ *	    	    - set it as the moniker for the primary
+ *	    	    - unrelocate the moniker list for next time.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	9/28/92		Initial Revision
+ *
+ **********************************************************************/
+static void
+MPPSetMoniker( optr  primary, /* Primary whose moniker we want to set */
+	       optr  list )   /* List of monikers from which to choose.
+			       * Must be in the same block as the
+			       * GenPrimary. */
+{
+    /*
+     * Because the moniker-list is not associated with any generic
+     * object, we must ask somebody to relocate it, adjusting the
+     * handle of the optr for each moniker in the list to the
+     * proper value for this instance of the application.
+     */
+    @call primary::MSG_GEN_RELOC_MONIKER_LIST( list, 0 );
+    /*
+     * Now the list is properly relocated, tell the primary to
+     * replace its current moniker with the one in the list.
+     */
+    @call primary::MSG_GEN_REPLACE_VIS_MONIKER_OPTR( list, VUM_NOW );
+    /*
+     * Unrelocate the list, ikn case we get called again for
+     * the same one.
+     */
+    @call primary::MSG_GEN_RELOC_MONIKER_LIST( list, 1 );
+} /* MPPSetMoniker */
+
+
+/***********************************************************************
+ *	MSG_MULT_PRIM_SET_PRIMARY_ONE_MONIKER_TO_GSTRING for
+ *	    	    	MultPrimProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Change the moniker for MultPrimPrimaryOne so it
+ *		    has something graphical to display for its icon.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the previous moniker for the object is destroyed.
+ *
+ * STRATEGY:	    call the utility routine (MPPSetMoniker) to do all
+ *		        the work.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/11/92		Initial Revision
+ *
+ **********************************************************************/
+@method MultPrimProcessClass, MSG_MULT_PRIM_SET_PRIMARY_ONE_MONIKER_TO_GSTRING
+{
+    MPPSetMoniker(@MultPrimPrimaryOne, @MultPrimOneMonikerList);
+} /* MSG_MULT_PRIM_SET_PRIMARY_ONE_MONIKER_TO_GSTRING */
+
+/***********************************************************************
+ *	MSG_MULT_PRIM_SET_PRIMARY_TWO_MONIKER_TO_GSTRING for
+ *	    	    	MultPrimProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Change the moniker for MultPrimPrimaryTwo so it
+ *		    has something graphical to display for its icon.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the previous moniker for the object is destroyed.
+ *
+ * STRATEGY:	    call the utility routine (MPPSetMoniker) to do all
+ *		        the work.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/11/92		Initial Revision
+ *
+ **********************************************************************/
+@method MultPrimProcessClass, MSG_MULT_PRIM_SET_PRIMARY_TWO_MONIKER_TO_GSTRING
+{
+    MPPSetMoniker( @MultPrimPrimaryTwo, @MultPrimTwoMonikerList );
+} /* MSG_MULT_PRIM_SET_PRIMARY_TWO_MONIKER_TO_GSTRING */
+
+/***********************************************************************
+ *	    	    Implementation of MultPrimContentClass
+ **********************************************************************/
+
+/***********************************************************************
+ *				MPCLoadGraphic
+ ***********************************************************************
+ * SYNOPSIS:	    Create a usable graphic string from the static
+ *		    one whose chunk is stored in our instance data.
+ * CALLED BY:	    (INTERNAL) MultPrimContent::VIS_DRAW
+ *			       MultPrimContent::VIS_RECALC_SIZE
+ * RETURN:	    Handle to GString
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	9/28/92		Initial Revision
+ *
+ **********************************************************************/
+static Handle
+MPCLoadGraphic( optr                      oself,
+                MultPrimContentInstance * pself )
+{
+    void * gstringData;
+
+    /*
+     * Get a far pointer to the graphics string that we can pass
+     * to the graphics system so we can manipluate the beast.
+     * We know the gstring is in the same block as we are, so we
+     * can use our own optr to form the global-handle half of
+     * the dereference operation.
+     */
+    gstringData = LMemDerefHandles( OptrToHandle( oself ),
+                                    pself->MPCI_graphic );
+
+    /*
+     * Tell the graphics system to create a Handle from the static
+     * data.
+     *
+     * NOTE: We may not do anything to cause the data to move until we
+     * destroy the gstring, or rampant death could easily result.
+     */
+    return( GrLoadGString( PtrToSegment( gstringData ), GST_PTR,
+			   PtrToOffset( gstringData ) ) );
+} /* MPCLoadGraphic */
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for MultPrimContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Draw the document.
+ * PARAMETERS:	    void (DrawFlags drawFlags, GStateHandle gstate)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    - load the gstring from its chunk
+ *	    	    - draw it.
+ *		    - destroy the gstring handle
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	9/28/92		Initial Revision
+ *
+ **********************************************************************/
+@method MultPrimContentClass, MSG_VIS_DRAW
+{
+    Handle   gstring;
+
+    gstring = MPCLoadGraphic( oself, pself );
+
+    /*
+     * Draw the entire graphics string at (0,0).
+     */
+    GrDrawGString( gstate, gstring, 0, 0, 0, (word*)0 );
+
+    /*
+     * Biff the handle, while leaving the static gstring
+     * data for next time.
+     */
+    GrDestroyGString( gstring, 0, GSKT_LEAVE_DATA );
+} /* MSG_VIS_DRAW */
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for MultPrimContentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Calculate how big we want to be.
+ * PARAMETERS:	    SizeAsDWord(word width, word height)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    - we ignore the width and height we were passed,
+ *		      preferring the bounds of our graphics string instead.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	9/28/92		Initial Revision
+ *
+ **********************************************************************/
+@method MultPrimContentClass, MSG_VIS_RECALC_SIZE
+{
+    Rectangle	bounds;  /* Calculated bounds of the graphics string */
+    Handle      gstring; /* Handle to loaded graphics string */
+    SizeAsDWord	retval;  /* Value we'll be returning */
+
+    /*
+     * Determine the bounds of the graphic we'll be displaying.
+     */
+    gstring = MPCLoadGraphic( oself, pself );
+    GrGetGStringBounds( gstring, 0, 0, &bounds );
+
+    /*
+     * Rather than the typical right-left, bottom-top for the width,
+     * height, we'd like to deal with any positive offset inherent
+     * in the graphics string and ensure there's a border of that
+     * magnitude around the graphics string, so we add the left to
+     * the right and the top to the bottom.
+     */
+    retval = MAKE_SIZE_DWORD( bounds.R_right+bounds.R_left,
+			      bounds.R_bottom+bounds.R_top );
+
+    /*
+     * Free up the gstring structure, while leaving our chunk alone.
+     */
+    GrDestroyGString( gstring, 0, GSKT_LEAVE_DATA );
+    return( retval );
+} /* MSG_VIS_RECALC_SIZE */
+

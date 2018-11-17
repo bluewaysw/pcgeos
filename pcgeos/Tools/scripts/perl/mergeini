@@ -1,0 +1,219 @@
+#!/usr/public/perl
+# -*- perl -*-
+##############################################################################
+#
+#       Copyright (c) Geoworks 1995 -- All Rights Reserved
+#	GEOWORKS CONFIDENTIAL
+#
+# PROJECT:      Jedi
+# MODULE:       Tools/scripts/perl -- mergeini
+# FILE:         mergeini
+# AUTHOR:       Jacob Gabrielson
+#
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       JAG     8/7/95         Initial Revision
+#       CCT     8/9/95         mods to make more flexible
+#
+# DESCRIPTION:
+#       Merges 2 ini files.
+#
+# USAGE:
+#	Run with no args for help.
+#
+#       $Id: mergeini,v 1.2 95/09/08 21:50:07 cthomas Exp $
+#
+###############################################################################
+
+
+($#ARGV == 1) || &usage;
+
+($templ, $ini) = @ARGV;
+
+open(TEMPL, "<$templ") || die "can't open $templ\n";
+open(INI, "<$ini") || die "can't open $ini\n";
+
+&scanini;
+# print STDERR "Scanned\n";
+&mergeini;
+
+close INI;
+close TEMPL;
+
+exit 0;
+
+#
+# Build up a table of category/keys and their data in the INI file
+#
+
+sub scanini {
+    local($cat, $key, $line);
+
+    while ($line = <INI>) {
+	if ($line =~ /^\s*$/) {
+	    #
+	    # Blank line, do nothing
+	    #
+
+	} elsif ($line =~ /^\[([^\[]+)\]/) {
+	    #
+	    # Category: Add to list of categories
+	    #
+	    $cat = $1;
+	    @categories = (@categories, $cat);
+	} elsif ($line =~ /^([^=]+)\s*=/) {
+	    #
+	    # Key: Read key data & store
+	    #
+	    die "key $key without category in $ini\n" unless $cat;
+	    $key = $1;
+	    $key =~ s/\s*$//;
+	    $keys{$cat} .= "|$key";
+	    $keydata{$cat,$key} = &readkey(INI, $line);
+	}
+    }
+}
+
+# Search for category/key pair in .INI file, and return a string
+# containing all the key lines
+
+sub readkey {
+    local($filehan, $line) = @_;
+    local($data) = ($line);
+
+    # Print out remaing parts of key if it's a string section, or
+    # a string section that's complete on one line.
+
+    return $data if ($line =~ /^[^\{]*$/ || $line =~ /\{.*\}/);
+
+    # Print out lines until we hit a "}".
+
+    while (<$filehan>) {
+	$data .= $_;
+	return $data if /\}/;
+    }
+
+    # Should never get here, unless there's a string section with no
+    # closing "}", which is an error, of course.
+
+    die "incomplete string section\n";
+}
+
+# Scan the template file, and merge data from the INI file into it.
+
+sub mergeini {
+    local($newcat, $cat, $key, $line);
+
+    while ($line = <TEMPL>) {
+	if ($line =~ /^\s*$/) {
+	    #
+	    # Blank line: just dump it
+	    #
+	    print $line;
+
+	} elsif ($line =~ /^\[([^\[]+)\]/) {
+	    #
+	    # Hit a New category.  Print any keys in the INI file not
+	    # in the TEMPL file
+	    #
+	    $newcat = $1;
+	    if ($cat) {
+#		print "DUMPING REMAINING KEYS\n";
+		&dumpkeys($cat);
+	    }
+	    $cat = $newcat;
+	    print $line;
+
+	} elsif ($line =~ /^([^=]+)\s*=/) {
+	    #
+	    # Hit a key.  Print out this data, or data from the INI file.
+	    #
+	    die "key $key without category in $ini\n" unless $cat;
+	    $key = $1;
+	    $key =~ s/\s*$//;
+	    if ($keydata{$cat,$key}) {
+		#
+		# Key exists in INI file, it takes precedence
+		#
+		&dumpIniData($cat, $key);
+
+	    } else {
+		#
+		# No INI entry for key.  Just print this one.
+		#
+		print &readkey(TEMPL, $line);
+	    }
+	}
+    }
+    &dumpcats;
+
+}
+
+# Dumps the remaining unused keys in a category from the INI to STDOUT
+
+sub dumpkeys {
+    local ($cat) = @_;
+    local ($key);
+
+    while ($keys{$cat}) {
+#	print "KEYS = $keys{$cat}\n";
+	#
+	# grab the first key from the key list
+	#
+	($key) = ($keys{$cat} =~ /^\|([^|]+)/);
+	if ($key) {
+	    #
+	    # dump the key's data, with the side effect of
+	    # removing the key from the key list
+	    #
+	    &dumpIniData($cat, $key);
+	}
+    }
+}
+
+# Dumps all remaining unused categories from the INI to STDOUT
+sub dumpcats {
+    foreach $cat (@categories) {
+	if ($keys{$cat}) {
+	    #
+	    # Category still has unused keys, which means it was
+	    # never encountered in the TEMPL file.  Dump the entire
+	    # category
+	    #
+	    print "\n[$cat]\n";
+	    &dumpkeys($cat);
+	}
+    }
+}
+
+# Prints the data for a category/key, and removes from data table
+
+sub dumpIniData {
+    local ($cat, $key) = @_;
+
+    #
+    # print the data
+    #
+    print $keydata{$cat,$key};
+
+    #
+    # delete the data, effectively marking it 'USED'
+    #
+    $keydata{$cat,$key} = '';
+
+    #
+    # remove the key from the key list for that category
+    #
+    $keys{$cat} =~ s/\|$key//;
+
+    #
+    # We could remove the category from the category list,
+    # but it's easier to just check for a null keylist
+    # later.
+    #
+}
+
+sub usage {
+    die "Usage: mergeini <template file> <actual .ini file>\n";
+}

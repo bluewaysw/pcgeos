@@ -1,0 +1,1659 @@
+/*****************************************************************************
+ * DEFINITIONS
+ ****************************************************************************/
+
+#include <geos.h>
+#include <heap.h>
+#include <file.h>
+#include <lmem.h>
+#include <chunkarr.h>
+#include <ec.h>
+#include <resource.h>
+#include <Ansi/string.h>
+#include "sstor.h"
+#include "intsstor.h"
+
+/*
+ * Macros to use Libary dgroup.
+ */
+#ifdef __HIGHC__
+
+#ifndef PUSHDS
+#define PUSHDS	_inline(0x1e)	/* push	ds */
+#endif
+
+#ifndef POPDS
+#define POPDS	_inline(0x1f)	/* pop	ds */
+#endif
+
+#endif
+
+#ifdef __BORLANDC__
+
+#ifndef PUSHDS
+#define PUSHDS  asm{push ds}
+#endif
+
+#ifndef POPDS
+#define POPDS   asm{pop  ds}
+#endif
+
+#endif
+
+#ifndef SET_DS_LIB_DGROUP
+#define SET_DS_LIB_DGROUP GeodeLoadDGroup (GeodeGetCodeProcessHandle())
+                                /* destroys ds! */
+#endif
+
+typedef MemHandle BCBHandle;
+
+typedef struct {
+    SECT        BCB_sect;       // SECT in the buffer
+    BCBHandle   BCB_mem;        // MemHandle of the data buffer
+    word        BCB_useCount;   // # of streams using this buffer
+} BCB;
+
+typedef struct {
+    ChunkHandle BCBS_freePool;      // chunk of the free pool array
+    word        BCBS_freePoolLen;   // # of elements in the free pool
+    word	BCBS_bufferCount;   // total # of allocated buffers
+    ChunkHandle BCBS_table;         // chunk of the buffer table chunk array
+} BCBStruct;
+
+typedef word BCBID;
+#define INVALID_BCBID   CA_NULL_ELEMENT
+
+#define BUFFER_FREE_POOL_MAX_LEN    8
+
+/* StgDocfile is a memblock that contains StgDocfileStruct: */
+
+typedef struct {
+    LMemBlockHeader         SDFS_meta;
+EC( word		    SDFS_tag; )	// Unique tag for Docfile
+    FileHandle              SDFS_file;  // The file handle of the storage
+    StgStorage              SDFS_root;  // The StgStorage of the root storage
+    StructuredStorageHeader SDFS_header;// The full file header
+    BCBStruct               SDFS_BCB;
+} StgDocfileStruct;
+
+#define SDFS_handle SDFS_meta.LMBH_handle
+
+/* StgStorage is a memblock that contains StgStorageStruct: */
+
+typedef struct {
+EC( word	SSTGS_tag; )	// Unique tag for storage
+    StgStorage  SSTGS_handle;   // The handle of this object
+    StgDocfile  SSTGS_file;     // The handle of the StgDocfile
+    SID         SSTGS_sid;      // The SID of this storage
+    StructuredStorageDirectoryEntry
+                SSTGS_dir;      // The full dir entry of this storage
+} StgStorageStruct;
+
+/* StgStream is a memblock that contains StgStreamStruct: */
+
+struct _StgStreamStruct;
+typedef SECT (*fpReadFat)(struct _StgStreamStruct *ps, SECT s);
+
+struct _StgStreamStruct {
+EC( word	SSTRS_tag; )	// Unique tag for stream
+    StgStream   SSTRS_handle;   // The handle of this object
+    StgDocfile  SSTRS_file;     // The handle of the StgDocfile
+    StgStorage  SSTRS_parent;   // The handle of the parent StgStorage
+    SID         SSTRS_sid;      // The SID of this stream (valid only if
+                                // SSTRS_parent is not null)
+    SECT        SSTRS_sectStart;// The starting SECT of the stream
+    word        SSTRS_sectSize; // The log to the base 2 of the SECT size
+                                // (left-shift count)
+    dword       SSTRS_sectMask; // AND an offset by this to obtain the
+                                // SECT-relative offset
+    dword       SSTRS_size;     // The total byte length of the stream
+                                // (only for main/mini-streams, the
+                                // Ministream, and the MiniFat), or
+                                // the SECT count of the stream (only for
+                                // FAT and DIF streams)
+    dword       SSTRS_curpos;   // Current stream pointer (only for main and
+                                // ministreams), or the current relative SECT
+                                // in stream (only for FAT and DIF)
+    dword       SSTRS_lastpos;  // Last position of the stream pointer,
+                                // before a physical seek.
+    SECT        SSTRS_curSect;  // Absolute SECT of current stream pointer
+    StgStream   SSTRS_base;     // The handle of the base StgStream
+                                // (only for streams in the Ministream)
+    StgStream   SSTRS_fat;      // The handle of the stream used to iterate
+                                // sectors (FAT, MiniFat, DIF)
+    fpReadFat   SSTRS_fpReadFat;// Function pointer to the method used to
+                                // read a FAT stream (only for MiniFat, FAT
+                                // and DIF streams)
+    StgError    SSTRS_lastError;// The code of the last error
+    BCBHandle   SSTRS_bh;       // Handle of the current buffered SECT
+    BCBID       SSTRS_bcbid;    // BCBID of the current buffered SECT
+};
+
+typedef struct _StgStreamStruct StgStreamStruct;
+
+#define min(x,y) ((x) < (y)) ? (x) : (y)
+
+/* These unique values are stored in the various structures and are checked
+ * for a match whenever a handle is locked down.  This should catch bad clients
+ * that gets their handles confused. (EC ONLY)
+ */
+
+#define TAG_DOCFILE		0xDCFE
+#define TAG_STORAGE		0x5109
+#define TAG_STREAM		0x5EA3
+
+#if ERROR_CHECK
+
+StgDocfileStruct *DocfileLock(StgDocfile file)
+{
+    StgDocfileStruct *pfile = MemLock(file);
+    EC_ERROR_IF(pfile->SDFS_tag != TAG_DOCFILE, -1);
+    return pfile;
+}
+
+StgStorageStruct *StorageLock(StgStorage stg)
+{
+    StgStorageStruct *pstg = MemLock(stg);
+    EC_ERROR_IF(pstg->SSTGS_tag != TAG_STORAGE, -1);
+    return pstg;
+}
+
+StgStreamStruct *SStreamLock(StgStream stream)
+{
+    StgStreamStruct *pstream = MemLock(stream);
+    EC_ERROR_IF(pstream->SSTRS_tag != TAG_STREAM, -1);
+    return pstream;
+}
+
+#else
+
+#define DocfileLock(file)       MemLock(file)
+#define StorageLock(stg)        MemLock(stg)
+#define SStreamLock(stream)     MemLock(stream)
+
+#endif
+
+#define DocfileUnlock(pfile)    MemUnlock(pfile->SDFS_handle)
+#define StorageUnlock(pstg)     MemUnlock(pstg->SSTGS_handle)
+#define SStreamUnlock(pstream)  MemUnlock(pstream->SSTRS_handle)
+
+#define BufferLockRead(bh)      MemLockShared(bh)
+#define BufferUnlockRead(bh)    MemUnlockShared(bh)
+
+/*****************************************************************************
+ * DECLARATIONS
+ ****************************************************************************/
+
+StgDocfile DocfileCreate(FileHandle file, StgStorage *pRoot, StgError *pError);
+StgStorage StorageCreate(StgDocfile docfile, SID sid,
+    StructuredStorageDirectoryEntry *pDir);
+StgDocfile StorageGetDocfile(StgStorage stg);
+StgError StorageGetDirEntry(StgDocfile file, SID sid,
+    StructuredStorageDirectoryEntry *pDir);
+StgError StorageFindDirEntry(StgStorage stg, char *name,
+    StructuredStorageDirectoryEntry *pDir, SID *pResult);
+StgStream SStreamCreate(StgStorage parent, SID sid, 
+    StructuredStorageDirectoryEntry *pDir, StgError *pError);
+StgStream SStreamCreateDir(StgDocfile docfile, StgError *pError);
+StgStream SStreamClone(StgStreamStruct *psource);
+StgStream SStreamFree(StgStream stream, StgError *pError);
+SECT SStreamReadDIF(struct _StgStreamStruct *ps, SECT s);
+SECT SStreamReadFAT(struct _StgStreamStruct *ps, SECT s);
+SECT SStreamReadMiniFat(struct _StgStreamStruct *ps, SECT s);
+StgError SStreamSeek(StgStreamStruct *ps, dword offset);
+word SStreamRead(StgStreamStruct *ps, byte *buf, word size);
+void BufferInit(MemHandle mh, BCBStruct *pbcbs);
+void BufferFree(StgDocfile doc, BCBStruct *pbcbs);
+StgError BufferGet(StgDocfileStruct **ppdoc, SECT sect, BCBID *pid,
+  BCBHandle *pbh);
+StgError BufferRelease(StgDocfile doc, BCBID id);
+
+/*****************************************************************************
+ * HIGH-LEVEL INTERFACE
+ ****************************************************************************/
+
+StgError StgOpenDocfile(FileHandle file, StgDocfile *sdf, StgStorage *root)
+{
+    StgError error = STGERR_NONE;
+    StgDocfile doc;
+    
+    /* Allocate and initialize a StgDocfile. */
+    if ((doc = DocfileCreate(file, root, &error)) != NullHandle)
+    {
+        /* Store the doc handle. */
+        *sdf = doc;
+    }
+        
+    return error;
+}
+
+void StgCloseDocfile(StgDocfile sdf)
+{
+    StgDocfileStruct *pdoc = DocfileLock(sdf);
+    StgStorageClose(pdoc->SDFS_root);
+    BufferFree(sdf, &pdoc->SDFS_BCB);
+    DocfileUnlock(pdoc);
+    MemFree(sdf);
+}
+
+StgError StgStorageOpen(StgStorage parent, char *name, StgStorage *child)
+{
+    SID childID;
+    StructuredStorageDirectoryEntry dir;
+    StgError error;
+
+    /* Lookup the passed name. */
+    if ((error = StorageFindDirEntry(parent, name, &dir, &childID))
+      != STGERR_NONE)
+        return error;
+
+    /* Ensure that the located child is a storage. */
+    if (dir.SSDE_mse != STGTY_STORAGE)
+        return STGERR_NAME_WRONG_TYPE;
+
+    /* Create a StgStorage for the child. */
+    if ((*child = StorageCreate(StorageGetDocfile(parent),
+      childID, &dir)) == NullHandle)
+        return STGERR_MEMORY_ERROR;
+
+    return STGERR_NONE;
+}
+
+void StgStorageClose(StgStorage storage)
+{
+#if ERROR_CHECK
+    /* Lock down the thing so we can verify that it's a storage. */
+    StorageUnlock(StorageLock(storage));
+#endif
+
+    MemFree(storage);
+}
+
+StgError StgStreamOpen(StgStorage stg, char *name, StgStream *stream)
+{
+    StgError error = STGERR_NONE;
+    SID childID;
+    StructuredStorageDirectoryEntry dir;
+
+    /* Lookup the passed name. */
+    if ((error = StorageFindDirEntry(stg, name, &dir, &childID))
+      != STGERR_NONE)
+        return error;
+
+    /* Ensure that the located child is a stream. */
+    if (dir.SSDE_mse != STGTY_STREAM)
+        return STGERR_NAME_WRONG_TYPE;
+
+    /* Create a StgStream for the child. */
+    *stream = SStreamCreate(stg, childID, &dir, &error);
+
+    return error;
+}
+
+StgStream StgStreamClone(StgStream stream)
+{
+    StgStream retval;
+    StgStreamStruct *ps = SStreamLock(stream);
+
+    retval = SStreamClone(ps);
+    SStreamUnlock(ps);
+
+    return retval;
+}
+
+word StgStreamRead(StgStream stream, void *buf, word size)
+{
+    word retval;
+    StgStreamStruct *ps = SStreamLock(stream);
+
+    retval = SStreamRead(ps, buf, size);
+    SStreamUnlock(ps);
+
+    return retval;
+}
+
+StgError StgStreamSeek(StgStream stream, dword pos, StgPosMode mode)
+{
+    StgError retval;
+    dword abspos = pos;
+    
+    StgStreamStruct *ps = SStreamLock(stream);
+    if (mode == STG_POS_RELATIVE)
+        abspos += ps->SSTRS_curpos;
+    else if (mode == STG_POS_END)
+        abspos = ps->SSTRS_size - pos;
+    retval = SStreamSeek(ps, abspos);
+    SStreamUnlock(ps);
+
+    return retval;
+}
+
+dword StgStreamPos(StgStream stream)
+{
+    dword retval;
+
+    StgStreamStruct *ps = SStreamLock(stream);
+    retval = ps->SSTRS_curpos;
+    SStreamUnlock(ps);
+
+    return retval;
+}
+
+StgError StgStreamGetLastError(StgStream stream)
+{
+    StgError retval;
+    
+    StgStreamStruct *ps = SStreamLock(stream);
+    retval = ps->SSTRS_lastError;
+    SStreamUnlock(ps);
+
+    return retval;
+}
+
+void StgStreamClose(StgStream stream)
+{
+    StgError error;
+    SStreamFree(stream, &error);
+}
+
+/*****************************************************************************
+ * DOCFILE ROUTINES
+ ****************************************************************************/
+
+/****************************************************************************
+ * DocfileCreate
+ *
+ * Creates a StgDocfile.
+ *
+ * Takes:
+ * file - the FileHandle of the opened file.
+ * pRoot - where the handle of the root StgStorage will be placed.
+ * pError - where the error code will be placed.
+ *
+ * Returns: the handle of the new StgDocfile on success;
+ * otherwise, NullHandle is returned, and *pError will contain the
+ * error reason:
+ *      STGERR_FILE_NOT_STORAGE - The file was not a valid storage;
+ *        either the header was not complete or the signature was
+ *        invalid.
+ *      STGERR_FILE_ERROR
+ *      STGERR_MEMORY_ERROR
+ */
+#define DocfileCheckSig(pdoc, sig) (!memcmp((pdoc)->SDFS_header.SSH_abSig, \
+					    (sig), SSH_SIG_LEN))
+    
+StgDocfile DocfileCreate(FileHandle file, StgStorage *pRoot, StgError *pError)
+{
+    StgDocfile docfile;
+    StgDocfileStruct *pDocfile;
+    static const byte DocfileSigNew[] = { SSH_SIG_NEW };
+    static const byte DocfileSigOld[] = { SSH_SIG_OLD };
+
+    /* Allocate a LMemBlock for the struct. */
+    if ((docfile = MemAllocLMem(LMEM_TYPE_GENERAL,
+      sizeof(StgDocfileStruct))) == NullHandle)
+    {
+        *pError = STGERR_MEMORY_ERROR;
+        return NullHandle;
+    }
+
+    /* Lock and fill in the struct. */
+    pDocfile = MemLock(docfile);
+    pDocfile->SDFS_file = file;
+EC (pDocfile->SDFS_tag = TAG_DOCFILE;					)
+
+    /* Setup buffer storage. */
+    BufferInit(docfile, &pDocfile->SDFS_BCB);
+
+    /* Read the file header. */
+    FilePos(file, 0, FILE_POS_START);
+    if (FileRead(file, &pDocfile->SDFS_header, sizeof(StructuredStorageHeader),
+      FALSE) != sizeof(StructuredStorageHeader))
+    {
+        if (ThreadGetError() == ERROR_SHORT_READ_WRITE)
+            *pError = STGERR_FILE_NOT_STORAGE;
+        else
+            *pError = STGERR_FILE_ERROR;
+    }
+    else
+    {
+	/* Since we're referencing variables in dgroup, setup DS now. */
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+
+        /* Validate the file signature. */
+        /* Validate the byte ordering. (Only Intel is supported.) */
+        if ((!DocfileCheckSig(pDocfile, DocfileSigNew) &&
+          !DocfileCheckSig(pDocfile, DocfileSigOld))
+          || (pDocfile->SDFS_header.SSH_uByteOrder != SSH_BYTE_ORDER_INTEL))
+            *pError = STGERR_FILE_NOT_STORAGE;
+        else
+        {
+            /* Create a StgStorage for SID 0 (root directory). */
+            StructuredStorageDirectoryEntry dir;
+
+            if ((*pError = StorageGetDirEntry(docfile, ROOT_SID, &dir))
+              == STGERR_NONE)
+            
+                if ((pDocfile->SDFS_root = StorageCreate(docfile,
+                  ROOT_SID, &dir)) == NullHandle)
+                    *pError = STGERR_MEMORY_ERROR;
+                else
+                    *pRoot = pDocfile->SDFS_root;
+        }
+	/* All done with dgroup. */
+	POPDS;
+    }
+
+    MemUnlock(docfile);
+    if (*pError)
+    {
+        MemFree(docfile);
+        docfile = NullHandle;
+    }
+    return docfile;
+}
+
+/****************************************************************************
+ * DocfileSeek
+ *
+ * Seeks to a position in the docfile.
+ *
+ * Takes:
+ * pdoc - a pointer to the docfile.
+ * sect - the SECT of the desired sector.
+ * offset - the offset into the desired sector.
+ *
+ * Returns: nothing
+ *
+ */
+void DocfileSeek(StgDocfileStruct *pdoc, SECT sect, word offset)
+{
+    dword absoff = ((dword)sect << pdoc->SDFS_header.SSH_uSectorShift) +
+      sizeof(StructuredStorageHeader) + offset;
+    FilePos(pdoc->SDFS_file, absoff, FILE_POS_START);
+}
+
+/****************************************************************************
+ * DocfileRead
+ *
+ * Reads from the docfile.
+ *
+ * Takes:
+ * pdoc - a pointer to the docfile.
+ * pBuffer - a pointer to the buffer to receive the data
+ * count - the number of bytes to read
+ *
+ * Returns: zero (STGERR_NONE) on success; otherwise, the error code:
+ *      STGERR_FORMAT_ERROR - EOF was reached before filling the buffer
+ *      STGERR_FILE_ERROR - any other error
+ *
+ */
+StgError DocfileRead(StgDocfileStruct *pdoc, void *pBuffer, word count)
+{
+    StgError error = STGERR_NONE;
+    
+    if (FileRead(pdoc->SDFS_file, pBuffer, count, FALSE) != count)
+    {
+        if (ThreadGetError() == ERROR_SHORT_READ_WRITE)
+            error = STGERR_FORMAT_ERROR;
+        else
+            error = STGERR_FILE_ERROR;
+    }
+    return error;
+}
+
+/*****************************************************************************
+ * STORAGE ROUTINES
+ ****************************************************************************/
+
+/****************************************************************************
+ * StorageCreate
+ *
+ * Creates a StgStorage.
+ *
+ * Takes:
+ * docfile - the handle of the parent StgDocfile.
+ * sid - the SID of the storage.
+ * dir - the directory entry for the storage.
+ *
+ * Returns: the handle of the new StgStorage; otherwise, NullHandle.
+ *
+ */
+StgStorage StorageCreate(StgDocfile docfile, SID sid,
+    StructuredStorageDirectoryEntry *pDir)
+{
+    StgStorage stg;
+    StgStorageStruct *pstg;
+
+    /* Allocate a memblock for the struct. */
+    if ((stg = MemAlloc(sizeof(StgStorageStruct), HF_DYNAMIC,
+      HAF_STANDARD_LOCK)) != NullHandle)
+    {
+        /* Lock, fill it in, and unlock. */
+        pstg = MemDeref(stg);
+EC (	pstg->SSTGS_tag = TAG_STORAGE;					)
+        pstg->SSTGS_handle = stg;
+        pstg->SSTGS_file = docfile;
+        pstg->SSTGS_sid = sid;
+        pstg->SSTGS_dir = *pDir;
+        MemUnlock(stg);
+    }
+    return stg;
+}
+
+StgDocfile StorageGetDocfile(StgStorage stg)
+{
+    StgDocfile retval;
+    
+    StgStorageStruct *pstg = StorageLock(stg);
+    retval = pstg->SSTGS_file;
+    StorageUnlock(pstg);
+
+    return retval;
+}
+
+void DirGetEntry(StgStream ds, SID sid, StructuredStorageDirectoryEntry *pDir)
+{
+    StgStreamStruct *pDS = SStreamLock(ds);
+
+    if (!SStreamSeek(pDS, (dword)sid * SSDE_PADDED_SIZE))
+        SStreamRead(pDS, pDir, sizeof(StructuredStorageDirectoryEntry));
+
+    SStreamUnlock(pDS);
+}
+
+StgError StorageGetDirEntry(StgDocfile file, SID sid,
+    StructuredStorageDirectoryEntry *pDir)
+{
+    StgStream ds;
+    StgError retval = STGERR_NONE;
+
+    if ((ds = SStreamCreateDir(file, &retval)) != NullHandle)
+    {
+        DirGetEntry(ds, sid, pDir);
+        retval = StgStreamGetLastError(ds);
+        SStreamFree(ds, &retval);
+    }
+
+    return retval;
+}
+
+/* Compares an ASCII string to a Unicode string. */
+sword DirNameCmp(char *str1, wchar *str2, word str2len)
+{
+    while (*str1 != '\0' && str2len --)
+    {
+        if ((wchar)*str1 != *str2)
+            break;
+        else
+            str1++, str2++;
+    }
+
+    return (sword)((wchar)*str1 - *str2);
+}
+
+StgError StorageFindDirEntry(StgStorage stg, char *name,
+    StructuredStorageDirectoryEntry *pDir, SID *pResult)
+{
+    StgStream ds;
+    StgStorageStruct *pstg = StorageLock(stg);
+    SID sid = pstg->SSTGS_dir.SSDE_sidChild;
+    StgError retval = STGERR_NONE;
+    
+    if ((ds = SStreamCreateDir(StorageGetDocfile(stg), &retval)) != NullHandle)
+    {
+        while (!retval && sid != NULL_SID)
+        {
+            DirGetEntry(ds, sid, pDir);
+            if (!(retval = StgStreamGetLastError(ds)))
+            {
+                if (pDir->SSDE_cb == 0) // make sure the entry has a name
+                    sid = NULL_SID;     // how'd we get here?
+                else
+                {
+                    /* The primary tree sort is by name length. */
+                    sword diff = strlen(name) -
+                      (pDir->SSDE_cb / sizeof(wchar) - 1);
+
+                    if (diff == 0)
+                        /* The secondary sort is by string comparison. */
+                        diff = DirNameCmp(name, pDir->SSDE_ab,
+                          pDir->SSDE_cb - 2);
+                    if (diff < 0)
+                        sid = pDir->SSDE_sidLeftSib;
+                    else if (diff > 0)
+                        sid = pDir->SSDE_sidRightSib;
+                    else /* (diff == 0) */
+                        break;          // found it
+                }
+            }
+        }
+        SStreamFree(ds, &retval);
+
+        if (!retval)
+        {
+            *pResult = sid;
+            if (sid == NULL_SID)
+                retval = STGERR_NAME_NOT_FOUND;
+        }
+    }
+    StorageUnlock(pstg);
+    return retval;
+}   
+
+/*****************************************************************************
+ * STREAM ROUTINES
+ ****************************************************************************/
+
+/****************************************************************************
+ * SStreamAlloc
+ *
+ * Allocates and initializes a StgStream.
+ *
+ * Takes:
+ * ppdoc - pointer to a pointer to the StgDocfile
+ * sid - the SID of this stream
+ * parent - the handle of the parent StgStorage
+ * start - the starting SECT of this stream
+ * size - the total byte length of this stream
+ * base - the handle of the StgStream containing this stream
+ * fat - the handle of the StgStream used to follow this stream
+ * fp - the pointer to the function used to read the fat stream
+ * pError - where the error code will be placed.
+ *
+ * Returns: the handle of the new StgStream on success;
+ * otherwise, NullHandle is returned, and *pError will contain the
+ * error reason:
+ *      STGERR_FORMAT_ERROR
+ *      STGERR_FILE_ERROR
+ *      STGERR_MEMORY_ERROR
+ */
+StgStream SStreamAlloc(StgDocfileStruct **ppdoc, SID sid, StgStorage parent,
+    SECT start, dword size, word shift, StgStream base, StgStream fat,
+    fpReadFat fp, StgError *pError)
+{
+    StgStream stg;
+    StgStreamStruct *pstream;
+
+    *pError = STGERR_NONE;
+
+    /* Allocate a memblock for the struct. */
+    if ((stg = MemAlloc(sizeof(StgStreamStruct), HF_DYNAMIC,
+      HAF_STANDARD_LOCK)) != NullHandle)
+    {
+        /* Lock, fill it in, and unlock. */
+        pstream = MemDeref(stg);
+EC (	pstream->SSTRS_tag = TAG_STREAM;				)
+        pstream->SSTRS_handle = stg;
+        pstream->SSTRS_file = (*ppdoc)->SDFS_handle;
+        pstream->SSTRS_parent = parent;
+        pstream->SSTRS_sid = sid;
+        pstream->SSTRS_size = size;
+        pstream->SSTRS_curpos = pstream->SSTRS_lastpos = 0;
+        pstream->SSTRS_curSect = pstream->SSTRS_sectStart = start;
+        pstream->SSTRS_sectSize = shift;
+        pstream->SSTRS_sectMask = ((1 << shift) - 1);
+        pstream->SSTRS_base = base;
+        pstream->SSTRS_fat = fat;
+        pstream->SSTRS_fpReadFat = fp;
+        pstream->SSTRS_lastError = STGERR_NONE;
+        if (base == NullHandle)
+        {
+            *pError = BufferGet(ppdoc, start, &pstream->SSTRS_bcbid,
+              &pstream->SSTRS_bh);
+        }
+        else
+        {
+            pstream->SSTRS_bh = NullHandle;
+            pstream->SSTRS_bcbid = INVALID_BCBID;
+        }
+        MemUnlock(stg);
+
+        if (*pError)
+        {
+            MemFree(stg);
+            stg = NullHandle;
+        }
+    }
+    else
+        *pError = STGERR_MEMORY_ERROR;
+
+    return stg;
+}
+
+/****************************************************************************
+ * SStreamCreateFAT
+ *
+ * Creates a FAT StgStream.  This is a special stream chained by the file
+ * header and the optional DIF and referenced by the file header.
+ *
+ * Takes:
+ * ppdoc - a pointer to a pointer to a StgDocfileStruct
+ * pError - where the error code will be placed.
+ *
+ * Returns: the handle of the new StgStream on success;
+ * otherwise, NullHandle is returned, and *pError will contain the
+ * error reason:
+ *      STGERR_MEMORY_ERROR
+ */
+StgStream SStreamCreateFAT(StgDocfileStruct **ppdoc, StgError *pError)
+{
+    StgStream fat = NullHandle, dif = NullHandle;
+    
+    /* If the docfile is larger than 7 MB, it will have more than 109 FAT
+     * SECTs. A DIF chain extends the header FAT SECT list. The presence of
+     * this chain is indicated by a non-zero count in SSH_csectDif.
+     */
+    if ((*ppdoc)->SDFS_header.SSH_csectDif)
+    {
+        /* Create a DIF stream.  This is a special stream chained by itself
+           (it's a linked list) and referenced by the file header. */
+        dif = SStreamAlloc(ppdoc, NULL_SID, NullHandle,
+          (*ppdoc)->SDFS_header.SSH_sectDifStart, (*ppdoc)->SDFS_header.SSH_csectDif,
+          (*ppdoc)->SDFS_header.SSH_uSectorShift, NullHandle, NullHandle,
+          SStreamReadDIF, pError);
+    }
+    if (!*pError)
+    {
+        fat = SStreamAlloc(ppdoc, NULL_SID, NullHandle,
+          (*ppdoc)->SDFS_header.SSH_sectFat[0], (*ppdoc)->SDFS_header.SSH_csectFat,
+          (*ppdoc)->SDFS_header.SSH_uSectorShift, NullHandle, dif, SStreamReadFAT,
+          pError);
+    }
+    if (*pError)
+    {
+        if (fat)
+            fat = SStreamFree(fat, pError); /* dif will be freed */
+        else if (dif)
+            dif = SStreamFree(dif, pError);
+    }
+    return fat;
+}
+
+/****************************************************************************
+ * SStreamCreateMiniFat
+ *
+ * Creates a MiniFat StgStream.  This is a main stream chained by the FAT
+ * and referenced by the file header.
+ *
+ * Takes:
+ * ppdoc - a pointer to a pointer to a StgDocfileStruct
+ * pError - where the error code will be placed.
+ *
+ * Returns: the handle of the new StgStream on success;
+ * otherwise, NullHandle is returned, and *pError will contain the
+ * error reason:
+ *      STGERR_MEMORY_ERROR
+ */
+StgStream SStreamCreateMiniFat(StgDocfileStruct **ppdoc, StgError *pError)
+{
+    StgStream fat = NullHandle, minifat = NullHandle;
+
+    /* Create a FAT stream. */
+    fat = SStreamCreateFAT(ppdoc, pError);
+
+    if (!*pError)
+    {
+        minifat = SStreamAlloc(ppdoc, NULL_SID, NullHandle,
+          (*ppdoc)->SDFS_header.SSH_sectMiniFatStart,
+          (*ppdoc)->SDFS_header.SSH_csectMiniFat << (*ppdoc)->SDFS_header.SSH_uSectorShift,
+          (*ppdoc)->SDFS_header.SSH_uSectorShift, NullHandle,
+          fat, SStreamReadMiniFat, pError);
+    }
+    if (*pError)
+    {
+        if (minifat)
+            minifat = SStreamFree(minifat, pError); /* fat will be freed */
+        else if (fat)
+            fat = SStreamFree(fat, pError);
+    }
+    return minifat;
+}
+
+/****************************************************************************
+ * SStreamCreateMinistream
+ *
+ * Creates a Ministream StgStream.  This is a main stream chained by FAT
+ * and referenced by the root directory entry.
+ *
+ * Takes:
+ * ppdoc - a pointer to a pointer to the StgDocfileStruct
+ * pError - where the error code will be placed.
+ *
+ * Returns: the handle of the new StgStream on success;
+ * otherwise, NullHandle is returned, and *pError will contain the
+ * error reason:
+ *      STGERR_MEMORY_ERROR
+ */
+StgStream SStreamCreateMinistream(StgDocfileStruct **ppdoc, StgError *pError)
+{
+    StgStream fat = NullHandle, ms = NullHandle;
+
+    /* Create a FAT stream. */
+    fat = SStreamCreateFAT(ppdoc, pError);
+
+    if (!*pError)
+    {
+        StgStorageStruct *proot = StorageLock((*ppdoc)->SDFS_root);
+        ms = SStreamAlloc(ppdoc, NULL_SID, NullHandle,
+          proot->SSTGS_dir.SSDE_sectStart, proot->SSTGS_dir.SSDE_ulSize,
+          (*ppdoc)->SDFS_header.SSH_uSectorShift, NullHandle, fat, NULL, pError);
+        StorageUnlock(proot);
+    }
+    if (*pError)
+    {
+        if (ms)
+            ms = SStreamFree(ms, pError);   /* fat will be freed */
+        else if (fat)
+            fat = SStreamFree(fat, pError);
+    }
+    return ms;
+}
+
+/****************************************************************************
+ * SStreamCreate
+ *
+ * Creates a directory-referenced StgStream.
+ *
+ * Takes:
+ * parent - the handle of the parent StgStream.
+ * sid - the SID of the stream.
+ * dir - the directory entry for the stream.
+ * pError - where the error code will be placed.
+ *
+ * Returns: the handle of the new StgStream on success;
+ * otherwise, NullHandle is returned, and *pError will contain the
+ * error reason:
+ *      STGERR_FORMAT_ERROR
+ *      STGERR_FILE_ERROR
+ *      STGERR_MEMORY_ERROR
+ */
+StgStream SStreamCreate(StgStorage parent, SID sid, 
+    StructuredStorageDirectoryEntry *pDir, StgError *pError)
+{
+    StgDocfileStruct *pdoc = DocfileLock(StorageGetDocfile(parent));
+    StgStream stream = NullHandle, base, fat;
+    word shift;
+    
+    /* Determine what kind of stream to create. A normal stream will have a
+     * byte length larger than or equal to SSH_ulMiniSectorCutoff; a FAT
+     * stream will be created for it. A ministream has a length below the
+     * cutoff and lives in the Ministream; a Ministream stream and a MiniFat
+     * stream will be created for it.
+     */
+    if (pDir->SSDE_ulSize < pdoc->SDFS_header.SSH_ulMiniSectorCutoff)
+    {
+        /* Create the Ministream and MiniFat streams. */
+        base = SStreamCreateMinistream(&pdoc, pError);
+        fat = SStreamCreateMiniFat(&pdoc, pError);
+        shift = pdoc->SDFS_header.SSH_uMiniSectorShift;
+    }
+    else
+    {
+        /* Create the FAT stream. */
+        base = NullHandle;
+        fat = SStreamCreateFAT(&pdoc, pError);
+        shift = pdoc->SDFS_header.SSH_uSectorShift;
+    }
+    if (!*pError)
+        stream = SStreamAlloc(&pdoc, sid, parent,
+          pDir->SSDE_sectStart, pDir->SSDE_ulSize, shift, base, fat, NULL,
+          pError);
+
+    /* Cleanup on error. */
+    if (*pError)
+    {
+        if (stream)
+            stream = SStreamFree(stream, pError); /* base and fat will be freed */
+        else
+        {
+            if (base)
+                base = SStreamFree(base, pError);
+            if (fat)
+                fat = SStreamFree(fat, pError);
+        }
+    }
+    DocfileUnlock(pdoc);
+    return stream;
+}
+
+/****************************************************************************
+ * SStreamCreateDir
+ *
+ * Creates a directory StgStream.  This is a main stream chained by the FAT
+ * and referenced by the file header.
+ *
+ * Takes:
+ * docfile - the handle of a StgDocfile
+ * pError - where the error code will be placed.
+ *
+ * Returns: the handle of the new StgStream on success;
+ * otherwise, NullHandle is returned, and *pError will contain the
+ * error reason:
+ *      STGERR_MEMORY_ERROR
+ */
+StgStream SStreamCreateDir(StgDocfile docfile, StgError *pError)
+{
+    StgDocfileStruct *pdoc = DocfileLock(docfile);
+    StgStream fat = NullHandle, dir = NullHandle;
+
+    /* Create a FAT stream. */
+    fat = SStreamCreateFAT(&pdoc, pError);
+
+    if (!*pError)
+    {
+        dir = SStreamAlloc(&pdoc, NULL_SID, NullHandle,
+          pdoc->SDFS_header.SSH_sectDirStart, 0,
+          pdoc->SDFS_header.SSH_uSectorShift, NullHandle, fat, NULL, pError);
+    }
+    if (*pError)
+    {
+        if (dir)
+            dir = SStreamFree(dir, pError);   /* fat will be freed */
+        else if (fat)
+            fat = SStreamFree(fat, pError);
+    }
+    DocfileUnlock(pdoc);
+    return dir;
+}
+
+/****************************************************************************
+ * SStreamClone
+ *
+ * Duplicates an existing StgStream.
+ *
+ * Takes:
+ * psource - a pointer to the source stream.
+ *
+ * Returns: the handle of the new stream, otherwise NullHandle.
+ *
+ */
+StgStream SStreamClone(StgStreamStruct *psource)
+{
+    StgStream stg;
+    StgStreamStruct *pdest;
+    Boolean error = FALSE;
+    StgError stgerr = STGERR_NONE;
+
+    /* Allocate a memblock for the struct. */
+    if ((stg = MemAlloc(sizeof(StgStreamStruct), HF_DYNAMIC,
+      HAF_STANDARD_LOCK)) != NullHandle)
+    {
+        /* Lock, copy it, and unlock. */
+        StgDocfileStruct *pdoc = DocfileLock(psource->SSTRS_file);
+        pdest = MemDeref(stg);
+        memcpy(pdest, psource, sizeof(StgStreamStruct));
+        pdest->SSTRS_handle = stg;
+        pdest->SSTRS_base = pdest->SSTRS_fat = NullHandle;
+        pdest->SSTRS_bcbid = INVALID_BCBID;
+        if (psource->SSTRS_base == NullHandle)
+        {
+            if (BufferGet(&pdoc, pdest->SSTRS_curSect, &pdest->SSTRS_bcbid,
+              &pdest->SSTRS_bh))
+                error = TRUE;
+        }
+        else /* if (psource->SSTRS_base != NullHandle) */
+        {
+            if ((pdest->SSTRS_base = StgStreamClone(psource->SSTRS_base)) == NullHandle)
+                error = TRUE;
+        }
+        if (!error && (psource->SSTRS_fat != NullHandle
+          && (pdest->SSTRS_fat = StgStreamClone(psource->SSTRS_fat)) == NullHandle))
+            error = TRUE;
+        DocfileUnlock(pdoc);
+        MemUnlock(stg);
+        if (error)
+        {
+            /* Handle out of memory situation. */
+            stg = SStreamFree(stg, &stgerr);
+        }
+    }
+    return stg;
+}
+
+/****************************************************************************
+ * SStreamFree
+ *
+ * Frees a StgStream and all of its child streams.
+ *
+ * Takes:
+ * stream - the handle of the stream sentenced to death
+ *
+ * Returns: NullHandle
+ *
+ */
+StgStream SStreamFree(StgStream stream, StgError *pError)
+{
+    StgStreamStruct *pstream = SStreamLock(stream);
+
+    *pError = STGERR_NONE;
+    
+    if (pstream->SSTRS_base)
+        pstream->SSTRS_base = SStreamFree(pstream->SSTRS_base, pError);
+    else if (pstream->SSTRS_bcbid != INVALID_BCBID)
+    {
+        StgDocfileStruct *pdoc = DocfileLock(pstream->SSTRS_file);
+        *pError = BufferRelease(pstream->SSTRS_file, pstream->SSTRS_bcbid);
+        DocfileUnlock(pdoc);
+    }
+    if (!*pError && pstream->SSTRS_fat)
+        pstream->SSTRS_fat = SStreamFree(pstream->SSTRS_fat, pError);
+    SStreamUnlock(pstream);
+    MemFree(stream);
+
+    return NullHandle;
+}
+
+StgError SStreamBufferSect(struct _StgStreamStruct *ps, SECT s)
+{
+    StgError error = STGERR_NONE;
+    
+    if (ps->SSTRS_curSect != s)
+    {
+        StgDocfileStruct *pdoc = DocfileLock(ps->SSTRS_file);
+        EC_ERROR_IF(ps->SSTRS_bcbid == INVALID_BCBID, -1);
+        if (!(error = BufferRelease(ps->SSTRS_file, ps->SSTRS_bcbid)))
+            if (!(error = BufferGet(&pdoc, s, &ps->SSTRS_bcbid,
+              &ps->SSTRS_bh)))
+                ps->SSTRS_curSect = s;
+        DocfileUnlock(pdoc);
+        ps->SSTRS_lastError = error;
+    }
+    return error;
+}
+
+/****************************************************************************
+ * SStreamCallReadFat
+ *
+ * Locks a StgStream and calls its FAT read method.
+ *
+ * Takes:
+ * stream - the handle of the stream
+ * s - the SECT to pass to the method
+ *
+ * Returns: the value returned by the method
+ *
+ */
+SECT SStreamCallReadFat(StgStream stream, SECT s, StgError *pError)
+{
+    SECT retval;
+    
+    StgStreamStruct *ps = SStreamLock(stream);
+    retval = ProcCallFixedOrMovable_cdecl(ps->SSTRS_fpReadFat, ps, s);
+    *pError = ps->SSTRS_lastError;
+    SStreamUnlock(ps);
+    return retval;
+}
+
+/****************************************************************************
+ * SStreamReadDIF
+ *
+ * Retrieves the SECT of a FAT sector from the DIF.
+ *
+ * Takes:
+ * ps - a pointer to a DIF stream
+ * s - the relative SECT of the FAT to locate.
+ *
+ * Returns: the absolute SECT for that FAT sector.
+ *
+ */
+SECT SStreamReadDIF(struct _StgStreamStruct *ps, SECT s)
+{
+    dword oDIF, d;
+    SECT rSECT, retval = FREESECT;
+    word o;
+    SSECT n;
+    byte *pBuffer;
+    
+    /* Compute the byte offset into the DIF stream. */
+    oDIF = s * sizeof(SECT);
+    /* Compute the number of bytes for FAT sectors in a DIF (also the
+       offset of the next DIF SECT). */
+    d = (ps->SSTRS_sectMask + 1) - sizeof(SECT);
+    /* Compute the relative DIF SECT containing the offset. */
+    rSECT = oDIF / d;
+    /* Compute the offset of the FAT SECT in the target DIF sector. */
+    o = s % d;
+
+    /* Compute the distance in SECTs from current SECT to rSECT. */
+    n = rSECT - ps->SSTRS_curpos;
+    if (n != 0)     /* change sectors only if necessary */
+    {
+        if (n < 0)
+        {           /* must start from beginning */
+            SStreamBufferSect(ps, ps->SSTRS_sectStart);
+            n = rSECT;
+        }
+
+        while (n-- && ps->SSTRS_curSect <= LASTVALIDSECT
+          && !ps->SSTRS_lastError)
+        {
+            SECT newSect;
+            
+            /* Seek to and read the next DIF SECT in ps->SSTRS_curSect. */
+            pBuffer = BufferLockRead(ps->SSTRS_bh);
+            newSect = *(SECT *)(&pBuffer[d]);
+            BufferUnlockRead(ps->SSTRS_bh);
+            SStreamBufferSect(ps, newSect);
+        }
+    }
+    if (!ps->SSTRS_lastError)
+    {
+        pBuffer = BufferLockRead(ps->SSTRS_bh);
+        retval = *(SECT *)(&pBuffer[o]);
+        BufferUnlockRead(ps->SSTRS_bh);
+    }
+
+    return retval;
+}
+
+/****************************************************************************
+ * SStreamReadFAT
+ *
+ * Retrieves the SECT of a stream sector from the FAT.
+ *
+ * Takes:
+ * ps - a pointer to a FAT stream
+ * s - the absolute SECT of the file to locate.
+ *
+ * Returns: the next absolute SECT in the chain for that sector.
+ *
+ */
+SECT SStreamReadFAT(struct _StgStreamStruct *ps, SECT s)
+{
+    StgDocfileStruct *pdoc;
+    dword oFAT;
+    word o;
+    SECT rFAT, aFAT = ps->SSTRS_curSect, retval = FREESECT;
+
+    /* Compute the offset in the FAT to the SECT. */
+    oFAT = s * sizeof(SECT);
+    /* Compute the relative sector of the FAT chain containing the offset. */
+    rFAT = oFAT >> ps->SSTRS_sectSize;
+    /* Compute the offset of the absolute SECT in the target FAT sector. */
+    o = oFAT & ps->SSTRS_sectMask;
+
+    if (rFAT > ps->SSTRS_size)  /* stay within the bounds of the FAT */
+        ps->SSTRS_lastError = STGERR_FORMAT_ERROR;
+    else
+    {
+        /* Find the appropriate SECT of the FAT. */
+        if (rFAT != ps->SSTRS_curpos)   /* already have aFAT from last seek */
+        {
+            if (rFAT < SSH_NUM_FAT_SECTS)
+            {
+                /* The SECT is in the file header. */
+                pdoc = DocfileLock(ps->SSTRS_file);
+                aFAT = pdoc->SDFS_header.SSH_sectFat[rFAT];
+                DocfileUnlock(pdoc);
+            }
+            else
+            {
+                /* The SECT is in the DIF. */
+                if (ps->SSTRS_fat == NullHandle)    /* what DIF? */
+                    ps->SSTRS_lastError = STGERR_FORMAT_ERROR;
+                else
+                    aFAT = SStreamCallReadFat(ps->SSTRS_fat, rFAT, &ps->SSTRS_lastError);
+            }
+            /* Cache rFAT and aFAT for future reference. */
+            ps->SSTRS_curpos = rFAT;
+            if (!ps->SSTRS_lastError)
+                SStreamBufferSect(ps, aFAT);
+        }
+
+        if (!ps->SSTRS_lastError)
+        {
+            /* Read from #bufFat the SECT at o */
+            byte *pBuffer = BufferLockRead(ps->SSTRS_bh);
+            retval = *(SECT *)(&pBuffer[o]);
+            BufferUnlockRead(ps->SSTRS_bh);
+        }
+    }
+    return retval;
+}
+
+/****************************************************************************
+ * SStreamReadMiniFat
+ *
+ * Retrieves the SECT of a Ministream sector from the MiniFat.
+ *
+ * Takes:
+ * ps - a pointer to a MiniFat stream
+ * s - the absolute SECT in the Ministream to locate.
+ *
+ * Returns: the next absolute SECT in the chain for that sector.
+ *
+ */
+SECT SStreamReadMiniFat(struct _StgStreamStruct *ps, SECT s)
+{
+    SECT retval = FREESECT;
+
+    if (!SStreamSeek(ps, s * sizeof(SECT)))
+        SStreamRead(ps, &retval, sizeof(SECT));
+    return retval;
+}
+
+/****************************************************************************
+ * SStreamSeek
+ *
+ * Sets the stream pointer to a particular offset in the stream.
+ *
+ * Takes:
+ * ps - a pointer to a main/mini stream
+ * offset - the desired offset in the stream.
+ *
+ * Returns: zero (STGERR_NONE) on success, otherwise an error code:
+ *      STGERR_SEEK_ERROR
+ *
+ */
+StgError SStreamSeek(StgStreamStruct *ps, dword offset)
+{
+    /* Check that the offset is within the bounds of the stream. */
+    if (ps->SSTRS_size && offset > ps->SSTRS_size)
+        ps->SSTRS_lastError = STGERR_SEEK_ERROR;
+    else
+    {
+        ps->SSTRS_lastError = STGERR_NONE;
+        ps->SSTRS_curpos = offset;
+    }
+
+    return ps->SSTRS_lastError;
+}
+
+/****************************************************************************
+ * SStreamPhysicalSeek
+ *
+ * Physically seeks the stream offset in the Docfile.  Should only be done
+ * while the file is locked to prevent other threads from changing the
+ * file position before a read or write can take place.
+ *
+ * Takes:
+ * ps - a pointer to a main/mini stream
+ * offset - the desired offset in the stream
+ *
+ * Returns: zero (STGERR_NONE) on success, otherwise an error code:
+ *      STGERR_FILE_ERROR
+ *      STGERR_FORMAT_ERROR
+ *
+ */
+StgError SStreamPhysicalSeek(StgStreamStruct *ps, dword offset)
+{
+    SECT rSECT, aSECT = ps->SSTRS_curSect;
+    word o;
+    SSECT n;
+
+    /* Reset the error state. */
+    ps->SSTRS_lastError = STGERR_NONE;
+    
+    /* Compute the relative SECT of the stream containing the offset. */
+    rSECT = offset >> ps->SSTRS_sectSize;
+    /* Compute the starting offset in the final sector. */
+    o = offset & ps->SSTRS_sectMask;
+    /* Compute the distance in SECTs from current SECT to rSECT. */
+    n = rSECT - (ps->SSTRS_lastpos >> ps->SSTRS_sectSize);
+
+    if (n != 0)     /* don't need to change sectors */
+    {
+        if (n < 0)
+        {
+            /* Can't backtrack, start at beginning of chain. */
+            aSECT = ps->SSTRS_sectStart;
+            n = rSECT;
+        }
+
+        /* Follow the FAT/MiniFat chain to rSECT. */
+        while (n-- && aSECT <= LASTVALIDSECT && !ps->SSTRS_lastError)
+            aSECT = SStreamCallReadFat(ps->SSTRS_fat, aSECT, &ps->SSTRS_lastError);
+    }
+
+    if (!ps->SSTRS_lastError)
+    {
+        if (ps->SSTRS_base != NullHandle)
+        {
+            /* Do a physical seek on the underlying base stream. */
+            StgStreamStruct *pBase = SStreamLock(ps->SSTRS_base);
+            ps->SSTRS_curSect = aSECT;
+            ps->SSTRS_lastError = SStreamPhysicalSeek(pBase,
+              (pBase->SSTRS_curpos = (aSECT << ps->SSTRS_sectSize) + o));
+            SStreamUnlock(pBase);
+        }
+        else
+        {
+            /* seek and buffer as #bufStream the sector at SSTRS_curSect */
+            SStreamBufferSect(ps, aSECT);
+        }
+    }
+    
+    if (!ps->SSTRS_lastError)
+        ps->SSTRS_lastpos = offset;
+
+    return ps->SSTRS_lastError;
+}
+
+/****************************************************************************
+ * SStreamRead
+ *
+ * Reads data from a main/mini stream.
+ *
+ * Takes:
+ * ps - a pointer to a main/mini stream
+ * buf - a pointer to the buffer to receive the data
+ * size - the number of bytes to read
+ *
+ * Returns: the actual number of bytes read.  If the return value is less
+ *   than size, the end of the stream was reached before filling the buffer,
+ *   or an error code was set for the stream:
+ *      STGERR_FILE_ERROR
+ *      STGERR_FORMAT_ERROR
+ *
+ */
+word SStreamRead(StgStreamStruct *ps, byte *buf, word size)
+{
+    word n = 0;    /* The number of bytes read thus far */
+    word o, c;
+    
+    /* Reset the error state. */
+    ps->SSTRS_lastError = STGERR_NONE;
+    
+    if (ps->SSTRS_size)
+    {
+        /* Limit the number of bytes to read by the stream size. */
+        if (ps->SSTRS_size - ps->SSTRS_curpos < size)
+            size = ps->SSTRS_size - ps->SSTRS_curpos;
+    }
+    /* Compute the starting offset into each sector. */
+    o = (word)(ps->SSTRS_curpos & ps->SSTRS_sectMask);
+
+    while (n < size && !ps->SSTRS_lastError)
+    {
+        /* Compute the number of bytes we can read from this sector. */
+        c = min((word)(ps->SSTRS_sectMask + 1 - o), size - n);
+        if (!(ps->SSTRS_lastError = SStreamPhysicalSeek(ps,
+          ps->SSTRS_curpos)))
+        {
+            /* read c bytes from ps->SSTRS_base or self into buf */
+            if (ps->SSTRS_base != NullHandle)
+            {
+                StgStreamStruct *pbs = SStreamLock(ps->SSTRS_base);
+                byte *pBuffer = BufferLockRead(pbs->SSTRS_bh);
+                memcpy(buf, &pBuffer[(pbs->SSTRS_curpos & pbs->SSTRS_sectMask)], c);
+                BufferUnlockRead(pbs->SSTRS_bh);
+                SStreamUnlock(pbs);
+            }
+            else
+            {
+                byte *pBuffer = BufferLockRead(ps->SSTRS_bh);
+                memcpy(buf, &pBuffer[o], c);
+                BufferUnlockRead(ps->SSTRS_bh);
+            }
+        }
+        if (!ps->SSTRS_lastError)
+        {
+            n += c;
+            buf += c;
+            ps->SSTRS_curpos += c;
+            o = 0;
+        }
+    }
+
+    return n;
+}   
+
+/*****************************************************************************
+ * BUFFER ROUTINES
+ ****************************************************************************/
+
+/****************************************************************************
+ * BufferInit
+ *
+ * Initializes the buffer storage mechanism for a docfile.
+ *
+ * Takes:
+ * mh - handle of LMemBlock
+ * pbcbs - pointer to BCBStruct
+ *
+ * Returns: nada.
+ *
+ */
+void BufferInit(MemHandle mh, BCBStruct *pbcbs)
+{
+    /* Allocate the chunks for the buffer tables. */
+    pbcbs->BCBS_freePool = LMemAlloc(mh, sizeof(BCBID) * BUFFER_FREE_POOL_MAX_LEN);
+    pbcbs->BCBS_freePoolLen = pbcbs->BCBS_bufferCount = 0;
+    pbcbs->BCBS_table = ChunkArrayCreate(mh, sizeof(BCB), 0, 0);
+}
+
+/****************************************************************************
+ * BufferFree
+ *
+ * Frees the buffer storage for a docfile.
+ *
+ * Takes:
+ * doc - handle of docfile
+ * pbcbs - pointer to BCBStruct
+ *
+ * Returns: nada.
+ *
+ */
+void BufferFree(StgDocfile doc, BCBStruct *pbcbs)
+{
+    word count = ChunkArrayGetCountHandles(doc, pbcbs->BCBS_table);
+
+    /* At this point, all allocated buffers should be in the free pool. */
+    EC_ERROR_IF(pbcbs->BCBS_freePoolLen != pbcbs->BCBS_bufferCount, -1);
+
+    /* Free all buffers in the BCB list. */
+    while (count)
+    {
+	word dummy;
+	BCB *bcb = ChunkArrayElementToPtrHandles(doc, pbcbs->BCBS_table, 
+						 --count, &dummy);
+	if (bcb->BCB_mem != NullHandle)
+	    MemFree(bcb->BCB_mem);
+    }
+    
+    /* Don't bother with the LMem chunks, the whole shebang will be freed
+       shortly. */
+}
+
+/****************************************************************************
+ * BufferGet
+ *
+ * Gets a buffer for the passed SECT.
+ *
+ * Takes:
+ * ppdoc - a pointer to a pointer to the docfile.  May be changed.
+ * sect - SECT to retrieve
+ * pid - pointer to BCBID to be filled in 
+ * pbh - pointer to BCBHandle to be filled in 
+ *
+ * Returns: zero (STGERR_NONE) on success, otherwise an error code:
+ *      STGERR_FORMAT_ERROR
+ *      STGERR_FILE_ERROR
+ *      STGERR_MEMORY_ERROR
+ *
+ */
+StgError BufferGet(StgDocfileStruct **ppdoc, SECT sect, BCBID *pid,
+  BCBHandle *pbh)
+{
+    StgDocfile doc = (*ppdoc)->SDFS_handle;
+    StgError error = STGERR_NONE;
+    word i, count, dummy;
+    BCB *bcb;
+    optr table = ConstructOptr(doc, (*ppdoc)->SDFS_BCB.BCBS_table);
+    BCBID *fp = LMemDerefHandles(doc, (*ppdoc)->SDFS_BCB.BCBS_freePool);
+    Boolean bNewBuffer = FALSE;
+    word empty = INVALID_BCBID;
+
+    /* Search BufferTable for matching SECT. */
+    count = ChunkArrayGetCount(table);
+    for (i = 0; i < count; i++)
+    {
+        bcb = ChunkArrayElementToPtr(table, i, &dummy);
+        if (bcb->BCB_sect == sect)
+            break;
+        if (bcb->BCB_sect == FREESECT)
+            empty = i;
+    }
+
+    /* If found: */
+    if (i != count)
+    {
+        /* If buffer is unused, remove it from the free pool before use. */
+        if (bcb->BCB_useCount == 0)
+        {
+            int j;
+
+            /* Search free pool array for matching BCBID. */
+            for (j = 0; j < (*ppdoc)->SDFS_BCB.BCBS_freePoolLen; j++, fp++)
+                if (*fp == i)
+                    break;
+            if (j != (*ppdoc)->SDFS_BCB.BCBS_freePoolLen)
+            {
+                /* Entry was found, remove it. */
+                (*ppdoc)->SDFS_BCB.BCBS_freePoolLen --;
+                for (; j < (*ppdoc)->SDFS_BCB.BCBS_freePoolLen; j++, fp++)
+                    *fp = *(fp + 1);
+            }
+        }
+    }
+    /* Else if not found: */
+    else
+    {
+        if ((*ppdoc)->SDFS_BCB.BCBS_freePoolLen == BUFFER_FREE_POOL_MAX_LEN)    /* > 0 */
+        {
+            /* Reuse the oldest buffer in the free pool. */
+            i = fp[-- (*ppdoc)->SDFS_BCB.BCBS_freePoolLen];
+            bcb = ChunkArrayElementToPtr(table, i, &dummy);
+        }
+        else
+        {
+            /* Create a new buffer. */
+	    bNewBuffer = TRUE;
+	    if (empty != INVALID_BCBID)
+	    {
+                bcb = ChunkArrayElementToPtr(table, i = empty, &dummy);
+		bcb->BCB_useCount = 0;
+	    }
+            else
+	    {
+                bcb = ChunkArrayAppend(table, 0);
+		(*ppdoc) = MemDeref(doc);
+	    }
+            if ((bcb->BCB_mem = MemAlloc(1 << (*ppdoc)->SDFS_header.SSH_uSectorShift,
+              HF_DYNAMIC, HAF_STANDARD)) == NullHandle)
+                error = STGERR_MEMORY_ERROR;
+	    else
+		(*ppdoc)->SDFS_BCB.BCBS_bufferCount ++;
+        }
+        bcb->BCB_sect = sect;
+
+        if (!error)
+        {
+            byte *pBuffer = MemLock(bcb->BCB_mem);
+            dword absoff = ((dword)sect << (*ppdoc)->SDFS_header.SSH_uSectorShift) +
+              sizeof(StructuredStorageHeader);
+            word count = 1 << (*ppdoc)->SDFS_header.SSH_uSectorShift;
+
+            /* Read the sector into the buffer. */
+            FilePos((*ppdoc)->SDFS_file, absoff, FILE_POS_START);
+            if (FileRead((*ppdoc)->SDFS_file, pBuffer, count, FALSE) != count)
+            {
+                if (ThreadGetError() == ERROR_SHORT_READ_WRITE)
+                    error = STGERR_FORMAT_ERROR;
+                else
+                    error = STGERR_FILE_ERROR;
+            }
+            MemUnlock(bcb->BCB_mem);
+        }
+
+	if (error)
+	{
+	    /* Release the erroneous buffer. */
+	    bcb->BCB_sect = FREESECT;
+	    if (bNewBuffer)
+	    {
+		/* Completely destroy a newly created buffer. */
+		if (bcb->BCB_mem != NullHandle)
+		{
+		    MemFree(bcb->BCB_mem);
+		    bcb->BCB_mem = NullHandle;
+		    (*ppdoc)->SDFS_BCB.BCBS_bufferCount --;
+		}
+		/* Only remove BCB if it is last in array, as this array cannot
+		   have elements inserted or deleted. */
+		if (ChunkArrayPtrToElement(table, bcb) == 
+		    ChunkArrayGetCount(table) - 1)
+		    ChunkArrayDelete(table, bcb);
+	    }
+	    else
+	    {
+		/* Return an old buffer to the free pool. */
+		(*ppdoc)->SDFS_BCB.BCBS_freePoolLen ++;
+	    }
+	}
+    }
+
+    if (!error)
+    {
+        /* Increment the buffer's use count. */
+        bcb->BCB_useCount ++;
+
+        /* Fill in the return parameters. */
+        *pid = i;
+        *pbh = bcb->BCB_mem;
+    }
+
+    return error;
+}
+
+/****************************************************************************
+ * BufferRelease
+ *
+ * Release a previously acquired buffer.
+ *
+ * Takes:
+ * doc - a handle to the docfile.  MUST BE LOCKED!
+ * id - BCBID
+ *
+ * Returns: always zero (STGERR_NONE).  Future versions may handle flushing
+ * dirtied buffers and could then return an error.
+ *
+ */
+StgError BufferRelease(StgDocfile doc, BCBID id)
+{
+    StgError error = STGERR_NONE;
+    StgDocfileStruct *pdoc = MemDeref(doc);
+    word i, dummy;
+    BCB *bcb;
+    optr table = ConstructOptr(doc, pdoc->SDFS_BCB.BCBS_table);
+    BCBID *fp = LMemDerefHandles(doc, pdoc->SDFS_BCB.BCBS_freePool);
+
+    /* Decrement the use count on the passed buffer. */
+    bcb = ChunkArrayElementToPtr(table, id, &dummy);
+    /* If use count drops to zero: */
+    if ((-- bcb->BCB_useCount) == 0)
+    {
+        /* Free the oldest buffer in the free pool if necessary. */
+        if (pdoc->SDFS_BCB.BCBS_freePoolLen == BUFFER_FREE_POOL_MAX_LEN)
+        {
+            BCB *oldbcb = ChunkArrayElementToPtr(table,
+              fp[pdoc->SDFS_BCB.BCBS_freePoolLen - 1], &dummy);
+            oldbcb->BCB_sect = FREESECT;
+            MemFree(oldbcb->BCB_mem);
+	    oldbcb->BCB_mem = NullHandle;
+	    pdoc->SDFS_BCB.BCBS_bufferCount --;
+        }
+        else
+            pdoc->SDFS_BCB.BCBS_freePoolLen ++;
+
+        /* Insert buffer into free pool. */
+        for (i = pdoc->SDFS_BCB.BCBS_freePoolLen - 1; i > 0; i--)
+            fp[i] = fp[i - 1];
+        fp[0] = id;
+    }
+
+    return error;
+}
+

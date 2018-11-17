@@ -1,0 +1,1558 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1993 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		SDK_C/Serial
+FILE:		serial.goc
+
+AUTHOR:		Tom Manshreck, John D. Mitchell
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.13	Initial version.
+	JDM	93.07.21	Big cleanup.
+	doug	1/27/94		Added error detection & printout
+	NF	 8/5/96		Made changes to the following:
+				MSG_SERIAL_DEMO_READ_TEXT
+                                MSG_META_KBD_CHAR.
+
+DESCRIPTION:
+	The Serial sample application demonstrates use of the GEOS
+	serial driver and provides an example of good error-handling.
+
+	$Id: serial.goc,v 1.1 97/04/04 16:36:23 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>		/* Standard GEOS headers.	*/
+
+#include <Ansi/string.h>	/* Standard C.	*/
+#include <Ansi/ctype.h>
+#include <Ansi/stdio.h>
+
+#include <streamC.h>		/* Additional GEOS headers.	*/
+#include <library.h>
+#include <driver.h>
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * SerialDemoProcessClass will be the only application thread.
+ */
+@class	SerialDemoProcessClass, GenProcessClass;
+
+/* Message declarations.	*/
+@message void MSG_SERIAL_DEMO_READ_TEXT();
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SERIAL_DEMO_CHOOSE_COM_PORT;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SERIAL_DEMO_CHOOSE_INITIAL_COM_PORT;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SERIAL_DEMO_CHOOSE_BAUD_RATE;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SERIAL_DEMO_CHOOSE_LENGTH;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SERIAL_DEMO_CHOOSE_PARITY_BITS;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SERIAL_DEMO_CHOOSE_XSTOP_BITS;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SERIAL_DEMO_CHOOSE_MODE;
+
+/* Instance data.	*/
+
+@endc;
+
+/*
+ * SerialTextDisplayClass only exists so that we can intercept a few
+ * messages.
+ */
+@class SerialTextDisplayClass, GenTextClass;
+
+@endc;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class Declarations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@classdecl	SerialDemoProcessClass, neverSaved ;
+@classdecl	SerialTextDisplayClass;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Constants
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define SERIAL_DEMO_COM_PORT_DEFAULT 	(SERIAL_COM2)
+#define SERIAL_DEMO_BAUD_RATE_DEFAULT	(SERIAL_BAUD_2400)
+#define SERIAL_DEMO_LENGTH_DEFAULT	(SERIAL_LENGTH_8)
+#define SERIAL_DEMO_PARITY_DEFAULT	(SERIAL_PARITY_NONE)
+#define	SERIAL_DEMO_XSTOP_BITS_DEFAULT	(SERIAL_XSTOP_NONE)
+#define SERIAL_DEMO_MODE_DEFAULT	(SERIAL_MODE_RAW)
+
+#define	SERIAL_DEMO_TIMER_READ_INTERVAL	(10)
+
+#define	SERIAL_DEMO_READ_BUFFER_SIZE	(512)
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Global Variables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static	Handle	serialDriver		= NullHandle;
+static	Boolean	serialPortOpen		= FALSE;
+static	word	serialComPort		= SERIAL_DEMO_COM_PORT_DEFAULT;
+static	word	serialBaudRate 		= SERIAL_DEMO_BAUD_RATE_DEFAULT;
+static	word	serialLength		= SERIAL_DEMO_LENGTH_DEFAULT;
+static	word	serialParity		= SERIAL_DEMO_PARITY_DEFAULT;
+static	word	serialXStopBits		= SERIAL_DEMO_XSTOP_BITS_DEFAULT;
+static	word	serialMode		= SERIAL_DEMO_MODE_DEFAULT;
+static	word	serialFlowControl	= 0;	/* No flow control.	*/
+static	word	serialModem		= 0;	/* No RTS, DTR yet.	*/
+static	word	serialModemStatus	= 0;	/* No status yet.	*/
+static	Handle	timerHandle		= NullHandle; 
+static	word	timerID			= 0;
+static	MemHandle	readBuffer	= NullHandle;
+static	MemHandle	processedBuffer	= NullHandle;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Function Prototypes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static	void ChannelSetup (word comPort, optr processObject);
+static	void ChannelTearDown (void);
+static	void ChannelSetFormat (void);
+static	StreamError ReportStreamError (word streamError);
+static	SerialError ReportSerialError (word serialError);
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		User Interface Definition
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	AppResource;
+
+@object GenApplicationClass SerialDemoApp = {
+    GI_visMoniker	= list { @SerialTextMoniker }
+    GI_comp		= @SerialPrimary,
+			  @ComPortWarning;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @SerialPrimary;
+}
+
+@visMoniker SerialTextMoniker = "Serial Host Application";
+
+@end	AppResource;
+
+
+@start	Interface;
+
+@object GenInteractionClass ComPortWarning = {
+    GI_visMoniker	= "Make sure to pick a correct COM port!";
+    GI_comp		= @ComPortWarningList;
+    GII_attrs		= @default | GIA_SYS_MODAL |
+			  GIA_INITIATED_VIA_USER_DO_DIALOG; 
+    GII_type		= GIT_NOTIFICATION;
+    GII_visibility	= GIV_DIALOG;
+}
+
+@object GenItemGroupClass ComPortWarningList = {
+    GI_comp		= @Com1WarnSetting,
+			  @Com2WarnSetting,
+			  @Com3WarnSetting,
+			  @Com4WarnSetting;
+    GIGI_applyMsg	= MSG_SERIAL_DEMO_CHOOSE_INITIAL_COM_PORT;
+    GIGI_destination	= process;
+}
+
+@object GenItemClass Com1WarnSetting = {
+    GI_visMoniker	= "COM 1";
+    GII_identifier	= SERIAL_COM1;
+}
+
+@object GenItemClass Com2WarnSetting = {
+    GI_visMoniker	= "COM 2";
+    GII_identifier	= SERIAL_COM2;
+}
+
+@object GenItemClass Com3WarnSetting = {
+    GI_visMoniker	= "COM 3";
+    GII_identifier	= SERIAL_COM3;
+}
+
+@object GenItemClass Com4WarnSetting = {
+    GI_visMoniker	= "COM 4";
+    GII_identifier	= SERIAL_COM4;
+}
+
+
+
+@object GenPrimaryClass SerialPrimary = {
+    GI_comp		= @SerialMainMenu,
+			  @SerialTextDisplay,
+			  @SerialErrorDisplay;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED; 
+}
+
+@object GenInteractionClass SerialMainMenu = {
+    GI_visMoniker	= "Main";
+    GI_comp		= @SerialSettingsDialog;
+    GII_visibility	= GIV_POPUP;
+}
+@object SerialTextDisplayClass SerialTextDisplay = {
+    GI_visMoniker	= "Text Buffer:";
+    GTXI_text		= "";
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass SerialErrorDisplay = {
+    GI_visMoniker	= "Error Buffer:";
+    GI_attrs		= @default | GA_READ_ONLY;
+    GTXI_text		= "";
+    HINT_FIXED_SIZE	= { 0, SST_LINES_OF_TEXT | 5, 0 }; 
+/*   HINT_TEXT_WHITE_WASH_COLOR; */
+}
+
+
+@object GenInteractionClass SerialSettingsDialog = {
+    GI_visMoniker	= "Settings";
+    GI_comp		= @ComPortGroup,
+			  @BaudRateGroup,
+			  @ParityBitsGroup,
+			  @LengthGroup,
+			  @XStopBitsGroup,
+			  @ModeGroup; 
+    GII_type		= GIT_PROPERTIES;
+    GII_visibility	= GIV_DIALOG;
+    HINT_INTERACTION_SINGLE_USAGE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+
+@object GenInteractionClass ComPortGroup = {
+    GI_visMoniker	= "COM port:";
+    GI_comp		= @ComPortList;
+    GII_type		= GIT_PROPERTIES;
+}
+
+
+@object GenItemGroupClass ComPortList = {
+    GI_comp		= @Com1Setting,
+			  @Com2Setting,
+			  @Com3Setting,
+			  @Com4Setting;
+    GIGI_applyMsg	= MSG_SERIAL_DEMO_CHOOSE_COM_PORT;
+    GIGI_destination	= process;
+}
+
+@object GenItemClass Com1Setting = {
+    GI_visMoniker	= "COM 1";
+    GII_identifier	= SERIAL_COM1;
+}
+
+@object GenItemClass Com2Setting = {
+    GI_visMoniker	= "COM 2";
+    GII_identifier	= SERIAL_COM2;
+}
+
+@object GenItemClass Com3Setting = {
+    GI_visMoniker	= "COM 3";
+    GII_identifier	= SERIAL_COM3;
+}
+
+@object GenItemClass Com4Setting = {
+    GI_visMoniker	= "COM 4";
+    GII_identifier	= SERIAL_COM4;
+}
+
+
+@object GenInteractionClass BaudRateGroup = {
+    GI_visMoniker	= "Baud Rate:";
+    GI_comp		= @BaudRateList;
+    GII_type		= GIT_PROPERTIES;
+}
+
+@object GenItemGroupClass BaudRateList = {
+    GI_comp		= @Baud1200,
+			  @Baud2400,
+			  @Baud4800,
+			  @Baud9600,
+			  @Baud14400,
+			  @Baud19200;
+    GIGI_applyMsg	= MSG_SERIAL_DEMO_CHOOSE_BAUD_RATE;
+    GIGI_destination	= process;
+    GIGI_selection	= SERIAL_DEMO_BAUD_RATE_DEFAULT;
+}
+
+@object GenItemClass Baud1200 = {
+    GI_visMoniker	= "1200";
+    GII_identifier	= SERIAL_BAUD_1200;
+}
+    
+@object GenItemClass Baud2400 = {
+    GI_visMoniker	= "2400";
+    GII_identifier	= SERIAL_BAUD_2400;
+}
+    
+@object GenItemClass Baud4800 = {
+    GI_visMoniker	= "4800";
+    GII_identifier	= SERIAL_BAUD_4800;
+}
+    
+@object GenItemClass Baud9600 = {
+    GI_visMoniker	= "9600";
+    GII_identifier	= SERIAL_BAUD_9600;
+}
+
+@object GenItemClass Baud14400 = {
+    GI_visMoniker	= "14400";
+    GII_identifier	= SERIAL_BAUD_14400;
+}
+
+@object GenItemClass Baud19200 = {
+    GI_visMoniker	= "19200";
+    GII_identifier	= SERIAL_BAUD_19200;
+}
+
+
+@object GenInteractionClass ParityBitsGroup = {
+    GI_visMoniker	= "Parity Bits:";
+    GI_comp		= @ParityBitsList;
+    GII_type		= GIT_PROPERTIES;
+}
+
+@object GenItemGroupClass ParityBitsList = {
+    GI_comp		= @ParityNone,
+			  @ParityOdd,
+			  @ParityEven;
+    GIGI_applyMsg	= MSG_SERIAL_DEMO_CHOOSE_PARITY_BITS;
+    GIGI_destination	= process;
+    GIGI_selection	= SERIAL_DEMO_PARITY_DEFAULT;
+}
+
+@object GenItemClass ParityNone = {
+    GI_visMoniker	= "NONE";
+    GII_identifier	= SERIAL_PARITY_NONE;
+}
+
+@object GenItemClass ParityOdd = {
+    GI_visMoniker	= "ODD";
+    GII_identifier	= SERIAL_PARITY_ODD;
+}
+
+@object GenItemClass ParityEven = {
+    GI_visMoniker	= "EVEN";
+    GII_identifier	= SERIAL_PARITY_EVEN;
+}
+
+
+@object GenInteractionClass LengthGroup = {
+    GI_comp		= @SerialLengthGlyph,
+			  @SerialLengthList;
+    GII_type		= GIT_PROPERTIES;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass SerialLengthGlyph = {
+    GI_visMoniker	= "Data Bits per Frame:";
+}
+    
+@object GenItemGroupClass SerialLengthList = {
+    GI_comp		= @Length5,
+			  @Length6,
+			  @Length7,
+			  @Length8;
+    GIGI_applyMsg	= MSG_SERIAL_DEMO_CHOOSE_LENGTH;
+    GIGI_destination	= process;
+    GIGI_selection	= SERIAL_DEMO_LENGTH_DEFAULT;
+}
+
+@object GenItemClass Length5 = {
+    GI_visMoniker	= "5 bits";
+    GII_identifier	= SERIAL_LENGTH_5;
+}
+
+@object GenItemClass Length6 = {
+    GI_visMoniker	= "6 bits";
+    GII_identifier	= SERIAL_LENGTH_6;
+}
+
+@object GenItemClass Length7 = {
+    GI_visMoniker	= "7 bits";
+    GII_identifier	= SERIAL_LENGTH_7;
+}
+
+@object GenItemClass Length8 = {
+    GI_visMoniker	= "8 bits";
+    GII_identifier	= SERIAL_LENGTH_8;
+}
+
+@object GenInteractionClass XStopBitsGroup = {
+    GI_comp		= @SerialXStopBitsList;
+    GII_type		= GIT_PROPERTIES;
+    GI_visMoniker	= "Extra Stop Bits: ";
+}
+
+@object GenItemGroupClass SerialXStopBitsList = {
+    GI_comp		= @XStopNone,
+			  @XStopOne;
+    GIGI_applyMsg	= MSG_SERIAL_DEMO_CHOOSE_XSTOP_BITS;
+    GIGI_destination	= process;
+    GIGI_selection	= SERIAL_DEMO_XSTOP_BITS_DEFAULT;
+}
+
+@object GenItemClass XStopNone = {
+    GI_visMoniker	= "None";
+    GII_identifier	= SERIAL_XSTOP_NONE;
+}
+@object GenItemClass XStopOne = {
+    GI_visMoniker	= "One";
+    GII_identifier	= SERIAL_XSTOP_ONE;
+}
+
+@object GenInteractionClass ModeGroup = {
+    GI_comp		= @SerialModeList;
+    GII_type		= GIT_PROPERTIES;
+    GI_visMoniker	= "Data Mode:";
+}
+
+@object GenItemGroupClass SerialModeList = {
+    GI_comp		= @RawMode,
+			  @RareMode,
+			  @CookedMode;
+    GIGI_applyMsg	= MSG_SERIAL_DEMO_CHOOSE_MODE;
+    GIGI_destination	= process;
+    GIGI_selection	= SERIAL_DEMO_MODE_DEFAULT;    
+}
+
+@object GenItemClass RawMode = {
+    GI_visMoniker	= "Raw";
+    GII_identifier	= SERIAL_MODE_RAW;
+}
+
+@object GenItemClass RareMode = {
+    GI_visMoniker	= "Rare";
+    GII_identifier	= SERIAL_MODE_RARE;
+}
+       
+@object GenItemClass CookedMode = {
+    GI_visMoniker	= "Cooked";
+    GII_identifier	= SERIAL_MODE_COOKED;
+}
+
+@end Interface;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Localizable Constants
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	ConstantData, data;
+
+/*
+ * SDSerialDriverLoadError informs the user that the Serial driver could
+ * *not* be loaded (and so the application is basically useless).
+ */
+@chunk	char SDSerialDriverLoadErrorString [] =
+		"Unable to load the Serial driver!";
+
+/*
+ * SDSerialMemAllocError informs the user that the Serial driver could
+ * *not* allocate memory (and so the application is basically useless).
+ */
+@chunk	char SDSerialMemAllocErrorString [] =
+		"*** Unable to allocate memory! ***";
+
+#define CR	13	/* ASCII carriage return */
+
+/*
+ * The various StreamErrors (enumerated values)
+ */
+@chunk	char StreamErrorMinus1 [] = "STREAM_NOT_IMPLEMENTED\r";
+@chunk	char StreamError1 [] = "STREAM_WOULD_BLOCK\r";
+@chunk	char StreamError2 [] = "STREAM_CLOSING\r";
+@chunk	char StreamError3 [] = "STREAM_CANNOT_ALLOC\r";
+@chunk	char StreamError4 [] = "STREAM_BUFFER_TOO_LARGE\r";
+@chunk	char StreamError5 [] = "STREAM_CLOSED\r";
+@chunk	char StreamError6 [] = "STREAM_SHORT_READ_WRITE\r";
+@chunk	char StreamError7 [] = "STREAM_NO_DEVICE\r";
+@chunk	char StreamError8 [] = "STREAM_DEVICE_IN_USE\r";
+@chunk	char StreamError9 [] = "STREAM_POWER_ERROR\r";
+@chunk	char StreamError256 [] = "STREAM_NO_FREE_PORTS\r";
+
+/*
+ * The various SerialErrors (bits)
+ */
+@chunk	char SerialErrorBit4 [] = "SERIAL_ERROR_BREAK\r";
+@chunk	char SerialErrorBit3 [] = "SERIAL_ERROR_FRAME\r";
+@chunk	char SerialErrorBit2 [] = "SERIAL_ERROR_PARITY\r";
+@chunk	char SerialErrorBit1 [] = "SERIAL_ERROR_OVERRUN\r";
+
+@end	ConstantData;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SerialDemoProcessClass Methods
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GEN_PROCESS_OPEN_APPLICATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Perform all application startup duties.
+
+PASS: 		AppAttachFlags	attachFlags	= Startup modes.
+		MemHandle	launchBlock	= App. launch block.
+		MemHandle	extraState	= Previously saved state
+						  information (iff restoring
+						  from state).
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Invoke the superclass so that the UI gets built out.
+	Load the serial driver.
+	Force the user to specify a COM port (and so initiate the opening
+	of the COM port with the default settings).
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	7/13/93 	Initial Revision.
+	JDM	93.07.22	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    GeodeLoadError gle;
+
+    /* The DOS filename of driver that we want to use.	*/
+#if	ERROR_CHECK
+    char *driverName = "serialec.geo";
+#else
+    char *driverName = "serial.geo";
+#endif
+
+    /* Let the superclass do it's thing.	*/
+    @callsuper();
+
+    /* Move to the SYSTEM directory (that's where the libraries are).	*/
+    FilePushDir ();
+    FileSetStandardPath (SP_SYSTEM);
+
+    /* Load the serial driver.	*/
+    if (NullHandle == (serialDriver = GeodeUseDriver (driverName,
+						      0, 0, &gle)))
+	{
+	/*
+	 * Inform the user that the serial driver was *not* loaded.
+	 *
+	 * Lock down the block containing the (localizable) error
+	 * message strings.
+	 * Inform the user.
+	 * Unlock the string block.
+	 */
+	MemLock (OptrToHandle (@SDSerialDriverLoadErrorString));
+        UserStandardDialog
+		((char *) NULL,
+		 /* not GIT_MULTIPLE_RESPONSE, so no custom triggers  */
+		 (char *) NULL,
+		 /* No string arguments. */
+		 (char *) NULL,
+		 (char *) NULL,
+		 /* dialog string */
+		 LMemDeref (@SDSerialDriverLoadErrorString),
+		 /* dialog type */
+		 (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		 /* interaction type */
+		 (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+	MemUnlock (OptrToHandle (@SDSerialDriverLoadErrorString));
+	}
+    else
+	{
+	/* Force the user to choose a COM port.	*/
+	UserDoDialog (@ComPortWarning);
+	}
+
+    /* Get back to wherever we started from.	*/
+    FilePopDir ();
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GEN_PROCESS_CLOSE_APPLICATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Perform all application shutdown duties.
+
+PASS: 		Void.
+
+RETURN:		MemHandle	= Handle of block containing information to
+				  save to state.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Close the serial port.
+	Free the serial driver.
+	Let the super class shutdown everything else.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.13	Initial version.
+	JDM	93.07.22	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    /* Shutdown the communication channel.	*/
+    ChannelTearDown ();
+
+    /* Get rid of the driver.	*/
+    if (serialDriver) {
+	GeodeFreeDriver (serialDriver);
+    }
+
+    /* Continue shutting down the rest of the application, as normal. */
+    @callsuper();
+
+    /* We aren't saving any state information so return NULL.	*/
+    return (NullHandle); 
+}	/* End of MSG_GEN_PROCESS_CLOSE_APPLICATION.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_SERIAL_DEMO_CHOOSE_INITIAL_COM_PORT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Select the initial COM port.
+
+PASS: 		word	selection		= Selected COM port.
+		word	numSelections		= Number of selections (1).
+		byte	stateFlags		= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Set the COM port selection UI to the given selection.
+	Set the COM port to the specified selection.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.15	Initial version.
+	JDM	93.07.22	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_SERIAL_DEMO_CHOOSE_INITIAL_COM_PORT
+{
+    /* Update the COM port settings UI.	*/
+    @call ComPortList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                           selection, FALSE );
+
+    /* Set the COM port.	*/
+    @call self::MSG_SERIAL_DEMO_CHOOSE_COM_PORT( selection, 1, 0 );
+}	/* End of MSG_SERIAL_DEMO_CHOOSE_INITIAL_COM_PORT.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_SERIAL_DEMO_CHOOSE_COM_PORT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Select which COM port to use.
+
+PASS: 		word	selection		= COM port to use.
+		word	numSelections		= Number of selections (1).
+		byte	stateFlags		= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Setup the communication using the given COM port.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.13	Initial version.
+	JDM	93.07.22	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_SERIAL_DEMO_CHOOSE_COM_PORT
+{
+    /* Set up the communication channel.	*/
+    ChannelSetup (selection, oself);
+}	/* End of MSG_SERIAL_DEMO_CHOOSE_COM_PORT.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_SERIAL_DEMO_CHOOSE_BAUD_RATE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Select the baud rate of the communication channel.
+
+PASS: 		word	selection		= Baud rate to set.
+		word	numSelections		= Number of selections (1).
+		byte	stateFlags		= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:	???
+
+KNOWN DEFECTS/CAVEATS/IDEAS:
+	Set the baud rate.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.13	Initial version.
+	JDM	93.07.22	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_SERIAL_DEMO_CHOOSE_BAUD_RATE
+{
+    /* Set the channel format.	*/
+    serialBaudRate = selection;
+    ChannelSetFormat ();
+}	/* End of MSG_SERIAL_DEMO_CHOOSE_BAUD_RATE.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_SERIAL_DEMO_CHOOSE_LENGTH
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Select the number of data bits for the channel.
+
+PASS: 		word	selection		= Number of data bits.
+		word	numSelections		= Number of selections (1).
+		byte	stateFlags		= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Set the number of data bits.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.13	Initial version.
+	JDM	93.07.22	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_SERIAL_DEMO_CHOOSE_LENGTH
+{
+    /* Set the channel format.	*/
+    serialLength = selection;
+    ChannelSetFormat ();
+}	/* End of MSG_SERIAL_DEMO_CHOOSE_LENGTH.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_SERIAL_DEMO_CHOOSE_PARITY_BITS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Select the number of parity bits for the current channel.
+
+PASS: 		word	selection		= Number of parity bits.
+		word	numSelections		= Number of selections (1).
+		byte	stateFlags		= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Set the number of parity bits for the communication channel.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.13	Initial version.
+	JDM	93.07.22	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_SERIAL_DEMO_CHOOSE_PARITY_BITS
+{
+    /* Set the channel format.	*/
+    serialParity = selection;
+    ChannelSetFormat ();
+}	/* End of MSG_SERIAL_DEMO_CHOOSE_PARITY_BITS.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_SERIAL_DEMO_CHOOSE_XSTOP_BITS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Select the number of extra stop bits for the current
+		channel.
+
+PASS: 		word	selection		= Number of extra stop bits.
+		word	numSelections		= Number of selections (1).
+		byte	stateFlags		= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Set the number of parity bits for the communication channel.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	93.07.25	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_SERIAL_DEMO_CHOOSE_XSTOP_BITS
+{
+    /* Set the channel format.	*/
+    serialXStopBits = selection;
+    ChannelSetFormat ();
+}	/* End of MSG_SERIAL_DEMO_CHOOSE_XSTOP_BITS.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_SERIAL_DEMO_CHOOSE_MODE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Select the low level driver handling mode for the channel.
+
+PASS: 		word	selection		= Mode (SerialMode).
+		word	numSelections		= Number of selections (1).
+		byte	stateFlags		= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Set the mode for the low level translation/handling of the channel.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.13	Initial version.
+	JDM	93.07.22	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_SERIAL_DEMO_CHOOSE_MODE
+{
+    /* Set the channel format.	*/
+    serialMode = selection;
+    ChannelSetFormat ();
+}	/* End of MSG_SERIAL_DEMO_CHOOSE_MODE.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_SERIAL_DEMO_READ_TEXT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Read bytes from the communication channel and display them.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	This message is invoked from a one-shot timer.  Read in up to a
+	buffer's worth of data and then process and display it.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:
+	For some reason, Ctrl-Z coming in through the serial line kills the
+	GenText as I was handling it.  Rather than investigate this (since
+	the reading is for demonstration only), I've filtered it out.  At
+	the end of the method, we re-start the timer (since it's a one-shot
+	timer, it needs to be restarted to ensure we try to read another
+	byte later).
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.13	Initial version.
+	PJD	93.07.17	Rewritten to handle control codes.
+	JDM	93.07.22	Big cleanup.
+        NF	8/5/96		Fixed MemUnlock problem with
+        			processedBuffer by moving it into
+                                the else construct.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialDemoProcessClass, MSG_SERIAL_DEMO_READ_TEXT {
+    word		bytesRead	= 0;
+    word		errorCode	= 0;
+    byte *		readBuffPtr	= NULL;
+    byte *		processedBuffPtr;
+    word		processedBuffLcv;
+    word		wLcv;
+
+    /* Disregard any timer firings when the timer has been nuked.	*/
+    if ( timerHandle ) {
+	/* Do we already have an allocated memory block?	*/
+	if ( NullHandle == readBuffer ) {
+	    /* Nope.  Allocate a buffer.	*/
+	    if ( NullHandle == ( readBuffer =
+			MemAlloc( SERIAL_DEMO_READ_BUFFER_SIZE,
+                                  HF_DYNAMIC, HAF_STANDARD ) ) ) {
+		/* Inform the user of the error.	*/
+		@call SerialTextDisplay::MSG_VIS_TEXT_APPEND_OPTR(
+                          @SDSerialMemAllocErrorString, 0 );
+		return;
+            }
+        }
+
+	/* Lock down THE read buffer block.	*/
+	readBuffPtr = MemLock( readBuffer );
+
+	/*
+	 * SerialRead returns StreamError. (STREAM_NO_ERROR = 0)
+	 */
+	if ( !( ( ReportStreamError(
+                      SerialRead( serialDriver, serialComPort,
+                                  STREAM_NO_BLOCK,
+                                  SERIAL_DEMO_READ_BUFFER_SIZE,
+                                  readBuffPtr, &bytesRead ) ) ) ||
+	        ( ReportStreamError(
+                      StreamGetError( serialDriver, serialComPort,
+                                      STREAM_ROLES_READER, &errorCode ))))) {
+	    if ( errorCode ) {
+                /* Inform the user of the serial error.	*/
+                ReportSerialError( errorCode );
+	    }
+            else {
+
+                /* Do we already have an allocated memory block? */
+                if ( NullHandle == processedBuffer ) {
+                    /* Nope. Allocate a buffer. */
+                    if ( NullHandle == ( processedBuffer =
+                             MemAlloc( 2 * SERIAL_DEMO_READ_BUFFER_SIZE,
+                                       HF_DYNAMIC, HAF_STANDARD ) ) ) {
+                        /* Inform the user of the error. */
+                        @call SerialTextDisplay::MSG_VIS_TEXT_APPEND_OPTR(
+                                  @SDSerialMemAllocErrorString, 0 );
+
+                        /* Unlock the read buffer. */
+                        MemUnlock( readBuffer );
+                        return;
+                    }
+                }
+
+                /* Lock down the processed character buffer block. */
+                processedBuffPtr = MemLock( processedBuffer );
+
+                /* Process all of the characters. */
+                processedBuffLcv = 0;
+                for ( wLcv = processedBuffLcv; wLcv < bytesRead; wLcv++ ) {
+                    /*
+                     * For some reason, Ctrl-Z kills the
+                     * reading application. Filter it out.
+                     */
+                    if ( readBuffPtr[wLcv] != C_CTRL_Z ) {
+                        /* Is it a control character? */
+                        if ( iscntrl( readBuffPtr[wLcv] ) ) {
+                            /* Prefix the displayed character with a carat. */
+                            processedBuffPtr[processedBuffLcv++] = '^';
+
+                            /* Shift it back into normal range.	*/
+                            processedBuffPtr[processedBuffLcv++] =
+                                readBuffPtr[wLcv] - 1 + 'a';
+                        }
+                        else {
+                            /* Not a control char so just copy it. */
+                            processedBuffPtr[processedBuffLcv++] =
+                                readBuffPtr[wLcv];
+                        }
+                    }
+                } /* End of for each character read in... */
+
+                /*
+                 * ASSERT:	processedBuffLcv == Number of characters in the
+                 *		processed character buffer.
+                 *
+                 * Append the processed text to the text display.
+                 * Unlock the processed buffer within the else,
+                 * otherwise we'll be unlocking a locked block if
+                 * errorCode is not zero.
+                 */
+                if ( processedBuffLcv ) {
+                    @call SerialTextDisplay::MSG_VIS_TEXT_APPEND_PTR(
+                                                 (char*)processedBuffPtr,
+                                                 processedBuffLcv );
+                }
+                /* NF - Moved from outside of else construct. */
+                MemUnlock( processedBuffer );
+            } /* else errorCode = 0 */
+
+            /* Unlock the read buffer. */
+            MemUnlock( readBuffer );
+
+            /* Re-start the timer. */
+            timerHandle = TimerStart( TIMER_EVENT_ONE_SHOT, oself,
+                                      SERIAL_DEMO_TIMER_READ_INTERVAL,
+                                      MSG_SERIAL_DEMO_READ_TEXT,
+                                      0, &timerID );
+        }
+    }
+} /* End of MSG_SERIAL_DEMO_READ_TEXT. */
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SerialDemoProcessClass Utility Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ChannelSetup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Build a communication channel.
+
+CALLED BY:	Internal --	MSG_SERIAL_DEMO_CHOOSE_COM_PORT.
+
+PASS:		word	comPort		= COM port to use.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	????
+
+	Asserts:	????
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:	????
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	93.07.22	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void
+ChannelSetup(word comPort, optr processObject)
+{
+    /* Is there a serial driver?	*/
+    if (serialDriver != NullHandle)
+	{
+	/* Yep.  Close the current communication channel (if any).	*/
+	ChannelTearDown ();
+
+	/*
+	 * Set the COM port variable to the new selection, then open the
+	 * port and set the open-port variable TRUE.
+	 */
+	serialComPort = comPort;
+	if ( ! ReportStreamError(
+		  SerialOpen (serialDriver, serialComPort, STREAM_OPEN_NO_BLOCK,
+		    512, 512, 0)
+	       )
+	   )
+	   {
+		serialPortOpen = TRUE;
+
+		/* Set up the channel's line format.	*/
+		ChannelSetFormat ();
+
+		/* Set up the channel's flow control handling.	*/
+		SerialSetFlowControl (serialDriver, serialComPort,
+			      serialFlowControl, serialModem,
+			      serialModemStatus);
+
+		/* Startup a new one shot timer to invoke us to
+		  read again.	*/
+       	 	timerHandle = TimerStart (TIMER_EVENT_ONE_SHOT, processObject,
+				  SERIAL_DEMO_TIMER_READ_INTERVAL,
+				  MSG_SERIAL_DEMO_READ_TEXT, 0, &timerID);
+	   }
+	}
+}	/* End of ChannelSetup().	*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ReportStreamError
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Report a StreamError
+
+CALLED BY:	Internal
+
+PASS:		word	streamError
+
+RETURN:		StreamError passed in
+
+SIDE EFFECTS:
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:	????
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	1/27/94		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static StreamError
+ReportStreamError (word streamError)
+{
+	optr	errorString;
+	char	hexString[28];
+
+	/* Figure out which error string to print out */
+	switch	(streamError) {
+		case 0:		errorString = 0;
+				break;
+		case -1:	errorString = (optr)&StreamErrorMinus1;
+				break;
+		case 1:		errorString = (optr)&StreamError1;
+				break;
+		case 2:		errorString = (optr)&StreamError2;
+				break;
+		case 3:		errorString = (optr)&StreamError3;
+				break;
+		case 4:		errorString = (optr)&StreamError4;
+				break;
+		case 5:		errorString = (optr)&StreamError5;
+				break;
+		case 6:		errorString = (optr)&StreamError6;
+				break;
+		case 7:		errorString = (optr)&StreamError7;
+				break;
+		case 8:		errorString = (optr)&StreamError8;
+				break;
+		case 9:		errorString = (optr)&StreamError9;
+				break;
+		case 256:	errorString = (optr)&StreamError256;
+				break;
+		default:	errorString = 0;
+			sprintf	(hexString,
+				"Unknown Stream Error: %04xh\r",
+				streamError);
+			@call SerialErrorDisplay::MSG_VIS_TEXT_APPEND_PTR
+							(hexString, 28);
+			break;
+	}
+	if (errorString) {
+		/* Inform the user of the stream error.	*/
+		@call SerialErrorDisplay::MSG_VIS_TEXT_APPEND_OPTR
+							(errorString, 0);
+	}
+
+	/* & return error (if any) */
+	return streamError;
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ReportSerialError
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Report a SerialError
+
+CALLED BY:	Internal
+
+PASS:		word	serialError
+
+RETURN:		SerialError passed in
+
+SIDE EFFECTS:
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:	????
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	1/27/94		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static SerialError
+ReportSerialError (word serialError)
+{
+	optr	errorString;
+	word	unknownError = 0;
+	char	hexString[50];
+	int	i;
+
+	for (i = 1; i != 0; i<<=1) {
+
+	    /* Only set bits represent errors */
+	    if (serialError & i) {
+
+		    /* Figure out which error string to print out */
+		    switch	(i) {
+			case 1<<1:	errorString = (optr)&SerialErrorBit1;
+					break;
+			case 1<<2:	errorString = (optr)&SerialErrorBit2;
+					break;
+			case 1<<3:	errorString = (optr)&SerialErrorBit3;
+					break;
+			case 1<<4:	errorString = (optr)&SerialErrorBit4;
+					break;
+			default:	errorString = 0;
+					unknownError += i;
+					break;
+		    }
+		    if (errorString) {
+		        /* Inform the user of the serial error.	*/
+		        @call SerialErrorDisplay::MSG_VIS_TEXT_APPEND_OPTR
+							(errorString, 0);
+		    }
+	    }
+	} /* for i */
+
+	if (unknownError) {
+	    sprintf	(hexString, "Unknown Serial Error(s):  %04xh\r",
+			unknownError);
+	    @call SerialErrorDisplay::MSG_VIS_TEXT_APPEND_PTR
+			(hexString, 32);
+	}
+
+	/* & return error */
+	return serialError;
+} /* ReportSerialError */
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ChannelTearDown
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Shutdown the current serial communication channel.
+
+CALLED BY:	Internal --	MSG_SERIAL_DEMO_CLOSE_APPLICATION,
+				ChannelSetup.
+PASS:		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	All {serial,timer}XXX global variables properly
+			set. 
+
+	Asserts:	timerHandle == NULL, serialPortOpen == FALSE.
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Nuke any outstanding timers.
+	Close the serial port.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	93.07.22	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void
+ChannelTearDown (void)
+{
+    SerialModem serialStatus = 0;
+
+    /*
+     * If the timerHandle is not NULL, then a timer is currently
+     * running.  Shut it down before exiting.
+     */
+    if (timerHandle)
+	{
+	TimerStop (timerHandle, timerID);
+	timerHandle = NullHandle;
+	}
+
+    /* Close the currently open port (if any).	*/
+    if (serialPortOpen)
+	{
+	/* Flush both sides of the stream.	*/
+    	SerialFlush (serialDriver, serialComPort, STREAM_ROLES_BOTH);
+
+	/* Drop the DTR signal (to 'hang up' on the other end).	*/
+    	SerialGetModem (serialDriver, serialComPort, &serialStatus);
+    	SerialSetModem (serialDriver, serialComPort,
+		    	serialStatus & ~SERIAL_MODEM_DTR);
+
+	/* Actually close the port itself.	*/
+    	SerialClose (serialDriver, serialComPort, FALSE);
+	serialPortOpen = FALSE;
+	}
+}	/* End of ChannelTearDown().	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ChannelSetFormat
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Specify the current serial driver line format settings.
+
+CALLED BY:	Internal --	ChannelSetup,
+				MSG_SERIAL_DEMO_CHOOSE_BAUD_RATE,
+				MSG_SERIAL_DEMO_CHOOSE_LENGTH,
+				MSG_SERIAL_DEMO_CHOOSE_PARITY_BITS,
+				MSG_SERIAL_DEMO_CHOOSE_XSTOP_BITS,
+				MSG_SERIAL_DEMO_CHOOSE_MODE.
+PASS:		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	All of the serialXXX global variables to be set
+			Note that the defaults will be set if nothing has
+			been set yet.
+
+	Asserts:	????
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Set the serial format if there is a currently open COM port.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.13	Initial version.
+	JDM	93.07.22	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void
+ChannelSetFormat (void)
+{
+    /* Is there an open COM port?	*/
+    if (serialPortOpen)
+	{
+	/* Yep.  Set the channel's line format.	*/
+    	SerialSetFormat
+		(serialDriver, serialComPort,
+		 (serialLength << SERIAL_FORMAT_LENGTH_OFFSET) |
+		 (serialParity << SERIAL_FORMAT_PARITY_OFFSET) |
+		 (serialXStopBits << SERIAL_FORMAT_EXTRA_STOP_OFFSET),
+		 serialMode, serialBaudRate);
+	}
+}	/* End of ChannelSetFormat().	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SerialTextDisplayClass Methods
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_META_KBD_CHAR
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Handle all keyboard events.
+
+PASS: 		word	character		= Input character.
+		word	flags			= Keyboard information.
+		word	state			= Keyboard state.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Put the received character in a temporary variable,
+	which may be changed during processing.  The original
+	parameter is preserved for passing in the FUP message.
+	
+	Check if the event is a repeat-press or a release and
+	if it is, FUP it up the focus tree.  We are only interested
+	in presses.
+	Check if either control key is pressed.  If one is,
+	translate the Ctrl-press to ASCII code.
+	If no control key is pressed, filter out a few unwanted
+	characters such as the Alt, Shift, and Ctrl keys when
+	pressed by themselves.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TM	93.07.16	Initial version.
+	JDM	93.07.25	Big cleanup.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method SerialTextDisplayClass, MSG_META_KBD_CHAR {
+    byte	tempChar = (byte) character;
+
+    /* Is this a key press event?	*/
+    if ( ( CF_REPEAT_PRESS & flags ) || ( CF_RELEASE & flags ) ) {
+	/* Nope.  Do nothing with the given character.	*/
+	tempChar = C_NULL;
+    }
+    else {
+	/*
+	 * Yep.  Is a control key also being pressed?
+	 * Note that this information is in the ShiftState record in the
+	 * flags parameter (high byte).
+	 */
+        if ( ( ( flags >> 8 ) & SS_LCTRL ) ||
+             ( ( flags >> 8 ) & SS_RCTRL ) ) {
+	    /* Yep.  Force character to lower case.	*/
+	    if ( isupper( tempChar ) ) {
+		tempChar = tolower( tempChar );
+            }
+
+	    /*
+	     * If the character is an alphabetic character, convert it to
+	     * ASCII control code by subtracting 'a' from the lower-case
+	     * ASCII character value, then adding 1 since Ctrl-A is 0x01
+	     * (0x00 is C_NULL).
+	     *
+	     * If the character is not alphabetic, ignore it for this
+	     * exercise.  Convert it to C_NULL (it will get nuked before
+	     * actually being set to the serial port).
+	     */
+            tempChar = ( isalpha( tempChar ) ) ? ( ( tempChar - 'a' ) + 1 ) :
+                                                 C_NULL;
+        }
+	else {
+	    /* Nope.  Is it a 'normal' character?	*/
+	    if ( !( ( isalnum( tempChar ) ) || ( ispunct( tempChar ) ) ||
+                    ( isspace( tempChar ) ) || ( iscntrl( tempChar ) ) ||
+                    ( C_ESC == tempChar ) ) ) {
+		/*
+		 * Nope.  Convert it to C_NULL (it will get nuked before
+		 * actually being set to the serial port).
+		 */
+		tempChar = C_NULL;
+            }
+
+	    /*
+	     * HACK!  Is it a character that screws things up?
+	     * Note:  These characters seem to be generated when the user
+	     *	      presses the alt, shift, or control keys.
+             * NF - Filter out all of E0 to EA.
+	     */
+	    if ( ( tempChar >= 0xE0 ) && ( tempChar <= 0xEA ) ) {
+		/* Yep. Nuke it. */
+		tempChar = C_NULL;
+            }
+        }
+    }
+
+    /*
+     * 'tempChar' is either C_NULL (i.e., a character to be filtered out),
+     * an ASCII control code for a key pressed with the Ctrl key, or
+     * an alphanumeric, space, or punctuation key.  Thus, anything that is
+     * not C_NULL should be passed to the serial port.  In the case of
+     * C_NULL, we pass the original character in its original form up the
+     * focus hierarchy, just as if it were either a release or repeat
+     * press.
+     */
+    if ( C_NULL != tempChar ) {
+	ReportStreamError( SerialWriteByte( serialDriver, serialComPort,
+                                            STREAM_BLOCK, tempChar ) );
+    }
+    else {
+	@call self::MSG_META_FUP_KBD_CHAR( character, flags, state );
+    }
+} /* End of MSG_META_KBD_CHAR. */
+

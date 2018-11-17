@@ -1,0 +1,355 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		bigcalcPCF.def
+
+AUTHOR:		Christian Puscasiu, Apr 16, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CP	4/16/92		Initial revision
+
+
+DESCRIPTION:
+	This file contains all the defintions that are used for the
+	PCFs when they are built and maintained.
+		
+	$Id: bigcalcPCF.def,v 1.1 97/04/04 14:37:49 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;------------------------------------------------------------------------------
+;                       Contants Definitions
+;------------------------------------------------------------------------------
+
+; Length of temp buffer to copy PCF.formula into.  Don't exceed this!
+
+MAX_LENGTH_FORMULA_STRING	= 400
+
+
+
+;------------------------------------------------------------------------------
+;               Error codes
+;------------------------------------------------------------------------------
+
+$x_VARIABLE_IN_FORMULA_NOT_WELL_DEFINED			enum	FatalErrors
+; When a formula is being specified then the syntax has to be $x where
+; x is '0'..'9', but only one digit and nothing else
+	
+THE_LINE_THAT_WE_WANTED_TO_ACCESS_DOESNT_EXIST		enum	FatalErrors
+; the PCF wasn't built out well, ie. check your ui file if the record
+; has been built out well
+
+THE_LINE_ISNT_RIGHT					enum	FatalErrors
+; the line always has to have 2 children, the second always being of
+; class CalcInputField.
+
+NO_CHILDREN_IE_SHOULDNT_BE_HERE				enum	FatalErrors
+; if al is zero one should be there ie al got trashed
+
+DS_NOT_DGROUP						enum	FatalErrors
+; DS was assumed to be dgroup for this routine
+
+ES_NOT_DGROUP						enum	FatalErrors
+; ES was assumed to be dgroup for this routine
+
+IT_SHOULD_BE_A_BAD_NUMBER_ERROR_IF_ANY			enum	FatalErrors
+; the parser was looking through ds:si and claims it is neither a bad
+; nor a regular number and the only two chances ds:si should have is
+; good number or bad number but nothing else
+
+NOT_A_CORRECT_PCFRF_TYPE				enum	FatalErrors
+;
+
+SHOULD_NEVER_BE_HERE					enum	FatalErrors
+;
+
+UNEXPECTED_ERROR_FROM_PARSE_STRING			enum	FatalErrors
+; Since BigCalc constructs strings itself, it should never construct anything
+; that won't parse correctly.  Tragically, however, an error occurred.
+
+FORMULA_STRING_TOO_LONG					enum	FatalErrors
+; The formula string exceeds MAX_LENGTH_FORMULA_STRING - either make
+; the formula smaller or else increase the constant so that buffers
+; are accordingly made larger.
+
+;------------------------------------------------------------------------------
+;               Enum, Record, and Struct defs
+;------------------------------------------------------------------------------
+
+FixedArgsLineStruct	struct
+; this struct is used when building up the PCFs.  They are used in
+; bigcalcData.ui
+;
+	FALS_description	lptr
+	FALS_defaultValue	lptr
+	FALS_unit		lptr
+FixedArgsLineStruct	ends
+	
+
+PreCannedFunctionID	etype	word, 0, 1
+; this are the unique IDs for each of the PCFs.  They are used so the
+; the program can keep track of them when they are built up and used.
+;
+PCFID_AVERAGE		enum	PreCannedFunctionID
+PCFID_CTERM		enum	PreCannedFunctionID
+PCFID_DBL_DECL_BALANCE	enum	PreCannedFunctionID
+PCFID_FUTURE_VALUE	enum	PreCannedFunctionID
+PCFID_PAYMENT		enum	PreCannedFunctionID
+PCFID_PRESENT_VALUE	enum	PreCannedFunctionID
+PCFID_RATE		enum	PreCannedFunctionID
+PCFID_STANDARD_DEVIATION enum	PreCannedFunctionID
+PCFID_STRAIGHT_LINE_DEP	enum	PreCannedFunctionID
+PCFID_SUM		enum	PreCannedFunctionID
+PCFID_SUM_OF_YEAR_DEP	enum	PreCannedFunctionID
+PCFID_TERM		enum	PreCannedFunctionID
+PCFID_VARIANCE		enum	PreCannedFunctionID
+PCFID_SALES_TAX		enum	PreCannedFunctionID
+PCFID_SALES_TOTAL	enum	PreCannedFunctionID
+PCFID_PROFIT		enum	PreCannedFunctionID
+PCFID_MARKUP_COST	enum	PreCannedFunctionID
+PCFID_MARKUP_PROFIT	enum	PreCannedFunctionID
+PCFID_DISCOUNT		enum	PreCannedFunctionID
+PCFID_BREAK_EVEN	enum	PreCannedFunctionID
+PCFID_BREAKEVEN_PROFIT	enum	PreCannedFunctionID
+PCFID_HOME_LOAN		enum	PreCannedFunctionID
+PCFID_CAR_LOAN		enum	PreCannedFunctionID
+PCFID_COLLEGE		enum	PreCannedFunctionID
+PCFID_SAVINGS_GOAL	enum	PreCannedFunctionID
+PCFID_CAR_MILAGE	enum	PreCannedFunctionID
+PCFID_CAR_LEASE		enum	PreCannedFunctionID
+PCFID_LOAN_AMOUNT	enum	PreCannedFunctionID
+PCFID_LOAN_PMT		enum	PreCannedFunctionID
+PCFID_LOAN_INTEREST	enum	PreCannedFunctionID
+PCFID_HOME_SALE		enum	PreCannedFunctionID
+PCFID_HOME_PUR_LOAN	enum	PreCannedFunctionID
+
+PreCannedFunctionType	etype byte,0, 1
+; determines the type.  Variable Args are typicallys stat functions
+; that can take 1-xx args, like average; fixed args are the ones where
+; the user just fills in the fields (like car loan)
+;
+PCFT_VARIABLE_ARGS	enum	PreCannedFunctionType
+PCFT_FIXED_ARGS		enum	PreCannedFunctionType
+
+PreCannedFunctionResultFormat	etype byte
+; this is the ouput format of the result
+;
+PCFRF_DOLLARS_AND_CENTS	enum	PreCannedFunctionResultFormat
+; floating-point with 2 decimals
+;
+PCFRF_GLOBAL_SETTINGS	enum	PreCannedFunctionResultFormat
+; same as the calulator display
+;
+PCFRF_INTEGER		enum	PreCannedFunctionResultFormat
+; integer (no decimals)
+;
+
+;------------------------------------------------------------------------------
+;                       Class and Instance Data Definitions
+;------------------------------------------------------------------------------
+PreCannedFunctionClass	class GenInteractionClass
+;
+;	This is a generic PCF
+;
+MSG_PCF_CALCULATE			message
+;
+;	will be called when a PCF is supposed to be calculated
+;
+;	PASS:	nothing
+;	RETURN: nothing 
+;	DESTROYED: nothing 
+;
+
+MSG_PCF_SEND_TO_CALCULATOR		message
+;
+;	sends the reult of a PCF computation to the calculator
+;	PASS: RETURN: DESTROYS: nothing 
+;
+
+MSG_PCF_SET_RESULT			message
+;
+;	will be called to store the result in the instnace data and
+;	display it in the result filed
+;
+;	PASS:	fp number on top of the fp stack
+;	RETURN: the result in the result field
+;	DESTROYED: nothing 
+;
+
+MSG_PCF_INIT_INST_DATA			message
+;
+;	sent to initialize the PCFs
+;
+;	PASS:	cx:dx	== pointer to the initialization data
+;	RETURN:	al	== number of arguments
+;		dx	will point past the last thing that has been
+;			read
+;	DESTROYED: nothing 
+
+MSG_PCF_DISPLAY_PCF_RESULT		message
+;
+;	will display the result and set the send enabled
+;	PASS:	dx:bp	== farptr to the result as ASCII text
+;	RETURN:	nothing 
+;	DESTROYED: nothing 
+;
+
+MSG_PCF_MAKE_FOCUS			message
+;
+;	will put the focus of the newly brought up PCF in the first
+;	box, ie where the user is expecting to enter the number
+;	PASS: 	nothing
+;	RETURN:	nothing 
+;	DESTROYED: nothing
+
+MSG_PCF_CLOSE				message
+;
+;	will close the interaction.  If we are on a memory poor
+;	machine we'll destroy the PCF, otherwise just hide it
+;	PASS: nothing
+;	RETURN: nothing 
+; 	DESTROY: nothing 
+;
+
+	PCFI_formula		nptr
+;
+;	This is the beginning part of the string that is going to be
+;	fed to the parser to get the result.
+;	
+;	IMPORTANT: This string CANNOT be longer than 100 chars.XX
+;
+	PCFI_ID			PreCannedFunctionID
+;
+;	the PreCannedFunctionID which corresponds to the iem number in
+;	the  list.
+;
+	PCFI_type		PreCannedFunctionType
+;
+;	the type of the PCF
+;
+	PCFI_resultFormat	PreCannedFunctionResultFormat
+;
+;	the format in which the result is being put in
+;
+	PCFI_resultFloat	word	5	dup(0)
+;
+;	the result that can be sent to the calculator
+;
+
+PreCannedFunctionClass		endc
+
+PCFChooserClass		class	GenInteractionClass
+; This class is used to chose the PCF
+;
+MSG_PCF_CHOOSER_CHANGE_DESCRIPTION	message
+; this changes the description when going throught the lists of PCFs
+;	
+;	PASS: cx is the new item that has been selected
+;	RETURN: DESTROY: nothing
+;
+
+MSG_PCF_CHOOSER_NEW_PCF_FROM_LIST	message
+; builds a new PCF
+;
+;	PASS: DESTROY: RETURN: nothing 
+;
+
+	PCFCI_chooserList	optr
+	PCFCI_description	optr
+
+PCFChooserClass		endc
+
+FixedArgsPCFClass		class	PreCannedFunctionClass
+; a PCF with a fiexed number of args
+;
+	FAPI_numberArgs		byte
+;	
+;	number of variables in the PCF
+;
+
+FixedArgsPCFClass		endc
+
+VariableArgsPCFClass		class	PreCannedFunctionClass
+; a PCF that can have a variable number of args
+;
+MSG_VARIABLE_ARGS_PCF_ADD_TO_LIST	message
+;
+;	being sent when a number has to be added to the list of
+;	arguments
+;	PASS: DESTROY: RETURN: nothing 
+;
+
+MSG_VARIABLE_ARGS_PCF_ITEM_SELECTED	message
+;
+;	being sent out when an item selected or unselected
+;
+;	PASS:
+;		cx	= current selection, or first selection in item 
+;			group, if more than one selection, or GIGS_NONE 
+;			of no selection
+;		bp 	= number of selections
+;		dl 	= GenItemGroupStateFlags
+;	DESTROY: RETURN: nothing
+;
+
+MSG_VARIABLE_ARGS_PCF_DELETE_ITEM		message
+;
+;	being sent from the trigger to delete an item from the list
+;	PASS: DESTROYED: nothing
+;	RETURN: the selected item in the list
+;
+
+	VAPI_minimumNumberArgs	byte
+
+VariableArgsPCFClass		endc
+
+FAPCFInputFieldClass		class	InputFieldClass
+; class of where to input the numbers in a FixedArgsPCF.  This
+; subclassing is neccessary for the filtering of the numbers to work
+; properly.
+;
+FAPCFInputFieldClass		endc
+
+VAPCFInputFieldClass		class	InputFieldClass
+; class of where to input the numbers in a VariableArgsPCF.  This
+; subclassing is neccessary for the filtering of the numbers to work
+; properly.
+;
+VAPCFInputFieldClass		endc
+
+PCFResultDisplayClass		class	GenTextClass
+; the class of the result field
+;
+PCFResultDisplayClass		endc
+
+VAItemGroupClass		class	GenItemGroupClass
+
+MSG_VA_ITEM_GROUP_FILL_IN_ARGS	message
+; when computing the VAPCF, a string that is legible by the parser has
+; to be built.  This function will take care of that
+;
+; RETURN:
+;	cx:0	= complete string
+;	cx:bp	= string past the last token written
+; PASS: DESTROYED: nothing 
+;
+
+
+MSG_VA_ITEM_GROUP_RESET_LIST	message
+; This will clear the entire of args
+;
+; PASS: DESTROYED: RETURN: nothing
+;
+
+VAItemGroupClass		endc
+
+VAItemClass			class	GenItemClass
+; holds all the variabel args
+;
+VAItemClass			endc
+

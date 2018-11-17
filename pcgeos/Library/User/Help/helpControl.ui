@@ -1,0 +1,317 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  uiHelp.ui
+ * FILE:	  uiHelp.ui
+ *
+ * AUTHOR:  	  Gene Anderson: Oct 22, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	10/22/92  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ * 	$Id: helpControl.ui,v 1.1 97/04/07 11:47:33 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#include "generic.uih"
+
+
+/***********************************************************************
+ *	help object's subclass of the text object
+ ***********************************************************************/
+
+class HelpText = GenText {
+}
+
+/***********************************************************************
+ *	UI for the help object
+ ***********************************************************************/
+
+start HelpControlUI, notDetachable;
+
+
+HelpTopGroup = GenInteraction {
+	genStates = default -usable;
+	children =
+		HelpFirstAid,
+		HelpContentsTrigger,
+		HelpGoBackTrigger,
+		HelpHistoryList,
+		HelpVersionTrigger,
+		HelpInfoTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+
+HelpTextDisplay = HelpText {
+	genStates = default -usable;
+	genAttributes = readOnly;
+	text = "";
+	hints = {
+		ATTR_GEN_TEXT_SELECTABLE,
+		HINT_DEFAULT_FOCUS,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+/*  Removed to make help text more distinctive - Don 4/21/99*/
+/*		HINT_TEXT_WHITE_WASH_COLOR */
+	}
+}
+
+HelpBottomGroup = GenInteraction {
+	genStates = default -usable;
+	children =
+		HelpFirstAidGoBack,
+		HelpCloseTrigger;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+/***********************************************************************
+ *	various components
+ ***********************************************************************/
+
+HelpOnHelpTrigger = GenTrigger {
+	kbdAccelerator = specificUI F1;
+	genStates = default -usable;
+	action = MSG_HC_BRING_UP_HELP, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_DEFAULT_MONIKER {
+			word GDMT_HELP_PRIMARY
+		},
+		HINT_SEEK_TITLE_BAR_RIGHT
+	}
+}
+
+HelpContentsTrigger = GenTrigger {
+	moniker = 't', "Contents";
+	action = MSG_HC_BRING_UP_TOC, "TO_OBJ_BLOCK_OUTPUT";
+}
+
+HelpGoBackTrigger = GenTrigger {
+	moniker = 'G', "Go Back";
+	action = MSG_HC_GO_BACK, "TO_OBJ_BLOCK_OUTPUT";
+}
+
+HelpHistoryList = GenDynamicList {
+	queryMsg = MSG_HC_GET_HISTORY_LIST_MONIKER;
+	applyMsg = MSG_HC_GOTO_HISTORY;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	moniker = 'H', "History";
+	hints = {
+		HINT_ITEM_GROUP_MINIMIZE_SIZE
+	}
+}
+
+HelpVersionTrigger = GenTrigger {
+	genStates = default -usable;
+	moniker = 'V', "Ver";
+	action = MSG_HC_JUMP_TO_VERSION_INFO, "TO_OBJ_BLOCK_OUTPUT";
+}
+
+HelpInfoTrigger = GenTrigger {
+	genStates = default -usable;
+	moniker = 'I', "Info";
+	action = MSG_HC_DISPLAY_CONTEXT_INFO, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+HelpCloseTrigger = GenTrigger {
+	/*
+	 * If we go back to having a non-Close button, a moniker with
+	 * VMO_CANCEL allows pressing <Esc> to activate this button
+	 */
+	kbdAccelerator = specificUI ESCAPE;
+	moniker = "VMO_CANCEL", "Close Help";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS }
+	}
+}
+
+HelpInstructions = GenInteraction {
+	genStates = default -usable;
+	children = HelpInstructionsText;
+	hints = {
+/* The extra level of interaction is here to allow HINT_DRAW_IN_BOX */
+/* Currently, the documentation people don't want a box... */
+/*		HINT_DRAW_IN_BOX,	*/
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+HelpInstructionsText = GenText {
+	genAttributes = readOnly;
+	text = "";
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR {
+			word DEF_CHAR_ATTR_FONT_SIZE(VTDF_UNIVERSITY, VTDS_9)
+		},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_PIXELS, HT_MIN_TEXT_WIDTH>
+			SpecHeight <SST_LINES_OF_TEXT, 2>
+		},
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+HelpFirstAidGoBack = GenTrigger {
+	moniker = 'J', "Jump Back";
+	action = MSG_HC_FIRST_AID_GO_BACK, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+HelpFirstAid = GenItemGroup {
+	children =
+		HFALTopicsEntry,
+		HFALQuestionsEntry,
+		HFALAnswersEntry;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_TOOLBOX,
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_HC_CHOOSE_FIRST_AID
+		}
+	}
+}
+
+HFALTopicsEntry = GenItem {
+	moniker = 'T', " TOC ";
+	identifier = "VTCT_CATEGORY";
+}
+
+HFALQuestionsEntry = GenItem {
+	moniker = 'C', " Chapter ";
+	identifier = "VTCT_QUESTION";
+}
+
+HFALAnswersEntry = GenItem {
+	moniker = 'A', " Article ";
+	identifier = "VTCT_ANSWER";
+}
+
+end HelpControlUI;
+
+/***********************************************************************
+ *	Strings for controllers
+ ***********************************************************************/
+
+start HelpControlStrings, data;
+
+chunk HelpName = "Help";
+chunk HCFirstAidName = "First Aid Status";
+chunk HCFirstAidGoBackName = "First Aid Jump Back";
+chunk HCInstructionsName = "Instructions";
+chunk HCCloseName = "Exit";
+chunk HCGoBackName = "Go Back";
+chunk HCHistoryName = "History";
+chunk HCContentsName = "Contents";
+chunk HCTextName = "Text";
+chunk HCHelpOnHelpName = "Help on Help";
+
+/***********************************************************************
+ *	Error messages for the help controller
+ ***********************************************************************/
+chunk helpFileNotFound = "The help file \\\"\\1\\\" was not found.  Help is unavailable for the topic \\\"\\2\\\".\\r\\rError Code: HP-01";
+	localize "Error message if a help file can't be found. '1' is the filename, '2' is the context name.";
+
+#ifdef PRODUCT_WIN_DEMO
+chunk helpFileNotAvailable = "Help is unavailable for this topic in the demonstration version.";
+	localize "Error message if a help file can't be found because it isn'tincluded in the demo version";
+#endif
+
+chunk contextNotFound = "Unable to find the \\\"\\2\\\" section in the help file \\\"\\1\\\".  Help is unavailable for the requested topic.\\r\\rError Code: HP-02";
+	localize "Error message if a help file is found, but the named context in it isn't.  '1' is the filename, '2' is the context name.";
+
+chunk noCompressLibrary = "Error in help: The decompression library could not be loaded. You may need to re-install your software.\\r\\rError Code: HP-03";
+	localize "Error message if the decompression library can't be found or loaded.";
+
+chunk helpFileNotHelp = "The file \\\"\\1\\\" is not a valid help file.  Help is unavailable for the requested topic.\\r\\rError Code: HP-04";
+	localize "Error message if a file that is not a valid help is in the help directory.";
+
+chunk helpFileBadProto = "The help file \\\"\\1\\\" is incompatible with this product.  Help is unavailable for the requested topic.\\r\\rError Code: HP-05";
+	localize "Error message if a help file is out of date (ie. older than the system software.";
+
+chunk helpFileContextInfo = "You are looking at the \\\"\\2\\\" section in the help file \\\"\\1\\\".\\r\\rGlad I could be of service!";
+	localize "Utility message to display the context and help file names.  '1' is the filename, '2' is the context name.";
+
+
+/***********************************************************************
+ *	Reserved Names
+ ***********************************************************************/
+
+/*
+ * Used to find the Table of Contents in an app's help file
+ */
+chunk TableOfContents = "TOC";
+	localize not;
+
+/*
+ * Used to find the Version Information in an help file
+ */
+chunk VersionInformation = "VER";
+	localize not;
+
+/*
+ * special file names
+ */
+/* Changed from "hoh (keyboard)" because "hoh" now covers it all - Steve 1/2/01 */
+chunk KbdHelpOnHelp = "hoh";
+	localize "File name for help about help for keyboard-only system.", 1, 32;
+/* Changed from "hoh (mouse)" per request from Ken Wilson - Don 4/20/99 */
+chunk MouseHelpOnHelp = "hoh";
+	localize "File name for help about help for non-keyboard-only system.", 1, 32;
+
+/***********************************************************************
+ *	Instruction lines
+ ***********************************************************************/
+
+/*
+ * First Aid -- TOC
+ */
+chunk tocInst = "Click on any chapter below. Use the scroll bar to see the rest of the list.\\rTo leave Help, click the Exit button below.";
+
+/*
+ * First Aid -- Chapter
+ */
+chunk chapterInst = "Click on any entry below. Use the scroll bar to see the rest of the list.\\rTo return to the Table of Contents, click the TOC button above.";
+
+/*
+ * First Aid -- Article (Chapter active, Jump Back inactive)
+ */
+chunk articleInst = "To return to the list of entries for this chapter, click the Chapter button.\\rYou can click on any underlined word to see more information on it.";
+
+/*
+ * First Aid -- Article (Chapter inactive, Jump Back inactive)
+ */
+chunk noChapterInst = "To go to the Table of Contents, click the TOC button above.\\rYou can click on any underlined word to see more information on it.";
+
+/*
+ * First Aid -- Article (Jump Back active)
+ */
+chunk jumpBackInst = "To return to your last location, click the Jump Back button below.\\rTo return to your original answer, click the Article button above.";
+
+/*
+ * Anything -- error occurred
+ */
+chunk nullInst = " ";
+
+end HelpControlStrings;

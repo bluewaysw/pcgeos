@@ -1,0 +1,99 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		faxserv.def
+
+AUTHOR:		Adam de Boor, Oct  8, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	10/ 8/93	Initial revision
+
+
+DESCRIPTION:
+	definitions for the simple fax server stuff I worked up.
+	
+	The fax server is organized around a shared-multiple VM file stored
+	in the server directory. The server directory is stored in the
+	SERVER_DIR_KEY key of the [fax server] category, on the server, or
+	the category named after the server, on the client.
+	
+	The file contains both the queue of jobs waiting to be submitted to
+	the server's spooler, and the list of jobs being serviced or
+	that have been completed.
+	
+	The queue of jobs to be submitted is a linked list of VM blocks holding
+	JobParameters structures. The blocks are linked through their uid.
+	The head is the map block for the file.
+	
+	The queue of jobs completed or being serviced is stored as a linked list
+	of DB items, with the head being the DB map item.
+		
+	$Id: faxserv.def,v 1.1 97/04/04 14:15:33 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+QUEUE_FILE_NAME	equ	<'Queue Status', 0>
+SERVER_DIR_KEY	equ	<'serverDir', 0>
+
+FaxJobStatus	etype	byte
+    FJS_QUEUED		enum	FaxJobStatus
+    ; Job has been given to the GEOS spooler.
+    ; 
+    FJS_CONVERTING	enum	FaxJobStatus
+    ; Job is being converted by the GEOS spooler.
+    ; 
+    FJS_WAITING		enum	FaxJobStatus
+    ; Job has been given to the FAX software and is awaiting shipment.
+    ; 
+    FJS_SENDING		enum 	FaxJobStatus
+    ; Job is being sent by FAX software.
+    ; 
+    FJS_SENT		enum	FaxJobStatus
+    ; Job has been sent by the FAX software.
+    ; 
+
+FaxPhoneNum	type	18 dup(char)
+
+FaxJob	struct
+    FJ_next		DBGroupAndItem
+    FJ_numJobs		word			; length of the list (makes
+						;  job of a monitor program
+						;  simpler)
+    FJ_numActive	word			; number of jobs not
+						;  FJS_SENT. Only valid for
+						;  the head of the list.
+    FJ_owner		FileOwnerName		; owner of spool file
+    FJ_docName		FileLongName		; name of document being faxed
+    FJ_numPages		word			; number of pages in document
+    FJ_jobID		word			; job ID assigned by the spooler
+    FJ_status		FaxJobStatus
+    FJ_phone		FaxPhoneNum
+    FJ_when		FileDateAndTime		; when the job entered the
+						;  system
+    FJ_params		word			; VM block handle of
+						;  JobParameters block, to be
+						;  freed when job is out of the
+						;  spooler
+FaxJob	ends
+
+JobParamData	struct		; stuff put at JP_printerData
+    ; These first two fields must match the stuff stored by the CCom driver
+    JPD_coverSheet	byte
+    JPD_server		byte	; doesn't match CCom, but it'll get zeroed
+				;  eventually
+    JPD_phoneNum	FaxPhoneNum
+JobParamData	ends
+
+ifdef JP_printerData
+	.assert size JobParamData le size JP_printerData
+endif
+

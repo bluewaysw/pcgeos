@@ -1,0 +1,214 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Desktop/Folder
+FILE:		folderVariable.asm
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	8/89		Initial version
+	brianc	8/16/89		changed to subclass of DeskVis class
+
+DESCRIPTION:
+	This file contains contains variables for the folder class.
+
+	$Id: cfolderVariable.def,v 1.2 98/06/03 13:36:42 joon Exp $
+
+------------------------------------------------------------------------------@
+
+FileMgrsClassStructures	segment	resource
+
+FolderClass
+
+method	HideHourglass, FolderClass, MSG_FOLDER_MARK_NOT_BUSY
+
+
+if _NEWDESK
+		
+NDFolderClass
+NDDesktopClass
+NDPrinterClass
+NDDriveClass
+NDPopupMenuClass
+NDSortViewPopupMenuClass
+EMCControlPanelClass
+endif		; if _NEWDESK
+
+if _NEWDESKBA
+BAFolderClass
+BATeacherClassesClass
+BATeacherHomeClass
+BARosterClass
+BATeacherCourseClass
+BAStudentHomeTViewClass
+BAStudentClassesClass
+BAListFolderClass
+BACoursewareListFolderClass
+BASpecialUtilitiesListFolderClass
+BAOfficeAppListFolderClass
+BAPeopleListFolderClass
+BAStudentHomeClass
+BAStudentCourseClass
+BAOfficeHomeClass
+BAOfficeCommonClass
+BATeacherCommonClass
+BACoursewareClass
+BAStudentUtilityClass
+BADescriptionTextClass
+
+endif		; if _NEWDESKBA
+
+FileMgrsClassStructures	ends
+
+		
+	;
+	; NewDesk and Zoomer don't have the UI for alot of the 
+	; Geomanager display options, so the grab from these
+	; defaults.  Zoomer does have the UI for display mode,
+	; so we don't have a default for zoomer for display
+	; mode, just for NewDesk
+	;
+idata	segment		
+if _NEWDESK or _ZMGR
+defDisplayTypes	FI_DisplayTypes	mask FIDT_ALL
+defDisplayAttrs	FI_DisplayAttrs mask FIDA_RO or mask FIDA_ARCHIVE or \
+					mask FIDA_INFO
+defDisplaySort	FI_DisplaySort	mask FIDS_NAME
+endif		; if _NEWDESK or _ZMGR
+ND<defDisplayMode	FI_DisplayMode  mask FIDM_LICON	>
+
+idata	ends
+
+
+
+udata	segment
+
+ND< globalMenuState		GlobalMenuBitfield >
+BA< baUserTypeIndex		word>
+
+openFileDiskHandle	word
+
+;
+; file dragging variables
+;
+fileDragging		FileDragFlag	; is something being dragged around?
+fileToMoveCopy		word		; for move/copy of unselected file
+fileDraggingDest	word		; buffer offset of last inverted entry
+
+if _PEN_BASED
+delayedFileDraggingEnd	BooleanByte	; hack to indicate end-select reached
+					;	GenView and is waiting to be
+					;	handled by Folder object
+endif
+
+;
+; flag to indicate that file has been double-clicked
+;
+fileDoubleClick		byte
+
+assocApplicationBuffer	PathName
+assocParametersBuffer	char	DOS_PARAMETERS_BUFFER_LENGTH dup(?)
+
+;
+; stuff for file selection lasso
+;
+regionSelectStart	Point
+regionSelectEnd		Point
+regionSelectGState	word
+regionWinBounds		Rectangle
+
+;
+; default monikers for folders and files and geos appls.
+;
+defaultSmallFileMoniker		TokenMonikerInfo <>
+defaultLargeFileMoniker		TokenMonikerInfo <>
+defaultSmallFolderMoniker	TokenMonikerInfo <>
+defaultLargeFolderMoniker	TokenMonikerInfo <>
+defaultSmallGeosApplMoniker	TokenMonikerInfo <>
+defaultLargeGeosApplMoniker	TokenMonikerInfo <>
+defaultSmallGeosDataMoniker	TokenMonikerInfo <>
+defaultLargeGeosDataMoniker	TokenMonikerInfo <>
+
+;
+; build display list work variables
+;
+buildListXPos		word
+buildListYPos		word
+
+;
+; sizes of file icon boxes in Folder Window
+;
+largeIconBoxWidth	word
+largeIconBoxHeight	word
+smallIconBoxWidth	word
+smallIconBoxHeight	word
+longTextBoxWidth	word
+longTextNameWidth	word
+longTextBoxHeight	word
+shortTextBoxWidth	word
+shortTextBoxHeight	word
+
+compressedLongTextWidth		word
+compressedFullFileDatePos	word
+compressedFullFileTimePos	word
+compressedFullFileAttrPos	word
+compressedFullFileWidth		word
+uncompressedLongTextWidth	word
+uncompressedFullFileDatePos	word
+uncompressedFullFileTimePos	word
+uncompressedFullFileAttrPos	word
+uncompressedFullFileWidth	word
+if _ZMGR and SEPARATE_NAMES_AND_DETAILS
+separateFileSizeEndPos		word
+endif
+
+fullFileDatePos		word			; positions of long view mode
+fullFileTimePos		word
+fullFileAttrPos		word
+fullFileWidth		word
+
+;
+; flag to indicate that error for too-many-Folder-Windows has already been
+; reported
+;
+tooManyFoldersReported	byte
+doingMultiFileLaunch	byte
+
+if _FAX_CAPABILITY
+outputType		PrinterDriverType
+endif
+		
+if COUNT_SORT_COMPARISONS
+;
+; counts number of comparions done in SortFolderBuffer
+;
+sortComparisonCount	dword
+endif		; if COUNT_SORT_COMPARISONS
+
+
+;
+; Currently unused variable that keeps track of the mouse position
+; between the Start and EndMoveCopy.
+;
+lastMousePosition	Point
+
+
+; Optr to a chunk array associated to a quick transfer operation from a BAList
+; object to a BA folder object.  Set by either NewDeskHandleSpecialObjects or
+; by special message handlers of BA folder classes (e.g.
+; MSG_BA_ADD_COURSEWARE, MSG_BA_ROSTER_ADD_STUDENT)
+BA <	listTransferCArray	optr	>
+
+; Flag to indicate that a MSG_SHELL_OBJECT_CHECK_TRANFER_ENTRY handler has
+; decided to abort the current operation.
+BA <	transferAbortFlag	byte	>
+
+; buffers for processing mappings in geos.ini file
+;
+mappingField1	PathName
+mappingField2	PathName
+
+udata	ends

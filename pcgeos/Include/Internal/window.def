@@ -1,0 +1,387 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		window.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines Window structures and routines.
+
+	$Id: window.def,v 1.1 97/04/04 14:15:38 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__WINDOW
+
+include lmem.def		;LMemBlockHeader
+include win.def
+include Internal/tmatrix.def
+
+StartKernel
+
+;-----------------------------------------------------------------------------
+;			Window structure
+;-----------------------------------------------------------------------------
+
+; W_saveUnder, W_savedUnderMask, W_savedUnderFlags
+
+WinUnderFlags	record
+    WUF_7:1
+    WUF_6:1
+    WUF_5:1
+    WUF_4:1
+    WUF_3:1
+    WUF_2:1
+    WUF_1:1
+    WUF_0:1
+WinUnderFlags	end
+
+;
+; W_grFlags and W_grRegFlags
+; NOTE: these must be adjacent
+;
+WinGrRegFlags	record
+	:6			;pad to BYTE only
+	WGRF_WIN_PATH_VALID:1	;TRUE  if win clip path region is valid
+	WGRF_PATH_VALID:1	;TRUE: if clip path region is valid
+WinGrRegFlags	end
+
+WinGrFlags	record
+	:1			;pad to BYTE only
+	WGF_MASK_SIMPLE:1	;TRUE: mask simple (rectangular)
+	WGF_XFORM_VALID:1	;TRUE: final transform matrix valid
+	WGF_BUFFER_VALID:1	;TRUE: driver clip line buffer valid
+	WGF_CLIP_SIMPLE:1	;TRUE: clip simple (no holes)
+	WGF_CLIP_NULL:1		;TRUE: clip line NULL (nothing visible)
+	WGF_MASK_NULL:1		;TRUE: NULL mask (nothing visible)
+	WGF_MASK_VALID:1	;TRUE: region & clip vars valid
+				;FALSE: need to call WinValWinStruct()
+WinGrFlags	end
+
+;	Structure of private data
+
+WinPrivateData	struct
+    WPD_ax		word
+    WPD_bx		word
+    WPD_cx		word
+    WPD_dx		word
+WinPrivateData	ends
+
+
+
+; A Window structure always resides in its own shared memory block, which must
+; be PLock'ed for access.
+;
+Window	struct
+
+    W_header		LMemBlockHeader <>
+
+    ;*** word aligned here
+    ;
+    ; WINDOW STATE
+    ;
+						; Object to which to
+						; 	send exposures
+    W_exposureObj	optr
+						; Object to which to
+						; 	send Enter/Leave
+						; 	notification
+    W_inputObj		optr
+
+    W_curState		hptr.GState 		; Handle of GState for which
+					    	; clipping info is current
+
+    W_updateState	hptr.GState 		; Handle of GState that is
+					    	; doing an update (0 if none)
+
+    W_privData		WinPrivateData <>
+
+    W_driverStrategy	fptr.far		; Strategy routine of video 
+						; driver for window
+
+    W_bitmap		dword			; HugeArrayHandle to bitmap
+						;  (window linked via vidmem)
+    W_bmSegment		word			; segment of locked HugeArray
+						;  directory block 
+    W_palette		lptr.RGBValue		; handle of custom palette, if
+						;  defined (else 0)
+    ;*** word aligned here
+
+    W_priority		WinPriorityData		; Window priority for placement
+						; within layer
+    W_layerID		hptr			; ID of layer group that this
+						; window belongs to (either 0,
+						; or a handle, to ensure
+						; uniqueness)
+
+					
+    W_color		WinColorFlags 		; Backgrnd window color, flags
+
+    ;*** word aligned here
+
+    W_colorRGB		RGBValue <> 		; if using RGB color
+
+    W_regFlags		WinRegFlags		; Internal flags for recalc
+
+    W_ptrFlags		WinPtrFlags		; Flags for ptr event handling
+
+    W_refCount		byte	(?)		; # of WinDecRefCount's needed
+						; before window may be freed.
+						; Is initialized to 1, 
+						; incremented on send of
+						; MSG_WIN_FLUSH_QUEUE, 
+						; decremented on WinClose &
+						; WinDecRefCount.
+
+    W_suspendCount	word			; Exposure suspension count.
+						; if non-zero, MSG_META_EXPOSED
+						; will be held back until 0.
+
+    W_gadgetPtrImage	optr.PointerDef
+    ;
+    ; Gadget Ptr Image.  Since PC/GEOS gadgets are typically not implemented
+    ; using windows, this instance data holds the ptr image to use for the
+    ; current active/implied gadget within the window, so that the window 
+    ; system can get at it when needed.
+    ; Any ptr image set here takes precedence over the window
+    ; ptr image, and appears when the mouse has entered this window.
+
+    W_windowPtrImage	optr.PointerDef
+    ; 
+    ; Window Ptr Image.  Ptr image to use (unless overriden by gadget ptr
+    ; image) when mouse has entered this window.
+
+    ;*** word aligned here
+ 
+    ; LINKS FOR WINDOW TREE
+    ;
+    ;	W_parent is valid only if wState is W_OPEN or W_LOCKED.
+    ;	wPrev/NextSibling, wFirst/LastChild, wGraphics valid anytime.
+    ;	0ffffh indicates NULL, or non-existent chain.
+  
+    W_parent		hptr.Window		; handle parent window
+    W_prevSibling	hptr.Window		; handle sibling to the left
+    W_nextSibling	hptr.Window		; handle sibling to the right
+    W_firstChild	hptr.Window		; handle left-most child window
+    W_lastChild		hptr.Window		; handle right-most child
+						;  window =$ffff for null
+						;  endpoint
+    ;
+    ; REGION HANDLES. If you add any additional regions, change
+    ; the constant WIN_NUM_HANDLES at the end of this file.
+    ;
+    W_winReg		lptr.Region		; window region
+    ; This is the basic, non-clipped shape of the window.  This region is
+    ; relied upon to determine the TRUE window location of the mouse, in a 
+    ; given window tree, regardless of the existence of save-under windows.
+    ; (Hence, it must be updated even when bringing up save-under windows as
+    ; immediate children) Region is identical to the region passed to WinOpen,
+    ; & is changed only on calls to WinMove or WinResize with THIS
+    ; window being the operand.
+    ;
+    W_univReg		lptr.Region		; window universe
+    ; This is the window's region after being clipped to fit in its parent's
+    ; W_univReg, & after the area taken up by non-save-under, overlapping
+    ; sibling windows have been cut out of it.
+
+    W_childReg		lptr.Region		; sum of child windows
+    ; Sum of all non-save-under child windows.  Often used to hold "sibReg",
+    ; that is, the sum of non-save-under children's window regions up to,
+    ; but not including, the one being calculated.  This sum builds up to
+    ; the full childReg at the point that all children have been dealt with.
+
+    W_visReg		lptr.Region		; visible region
+    ; W_univReg -W_childReg -any save-under areas that have been collided
+    ; with in this window.
+   
+    W_invalReg		lptr.Region		; invalid region
+    W_updateReg		lptr.Region		; region being updated
+    W_maskReg		lptr.Region		; final mask used by vid driver
+
+    W_temp1Reg		lptr.Region		; temp reg 1
+    W_temp2Reg		lptr.Region		; temp reg 2
+    ;
+    ; This is transformed by the W_TMatrix *only*.
+    ; It is valid iff WGRF_WIN_PATH_VALID is TRUE.
+    ;
+    W_winPathReg	lptr.Region		; transformed Path region
+    ;
+    ; This is transformed by the GS_TMatrix *and* by the W_TMatrix.
+    ; It is valid iff WGRF_PATH_VALID is TRUE.
+    ;
+    W_pathReg		lptr.Region		; transformed Path region
+    ;
+    ; equates for use by Window init/alloc routines.
+    ;
+WIN_FIRST_HANDLE equ < W_winReg >
+WIN_LAST_HANDLE	equ < W_pathReg >
+WIN_NUM_HANDLES	= (offset WIN_LAST_HANDLE+2 - offset WIN_FIRST_HANDLE) / 2
+
+    ;*** word aligned here
+
+    ;
+    ; WINDOW BOUNDS
+    ;
+    W_winRect		Rectangle <>		; rect bounds of window
+
+    ;	GRAPHICS/WINDOW STATE THAT MUST BE ATTATCHED TO A WINDOW
+
+    ;	current values of document and pattern-reference position
+
+    W_pattPos		word	(?)		; 1 byte ea. for x and y
+    W_ditherX		word			; for dither matrices that
+    W_ditherY		word			;  are not 8x8
+
+    ;	current transformation matrix for window
+
+    W_TMatrix		TMatrix <> 		; default window trans
+    W_curTMatrix	TMatrix <> 		; final TMatrix, used 
+						;  for coord xforms
+    ;*** word aligned here
+
+    ;	Save under information
+
+    W_saveUnder		WinUnderFlags
+    ; A single bit will be set in this variable, ONLY if the
+    ; window was opened requesting SAVE_UNDER, & was granted
+    ; a save under area by the video driver.  The bit set
+    ; indicates which save under area is used.
+
+    W_savedUnderMask	WinUnderFlags
+    ; Set if collision check should be done with save under area when drawing
+
+    W_savedUnderFlags	WinUnderFlags
+    ; Add'l flag to allow win sys to keep track of which state window is
+    ; in w/regards to the save under area:
+    ;
+    ;	  Mask	 Flag
+    ;	  ----   -----
+    ;	   0      0: Unaffected by Save Under area.  This is the
+    ;		     Standard window state when there are no save
+    ;		     under areas, OR window is above, or child
+    ;		     of window w/save under & therefore absolutely
+    ;		     unaffected.
+    ;				(Video sys need NOT test for collision)
+    ;
+    ;	   0      1: Window regions altered to be clipped by window
+    ;		     w/save under.  This is the state after a DRAW
+    ;		     collision in video drive, with a window which was
+    ;		     transparent to the save under region which it
+    ;		     is under.
+    ;			* Region state: Save under is solid, & cuts
+    ;			  a whole in this window's univ/vis/mask
+    ;				(video sys need NOT test for collision)
+    ;
+    ;	   1      0: ILLEGAL STATE
+    ;
+    ;	   1      1: Window regions unaltered by save-under window,
+    ;		     in hopes that it goes away soon.  This is the
+    ;		     Initial state when a save under window comes
+    ;		     into existance that is to the left
+    ;		     of this window in the window tree &
+    ;		     therefore might be on top of this window.
+    ;			* Region state: Save under is transparent -
+    ;			  window univ/vis/mask is oblivious to the
+    ;			  save under area's existence
+    ;				(video sys MUST test for collision)
+    ;
+   
+
+
+    ;
+    ; GRAPHICS PARTIAL RESULTS/ OPTIMIZATION VARIABLES
+    ;
+
+    ;
+    ; mask region bounds
+    ;
+    W_maskRect		Rectangle <> 		; rect bounds of mask
+
+    ;
+    ; clip record/mask bounds
+    ;
+    W_clipRect		Rectangle <> 		; rect bounds of clip
+						; valid area
+
+    W_clipPtr		nptr.word		; offset into this struct to 
+						;  scan line record in Vis reg.
+    ;
+    ; These flags represent the state of the transformation matrix
+    ; as well as various clipping regions stored in the Window.
+    ; For a more detailed explanation, see WinGrFlags
+    ; NOTE: these MUST be adjacent!
+    ;
+    W_grFlags		WinGrFlags
+    W_grRegFlags	WinGrRegFlags
+
+    W_temp3Reg		lptr.Region		; another temp region
+
+Window	ends
+
+GeodeWinFlags	record
+	GWF_FOCUSABLE:1
+	; Set if geode should be given focus on launch, or when clicked on
+
+	GWF_TARGETABLE:1
+	; Set if geode should be given target on launch, or when clicked on
+
+	GWF_MODELABLE:1
+	; Set if geode should be given model excl on launch, or when clicked on
+
+	GWF_FULL_SCREEN:1
+	; Set if this geode should be given the full screen excl on
+	; launch or when clicked in.
+
+	:12
+
+GeodeWinVarFlags	end
+
+
+; This data is stored in each Geode's private data area.
+;
+GeodeWinVars	struct
+
+    GWV_inputObj		optr
+    ;
+    ; Object to which all input destined for this geode should be sent.
+    ; Will generally be a GenApplicationClass object, unless this
+    ; Geode doesn't have one, but still wishes to put windows up &
+    ; get input from them.
+
+    GWV_parentObj		optr
+    ;
+    ; Object which should be called with MSG_META_MUP_ALTER_FTVMC_EXCL,
+    ; passing the inputObj as the object to grab/release exclusive for,
+    ; to implement auto-focus on click within window of geode, and shift
+    ; of focus to geode's input object in that case that it has put up
+    ; a system modal dialog box.
+    ; Will generally be a GenFieldClass object.
+
+    GWV_ptrImage		optr.PointerDef
+    ;
+    ; Status Ptr Image, set to indicate overriding, overall state of a layer
+    ; such as "BUSY".  Overrides gadget, window & modal ptr images, will 
+    ; appear as long as the mouse is over, else grabbed by, a window of the
+    ; layer.
+
+    GWV_flags			GeodeWinFlags
+    ;
+    ; Flags to indicate what grabs the system may give this geode when clicked
+    ; on, or launched.
+
+    GWV_activeWin		hptr.Window
+    ;
+    ; Active window within layer, if any.  Supercedes implied window.
+    ; Normally set by GenApplicationClass anytime the active mouse grab changes
+    ; for the application, to be the window the mouse is grabbed for.
+    ; This window's PIL_WINDOW & PIL_GADGET images will be used in place of
+    ; any currently implied window within the Layer.
+
+GeodeWinVars	ends
+
+
+EndKernel
+

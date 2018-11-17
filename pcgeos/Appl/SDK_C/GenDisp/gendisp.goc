@@ -1,0 +1,483 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-92 -- All Rights Reserved
+ *
+ * PROJECT:	Sample Applications
+ * MODULE:	GenDisplay Possibilities
+ * FILE:	gendisp.goc
+ *
+ * AUTHOR:	Brian Chin: April 11, 1992
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      brianc  4/11/92         Initial version
+ *
+ * DESCRIPTION:
+ *	This application demonstrates the sorts of things you can do to
+ *	GenDisplay objects.
+ *
+ *	(Throughout this file you will see references like this:
+ *      [Con 7.2.1]. This is a reference to chapter 7, section 7.2.1
+ *      of the Concepts manual. [Obj 7.2.1] is a reference to
+ *      chapter 7, section 7.2.1 of the Objects manual. You should use
+ *      these references to locate further information about the topic
+ *      being discussed if anything is unclear.)
+ *
+ *      This sample app assumes some basic knowledge of basic GEOS
+ *      programming. To see more commented examples of a GenView,
+ *      GenPrimary, GenApplication, etc., see SDK_C/Hello.
+ *
+ *	The GenDisplay object is the top-most visible long-term user
+ *      interface object in the system (GenInteraction objects that
+ *      are GIV_POPUP or GIV_DIALOG can also serve as top-most
+ *      visible objects, but they tend to be on-screen for only a
+ *      short while). Its subclass, GenPrimary, is the main window
+ *      the user sees for an application.
+ *
+ *	The GenDisplay, in concert with its parent, GenDisplayGroup,
+ *      and its controller, GenDisplayControl, make up the GEOS
+ *	equivalent of MDI, but with a whole lot less work on your part.
+ *
+ *	For more information, please refer to [Obj 4].
+ *
+ * RCS STAMP:
+ *	$Id: gendisp.goc,v 1.1 97/04/04 16:38:04 newdeal Exp $
+ *
+ *******************************************************************/
+
+/*
+ ********************************************************************
+ *		Include files
+ ********************************************************************
+ */
+
+@include <stdapp.goh>
+
+/*
+ ********************************************************************
+ *		Class & Message Definitions
+ ********************************************************************
+ */
+
+
+@class	GenDispProcessClass, GenProcessClass;
+
+@message void MSG_GEN_DISP_SET_PRIMARY_NOT_MINIMIZED();
+
+@endc;
+
+@classdecl	GenDispProcessClass, neverSaved;
+
+/*
+ ********************************************************************
+ *		UI Objects
+ ********************************************************************
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass GenDispApp = {
+    GI_visMoniker = list { @GenDispTextMoniker };
+    GI_comp = @GenDispPrimary;
+
+    /*
+     * Specify which windowed objects should be activated when the
+     * application starts. Note that one of them (GenDispDisplayTwo)
+     * has a hint on it that will keep it from actually opening a
+     * window, but it will appear in the GenDisplayControl's list
+     * of active displays, which cannot be said for
+     * GenDispDisplayThree, which is initially not usable.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+	@GenDispPrimary, @GenDispDisplayOne, @GenDispDisplayTwo;
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+	@GenDispDisplayControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+	@GenDispDisplayControl;
+}
+
+@visMoniker GenDispTextMoniker = "C GenDisp Sample Application";
+
+@end	AppResource;
+
+
+@start	Interface;
+
+@object GenPrimaryClass GenDispPrimary = {
+    GI_comp = @GenDispActionsMenu,
+              @GenDispWindowMenu,
+              @GenDispDisplayGroup;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenInteractionClass GenDispActionsMenu = {
+    GI_visMoniker = 'A', "Actions";
+    GI_comp = @ActionsSetDisplayThreeUsable,
+	      @ActionsSetDisplayThreeNotUsable,
+              @ActionsSetPrimaryMinimized,
+              @ActionsSetPrimaryNotMinimized,
+              @ActionsSetPrimaryMaximized,
+              @ActionsSetPrimaryNotMaximized;
+    GII_visibility = GIV_POPUP;
+}
+
+/*
+ * The next two triggers control whether the user can get to
+ * GenDispDisplayThree. They send MSG_GEN_SET_USABLE and
+ * MSG_GEN_SET_NOT_USABLE to GenDispDisplayThree when they are
+ * activated. Both of these messages require one to pass a
+ * VisUpdateMode. The GenTrigger object provides a means of
+ * passing data along with its action message, but we have to be
+ * careful: looking at the prototype for MSG_GEN_SET_USABLE, you see:
+ *
+ * @message void MSG_GEN_SET_USABLE(VisUpdateMode updateMode = dl);
+ *
+ * Because of how GenTrigger allocates the bytes of the action data,
+ * specified via ATTR_GEN_TRIGGER_ACTION_DATA or one of its aliases,
+ * we need to actually store two words of data with the trigger.
+ * The first word will be passed in CX (and will be ignored by the
+ * recipient), while the second word will be passed in DX. Since
+ * the VisUpdateMode must be passed in DL, we can just set the
+ * second word to the mode we want (VUM_NOW in both cases) and set
+ * the first word to 0.
+ */
+@object GenTriggerClass ActionsSetDisplayThreeUsable = {
+    GI_visMoniker = "Set Display Three Usable";
+    GTI_destination = GenDispDisplayThree;
+    GTI_actionMsg = MSG_GEN_SET_USABLE;
+    ATTR_GEN_TRIGGER_ACTION_TWO_WORDS = { 0, VUM_NOW };
+}
+
+@object GenTriggerClass ActionsSetDisplayThreeNotUsable = {
+    GI_visMoniker = "Set Display Three Not Usable";
+    GTI_destination = GenDispDisplayThree;
+    GTI_actionMsg = MSG_GEN_SET_NOT_USABLE;
+    ATTR_GEN_TRIGGER_ACTION_TWO_WORDS = { 0, VUM_NOW };
+}
+
+/*
+ * Minimizing a GenDisplay object (GenPrimary is a subclass of
+ * GenDisplay) takes it off the screen [Obj 4.1.2], while leaving
+ * some mechanism for the user to get it back again. In the case
+ * of a GenPrimary object, it creates an icon at the bottom of the
+ * screen (in OSF/Motif); for a GenDisplay, again under OSF/Motif,
+ * it is taken off the screen, but its entry remains in the list
+ * managed by the GenDisplayControl object, by means of which the
+ * user can bring the GenDisplay back on-screen.
+ */
+@object GenTriggerClass ActionsSetPrimaryMinimized = {
+    GI_visMoniker = "Set Primary Minimized";
+    GTI_destination = GenDispPrimary;
+    GTI_actionMsg = MSG_GEN_DISPLAY_SET_MINIMIZED;
+}
+
+/*
+ * A minimized GenDisplay can also be brought back on screen by
+ * sending it MSG_GEN_DISPLAY_SET_NOT_MINIMIZED. To demonstrate
+ * this, we have to minimize the primary (of course), which would
+ * take away any access you might have to a trigger that would
+ * send this message. So, instead, we send a message to our process,
+ * which uses MSG_GEN_DISPLAY_SET_MINIMIZED to minimize the primary,
+ * and then, 3 seconds later, sends MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
+ * to bring it back on-screen.
+ */
+@object GenTriggerClass ActionsSetPrimaryNotMinimized = {
+    GI_visMoniker = "Set Primary Not Minimized (after minimizing it)";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GEN_DISP_SET_PRIMARY_NOT_MINIMIZED;
+}
+
+
+/*
+ * Maximizing a GenDisplay, as the name implies, makes it as big
+ * as possible. For a GenPrimary, it becomes the size of the screen;
+ * a GenDisplay becomes the size of the GenDisplayGroup it is under.
+ */
+@object GenTriggerClass ActionsSetPrimaryMaximized = {
+    GI_visMoniker = "Set Primary Maximized";
+    GTI_destination = GenDispPrimary;
+    GTI_actionMsg = MSG_GEN_DISPLAY_SET_MAXIMIZED;
+}
+
+@object GenTriggerClass ActionsSetPrimaryNotMaximized = {
+    GI_visMoniker = "Set Primary Not Maximized";
+    GTI_destination = GenDispPrimary;
+    GTI_actionMsg = MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED;
+}
+
+/*
+ * Standard Window menu and GenDisplayControl for
+ * controlling our various displays.
+ */
+@object GenInteractionClass GenDispWindowMenu = {
+    GI_comp = @GenDispDisplayControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = { GIGT_WINDOW_MENU };
+}
+
+@object GenDisplayControlClass GenDispDisplayControl = {
+}
+
+/*
+ * GenDisplayGroup that manages our GenDisplay. We make all our
+ * GenDisplay objects generic children of these beast, even
+ * though one of them (GenDispDisplayThree) starts out being
+ * not-usable (this allows us to just send a message to that display
+ * and get it to come up on-screen, rather than having to add it
+ * into the tree and then set it usable).
+ */
+@object GenDisplayGroupClass GenDispDisplayGroup = {
+    GI_comp = @GenDispDisplayOne,
+              @GenDispDisplayTwo,
+              @GenDispDisplayThree;
+    /*
+     * Display groups are in full-sized mode by default.
+     *
+     * GenDisplayGroup is the default focus and target of
+     * GenPrimary, so its children can be the focus and target, in turn.
+     */
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_TARGET;
+    /*
+     * We can specify some initial size for the display control.
+     */
+    HINT_INITIAL_SIZE = {
+	SST_PCT_OF_FIELD_WIDTH | PCT_50,
+	SST_PCT_OF_FIELD_HEIGHT | PCT_50,
+	0
+    };
+    /*
+     * When children are tiled, tile them vertically so as not to go
+     * off the screen if we're running on Zoomer.
+     */
+    HINT_DISPLAY_GROUP_TILE_VERTICALLY;
+}
+
+/*
+ *	    	    Display #1
+ *
+ * You can have various generic objects under a GenDisplay.
+ * DisplayOne just holds a trigger and a silly dialog box.
+ */
+@object GenDisplayClass GenDispDisplayOne = {
+    GI_visMoniker = "Display One";
+    GI_comp = @GenDispDisplayOneTrigger,
+              @GenDispDisplayOneBox;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTriggerClass GenDispDisplayOneTrigger = {
+    GI_visMoniker = "Trigger in Display One";
+}
+
+@object GenInteractionClass GenDispDisplayOneBox = {
+    GI_visMoniker = "Press Me";
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    GI_comp = @DisplayOneBoxText;
+    GII_attrs = @default | GIA_MODAL;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass DisplayOneBoxText = {
+    GI_visMoniker = "Ouch!";
+}
+
+/*
+ *	    	    Display #2
+ *
+ * This GenDisplay is on the GenApplication object's GAGCNLT_WINDOWS
+ * list, so it will be brought on-screen when the application starts,
+ * but will detect the HINT_DISPLAY_MINIMIZED_ON_STARTUP and start
+ * its life minimized. So its moniker will show up in the
+ * GenDisplayControl's list of displays, but it won't appear on-screen
+ * itself (under OSF/Motif).
+ *
+ * This GenDisplay has another special property: one of the objects
+ * underneath it is a menu. Under OSF/Motif, the menu will not appear
+ * on the GenDisplay, but will be shifted up to the application's main
+ * menu bar whenever this GenDisplay has the target.
+ */
+@object GenDisplayClass GenDispDisplayTwo = {
+    GI_visMoniker = "Display Two (Minimized on Startup)";
+    GI_comp = @GenDispDisplayTwoMenu,
+              @GenDispDisplayTwoVanna;
+    HINT_DISPLAY_MINIMIZED_ON_STARTUP;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+/* GenDisplays under a GenDisplayGroup ignore
+   HINT_DISPLAY_MAXIMIZED_ON_STARTUP */
+
+/*
+ * This menu is under a GenDisplay.  The specific UI will move it to the
+ * GenPrimary and show it when this GenDisplay is the target.
+ */
+@object GenInteractionClass GenDispDisplayTwoMenu = {
+    GI_visMoniker = 'D', "DisplayGroup Actions";
+    GI_comp = @DisplayTwoMenuItemOne,
+              @DisplayTwoMenuItemTwo,
+              @DisplayTwoMenuItemThree;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass DisplayTwoMenuItemOne = {
+    GI_visMoniker = "Set DisplayGroup Full-Sized";
+    GTI_destination = GenDispDisplayGroup;
+    GTI_actionMsg = MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED;
+}
+
+@object GenTriggerClass DisplayTwoMenuItemTwo = {
+    GI_visMoniker = "Set DisplayGroup Overlapping";
+    GTI_destination = GenDispDisplayGroup;
+    GTI_actionMsg = MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING;
+}
+
+@object GenTriggerClass DisplayTwoMenuItemThree = {
+    GI_visMoniker = "Tile Displays";
+    GTI_destination = GenDispDisplayGroup;
+    GTI_actionMsg = MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS;
+}
+
+@object GenTextClass GenDispDisplayTwoVanna = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Note that the DisplayGroup Actions \
+menu appears in the application menu bar whenever this \
+GenDisplay is selected, and goes away again should some \
+other GenDisplay be selected.";
+    ATTR_GEN_TEXT_DEFAULT_PARA_ATTR =
+	((1 << VTDPA_LEFT_MARGIN_OFFSET) |
+	 (1 << VTDPA_PARA_MARGIN_OFFSET) |
+	 (1 << VTDPA_RIGHT_MARGIN_OFFSET) |
+	 (VTDDT_HALF_INCH << VTDPA_DEFAULT_TABS_OFFSET) |
+	 (J_FULL << VTDPA_JUSTIFICATION_OFFSET));
+}
+
+/*
+ *	    	    Display #3
+ *
+ * This GenDisplay is initially not usable, and is not on the
+ * GenApplication's GAGCNLT_WINDOWS list, so it will not be
+ * made available to the user until s/he clicks on the
+ * ActionsSetDisplayThreeUsable trigger.
+ */
+@object GenDisplayClass GenDispDisplayThree = {
+    GI_visMoniker = "Display Three";
+    GI_comp = @DisplayThreeView;
+    GI_states = @default & ~GS_USABLE;
+}
+
+/*
+ * You can have various generic objects under a GenDisplay.
+ * Here is a GenView.
+ */
+@object GenViewClass DisplayThreeView = {
+    /* Set some document bounds (we'll just use 8 1/2 by 11 inches) */
+    GVI_docBounds = {0, 0, 72*17/2, 11*72};
+    GVI_content = process;
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@end Interface;
+
+/*
+ ********************************************************************
+ *		Code for GenDispProcessClass
+ ********************************************************************
+ */
+
+
+/********************************************************************
+ *	MSG_GEN_DISP_SET_PRIMARY_NOT_MINIMIZED for GenDispProcessClass
+ ********************************************************************
+ * SYNOPSIS:	    Demonstrate how one can un-minimize a GenPrimary.
+ *		    One cannot do this unless the GenPrimary is minimized,
+ *		    which it can't be if the user is to be able to click
+ *		    on something to send us this message, so we first
+ *		    minimize the GenPrimary, then un-minimize it on a
+ *		    time-delay.
+ * PARAMETERS:	    void(void)
+ * SIDE EFFECTS:    the GenPrimary is minimized for 3 seconds.
+ *
+ * STRATEGY:	    Call MSG_GEN_DISPLAY_SET_MINIMIZED on the GenPrimary.
+ *		    Start a one-shot timer to send
+ *		        MSG_GEN_DISPLAY_SET_NOT_MINIMIZED to the
+ *			GenPrimary after 3 seconds.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/11/92		Initial Revision
+ *
+ *******************************************************************/
+@method GenDispProcessClass, MSG_GEN_DISP_SET_PRIMARY_NOT_MINIMIZED
+{
+    word    timerID;		/* Junk */
+
+    @call GenDispPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+
+    /*
+     * Just start the timer and ignore the return value, as we won't
+     * need to stop it (if we exit while it's not expired, the system
+     * will free it for us anyway).
+     */
+    (void)TimerStart(TIMER_EVENT_ONE_SHOT,
+		     @GenDispPrimary,	/* Send message to this object */
+		     60*3,  	    	/* 3 seconds (60 ticks/second...) */
+		     MSG_GEN_DISPLAY_SET_NOT_MINIMIZED,
+		     0,	    	    	/* Not continual, so no interval */
+		     &timerID);	    	/* Junk variable for kernel to
+					 * abuse. */
+}
+
+
+/********************************************************************
+ *		MSG_META_EXPOSED for GenDispProcessClass
+ ********************************************************************
+ * SYNOPSIS:	    Redraw the recently-exposed portion of the View under
+ *		    Display #3
+ * PARAMETERS:	    void (WindowHandle win)
+ * SIDE EFFECTS:    the invalid region of the window is cleared out
+ *
+ * STRATEGY:	    perform the usual exposed-processing and draw a
+ *		    string into the view. Nothing major.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	9/24/92		Initial Revision
+ *
+ *******************************************************************/
+@method GenDispProcessClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    /*
+     * Get a default graphics state that we can use while drawing.
+     */
+    gstate = GrCreateState(win);
+
+    /*
+     * Start a window update.
+     */
+    GrBeginUpdate(gstate);
+
+    GrSetTextColor(gstate, CF_INDEX, C_LIGHT_VIOLET, 0, 0);
+    GrSetTextStyle(gstate, TS_BOLD, 0);
+    GrSetFont(gstate, FID_DTC_PARK_AVENUE, MakeWWFixed(18));
+    GrDrawText(gstate, 10, 10, "Hi Mom!", 0);
+
+    /*
+     * Now indicate that we are done drawing to the invalid area
+     * and free the gstate.
+     */
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}
+

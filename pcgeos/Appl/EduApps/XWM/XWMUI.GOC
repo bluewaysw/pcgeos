@@ -1,0 +1,594 @@
+/***********************************************************************
+ *Copyright 1994-2001 Breadbox Computer Company LLC  All Rights Reserved
+ *
+ * PROJECT:	Breadbox Crossword Maker
+ * FILE:		xwmui.goc
+ * AUTHOR:	John Howard   11/01
+ *
+ *
+ * DESCRIPTION:
+ *	          This is the Crossword Puzzle Maker
+ *           A lot of the guts borrowed from WSM
+ *
+ *
+ * WHATS NEW:
+ *
+ *		11/09/01	jfh	Initial Version (engine)
+ *       19          Finished the engine
+ *    11/30/01			Release
+ *    07/16/02 jfh	- added copy to clipboard
+ *    07/16/02 jfh	- added name/date block on printed puzzle
+ *
+ *
+ ***********************************************************************/
+
+@include "xwm.goh"
+@include "bboxreg.goh"
+@include "appicon.goh"
+@include "docicon.goh"
+
+
+/***************************************************************************
+ * Application resource
+ **************************************************************************/
+
+@start AppResource;
+
+@object GenApplicationClass XWMApp =
+{
+	 GI_visMoniker = list { @XWMLCAppMoniker,
+					  @XWMTinyAppMoniker,
+					  @XWMTextMoniker };
+    GI_comp = @XWMPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @XWMPrimary;
+	 gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+      @XWMDocumentControl, @XWMPrintControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_APP_STARTUP) = 
+      @XWMDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = 
+      @XWMDocumentControl;
+    ATTR_GEN_APPLICATION_PRINT_CONTROL = @XWMPrintControl;
+	 ATTR_GEN_HELP_FILE = "XWM Help";
+}
+
+@visMoniker XWMTextMoniker = "Crossword Maker";
+
+@end AppResource;
+
+
+/***************************************************************************
+ * Document Group Resource
+ **************************************************************************/
+
+@start DocGroupResource;
+
+@object GenDocumentGroupClass XWMDocumentGroup =
+{
+	 GDGI_untitledName = "Crossword Untitled";
+    GDGI_output = process;
+    GDGI_documentControl = XWMDocumentControl;
+    GDGI_protocolMajor = XWM_DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = XWM_DOCUMENT_PROTOCOL_MINOR;
+    GDGI_attrs = @default;
+}
+
+@end    DocGroupResource;
+
+/***************************************************************************
+ * Interace resource
+ **************************************************************************/
+
+@start Interface;
+
+@object GenPrimaryClass XWMPrimary =
+{
+	GI_visMoniker = "Crossword Maker";
+	GI_comp = @XWMFileGroup, @XWMEditGroup, @XWMSettingsGroup,
+	          @XWMDocumentGroups;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+/***** File Group *****/
+
+@object GenInteractionClass XWMFileGroup = {
+	 GI_comp = @XWMDocumentControl, @XWMImportDialog, @XWMMakePuzzleTrigger,
+				@XWMMakeCrosswordTrigger, @XWMPrintControl,
+				@AboutSubGroup, @XWMExportDialog;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object XWMDocumentControlClass XWMDocumentControl = {
+    GDCI_documentToken = {"XWMd", MANUFACTURER_ID_BREADBOX };
+    GDCI_noNameText = "No Document";
+    GDCI_documentGroup = @XWMDocumentGroup;
+    GDCI_features = @default & ~(GDCF_SUPPORTS_TEMPLATES
+       | GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT
+       | GDCF_SUPPORTS_USER_SETTABLE_DEFAULT_DOCUMENT);
+}
+
+@object GenTriggerClass XWMMakePuzzleTrigger = {
+	 GI_visMoniker = 'M', "Make .PZL";
+	 GTI_actionMsg = MSG_XWM_PROCESS_OPEN_EXPORT_DB;
+	 GTI_destination = process;
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass XWMMakeCrosswordTrigger = {
+	 GI_visMoniker = 'C', "Make Crossword";
+	 GTI_actionMsg = MSG_XWM_PROCESS_OPEN_EXPORT_DB;
+	 GTI_destination = process;
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+/* ---------------------------------------------------------- */
+@object PrintControlClass XWMPrintControl =
+{
+    GI_states = @default | GS_ENABLED;
+    PCI_attrs = (@default & ~(PCA_PAGE_CONTROLS | PCA_VERIFY_PRINT)); 
+    PCI_startUserPage = 1;
+    PCI_endUserPage = 1;
+    PCI_output = process;
+    PCI_docNameOutput = @XWMDocumentGroup;
+    PCI_docSizeInfo = { (8.5 * 72), (11 * 72), 0,
+		{.5 * 72, .5 * 72, 1.5 * 72, .5 * 72} };
+}
+
+
+@object GenInteractionClass AboutSubGroup = {
+    GI_comp = @AboutDBox;
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+/* ---------------------------------------------------------------- */
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 't', "About";
+	 GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Crossword Maker";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2001 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+/* ---------------------------------------------------------- */
+@object GenInteractionClass XWMExportDialog = {
+	 GI_comp = @ExpPuzzleNameStuff, @ExpInfoStuff, @XWDFileSel, @PZLFileSel,
+				  @MakePZLTrigger, @MakeXWDTrigger, @ExpCancelTrigger;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+@visMoniker MakeXWDMoniker = "Make Crossword";
+@visMoniker MakePZLMoniker = "Make .PZL";
+
+@object GenInteractionClass ExpPuzzleNameStuff = {
+	 GI_comp = @XWDFileName, @PZLFileName, @PZLNameWarn;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass PZLFileName = {
+	 GI_visMoniker = ".PZL File Name:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (12);
+	 ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+	 ATTR_GEN_TEXT_MAKE_UPPERCASE;
+	 HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 16, 0, 0};
+	 HINT_TEXT_WHITE_WASH_COLOR;
+	 HINT_DEFAULT_FOCUS;
+}
+
+@object GenGlyphClass PZLNameWarn = {
+	 GI_visMoniker = "(DOS file name)";
+}
+
+@object GenTextClass XWDFileName = {
+	 GI_visMoniker = "File Name:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (32);
+	 ATTR_GEN_TEXT_LEGAL_FILENAMES;
+	 HINT_TEXT_WHITE_WASH_COLOR;
+	 HINT_DEFAULT_FOCUS;
+}
+
+@object GenInteractionClass ExpInfoStuff = {
+	 GI_comp = @PZLTitle, @ExpCopyright, @ExpAuthor, @ExpSource;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass PZLTitle = {
+	 GI_visMoniker = "Title:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (50);
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass ExpCopyright = {
+	 GI_visMoniker = "Copyright:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (50);
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass ExpAuthor = {
+	 GI_visMoniker = "Author:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (50);
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass ExpSource = {
+	 GI_visMoniker = "Source:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (50);
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenFileSelectorClass XWDFileSel = {
+	 GFSI_attrs = @default | FSA_SHOW_FILES_DISABLED;
+	 ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+	 HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenFileSelectorClass PZLFileSel = {
+	 GFSI_fileCriteria = FSFC_MASK_CASE_INSENSITIVE |
+					 FSFC_DIRS |
+					 FSFC_NON_GEOS_FILES;
+	 GFSI_attrs = @default | FSA_SHOW_FILES_DISABLED;
+	 ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+	 ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.PZL"};
+	 HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+	 HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass MakePZLTrigger = {
+	 GI_visMoniker = "Make .PZL";
+	 GTI_actionMsg = MSG_XWM_PROCESS_MAKE_PZL;
+	 GTI_destination = process;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass MakeXWDTrigger = {
+	 GI_visMoniker = "Make Crossword";
+	 GTI_actionMsg = MSG_XWM_PROCESS_MAKE_XWORD;
+	 GTI_destination = process;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ExpCancelTrigger = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+/*---------------------------------------------------------------------*/
+@object GenInteractionClass XWMEditGroup = {
+	GI_visMoniker   = 'E', "Edit" ;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	GI_comp        = @XWMCopyToClipboard ;
+	GII_visibility = GIV_POPUP ;
+}
+
+@object GenTriggerClass XWMCopyToClipboard = {
+	GI_visMoniker   = 'C', "Copy Puzzle" ;
+	GTI_destination = process ;
+	GTI_actionMsg   = MSG_META_CLIPBOARD_COPY ;
+}
+
+/* ---------------------------------------------------------- */
+@object GenInteractionClass XWMDocumentGroups =
+{
+	 GI_comp = @XWMDocumentUIGroup, @XWMDocumentViewGroup;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/***** Document UI Group *****/
+
+@object GenInteractionClass XWMDocumentUIGroup = 
+{
+    GI_comp = @XWMWordListGroup;
+    GI_states = @default & ~GS_ENABLED;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+/***** Word List Group *****/
+
+@object GenInteractionClass XWMWordListGroup =
+{
+    GI_visMoniker = "Word List";
+	 GI_comp = @XWMWordList, @XWMWordListAddText, @XWMWordListDeleteTrigger,
+				  @XWMCluesTrigger, @XWMCluesDBox;
+	 HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDynamicListClass XWMWordList =
+{
+//	 GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	 GIGI_destination = process;
+	 GDLI_queryMsg = MSG_XWM_PROCESS_QUERY_WORD_LIST;
+	 ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_XWM_PROCESS_WORD_LIST_STATUS;
+	 ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = MSG_XWM_PROCESS_OPEN_CLUES_DB;
+	 HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTextClass XWMWordListAddText =
+{
+	 GI_visMoniker = 'A', "Add word";
+    GI_attrs = GA_INITIATES_INPUT_HOLD_UP;
+	 GTXI_maxLength = WORD_MAX_SIZE;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_destination = process;
+	 GTXI_applyMsg = MSG_XWM_PROCESS_ADD_WORD;
+    ATTR_GEN_TEXT_ALPHA;
+	 ATTR_GEN_TEXT_NO_SPACES;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_DEFAULT_FOCUS;
+}
+
+@object GenTriggerClass XWMWordListDeleteTrigger = {
+	 GI_visMoniker = 'D', "Delete word";
+	 GTI_actionMsg = MSG_XWM_PROCESS_DELETE_WORD;
+	 GTI_destination = process;
+}
+
+@object GenTriggerClass XWMCluesTrigger = {
+	 GI_visMoniker = 'l', "Clues";
+	 GTI_actionMsg = MSG_XWM_PROCESS_OPEN_CLUES_DB;
+	 GTI_destination = process;
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass XWMCluesDBox = {
+	GI_visMoniker = "Clues";
+	GI_comp = @CDBInstrGlyph, @CDBWordText, @CDBClueText,
+				 @CDBEnterTrigger, @CDBCancelTrigger;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	ATTR_GEN_HELP_CONTEXT = "CluesDBox";
+}
+
+@object GenGlyphClass CDBInstrGlyph =  {
+	GI_visMoniker = "Type in the clue for the selected word.";
+}
+
+@object GenTextClass CDBWordText = {
+	 GI_attrs = GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_TEXT_NO_FRAME;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass CDBClueText = {
+	GTXI_maxLength = CLUE_TEXT_MAX_SIZE - 1;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_TEXT_WHITE_WASH_COLOR;
+   HINT_DEFAULT_FOCUS;
+}
+
+@object GenTriggerClass CDBEnterTrigger = {
+	 GI_visMoniker = "Enter";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 GTI_actionMsg = MSG_XWM_PROCESS_ENTER_CLUE;
+	 GTI_destination = process;
+	 HINT_SEEK_REPLY_BAR;
+	 HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass CDBCancelTrigger = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+/***** Document View Group *****/
+
+@object GenInteractionClass XWMDocumentViewGroup = 
+{
+    GI_comp = @XWMCalculateTrigger, @XWMDocumentView;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass XWMCalculateTrigger =
+{
+    GI_visMoniker = 'C', "Calculate Crossword";
+	 GTI_actionMsg = MSG_XWM_PROCESS_CALCULATE;
+    GTI_destination = process;
+}
+
+@object GenViewClass XWMDocumentView =
+{
+    GVI_content = process;
+    GVI_docBounds = { 0, 0, 0, 0 };
+    GVI_attrs = @default & ~GVA_FOCUSABLE;
+    GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+/***** Settings Group *****/
+
+@object GenInteractionClass XWMSettingsGroup =
+{
+	 GI_visMoniker = 'S', "Settings";
+	 GI_comp = @XWMSettingsSize, @XWMSettingsOther;
+    GI_states = @default & ~GS_ENABLED;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_PROPERTIES;
+	 HINT_SEEK_MENU_BAR;
+	 ATTR_GEN_HELP_CONTEXT = "SettingsDBox";
+}
+
+@object GenInteractionClass XWMSettingsSize =
+{
+    GI_comp = @XWMSettingsSizeWidth, @XWMSettingsSizeHeight;
+}
+
+@object GenValueClass XWMSettingsSizeWidth =
+{
+    GI_visMoniker = "Grid width";
+    GVLI_minimum = MakeWWFixed(GRID_MIN_SIZE);
+    GVLI_maximum = MakeWWFixed(GRID_MAX_SIZE);
+    GVLI_increment = MakeWWFixed(1);
+    GVLI_stateFlags = GVSF_INDETERMINATE;
+    GVLI_destination = process;
+    GVLI_applyMsg = MSG_XWM_PROCESS_APPLY_SETTINGS_WIDTH;
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_XWM_PROCESS_STATUS_WIDTH;
+}
+
+@object GenValueClass XWMSettingsSizeHeight =
+{
+    GI_visMoniker = "Grid height";
+    GVLI_minimum = MakeWWFixed(GRID_MIN_SIZE);
+    GVLI_maximum = MakeWWFixed(GRID_MAX_SIZE);
+    GVLI_increment = MakeWWFixed(1);
+    GVLI_stateFlags = GVSF_INDETERMINATE;
+    GVLI_destination = process;
+    GVLI_applyMsg = MSG_XWM_PROCESS_APPLY_SETTINGS_HEIGHT;
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_XWM_PROCESS_STATUS_HEIGHT;
+}
+
+@object GenBooleanGroupClass XWMSettingsOther =
+{
+	 GI_comp = @XWMSettingsSquare, @XWMSettingsShowAnswers;
+	 GBGI_indeterminateBooleans = XWMS_SQUARE | XWMS_ANSWERS;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_XWM_PROCESS_APPLY_SETTINGS_OTHER;
+    ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG = MSG_XWM_PROCESS_SETTINGS_OTHER_CHANGED;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenBooleanClass XWMSettingsSquare =
+{
+    GI_visMoniker = "Keep grid square";
+    GBI_identifier = XWMS_SQUARE;
+}
+
+@object GenBooleanClass XWMSettingsShowAnswers =
+{
+    GI_visMoniker = "Show answers";
+    GBI_identifier = XWMS_ANSWERS;
+}
+
+/* -------------------------------------------------------------- */
+@object GenInteractionClass XWMImportDialog = {
+	 GI_visMoniker = "Read Word List";
+	 GI_states = @default & ~GS_ENABLED;
+	 GI_comp = @XWMImpFileSel, @XWMImportButton, @XWMImpCanx;
+    GII_visibility = GIV_DIALOG;
+    ATTR_GEN_HELP_CONTEXT = "ImpDB";
+}
+
+@object GenFileSelectorClass XWMImpFileSel = {
+    GFSI_fileCriteria = FSFC_MASK_CASE_INSENSITIVE |
+				    FSFC_DIRS |
+				    FSFC_NON_GEOS_FILES;
+	 GFSI_destination = process;
+	 GFSI_notificationMsg = MSG_XWM_IMPORT_SELECTOR_ACTION;
+	 ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+	 HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+	 HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass XWMImportButton = {
+	 GI_visMoniker = "Read";
+	 GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+	 GTI_actionMsg = MSG_XWM_IMPORT_WORD_LIST;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass XWMImpCanx = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end Interface;
+
+@start Strings;
+
+@chunk char XWFolderTxt[] = "Crossword Puzzles";
+@chunk char XWMFolderTxt[] = "Crossword Maker Files";
+@chunk char XWNoFitTxt[] = "Not all of the words fit in the puzzle, try again.  If you continue to get this message, try increasing the size of the grid or decreasing the number of words.";
+@chunk char DefaultPZL[] = "UNNAMED.PZL";
+@chunk char ExpOpenErrMsg[] = "There was an error opening the .PZL file.";
+@chunk char ExpCreateErrMsg[] = "There was an error creating the .PZL file.";
+@chunk char ExpWriteErrMsg[] = "There was an error writing the .PZL file.";
+@chunk char ExpCloseErrMsg[] = "There was an error closing the .PZL file.";
+@chunk char FileExistsErrMsg[] = "There is already a file with that name.  Please chose another name.";
+@chunk char AcrossText[] = "Across";
+@chunk char DownText[] = "Down";
+@chunk char WordTooShortMsg[] = "The word \"\001\" needs to be at least three letters long.";
+@localize "do not translate the @1";
+@chunk char WordTooLongMsg[] = "The word \"\001\" needs to be less than 16 letters long.";
+@localize "do not translate the @1";
+@chunk char WordInvalidCharMsg[] = "The word \"\001\" can have letters only.";
+@localize "do not translate the @1";
+@chunk char DupeWordMsg[] = "The word \"\001\" is already in your list.";
+@localize "do not translate the @1";
+@chunk char ListTooLongMsg[] = "You may have only 50 words in the list.";
+@chunk char XWDDBoxHelp[] = "MakeXWDDBox";
+@chunk char PZLDBoxHelp[] = "MakePZLDBox";
+@chunk char XWDFileNameMsg[] = "Please enter a File Name for the converted puzzle.";
+@chunk char ImportMsg[] = "Are you sure you want to import words from \"\001\" into this puzzle?";
+@localize "do not translate the @1";
+@chunk char ImpOpenErrMsg[] = "There was an error opening the word list file.";
+@chunk char ImpBadTypeErrMsg[] = "Not a valid word list file.";
+@chunk char ImpCloseErrMsg[] = "There was an error closing the word list file.";
+@chunk char ImpReadErrMsg[] = "There was an error reading the word list file.";
+@chunk char PrintNameLine[] = "Name: _______________________";
+@chunk char PrintDateLine[] = "Date: _______________________";
+
+
+@end Strings;
+
+

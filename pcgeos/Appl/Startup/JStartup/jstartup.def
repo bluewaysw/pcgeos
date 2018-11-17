@@ -1,0 +1,178 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	Jedi
+MODULE:		startup
+FILE:		jstartup.def
+
+AUTHOR:		Steve Yegge, Jul 15, 1993
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	stevey	7/15/93		Initial revision
+
+
+DESCRIPTION:
+		
+
+	$Id: jstartup.def,v 1.1 97/04/04 16:53:11 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;		constants, etc.
+;-----------------------------------------------------------------------------
+
+include	Internal/Jedi/hp.def
+include iacp.def
+
+SCREEN_WIDTH		equ	240
+SCREEN_FONT_SIZE	equ	12
+OWNER_BUFFER_SIZE	equ	100		; stolen from HomeScreen
+
+WELCOME_STRING_TOP	equ	50
+TOUCH_SCREEN_STRING1_TOP	equ	150
+TOUCH_SCREEN_STRING2_TOP	equ	165
+
+DoingSomething		etype	byte, 0, 1
+    DS_CALIBRATION	enum	DoingSomething
+    DS_DATE_TIME	enum	DoingSomething
+
+;
+; Hardware constants copied from jprefConstant.def
+; --- AY 8/17/95
+;
+JEDI_BIOS_READ_CMOS_WORD	equ	10h
+JEDI_BIOS_WRITE_CMOS_WORD	equ	11h
+JEDI_BIOS_INTERRUPT		equ	1ah
+
+JEDI_TOUCH_ON_CMOS_ADDRESS	equ	35h
+JEDI_TOUCH_ON_MASK		equ	0080h
+JEDI_TOUCH_ON_DISABLE		equ	0080h
+
+;-----------------------------------------------------------------------------
+;		process class
+;-----------------------------------------------------------------------------
+
+JSProcessClass	class	GenProcessClass
+
+MSG_JSP_SET_DATE	message
+MSG_JSP_SET_TIME	message
+
+MSG_JSP_QUERY_CITY_MONIKER    message
+;
+; The CityList sends this message to the process
+; in order to get the city name to display.
+;
+; Pass:		^lcx:dx = The dynamic list requesting the moniker
+;         	bp      = position of the item requested
+; Return:     	nothing
+;             	ax, cx, dx, bp destroyed
+;
+
+MSG_JSP_CITY_APPLY    message
+;
+; The CityList sends this message to the process
+; when a change of selection has occured.
+;
+; Pass:  	cx 	= current selection
+;		bp	= number of selections
+; 		dl 	= GenItemGroupStateFlags
+; Return:  	nothing
+;           	ax, cx, dx, bp destroyed
+;
+
+JSProcessClass	endc
+
+JSApplicationClass	class	GenApplicationClass
+JSApplicationClass	endc
+
+JSPrimaryClass	class	GenInteractionClass
+
+MSG_JS_PRIMARY_COMING_UP				message
+;
+;  Sent to ourselves via the gen-visibility-notification mechanism.
+;  (puts up the welcome screen).
+;
+;  Pass:	nothing
+;  Return:	nothing
+;  Destroyed:	nothing
+;
+
+MSG_JS_PRIMARY_DO_CALIBRATION				message
+;
+;  Sent after the user dismisses the welcome screen.
+;
+;  Pass:	nothing
+;  Return:	nothing
+;  Destroyed:	nothing
+;
+
+MSG_JS_PRIMARY_DO_THE_TIME_DATE_THING			message
+;
+;  Sent when the user completes digitizer calibration.
+;
+;  Pass:	nothing
+;  Return:	nothing
+;  Destroyed:	nothing
+;
+
+MSG_JS_PRIMARY_DONE_OWNER				message
+;
+;  We're ready to quit.
+;
+;  Pass:	nothing
+;  Return:	nothing
+;  Destroyed:	nothing
+;
+
+;---------------------------------------------
+;		Instance Data
+;---------------------------------------------
+
+JSPI_screen	optr
+
+JSPrimaryClass	endc
+
+if _CITY_LIST
+;-----------------------------------------------------------------------------
+;		MnemonicInteractionClass
+; Lets the mnemonic for the interaction give focus to the linked object
+;-----------------------------------------------------------------------------
+MnemonicInteractionClass	class	GenInteractionClass
+	MII_mnemonicFocus	optr
+MnemonicInteractionClass	endc
+
+
+;-----------------------------------------------------------------------------
+;		JSCityListClass
+;-----------------------------------------------------------------------------
+JSCityListClass	class	GenDynamicListClass
+
+JSCityListClass	endc
+
+endif  ; _CITY_LIST
+
+;-----------------------------------------------------------------------------
+;		global routines
+;-----------------------------------------------------------------------------
+
+
+;-----------------------------------------------------------------------------
+;		Errors
+;-----------------------------------------------------------------------------
+
+STARTUP_INI_FILE_ERROR					enum	FatalErrors
+FIRST_CHILD_OF_OWNER_INTERACTION_NOT_FOUND		enum	FatalErrors
+FIRST_CHILD_OF_OWNER_INTERACTION_NOT_TEXT_OBJECT	enum	FatalErrors
+
+;-----------------------------------------------------------------------------
+;		Global ui objects
+;-----------------------------------------------------------------------------
+
+if _CITY_LIST
+global	JSCityList:		chunk
+endif

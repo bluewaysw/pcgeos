@@ -1,0 +1,573 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991 -- All Rights Reserved.
+ *
+ * PROJECT:	GEOS Sample Applications
+ * MODULE:	TwoDLists
+ * FILE:	TwoDLists.goc
+ *
+ * AUTHOR:	Tony Requist: April 1, 1991
+ *
+ * DESCRIPTION:
+ *	This file source code for the TwoDLists application.
+ *      This code will be compiled by GOC, and then linked by the
+ *      GLUE linker to produce a runnable .geo application file.
+ *
+ *      This sample app assumes some basic knowledge of basic GEOS
+ *      programming. To see more commented examples of a GenView,
+ *      GenPrimary, GenApplication, etc., see SDK_C/Hello.
+ *
+ * RCS STAMP:
+ *	$Id: twodlists.goc,v 1.1 97/04/04 16:39:02 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include Files
+ *******************************************************************/
+    @include <stdapp.goh>
+
+/********************************************************************
+ *		Constants
+ *******************************************************************/
+    #define NUM_TOTAL_COLORS        16
+    #define LIST_ITEM_NEEDS_REMOVAL ( (word) - 1 )
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    @class TwoDListsProcessClass, GenProcessClass;
+      /*
+       * Messages for getting the monikers from each list.
+       */
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG)MSG_TDLP_FIRST_DLIST_MONIKER_QUERY;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG)MSG_TDLP_SECOND_DLIST_MONIKER_QUERY;
+
+      /*
+       * Messages for handling user changes to the list.
+       */
+    @message (GEN_ITEM_GROUP_APPLY_MSG)MSG_TDLP_FIRST_DLIST_APPLY;
+    @message (GEN_ITEM_GROUP_APPLY_MSG)MSG_TDLP_SECOND_DLIST_APPLY;
+
+      /*
+       * Messages for transferring the selections from one
+       * list to the other.
+       */
+    @message void MSG_TDLP_FIRST_TO_SECOND_TRANSFER();
+    @message void MSG_TDLP_SECOND_TO_FIRST_TRANSFER();
+    @endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    @classdecl TwoDListsProcessClass, neverSaved;
+
+/********************************************************************
+ *		Global Variables
+ *******************************************************************/
+      /*
+       * First list initialized with all the colors.
+       */
+    word firstListItems[NUM_TOTAL_COLORS] = {
+        C_BLACK, C_BLUE, C_GREEN, C_CYAN,
+        C_RED, C_VIOLET, C_BROWN, C_LIGHT_GREY,
+        C_DARK_GREY, C_LIGHT_BLUE, C_LIGHT_GREEN, C_LIGHT_CYAN,
+        C_LIGHT_RED, C_LIGHT_VIOLET, C_YELLOW, C_WHITE
+    };
+    word numFirstListItems = NUM_TOTAL_COLORS;
+
+      /*
+       * Second list initialized with no items.
+       */
+    word secondListItems[NUM_TOTAL_COLORS];
+    word numSecondListItems = 0;
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass TwoDListsApp = {
+    GI_visMoniker = list { @TwoDListsTextMoniker };
+    GI_comp = @TwoDListsPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @TwoDListsPrimary;
+}
+
+@visMoniker TwoDListsTextMoniker = "TwoDLists";
+
+@end AppResource;
+
+/********************************************************************
+ *		Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass TwoDListsPrimary  = {
+    GI_comp = @TwoDListsGroup;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object	GenInteractionClass TwoDListsGroup = {
+    GI_comp = @FirstDList,
+              @TransferTriggers,
+              @SecondDList;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenDynamicListClass FirstDList = {
+    GI_visMoniker = "First list:";
+    HINT_PLACE_MONIKER_ABOVE;
+
+      /*
+       * Let's make the list have extended-selection behavior.
+       */
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+
+      /*
+       * Initializing first list to have all the colors.
+       */
+    GDLI_numItems = NUM_TOTAL_COLORS;
+
+      /*
+       * Message and destination for sending applies to user
+       * changes of the list.
+       */
+    GIGI_applyMsg = MSG_TDLP_FIRST_DLIST_APPLY;
+    GIGI_destination = process;
+
+      /*
+       * Message to send to destination to query for monikers.
+       */
+    GDLI_queryMsg = MSG_TDLP_FIRST_DLIST_MONIKER_QUERY;
+
+      /*
+       * Make scrollable.
+       */
+    HINT_ITEM_GROUP_SCROLLABLE;
+}
+
+@object GenInteractionClass TransferTriggers = {
+    GI_comp = @FirstToSecondTransferTrigger,
+              @SecondToFirstTransferTrigger;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenTriggerClass FirstToSecondTransferTrigger = {
+    GI_visMoniker = "->";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_TDLP_FIRST_TO_SECOND_TRANSFER;
+    GTI_destination = process;
+}
+
+@object GenTriggerClass SecondToFirstTransferTrigger = {
+    GI_visMoniker = "<-";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_actionMsg = MSG_TDLP_SECOND_TO_FIRST_TRANSFER;
+    GTI_destination = process;
+}
+
+@object GenDynamicListClass SecondDList = {
+    GI_visMoniker = "Second list:";
+    HINT_PLACE_MONIKER_ABOVE;
+    GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+    GDLI_numItems = 0;
+    GIGI_applyMsg = MSG_TDLP_SECOND_DLIST_APPLY;
+    GIGI_destination = process;
+    GDLI_queryMsg = MSG_TDLP_SECOND_DLIST_MONIKER_QUERY;
+    HINT_ITEM_GROUP_SCROLLABLE;
+}
+
+@end Interface
+
+/********************************************************************
+ *		ItemText Resource
+ *******************************************************************/
+@start ItemText, data ;
+
+@chunk char BlackText[] = "Black";
+@chunk char DkBlueText[] = "Dark Blue";
+@chunk char DkGreenText[] = "Dark Green";
+@chunk char DkCyanText[] = "Dark Cyan";
+@chunk char DkRedText[] = "Dark Red";
+@chunk char DkVioletText[] = "Dark Violet";
+@chunk char BrownText[] = "Brown";
+@chunk char LtGrayText[] = "Light Grey";
+@chunk char DkGrayText[] = "Dark Grey";
+@chunk char LtBlueText[] = "Light Blue";
+@chunk char LtGreenText[] = "Light Green";
+@chunk char LtCyanText[] = "Light Cyan";
+@chunk char LtRedText[] = "Light Red";
+@chunk char LtVioletText[] = "Light Violet";
+@chunk char YellowText[] = "Yellow";
+@chunk char WhiteText[] = "White";
+
+@end ItemText;
+
+/********************************************************************
+ *		Code for TwoDListsProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_TDLP_FIRST_DLIST_MONIKER_QUERY
+ ********************************************************************
+ * SYNOPSIS:     Queries for monikers for first list.
+ * PARAMETERS:   optr list
+ *               word item
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Lock down the block containing the color text
+ *               strings. Reference the one we want, then set the
+ *               item moniker to that string. Unlock the block.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	chris	4/14/92		Initial version
+ *******************************************************************/
+@method TwoDListsProcessClass, MSG_TDLP_FIRST_DLIST_MONIKER_QUERY
+{
+      /*
+       * textPtr - Pointer to the color text in the chunk.
+       */
+    char * textPtr;
+
+      /*
+       * We'll get a pointer to the appropriate text by looking
+       * up the appropriate item in firstListItems, then using
+       * that to get an offset from the first (C_BLACK) text
+       * chunk to the text chunk we want, keeping in mind that
+       * the handles for each text chunk go up by increments of 2.
+       * We have to lock the block that the text is in to actually
+       * get at the text.
+       */
+    textPtr = (char*)MemLock( OptrToHandle( @BlackText ) );
+    textPtr = LMemDerefHandles( OptrToHandle( @BlackText ),
+                                OptrToChunk( @BlackText ) +
+                                firstListItems[item] * 2 );
+
+      /*
+       * Send the text on to the list.
+       */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT( item, textPtr );
+
+      /*
+       * Unlock the block.
+       */
+    MemUnlock( OptrToHandle( @BlackText ) );
+} /* MSG_TDLP_FIRST_DLIST_MONIKER_QUERY */
+
+/********************************************************************
+ *              MSG_TDLP_SECOND_LIST_MONIKER_QUERY
+ ********************************************************************
+ * SYNOPSIS:     Queries for monikers for second list.
+ * PARAMETERS:   optr list
+ *               word item
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Same as previous method, only do this for the
+ *               second list object.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	chris	4/14/92		Initial version
+ *******************************************************************/
+@method TwoDListsProcessClass, MSG_TDLP_SECOND_DLIST_MONIKER_QUERY
+{
+    char *textPtr;
+
+      /*
+       * We'll get a pointer to the appropriate text by looking
+       * up the appropriate item in firstListItems, then using
+       * that to get an offset from the first (C_BLACK) text
+       * chunk to the text chunk we want, keeping in mind that
+       * the handles for each text chunk go up by increments of 2.
+       * We have to lock the block that the text is in to actually
+       * get at the text.
+       */
+    textPtr = (char*)MemLock( OptrToHandle( @BlackText ) );
+    textPtr = LMemDerefHandles( OptrToHandle( @BlackText ),
+                                OptrToChunk( @BlackText ) +
+                                secondListItems[item] * 2 );
+
+      /*
+       * Send the text on to the list.
+       */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT( item, textPtr );
+
+      /*
+       * Unlock the block.
+       */
+    MemUnlock( OptrToHandle( @BlackText ) );
+} /* MSG_TDLP_SECOND_DLIST_MONIKER_QUERY */
+
+/********************************************************************
+ *              MSG_TDLP_FIRST_DLIST_APPLY
+ ********************************************************************
+ * SYNOPSIS:     Handles an apply of user changes to the first
+ *               dynamic list.
+ * PARAMETERS:   word selection
+ *               word numSelections
+ *               word flags
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the first trigger either enabled or disabled
+ *               depending on the number of selections in the list.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	chris	4/14/92		Initial version
+ *******************************************************************/
+@method TwoDListsProcessClass, MSG_TDLP_FIRST_DLIST_APPLY
+{
+
+      /*
+       * Set first-to-second transfer trigger enabled or disabled,
+       * depending on numSelections.
+       */
+    if ( numSelections ) {
+        @call FirstToSecondTransferTrigger::MSG_GEN_SET_ENABLED(
+            VUM_DELAYED_VIA_APP_QUEUE );
+    }
+    else {
+        @call FirstToSecondTransferTrigger::MSG_GEN_SET_NOT_ENABLED(
+            VUM_DELAYED_VIA_APP_QUEUE );
+    }
+} /* MSG_TDLP_FIRST_DLIST_APPLY */
+
+/********************************************************************
+ *              MSG_TDLP_SECOND_DLIST_APPLY
+ ********************************************************************
+ * SYNOPSIS:   	 Handles an apply of user changes to the second
+ *               dynamic list.
+ * PARAMETERS:   word selection
+ *               word numSelections
+ *               word flags
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	chris	4/14/92		Initial version
+ ***********************************************************************/
+@method TwoDListsProcessClass, MSG_TDLP_SECOND_DLIST_APPLY
+{
+
+      /*
+       * Set second-to-first transfer trigger enabled or disabled,
+       * depending on numSelections.
+       */
+    if ( numSelections ) {
+        @call SecondToFirstTransferTrigger::MSG_GEN_SET_ENABLED(
+            VUM_DELAYED_VIA_APP_QUEUE );
+    }
+    else {
+        @call SecondToFirstTransferTrigger::MSG_GEN_SET_NOT_ENABLED(
+            VUM_DELAYED_VIA_APP_QUEUE );
+    }
+} /* MSG_TDLP_SECOND_DLIST_APPLY */
+
+/********************************************************************
+ *              MSG_TDLP_FIRST_TO_SECOND_TRANSFER
+ ********************************************************************
+ * SYNOPSIS:     Transferred items selected in first list to the
+ *               second list.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Using the numSelections variable, remove all the
+ *               selected items from the first list, then add those
+ *               items to the second list.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	chris	4/14/92		Initial version
+ *******************************************************************/
+@method TwoDListsProcessClass, MSG_TDLP_FIRST_TO_SECOND_TRANSFER
+{
+      /*
+       * positionsToMove - Positions of colors to move.
+       * colorsToMove    - Colors to move.
+       * i               - For loop variable.
+       * j               - For loop variable.
+       * numSelections   - Number of selections in list.
+       */
+    word positionsToMove[NUM_TOTAL_COLORS];
+    word colorsToMove[NUM_TOTAL_COLORS];
+    word i;
+    word j;
+    word numSelections;
+
+      /*
+       * Get a list of positions of the items to move.
+       * We have to get a list in case there are more
+       * than one item to move.
+       */
+    numSelections = @call FirstDList::
+        MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
+            positionsToMove, NUM_TOTAL_COLORS );
+
+      /*
+       * For each item to move, we'll stick a -1 in our list to
+       * mark it as needing removal. Also save the actual color
+       * being moved.
+       */
+    for ( i = 0; i < numSelections; i++ ) {
+        colorsToMove[i] = firstListItems[ positionsToMove[i] ];
+        firstListItems[ positionsToMove[i] ] = LIST_ITEM_NEEDS_REMOVAL;
+    }
+
+      /*
+       * Now remove the items with LIST_ITEM_NEEDS_REMOVAL.
+       */
+    for ( i = 0; i < numFirstListItems; i++ ) {
+        if ( firstListItems[i] == LIST_ITEM_NEEDS_REMOVAL ) {
+
+              /*
+               * Move all items up to fill the vacated spot.
+               */
+            for ( j = i; j < numFirstListItems; j++ ) {
+                firstListItems[j] = firstListItems[ j + 1 ];
+            }
+
+              /*
+               * Repeat this spot again.
+               * This new item might also be -1.
+               */
+            i--;
+        }
+    }
+
+      /*
+       * Keep the number of items in the first list up-to-date.
+       */
+    numFirstListItems -= numSelections;
+
+      /*
+       * We'll delete all the current selections visually
+       * from the first list.
+       */
+    @call FirstDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEM_LIST(
+        positionsToMove, numSelections );
+
+    for ( i = 0; i < numSelections; i++ ) {
+
+          /*
+           * Add item to the other list, updating it as needed.
+           * We'll do it via ADD_ITEM because it looks better.
+           */
+        secondListItems[numSecondListItems] = colorsToMove[i];
+        @call SecondDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(
+            numSecondListItems, 1 );
+        numSecondListItems++;
+    }
+
+      /*
+       * Disable the right-pointing trigger now.
+       */
+    @call FirstToSecondTransferTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_NOW );
+} /* MSG_TDLP_FIRST_TO_SECOND_TRANSFER */
+
+/********************************************************************
+ *              MSG_TDLP_SECOND_TO_FIRST_TRANSFER
+ ********************************************************************
+ * SYNOPSIS:     Transferred items selected in second list to the
+ *               first list.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	chris	4/14/92		Initial version
+ *******************************************************************/
+@method TwoDListsProcessClass, MSG_TDLP_SECOND_TO_FIRST_TRANSFER
+{
+      /*
+       * positionsToMove - Positions of colors to move.
+       * colorsToMove    - Colors to move.
+       * i               - For loop variable.
+       * j               - For loop variable.
+       * numSelections   - Number of selections in the list.
+       */
+    word positionsToMove[NUM_TOTAL_COLORS];
+    word colorsToMove[NUM_TOTAL_COLORS];
+    word i;
+    word j;
+    word numSelections;
+
+      /*
+       * Get a list of positions of the items to move.
+       * We have to get a list in case there are more
+       * than one item to move.
+       */
+    numSelections = @call SecondDList::
+        MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
+            positionsToMove, NUM_TOTAL_COLORS );
+
+      /*
+       * For each item to move, we'll stick a -1 in our list
+       * to mark it as needing removal. Also save the actual
+       * color being moved.
+       */
+    for ( i = 0; i < numSelections; i++ ) {
+        colorsToMove[i] = secondListItems[ positionsToMove[i] ];
+        secondListItems[ positionsToMove[i] ] = LIST_ITEM_NEEDS_REMOVAL;
+    }
+
+      /*
+       * Now remove the items with LIST_ITEM_NEEDS_REMOVAL.
+       */
+    for ( i = 0; i < numSecondListItems; i++ ) {
+        if ( secondListItems[i] == LIST_ITEM_NEEDS_REMOVAL ) {
+
+              /*
+               * Move all items up to fill the vacated spot.
+               */
+            for (j = i; j < numSecondListItems; j++) {
+                secondListItems[j] = secondListItems[j+1];
+            }
+              /*
+               * Repeat this spot again.
+               * This new item might also be -1.
+               */
+            i--;
+        }
+    }
+
+      /*
+       * Keep the number of items in the second list up-to-date.
+       */
+    numSecondListItems -= numSelections;
+
+      /*
+       * We'll delete all the current selections visually from
+       * the second list.
+       */
+    @call SecondDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEM_LIST(
+        positionsToMove, numSelections );
+
+    for ( i = 0; i < numSelections; i++ ) {
+
+        /*
+         * Add item to the other list, updating it as needed.
+         */
+      firstListItems[numFirstListItems] = colorsToMove[i];
+      @call FirstDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(
+          numFirstListItems, 1 );
+      numFirstListItems++;
+    }
+
+      /*
+       * Disable the left-pointing trigger now.
+       */
+    @call SecondToFirstTransferTrigger::MSG_GEN_SET_NOT_ENABLED( VUM_NOW );
+} /* MSG_TDLP_SECOND_TO_FIRST_TRANSFER */
+

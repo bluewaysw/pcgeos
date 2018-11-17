@@ -1,0 +1,1465 @@
+/***********************************************************************
+ *Copyright 1994-2001 Breadbox Computer Company LLC  All Rights Reserved
+ *
+ * PROJECT:	Breadbox Crossword Maker
+ * FILE:		process.goc
+ * AUTHOR:	John Howard   3/15
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+@include "xwplay.goh"
+@include "externs.goh"
+
+/***************************************************************************
+ * Globals
+ **************************************************************************/
+
+VMFileHandle g_fhDocument = NullHandle;
+optr g_oDocument = NullHandle;
+VMBlockHandle g_bhDocHeap = NullHandle;
+ChunkHandle g_chDocWordList = NullChunk;
+ChunkHandle g_chDocWordGrid = NullChunk;
+ChunkHandle g_chDocAnswers = NullChunk;
+ChunkHandle g_chDocClues = NullChunk;
+MemHandle g_clueHeapHandle;
+word g_width = GRID_DEFAULT_SIZE;
+word g_height = GRID_DEFAULT_SIZE;
+word g_settings = 0;
+word g_cellNum = 0;
+word g_cellNumArray[GRID_MAX_SIZE][GRID_MAX_SIZE];
+word g_selClue = 0;
+word g_prevClue = 0;
+Boolean g_opening = TRUE;
+word g_letterNum = 0;
+char g_solveArray[GRID_MAX_SIZE][GRID_MAX_SIZE];
+
+/***************************************************************************
+ * Class declarations
+ **************************************************************************/
+
+
+@classdecl XWPProcessClass, neverSaved;
+@classdecl XWPDocumentControlClass;
+@classdecl XWPGenViewClass;
+
+
+/***************************************************************************
+ * XWPProcessClass methods
+ **************************************************************************/
+ 
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for XWPProcessClass
+ *
+ * DESCRIPTION:	 check if we're on a yago
+ *
+ *
+ *
+ ***********************************************************************/
+@method XWPProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+
+	 /* probably don't need but I'll keep for now */
+
+	 @callsuper();
+
+}
+
+ /***************************************************************************
+ * MSG_GEN_PROCESS_INSTALL_TOKEN
+ ***************************************************************************
+ * SYNOPSIS:    Sent by desktop to get process to install its token and
+ *              moniker lists.
+ *
+ * PARAMETERS:  none
+ *
+ * STRATEGY:    Call the superclass to install the application icon.
+ *              Check and install the document icon.
+ *
+ **************************************************************************/
+/*@method XWPProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+	 dword tokenChars;
+    TokenFlags tokenFlags;
+
+    /* Install application icon. */
+/*	 @callsuper();
+    
+	 tokenChars = TOKEN_CHARS('X', 'W', (dword) 'M',(dword) 'd');
+
+    if (!TokenGetTokenInfo(tokenChars, MANUFACTURER_ID_BREADBOX, &tokenFlags))
+        TokenDefineToken(tokenChars, MANUFACTURER_ID_BREADBOX,
+          @XWPDocIconList, 0);
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_CREATE_UI_FOR_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to create UI for the puzzle
+ *              as it is opened
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Enable the document control UI.
+ *
+ *
+ **************************************************************************/
+@method XWPProcessClass, MSG_META_DOC_OUTPUT_CREATE_UI_FOR_DOCUMENT
+{
+	@send XWPDocumentUIGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to setup UI for the puzzle
+ *              as it is opened
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Setup the document UI.
+ *
+ **************************************************************************/
+@method XWPProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+MemHandle				mh;
+VMBlockHandle			bhMapBlock, vmbh;
+XWPDocumentMap			*pMap;
+RectDWord				docBounds;
+VisUpdateModeAsWord	vumaw = { VUM_MANUAL, 0 };
+word						numClues, row, col;
+optr						owg;
+Boolean					getsNum;
+char						c;
+
+	g_fhDocument = file;
+
+	/* Load in the map block. */
+	bhMapBlock = VMGetMapBlock(g_fhDocument);
+	pMap = VMLock(g_fhDocument, bhMapBlock, &mh);
+	/* Set global variables so we can quickly reference certain data. */
+	g_fhDocument = file;
+	g_chDocWordList = pMap->XWPDM_wordListChunk;
+	g_chDocWordGrid = pMap->XWPDM_wordSearchChunk;
+	g_chDocAnswers = pMap->XWPDM_answersChunk;
+	g_width = pMap->XWPDM_width;
+	g_height = pMap->XWPDM_height;
+	g_settings = 0; /*pMap->XWPDM_settings;*/
+	VMUnlock(mh);
+
+	EnableDisableFileUI(UI_ENABLE);
+
+	/* Retrieve the size of the word search and set the view's
+		document bounds. */
+	XWPGetDocBounds(&docBounds);
+	@send XWPDocumentView::MSG_GEN_VIEW_SET_DOC_BOUNDS(docBounds.RD_bottom,
+			 docBounds.RD_right, docBounds.RD_top, docBounds.RD_left);
+	/* Don't show answers */
+	@send XWPSettingsOther::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(0, 0);
+
+	/* Set scaling attributes for the view now; otherwise, it will
+		shrink to nothing with the initial zero bounds. */
+	@send XWPDocumentView::MSG_GEN_VIEW_SET_ATTRS(GVA_SCALE_TO_FIT, 0, vumaw);
+
+	/* Force the document view to scale and draw itself. */
+	@send XWPDocumentView::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
+	@send XWPDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+	/* Create our clue array */
+	/* create a mem block for the clues chunk array */
+	g_clueHeapHandle = MemAlloc(2048, HF_SWAPABLE, HAF_LOCK);
+	LMemInitHeap(g_clueHeapHandle, LMEM_TYPE_GENERAL, 0,
+				 sizeof(LMemBlockHeader), STD_INIT_HANDLES, STD_INIT_HEAP);
+	/* create the chunk array  */
+	g_chDocClues = ChunkArrayCreate(g_clueHeapHandle, sizeof(XWPClueElement), 0, 0);
+	MemUnlock(g_clueHeapHandle);
+
+	/* fill the cell number array so we can get clue numbers */
+	vmbh = VMFind(g_fhDocument, 0, GRID);
+	VMLock(g_fhDocument, vmbh, &mh);
+	owg = ConstructOptr(mh, g_chDocWordGrid);
+	for (row = 0; row < g_height; row++)  {
+		for (col = 0; col < g_width; col++) {
+			c = XWPGetLetter(owg, col, row);
+			getsNum = FALSE;
+			if (c != ' ') {
+				/* check for down words */
+				if ((!row || (XWPGetLetter(owg, col, row-1) == ' '))
+						&& (XWPGetLetter(owg, col, row+1) != ' ')) getsNum = TRUE;
+				/* check for across words */
+				else if ((!col || (XWPGetLetter(owg, col-1, row) == ' '))
+					&& (XWPGetLetter(owg, col+1, row) != ' ')) getsNum = TRUE;
+				if (getsNum) {
+					/* set the cell number and put it in our array */
+					g_cellNum++;
+					g_cellNumArray[row][col] = g_cellNum;
+					}
+				else g_cellNumArray[row][col] = 0;
+				}
+			}
+		}
+	VMUnlock(mh);
+
+	/* now fill the across clues array */
+	numClues = FillCluesArray(C_ACROSS); /* across clues */
+	/* and tell its list */
+	@send XWPAcrossClueList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numClues);
+	@send XWPAcrossClueList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+	/* and the down clues array */
+	numClues = FillCluesArray(C_DOWN); /* down clues */
+	/* and tell its list */
+	@send XWPDownClueList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numClues);
+	@send XWPDownClueList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+   g_selClue = 0;
+
+	/* initialize our solution array */
+	for (row = 0; row < g_height; row++)  {
+		for (col = 0; col < g_width; col++) {
+			g_solveArray[row][col] = ' ';
+			}
+		}
+
+	/* Cache the document's object descriptor. */
+	g_oDocument = document;
+
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to break down UI for the
+ *              puzzle as it is being closed
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Break down the document UI.
+ *
+ **************************************************************************/
+@method XWPProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+
+	/* Empty the clue list UI. */
+	@send XWPAcrossClueList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+	@send XWPDownClueList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+
+	/* Destroy global variables. */
+	g_chDocWordGrid = NullChunk;
+	g_chDocWordList = NullChunk;
+	g_bhDocHeap = NullHandle;
+	g_fhDocument = NullHandle;
+	g_oDocument = NullHandle;
+
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_DESTROY_UI_FOR_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to destroy UI for the the
+ *              puzzle as it is being closed
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Disable the document control UI and erase the view.
+ *
+ **************************************************************************/
+@method XWPProcessClass, MSG_META_DOC_OUTPUT_DESTROY_UI_FOR_DOCUMENT
+{
+	@send XWPDocumentUIGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+	/* Force the document view to empty. */
+	@send XWPDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/***************************************************************************
+ * MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+ ***************************************************************************
+ * SYNOPSIS:    Called to allow special configuration of the file selector
+ *              used by the document control.
+ *
+ * PARAMETERS:  optr fileSelector,
+ *              word flags
+ *
+ * STRATEGY:    See if our default folder is there and go there
+ *              If not go to Document
+ *              Set the file selector's path to the path.
+ *
+ **************************************************************************/
+@method XWPDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+{
+Boolean		notThere;
+
+	@callsuper();
+
+	MemLock (OptrToHandle(@XWFolderTxt));
+	notThere = @call fileSelector::MSG_GEN_PATH_SET
+					 (LMemDeref(@XWFolderTxt), SP_DOCUMENT);
+	MemUnlock (OptrToHandle(@XWFolderTxt));
+
+	/* if it was there we're all set - if not just go to Document */
+	if(notThere) @call fileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+}
+
+/***************************************************************************
+ * MSG_XWP_PROCESS_APPLY_SETTINGS_OTHER
+ ***************************************************************************
+ * SYNOPSIS:    Sent when changes are made to the XWMSettingsOther object.
+ *               (GEN_BOOLEAN_GROUP_APPLY_MSG)
+ * PARAMETERS:  word selectedBooleans,
+ *              word indeterminateBooleans,
+ *              word modifiedBooleans
+ *
+ * STRATEGY:    save the show answer setting
+ *
+ *              Queue a redraw of the view if XWMS_ANSWERS has been changed.
+ *
+ **************************************************************************/
+@method XWPProcessClass, MSG_XWP_PROCESS_APPLY_SETTINGS_OTHER
+{
+
+
+	/* Save the setting to the global */
+	if (g_settings != selectedBooleans) {
+		g_settings = selectedBooleans;
+		}
+        
+	/* Redraw the grid if XWPS_ANSWERS has been changed. */
+	if (modifiedBooleans & XWPS_ANSWERS)
+		@send, forceQueue, checkDuplicate
+              XWPDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/***************************************************************************
+ * MSG_XWP_PROCESS_QUERY_CLUE_LIST
+ ***************************************************************************
+ * SYNOPSIS:    Called by dynamic XWPClueList to define its items.
+ *               (GEN_DYNAMIC_LIST_QUERY_MSG)
+ *
+ * PARAMETERS:  optr        list,
+ *              word        item
+ *
+ * STRATEGY:    Retrieve the clue from the list and call the replace method.
+ *
+ **************************************************************************/
+@method XWPProcessClass, MSG_XWP_PROCESS_QUERY_ACROSS_CLUE_LIST
+{
+XWPClueElement			*pClue;
+
+
+	/* Lock the clue list. */
+	MemLock(g_clueHeapHandle);
+
+	/* Locate the requested item and set it in the dynamic list. */
+	pClue = ChunkArrayElementToPtrHandles(g_clueHeapHandle, g_chDocClues, item, 0);
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, pClue->XWPCE_clue);
+
+	MemUnlock (g_clueHeapHandle);
+
+}
+
+@method XWPProcessClass, MSG_XWP_PROCESS_QUERY_DOWN_CLUE_LIST
+{
+XWPClueElement			*pClue;
+word						acrossClues, arrayItem;
+
+
+	/* see how many across clues there are and add that to item */
+	acrossClues = @call XWPAcrossClueList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+	arrayItem = acrossClues + item;
+
+	/* Lock the clue list. */
+	MemLock(g_clueHeapHandle);
+
+	/* Locate the requested item and set it in the dynamic list. */
+	pClue = ChunkArrayElementToPtrHandles(g_clueHeapHandle, g_chDocClues, arrayItem, 0);
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, pClue->XWPCE_clue);
+
+	MemUnlock (g_clueHeapHandle);
+
+}
+
+/***************************************************************************
+ *  MSG_XWP_PROCESS_APPLY_CLUE_LIST
+ ***************************************************************************
+ * SYNOPSIS:    Called by dynamic XWPClueList to when an item is selected.
+ *               (GEN_ITEM_GROUP_APPLY_MSG)
+ *
+ * PARAMETERS:  word	selection,
+ *					 word	numSelections
+ *					 byte	stateFlags
+ *
+ * STRATEGY:    Sets the other list as none selected and gets the grid
+ *              ready for the user to enter the word
+ *
+ **************************************************************************/
+@method XWPProcessClass, MSG_XWP_PROCESS_APPLY_ACROSS_CLUE_LIST
+{
+
+	@send XWPDownClueList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	g_prevClue = g_selClue;
+	g_selClue = selection;
+	HiliteSelectedWord(FALSE);
+	@send XWPDocumentView::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+@method XWPProcessClass, MSG_XWP_PROCESS_APPLY_DOWN_CLUE_LIST
+{
+
+	@send XWPAcrossClueList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	g_prevClue = g_selClue;
+	g_selClue = selection + @call XWPAcrossClueList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+	HiliteSelectedWord(FALSE);
+	@send XWPDocumentView::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+/***************************************************************************
+ * HiliteSelectedWord
+ ***************************************************************************
+ * SYNOPSIS:    Called by the dlist apply method and ATTACH_UI_TO_DOC
+ *
+ * STRATEGY:    Hilites the word in the grid based on which clue was selected
+ *
+ *              returns nothing
+ *              
+ **************************************************************************/
+void HiliteSelectedWord(Boolean startingClue)
+{
+word					x, y;
+XWPAnswerElement	ansInfo;
+XWPClueElement		*pClue;
+GStateHandle		gstate;
+WindowHandle		win;
+const LineAttr 	selLAttr = {CF_INDEX,{C_LIGHT_GREEN,0,0},SDM_100,CMT_CLOSEST,
+						LE_BUTTCAP,LJ_MITERED,LS_SOLID,MakeWWFixed(2)};
+const AreaAttr		selAAttr = {CF_INDEX,{C_LIGHT_GREEN,0,0},SDM_25,CMT_CLOSEST};
+
+	/* get a gstate to draw to */
+	win = @call XWPDocumentView::MSG_GEN_VIEW_GET_WINDOW();
+	gstate = GrCreateState(win);
+	GrSetDefaultTransform(gstate);
+	GrApplyTranslation(gstate, MakeWWFixed(DRAW_GRID_MARGINS), MakeWWFixed(DRAW_GRID_MARGINS));
+	GrSetLineAttr(gstate, &selLAttr);
+
+	MemLock(g_clueHeapHandle);
+
+	/* we un-draw the previous rectangle if any */
+	if (!startingClue) {
+		pClue = ChunkArrayElementToPtrHandles(g_clueHeapHandle, g_chDocClues,
+					g_prevClue, 0);
+		ansInfo = pClue->XWPCE_data;
+
+		/*GrSetLineAttr(gstate, &prevAttr); */
+		x = ansInfo.XWPAE_column * DRAW_GRID_SPACE_SIZE;
+		y = ansInfo.XWPAE_row * DRAW_GRID_SPACE_SIZE;
+
+		if (ansInfo.XWPAE_direction == C_ACROSS) {
+			GrInvalRect(gstate, x, y,
+							x + (ansInfo.XWPAE_length * DRAW_GRID_SPACE_SIZE),
+							y + DRAW_GRID_SPACE_SIZE);
+			}
+		else {
+			GrInvalRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + (ansInfo.XWPAE_length * DRAW_GRID_SPACE_SIZE));
+			}
+		}
+
+	/* draw the newly selected rect */
+	pClue = ChunkArrayElementToPtrHandles(g_clueHeapHandle, g_chDocClues,
+					g_selClue, 0);
+	ansInfo = pClue->XWPCE_data;
+
+	x = ansInfo.XWPAE_column * DRAW_GRID_SPACE_SIZE;
+	y = ansInfo.XWPAE_row * DRAW_GRID_SPACE_SIZE;
+	GrSetAreaAttr(gstate, &selAAttr);
+
+	if (ansInfo.XWPAE_direction == C_ACROSS) {
+		GrDrawRect(gstate, x, y,
+							x + (ansInfo.XWPAE_length * DRAW_GRID_SPACE_SIZE),
+							y + DRAW_GRID_SPACE_SIZE);
+		}
+	else {
+		GrDrawRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + (ansInfo.XWPAE_length * DRAW_GRID_SPACE_SIZE));
+		}
+
+	/* and hilite the first cell */
+	g_letterNum = 0;
+	GrFillRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+
+
+	MemUnlock(g_clueHeapHandle);
+	GrDestroyState(gstate);
+
+}
+
+/***************************************************************************
+ * FillCluesArray
+ ***************************************************************************
+ * SYNOPSIS:    Initialize the across clues array (across or down).
+ *
+ * STRATEGY:    use the code from the print clues function
+ *
+ *              returns number of across or down clues
+ *
+ **************************************************************************/
+word FillCluesArray(word aOrD)
+{
+MemHandle			mhList, mhAnsw;
+VMBlockHandle		vmbh;
+word					numWords, i, cellNum, col, row, clues;
+char					lineBuffer[255], cellNumStr[13];
+XWPListElement		*pElement;
+XWPAnswerElement	*pAns;
+XWPClueElement		*pClue;
+
+	/* lock our data stuff */
+	vmbh = VMFind(g_fhDocument, 0, LIST);
+	VMLock(g_fhDocument, vmbh, &mhList);
+	vmbh = VMFind(g_fhDocument, 0, ANSW);
+	VMLock(g_fhDocument, vmbh, &mhAnsw);
+	MemLock(g_clueHeapHandle);
+
+	numWords = ChunkArrayGetCountHandles(mhList, g_chDocWordList);
+	clues = 0;
+
+	/* grab the clues */
+	for (row = 0; row < g_height; row ++) {
+		for (col = 0; col < g_width; col ++) {
+			for (i = 0; i < numWords; i++) {
+				pAns = ChunkArrayElementToPtrHandles(mhAnsw, g_chDocAnswers, i, 0);
+				if (pAns->XWPAE_row == row && pAns->XWPAE_column == col
+						 && pAns->XWPAE_direction == aOrD) {
+					/* we have an across word start - so grab the cell number */
+					cellNum = g_cellNumArray[row][col];
+					UtilHex32ToAscii(cellNumStr, (dword)cellNum, UHTAF_NULL_TERMINATE);
+					strcpy(lineBuffer, cellNumStr);
+					strcat(lineBuffer, ". ");
+					/* and the clue text */
+					pElement = ChunkArrayElementToPtrHandles(
+										mhList, g_chDocWordList, pAns->XWPAE_wordNum, 0);
+					strcat(lineBuffer, pElement->XWPLE_clue);
+					/* copy to the clues array */
+					pClue = ChunkArrayAppendHandles(g_clueHeapHandle, g_chDocClues, 0);
+					strcpy(pClue->XWPCE_clue, lineBuffer);
+					pClue->XWPCE_data = *pAns;
+					clues++;
+					}  /* end of found across start if */
+				}  /* end of numWords (i) for */
+			}  /* end of col for */
+		}  /* end of row for */
+
+	VMUnlock(mhAnsw);
+	VMUnlock(mhList);
+	MemUnlock(g_clueHeapHandle);
+
+	return (clues);
+}
+
+/***************************************************************************
+ * XWPGetLetter
+ ***************************************************************************
+ * SYNOPSIS:    Get a letter from the word search.
+ *
+ * NOTE:        Make sure the word grid is locked
+ **************************************************************************/
+char XWPGetLetter(optr owg, word x, word y)
+{
+char *pRow;
+
+
+	pRow = ChunkArrayElementToPtr(owg, y, 0);
+	return pRow[x];
+
+}
+
+/***************************************************************************
+ * XWPGetDocBounds
+ ***************************************************************************
+ * SYNOPSIS:    Determine the document bounds of the word search grid so
+ *              that the view properly scales-to-fit the entire grid.
+ *
+ **************************************************************************/
+void XWPGetDocBounds(RectDWord *pr)
+{
+    pr->RD_left = pr->RD_top = 0;
+    pr->RD_right = DRAW_GRID_MARGINS * 2
+		+ g_width * DRAW_GRID_SPACE_SIZE;
+    pr->RD_bottom = DRAW_GRID_MARGINS * 2
+      + g_height * DRAW_GRID_SPACE_SIZE;
+}
+
+
+        
+/***************************************************************************
+ * XWPDrawHeader
+ ***************************************************************************
+ * SYNOPSIS:    Called to draw the word search header.
+ *
+ * STRATEGY:    Calculate the position for drawing the file name centered
+ *                horizontally within the header bounds.
+ *              Draw the file name.
+ *
+ **************************************************************************/
+void XWPDrawHeader(GStateHandle gstate, Boolean drawNameBlock)
+{
+ char szFileName[FILE_LONGNAME_BUFFER_SIZE];
+ sword x;
+    
+    if (g_oDocument != NullOptr)
+    {
+		  GrSetFont(gstate, PRINT_HEADER_TEXT_FONT, PRINT_HEADER_TEXT_SIZE);
+		  GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+        GrSetDefaultTransform(gstate);
+
+		  @call g_oDocument::MSG_GEN_DOCUMENT_GET_FILE_NAME(szFileName);
+
+        x = (PRINT_HEADER_BOUNDS_LEFT + PRINT_HEADER_BOUNDS_RIGHT -
+          GrTextWidth(gstate, szFileName, sizeof(szFileName))) / 2;
+		  GrDrawText(gstate, x, PRINT_HEADER_BOUNDS_TOP, szFileName,
+			 sizeof(szFileName));
+
+		  if (drawNameBlock) {
+				GrSetFont(gstate, PRINT_WORD_TEXT_FONT, MakeWWFixed(12));
+				GrSetTextStyle(gstate, TS_BOLD, 0);
+				MemLock (OptrToHandle(@PrintNameLine));
+				strcpy(szFileName, LMemDeref(@PrintNameLine));
+				GrDrawText(gstate,
+								.25*72,
+								.25*72,
+								szFileName,
+								sizeof(szFileName) );
+				strcpy(szFileName, LMemDeref(@PrintDateLine));
+				GrDrawText(gstate,
+								.25*72,
+								.25*72 + 14,
+								szFileName,
+								sizeof(szFileName) );
+				MemUnlock (OptrToHandle(@PrintNameLine));
+				}
+	 }
+}
+
+/***************************************************************************
+ * XWPDrawWordGrid
+ ***************************************************************************
+ * SYNOPSIS:    Called by MSG_META_EXPOSED to draw the puzzle.
+ *
+ * STRATEGY:    Draw the puzzle.
+ *              If the answers are to be drawn, draw them as well.
+ *              If printing, scaling must be applied for the passed bounds.
+ *
+ **************************************************************************/
+void XWPDrawWordGrid(GStateHandle gstate, word nLeftBound, word nTopBound, 
+                       word nRightBound, word nBottomBound, Boolean bPrinting)
+{
+MemHandle		mh;
+VMBlockHandle	vmbh;
+optr				oWordGrid;
+word				row, col, x, y, xoff, yoff;
+char				c, sol, cellNumStr[13];
+
+
+	if (!g_fhDocument) return;
+
+	/* Setup the gstate. */
+	GrSetFont(gstate, DRAW_GRID_TEXT_FONT, MakeWWFixed(DRAW_GRID_TEXT_SIZE));
+	GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0);
+	GrSetDefaultTransform(gstate);
+	GrApplyTranslation(gstate, MakeWWFixed(nLeftBound), MakeWWFixed(nTopBound));
+        
+	/* Lock things. */
+	vmbh = VMFind(g_fhDocument, 0, GRID);
+	VMLock(g_fhDocument, vmbh, &mh);
+	oWordGrid = ConstructOptr(mh, g_chDocWordGrid);
+
+	/* Determine the scaling factor to use. */
+	if (bPrinting) {
+		word nLargestDimension;
+		WWFixedAsDWord fScale, fHeight, fWidth, fLeft, fTop;
+
+		if (g_width > g_height)
+			nLargestDimension = g_width * DRAW_GRID_SPACE_SIZE;
+		else
+			nLargestDimension = g_height * DRAW_GRID_SPACE_SIZE;
+		fScale = GrUDivWWFixed(MakeWWFixed(nRightBound - nLeftBound),
+															  MakeWWFixed(nLargestDimension));
+		if (fScale > DRAW_GRID_MAX_SCALE_FACTOR)
+			fScale = DRAW_GRID_MAX_SCALE_FACTOR;
+		fHeight = GrMulWWFixed(
+					MakeWWFixed(g_height * DRAW_GRID_SPACE_SIZE), fScale);
+		fWidth = GrMulWWFixed(
+					 MakeWWFixed(g_width * DRAW_GRID_SPACE_SIZE), fScale);
+		fLeft = (MakeWWFixed(nRightBound - nLeftBound) - fWidth) / 2;
+		fTop = (MakeWWFixed(nBottomBound - nTopBound) - fHeight) / 2;
+		GrApplyTranslation(gstate, fLeft, fTop);
+		GrApplyScale(gstate, fScale, fScale);
+		}  /* end of printing if */
+            
+	/* Draw the letters. */
+   g_cellNum = 0;
+	yoff = DRAW_GRID_SPACE_SIZE - DRAW_GRID_TEXT_SIZE /*+ 1*/ -3;
+	y = 0;
+	for (row = 0; row < g_height; row++)  {
+		x = 0;
+		for (col = 0; col < g_width; col++) {
+			c = XWPGetLetter(oWordGrid, col, row);
+			sol = g_solveArray[row][col];
+			if (c != ' ') {
+				GrDrawRect(gstate, x, y,
+										 x+DRAW_GRID_SPACE_SIZE,
+										 y+DRAW_GRID_SPACE_SIZE);
+				/* show the answers? */
+				if (g_settings == XWPS_ANSWERS) {
+					xoff = (DRAW_GRID_SPACE_SIZE - IntegerOf(GrCharWidth(gstate, c)))/2;
+					GrSetFont(gstate, DRAW_GRID_TEXT_FONT,
+															 MakeWWFixed(DRAW_GRID_TEXT_SIZE));
+					GrDrawChar(gstate, x + xoff, y + yoff, c);
+					}
+				/* show any solutions? */
+				if (sol != ' ') {
+					xoff = (DRAW_GRID_SPACE_SIZE - IntegerOf(GrCharWidth(gstate, sol)))/2;
+					GrSetFont(gstate, DRAW_GRID_TEXT_FONT,
+															 MakeWWFixed(DRAW_GRID_TEXT_SIZE));
+					GrDrawChar(gstate, x + xoff, y + yoff, sol);
+					}
+				/* see if it gets a cell number */
+				if (g_cellNumArray[row][col]) {
+					UtilHex32ToAscii(cellNumStr, (dword)g_cellNumArray[row][col], UHTAF_NULL_TERMINATE);
+					GrSetFont(gstate, DRAW_GRID_NUM_FONT,
+															 MakeWWFixed(DRAW_GRID_NUM_SIZE));
+					GrDrawText(gstate, x + 2, y, cellNumStr, strlen(cellNumStr));
+					}
+				}
+			else if (!bPrinting) {
+				GrFillRect(gstate, x, y,
+										 x+DRAW_GRID_SPACE_SIZE,
+										 y+DRAW_GRID_SPACE_SIZE);
+				}
+			x += DRAW_GRID_SPACE_SIZE;
+			}
+		y += DRAW_GRID_SPACE_SIZE;
+		}
+
+	/* Unlock things. */
+	VMUnlock(mh);
+
+	/* if we're opening then hilite the first word */
+	if (g_opening) {
+		HiliteSelectedWord(TRUE);
+		g_opening = FALSE;
+		}
+
+}
+
+/***************************************************************************
+ * XWPDrawClueList
+ ***************************************************************************
+ * SYNOPSIS:    Called to print the clue list.
+ *
+ * STRATEGY:    Calculate the text size, column width, number of columns,
+ *                and number of rows.
+ *              Call appropriate drawing functions.
+ *
+ **************************************************************************/
+void XWPDrawClueList(GStateHandle gstate)
+{
+MemHandle			mhList, mhAnsw;
+VMBlockHandle		vmbh;
+word					width, numWords, i, j, longestClue, longestClueIdx, colWidth;
+word					cellNum, col, row, printRow, clues, tabWidth, tabOffset;
+word					acrossXOffset;
+sword					x;
+WWFixedAsDWord		fFontSize;
+char					lineBuffer[255], cellNumStr[13], wrapBuffer[200];
+Boolean				bFits = FALSE;
+XWPListElement		*pElement;
+XWPAnswerElement	*pAns;
+
+
+	/* lock our data stuff */
+	vmbh = VMFind(g_fhDocument, 0, LIST);
+	VMLock(g_fhDocument, vmbh, &mhList);
+	vmbh = VMFind(g_fhDocument, 0, ANSW);
+	VMLock(g_fhDocument, vmbh, &mhAnsw);
+
+	numWords = ChunkArrayGetCountHandles(mhList, g_chDocWordList);
+	/* No point in continuing if there are no words. */
+	if (!numWords)  {
+		VMUnlock(mhAnsw);
+		VMUnlock(mhList);
+		return;
+		}
+
+	/* Find the longest clue.  This will help determine the text size. */
+	GrSetFont(gstate, PRINT_WORD_TEXT_FONT, PRINT_WORD_MAX_TEXT_SIZE);
+	longestClue = 0;
+	longestClueIdx = 0;
+	for (i = 0; i < numWords; i++)  {
+		pElement = ChunkArrayElementToPtrHandles(mhList, g_chDocWordList, i, 0);
+		width = GrTextWidth(gstate, pElement->XWPLE_clue, 0);
+		if (width > longestClue) {
+			longestClue = width;
+			longestClueIdx = i;
+			}
+		}
+	/* Add a small amount for spacing. */
+	longestClue += PRINT_WORD_COLUMN_SPACING;
+        
+	/* Calculate column width for max text length. */
+	colWidth = PRINT_WORD_TEXT_BOX_WIDTH / 2 - PRINT_WORD_COLUMN_SPACING;
+        
+	/* Start with the largest font size. */
+	for (fFontSize = PRINT_WORD_MAX_TEXT_SIZE;
+          !bFits && fFontSize >= PRINT_WORD_MIN_TEXT_SIZE; 
+			 fFontSize -= PRINT_WORD_STEP_TEXT_SIZE)  {
+		/* get the width in pixels */
+		GrSetFont(gstate, PRINT_WORD_TEXT_FONT, fFontSize);
+		pElement = ChunkArrayElementToPtrHandles(
+											 mhList, g_chDocWordList, longestClueIdx, 0);
+		width = GrTextWidth(gstate, pElement->XWPLE_clue, 0)
+																  + PRINT_WORD_COLUMN_SPACING;
+
+		/* If all of the words fit, keep this font size; otherwise,
+               shrink the font and try again. */
+		if (width <= colWidth)  bFits = TRUE;
+		}
+        
+	/* Enforce the minimum font size even if all the words won't fit. */
+	if (!bFits) fFontSize = PRINT_WORD_MIN_TEXT_SIZE;
+            
+	/* make sure the clues fit vertically too */
+	if (numWords > 24) fFontSize = PRINT_WORD_MIN_TEXT_SIZE;
+
+	/* had to add this bit to center the clues under the grid so that it
+		would look right when copied to clipboard */
+	GrSetFont(gstate, PRINT_WORD_TEXT_FONT, fFontSize);
+	pElement = ChunkArrayElementToPtrHandles(
+											 mhList, g_chDocWordList, longestClueIdx, 0);
+	width = GrTextWidth(gstate, pElement->XWPLE_clue, 0)
+																  + PRINT_WORD_COLUMN_SPACING;
+	acrossXOffset = 0;
+	if (width < colWidth)  acrossXOffset = colWidth - width -
+														PRINT_WORD_COLUMN_SPACING;
+
+	/* Setup the remainder of the GState. */
+	GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	GrSetDefaultTransform(gstate);
+
+	/* Print across clues column */
+	clues = 0;
+	x = PRINT_WORD_TEXT_BOX_LEFT + acrossXOffset;
+	printRow = 0;
+	/* draw the across header */
+	GrSetFont(gstate, PRINT_WORD_TEXT_FONT, PRINT_WORD_MAX_TEXT_SIZE);
+	GrSetTextStyle(gstate, TS_BOLD | TS_UNDERLINE, 0);
+	MemLock (OptrToHandle(@AcrossText));
+	GrDrawText(gstate, x, PRINT_WORD_TEXT_BOX_TOP - 16,
+						LMemDeref(@AcrossText), 0);
+	MemUnlock (OptrToHandle(@AcrossText));
+	GrSetFont(gstate, PRINT_WORD_TEXT_FONT, fFontSize);
+	GrSetTextStyle(gstate, 0, TS_BOLD | TS_UNDERLINE);
+	/* and the clues */
+	for (row = 0; row < g_height; row ++) {
+		for (col = 0; col < g_width; col ++) {
+			for (i = 0; i < numWords; i++) {
+				pAns = ChunkArrayElementToPtrHandles(mhAnsw, g_chDocAnswers, i, 0);
+				if (pAns->XWPAE_row == row && pAns->XWPAE_column == col
+						 && pAns->XWPAE_direction == C_ACROSS) {
+					/* we have an across word start - so grab the cell number */
+					tabOffset = 0;
+					cellNum = g_cellNumArray[row][col];
+					UtilHex32ToAscii(cellNumStr, (dword)cellNum, UHTAF_NULL_TERMINATE);
+					if (strlen(cellNumStr) == 1) {
+						strcpy(lineBuffer, " ");
+						strcat(lineBuffer, cellNumStr);
+						}
+					else
+						strcpy(lineBuffer, cellNumStr);
+					strcat(lineBuffer, ". ");
+					tabWidth = GrTextWidth(gstate, lineBuffer, 0);
+					/* and the clue text */
+					pElement = ChunkArrayElementToPtrHandles(
+										mhList, g_chDocWordList, pAns->XWPAE_wordNum, 0);
+					strcat(lineBuffer, pElement->XWPLE_clue);
+					/* see if we need to wrap */
+					width = GrTextWidth(gstate, lineBuffer, 0);
+					while (width > colWidth) {
+						/* we need to wrap */
+						for (j = strlen(lineBuffer) - 1; j > 0; j--) {
+							if (lineBuffer[j] == ' ') {
+								/* test if wrap here */
+								lineBuffer[j] = 0;
+								width = GrTextWidth(gstate, lineBuffer, 0) + tabOffset;
+								if (width < colWidth) {
+									/* ok - it's short enuf, wrap here */
+									strcpy(wrapBuffer, &lineBuffer[j+1]);
+									GrDrawText(gstate, x + tabOffset,
+										PRINT_WORD_TEXT_BOX_TOP +
+										IntegerOf(GrMulWWFixed(MakeWWFixed(printRow), fFontSize)),
+										lineBuffer, 0);
+									printRow++;
+									strcpy(lineBuffer, wrapBuffer);
+									if (!tabOffset) tabOffset = tabWidth;
+									width = GrTextWidth(gstate, lineBuffer, 0) + tabOffset;
+									break;
+									}
+								else {
+									/* still too long - keep trying */
+									lineBuffer[j] = ' ';
+									}
+								}  /* end of found a space if */
+							}  /* end of find spaces for */
+						}   /* end of wider than col while */
+					/* draw it */
+					GrDrawText(gstate, x + tabOffset, PRINT_WORD_TEXT_BOX_TOP +
+						IntegerOf(GrMulWWFixed(MakeWWFixed(printRow), fFontSize)),
+						lineBuffer, 0);
+					printRow++;
+					clues++;
+					break;
+					}  /* end of found across start if */
+				}  /* end of numWords (i) for */
+			}  /* end of col for */
+		}  /* end of row for */
+
+	/* Print down clues column */
+	x = PRINT_WORD_TEXT_BOX_LEFT + (PRINT_WORD_TEXT_BOX_WIDTH / 2);
+	printRow = 0;
+	/* draw the down text */
+	GrSetFont(gstate, PRINT_WORD_TEXT_FONT, PRINT_WORD_MAX_TEXT_SIZE);
+	GrSetTextStyle(gstate, TS_BOLD | TS_UNDERLINE, 0);
+	MemLock (OptrToHandle(@DownText));
+	GrDrawText(gstate, x, PRINT_WORD_TEXT_BOX_TOP - 16,
+						LMemDeref(@DownText), 0);
+	MemUnlock (OptrToHandle(@DownText));
+	GrSetFont(gstate, PRINT_WORD_TEXT_FONT, fFontSize);
+	GrSetTextStyle(gstate, 0, TS_BOLD | TS_UNDERLINE);
+	/* and the clues */
+	for (row = 0; row < g_height; row ++) {
+		for (col = 0; col < g_width; col ++) {
+			for (i = 0; i < numWords; i++) {
+				pAns = ChunkArrayElementToPtrHandles(mhAnsw, g_chDocAnswers, i, 0);
+				if (pAns->XWPAE_row == row && pAns->XWPAE_column == col
+						 && pAns->XWPAE_direction == C_DOWN) {
+					/* we have a down word start - so grab the cell number */
+					tabOffset = 0;
+					cellNum = g_cellNumArray[row][col];
+					UtilHex32ToAscii(cellNumStr, (dword)cellNum, UHTAF_NULL_TERMINATE);
+					if (strlen(cellNumStr) == 1) {
+						strcpy(lineBuffer, " ");
+						strcat(lineBuffer, cellNumStr);
+						}
+					else
+						strcpy(lineBuffer, cellNumStr);
+					strcat(lineBuffer, ". ");
+					tabWidth = GrTextWidth(gstate, lineBuffer, 0);
+					/* and the clue text */
+					pElement = ChunkArrayElementToPtrHandles(
+										mhList, g_chDocWordList, pAns->XWPAE_wordNum, 0);
+					strcat(lineBuffer, pElement->XWPLE_clue);
+					/* see if we need to wrap */
+					width = GrTextWidth(gstate, lineBuffer, 0);
+					while (width > colWidth) {
+						/* we need to wrap */
+						for (j = strlen(lineBuffer) - 1; j > 0; j--) {
+							if (lineBuffer[j] == ' ') {
+								/* test if wrap here */
+								lineBuffer[j] = 0;
+								width = GrTextWidth(gstate, lineBuffer, 0) + tabOffset;
+								if (width < colWidth) {
+									/* ok - it's short enuf, wrap here */
+									strcpy(wrapBuffer, &lineBuffer[j+1]);
+									GrDrawText(gstate, x + tabOffset, PRINT_WORD_TEXT_BOX_TOP +
+										IntegerOf(GrMulWWFixed(MakeWWFixed(printRow), fFontSize)),
+										lineBuffer, 0);
+									printRow++;
+									strcpy(lineBuffer, wrapBuffer);
+									if (!tabOffset) tabOffset = tabWidth;
+									width = GrTextWidth(gstate, lineBuffer, 0) + tabOffset;
+									break;
+									}
+								else {
+									/* still too long - keep trying */
+									lineBuffer[j] = ' ';
+									}
+								}  /* end of found a space if */
+							}  /* end of find spaces for */
+						}   /* end of wider than col while */
+					/* draw it */
+					GrDrawText(gstate, x + tabOffset, PRINT_WORD_TEXT_BOX_TOP +
+						IntegerOf(GrMulWWFixed(MakeWWFixed(printRow), fFontSize)),
+						lineBuffer, 0);
+					printRow++;
+					clues++;
+					break;
+					}  /* end of found across start if */
+				}  /* end of numWords (i) for */
+			if (clues == numWords) break;
+			}  /* end of col for */
+		if (clues == numWords) break;
+		}  /* end of row for */
+
+	VMUnlock(mhAnsw);
+	VMUnlock(mhList);
+
+}
+
+/***************************************************************************
+ * MSG_META_EXPOSED
+ ***************************************************************************
+ * SYNOPSIS:    Called by XWPDocumentView to redraw the word search display.
+ *
+ * PARAMETERS:  WindowHandle    win
+ *
+ * STRATEGY:    Call appropriate drawing functions to render the display.
+ *
+ **************************************************************************/
+@method XWPProcessClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    gstate = GrCreateState(win);    /* Create a temporary GState. */
+    GrBeginUpdate(gstate);          /* Start a window update. */
+	 XWPDrawWordGrid(gstate, DRAW_GRID_MARGINS, DRAW_GRID_MARGINS, 0, 0, FALSE);
+    GrEndUpdate(gstate);            /* We are done with the window update. */
+    GrDestroyState(gstate);         /* Destroy the temporary GState. */
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_XWP_GEN_VIEW_NAVIGATE for XWPGenViewClass
+ *
+ * PARAMETERS:   word dir
+ *
+ * DESCRIPTION:	navigates from cell to cell in selected word
+ *
+ ***********************************************************************/
+@method XWPGenViewClass, MSG_XWP_GEN_VIEW_NAVIGATE
+{
+word					x, y;
+XWPAnswerElement	ansInfo;
+XWPClueElement		*pClue;
+GStateHandle		gstate;
+WindowHandle		win;
+const AreaAttr		selAAttr = {CF_INDEX,{C_LIGHT_GREEN,0,0},SDM_25,CMT_CLOSEST};
+
+
+	/* get a gstate to work with */
+	win = @call self::MSG_GEN_VIEW_GET_WINDOW();
+	gstate = GrCreateState(win);
+	GrSetDefaultTransform(gstate);
+	GrApplyTranslation(gstate, MakeWWFixed(DRAW_GRID_MARGINS), MakeWWFixed(DRAW_GRID_MARGINS));
+	GrSetAreaAttr(gstate, &selAAttr);
+
+	MemLock(g_clueHeapHandle);
+	pClue = ChunkArrayElementToPtrHandles(g_clueHeapHandle, g_chDocClues,
+							g_selClue, 0);
+	ansInfo = pClue->XWPCE_data;
+
+	if ((ansInfo.XWPAE_direction == C_ACROSS) && (dir == NAV_LEFT) && g_letterNum) {
+		/*  move left */
+		/* here's where we are */
+		x = (ansInfo.XWPAE_column + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+		y = ansInfo.XWPAE_row * DRAW_GRID_SPACE_SIZE;
+		/* so we unhilite ourself */
+		GrInvalRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+		/* move left one cell & hilite */
+		g_letterNum--;
+		x = (ansInfo.XWPAE_column + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+		GrFillRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+		}
+	if ((ansInfo.XWPAE_direction == C_ACROSS) && (dir == NAV_RIGHT) &&
+						(g_letterNum < (ansInfo.XWPAE_length - 1))) {
+		/* move right */
+		/* here's where we are */
+		x = (ansInfo.XWPAE_column + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+		y = ansInfo.XWPAE_row * DRAW_GRID_SPACE_SIZE;
+		/* so we unhilite ourself */
+		GrInvalRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+		/* move right one cell & hilite */
+		g_letterNum++;
+		x = (ansInfo.XWPAE_column + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+		GrFillRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+		}
+	if ((ansInfo.XWPAE_direction == C_DOWN) && (dir == NAV_UP) && g_letterNum) {
+		/*  move up */
+		/* here's where we are */
+		x = ansInfo.XWPAE_column * DRAW_GRID_SPACE_SIZE;
+		y = (ansInfo.XWPAE_row + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+		/* so we unhilite ourself */
+		GrInvalRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+		/* move left one cell & hilite */
+		g_letterNum--;
+		y = (ansInfo.XWPAE_row + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+		GrFillRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+		}
+	if ((ansInfo.XWPAE_direction == C_DOWN) && (dir == NAV_DOWN) &&
+						(g_letterNum < (ansInfo.XWPAE_length - 1))) {
+		/* move down */
+		/* here's where we are */
+		x = ansInfo.XWPAE_column * DRAW_GRID_SPACE_SIZE;
+		y = (ansInfo.XWPAE_row + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+		/* so we unhilite ourself */
+		GrInvalRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+		/* move right one cell & hilite */
+		g_letterNum++;
+		y = (ansInfo.XWPAE_row + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+		GrFillRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+		}
+
+	/* and clean up */
+	MemUnlock(g_clueHeapHandle);
+	GrDestroyState(gstate);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_KBD_CHAR for XWPGenViewClass
+ *
+ * PARAMETERS:   word character
+ *               word flags
+ *               word state
+ *
+ * DESCRIPTION:	puts players keypresses on the screen and
+ *                navigates from cell to cell in selected word
+ *
+ *
+ ***********************************************************************/
+@method XWPGenViewClass, MSG_META_KBD_CHAR
+{
+word					x, y, xoff, yoff, row, col;
+XWPAnswerElement	ansInfo;
+XWPClueElement		*pClue;
+GStateHandle		gstate;
+WindowHandle		win;
+const AreaAttr		selAAttr = {CF_INDEX,{C_LIGHT_GREEN,0,0},SDM_25,CMT_CLOSEST};
+
+	if ((character >= 'a') && (character <= 'z')) {
+		/* We have a letter, make sure the user is not holding the key down and
+		 * that this is not a release event. */
+		if ((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE)) {
+			@callsuper();
+			}
+		else {
+			/* Draw the letter */
+			/* get a gstate to draw to */
+			win = @call self::MSG_GEN_VIEW_GET_WINDOW();
+			gstate = GrCreateState(win);
+			GrSetDefaultTransform(gstate);
+			GrApplyTranslation(gstate, MakeWWFixed(DRAW_GRID_MARGINS), MakeWWFixed(DRAW_GRID_MARGINS));
+			GrSetFont(gstate, DRAW_GRID_TEXT_FONT, MakeWWFixed(DRAW_GRID_TEXT_SIZE));
+			GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+
+			MemLock(g_clueHeapHandle);
+
+			pClue = ChunkArrayElementToPtrHandles(g_clueHeapHandle, g_chDocClues,
+							g_selClue, 0);
+			ansInfo = pClue->XWPCE_data;
+
+			if (ansInfo.XWPAE_direction == C_ACROSS) {
+				x = (ansInfo.XWPAE_column + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+				y = ansInfo.XWPAE_row * DRAW_GRID_SPACE_SIZE;
+				row = ansInfo.XWPAE_row;
+				col = ansInfo.XWPAE_column + g_letterNum;
+				}
+			else {
+				x = ansInfo.XWPAE_column * DRAW_GRID_SPACE_SIZE;
+				y = (ansInfo.XWPAE_row + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+				row = ansInfo.XWPAE_row + g_letterNum;
+				col = ansInfo.XWPAE_column;
+				}
+
+			/* draw the letter */
+			if (g_solveArray[row][col] != ' ') {
+				/* if there's a letter already there, erase it */
+				GrInvalRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+				}
+			yoff = (DRAW_GRID_SPACE_SIZE - DRAW_GRID_TEXT_SIZE)/* + 1*/ -3;
+			xoff = (DRAW_GRID_SPACE_SIZE - IntegerOf(GrCharWidth(gstate, character)))/2;
+			GrDrawChar(gstate, x + xoff, y + yoff, toupper(character));
+			/* and add to the solution array */
+			g_solveArray[row][col] = toupper(character);
+
+			/* move on - hilite the next cell
+				if we're not at the end of the word */
+			g_letterNum++;
+			if (g_letterNum < ansInfo.XWPAE_length) {
+				/* not at the end of the word */
+				/* first unhilite where we just put the letter */
+				GrInvalRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+				/* and hilite the next cell */
+				GrSetAreaAttr(gstate, &selAAttr);
+				if (ansInfo.XWPAE_direction == C_ACROSS) {
+					x = (ansInfo.XWPAE_column + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+					y = ansInfo.XWPAE_row * DRAW_GRID_SPACE_SIZE;
+					}
+				else {
+					x = ansInfo.XWPAE_column * DRAW_GRID_SPACE_SIZE;
+					y = (ansInfo.XWPAE_row + g_letterNum) * DRAW_GRID_SPACE_SIZE;
+					}
+				GrFillRect(gstate, x, y,
+							x + DRAW_GRID_SPACE_SIZE,
+							y + DRAW_GRID_SPACE_SIZE);
+				}
+			else {
+				/* at the end of the word, reset the letter counter
+					remember, we incremented it a bit ago */
+				g_letterNum--;
+				}
+
+			MemUnlock(g_clueHeapHandle);
+			GrDestroyState(gstate);
+			} /* end of not a repeat ot release else */
+		} /* end of it's a letter if */
+
+	/* is it an arrow key? */
+	if ((flags & CF_FIRST_PRESS) || (flags & CF_REPEAT_PRESS)) {
+		if ((character >> 8) == CS_CONTROL) {
+			switch (character & 0xff) {
+				case VC_NUMPAD_4:
+				case VC_LEFT:
+					@call self::MSG_XWP_GEN_VIEW_NAVIGATE(NAV_LEFT);
+					break;
+				case VC_NUMPAD_6:
+				case VC_RIGHT:
+					@call self::MSG_XWP_GEN_VIEW_NAVIGATE(NAV_RIGHT);
+					break;
+				case VC_NUMPAD_8:
+				case VC_UP:
+					@call self::MSG_XWP_GEN_VIEW_NAVIGATE(NAV_UP);
+					break;
+				case VC_NUMPAD_2:
+				case VC_DOWN:
+					@call self::MSG_XWP_GEN_VIEW_NAVIGATE(NAV_DOWN);
+					break;
+				default:
+					@callsuper();
+				} /* end of switch */
+			} /* end of control if */
+		else  /* not control */
+			@callsuper();
+		}
+	else {
+		/* not a key we're capturing - send it on to the UI */
+		@callsuper();
+		}
+
+}
+/***************************************************************************
+ * MSG_PRINT_START_PRINTING
+ ***************************************************************************
+ * SYNOPSIS:    Sent by the print control whenever it wants to print.
+ *
+ * PARAMETERS:  optr            printCtrlOD,
+ *              GStateHandle    gstate
+ *
+ * STRATEGY:    Call appropriate drawing functions to print the document.
+ *
+ **************************************************************************/
+@method XWPStartPrinting, XWPProcessClass, MSG_PRINT_START_PRINTING
+{
+
+	/* Print the header. */
+	XWPDrawHeader(gstate, TRUE);
+
+	/* Print the puzzle. */
+	XWPDrawWordGrid(gstate, PRINT_GRID_BOUNDS_LEFT, PRINT_GRID_BOUNDS_TOP,
+					PRINT_GRID_BOUNDS_RIGHT, PRINT_GRID_BOUNDS_BOTTOM, TRUE);
+
+	/* Print the word list. */
+	XWPDrawClueList(gstate);
+
+	/* End with a form feed. */
+	GrNewPage(gstate, PEC_FORM_FEED);
+
+	@send printCtrlOD::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+
+}
+
+/***************************************************************************
+ * MSG_META_CLIPBOARD_COPY
+ ***************************************************************************
+ * SYNOPSIS:    Draw the word search display to the clipboard.
+ *
+ * PARAMETERS:
+ *
+ * STRATEGY:    Call appropriate drawing functions to render the display.
+ *
+ **************************************************************************/
+@method XWPProcessClass, MSG_META_CLIPBOARD_COPY
+{
+ ClipboardItemHeader *headerMem ;
+ MemHandle           headerMemHandle ;
+ VMFileHandle        transferVMFile ;
+ VMBlockHandle       dataVMBlock, headerVMBlock ;
+ GStateHandle        gstate;
+
+
+	 @send XWPApp::MSG_GEN_APPLICATION_MARK_BUSY() ;
+	 transferVMFile = ClipboardGetClipboardFile() ;
+
+	 gstate = GrCreateGString(transferVMFile, GST_VMEM, &dataVMBlock);
+
+	 /* Draw the header. Don't draw the name/date block. */
+	 XWPDrawHeader(gstate, FALSE);
+	 /* Draw the puzzle. */
+	 XWPDrawWordGrid(gstate, PRINT_GRID_BOUNDS_LEFT, PRINT_GRID_BOUNDS_TOP,
+					PRINT_GRID_BOUNDS_RIGHT, PRINT_GRID_BOUNDS_BOTTOM, TRUE);
+	 /* Draw the word list. */
+	 XWPDrawClueList(gstate);
+
+	 GrEndGString(gstate);
+
+	 headerVMBlock = VMAlloc(transferVMFile, sizeof(ClipboardItemHeader), 1111) ;
+	 headerMem = (ClipboardItemHeader *)VMLock(
+					  transferVMFile, headerVMBlock, &headerMemHandle) ;
+	 headerMem->CIH_owner = ConstructOptr(GeodeGetProcessHandle(), 0) ;
+	 headerMem->CIH_flags = 0 ;
+	 headerMem->CIH_name[0] = 'X' ;
+	 headerMem->CIH_name[1] = 'W' ;
+	 headerMem->CIH_name[2] = 'M' ;
+	 headerMem->CIH_name[3] = '\0' ;
+	 headerMem->CIH_formatCount = 1;
+	 headerMem->CIH_sourceID = 0 ;
+	 headerMem->CIH_formats[0].CIFI_format =
+		  FormatIDFromManufacturerAndType(
+				 MANUFACTURER_ID_GEOWORKS,
+				 CIF_GRAPHICS_STRING) ;
+	 headerMem->CIH_formats[0].CIFI_vmChain =
+		  (VMChain)(((dword)(dataVMBlock))<<16L) ;
+	 headerMem->CIH_formats[0].CIFI_extra1 = 0 ;
+	 headerMem->CIH_formats[0].CIFI_extra2 = 0 ;
+	 VMUnlock(headerMemHandle) ;
+	 ClipboardRegisterItem(BlockIDFromFileAndBlock(transferVMFile,
+		  headerVMBlock),
+		  0) ;
+	 @send XWPApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox  (char* string1, optr notifyMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    Puts up selected notification box
+ *
+ *
+ ***********************************************************************/
+void NotifyDBox (char* string1, optr notifyMsg)
+{
+
+	 /* put up a notification box */
+	 MemLock (OptrToHandle(@XWFolderTxt));
+	 UserStandardDialog((char*)0,
+			  (char*)0,
+			  (char*)0,
+			  string1,
+			  LMemDeref(notifyMsg),
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	 MemUnlock (OptrToHandle(@XWFolderTxt));
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	AckDBox (char* string1, char* string2, optr ackMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    returns user's Yes or No response
+ *
+ *
+ ***********************************************************************/
+word AckDBox (char* string1, char* string2, optr ackMsg)
+{
+
+	 /* put up an Are you sure box */
+	 MemLock (OptrToHandle(@XWFolderTxt));
+	 if ((UserStandardDialog((char*)0,
+				 (char*)0,
+				 string2,
+				 string1,
+				 LMemDeref(ackMsg),
+				 ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+				 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+				 ) != IC_YES))  {
+	  MemUnlock (OptrToHandle(@XWFolderTxt));
+	  return(ACK_NO);
+	  }
+	 else  {
+	  MemUnlock (OptrToHandle(@XWFolderTxt));
+	  return(ACK_YES);
+	  }
+
+}
+/***********************************************************************
+ *
+ * FUNCTION:	EnableDisableFileUI  (word enOrDis)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    En/Disables UI based on words in list
+ *
+ *
+ ***********************************************************************/
+void EnableDisableFileUI(word enOrDis)
+{
+
+	if (enOrDis) {
+		@send XWPPrintControl::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+	else {
+		@send XWPPrintControl::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		}
+
+}
+
+
+
+

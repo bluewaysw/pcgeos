@@ -1,0 +1,528 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:     BASICBase
+ * FILE:        babase.goc
+ * AUTHOR:      John F. Howard,   4/98
+ *
+ * DESCRIPTION:
+ *      This file source code for the BASICBase application.
+ *
+ * WHATS NEW:   Based on HomeBase for Dirk Haase to store BASIC code
+ *      5/2/98		Renamed to BuilderBase
+ *              
+ *              
+ *              
+ *              
+ *      
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *              Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include "hbase.goh"
+@include "hbicons.goh"
+@include "bblogo.goh"
+
+
+/*
+ ***************************************************************************
+ *              Class & Method Declarations
+ ***************************************************************************
+ */
+
+@classdecl      HBaseProcessClass, neverSaved;
+
+/* methods in the doc methods .goc file */
+@extern method HBaseProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE;
+@extern method HBaseProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT;
+@extern method HBaseProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT;
+@extern method HBaseProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED;
+@extern method HBaseProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN;
+@extern method HBaseProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION;
+
+/* methods in the data methods .goc file*/
+@extern method HBaseProcessClass, MSG_ENTER_DATA;
+@extern method HBaseProcessClass, MSG_MODIFY_DATA;
+@extern method HBaseProcessClass, MSG_DELETE_DATA;
+@extern method HBaseProcessClass, MSG_NEW_RECORD;
+@extern method HBaseProcessClass, MSG_COPY_CODE_TO_CLIP;
+
+/* methods in the navigation methods .goc file*/
+@extern method HBaseProcessClass, MSG_INDEX_DLIST_MONIKER_QUERY;
+@extern method HBaseProcessClass, MSG_INDEX_DLIST_APPLY;
+
+/* methods in the search methods .goc file*/
+@extern method HBaseProcessClass, MSG_SEARCH_FIELDS;
+@extern method TextEnableClass, MSG_META_KBD_CHAR;
+
+@classdecl TextEnableClass;
+
+/*
+ ***************************************************************************
+ *              UI Objects
+ ***************************************************************************
+ */
+
+@start  AppResource;
+@object GenApplicationClass HBaseApp = {
+    GI_visMoniker = list {
+	 @HBLCAppIcon,
+	 @HBLMAppIcon,
+	 @HBSCAppIcon,
+	 @HBaseTextMoniker
+	 }
+    GI_comp = @HBasePrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @HBasePrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @HBaseDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @HBaseDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			 @HBaseDocumentControl, @BBEditControl;
+}
+
+@visMoniker HBaseTextMoniker = "BuilderBase";
+    @localize "app moniker on title bar";
+@end AppResource;
+
+@start  Interface;
+@object GenPrimaryClass HBasePrimary = {
+    GI_comp = @HBFileMenu, @BBEditControl,
+	      @MainGroup, @SearchDBox;
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+  /*  ATTR_GEN_HELP_CONTEXT = "TOC"; */
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+@end Interface;
+
+
+@start Menu;
+@object GenInteractionClass HBFileMenu = {
+    GI_comp = @HBaseDocumentControl, @AboutDBox;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenDocumentControlClass HBaseDocumentControl = {
+    GDCI_features = @default & ~GDCF_SUPPORTS_TEMPLATES;
+    GDCI_documentToken = {"BBDA", 16431};
+    GDCI_noNameText = "No File";
+    @localize "Shown on title bar if no file is acitve";
+    GDCI_documentGroup = HBaseDocumentGroup;
+    GDCI_enableDisableList = HBEnableList;
+}
+
+@chunk optr HBEnableList[] = {
+    @MainGroup, @SearchDBox
+};
+
+@object GenEditControlClass BBEditControl = {
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_EDIT_MENU;
+    ATTR_GEN_CONTROL_PROHIBIT_UI = GECF_UNDO;
+}
+
+@end Menu;
+
+@start DocumentUI;
+@object GenDocumentGroupClass HBaseDocumentGroup ={
+    GDGI_untitledName = "BuilderBase untitled";
+    @localize "untitled HBase document";
+    GDGI_protocolMajor = 1;
+    GDGI_protocolMinor = 0;
+    GDGI_output = process;
+    GDGI_documentControl = HBaseDocumentControl;
+}
+@end DocumentUI;
+
+@start AboutResource;
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'A', "About";
+    @localize "title of the about dialog box";
+    GI_comp = @ADBTitle, @ADBTextGroup,
+		 @ADBCopyright, @ADBok;
+    GII_visibility = GIV_DIALOG;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass ADBTitle = {
+    GI_visMoniker = "BuilderBase V1.0";
+}
+
+@object GenInteractionClass ADBTextGroup = {
+    GI_comp = @LeftGroup, @RightGroup;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_DIVIDE_WIDTH_EQUALLY;
+}
+
+@object GenInteractionClass LeftGroup = {
+    GI_comp = @Left1, @Left2, @Left3, @Left4, @Left5, @Left6;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenGlyphClass Left1 = {
+    GI_visMoniker = "Store your code snippets";
+}
+
+@object GenGlyphClass Left2 = {
+    GI_visMoniker = "in this easy to use database.";
+}
+
+@object GenGlyphClass Left3 = {
+    GI_visMoniker = "Aviod re-writing code!";
+}
+
+@object GenGlyphClass Left4 = {
+    GI_visMoniker = "This program is a subset of";
+}
+
+@object GenGlyphClass Left5 = {
+    GI_visMoniker = "the HomeBase database program";
+}
+
+@object GenGlyphClass Left6 = {
+    GI_visMoniker = "available from Breadbox.";
+}
+
+@object GenInteractionClass RightGroup = {
+    GI_comp = @ADBLogo, @Right1, @Right2;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass ADBLogo = {
+  GI_visMoniker = list {@BBoxMoniker};
+}
+
+@object GenGlyphClass Right1 = {
+    GI_visMoniker = "web:  www.breadbox.com";
+}
+
+@object GenGlyphClass Right2 = {
+    GI_visMoniker = "email:  info@breadbox.com";
+}
+
+@object GenGlyphClass ADBCopyright = {
+    GI_visMoniker = "Copyright 1994 - 1998 Breadbox Computer Company. All Rights Reserved";
+}
+
+@object GenTriggerClass ADBok = {
+    GI_visMoniker = "OK";
+    @localize "button to cancel the about dialog box";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+@end AboutResource;
+/* ----------------------------------------------------------- */
+
+@start Interface;
+@object GenInteractionClass MainGroup = {
+    GI_comp = @FieldsGroup, @Field4Group, @CodeGroup, @Controls;
+    GI_states = @default & ~GS_ENABLED; /* on doc enable list */
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass FieldsGroup = {
+    GI_comp = @Fields, @ListGroup;
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass Fields = {
+    GI_comp = @Field1, @FromGroup, @Field6;
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass Field1 = {
+    GI_visMoniker = "Routine:";
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (DATA_LEN - 1);
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @FieldFilter;
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @CodeCharAttrs;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenInteractionClass FromGroup = {
+    GI_visMoniker = "From:";
+    GI_comp = @Field2, @Field3;
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass Field2 = {
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (DATA_LEN - 1);
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @FieldFilter;
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @CodeCharAttrs;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass Field3 = {
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (DATA_LEN - 1);
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @FieldFilter;
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @CodeCharAttrs;
+    HINT_FIXED_SIZE = {
+	   SST_AVG_CHAR_WIDTHS | 12,
+	   0,
+	   0};
+    HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass Field6 = {
+    GI_visMoniker = "Info:";
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    GTXI_attrs = @default | GTA_INIT_SCROLLING;
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @FieldFilter;
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @CodeCharAttrs;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_FIXED_SIZE = {
+	   /*SST_AVG_CHAR_WIDTHS | 14*/ 0,
+	   SST_LINES_OF_TEXT | 5,
+	   0};
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/* allows all but tilde / */
+@chunkArray VisTextCustomFilterData FieldFilter = {
+	C_ASCII_TILDE, C_ASCII_TILDE
+	};
+
+@object GenInteractionClass ListGroup = {
+    GI_comp = @IndexDList;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDynamicListClass IndexDList = {
+    GDLI_numItems = 0;
+    GIGI_selection = 0;
+    GIGI_applyMsg = MSG_INDEX_DLIST_APPLY;
+    GIGI_destination = process;
+    GDLI_queryMsg = MSG_INDEX_DLIST_MONIKER_QUERY;
+    HINT_INITIAL_SIZE = {
+		SST_AVG_CHAR_WIDTHS | 35,
+		0,
+		0};
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @FieldsGroup;
+    HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT = @FieldsGroup;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_MONIKER;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenInteractionClass Field4Group = {
+    GI_comp = @Field4;
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTextClass Field4 = {
+    GI_visMoniker = "Usage:";
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (DATA_LEN - 1);
+    ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @FieldFilter;
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @CodeCharAttrs;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass CodeGroup = {
+    GI_comp = @Field7;
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTextClass Field7 = {
+    GI_attrs = @default | GA_TARGETABLE
+				    | GA_KBD_SEARCH_PATH;
+    GTXI_attrs = (@default & ~GTA_USE_TAB_FOR_NAVIGATION) | GTA_INIT_SCROLLING;
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @CodeCharAttrs;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_MINIMUM_SIZE = {
+	   /*SST_AVG_CHAR_WIDTHS | 14*/ 0,
+	   SST_LINES_OF_TEXT | 12,
+	   0};
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@chunk VisTextCharAttr CodeCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 12, 0);
+
+@object GenInteractionClass Controls = {
+    GI_comp = @BBLogo, @EnterButton, @ModButton,
+		    @CopyCodeButton, @DeleteButton, @NewButton;
+    HINT_MAKE_REPLY_BAR;
+}
+
+@object GenInteractionClass BBLogo = {
+    GI_visMoniker = list {@BBoxMoniker};  /*BreadboxSmallMonikerColor*/
+}
+
+@object GenTriggerClass EnterButton = {
+    GI_visMoniker = "Add";
+    @localize "button to add record to database";
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_ENTER_DATA;
+}
+
+@object GenTriggerClass ModButton = {
+    GI_visMoniker = "Modify";
+    @localize "button to store modified record to database";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_MODIFY_DATA;
+}
+
+@object GenTriggerClass CopyCodeButton = {
+    GI_visMoniker = "Copy Code";
+    @localize "button to copy code to clipboard";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_COPY_CODE_TO_CLIP;
+}
+
+@object GenTriggerClass DeleteButton = {
+    GI_visMoniker = "Delete";
+    @localize "button to delete record from database";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_DELETE_DATA;
+}
+
+@object GenTriggerClass NewButton = {
+    GI_visMoniker = "New";
+    @localize "button to display empty record form";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process ;
+    GTI_actionMsg = MSG_NEW_RECORD;
+}
+
+@end Interface;
+
+/* -------------------------------------------------------------- */
+@start SearchResource;
+@object GenInteractionClass SearchDBox = {
+    GI_visMoniker = 'S', "Search";
+    @localize "title of the search dialog box";
+    GI_comp = @SDBSearchText, @SDBOptions, @SDBSearch,
+		 @SDBSearchNext, @SDBCanx;
+    GII_visibility = GIV_DIALOG;
+    HINT_SEEK_MENU_BAR;
+ /*   ATTR_GEN_HELP_CONTEXT = "SrchDB";    /* the help file Entry Point */
+}
+
+@object TextEnableClass SDBSearchText = {
+    GI_visMoniker = "Search for:";
+    @localize "label of the search for text entry window";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (DATA_LEN - 1);
+ /*   ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS =
+	   @SDBSearch;  */
+    TE_button = @SDBSearch;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenInteractionClass SDBOptions = {
+    GI_comp = @SDBFieldOpts, @SDBCaseOpts;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenItemGroupClass SDBFieldOpts = {
+    GI_comp = @SDBField;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+}
+
+@object GenItemClass SDBField = {
+    GI_visMoniker = "First Field Only";
+    @localize "option to search in the first field only";
+    GII_identifier = S_FIELD;
+}
+
+@object GenItemGroupClass SDBCaseOpts = {
+    GI_comp = @SDBCase;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+}
+
+@object GenItemClass SDBCase = {
+    GI_visMoniker = "Ignore Case";
+    @localize "option to ignore the case of the search text";
+    GII_identifier = S_CASE;
+}
+
+@object GenTriggerClass SDBSearch = {
+    GI_visMoniker = "Search";
+    @localize "button to start searching";
+    GI_states = @default & ~GS_ENABLED; /* enabled by TextEnableClass obj */
+    GTI_destination = process;
+    GTI_actionMsg = MSG_SEARCH_FIELDS;
+    ATTR_GEN_TRIGGER_ACTION_DATA = FIRST;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION; 
+}
+
+@object GenTriggerClass SDBSearchNext = {
+    GI_visMoniker = "Search next";
+    @localize "button to continue searching from this point in the database";
+    GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_SEARCH_FIELDS;
+    ATTR_GEN_TRIGGER_ACTION_DATA = NEXT;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass SDBCanx = {
+    GI_visMoniker = "Cancel";
+    @localize "button to cancel the search dialog box";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end SearchResource;
+
+
+

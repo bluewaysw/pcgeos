@@ -1,0 +1,2863 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS  
+ * MODULE:	  CMain
+ * FILE:	  cmainUIDocumentControl.ui
+ *
+ * AUTHOR:  	  David Litwin, May  5, 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	Tony	5/ 5/94   	Initial version
+ *
+ * DESCRIPTION:
+ *	
+ *	This file contains the user interface description for a document
+ *	control
+ *
+ * 	$Id: cmainUIDocumentControl.ui,v 1.1 97/04/07 10:51:51 newdeal Exp $
+ *
+ ***********************************************************************/
+/* define as -1 to make a non-saving version for demo */
+/*#define PRODUCT_WIN_DEMO = 0
+
+/*
+ * Document control
+ */
+
+start OLDocumentControlUI, notDetachable;
+
+NewTrigger = GenTrigger vardataReloc {
+	moniker = 'N', "New/Open";
+	genStates = default -usable;
+	action = MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+	    HINT_TRIGGER_BRINGS_UP_WINDOW,
+	    ATTR_GEN_FOCUS_HELP {
+		UN_OPTR FileNewHelp
+	    }
+	}
+}
+
+OpenTrigger = GenTrigger vardataReloc {
+	genStates = default -usable;
+	moniker = 'O', "Open";
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_OPEN_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_FEATURE_LINK { word offset CloseTrigger },
+		ATTR_GEN_FOCUS_HELP {
+			UN_OPTR FileOpenHelp
+		}
+	}
+}
+
+visMoniker SwitchDocumentMoniker = 'w', "Switch Document";
+
+CloseTrigger = GenTrigger vardataReloc {
+	genStates = default -usable, -enabled;
+#if KEYBOARD_ONLY_UI
+	moniker = 'C', "Close"; 
+#else
+	CLOSE_TRIGGER_VALUES
+#endif
+	action = MSG_OL_DOCUMENT_CHECK_CUI_CLOSE, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass },
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word 0, 0, 0	; pass 0 as IACPConnection (3d word)
+					;  to signal user-initiated
+		},
+		ATTR_GEN_FOCUS_HELP {
+			UN_OPTR FileCloseHelp
+		}
+	}
+}
+
+SaveTrigger = GenTrigger vardataReloc {
+	genStates = default -usable, -enabled;
+	moniker = 'S', "Save";
+	kbdAccelerator = control 's';
+/*#ifndef PRODUCT_WIN_DEMO   */
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_SAVE_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+/*#endif */
+	hints = {
+		ATTR_GEN_FOCUS_HELP {
+			UN_OPTR FileSaveHelp
+		},
+		ATTR_GEN_FOCUS_DISABLED_HELP {
+			UN_OPTR FileSaveDisabledHelp
+		}
+	}
+}
+
+SaveAsTrigger = GenTrigger vardataReloc {
+	genStates = default -usable, -enabled;
+	moniker = 'A', "Save As";
+/*#ifndef PRODUCT_WIN_DEMO */
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_SAVE_AS_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+/*#endif */
+	hints = {
+	        HINT_TRIGGER_BRINGS_UP_WINDOW,
+		ATTR_GEN_FOCUS_HELP {
+			UN_OPTR FileSaveAsHelp
+		}
+	}
+}
+
+/***/
+
+BackupSubMenu = GenInteraction {
+	genStates = default -usable;
+	moniker = 'B', "Backup";
+	children = QuickBackupTrigger, RecoverFromQuickBackupTrigger;
+	visibility = popup;
+}
+
+QuickBackupTrigger = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = 'M', "Make Backup";
+	action = MSG_GEN_DOCUMENT_QUICK_BACKUP, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass }
+	}
+}
+
+RecoverFromQuickBackupTrigger = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = 'R', "Restore From Backup";
+	action = MSG_GEN_DOCUMENT_RECOVER_QUICK_BACKUP, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass }
+	}
+}
+
+/***/
+
+OptionsSubMenu = GenInteraction {
+	genStates = default -usable;
+	moniker = 't', "Other";
+	children = OptionsSaveGroup, SaveAsTemplateTrigger, OptionsMiscGroup,
+		   OptionsEmptyPopup;
+	visibility = popup;
+}
+
+OptionsSaveGroup = GenInteraction {
+	children = CopyMoveTriggers, ExportTrigger,
+		   RevertTrigger, RenameTrigger;
+}
+
+CopyMoveTriggers = GenInteraction {
+	children = CopyTrigger, MoveTrigger;
+}
+
+CopyTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'C', "Copy To";
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_COPY_TO_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_TRIGGER_BRINGS_UP_WINDOW }
+}
+
+MoveTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'M', "Move To";
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_MOVE_TO_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_TRIGGER_BRINGS_UP_WINDOW }
+}
+
+ExportTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'E', "Export Document";
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_EXPORT_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_TRIGGER_BRINGS_UP_WINDOW }
+}
+
+RevertTrigger = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = 'D', "Discard Changes";
+	action = MSG_GEN_DOCUMENT_REVERT, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass }
+	}
+}
+
+RenameTrigger = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = 'R', "Rename";
+	action = MSG_GEN_DOCUMENT_RENAME, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass },
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+/***/
+
+SaveAsTemplateTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'S', "Save as Template";
+/*#ifndef PRODUCT_WIN_DEMO    */
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_SAVE_AS_TEMPLATE_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+/*#endif */
+	hints = { HINT_TRIGGER_BRINGS_UP_WINDOW }
+}
+
+/***/
+
+OptionsMiscGroup = GenInteraction {
+	children = EditUserNotesTrigger, SetPasswordTrigger, SetTypeTrigger;
+}
+
+
+
+EditUserNotesTrigger = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = 'N', "Edit Document Notes";
+	action = MSG_GEN_DOCUMENT_EDIT_USER_NOTES, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass },
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+SetPasswordTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'P', "Set Document Password";
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_SET_PASSWORD_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_TRIGGER_BRINGS_UP_WINDOW }
+}
+
+SetTypeTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'T', "Set Document Type";
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_SET_TYPE_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_TRIGGER_BRINGS_UP_WINDOW }
+}
+
+/***/
+
+OptionsEmptyPopup = GenInteraction {
+	moniker = 'y', "Empty Document";
+	children = SetEmptyDocumentTrigger, ClearEmptyDocumentTrigger,
+		   SetDefaultDocumentTrigger, ClearDefaultDocumentTrigger;
+	visibility = popup;
+}
+
+SetEmptyDocumentTrigger = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = 'S', "Set Empty Document";
+	action = MSG_GEN_DOCUMENT_SET_EMPTY, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_FEATURE_LINK { word offset ClearEmptyDocumentTrigger },
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass }
+	}
+}
+
+ClearEmptyDocumentTrigger = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = 'R', "Reset Empty Document";
+	action = MSG_GEN_DOCUMENT_CLEAR_EMPTY, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass }
+	}
+}
+
+SetDefaultDocumentTrigger = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = 'S', "Set Startup Document";
+	action = MSG_GEN_DOCUMENT_SET_DEFAULT, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_FEATURE_LINK {
+			word offset ClearDefaultDocumentTrigger
+		},
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass },
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+ClearDefaultDocumentTrigger = GenTrigger vardataReloc {
+	genStates = default -enabled;
+	moniker = 'R', "Reset Startup Document";
+	action = MSG_GEN_DOCUMENT_CLEAR_DEFAULT, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass },
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+end OLDocumentControlUI;
+
+/*---*/
+
+start OLDocumentControlToolboxUI, notDetachable;
+
+NewEmptyToolTrigger = GenTrigger vardataReloc {
+	genStates = default -usable;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		NewTCMoniker,
+#endif
+#if INCLUDE_SM_MONIKERS
+		NewTMMoniker,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		NewTCGAMoniker
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = { ATTR_GEN_FOCUS_HELP { UN_OPTR FileNewHelp } }
+}
+
+UseTemplateToolTrigger = GenTrigger vardataReloc {
+	genStates = default -usable;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		UseTemplateTCMoniker,
+#endif
+#if INCLUDE_SM_MONIKERS
+		UseTemplateTMMoniker,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		UseTemplateTCGAMoniker
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_USE_TEMPLATE_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = { ATTR_GEN_FOCUS_HELP { UN_OPTR UseTemplateName } }
+}
+
+OpenToolTrigger = GenTrigger vardataReloc {
+	genStates = default -usable;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		OpenTCMoniker,
+#endif
+#if INCLUDE_SM_MONIKERS
+		OpenTMMoniker,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		OpenTCGAMoniker
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_OPEN_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = { ATTR_GEN_FOCUS_HELP { UN_OPTR FileOpenHelp } }
+}
+
+CloseToolTrigger = GenTrigger vardataReloc {
+	genStates = default -usable;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		CloseTCMoniker,
+#endif
+#if INCLUDE_SM_MONIKERS
+		CloseTMMoniker,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		CloseTCGAMoniker
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_CLOSE, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass },
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word 0, 0, 0	; pass 0 as IACPConnection (3d word)
+					;  to signal user-initiated
+		},
+		ATTR_GEN_FOCUS_HELP { UN_OPTR FileCloseHelp }
+	}
+}
+
+SaveToolTrigger = GenTrigger vardataReloc {
+	genStates = default -usable;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		SaveTCMoniker,
+#endif
+#if INCLUDE_SM_MONIKERS
+		SaveTMMoniker,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		SaveTCGAMoniker
+#endif
+	}
+/*#ifndef PRODUCT_WIN_DEMO  */
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_SAVE_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+/*#endif  */
+	hints = { ATTR_GEN_FOCUS_HELP { UN_OPTR FileSaveHelp } }
+}
+
+QuickBackupToolTrigger = GenTrigger vardataReloc {
+	genStates = default -usable;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		QuickBackupTCMoniker,
+#endif
+#if INCLUDE_SM_MONIKERS
+		QuickBackupTMMoniker,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		QuickBackupTCGAMoniker
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_QUICK_BACKUP, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenDocumentClass },
+		ATTR_GEN_FOCUS_HELP { UN_OPTR QuickBackupName }
+	}
+}
+
+end OLDocumentControlToolboxUI;
+
+/*
+ * Strings for controllers
+ */
+
+start ControlStrings, data;
+
+chunk OLDCName = "Document Control";
+
+chunk SetDefaultDocumentName = "Set Default Document";
+chunk SetEmptyDocumentName = "Set Empty Document";
+chunk SaveAsTemplateName = "Save As Template";
+chunk SetPasswordName = "Set Document Password";
+chunk SetTypeName = "Set Document Type";
+chunk EditUserNotesName = "Edit Document's User Notes";
+chunk RenameName = "Rename";
+chunk RevertName = "Revert From Last Save";
+chunk ExportName = "Export";
+chunk CopyMoveName = "Copy/Move";
+chunk SaveAsName = "Save As";
+chunk SaveName = "Save";
+chunk QuickBackupName = "Quick Backup";
+chunk CloseName = "Close";
+chunk OpenName = "Open";
+chunk OpenCloseName = "Open/Close";
+chunk UseTemplateName = "Use Template";
+chunk NewName = "Create Empty";
+
+chunk BlankFileNameErrStr = "This name is invalid because it contains only spaces.  Please enter another name.";
+
+visMoniker FileVolumeText = "Volume";
+visMoniker FileSubDirText = "Folder";
+visMoniker FileErrorText = "";
+visMoniker FileTemplateText = "Template Document";
+visMoniker FileReadOnlyTemplateText = "Read-only Template";
+visMoniker FileReadOnlyText = "Read-only document";
+visMoniker FileSharedMultipleText = "Multi-user document";
+visMoniker FileSharedSingleText = "Public document";
+visMoniker FileNormalText = "Normal document";
+
+chunk FileNewHelp = "Create a new file or template";
+chunk FileOpenHelp = "Retrieve a previously saved document";
+chunk FileCloseHelp = "Close the current document";
+chunk FileSaveHelp = "Store current document on disk";
+chunk FileSaveDisabledHelp = "Disabled because document is already saved";
+chunk FileSaveAsHelp = "Store current document on disk with different name";
+
+end ControlStrings;
+
+/*
+ * Dialog boxes
+ */
+
+#if !_DUI
+
+start DocumentDialogUI, notDetachable;
+
+FileDialogSummons = GenInteraction {
+	moniker = "New/Open";
+#if NO_USER_LEVELS
+	children = FDMainGroup, FDCancelTrigger;
+#else
+	children = FDMainGroup, FDUserLevelGroup, FDCancelTrigger;
+#endif
+	visibility = dialog;
+	attributes = default +modal;
+#if ALL_DIALOGS_ARE_MODAL
+	hints = {
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecWidth <SST_PIXELS, 10>
+		},
+		ATTR_GEN_HELP_CONTEXT { char "dbDCBig", 0 },
+		HINT_PREVENT_DEFAULT_OVERRIDES,
+		ATTR_ALLOWS_EXPRESS_MENU_SHORTCUTS_THROUGH
+	}
+#else						
+	hints = {
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecWidth <SST_PIXELS, 10>
+		},
+		ATTR_GEN_HELP_CONTEXT { char "dbDCBig", 0 },
+		HINT_PREVENT_DEFAULT_OVERRIDES
+	}
+#endif					
+}
+
+FDMainGroup = GenInteraction {
+	children = FDNewEmptyGroup, FDOpenDefaultGroup, FDOpenGroup, 
+		   FDNewTemplateGroup, FDImportGroup;
+}
+
+FDNewEmptyGroup = GenInteraction {
+	children = FDNewEmptyTrigger, FDNewEmptyText;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+FDNewEmptyTrigger = GenTrigger {
+	genAttributes = default +signalInteractionComplete,
+				+initiatesInputHoldUp;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		DialogEmptyICEntry,
+#endif
+#if _NDO2000
+		DialogEmpty4bEntry,
+#endif
+#if INCLUDE_SM_MONIKERS
+		DialogEmptyIMEntry,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		DialogEmptyICGAEntry
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+}
+
+FDNewEmptyText = GenText {
+	genAttributes = default +readOnly;
+	text = "New:\\\rCreate a blank, empty document.";
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_60>
+			SpecHeight <>
+		},
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		}
+	}
+}
+
+FDNewTemplateGroup = GenInteraction {
+	children = FDNewTemplateTrigger, FDNewTemplateText;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+FDNewTemplateTrigger = GenTrigger {
+	genAttributes = default +signalInteractionComplete,
+				+initiatesInputHoldUp;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		DialogUseTemplateICEntry,
+#endif
+#if _NDO2000
+		DialogUseTemplate4bEntry,
+#endif
+#if INCLUDE_SM_MONIKERS
+		DialogUseTemplateIMEntry,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		DialogUseTemplateICGAEntry
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_USE_TEMPLATE_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+}
+
+FDNewTemplateText = GenText {
+	genAttributes = default +readOnly;
+	text = "Template:\\\rUse a pre-designed template to create a new"
+	       " document.";
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_60>
+			SpecHeight <>
+		},
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		}
+	}
+}
+
+FDOpenDefaultGroup = GenInteraction {
+	children = FDOpenDefaultTrigger, FDOpenDefaultText;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+FDOpenDefaultTrigger = GenTrigger {
+	genAttributes = default +signalInteractionComplete,
+				+initiatesInputHoldUp;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		DialogOpenDefaultICEntry,
+#endif
+#if _NDO2000
+		DialogOpenDefault4bEntry,
+#endif
+#if INCLUDE_SM_MONIKERS
+		DialogOpenDefaultIMEntry,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		DialogOpenDefaultICGAEntry
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_CONTROL_OPEN_DEFAULT_DOC,
+							"TO_OBJ_BLOCK_OUTPUT";
+}
+
+FDOpenDefaultText = GenText {
+	genAttributes = default +readOnly;
+	text = "Open Default:\\\rOpen the default document.";
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_60>
+			SpecHeight <>
+		},
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		}
+	}
+}
+
+FDImportGroup = GenInteraction {
+	children = FDImportTrigger, FDImportText;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+FDImportTrigger = GenTrigger {
+	genAttributes = default +signalInteractionComplete,
+				+initiatesInputHoldUp;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		DialogImportICEntry,
+#endif
+#if _NDO2000
+		DialogImport4bEntry,
+#endif
+#if INCLUDE_SM_MONIKERS
+		DialogImportIMEntry,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		DialogImportICGAEntry
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_IMPORT_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+}
+
+FDImportText = GenText {
+	genAttributes = default +readOnly;
+	text = "Import:\\\rImport data from a different application to"
+	       " create a new document.";
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_60>
+			SpecHeight <>
+		},
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		}
+	}
+}
+
+FDOpenGroup = GenInteraction {
+	children = FDOpenTrigger, FDOpenText;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+FDOpenTrigger = GenTrigger {
+	genAttributes = default +signalInteractionComplete,
+				+initiatesInputHoldUp;
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		DialogOpenICEntry,
+#endif
+#if _NDO2000
+		DialogOpen4bEntry,
+#endif
+#if INCLUDE_SM_MONIKERS
+		DialogOpenIMEntry,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		DialogOpenICGAEntry
+#endif
+	}
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_OPEN_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+}
+
+FDOpenText = GenText {
+	genAttributes = default +readOnly;
+	text = "Open:\\\rOpen an existing document.";
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_60>
+			SpecHeight <>
+		},
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		}
+	}
+}
+
+#if !NO_USER_LEVELS
+FDUserLevelGroup = GenInteraction {
+	children = FDUserLevelTrigger, FDUserLevelText;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+FDUserLevelTrigger = GenTrigger vardataReloc {
+	genAttributes = default +initiatesInputHoldUp;
+
+	moniker = list {
+#if INCLUDE_SC_MONIKERS
+		DialogUserLevelICEntry,
+#endif
+#if _NDO2000
+		DialogUserLevel4bEntry,
+#endif
+#if INCLUDE_SM_MONIKERS
+		DialogUserLevelIMEntry,
+#endif
+#if INCLUDE_CGA_MONIKERS
+		DialogUserLevelICGAEntry
+#endif
+	}
+
+	action = MSG_GEN_INTERACTION_INITIATE, null;
+}
+
+FDUserLevelText = GenText {
+	genAttributes = default +readOnly;
+	text = "Change Program Level:\\\rChoose how simple or complex you would "
+	       "like this application to be.";
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_60>
+			SpecHeight <>
+		},
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		}
+	}
+}
+#endif						/* end of if !NO_USER_LEVELS */
+
+
+FDCancelTrigger = GenTrigger vardataReloc {
+	moniker = 'E', "Exit";
+	kbdAccelerator = specificUI F3;
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_META_QUIT, "TO_GEN_PARENT";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS },
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenApplicationClass }
+	}
+}
+
+end DocumentDialogUI;
+
+#else		/* _NIKE & _JEDIMOTIF & _DUI version of the New/Open dialog */
+
+start DocumentDialogUI, notDetachable;
+
+#if _DUI		/* DUI version */
+
+FileDialogSummons = GenPrimary {
+	children = OpenFileSelector, FDMenuBar;
+        genStates = default -usable;
+        hints = {
+                HINT_PRIMARY_NO_FILE_MENU,
+                HINT_IF_SYSTEM_ATTRS {
+                        SystemAttrs mask SA_TINY
+                },
+                        HINT_NOT_MOVABLE,
+                        HINT_DISPLAY_NOT_RESIZABLE,
+			ATTR_GEN_DISPLAY_MAXIMIZED_STATE,
+#if 0
+	/*
+	 * With the ATTR_GEN_DISPLAY_MAXIMIZED_STATE hack, we don't need the 
+	 * following.
+	 * 2/6/97 - ptrinh
+	 */
+                        HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD {
+                        SpecWinSizePair < mask SWSS_RATIO or PCT_100, \
+                                                  mask SWSS_RATIO or PCT_100>
+                        },
+                        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT {
+                                SpecWinSizePair < mask SWSS_RATIO or PCT_0, \
+                                                  mask SWSS_RATIO or PCT_0>
+                        },
+#endif
+                HINT_ELSE,
+                HINT_ENDIF,
+        }
+}
+
+FDMenuBar = GenInteraction {
+	children =	FDMenuBarLeftGroup,
+			FDMemo;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+FDMenuBarLeftGroup = GenInteraction {
+	children =	FDOpenTrigger,
+			OpenNewTrigger,
+			UserFileListGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+FDOpenTrigger = GenTrigger {
+	genAttributes = default +initiatesInputHoldUp;
+	moniker = "Open";
+	genStates = default -enabled;
+	action = MSG_OLDC_OPEN_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+}
+
+UserFileListGroup = GenInteraction {
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+FDMemo = GenInteraction {
+	moniker = "Edit";
+	children = OpenDeleteTrigger,
+			OpenDuplicateTrigger,
+			OpenRenameTrigger,
+			OpenTemplateTrigger;
+	visibility = popup;
+	hints = {
+		HINT_AVOID_MENU_BAR
+	}
+}
+
+OpenDeleteTrigger = GenTrigger {
+	moniker = "Delete";
+	genStates = default -enabled;
+	action = MSG_OLDC_DELETE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { 	HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+OpenRenameTrigger = GenTrigger {
+	moniker = "Change Title";
+	genStates = default -enabled;
+	action = MSG_OLDC_RENAME, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { 	HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+OpenDuplicateTrigger = GenTrigger {
+	moniker = "Duplicate";
+	genStates = default -enabled;
+	action = MSG_OLDC_COPY, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { 	HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+OpenTemplateTrigger = GenTrigger {
+	moniker = "Template";
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_USE_TEMPLATE_DOC, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { 	HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+#else			/* JEDIMOTIF version	*/
+
+FileDialogSummons = GenPrimary {
+	children = 	FDOpenGroup,
+			OpenNewTrigger,
+			OpenSearchControl,
+			OpenDocNoteTrigger,
+			OpenNormalTrigger,
+			OpenRenameTrigger;
+        genStates = default -usable;
+        hints = {
+                HINT_PRIMARY_NO_FILE_MENU,
+                HINT_IF_SYSTEM_ATTRS {
+                        SystemAttrs mask SA_TINY
+                },
+                        HINT_NOT_MOVABLE,
+                        HINT_DISPLAY_NOT_RESIZABLE,
+                        HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD {
+                        SpecWinSizePair < mask SWSS_RATIO or PCT_100, \
+                                                  mask SWSS_RATIO or PCT_100>
+                        },
+                        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT {
+                                SpecWinSizePair < mask SWSS_RATIO or PCT_0, \
+                                                  mask SWSS_RATIO or PCT_0>
+                        },
+                HINT_ELSE,
+                HINT_ENDIF,
+        }
+}
+
+FDOpenGroup = GenInteraction {
+	children = OpenFSGroup;
+	hints = {
+		HINT_DO_NOT_USE_MONIKER
+	}
+}
+#endif		/* #if _NIKE */
+
+#if !_DUI
+OpenFileGlyph = GenGlyph {
+	moniker = "Select a document to open.";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+#endif
+
+#if !_DUI
+OpenFSGroup = GenInteraction {
+	children = OpenFileSelector;
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 12>
+			word	1
+		},
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_35>
+			word	1
+		}
+	}
+}
+#endif 	/* #if !_DUI */
+
+#if _DUI
+OpenFileSelector = GenFileSelector {
+#if _DUI
+	moniker = "Documents";
+#endif
+	action = MSG_OLDC_OPEN_FILE_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+	attributes = default +useVirtualRoot;
+	hints = {
+#if SINGLE_DRIVE_DOCUMENT_DIR
+		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT {
+			word 0
+			char DOCUMENT_DRIVE_CHAR, ":\\\\",0
+		},
+#else					
+		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT {
+			word SP_DOCUMENT
+			char 0
+		},
+#endif					
+		ATTR_GEN_FILE_SELECTOR_FILE_HEADER_FLAGS {
+			GeosFileHeaderFlags 0			/* match */
+			GeosFileHeaderFlags mask GFHF_TEMPLATE	/* mismatch */
+		},
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+#if _DUI
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+#else
+		HINT_FILE_SELECTOR_SINGLE_ACTION
+#endif
+	}
+}
+
+#else			/* JEDIMOTIF version	*/
+OpenFileSelector = JFileSelector {
+	action = MSG_OLDC_OPEN_FILE_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+	attributes = default +useVirtualRoot;
+	fileCriteria = default -dirs;
+	hints = {
+#if SINGLE_DRIVE_DOCUMENT_DIR
+		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT {
+			word 0
+			char DOCUMENT_DRIVE_CHAR, ":\\\\",0
+		},
+#else
+		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT {
+			word SP_DOCUMENT
+			char 0
+		},
+#endif					
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FILE_SELECTOR_SHOW_FILE_SIZE,
+		HINT_FILE_SELECTOR_SINGLE_ACTION
+	}
+}
+#endif		/* #if _NIKE */
+
+
+OpenInfoGroup = GenInteraction {
+	children = OpenFileTypeGlyph, OpenForEditingList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+OpenFileTypeGlyph = GenGlyph {
+	hints = {
+	    HINT_FIXED_SIZE {
+		SpecWidth <SST_AVG_CHAR_WIDTHS, 20>
+		SpecHeight <SST_LINES_OF_TEXT, 1>
+	    }
+	}
+}
+
+OpenForEditingList = GenBooleanGroup {
+	children = OpenForEditingEntry;
+	genStates = default -enabled;
+	hints = { HINT_CENTER_CHILDREN_HORIZONTALLY }
+}
+
+OpenForEditingEntry = GenBoolean ignoreDirty {
+	moniker = 'E', "For Editing";
+	identifier = "mask GDA_READ_WRITE";
+}
+
+OpenUserNotesTextDisplay = GenText {
+	moniker = "Notes:";
+	genStates = default -enabled;
+	genAttributes = default +readOnly;
+	text = "";
+	maxLength = GFH_USER_NOTES_LENGTH;
+	textDisplayAttributes = default +initScrolling, +dontScrollToChanges;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FIXED_SIZE {
+		    SpecWidth <>
+		    SpecHeight <SST_LINES_OF_TEXT, 3>
+		}
+	}
+}
+
+OpenFileTrigger = GenTrigger {
+	moniker = 'O', "Open";
+	genStates = default -enabled;
+	genAttributes = default +signalInteractionComplete,
+				+initiatesInputHoldUp;
+	action = MSG_OLDC_OPEN_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR }
+}
+
+OpenNewTrigger = GenTrigger {
+#if _DUI
+	moniker = "New";
+	genAttributes = default +initiatesInputIgnore;
+#else
+	moniker = 'N', "New";
+	genAttributes = default +signalInteractionComplete,
+				+initiatesInputHoldUp;
+#endif
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+#if !_DUI
+	hints = { HINT_SEEK_MENU_BAR }
+#endif
+}
+
+OpenImportTrigger = GenTrigger {
+	moniker = 'I', "Import";
+	genAttributes = default +signalInteractionComplete,
+				+initiatesInputHoldUp;
+	action = MSG_GEN_DOCUMENT_CONTROL_INITIATE_IMPORT_DOC,
+						"TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+#if !NO_USER_LEVELS
+OpenSimpleTrigger = GenTrigger {
+	moniker = 'S', "Simple";
+	action = MSG_OLDC_OPEN_SIMPLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+OpenAdvancedTrigger = GenTrigger {
+	moniker = 'A', "Advanced";
+	action = MSG_OLDC_OPEN_ADVANCED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+#endif
+
+CancelOpenTrigger = GenTrigger vardataReloc {
+	moniker = 'x', "Exit";
+	kbdAccelerator = specificUI F4;
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_META_QUIT, "TO_GEN_PARENT";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS },
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenApplicationClass }
+	}
+}
+
+#if !_DUI
+OpenHelpTrigger = GenTrigger {
+	action = MSG_META_BRING_UP_HELP, "TO_SELF";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_HELP_CONTEXT { char "dbDCOpen", 0 },
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_HELP }
+	}
+}
+
+FDTemplateGroup = GenInteraction {
+	moniker = 'T', "   Templates   ";   /* spaces included to look nice */
+	genStates = default -usable;
+	children = UseTemplateFileText, UseTemplateFSGroup,
+		   UseTemplateForEditingList, UseTemplateUserNotesTextDisplay,
+		   UseTemplateFileTrigger, CancelTemplateTrigger,
+		   UseTemplateHelpTrigger;
+	hints = {
+		HINT_DO_NOT_USE_MONIKER
+	}
+}
+
+UseTemplateFileText = GenText {
+	moniker = "";
+	genAttributes = default +readOnly;
+	text = "Select a template to use.\\\rA copy of the template will be"
+		"\\\ropened as an Untitled document.";
+/*	textDisplayAttributes = default -initScrolling; */
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE,
+		HINT_DO_NOT_USE_MONIKER,
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word	DEF_PARA_ATTR_CENTER
+		}
+
+	}
+}
+#endif
+
+/* Save As Menu */
+
+end DocumentDialogUI;
+
+#endif			/* end if #if !_NIKE && !_JEDIMOTIF  && !_DUI */
+
+/***/
+
+start DocumentNewUI, notDetachable;
+
+FileNewSummons = GenInteraction {
+	moniker = "Name Document";
+	genStates = default -usable;
+	children = FileNewGlyph, FileNewTextEdit, NewFileTrigger;
+	type = properties;
+	visibility = dialog;
+	attributes = default +modal, +initiatedViaUserDoDialog;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCNew", 0 }
+	}
+}
+
+FileNewGlyph = GenGlyph {
+	moniker = "Enter a name for the new document.";
+	hints = { HINT_CENTER_CHILDREN_HORIZONTALLY }
+}
+
+
+FileNewTextEdit = GenText vardataReloc{
+	moniker = "Document name:";
+	text = "";
+	maxLength = 31;				/* Modified */
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		HINT_DEFAULT_FOCUS,
+#if _DUI
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, FILE_LONGNAME_LENGTH>
+			SpecHeight <>
+		},
+#else
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 35>
+			SpecHeight <>
+		},
+#endif
+		ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+		  	I_OPTR	NewFileTrigger
+		},
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_PLACE_MONIKER_ABOVE,
+		HINT_ELSE,
+			HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_ENDIF
+	}
+}
+
+NewFileTrigger = GenTrigger {
+	moniker = 'N', "Create New Document";
+	genStates = default -enabled;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY }
+	}
+}
+
+end DocumentNewUI;
+
+/***/
+
+#if !_DUI
+
+start DocumentOpenUI, notDetachable;
+
+FileOpenSummons = GenInteraction {
+	moniker = "Open";
+#if SINGLE_DRIVE_DOCUMENT_DIR
+	children = OpenFileGlyph, OpenFSGroup, OpenInfoGroup,
+		   OpenUserNotesTextDisplay,
+		   OpenFileTrigger, 
+		   CancelOpenTrigger;
+#elif NO_USER_LEVELS
+	children = OpenFileGlyph, OpenFSGroup, OpenInfoGroup,
+		   OpenUserNotesTextDisplay,
+		   OpenFileTrigger, 
+		   CancelOpenTrigger;
+#else
+	children = OpenFileGlyph, OpenFSGroup, OpenInfoGroup,
+		   OpenUserNotesTextDisplay,
+		   OpenFileTrigger, OpenSimpleTrigger, OpenAdvancedTrigger,
+		   CancelOpenTrigger;
+#endif		/* end of if SINGLE_DRIVE_DOCUMENT_DIR */
+
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCOpen", 0 }
+	}
+}
+
+OpenFileGlyph = GenGlyph {
+	moniker = "Select document to open.";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+OpenFSGroup = GenInteraction {
+	children = OpenFileSelector;
+	hints = {
+
+#if _MOTIF
+		/* Can't use this in PM for now because screen dumps are done */
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 12>
+			word	1
+		},
+#endif						/* end of if _MOTIF */
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_45>
+			word	1
+		}
+	}
+}
+
+OpenFileSelector = GenFileSelector {
+	action = MSG_OLDC_OPEN_FILE_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+#if SINGLE_DRIVE_DOCUMENT_DIR
+	    ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT {
+		word 0
+#ifdef DO_DBCS
+		wchar DOCUMENT_DRIVE_CHAR, ":\\\\",0
+#else
+		char DOCUMENT_DRIVE_CHAR, ":\\\\",0
+#endif
+	    },
+#else
+	    HINT_FILE_SELECTOR_SINGLE_ACTION,
+#endif					
+	    HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+	    HINT_DEFAULT_FOCUS,
+	    HINT_FILE_SELECTOR_SINGLE_ACTION
+	}
+}
+
+OpenInfoGroup = GenInteraction {
+	children = OpenFileTypeGlyph, OpenForEditingList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+OpenFileTypeGlyph = GenGlyph {
+	hints = {
+	    HINT_FIXED_SIZE {
+		SpecWidth <SST_AVG_CHAR_WIDTHS, 20>
+		SpecHeight <SST_LINES_OF_TEXT, 1>
+	    }
+	}
+}
+
+OpenForEditingList = GenBooleanGroup {
+	children = OpenForEditingEntry;
+	genStates = default -enabled;
+	hints = { HINT_CENTER_CHILDREN_HORIZONTALLY }
+}
+
+OpenForEditingEntry = GenBoolean ignoreDirty {
+	moniker = 'E', "For Editing";
+	identifier = "mask GDA_READ_WRITE";
+}
+
+OpenUserNotesTextDisplay = GenText {
+	moniker = "Notes:";
+	genAttributes = default +readOnly;
+	text = "";
+	maxLength = GFH_USER_NOTES_LENGTH;
+	textDisplayAttributes = default +initScrolling, +dontScrollToChanges;
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_INITIAL_SIZE {	
+		SpecWidth <>
+		SpecHeight <SST_LINES_OF_TEXT, 2>
+	    },
+	    HINT_FIXED_SIZE {
+		SpecWidth <>
+		SpecHeight <SST_PCT_OF_FIELD_HEIGHT, (PCT_10+3*PCT_5/5)>
+	    }
+	}
+}
+
+OpenFileTrigger = GenTrigger {
+	moniker = 'O', "Open";
+	action = MSG_OLDC_OPEN_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR }
+}
+
+#if !NO_USER_LEVELS
+OpenSimpleTrigger = GenTrigger {
+	moniker = 'S', "Simple";
+	action = MSG_OLDC_OPEN_SIMPLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+OpenAdvancedTrigger = GenTrigger {
+	moniker = 'A', "Advanced";
+	action = MSG_OLDC_OPEN_ADVANCED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+#endif
+
+CancelOpenTrigger = GenTrigger vardataReloc {
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_OLDC_REMOVE_OLD_AND_TEST_FOR_DISPLAY_MAIN_DIALOG,
+							"TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS },
+			/* needed for viewer mode */
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GenApplicationClass }
+	}
+}
+
+#if _MOTIF || _ISUI
+visMoniker CancelOpenExitMoniker = 'E', "Exit";
+#endif
+
+end DocumentOpenUI;
+
+#endif				/* #if !_NIKE && !_JEDIMOTIF  && !_DUI */
+
+/***/
+
+
+start DocumentUseTemplateUI, notDetachable;
+
+
+FileUseTemplateSummons = GenInteraction {
+	moniker = "Template";
+	children = UseTemplateFileGlyph, UseTemplateFileSelector,
+		   UseTemplateForEditingList, UseTemplateUserNotesTextDisplay,
+		   UseTemplateFileTrigger, CancelTemplateTrigger;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCTemp", 0 }
+	}
+}
+
+
+UseTemplateFileGlyph = GenGlyph {
+	moniker = "Select a template to use.";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+UseTemplateFileSelector = GenFileSelector {
+	action = MSG_OLDC_USE_TEMPLATE_FILE_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+	attributes = default +useVirtualRoot;
+	hints = {
+#if _DUI
+		HINT_FILE_SELECTOR_MINIMIZE_WIDTH	/* no date, etc. */
+#else
+		HINT_FILE_SELECTOR_SINGLE_ACTION
+#endif
+	}		
+}
+
+
+UseTemplateForEditingList = GenBooleanGroup {
+	children = UseTemplateForEditingEntry;
+#if _DUI
+	genStates = default -usable;
+#else
+	genStates = default -enabled;
+#endif
+	hints = { HINT_CENTER_CHILDREN_HORIZONTALLY }
+}
+
+UseTemplateForEditingEntry = GenBoolean ignoreDirty {
+	moniker = 'E', "For Editing";
+	identifier = "mask GDA_READ_WRITE";
+}
+
+UseTemplateUserNotesTextDisplay = GenText {
+	moniker = "Notes:";
+	genAttributes = default +readOnly;
+	text = "";
+	maxLength = GFH_USER_NOTES_LENGTH;
+	textDisplayAttributes = default +initScrolling;
+	hints = {
+	    HINT_FIXED_SIZE {
+		SpecWidth <SST_AVG_CHAR_WIDTHS, 30>
+		SpecHeight <SST_LINES_OF_TEXT, 4>
+	    }
+	}
+}
+
+UseTemplateFileTrigger = GenTrigger {
+	moniker = 'U', "Use Template";
+	action = MSG_OLDC_USE_TEMPLATE_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR }
+}
+
+CancelTemplateTrigger = GenTrigger {
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_OLDC_REMOVE_OLD_AND_TEST_FOR_DISPLAY_MAIN_DIALOG,
+							"TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS }
+	}
+}
+end DocumentUseTemplateUI;
+
+
+/***/
+
+start DocumentSaveAsUI, notDetachable;
+
+FileSaveAsSummons = GenInteraction {
+	moniker = "Save As a New Document";
+
+#if NO_USER_LEVELS
+	children = SaveAsFileGlyph, SaveAsTemplateFileGlyph,
+		   SaveAsFileSelector, SaveAsDirText,
+		   SaveAsTextEdit, SaveAsFileTrigger,
+		   SaveAsCancelTrigger;
+#else
+	children = SaveAsFileGlyph, SaveAsTemplateFileGlyph,
+		   SaveAsFileSelector, SaveAsDirText,
+		   SaveAsTextEdit, SaveAsFileTrigger, SaveAsSimpleTrigger, 
+		   SaveAsAdvancedTrigger,
+		   SaveAsCancelTrigger;
+#endif
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCSaveAs", 0 }
+	}
+}
+
+SaveAsFileGlyph = GenGlyph {
+	moniker = "Save document with a new name.";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+SaveAsTemplateFileGlyph = GenGlyph {
+	genStates = default -usable;
+	moniker = "Save document as a template.";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+SaveAsFileSelector = GenFileSelector {
+/*#ifndef PRODUCT_WIN_DEMO  */
+	action = MSG_OLDC_SAVE_AS_DIR_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+/*#endif */
+	attributes = default +showFilesDisabled;
+
+#if SINGLE_DRIVE_DOCUMENT_DIR
+	hints = { ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT {
+		word 0
+		char DOCUMENT_DRIVE_CHAR, ":\\\\",0
+	} }
+#else						
+	hints = {
+		HINT_FILE_SELECTOR_SINGLE_ACTION
+	}
+#endif					
+}
+
+SaveAsDirText = GenText {
+	genAttributes = default +readOnly;
+	text = "";
+	textDisplayAttributes = default +singleLineText;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+SaveAsTextEdit = GenText vardataReloc {
+	moniker = "New Name:";
+	text = "";
+	maxLength = 31;				/* Modified */
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		  ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+		  	I_OPTR	SaveAsFileTrigger
+		  },
+		  HINT_DEFAULT_FOCUS,
+#if _DUI
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, FILE_LONGNAME_LENGTH>
+			SpecHeight <>
+		}
+#else
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, FILE_LONGNAME_LENGTH+2>
+			SpecHeight <>
+		  }
+#endif
+	}
+}
+
+SaveAsFileTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'a', "Save";
+/*#ifndef PRODUCT_WIN_DEMO  */
+	action = MSG_OLDC_SAVE_AS_FILE_ENTERED, "TO_OBJ_BLOCK_OUTPUT";
+/*#endif */
+	hints = { HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR }
+}
+
+
+#if !NO_USER_LEVELS
+SaveAsSimpleTrigger = GenTrigger {
+	moniker = 'S', "Simple";
+	action = MSG_OLDC_SAVE_AS_SIMPLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+SaveAsAdvancedTrigger = GenTrigger {
+	moniker = 'A', "Advanced";
+	action = MSG_OLDC_SAVE_AS_ADVANCED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+#endif
+
+
+SaveAsCancelTrigger = GenTrigger {
+	action = MSG_GEN_DOCUMENT_CONTROL_SAVE_AS_CANCELLED,
+						"TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS}
+	}
+}
+
+#if DISPLAY_SAVING_MESSAGE
+
+SaveDialog = GenInteraction {
+	genStates = default -usable;
+	children = SavingGroup;
+	attributes = default +notUserInitiatable;
+	type = organizational;
+	visibility = dialog;
+	hints = {
+		HINT_WINDOW_NO_TITLE_BAR,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+	}
+}
+
+SavingGroup = GenInteraction {
+	children = SavingGlyph, MomentGlyph;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 23>
+			SpecHeight <SST_LINES_OF_TEXT, 3>
+			word 	1
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CUSTOM_CHILD_SPACING {	
+			SpecSizeSpec <SST_PIXELS, 10>
+		}
+	}
+}
+
+SavingGlyph = GenGlyph {
+	moniker = "Saving document.";
+}
+
+MomentGlyph = GenGlyph {
+	moniker = "One moment please...";
+}
+
+#endif						
+
+end DocumentSaveAsUI;
+
+/***/
+
+
+start DocumentCopyToUI, notDetachable;
+
+FileCopyToSummons = GenInteraction {
+	moniker = "Copy To";
+	children = CopyToFileGlyph, CopyToFileSelector, CopyToDirText,
+		   CopyToTextEdit, CopyToFileTrigger,
+		   CopyToSimpleTrigger, CopyToAdvancedTrigger,
+		   CopyToCancelTrigger;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCCopy", 0 }
+	}
+}
+
+CopyToFileGlyph = GenGlyph {
+	moniker = "Create a copy of this document.";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+
+CopyToFileSelector = GenFileSelector {
+	action = MSG_OLDC_COPY_TO_DIR_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+	attributes = default +showFilesDisabled;
+	hints = {
+		HINT_FILE_SELECTOR_SINGLE_ACTION
+	}
+}
+
+CopyToDirText = GenText {
+	genAttributes = default +readOnly;
+	text = "";
+	textDisplayAttributes = default +singleLineText;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+CopyToTextEdit = GenText vardataReloc {
+	moniker = 'N', "New Name:";
+	text = CopyToText;
+	maxLength = 31;				/* Modified */
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		  ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+		  	I_OPTR CopyToFileTrigger
+		  },
+		  HINT_DEFAULT_FOCUS,
+#if _DUI
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, FILE_LONGNAME_LENGTH>
+			SpecHeight <>
+		}
+#else
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 35>
+			SpecHeight <>
+		  }
+#endif
+	}
+}
+
+chunk CopyToText = "";
+
+CopyToFileTrigger = GenTrigger {
+	genStates = default -enabled;	  
+	moniker = 'C', "Copy To";
+	action = MSG_OLDC_COPY_TO_FILE_ENTERED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR }
+}
+
+CopyToSimpleTrigger = GenTrigger {
+	moniker = 'S', "Simple";
+	action = MSG_OLDC_COPY_TO_SIMPLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+CopyToAdvancedTrigger = GenTrigger {
+	moniker = 'A', "Advanced";
+	action = MSG_OLDC_COPY_TO_ADVANCED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+CopyToCancelTrigger = GenTrigger {
+	action = MSG_OLDC_REMOVE_OLD_AND_TEST_FOR_DISPLAY_MAIN_DIALOG,
+						"TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS}
+	}
+}
+
+end DocumentCopyToUI;
+
+
+/***/
+
+#if !_DUI
+
+start DocumentMoveToUI, notDetachable;
+
+FileMoveToSummons = GenInteraction {
+	moniker = "Move To";
+	children = MoveToFileGlyph, MoveToFileSelector, MoveToDirText,
+		   MoveToTextEdit, MoveToFileTrigger,
+		   MoveToSimpleTrigger, MoveToAdvancedTrigger,
+		   MoveToCancelTrigger;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCMove", 0 }
+	}
+}
+
+MoveToFileGlyph = GenGlyph {
+	moniker = "Move document.";
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+MoveToFileSelector = GenFileSelector {
+	action = MSG_OLDC_MOVE_TO_DIR_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+	attributes = default +showFilesDisabled;
+	hints = {
+		HINT_FILE_SELECTOR_SINGLE_ACTION
+	}
+}
+
+MoveToDirText = GenText {
+	genAttributes = default +readOnly;
+	text = "";
+	textDisplayAttributes = default +singleLineText;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+MoveToTextEdit = GenText vardataReloc {
+	moniker = 'N', "New Name:";
+	text = MoveToText;
+	maxLength = 31;				/* Modified */
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		  ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+		  	I_OPTR MoveToFileTrigger
+		  },
+		  HINT_DEFAULT_FOCUS,
+#if _DUI
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, FILE_LONGNAME_LENGTH>
+			SpecHeight <>
+		}
+#else
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 35>
+			SpecHeight <>
+		  }
+#endif
+	}
+}
+
+chunk MoveToText = "";
+
+MoveToFileTrigger = GenTrigger {
+	genStates = default -enabled;	  
+	moniker = 'M', "Move To";
+	action = MSG_OLDC_MOVE_TO_FILE_ENTERED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR }
+}
+
+MoveToSimpleTrigger = GenTrigger {
+	moniker = 'S', "Simple";
+	action = MSG_OLDC_MOVE_TO_SIMPLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+MoveToAdvancedTrigger = GenTrigger {
+	moniker = 'A', "Advanced";
+	action = MSG_OLDC_MOVE_TO_ADVANCED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+MoveToCancelTrigger = GenTrigger {
+	action = MSG_OLDC_REMOVE_OLD_AND_TEST_FOR_DISPLAY_MAIN_DIALOG,
+						"TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS}
+	}
+}
+
+end DocumentMoveToUI;
+#endif				/* end of if !_NIKE && !_JEDIMOTIF && !_DUI*/
+
+/***/
+
+start DocumentUserNotesUI, notDetachable;
+
+EditUserNotesSummons = GenInteraction {
+	moniker = "Edit Document Notes";
+	genStates = default -usable;
+	children = EditUserNotesFileGlyph, EditUserNotesTextEdit, 
+		   EditUserNotesOK;
+	type = properties;
+	visibility = dialog;
+	attributes = default +modal, +initiatedViaUserDoDialog;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCNote", 0 }
+	}
+}
+
+EditUserNotesFileGlyph = GenGlyph {
+	moniker = "Edit the notes for this document.";
+	hints = { HINT_CENTER_CHILDREN_HORIZONTALLY }
+}
+
+
+EditUserNotesTextEdit = GenText {
+	text = "";
+	maxLength = GFH_USER_NOTES_LENGTH;
+	textDisplayAttributes = default +initScrolling;
+	hints = {
+		  HINT_FIXED_SIZE {
+		    SpecWidth <SST_AVG_CHAR_WIDTHS, 50>
+		    SpecHeight <SST_LINES_OF_TEXT, 5>
+		  },
+		  HINT_DEFAULT_FOCUS
+	}
+}
+
+EditUserNotesOK = GenTrigger {
+	moniker = "Set Document Notes";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY }
+	}
+}
+
+end DocumentUserNotesUI;
+
+#if !_DUI
+start DocumentTypeUI, notDetachable;
+
+TypeSummons = GenInteraction {
+	moniker = "Set Document Type";
+	children = TypeList, TypeDescription, TypeOK, TypeCancel;
+	type = properties;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCType", 0 }
+	}
+}
+
+
+TypeList = GenItemGroup {
+	moniker = "Document Type";
+	children = NormalItem, ReadOnlyItem, TemplateItem, ReadOnlyTemplateItem,
+		   PublicItem, MultiUserItem;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_OLDC_TYPE_USER_CHANGE
+		}
+	}
+}
+
+NormalItem = GenItem {
+	moniker = "Normal";
+	identifier = "GDT_NORMAL";
+}
+
+ReadOnlyItem = GenItem {
+	moniker = "Read-Only";
+	identifier = "GDT_READ_ONLY";
+}
+
+TemplateItem = GenItem {
+	moniker = "Template";
+	identifier = "GDT_TEMPLATE";
+}
+
+ReadOnlyTemplateItem = GenItem {
+	moniker = "Read-Only Template";
+	identifier = "GDT_READ_ONLY_TEMPLATE";
+}
+
+PublicItem = GenItem {
+	moniker = "Public";
+	identifier = "GDT_PUBLIC";
+}
+
+MultiUserItem = GenItem {
+	moniker = "Multi-User";
+	identifier = "GDT_MULTI_USER";
+}
+
+TypeDescription = GenText {
+	genAttributes = default +readOnly;
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 5>
+		  }
+	}
+}
+
+chunk TypeNormalText =
+	"A normal document.";
+
+chunk TypeReadOnlyText =
+	"A read-only document cannot be edited.";
+
+chunk TextTemplateText =
+	"A template document is used as a starting point for creating"
+	" new documents.";
+
+chunk TextReadOnlyTemplateText =
+	"A read-only template document is a template that cannot be"
+	" edited.";
+
+chunk TypePublicText =
+	"A public document is opened read-only by default.  Public"
+	" documents are intended for sharing work over a network.";
+
+chunk TypeMultiUserText =
+	"A multi-user document can be opened and modified by many people"
+	" at the same time.";
+
+
+TypeOK = GenTrigger {
+	moniker = 'C', "Change Type";
+	action = MSG_OLDC_TYPE_CHANGED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY }
+	}
+}
+
+TypeCancel = GenTrigger {
+	CANCEL_TRIGGER_VALUES
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_OLDC_REMOVE_OLD_AND_TEST_FOR_DISPLAY_MAIN_DIALOG,
+							"TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS }
+	}
+}
+
+
+end DocumentTypeUI;
+#endif				/* end of if !_NIKE && !_JEDIMOTIF && !_DUI */
+
+/***/
+
+start DocumentPasswordUI, notDetachable;
+
+PasswordSummons = GenInteraction {
+	moniker = "Set Document Password";
+	children = PasswordFileGlyph, PasswordText, PasswordOK, PasswordCancel;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCSetPass", 0 }
+	}
+}
+
+PasswordFileGlyph = GenGlyph {
+	moniker = "Enter a password for this document.";
+	hints = { HINT_CENTER_CHILDREN_HORIZONTALLY }
+}
+
+PasswordText = GenText {
+	moniker = "Password:";
+	text = "";
+	maxLength = MAX_PASSWORD_SOURCE_LENGTH;
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+#if 0
+		ATTR_GEN_TEXT_CHAR_ATTR {
+			word PasswordTextCharAttr
+		},
+#endif
+		HINT_DEFAULT_FOCUS,
+		HINT_FIXED_SIZE {
+		    SpecWidth <SST_AVG_CHAR_WIDTHS,MAX_PASSWORD_SOURCE_LENGTH+4>
+		    SpecHeight <>
+		},
+#ifdef DO_PIZZA
+		ATTR_GEN_TEXT_NO_FEP,
+#endif
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_PLACE_MONIKER_ABOVE,
+		HINT_ELSE,
+			HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_ENDIF
+	}
+}
+
+#if 0
+chunk PasswordTextCharAttr = data {
+	CHAR_ATTR_FONT_SIZE_STYLE_COLOR(2, FID_BISON, 13, 0, C_BLACK)
+}
+#endif
+
+PasswordOK = GenTrigger {
+	moniker = 'C', "Change Password";
+	action = MSG_OLDC_PASSWORD_CHANGED, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_OK }
+	}
+}
+
+PasswordCancel = GenTrigger {
+	/* moniker filled in by Specific UI */
+	action = MSG_OLDC_PASSWORD_CANCELLED, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS}
+	}
+}
+
+end DocumentPasswordUI;
+
+/***/
+
+start DocumentGetPasswordUI, notDetachable;
+
+GetPasswordDialog = GenInteraction {
+	moniker = "Password";
+	genStates = default -usable;
+	children = GetPasswordGlyph, GetPasswordText, GetPasswordOK;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal, +initiatedViaUserDoDialog;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCGetPass", 0 }
+	}
+}
+
+GetPasswordGlyph = GenGlyph {
+	moniker = "Enter the password for this document.";
+	hints = { HINT_CENTER_CHILDREN_HORIZONTALLY }
+}
+
+
+GetPasswordText = GenText {
+	moniker = "Password:";
+	text = "";
+	maxLength = MAX_PASSWORD_SOURCE_LENGTH;
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		HINT_FIXED_SIZE {
+		    SpecWidth <SST_AVG_CHAR_WIDTHS,MAX_PASSWORD_SOURCE_LENGTH+4>
+		    SpecHeight <>
+		},
+#ifdef DO_PIZZA
+		ATTR_GEN_TEXT_NO_FEP,
+#endif
+		ATTR_GEN_TEXT_CHAR_ATTR {
+			word GetPasswordTextCharAttr
+		}
+	}
+}
+
+chunk GetPasswordTextCharAttr = data {
+	CHAR_ATTR_FONT_SIZE_STYLE_COLOR(2, FID_BISON, 13, 0, C_BLACK)
+}
+
+GetPasswordOK = GenTrigger {
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_OK }
+	}
+}
+
+end DocumentGetPasswordUI;
+
+/***/
+
+
+start DocumentRenameUI, notDetachable;
+
+RenameDialog = GenInteraction {
+	moniker = "Rename";
+	children = RenameGlyph, RenameText, RenameOK;
+	genStates = default -usable;
+	type = properties;
+	visibility = dialog;
+	attributes = default +modal, +initiatedViaUserDoDialog;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbDCRen", 0 }
+	}
+}
+
+RenameGlyph = GenGlyph {
+	moniker = "Enter a new name for this document.";
+}
+
+RenameText = GenText vardataReloc {
+	moniker = "New Name:";
+	text = "";
+	maxLength = 31;			/*Modified */
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		  HINT_DEFAULT_FOCUS,
+		  ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+		  	I_OPTR	RenameOK
+		  },
+#if _DUI
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, FILE_LONGNAME_LENGTH>
+			SpecHeight <>
+		}
+#else
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 35>
+			SpecHeight <>
+		  }
+#endif
+	}
+}
+
+RenameOK = GenTrigger {
+	moniker = 'R', "Rename";
+	genStates = default -enabled;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY }
+	}
+}
+
+end DocumentRenameUI;
+
+#if _DUI
+start DocumentCopyUI, notDetachable;
+
+CopyDialog = GenInteraction {
+	moniker = "Duplicate Document";
+	children = CopyText, CopyOK;
+	genStates = default -usable;
+	type = properties;
+	visibility = dialog;
+	attributes = default +modal, +initiatedViaUserDoDialog;
+}
+
+CopyText = GenText vardataReloc {
+	moniker = "New Name:";
+	text = "";
+	maxLength = 31;			/*Modified */
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		  HINT_DEFAULT_FOCUS,
+		  ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+		  	I_OPTR	CopyOK
+		  },
+#if _DUI
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, FILE_LONGNAME_LENGTH>
+			SpecHeight <>
+		}
+#else
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 31>
+			SpecHeight <>
+		  }
+#endif
+	}
+}
+
+CopyOK = GenTrigger {
+	moniker = 'O', "OK";
+	genStates = default -enabled;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY }
+	}
+}
+
+end DocumentCopyUI;
+
+
+start DocumentDeleteUI;
+
+DeleteDialog = GenInteraction {
+	moniker = "Confirm Delete";
+	children = DeleteGlyph, DeleteOK, DeleteCancel;
+	genStates = default -usable;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal, +initiatedViaUserDoDialog;
+}
+
+DeleteGlyph = GenText {
+	moniker = "";
+	text = "Deleted items are lost forever. Delete the selected item?";
+	genAttributes = default +readOnly;
+}
+
+DeleteOK = GenTrigger {
+	moniker = 'D', "Delete";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY }
+	}
+}
+
+DeleteCancel = GenTrigger {
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS }
+	}
+}
+
+DeleteRomDialog = GenInteraction {
+	moniker = "Can't Delete";
+	children = DeleteRomText;
+	genStates = default -usable;
+	attributes = default +modal, +initiatedViaUserDoDialog;
+	visibility = dialog;
+	type = notification;
+}
+
+DeleteRomText = GenText {
+	text = "This item is stored in read-only memory (ROM) and cannot be cut or deleted.";
+	genAttributes = default +readOnly;
+	
+}
+
+end DocumentDeleteUI;
+
+#endif	/* if _JEDIMOTIF || _DUI */
+
+/***/
+
+
+#if !_DUI
+start DocumentQuickBackupUI, notDetachable;
+
+QuickBackupDialog = GenInteraction {
+	genStates = default -usable;
+	children = QuickBackupGlyph;
+	type = multipleResponse;
+	visibility = dialog;
+	attributes = default +modal, +notUserInitiatable;
+}
+
+QuickBackupGlyph = GenGlyph {
+	moniker = "Making a backup copy...";
+}
+
+end DocumentQuickBackupUI;
+#endif		/* end of if !_NIKE && !_JEDIMOTIF && !_DUI */
+
+/***/
+
+#if !NO_DOCUMENT_UPGRADE_PROGRESS_DIALOG
+start DocumentProtoProgressUI, notDetachable;
+
+ProtoProgressDialog = GenInteraction {
+	genStates = default -usable;
+	children = ProtoProgressGlyph;
+	type = multipleResponse;
+	visibility = dialog;
+	attributes = default +modal, +notUserInitiatable;
+}
+
+ProtoProgressGlyph = GenGlyph {
+	moniker = "Updating old document...";
+}
+
+end DocumentProtoProgressUI;
+#endif		/* end of if !NO_DOCUMENT_UPGRADE_PROGRESS_DIALOG */
+
+
+start DocumentConfirmSaveUI, notDetachable;
+
+ConfirmSaveDialog = GenInteraction {
+	genStates = default -usable;
+	children = ConfirmSaveGlyph, ConfirmSaveFile, ConfirmSaveQuestion;
+	type = affirmation;
+	visibility = dialog;
+	attributes = default +modal, +initiatedViaUserDoDialog;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+ConfirmSaveGlyph = GenGlyph {
+	moniker = "Save changes to ";
+}
+
+ConfirmSaveFile = GenGlyph {
+	moniker = "file";
+}
+
+ConfirmSaveQuestion = GenGlyph {
+	moniker = "?";
+}
+
+end DocumentConfirmSaveUI;
+
+
+/*
+ * response trigger monikers for standard dialogs with GIT_MULTIPLE_RESPONSE
+ */
+start DocumentStringsUI, data;
+
+/*
+ * strings for standard dialog
+ */
+
+/* Common strings */
+
+#if KEYBOARD_ONLY_UI
+visMoniker SDRT_ok = 'O',"OK";
+visMoniker SDRT_cancel = "VMO_CANCEL", "Cancel";
+visMoniker SDRT_yes = 'Y',"Yes";
+visMoniker SDRT_no = 'N',"No";
+#else						
+visMoniker SDRT_ok = "OK";
+visMoniker SDRT_cancel = "VMO_CANCEL", "Cancel";
+#endif					
+
+/* SDBT_FILE_NEW_CANNOT_CREATE_TEMP_NAME -----------------------------------*/
+chunk SDS_fileCannotCreateTemp =
+	"You cannot have more than 99 untitled documents. Close or remove some of these documents before continuing.\\\r\\\r Error Code: DC-01";
+
+
+#if LIMITED_UNTITLED_DOC_DISK_SPACE /*--------------------------------------*/
+chunk SDS_fileNewInsufficientDiskSpace =
+	"There is not enough memory available to \\2 \\\"\\1\\\"."
+	" Try again after rebooting your system.\\\r\\\r Error Code: DC-02b";
+#endif	/* LIMITED_UNTITLED_DOC_DISK_SPACE ---------------------------------*/
+
+
+/* SDBT_FILE_NEW_INSUFFICIENT_DISK_SPACE,
+   SDBT_FILE_OPEN_INSUFFICIENT_DISK_SPACE,
+   SDBT_FILE_SAVE_INSUFFICIENT_DISK_SPACE,
+   SDBT_FILE_MOVE_INSUFFICIENT_DISK_SPACE */
+chunk SDS_fileInsufficientDiskSpace =
+	"There is not enough free space on the disk to \\2 \\\"\\1\\\"."
+	" Remove some files from the disk to free up space.\\\r\\\r Error Code: DC-02";
+
+/* SDBT_FILE_NEW_TOO_MANY_OPEN_FILES */
+
+#if NO_NETWORK
+chunk SDS_fileTooManyOpenFiles = 
+	"There are too many open files to \\2 \\\"\\1\\\","
+	" due to some unspecified problem.  Try rebooting your system.";
+#else
+chunk SDS_fileTooManyOpenFiles =
+	"There are too many open files to \\2 \\\"\\1\\\"."
+	" DOS, SHARE.EXE, or a network may be limiting the number of files"
+	" that can be open at once. Consult the appropriate manual"
+	" for assistance.\\\r\\\r Error Code: DC-03";
+#endif
+
+/* SDBT_FILE_NEW_ERROR, SDBT_FILE_OPEN_ERROR, SDBT_FILE_REVERT_ERROR */
+chunk SDS_fileError =
+	"Could not \\2 \\\"\\1\\\". You may wish to try again."
+	" If the problem continues, the disk may contain errors"
+	" or be unreadable.\\\r\\\r Error Code: DC-04";
+
+/* SDBT_FILE_NEW_WRITE_PROTECTED,
+   SDBT_FILE_SAVE_WRITE_PROTECTED,
+   SDBT_FILE_MOVE_WRITE_PROTECTED, */
+chunk SDS_fileWriteProtected =
+	"The disk is write protected. Remove the write protection"
+	" and click OK to try to \\2 \\\"\\1\\\" again, or click Cancel.\\\r\\\r Error Code: DC-05";
+
+/* SDBT_FILE_OPEN_SHARING_DENIED, SDBT_FILE_SAVE_AS_SHARING_DENIED */
+
+#if NO_NETWORK
+chunk SDS_fileSharingDenied =
+	"Could not \\2 \\\"\\1\\\". You may wish to try again,"
+	" or try a different disk."
+	"\\\r\\\r Error Code: DC-06";
+#else
+chunk SDS_fileSharingDenied =
+	"Could not \\2 \\\"\\1\\\". The document is already open."
+	" You may have it open in an application or, if you are"
+	" on a network, someone else may be using it."
+	"\\\r\\\r Error Code: DC-06";
+#endif
+
+/* SDBT_FILE_OPEN_FILE_NOT_FOUND */
+
+#if NO_NETWORK
+chunk SDS_fileFileNotFound =
+	"Could not find \\\"\\1\\\".   The file may already be open in"
+	" another application.";
+#else
+chunk SDS_fileFileNotFound =
+	"Could not find \\\"\\1\\\". If you are attached to a network,"
+	" the file may already be open in an application or by"
+	" another user.";
+#endif
+
+chunk SDS_fileFileNotFoundPDA =
+	"Could not find \\\"\\1\\\". It may have been deleted.";
+
+/* SDBT_FILE_OPEN_INVALID_VM_FILE */
+chunk SDS_fileInvalidVMFile =
+	"Could not \\2 \\\"\\1\\\". The document is damaged. You will need"
+	" to restore it from a backup copy to continue.\\\r\\\r Error Code: DC-08";
+
+#if !NO_NETWORK
+/* SDBT_FILE_OPEN_READ_ONLY_PUBLIC_IN_TRANSPARENT_MODE */
+chunk SDS_fileOpenReadOnlyPublicInTransparentMode =
+	"\\\"\\1\\\" is a read-only or public document. You will not be"
+	" able to save any changes that you make to this document.";
+#else
+/* SDBT_FILE_OPEN_READ_ONLY_PUBLIC_IN_TRANSPARENT_MODE */
+chunk SDS_fileOpenReadOnlyPublicInTransparentMode =
+	"\\\"\\1\\\" is a read-only document. You will not be"
+	" able to save any changes that you make to this document.";
+#endif
+
+/* SDBT_FILE_OPEN_VM_DIRTY */
+chunk SDS_fileOpenVMDirty =
+	"\\\"\\1\\\" contains modifications that have not been permanently"
+	" saved. Save or close the document to make the changes permanent.";
+
+/* SDBT_FILE_OPEN_APP_MORE_RECENT_THAN_DOC */
+chunk SDS_fileOpenAppMoreRecent =
+	"The document \\\"\\1\\\" cannot be opened because it was created"
+	" with an older version of this application.\\\r\\\r Error Code: DC-09";
+
+/* SDBT_FILE_OPEN_DOC_MORE_RECENT_THAN_APP */
+chunk SDS_fileOpenDocMoreRecent =
+	"The document \\\"\\1\\\" cannot be opened because it was created"
+	" with a more recent version of this application.\\\r\\\r Error Code: DC-10";
+
+/* SDBT_FILE_OPEN_FILE_TYPE_MISMATCH */
+chunk SDS_fileOpenFileTypeMismatch =
+	"The document \\\"\\1\\\" is not a type that can be opened by"
+	" this application.\\\r\\\r Error Code: DC-11";
+
+#if NO_NETWORK
+/* SDBT_FILE_SAVE_ERROR */
+chunk SDS_fileSaveError =
+	"Could not save document \\\"\\1\\\" - DOS reports"
+	" error #\\2.  You may wish to try again or try a different"
+	" disk.\\\r\\\r Error Code: DC-12";
+
+chunk SDS_fileSaveErrorPDA =
+	"Could not save document \\\"\\1\\\" - DOS reports"
+	" error #\\2.  You may wish to try again or try a different"
+	" disk.\\\r\\\r Error Code: DC-12";
+#else
+chunk SDS_fileSaveError =
+	"Could not save document \\\"\\1\\\" - DOS or network reports"
+	" error #\\2.  You may wish to try again or consult your DOS or"
+	" network manual.\\\r\\\r Error Code: DC-12";
+
+chunk SDS_fileSaveErrorPDA =
+	"Could not save document \\\"\\1\\\" - DOS reports"
+	" error #\\2.  You may wish to try again or consult your"
+	" manual.\\\r\\\r Error Code: DC-12";
+#endif
+
+/* SDBT_FILE_SAVE_AS_FILE_EXISTS */
+chunk SDS_fileSaveFileExists =
+	"A document named \\\"\\1\\\" already exists. Do you wish to"
+	" overwrite it?";
+
+/* SDBT_FILE_SAVE_AS_FILE_FORMAT_MISMATCH */
+chunk SDS_fileSaveAsFileFormatMismatch =
+	"A document named \\\"\\1\\\" already exists and is a different"
+	" type of document.";
+
+/* SDBT_FILE_CLOSE_SAVE_CHANGES_UNTITLED */
+chunk SDS_fileCloseSaveChangesUntitled =
+	"\\\"\\1\\\" is a new document. Do you wish to save it?";
+
+visMoniker SDRT_fileCloseSaveChangesUntitled_Yes = 'S', "Save It";
+visMoniker SDRT_fileCloseSaveChangesUntitled_No = 'D', "Delete It";
+
+/* SDBT_FILE_CLOSE_SAVE_CHANGES_TITLED */
+chunk SDS_fileCloseSaveChangesTitled =
+	"\\\"\\1\\\" has been changed. Do you wish to save the changes,"
+	" or discard them?";
+
+visMoniker SDRT_fileCloseSaveChangesTitled_Yes = 'S', "Save Changes";
+visMoniker SDRT_fileCloseSaveChangesTitled_No = 'D', "Discard Changes";
+
+/* SDBT_FILE_CLOSE_ATTACH_DIRTY */
+chunk SDS_fileCloseAttachDirty =
+	"\\\"\\1\\\" has been changed. Some of these changes may have been"
+	" made during the previous session. Do you wish to save the changes?";
+
+visMoniker SDRT_fileCloseAttachDirty_Yes = 'S', "Save Changes";
+visMoniker SDRT_fileCloseAttachDirty_No = 'D', "Discard Changes";
+
+/* SDBT_FILE_REVERT_CONFIRM */
+chunk SDS_fileRevertConfirm =
+	"Are you sure you want to discard all changes since the last saved"
+	" version of \\\"\\1\\\"?";
+
+/* SDBT_FILE_ATTACH_DISK_NOT_FOUND */
+chunk SDS_attachDiskNotFound =
+	"In the previous session you were editing \\\"\\1\\\" on a diskette."
+	" Please insert the diskette \\\"\\2\\\" and click OK to open"
+	" the document, or click Cancel to skip this document.";
+
+/* SDBT_CANNOT_CHANGE_TYPE */
+chunk SDS_cannotChangeType =
+	"An error was encountered trying to change the type of \\\"\\1\\\"."
+	" The operation could not be completed.\\\r\\\r Error Code: DC-13";
+
+/* SDBT_CANNOT_CHANGE_PASSWORD */
+chunk SDS_cannotChangePassword =
+	"An error was encountered while trying to change the password"
+	" for \\\"\\1\\\". The operation could not be completed.\\\r\\\r Error Code: DC-14";
+
+/* SDBT_PROMPT_MOVE_TEMPLATE */
+chunk SDS_promptMoveTempalte =
+	"Do you want to move this template document to the template"
+	" folder?";
+
+visMoniker SDRT_promptMoveTemplate_Yes = "Move Template";
+
+visMoniker SDRT_promptMoveTemplate_No = "Don't Move Template";
+
+/* SDBT_BAD_PASSWORD */
+chunk SDS_badPassword =
+	"This is not the correct password.";
+
+/* SDBT_RENAME_FILE_EXISTS */
+chunk SDS_renameFileExists =
+	"A file named \\\"\\1\\\" already exists."
+	" Choose a different name.";
+
+/* SDBT_RENAME_ERROR */
+chunk SDS_renameError =
+	"An error occurred while trying to rename the document."
+	" The operation could not be completed.\\\r\\\r Error Code: DC-15";
+
+/* SDBT_BACKUP_ERROR */
+chunk SDS_backupError =
+	"An error occurred while trying to back up the document."
+	" The operation could not be completed.\\\r\\\r Error Code: DC-16";
+
+
+/* SDBT_REVERT_QUICK_CONFIRM */
+chunk SDS_revertQuickConfirm =
+	"Are you sure you want to revert to the backup copy of \\\"\\1\\\"?";
+
+/* SDBT_REVERT_QUICK_ERROR */
+chunk SDS_revertQuickError =
+	"An error occurred trying to revert to the backup copy of"
+	" this document. The operation could not be completed.\\\r\\\r Error Code: DC-17";
+
+
+/* SDBT_QUERY_SET_EMPTY_NONE_EXISTS */
+chunk SDS_querySetEmptyNoneExists =
+	"Are you sure you want to set"
+	" this document as the default empty document?";
+
+visMoniker SDRT_querySetEmpty_Yes = 'S', "Set Empty Document";
+
+/* SDBT_QUERY_SET_EMPTY_ONE_EXISTS */
+chunk SDS_querySetEmptyOneExists =
+	"There is already a default empty document set for this application."
+	" Do you want to clear the current default empty document (remove it),"
+	" or set this document to be the default empty document?";
+
+visMoniker SDRT_querySetEmptyOneExists_No = 'C', "Clear Empty Document";
+
+/* SDBT_QUERY_CLEAR_EMPTY */
+chunk SDS_queryClearEmpty =
+	"There is already a default empty document set for this application."
+	" Are you sure you wish to clear it?";
+
+/* SDBT_QUERY_SET_DEFAULT_NONE_EXISTS */
+chunk SDS_querySetDefaultNoneExists =
+	"Are you sure you want to set"
+	" this file as the startup document?";
+
+visMoniker SDRT_querySetDefault_Yes = 'S', "Set Startup Document";
+
+
+/* SDBT_QUERY_SET_DEFAULT_ONE_EXISTS */
+chunk SDS_querySetDefaultOneExists =
+	"There is already a special startup document set for this application."
+	" Do you want to change the startup document back to its default,"
+	" or do you want to set the current document to be the startup document?";
+
+visMoniker SDRT_querySetDefaultOneExists_No = 'C', "Clear Startup Document";
+
+/* SDBT_QUERY_CLEAR_DEFAULT */
+chunk SDS_queryClearDefault =
+	"There is a special startup document set. Are you sure you want to"
+	" clear the startup document, changing it back to its default?";
+
+/* SDBT_SET_EMPTY_ERROR */
+chunk SDS_setEmptyError =
+	"An error occurred trying to set the default empty document."
+	" The operation could not be completed.\\\r\\\r Error Code: DC-18";
+
+
+/* SDBT_TRANSPARENT_NEW_FILE_EXISTS */
+chunk SDS_transparentNewFileExists =
+	"A document with the name \\\"\\1\\\" already exists."
+	" Choose another name.";
+
+
+/* SDBT_CONFIRM_PASSWORD_CHANGE */
+chunk SDS_confirmPasswordChange =
+	"Once a password is set it will be impossible to open this document"
+	" without giving the password. Are you sure you want to set the"
+	" password?";
+
+/* SDBT_NOTIFY_SAVE_AS_TEMPLATE */
+chunk SDS_notifySaveAsTemplate =
+	"The document has been saved as a template. "
+	" The template is now opened for editing."
+	" Any changes you make will be saved to the template.";
+
+/* SDBT_NOTIFY_SAVING_PUBLIC */
+chunk SDS_notifySavingPublic =
+	"This is a public document which prevents you from saving your changes"
+	" back to the original document. You can, however,"
+	" save your changes to a new document with a different name.";
+
+/* SDBT_NOTIFY_SAVING_READ_ONLY */
+chunk SDS_notifySavingReadOnly =
+	"This is a read-only document which prevents you from saving your changes"
+	" back to the original document. You can, however,"
+	" save your changes to a new document"
+	" with a different name.";
+
+/* SDBT_DISK_RESTORE */
+
+  #ifdef DO_DBCS
+chunk SDS_diskRestore = data {
+	wchar "Please insert the disk containing ", C_DOUBLE_TURNED_COMMA_QUOTATION_MARK, 1, C_DOUBLE_COMMA_QUOTATION_MARK, " into drive ", 2, ".", 0
+}
+  #else
+chunk SDS_diskRestore =
+	"Please insert the disk containing \\xd2\\1\\xd3 into drive \\2.";
+  #endif
+
+visMoniker SDRT_diskRestore_Yes = 'D', "Disk Is In The Drive";
+visMoniker SDRT_diskRestore_No = 'S', "Stop Trying To Reopen The Document";
+
+
+/* SDBT_FILE_ILLEGAL_NAME */
+chunk SDS_fileSaveIllegalName =
+	"The name \\\"\\1\\\" is not a legal name for a document for this"
+	" application.\\\r\\\r Error Code: DC-19";
+
+/* SDBT_FILE_OVERWRITING_ITSELF */
+chunk SDS_fileOverwritingItself =
+	"The file already has this name.\\\rPlease give it a different name."
+	"\\\r\\\r Error Code: DC-20";
+
+#if VOLATILE_SYSTEM_STATE
+
+/* SDBT_QUERY_SAVE_ON_APP_SWITCH_UNTITLED */
+chunk SDS_querySaveOnAppSwitchUntitled =
+	"\\\"\\1\\\" is a new document. Do you wish to save it?   If not, the document will be deleted.";
+
+/* SDBT_QUERY_SAVE_ON_APP_SWITCH_TITLED */
+chunk SDS_querySaveOnAppSwitchTitled =
+	"\\\"\\1\\\" has been changed. Do you wish to save it?   If not, the document will be reverted to its original state and your modifications will be deleted.";
+
+#endif
+
+
+#if LIMITED_UNTITLED_DOC_DISK_SPACE
+
+/* SDBT_QUERY_AUTOSAVE_UNTITLED */
+chunk SDS_queryAutosaveUntitled =
+	"\\\"\\1\\\" has not yet been saved.   Please save it now, or close it without saving the changes.";
+
+/* SDBT_QUERY_AUTOSAVE_TITLED */
+chunk SDS_queryAutosaveTitled =
+	"\\\"\\1\\\" contains a large number of unsaved changes.   Please save it now, or close it without saving the changes.";
+
+#endif
+
+
+#if FLOPPY_BASED_DOCUMENTS
+
+/* SDBT_AUTOSAVE_TOTAL_FILES_TOO_LARGE */
+chunk SDS_autosaveTotalFilesTooLarge =
+	"Memory is full.   Please close one or more documents now.";
+chunk SDS_autosaveFileTooLarge =
+	"\\\"\\1\\\" is too large to fit in memory.  Please remove data from the document or break it up into multiple documents.";
+
+chunk SDS_cantOpenTotalFilesTooLarge =
+	"Memory is full, the document cannot be opened.   Please close one or more documents now.";
+chunk SDS_cantCreateTotalFilesTooLarge =
+	"Memory is full, the document cannot be created.   Please close one or more documents now.";
+chunk SDS_cantImportTotalFilesTooLarge =
+	"Memory is full, the document cannot be imported.   Please close one or more documents now.";
+
+#endif				
+
+/* these should only be defined if ENFORCE_DOCUMENT_HANDLES is TRUE */
+#if ENFORCE_DOCUMENT_HANDLES
+chunk SDS_cantOpenTotalFilesTooLarge =
+	"Memory is full, the document cannot be opened.   Please close one or more documents now.";
+chunk SDS_cantCreateTotalFilesTooLarge =
+	"Memory is full, the document cannot be created.   Please close one or more documents now.";
+#endif
+
+chunk SDS_cantMoveReadOnlyDocument =
+	"Could not move \\\"\\1\\\".  The document is read-only and may"
+	" not be moved.\\\r\\\r Error Code: DC-21";
+
+chunk SDS_unableToOverwriteExistingFile =
+	"Unable to overwrite \\\"\\1\\\".  The document may be read-only"
+	" or may already be in use.\\\r\\\r Error Code: DC-22";
+
+#if NO_NETWORK
+chunk SDS_fileMoveError =
+	"Could not move document \\\"\\1\\\" - DOS reports"
+	" error #\\2.  You may wish to try again."
+	"\\\r\\\r Error Code: DC-23";
+#else
+chunk SDS_fileMoveError =
+	"Could not move document \\\"\\1\\\" - DOS or network reports"
+	" error #\\2.  You may wish to try again or consult your DOS or"
+	" network manual.\\\r\\\r Error Code: DC-23";
+#endif
+
+chunk SDS_fileCopyPublicOrReadOnly =
+	"\\\"\\1\\\" is a read-only or public document.  Changes made to this"
+	" document will not be copied to \\\"\\2\\\".";
+
+
+
+
+#if VOLATILE_SYSTEM_STATE | LIMITED_UNTITLED_DOC_SPACE
+visMoniker SDS_querySave_Save = 'S', "Save";
+visMoniker SDS_querySave_Delete = 'D', "Delete";
+visMoniker SDS_querySave_Revert = 'R', "Revert";
+#endif					
+
+
+/***/
+
+chunk SDA_createNew = "create new";
+chunk SDA_opening = "open";
+chunk SDA_saving = "save";
+chunk SDA_reverting = "revert";
+chunk SDA_moving = "move";
+
+/***/
+
+chunk defaultDocumentName = "Empty Document";
+
+/***/
+
+chunk IntroductoryTemplateDir = "Introductory";
+
+chunk SavingToDirString = "Saving to Folder: ";
+
+
+#if _JEDITMOTIF || _DUI
+chunk fileInUse	= "\\\"\\1\\\" cannot be accessed. It may already be in use.";
+
+chunk fileNotFound = "Couldn't find \\\"\\1\\\". The file may have been deleted or moved.";
+
+chunk fileAccessDenied = "This item is stored in read-only memory (ROM) and cannot be cut or deleted.";
+
+chunk deleteFailed = "Unable to delete the file.";
+  localize "This string is displayed if the delete failed but we have no idea why it failed.";
+#endif
+   
+
+#if _DUI
+chunk copyFailed = "Unable to duplicate the document. There may not be enough memory to store the duplicate or there may already be a document with that name.";
+#endif
+
+end DocumentStringsUI;

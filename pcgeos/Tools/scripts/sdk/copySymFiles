@@ -1,0 +1,315 @@
+#!/bin/sh -
+#
+# This script copies symbol and ldf files to the CD-Rom image directory.
+#
+# $Id: copySymFiles,v 1.13 95/01/17 21:31:35 jon Exp $
+#
+
+MAKETOOLPATH=/staff/pcgeos/Tools/scripts/sdk
+export MAKETOOLPATH
+
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage: copySymFiles <branch> <CD-Rom dir>"
+	echo "Ex.: copySymFiles Release20X /n/intl_disks"
+	exit 1
+fi
+
+
+if ( cd /staff/pcgeos/$1/Installed ); then
+	cd /staff/pcgeos/$1/Installed
+	echo ""
+	echo "copySymFiles Started On `hostname` At `date` running as $USER"
+else
+	echo "$1 is not a PC/GEOS development tree. (e.g., . or Release20X)"
+	exit 1
+fi
+
+
+#==============================================================================
+# Copy symbol files
+#==============================================================================
+
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find Library \
+     Driver \
+     Appl/FileMgrs/ZManager \
+     Appl/FileMgrs/GeoManager \
+     Appl/Preferences/ZPrefMgr \
+     Appl/Preferences/ZSetup \
+     Appl/Preferences/PrefMgr \
+     Appl/Preferences/Setup \
+     Appl/Startup/Welcome \
+     Appl/GeoWrite \
+     Appl/Icon \
+     Appl/Tools/Localize \
+     Appl/Tools/Debug \
+     Appl/Demo/InfoView \
+     Appl/ScrapBk \
+     Appl/Dump \
+	\(  \( -name \*.sym \) -a \
+	  ! \( -name \*.old* -o -name \*_old* -o -name \*OLD* \) \
+	    -exec $MAKETOOLPATH/copy_for_sdk {} $2/pcgeos \; \
+	\) -o \
+	\(  -type d \
+		\( -name BNF -o \
+		   -name BTest -o \
+		   -name Book -o \
+		   -name Bullet -o \
+		   -name CandT -o \
+		   -name CandTPen -o \
+		   -name DBCS -o \
+		   -name DWP -o \
+		   -name Email -o \
+		   -name EmailLst -o \
+		   -name Gazelle -o \
+		   -name GeoPM -o \
+		   -name Iclas -o \
+		   -name KernelZoomer -o \
+		   -name MegaFile -o \
+		   -name NIKE -o \
+		   -name NW -o \
+		   -name OLD -o \
+		   -name Old -o \
+		   -name old -o \
+		   -name Pizza -o \
+		   -name PM2 -o \
+		   -name PMBA -o \
+		   -name Poqet -o \
+		   -name Pqpen -o \
+		   -name Profile -o \
+		   -name RealOld -o \
+		   -name Red\* -o \
+		   -name RESPONDER -o \
+		   -name Sample -o \
+		   -name SDK_Asm -o \
+		   -name SDK_C -o \
+		   -name TabsGadget -o \
+		   -name Translation -o \
+		   -name XIP \
+		\) \
+	    -prune \
+	\)
+
+
+#==============================================================================
+# Do the loader stuff separately, since we don't want any of the subdirectories
+#==============================================================================
+
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+for file in `ls Loader/*.exe Loader/*.sym Loader/Zoomer/*.exe Loader/Zoomer/*.sym`; do
+	$MAKETOOLPATH/copy_for_sdk $file $2/pcgeos
+done
+
+
+#==============================================================================
+# Copy a bunch of .ldf files to Include/LDF
+#==============================================================================
+
+cd Include
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find . \( -name \*.ldf -a \
+	! \( -name blank.ldf    -o -name bmp.ldf      -o -name bnf.ldf -o \
+	     -name bobbin.ldf   -o -name circles.ldf  -o -name clp.ldf -o \
+	     -name compress.ldf -o -name csv.ldf      -o -name cvttool.ldf -o \
+	     -name dbase3.ldf   -o -name dbase4.ldf   -o -name dib.ldf -o \
+	     -name dribble.ldf  -o -name dwrite.ldf  -o -name emaillst.ldf -o \
+	     -name emailtmp.ldf -o -name eps.ldf      -o -name fades.ldf -o \
+	     -name filestr.ldf  -o -name gif.ldf      -o -name iclas.ldf -o \
+	     -name int\*.ldf    -o -name intX87.ldf   -o -name lot123.ldf -o \
+	     -name lot123ss.ldf -o -name lotus123.ldf -o -name melt.ldf -o \
+	     -name mmate.ldf    -o -name msmfile.ldf  -o -name msword.ldf -o \
+	     -name netstr.ldf   -o -name pcx.ldf      -o -name pieces.ldf -o \
+	     -name ps2.ldf      -o -name pref\*.ldf   -o -name qix.ldf -o \
+	     -name rtf.ldf      -o -name sand.ldf     -o -name saver.ldf -o \
+	     -name stars.ldf    -o -name swarm.ldf    -o -name tif.ldf -o \
+	     -name tiles.ldf    -o -name winword.ldf  -o -name worms.ldf -o \
+	     -name wperf\*.ldf  -o -name wstar.ldf    -o -name xywrite.ldf -o \
+	     -name zoom\*.ldf \) \) \
+	-exec $MAKETOOLPATH/copy_for_sdk {} $2/pcgeos/Include/LDF \;
+
+
+#==============================================================================
+# And copy a couple random files over...
+#==============================================================================
+
+cd ../../Library/Math/Compiler/HighC
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/copy_for_sdk math.lib $2/pcgeos/Include
+
+
+if ( cd /n/nevada/tools/src/borland ); then
+	cd /n/nevada/tools/src/borland
+
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/copy_for_sdk borland.obj $2/pcgeos/Include/LDF
+else
+	echo "error: The command:"
+	echo $MAKETOOLPATH/copy_for_sdk borland.obj $2/pcgeos/Include/LDF
+	echo "could not be completed due to an error cd'ing to /n/nevada/tools/src/borland"
+fi
+
+#==============================================================================
+# Copy Jimmy's .gym files
+#==============================================================================
+
+if ( cd /staff/pcgeos/jimmy2024 ); then
+
+	cd /staff/pcgeos/jimmy2024
+
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find Library \
+     Driver \
+     Loader \
+     Appl/FileMgrs/ZManager \
+     Appl/FileMgrs/GeoManager \
+     Appl/Preferences/ZPrefMgr \
+     Appl/Preferences/ZSetup \
+     Appl/Preferences/PrefMgr \
+     Appl/Preferences/Setup \
+     Appl/Startup/Welcome \
+     Appl/GeoWrite \
+     Appl/Icon \
+     Appl/Tools/Localize \
+     Appl/Tools/Debug \
+     Appl/Demo/InfoView \
+     Appl/ScrapBk \
+     Appl/Dump \
+	\(  \( -name \*.gym \) -a \
+	  ! \( -name \*.old* -o -name \*_old* -o -name \*OLD* \) \
+	    -exec $MAKETOOLPATH/copy_for_sdk {} $2/pcgeos \; \
+	\) -o \
+	\(  -type d \
+		\( -name BNF -o \
+		   -name BTest -o \
+		   -name Book -o \
+		   -name Bullet -o \
+		   -name CandT -o \
+		   -name CandTPen -o \
+		   -name Email -o \
+		   -name EmailLst -o \
+		   -name Gazelle -o \
+		   -name GeoPM -o \
+		   -name Iclas -o \
+		   -name Kernel -o \
+		   -name MegaFile -o \
+		   -name NW -o \
+		   -name OLD -o \
+		   -name Old -o \
+		   -name old -o \
+		   -name PM2 -o \
+		   -name PMBA -o \
+		   -name Poqet -o \
+		   -name Pqpen -o \
+		   -name Profile -o \
+		   -name RealOld -o \
+		   -name Red\* -o \
+		   -name Sample -o \
+		   -name SDK_C -o \
+		   -name TabsGadget -o \
+		   -name Translation -o \
+		   -name User \
+		\) \
+	    -prune \
+	\)
+
+#
+# Copy the kernel and ui .gym files into the gym directory.
+#
+
+$MAKETOOLPATH/cp_for_sdk Library/Kernel/geos.gym \
+			 $2/pcgeos/Library/Kernel/gym/geos.gym
+
+$MAKETOOLPATH/cp_for_sdk Library/User/ui.gym \
+			 $2/pcgeos/Library/User/gym/ui.gym
+else
+	echo "error: None of the GYM files were copied because the"
+	echo "/staff/pcgeos/jimmy2024 directory couldn't be located, probably"
+	echo "because you're running this on fusion."
+	echo ""
+fi
+
+#==============================================================================
+# Copy Palm .gym files
+#==============================================================================
+
+cd /staff/pcgeos/Palm/Installed
+
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find . \(  -name \*.gym \
+	   -exec $MAKETOOLPATH/copy_for_sdk {} $2/pcgeos \; \
+       \) -o \
+       \(  -type d \
+		\( -name OLD -o -name Old -o -name old \) \
+	   -prune \
+       \)
+
+
+#==============================================================================
+# Copy Zoomer XIP kernel .sym file
+#==============================================================================
+
+if ( cd /staff/pcgeos/jimmy625/Library/Kernel ); then
+
+	cd /staff/pcgeos/jimmy625/Library/Kernel
+
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/cp_for_sdk geos.sym $2/pcgeos/Library/Kernel/geos_z1.sym
+
+else
+	echo "error: The XIP kernel sym file could not be copied"
+	echo "because the /staff/pcgeos/jimmy625 directory couldn't be located,"
+	echo "probably because you're running this on fusion."
+	echo ""
+fi
+
+#==============================================================================
+# Copy Zoomer kernel .sym file
+#==============================================================================
+
+cd /staff/pcgeos/Zoomer816B/Installed/Library
+
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/cp_for_sdk Kernel/geos.sym $2/pcgeos/Library/Kernel/geos_zn.sym
+$MAKETOOLPATH/cp_for_sdk Kernel/geosec.sym $2/pcgeos/Library/Kernel/geos_ze.sym
+$MAKETOOLPATH/cp_for_sdk User/ui.sym $2/pcgeos/Library/User/ui_zn.sym
+$MAKETOOLPATH/cp_for_sdk User/uiec.sym $2/pcgeos/Library/User/ui_ze.sym
+$MAKETOOLPATH/cp_for_sdk Motif/motif.sym $2/pcgeos/Library/Motif/motif_z1.sym
+
+echo copySymFiles Ended At `date`

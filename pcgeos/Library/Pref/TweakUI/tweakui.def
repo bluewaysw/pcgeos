@@ -1,0 +1,292 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) New Deal 1998 -- All Rights Reserved
+
+PROJECT:	New Deal
+MODULE:		
+FILE:		tweakui.def
+
+AUTHOR:		Gene Anderson
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Gene	8/25/92		Initial revision
+
+
+DESCRIPTION:
+	Definitions for Tweak UI module of Preferences
+		
+	$Id: tweakui.def,v 1.2 98/05/02 22:09:34 gene Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;	CONSTANTS -- from Appl/FileMgrs/CommonDesktop/cdesktopConstant.def
+;-----------------------------------------------------------------------------
+; DesktopFeatures:  This record is the basis for the scalable UI of
+; GeoManager.  Unlike other major apps, there is no way to set this UI
+; in the app itself -- since UI is likely to be set different ways for
+; different products, and it may be undesirable for the user to be
+; able to change these settings.
+;
+; These features are stored in app object's GAI_features field, and
+; can be fetched using MSG_GEN_APPLICATION_GET_APP_FEATURES.  However,
+; the proper way to use this record is in conjunction with the
+; usability tables set up in DeskApplicationUpdateAppFeatures.
+
+DesktopFeatures	record
+	DF_CONNECT:1
+	; If this flag is set, GeoManager will have a "Connect" icon,
+	; and a connect trigger in the disk menu.  Note that this can
+	; only be used if the file manager is compiled with the
+	; CONNECT_TO_REMOTE flag.
+
+	:13
+
+	DF_SHOW_LINKS:1
+	; If set, links filenames will be drawn in blue
+
+	DF_WRAP:1
+	; Allow word-wrapping of filenames
+DesktopFeatures end
+
+;-----------------------------------------------------------------------------
+;	CONSTANTS		
+;-----------------------------------------------------------------------------
+
+TweakUISection	etype	byte
+TUIS_APPLICATIONS	enum TweakUISection
+TUIS_EXPRESS_MENU	enum TweakUISection
+TUIS_INTERFACE		enum TweakUISection
+TUIS_ADVANCED		enum TweakUISection
+TUIS_FILE_MGRS		enum TweakUISection
+TUIS_APPEARANCE		enum TweakUISection
+
+TweakUIAdvanced	record
+	:12
+	TUIA_AUTO_RESET:1
+	TUIA_CONFIRM_SHUTDOWN:1
+	TUIA_REBOOT_3:1
+	TUIA_HELP_EDITOR:1
+TweakUIAdvanced	end
+
+PrefUIColor	etype byte
+PUIC_TITLE_BARS		enum PrefUIColor
+PUIC_TITLE_BAR_GRADIENT	enum PrefUIColor
+PUIC_DARK_ITEMS		enum PrefUIColor
+PUIC_LIGHT_ITEMS	enum PrefUIColor
+PUIC_FILE_MGR		enum PrefUIColor
+PUIC_HELP_BG		enum PrefUIColor
+PUIC_SELECTIONS		enum PrefUIColor
+
+PrefUILauncher	etype byte
+PUIL_NEWMANAGER		enum PrefUILauncher
+PUIL_NEWDESK		enum PrefUILauncher
+
+PrefUICombo	etype byte
+PUIC_MOTIF		enum PrefUICombo
+PUIC_NEWUI		enum PrefUICombo
+PUIC_NEWUI_CUI		enum PrefUICombo
+
+PrefUIDefaultColorScheme	etype	byte
+PUIDCS_DEFAULT		enum PrefUIDefaultColorScheme
+PUIDCS_NEWUI		enum PrefUIDefaultColorScheme
+PUIDCS_CYAN		enum PrefUIDefaultColorScheme
+PUIDCS_EARTH		enum PrefUIDefaultColorScheme
+PUIDCS_MERLOT		enum PrefUIDefaultColorScheme
+PUIDCS_CORPORATE	enum PrefUIDefaultColorScheme
+PUIDCS_FOREST		enum PrefUIDefaultColorScheme
+PUIDCS_SEDONA		enum PrefUIDefaultColorScheme
+PUIDCS_STAINLESS	enum PrefUIDefaultColorScheme
+PUIDCS_CONTRAST		enum PrefUIDefaultColorScheme
+PUIDCS_OCEAN		enum PrefUIDefaultColorScheme
+PUIDCS_BLUE_SKY		enum PrefUIDefaultColorScheme
+PUIDCS_EMERALD_CITY	enum PrefUIDefaultColorScheme
+PUIDCS_TEAL		enum PrefUIDefaultColorScheme
+PUIDCS_SWIMMING_POOL	enum PrefUIDefaultColorScheme
+PUIDCS_GREY_SKY		enum PrefUIDefaultColorScheme
+PUIDCS_CUPPA_JOE	enum PrefUIDefaultColorScheme
+PUIDCS_GREY_AND_RED	enum PrefUIDefaultColorScheme
+PUIDCS_GREY_AND_GREEN	enum PrefUIDefaultColorScheme
+
+TweakUIFontArea			etype byte
+TUIFA_MENUS		enum TweakUIFontArea
+TUIFA_EDITABLE		enum TweakUIFontArea
+TUIFA_FOLDERS		enum TweakUIFontArea
+
+;-----------------------------------------------------------------------------
+;	Color Scheme file constants
+;-----------------------------------------------------------------------------
+
+COLOR_SCHEME_MAX_NAME_LENGTH	equ	32
+
+ColorSchemeStruct	struct
+    CSS_titleBarColor	Color
+    CSS_titleBarColor2	Color
+    CSS_darkColor	Color
+    CSS_lightColor	Color
+    CSS_fileMgrColor	Color
+    CSS_helpBGColor	Color
+    CSS_selectColor	Color
+    CSS_reserved	byte 32 dup (0)
+ColorSchemeStruct	ends
+
+CheckHack <offset CSS_lightColor -offset CSS_titleBarColor eq PUIC_LIGHT_ITEMS>
+CheckHack <offset CSS_darkColor - offset CSS_titleBarColor eq PUIC_DARK_ITEMS>
+CheckHack <offset CSS_fileMgrColor - offset CSS_titleBarColor eq PUIC_FILE_MGR>
+CheckHack <offset CSS_helpBGColor - offset CSS_titleBarColor eq PUIC_HELP_BG>
+
+;-----------------------------------------------------------------------------
+;	CLASSES		
+;-----------------------------------------------------------------------------
+
+TweakUIDialogClass	class	PrefDialogClass
+
+MSG_TUID_SECTION_CHANGED	message
+;
+; Sent when section list changes
+;
+; Pass:
+;	cx - current selection (TweakUISection)
+;
+
+MSG_TUID_AREA_CHANGED					message
+
+MSG_TUID_SET_DEFAULT_COLORS				message
+
+TweakUIDialogClass	endc
+
+;-----
+
+TweakUIStartupListClass	class	PrefDynamicListClass
+
+MSG_TUISL_STARTUP_PROGRAM_SELECTED	message
+;
+; Sent when a program in the startup list is selected
+;
+; Pass:
+;	cx - current selection
+;	bp - # of selections
+;	dl - GenItemGroupStateFlags
+;
+
+MSG_TUISL_DELETE_PROGRAM		message
+;
+; Delete the currently selected program
+;
+; Pass:
+;	none
+;
+
+MSG_TUISL_ADD_PROGRAM			message
+;
+; Add a program from the file selector
+;
+; Pass:
+;	none
+;
+
+	TUISLI_array		optr
+	TUISLI_dirty		byte	0
+
+TweakUIStartupListClass	endc
+
+;-----
+
+if 0
+TweakUIHideDriveBooleanClass	class	GenBooleanClass
+	TUIHDB_drive	byte
+TweakUIHideDriveBooleanClass	endc
+endif
+
+;-----
+
+PrefUICColorSelectorClass	class	PrefColorSelectorClass
+PrefUICColorSelectorClass	endc
+
+PREF_COLORS_SAMPLE_WIDTH	equ	240
+PREF_COLORS_SAMPLE_HEIGHT	equ	48
+
+PrefColorsSampleClass	class	GenGadgetClass
+
+
+PrefColorsSampleClass	endc
+
+PrefMinuteValueClass	class	PrefValueClass
+PrefMinuteValueClass	endc
+
+TweakUIFontAreaClass	class	PrefItemGroupClass
+
+MSG_TUIFA_FONT_AREA_CHANGED				message
+
+MSG_TUIFA_FONT_SIZE_CHANGED				message
+
+TweakUIFontAreaClass	endc
+
+PrefUICSchemeListClass	class	PrefDynamicListClass
+
+MSG_PUIC_SCHEME_LIST_SAVE		message
+MSG_PUIC_SCHEME_LIST_DELETE		message
+
+PrefUICSchemeListClass	endc
+
+;-----------------------------------------------------------------------------
+;	VARIABLES		
+;-----------------------------------------------------------------------------
+ 
+idata	segment
+	TweakUIDialogClass
+	TweakUIStartupListClass
+if 0
+	TweakUIHideDriveBooleanClass
+endif
+	PrefUICColorSelectorClass
+	PrefColorsSampleClass
+	PrefMinuteValueClass
+	TweakUIFontAreaClass
+	PrefUICSchemeListClass
+
+titleBarColor	Color	C_UNUSED_0
+titleBar2Color	Color	C_UNUSED_0
+darkColor	Color	C_UNUSED_0
+lightColor	Color	C_UNUSED_0
+fileMgrColor	Color	C_UNUSED_0
+helpBGColor	Color	C_UNUSED_0
+selectColor	Color	C_UNUSED_0
+
+CheckHack <offset lightColor - offset titleBarColor eq PUIC_LIGHT_ITEMS>
+CheckHack <offset darkColor - offset titleBarColor eq PUIC_DARK_ITEMS>
+CheckHack <offset fileMgrColor - offset titleBarColor eq PUIC_FILE_MGR>
+CheckHack <offset helpBGColor - offset titleBarColor eq PUIC_HELP_BG>
+
+ForceRef titleBar2Color
+ForceRef darkColor
+ForceRef lightColor
+ForceRef fileMgrColor
+ForceRef helpBGColor
+ForceRef selectColor
+
+menuFont	word	0
+editableFont	word	0
+folderFont	word	0
+
+CheckHack <offset editableFont - offset menuFont eq TUIFA_EDITABLE*2>
+CheckHack <offset folderFont - offset menuFont eq TUIFA_FOLDERS*2>
+
+ForceRef editableFont
+ForceRef folderFont
+
+idata	ends
+
+
+;-----------------------------------------------------------------------------
+;	Exported routines		
+;-----------------------------------------------------------------------------
+ 
+TweakUICode	segment resource
+
+global TweakUIGetPrefUITree:far
+global TweakUIGetModuleInfo:far
+
+TweakUICode	ends

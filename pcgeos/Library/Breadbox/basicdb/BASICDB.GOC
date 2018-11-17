@@ -1,0 +1,3085 @@
+/***************************************************************************
+
+                Copyright (c) Breadbox Computer Company 1998
+                         -- All Rights Reserved --
+
+  PROJECT:      Generic Database System
+  MODULE:       Basic Database System
+  FILE:         basicDB.goc
+
+  AUTHOR:       Gerd Boerrigter
+
+  $Header: /Home Bulletin Board/Library/BasicDB/BASICDB.GOC 26    7/16/98 18:29 Gerdb $
+
+  DESCRIPTION:
+
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-05  GerdB     Initial version.
+    98-03-19  GerdB     Updated to allow multiple databases in one file.
+    98-03-23  GerdB     Added index support.
+
+***************************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+
+#include <basicDB.h>
+#include "internal.h"
+#include "patch.h"
+
+// #define DO_HW_CHECKSUM_CHECKING
+#include <hwlib.h>
+
+
+#ifdef DO_HW_CHECKSUM_CHECKING
+void TestMemory(void)
+{
+    MemHandle mem ;
+
+    HWChecksumCheck() ;
+    mem = MemAlloc(32, HF_DYNAMIC, 0) ;
+    MemReAlloc(mem, 64, 0) ;
+    MemReAlloc(mem, 16, 0) ;
+    MemFree(mem) ;
+}
+#else
+#define TestMemory()
+#endif
+
+/***********************************************************************
+    Global Variables
+***********************************************************************/
+/* Fold our error constants in with other GEOS error constants
+   using GOC trick. (Define a global of type FatalErrors.) */
+FatalErrors fatalErrors;
+Warnings warnings;
+
+
+/***************************************************************************
+    Functions
+***************************************************************************/
+
+/*==========================================================================
+    Working on the whole database.
+==========================================================================*/
+
+
+/***************************************************************************
+    BasicDBGrabExclusive
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Does a VMGrabExclusive.
+    !!! Should be sends a general change notification (someday).
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-12  GerdB     Initial version.
+
+***************************************************************************/
+VMStartExclusiveReturnValue _pascal
+BasicDBGrabExclusive(
+    VMFileHandle    file,           /* contains our database. */
+    VMOperation     operation
+    )
+{
+    VMOperation                 currentOperation;
+    VMStartExclusiveReturnValue returnValue;
+
+EC( ECVMCheckVMFile( file ); )
+
+    returnValue = VMGrabExclusive( file, BDB_GRAB_TIMEOUT,
+            operation, &currentOperation );
+
+    if ( VMSERV_TIMEOUT != returnValue ) {
+        /* !!! Send some notifications here. */
+    }
+
+    return returnValue;
+
+} /* BasicDBGrabExclusive */
+
+
+/***************************************************************************
+    BasicDBReleaseExclusive
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Does a VMReleaseExclusive.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-09  GerdB     Initial version.
+
+***************************************************************************/
+void _pascal
+BasicDBReleaseExclusive(
+    VMFileHandle    file        /* contains our database. */
+    )
+{
+EC( ECVMCheckVMFile( file ); )
+
+    VMReleaseExclusive( file );
+
+} /* BasicDBReleaseExclusive */
+
+
+
+/***************************************************************************
+    BasicDBStringSearch  !!! Not implemented, yet. !!!
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Performs a string search on the database.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-10  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBStringSearch(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    TCHAR *         searchString
+    )
+{
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+    return 0;
+
+} /* BasicDBStringSearch */
+
+
+/***************************************************************************
+    BasicDBCreate
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Creates a new empty database in a given VMFile.
+    Returns the handle of the database directory block, if the creation
+    was successful.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-19  GerdB     Initial version.
+
+***************************************************************************/
+/* jfhtest */
+BasicDBError _pascal
+//dword _pascal
+BasicDBCreate(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle*  dirBlock,       /* database directory block. */
+    Boolean isShared                /* Flag telling if grabs are necessary */
+    )
+{
+    BasicDBError        error = BDBE_NO_ERROR;
+    VMBlockHandle       elementBlock;   /* of the fieldname array. */
+    ChunkHandle         elementArray;   /* of the fieldname array. */
+    VMBlockHandle       recordArray;    /* Array to store the records in. */
+    MemHandle           dirHandle;      /* The database directory. */
+    BasicDBDirectory *  dirPtr;
+    MemHandle           memoryHandle;
+    GeosFileHeaderFlags fileFlags = GFHF_SHARED_MULTIPLE;
+
+
+EC( ECVMCheckVMFile( file ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) {
+        error = BDBE_TIMEOUT;
+    }
+    else {
+        /* Create the database structure. */
+/*        VMSetAttributes( file, VMA_NOTIFY_DIRTY, 0 ); */
+
+        /* Set file shared-multiple! */
+        if (isShared)
+            FileSetHandleExtAttributes( file, FEA_FLAGS, &fileFlags, sizeof( fileFlags ));
+
+        /* Create the HugeArray for the records. */
+		  recordArray  = HugeArrayCreate( file, 0, 0 );
+
+		  /* Create the ElementArray for the fieldnames. */
+		  elementBlock = VMAllocLMem( file, LMEM_TYPE_GENERAL, 0 );
+
+		  VMLock( file, elementBlock, &memoryHandle );
+		  elementArray = ElementArrayCreate( memoryHandle, 0, 0, 0 );
+		  VMDirty( memoryHandle );
+        VMUnlock( memoryHandle );
+
+        /* Create and set a block which represents our database. */
+		  *dirBlock = VMAllocLMem( file, LMEM_TYPE_GENERAL, sizeof( BasicDBDirectory ));
+		  dirPtr    = VMLock( file, *dirBlock, &dirHandle );
+/* jfhtest */
+//return(dirHandle);
+
+
+        dirPtr->BDBD_nextRecordID   = 1;
+        dirPtr->BDBD_nameBlock      = elementBlock;
+        dirPtr->BDBD_nameArray      = elementArray;
+        dirPtr->BDBD_recordArray    = recordArray;
+        dirPtr->BDBD_indices        = NullHandle;
+
+        VMDirty( dirHandle );
+        VMUnlock( dirHandle );
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBCreate */
+
+
+
+/*==========================================================================
+    Working with records:
+==========================================================================*/
+
+
+/***************************************************************************
+    BasicDBCreateRecord
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Create a new empty record in memory.  It is not added to a database,
+    this happens only with C<BasicDBSaveRecord>.
+    The recordID is also assigned during saving.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-11  GerdB     Initial version.
+
+***************************************************************************/
+MemHandle _pascal                   /* Working handle to the record. */
+BasicDBCreateRecord(
+    void
+    )
+{
+    MemHandle               recordHandle;
+    BasicDBRecordHeader*    recordPtr;
+
+    recordHandle = MemAlloc( sizeof( BasicDBRecordHeader ),
+                             HF_SWAPABLE,
+                             HAF_ZERO_INIT | HAF_LOCK );
+    recordPtr = MemDeref( recordHandle );
+
+    recordPtr->BDBRH_size        = sizeof( BasicDBRecordHeader );
+    recordPtr->BDBRH_nextFieldID = 1;
+    recordPtr->BDBRH_userID      = 0;
+
+    MemUnlock( recordHandle );
+
+    return recordHandle;
+
+} /* BasicDBCreateRecord */
+
+
+/***************************************************************************
+    BasicDBDuplicateRecord
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Duplicate a record and returns the handle to the newly created
+    record.  A recordID is assigned during saving.
+    Useful if template records are used.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-11  GerdB     Initial version.
+
+***************************************************************************/
+MemHandle _pascal                   /* record handle to new record. */
+BasicDBDuplicateRecord(
+    MemHandle       recordHandle    /* Record handle of the record
+                                        to be duplicated. */
+    )
+{
+    BasicDBRecordHeader*    recordPtr;
+    MemHandle               newRecordHandle;
+    BasicDBRecordHeader*    newRecordPtr;
+    word                    recordSize;
+
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordSize = MemGetInfo( recordHandle, MGIT_SIZE );
+    newRecordHandle = MemAlloc( recordSize, HF_SWAPABLE, HAF_LOCK );
+
+    if ( NullHandle != recordHandle )
+    {
+        recordPtr    = MemLock( recordHandle );
+        newRecordPtr = MemDeref( newRecordHandle );
+
+        memcpy( newRecordPtr, recordPtr, recordSize );
+
+        /* Mark new record as not saved. */
+        newRecordPtr->BDBRH_id = 0;
+
+        MemUnlock( newRecordHandle );
+        MemUnlock( recordHandle );
+    }
+
+    return newRecordHandle;
+
+} /* BasicDBDuplicateRecord */
+
+
+/***************************************************************************
+    BasicDBSaveRecord
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Saves the record in the memory to the database file and
+    frees the memory block.  If the recordID is C<0>, then a new unique
+    recordID is assigned to this record.  If the record was deleted
+    meanwhile, it will be saved into the DB again.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-11  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBSaveRecord(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    MemHandle       recordHandle,   /* Record handle of the record
+                                        to be saved. */
+    BasicDBCallback Callback,                     /* Callback function for sorting indices. */
+    BasicDBRecordID*    recordID
+    )
+{
+    BasicDBError            error = BDBE_NO_ERROR;
+
+    BasicDBRecordHeader*    recordPtr;
+
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+    dword               elemNum;      /* ElemNum of record. */
+    MemHandle           recHandle;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) {
+        error = BDBE_TIMEOUT;
+    }
+    else {
+
+        dirPtr      = VMLock( file, dirBlock, &dirHandle );
+        recordPtr   = MemLock( recordHandle );
+
+        /* If the record was never saved before. */
+        if ( 0 == recordPtr->BDBRH_id ) {
+            /* Assign record ID. */
+            recordPtr->BDBRH_id = dirPtr->BDBD_nextRecordID++;
+            VMDirty( dirHandle );
+
+            /* Append the record to the HugeArray. */
+            HugeArrayAppend(
+                    file,
+                    dirPtr->BDBD_recordArray,
+                    recordPtr->BDBRH_size,
+                    recordPtr );
+
+            IndicesAddEntry( file, dirBlock, recordHandle, Callback );
+
+        } /* if ( 0 == recordPtr->BDBRH_id ) */
+        else {
+            /* Replace record with the current one. */
+            error = GetElemNumFromID(
+                    file, dirPtr->BDBD_recordArray, recordPtr->BDBRH_id, &elemNum );
+
+            if ( BDBE_NO_ERROR != error ) {
+                /* Index not found, so record was deleted. */
+                HugeArrayAppend(
+                        file,
+                        dirPtr->BDBD_recordArray,
+                        recordPtr->BDBRH_size,
+                        recordPtr );
+
+                IndicesAddEntry( file, dirBlock, recordHandle, Callback );
+
+                error = BDBE_SAVED_DELETED_RECORD;
+
+            }
+            else
+            {
+                recHandle = GetRecordByElemNum(
+                        file,
+                        dirPtr->BDBD_recordArray,
+                        elemNum );
+                IndicesDeleteEntry( file, dirBlock, recHandle, Callback );
+                MemFree( recHandle );
+
+                HugeArrayReplace(
+                        file,
+                        dirPtr->BDBD_recordArray,
+                        recordPtr->BDBRH_size,
+                        elemNum,
+                        recordPtr );
+
+                IndicesAddEntry( file, dirBlock, recordHandle, Callback );
+
+            }
+
+        } /* if ( 0 == recordPtr->BDBRH_id ) */
+
+        if ( NullHandle != recordID ) {
+            *recordID = recordPtr->BDBRH_id;
+        }
+#if ERROR_CHECK
+		else
+			EC_WARNING( NO_ADDRESS_TO_STORE_RECORD_ID );
+#endif
+
+// FR
+		/* remove if successful */
+		switch(error)
+		{
+			case BDBE_NO_ERROR:
+			case BDBE_SAVED_DELETED_RECORD:
+				MemFree( recordHandle );
+		}
+
+		VMUnlock( dirHandle );
+        BasicDBReleaseExclusive( file );
+
+    } /* if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) */
+    return error;
+
+} /* BasicDBSaveRecord */
+
+
+
+/***************************************************************************
+    BasicDBDiscardRecord
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Frees the memory block without saving it to the database.  The
+    database is completly unchanged.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-11  GerdB     Initial version.
+
+***************************************************************************/
+void _pascal
+BasicDBDiscardRecord(
+    MemHandle       recordHandle
+    )
+{
+EC( ECCheckMemHandle( recordHandle ); )
+
+    MemFree( recordHandle );
+
+} /* BasicDBDiscardRecord */
+
+
+
+/***************************************************************************
+    BasicDBGetRecord
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get a record -- given its ID -- from the database into memory.
+    The record is copied into a memory block, which handle is returned.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-11  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBGetRecord(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    BasicDBRecordID recordID,       /* ID of the record. */
+    MemHandle *     returnHandle    /* handle of record */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+
+    VMBlockHandle       recordArray;    /* Handle of the HugeArray. */
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+            error = BDBE_TIMEOUT;
+    }
+    else {
+
+        dirPtr      = VMLock( file, dirBlock, &dirHandle );
+        recordArray = dirPtr->BDBD_recordArray;
+        VMUnlock( dirHandle );
+
+        error = GetRecordByRecordID( file, recordArray, recordID, returnHandle );
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBGetRecord */
+
+
+/***************************************************************************
+    BasicDBGetRecordByElemNum
+---------------------------------------------------------------------------
+  DESCRIPTION:
+    Get a record -- given its element number in the HugeArray -- from the
+    database into memory.
+    The record is copied into a memory block, which handle is returned.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-26  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBGetRecordByElemNum(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    dword           elemNum,        /* index in HugeArray of the record. */
+    MemHandle *     recordHandle    /* handle of record */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+
+    VMBlockHandle       recordArray;    /* Handle of the HugeArray. */
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+            error = BDBE_TIMEOUT;
+    }
+    else {
+
+        dirPtr      = VMLock( file, dirBlock, &dirHandle );
+        recordArray = dirPtr->BDBD_recordArray;
+        VMUnlock( dirHandle );
+
+        *recordHandle = GetRecordByElemNum(
+                        file,
+                        recordArray,
+                        elemNum );
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBGetRecordByElemNum */
+
+
+/***************************************************************************
+    BasicDBGetRecordByIndex
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get a record -- given a position in an index -- from the database into
+    memory.
+    The record is copied into a memory block, which handle is returned.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-31  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBGetRecordByIndex(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    VMBlockHandle   indexArray,     /* HugeArray of the index array to use. */
+    dword           elemNum,        /* element to get from the index. */
+    MemHandle *     returnHandle    /* handle of record. */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+
+    VMBlockHandle       recordArray;    /* Handle of the HugeArray. */
+
+    BasicDBIndexElement*    elemPtr;    /* Pointer to the current element. */
+    word                    elemSize;   /* Size of the current element. */
+
+    BasicDBRecordID         currentID;
+    dword haCount;                      /* return value of HugeArrayLock */
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+        error = BDBE_TIMEOUT;
+    }
+    else {
+        /* Get record ID from index. */
+        haCount = HugeArrayLock( file, indexArray, elemNum, &elemPtr, &elemSize );
+        if ( 0 == HAL_COUNT( haCount )) {
+            error = BDBE_UNSUCCESSFUL_HUGE_ARRAY_LOCK;
+        }
+        else {
+            currentID = elemPtr->BDBIE_id;
+            HugeArrayUnlock( elemPtr );
+
+            dirPtr      = VMLock( file, dirBlock, &dirHandle );
+            recordArray = dirPtr->BDBD_recordArray;
+            VMUnlock( dirHandle );
+
+            error = GetRecordByRecordID( file, recordArray, currentID, returnHandle );
+        }
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBGetRecordByIndex */
+
+
+/***************************************************************************
+    BasicDBGetRecordIDByIndex
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get a record id -- given a position in an index -- from the database 
+	into memory.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-31  GerdB     Initial version.
+	98-10-02  FalkR		Modified for recordID
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBGetRecordIDByIndex(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   indexArray,     /* HugeArray of the index array to use. */
+    dword           elemNum,        /* element to get from the index. */
+    BasicDBRecordID *returnID		/* handle of record. */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    BasicDBIndexElement*    elemPtr;    /* Pointer to the current element. */
+    word                    elemSize;   /* Size of the current element. */
+
+    BasicDBRecordID         currentID;
+    dword haCount;                      /* return value of HugeArrayLock */
+
+
+EC( ECVMCheckVMFile( file ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+        error = BDBE_TIMEOUT;
+    }
+    else {
+        /* Get record ID from index. */
+        haCount = HugeArrayLock( file, indexArray, elemNum, &elemPtr, &elemSize );
+        if ( 0 == HAL_COUNT( haCount )) {
+            error = BDBE_UNSUCCESSFUL_HUGE_ARRAY_LOCK;
+        }
+        else {
+            currentID = elemPtr->BDBIE_id;
+            HugeArrayUnlock( elemPtr );
+			
+			*returnID = currentID;
+        }
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBGetRecordByIndex */
+
+
+/***************************************************************************
+    BasicDBDeleteRecord
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Deletes the record from the database.  If the record was actually
+    never saved to the database, it frees the memory block without
+    saving it to the database and the database is completly unchanged.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-11  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBDeleteRecord(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    MemHandle       recordHandle,   /* Record in memory. */
+    BasicDBCallback Callback                      /* Callback function for sorting indices. */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    BasicDBRecordHeader *   recordPtr;
+
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+
+    dword           elemNum;          /* ElemNum of record. */
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordPtr = MemLock( recordHandle );
+
+
+    if ( 0 != recordPtr->BDBRH_id ) {
+        /* If the record was saved before, delete it from the database. */
+        if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) )  {
+            MemUnlock( recordHandle );
+            error = BDBE_TIMEOUT;
+        }
+        else {
+            /* Delete the record from the HugeArray. */
+            dirPtr = VMLock( file, dirBlock, &dirHandle );
+            error = GetElemNumFromID(
+                        file,
+                        dirPtr->BDBD_recordArray,
+                        recordPtr->BDBRH_id,
+                        &elemNum );
+
+            if ( BDBE_NO_ERROR == error ) {
+                IndicesDeleteEntry( file, dirBlock, recordHandle, Callback );
+                HugeArrayDelete( file, dirPtr->BDBD_recordArray, 1, elemNum );
+            }
+            VMUnlock( dirHandle );
+            BasicDBReleaseExclusive( file );
+
+        } /* if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) */
+    } /* if ( 0 != recordPtr->BDBRH_id ) */
+
+    /* In every case, free the memory block containing the record. */
+    MemFree( recordHandle );
+    return error;
+
+} /* BasicDBDeleteRecord */
+
+
+/***************************************************************************
+    BasicDBDeleteRecordByID
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Deletes the record given by its record ID from the database.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-11  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBDeleteRecordByID(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    BasicDBRecordID recordID,       /* record ID of record to delete. */
+    BasicDBCallback Callback                      /* Callback function for sorting indices. */
+    )
+{
+    BasicDBError        error = BDBE_NO_ERROR;
+
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+
+    MemHandle       recordHandle;   /* Record in memory. */
+
+    dword           index;          /* ElemNum of record. */
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) )  {
+        error = BDBE_TIMEOUT;
+    }
+    else {
+        /* Delete the record from the HugeArray. */
+        dirPtr = VMLock( file, dirBlock, &dirHandle );
+
+        error = GetElemNumFromID( file, dirPtr->BDBD_recordArray, recordID, &index );
+
+        if ( BDBE_NO_ERROR != error ) {
+            recordHandle = GetRecordByElemNum(
+                    file,
+                    dirPtr->BDBD_recordArray,
+                    index );
+            IndicesDeleteEntry( file, dirBlock, recordHandle, Callback );
+            HugeArrayDelete( file, dirPtr->BDBD_recordArray, 1, index );
+            MemFree( recordHandle );
+        }
+        VMUnlock( dirHandle );
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBDeleteRecordByID */
+
+
+/***************************************************************************
+    BasicDBGetRecordID
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Returns the recordID of the current record.  If the return value is
+    C<0> the record is not yet saved into the database.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-11  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBRecordID _pascal
+BasicDBGetRecordID(
+    MemHandle       recordHandle
+    )
+{
+    BasicDBRecordHeader *   recordPtr;
+    BasicDBRecordID         recordID;
+
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordPtr   = MemLock( recordHandle );
+    recordID    = recordPtr->BDBRH_id;
+    MemUnlock( recordHandle );
+
+    return recordID;
+
+} /* BasicDBGetRecordID */
+
+
+/***************************************************************************
+    BasicDBGetElemNumFromID
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get the index in the data HugeArray for a record given its ID.  If
+    the ID can not be found, C<BDBE_RECORD_NOT_FOUND> is returned and index
+    is set to C<ID_NOT_FOUND>.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-26  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBGetElemNumFromID(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    BasicDBRecordID recordID,       /* record ID of record to delete. */
+    dword           *elemNum        /* ElemNum of record with given ID. */
+    )
+{
+    BasicDBError        error = BDBE_NO_ERROR;
+
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) )  {
+        error = BDBE_TIMEOUT;
+    }
+    else {
+        /* Delete the record from the HugeArray. */
+        dirPtr = VMLock( file, dirBlock, &dirHandle );
+
+        error = GetElemNumFromID( file, dirPtr->BDBD_recordArray, recordID, elemNum );
+
+        VMUnlock( dirHandle );
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBGetElemNumFromID */
+
+
+/***************************************************************************
+    BasicDBGetRecordUserID
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Return the user ID of the current record.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-11-14  FalkR     Initial version.
+
+***************************************************************************/
+dword _pascal
+BasicDBGetRecordUserID(
+    MemHandle       recordHandle,
+    BasicDBError    *error
+    )
+{
+    BasicDBRecordHeader *   recordPtr;
+    dword                   userID;
+
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordPtr   = MemLock( recordHandle );
+
+    userID  = recordPtr->BDBRH_userID;
+
+    MemUnlock( recordHandle );
+
+    if(error)
+        *error = BDBE_NO_ERROR;
+
+    return userID;
+
+} /* BasicDBGetRecordID */
+
+
+/***************************************************************************
+    BasicDBSetRecordUserID
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Set the user ID of the current record.
+    This is only possible for records never saved before.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-11-14  FalkR     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBSetRecordUserID(
+    MemHandle       recordHandle,
+    dword           userID
+    )
+{
+    BasicDBError stat;
+    BasicDBRecordHeader *   recordPtr;
+
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordPtr   = MemLock( recordHandle );
+
+    if(!recordPtr->BDBRH_id)
+    {
+        recordPtr->BDBRH_userID = userID;
+    
+        stat = BDBE_NO_ERROR;
+    }
+    else
+        stat = BDBE_RECORD_ALREADY_SAVED_ERROR;
+
+    MemUnlock( recordHandle );
+
+
+    return stat;
+
+} /* BasicDBSetRecordUserID */
+
+
+/***************************************************************************
+    GetRecordByRecordID
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get a record from the record HugeArray into memory.
+    The record is copied into a memory block, which handle is returned.
+
+    Note: Be sure to call C<VMGrabExclusive()> befor this function is
+          called!
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-24  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+GetRecordByRecordID(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   recordArray,    /* HugeArray of the records. */
+    BasicDBRecordID recordID,       /* ID of the record. */
+    MemHandle *     returnHandle    /* handle of record */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    dword           index;          /* Return value */
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECCheckHugeArray( file, recordArray ); )
+
+    error = GetElemNumFromID( file, recordArray, recordID, &index );
+    if ( BDBE_NO_ERROR != error ) {
+        *returnHandle = NullHandle;
+    }
+    else {
+        *returnHandle = GetRecordByElemNum( file, recordArray, index );
+    }
+    return error;
+
+} /* GetRecordByRecordID */
+
+
+/***************************************************************************
+    GetRecordByElemNum
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get a record from the record HugeArray into memory.
+    The record is copied into a memory block, which handle is returned.
+
+    Note: Be sure to call C<VMGrabExclusive()> befor this function is
+          called!
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-25  GerdB     Initial version.
+
+***************************************************************************/
+MemHandle _pascal
+GetRecordByElemNum(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   recordArray,    /* HugeArray of the records. */
+    dword           elemNum         /* index of record in HugeArray. */
+    )
+{
+    BasicDBRecordHeader*    elemPtr;    /* Pointer to the current element. */
+    word                    elemSize;   /* Size of the current element. */
+
+    MemHandle       recordHandle;
+    dword haCount;                      /* return value of HugeArrayLock */
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECCheckHugeArray( file, recordArray ); )
+
+    if ( elemNum > HugeArrayGetCount( file, recordArray ) ) {
+        recordHandle = NullHandle;
+    }
+    else {
+        haCount = HugeArrayLock( file, recordArray, elemNum, &elemPtr, &elemSize );
+
+        if ( 0 == HAL_COUNT( haCount )) {
+            recordHandle = NullHandle;
+        }
+        else {
+            recordHandle = MemAlloc( elemSize, HF_SWAPABLE, HAF_LOCK );
+            if ( NullHandle != recordHandle ) {
+                memcpy( MemDeref( recordHandle ), elemPtr, elemSize );
+                MemUnlock( recordHandle );
+            }
+            HugeArrayUnlock( elemPtr );
+        }
+    }
+
+    return recordHandle;
+
+} /* GetRecordByElemNum */
+
+
+/***************************************************************************
+    GetElemNumFromID
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get the index in the data HugeArray for a record given its ID.
+
+    Note: Be sure to call C<VMGrabExclusive()> befor this function is
+          called!
+
+  IMPLEMENTATION:
+    We use a binary search here, because the HugeArray is sorted
+    by the record ID.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-10  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+GetElemNumFromID(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   recordArray,    /* HugeArray of the records. */
+    BasicDBRecordID recordID,       /* ID of the record. */
+    dword *         elemNum         /* Index in the HugeArray. */
+    )
+{
+    BasicDBError            error = BDBE_NO_ERROR;
+
+    BasicDBRecordHeader*    elemPtr;    /* Pointer to the current element. */
+    word                    elemSize;   /* Size of the current element. */
+
+    dword   numOfElements;      /* number of elements in the HugeArray */
+    BasicDBRecordID currentID;
+
+    /* Indices for the binary search. */
+    dword   leftIndex;
+    dword   rightIndex;
+    dword   currentIndex;
+    dword   haCount;                    /* return value of HugeArrayLock */
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, recordArray ); )
+
+
+    numOfElements = HugeArrayGetCount( file, recordArray );
+
+    if ( numOfElements > 0 ) {
+        /* Lets do a binary search for the record ID. */
+        leftIndex  = 0;
+        rightIndex = numOfElements - 1;
+        do {
+            currentIndex = ( leftIndex + rightIndex ) / 2;
+
+            haCount = HugeArrayLock( file, recordArray, currentIndex, &elemPtr, &elemSize );
+            if ( 0 == HAL_COUNT( haCount )) {
+                error = BDBE_UNSUCCESSFUL_HUGE_ARRAY_LOCK;
+                break;
+            }
+
+            currentID = elemPtr->BDBRH_id;
+            HugeArrayUnlock( elemPtr );
+
+            if ( recordID < currentID ) {
+                if ( 0 == rightIndex ) {
+                    break;
+                }
+                rightIndex = currentIndex - 1;
+            }
+            else {
+                leftIndex = currentIndex + 1;
+            }
+
+        } while (( recordID != currentID ) && ( leftIndex <= rightIndex ));
+
+        if ( recordID != currentID ) {
+            /* recordID not found */
+            error = BDBE_RECORD_NOT_FOUND;
+        }
+    }
+    *elemNum = currentIndex;
+
+    return error;
+
+} /* GetElemNumFromID */
+
+
+
+/*==========================================================================
+    Working with fields:
+==========================================================================*/
+
+BasicDBError _pascal 
+BasicDBGetFieldCount(MemHandle recordHandle, word *fieldCount)
+{
+	BasicDBError stat;
+    BasicDBRecordHeader *recordPtr;
+
+    recordPtr = MemLock(recordHandle);
+
+	if(recordPtr)
+	{
+		*fieldCount = recordPtr->BDBRH_fieldCount;
+	
+		MemUnlock(recordHandle);
+
+		stat = BDBE_NO_ERROR;
+	}
+	else
+		stat = BDBE_UNSUCCESSFUL_HUGE_ARRAY_LOCK;
+
+	return(stat);
+}
+
+
+/***************************************************************************
+    BasicDBAddField
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Adds a new (empty) field to the record.  The returned BasicDBFieldID
+    is the unique ID to identify this field in this record.
+    For simplicity we add every new field to the end of the record.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-12  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBAddField(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    MemHandle       recordHandle,
+    BasicDBFieldCategory    fieldCategory,
+    BasicDBFieldType        fieldType,
+    TCHAR *         fieldName,      /* Namestring of the field. */
+    BasicDBFieldID* fieldID         /* ID assigned to that field. */
+    )
+{
+    BasicDBError            error;
+
+    BasicDBRecordHeader *   recordPtr;
+    BasicDBFieldHeader *    fieldPtr;
+
+    word                    recordSize;
+    NameToken               token;
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECCheckMemHandle( recordHandle ); )
+
+    /* Try to add the field name. */
+    error = AddFieldName( file, dirBlock, fieldName, &token );
+
+    if ( BDBE_NO_ERROR == error ) {
+        recordPtr  = MemLock( recordHandle );
+        recordSize = recordPtr->BDBRH_size;
+
+        MemReAlloc(
+                recordHandle,
+                recordSize + sizeof( BasicDBFieldHeader ),
+                HAF_ZERO_INIT );
+
+        recordPtr = MemDeref( recordHandle );
+        fieldPtr = (byte*) recordPtr + recordPtr->BDBRH_size;
+
+        /* Update RecordHeader */
+        recordPtr->BDBRH_fieldCount++;
+        recordPtr->BDBRH_size += sizeof( BasicDBFieldHeader );
+
+        /* Initialize FieldHeader */
+        fieldPtr->BDBFH_id          = recordPtr->BDBRH_nextFieldID++;
+        fieldPtr->BDBFH_size        = sizeof( BasicDBFieldHeader );
+        fieldPtr->BDBFH_nameToken   = token;
+        fieldPtr->BDBFH_type        = fieldType;
+        fieldPtr->BDBFH_category    = fieldCategory;
+
+        *fieldID = fieldPtr->BDBFH_id;
+
+        MemUnlock( recordHandle );
+    }
+    return error;
+
+} /* BasicDBAddField */
+
+
+/***************************************************************************
+    BasicDBDeleteField
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Deletes the field with the given field ID from the record.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-12  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBDeleteField(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    MemHandle       recordHandle,
+    BasicDBFieldID  fieldID
+    )
+{
+    BasicDBError            error = BDBE_FIELD_NOT_FOUND;
+
+    BasicDBRecordHeader *   recordPtr;
+    BasicDBFieldHeader *    fieldPtr;
+
+    word                    fieldSize;
+    word                    restOfRecordSize;
+    word                    bytesBeforeField;
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECCheckMemHandle( recordHandle ); )
+
+
+    recordPtr = MemLock( recordHandle );
+
+    fieldPtr = GetFieldPtr( recordPtr, fieldID );
+    if ( NULL != fieldPtr ) {
+        /* Field found. Now delete it */
+        /* Try to delete the field name. */
+        error = DeleteFieldName( file, dirBlock, fieldPtr->BDBFH_nameToken );
+
+        if ( BDBE_NO_ERROR == error ) {
+            /* Only if name could be deleted. */
+            fieldSize = fieldPtr->BDBFH_size;
+
+            bytesBeforeField = (byte*) fieldPtr - (byte*) recordPtr;
+            restOfRecordSize = recordPtr->BDBRH_size - bytesBeforeField - fieldSize;
+
+            if ( restOfRecordSize != 0 ) {
+                /* Overwrite current field with the following fields (only
+                    if there are some). */
+                memmove( fieldPtr, (byte*) fieldPtr + fieldSize, restOfRecordSize );
+            }
+            /* Update the RecordHeader. */
+            recordPtr->BDBRH_fieldCount--;
+            recordPtr->BDBRH_size -= fieldSize;
+
+            MemReAlloc( recordHandle, recordPtr->BDBRH_size, 0 );
+ 
+// FR		unlock? 
+			MemUnlock( recordHandle );
+        }
+    }
+    return error;
+
+} /* BasicDBDeleteField */
+
+
+/***************************************************************************
+    BasicDBSetFieldData
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Stores data in the specified field.
+
+    When storing ASCII data (strings), the strings should B<not> be null
+    terminated. For example, if you want to store the string "ABCD", then
+    pass a pointer to the string, and dataSize = 4.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-12  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBSetFieldData(
+    MemHandle       recordHandle,
+    BasicDBFieldID  fieldID,
+    void *          data,
+    word            dataSize
+    )
+{
+    BasicDBRecordHeader *   recordPtr;
+    BasicDBFieldHeader *    fieldPtr;
+
+    word                    fieldOffset;
+    word                    fieldSize;
+    word                    fieldDataSize;
+    word                    recordSize;
+    word                    restOfRecordSize;
+    word                    bytesBeforeField;
+    int                     diffSize;
+
+    BasicDBError            error = BDBE_FIELD_NOT_FOUND;
+
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordPtr = MemLock( recordHandle );
+    recordSize = recordPtr->BDBRH_size;
+
+    fieldPtr = GetFieldPtr( recordPtr, fieldID );
+
+    if ( NULL != fieldPtr ) {
+        /* Field found. */
+        error = BDBE_NO_ERROR;
+
+        fieldSize = fieldPtr->BDBFH_size;
+        fieldDataSize = fieldSize - sizeof( BasicDBFieldHeader );
+        diffSize = dataSize - fieldDataSize;
+        bytesBeforeField = (byte*) fieldPtr - (byte*) recordPtr;
+        restOfRecordSize = recordSize - bytesBeforeField - fieldSize;
+        fieldOffset = (byte*) fieldPtr - (byte*) recordPtr;
+
+        if ( diffSize > 0 ) {
+            /* Make room for the data. */
+            MemReAlloc(
+                    recordHandle,
+                    recordSize + diffSize,
+                    HAF_ZERO_INIT );
+
+            recordPtr = MemDeref( recordHandle );
+            fieldPtr = (byte*) recordPtr + fieldOffset;
+
+            if ( restOfRecordSize != 0 ) {
+                /* Moves following field to the end. */
+                memmove( (byte*) fieldPtr + sizeof( BasicDBFieldHeader ) + dataSize,
+                         (byte*) fieldPtr + fieldSize,
+                         restOfRecordSize );
+            }
+        }
+        else if ( diffSize < 0 ) {
+            /* Make the field smaller for the less data. */
+            fieldPtr = (byte*) recordPtr + fieldOffset;
+
+            if ( restOfRecordSize != 0 ) {
+                /* Overwrite parts of current field with the following
+                    fields (only if there are some). */
+                memmove( (byte*) fieldPtr + sizeof( BasicDBFieldHeader ) + dataSize,
+                         (byte*) fieldPtr + fieldSize,
+                         restOfRecordSize );
+            }
+            MemReAlloc(
+                    recordHandle,
+                    recordSize + diffSize,
+                    0 );
+        }
+
+        /* The field has now the correct size for the data. */
+        memcpy( (byte*) fieldPtr + sizeof( BasicDBFieldHeader ), data, dataSize );
+
+        fieldPtr->BDBFH_size += diffSize;
+        recordPtr->BDBRH_size += diffSize;
+
+    }
+    MemUnlock( recordHandle );
+    return error;
+
+} /* BasicDBSetFieldData */
+
+
+
+/***************************************************************************
+    BasicDBGetFieldData
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Gets data of a field.  Returns the number of bytes used for the data.
+    If C<0> is returned, the field does not exist or is empty.  If the
+    return value is greater than C<destSize> it indicates, that not all
+    data could be copied.
+
+    If the destination pointer c<dest> is c<NULL> or the
+    c<maxBytesToGet> is c<0>, then just the number of bytes used
+    for the data is returned.
+
+    Note: The standard (most efficient) way to store string data is
+          B<without> a null terminator, so callers will need to use the
+          returned data size.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-12  GerdB     Initial version.
+
+***************************************************************************/
+word _pascal                        /* size of data */
+BasicDBGetFieldData(
+    MemHandle       recordHandle,
+    BasicDBFieldID  fieldID,
+    void *          dest,
+    word            maxBytesToGet   /* size of dest buffer */
+    )
+{
+    BasicDBRecordHeader *   recordPtr;
+    BasicDBFieldHeader *    fieldPtr;
+
+    word                    dataSize = 0;
+
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordPtr = MemLock( recordHandle );
+
+    fieldPtr = GetFieldPtr( recordPtr, fieldID );
+    if ( NULL != fieldPtr ) {
+
+        dataSize =  fieldPtr->BDBFH_size - sizeof( BasicDBFieldHeader );
+
+        if ( ( NULL != dest ) && ( 0 != maxBytesToGet ) )
+        {
+            memcpy( dest,
+                    (byte*) fieldPtr + sizeof( BasicDBFieldHeader ),
+                    ( dataSize < maxBytesToGet ) ? dataSize : maxBytesToGet );
+        }
+    }
+    MemUnlock( recordHandle );
+    return dataSize;
+
+} /* BasicDBGetFieldData */
+
+
+/***************************************************************************
+    BasicDBGetPtrToFieldData
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Gets the pointer to the data of a field.
+    If the returned pointer is C<NULL>, the requested field ID could not
+    be found in this record.
+
+    Note: The record B<must> be locked!
+
+    Note: The standard (most efficient) way to store string data is
+          B<without> a null terminator, so callers will need to use the
+          returned data size.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-13  GerdB     Initial version.
+
+***************************************************************************/
+word _pascal                        /* size of data */
+BasicDBGetPtrToFieldData(
+    BasicDBRecordHeader *   recordPtr,
+    BasicDBFieldID          fieldID,
+    byte **                 dataPtr
+    )
+{
+    byte *                  ptr;
+    BasicDBFieldHeader *    fieldPtr;
+    word                    size = 0;
+
+    fieldPtr = GetFieldPtr( recordPtr, fieldID );
+
+    if ( NULL == fieldPtr ) {
+        *dataPtr = NULL;
+    }
+    else {
+        ptr = (byte*) fieldPtr + sizeof( BasicDBFieldHeader );
+        *dataPtr = ptr;
+// FR
+        size = fieldPtr->BDBFH_size - sizeof( BasicDBFieldHeader );
+    }
+
+    return size;
+
+} /* BasicDBGetPtrToFieldData */
+
+
+/***************************************************************************
+    BasicDBGetFieldDataSize
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Returns the number of bytes used for the data.
+    If C<0> is returned, the field does not exist or is empty.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-06-23  GerdB     Initial version.
+
+***************************************************************************/
+word _pascal                        /* size of data */
+BasicDBGetFieldDataSize(
+    MemHandle       recordHandle,
+    BasicDBFieldID  fieldID
+    )
+{
+    BasicDBRecordHeader *   recordPtr;
+    BasicDBFieldHeader *    fieldPtr;
+
+    word                    dataSize = 0;
+
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordPtr = MemLock( recordHandle );
+
+    fieldPtr = GetFieldPtr( recordPtr, fieldID );
+    if ( NULL != fieldPtr ) {
+
+        dataSize =  fieldPtr->BDBFH_size - sizeof( BasicDBFieldHeader );
+    }
+    MemUnlock( recordHandle );
+    return dataSize;
+
+} /* BasicDBGetFieldDataSize */
+
+
+/***************************************************************************
+    BasicDBSetFieldName
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Changes the name of the specified field.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-17  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBSetFieldName(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,      /* database directory block. */
+    MemHandle       recordHandle,
+    BasicDBFieldID  fieldID,
+    TCHAR *         fieldName       /* New name of the field. */
+    )
+{
+    BasicDBError    error = BDBE_FIELD_NOT_FOUND;
+
+    BasicDBRecordHeader *   recordPtr;
+    BasicDBFieldHeader *    fieldPtr;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordPtr   = MemLock( recordHandle );
+
+    fieldPtr = GetFieldPtr( recordPtr, fieldID );
+    if ( NULL != fieldPtr ) {
+        if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) {
+            error = BDBE_TIMEOUT;
+        }
+        else {
+// FR
+            error = ChangeFieldName(
+                    file,
+                    dirBlock,
+                    fieldPtr->BDBFH_nameToken,
+                    fieldName,
+                    &fieldPtr->BDBFH_nameToken );
+
+            BasicDBReleaseExclusive( file );
+        }
+    }
+    MemUnlock( recordHandle );
+
+    return error;
+
+} /* BasicDBSetFieldName */
+
+
+/***************************************************************************
+    BasicDBGetFieldName
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Gets the name of the specified field.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-18  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBGetFieldName(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,      /* database directory block. */
+    MemHandle       recordHandle,
+    BasicDBFieldID  fieldID,
+    TCHAR *         fieldName,      /* buffer for name string. */
+    word            maxBytesToGet   /* size of buffer for the null
+                                        terminated name string. */
+    )
+{
+    BasicDBError    error = BDBE_FIELD_NOT_FOUND;
+
+    BasicDBRecordHeader *   recordPtr;
+    BasicDBFieldHeader *    fieldPtr;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECCheckMemHandle( recordHandle ); )
+
+
+    recordPtr   = MemLock( recordHandle );
+
+    fieldPtr = GetFieldPtr( recordPtr, fieldID );
+    if ( NULL != fieldPtr ) {
+        error = GetFieldNameByToken(
+                    file,
+                    dirBlock,
+                    fieldPtr->BDBFH_nameToken,
+                    fieldName,
+                    maxBytesToGet );
+    }
+    MemUnlock( recordHandle );
+
+    return error;
+
+} /* BasicDBGetFieldName */
+
+/***************************************************************************
+    BasicDBGetFieldID
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Returns the fieldID of the field with the given C<value>
+    If C<nth> is greater than 1, the fieldID of the nth found field is
+    returned, otherwise the first found field is returned.
+
+    If the return value is C<0>, the field could not be found in
+    the record.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-01  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBFieldID _pascal
+BasicDBGetFieldID(
+    MemHandle       recordHandle,
+    BasicDBFieldHeaderElement   searchFor,
+    word                    value,      /* value to search for. */
+    int                     nth
+    )
+{
+    BasicDBRecordHeader *   recordPtr;
+    BasicDBFieldID          fieldID;
+
+EC( ECCheckMemHandle( recordHandle ); )
+
+    recordPtr = MemLock( recordHandle );
+    fieldID = BasicDBGetFieldIDPtr( recordPtr, searchFor, value, nth );
+    MemUnlock( recordHandle );
+
+    return fieldID;
+
+} /* BasicDBGetFieldID */
+
+
+/***************************************************************************
+    BasicDBGetFieldIDPtr
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Returns the fieldID of the field with the given C<value>.
+    If C<nth> is greater than 1, the fieldID of the nth found field is
+    returned, otherwise the first found field is returned.  This is
+    necessary because more fields can belong to the same category
+    or type.
+
+    If the return value is C<0>, the field could not be found in
+    the record.
+
+    Note: The record to search in must be locked on the heap.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-01  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBFieldID _pascal
+BasicDBGetFieldIDPtr(
+    BasicDBRecordHeader *   recordPtr,  /* Pointer to the locked record. */
+    BasicDBFieldHeaderElement   searchFor,  /* */
+    word                    value,      /* value to search for. */
+    int                     nth         /* */
+    )
+{
+    BasicDBFieldHeader *    fieldPtr;   /* Pointer to the current field. */
+
+    int                     fieldCount;
+    Boolean                 fieldFound = FALSE;
+    BasicDBFieldID          fieldID = 0;
+
+    /* Address of first field. */
+    fieldPtr = (byte*) recordPtr + sizeof( BasicDBRecordHeader );
+
+    for ( fieldCount = recordPtr->BDBRH_fieldCount;
+          fieldCount > 0;
+          fieldCount-- )
+    {
+        switch ( searchFor ) {
+        case BDBFHE_CATEGORY:
+            if ( value == fieldPtr->BDBFH_category ) {
+                /* Field found. */
+                --nth;
+                if ( nth <= 0 ) {
+                    fieldFound = TRUE;
+                }
+            }
+            break;
+        case BDBFHE_TYPE:
+            if ( value == fieldPtr->BDBFH_type ) {
+                /* Field found. */
+                --nth;
+                if ( nth <= 0 ) {
+                    fieldFound = TRUE;
+                }
+            }
+            break;
+        case BDBFHE_NAME_TOKEN:
+            if ( value == fieldPtr->BDBFH_nameToken ) {
+                /* Field found. */
+                --nth;
+                if ( nth <= 0 ) {
+                    fieldFound = TRUE;
+                }
+            }
+            break;
+
+        default:
+            EC_WARNING( UNKNOWN_FIELD_HEADER_ELEMENT );
+
+        } /* switch ( searchFor ) */
+
+        if ( fieldFound ) {
+            /* Field found */
+            fieldID = fieldPtr->BDBFH_id;
+            /* exit for loop. */
+            break;
+        }
+
+        /* Next field. */
+        fieldPtr = (byte*) fieldPtr + fieldPtr->BDBFH_size;
+    }
+    return fieldID;
+
+} /* BasicDBGetFieldIDPtr */
+
+
+
+/***************************************************************************
+    GetFieldPtr
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Returns a pointer to the field with the given ID.
+    If the return value is NULL, the field could not be found in the record.
+
+    Note: The record to search in must be locked on the heap.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-12  GerdB     Initial version.
+
+***************************************************************************/
+void * _pascal            /* Pointer to the field. */
+GetFieldPtr(
+    BasicDBRecordHeader *   recordPtr,  /* Pointer to the locked record. */
+    BasicDBFieldID          fieldID     /* ID to search for. */
+    )
+{
+    BasicDBFieldHeader *    fieldPtr;   /* Pointer to the current field. */
+    int                     fieldCount;
+    void *                  returnPointer = NULL;
+
+    /* Address of first field. */
+    fieldPtr = (byte*) recordPtr + sizeof( BasicDBRecordHeader );
+
+    for ( fieldCount = recordPtr->BDBRH_fieldCount;
+          fieldCount > 0;
+          fieldCount-- )
+    {
+        if ( fieldID == fieldPtr->BDBFH_id ) {
+            /* Field found. Exit for loop, because the ID is unique. */
+            returnPointer = fieldPtr;
+            break;
+        }
+        /* Next field. */
+        fieldPtr = (byte*) fieldPtr + fieldPtr->BDBFH_size;
+    }
+    return returnPointer;
+
+} /* GetFieldPtr */
+
+
+
+/***************************************************************************
+    AddFieldName
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Adds a name to the name array.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-17  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+AddFieldName(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    TCHAR *         fieldName,      /* field name. */
+    NameToken *     token
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    MemHandle       dirHandle;      /* to the map block */
+    BasicDBDirectory *    dirPtr;
+
+    MemHandle       arrayHandle;
+
+    word            elemSize;
+    byte            elem[ BASICDB_MAX_NAME_SIZE ];
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    *token  = CA_NULL_ELEMENT;
+
+    if ( NULL != fieldName ) {
+        /* Only add fieldname if we really have one. */
+        if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) {
+            error = BDBE_TIMEOUT;
+        }
+        else {
+            elemSize = strlen( fieldName ) + 1;
+
+            memcpy( elem + sizeof( RefElementHeader ), fieldName, elemSize );
+            dirPtr   = VMLock( file, dirBlock, &dirHandle );
+            VMLock( file, dirPtr->BDBD_nameBlock, &arrayHandle );
+
+            /* Add name */
+            *token = P_ElementArrayAddElementHandles(
+                    arrayHandle, dirPtr->BDBD_nameArray,
+                    elem, elemSize + sizeof( RefElementHeader ),
+                    0, NullHandle );
+
+            VMUnlock( arrayHandle );
+            VMUnlock( dirHandle );
+
+            BasicDBReleaseExclusive( file );
+        }
+    }
+    return error;
+
+} /* AddFieldName */
+
+
+/***************************************************************************
+    DeleteFieldName
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Deletes a name from the name array.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-17  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+DeleteFieldName(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    NameToken       token           /* Token of the field name. */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    MemHandle       dirHandle;      /* to the map block */
+    BasicDBDirectory *    dirPtr;
+
+    MemHandle       arrayHandle;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    if ( CA_NULL_ELEMENT != token ) {
+        /* Only if there is really a name associated with the field. */
+        if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) {
+            error = BDBE_TIMEOUT;
+        }
+        else {
+            dirPtr   = VMLock( file, dirBlock, &dirHandle );
+            VMLock( file, dirPtr->BDBD_nameBlock, &arrayHandle );
+
+            /* Delete name */
+//FR            ElementArrayDeleteHandles(
+//                    arrayHandle, dirPtr->BDBD_nameArray, token );
+			ElementArrayRemoveReferenceHandles(
+					arrayHandle, dirPtr->BDBD_nameArray, token,
+					0, 0);
+
+            VMUnlock( arrayHandle );
+            VMUnlock( dirHandle );
+
+            BasicDBReleaseExclusive( file );
+
+        } /* if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) */
+    } /* if ( CA_NULL_ELEMENT == token ) */
+
+    return error;
+
+} /* DeleteFieldName */
+
+
+/***************************************************************************
+    ChangeFieldName
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Changes a field name.
+    It deletes the old name -- given by its NameToken -- from the array,
+    and adds the new name to the array.
+
+    If C<oldToken> is C<CA_NULL_ELEMENT>, no name will be deleted.  And if
+    C<fieldName> is C<NULL> no name will be added and C<newToken> will
+    be C<CA_NULL_ELEMENT>.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-17  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+ChangeFieldName(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,      /* database directory block. */
+    NameToken       oldToken,       /* Token of the field name. */
+    TCHAR *         fieldName,      /* field name. */
+    NameToken *     newToken
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    MemHandle       dirHandle;      /* to the map block */
+    BasicDBDirectory *    dirPtr;
+
+    MemHandle       arrayHandle;
+
+    word            elemSize;
+    byte            elem[ BASICDB_MAX_NAME_SIZE ];
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    *newToken  = CA_NULL_ELEMENT;
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) {
+        error = BDBE_TIMEOUT;
+    }
+    else {
+        dirPtr   = VMLock( file, dirBlock, &dirHandle );
+        VMLock( file, dirPtr->BDBD_nameBlock, &arrayHandle );
+
+        /* Delete old name */
+        if ( CA_NULL_ELEMENT != oldToken ) {
+            /* Only if there is really a name associated with the field. */
+//FR
+//            ElementArrayDeleteHandles(
+//                    arrayHandle, dirPtr->BDBD_nameArray, oldToken );
+			ElementArrayRemoveReferenceHandles(
+					arrayHandle, dirPtr->BDBD_nameArray, oldToken,
+					0, 0);
+		}
+
+        if ( NULL != fieldName ) {
+
+            elemSize = strlen( fieldName ) + 1;
+
+            memcpy( elem + sizeof( RefElementHeader ), fieldName, elemSize );
+
+            /* Add name */
+            *newToken = P_ElementArrayAddElementHandles(
+                    arrayHandle, dirPtr->BDBD_nameArray,
+                    elem, elemSize + sizeof( RefElementHeader ),
+                    0, NullHandle );
+        }
+        VMUnlock( arrayHandle );
+        VMUnlock( dirHandle );
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* ChangeFieldName */
+
+
+
+/***************************************************************************
+    GetFieldNameByToken
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get a field name.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-18  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+GetFieldNameByToken(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    NameToken       token,          /* Token of the field name. */
+    TCHAR *         fieldName,      /* field name. */
+    word            maxBytesToGet
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    MemHandle           dirHandle;      /* to the map block */
+    BasicDBDirectory *  dirPtr;
+
+    MemHandle       arrayHandle;
+
+    word            index;
+    word            elemSize;
+    byte *          elemPtr;
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    fieldName[ 0 ] = 0;
+
+    if ( CA_NULL_ELEMENT != token ) {
+        /* Only if there is really a name associated with the field. */
+        if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) {
+            error = BDBE_TIMEOUT;
+        }
+        else {
+            dirPtr   = VMLock( file, dirBlock, &dirHandle );
+            VMLock( file, dirPtr->BDBD_nameBlock, &arrayHandle );
+
+            /* Get the name. */
+
+            index = P_ElementArrayTokenToUsedIndexHandles(
+                        arrayHandle, dirPtr->BDBD_nameArray,
+                        token,
+                        0, NULL );
+
+            elemPtr = ChunkArrayElementToPtrHandles(
+                        arrayHandle, dirPtr->BDBD_nameArray,
+                        index,
+                        &elemSize );
+
+            elemSize -= sizeof( RefElementHeader );
+
+            memcpy( fieldName,
+                    elemPtr + sizeof( RefElementHeader ),
+                    ( elemSize < maxBytesToGet ) ? elemSize : maxBytesToGet );
+
+            /* make sure, string is ended by a 0. */
+            fieldName[ maxBytesToGet - 1 ] = 0;
+
+            VMUnlock( arrayHandle );
+            VMUnlock( dirHandle );
+
+            BasicDBReleaseExclusive( file );
+
+        } /* if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_WRITE ) ) */
+    } /* if ( CA_NULL_ELEMENT != token ) */
+    return error;
+
+} /* GetFieldNameByToken */
+
+
+
+/*==========================================================================
+    Indices:
+==========================================================================*/
+
+
+/***************************************************************************
+    BasicDBIndexCreate
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Creates a new index.
+
+    If the flag C<BDBILF_AUTO_UPDATE> is set, the index will be
+    automatically updated, if records are added or deleted.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-23  GerdB     Initial version.
+    98-04-13  GerdB     Updated to new index concept.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBIndexCreate(
+    VMFileHandle        file,           /* contains the database. */
+    VMBlockHandle       dirBlock,       /* database directory block. */
+    BasicDBIndexListFlags    flags,
+    word                valueForCallback,
+    VMBlockHandle *     indexArray      /* HugeArray of the index array. */
+    )
+{
+    BasicDBError        error = BDBE_NO_ERROR;
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+    VMBlockHandle       index;
+    BasicDBIndexListNode *  indexPtr;
+    BasicDBIndexHandle  indexHandle;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC_ERROR_IF( flags & ~( BDBILF_AUTO_UPDATE ), UNUSED_FLAG_SET );
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+            error = BDBE_TIMEOUT;
+    }
+    else {
+        /* Create the HugeArray for the index. */
+        index = HugeArrayCreate( file, sizeof( BasicDBIndexElement ), 0 );
+        *indexArray = index;
+
+        if (( NullHandle != index ) && ( flags & BDBILF_AUTO_UPDATE ))
+        {
+            /* Add it to the auto updated indices. */
+            VMLock( file, dirBlock, &dirHandle );
+            indexHandle = LMemAlloc( dirHandle, sizeof( BasicDBIndexListNode ));
+
+            dirPtr   = MemDeref( dirHandle );
+            indexPtr = LMemDerefHandles( dirHandle, indexHandle );
+
+            indexPtr->BDBILE_vmBlock          = index;
+            indexPtr->BDBILE_next             = dirPtr->BDBD_indices;
+            indexPtr->BDBILE_valueForCallback = valueForCallback;
+
+            dirPtr->BDBD_indices = indexHandle;
+
+            VMDirty( dirHandle );
+            VMUnlock( dirHandle );
+        }
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBIndexCreate */
+
+
+/***************************************************************************
+    BasicDBIndexDestroy
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Destroys an index by destroying the HugeArray containing it and to free
+    the element in the index list, if the index was present there.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-23  GerdB     Initial version.
+    98-04-13  GerdB     Updated to new index concept.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBIndexDestroy(
+    VMFileHandle        file,           /* contains the database. */
+    VMBlockHandle       dirBlock,       /* database directory block. */
+    VMBlockHandle       indexToDestroy  /* HugeArray of the index array. */
+    )
+{
+    BasicDBError        error = BDBE_NO_ERROR;
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+    BasicDBIndexHandle  indexHandle;
+    BasicDBIndexListNode *   nodePtr;        /* ptr in current element. */
+    BasicDBIndexListNode *   lastNodePtr;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECVMCheckVMBlockHandle( file, indexToDestroy ); )
+
+    if ( NullHandle == indexToDestroy ) {
+        EC_WARNING( INDEX_HANDLE_INVALID );
+    }
+    else if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+        error = BDBE_TIMEOUT;
+    }
+    else {
+        dirPtr = VMLock( file, dirBlock, &dirHandle );
+
+        indexHandle = dirPtr->BDBD_indices;
+        if ( NullHandle == indexHandle ) {
+            EC_WARNING( NO_INDEX_IN_DATABASE );
+        } /* if ( NullHandle == indexHandle ) */
+
+        else {
+            nodePtr = NULL;
+
+            /* Search for the right index. */
+            while (( indexToDestroy != nodePtr->BDBILE_vmBlock ) &&
+                   ( NullHandle != indexHandle ))
+            {
+                /* Deref index list element. */
+                lastNodePtr = nodePtr;
+                nodePtr = LMemDerefHandles( dirHandle, indexHandle );
+
+                indexHandle = nodePtr->BDBILE_next;
+
+            }
+
+            if ( indexToDestroy == nodePtr->BDBILE_vmBlock ) {
+                /* Index found. */
+                error = BDBE_NO_ERROR;
+
+                /* Update list of indices. */
+                if ( indexHandle == dirPtr->BDBD_indices ) {
+                    /* First element will be destroyed. */
+                    dirPtr->BDBD_indices = nodePtr->BDBILE_next;
+                } /* if ( indexHandle == dirPtr->BDBD_indices ) */
+
+                else {
+                    lastNodePtr->BDBILE_next = nodePtr->BDBILE_next;
+                } /* if ( indexHandle == dirPtr->BDBD_indices ) */
+
+                LMemFreeHandles( dirHandle, indexHandle );
+
+            }
+        }
+
+        VMUnlock( dirHandle );
+
+        /* Free array. */
+        HugeArrayDestroy( file, indexToDestroy );
+
+        BasicDBReleaseExclusive( file );
+
+    } /* else if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) ) */
+
+    return error;
+
+} /* BasicDBIndexDestroy */
+
+
+/***************************************************************************
+    IndicesAddEntry
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Adds a new record to all the indices.
+    If there is no index in use by the current database, C<BDBE_NO_ERROR>
+    is returned.
+    But if an index is used but the pointer to the callback routine is
+    C<NULL>, the index can not be updated and C<BDBE_INDEX_NO_CALLBACK>
+    is returned.
+
+    Note: Make sure, that VMGrabExclusive is already called.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-24  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+IndicesAddEntry(
+    VMFileHandle        file,           /* contains our database. */
+    VMBlockHandle       dirBlock,       /* database directory block. */
+    MemHandle           recordHandle,   /* Record to be added. */
+    BasicDBCallback     Callback        /* Callback function for sorting indices. */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    BasicDBDirectory *      dirPtr;
+    MemHandle               dirHandle;
+
+    BasicDBRecordHeader *   recordPtr;
+
+    BasicDBIndexListNode *   nodePtr;        /* ptr in current element. */
+
+    ChunkHandle         indexHandle;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECCheckMemHandle( recordHandle ); )
+
+EC_WARNING_IF( NULL == Callback, NO_CALLBACK_FOR_INDEX_UPDATE );
+
+    dirPtr    = VMLock( file, dirBlock, &dirHandle );
+    recordPtr = MemLock( recordHandle );
+
+    indexHandle = dirPtr->BDBD_indices;
+
+    while ( NullHandle != indexHandle ) {
+        nodePtr = LMemDerefHandles( dirHandle, indexHandle );
+        error = HugeIndexAdd( file, nodePtr->BDBILE_vmBlock,
+                      dirPtr->BDBD_recordArray,
+                      recordPtr,
+					  recordHandle,
+                      nodePtr->BDBILE_valueForCallback, Callback );
+
+        indexHandle = nodePtr->BDBILE_next;
+    }
+    MemUnlock( recordHandle );
+    VMUnlock( dirHandle );
+
+    return error;
+
+} /* IndicesAddEntry */
+
+
+
+/***************************************************************************
+    BasicDBIndexElementAdd
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Adds a entry to an index.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-13  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBIndexElementAdd (
+    VMFileHandle        file,           /* contains our database. */
+    VMBlockHandle       dirBlock,       /* database directory block. */
+    BasicDBRecordID     recordID,       /* ID of the record. */
+    VMBlockHandle       indexArray,     /* HugeArray of index. */
+    word                valueForCallback,
+    BasicDBCallback     Callback        /* Callback function for sorting indices. */
+    )
+{
+    BasicDBError        error = BDBE_NO_ERROR;
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+    VMBlockHandle       recordArray;    /* Handle of the HugeArray. */
+    MemHandle           recordHandle;
+    BasicDBRecordHeader*    recordPtr;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECVMCheckVMBlockHandle( file, indexArray ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+            error = BDBE_TIMEOUT;
+    }
+    else {
+        dirPtr      = VMLock( file, dirBlock, &dirHandle );
+        recordArray = dirPtr->BDBD_recordArray;
+        VMUnlock( dirHandle );
+
+        error = GetRecordByRecordID( file, recordArray, recordID, &recordHandle );
+
+        if ( BDBE_NO_ERROR == error ) {
+            recordPtr = MemLock( recordHandle );
+            error = HugeIndexAdd( file, indexArray,
+                          recordArray,
+                          recordPtr,
+						  recordHandle,
+                          valueForCallback, Callback );
+            MemUnlock( recordHandle );
+            BasicDBDiscardRecord( recordHandle );
+        }
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBIndexElementAdd */
+
+
+/***************************************************************************
+    HugeIndexAdd
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Adds a entry to an index.
+    If the callback routine is a C<NULL> pointer, this function does
+    nothing but still return C<BDBE_NO_ERROR>.
+
+    Note: Make sure, that VMGrabExclusive is already called.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-24  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+HugeIndexAdd (
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   indexBlock,     /* HugeArray of index. */
+    VMBlockHandle   recordArray,    /* HugeArray of our records. */
+    BasicDBRecordHeader *   newRecordPtr,   /* record to be sorted into index. */
+    MemHandle		newRecordHandle,
+	word            valueForCallback,
+    BasicDBCallback Callback
+    )
+{
+    BasicDBError error = BDBE_NO_ERROR;
+    BasicDBIndexElement indexElem;
+    BasicDBRecordID currentID;
+    dword numOfElements;
+    dword position = 0;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, indexBlock ); )
+EC( ECVMCheckVMBlockHandle( file, recordArray ); )
+
+EC_WARNING_IF( NULL == Callback, NO_CALLBACK_FOR_INDEX_UPDATE );
+
+    if ( NULL == Callback ) {
+        error = BDBE_INDEX_NO_CALLBACK;
+    }
+    else {
+        numOfElements = HugeArrayGetCount( file, indexBlock );
+        if ( numOfElements > 0 ) {
+            error = HugeIndexFindPosition(
+                        file,
+                        indexBlock,
+                        recordArray,
+                        newRecordPtr,
+						newRecordHandle,
+                        valueForCallback,
+                        Callback,
+                        &position,
+                        &currentID,
+						FALSE);			// don't look for ID
+        }
+
+        /* Insert position found.  If numOfElements is 0, currentIndex is
+            0 due to declaration. */
+        indexElem.BDBIE_id = newRecordPtr->BDBRH_id;
+
+        if ( position >= numOfElements ) {
+            HugeArrayAppend( file, indexBlock, 1, &indexElem );
+        }
+        else {
+            HugeArrayInsert( file, indexBlock, 1, position, &indexElem );
+        }
+
+    }
+    return error;
+
+} /* HugeIndexAdd */
+
+
+/***************************************************************************
+    IndicesDeleteEntry
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Deletes a record from all the indices.
+    If there is no index in use by the current database, C<BDBE_NO_ERROR>
+    is returned.
+    But if an index is used but the pointer to the callback routine is
+    C<NULL>, the index can not be updated and C<BDBE_INDEX_NO_CALLBACK>
+    is returned.
+
+    Note: Make sure, that VMGrabExclusive is already called.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-24  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+IndicesDeleteEntry(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    MemHandle       recordHandle,   /* Record to be deleted. */
+    BasicDBCallback Callback                      /* Callback function for sorting indices. */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    BasicDBDirectory *      dirPtr;
+    MemHandle               dirHandle;
+
+    BasicDBRecordHeader *   recordPtr;
+
+    BasicDBIndexListNode *   nodePtr;        /* ptr in current element. */
+
+    ChunkHandle         indexHandle;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+EC_WARNING_IF( NULL == Callback, NO_CALLBACK_FOR_INDEX_UPDATE );
+
+    dirPtr    = VMLock( file, dirBlock, &dirHandle );
+    recordPtr = MemLock( recordHandle );
+
+    indexHandle = dirPtr->BDBD_indices;
+
+    while ( NullHandle != indexHandle ) {
+	 /*  nodePtr = LMemDerefHandles( dirHandle, dirPtr->BDBD_indices); jfh 7/12/99 */
+	   nodePtr = LMemDerefHandles( dirHandle, indexHandle);
+
+        error = HugeIndexDelete( file, nodePtr->BDBILE_vmBlock,
+                        dirPtr->BDBD_recordArray, recordPtr,
+						recordHandle,
+                        nodePtr->BDBILE_valueForCallback, Callback );
+
+        indexHandle = nodePtr->BDBILE_next;
+    }
+    MemUnlock( recordHandle );
+    VMUnlock( dirHandle );
+
+    return error;
+
+} /* IndicesDeleteEntry */
+
+
+/***************************************************************************
+    BasicDBIndexElementDelete
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Deletes an entry from an index.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-13  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBIndexElementDelete (
+    VMFileHandle        file,           /* contains our database. */
+    VMBlockHandle       dirBlock,       /* database directory block. */
+    BasicDBRecordID     recordID,       /* ID of the record. */
+    VMBlockHandle       indexArray,     /* HugeArray of index. */
+    word                valueForCallback,
+    BasicDBCallback     Callback        /* Callback function for sorting indices. */
+    )
+{
+    BasicDBError        error = BDBE_NO_ERROR;
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+    VMBlockHandle       recordArray;    /* Handle of the HugeArray. */
+    MemHandle           recordHandle;
+    BasicDBRecordHeader*    recordPtr;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECVMCheckVMBlockHandle( file, indexArray ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+            error = BDBE_TIMEOUT;
+    }
+    else {
+        dirPtr      = VMLock( file, dirBlock, &dirHandle );
+        recordArray = dirPtr->BDBD_recordArray;
+        VMUnlock( dirHandle );
+
+        error = GetRecordByRecordID( file, recordArray, recordID, &recordHandle );
+
+        if ( BDBE_NO_ERROR == error ) {
+            recordPtr = MemLock( recordHandle );
+            error = HugeIndexDelete( file, indexArray,
+                            recordArray, recordPtr,
+							recordHandle,
+                            valueForCallback, Callback );
+
+            MemUnlock( recordHandle );
+            BasicDBDiscardRecord( recordHandle );
+        }
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBIndexElementDelete */
+
+
+/***************************************************************************
+    BasicDBIndexElementFind
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Find a record ID in index.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-13  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBIndexElementFind (
+    VMFileHandle        file,           /* contains our database. */
+    VMBlockHandle       dirBlock,       /* database directory block. */
+    BasicDBRecordID     recordID,       /* ID of the record. */
+    VMBlockHandle       indexArray,     /* HugeArray of index. */
+    word                valueForCallback,
+    BasicDBCallback     Callback,        /* Callback function for sorting indices. */
+    dword				*elemNum
+	)
+{
+    BasicDBError        error = BDBE_NO_ERROR;
+    BasicDBDirectory *  dirPtr;
+    MemHandle           dirHandle;
+    VMBlockHandle       recordArray;    /* Handle of the HugeArray. */
+    MemHandle           recordHandle;
+    BasicDBRecordHeader*    recordPtr;
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+EC( ECVMCheckVMBlockHandle( file, indexArray ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+            error = BDBE_TIMEOUT;
+    }
+    else {
+        dirPtr      = VMLock( file, dirBlock, &dirHandle );
+        recordArray = dirPtr->BDBD_recordArray;
+        VMUnlock( dirHandle );
+
+        error = GetRecordByRecordID( file, recordArray, recordID, &recordHandle );
+
+        if ( BDBE_NO_ERROR == error ) {
+            recordPtr = MemLock( recordHandle );
+            error = HugeIndexFind( file, indexArray,
+                            recordArray, recordPtr,
+							recordHandle,
+                            valueForCallback, Callback,
+							elemNum );
+
+            MemUnlock( recordHandle );
+            BasicDBDiscardRecord( recordHandle );
+        }
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBIndexElementDelete */
+
+
+/***************************************************************************
+    HugeIndexFind
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Find an entry from an index.
+    If the callback routine is a C<NULL> pointer, this function does
+    nothing but still return C<BDBE_NO_ERROR>.
+
+    Note: Make sure, that VMGrabExclusive is already called.
+
+  IMPLEMENTATION:
+    We pass in a record pointer instead of the record ID, so we can use
+    a binary search to find the index in our list.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-24  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+HugeIndexFind(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   indexBlock,     /* HugeArray of index. */
+    VMBlockHandle   recordArray,    /* HugeArray of our records. */
+    BasicDBRecordHeader *   delRecordPtr,   /* record to be deleted from index. */
+	MemHandle		delRecordHandle,
+    word            valueForCallback,
+    BasicDBCallback Callback,
+	dword			*elemNum)
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    BasicDBRecordID         currentID;
+
+    dword                   numOfElements;
+
+    dword position;
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, indexBlock ); )
+
+EC_WARNING_IF( NULL == Callback, NO_CALLBACK_FOR_INDEX_UPDATE );
+
+    if ( NULL == Callback ) {
+        error = BDBE_INDEX_NO_CALLBACK;
+    }
+    else {
+        numOfElements = HugeArrayGetCount( file, indexBlock );
+        if ( numOfElements > 0 ) {
+
+            error = HugeIndexFindPosition(
+                        file,
+                        indexBlock,
+                        recordArray,
+                        delRecordPtr,
+						delRecordHandle,
+                        valueForCallback,
+                        Callback,
+                        &position,
+                        &currentID,
+						TRUE);		// look for ID
+
+            if ( currentID == delRecordPtr->BDBRH_id ) {
+                /* Found the index element to delete. */
+                *elemNum = position;
+            }
+            else {
+                /* The record ID is not the ID of the record to
+                   delete, but it really should be. */
+                error = BDBE_INDEX_UNSORTED;
+            }
+        }
+    }
+    return error;
+
+} /* HugeIndexFind */
+
+
+
+/***************************************************************************
+    HugeIndexDelete
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Deletes an entry from an index.
+    If the callback routine is a C<NULL> pointer, this function does
+    nothing but still return C<BDBE_NO_ERROR>.
+
+    Note: Make sure, that VMGrabExclusive is already called.
+
+  IMPLEMENTATION:
+    We pass in a record pointer instead of the record ID, so we can use
+    a binary search to find the index in our list.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-24  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+HugeIndexDelete(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   indexBlock,     /* HugeArray of index. */
+    VMBlockHandle   recordArray,    /* HugeArray of our records. */
+    BasicDBRecordHeader *   delRecordPtr,   /* record to be deleted from index. */
+	MemHandle		delRecordHandle,
+    word            valueForCallback,
+    BasicDBCallback Callback
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+    BasicDBRecordID         currentID;
+
+    dword                   numOfElements;
+
+    dword position;
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, indexBlock ); )
+
+EC_WARNING_IF( NULL == Callback, NO_CALLBACK_FOR_INDEX_UPDATE );
+
+    if ( NULL == Callback ) {
+        error = BDBE_INDEX_NO_CALLBACK;
+    }
+    else {
+        numOfElements = HugeArrayGetCount( file, indexBlock );
+        if ( numOfElements > 0 ) {
+
+            error = HugeIndexFindPosition(
+                        file,
+                        indexBlock,
+                        recordArray,
+                        delRecordPtr,
+						delRecordHandle,
+                        valueForCallback,
+                        Callback,
+                        &position,
+                        &currentID,
+						TRUE);			// look for ID
+
+            if ( currentID == delRecordPtr->BDBRH_id ) {
+                /* Found the index element to delete. */
+                HugeArrayDelete( file, indexBlock, 1, position );
+            }
+            else {
+                /* The record ID is not the ID of the record to
+                   delete, but it really should be. */
+                error = BDBE_INDEX_UNSORTED;
+            }
+        }
+    }
+    return error;
+
+} /* HugeIndexDelete */
+
+
+
+/***************************************************************************
+    HugeIndexFindPosition
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Find the element number in the HugeArray, where the index element
+    belongs to.
+    If the callback routine is a C<NULL> pointer, this function
+    FatalErrors.
+
+    Note: Make sure, that VMGrabExclusive is already called.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-03  GerdB     Initial version (split out HugeIndexAdd).
+
+***************************************************************************/
+BasicDBError _pascal                /* elemNum where the record belongs. */
+HugeIndexFindPosition (
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   indexBlock,     /* HugeArray of index. */
+    VMBlockHandle   recordArray,    /* HugeArray of our records. */
+    BasicDBRecordHeader *   newRecordPtr,   /* record to be sorted into index. */
+    MemHandle		newRecordHandle,
+	word            valueForCallback,
+    BasicDBCallback Callback,
+    dword *         position,
+    BasicDBRecordID*    id,
+	Boolean			lookID
+    )
+{
+    BasicDBError            error = BDBE_NO_ERROR;
+
+    BasicDBRecordHeader *   recordPtr;  /* Current record. */
+    MemHandle               recordHandle;
+
+    BasicDBIndexElement*    elemPtr;    /* Pointer to the current element. */
+    word                    elemSize;   /* Size of the current element. */
+
+    BasicDBRecordID         currentID;
+
+    sword           callbackReturn;
+
+    /* Indices for the binary search. */
+    dword   leftIndex;
+    dword   rightIndex;
+    dword   currentIndex;
+    dword haCount;                      /* return value of HugeArrayLock */
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, indexBlock ); )
+EC( ECVMCheckVMBlockHandle( file, recordArray ); )
+/* EC_ERROR_IF( numOfElements != 0, -1) ; */
+EC_ERROR_IF( NULL == Callback, NO_CALLBACK_FOR_INDEX_UPDATE );
+
+    /* Lets do a binary search. */
+// FR
+	currentIndex = 0;
+    leftIndex  = 0;
+    rightIndex = HugeArrayGetCount( file, indexBlock );
+
+    if ( 0 != rightIndex ) {
+        /* If we have elements in the array. */
+        --rightIndex;
+        do {
+            currentIndex = ( leftIndex + rightIndex ) / 2;
+
+            /* Get record ID from the current element. */
+            haCount = HugeArrayLock( file, indexBlock, currentIndex,
+                            &elemPtr, &elemSize );
+
+            if ( 0 == HAL_COUNT( haCount )) {
+                error = BDBE_UNSUCCESSFUL_HUGE_ARRAY_LOCK;
+                break;
+            }
+
+            currentID = elemPtr->BDBIE_id;
+            HugeArrayUnlock( elemPtr );
+
+            /* Get record into memory. */
+            error = GetRecordByRecordID( file, recordArray,
+                        currentID, &recordHandle );
+
+            recordPtr = MemLock( recordHandle );
+
+            /* Compare. */
+            callbackReturn = ((pcfm_BasicDBCallback) ProcCallFixedOrMovable_pascal)(
+                            newRecordHandle, recordHandle,
+                            valueForCallback, Callback );
+
+            MemUnlock( recordHandle );
+            BasicDBDiscardRecord( recordHandle );
+
+            if ( callbackReturn < 0 ) {
+
+                /* Make sure that the right border never is < 0. */
+                if ( 0 == currentIndex ) {
+                    break; // not found... or insert as first
+                }
+                rightIndex = currentIndex - 1;
+
+            }
+            else if(callbackReturn > 0) {
+
+                leftIndex = currentIndex + 1;
+
+            }
+			else
+			{
+
+				if(lookID && 
+					(currentID == (newRecordPtr->BDBRH_id)))
+					break;
+				
+                if(currentID) {
+
+				    if(currentID < (newRecordPtr->BDBRH_id))
+					    leftIndex = currentIndex + 1;
+				    else
+	                    rightIndex = currentIndex - 1;
+
+			    } else {
+
+	                rightIndex = currentIndex - 1;
+                }
+            }
+
+			if(lookID && (currentID == (newRecordPtr->BDBRH_id)))
+				break;
+
+        } while (/*( 0 != callbackReturn ) &&*/ ( leftIndex <= rightIndex ));
+
+		if (( 1 == callbackReturn ) ||
+			((callbackReturn == 0) && (currentID < (newRecordPtr->BDBRH_id)))) {
+			++currentIndex;
+		}
+	}
+
+    *position = currentIndex;
+    *id       = currentID;
+
+    return error;
+
+} /* HugeIndexFindPosition */
+
+
+/***************************************************************************
+    BasicDBIndexGetCount
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get the number of elements in the index.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-03-31  GerdB     Initial version.
+
+***************************************************************************/
+BasicDBError _pascal
+BasicDBIndexGetCount(
+    VMFileHandle    file,           /* contains our database. */
+    VMBlockHandle   dirBlock,       /* database directory block. */
+    VMBlockHandle   indexArray,     /* HugeArray of the index array to use. */
+    dword *         count           /* elements in the index. */
+    )
+{
+    BasicDBError    error = BDBE_NO_ERROR;
+
+
+EC( ECVMCheckVMFile( file ); )
+EC( ECVMCheckVMBlockHandle( file, dirBlock ); )
+
+    if ( VMSERV_TIMEOUT == BasicDBGrabExclusive( file, VMO_READ ) )  {
+        error = BDBE_TIMEOUT;
+    }
+    else {
+
+        /* Get record ID from index. */
+        *count = HugeArrayGetCount( file, indexArray );
+
+        BasicDBReleaseExclusive( file );
+    }
+    return error;
+
+} /* BasicDBIndexGetCount */
+
+

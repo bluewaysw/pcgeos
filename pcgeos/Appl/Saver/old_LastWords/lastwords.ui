@@ -1,0 +1,573 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  Specific Screen Savers -- LW
+ * FILE:	  lastwords.ui
+ *
+ * AUTHOR:  	  Adam de Boor: Apr 28, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	4/28/91	  ardeb	    Initial version
+ *
+ * DESCRIPTION:
+ *	Options for Last Words saver
+ *
+ *
+ * 	$Id: lastwords.ui,v 1.1 97/04/04 16:48:33 newdeal Exp $
+ *
+ ***********************************************************************/
+#include	"generic.uih"
+#include	"saver.uih"
+#include	"options.uih"
+
+#define CALL_LAST_WORDS(routine) METHOD_SAVER_CALL_SPECIFIC, "enum " #routine
+
+start	LWOptions;
+
+LWRoot = OptInteraction {
+	category = "Last Words";
+	children = LWFonts, LWSizes, LWGroup, LWAngle, LWMotion, LWColor,
+		LWSpeed;
+	genStates = default -usable;
+	hints = {HINT_CENTER_BY_MONIKERS}
+}
+
+/******************************************************************************
+ *
+ *				FONTS
+ *
+ ******************************************************************************/
+LWFonts = OptInteraction {
+	children = LWMoreFontsBox;
+	moniker = 'n', "Fonts";
+	hints = { HINT_SEEK_MENU_BAR, HINT_MENUABLE }
+}
+
+LWMoreFontsBox = OptSummons {
+	moniker = 'M', "More Fonts";
+	children =
+		LWFontSampleTextDisplay;
+	attributes = default -appModal;
+	summonsAttributes = responseType applyReset;
+	hints = {
+	    HINT_IS_TEMPORARY,
+	    HINT_SET_WIN_POS_SIZE_ATTR {
+		dw	mask WPSF_POSITION_TYPE
+		dw	(WPT_CENTER shl offset WPSF_POSITION_TYPE)
+	    }
+	}
+}
+
+LWFontSampleTextDisplay = GenTextDisplay {
+	genFont = noGenMapping;
+	text = "AaBbCc 123";
+	desiredWidth = "120";
+	desiredHeight = 1;
+	/* textDisplayAttributes = desiredWidthIsMax; */
+	styleRuns = ( "VisTextDefaultStyle" ) {
+		0, 0, 0,		/* underline, bold, italic */
+		VTDCMM_SOLID,		/* VisTextDefaultColorMapModes */
+		BLACK,			/* color */
+		VTDS_18,		/* size */
+		VTDF_URW_ROMAN		/* font */
+	}
+}
+
+
+/******************************************************************************
+ *
+ *				SIZES
+ *
+ ******************************************************************************/
+LWSizes = OptInteraction {
+	moniker = 'z', "Sizes";
+	children = LWSizesList, LWCustomSizeBox;
+	hints = { HINT_SEEK_MENU_BAR, HINT_MENUABLE }
+}
+
+
+LWSizesList = OptList {
+	key = "size";
+	attributes = type exclusive, listMethod, listMethodIsData;
+	children =
+		LWSize10Entry,
+		LWSize12Entry,
+		LWSize14Entry,
+		LWSize18Entry,
+		LWSize24Entry,
+		LWSize36Entry,
+		LWSize54Entry,
+		LWSize72Entry;
+	action = CALL_LAST_WORDS(LWSetSize);
+}
+LWSize10Entry = GenListEntry {
+	moniker = '1', "1.  10 point";
+	method = "10*8";
+}
+
+LWSize12Entry = GenListEntry {
+	moniker = '2', "2.  12 point";
+	method = "12*8";
+}
+
+LWSize14Entry = GenListEntry {
+	moniker = '3', "3.  14 point";
+	method = "14*8";
+}
+
+LWSize18Entry = GenListEntry {
+	moniker = '4', "4.  18 point";
+	method = "18*8";
+}
+
+LWSize24Entry = GenListEntry {
+	moniker = '5', "5.  24 point";
+	method = "24*8";
+	curState = isOn, userIsOn, isDefault;
+}
+
+LWSize36Entry = GenListEntry {
+	moniker = '6', "6.  36 point";
+	method = "36*8";
+}
+
+LWSize54Entry = GenListEntry {
+	moniker = '7', "7.  54 point";
+	method = "54*8";
+}
+
+LWSize72Entry = GenListEntry {
+	moniker = '8', "8.  72 point";
+	method = "72*8";
+}
+
+
+LWCustomSizeBox = OptSummons {
+	moniker = 'C', "Custom Size";
+	children =
+		LWPointSizeRange;
+	attributes = default -appModal, +independentlyDisplayable;
+	summonsAttributes = responseType applyReset;
+	hints = {
+	    HINT_IS_TEMPORARY,
+	    HINT_SET_WIN_POS_SIZE_ATTR {
+		dw	mask WPSF_POSITION_TYPE
+		dw	(WPT_CENTER shl offset WPSF_POSITION_TYPE)
+	    }
+	}
+}
+
+
+LWPointSizeRange = OptRange {
+	key = "size";
+	moniker = "Point Size:";
+	distanceFlags = distanceMode, displayUnits points;
+	value = "10*8";
+	minimum = "MIN_POINT_SIZE*8";
+	maximum = "MAX_POINT_SIZE*8";
+	increment = "8";
+	gadgetAttrs = delayed;
+	action = CALL_LAST_WORDS(LWSetSize);
+}
+
+/******************************************************************************
+ *
+ *			     LAST_WORDS TEXT
+ *
+ ******************************************************************************/
+LWGroup = OptInteraction {
+	moniker = "Last Words:";
+	children = LWFormatList, LWFormatData;
+	hints = {
+	    HINT_ORIENT_HORIZONTALLY, HINT_EXPAND_TO_FIT,
+	    HINT_TOP_JUSTIFY
+	}
+}
+
+LWFormatList = OptList {
+	key = "format";
+#if SHOW_DATE_TIME
+	children = LWFormatText, LWFormatGraphic, LWFormatTime,
+		   LWFormatDate;
+#else
+	children = LWFormatText, LWFormatGraphic;
+#endif
+	action = CALL_LAST_WORDS(LWSetFormat);
+	hints = { HINT_ORIENT_VERTICALLY }
+}
+
+LWFormatText = GenListEntry {
+	moniker = "Text";
+	method = LWFT_TEXT;
+	curState = isOn, userIsOn, isDefault;
+}
+
+LWFormatGraphic = GenListEntry {
+	moniker = "Graphic";
+	method = LWFT_GRAPHIC;
+	genStates = default -enabled;
+}
+
+#if SHOW_DATE_TIME
+LWFormatTime = GenListEntry {
+	moniker = "Time";
+	method = LWFT_TIME;
+}
+
+LWFormatDate = GenListEntry {
+	moniker = "Date";
+	method = LWFT_DATE;
+}
+#endif
+
+LWFormatData = OptInteraction {
+	children = LWText, LWPaste;
+	hints = { 
+		HINT_ORIENT_VERTICALLY, HINT_EXPAND_WIDTH_TO_FIT,
+		HINT_MINIMIZE_SPACING
+	}
+}
+
+LWText = OptTextEdit {
+	key = "message";
+	action = METHOD_DUMMY, "enum LWSetFont";
+					/* this is any one of the routines for
+					 * which the generic saver library will
+					 * search and replace the handle portion
+					 * with the generic saver process. We
+					 * need this to receive the
+					 * METHOD_TEXT_MADE_DIRTY message so
+					 * we can mark the document dirty when
+					 * the user changes the message text */
+	text = "";
+	maxLength = LW_MAX_LENGTH;
+	desiredWidth = "32 or mask GTDW_CHARS";
+	SINGLE_LINE_VALUES
+	textDisplayAttributes = desiredWidthIsMin, selectable, singleLineText,
+		noWordWrapping, useTabForNavigation;
+}
+
+LWPaste = GenTrigger {
+	moniker = "Paste";
+	action = CALL_LAST_WORDS(LWPasteGraphic);
+	genStates = default -enabled;
+}
+
+/******************************************************************************
+ *
+ *			    LAST_WORDS ANGLE
+ *
+ ******************************************************************************/
+LWAngle = OptInteraction {
+	moniker = "Angle:";
+	children = LWAngleRange, LWAngleList;
+	hints = { HINT_ORIENT_HORIZONTALLY }
+}
+
+LWAngleRange = OptRange {
+	key = "angle";
+	minimum = 0;
+	maximum = 360;
+	value = 0;
+	action = CALL_LAST_WORDS(LWSetAngleRandom);
+}
+
+LWAngleList = OptList {
+	key = "angleRandom";
+	attributes = default type nonExclusive;
+	children = LWRandomAngle;
+	action = CALL_LAST_WORDS(LWSetAngleRandom);
+}
+
+LWRandomAngle = GenListEntry {
+	moniker = "Random";
+	method = "-1";
+}
+	
+/******************************************************************************
+ *
+ *			    LAST_WORDS MOTION
+ *
+ ******************************************************************************/
+LWMotion = OptList {
+	key = "motion";
+	moniker = "Motion:";
+	children = LWBounceMotion, LWRandomMotion;
+	hints = { HINT_ORIENT_HORIZONTALLY }
+	action = CALL_LAST_WORDS(LWSetMotion);
+}
+LWBounceMotion = GenListEntry {
+	moniker = "Bounce";
+	method = LWMT_BOUNCE;
+	curState = isOn, userIsOn, isDefault;
+}
+LWRandomMotion = GenListEntry {
+	moniker = "Random";
+	method = LWMT_RANDOM;
+}
+
+/******************************************************************************
+ *
+ *			    LAST_WORDS COLOR
+ *
+ ******************************************************************************/
+LWColor = OptList {
+	key = "color";
+	moniker = "Color:";
+	action = CALL_LAST_WORDS(LWSetColor);
+	children =
+		DarkBlueEntry, DarkGreenEntry, DarkCyanEntry,
+		DarkRedEntry, DarkVioletEntry, BrownEntry, LightGrayEntry,
+		DarkGrayEntry, LightBlueEntry, LightGreenEntry, LightCyanEntry,
+		LightRedEntry, LightVioletEntry, YellowEntry, WhiteEntry,
+		RandomColorEntry;
+	hints = { HINT_IS_TOOLBOX, HINT_ORIENT_HORIZONTALLY }
+}
+
+#define COLOR_WIDTH 14
+#define COLOR_HEIGHT 14
+
+#define COLOR_ENTRY(name, color) \
+name = GenListEntry { \
+	moniker = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaColorMap COLOR_MAP_DITHER | \
+		GSSetAreaColorIndex	color | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+	} \
+	method = #color; \
+}
+
+COLOR_ENTRY(DarkBlueEntry, DK_BLUE)
+COLOR_ENTRY(DarkGreenEntry, DK_GREEN)
+COLOR_ENTRY(DarkCyanEntry, DK_CYAN)
+COLOR_ENTRY(DarkRedEntry, DK_RED)
+COLOR_ENTRY(DarkVioletEntry, DK_VIOLET)
+COLOR_ENTRY(BrownEntry, BROWN)
+COLOR_ENTRY(LightGrayEntry, LT_GRAY)
+COLOR_ENTRY(DarkGrayEntry, DK_GRAY)
+COLOR_ENTRY(LightBlueEntry, LT_BLUE)
+COLOR_ENTRY(LightGreenEntry, LT_GREEN)
+COLOR_ENTRY(LightCyanEntry, LT_CYAN)
+COLOR_ENTRY(LightRedEntry, LT_RED)
+COLOR_ENTRY(LightVioletEntry, LT_VIOLET)
+COLOR_ENTRY(YellowEntry, YELLOW)
+COLOR_ENTRY(WhiteEntry, WHITE)
+
+RandomColorEntry = GenListEntry {
+	moniker = "Random";
+	curState = isOn, userIsOn, isDefault;
+	method = "-1";
+}
+
+/******************************************************************************
+ *
+ *			    LAST_WORDS SPEED
+ *
+ ******************************************************************************/
+LWSpeed = OptList {
+	key = "speed";
+	moniker = "Speed:";
+	children = LWSSlug, LWSSlow, LWSMedium, LWSFast;
+	action = CALL_LAST_WORDS(LWSetSpeed);
+}
+
+LWSSlug = GenListEntry {
+	moniker = "Slug-like";
+	method = LW_SLUG_SPEED;
+}
+
+LWSSlow = GenListEntry {
+	moniker = "Slow";
+	method = LW_SLOW_SPEED;
+}
+
+LWSMedium = GenListEntry {
+	moniker = "Medium";
+	method = LW_MEDIUM_SPEED;
+	curState = isOn, isDefault, userIsOn;
+}
+
+LWSFast = GenListEntry {
+	moniker = "Fast";
+	method = LW_FAST_SPEED;
+}
+
+/******************************************************************************
+ *
+ *			   DOCUMENT CONTROL
+ *
+ ******************************************************************************/
+LWUIDocumentControl = SaverUIDocumentControl {
+	fileAttributes = showFiles, showDirs, showGeosFiles,
+		showGeosNonExecutables, showTokenMatch, showCreatorMatch,
+		allowChangeDirs, allowChangeVolumes;
+	tokenMatchChars = "'LWDD'";
+	creatorMatchChars = "'SSAV'";
+	attributes = allowReadOnly, editReadOnly, vmFile, backup,
+		currentTask new, displayNameOnPrimary, 
+		singleFileCleanCanNewOpen;
+	noNameText = "Nothing To Say";
+	genStates = default -usable;
+}
+
+end	LWOptions;
+
+start	LWDocumentUI;
+	
+LWAppDocumentControl = SaverAppDocumentControl {
+	attributes = allowReadOnly, vmFile, backup,
+		readWriteDenyMode denyReadWrite,
+		readOnlyDenyMode denyWrite;
+	defaultName = "Last Words Untitled";
+
+	protocolMajor = "LW_DOCUMENT_PROTOCOL_MAJOR";
+	protocolMinor = "LW_DOCUMENT_PROTOCOL_MINOR";
+}
+
+end	LWDocumentUI;
+
+/******************************************************************************
+ *
+ *			   FONTS TEMPLATES
+ *
+ ******************************************************************************/
+start	LWFontsUI, notDetachable;
+
+LWShortFontsList = OptList ignoreDirty {
+	attributes = type exclusive, listMethod, listMethodIsData;
+	action = CALL_LAST_WORDS(LWSetFont);
+	key = "font";
+}
+
+LWLongFontsList = OptList ignoreDirty {
+	gadgetAttrs = delayed, sendUserChanges;
+	action = CALL_LAST_WORDS(LWSetListFont);
+	attributes = type exclusive, listMethod, listMethodIsData;
+	hints = {
+		HINT_SCROLL_LIST,
+		HINT_SET_DESIRED_SIZE {
+						; number of entries in a line
+			dw SpecSizeSpec <SST_COUNT, 10>
+						; desired entry height
+			dw SpecSizeSpec <SST_NUMBER_OF_TEXT_LINES, 1>
+						; desired list width 
+			dw SpecSizeSpec <SST_NUMBER_OF_AVG_WIDTH_CHARS, 25>
+		}
+	}
+	key = "font";
+}
+
+end	LWFontsUI;
+
+
+/******************************************************************************
+ *
+ *				HELP TREE
+ *
+ ******************************************************************************/
+
+start	LWHelp;
+
+HelpBox = GenInteraction {
+	moniker = 'H', "Last Words Help";
+	attributes = default +independentlyDisplayable;
+	children = HelpText, HelpReplyBar;
+	genStates = default -usable;
+	hints = {
+            HINT_SET_WIN_POS_SIZE_ATTR {
+            PosSizeAttrInfo <
+                ; Change indicated fields
+                <
+                    FALSE,          ; WPSF_PERSIST (dont care)
+                    FALSE,          ; WPSF_HINT_FOR_ICON (dont care)
+                    FALSE,          ; WPSF_NEVER_SAVE_STATE (dont care)
+                    TRUE,           ; WPSF_SHRINK_DESIRED_SIZE_TO_FIT_IN_PARENT
+                    TRUE,           ; WPSF_CONSTRAIN_TYPE
+                    FALSE,          ; WPSF_POSITION_TYPE (dont care)
+                    TRUE            ; WPSF_SIZE_TYPE
+                >,
+                ; to indicated values
+                <
+                    0,              ; WPSF_PERSIST (dont care)
+                    0,              ; WPSF_HINT_FOR_ICON (dont care)
+                    0,              ; WPSF_NEVER_SAVE_STATE (dont care)
+                    TRUE,           ; WPSF_SHRINK_DESIRED_SIZE_TO_FIT_IN_PARENT
+                    WCT_KEEP_VISIBLE,; WPSF_CONSTRAIN_TYPE
+                    0,              ; WPSF_POSITION_TYPE (dont care)
+                    WST_AS_RATIO_OF_FIELD  ; WPSF_SIZE_TYPE
+                >,
+		; no position being specified
+                <>,
+		; make help text 3/4 of the screen length-wise, 3/4 the screen
+		; height-wise
+		<
+		    mask SWSS_RATIO or SS_PERCENT75,
+		    mask SWSS_RATIO or SS_PERCENT75
+		>
+	    >
+	    }
+	}
+}
+
+HelpText = GenTextDisplay {
+	desiredHeight = 9;		/* 7 */
+	desiredWidth = "6*72";
+	genFont = noGenMapping;
+	textDisplayAttributes = default +desiredHeightIsViewMin, +initScrolling,
+				-dontScrollToChanges, +selectable;
+	type = default -defaultStyle, +multipleStyles,
+			-defaultRuler, +multipleRulers;
+	styleRuns = TextStyleRuns;
+	rulerRuns = TextRulerRuns;
+	text = TextChunk;
+	hints = {
+		HINT_WASH_COLOR {
+		    SetColorParams <
+			SCP_index <		;SCP_index.
+			    WHITE,		;    SCPI_index
+			    <			;    SCPI_info.
+				0,		;	VTCMM_COLOR_FLAG
+				VTGS_100,	;	VTCMM_GRAY_SCREEN
+				0,		;	VTCMM_TRANSPARENT
+				0,		;	VTCMM_ON_BLACK
+				COLOR_MAP_SOLID	;	VTCMM_COLOR_MAP_MODE
+			    >,
+			    0			;    SCPI_unused
+			>
+		    >
+    	    	}
+	}
+}
+
+#include "lastwordsHelp.ui"
+
+HelpReplyBar = GenInteraction {
+	attributes = default +notIndependentlyDisplayable;
+	hints = {
+		 HINT_MAKE_REPLY_BAR
+		}
+	children = HelpPageUp, HelpPageDown, HelpClose;
+}
+HelpClose = GenTrigger {
+	CLOSE_TRIGGER_VALUES
+	genAttributes = default + completesInteraction;
+}
+HelpPageUp = GenTrigger {
+	moniker = 'U',"Page Up";
+	action = METHOD_TEXT_SCROLL_PAGE_UP, HelpText;
+}
+HelpPageDown = GenTrigger {
+	moniker = 'D',"Page Down";
+	action = METHOD_TEXT_SCROLL_PAGE_DOWN, HelpText;
+}
+
+end	LWHelp;

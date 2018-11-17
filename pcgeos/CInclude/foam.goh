@@ -1,0 +1,2758 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Foam Library
+FILE:		foam.goh
+
+AUTHOR:		Skarpi Hedinsson, Nov  9, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SH	11/ 9/94   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: foam.goh,v 1.1 97/04/04 15:56:38 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __FOAM_GOH
+@define __FOAM_GOH
+
+@optimize
+@deflib	foam
+
+@include <mailbox.goh>    
+
+/* ----------------------------------------------------------------------------
+ *   Constants
+ * --------------------------------------------------------------------------*/
+
+/*
+ *  Mailbox format ID's specific to Lizzy.  To be used along with
+ *  MANUFACTURER_ID_NOKIA in the MailboxDataFormat structure.
+ */
+
+typedef enum {
+    LMDFID_INVALID = 0x0,
+    LMDFID_WYSWYG_FOAM_FILE = 0x1,		/*  FILE */
+} LizzyMailboxDataFormatID;
+
+#define IC_CHANGE		11	/* comes after InteractionCommand */
+#define IC_CANCEL_POPUP_LIST	12
+
+#define GIT_FLASHING            7    	/* comes after GenInteractionType */
+
+typedef enum {
+    FDSS_NOT_FULL = 0x0,
+    FDSS_NEARLY_FULL = 0x2,
+    FDSS_FULL = 0x4,
+} FoamDiskSpaceStatus;
+
+typedef enum {
+    FSA_SAVE_DATA = 0x0,
+    FSA_THROW_AWAY_CHANGES = 0x2,
+    FSA_DO_NOTHING = 0x4,
+} FoamSaveAction;
+
+typedef enum {
+    FDD_PRIVATE = -0x2,
+    FDD_DOCUMENT,
+    FDD_NONE,
+    FDD_CREATED_TEXTS,
+    FDD_RECEIVED_FAXES,
+    FDD_RECEIVED_SM,
+    FDD_RECEIVED_MAILS,
+    FDD_MESSAGE_TEMPLATES,
+    FDD_BUSINESS_CARDS,
+    FDD_DOWNLOADED_FILES,
+    FDD_WWW_HOTLIST,
+    FDD_BROADCAST_MESSAGES,
+    FDD_INTERNET,
+    FDD_TONES
+} FDocumentDir;
+
+#define CONSTANT_MAX_FDD	0x0100
+/*
+ * Any FDocumentDir value must be below CONSTANT_MAX_FDD because 
+ * FoamPathHandles use values above this.
+ *
+ * With Lizzy project, we introduced sub-folders that spawn off from
+ * FDocumentDir folders.  These sub-folders are created by the user,
+ * which means that we cannot expect all user accessible directories
+ * to be one of FDocumentDir's anymore.  So, we defined FoamPathHandle
+ * type.  These handles are completely interchangeable with FDocumentDir
+ * constants.  
+ */
+
+typedef word FoamPathHandle;
+#define NULL_FOAM_PATH -3
+
+
+typedef enum {
+    FDA_READ_WRITE = 0x0,
+    FDA_READ_ONLY = 0x2,
+    FDA_READ_ONLY_DENY_NONE = 0x4,
+} FDocAccess;
+
+#define FOAM_INI_APP_DOC_PATHS "appDocPaths"
+#define FOAM_INI_LAST_DOC_PATH "lastDocPath"
+#define FOAM_INI_DOC_PATH "docPath"
+
+/*
+    Default settings for the notes editor (set in notebook).
+*/
+#define NOTES_EDITOR_INIT_CATAGORY "notesEditor"
+#define NOTES_EDITOR_DEFAULT_FONT_ID_KEY "defaultFont"
+#define NOTES_EDITOR_DEFAULT_FONT_SIZE_KEY "defaultFontSize"
+#define NOTES_EDITOR_DEFAULT_TOP_MARGIN_KEY "defaultTopMargin"
+#define NOTES_EDITOR_DEFAULT_BOTTOM_MARGIN_KEY "defaultBottomMargin"
+#define NOTES_EDITOR_DEFAULT_LEFT_MARGIN_KEY "defaultLeftMargin"
+#define NOTES_EDITOR_DEFAULT_RIGHT_MARGIN_KEY "defaultRightMargin"
+
+/*
+ *  FEA_CREATOR token for all responder documents.
+ */
+#define DOCUMENT_CREATOR_TOKEN "RDOC"
+
+/*
+ *  FEA_CREATOR token for viewer loader documents ("Document outbox" and
+ *  "Remote mailbox".
+ */
+#define VIEWER_LIBRARY_LOADER_DOCUMENT_CREATOR_TOKEN "VLLD"
+
+/*
+ Token and protocol numbers of a Foam notebook document.  All geodes using
+ the ViewerControlClass must use the same major protocol number has the
+ notes files.  ViewerControlClass checks the major protocol, if applications
+ need to do their own protocol varification they can use the minor protocol.
+*/
+#define NOTES_FILE_TOKEN "NOTE"
+#define NOTES_FILE_MAJOR_PROTOCOL 2
+#define NOTES_FILE_MINOR_PROTOCOL 0
+
+#define SMS_FILE_TOKEN "SMSF"
+#define SMS_FILE_MAJOR_PROTOCOL NOTES_FILE_MAJOR_PROTOCOL
+#define SMS_FILE_MINOR_PROTOCOL 0
+
+#define MEMO_FILE_TOKEN	"MEMO"
+#define MEMO_FILE_MAJOR_PROTOCOL NOTES_FILE_MAJOR_PROTOCOL
+#define MEMO_FILE_MINOR_PROTOCOL 0
+
+#define FAX_NOTE_FILE_TOKEN "FAXN"
+#define FAX_NOTE_FILE_MAJOR_PROTOCOL NOTES_FILE_MAJOR_PROTOCOL
+#define FAX_NOTE_FILE_MINOR_PROTOCOL 0
+
+#define OUTBOX_FILE_TOKEN "OUTB"
+
+/*
+ *  Token for the special "Remote mailbox" file that is used to launch the
+ *  remote mailbox view.  Use this token with ATTR_FILE_OPEN_EXCLUDE_FILE
+ *  if you don't want the remote mailbox in your FileOpenControl.
+ */
+#define REMOTE_MAILBOX_FILE_TOKEN "RMMB"
+
+/*
+ *  Token for the special "Delivery Reports" file that is used by the
+ *  Mail app.
+ */
+#define DELIVERY_REPORTS_FILE_TOKEN "SMSC"
+
+#define FOAM_MAX_SMS_TEXT_SIZE 160
+#define FOAM_DOCUMENT_PREFIX_TEXT_SIZE 26
+#define FOAM_FILE_SELECTOR_WIDTH 54
+
+#define FOAM_DEFAULT_COMPONENT_WIDTH	405
+/*  Default width of a UI component pos */
+
+#define FOAM_DEFAULT_BUBBLE_WIDTH 250
+/*  Default width of a UI bubble */
+
+#define FOAM_HEADER_ICON_WIDTH		37
+/*
+ * Width of the Icon portion of a main screen's ComplexMoniker (plus space).
+ * Children should be indented by this amount in order to be left-
+ * justified with the text portion of the moniker.
+ */
+
+#define FOAM_LARGE_FONT_SIZE	20
+#define FOAM_NORMAL_FONT_SIZE	18
+#define FOAM_LIGHT_FONT_SIZE	17
+#define FOAM_SMALL_FONT_SIZE	16
+
+#define VTDS_FOAM_NORMAL	VTDS_18		
+#define VTDS_FOAM_SMALL		VTDS_12		
+
+#define VTDF_RESPONDER		VTDF_BERKELEY
+
+
+#define FOAM_BUBBLE_TITLE_FONT_SIZE	FOAM_LARGE_FONT_SIZE
+#define FOAM_TITLE_FONT_SIZE		FOAM_LARGE_FONT_SIZE
+
+
+/* Critical levels of free disk space */
+#define FOAM_DISK_SPACE_NEARLY_FULL_LEVEL  	0x0000c800	/* 50K */
+#define FOAM_DISK_SPACE_FULL_LEVEL		0x00006400	/* 25K */
+
+/*
+ Names of directories under "world" used to store various applications.
+*/
+#define SYSAPPS_DIR_NAME "SYSAPPS"
+#define SERVICES_DIR_NAME "SVCAPPS"
+#define EXTRAS_DIR_NAME	"EXTRAPPS"
+
+#define MAX_COMPLEX_MONIKER_WIDTH  (FOAM_DEFAULT_COMPONENT_WIDTH-20)
+#define MAX_COMPLEX_MONIKER_HEIGHT 200
+
+#define COMPLEX_MONIKER_MAX_TOP_TEXT_LENGTH		100
+#define COMPLEX_MONIKER_MAX_BOTTOM_TEXT_LENGTH		50
+
+/*
+ Application enum's used with FoamLaunchApplication
+*/
+typedef enum {
+    FA_PHONE_APP = 0x0,
+    FA_FAX_APP,
+    FA_SMS_APP,
+    FA_SERVICES_APP,
+    FA_CONTACT_APP,
+    FA_NOTEBOOK_APP,
+    FA_CALENDAR_APP,
+    FA_SYSTEM_APP,
+    FA_EXTRAS_APP,
+    FA_CALCULATOR_APP,
+    FA_CLOCK_APP,
+    FA_USER_DATA_APP,
+    FA_WWW_INSTALL_APP,
+} FApplication;
+
+/*
+ * Flashing notes
+ */
+#define FLASHING_NOTE_DEFAULT_DURATION	        (3*60) /*  3 seconds */
+#define FLASHING_NOTE_DEFAULT_MINIMUM_DURATION	(1*60) /*  1 second */
+
+/*
+ * width of indicator for Rudy to decide whether indicator should float
+ * up or sink when a window comes up
+ */
+#define FOAM_INDICATOR_WIDTH			80
+
+/*
+ * sound key click type, to be included by user library
+ *
+ * if there is new type, add before SKCT_THE_END
+ */
+typedef enum {
+	SKCAT_CLICK_OFF		= 0x0,
+	SKCAT_CLICK_QUIET	= 0x2,
+	SKCAT_CLICK_LOUD	= 0x4,
+	SKCAT_ALARM_SOUND_1	= 0x6,
+	SKCAT_ALARM_SOUND_2	= 0x8,
+	SKCAT_ALARM_SOUND_3	= 0xa,
+
+} SoundKeyClickAlarmType;
+
+#define FOAM_NUM_SPECIAL_SOUNDS	6	/* six things above */
+/*
+ * default values to be used in user library
+ */
+#define FOAM_KEY_CLICK_DEFAULT SKCAT_CLICK_QUIET
+#define FOAM_ALARM_SOUND_DEFAULT SKCAT_ALARM_SOUND_1
+
+/*
+ * Margin values used in Notebook and NotesEdit.
+ */
+#define MIN_PAGE_MARGIN 36			/* 1/2" */
+#define MAX_PAGE_MARGIN 216			/* 3"   */
+#define DEFAULT_PAGE_MARGIN 72		        /* 1"   */
+#define PAGE_MARGIN_INCREMENT 18		/* 1/4" */
+
+/*
+ * help character. This is provided merely for convenience; read: rudy
+ * does not know about this constant.
+ */
+#ifdef DO_DBCS
+#define RUDY_HELP_CHAR	C_SYS_INS
+#else
+#define RUDY_HELP_CHAR	((word)(VC_ISCTRL << 8) | VC_BACKSPACE)
+#endif
+
+/*
+ *  Backlight stuff
+ */
+#define DEFAULT_BACKLIGHT_LEVEL		0	/* level, not actual time */
+#define MINIMUM_BACKLIGHT_LEVEL		0
+#define MAXIMUM_BACKLIGHT_LEVEL		8
+
+/*
+ *  Delta time stuff
+ */
+typedef enum {
+	ANT_minutes = 0x0,
+	ANT_hours = 0x1,
+	ANT_days = 0x2
+} AdvanceNoticeType;
+
+/* ----------------------------------------------------------------------------
+ *   Structures
+ * --------------------------------------------------------------------------*/
+
+typedef	struct {
+    FileLongName DI_docName;
+	/* Document name */
+    FDocumentDir DI_docDir;
+	/* Document directory */
+} DocumentInfo;
+
+typedef struct {
+    GeodeToken	FAI_token;		/*  token of file */
+    ProtocolNumber FAI_protocol;	/*  protocol number of file */
+} FileAttrInfo;
+
+typedef TCHAR DocumentPrefix[FOAM_DOCUMENT_PREFIX_TEXT_SIZE+1];
+typedef hptr DocumentHandle;
+
+/* enum FoamDocHeader */
+typedef enum {
+    FDH_TEXT_TR_ITEM = 0x0,
+    FDH_ADDRESS_INFO = 0x2,
+    FDH_HANDLE1 = 0x4,
+    FDH_HANDLE2 = 0x6,
+    FDH_HANDLE3 = 0x8,
+    FDH_HANDLE4 = 0xa,
+    FDH_HANDLE5 = 0xc,
+} FoamDocHeader;
+
+
+/*
+ *  Passed to FoamDocTextSetFormatted to mark the document as containing
+ *  formatted or not formatted text.
+ */
+typedef enum {	
+    FDTF_NOT_FORMATTED = 0x0,
+    FDTF_FORMATTED,
+} FoamDocTextFormatted;
+
+
+/*
+ FoamDocHeader stores various information about the document, like margins.
+*/
+typedef struct {
+/* points*8 */
+    word	FDS_leftMargin;
+/* points*8 */
+    word	FDS_topMargin;
+/* points*8 */
+    word	FDS_rightMargin;
+/* points*8 */
+    word	FDS_bottomMargin;
+} FoamDocSettings;
+
+
+/*
+ FoamDocMapBlock is the structure stored in the mapblock of a Foam
+ document file.
+*/
+typedef struct {
+    word FDMB_textTrItem;
+    word FDMB_addressInfo;
+    word FDMB_handle1;
+    word FDMB_handle2;
+    word FDMB_handle3;
+    word FDMB_handle4;
+    word FDMB_handle5;
+    FoamDocSettings FDMB_docSettings;
+} FoamDocMapBlock;
+
+
+#define EVENT_TEXT_STRING_SIZE 40
+typedef TCHAR EventTextString[EVENT_TEXT_STRING_SIZE];
+
+typedef struct {
+	TCHAR ILEP_singularText[EVENT_TEXT_STRING_SIZE];
+	TCHAR ILEP_pluralText[EVENT_TEXT_STRING_SIZE];
+} IndicatorLogEventParams;
+
+
+typedef ByteFlags ColumnBorder;
+#define CB_LEFT	 (0x80)
+#define CB_RIGHT (0x40)
+
+/*
+ *  Structure to be used in CreateVisMoniker.
+ *  The structure defines the string to be used in creating
+ *  VisMonikers. A few attributes can be defined for each string in any
+ *  column.
+ */
+typedef struct {
+	byte 		VMC_width;   /* Width of text in chars, 0 if bitmap */
+	const void * 	VMC_ptr;     /* Pointer to text or bitmap */
+	Justification 	VMC_just;    /* How to justify the column text */
+	TextStyle 	VMC_style;   /* Column text styles */
+	ColumnBorder    VMC_border;  /* Draw vertical border */
+} VisMonikerColumn;
+
+/*
+ *  Placed in vardata by flashing note
+ */
+typedef struct {
+    word	FNTD_timerID;
+    word	FNTD_timerHandle;
+} FlashingNoteTimerData;
+
+
+/*
+ *  Returned by FoamDocIsTextFormatted
+ */
+typedef struct {
+    FontID	DFI_font;
+    word	DFI_pointSize;
+} DocumentFontInfo;
+
+/*
+ * These correspond to [readerApps] in the .ini file. Sample .ini file entry:
+ *
+ *	[readerApps]
+ *	app0 = SMSA0		; SMS App (TokenChar w/ ManufacturerID)
+ *	app0_dir = 3		; FDD_RECEIVED_SM
+ *	app2 = MAIL11		; Mail App
+ *	app2_dir = 4		; FDD_RECEIVED_MAIL
+ */
+typedef enum {
+    FRAT_SMS = 0x0,
+    FRAT_FAX,
+    FRAT_MAIL,
+    FRAT_OUTBOX,
+    FRAT_MISSED_CALLS
+} FoamReaderAppType;
+
+/* ----------------------------------------------------------------------------
+ *   Records
+ * --------------------------------------------------------------------------*/
+
+typedef ByteFlags IconsShown;
+#define IS_ICON_LEFT  0x80
+#define IS_ICON_RIGHT 0x40  
+
+/* ----------------------------------------------------------------------------
+ *   FFileSelector class
+ * --------------------------------------------------------------------------*/
+@class  FFileSelectorClass, GenFileSelectorClass;
+
+/*
+ *  Set the open directory.
+ * 
+ *  Pass:	cx -- FDocumentDir
+ *  Return:	nothing
+ * 		
+ */
+@message void MSG_FFS_SET_PATH(FDocumentDir fDocDir = cx); 
+
+/*
+ *  Get the current path.
+ * 
+ *  Pass:	nothing
+ *  Return:	cx -- FDocumentDir
+ * 		
+ */
+@message FDocumentDir MSG_FFS_GET_PATH() = cx;
+
+/*
+ *  Sent when the user presses the "ENTER" key.
+ * 
+ *  Pass:	nothing
+ *  Return:	nothing
+ * 		
+ */
+@message void MSG_FFS_OPEN();
+
+@vardata FDocumentDir	ATTR_FFS_DOCUMENT_DIR; 
+/*  Default document directory for the file selector. */
+
+@endc	/* FFileSelectorClass */
+
+
+/* ------------------------------------------------------------------------
+ *   ExtendedFileSelector class (only availible in Communicator products
+ *			         shipped in April 1997 or later)
+ * ----------------------------------------------------------------------*/
+
+@class  ExtendedFileSelectorClass, GenFileSelectorClass, master, variant;
+
+typedef WordFlags ExtendedFileSelectorAttrs;
+#define EFSA_NON_EXCLUSIVE	(0x8000)
+	/*
+	 *  When set, file selector allows multiple files to be
+	 *  selected.  Note the change in parameters &
+	 *  semantics of GFSI_notificationMsg below, and that
+	 *  the following GenFileSelectorClass messages
+	 *  are prohibited:
+	 * 
+	 * 	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH
+	 * 	MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH
+	 * 	MSG_GEN_FILE_SELECTOR_DELETE_SELECTION
+	 * 
+	 *  The following messages have different semantics
+	 *  when in non-exclusive mode, documented below.
+	 * 
+	 * 	MSG_GEN_FILE_SELECTOR_GET_SELECTION_TOKEN
+	 */
+
+#define EFSA_SEARCHABLE		(0x4000)
+	/*
+	 *  When set, a search box will be provided, permitting
+	 *  the user to narrow the list of files to those that
+	 *  match the text typed into the search box.
+	 */
+
+/* 14 bits unused */
+
+typedef struct {
+
+    word			EFSE_id;     /* entry # of file */
+    GenFileSelectorEntryFlags	EFSE_flags;  /* attributes of file */
+    GenFileSelectorSelection	EFSE_file;   /* name of file */
+
+} ExtendedFileSelectorEntry;
+
+
+/*
+ *  Returns the current array of selections
+ * 
+ *  Pass:	selections -- fptr to ExtendedFileSelectorEntry array
+ * 		bufLength  -- # of entries in selections
+ *  Return:	Total number of selected items.
+ *		selections -- array filled with as many of the current
+ * 			 selections as will fit.
+ */
+@message word MSG_EFS_GET_MULTIPLE_SELECTIONS
+	(ExtendedFileSelectorEntry *selections = cx:dx,
+	 word bufLength = bp) = ax;
+
+/*
+ *  @message MSG_GEN_FILE_SELECTOR_GET_SELECTION
+ * 
+ *  	Takes and returns same values as GenFileSelectorClass,
+ *      except that if multiple files are selected, returns one
+ *	of them at random.  Because of this unpredictable behavior,
+ *	MSG_EFS_GET_MULTIPLE_SELECTIONS should be used instead.
+ */
+
+/*
+ *  @message MSG_GEN_FILE_SELECTOR_GET_SELECTION_TOKEN
+ * 
+ *  	Returns the GeodeToken of the selected file.  If the file is
+ *      a DOS file the dos extension (including the dot) is returned.
+ * 
+ *	If multiple files are selected, then the token of one of
+ * 	those files (at random) is returned.  Therefore, for this
+ * 	message to be useful, you should only call it when
+ * 	you know there is exactly one selection.
+ * 
+ * 	If no files are selected, then the passed GeodeToken
+ * 	buffer will be unchanged.
+ */
+
+/*
+ *  Returns the current value of EFSI_attrs
+ * 
+ *  Pass:	nothing
+ *  Return:	ExtendedFileSelectorAttrs
+ *  Destroyed:	nothing
+ */
+@message ExtendedFileSelectorAttrs MSG_EFS_GET_ATTRS() = cx;
+
+/*
+ *  Changes the current EFSI_attrs.  Currently, only the EFSA_SEARCHABLE
+ *  flag may be altered.
+ * 
+ *  Pass:	set   -- ExtendedFileSelectorAttrs to set
+ * 		clear -- ExtendedFileSelectorAttrs to clear
+ *  Returns:	nothing
+ */
+@message void MSG_EFS_SET_ATTRS(ExtendedFileSelectorattrs set = cx,
+			        ExtendedFileSelectorattrs clear = dx);
+
+/*
+ *  Returns the current number of selections for this file selector.
+ *  Returns zero if there's no selection.
+ * 
+ *  Pass:	nothing
+ *  Return:	number of selections
+ *  Destroyed:	nothing
+ */
+@message word MSG_EFS_GET_NUM_SELECTIONS() = ax;
+
+@message ExtendedFileSelectorEntryData MSG_EFS_GET_MULTIPLE_SELECTIONS_BLOCK() = cx:ax;
+/*
+ *  Returns the current array of selections in a block.
+ * 
+ *  Pass:	nothing
+ *  Return:	ExtendedFileSelectorEntryData
+ */
+
+typedef struct {
+    word      EFSED_numSelections;
+    MemHandle EFSED_block;
+} ExtendedFileSelectorEntryData;
+
+@message void MSG_EFS_RESET_SEARCH();
+/*
+ * If a searchable file selector, clears the search and restores all
+ * entries. Returns the current array of selections in a block.
+ * 
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_EFS_GET_SELECTION_INFO(EFSSelectionInfo *retValue=cxdxbpax);
+
+typedef struct {
+    word			numSelections;
+    GenFileSelectorEntryFlags	determinate;
+    GenFileSelectorEntryFlags	entryFlags;
+    word			junk;
+} EFSSelectionInfo;
+
+
+@vardata	void	HINT_EFS_SHORT_SEARCH_MONIKER;
+/*
+ *  Uses a smaller moniker for the Search input box, instead
+ *  of the full Icon + Text
+ */
+
+@instance ExtendedFileSelectorAttrs  EFSI_attrs = EFSA_NON_EXCLUSIVE;
+	/*
+	 * Features which this file selector should offer.
+	 */
+
+@instance ChunkHandle		     EFSI_selections;
+	/* Chunk containing the currently selected files,
+	 * in an array of ExtendedFileSelectorEntry.
+	 */
+
+/* @instance  Message GFSI_notificationMsg;  */
+/*
+ *  When EFSA_NON_EXCLUSIVE is set, the GFSI_notification message
+ *  uses this prototype, not GEN_FILE_SELECTOR_NOTIFICATION_MESSAGE:
+ *
+ *  params:	numSelections  -- Number of selected files
+ *		entryFlags     -- Value of GenFileSelectorEntryFlags of
+ *				   selected files
+ *		determinate    -- GenFileSelectorEntryFlags which have
+ *				   the same value in all selected files.
+ */
+
+@prototype void EXT_FILE_SELECTOR_NON_EXCLUSIVE_NOTIFICATION_MSG(
+	word numSelections = cx,
+	GenFileSelectorEntryFlags entryFlags = bp,
+	GenFileSelectorEntryFlags determinate = dx);
+	
+
+@endc	/* ExtendedFileSelectorClass */
+
+/* ----------------------------------------------------------------------------
+ *   ComplexMonikerClass
+ * --------------------------------------------------------------------------*/
+@class ComplexMonikerClass, GenClass, master, variant;
+
+typedef enum {
+	CMT_NULL 		= 0,
+	CMT_OK			= 1,
+	CMT_CLOSE		= 3,
+	CMT_CHANGE		= 5,
+	CMT_CANCEL		= 7,
+	CMT_CLEAR		= 9,
+	CMT_CALL		= 11,
+	CMT_CLEAR_ALL		= 13,
+	CMT_YES			= 15,
+	CMT_NO			= 17,
+	CMT_RENAME		= 19,
+	CMT_COPY		= 21,
+	CMT_SETTINGS		= 23,
+	CMT_OPEN		= 25,
+	CMT_CREATE_NEW		= 27, 
+	CMT_SEND		= 29,
+	CMT_DELETE		= 31,
+	CMT_ROTATE		= 33,
+	CMT_ZOOM		= 35,
+	CMT_ZOOM_IN		= 37,
+	CMT_ZOOM_OUT		= 39,
+	CMT_VIEWING_TOOLS	= 41,
+	CMT_SEND_OPTIONS	= 43,
+	CMT_OPTIONS		= 45,
+	CMT_FORWARD		= 47,
+	CMT_REPLY		= 49,
+	CMT_SELECT		= 51,
+	CMT_START		= 53,
+	CMT_CONNECT		= 55,
+	CMT_GO			= 57,
+	CMT_INSTALL		= 59,
+	CMT_DEINSTALL		= 61,
+	CMT_NEXT		= 63,
+	CMT_PREVIOUS		= 65,
+	CMT_RECENT_CALLS	= 67,
+	CMT_RECENT_FAXES	= 69,
+	CMT_RECENT_MESSAGES	= 71,
+	CMT_USER_DEFINED	= 73,
+	CMT_CLEAR_LIST		= 75,
+	CMT_CALLS		= 77,
+	CMT_FAXES		= 79,
+	CMT_DATA_CALLS		= 81,
+	CMT_MESSAGES		= 83,
+	CMT_NO_CONTACT_INFORMATION = 85,
+	CMT_CONTACT_CARD	= 87,
+	CMT_NONE		= 89,
+	CMT_CALL_LOWERCASE	= 91,
+	CMT_CLEAR_ALL_COMMAND	= 93,
+	CMT_TO_COLON		= 95,
+	CMT_FROM_COLON		= 97,
+	CMT_ACCEPT		= 99,
+	CMT_RESET		= 101,
+	CMT_STOP		= 103,
+	CMT_RECEIVED_CALLS	= 105,
+	CMT_RECEIVED_FAXES	= 107,
+	CMT_RECEIVED_MESSAGES	= 109,
+	CMT_MISSED_CALLS	= 111,
+	CMT_LAST_DIALED_CALLS	= 113,
+	CMT_ACTIVATE		= 115,
+	CMT_DISABLE		= 117,
+	CMT_HELP		= 119,
+	CMT_BACK		= 121,
+	CMT_SELECT_RECEIVER     = 123,
+	CMT_SPECIAL_KEYS_COMMAND	= 125,
+	CMT_SPECIAL_KEYS	= 127,
+	CMT_TEXT		= 129,
+	CMT_TEXTS		= 131,
+	CMT_ZOOM_PLUS		= 133,
+	CMT_ZOOM_MINUS		= 135,
+	CMT_HANGUP		= 137,
+	CMT_CAPTURE		= 139,
+	CMT_INSERT		= 141,
+	CMT_PHONE		= 143,
+	CMT_OFF			= 145,
+	CMT_ON			= 147,
+	CMT_TEXT_SEND		= 149,
+	CMT_TEXT_CAPTURE	= 151,
+	CMT_STOP_CAPTURE	= 153,
+	CMT_FORWARD_FAX         = 155,
+	CMT_MENU                = 157,
+	CMT_SEARCH              = 159,
+
+} ComplexMonikerText;
+
+typedef enum {
+    CMB_LEFT_FINGER = 1,
+    CMB_RIGHT_FINGER = 3,
+    CMB_CONTACT_CARD = 5,
+    CMB_CONTACT_LIST = 7,
+    CMB_SPEED_DIAL = 9,
+    CMB_SETTINGS_TITLE_ICON = 11,
+    CMB_SERVICES_VIEW = 13,
+    CMB_SERVICES_DEFINE = 15,
+    CMB_QUESTION_ICON = 17,
+    CMB_OPEN_FOLDER = 19,
+    CMB_DRAWER = 21,
+    CMB_RENAME_COPY = 23,
+    CMB_FOLDER = 25,
+    CMB_SECURITY_SUCCESS = 27,
+    CMB_SECURITY_ERROR = 29,
+    CMB_PC_ICON = 31,
+    CMB_INPUT_TITLE_ICON = 33,
+    CMB_WARNING_TITLE_ICON = 35,
+    CMB_SMS_CARD_ICON = 37,
+    CMB_SEARCH = 39
+} ComplexMonikerBitmap;
+
+
+/*
+ *  Source type information passed to MSG_COMPLEX_MONIKER_REPLACE_MONIKER
+ */
+typedef enum {                   /* enum ComplexMonikerSourceType */
+    CMST_FPTR = 0x1,
+    /*  Indicates source is referenced by a fptr. */
+    CMST_OPTR,
+    /*  Indicates source is referenced by a optr. */
+    CMST_HPTR,
+    /*  Indicates source is referenced by a hptr and offset. */
+    CMST_LPTR,
+    /*
+     *  Indicates source is referenced by a local memory chunk and thus
+     *  does not have to copy the source into the object block.  When this
+     *  source type is uses the overwrite flag does not apply.
+     */
+    CMST_CMT,
+    /*
+     *  Indicates source is referenced by a ComplexMonikerText enumerated
+     *  type.
+     */
+    CMST_CMB,
+    /*
+     *  Indicates source is referenced by ComplexMonikerBitmap enumerated
+     *  type.
+     */
+    CMST_KEEP,
+    /*
+     *  Indicates that you want to keep the current chunk in the new
+     *  complex moniker.
+     */
+
+} ComplexMonikerSourceType;
+
+
+typedef WordFlags RCMOverwrite;
+  #define RCMO_TOP_TEXT (0x8000)
+  /*  Indicates that you want to overwrite the text if set. */
+  #define RCMO_ICON_BITMAP (0x4000)
+  /*  Indicates that you want to overwrite the iconBitmap if set. */
+	
+typedef struct {
+    TextStyle	RCM_textStyleSet;
+    /*  TextStyle to set */
+    TextStyle	RCM_textStyleClear;
+    /*  TextStyle to clear */
+    word	RCM_fontSize;
+    /*  Size of topText font. (0 for no change) */
+    dword	RCM_topTextSource;
+    /*  Top text source. */
+    dword	RCM_iconBitmapSource;
+    /*  Icon bitmap source */
+    ComplexMonikerSourceType	RCM_topTextSourceType;
+    /*  Top text source type */
+    ComplexMonikerSourceType	RCM_iconBitmapSourceType;
+    /*  Icon bitmap source type */
+    word	RCM_iconBitmapSize;
+    /*  Size of icon bitmap */
+    RCMOverwrite	RCM_overwrite;
+    /*  Set TRUE if you want to overwrite existing complex moniker chunks. */
+} ReplaceComplexMoniker;
+
+typedef struct {
+    TextStyle	GCM_textStyle;
+    /*  TextStyle of moniker */
+    byte	GCM_fontSize;
+    /*  size of moniker text */
+    ComplexMonikerText	GCM_topText;
+    /*  top text id or chunk handle */
+    ComplexMonikerBitmap	GCM_iconBitmap;
+    /*  icon bitmap id or chunk handle */
+} GetComplexMoniker;
+
+/*
+ *  Replace the complex moniker with the newly specified elements. And
+ *  rebuilds itself onscreen.
+ */
+typedef struct {
+    ChunkHandle	RCMCH_topText;
+    word	RCMCH_unusedCX;
+    ChunkHandle	RCMCH_iconBitmap;
+    word	RCMCH_unusedBP;
+} ReplaceComplexMonikerChunkHandles;
+
+@message void \
+MSG_COMPLEX_MONIKER_REPLACE_MONIKER(ReplaceComplexMonikerChunkHandles \
+				    *retValue = axcxdxbp,
+				    const ReplaceComplexMoniker *rcm = dx:bp);
+
+/*
+ * Fetch information about a complex moniker, including it's text and
+ * bitmap chunks.
+ */
+@message void \
+MSG_COMPLEX_MONIKER_GET_MONIKER(const GetComplexMoniker *gcm = dx:bp);
+
+@vardata  void          ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+
+@vardata  Point		ATTR_COMPLEX_MONIKER_SEPARATOR_START_POINT;
+/*
+ * Contains the x,y coordinate (with respect to the origin of the
+ * visMoniker's gstring) of the left edge of the separator line.
+ * Used by the Rudy SPUI to draw the separator, if necessary.
+ */
+
+@vardata  void    	HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+
+@vardata  void		HINT_COMPLEX_MONIKER_DONT_DRAW_SEPARATOR;
+
+@vardata  void          HINT_COMPLEX_MONIKER_CENTER_TEXT_HORIZONTALLY;
+
+@vardata  void		HINT_COMPLEX_MONIKER_MINIMIZE_ICON_SPACING;
+
+@instance TextStyle CMI_textStyle = (TS_BOLD);
+@instance word CMI_topText;
+@instance word CMI_iconBitmap;
+@instance byte CMI_fontSize;
+
+@endc
+
+
+
+/* --------------------------------------------------------------------------
+ *   TwoLevelTrigger class
+ * ------------------------------------------------------------------------*/
+@class	TwoLevelTriggerClass, ComplexMonikerClass;
+
+@default ComplexMoniker = GenTriggerClass;
+
+@message	void MSG_TLT_ACTIVATE_OTHER_LEVEL();
+
+@instance  optr	TLTI_other_parent;
+
+@default GTI_actionMsg = MSG_TLT_ACTIVATE_OTHER_LEVEL;
+@default GTI_destination = (TO_SELF);
+@default CMI_textStyle = (TS_BOLD);
+@vardata void ATTR_TLT_IS_BACK_TRIGGER;
+/* If present, the object will supply its own standard "back" moniker */
+
+@endc
+/* ------------------------------------------------------------------------*/
+
+@class GreyFrameClass, GenInteractionClass;
+@endc
+
+@class UnderlinedGenTextClass, GenTextClass;
+@endc
+
+@class UnderlinedVisTextClass, VisTextClass;
+@message void MSG_UVT_DRAW_UNDERLINE();
+          /*
+	   * Internal message to redraw the underline.
+	   */
+@message void MSG_UVT_MOVE_TO_END_IF_NOT_FOCUSED();
+  	  /*
+	   * Internal message queued up when we lose the focus - if we've
+	   * *really* lost the focus (as opposed to merely had it momentarily
+	   * usurped by the charset dialog), then move cursor to the end.
+           */
+
+@vardata void ATTR_UNDERLINED_VIS_TEXT_NO_UNDERLINES;
+	  /*
+	   * Turn off the underline functionality, act as a normal
+	   * VisText object.
+	   */
+@endc
+
+@class GenValueWithListClass, GenValueClass;
+@instance optr GVWLC_listObj;
+
+@vardata void ATTR_GEN_VALUE_WITH_LIST_DO_NOT_ALLOW_NAVIGATION;
+/*
+ *  Do not allow navigation to this object - it will only take the focus
+ *  if explicitly given to it via MSG_GEN_MAKE_FOCUS
+ */
+
+@vardata word ATTR_GEN_VALUE_WITH_LIST_MAX_TEXT_LEN;
+/*
+ *  Specify the maximum number of characters the GenValue allows the user
+ *  to enter.
+ */
+
+@endc
+
+@class UnderlinedTextWithListClass, UnderlinedGenTextClass;
+    @instance optr UTWLC_listObj;
+    @vardata void ATTR_UNDERLINED_TEXT_WITH_LIST_DO_NOT_ALLOW_NAVIGATION;
+@endc
+
+@class TextWithListClass, GenTextClass;
+    @instance optr TWLC_listObj;
+    @vardata void ATTR_TEXT_WITH_LIST_DO_NOT_ALLOW_NAVIGATION;
+@endc
+
+
+/* ----------------------------------------------------------------------------
+ *   FilterListClass	 (only availible in Communicator products
+ *			         shipped in April 1997 or later)
+ * ----------------------------------------------------------------------------
+ * 
+ *  FilterList acts just like a GenDynamicList, but instead
+ *  of referring to the items by their order in the list, it allows
+ *  an application to supply an array of the identifiers (the
+ *  filter) that should be displayed in the item group.  The list
+ *  object internally maps back and forth between the physical item
+ *  number and the application item identifer when communicating
+ *  with the application.
+ * 
+ *  In addition, the app may supply monikers to be displayed when
+ *  there are no items in the list, or there are no items in the filter.
+ * 
+ *  Possible uses for FilterList:
+ * 	- Displaying results of a narrowing database search
+ * 	- re-ordering the display of a list
+ * 	- displaying an item multiple times
+ * 
+ *  Any GenItemGroupClass or GenDynamicListClass message that deals
+ *  with item identifiers has a corresponding like-named message in
+ *  FilterListClass.  The application must use the FilterListClass
+ *  version of the message instead of the GenItemGroup or
+ *  GenDynamicListClass messages to query and set item state.  The
+ *  semantics and parameters of each message are the same as the
+ *  GenItemGroup/GenDynamicList counterpart, except where noted.
+ *  The word "identifier", in the message descriptions, means
+ *  application identifer, except where noted.
+ */
+
+@class  FilterListClass, GenDynamicListClass;
+
+/*
+ *  Returns the application item ID that corresponds to the passed
+ *  physical item ID in the current filter.
+ * 
+ *  Source:	can be called at any time, but shouldn't be necessary,
+ * 		as rest of FilterList API handles this automatically.
+ * 
+ *  Pass:	id	= physical item identifier
+ *  Return:	corresponding application ID, or GIGS_NONE
+ * 		    if current filter doesn't contain the item.
+ *  Destroyed:	nothing
+ */
+@message word MSG_FILTER_LIST_MAP_PHYSICAL_TO_APP(word id = cx) = cx;
+
+/*
+ *  Returns the physical item ID that corresponds to the passed
+ *  application item ID in the current filter.
+ * 
+ *  Source:	can be called at any time, but shouldn't be necessary,
+ * 		as rest of FilterList API handles this automatically.
+ * 
+ *  Pass:	id	= application item identifier
+ *  Return:	corresponding application ID, or GIGS_NONE
+ * 		    if current filter doesn't contain the item.
+ *  Destroyed:	nothing
+ */
+@message word MSG_FILTER_LIST_MAP_APP_TO_PHYSICAL(word id = cx) = cx;
+
+/*
+ *  Pass:	identifer -- identifier of the item to select
+ * 		indeterminate -- non-zero if indeterminate
+ *  Return:	nothing
+ */
+@message void MSG_FILTER_LIST_SET_SINGLE_SELECTION(word identifier = cx,
+					  Boolean indeterminate = dx);
+
+/*
+ *  Pass: 	selectionList - fptr to buffer with the selections.
+ * 		numSelections - number of selections in selectionList
+ *  Return:	nothing
+ *  Destroyed:	the contents of the passed buffer are destroyed
+ */
+@message void MSG_FILTER_LIST_SET_MULTIPLE_SELECTIONS(
+					  word *selectionList = cx:dx,
+				 	  word numSelections = bp);
+
+/*
+ *  Pass:		nothing
+ *  Return:	current selection, or GIGS_NONE if no selections,
+ * 		      or the first selection in the item group if there are 
+ *  		      multiple selections in a non-exclusive or extended-
+ *  		      selection-exclusive item group.
+ */
+@message word MSG_FILTER_LIST_GET_SELECTION() = ax;
+
+/*
+ *  Pass:	selectionList -- Buffer to hold the selections.
+ * 		maxSelections -- Max number of selections to place in buffer
+ *  Return:	Number of selections.
+ *		selectionList -- filled in with the identifiers of the
+ * 			 selections (the list will not be null-terminated).
+ * 		
+ */
+@message word MSG_FILTER_LIST_GET_MULTIPLE_SELECTIONS(
+					word *selectionList = cx:dx,
+					word maxSelections = bp) = ax;
+
+/*
+ *  Pass:	identifier -- identifier to look for
+ *  Return:	optr of item, or null if none found
+ */
+@message optr MSG_FILTER_LIST_GET_ITEM_OPTR(word identifier = cx) = cx:dx;
+
+/*
+ *  Pass:	identifer -- identifier of item to select
+ * 		state -- non-zero if item should be selected, zero if not
+ *  Return:	nothing
+ */
+@message void MSG_FILTER_LIST_SET_ITEM_STATE(word identifier = cx,
+					        Boolean state = dx);
+
+/*
+ *  Pass:	identifer -- identifier of item to check on
+ *  Return:	non-zero if item is selected
+ */
+@message Boolean MSG_FILTER_LIST_IS_ITEM_SELECTED(word identifier = cx) = carry;
+
+/*
+ *  Pass:	identifier -- identifier of item to ensure visible
+ *  Return:	nothing
+ */
+@message void MSG_FILTER_LIST_MAKE_ITEM_VISIBLE(word identifier = cx);
+
+/*
+ *  Pass:	Params as in MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
+ *  Return:	nothing
+ */
+@message void MSG_FILTER_LIST_REPLACE_ITEM_MONIKER(@stack
+		word item, ReplaceItemMonikerFlags flags, 
+		word height, word width, word length,
+		VisMonikerDataType dataType,
+		VisMonikerSourceType sourceType,
+		dword source);
+
+/*
+ *  Pass:	moniker - source VisMoniker
+ * 		item - identifier of item to replace
+ *  Return:	nothing
+ */
+@message void MSG_FILTER_LIST_REPLACE_ITEM_MONIKER_OPTR(word item = bp,
+					optr moniker = cx:dx);
+
+/*
+ *  Pass:	text - far pointer to source null-terminated text string
+ * 		item - identifier of item to replace
+ *  Return:	nothing
+ */
+@message void MSG_FILTER_LIST_REPLACE_ITEM_TEXT(word item = bp,
+					 	     char *text = cx:dx);
+
+/*
+ *  Pass:	nothing
+ *  Return:	item identifier of current focus exclusive,
+ * 		      or GIGS_NONE if none, or not spec built.
+ */
+@message word MSG_FILTER_LIST_GET_FOCUS_ITEM() = ax;
+
+/*
+ *  Pass:	identifer -- identifier of the item to move the focus 
+ * 			 exclusive to. GIGS_NONE if no exclusive is desired
+ *  Return:	nothing
+ */
+@message void MSG_FILTER_LIST_SET_FOCUS_ITEM(word identifier = cx);
+
+/*
+ *  Notifies the dynamic list to display a new list of items.
+ *  If the list is already usable, invalidates all the current
+ *  items and re-requests all the monikers.  All items will be
+ *  deselected.  The list will not scroll back to the top
+ *  explicitly -- send a MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE
+ *  to get back to the top of the list.
+ * 
+ *  NOTE: the application should use this message, not
+ *  MSG_GEN_DYNAMIC_LIST_INITIALIZE to set the number of items in the list.
+ * 
+ *  Context:	Can be called any time.
+ *  Source:	No restrictions
+ *  Destination:	Any GenDynamicList object.
+ *  Interception:	Generally not intercepted.
+ * 
+ *  Pass:		cx -- new number of displayed items
+ * 		dx:bp -- new filter for list.  The filter is
+ * 			array of application item identifiers
+ * 			to display in the list.
+ * 			If NULL, then physical ID's and application ID's
+ * 				are the same, and no mapping between
+ * 				them takes place.
+ * 			If not null, and cx=0, then there are no matching
+ * 				items, and FLI_noMatchMoniker will be
+ * 				displayed.
+ *  Return:	nothing
+ *  Destroys:	nothing
+ */
+@message void MSG_FILTER_LIST_INITIALIZE(word numItems = cx,
+					 word *filter = dx:bp);
+
+
+/*
+ *  Data type for ATTR_FILTER_LIST_CUSTOM_IDENTIFIERS
+ */
+typedef struct {
+    word	FLCI_noItems;
+    word	FLCI_noMatch;
+} FilterListCustomIdentifiers;
+
+@vardata FilterListCustomIdentifiers ATTR_FILTER_LIST_CUSTOM_IDENTIFIERS;
+/*
+ *  Normally, when the list is displaying "no items" or "no
+ *  matches", the list uses the identifier GIGS_NONE,
+ *  making these states transparent to the application.
+ *  This ATTR allows the application to supply alternate
+ *  identifiers for these states, should the application
+ *  need to distinguish them from GIGS_NONE.
+ */
+
+@instance @visMoniker FLI_noItemsMoniker;
+/*
+ *  A chunk containing the item moniker to display
+ *  when the item count is 0, and there is no filter.
+ */
+
+@instance @visMoniker FLI_noMatchMoniker;
+/*
+ *  A chunk containing the item moniker to display
+ *  when the item count is 0, and the filter has zero length.
+ */
+
+@instance word	FLI_currentNoneMoniker;
+/*
+ *  INTERNAL: points to either FLI_noItemsMoniker,
+ *  FLI_noMatchMoniker, or NULL
+ */
+
+@instance ChunkHandle FLI_filterItems;
+/*
+ *  INTERNAL: if non-zero, chunk is an array of application ID's
+ *  to display.  if the array is of zero length, then
+ *  there are no items which match, and
+ *  FLI_noMatchText is displayed.
+ */
+
+@endc	/* FilterListClass */
+
+/* ----------------------------------------------------------------------------
+ *   FilterTextClass	 (only availible in Communicator products
+ *			         shipped in April 1997 or later)
+ * ----------------------------------------------------------------------------
+ * 
+ *  This is the class of object used to enter the text that will
+ *  limit the items displayed in a corresponding FilterListClass
+ *  object.
+ */
+
+@class  FilterTextClass, TextWithListClass;
+
+/*
+ *  Causes the filter timeout to be reset, and to send the
+ *  FTI_filterMsg.  Sent internally by timeout, or by
+ *  application to cause an immediate filter
+ * 
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+@message void MSG_FILTER_TEXT_SEND_FILTER_MSG();
+
+/*
+ *  Clears the current search text, and immediately sends out
+ *  FTI_filterMsg, causing the destination to clear the search.
+ *  This is the equivalent of MSG_VIS_TEXT_DELETE_ALL followed by
+ *  MSG_FILTER_TEXT_SEND_FILTER_MSG
+ * 
+ *  Pass:		nothing
+ *  Return:	nothing
+ */
+@message void MSG_FILTER_TEXT_RESET();
+
+/*
+ *  Message queued up when we lose the focus - if we've *really* lost the
+ *  focus, then nuke the text.
+ * 
+ *  Pass: nothing
+ *  Return: nothing
+ */
+@message void MSG_FILTER_TEXT_RESET_TEXT_IF_NOT_FOCUSED();
+
+@default GTXI_attrs = (@default | GTA_SINGLE_LINE_TEXT);
+
+@instance word FTI_filterTimeout = 30;
+/*
+ *  Time delay (in ticks) after text is modified that the
+ *  FTI_filterMsg should be sent.
+ */
+
+@instance Message FTI_filterMsg;
+/*
+ *  Message to send out to the GTXI_destination to initiate
+ *  a filter search.  The actual text to filter on may be obtained
+ *  with MSG_VIS_TEXT_GET_ALL_xxx. The message takes the following
+ *  form:
+ * 
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@instance word FTI_timerID;
+@instance word FTI_timerHandle;
+/*
+ *  Internal: handle/ID of timer used to determine when to start a
+ *  search.
+ */
+
+@endc	/* FilterTextClass */
+
+@class RepeatingGenGlyphClass, GenGlyphClass;
+@message void MSG_RGG_STOP_ANIMATION();
+/*
+  	Send this to stop the animation and leave the last glyph on
+	screen.
+*/
+
+@message void MSG_RGG_START_ANIMATION();
+/*
+	Restarts the previously stopped animation.
+*/
+
+@message void MSG_RGG_CHANGE_MONIKER();
+/*
+	Internal message, to trigger changing of moniker to the next one in
+	the list
+*/
+
+@instance word RGGI_currentItem; 
+@instance word RGGI_timerHandle;
+@instance word RGGI_timerID;
+@instance word RGGI_delayTime;
+@instance @visMoniker RGGI_monikerList;
+@endc
+
+@class ListWithUserDefinedClass, GenItemGroupClass;
+/*
+ *  A special list with "User defined" item. 
+ *  This list which has an associated (Underlined)TextWithList object.
+ *  It handles the giving/taking of focus from the text object, when we
+ *  move to/from the specified item in the list.
+ */
+
+@message void MSG_LWUD_SET_SINGLE_SELECTION_OR_USER_DEFINED(
+					word identifier = cx, 
+					Boolean indeterminate = dx);
+/*
+ *  Works like MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION the difference being
+ *  if the identifier you are trying to set is not found in a GenItem then the
+ *  user defined GenItem is selected.
+ * 
+ */
+
+    @vardata void ATTR_LIST_WITH_USER_DEFINED_TEXT_OBJECT_SELECTED;
+    /*  If present, the text object is currently selected. */
+
+    @instance optr LWUDI_textObj;
+    @instance word LWUDI_textID;
+@endc
+
+/* --------------------------------------------------------------------------
+ *   Indicator Library classes
+ * ------------------------------------------------------------------------*/
+
+@class GreyGenInteractionClass, GenPrimaryClass;
+@endc
+
+@class IndicatorClass, GenGlyphClass;
+@instance IconsShown II_numIcons;
+@endc
+
+@class IconIndicatorClass, IndicatorClass;
+@message void MSG_II_SET_LEFT_ICON(word iconNumber = cx);
+/*
+    Sets the left icon to be displayed in the indicator slot.
+*/
+
+@message void MSG_II_SET_RIGHT_ICON(word iconNumber = cx);
+/*
+    Sets the right icon to be displayed in the indicator slot.
+*/
+
+@instance ChunkHandle    III_leftIconList;
+@instance ChunkHandle    III_rightIconList;
+@instance word           III_leftIcon;
+@instance word           III_rightIcon;
+@endc
+
+@class LevelIndicatorClass, IndicatorClass;
+@message void MSG_LI_REPLACE_TYPE_BITMAP(ChunkHandle typeBitmap = cx);
+/*
+    Replace the tiny bitmap on the left, and redraws itself.
+			0 to not draw a bitmap and not draw the levels
+			(setting to 0 will NOT erase the old bitmap lptr).
+*/
+
+@message void MSG_LI_SET_LEVEL(word iconNumber = cx);
+/*
+    Sets the new indicator level, and redraws itself
+*/
+
+@instance word          LII_currLevel;
+@instance ChunkHandle   LII_typeBitmap;
+@instance ChunkHandle   LII_levelBitmapList;
+@endc
+
+@class IndicatorInteractionClass, GenInteractionClass;
+@endc
+
+/*
+ * AppLaunchClass
+ */
+
+@class	AppLaunchClass, GenFileSelectorClass;
+
+@message void MSG_AL_LAUNCH_SELECTED_APP();
+/*
+ * Launches the selected app.   Usually sent as a result of the user pressing
+ * on the "select" trigger.
+ */
+
+@message void MSG_AL_APP_SELECTED();
+/*
+ * Message sent out when an app is selected in the file selector.
+ */
+
+@instance FApplication	ALI_launcherApp;
+@instance optr          ALI_triggerObj;
+
+@default GFSI_destination = (TO_SELF);
+@default GFSI_notificationMsg = MSG_AL_APP_SELECTED;
+
+@endc
+
+/*
+ * FoamHelpControlClass
+ */
+@class	FoamHelpControlClass, HelpControlClass;
+
+@vardata    hptr    TEMP_FOAM_HELP_CONTROL_UI;
+
+@endc
+
+
+/******************************************************************************
+ *		FaomTextStyleControlClass
+ *****************************************************************************/
+
+@class	FoamTextStyleControlClass, GenControlClass;
+
+/*
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_TEXT_STYLE (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_STYLE_CHANGE: FoamNotifyTextStyleChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+
+
+/*--------------------------------------------------------------------------
+ * 		Methods
+ *--------------------------------------------------------------------------*/
+
+/*--------------------------------------------------------------------------
+ * 		Internal methods
+ *--------------------------------------------------------------------------*/
+
+@message void MSG_FTSC_PLAIN_TEXT_CHANGE();
+/*
+ *  Sent from "Plain" list entry on any change
+ * 
+ *  Pass:   nothing
+ */
+
+@message void MSG_FTSC_STYLE_CHANGE(word selectedBooleans = cx,
+				   word changedBooleans = bp);
+/*
+ *  Sent from non-exclusive "Style" list on any change
+ * 
+ *  Pass:
+ * 	selectedBooleans - new state of style list
+ * 	changedBooleans - changed bits in style list
+ */
+
+@message void MSG_FTSC_EXTENDED_STYLE_CHANGE(word selectedBooleans = cx,
+					    word changedBooleans = bp);
+/*
+ *  Sent from non-exclusive "Extended Style" list on any change
+ * 
+ *  Pass:
+ * 	selectedBooleans - new state of style list
+ * 	changedBooleans - changed bits in style list
+ */
+
+
+/* -------------------------------------------------------------------------
+ * 		Hints
+ * -------------------------------------------------------------------------*/
+
+/* -------------------------------------------------------------------------
+ * 		Constants & Structures
+ * -------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags FTSCFeatures;
+#define FTSCF_PLAIN		0x0800
+#define FTSCF_BOLD		0x0400
+#define FTSCF_ITALIC		0x0200
+#define FTSCF_UNDERLINE		0x0100
+#define FTSCF_STRIKE_THRU	0x0080
+#define FTSCF_SUBSCRIPT		0x0040
+#define FTSCF_SUPERSCRIPT	0x0020
+#define FTSCF_BOXED		0x0010
+#define FTSCF_BUTTON		0x0008
+#define FTSCF_INDEX		0x0004
+#define FTSCF_ALL_CAP		0x0002
+#define FTSCF_SMALL_CAP		0x0001
+
+#define FTSC_DEFAULT_FEATURES (FTSCF_PLAIN | FTSCF_BOLD \
+			| FTSCF_ITALIC | FTSCF_UNDERLINE \
+			| FTSCF_SUBSCRIPT | FTSCF_SUPERSCRIPT \
+			| FTSCF_STRIKE_THRU | FTSCF_BOXED | FTSCF_BUTTON \
+			| FTSCF_INDEX | FTSCF_ALL_CAP | FTSCF_SMALL_CAP)
+/*
+ *  Notification structure 
+ */
+typedef struct {
+    TextStyle			FNTSC_styles;		/* TextStyle */
+    TextStyle			FNTSC_indeterminates;	/* TextStyle */
+} FoamNotifyTextStyleChange;
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+    @default GCI_output = (TO_APP_TARGET);
+    @default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
+
+@endc
+
+
+/******************************************************************************
+ * 		FoamFontControlClass
+ ******************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_FONT_ID (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_FONT_CHANGE: FoamNotifyFontChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class	FoamFontControlClass, GenControlClass;
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+@message void MSG_FFC_SET_FONT(word fontID = cx);
+/*
+ *  Handle a font set via the short list
+ * 
+ *  Pass:
+ * 	fontID - font ID
+ */
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+    @vardata FontEnumFlags ATTR_FOAM_FONT_CONTROL_SHORT_LIST_FONT_TYPE;
+    /*
+     *  This attribute sets the legal font types for the short font list
+     */
+
+/*--------------------------------------------------------------------------
+ * 		Constants & Structures
+ *--------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ *
+ *  the original name is FFCFeatures (Foam Font Ctrl Feature) but
+ *  math.def has a struct with same name already... -- kho, 7/11/95
+ */
+typedef WordFlags FFCCFeatures;
+#define FFCCF_SHORT_LIST	0x0001
+
+#define FFCC_DEFAULT_FEATURES 	    (FFCCF_SHORT_LIST)
+
+/* 
+ * 	Notification structure
+ */
+typedef struct {
+    FontID			FNFC_fontID;
+    byte			FNFC_diffs;
+} FoamNotifyFontChange;
+
+
+/*--------------------------------------------------------------------------
+ * 		Instance Data
+ *--------------------------------------------------------------------------*/
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/******************************************************************************
+ * 		FoamPointSizeControlClass
+ ******************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_POINT_SIZE (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_FONT_SIZE_CHANGE: FoamNotifyFontSizeChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class	FoamPointSizeControlClass, GenControlClass;
+
+
+@message void MSG_FPSC_SET_POINT_SIZE(WWFixed size = dx:cx);
+/*
+ *  Pass:   size - WWFixed
+ */
+
+@message void MSG_FPSC_SET_POINT_SIZE_FROM_LIST(word size = cx);	
+/*
+ *  Pass:   size - word
+ */
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags FPSCFeatures;
+#define FPSCF_10	        0x0080
+#define FPSCF_12		0x0040
+#define FPSCF_14		0x0020
+#define FPSCF_18		0x0010
+#define FPSCF_24		0x0008
+#define FPSCF_36		0x0004
+#define FPSCF_54		0x0002
+#define FPSCF_USER_DEFINED	0x0001
+
+
+#define FPSC_DEFAULT_FEATURES (FPSCF_10 | FPSCF_12 | FPSCF_14 \
+			| FPSCF_18 | FPSCF_24 | FPSCF_36 \
+			| FPSCF_54 | FPSCF_USER_DEFINED)
+
+#define SIZE_USER_DEFINED 0
+
+
+/*
+ *	Notification structure
+ */
+typedef struct {
+    WWFixedAsDWord		FNPSC_FontSize;
+    byte			FNPSC_diffs;
+} FoamNotifyPointSizeChange;
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *--------------------------------------------------------------------------*/
+    @default GCI_output = (TO_APP_TARGET);
+    @default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
+
+@endc
+
+
+/*****************************************************************************
+ * 		FoamJustificationControlClass
+ *****************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_PARA_ATTRIBUTES (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_JUSTIFICATION_CHANGE:
+ *                                             FoamNotifyJustificationChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class FoamJustificationControlClass, GenControlClass;
+
+/*----------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+@message void MSG_FJC_SET_JUSTIFICATION();
+
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags FJCFeatures;
+#define FJCF_FULL_CHAR	0x0010	    /* DBCS only */
+#define FJCF_LEFT	0x0008
+#define FJCF_RIGHT	0x0004
+#define FJCF_CENTER	0x0002
+#define FJCF_FULL	0x0001
+
+#define FJC_DEFAULT_FEATURES  (FJCF_LEFT | FJCF_RIGHT | FJCF_CENTER \
+			       | FJCF_FULL)
+
+/* 	Notification structure */
+typedef struct {
+    Justification	FNJC_justification;
+    byte		FNJC_diffs;
+
+    /*
+     * if non-zero then use "general" in place
+     * of "full"
+     */
+    byte		FNJC_useGeneral;
+} FoamNotifyJustificationChange;
+
+    @default GCI_output = (TO_APP_TARGET);
+    @default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
+
+@endc
+
+
+
+/******************************************************************************
+ * 		ClockContentClass
+ ******************************************************************************
+ * 
+ */
+
+@class	ClockContentClass, VisContentClass;
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *--------------------------------------------------------------------------*/
+@instance optr CAI_curClock;
+@instance word CAI_interval;
+@endc
+
+/******************************************************************************
+ * 		VisClockClass
+ ******************************************************************************
+ * 
+ */
+
+@class	VisClockClass, VisCompClass, master;
+@message void MSG_VC_REMOVE_ME(int ticks = cx);
+
+@message void MSG_VC_CLOCK_TICK();
+
+@message void MSG_VC_START_TIMER();
+
+@message void MSG_VC_STOP_TIMER();
+
+#define  VC_CLOCK 1
+
+typedef enum {
+    VCC_CONTINUE = 0x0,
+    VCC_DONT_CONTINUE
+} VisClockContinue;
+
+typedef ByteFlags VisClockFlags;
+#define VCF_MOVING     		0x0040
+#define VCF_RESTORED   		0x0020
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *--------------------------------------------------------------------------*/
+@instance hptr VCI_timer;
+@instance word VCI_timerID;
+@instance VisClockContinue VCI_timerContinue;
+@instance ChunkHandle VCI_region;
+@instance word VCI_interval;
+@endc
+
+
+/******************************************************************************
+ * 		VisAnalogClockClass
+ ******************************************************************************
+ * 
+ */
+@class	VisAnalogClockClass, VisClockClass;
+
+typedef struct {
+    Rectangle		BGS_bounds;
+    byte	        BGS_gstring;
+} BoundedGString;
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *--------------------------------------------------------------------------*/
+@instance ChunkHandle VACI_pattern;
+@instance ChunkHandle VACI_hourHand;
+@instance ChunkHandle VACI_minuteHand;
+@instance ChunkHandle VACI_secondHand;
+
+typedef enum {
+	VACC_BACKGROUND 	= 0,
+	VACC_HOUR_HAND	      	= 1,
+	VACC_MINUTE_HAND        = 2,
+	VACC_SECOND_HAND        = 3,
+} VisAnalogClockColor;
+
+#define GR_CLOCK_COLOR_ESCAPE GR_FIRST_GEOWORKS_ESCAPE
+
+@instance WWFixed VACI_xScale;
+@instance WWFixed VACI_yScale;
+@instance WWFixed VACI_aspectRatio;
+@instance word VACI_lastHourAngle;
+@instance word VACI_lastMinuteAngle;
+@instance word VACI_lastSecondAngle;
+@instance word VACI_diameter;
+
+@vardata Point ATTR_ANALOG_CLOCK_SHOW_AM_PM;
+
+@endc
+
+/* ----------------------------------------------------------------------------
+ *   FlashingNoteClass
+ * ------------------------------------------------------------------------- */
+@class  FlashingNoteClass, GenInteractionClass;
+/*
+ *  The recommended usage of a FlashingNote object is to place it as the
+ *  root of an unattached tree in it's own UI block. If you then use
+ *  PutUpDialogViaUIThread to initiate it, and you don't manually
+ *  destroy the dialog later, you should use
+ *  HINT_FLASHING_NOTE_DESTROY_SELF_AFTER_DISMISS
+ * 
+ */
+
+/*
+ *  Sets how long the dialog will stay up, before dimissing itself.
+ *  (default = 3 seconds)
+ * 
+ *  Pass:	ticks = number of ticks (if 0, then the dialog box will
+ * 		never be dismissed, and any keystrokes will be ignored).
+ */
+@message void MSG_FLASHING_NOTE_SET_DURATION(int ticks = cx);
+
+/*
+ *  Internal messages:
+ */
+/*
+ *  Sent to ourselves (by timer) when the dead zone is over,
+ *  and we can start accepting keystrokes.
+ */
+@message void MSG_FLASHING_NOTE_ACCEPT_USER_ACTION();
+
+/*
+ *  Sent to ourselves (by timer) when we want to be taken down.
+ */
+@message void MSG_FLASHING_NOTE_DISMISS_DIALOG();
+
+/*
+ *  Vardata:
+ */
+@vardata void HINT_FLASHING_NOTE_DESTROY_SELF_AFTER_DISMISS;
+/*
+ *  Calls UserDestroyDialog on itself after dismissing the dialog.
+ *  Suitable for routines which don't care when the dialog is taken
+ *  down, and don't want to manually destroy it.
+ */
+
+@vardata word ATTR_FLASHING_NOTE_MINIMUM_DURATION;
+/*
+ *  How long, in # of ticks, the dialog will ignore keystrokes before
+ *  allowing the user to bring down the dialog with a keystroke. Also,
+ *  during this time, any IC_DISMISS sent to our object will be delayed
+ *  till minimum duration is over.
+ *  If not present, the default is 1 second.
+ */
+
+@vardata FlashingNoteTimerData TEMP_FLASHING_NOTE_TIMER_DATA;
+/*
+ *  Used to temporarily store the timer ID & timer handle.
+ */
+
+@vardata void TEMP_FLASHING_NOTE_DISMISS_ACTION_OK;
+/*
+ *  If present, user can dismiss dialog box with keystroke, or
+ *  programmer can dismiss dialog.
+ */
+
+@vardata void TEMP_FLASHING_NOTE_TRIED_DISMISS;
+/*
+ *  If present, programmer tried to dismiss dialog before dead zone
+ *  timer expired.
+ */
+
+@vardata void TEMP_FLASHING_NOTE_ALT_MARGINS;
+/*
+ * Used internally when smaller margins are needed to accomodate larger
+ * flashing note contents.
+ */
+
+/*
+ *  Instance data:
+ */
+@instance word	FNI_duration;
+/*
+ *  # of ticks to stay up
+ */
+
+@default GII_attrs      = (GIA_NOT_USER_INITIATABLE | GIA_SYS_MODAL);
+@default GII_visibility = GIV_DIALOG;
+@default GII_type       = GIT_MULTIPLE_RESPONSE;
+@default FNI_duration   = FLASHING_NOTE_DEFAULT_DURATION;
+
+@endc	/* FlashingNoteClass */
+
+/* ----------------------------------------------------------------------------
+ *   SelfDestroyingDialogClass
+ * ------------------------------------------------------------------------- */
+@class  SelfDestroyingDialogClass, GenInteractionClass;
+/*
+ *  A dialog which knows how to destroy itself after being closed.
+ * 
+ *  This is used by FoamStandardDialogOptr's UI.
+ *  The recommended usage of this object is to place it as the
+ *  root of an unattached tree in it's own UI block.
+ *
+ *  Never call UserDestroyDialog directly on this object, instead use
+ *  MSG_GEN_GUP_INTERACTION_COMMAND to send IC_DISMISS.
+ */
+@endc	/* SelfDestroyingDialogClass */
+
+
+/* ----------------------------------------------------------------------------
+ *   FoamProgressDialogClass
+ * ------------------------------------------------------------------------- */
+@class	FoamProgressDialogClass, GenControlClass;
+/* A standard dialog which provides the cancellation animation.
+ *
+ *  Will contain:
+ * 	description text to say what's going on
+ * 	standard cancellation animation
+ * 	status text for progress updates if desired
+ * 	cancellation trigger
+ */
+
+/*
+ *  Set the description text.
+ * 
+ *  Pass: ^lcx:dx = optr to description text
+ *  Return: nothing
+ */
+@message void MSG_FOAM_PROGRESS_DIALOG_SET_DESCRIPTION_TEXT_OPTR(
+				optr descText = cx:dx);
+
+/*
+ *  Set the status text.
+ * 
+ *  Pass: cx:dx = fptr to status text
+ *  Return: nothing
+ */
+@message void MSG_FOAM_PROGRESS_DIALOG_SET_STATUS_TEXT(
+				TCHAR *statusText = cx:dx);
+
+/*
+ *  Set the cancel action.
+ * 
+ *  Pass: ^lcx:dx = optr to destination
+ * 	   bp 	  = cancellation msg message
+ *  Return: nothing
+ */
+@message void MSG_FOAM_PROGRESS_DIALOG_SET_CANCEL_ACTION(
+				optr dest = cx:dx, 
+				word msg = bp);
+
+/*
+ *  Set the status text.
+ * 
+ *  Pass: ^lcx:dx = optr to status text
+ *  Return: nothing
+ */
+@message void MSG_FOAM_PROGRESS_DIALOG_SET_STATUS_TEXT_OPTR(
+			  	optr statusText = cx:dx);
+
+/*
+ *  Append text to the current status text.
+ * 
+ *  Pass: cx:dx = fptr to status text to append 
+ * 		to current status text
+ *  Return: nothing
+ */
+@message void MSG_FOAM_PROGRESS_DIALOG_APPEND_STATUS_TEXT(
+			  	TCHAR *statusText = cx:dx);
+
+/*
+ *  Set the description text.
+ * 
+ *  Pass: cx:dx = fptr to description text
+ *  Return: nothing
+ */
+@message void MSG_FOAM_PROGRESS_DIALOG_SET_DESCRIPTION_TEXT(
+			  	TCHAR *descText = cx:dx);
+
+/*
+ *  Append text to the current description text.
+ * 
+ *  Pass: cx:dx = fptr to description text to append 
+ * 		to current description text
+ *  Return: nothing
+ */
+@message void MSG_FOAM_PROGRESS_DIALOG_APPEND_DESCRIPTION_TEXT(
+			  	TCHAR *descText = cx:dx);
+
+/*
+ * Internal: Sent to us by our Cancel trigger when pressed.
+ *
+ * Pass: nothing
+ * Return: nothing
+ */
+@message void MSG_FOAM_PROGRESS_DIALOG_CANCEL_TRIGGERED();
+
+/*
+ * Calls UserDestroyDialog on itself after dismissing the dialog.
+ * Suitable for routines which don't care when the dialog is taken
+ * down, and don't want to manually destroy it.
+ */
+@vardata void HINT_FOAM_PROGRESS_DIALOG_DESTROY_SELF_AFTER_DISMISS;
+
+/*
+ * Specifies that the dialog should not be dismissed when the
+ * cancel trigger is activated.  The application is responsible for
+ * dismissing the dialog.
+ */
+@vardata void ATTR_FOAM_PROGRESS_DIALOG_DONT_DISMISS_ON_CANCEL;
+
+@instance	ChunkHandle	FPDI_descriptionText 	= NullChunk;
+@instance	ChunkHandle	FPDI_statusText 	= NullChunk;
+@instance	optr		FPDI_cancelDestination 	= NullOptr;
+@instance	word		FPDI_cancelActionMsg 	= 0;
+
+@default 	GII_visibility	= GIV_POPUP;
+@default 	GII_type	= GIT_MULTIPLE_RESPONSE;
+@default 	GII_attrs      	= (GIA_NOT_USER_INITIATABLE | GIA_MODAL);
+@default	GI_attrs	= GA_SIGNAL_INTERACTION_COMPLETE;
+@default	GI_states	= (@default | GS_ENABLED);
+
+@endc  /* FoamProgressDialogClass */
+
+typedef WordFlags FoamProgressDialogFeatures;
+/* 15 bits unused */
+#define FPDF_CANCEL	(0x0001) /* whether there is a cancel trigger */
+
+
+/*----------------------------------------------------------------------------
+ *  FoamSubApplicationClass
+ *--------------------------------------------------------------------------*/
+
+@class FoamSubApplicationClass, GenApplicationClass;
+/*
+ * This class should be used for any application that must exist under the
+ * systems, extras, or services application.    It provides needed default
+ * behavior for sub-applications, and a method handler to call when the
+ * user clicks on the "Close" button.
+ */
+
+@instance FApplication	FSAI_launcherApp;
+	/* The name of the application that should launch this app.
+	 * Needed for proper open and close behavior for the sub-app. 
+	 */
+
+@message void MSG_FSA_RETURN_TO_LAUNCHER();
+/*
+ * Provided for sub-apps to have an easy way to return to their parent app.
+ * Usually called as a result of the user pressing "Close" in the sub-app.
+ */
+
+@vardata  void		HINT_FOAM_SUB_APP_NOT_DEFAULT_LAUNCHABLE;
+        /*
+ 	 * Used internally by FoamSubApplicationClass to determine
+	 * when the app may be lauched in place of the default launcher.
+	 */
+
+@endc	/* FoamSubApplicationClass */
+
+/* ----------------------------------------------------------------------------
+ *   Exported functions
+ * --------------------------------------------------------------------------*/
+extern void _far _pascal \
+	FoamSetDocumentDir(FDocumentDir fDocDir);
+
+extern FDocumentDir _far _pascal \
+	FoamGetDocumentDir(void);
+
+extern void _far _pascal \
+	FoamGetDocumentDirName(FDocumentDir fDocDir, FileLongName *buffer);
+
+extern InteractionCommand _far _pascal \
+	FoamDisplayDeleteWarning(optr preText, TCHAR *midText, optr postText);
+
+extern void _far _pascal \
+        FoamDisplayDeleteWarningNoBlock(optr bodyText, word msg, optr dest);
+
+extern void _far _pascal \
+	FoamDisplayWarning(optr warningText);
+
+extern InteractionCommand _far _pascal \
+	FoamDisplayQuestion(optr questionText);
+
+extern void _far _pascal \
+	FoamDisplayError(optr errorText);
+
+extern InteractionCommand _far _pascal \
+	FoamDisplayOkCancelWarning(optr warningText);
+
+extern void _far _pascal \
+	FoamDocSetAttrInfo(DocumentHandle docHandle, 
+			   FileAttrInfo *fileAttrInfo);
+/*
+ * SYNOPSIS:    Checks a document file for the correct protocol and creator
+ *              token.  
+ * 		
+ * PASS:        DocumentHandle docHandle - Document to check
+ *              word numCreatorChars - Number of FEA_CREATOR token chars to
+ *                                     check.  You can pass two if you only
+ *                                     want to check the first to characters.
+ *              word majorProtocol - Major protocol number to check
+ *              word minorProtocol - Minor protocol number to check
+ *                                   (pass -1 if you don't want to check the
+ *                                    minor protocol.)
+ *  
+ * RETURNS:    TRUE if the check failed.
+ */
+extern Boolean _far _pascal \
+	FoamDocCheckProtocol(DocumentHandle docHandle,
+			     word numCreatorChars,
+			     word majorProtocol, 
+			     word minorProtocol);
+
+extern word _far _pascal \
+	FoamDocCreate(DocumentInfo *docInfo, FileAttrInfo *fileAttr,
+		      DocumentPrefix *prefix);
+
+extern DocumentHandle _far _pascal \
+	FoamDocOpen(DocumentInfo *docInfo, FDocAccess docAccess);
+        /* Use ThreadGetError to check error value */
+
+extern void _far _pascal \
+	FoamDocClose(DocumentHandle docHandle);
+
+extern Boolean _far _pascal \
+	FoamDocDelete(DocumentInfo *docInfo);
+
+extern void _far _pascal \
+	FoamDocSetBlockHandle(DocumentHandle docHandle, \
+			      VMBlockHandle block, FoamDocHeader docHeader);
+
+extern void _far _pascal \
+	FoamDocSetHeaderData(DocumentHandle docHandle, \
+			     word data, FoamDocHeader docHeader);
+
+extern word _far _pascal \
+	FoamDocGetHeaderData(DocumentHandle docHandle, \
+			     FoamDocHeader docHeader);
+
+extern void _far _pascal \
+	FoamDocSetTextLength(DocumentHandle docHandle, \
+			     dword length);
+
+extern dword _far _pascal \
+	FoamDocGetTextLength(DocumentHandle docHandle);
+
+extern dword _far _pascal \
+	FoamDocGetTextLengthFromField(char *field);
+
+extern word _far _pascal \
+	FoamDocGetDosTextSmall(DocumentHandle docHandle, void *buffer, 
+			       word count);
+
+extern void _far _pascal \
+	FoamDocStoreDosTextSmall(DocumentHandle docHandle, void *buffer, \
+			    word bufferLen);
+
+extern optr _far _pascal \
+	FoamDocConvertFromDosInit(void);
+
+extern void _far _pascal \
+	FoamDocConvertFromDosAppend(optr object, TCHAR *buffer, 
+					 word bufferLength);
+
+extern void _far _pascal \
+	FoamDocConvertFromDosDone(DocumentHandle docHandle, optr object);
+
+extern optr _far _pascal \
+	FoamDocConvertToDosInit(DocumentHandle docHandle);
+
+extern word _far _pascal \
+	FoamDocConvertToDosRange(optr object, TCHAR *buffer, 
+					 dword startPos, dword endPos);
+
+extern void _far _pascal \
+	FoamDocConvertToDosDone(optr object);
+
+extern Boolean _far _pascal \
+	FoamDocIsTextFormatted(DocumentHandle docHandle, 
+			       DocumentFontInfo *fontInfo);
+
+extern FoamDiskSpaceStatus _far _pascal \
+        FoamCheckIfOutOfSpace(void);
+
+extern Boolean _far _pascal \
+        FoamWarnIfOutOfSpace(void);
+
+extern FoamSaveAction _far _pascal \
+        FoamWarnForSaving(dword space);
+
+extern Boolean _far _pascal \
+        FoamCancelIfNoFreeSpace(void);
+
+extern FoamDiskSpaceStatus _far _pascal \
+        FoamWarnIfNotEnoughSpace(dword space);
+
+extern FoamDiskSpaceStatus _far _pascal \
+        FoamWarnSpaceAfterOperation(void);
+
+extern dword _far _pascal \
+        FoamGetFreeDiskSpace(void);
+
+extern dword _far _pascal \
+        FoamRoundUpAsMultipleOfClusterSize(dword space);
+
+extern void _far _pascal \
+	FoamLaunchApplication(FApplication applicationConstant);
+
+extern optr _far _pascal \
+	PutUpDialogViaUIThread(optr dialogBoxTemplate);
+
+extern void _far _pascal \
+	TakeDownDialogViaUIThread(optr dialogBox);
+
+typedef WordFlags FoamCustomDialogBoxFlags;
+#define FCDBF_SYSTEM_MODAL		0x8000
+#define FCDBF_DIALOG_TYPE		0x6000
+#define FCDBF_INTERACTION_TYPE		0x1e00
+#define FCDBF_DESTRUCTIVE_ACTION	0x0100
+#define FCDBF_DIALOG_TYPE_OFFSET	13
+#define FCDBF_INTERACTION_TYPE_OFFSET	9
+
+
+/*
+ * NOTE: rejectTriggerMessage, rejectTriggerDestination,
+ *	 acceptTriggerMessage, and acceptTriggerDestination are unused
+ *       in FoamStandardDialogOptr!!
+ */
+extern InteractionCommand _far _pascal \
+        FoamStandardDialogOptr(void *helpFile,
+			           void *helpContext,
+				   LayerPriority layerPriority,
+				   word rejectTriggerMessage,
+				   optr rejectTriggerDestination,
+				   word acceptTriggerMessage,
+				   optr acceptTriggerDestination,
+				   optr triggerTopText,
+                                   TCHAR *arg2,
+                                   TCHAR *arg1,
+                                   FoamCustomDialogBoxFlags dialogFlags,
+				   optr bodyText,
+				   optr titleText,
+				   optr titleIconBitmap);
+
+extern optr _far _pascal \
+        FoamStandardDialogOptrNoBlock(void *helpFile,
+				   void *helpContext,
+				   LayerPriority layerPriority,
+				   word rejectTriggerMessage,
+				   optr rejectTriggerDestination,
+				   word acceptTriggerMessage,
+				   optr acceptTriggerDestination,
+				   optr triggerTopText,
+                                   TCHAR *arg2,
+                                   TCHAR *arg1,
+                                   FoamCustomDialogBoxFlags dialogFlags,
+				   optr bodyText,
+				   optr titleText,
+				   optr titleIconBitmap);
+
+extern optr _far _pascal \
+	CreateVisMonikerLine(word pointSize,
+			FontID typeFace,
+			word numberOfFields,
+			VisMonikerColumn *columnList);
+
+extern optr _far _pascal \
+	CreateVisMonikerLineAdaptableColumns(word pointSize,
+			FontID typeFace,
+			word numberOfFields,
+			VisMonikerColumn *columnList);
+
+extern void _far _pascal \
+	FoamDisplayNote(optr noteText);
+			
+extern void _far _pascal \
+	FoamDisplayNoteNoBlock(optr noteText);
+
+extern void _far _pascal \
+	FoamDisplayErrorNoBlock(optr errorText);
+
+extern void _far _pascal \
+	FoamDisplayWarningNoBlock(optr warningText);
+
+extern GeosFileType _far _pascal \
+	FoamGetFileType(TCHAR *filename);
+
+extern GeosFileType _far _pascal \
+	FoamGetHandleFileType(DocumentHandle docHandle);
+
+extern Boolean _far _pascal \
+	FoamStopSoundSequence(void);
+
+/*
+ * make a sequence of sound with UserStandardSound,
+ * duration ticks.
+ * 
+ * if (sound==FOAM_FCLOCK_ALARM_SOUND) then the start sound of clock
+ * alarm will be played.
+ */
+#define FOAM_FCLOCK_ALARM_SOUND -1
+
+extern void _far _pascal \
+	FoamStartSoundSequence(StandardSoundType sound,
+				word duration,
+				word interval);
+
+/*************************************************************************
+C FUNCTION:	FoamUTOffset
+
+C DECLARATION:	extern signed int _far _pascal
+		FoamUTOffset(void)
+
+RETURNS:	signed integer gmt offset (or universal time) in minutes.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+        AW	9/28/95	        Initial version
+*************************************************************************/
+
+extern signed int _far _pascal \
+        FoamUTOffset();
+
+/*
+ * Gets the "lexical order" of a character, for use in optimized
+ * case and accent-insensitive searching (all versions of a character,
+ * accented, unaccented, upper and lower case will have the same lexical
+ * order).
+ */	
+extern byte _pascal \
+    	FoamGetLexicalOrder(char theChar);
+
+/*
+ * SYNOPSIS:	Generates a unique document name.  A prefix is passed in
+ *              fileBuffer, the function will add the "next available" 
+ *              number to the prefix and return the document name in 
+ *              the form: "[prefix] #[number]".
+ *
+ *		NOTE:  The caller should try and create the document using the
+ *		       returned name.  If the create fails, call this function
+ *		       again to get a new name.
+ */
+extern void _pascal \
+    FoamGenerateUniqueFilename(FileLongName *nameBuffer);
+
+
+/*
+ * SYNOPSIS:	Given a reason and a reason type passed to handlers for
+ * 		ECI_CALL_RELEASE_STATUS and ECI_CALL_TERMINATE_STATUS, this
+ * 		function returns values appropriate for returning in a mailbox
+ * 		transport driver's DR_MBTD_TRANSMIT_MESSAGE.
+ * 
+ * 		If a string needs to be returned, it will be in the foam
+ * 		library's FoamECIErrorStrings resource.
+ *
+ * PASS:	reasonType	= ECICauseType
+ *		reason		= ECICommonCause
+ * 
+ * RETURNS:	TRUE if a problem caused the disconnect
+ * 			*mbErrorString	= reason string for failure
+ * 			*mbErr 		= MailboxError
+ * 
+ * 		FALSE if it was a clean disconnect
+ * 			*mbErr		= ME_SUCCESS
+ * 			*mbErrorString	= 0
+ */
+extern Boolean _far _pascal \
+    	FoamECIToMailboxError(byte reasonType,
+			      byte reason,
+			      MailboxError *mbErr,
+			      optr *mbErrorString);
+
+
+/*
+ * SYNOPSIS:	Copies the text of a text object into a chain of text
+ * 		transfer items, each about 4000 bytes in size.  The
+ * 		starting block of the chain is saved in FDH_TEXT_TR_ITEM
+ *  		of the document mapblock.  The next transfer item block
+ * 		handle is saved in the TTBH_reservedVM field of the
+ * 		TextTransferBlockHeader.
+ * 
+ *              When it's time read in the chain of text transfer items first
+ *              use the block in FDH_TEXT_TR_ITEM with MSG_VIS_TEXT_REPLACE_
+ *              WITH_TEXT_TRANSFER_FORMAT then loop until TTBH_reservedVM.high
+ *              is zero.  To get at TTBH_reservedVM use VMLock passing the
+ *              the VMBlockHandle you used when calling MSG_VIS_TEXT_REPLACE_
+ *              WITH_TEXT_TRANSFER_FORMAT. 
+ * 
+ * PASS:        DocumentHandle docHandle - Document to store text in
+ *              optr textObject - Text object containing text to store.
+ *  
+ * RETURNS:     word - VMBlockHandle of the first text transfer item.
+ *              (This handle is also stored in FDH_TEXT_TR_ITEM)
+ */
+extern word _far _pascal \
+    FoamDocStoreTextAsVMChain(DocumentHandle docHandle,
+			      optr textObject);
+
+/*
+ * SYNOPSIS:    Tells you if text in a text object is formatted (does it have
+ *              multiple character attributes).  If the text is not formatted
+ *              the function will return the font and the point size of the
+ *              text.
+ * 		
+ * PASS:        optr textObject - Text object containing text
+ *              DocumentFontInfo *fontInfo - ptr to structure to store font
+ *                                           info if the text is not formatted.
+ *  
+ * RETURNS:     boolean - TRUE if text is formatted
+ *                        FALSE if text is not formatted
+ *                           fontInfo structure filled if text is not formatted
+ */
+extern Boolean _far _pascal \
+    FoamIsTextFormatted(optr textObject,
+			DocumentFontInfo *fontInfo);
+
+/*
+ * SYNOPSIS:    Stores information on the document text in the GeosFileHeader
+ *              of the Document.  This information can be retrieved by calling
+ *              FoamDocIsTextFormatted.
+ * 		
+ * PASS:        DocumentHandle docHandle - Document to store info in
+ *              FoamDocTextFormatted fdtf - Set to FDTF_FORMATTED if the text
+ *                                          is formatted, otherwise 
+ *                                          FDTF_NOT_FORMATTED.
+ *              DocumentFontInfo *fontInfo - If the text is not formatted then
+ *                                           pass the font and point size of
+ *                                           the text.
+ *  
+ * RETURNS:     Nothing
+ */
+extern void _far _pascal \
+    FoamDocSetTextFormatted(DocumentHandle docHandle,
+			    FoamDocTextFormatted fdtf,
+			    DocumentFontInfo *fontInfo);
+
+/*
+ * Set the lowSoundFlag.
+ *
+ * When the flag is set to TRUE, UserStandardSound will play one plain
+ * note, no matter what is being passed.
+ *
+ */
+extern void _far _pascal FoamSetLowSoundFlag(word lowSndFlag);
+
+
+/*
+ * Get the lowSoundFlag.
+ *
+ */
+extern word _far _pascal FoamGetLowSoundFlag(void);
+
+
+/*
+ * Generate a FoamPathHandle
+ *
+ * stdPath   - standard path to start from
+ * pathname  - path name string
+ *
+ * returns: a valid FoamPathHandle for the path
+ *
+ */
+extern	FoamPathHandle _far _pascal FoamPathMakeSP (
+				       StandardPath stdPath,
+				       TCHAR *pathname );
+/*
+ * Generate a FoamPathHandle
+ *
+ * parent    - FoamPathHandle of parent directory
+ * pathstr   - path string starting from parent
+ *
+ * returns: a valid FoamPathHandle for the path
+ *
+ */
+extern FoamPathHandle _far _pascal FoamPathMake(
+					FoamPathHandle parent,
+					TCHAR *pathstr );
+
+/*
+ * Get parent of a FoamPathHandle
+ *
+ * fph       - FoamPathHandle to get parent of
+ *
+ * returns: parent FoamPathHandle
+ *
+ */
+extern FoamPathHandle _far _pascal FoamPathParent( FoamPathHandle fph );
+
+/*
+ * Get full path name of a FoamPathHandle
+ *
+ * fph       - FoamPathHandle to get full path of
+ * buffer    - pointer to a buffer that's at least of size PathName
+ *
+ * returns:    StandardPath
+ *             buffer filled in
+ *
+ */
+extern StandardPath _far _pascal FoamPathGetFullPath(
+				    FoamPathHandle fph,
+				    TCHAR	   *buffer);
+
+/*
+ * Get the name of folder from FoamPathHandle
+ *
+ * fph       - FoamPathHandle
+ * buffer    - pointer to a buffer that's at least of size FileLongName
+ *
+ * returns:    nothing( buffer filled in )
+ *
+ */
+extern void _far _pascal FoamPathFolderName( FoamPathHandle fph,
+					     TCHAR *buffer );
+
+/*
+ * Lock a FoamPathHandle
+ *
+ * fph       - FoamPathHandle to lock
+ *
+ * Returns:    nothing
+ *
+ */
+extern void _far _pascal FoamPathLock( FoamPathHandle fph );
+
+/*
+ * Unlock a FoamPathHandle
+ *
+ * fph       - FoamPathHandle to unlock
+ *
+ * returns:    nothing
+ *
+ */
+extern void _far _pascal FoamPathUnlock( FoamPathHandle fph );
+
+/*
+ * Check if a path is locked( so you cannot delete the directory)
+ *
+ * fph       - FoamPathHandle
+ *
+ * retunrs:    -1 if not locked
+ *             0 if locked
+ *
+ */
+extern word _far _pascal FoamPathCheckLock( FoamPathHandle fph );
+
+/*
+ * Rename a directory represented by FoamPathHandle
+ *
+ * fph       - FoamPathHandle
+ * newName   - string for new name
+ *
+ * returns:    nothing
+ *
+ */
+extern void _far _pascal FoamPathRename( FoamPathHandle fph,
+					 TCHAR *newName ); 
+
+/*
+ * Check if a FoamPathHandle is a FDocumentDir
+ *
+ * fph       - FoamPathHandle
+ *
+ * returns:    -1 if it is a FDocumentDir
+ *             0 if not
+ *
+ */
+extern word _far _pascal FoamPathIsFDD( FoamPathHandle fph );
+
+/*
+ * Launch the appropiate reader app.
+ *
+ * returns:    -1 if it failed to launch
+ *             0 if not
+ */
+extern Boolean _far _pascal FoamLaunchReaderApp(FoamReaderAppType frat);
+
+/*
+ * Get the current backlight timeout level
+ *
+ * returns: [MINIMUM_BACKLIGHT_LEVEL .. MAXIMUM_BACKLIGHT_LEVEL]
+ *          0 is off, actual timeout values are determined in the
+ *          Respondr Library
+ */
+extern int _far _pascal FoamGetBacklightTimeout(void);
+
+/*
+ * Set the backlight timeout level
+ *
+ * pass:    timeout level, must be valid integer between
+ *          [MINIMUM_BACKLIGHT_LEVEL .. MAXIMUM_BACKLIGHT_LEVEL]
+ */
+extern void _far _pascal FoamSetBacklightTimeout(int timeoutLevel);
+
+/*
+ * Retrieves the Document Outbox name
+ */
+extern void _far _pascal FoamGetDocumentOutboxName(FileLongName *buffer);
+
+/*
+ * Returns the current date and time as a TimerCompressedDate and hour/min
+ */
+extern void _far _pascal FoamGetCompressedDateTime(
+    TimerCompressedDate *currentDate, word *currentTime);
+
+
+/*
+ * Returns (secondDate&Time) - (firstDate&Time) in minutes
+ */
+extern dword _far _pascal FoamGetMinutesBetweenTimes(
+    TimerCompressedDate firstDate, word firstTime,
+    TimerCompressedDate secondDate, word secondTime);
+
+/*
+ * Returns (date&time) + (time adjustment)
+ */
+extern void _far _pascal FoamAdjustTimeForward(
+    TimerCompressedDate startDate, word startTime,
+    word adjustment, AdvanceNoticeType noticeType,
+
+    TimerCompressedDate *resultDate, word *resultTime);
+
+/*
+ * Returns (date&time) - (time adjustment)
+ */
+extern void _far _pascal FoamAdjustTimeBackward(
+    TimerCompressedDate startDate, word startTime,
+    word adjustment, AdvanceNoticeType noticeType,
+
+    TimerCompressedDate *resultDate, word *resultTime);
+
+#ifdef __HIGHC__
+pragma Alias(FoamSetDocumentDir, "FOAMSETDOCUMENTDIR");
+pragma Alias(FoamGetDocumentDir, "FOAMGETDOCUMENTDIR");
+pragma Alias(FoamGetDocumentDirName, "FOAMGETDOCUMENTDIRNAME");
+pragma Alias(FoamDisplayDeleteWarning, "FOAMDISPLAYDELETEWARNING");
+pragma Alias(FoamDisplayDeleteWarningNoBlock, "FOAMDISPLAYDELETEWARNINGNOBLOCK");
+pragma Alias(FoamDisplayWarning, "FOAMDISPLAYWARNING");
+pragma Alias(FoamDisplayOkCancelWarning, "FOAMDISPLAYOKCANCELWARNING");
+pragma Alias(FoamDisplayQuestion, "FOAMDISPLAYQUESTION");
+pragma Alias(FoamDisplayError, "FOAMDISPLAYERROR");
+pragma Alias(FoamDocSetAttrInfo, "FOAMDOCSETATTRINFO");
+pragma Alias(FoamDocCheckProtocol, "FOAMDOCCHECKPROTOCOL");
+pragma Alias(FoamDocCreate, "FOAMDOCCREATE");
+pragma Alias(FoamDocOpen, "FOAMDOCOPEN");
+pragma Alias(FoamDocClose, "FOAMDOCCLOSE");
+pragma Alias(FoamDocDelete, "FOAMDOCDELETE");
+pragma Alias(FoamDocSetBlockHandle, "FOAMDOCSETBLOCKHANDLE");
+pragma Alias(FoamDocSetHeaderData, "FOAMDOCSETHEADERDATA");
+pragma Alias(FoamDocGetHeaderData, "FOAMDOCGETHEADERDATA");
+pragma Alias(FoamDocSetTextLength, "FOAMDOCSETTEXTLENGTH");
+pragma Alias(FoamDocGetTextLength, "FOAMDOCGETTEXTLENGTH");
+pragma Alias(FoamDocGetTextLengthFromField, "FOAMDOCGETTEXTLENGTHFROMFIELD");
+pragma Alias(FoamDocGetDosTextSmall, "FOAMDOCGETDOSTEXTSMALL");
+pragma Alias(FoamDocStoreDosTextSmall, "FOAMDOCSTOREDOSTEXTSMALL");
+pragma Alias(FoamDocConvertFromDosInit, "FOAMDOCCONVERTFROMDOSINIT");
+pragma Alias(FoamDocConvertFromDosAppend, "FOAMDOCCONVERTFROMDOSAPPEND");
+pragma Alias(FoamDocConvertFromDosDone, "FOAMDOCCONVERTFROMDOSDONE");
+pragma Alias(FoamDocConvertToDosInit, "FOAMDOCCONVERTTODOSINIT");
+pragma Alias(FoamDocConvertToDosRange, "FOAMDOCCONVERTTODOSRANGE");
+pragma Alias(FoamDocConvertToDosDone, "FOAMDOCCONVERTTODOSDONE");
+pragma Alias(FoamDocIsTextFormatted, "FOAMDOCISTEXTFORMATTED");
+pragma Alias(FoamIsTextFormatted, "FOAMISTEXTFORMATTED");
+pragma Alias(FoamDocSetTextFormatted, "FOAMDOCSETTEXTFORMATTED");
+pragma Alias(FoamCheckIfOutOfSpace, "FOAMCHECKIFOUTOFSPACE");
+pragma Alias(FoamWarnIfOutOfSpace, "FOAMWARNIFOUTOFSPACE");
+pragma Alias(FoamWarnForSaving, "FOAMWARNFORSAVING");
+pragma Alias(FoamCancelIfNoFreeSpace, "FOAMCANCELIFNOFREESPACE");
+pragma Alias(FoamWarnIfNotEnoughSpace, "FOAMWARNIFNOTENOUGHSPACE");
+pragma Alias(FoamGetFreeDiskSpace, "FOAMGETFREEDISKSPACE");
+pragma Alias(FoamWarnSpaceAfterOperation, "FOAMWARNSPACEAFTEROPERATION");
+pragma Alias(FoamRoundUpAsMultipleOfClusterSize, "FOAMROUNDUPASMULTIPLEOFCLUSTERSIZE");
+pragma Alias(FoamLaunchApplication, "FOAMLAUNCHAPPLICATION");
+pragma Alias(PutUpDialogViaUIThread, "PUTUPDIALOGVIAUITHREAD");
+pragma Alias(TakeDownDialogViaUIThread, "TAKEDOWNDIALOGVIAUITHREAD");
+pragma Alias(FoamStandardDialogOptr, "FOAMSTANDARDDIALOGOPTR");
+pragma Alias(FoamStandardDialogOptrNoBlock, "FOAMSTANDARDDIALOGOPTRNOBLOCK");
+pragma Alias(CreateVisMonikerLine, "CREATEVISMONIKERLINE");
+pragma Alias(CreateVisMonikerLineAdaptableColumns, "CREATEVISMONIKERLINEADAPTABLECOLUMNS");
+pragma Alias(FoamDisplayNote,"FOAMDISPLAYNOTE");
+pragma Alias(FoamDisplayNoteNoBlock,"FOAMDISPLAYNOTENOBLOCK");
+pragma Alias(FoamDisplayWarningNoBlock, "FOAMDISPLAYWARNINGNOBLOCK");
+pragma Alias(FoamDisplayErrorNoBlock, "FOAMDISPLAYERRORNOBLOCK");
+pragma Alias(FoamGetFileType, "FOAMGETFILETYPE");
+pragma Alias(FoamGetHandleFileType, "FOAMGETHANDLEFILETYPE");
+pragma Alias(FoamUTOffset, "FOAMUTOFFSET");
+pragma Alias(FoamStopSoundSequence, "FOAMSTOPSOUNDSEQUENCE");
+pragma Alias(FoamStartSoundSequence, "FOAMSTARTSOUNDSEQUENCE");
+pragma Alias(FoamGetLexicalOrder, "FOAMGETLEXICALORDER");
+pragma Alias(FoamGenerateUniqueFilename, "FOAMGENERATEUNIQUEFILENAME");
+pragma Alias(FoamECIToMailboxError, "FOAMECITOMAILBOXERROR");
+pragma Alias(FoamDocStoreTextAsVMChain, "FOAMDOCSTORETEXTASVMCHAIN");
+pragma Alias(FoamSetLowSoundFlag, "FOAMSETLOWSOUNDFLAG");
+pragma Alias(FoamGetLowSoundFlag, "FOAMGETLOWSOUNDFLAG");
+pragma Alias(FoamPathMakeSP, "FOAMPATHMAKESP");
+pragma Alias(FoamPathMake, "FOAMPATHMAKE");
+pragma Alias(FoamPathGetFullPath, "FOAMPATHGETFULLPATH");
+pragma Alias(FoamPathFolderName, "FOAMPATHFOLDERNAME");
+pragma Alias(FoamPathParent, "FOAMPATHPARENT");
+pragma Alias(FoamPathLock, "FOAMPATHLOCK");
+pragma Alias(FoamPathUnlock, "FOAMPATHUNLOCK");
+pragma Alias(FoamPathCheckLock, "FOAMPATHCHECKLOCK");
+pragma Alias(FoamPathRename, "FOAMPATHRENAME");
+pragma Alias(FoamPathIsFDD, "FOAMPATHISFDD");
+pragma Alias(FoamLaunchReaderApp,"FOAMLAUNCHREADERAPP");
+pragma Alias(FoamSetBacklightTimeout,"FOAMSETBACKLIGHTTIMEOUT");
+pragma Alias(FoamGetBacklightTimeout,"FOAMGETBACKLIGHTTIMEOUT");
+pragma Alias(FoamGetDocumentOutboxName,"FOAMGETDOCUMENTOUTBOXNAME");
+pragma Alias(FoamAdjustTimeForward,"FOAMADJUSTTIMEFORWARD");
+pragma Alias(FoamAdjustTimeBackward,"FOAMADJUSTTIMEBACKWARD");
+pragma Alias(FoamGetMinutesBetweenTimes,"FOAMGETMINUTESBETWEENTIMES");
+pragma Alias(FoamGetCompressedDateTime,"FOAMGETCOMPRESSEDDATETIME");
+#endif
+@endlib
+
+@endif
+

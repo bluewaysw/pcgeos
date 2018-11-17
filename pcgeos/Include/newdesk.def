@@ -1,0 +1,213 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		NewDesk
+FILE:		newdesk.def
+
+AUTHOR:		David Loftesness, Sep 10, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	DL	9/10/92		Initial revision
+
+
+DESCRIPTION:
+	Global constants for NewDesk related apps and libraries	
+		
+	$Id: newdesk.def,v 1.4 98/08/18 16:29:56 joon Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @--------------------------------------------------------------------
+	TO ADD NewDeskObjectType ENUMS
+-----------------------------------------------------------------------------
+
+	The NewDeskObjectType is an enumerated type that is very odd.  It
+is designed to be flexible in that it needs to have its set types not be 
+changed by adding to either BA WOT's or NewDesk-only WOT's.  This is
+accomplished by having the BA WOT's (conditionally compiled) start with a 
+negative value such that they end at negative 2.  This means that the NewDesk
+only WOT's (the defaults that BA and NewDesk-only share) start at 0 and grow
+in a positive direction.  Structuring it thusly allows the NewDesk-only WOT's
+to grow without changing the BA WOT's (as happened before when the BA WOT's
+immediatley followed the NewDesk-only WOT's, causing any WOT values stored
+in shadows to become invalid if a WOT was added to the NewDesk-only WOT's).
+When someone wants to add a BA WOT, they "push" it on the negative BA WOT's
+by adding it to the beginning of the enumeration and starting the enumeration
+from a negative number 2 less that previously, so all the WOT's remain the
+same.
+	The WOT is later used in code to index into a table.
+In the NewDesk-only case the negative BA WOT's are not included (conditional
+compilation), so the first WOT (WOT_FOLDER) is zero and they increase from
+there.  All BA WOT table items will not be compiled into the tables either,
+so the tables will start out at WOT 0 as well and our OFFSET_FOR WOT_TABLES
+is 0 (no offset needed).
+
+In the BA case, the negative BA WOT's are compiled with the enumeration, but
+they start in such a way that the first NewDesk-only WOT (WOT_FOLDER) is 0.
+All the tables have table entries for the BA WOT's and so the table offset
+0 does not correspond to the WOT 0, and we have to have OFFSET_FOR_WOT_TABLES
+be equal to the negative of the last (first in linear order) defined BA WOT.
+This way when we evaluate the table plus the OFFSET_FOR_WOT_TABLES, it sets
+us directly at WOT 0 (WOT_FOLDER) and then indexing (whether positive for
+NewDesk-only WOTs or negative for the BA WOT's) will take us to the correct
+entry.
+
+
+	What to do:
+	-----------
+
+1) Add the value here.
+   If you are adding a new NewDesk-only WOT, add it to the end of the
+   enumerated type and add all entries to tables (see point six below)
+   to the end of the tables.  If you are adding a new BA WOT, add it
+   to the FRONT of the enumerated type and add two to the constant
+   OFFSET_FOR_WOT_TABLES.  When adding to the tables (see point six below)
+   add to the beginning of the table before the previous first BA item.
+
+2) If this WOT is a folder type WOT (if it can be opened like a directory
+   to display some files) you will need to create ui template blocks for
+   the folder type objects to open.  If not, make sure the tables in point
+   six contain zero's indicating that these items are not opened.
+
+   Create 3 blocks of ui:
+
+	- A FOLDER template block, containing the FolderClass subclass
+	  that will run under thread 0 (the process thread).  The
+	  FOLDER block must contain the folder object as its FIRST
+	  object -- it may contain others as well, if needed.  Make sure
+	  this has the correct help context.
+
+	- A WINDOW template block that will run under the UI thread.
+	  This block must contain a PRIMARY (subclass of NewDeskPrimary
+	  or ELPrimary) as its first object, and a VIEW (subclass of
+	  DesktopView recommended) as its second object.
+
+	- A DUMMY block that will contain a Folder object that will be
+	  used when actions are performed on the folder's glyph (ie,
+	  when a "real" folder object is not available).  Make sure this
+	  has the correct help context, the same as the Folder object 
+	  described above, unless the WOT is a no openable type, in which
+	  case there is no folder template, and the help context will be
+	  gotten from the dummy object.
+
+3) Add the resources and the class definition (if necessary) to the .gp file
+
+4) Add the resources to either cWSGlobal.def or BAGlobal.def, and add
+   the names of the Folder, Primary, and View to the global .def file
+
+5) (optional) -- if you want, do a compile at this point.  The
+   (.assert) statements in the tables described in step 6 will bring
+   you right to the tables you need to update.
+
+6) Update the tables in CommonDesktop/CUtil/cutilUtil.asm and
+   CommonWS/CUtil/cutilSpecialObj.asm, and update the .assert
+   statements to include the offsets of the new objects.  If these are
+   not folder type WOT's, place 0's in the place of objects.  Also update
+   the table in CommonWS/CFolder/cwsfolderClass.asm.  Normally you will
+   not need to update the WSGlobalMenuItemTable so feel free to leave it
+   alone (anyone needing to update it will know to ignore this warning)
+
+7) In the file ./CommonWS/CFolder/cwsfolderClass.asm make sure to update
+   the tables associated with BAConstrainDropDownMenu if need be.  For the 
+   first set of tables this will (most of the time) be involve adding a zero,
+   but it things may change.  The BADropDownCreateFolderTable will need to be
+   updated with a object offset for every object having a menu with "Create
+   Folder" in it, a zero for those that don't.
+
+8) Add a new class definition to uiNewDeskBA.uih and BAConstant.def (or
+   cdesktopConstant or cNewDeskConstant.def).
+
+9) Add a new equate for the popup menu to cNewDeskConstant.def
+
+10) Remake dependencies & makefiles to include new files, if any.
+----------------------------------------------------------------------------@
+
+;------------------------------------------------------------------------------
+;	Enumerated type for NewDesk Objects.
+;	****  READ THE ABOVE DOCUMENTATION BEFORE ADDING ANYTHING  ****
+;------------------------------------------------------------------------------
+
+
+ifdef NEWDESKBA
+OFFSET_FOR_WOT_TABLES	equ	36
+else
+OFFSET_FOR_WOT_TABLES	equ	0
+endif		; ifdef NEWDESKBA
+
+
+NewDeskObjectType	etype word,	(-OFFSET_FOR_WOT_TABLES),2
+
+ifdef NEWDESKBA
+
+WOT_STUDENT_UTILITY	enum	NewDeskObjectType
+WOT_OFFICE_COMMON	enum	NewDeskObjectType
+WOT_TEACHER_COMMON	enum	NewDeskObjectType
+WOT_OFFICE_HOME		enum	NewDeskObjectType
+WOT_STUDENT_COURSE	enum	NewDeskObjectType
+WOT_STUDENT_HOME	enum	NewDeskObjectType
+WOT_GEOS_COURSEWARE	enum	NewDeskObjectType
+WOT_DOS_COURSEWARE	enum	NewDeskObjectType
+WOT_OFFICEAPP_LIST	enum	NewDeskObjectType
+WOT_SPECIALS_LIST	enum	NewDeskObjectType
+WOT_COURSEWARE_LIST	enum	NewDeskObjectType
+WOT_PEOPLE_LIST		enum	NewDeskObjectType
+WOT_STUDENT_CLASSES	enum	NewDeskObjectType
+WOT_STUDENT_HOME_TVIEW	enum	NewDeskObjectType
+WOT_TEACHER_COURSE	enum	NewDeskObjectType
+WOT_ROSTER		enum	NewDeskObjectType
+WOT_TEACHER_CLASSES	enum	NewDeskObjectType
+WOT_TEACHER_HOME	enum	NewDeskObjectType
+endif		; ifdef NEWDESKBA
+
+WOT_FOLDER		enum	NewDeskObjectType	; 0
+WOT_DESKTOP		enum	NewDeskObjectType
+WOT_PRINTER		enum	NewDeskObjectType
+WOT_WASTEBASKET		enum	NewDeskObjectType
+WOT_DRIVE		enum	NewDeskObjectType
+WOT_DOCUMENT		enum	NewDeskObjectType
+WOT_EXECUTABLE		enum	NewDeskObjectType
+WOT_HELP		enum	NewDeskObjectType
+WOT_LOGOUT		enum	NewDeskObjectType
+WOT_SYSTEM_FOLDER	enum	NewDeskObjectType
+;;WOT_SIGN_UP		enum	NewDeskObjectType
+
+.assert (WOT_FOLDER eq 0), <ERROR: MUST UPDATE OFFSET_FOR_WOT_TABLES when defining new BA-specific WOT_ enums>
+
+
+NewDeskDriveType	etype	byte, 0, 2
+WDT_FLOPPY5_25	enum	NewDeskDriveType
+WDT_FLOPPY3_5	enum	NewDeskDriveType
+WDT_HARDDISK	enum	NewDeskDriveType
+WDT_CD_ROM	enum	NewDeskDriveType
+WDT_NETDISK	enum	NewDeskDriveType
+WDT_RAMDISK	enum	NewDeskDriveType
+WDT_REMOVABLE	enum	NewDeskDriveType
+
+;
+; Our own definition of FileDesktopInfo:
+;
+; The FileDesktopInfo structure in the FileExtendedAttributes of every
+; PC/GEOS file and link is used in the following way by NewDesk:
+;
+DesktopInfo	struct
+	DI_objectType	NewDeskObjectType	0
+DesktopInfo	ends
+
+
+
+ifdef NEWDESKBA
+
+BATransferType	record
+	BATT_LIST_OPERATION:1
+	; Transfer contains an IclasQuickTransferFooter (i.e. is
+	; coming from a list folder)
+	BATT_LIST_TYPE:7
+	; Type of list that's being transferred. (BAListListType)
+BATransferType	end
+
+endif	; ifdef NEWDESKBA

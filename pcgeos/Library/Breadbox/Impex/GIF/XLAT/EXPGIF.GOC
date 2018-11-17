@@ -1,0 +1,125 @@
+/***********************************************************************
+ *
+ * MODULE:    expjpeg (Jpeg Export)
+ * FILE:      expjpeg.goc
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *              Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <graphics.h>
+#include <ansi\stdio.h>
+@include <impex.goh>
+#include <xlatlib.h>
+#include <ansi/string.h>
+#include <gstring.h>
+
+@include <extgraph.goh>
+@include <giflib.goh>
+
+/****************************************************************************
+*  GLOBALS
+****************************************************************************/
+
+
+/**************************************************************************/
+
+dword _pascal
+GifExport(ExportFrame *frame)
+{
+	GifError gstat = GE_NO_ERROR;
+	EGError egstat = EGE_NO_ERROR;
+	VMBlockHandle bmblock;
+	BMType desttype;
+	word *optptr;
+
+	if(!frame->EF_transferVMChain)
+		return(TE_ERROR);		
+
+	// get the selected output format
+    if(frame->EF_exportOptions)
+    {
+        /* getting and prepairing options */
+        optptr = (word*) MemLock(frame->EF_exportOptions);
+		
+		if(optptr)
+		{
+			desttype = *optptr;
+			MemUnlock(frame->EF_exportOptions);
+		}
+		else
+			return(TE_ERROR);
+    }
+    else
+		return(TE_ERROR);
+
+	if(desttype == BMF_4BIT)
+		desttype |= BMT_PALETTE;
+	if(desttype == BMF_8BIT)
+		desttype |= BMT_PALETTE;
+
+	// convert gstring to bmp
+	bmblock = BmpGStringToBitmap(frame->EF_transferVMFile, 
+				VMCHAIN_GET_VM_BLOCK(frame->EF_transferVMChain),
+				frame->EF_transferVMFile, 
+				desttype, 
+				&egstat);
+
+	if(egstat != EGE_NO_ERROR)
+	{
+		// error code translation
+		switch(egstat)
+		{
+			case EGE_BLOCK_LOCKING_FAILURE:
+			case EGE_CANT_CREATE_BITMAP:
+				return(TE_OUT_OF_MEMORY);
+
+			case EGE_ILLEGAL_BITMAP_SIZE:
+				return(TE_INVALID_FORMAT);
+
+			default:
+				return(TE_ERROR);
+		}
+
+	}
+
+	if(!bmblock)
+		return(TE_OUT_OF_MEMORY);
+	
+	gstat = GifExportBitmapFHandle(frame->EF_transferVMFile, 
+				bmblock, frame->EF_outputFile);
+
+	// free bmblock
+	VMFreeVMChain(frame->EF_transferVMFile, 
+		VMCHAIN_MAKE_FROM_VM_BLOCK(bmblock));
+
+	if(gstat != GE_NO_ERROR)
+	{
+		// error code translation
+		switch(gstat)
+		{
+			case GE_WRITE_PROBLEM:
+				return(TE_FILE_WRITE);
+
+			case GE_OUT_OF_MEMORY:
+				return(TE_OUT_OF_MEMORY);
+
+			case GE_INVALID_BITMAP:
+				return(TE_EXPORT_ERROR);
+
+			case GE_CANT_CREATE_DESTINATION_FILE:
+				return(TE_FILE_ERROR);
+		
+			default:
+				return(TE_ERROR);
+		}
+	}
+
+	return(TE_NO_ERROR);
+}
+

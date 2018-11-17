@@ -1,0 +1,345 @@
+COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+
+PROJECT:	PC GEOS
+MODULE:		SVGA Video Driver
+FILE:		svgaMacro.def
+
+AUTHOR:		Jim DeFrisco
+
+REVISION HISTORY:
+	Name	Date	Description
+	----	----	-----------
+	jim	9/90	initial
+
+	$Id: svgaMacro.def,v 1.1 97/04/18 11:42:25 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		SetBuffer	segreg, trashReg
+
+DESCRIPTION:	Set a segment register to point to the video buffer
+
+PASS:
+	segreg - segment register to set
+	trashReg - register that can be trashed
+
+RETURN:
+	segreg - set
+
+-------------------------------------------------------------------------------@
+
+SetBuffer	macro	segreg, trashReg
+	mov	trashReg,SCREEN_BUFFER
+	mov	segreg,trashReg
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		SetAltBuffer	segreg, trashReg
+
+DESCRIPTION:	Set a segment register to point to the alternate video buffer
+
+PASS:
+	segreg - segment register to set
+	trashReg - register that can be trashed
+
+RETURN:
+	segreg - set
+
+-------------------------------------------------------------------------------@
+
+SetAltBuffer	macro	segreg, trashReg
+	mov	trashReg,ALT_SCREEN_BUFFER
+	mov	segreg,trashReg
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		NextScan
+
+DESCRIPTION:	Increment to the next scan line
+
+PASS:
+	dest - register with scan line address
+	adjust - modification (in bytes) to position on next scan
+
+RETURN:
+	reg - updated
+
+-------------------------------------------------------------------------------@
+
+NextScan	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	add	dest, SCREEN_BYTE_WIDTH+(adjust)
+    else
+	add	dest, SCREEN_BYTE_WIDTH
+	add	dest, (adjust)
+    endif
+else
+	add	dest, SCREEN_BYTE_WIDTH
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		PrevScan
+
+DESCRIPTION:	Decrement to the previous scan line
+
+PASS:
+	dest 	- location with scan line address
+	adjust 	- modification (in bytes) to position on next scan
+
+RETURN:
+	dest 	- updated
+
+-------------------------------------------------------------------------------@
+
+PrevScan	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	add	dest, (adjust)-SCREEN_BYTE_WIDTH
+    else
+	sub	dest, SCREEN_BYTE_WIDTH
+	add	dest, (adjust)
+    endif
+else
+	sub	dest, SCREEN_BYTE_WIDTH
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		StoreNextScanMod
+
+DESCRIPTION:	Store a self modified value for NextScanMod
+
+PASS:
+	dest - destination address
+	reg - register with value to modify or constant
+
+RETURN:
+	reg - destroyed
+
+-------------------------------------------------------------------------------@
+
+StoreNextScanMod	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	mov	dest, SCREEN_BYTE_WIDTH+(adjust)
+    else
+	mov	dest, SCREEN_BYTE_WIDTH
+	add	dest, (adjust)
+    endif
+else
+	mov	dest, SCREEN_BYTE_WIDTH
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		NextScanMod
+
+DESCRIPTION:	Increment register to the next scan line
+
+PASS:
+	reg - register with scan line address
+	sym - symbol for word to relocate
+
+RETURN:
+	reg - updated
+
+-------------------------------------------------------------------------------@
+
+NextScanMod	macro	reg, sym
+		local	stuff
+stuff	label	word
+sym	=	stuff + 2
+	add	reg, 1234h
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		StorePrevScanMod
+
+DESCRIPTION:	Store a self modified value for PrevScanMod
+		For the MCGA, this is the same as StoreNextScanMod
+
+PASS:
+	dest - destination address
+	reg - register with value to modify
+
+RETURN:
+	reg - destroyed
+
+-------------------------------------------------------------------------------@
+
+StorePrevScanMod	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	mov	dest, (adjust)-SCREEN_BYTE_WIDTH
+    else
+	mov	dest, -SCREEN_BYTE_WIDTH
+	add	dest, (adjust)
+    endif
+else
+	mov	dest, -SCREEN_BYTE_WIDTH
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		PrevScanMod
+
+DESCRIPTION:	Increment register to the next scan line
+
+PASS:
+	reg - register with scan line address
+	sym - symbol for word to relocate
+
+RETURN:
+	reg - updated
+
+-------------------------------------------------------------------------------@
+
+PrevScanMod	macro	reg, sym
+		local	stuff
+stuff	label	word
+sym	=	stuff + 2
+	add	reg, 1234h
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		CalcScanLine
+
+DESCRIPTION:	Calculate the beginning scan line position
+
+PASS:
+	reg - register containing line number
+	offsetReg - register containing offset to add to base scan line address
+
+RETURN:
+	reg - address
+	offsetReg - destroyed
+
+-------------------------------------------------------------------------------@
+
+	; result should be: reg = 100L + O
+	;		where:
+	;			L = line number (passed in reg)
+	;			O = offset (passed in offsetReg)
+
+CalcScanLine	macro	reg, offsetReg
+	sal	reg,1			;reg = 2L
+	sal	reg,1			;reg = 4L
+	add	offsetReg, reg		; offsetReg = 4L + 0
+	sal	reg,1			;reg = 8L
+	sal	reg,1			;reg = 16L
+	sal	reg,1			;reg = 32L
+	add	offsetReg,reg		;offsetReg = 4L + 32L + O = 36L
+	sal	reg,1			;reg = 64L
+	add	reg,offsetReg		;reg = 64L + (36L + O) = 100L + O
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		ReadBitPlanes	segreg, offsetReg, reg1, reg2, reg3, reg4
+
+DESCRIPTION:	Read the 4 bit planes into registers
+
+PASS:
+	segreg:offsetReg - address in video memory to read from
+	dx - GR_CONTROL
+	al - BITMASK
+
+RETURN:
+	reg1, reg2, reg3, reg4 - bit plane values
+
+-------------------------------------------------------------------------------@
+
+ReadBitPlanes	macro	segreg, offsetReg, reg1, reg2, reg3, reg4
+	mov	ax, READ_MAP_0		; get each bit plane in
+	out	dx, ax
+	mov	reg1, segreg:[offsetReg] ; read all four bit planes
+	inc	ah
+	out	dx, ax
+	mov	reg2, segreg:[offsetReg] ; read plane 1
+	inc	ah
+	out	dx, ax
+	mov	reg3, segreg:[offsetReg] ; read plane 2
+	inc	ah
+	out	dx, ax
+	mov	reg4, segreg:[offsetReg] ; read plane 3
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		WriteBitPlanes segreg, offsetReg, reg1, reg2, reg3, reg4
+
+DESCRIPTION:	Write the 4 bit planes from registers
+
+PASS:
+	segreg:offsetReg - address in video memory to write to
+	dx - GR_CONTROL
+	al - BITMASK
+	reg1, reg2, reg3, reg4 - bit plane values
+
+RETURN:
+
+-------------------------------------------------------------------------------@
+
+WriteBitPlanes	macro	segreg, offsetReg, reg1, reg2, reg3, reg4
+	mov	dx, GR_SEQUENCER	; switch to ega sequencer reg
+	mov	ax, MAP_MASK_0		; enable plane 0 only
+	out	dx, ax
+	and	segreg:[offsetReg], reg1 ; write out data for plane 0
+	shl	ah, 1			; enable plane 0 only
+	out	dx, ax
+	and	segreg:[offsetReg], reg2 ; write cpu data for bit plane 1
+	shl	ah, 1			; enable plane 0 only
+	out	dx, ax
+	and	segreg:[offsetReg], reg3 ; write cpu data for bit plane 2
+	shl	ah, 1			; enable plane 0 only
+	out	dx, ax
+	and	segreg:[offsetReg], reg4 ; write cpu data for bit plane 3
+	mov	ah, 0fh			; enable all planes again
+	out	dx, ax
+	mov	dx, GR_CONTROL
+endm
+
+EndBitWrite	macro
+	mov	ax, WR_MODE_0		; set read mode 0
+	out	dx, ax
+	mov	ax, EN_SR_ALL		; don't care about any
+	out	dx, ax
+	mov	ax, DATA_ROT_OR		; don't care about any
+	out	dx, ax
+	mov	ax, BMASK_ALL		; do all the bits
+	out	dx, ax
+endm
+
+StartBitWrite	macro
+	mov	ax, W0R1_MODE		; set read mode 1
+	out	dx, ax
+	mov	ax, COLOR_DC0		; don't care about any
+	out	dx, ax
+	mov	ax, EN_SR_NONE		; don't care about any
+	out	dx, ax
+	mov	ax, DATA_ROT_COPY	; don't care about any
+	out	dx, ax
+endm

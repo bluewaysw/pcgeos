@@ -1,0 +1,323 @@
+/***********************************************************************
+ *
+ * MODULE:    impjpeg (Jpeg Import)
+ * FILE:      impjpeg.goc
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <graphics.h>
+#include <Ansi\stdio.h>
+#include <Ansi\stdlib.h>
+//include <jpeglib.h>
+#include <..\..\fjpeg\fjpeg.h>
+
+@include <impex.goh>
+//include "xlat/xlatimp.h"
+#include <ansi/string.h>
+
+// This file was never installed... 
+// Is it needed?
+//include "console.goh"
+#include <initfile.h>
+
+dword _pascal JpegExport (void)
+{
+  return 0;
+}
+
+
+void ConvertLine(byte *dest, byte *src, word size)
+{
+    while (size--)  {
+        *(dest++) = *(src++) + 40 ;
+    }
+}
+
+void ConvertGreyLine(byte *dest, byte *src, word size)
+{
+    while (size--)  {
+        *(dest++) = (*(src++)>>4) + 16 ;
+    }
+}
+
+
+/*
+void CopyAndDither(byte *dest, byte *src, word size)
+{
+    unsigned char *p_trans ;
+    unsigned char *p_second ;
+    unsigned char *p_error ;
+    word index ;
+    word dither = 0 ;
+    word r, g, b ;
+    byte *p ;
+    word x ;
+    byte color ;
+
+    p = dest ;
+
+    MemLock(OptrToHandle(@G_transTable)) ;
+    MemLock(OptrToHandle(@G_secondTable)) ;
+    MemLock(OptrToHandle(@G_errorDiffTable)) ;
+
+    p_trans = LMemDeref(@G_transTable) ;
+    p_second = LMemDeref(@G_secondTable) ;
+    p_error = LMemDeref(@G_errorDiffTable) ;
+
+    for (x=0; x<size; x++)  {
+        r = *(src++) ;
+        g = *(src++) ;
+        b = *(src++) ;
+        r = (r>>4)&0xF ;
+        g = g & 0xF0 ;
+        b = (b>>4)&0xF ;
+        index = (r<<8)|g|b ;
+#ifdef DITHERING_ON
+        dither += p_error[index] ;
+        if (dither < 0x100)  {
+            color = p_trans[index] ;
+        } else {
+            dither &= 0xFF ;
+            color = p_second[index] ;
+        }
+#else
+        color = p_trans[index] ;
+#endif
+        *(p++) = color ;
+    }
+
+    MemUnlock(OptrToHandle(@G_errorDiffTable)) ;
+    MemUnlock(OptrToHandle(@G_secondTable)) ;
+    MemUnlock(OptrToHandle(@G_transTable)) ;
+}
+*/
+
+/* define to only support JFIF tagged JPEGs */
+/*#define JFIF_ONLY*/
+
+typedef struct  {
+    word soi ;            /* start of image */
+#ifdef JFIF_ONLY
+    word app0 ;           /* Application Use Marker */
+    word length ;         /* Length of this record */
+    byte identifier[5] ;  /* JFIF zero terminated id string */
+#else
+    byte marker;          /* start of some marker */
+#endif
+    /* ... don't need the rest ... */
+} T_jpegHeader ;
+
+Boolean isJpeg(FileHandle file)
+{
+    FILE *infile;		/* source file */
+    T_jpegHeader header ;
+    Boolean status = FALSE ;
+
+    FilePos(file, 0, FILE_POS_START) ;
+    infile = fdopen(file, "r");
+    if (infile)  {
+        fread(&header, sizeof(header), 1, infile);
+
+        /* Check the header for the correct start and identifier */
+#ifdef JFIF_ONLY
+        if ((header.soi == 0xD8FF) &&
+            (header.app0 == 0xE0FF) &&
+            (memcmp(header.identifier, "JFIF", 5)==0))  {
+#else
+        if ((header.soi == 0xD8FF) &&
+            (header.marker == 0xFF)) {
+#endif
+
+            /* Looks like a JPEG to me! */
+            status = TRUE ;
+        }
+        fdclose(infile) ;
+    }
+    FilePos(file, 0, FILE_POS_START) ;
+
+    return status ;
+}
+
+extern word set_error_handler(word *context);
+
+/******************** JPEG DECOMPRESSION SAMPLE INTERFACE *******************/
+
+/* This half of the example shows how to read data from the JPEG decompressor.
+ * It's a bit more refined than the above, in that we show:
+ *   (a) how to modify the JPEG library's standard error-reporting behavior;
+ *   (b) how to allocate workspace using the library's memory manager.
+ *
+ * Just to make this example a little different from the first one, we'll
+ * assume that we do not intend to put the whole image into an in-memory
+ * buffer, but to send it line-by-line someplace else.  We need a one-
+ * scanline-high JSAMPLE array as a work buffer, and we will let the JPEG
+ * memory manager allocate it for us.  This approach is actually quite useful
+ * because we don't need to remember to deallocate the buffer separately: it
+ * will go away automatically when the JPEG object is cleaned up.
+ */
+
+
+/*
+ * Sample routine for JPEG decompression.  We assume that the source file name
+ * is passed in.  We want to return 1 on success, 0 on error.
+ */
+
+dword _pascal
+JpegImport(ImportFrame *frame, VMChain *chain)
+{
+  /* This struct contains the JPEG decompression parameters and pointers to
+   * working space (which is allocated as needed by the JPEG library).
+   */
+  struct jpeg_decompress_struct cinfo;
+  /* More stuff */
+  FILE * infile = NULL;		/* source file */
+  JSAMPARRAY buffer;    	/* 1 Output row buffer */
+  int row_stride;		/* physical row width in output buffer */
+
+  GStateHandle bmstate;
+  VMBlockHandle bmblock;
+  word size;
+  void *lineptr;
+  word dummy;
+  word elementCount; /* counts # of elements in HugaArray Block */
+
+  /* Check to see if the file is correctly a jpeg file */
+  if (isJpeg(frame->IF_sourceFile))  {
+      infile = fdopen(frame->IF_sourceFile, "r");
+
+      /* switch in status bar */
+      ImpexUpdateImportExportStatus("Importing file!", -1);
+
+// !!!   return TE_IMPORT_ERROR;
+
+
+      jpeg_create_decompress(&cinfo);
+      jpeg_stdio_src(&cinfo, infile);
+      (void) jpeg_read_header(&cinfo);
+      if(cinfo.error) {
+        jpeg_destroy_decompress(&cinfo);
+        fdclose(infile); 
+        return TE_INVALID_FORMAT;
+      }
+      (void) jpeg_start_decompress(&cinfo);
+      if(cinfo.error) {
+        jpeg_destroy_decompress(&cinfo);
+        fdclose(infile); 
+        return TE_IMPORT_ERROR;
+      }
+    
+      row_stride = cinfo.image_width * 3;
+      /* fjpeg always delivers RGB */ 
+
+      /* Make a 1-rows-high sample array 
+       * that is automatically freed when done with image 
+       */
+      buffer =(JSAMPARRAY) smallocarr(&cinfo,row_stride,1);
+      if(buffer==NULL) {
+        jpeg_destroy_decompress(&cinfo);
+        fdclose(infile); 
+        return TE_IMPORT_ERROR;
+      }
+
+      bmblock = GrCreateBitmap(BMF_24BIT|BMT_COMPLEX,
+                               cinfo.image_width,
+                               cinfo.image_height,
+                               frame->IF_transferVMFile, 0, &bmstate);
+    
+      GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
+
+
+      /* lock first HugeArray element 
+       * new code uses HugeArrayNext. This keeps the array block locked
+       * until all elements inside have been processed.
+       */ 
+      elementCount = (byte)HugeArrayLock(frame->IF_transferVMFile, 
+                                         bmblock,0,&lineptr,&size); 
+
+      while (cinfo.output_scanline < cinfo.image_height) {
+        /* jpeg_read_scanlines expects an array of pointers to scanlines.
+         * fjpeg emits always only one scanline since merged upsampling
+         * has been removed.
+         */
+        jpeg_read_scanlines(&cinfo, buffer, 1);
+        if(cinfo.error) {
+          jpeg_destroy_decompress(&cinfo);
+          HugeArrayUnlock(lineptr);
+          fdclose(infile); 
+          return TE_IMPORT_ERROR;
+        }
+
+        memcpy(lineptr, buffer[0], size);
+        /* mark only last element of actual HugeArray block dirty */
+        if(elementCount==1)
+          HugeArrayDirty(lineptr);
+        /* next element, please */
+        elementCount = (byte) HugeArrayNext(&lineptr,&dummy);
+
+
+      }
+      /* mark last element dirty and unlock it. Seems to be necessary */
+      HugeArrayDirty(lineptr); 
+      HugeArrayUnlock(lineptr);
+
+      UserStandardSound(SST_NOTIFY);
+
+      jpeg_destroy_decompress(&cinfo);
+
+       fdclose(infile);
+
+      /* At this point you may want to check to see whether any corrupt-data
+       * warnings occurred (test whether jerr.pub.num_warnings is nonzero).
+       */
+
+      *chain = VMCHAIN_MAKE_FROM_VM_BLOCK(bmblock);
+
+      return (TE_NO_ERROR|(((dword)CIF_BITMAP)<<16));
+    } else {
+      return TE_INVALID_FORMAT;
+    }
+}
+
+
+/*
+ * SOME FINE POINTS:
+ *
+ * In the above code, we ignored the return value of jpeg_read_scanlines,
+ * which is the number of scanlines actually read.  We could get away with
+ * this because we asked for only one line at a time and we weren't using
+ * a suspending data source.  See libjpeg.doc for more info.
+ *
+ * We cheated a bit by calling alloc_sarray() after jpeg_start_decompress();
+ * we should have done it beforehand to ensure that the space would be
+ * counted against the JPEG max_memory setting.  In some systems the above
+ * code would risk an out-of-memory error.  However, in general we don't
+ * know the output image dimensions before jpeg_start_decompress(), unless we
+ * call jpeg_calc_output_dimensions().  See libjpeg.doc for more about this.
+ *
+ * Scanlines are returned in the same order as they appear in the JPEG file,
+ * which is standardly top-to-bottom.  If you must emit data bottom-to-top,
+ * you can use one of the virtual arrays provided by the JPEG memory manager
+ * to invert the data.  See wrbmp.c for an example.
+ *
+ * As with compression, some operating modes may require temporary files.
+ * On some systems you may need to set up a signal handler to ensure that
+ * temporary files are deleted if the program is interrupted.  See libjpeg.doc.
+ */
+
+word _pascal
+JpegTestFile(FileHandle file)
+{
+   word status = NO_IDEA_FORMAT ;
+   if (isJpeg(file))
+       status = TE_NO_ERROR ;
+
+   return status;
+};
+

@@ -1,0 +1,727 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) Geoworks 1992-1994 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Studio
+FILE:		studioDocument.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	2/92		Initial version
+
+DESCRIPTION:
+	This file contains the description of the Studio document class
+
+	$Id: studioDocument.def,v 1.1 97/04/04 14:40:49 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+;-----------------------------------------------------------------------------
+;		Our document group class
+;-----------------------------------------------------------------------------
+;
+; Subclass GenDocumentGroupClass in order that the StudioDocumentGroup
+; be able to handle MSG_META_SEND_CLASSED_EVENT.
+;
+StudioDocumentGroupClass	class	GenDocumentGroupClass
+
+TravelOption	equ	first	StudioDocumentGroupMessages
+TO_CUR_TEXT	enum	TravelOption
+
+StudioDocumentGroupClass	endc
+
+
+;-----------------------------------------------------------------------------
+;		Our document class
+;-----------------------------------------------------------------------------
+StudioDocumentClass	class	GenDocumentClass
+	uses	VisContentClass
+
+MSG_STUDIO_DOCUMENT_SET_POSITION		message
+MSG_STUDIO_DOCUMENT_SET_POSITION_ABS	message
+;
+; Set the current position within the document.  This causes notifications to
+; be sent out if this document is the target.
+;
+; The ABS version always takes a page position, regardless of the display mode
+;
+; Pass:
+;	cx - x position
+;	dx.bp - y position
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_INSERT_PAGE		message
+;
+; Insert a page before the current page
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_APPEND_PAGE		message
+;
+; Append a page after the current page
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_INSERT_APPEND_PAGES_LOW	message
+;
+; Low-level routine to insert/append one master page group worth of pages
+;
+; Pass:
+;	cx - section #
+;	dx - MSG_STUDIO_DOCUMENT_INSERT_PAGE to insert or
+;	     MSG_STUDIO_DOCUMENT_APPEND_PAGE to append
+;	bp - page # in section
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_DELETE_PAGE		message
+;
+; Delete the current page
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_SET_STARTING_SECTION	message
+;
+; Set the starting section number
+;
+; Pass:
+;	cx - starting section number
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_SET_DISPLAY_MODE	message
+;
+; Set the display mode
+;
+; Pass:
+;	cx - VisTextDisplayModes
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_SET_DISPLAY_MODE_LOW	message
+;
+; Set the display mode without changing any of the UI
+;
+; Pass:
+;	cx - VisTextDisplayModes
+; Return:
+;	dx - old VisTextDisplayModes
+
+MSG_STUDIO_DOCUMENT_SET_TARGET_BASED_ON_TOOL	message
+;
+; Set the target based on the current tool
+;
+
+MSG_STUDIO_DOCUMENT_FLOW_REGION_CHANGED	message
+;
+; Notification that a flow region has been changed
+;
+; Pass:
+;	ss:bp - FlowRegionChangedParams
+; Return:
+;	bp - data depending on call type
+
+FlowRegionChangedParams	struct
+    FRCP_action		GrObjActionNotificationType
+    FRCP_object		optr
+    FRCP_masterPage	word
+    FRCP_article	word
+FlowRegionChangedParams	ends
+
+MSG_STUDIO_DOCUMENT_RECALC_LAYOUT	message
+;
+; Recalculate the layout for any sections that need recalculation
+
+MSG_STUDIO_DOCUMENT_RECALC_INVAL	message
+;
+; Recalculate the invalid area of the document
+
+MSG_STUDIO_DOCUMENT_GROBJ_PRE_WRAP_NOTIFICATION	message
+;
+; Notification that a grobj object is about to change its wrap area
+;
+; Pass:
+;	cx:dx  - grobj object
+;	bp - VM block of master page (or 0 for main body)
+
+MSG_STUDIO_DOCUMENT_GROBJ_WRAP_NOTIFICATION	message
+;
+; Notification that a grobj object has changed its wrap area
+;
+; Pass:
+;	cx:dx  - grobj object
+;	bp - VM block of master page (or 0 for main body)
+
+;---------------
+
+MSG_STUDIO_DOCUMENT_INIT_SECTION_LIST	message
+;
+; Initialize a section list (send # of entries)
+;
+; Pass:
+;	cx:dx - GenDynamicList
+
+MSG_STUDIO_DOCUMENT_QUERY_SECTION_LIST	message
+;
+; Handle a dynamic list query for a section name
+;
+; Pass:
+;	cx:dx - GenDynamicList
+;	bp - item number
+
+MSG_STUDIO_DOCUMENT_INSERT_SECTION	message
+;
+; Insert a section
+;
+
+MSG_STUDIO_DOCUMENT_APPEND_SECTION	message
+;
+; Insert a section
+;
+
+MSG_STUDIO_DOCUMENT_DELETE_SECTION	message
+;
+; Delete a section
+;
+
+MSG_STUDIO_DOCUMENT_RENAME_SECTION	message
+;
+; Delete a section
+;
+
+MSG_STUDIO_DOCUMENT_UPDATE_RENAME_SECTION	message
+;
+; Update the text object in the rename section dialog box
+;
+
+MSG_STUDIO_DOCUMENT_CHANGE_PAGE_SETUP	message
+;
+; Change the page setup
+;
+
+MSG_STUDIO_DOCUMENT_EDIT_MASTER_PAGE	message
+;
+; Edit the master page for the current section
+;
+
+MSG_STUDIO_DOCUMENT_OPEN_MASTER_PAGE	message
+;
+; Open a master page
+;
+; Pass:
+;	cx - memory handle of master page to open
+;
+
+MSG_STUDIO_DOCUMENT_EDIT_HEADER	message
+;
+; Edit the header for the current section
+;
+
+MSG_STUDIO_DOCUMENT_EDIT_FOOTER	message
+;
+; Edit the header for the current section
+;
+
+MSG_STUDIO_DOCUMENT_CREATE_TITLE_PAGE	message
+;
+; Create a title page
+;
+
+MSG_STUDIO_DOCUMENT_GOTO_TITLE_PAGE	message
+;
+; Goto the title page
+;
+MSG_STUDIO_DOCUMENT_DELETE_TITLE_PAGE	message
+;
+; Delete the title page
+;
+
+MSG_STUDIO_DOCUMENT_CLOSE_MASTER_PAGE	message
+;
+; Close a master page
+;
+; Pass:
+;	cx - master page body VM block
+
+MSG_STUDIO_DOCUMENT_FINISH_IMPORT	message
+;
+; Finish importing
+;
+; Pass:
+;	ss:bp - ImpexTranslationParams
+
+MSG_STUDIO_DOCUMENT_SET_DOCUMENT_SIZE	message
+;
+; Set the document size
+;
+; Pass:
+;	ss:bp - RectDWord
+; Return:
+
+;--------------------------
+; The messages below come from the APPEND_REGION and REGION_IS_LAST
+; messages sent to the articles.  They assume things about the ordering
+; of these messages, so these messages should be be sent from elsewhere
+;--------------------------
+
+MSG_STUDIO_DOCUMENT_APPEND_PAGES_VIA_POSITION	message
+;
+; Append pages after a given position
+;
+; Pass:
+;	cx - x pos
+;	dxbp - y pos
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_DELETE_PAGES_AFTER_POSITION	message
+;
+; Delete all pages in a section after a given position
+;
+; Pass:
+;	cx - x pos
+;	dxbp - y pos
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_SEND_TO_ALL_ARTICLES	message
+;
+; Send a message to all the articles
+;
+; Pass:
+;	cx - message
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_CONTINUE_PRINTING	message
+;
+; Continue printing...
+;
+; Pass:
+;	cx - message
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_SEND_TO_FIRST_ARTICLE	message
+;
+; Send a message to the first article
+;
+; Pass:
+;	^lcx:dx	= print control object
+;	bp	= gstate
+;
+
+MSG_STUDIO_DOCUMENT_GENERATE_HELP_FILE				message
+;
+; Create a help file from the current Studio document
+;
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_STUDIO_DOCUMENT_GET_GRAPHIC_TOKENS_FOR_STYLE	message
+;
+; Get the attribute tokens for a graphic style
+;
+; Pass:
+;	cx - style
+; Return:
+;	cx - line attr token
+;	dx - area attr token
+
+MSG_STUDIO_DOCUMENT_GET_TEXT_TOKENS_FOR_STYLE	message
+;
+; Get the attribute tokens for a text style
+;
+; Pass:
+;	cx - style
+; Return:
+;	cx - char attr token
+;	dx - para attr token
+
+MSG_STUDIO_DOCUMENT_RESET_REAPPLY_MASTER_PAGE	message
+;
+; Reapply formatting for a master page
+;
+
+MSG_STUDIO_DOCUMENT_REAPPLY_EXISTING_MASTER_PAGE	message
+;
+; Reapply formatting for a master page
+;
+
+MSG_STUDIO_DOCUMENT_MP_BODY_SUSPEND message
+;
+; Notification that a master page body has been suspended
+;
+
+MSG_STUDIO_DOCUMENT_MP_BODY_UNSUSPEND message
+;
+; Notification that a master page body has been unsuspended
+;
+
+MSG_STUDIO_DOCUMENT_GET_TOC_CONTEXT_MONIKER message
+; get the appropriate moniker for the list of TOC contexts for the current
+; article
+
+MSG_STUDIO_DOCUMENT_TOC_CONTEXT_LIST_VISIBLE message
+; update the list of contexts for the TOC shme
+
+MSG_STUDIO_DOCUMENT_SET_PLATFORM	message
+;
+; Sets horizontal margins according to the passed PlatformEmulationType
+;
+; Context:	Platform emulation
+; Source:	Platform emulation triggers
+;
+; Pass:		cx -	PlatformEmulationType
+; Return:	none
+
+MSG_STUDIO_DOCUMENT_PLATFORM_STATUS	message
+; Enable or disable the GenValue in platform emulation dialog.
+; You probably won't be sending this manually.
+;
+; Context:	Platform emulation (status message from EmulationItemGroup)
+
+MSG_STUDIO_DOCUMENT_SEND_PAGE_NOTIFICATION	message
+;
+; Send a notification that the name of the current page has changed.
+; 
+; Pass:	cx - NotifyPageNameChange block
+;
+
+MSG_STUDIO_DOCUMENT_INSERT_CONTEXT_NUMBER	message
+;
+; Insert a context variable graphic in text
+;
+; Pass: 	nothing
+; Return: 	nothing
+;
+
+MSG_STUDIO_DOCUMENT_RECALC_HOTSPOTS		message
+;
+; Recalculate the hotspots on hotspots affected by a page add/delete
+;
+; Pass: 	cl - non-zero if deleting a page
+; Return: 	nothing
+;
+
+MSG_STUDIO_DOCUMENT_SET_CONTENT_FILE_NAME		message
+;
+; Replace text in ContentFileNameText with name of current document.
+;
+; Pass: 	nothing
+; Return: 	nothing
+;
+
+MSG_STUDIO_DOCUMENT_SET_MISC_FLAGS			message
+;
+; Set and clear the passed flags.
+;
+; Pass: 	cx - MiscStudioDocumentFlags to set
+;		dx - MiscStudioDocumentFlags to clear
+; Return: 	dx - old MiscStudioDocumentFlags
+; Destroyed:	ax, cx
+;
+
+MSG_STUDIO_DOCUMENT_GET_MISC_FLAGS			message
+;
+; Get the document's MiscStudioDocumentFlags
+;
+; Pass: 	nothing
+; Return: 	dx - MiscStudioDocumentFlags
+; Destroyed:	nothing
+;
+
+MSG_STUDIO_DOCUMENT_GET_PAGE_NAME_GRAPHIC_ID		message
+;
+; Get the document's unique ID for the next page name graphic.
+;
+; Pass: 	nothing
+; Return: 	cx	= ID
+; Destroyed:	nothing
+;
+
+
+;-----------------------------------------------------------------------------
+;		Constants
+;-----------------------------------------------------------------------------
+
+DISTANCE_1_CM		=	227
+DISTANCE_1_2_CM		=	113
+DISTANCE_2_CM		=	454
+
+DOCUMENT_PROTOCOL_MAJOR	=	4
+DOCUMENT_PROTOCOL_MINOR	=	0
+
+DEFAULT_NUMBER_OF_COLUMNS	=	1
+DEFAULT_RULE_WIDTH		=	0
+
+US_DEFAULT_COLUMN_SPACING	=	(72/8)*8
+;US_DEFAULT_DOCUMENT_LEFT_MARGIN	=	72*8
+;US_DEFAULT_DOCUMENT_TOP_MARGIN	=	72*8
+;US_DEFAULT_DOCUMENT_RIGHT_MARGIN =	72*8
+;US_DEFAULT_DOCUMENT_BOTTOM_MARGIN =	72*8
+
+; Want the default to be 3/4" instead of 1".
+; measured in 1/8ths of a point.
+STUDIO_DEFAULT_DOCUMENT_LEFT_MARGIN	=	54*8
+STUDIO_DEFAULT_DOCUMENT_TOP_MARGIN	=	54*8
+STUDIO_DEFAULT_DOCUMENT_RIGHT_MARGIN	=	54*8
+STUDIO_DEFAULT_DOCUMENT_BOTTOM_MARGIN	=	54*8
+
+METRIC_DEFAULT_COLUMN_SPACING	=	113	;5 mm
+METRIC_DEFAULT_DOCUMENT_LEFT_MARGIN =	454
+METRIC_DEFAULT_DOCUMENT_TOP_MARGIN =	454
+METRIC_DEFAULT_DOCUMENT_RIGHT_MARGIN =	454
+METRIC_DEFAULT_DOCUMENT_BOTTOM_MARGIN =	454
+
+MAXIMUM_NUMBER_OF_COLUMNS	=	32
+
+MINIMUM_COLUMN_SPACING		=	9*8
+MAXIMUM_COLUMN_SPACING		=	72*8
+
+MAXIMUM_RULE_WIDTH		=	9*8
+
+MINIMUM_MARGIN_SIZE		=	18*8
+
+MAXIMUM_MARGIN_SIZE		=	6*72*8
+
+HEADER_FOOTER_INSET_X		=	72/4
+
+HEADER_FOOTER_INSET_Y		=	72/4
+
+HEADER_FOOTER_SPACING		=	72/4
+
+MINIMUM_HEADER_FOOTER_HEIGHT	=	72/4
+
+FLOW_REGION_BOUNDS_BUMP		=	4
+
+MAX_MERGE_FEEDBACK_STRING_SIZE	=	48
+MERGE_FEEDBACK_STRING_NUMBER_LOCATION	= MAX_MERGE_FEEDBACK_STRING_SIZE - UHTA_NULL_TERM_BUFFER_SIZE
+
+;-----------------------------------------------------------------------------
+;		Structures -- Map Block
+;-----------------------------------------------------------------------------
+
+; The core data for the data file is kept in the map block.
+
+MapBlockHeader	struct
+    MBH_meta		LMemBlockHeader
+
+    MBH_charAttrElements word		;VM block of char attr elements
+    MBH_paraAttrElements word		;VM block of para attr elements
+    MBH_graphicElements word		;VM block of graphic elements
+    MBH_typeElements	word		;VM block of type elements
+    MBH_nameElements	word		;VM block of name elements
+    MBH_textStyles	word		;VM block of text styles 
+
+    MBH_lineAttrElements word		;VM block of line attr elements
+    MBH_areaAttrElements word		;VM block of area attr elements
+    MBH_graphicStyles	word		;VM block of graphic styles
+
+    MBH_grobjBlock	word		;VM block handle containing body
+					;and attribute manager -- chunks are
+					;fixed
+    MBH_startingSectionNum word		;starting section number
+    MBH_totalPages	word		;total pages in document
+    MBH_pageSize	XYSize		;page size
+    MBH_pageInfo	PageLayout	;page layout
+    MBH_displayMode	VisLargeTextDisplayModes
+    MBH_draftFont	FontID
+    MBH_draftPointSize	word
+
+    MBH_invalidRect	RectDWord
+    
+    MBH_revisionStamp	FileDateAndTime	; Time when file was last written out
+
+    MBH_currentEmulationState	PlatformEmulationState
+    MBH_userSize	XYSize
+    MBH_customSize	XYSize
+    MBH_miscFlags	MiscStudioDocumentFlags
+    MBH_pageNameGraphicID word		;unique ID to store in the
+					; privateData of the next page
+					; name graphic to be added
+    MBH_reserved	byte 14 dup (?)
+MapBlockHeader	ends
+
+; The section array is a name array with the data for each element being
+; the following structure
+
+MAX_MASTER_PAGES	=	4
+
+SectionFlags	record
+    SF_PAGE_NUMBER_FOLLOWS_LAST_SECTION:1
+
+    SF_NEEDS_RECALC:1
+    :14
+SectionFlags	end
+
+SectionArrayElement	struct
+    SAE_meta1		NameArrayElement
+
+    SAE_startCopyVars	label	word
+
+    SAE_flags		SectionFlags
+    SAE_startingPageNum word		;starting page number
+    SAE_numMasterPages	word
+    SAE_numColumns	word
+    SAE_ruleWidth	word		;points*8, 0 for no rules
+    SAE_columnSpacing	word		;points*8
+    SAE_leftMargin	word		;points*8
+    SAE_topMargin	word		;points*8
+    SAE_rightMargin	word		;points*8
+    SAE_bottomMargin	word		;points*8
+
+    SAE_endCopyVars	label	word
+
+    SAE_masterPages	word MAX_MASTER_PAGES dup (?)	;VM blocks
+
+	; These variables keep track of the things biffed by deleting
+	; regions in the section
+
+    SAE_charsDeleted	dword
+    SAE_linesDeleted	dword
+    SAE_spaceDeleted	WBFixed
+
+    SAE_numPages	word		;# of pages in section
+    SAE_reserved	byte 16 dup (?)
+SectionArrayElement	ends
+
+MAX_SECTION_NAME_SIZE	=	32
+
+; The article array is a name array with the following data being stored
+; with each name
+
+ArticleArrayElement	struct
+    AAE_meta		NameArrayElement
+    AAE_articleBlock	word		;VM block of article information
+    AAE_reserved1	byte 32 dup (?)
+ArticleArrayElement	ends
+
+;-----------------------------------------------------------------------------
+;		Structures -- Master Page Block
+;-----------------------------------------------------------------------------
+
+MasterPageFlags	record
+    MPF_USER_MODIFIED:1
+    :15
+MasterPageFlags	end
+
+MasterPageBlockHeader	struct
+    MPBH_meta		ObjLMemBlockHeader
+    MPBH_header		dword		;vm block, chunk handle
+    MPBH_footer		dword		;vm block, chunk handle
+    MPBH_flags		MasterPageFlags
+    MPBH_reserved	byte 32 dup (?)
+MasterPageBlockHeader	ends
+
+; The flow region array has an entry for each region of the master page into
+; which text can flow
+
+FlowRegionArrayElement	struct
+    FRAE_position	XYOffset
+    FRAE_size		XYSize
+    FRAE_textRegion	dword		;db item
+    FRAE_drawRegion	dword		;db item
+    FRAE_flowObject	dword		;vm block, chunk handle
+    FRAE_ruleObject	dword		;vm block, chunk handle
+    FRAE_article	word
+    FRAE_reserved	byte 8 dup (?)
+FlowRegionArrayElement	ends
+
+;-----------------------------------------------------------------------------
+;		Structures -- Article Block
+;-----------------------------------------------------------------------------
+
+ArticleRegionArrayElement	struct
+    ARAE_meta			VisLargeTextRegionArrayElement
+    ARAE_inheritedTextRegion	dword		;db item
+    ARAE_drawRegion		dword		;db item
+    ARAE_object			dword		;vm block, chunk handle
+    ARAE_reserved	byte 8 dup (?)
+ArticleRegionArrayElement	ends
+
+;-----------------------------------------------------------------------------
+;		Structures -- Other
+;-----------------------------------------------------------------------------
+
+StudioDocumentState	record
+    SDS_TARGET:1
+    SDS_MODEL:1
+    SDS_SEND_SIZE_PENDING:1
+    SDS_SUSPENDED_FOR_APPENDING_REGIONS:1
+    SDS_RECALC_ABORTED:1
+    SDS_REPLAY:1			;Redwood-only
+    SDS_GOTO_PAGE:1			;Redwood-only
+    :9
+StudioDocumentState	end
+
+; To keep track of open master pages the document keeps a chunk array with
+; an element for each open master page.  This chunk is saved to state.
+
+OpenMasterPage	struct
+    OMP_display		hptr
+    OMP_content		hptr
+    OMP_vmBlock		word
+OpenMasterPage	ends
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+    SDI_size			PointDWord	;content's size (not including
+						;page margin)
+    SDI_pageHeight		word		;page height
+    SDI_currentPage		word		;starting at 0
+    SDI_currentSection		word		;starting at 0
+    SDI_state			StudioDocumentState
+    SDI_mpBodySuspendCount	word
+    SDI_suspendCount		word
+StudioDocumentClass	endc
+
+;============================================================================
+;============================================================================
+
+StudioMasterPageContentClass	class	VisContentClass
+
+;-----------------------------------------------------------------------------
+;		Messages
+;-----------------------------------------------------------------------------
+
+MSG_STUDIO_MASTER_PAGE_CONTENT_SET_DOCUMENT_AND_MP	message
+;
+; Set the associated document
+;
+; Pass:
+;	cx:dx - document
+;	bp - master page body block
+
+;-----------------------------------------------------------------------------
+;		Constants
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Structures
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+    SMPCI_document	optr
+    SMPCI_mpBodyVMBlock	word
+
+StudioMasterPageContentClass	endc

@@ -1,0 +1,767 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/*
+ **************************************************************************
+ *  FILE:			rpt_mtds.goc
+ *  PROJECT:		GPC Banker
+ *  DESCRIPTION:	This file has methods for the reports
+ *				functions
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "bnkr30.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+
+/****************************************************************************
+ *		Code for GPCBnkrProcessClass Reports
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_REPORT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the menu
+ *              item is selected 
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_OPEN_REPORT
+{
+TimerDateAndTime	date;
+char		dateString[DATE_TIME_BUFFER_SIZE + 1];
+
+
+    /* put system date in To: date box */
+    TimerGetDateAndTime(&date);
+    LocalFormatDateTime(dateString, DTF_SHORT, &date);
+    @call RDBTo::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateString, 0);
+
+    /* and 1 Jan current year in the From: date box */ 
+    date.TDAT_month = 1;
+    date.TDAT_day = 1;
+    LocalFormatDateTime(dateString, DTF_SHORT, &date);
+    @call RDBFrom::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateString, 0);
+
+    /* Open the dialog box */
+    @call ReportDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CREATE_REPORT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Fills in the report text object based on the dbox
+ *              selections.
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_CREATE_REPORT
+{
+TimerDateAndTime	date;
+char			dateFString[DATE_SIZE];
+char			dateTString[DATE_SIZE];
+dword		toDateNum, fromDateNum, transDateNum, rangeStart;
+word			typeSelection, displaySelection, catSelection;
+Boolean		isSubs, isMemo, isTax = FALSE;
+word			catNumHold, ie;
+word			i, j, k, doneMultis, length;
+Boolean		isSel, noCat, isNeg, firstInCat;
+AcctStruct	*account;
+TransStruct	*trans, *tmp;
+DBItem		multiItem, multiParent;
+DBGroup		multiGroup;
+DBMapStruct*	mapPtr;
+MemHandle		mh;
+CatPickStruct	*pickElement;
+char			catString[ENTRY_SIZE], lineBuffer[100];
+char			amtString[MAX_TEXT_LEN], numString[CKNUM_SIZE];
+TransSortStruct	*trArrayElement;
+FloatNum		subTotal=0, total, amount, incTotal, expTotal;
+Tab typeTab = {1.25 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, NULL};
+Tab payeeTab = {2 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, NULL};
+Tab amtTab = {5.5 * 8 * PIXELS_PER_INCH, TL_NONE | TT_ANCHORED, SDM_100, 0, 0, NULL};
+Tab taxTab = {5.75 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, NULL};
+Tab typeTVTab = {.75 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, NULL};
+Tab payeeTVTab = {1.5 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, NULL};
+Tab amtTVTab = {4.5 * 8 * PIXELS_PER_INCH, TL_NONE | TT_ANCHORED, SDM_100, 0, 0, NULL};
+Tab taxTVTab = {4.75 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, NULL};
+VMFileHandle	fileHan;
+
+    /* first see if the dates are OK */
+    @call RDBTo::MSG_VIS_TEXT_GET_ALL_PTR(dateTString);
+    /* Exit if date no good */
+    if (!DateCheck(dateTString))  {
+	  /* send the focus back to the date field */
+	  @send RDBTo::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+    LocalParseDateTime(dateTString, DTF_SHORT, &date);
+    /* convert to comparison number */
+    toDateNum = MakeDateNum(date);
+    @call RDBFrom::MSG_VIS_TEXT_GET_ALL_PTR(dateFString);
+    /* Exit if date no good */
+    if (!DateCheck(dateFString))  {
+	  /* send the focus back to the date field */
+	  @send RDBFrom::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+    LocalParseDateTime(dateFString, DTF_SHORT, &date);
+    /* convert to comparison number */
+    fromDateNum = MakeDateNum(date);
+    if (fromDateNum > toDateNum)  {  /* from later than to */
+	  NotifyDBox(0, @RptToFromMsg);
+	  return;
+	  } /* end of bad dates */
+
+    /* add the text window and do some opening set-up */
+    @call TextContent::MSG_VIS_ADD_CHILD(@TextWindow, CCO_FIRST);
+    fileHan = ClipboardGetClipboardFile();
+    @call TextWindow::MSG_VIS_TEXT_SET_VM_FILE(fileHan);
+    @call TextWindow::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+    @call TextWindow::MSG_VIS_TEXT_CREATE_STORAGE(
+		   VTSF_MULTIPLE_CHAR_ATTRS | VTSF_MULTIPLE_PARA_ATTRS,
+			    FALSE);
+    @call TextWindow::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+ //   @send GPCCopyButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    /* disable the create report button */
+    @send RDBCreate::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* now check the report type... */
+    typeSelection = @call RDBTypeSel::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    /* and show the window moniker */
+    MemLock (OptrToHandle(@RptSummary));
+    switch (typeSelection) {
+	  case R_SUM:
+		@call ReportGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+						LMemDeref(@RptSummary),
+						VUM_DELAYED_VIA_APP_QUEUE);
+		break;
+	  case R_IE:
+		@call ReportGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+						LMemDeref(@RptIE),
+						VUM_DELAYED_VIA_APP_QUEUE);
+		break;
+	  case R_TAX:
+		@call ReportGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+						LMemDeref(@RptTax),
+						VUM_DELAYED_VIA_APP_QUEUE);
+		isTax = TRUE;
+		/* since this is a tax only summary report */
+		typeSelection = R_SUM;
+		break;
+       }
+    MemLock (OptrToHandle(@RptSummary));
+
+    /* now see if we're to select by date or cat... */
+    displaySelection = @call RDBDisplaySel::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    /* see if we're to select categories... */
+    catSelection = @call RDBCatSel::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    /* get the boolean data */
+    isSubs = @call RDBIncludeSel::
+					   MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(R_SUBS);
+    isMemo = @call RDBIncludeSel::
+					   MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(R_MEMO);
+
+    /* set font to header */
+    ChangeCharAttr(@GPCBnkrTitleCharAttrs);
+    /* set para to title */
+    ChangeParaAttr(@GPCBnkrTitleParaAttrs);
+    /* Open the report window */
+    @call ReportGroup::MSG_GEN_INTERACTION_INITIATE();
+    @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_BUSY();
+    @send TextWindow::MSG_META_GRAB_FOCUS_EXCL();
+    @send TextWindow::MSG_META_GRAB_TARGET_EXCL();
+    @send TextWindow::MSG_META_SUSPEND();
+
+    /* display the title */
+    @call RDBTitle::MSG_VIS_TEXT_GET_ALL_PTR(catString);
+    strcpy(lineBuffer, catString);
+    @call TextWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR(lineBuffer, 0);
+    /* get the acct info */
+    /* Normal setup */
+    mapPtr = DBLockMap(GPCBnkrFile);
+    account = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+    /* get and show acct info */
+    MemLock (OptrToHandle(@RptToFromMsg));
+    strcpy(lineBuffer, "\r");
+    strcat(lineBuffer, LMemDeref(@AcctSP));
+    strcat(lineBuffer, account[currentAcct].AS_bank);
+    strcat(lineBuffer, LMemDeref(@spNumSym));
+    strcat(lineBuffer, account[currentAcct].AS_number);
+    DBUnlock(mapPtr);
+    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(lineBuffer, 0);
+    /* and the dates */
+    strcpy(lineBuffer, "\r");
+    strcat(lineBuffer, LMemDeref(@From));
+    strcat(lineBuffer, dateFString);
+    strcat(lineBuffer, "     ");
+    strcat(lineBuffer, LMemDeref(@To));
+    MemUnlock (OptrToHandle(@RptToFromMsg));
+    strcat(lineBuffer, dateTString);
+    strcat(lineBuffer, "\r\r");
+    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(lineBuffer, 0);
+    /* set para to doc */
+    ChangeParaAttr(@GPCBnkrDocParaAttrs);
+    /* Set the tabs */
+    rangeStart = @call TextWindow::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    if (!onTV)  {
+	  @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+				   typeTab, TEXT_ADDRESS_PAST_END, rangeStart);
+	  @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+				   payeeTab, TEXT_ADDRESS_PAST_END, rangeStart);
+	  @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+				   amtTab, TEXT_ADDRESS_PAST_END, rangeStart);
+	  @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+				   taxTab, TEXT_ADDRESS_PAST_END, rangeStart);
+	  }
+    else  {
+	  @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+				   typeTVTab, TEXT_ADDRESS_PAST_END, rangeStart);
+	  @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+				   payeeTVTab, TEXT_ADDRESS_PAST_END, rangeStart);
+	  @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+				   amtTVTab, TEXT_ADDRESS_PAST_END, rangeStart);
+	  @call TextWindow::MSG_VIS_TEXT_SET_TAB(
+				   taxTVTab, TEXT_ADDRESS_PAST_END, rangeStart);
+	  }
+
+
+    /* OK now */
+    for (ie = 0; ie < 2; ie++)  {  /* set up I/E loop */
+	  if (displaySelection == R_DATE)  {
+		catNumHold = catNumItems;
+		catNumItems = 0;
+		isSel = TRUE;
+	     }
+	  total = 0;
+	  if ((ie == 0) && (typeSelection == R_IE)) {
+		MemLock (OptrToHandle(@RptToFromMsg));
+		strcpy(lineBuffer, LMemDeref(@IncomeText));
+		MemUnlock (OptrToHandle(@RptToFromMsg));
+		if (displaySelection == R_DATE) strcat(lineBuffer, "\r");
+		@call TextWindow::MSG_VIS_TEXT_APPEND_PTR(lineBuffer, 0);
+		}
+	  if ((ie == 1) && (typeSelection == R_IE)) {
+		MemLock (OptrToHandle(@RptToFromMsg));
+		strcpy(lineBuffer, LMemDeref(@ExpenseText));
+		MemUnlock (OptrToHandle(@RptToFromMsg));
+		if (displaySelection == R_DATE) strcat(lineBuffer, "\r");
+		/* set font to header */
+		ChangeCharAttr(@GPCBnkrTitleCharAttrs);
+		@call TextWindow::MSG_VIS_TEXT_APPEND_PTR(lineBuffer, 0);
+		}
+	  for (i = 0; i <= catNumItems; i++)  {
+		/* get our cat list's block using its ID # */
+		if (i < catNumItems)  {
+		   catListVMBHandle = VMFind(GPCBnkrFile, NullHandle, CATLIST);
+		   VMLock(GPCBnkrFile, catListVMBHandle ,&mh);
+		   pickElement = ChunkArrayElementToPtrHandles(
+				    mh,
+				    catListChunkArray,
+				    i,
+				    0);
+		   isSel = pickElement->CPS_isSelected;
+		   noCat = FALSE;
+		   if (pickElement->CPS_isSub) {
+			 strcpy(catString, pickElement->CPS_subOf);
+			 strcat(catString, ":");
+			 strcat(catString, pickElement->CPS_category);
+			 }
+		   else strcpy(catString, pickElement->CPS_category);
+		   VMUnlock(mh);
+		   }
+		else if (displaySelection != R_DATE) {  /* uncategorized transacts */
+		   MemLock (OptrToHandle(@RptToFromMsg));
+		   strcpy(catString, LMemDeref(@UncatText));
+		   MemUnlock (OptrToHandle(@RptToFromMsg));
+		   noCat = TRUE;
+		   isSel = FALSE; /* in case last cat was selected */
+		   }
+		/* do we want transactions from this cat? */
+		if ((isSel) || (catSelection == R_ALL))  {  /* yes */
+		   firstInCat = TRUE; /* set header print flag */
+		   if (displaySelection == R_DATE) firstInCat = FALSE;
+		   strcpy(lineBuffer, "\r");
+		   strcat(lineBuffer, catString);
+		   strcat(lineBuffer, "\r");
+
+		   /* get the index array VMBlock */
+		   transListVMBHandle = VMFind(GPCBnkrFile,
+						    NullHandle,
+						    (currentAcct*10)+ALLSORT);
+		   VMLock(GPCBnkrFile, transListVMBHandle ,&mh);
+             multiParent = 0;
+		   /* cycle thru the index elements to get the selected one */
+		   for (j = 0; j < numTrans; j++)  {
+			 /* get the jth element info */
+			 trArrayElement = ChunkArrayElementToPtrHandles(
+						mh,
+						transListChunkArray,
+						j,
+						0);
+			 transDateNum = ((dword)(trArrayElement->TSS_year) * (dword)10000) +
+				  ((dword)(trArrayElement->TSS_month) * (dword)100) +
+				  (dword)trArrayElement->TSS_day;
+			 /* is transDate >= from date? */
+			 if (transDateNum >= fromDateNum)  { /* yes */
+			    /* OK is it <= to date? */
+			    if (transDateNum <= toDateNum)  { /* yes */
+				  /* Get the selected trans item. */
+				  trans = DBLock(GPCBnkrFile, currentAcctGroup,
+								 trArrayElement->TSS_item);
+
+				  /* set up for multi kids if this is a parent */
+				  if ((trans->TS_numMultis) && (displaySelection != R_DATE)){
+					multiGroup = trans->TS_multiGroup;
+					multiItem = trans->TS_multiItem;
+					numMultis = trans->TS_numMultis;
+					if (multiParent != trArrayElement->TSS_item)  {
+					   /* a new multi parent */
+					   doneMultis = 0;
+					   multiParent = trArrayElement->TSS_item;
+					   }
+					else  {
+					   /* we've gotten at least one kid so far */
+					   doneMultis++;
+					   }
+					if (doneMultis != numMultis)  {
+					   /* we have to check out this kid */
+					   DBUnlock(trans);
+					   trans = DBLock(GPCBnkrFile, multiGroup, multiItem);
+					   for (k = 0; k < doneMultis; k++)  {
+						 tmp = DBLock(GPCBnkrFile, multiGroup,
+						                             trans->TS_multiItem);
+						 DBUnlock(trans);
+						 trans = tmp;
+						 }
+					   /* decrement j so that we catch this parent again */
+					   j--;
+					   }
+					/* if (doneMultis == numMultis) we've finished with
+					 * this parent so let it go thru again since it won't
+					 * pass the cat compare test and take a lot more
+					 *time */
+					} /* end of it's a multi-parent if */
+
+
+				  /* is it in current cat? */
+				  if (noCat) strcpy(catString, "");
+				  if (strlen(catString) >= strlen(trans->TS_category))
+						length = strlen(catString);
+				  else  length = strlen(trans->TS_category);
+				  if (!LocalCmpStrings(catString, trans->TS_category,
+								 length)
+						|| (displaySelection == R_DATE)) {
+					 /* yes, want it based on tax status? */
+					if ((trans->TS_taxItem) || !isTax) {
+					   /* we want this so far - check I/E */
+					   isNeg = TRUE;
+					   if ((trans->TS_type == TRANS_DP)
+						    || (trans->TS_type == TRANS_CR)
+						    || (trans->TS_type == TRANS_XFP)) isNeg = FALSE;
+					   if (((!isNeg)
+						    && (ie == 0)
+						    && (typeSelection == R_IE))
+						  ||((isNeg)
+						    && (ie == 1)
+						    && (typeSelection == R_IE))
+						  || (typeSelection == R_SUM)) {
+						 /* yes, put this one on the screen */
+						 if (firstInCat)  {  /* print header */
+						    /* set font to header */
+						    ChangeCharAttr(@GPCBnkrHeaderCharAttrs);
+						    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR
+									 (lineBuffer, 0);
+						    firstInCat = FALSE;
+						    }
+
+						 *lineBuffer = NULL;
+						 /* get the date */
+						 date.TDAT_year = trans->TS_year;
+						 date.TDAT_month = trans->TS_month;
+						 date.TDAT_day = trans->TS_day;
+						 LocalFormatDateTime(dateTString, DTF_SHORT, &date);
+						 strcpy(lineBuffer, dateTString);
+						 strcat(lineBuffer, "\t");
+						 MemLock (OptrToHandle(@RptToFromMsg));
+						 switch (trans->TS_type) {
+						    case TRANS_CK:
+							  UtilHex32ToAscii(numString,
+								    (sdword) trans->TS_number,
+								    UHTAF_NULL_TERMINATE);
+							  strcat(lineBuffer, numString);
+							  break;
+						    case TRANS_DP:
+							  strcat(lineBuffer, LMemDeref(@DepText));
+							  break;
+						    case TRANS_DB:
+							  strcat(lineBuffer, LMemDeref(@DebText));
+							  break;
+						    case TRANS_CR:
+							  strcat(lineBuffer, LMemDeref(@CrdText));
+							  break;
+						    case TRANS_XFM:
+							  strcat(lineBuffer, LMemDeref(@XfOText));
+							  break;
+						    case TRANS_XFP:
+							  strcat(lineBuffer, LMemDeref(@XfIText));
+							  break;
+						    } /* end switch */
+						 strcat(lineBuffer, "\t");
+						 strcat(lineBuffer, trans->TS_payee);
+						 strcat(lineBuffer, "\t");
+						 MemUnlock (OptrToHandle(@RptToFromMsg));
+						 if (isNeg) {
+						    FloatPushNumber(&trans->TS_amount);
+						    FloatNegate();
+						    FloatPopNumber(&amount);
+						    }
+						 else  {
+						    amount = trans->TS_amount;
+						    }
+						 FloatFormatNumber(FORMAT_ID_FIXED_WITH_COMMAS,
+									 NullHandle,
+									 NullHandle,
+									 &amount,
+									 amtString);
+						 if (isNeg)  {  /* make amount red */
+						    /* set font to text */
+						    ChangeCharAttr(@GPCBnkrTextCharAttrs);
+						    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+								   lineBuffer, 0);
+						    strcpy(lineBuffer, amtString);
+						    /* set font to red text */
+						    ChangeCharAttr(@GPCBnkrRedTextCharAttrs);
+						    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+								   lineBuffer, 0);
+						    /* set font to text */
+						    ChangeCharAttr(@GPCBnkrTextCharAttrs);
+						    }
+						   else  {
+						    strcat(lineBuffer, amtString);
+						    /* set font to text */
+						    ChangeCharAttr(@GPCBnkrTextCharAttrs);
+						    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+								    lineBuffer, 0);
+						    }
+						 if (trans->TS_taxItem) {
+						    MemLock (OptrToHandle(@RptToFromMsg));
+						    strcpy(lineBuffer, LMemDeref(@TaxMarkText));
+						    MemUnlock (OptrToHandle(@RptToFromMsg));
+						    strcat(lineBuffer, "\r");
+						    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+								    lineBuffer, 0);
+						    }
+						   else {
+						    strcpy(lineBuffer, "\r");
+						    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+								    lineBuffer, 0);
+						    }
+						 if ((isMemo) &&
+							   (strlen(trans->TS_memo))){
+						    strcpy(lineBuffer, "\t");
+						    strcat(lineBuffer, trans->TS_memo);
+						    strcat(lineBuffer, "\r");
+						    @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(
+								   lineBuffer, 0);
+						    }
+						 /* add the amount here */
+						 subTotal = subTotal + amount;
+						 }  /* end of we want it ie if */
+					   }  /* end of we want it tax if */
+					}  /* end of want it cat if */
+				  DBUnlock(trans);
+				  }  /* end of <= to date if */
+			    else  {  /* we're past our range */
+				  j = numTrans;
+				  }
+			    }  /* end of >= from if */
+			 }  /* end of j for loop */
+		   VMUnlock(mh);
+		   /* show the subtotal here if selected */
+		   if (isSubs && (!firstInCat)
+					 && (displaySelection == R_CAT)) {
+			 MemLock (OptrToHandle(@RptToFromMsg));
+			 strcpy(lineBuffer, LMemDeref(@RptSubtotalText));
+			 MemUnlock (OptrToHandle(@RptToFromMsg));
+			 FloatFormatNumber(FORMAT_ID_CURRENCY_WITH_COMMAS,
+				    NullHandle,
+				    NullHandle,
+				    &subTotal,
+				    amtString);
+			 strcat(lineBuffer, amtString);
+			 strcat(lineBuffer, "\r");
+			 /* set font to totals */
+			 ChangeCharAttr(@GPCBnkrTotalsCharAttrs);
+			 @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(lineBuffer, 0);
+			 }
+		   total = total + subTotal;
+		   subTotal = 0;
+		   }  /* end of want this cat if */
+		}  /* end of cycle thru categories for */
+	  if (displaySelection == R_DATE)  {
+		catNumItems = catNumHold;
+		}
+	  /* print the total */
+	  MemLock (OptrToHandle(@RptToFromMsg));
+	  if ((ie == 0) && (typeSelection == R_IE))  {
+		strcpy(lineBuffer, LMemDeref(@IncTotalText));
+		incTotal = total;
+		/* set font to totals */
+		ChangeCharAttr(@GPCBnkrTotalsCharAttrs);
+		}
+	  else if ((ie == 1) && (typeSelection == R_IE))  {
+		strcpy(lineBuffer, LMemDeref(@ExpTotalText));
+		expTotal = total;
+		/* set font to totals */
+		ChangeCharAttr(@GPCBnkrTotalsCharAttrs);
+		}
+	  else  {
+		strcpy(lineBuffer, LMemDeref(@RptTotalText));
+		/* set font to header */
+		ChangeCharAttr(@GPCBnkrTitleCharAttrs);
+		}
+	  MemUnlock (OptrToHandle(@RptToFromMsg));
+	  FloatFormatNumber(FORMAT_ID_CURRENCY_WITH_COMMAS,
+			NullHandle,
+			NullHandle,
+			&total,
+			amtString);
+	  strcat(lineBuffer, amtString);
+	  strcat(lineBuffer, "\r");
+	  @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(lineBuffer, 0);
+
+	  if (typeSelection == R_SUM)  {
+		ie = 2;  /* bail out */
+		}
+	  else {
+		total = 0;  /* reset total for expense loop */
+		}
+	  } /* end of IE for loop */
+    if (typeSelection == R_IE)  {
+	  /* print the total */
+	  MemLock (OptrToHandle(@RptToFromMsg));
+	  strcpy(lineBuffer, LMemDeref(@IETotalText));
+	  MemUnlock (OptrToHandle(@RptToFromMsg));
+	  total = incTotal + expTotal;
+	  FloatFormatNumber(FORMAT_ID_CURRENCY_WITH_COMMAS,
+			NullHandle,
+			NullHandle,
+			&total,
+			amtString);
+	  strcat(lineBuffer, amtString);
+	  strcat(lineBuffer, "\r");
+	  /* set font to header */
+	  ChangeCharAttr(@GPCBnkrTitleCharAttrs);
+	  @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(lineBuffer, 0);
+       }
+
+    @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    @send TextWindow::MSG_META_UNSUSPEND();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_RPT_DISPLAY_SELECTED for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	When an item is selected before any apply
+ *
+ *
+ * PARAMETERS:  void (word selection, numSelections, byte flags)
+ *
+ * 
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_RPT_DISPLAY_SELECTED
+{
+
+    if (selection == R_DATE)  {
+	  @send RDBCatSel::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	  @send RDBSub::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	  }
+    else  {
+	  @send RDBCatSel::MSG_GEN_SET_ENABLED(VUM_NOW);
+	  @send RDBSub::MSG_GEN_SET_ENABLED(VUM_NOW);
+	  }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_RPT_CAT_SELECTED for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Open the cat select dlist [and reset the selection
+ *                  to All if the user chooses selected cats. can't do this!]
+ *
+ * PARAMETERS:  void (word selection, numSelections, byte flags)
+ *
+ * 
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_RPT_CAT_SELECTED
+{
+
+    if (selection == R_SEL)  {
+	  @send CatSelDBox::MSG_GEN_INTERACTION_INITIATE();
+	  }
+ 
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CATSEL_DLIST_APPLY for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	When an item is selected 
+ *              it is toggled selected or !selected.  Then since
+ *              the list can't tell me which item (of multiple items)
+ *              was selected we change the moniker and reset the list
+ *		      to no selections.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * 
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_CATSEL_DLIST_APPLY
+{
+MemHandle		mh;
+CatPickStruct	*pickElement;
+
+
+    /* get our list's block using its ID # */
+    catListVMBHandle = VMFind(GPCBnkrFile, NullHandle, CATLIST);
+    VMLock(GPCBnkrFile, catListVMBHandle ,&mh);
+    pickElement = ChunkArrayElementToPtrHandles(
+		   mh,
+		   catListChunkArray,
+		   selection,
+		   0);
+    /* toggle selected status */
+    if (pickElement->CPS_isSelected)  pickElement->CPS_isSelected = FALSE;
+    else  pickElement->CPS_isSelected = TRUE;
+    VMDirty(mh); 
+    VMUnlock(mh);
+
+    /* now change the moniker in the list */
+    @send process::MSG_CAT_DLIST_MONIKER_QUERY(@CSDList, selection);
+
+    /* and set the list to no selections */
+    @send CSDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CLEAR_REPORT_CATEGORIES for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:    clears all the selections in the list
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_CLEAR_REPORT_CATEGORIES
+{
+MemHandle		mh;
+CatPickStruct	*pickElement;
+word			i;
+
+
+    catListVMBHandle = VMFind(GPCBnkrFile, NullHandle, CATLIST);
+    VMLock(GPCBnkrFile, catListVMBHandle ,&mh);
+    for (i = 0; i < catNumItems; i++)  {
+	  pickElement = ChunkArrayElementToPtrHandles(
+				    mh,
+				    catListChunkArray,
+				    i,
+				    0);
+	 /* clear selected status */
+	 pickElement->CPS_isSelected = FALSE;
+	 }
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* reinit the list */
+    @send CSDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(catNumItems);
+    /* and set the list to no selections */
+    @send CSDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CLOSE_REPORT_WINDOW for GPCBnkrProcessClass
+ *
+ * PARAMETERS:  void (void)
+ *
+ *
+ * DESCRIPTION:	does some closing stuff
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_CLOSE_REPORT_WINDOW
+{
+
+    @call TextWindow::MSG_VIS_TEXT_FREE_ALL_STORAGE(TRUE);
+    @call TextWindow::MSG_VIS_TEXT_SET_VM_FILE(NullHandle);
+    /* needed in NT SDK */
+    @send TextWindow::MSG_VIS_CLOSE();
+    @call TextContent::MSG_VIS_REMOVE_CHILD(@TextWindow, CCO_FIRST);
+
+    /* re enable the create report button */
+    @send RDBCreate::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    @send ReportGroup::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DO_SELECT_ALL for GPCBnkrProcessClass
+ *
+ * PARAMETERS:  void (void)
+ *
+ *
+ * DESCRIPTION:	enables copy button and selects all
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_DO_SELECT_ALL
+{
+
+    @send TextWindow::MSG_META_SELECT_ALL();
+ //   @send GPCCopyButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+

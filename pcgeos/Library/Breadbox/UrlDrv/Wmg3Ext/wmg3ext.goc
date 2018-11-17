@@ -1,0 +1,299 @@
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          wmg3ext.goc
+ *
+ * AUTHOR:        Brian Chin
+ *
+ * Note: This code uses many functions that a very simular to the
+ *       functions in the FTP driver.  We should really
+ *       redesign all URL drivers.  Especially the parts which
+ *       work on the URL string.
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *                Include files
+ **************************************************************************/
+@include <stdapp.goh>
+
+#include <geomisc.h>
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <ansi\stdlib.h>
+
+#include <initfile.h>
+
+#include <htmldrv.h>
+
+@include <library.h>
+
+@include <iapp.h>
+
+
+/* buffer for returning list of supported formats */
+/* protocol 1, protocol 2, ... */
+int protocolSize = 0;
+TCHAR protocolList[URL_INFO_MAXBUF];
+
+
+/* list of protocol ("scheme") to token */
+typedef struct {
+    int        MTT_offset;
+    GeodeToken MTT_token;
+    InternetAppDataType MTT_iadt;
+} ProtocolToToken;
+
+/* minsize(Protocol type)+null+minsize(extension)+null */
+#define TOKEN_LIST_SIZE 50
+int tokenNum = 0;
+ProtocolToToken tokenList[TOKEN_LIST_SIZE];
+
+
+/**************************************************************************
+ *        Message strings
+ **************************************************************************/
+@start  HTMLResource, data;
+  @chunk TCHAR MsgNoExtApp[] = _TEXT(
+    "<H1>External URL application not specified</H1>");
+  @chunk TCHAR MsgCouldntStartExtApp[] = _TEXT(
+    "<H1>External URL application could not be started</H1>");
+@end    HTMLResource;
+
+
+optr ToolsFormatMessage(optr msg)
+{
+    word size;
+    MemHandle mh;
+    TCHAR *dst;
+
+    MemLock(OptrToHandle(msg));         /* copy message to new data block */
+
+    size = (strlen(LMemDeref(msg))+2)*sizeof(TCHAR);    /* basic size of HTML message */
+
+    mh = MemAlloc(size, HF_DYNAMIC, HAF_NO_ERR);
+    dst = MemLock(mh);
+    strcpy(dst, LMemDeref(msg));
+    MemUnlock(mh);
+
+    MemUnlock(OptrToHandle(msg));
+
+    return ConstructOptr(mh,0);         /* return optr to data block */
+}
+
+void BuildAssocList(void)
+{
+    int sectionNum = 0;
+    MemHandle dataB;
+    int dataSize;
+    TCHAR *dataP, *numP;
+    TCHAR *outputP = protocolList;
+    int i;
+    dword manuf;
+    Boolean checkIADT = FALSE;
+
+    tokenNum = 0;
+    while(!InitFileReadStringSectionBlock("extURL", "apps",
+					 sectionNum++, &dataB, 0, &dataSize)) {
+	if (dataB && dataSize) {
+	    dataP = MemLock(dataB);
+	    if (dataP && *dataP) {
+		tokenList[tokenNum].MTT_iadt = IADT_MAIL_TO;
+                /* skip separators */
+@ifdef DO_DBCS
+		while ((*dataP == C_SPACE) || (*dataP == C_HORIZONTAL_TABULATION)) dataP++;
+@else
+		while ((*dataP == C_SPACE) || (*dataP == C_TAB)) dataP++;
+@endif
+                /* copy protocol type to protocolList */
+                tokenList[tokenNum].MTT_offset = (word)(outputP-protocolList);
+		while (*dataP && (*dataP != C_SPACE)) {
+		    *outputP++ = *dataP++;
+		}
+		*outputP++ = C_NULL;
+		/* skip separators */
+@ifdef DO_DBCS
+		while ((*dataP == C_SPACE) || (*dataP == C_HORIZONTAL_TABULATION)) dataP++;
+@else
+		while ((*dataP == C_SPACE) || (*dataP == C_TAB)) dataP++;
+@endif
+		/* copy token to tokenList */
+		for (i = 0; i < TOKEN_CHARS_LENGTH; i++ ) {
+		    if (*dataP) {
+			tokenList[tokenNum].MTT_token.GT_chars[i] = *dataP++;
+		    }
+		}
+		if (*dataP++ == C_COMMA) {
+		    numP = dataP;
+		    /* find end of number */
+		    while (*dataP && *dataP != C_SPACE) dataP++;
+		    /* terminate number */
+		    if (*dataP != C_NULL) {
+			*dataP++ = C_NULL;
+			checkIADT = TRUE;
+		    } else {
+			checkIADT = FALSE;
+		    }
+		    if (!UtilAsciiToHex32(numP, &manuf)) {
+			tokenList[tokenNum].MTT_token.GT_manufID = (word)manuf;
+			/* parse IADT, if any */
+			if (checkIADT) {
+			    /* skip spaces */
+@ifdef DO_DBCS
+			    while (*dataP==C_SPACE || *dataP==C_HORIZONTAL_TABULATION) dataP++;
+@else
+			    while (*dataP==C_SPACE || *dataP==C_TAB) dataP++;
+@endif
+			    if (*dataP >= '0' && *dataP <= '9') {
+				tokenList[tokenNum].MTT_iadt = *dataP - '0';
+			    }
+			}
+			tokenNum++;
+			/* if filled our buffer, stop reading entries */
+			if (tokenNum == TOKEN_LIST_SIZE) break;
+		    } else {
+			/* something wrong with string section format, don't
+			   advance tokenNum and reset pointer into
+			   protocolList */
+			outputP = protocolList +
+			    tokenList[tokenNum].MTT_offset;
+		    }
+		} else {
+		    /* something wrong with string section format, don't
+                       advance tokenNum and reset pointer into protocolList */
+                    outputP = protocolList + tokenList[tokenNum].MTT_offset;
+		}
+	    }
+	}
+	if (dataB) MemFree(dataB);
+    }
+    /* end format list */
+    *outputP = C_NULL;
+
+    /* store size of list */
+    protocolSize = (outputP-protocolList+1)*sizeof(TCHAR);
+}
+
+
+entry_URLDrvMain URLDrvMain
+{
+    GeodeToken *tokenP = 0;
+    word rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+    TCHAR extURL[20];
+    MemHandle alb;
+    AppLaunchBlock *albP;
+    MemHandle extraData;
+    InternetAppBlock *extraDataP;
+    word numServers;
+    IACPConnection extConn;
+    TCHAR *url, *urlAddr;
+    int i;
+    URLRequestBlock *req;
+    optr ret;
+    InternetAppDataType iadt = IADT_MAIL_TO;
+
+    req = MemLock(request);
+    req->URB_date = URL_TIME_UNKNOWN;   /* dates unknown */
+    req->URB_expireDate = URL_TIME_UNKNOWN;
+    req->URB_mimeType = 0;
+
+    ret = NullHandle;
+    url = LMemDerefHandles(request, req->URB_url);
+
+    /* fetch URL protocol, skip to actual address */
+    urlAddr = strchr(url, ':');
+    if (urlAddr) {
+	strncpy(extURL, url, urlAddr-url);
+	extURL[urlAddr-url] = 0;
+	urlAddr++;    /* skip ':' */
+	while((*urlAddr == '/') && (*urlAddr != 0)) {
+	    urlAddr++;
+	}
+    }
+
+    /* find mail app in list */
+    for (i = 0; i < tokenNum; i++ ) {
+        if (!strcmpi(protocolList+tokenList[i].MTT_offset, extURL)) {
+	    tokenP = &tokenList[i].MTT_token;
+	    iadt = tokenList[i].MTT_iadt;
+	    break;
+	}
+    }
+
+    /* if found, launch app */
+    if (tokenP) {
+	alb = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+	albP = MemLock(alb);
+	if (albP) {
+	    extraData = MemAlloc(sizeof(InternetAppBlock)+(strlen(urlAddr)+1)*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
+	    if (extraData) {
+		extraDataP = MemLock(extraData);
+		if (extraDataP) {
+		    extraDataP->IAB_type = iadt;
+		    strcpy((TCHAR *)&(extraDataP[1]), urlAddr);
+		    urlAddr = &(extraDataP[1]);
+		    /* remove trailing /s */
+		    while (urlAddr[strlen(urlAddr)-1] == '/') {
+			urlAddr[strlen(urlAddr)-1] = 0;
+		    }
+		    MemUnlock(extraData);
+		    albP->ALB_extraData = extraData;
+		    MemUnlock(alb);
+                    extConn = IACPConnect(tokenP, 0, alb, (optr)0,
+					  &numServers);
+		    if (extConn) {
+			IACPShutdown(extConn, (optr)0);
+		    } else {
+                        ret = ToolsFormatMessage(@MsgCouldntStartExtApp);
+		    }
+		} else {
+		    MemFree(extraData);
+		    MemFree(alb);
+                    ret = ToolsFormatMessage(@MsgCouldntStartExtApp);
+		}
+	    } else {
+		MemFree(alb);
+                ret = ToolsFormatMessage(@MsgCouldntStartExtApp);
+	    }
+	} else {
+	    MemFree(alb);
+            ret = ToolsFormatMessage(@MsgCouldntStartExtApp);
+	}
+    } else {
+        ret = ToolsFormatMessage(@MsgNoExtApp);
+    }
+
+    req->URB_message = ret;
+    req->URB_extraData = 0;
+    req->URB_errorCode = 0;
+    MemUnlock(request);
+    return rcode;
+}
+
+#pragma argsused
+entry_URLDrvAbort URLDrvAbort
+{
+    /* do nothing */
+}
+
+#pragma argsused
+entry_URLDrvInfo URLDrvInfo
+{
+    return memcpy(buf, protocolList, protocolSize);
+}
+
+entry_URLDrvFlush URLDrvFlush
+{
+}
+
+#pragma argsused
+Boolean _pascal _export LibraryEntry(LibraryCallType ty, GeodeHandle client)
+{
+     if (ty == LCT_ATTACH)
+     {
+          BuildAssocList();
+          EC_ERROR_IF(protocolSize > URL_INFO_MAXBUF*sizeof(TCHAR), -1);
+     }
+
+     return FALSE;
+}

@@ -1,0 +1,467 @@
+/********************************************************************
+ *
+ *      Copyright (c) Geoworks 1996-97 -- All Rights Reserved.
+ *
+ * PROJECT:     GEOS Sample Applications
+ * MODULE:      Application Launcher
+ * FILE:        launch.goc
+ *
+ * AUTHOR:      Nathan Fiedler
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      11/12/95        Initial version of BRLauncher
+ *      NF      11/14/96        Turned into Launch sample
+ *      NF      1/10/97         Added IACP launch method
+ *
+ * DESCRIPTION:
+ *      This will launch a particular application. It is an example
+ *      of how to use FileEnum, UserLoadApplication, and GeodeFind.
+ *      As an alternative, the sample also illustrates the use of
+ *      IACP (Inter-Application Communication Protocol) to launch
+ *      an application.
+ *
+ *      This sample is useful if you'd like to know how to launch
+ *      an application from within your application. This sample
+ *      will even bring a running app to the foreground.
+ *
+ *      This sample provides two ways to launch the application.
+ *      The first method is described below, following the by the
+ *      second method.
+ *
+ *      First Method:
+ *      We can use FileEnum to verify the existence of a particular
+ *      application in the World directory. Once we've verified that
+ *      the application exists we use UserLoadApplication to start
+ *      the application.
+ *
+ *      If the application we're launching is already running then
+ *      we'll need to bring it to the top. We do this by using
+ *      GeodeFind to get the GeodeHandle of the running app. Then
+ *      we get the application optr using GeodeGetAppObject.
+ *      With that we can send MSG_GEN_BRING_TO_TOP.
+ *
+ *      Second Method:
+ *      We can use IACP to force another application to start. This
+ *      method is far simpler and easier, but it requires knowing the
+ *      geode token of the application you want to launch. You can
+ *      retrieve the token of a geode using FileGetPathExtAttributes.
+ *
+ * RCS STAMP:
+ *      $Id: launch.goc,v 1.1 97/04/04 16:41:42 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    #include <Ansi/string.h>  /* strcpy */
+
+/********************************************************************
+ *              Class Definitions
+ *******************************************************************/
+    @class AppLaunchProcessClass, GenProcessClass;
+      /*
+       * Launch using UserLoadApplication.
+       */
+    @message void MSG_APPLAUNCH_PROCESS_LOAD_APP_START();
+      /*
+       * Launch using IACP.
+       */
+    @message void MSG_APPLAUNCH_PROCESS_IACP_START();
+    @endc;
+
+/********************************************************************
+ *              Class Declarations
+ *******************************************************************/
+    @classdecl AppLaunchProcessClass, neverSaved;
+
+/********************************************************************
+ *              Global Variable Definitions
+ *******************************************************************/
+      /*
+       * launchError - TRUE if the application could not
+       *               be launched using UserLoadApplication.
+       */
+    Boolean launchError;
+
+/********************************************************************
+ *              UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *              Application Resource
+ *******************************************************************/
+@start Application;
+
+@object GenApplicationClass AppLaunchApp = {
+    GI_visMoniker = list { @AppLaunchTextMoniker };
+    GI_comp = @AppLaunchPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @AppLaunchPrimary;
+}
+
+@visMoniker AppLaunchTextMoniker = "App Launcher";
+
+@end Application;
+
+/********************************************************************
+ *              Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass AppLaunchPrimary = {
+    GI_comp = @AppLaunchUserLoadStart,
+              @AppLaunchIACPStart;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+  /*
+   * This trigger will start the other application
+   * using UserLoadApplication.
+   */
+@object GenTriggerClass AppLaunchUserLoadStart = {
+    GI_visMoniker = "Start via UserLoadApplication";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_APPLAUNCH_PROCESS_LOAD_APP_START;
+}
+
+  /*
+   * This trigger will start the other application
+   * using Inter-Application Communication Protocol.
+   */
+@object GenTriggerClass AppLaunchIACPStart = {
+    GI_visMoniker = "Start via IACP";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_APPLAUNCH_PROCESS_IACP_START;
+}
+
+@end Interface;
+
+/********************************************************************
+ *              Strings Resource
+ * Localizable string chunks.
+ *******************************************************************/
+@start Strings, data;
+
+@chunk char acrBRErrMsg[] = "Application couldn't be launched!";
+@localize { "An error message indicating application could not \
+be started." };
+
+@end Strings;
+
+/********************************************************************
+ *              Code for AppLaunchProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_APPLAUNCH_PROCESS_LOAD_APP_START
+ ********************************************************************
+ * SYNOPSIS:     This starts up the other application by using the
+ *               routine UserLoadApplication. If the application is
+ *               already running then we will cause it to come to
+ *               the top (above other apps).
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Look for the application and start it up if we
+ *               find it. If it's already running then bring it to
+ *               the foreground using MSG_GEN_BRING_TO_TOP.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      11/11/95        Displayed message, then quit.
+ *      EB      11/17/95        Removed the MSG_META_QUIT send.
+ *      NF      11/14/96        Added use of GeodeFind and
+ *                              MSG_GEN_BRING_TO_TOP.
+ *******************************************************************/
+@method AppLaunchProcessClass, MSG_APPLAUNCH_PROCESS_LOAD_APP_START
+{
+      /*
+       * FE_params       - FileEnum parameters.
+       * FE_returnAttrs  - What FileEnum should return about the files
+       *                   it finds.
+       * FE_matchAttrs   - What attributes FileEnum should look for.
+       * FE_name         - The name of the file to find.
+       * FE_buffer       - The block to return the enum results in.
+       * FE_numExtra     - The number of files found beyond what we
+       *                   asked for.
+       * hmemAppBlock    - AppLaunchBlock used to start application.
+       * pmemAppBlock    - Pointer to the AppLaunchBlock.
+       * appError        - Error returned by UserLoadApplication.
+       * hgeoApplication - GeodeHandle of the application if launched.
+       * odApplication   - Optr to application object of the app.
+       */
+    FileEnumParams   FE_params;
+    FileExtAttrDesc  FE_returnAttrs[2];
+    FileExtAttrDesc  FE_matchAttrs[2];
+    FileLongName     FE_name;
+    MemHandle        FE_buffer;
+    word             FE_numExtra;
+    MemHandle        hmemAppBlock;
+    AppLaunchBlock * pmemAppBlock;
+    GeodeLoadError   appError;
+    GeodeHandle      hgeoApplication;
+    optr             odApplication;
+
+      /*
+       * Switch to application directory.
+       * Set the attributes we want returned.
+       * We have to ask for something in return from
+       * FileEnum or it will exit without searching.
+       */
+    FileSetCurrentPath( SP_APPLICATION, "." );
+    FE_returnAttrs[0].FEAD_attr  = FEA_DOS_NAME;
+    FE_returnAttrs[0].FEAD_value = 0;
+    FE_returnAttrs[0].FEAD_size  = DOS_DOT_FILE_NAME_LENGTH_ZT;
+    FE_returnAttrs[0].FEAD_name  = 0;
+    FE_returnAttrs[1].FEAD_attr  = FEA_END_OF_LIST;
+    FE_returnAttrs[1].FEAD_value = 0;
+    FE_returnAttrs[1].FEAD_size  = 0;
+    FE_returnAttrs[1].FEAD_name  = 0;
+
+      /*
+       * We're going to launch the Preferences application.
+       * You can put here whatever application name you want
+       * to launch.
+       */
+#if ERROR_CHECK
+    strcpy( FE_name, "EC Preferences" );
+#else
+    strcpy( FE_name, "Preferences" );
+#endif
+
+      /*
+       * Find the file based on the name.
+       */
+    FE_matchAttrs[0].FEAD_attr  = FEA_NAME;
+    FE_matchAttrs[0].FEAD_value = &FE_name;
+    FE_matchAttrs[0].FEAD_size  = sizeof( FileLongName );
+    FE_matchAttrs[0].FEAD_name  = 0;
+    FE_matchAttrs[1]            = FE_returnAttrs[1];
+
+      /*
+       * Search only for GEOS executables.
+       * We only want one result returned (FEP_bufSize = 1)
+       * since we just want to confirm that the application
+       * exists in this directory.
+       */
+    FE_params.FEP_searchFlags   = FESF_GEOS_EXECS;
+    FE_params.FEP_matchAttrs    = &FE_matchAttrs[0];
+    FE_params.FEP_returnAttrs   = &FE_returnAttrs[0];
+    FE_params.FEP_returnSize    = DOS_DOT_FILE_NAME_LENGTH_ZT;
+    FE_params.FEP_bufSize       = 1;
+    FE_params.FEP_skipCount     = 0;
+    FE_params.FEP_callback      = 0;
+    FE_params.FEP_callbackAttrs = 0;
+    FE_params.FEP_cbData1       = 0;
+    FE_params.FEP_cbData2       = 0;
+    FE_params.FEP_headerSize    = 0;
+    FE_buffer                   = 0;
+    FE_numExtra                 = 0;
+
+      /*
+       * Find the file.
+       * We don't need the results so free the block.
+       */
+    if ( FileEnum( &FE_params, &FE_buffer, &FE_numExtra ) ) {
+EC(     ECCheckMemHandle( FE_buffer ); )
+        MemFree( FE_buffer );
+
+          /*
+           * Create the AppLaunchBlock and have it set to
+           * some standard defaults. The ALB_mode will be
+           * set to whatever we passed into IACPCreateDefaultLaunchBlock
+           * and ALB_diskHandle will be set to SP_DOCUMENT.
+           * All other flags will be zero.
+           */
+        hmemAppBlock = IACPCreateDefaultLaunchBlock(
+            MSG_GEN_PROCESS_OPEN_APPLICATION );
+
+          /*
+           * Now let's put in the name of the application to
+           * launch, as well as the DiskHandle of where the
+           * application is stored.
+           */
+EC(     ECCheckMemHandle( hmemAppBlock ); )
+        pmemAppBlock = MemLock( hmemAppBlock );
+EC(     ECCheckBounds( pmemAppBlock ); )
+        strcpy( pmemAppBlock->ALB_appRef.AIR_fileName, FE_name );
+        pmemAppBlock->ALB_appRef.AIR_diskHandle = SP_APPLICATION;
+
+          /*
+           * Load the application.
+           */
+        hgeoApplication = UserLoadApplication( 0,
+                                               0,
+                                               hmemAppBlock,
+                                               FE_name,
+                                               SP_APPLICATION,
+                                               &appError );
+          /*
+           * If there's an error, the GeodeHandle returned
+           * will be -1 (0xFFFF).
+           */
+        if ( 0xFFFF == hgeoApplication ) {
+            if ( GLE_NOT_MULTI_LAUNCHABLE == appError ) {
+                  /*
+                   * The application is already running and
+                   * is not multi-launchable. You can use
+                   * GeodeFind to get the GeodeHandle of the
+                   * application.
+                   * You'll need to know the permanent name
+                   * of the app when using GeodeFind. You can
+                   * find out by running the app and seeing what
+                   * name Swat displays when it prints out
+                   * "Thread 0 created for patient <name>".
+                   */
+                hgeoApplication = GeodeFind( "prefmgr", 7, 0, 0 );
+EC(             ECCheckGeodeHandle( hgeoApplication ); )
+                odApplication = GeodeGetAppObject( hgeoApplication );
+EC(             ECCheckLMemOD( odApplication ); )
+                @send odApplication::MSG_GEN_BRING_TO_TOP();
+                launchError = FALSE;
+            }
+            else {
+                launchError = TRUE;
+            }
+        }
+        else {
+            launchError = FALSE;
+        }
+    }
+    else {
+        launchError = TRUE;
+    }
+    if ( TRUE == launchError ) {
+        MemLock( OptrToHandle( @acrBRErrMsg ) );
+        UserStandardDialog( (char*)0,
+                            (char*)0,
+                            (char*)0,
+                            (char*)0,
+                            LMemDeref( @acrBRErrMsg ),
+                            ( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET ) |
+                            ( GIT_NOTIFICATION <<
+                              CDBF_INTERACTION_TYPE_OFFSET ) );
+        MemUnlock( OptrToHandle( @acrBRErrMsg ) );
+    }
+} /* MSG_APPLAUNCH_PROCESS_LOAD_APP_START */
+
+/********************************************************************
+ *              MSG_APPLAUNCH_PROCESS_IACP_START
+ ********************************************************************
+ * SYNOPSIS:     This starts up the other application by using IACP.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call IACPCreateDefaultLaunchBlock to create
+ *               the default AppLaunchBlock for starting the other
+ *               application. Set the connection flags so the app
+ *               will be started correctly. Then call IACPConnect
+ *               using the geode token of the application we want
+ *               to launch. (The geode token is the specifier for the
+ *               server list we want to become a client of.) Then once
+ *               a connection has been made shut it down so the user
+ *               can exit both applications manually.
+ *
+ *               Notice that even though we've closed the IACP
+ *               connection, the other app remains running. That's
+ *               because we've told the other app to be launched in
+ *               a "user interactible" mode using the
+ *               IACPSM_USER_INTERACTIBLE flag.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      1/9/97          Initial version
+ *******************************************************************/
+@method AppLaunchProcessClass, MSG_APPLAUNCH_PROCESS_IACP_START
+{
+      /*
+       * serverCount         - Number of servers on the specified list.
+       * serverGeodeToken    - You can dynamically obtain a geode's
+       *                       GeodeToken with the routine
+       *                       FileGetPathExtAttributes(), with
+       *                       parameter attr = FEA_CREATOR.
+       * connectionFlags     - Flags to modify how the IACP connection
+       *                       is made.
+       * iacpConnectionToken - The IACP connection token. Use this
+       *                       to refer to the connection.
+       * launchBlock         - Handle of AppLaunchBlock.
+       */
+    word           serverCount;
+    GeodeToken     serverGeodeToken = { 'P', 'M', 'G', 'R',
+                                        MANUFACTURER_ID_GEOWORKS };
+    word           connectionFlags;
+    IACPConnection iacpConnectionToken;
+    MemHandle      launchBlock;
+
+      /*
+       * Tell IACP to force the application to launch.
+       * If you pass IACPCF_OBEY_LAUNCH_MODEL you must
+       * provide an AppLaunchBlock with the default values
+       * as described in the Concepts book, section 6.6.
+       * Further, if you use IACPCF_OBEY_LAUNCH_MODEL you
+       * must also use IACPSM_USER_INTERACTIBLE because the
+       * application is being launched in "application" mode.
+       * See below for more info.
+       *
+       * You must also pass the IACPCF_FIRST_ONLY flag since
+       * the application we're trying to launch may already
+       * be running.
+       */
+    connectionFlags = IACPCF_OBEY_LAUNCH_MODEL |
+                      IACPCF_FIRST_ONLY |
+                      IACPSM_USER_INTERACTIBLE;
+
+      /*
+       * Create the default AppLaunchBlock to start the
+       * application in "application" mode (as opposed to
+       * engine mode in which there would be no user
+       * interface displayed) so the user can interact with
+       * the other application once it's started.
+       */
+    launchBlock = IACPCreateDefaultLaunchBlock(
+        MSG_GEN_PROCESS_OPEN_APPLICATION );
+
+      /*
+       * Make the connection which will force the other
+       * application to be started. Then check to see that
+       * it worked.
+       */
+    iacpConnectionToken = IACPConnect( &serverGeodeToken,
+                                       connectionFlags,
+				       launchBlock,
+                                       NullOptr,
+                                       &serverCount );
+    if( IACP_NO_CONNECTION != iacpConnectionToken ) {
+          /*
+           * Make sure to shut down the connection
+           * before allowing the user to quit either
+           * application.
+           */
+	IACPShutdown( iacpConnectionToken, NullOptr );
+    }
+    else {
+          /*
+           * Somehow something didn't work. Most likely
+           * the application we want to launch is not in
+           * any of the usual places in the system
+           * (i.e. in WORLD or SYSTEM/SYSAPPL).
+           */
+        MemLock( OptrToHandle( @acrBRErrMsg ) );
+        UserStandardDialog( (char*)0,
+                            (char*)0,
+                            (char*)0,
+                            (char*)0,
+                            LMemDeref( @acrBRErrMsg ),
+                            ( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET ) |
+                            ( GIT_NOTIFICATION <<
+                              CDBF_INTERACTION_TYPE_OFFSET ) );
+        MemUnlock( OptrToHandle( @acrBRErrMsg ) );
+    }
+} /* MSG_APPLAUNCH_PROCESS_IACP_START */
+

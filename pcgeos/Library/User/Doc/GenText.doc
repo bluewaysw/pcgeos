@@ -1,0 +1,623 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Objects
+FILE:		gTextC.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Chris	4/28/92		Initial version
+
+DESCRIPTION:
+	Object definitions for GenTextClass.
+
+	$Id: GenText.doc,v 1.1.34.1 97/03/29 03:38:05 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef __GTEXTC
+
+StartLibrary	ui
+
+
+GenTextClass	class GenClass
+		uses VisTextClass
+		
+; Clarification of usage of GenAttributes for this object
+;
+;	GA_TARGETABLE:1
+; 		Set if this object should take the "targetable" exclusive when 
+;		it is clicked in or selected.  This object would then be 
+;		returned in a query by the application to find out what the 
+;		current "target" object is.  Normally set used for data which 
+;		may be operated on, clear for information-only, or for setting 
+;		up commands.
+
+
+
+;------------------------------------------------------------------------------
+;	VisText/GenText common messages
+;------------------------------------------------------------------------------
+;
+; GenTextClass is guaranteed to always build out into a completely functioning
+; subset of VisTextClass.  With the exception of geometry behavior, you can
+; assume that they will behave the same.  You may send any VisTextClass message
+; to a GenText object to manipulate the text, add styles, etc.  See VisTextClass
+; for more details on the common text messages.
+;
+
+;------------------------------------------------------------------------------
+;	GenText specific messages
+;------------------------------------------------------------------------------
+
+MSG_GEN_TEXT_SET_ATTRS			message
+;
+; Allows setting the object's generic attributes.  Can only be sent when the
+; text object is not usable.
+;
+; Context:	Can be sent any time.
+; Source:	No restrictions
+; Destination:	Any non-usable GenText object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cl -- GenTextAttrs to set
+;		ch -- GenTextAttrs to clear
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_TEXT_GET_ATTRS			message
+;
+; Allows retrieval of the object's generic attributes.  
+;
+; Context:	Can be sent any time.
+; Source:	No restrictions
+; Destination:	Any GenText object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	al -- GenTextAttrs 
+;		ah, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_TEXT_SET_INDETERMINATE_STATE	message
+;
+; Allows setting the object's indeterminate state.    Does not affect the stored
+; text.  See GVSF_INDETERMINATE for more info.
+;
+; Context:	Can be sent any time
+; Source:	No restrictions
+; Destination:	Any GenText object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cx -- non zero to set the text indeterminate
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_TEXT_IS_INDETERMINATE		message
+; 
+; A boolean message for querying the object to see if its selection is 
+; currently indeterminate.  See GVSF_INDETERMINATE for more info.
+;
+; Context:	Can be sent any time
+; Source:	No restrictions
+; Destination:	Any GenText object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	carry set if item group is indeterminate.
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_TEXT_SET_MODIFIED_STATE		message
+;
+; Texts are normally marked as "not modified" anytime their state is
+; set, marked "modified" anytime the user interacts with them, and marked
+; "not modified" again on MSG_APPLY.  This primitive provides a way to 
+; control the modified status outside of these events.
+;
+; Pass:		cx -- non-zero to mark modified, zero to mark not modified.
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+
+MSG_GEN_TEXT_IS_MODIFIED			message
+; 
+; A boolean message for querying the object to see if its text has been
+; modified by the user since the last apply.  See GVSF_MODIFIED for more 
+; info.
+;
+; Context:	Can be sent any time
+; Source:	No restrictions
+; Destination:	Any GenText object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	carry set if item group is modified.
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_TEXT_SEND_STATUS_MSG		message
+;
+; Causes text object to send out the "Status" message as specified in
+; ATTR_GEN_TEXT_STATUS_MSG.  The message will include the current
+; state of the object, as well as the "change" flag we pass here.
+; This message will still function even if the object is not enabled 
+; not usable.
+; 
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenTextObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		cx -- non-zero if GVSF_MODIFIED bit should be passed set in
+;		      status message
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+;------------------------------------------------------------------------------
+;	Other instance data Messages
+;------------------------------------------------------------------------------
+
+MSG_GEN_TEXT_GET_DESTINATION		message
+;
+; Returns the current destination object, as specified in GTI_destination.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenText object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	^lcx:dx -- the current destination object
+;		ax, bp -- destroyed
+;
+
+MSG_GEN_TEXT_SET_DESTINATION		message
+;
+; Sets a new destination object, as specified in GTI_destination.  Apply
+; messages and status messags are sent out to this object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenText object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		^lcx:dx -- destination object
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_TEXT_GET_APPLY_MSG		message
+; 
+; Returns the current apply message for the text object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenText object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	ax -- the current apply message
+;		cx, dx, bp -- destroyed
+;
+
+
+MSG_GEN_TEXT_SET_APPLY_MSG		message
+; 
+; Sets a new apply message for the text object.  
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenText object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cx -- new notification message
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+
+
+MSG_GEN_TEXT_SET_FROM_ITEM_GROUP	message
+;
+; Used, with ATTR_GEN_TEXT_RUNS_ITEM_GROUP, sets the user text, based on the 
+; identifier passed from the item group specified in the above attribute.  The
+; text will attempt to convert the moniker of the specified item into text.
+;
+; Pass:		cx -- item identifier
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+;---------------------------------------------
+;		Hints
+;---------------------------------------------
+Hints		= first GenTextMethods
+
+
+ATTR_GEN_TEXT_STATUS_MSG	vardata		word
+;
+;	Allows a message to be specified for receiving notification of the
+;	gadget's current status following user interaction, or the app's
+;	forcing of the message via MSG_GEN_TEXT_SEND_STATUS_MSG.
+;	attribute takes a word argument specifying the message to be sent out.
+;	The parameters for the notification message differs from the normal
+; 	apply notification:
+;
+;	 Pass:	bp -- GenTextStateFlags
+;		      GVSF_MODIFIED will be set if a user activation has
+;		      just changed the status of the object.  If message is a 
+;		      result of MSG_GEN_TEXT_SEND_STATUS_MSG being sent, 
+;	  	      then this bit will hold the modified state text passed in
+;		      that message.
+;	 Return: nothing
+;		 ax, cx, dx, bp -- destroyed
+;
+
+HINT_TEXT_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS	vardata	
+	;Instructs a textually oriented GenText object to navigate to the next
+	;field when the user presses return.  The default behavior is to 
+	;activate the object with the interaction default (usually an apply 
+	;trigger of some kind).
+
+HINT_TEXT_CUSTOM_RETURN_PRESS				vardata		word
+	;Allows a textually oriented GenText object to send the specified 
+	;message to the destination when the user presses return.  The default 
+	;behavior is to activate the object with the interaction default 
+	;(usually an apply trigger of some kind).  
+
+ATTR_GEN_TEXT_SET_MODIFIED_ON_REDUNDANT_SELECTION	vardata
+	; In GenText objects that are not currently indeterminate in state,
+	; if the user does some action that doesn't change the internal text
+	; of the object (i.e. pressing return without changing the textual
+	; text, incrementing or decrementing when at the beginning or end of
+	; the object's range) by default no change in state takes place, and
+	; thus is not normally considered to be a "modification".  Setting this 
+	; attribute, however, will cause the group to be marked as modified in 
+	; such situations. The apply message will then be sent out in response 
+	; to a subsequent MSG_GEN_APPLY sent to the object.
+
+
+
+
+ATTR_GEN_TEXT_SELECTABLE		vardata
+	; Set if text should be selectable.  By default, non-editable text is
+	; not selectable.
+
+ATTR_GEN_TEXT_LARGE			vardata
+	; Specifies the large-text data structure.   This should be used any
+	; time you need your GenText object to contain more than 64K of text.
+	; See VisTextClass for more info.
+
+HINT_TEXT_WASH_COLOR		vardata ColorQuad	
+	; Sets wash, or background color. Followed by ColorQuad structure
+	; giving exact color desired.   For example, to draw a blue background
+	; color:
+	;
+	;	  HINT_TEXT_WASH_COLOR {
+	;	    ColorQuad <
+	;		    C_BLUE,		;SCPI_index
+        ;                   CF_INDEX,        	;SCPI_info.
+	;		    0, 0		;SCPI_unused
+	;	    >
+    	;    	   }
+	;	
+	; In Motif, text is usually drawn in the window's background color by
+	; default.
+
+HINT_TEXT_WHITE_WASH_COLOR	vardata	
+	; Sets wash, or background color to WHITE, a common choice.  In motif,
+	; the default color is the window's background color.
+
+ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR		vardata	VisTextDefaultCharAttr
+	; Specifies simple character attributes for the text, i.e. the text
+	; style, text color, text font and size.  An example:
+	;
+	;	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR {
+	;	    VisTextDefaultCharAttr <
+	;		0, 0, 0,		/* underline, bold, italic */
+	;		0, 			/* Unused */
+	;		C_RED,			/* color */
+	;		VTDS_12,		/* size */
+	;		VTDF_BERKELEY		/* font */
+	;	    >
+	;	}
+	;
+	; Will put the text in Berkeley 12 and be drawn in red.  
+
+ATTR_GEN_TEXT_DEFAULT_PARA_ATTR		vardata VisTextDefaultParaAttr
+	; A simple way to add basic paragraph attributes for the text, i.e. the
+	; justification and spacing of fixed interval tabs.  An example:
+	;
+	;	ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+	;		word	DEF_PARA_ATTR_RIGHT
+	;	}
+	;
+	; right justifies the text.  
+
+ATTR_GEN_TEXT_CHAR_ATTR			vardata	lptr 
+	; Specifies a chunk that holds a single set of complex character 
+	; attributes for the entire text.  See VisTextClass for more info.
+
+ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS		vardata	lptr 
+	; Specifies a chunk that holds multiple character attribute runs for
+	; the text object.  See VisTextClass for more info.
+
+ATTR_GEN_TEXT_PARA_ATTR			vardata	lptr 
+	; Specifies a chunk that holds a single set of complex paragraph
+	; attributes that apply to the entire object.  See VisTextClass for
+	; more info.
+
+ATTR_GEN_TEXT_MULTIPLE_PARA_ATTR_RUNS		vardata lptr
+	; Specifies a chunk that holds a multiple paragraph attribute
+	; runs for the text object.  See VisTextClass for more info.
+
+
+GenTextCustomMargins struc
+	GTCM_lrMargin	byte		;margin on left and right of text	
+	GTCM_rbMargin	byte		;margin on top and bottom of text
+GenTextCustomMargins ends
+
+HINT_TEXT_CUSTOM_MARGINS	vardata		GenTextCustomMargins
+	; Sets up custom margins for the text object, for adding empty space
+	; around the text.  Margins cannot be made smaller than the standard
+	; specific UI margins.  An example:
+	;
+	;	HINT_TEXT_CUSTOM_MARGINS {
+	;		GenTextCustomMargins <10, 10>
+	;	}
+	;
+	; To have a text object with a 10 pixel margin around the text area.
+	; To get the specific UI default for one or the other of the two
+	; arguments, put a zero for that argument.
+
+ATTR_GEN_TEXT_NOTIFY_ATTR_CHANGE	vardata
+	; Set if MSG_TEXT_STYLE_RULER_MAY_HAVE_CHANGED should be sent to
+	; the text object's OD.
+
+HINT_TEXT_AUTO_HYPHENATE 	vardata		
+	; Auto-hyphenates text.
+
+HINT_TEXT_SELECT_TEXT 		vardata		
+	; Select text initially.
+
+HINT_TEXT_CURSOR_AT_START 	vardata		
+	; Position cursor at start of text initially.
+
+HINT_TEXT_CURSOR_AT_END 	vardata		
+	; Position cursor at end of text initially.
+			
+HINT_TEXT_FRAME			vardata		
+	; Frame the text, if possible.
+
+HINT_TEXT_NO_FRAME		vardata		
+	; Don't frame the text, if possible.
+
+HINT_TEXT_ALLOW_UNDO		vardata		
+	; Allow undo on this object.
+
+HINT_TEXT_ALLOW_SMART_QUOTES 	vardata		
+	; Allow smart quotes on the text.
+
+;
+; Key filter hints.  Keeps certain characters from being inserted when the user
+; types them, or when added via a paste operation.
+;
+HINT_TEXT_ALPHA			vardata	
+	; Allows alpha characters and spaces.
+
+HINT_TEXT_NUMERIC		vardata	
+	; Allows numeric characters, spaces.
+
+HINT_TEXT_SIGNED_NUMERIC	vardata	
+	; Allows signed numeric characters, spaces.
+
+HINT_TEXT_SIGNED_DECIMAL		vardata	
+	; Allows numeric characters, decimal points, spaces.
+
+HINT_TEXT_FLOAT_DECIMAL		vardata	
+	; Allows numeric characters, decimal points, spaces, E's.
+
+HINT_TEXT_ALPHA_NUMERIC		vardata	
+	; Allows alphanumeric characters, spaces.
+
+HINT_TEXT_LEGAL_FILENAMES		vardata	
+	; Legal GEOS filenames characters only.
+
+HINT_TEXT_LEGAL_DOS_FILENAMES	vardata	
+	; Legal DOS filenames only.
+
+HINT_TEXT_LEGAL_DOS_PATH		vardata	
+	; Legal DOS path characters.
+
+HINT_TEXT_DATE			vardata	
+	; Allows short date characters, spaces.  Affected by any short date
+	; customizations by the user in the localization driver.
+
+HINT_TEXT_TIME			vardata	; allows time
+	; Allows time characters, spaces.  Affected by any time
+	; customizations by the user in the localization driver.
+
+HINT_TEXT_UPPERCASE_ALPHA		vardata	
+	; Allows only uppercase alpha characters and spaces.
+
+HINT_TEXT_UPPERCASE_ALPHA_NUMERIC	vardata	
+	; Allows only uppercase alpha characters, spaces, and numeric 
+	; characters.
+
+HINT_TEXT_DASHED_ALPHA_NUMERIC	vardata	
+	; Like HINT_TEXT_UPPERCASE_ALPHA_NUMERIC, but allows a dash ('-') as
+	; well.
+
+HINT_TEXT_NORMAL_ASCII		vardata
+	; Allows normal ASCII characters only (no extended ASCII characters).
+
+HINT_TEXT_LEGAL_DOS_VOLUME_NAMES	vardata	
+	; Allows legal DOS volume characters only.
+
+HINT_TEXT_DOS_CHARACTER_SET		vardata	
+	; Allows only DOS character set characters only.
+				
+HINT_TEXT_NO_SPACES			vardata	
+	; With any of the above filters, also disallows spaces if they are 
+	; allowed by default.
+
+HINT_TEXT_ALLOW_SPACES		vardata	
+	; With any of the above filters, allows spaces.
+
+ATTR_GEN_TEXT_EXTENDED_FILTER	vardata word
+	; Another Tony hint.  See corresponding hint in vTextC.def.
+
+ATTR_GEN_TEXT_TYPE_RUNS		vardata	word
+ATTR_GEN_TEXT_GRAPHIC_RUNS	vardata	word
+ATTR_GEN_TEXT_REGION_ARRAY	vardata	word
+ATTR_GEN_TEXT_STYLE_ARRAY	vardata	word
+ATTR_GEN_TEXT_NAME_ARRAY	vardata	word
+;
+; Matches vis counterparts.  Look there to see what they do (good luck).
+;
+
+ATTR_GEN_TEXT_RUNS_ITEM_GROUP		vardata		optr
+	;When the user hits return on this object, it will use its text to
+	;try to set a selection on the specified item group.  Similarly, it
+	;will set up the item group to update this object when its selection
+	;changes.
+
+HINT_GEN_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS	vardata
+	;Keeps text object from increasing their height on pen-only systems, as
+	;they do by default.
+
+
+GenTextAttrs	record	
+	GTA_SINGLE_LINE_TEXT:1
+;		Indicates text has no or 1 <CR> only.  Scrolling in OL gets 
+;		implemented horizontally in OL if this is set.
+;
+	GTA_USE_TAB_FOR_NAVIGATION:1
+;		If set then TAB is used to navigate around your primary, rather
+;		than inserted in your text field.  For simple text objects
+;		you will nearly always want this.
+
+	GTA_INIT_SCROLLING:1
+;		Forces into scrolling text area with desired size set by 
+;		desiredWidth, desiredHeight.   Supercedes Other size flags.  
+;		Scrolling box is allowed to be resized vertically from height 
+;		of 1 upward.  The TDA_DESIRED_HEIGHT_IS_VIEW_MIN flag below
+;		uses the desiredHeight is a minimum height for the box. Width
+;		is determined as in a non-scrollable text object, using the 
+;		WIDTH_IS flags below.
+;
+	GTA_NO_WORD_WRAPPING:1
+;		Don't word wrap.  Example is spreadsheet function.
+;
+	GTA_ALLOW_TEXT_OFF_END:1
+; 		Set if we don't care that text may overflow past end of text 
+;		box.  
+;
+	GTA_TAIL_ORIENTED:1
+;		Set if we prefer the tail end of the text to be visible over the
+; 		top end, given that option.  In a scrolling text box, this 
+;		means we always keep the end of the tail visible while text is
+;		being added or deleted at the bottom of the text field, if the 
+;		end of the text field is currently visible.
+; 
+	GTA_DONT_SCROLL_TO_CHANGES:1
+;		Usually if there is a scrollable text field, any insertion or 
+;		deletion of text will be made visible, by scrolling the text 
+;		if necessary.   Setting this flag will turn this behaviour off,
+;		so that text can be getting inserted at the end of a document 
+;		without automatically scrolling there.
+;
+	:1
+GenTextAttrs	end
+
+
+
+GenTextStateFlags record
+	GTSF_INDETERMINATE:1,
+		;Set if the current text is indeterminate.  This means
+		;that for whatever data is being represented, there is more
+		;than one text.  GTI_text in this case should refer
+		;to the state at the beginning of the data being represented.
+
+	GTSF_MODIFIED:1,
+		;As stored in instance data, & sent in MSG_APPLY:
+		;
+		;Whether or not the object is "modified".  Cleared anytime
+		;state is set, set anytime user changes the state of
+		;the object and cleared on MSG_APPLY or MSG_GEN_TEXT_SET_TEXT.
+		;This status may further be modified using
+		;MSG_GEN_TEXT_SET_MODIFIED_STATE.  It may be checked
+		;using MSG_GEN_TEXT_IS_MODIFIED.  The apply message is
+		;normally  only sent out on MSG_APPLY if this bit is non-zero,
+		;though this behavior can be overridden using
+		;ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED
+		;
+		;As sent in status message:
+		;
+		;GVSF_MODIFIED will be set if the user has done something
+		;to change the state of the item group.  If message is the 
+		;result of a MSG_GEN_TEXT_SEND_STATUS_MSG being sent, then this
+		;bit will be the text passed in that message.
+	:6
+GenTextStateFlags end
+
+
+				
+;------------------------------------------------------------------------------
+;		Variables Instance Data
+;------------------------------------------------------------------------------
+;------------------------------------------------------------------------------
+;		Instance Data
+;------------------------------------------------------------------------------
+
+GTXI_text           	lptr			
+	;The text.  To change text on the fly, use one of the many 
+	;MSG_VIS_TEXT_REPLACE_... or MSG_VIS_TEXT_APPEND_... messages, along
+	;with others.  There are many MSG_VIS_TEXT message to retrieve the
+	;text as well.
+
+GTXI_maxLength		sword			-1
+	;Maximum number of characters that can be entered.  Set and gotten
+	;via MSG_VIS_TEXT_GET_MAX_LENGTH and MSG_VIS_TEXT_SET_MAX_LENGTH.
+
+GTXI_attrs		GenTextAttrs		(GTA_USE_TAB_FOR_NAVIGATION)
+	;Text attributes, gotten or changed via MSG_GEN_TEXT_GET_ATTRS and
+	;MSG_GEN_TEXT_SET_ATTRS, respectively.
+
+GTXI_stateFlags		GenTextStateFlags	0
+	;GenTextStates, for the indeterminate and user-modified flags.
+	;These can be set via MSG_GEN_TEXT_SET_INDETERMINATE_STATE and
+	;MSG_GEN_TEXT_SET_MODIFIED_STATE.  Indeterminate state can be changed
+	;and modified state cleared automatically when sending a MSG_GEN_TEXT-
+	;SET_TEXT.   The states of these flags are passed in
+	;notifications, or can be obtained via MSG_GEN_TEXT_IS_MODIFIED 
+	;and MSG_GEN_TEXT_IS_INDETERMINATE.
+
+GTXI_destination		optr
+	;The destination of any messages sent out by the object.  This can
+	;be set via MSG_GEN_TEXT_SET_DESTINATION, and retrieved via
+	;MSG_GEN_TEXT_GET_DESTINATION.
+
+GTXI_applyMsg		word			0
+	;Message to send out to the destination on MSG_APPLY.  This message can
+	;be set via MSG_GEN_TEXT_SET_APPLY_MSG and obtained via MSG_GEN_TEXT_-
+	;GET_APPLY_MSG.  The arguments passed in the notify message are as 
+	;follows:
+	;
+	; Pass:		bp low -- GenTextStateFlags
+	; Return:	nothing
+	;		ax, cx, dx, bp -- destroyed
+	;
+
+
+GenTextClass	endc
+
+
+EndLibrary	ui

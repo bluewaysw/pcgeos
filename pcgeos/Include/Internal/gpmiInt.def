@@ -1,0 +1,126 @@
+COMMENT @----------------------------------------------------------------------
+
+  Copyright (c) 1999-2000 Breadbox Company Company -- All Rights Reserved
+
+PROJECT:	GEOS-PM
+MODULE:		Loader
+FILE:		gpmiInt.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	LES	12/15		Initial version
+
+DESCRIPTION:
+	Header file to define internal GPMI structures.
+
+	$Id: gpmiInt.def$
+------------------------------------------------------------------------------@
+
+; Constants
+
+GPMI_NULL_SELECTOR = 0
+GPMI_NUM_SELECTORS = 7680		; Selectors 0 to 0xF000 are tracked
+GPMI_HIGH_SELECTOR_VALUE = 0F000h	; Selectors must be below this value
+					; for GEOS address/selector compatibility
+
+; Internal Data types used by the GPMI
+
+GPMISelectorType etype byte
+GPMI_SELECTOR_TYPE_NOT_USED		enum	GPMISelectorType
+GPMI_SELECTOR_TYPE_EMPTY		enum	GPMISelectorType
+GPMI_SELECTOR_TYPE_MEMORY		enum	GPMISelectorType
+GPMI_SELECTOR_TYPE_ALIAS		enum	GPMISelectorType
+GPMI_SELECTOR_TYPE_PHYSICAL_ADDRESS	enum	GPMISelectorType
+GPMI_SELECTOR_TYPE_REAL_SEGMENT		enum	GPMISelectorType
+GPMI_SELECTOR_TYPE_NOT_PRESENT		enum	GPMISelectorType
+
+; GPMISelectorFlags store any bits of data that are needed to mark
+; the various selectors (not currently used).
+GPMISelectorFlags record
+	; Allocation flag used to denote memory attached to selector
+	GPMISF_allocated:1
+
+	; Flag used to note that this is a code segment (even when it
+	; is modifiable)
+	GPMISF_isCode:1
+	GPMISF_isNotPresent:1
+	:5
+GPMISelectorFlags end
+
+; GPMISelector declares an entry per selector for containing additional
+; data.  Most particular, it keeps the 32-bit handle returned by the DPMI
+; controller for handling blocks of memory attached to selectors.  We
+; assume a one to one association unless an alias is being used (and then
+; it assumes that it does not control the memory).
+GPMISelector struct
+	; The selector type determines what the rest of the data contains
+	; A NOT_USED selector is a slot that is not available for use
+	; An EMPTY selector is one that's allocated but has no purpose
+	; A MEMORY selector is one that is allocated in memory
+	; A ALIAS is a selector that is linked to another existing selector
+	; A PHYSICAL_ADDRESS selector has had its placed mapped to a very
+	;	precise location in the computer's memory.
+	GPMIS_type		GPMISelectorType
+	GPMIS_flags		GPMISelectorFlags
+
+	; * If the selector is a NOT_USED selector, all data should
+	;   be zero.
+	; * If the selector is a MEMORY selector, the
+	;   data1:data2 is what was returned by the DPMI driver for
+	;   later accesses (especially needed for freeing the memory).
+	; * If the selector is an EMPTY selector, no
+	;   data items are used
+	; * If the selector is an ALIAS selector, the value
+	;   data1 is the selector being aliased.
+	; * If the selector is a PHYSICAL_ADDRESS, data1 and data2
+	;   contains the physical address.
+	; * If the selector is a REAL_SEGMENT, data1 is the segment addr
+	; * If the selector is NOT_PRESENT, data1 and data2 are always zero 
+	GPMIS_data1		word
+	GPMIS_data2		word
+
+	; Always 0
+	GPMIS_reserved 		word
+GPMISelector ends
+
+SELECTOR_INDEX_MASK	= 0FFF8h
+
+DPMI_FUNC_ALLOCATE_DESCRIPTOR			= 0000h
+DPMI_FUNC_FREE_DESCRIPTOR			= 0001h
+DPMI_FUNC_SEGMENT_TO_DESCRIPTOR			= 0002h
+DPMI_FUNC_SET_DESCRIPTOR_BASE			= 0007h
+DPMI_FUNC_SET_DESCRIPTOR_LIMIT			= 0008h
+DPMI_FUNC_CREATE_CODE_DESCRIPTOR_ALIAS		= 000Ah
+DPMI_FUNC_GET_DESCRIPTOR			= 000Bh
+DPMI_FUNC_SET_DESCRIPTOR			= 000Ch
+
+DPMI_FUNC_GET_EXCEPTION_HANDLER			= 0202h
+DPMI_FUNC_SET_EXCEPTION_HANDLER			= 0203h
+DPMI_FUNC_GET_PROTECTED_MODE_INTERRUPT_HANDLER	= 0204h
+DPMI_FUNC_SET_PROTECTED_MODE_INTERRUPT_HANDLER	= 0205h
+
+DPMI_FUNC_GET_MEMORY_INFORMATION		= 0500h
+DPMI_FUNC_ALLOCATE_MEMORY_BLOCK			= 0501h
+DPMI_FUNC_FREE_MEMORY_BLOCK			= 0502h
+DPMI_FUNC_RESIZE_MEMORY_BLOCK			= 0503h
+
+DPMI_FUNC_GET_PAGE_SIZE				= 0604h
+
+DPMI_FUNC_MAP_PHYSICAL_ADDRESS			= 0800h
+
+DPMIInfoStruct	struct
+	DPMIIS_largestFreeBlock		dword
+	DPMIIS_maxUnlockedPageAlloc	dword
+	DPMIIS_maxLockedPageAlloc	dword
+	DPMIIS_linearAddrSpaceInPages	dword
+	DPMIIS_totalUnlockedPages	dword
+	DPMIIS_numberPages		dword
+	DPMIIS_totalPhysicalPages	dword
+	DPMIIS_freeLinearAddrPages	dword
+	DPMIIS_sizePagingFilePages	dword
+	DPMIIS_reserved1		dword
+	DPMIIS_reserved2		dword
+	DPMIIS_reserved3		dword
+DPMIInfoStruct	ends
+

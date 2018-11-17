@@ -1,0 +1,561 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Tiramisu
+FILE:		fax.def
+
+AUTHOR:		Jeremy Dashe, Aug  4, 1994
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jeremy	8/ 4/94		Initial revision
+
+
+DESCRIPTION:
+
+	This file contains fax-intrisic constants and structures used across
+	libraries, drivers, and applications.
+		
+	$Id: fax.def,v 1.1 97/04/04 14:25:30 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ifndef	__FAXDEF
+__FAXDEF = 1
+
+;***************************************************************************
+;*				Constants				   *
+;***************************************************************************
+
+;
+; Basic fax destination constants.  The phone number, the name of the
+; recipient(s), and the company they keep.
+;
+FAX_PHONE_NUMBER_SIZE		equ	31	; 20 + null-terminator
+FAX_NAME_SIZE			equ	101	; 100 + null-terminator
+FAX_COMPANY_NAME_SIZE		equ	51	; 50 + null-terminator
+FAX_SUBJECT_SIZE		equ	51	; 50 + null-terminator
+
+;
+; Dial assistance constants.  The sizes of the access number, long distance
+; number, and billing card number/password, which are concatenated together and
+; prepended to the fax number before dialing.
+;
+FAX_ACCESS_NUMBER_SIZE		equ	51	; 50 + null-terminator
+FAX_ACCESS_NOTE_SIZE		equ	51	; 50 + null-terminator
+FAX_LONG_DISTANCE_NUMBER_SIZE	equ	51	; 50 + null-terminator
+FAX_BILLING_CARD_SIZE		equ	51	; 50 + null-terminator
+FAX_LONG_DISTANCE_NOTE_SIZE	equ	51	; 50 + null-terminator
+
+FAX_DIAL_ASSIST_BUFFER_SIZE	equ	51	; max{ above 4 sizes }
+
+;
+; Dialing assistance and the phone number all need to be sent out in one string
+; to the modem.  Here's the size of the maximum buffer needed.
+;
+FAX_DIAL_STRING_SIZE		equ	FAX_PHONE_NUMBER_SIZE 	      + \
+					FAX_ACCESS_NUMBER_SIZE 	      + \
+					FAX_LONG_DISTANCE_NUMBER_SIZE + \
+					FAX_BILLING_CARD_SIZE
+					
+;
+; The sizes of the quick number/human readable string individual elements.
+;
+MAX_FORMATTED_NAME_BUFFER	equ	25
+MAX_FORMATTED_COMPANY_BUFFER	equ	MAX_FORMATTED_NAME_BUFFER
+MAX_FORMATTED_NUMBER_BUFFER	equ	MAX_FORMATTED_NAME_BUFFER
+FORMATTED_BUFFER_DETAILS	equ	15	; "(manual dial)" + NULL
+
+MAX_FORMATTED_QUICK_NUMBER_BUFFER	equ \
+	MAX_FORMATTED_NAME_BUFFER	  + \
+	MAX_FORMATTED_COMPANY_BUFFER	  + \
+	MAX_FORMATTED_NUMBER_BUFFER	  + \
+	FORMATTED_BUFFER_DETAILS
+
+
+;
+; The number of scanlines in the ttl line of std resolution fax.
+;
+FAX_TTL_LINE_PADDING_STD	equ	15
+
+
+;
+; The max size of strings sent just after initializing and just before
+; releasing the modem.
+;
+FAX_MAX_USER_MODEM_STRING	 equ	79
+
+;
+; The minimum wait time (seconds) before timing-out when sending faxes.
+FAX_MIN_TIMEOUT_TIME	equ	10
+;
+; The maximum wait time (seconds) before timing-out when sending faxes.
+FAX_MAX_TIMEOUT_TIME	equ	90
+;
+
+;
+; Help file for the fax preference module.
+FAX_HELP_FILE			equ	"prefFaxHelp"
+;
+; Context - in the main dialog box
+FAX_HELP_CONTEXT_MAIN_DB		equ	"mainDb"
+;
+; Advanced dialog box
+FAX_HELP_CONTEXT_ADVANCED_DB		equ	"advancedDb"
+;
+; Dialing code dialog box
+FAX_HELP_CONTEXT_DIALING_CODE_DB	equ	"dialingCodeDb"
+;
+; Sender info dialog box
+FAX_HELP_CONTEXT_SENDER_INFO_DB		equ	"senderInfoDb"
+;
+
+;
+; Constants for Main DB.
+;
+; Indicates which class of driver was chosen
+FAX_CLASS_1			equ	0	; position in item group
+FAX_CLASS_2			equ	1
+
+;
+; Indicates whether the fax program will automatically answer a fax request
+FAX_NOT_AUTO_ANSWER		equ	0
+FAX_AUTO_ANSWER			equ	1
+;
+; Distinguishes the driver type being dealt with.
+FAX_INPUT_DRIVER		equ	0	; position in item group
+FAX_OUTPUT_DRIVER		equ	1
+
+;
+; Constants for Advanced DB.
+;
+; Phone line status.
+FAX_NORMAL_LINE			equ	0	; position in item group
+FAX_UNEVEN_LINE			equ	1
+FAX_POOR_LINE			equ	2
+;
+; Indicates whether fine mode is accepted or not
+FAX_NOT_ACCEPT_FINE_MODE	equ	0	; position in item group
+FAX_ACCEPT_FINE_MODE		equ	1
+;
+
+;
+; Constants for Dialing Code DB.
+;
+; Indicates which DialingCodeSelector item is selected.
+FAX_ACCESS_ITEM			equ	0	; position in item group
+FAX_LONG_DISTANCE_ITEM		equ	1
+;
+
+
+
+;***************************************************************************
+;*				Structures				   *
+;***************************************************************************
+
+;
+; Structure to keep the date and time the file was spooled.
+;
+FaxSpoolDateTime		struct
+	FSDT_spoolYear		word
+	FSDT_spoolMonth		byte
+	FSDT_spoolDay		byte
+	FSDT_spoolDayOfWeek	byte
+	FSDT_spoolHour		byte
+	FSDT_spoolMinute	byte
+	FSDT_spoolSeconds	byte
+FaxSpoolDateTime	ends
+
+FaxFileFlags	record
+	FFF_FAX_UNOPENABLE:1		; 1 = don't bother trying to view file
+	FFF_FAX_INCOMPLETE:1		; 1 = 0 pages, or missing/partial pages
+					; 0 = no errors in receiveing fax
+	FFF_FORWARDED_FAX:1		; 1 = file is rasterized but needs work
+	FFF_FILE_EXISTS:1		; 1 = rasterized file is ready, 0 = not
+	FFF_FINE_RESOLUTION:1		; 1 = fine, 0 = standard
+	FFF_PRINTING_COVER_PAGE:1	; 1 = printing cover page, 0 = body
+	FFF_COVER_PAGE:1		; 1 = has cover page, 0 = none
+	FFF_DIAL_ASSIST:1		; 1 = dialing assistance is selected
+	FFF_LONG_DIST:1			; 1 = uses long-distance, 0 = not
+	FFF_BILL_CARD:1			; 1 = uses billing card, 0 = not
+	FFF_ACCESS_CODE:1		; 1 = uses access code, 0 = not
+	FFF_DIRTY:1			; 1 = was edited by the spooler
+	FFF_COVER_PAGE_IS_HEADER:1	; 1 = cover page is a header for body 
+	FFF_REPLACE_WITH_COVER_PAGE:1	; 1 = replace rather than append
+	FFF_PRE_REPLACE_PAGE:1		; 1 = the top of this page will be
+					;     replaced.
+	FFF_DONE_REPLACING:1		; 1 = just return from PrintSwath
+					; last 3 ONLY set in faxprint!!!!!
+FaxFileFlags	end
+
+;
+;  Etype representing the status of the fax file, and used to
+;  determine the message to display regarding the fax.  Make sure
+;  to add to the END of this etype when adding enumerations!
+;
+FaxFileStatus	etype	word, 0, 2
+	FFS_DISABLED			enum	FaxFileStatus
+	FFS_READY			enum	FaxFileStatus
+	FFS_WAITING			enum	FaxFileStatus
+	FFS_BUSY			enum	FaxFileStatus
+	FFS_NOANS			enum	FaxFileStatus
+	FFS_NO_FAX_DEVICE		enum	FaxFileStatus
+	FFS_ERROR_RESPONSE		enum	FaxFileStatus
+	FFS_UNEXPECTED_RESPONSE		enum	FaxFileStatus
+	FFS_TIMEOUT			enum	FaxFileStatus
+	FFS_USER_STOP			enum	FaxFileStatus
+	FFS_DEVICE_NOT_OPEN		enum	FaxFileStatus
+	FFS_INCOMPATIBLE_MODEM		enum	FaxFileStatus
+		; This corresponds to BM_notClass2 in the Fax Spooler.	I
+		; didn't call this FFS_NOT_CLASS_2 because FaxFiles are
+		; supposed to be general --- thus it doesn't make sense to
+		; assume all devices we ever use are going to be Class 2.
+	FFS_COULD_NOT_SEND_PAGE		enum	FaxFileStatus
+
+;
+; The FDBFlags are passed with the destination basics structure to signal when
+; the thing should be manual dialed.
+;
+FDBFlags	record
+	FDBF_USE_ECM:1		; If 0, don't.
+	FDBF_RESEND_ALL_PAGES:1	; If 0, then only send missing pages on resends
+	FDBF_MANUAL_DIAL:1	; If 1, then dial manually.
+FDBFlags	end
+
+;
+; Fax basic destination structure.  Keeps track of the fax number, name of the
+; recipient(s), and the company name of the destination fax machine.
+;
+FaxDestinationBasics	struct
+	FDB_phoneNumber		TCHAR FAX_PHONE_NUMBER_SIZE	dup (0)
+	FDB_names		TCHAR FAX_NAME_SIZE		dup (0)
+	FDB_companyName		TCHAR FAX_COMPANY_NAME_SIZE	dup (0)
+	FDB_id			dword
+	FDB_flags		FDBFlags
+FaxDestinationBasics	ends
+
+;
+; The Dial Assist structures, used when dialing out.
+;
+; NOTE: All strings must be null-terminated.
+;
+DAFlags	record
+	DAF_USE_SYS_DEFAULT:1	; Ignore everything, use the system default.
+	DAF_ACCESS:1		; Use the access code
+	DAF_LONG_DISTANCE:1	; Use the long distance number
+
+;  No longer needed...  1/13/95 - ptrinh
+;	DAF_BILLING_CARD:1	; Use the billing card number
+;
+DAFlags	end
+
+
+DialAssistInfo	struct
+	DAI_flags	 DAFlags ; Indicates which of the following to use.
+	DAI_access	 TCHAR	FAX_ACCESS_NUMBER_SIZE 		dup (0)
+	DAI_longDistNote TCHAR  FAX_LONG_DISTANCE_NOTE_SIZE	dup (0)
+	DAI_longDistance TCHAR	FAX_LONG_DISTANCE_NUMBER_SIZE 	dup (0)
+	DAI_billingCard	 TCHAR	FAX_BILLING_CARD_SIZE 		dup (0)
+DialAssistInfo	ends
+
+;
+; Sender info structure.  As above, all strings must be null-terminated.
+;
+FaxSenderInfo		struct
+	FSI_next		VMChainLink  ; This is necessary to make this
+					     ; block vm chainable.
+	FSI_name		TCHAR	FAX_NAME_SIZE dup (0)
+	FSI_company		TCHAR	FAX_COMPANY_NAME_SIZE dup (0)
+	FSI_voiceNumber		TCHAR	FAX_PHONE_NUMBER_SIZE dup (0)
+	FSI_faxNumber		TCHAR	FAX_PHONE_NUMBER_SIZE dup (0)
+	FSI_faxID		TCHAR	FAX_NAME_SIZE dup (0)
+FaxSenderInfo	ends
+
+;
+; Record to say whether to put all or just ONE receiver in the TO line.
+; Use a word-sized enum so that we can use them as GenItem identifiers, too.
+;
+FaxReceiverListChoiceType       etype	word, 0, 2
+	FRLCT_FIRST		enum	FaxReceiverListChoiceType
+	FRLCT_ALL		enum	FaxReceiverListChoiceType
+
+;
+; Misc info that accompanies the list... the subject and an index to the
+; current destination.
+;
+FaxTransAddrInfo	struct
+	FTAI_current	word	; which element in the transAddrList is
+				;  the current destination
+	FTAI_subject	TCHAR	FAX_SUBJECT_SIZE dup (0)
+	FTAI_dateAndTime FaxSpoolDateTime
+				; date and time
+	FTAI_oneOrAll	FaxReceiverListChoiceType
+				; whether to include one or all receivers
+				;  in the To: list
+	FTAI_flags	FaxFileFlags
+				; Signals: coverpage, forward file, others.
+	FTAI_jobParams	hptr	; VMBlock of JobParameters for this message 
+FaxTransAddrInfo	ends
+
+
+;
+; Record to say whether an item goes on the To: or the Cc: list.
+;
+FaxCoverpageDestinationType        record
+        FCDT_ON_TO_LIST:1       ; This destination is on the coverpage's "To:"
+                                ;  list.
+        FCDT_ON_CC_LIST:1       ; This destination is on the coverpage's "Cc:"
+                                ;  list.
+FaxCoverpageDestinationType        end
+
+;
+; The resolution of the fax.  FINE resolution has twice as many scanlines ver-
+; tically.
+;
+FaxResolution	etype	byte
+FR_FINE			enum	FaxResolution	; This is a fine fax...
+FR_STANDARD		enum	FaxResolution	; This is a not-so-fine fax.
+
+;
+; Details of this destination's send history.  Includes whether the
+; fax has been sent, errors that occurred during a send, the number of
+; pages successfully sent, and so on.
+;
+FaxSendDetails	struct
+	FSD_status	FaxFileStatus		; 
+	FSD_pagesSent	word			; number of pages successfully
+						;  sent (including cover page) 
+FaxSendDetails	ends
+
+; This structure defines an individual fax destination: the fax number, names,
+; company name, dial assist information, and the cover sheet field (To: or Cc:).
+;
+FaxDestination	struct
+	FD_basics		FaxDestinationBasics 	; name, company, phone
+	FD_DAInfo		DialAssistInfo		; dial assistance
+	FD_destinationType	FaxCoverpageDestinationType
+							; Cc: or To: line?
+	FD_sendInfo		FaxSendDetails		; status of latest send
+FaxDestination	ends
+
+;
+; The number of significant bytes represent the number of bytes in a transport
+; address that should be compared when checking to see if a message can be sent
+; via an established connection, or if two messages have the same address, or
+; things like that.
+;
+; We use just the fax number as the connection ID.
+;
+FAX_NUM_SIGNIFICANT_BYTES	equ	(size FDB_phoneNumber)
+
+;
+; The individual elements that go into the Mailbox Address chunkarrays that are
+; handed to Clavin and to the Coverpage code.
+;
+FaxMailboxAddrElement	struct
+	FMAE_opaqueSize			word	; size of the opaque data.
+						; corresponds to MBCA_opaqueSize
+	FMAE_opaqueData			FaxDestination
+						; the destination info
+	FMAE_humanReadableString	label	byte
+						; The offset used to get to the
+						;  human readable destination
+						;  string used by the mailbox
+						;  lib.  See mailbox.def for
+						;  more info.
+FaxMailboxAddrElement	ends
+
+
+;***************************************************************************
+;*			path string constants				   *
+;***************************************************************************
+
+; These are used in faxfileDirectory.asm for returning the path of one
+; of the fax directories.
+
+	FAX_FILE_STANDARD_PATH		equ SP_PRIVATE_DATA
+	FAX_DRIVER_STANDARD_PATH	equ SP_SYSTEM
+
+
+
+	FAX_TOP_DIR_STRING		equ "FAX"
+	FAX_DRIVER_DIR_STRING		equ "FAX"
+
+	FAX_IN_DIR_STRING		equ "FAX\\\\IN"
+	FAX_IN_DIR_STRING_NO_ESC	equ "FAX\\IN"
+
+	FAX_OUT_DIR_STRING		equ "FAX\\\\OUT"
+	FAX_OUT_DIR_STRING_NO_ESC	equ "FAX\\OUT"
+
+	FAX_FORWARD_DIR_STRING		equ "FAX\\\\FORWARD"
+	FAX_FORWARD_DIR_STRING_NO_ESC	equ "FAX\\FORWARD"
+
+; This one is used in uiCoverPageControl.asm for representing the  
+; subdirectory where cover pages are to be kept.
+
+	FAX_COVER_PAGE_DEFAULT_SUB_DIR	equ "Fax Templates"
+
+;***************************************************************************
+;*			.INI File Categories and Keys			   *
+;***************************************************************************
+
+FAX_INI_MAIN_CATEGORY		equ	"fax"
+; Contains general fax info used across many parts of the system.
+;
+	FAX_INI_MAIN_SENDER_NAME_KEY	equ	"senderName"
+	; string[FAX_NAME_SIZE]: The sender's name.
+	;
+	FAX_INI_MAIN_SENDER_COMPANY_KEY	equ	"senderCompany"
+	; string[FAX_COMPANY_NAME_SIZE]: The sender's company.
+	;
+	FAX_INI_MAIN_SENDER_VOICE_KEY	equ	"senderVoiceNum"
+	; string[FAX_PHONE_NUMBER_SIZE]: The sender's voice phone number.
+	;
+	FAX_INI_MAIN_SENDER_FAXNUM_KEY	equ	"senderFaxNum"
+	; string[FAX_PHONE_NUMBER_SIZE]: The sender's fax phone number.
+	;
+	FAX_INI_MAIN_SENDER_STATION_KEY	equ	"senderStationID"
+	; string[FAX_NAME_SIZE]: The sender's fax machine station ID, as
+	; required by the FCC.
+	;
+	FAX_INI_MAIN_ACCESS_NOTES_KEY	equ	"accessNotesList"
+	; string[FAX_ACCES_NOTE_SIZE]: The list of "notes" or monikers
+	; for the access code list.
+	;
+	FAX_INI_MAIN_ACCESS_CODE_KEY	equ	"accessCodeList"
+	; string[FAX_ACCESS_NUMBER_SIZE]: The list of prefix access
+	; code that is attached to the fax dialing number.
+	;
+	FAX_INI_MAIN_LONG_DIST_NOTE_KEY	equ	"longDistNotesList"
+	; string[FAX_LONG_DISTANCE_NOTE_SIZE]: The list of "notes" or
+	; monikers for the long distance code list.
+	;
+	FAX_INI_MAIN_LONG_DIST_CODE_KEY	equ	"longDistCodeList"
+	; string[FAX_LONG_DISTANCE_NUMBER_SIZE]: The list of prefix long
+	; distance code that is attached to the fax dialing number. 
+	;
+	FAX_INI_MAIN_BILLING_CARD_CODE_KEY	equ	"billingCardCodeList"
+	; string[FAX_BILLING_CARD_SIZE]: The list of prefix billing
+	; card code that is also attached to the fax dialing number.
+	;
+	FAX_INI_MAIN_USER_PREPEND_STRING equ	"userInitString"
+	; string[FAX_MAX_USER_MODEM_STRING]: The string sent to the faxmodem
+	; just after it's been initialized.
+	;
+	FAX_INI_MAIN_USER_EXIT_STRING	equ	"userCleanupString"
+	; string[FAX_MAX_USER_MODEM_STRING]: The string sent to the faxmodem
+	; just before it's released.
+	;
+	FAX_INI_MAIN_PHONE_LINE_QUALITY	equ	"phoneLineQuality"
+	; string[?]: "normal","uneven", or "poor"
+	; Will set the minimum/maximum connect speed, and control the
+	; compression level accordingly.
+	FAX_INI_MAIN_LOGO_FILE	equ	"logoFile"
+	; string[?]: filename
+	; Name of logo file that is being used in cover pages.
+	; Set to a null string to use "None"
+	FAX_INI_MAIN_SIG_FILE	equ	"sigFile"
+	; string[?]: filename
+	; Name of sig file that is being used in cover pages
+	; Set to a null string to use "None"
+
+FAX_INI_FAXOUT_CATEGORY		equ	"faxOut"
+; Flags and values used when dialing and sending via the fax send system.
+;
+	FAX_INI_FAXOUT_TIMEOUT_KEY	equ	"timeout"
+	; integer: # seconds to timeout when dialing out.
+	;
+	FAX_INI_FAXOUT_FLAGS_KEY	equ	"flags"
+	; integer: FaxoutDialFlags for dialing out and rasterizing fax pages in
+	; the faxprint driver (FDF_SEND_UNIFORM_PAGES)
+	;
+	FAX_INI_FAXOUT_DRIVER_KEY	equ	"faxoutDriverName"
+	; string[?]: geode name for the faxout send driver.
+	;
+	FAX_INI_FAXOUT_CAPABILITIES_KEY	equ	"capabilities"
+	; string[?]: capabilities string for the faxout driver.
+	;
+	FAX_INI_FAXOUT_COMPORT_KEY	equ	"comPort"
+	; integer: the serial com port used for dialing out.
+	;
+	FAX_INI_FAXOUT_CLASS_KEY	equ	"class"
+	; integer: the class of the faxout driver, 1 or 2
+	;
+	FAX_INI_FAXOUT_THREAD_PRIORITY_KEY equ	"threadPriority"
+	; integer: the ThreadPriority of the sending thread is set to this
+	; value when sending a fax, then set back to THREAD_STANDARD.
+	; NOTE: this is done by the sending app, not the driver.
+
+FAX_INI_FAXIN_CATEGORY			equ	"faxIn"
+; Flags and values used when dealing with the fax input drivers.
+;
+	FAX_INI_FAXIN_CAPABILITIES_KEY	equ	"capabilities"
+	; string[?]: capabilities string for the faxin driver.
+	;
+	FAX_INI_FAXIN_DRIVER_KEY	equ	"faxinDriverName"
+	; string[?]: geode name for the faxin driver.
+	;
+	FAX_INI_FAXIN_COMPORT_KEY	equ	"comPort"
+	; integer: the serial com port used for fax reception
+	;
+	FAX_INI_FAXIN_CLASS_KEY		equ	"class"
+	; integer: the class of the faxin driver, 1 or 2
+	;
+	FAX_INI_FAXIN_THREAD_PRIORITY_KEY equ	"threadPriority"
+	; integer: the ThreadPriority of the receiving thread is set to this
+	; value when receiving a fax, then set back to THREAD_STANDARD.
+	; NOTE: this is done by the receiving app, not the driver.
+
+FAX_INI_RECEIVE_CATEGORY		equ	"modemLurker"
+; Flags and values used in the fax receive system
+;
+	FAX_INI_RECEIVE_NUM_RINGS_KEY	equ	"ringThreshold"
+	; integer: the number of times the auto answer waits before picking up
+	; the phone.
+	;
+	FAX_INI_RECEIVE_AUTO_ANSWER_KEY	equ	"autoAnswer"
+	; Boolean: auto answering or not?
+	;
+	FAX_INI_RECEIVE_FAX_REC_TOKEN_KEY equ	"faxAppToken"
+	; string: name of the fax receive application to launch when receiving
+	; a fax.
+	;
+	FAX_INI_RECEIVE_FAX_REC_MAN_ID_KEY equ	"faxAppManID"
+	; integer: manufacturer ID of fax receive application.
+	;
+	FAX_INI_RECEIVE_DATA_NAME_KEY 	equ	"dataDriver"
+	; string: data driver name for receiving data from the modem
+	;
+	FAX_INI_RECEIVE_DATA_ENTRY_KEY	equ	"dataDriverEntry"
+	; integer: data driver entry function.
+	;
+	FAX_INI_RECEIVE_FINE_MODE_KEY	equ	"acceptFineMode"
+	; Boolean: true if accepts receiving fine mode faxes
+	;
+	
+FAX_INI_COVERPAGE_INFO_CATEGORY		equ  	"coverPage"
+; Contains info needed to describe the default cover page,
+; including scrapbook name, scrap name, path, and disk.
+;
+	FAX_INI_COVERPAGE_DISK_KEY	equ 	"disk"
+	; Integer: opaque data used by file routines to get actual disk.
+	; 
+	FAX_INI_COVERPAGE_PATH_KEY	equ 	"path"
+	; String representing path, in relation to disk.
+	;
+	FAX_INI_COVERPAGE_SCRAPBOOK_KEY	equ 	"scrapbook"
+	; String representing scrapbook name.
+	;
+	FAX_INI_COVERPAGE_SCRAP_KEY	equ 	"scrap"
+	; String representing scrap name within scrapbook.
+
+
+FAX_DEFAULT_COVERPAGE_PATH 	equ	"USERDATA"
+FAX_DEFAULT_COVERPAGE_BOOK	equ	"Responder fax templates"
+FAX_DEFAULT_COVERPAGE_SCRAP 	equ 	"Coverpage template"
+
+endif

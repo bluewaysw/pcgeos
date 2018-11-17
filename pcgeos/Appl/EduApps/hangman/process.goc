@@ -1,0 +1,1076 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Breadbox Computer Company LLC 2001 -- All Rights Reserved
+
+PROJECT:	Educational Applications
+MODULE:	HangMan application
+FILE:		process.goc
+
+AUTHOR:		John Howard 11/1/01
+
+***********************************************************************/
+
+/***********************************************************************
+ *		Include files
+ ***********************************************************************/
+@include "hangman.goh"
+@include "externs.goh"
+
+/***********************************************************************
+ *		Globals
+ ***********************************************************************/
+char		g_letterStr[26] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+byte		g_letterStatus[26];
+byte		g_whichPart;
+byte		g_gameStatus;
+char		g_wordStr[MAX_LETTERS+1];
+byte		g_wordStatus[MAX_LETTERS+1];
+byte		g_numFound;
+byte		g_numParts = APPENDAGES;
+Boolean	g_sound = TRUE;
+
+/* and for the word grabbing stuff */
+WMParamsStruct      g_wordParams;    /* from wmlib.h */
+
+/* and for the custom word list */
+Boolean			g_customList = FALSE;
+MemHandle		g_cListMemHan = 0;
+ChunkHandle		g_cListChunkHan = 0;
+
+/***********************************************************************
+ *		Class and Declarations
+ ***********************************************************************/
+
+@classdecl	HangManProcessClass, neverSaved;
+@classdecl	HangManViewClass;
+
+/* methods in import.goc */
+@extern method HangManProcessClass, MSG_HM_IMPORT_WORD_LIST;
+@extern method HangManProcessClass, MSG_HM_IMPORT_SELECTOR_ACTION;
+@extern method HangManProcessClass, MSG_HM_CANCEL_IMPORT_WORD_LIST;
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_APPLICATION for HangManProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Do some opening stuff
+ *
+ *
+ *
+ * PARAMETERS:
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+@method	HangManProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+
+
+	InitFileReadBoolean("hangman", "sound", &g_sound);
+	InitFileReadInteger("hangman", "difficulty", &g_numParts);
+
+	if (g_sound)
+		@send HMSoundGroup::
+						  MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(SOUND_ON, FALSE);
+	else
+		@send HMSoundGroup::
+						  MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(SOUND_OFF, FALSE);
+	@send HMDifficultyGroup::
+						  MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(g_numParts, FALSE);
+
+	g_whichPart = g_numParts;
+	g_gameStatus = GAME_NOT_STARTED;
+
+	@callsuper();
+
+	/* open up the wm word list file */
+	FilePushDir();
+	FileSetCurrentPath(SP_USER_DATA, "Word Matcher");
+	g_wordParams.WMPS_file = VMOpen( "WM Words",
+							VMAF_FORCE_READ_WRITE,
+							VMO_CREATE, 0 );
+	FilePopDir();
+
+	@call HangManApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+}
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION for HangManProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Do some closing stuff
+ *
+ *
+ *
+ * PARAMETERS:
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/2		Initial Revision
+ *
+ ***********************************************************************/
+@method	HangManProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+
+	 VMClose(g_wordParams.WMPS_file, 0);
+
+	 /* and free any existing custom list block */
+	 if (g_cListMemHan)  MemFree(g_cListMemHan);
+
+	 return @callsuper();
+
+}
+
+/***********************************************************************
+ *		MSG_HANGMAN_NEW_GAME for HangManProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Initialize things for the new game
+ *
+ *
+ *  
+ * PARAMETERS:	void (void)    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+@method	HangManProcessClass, MSG_HANGMAN_NEW_GAME
+{
+ byte		i;
+
+
+	for (i = 0; i < 26; i++) g_letterStatus[i] = LTR_NOT_SEL;
+	g_gameStatus = GAME_IN_PROGRESS;
+	g_whichPart = NO_PARTS;
+
+	if (g_customList) HMGrabACustomWord();
+	else  HMGrabARandomWord();
+
+	for (i = 0; i < 11; i++) g_wordStatus[i] = LTR_NOT_SEL;
+	g_numFound = 0;
+
+	@send HangManView::MSG_GEN_VIEW_REDRAW_CONTENT();
+	@send HangManView::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+/***********************************************************************
+ *		MSG_META_EXPOSED for HangManProcessClass
+ ***********************************************************************
+ * SYNOPSIS:
+ *
+ *
+ *
+ * PARAMETERS:	void (WindowHandle win)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+@method	HangManProcessClass, MSG_META_EXPOSED
+{
+GStateHandle	gstate;
+
+
+	gstate = GrCreateState(win);
+	GrBeginUpdate(gstate);
+
+	HMDrawBoard(gstate);
+	HMDrawBody(gstate);
+	if (!g_gameStatus)  {
+		HMDrawTextInBox(gstate, OPENING_TEXT);
+		}
+	if (g_gameStatus)  {
+		if (g_gameStatus == GAME_WON) HMDrawTextInBox(gstate, WINNING_TEXT);
+		if (g_gameStatus == GAME_LOST) HMDrawTextInBox(gstate, LOSING_TEXT);
+		HMDrawWordBoxes(gstate);
+		}
+
+	GrEndUpdate(gstate);
+	GrDestroyState(gstate);
+
+}
+
+/***********************************************************************
+ *		MSG_HANGMAN_DIFFICULTY_APPLY for HangManProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	(GEN_ITEM_GROUP_APPLY_MSG)
+ *
+ *
+ *
+ * PARAMETERS:		word selection,
+ *						word numSelections,
+ *						word stateFlags
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/2		Initial Revision
+ *
+ ***********************************************************************/
+@method	HangManProcessClass, MSG_HANGMAN_DIFFICULTY_APPLY
+{
+
+
+//   if (selection == g_numParts) return; /* no change */
+
+	/* if a game is in progress ask the user to confirm the change,
+	 * since a change starts a new game */
+	if (g_gameStatus == GAME_IN_PROGRESS) {
+		if ((UserStandardDialogOptr(0, 0, 0, 0,
+				 @RestartWarningMsg,
+				 ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+				 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+				 ) != IC_YES))  {
+			/* reset the selection */
+			@send HMDifficultyGroup::
+						  MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(g_numParts, FALSE);
+			return;
+			}
+		}
+
+   /* change the selection */
+	if (selection == LIMBS) g_numParts = LIMBS;
+	else g_numParts = APPENDAGES;
+
+	InitFileWriteInteger("hangman", "difficulty", g_numParts);
+
+	if (g_gameStatus == GAME_IN_PROGRESS)
+		@send self::MSG_HANGMAN_NEW_GAME();
+	else  {
+		g_whichPart = g_numParts;
+		@send HangManView::MSG_GEN_VIEW_REDRAW_CONTENT();
+		}
+
+}
+
+/***********************************************************************
+ *		MSG_HANGMAN_SOUND_APPLY for HangManProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	(GEN_ITEM_GROUP_APPLY_MSG)
+ *
+ *
+ *
+ * PARAMETERS:		word selection,
+ *						word numSelections,
+ *						word stateFlags
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/2		Initial Revision
+ *
+ ***********************************************************************/
+@method	HangManProcessClass, MSG_HANGMAN_SOUND_APPLY
+{
+
+	if (selection == SOUND_ON) g_sound = TRUE;
+	else g_sound = FALSE;
+
+	InitFileWriteBoolean("hangman", "sound", g_sound);
+
+}
+
+/***********************************************************************
+ *		MSG_HM_CUSTOM_LIST_GROUP_APPLY for HangManProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	(GEN_BOOLEAN_GROUP_APPLY_MSG)
+ *
+ *
+ *
+ * PARAMETERS:		word	selectedBooleans,
+ *						word	indeterminateBooleans,
+ *						word	modifiedBooleans
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date			Description
+ *	----	----			-----------
+ *	jfh	7/2/02		Initial Revision
+ *
+ ***********************************************************************/
+@method	HangManProcessClass, MSG_HM_CUSTOM_LIST_GROUP_APPLY
+{
+
+	if (selectedBooleans == CUSTOM_LIST)  {
+		g_customList = TRUE;
+		/* bring up the import file selector */
+		@send HMImportDialog::MSG_GEN_INTERACTION_INITIATE();
+		}
+	else g_customList = FALSE;
+
+}
+
+/***********************************************************************
+ *		HMDrawBoard
+ ***********************************************************************
+ * SYNOPSIS:	Draws the gallows and the letter boxes
+ *
+ *
+ * PARAMETERS:	void (GStateHandle gstate)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+void HMDrawBoard (GStateHandle gstate)
+{
+word		i;
+
+
+	/* draw the gallows */
+	GrSetLineColor(gstate, CF_INDEX, C_BROWN, 0, 0);
+	GrSetLineWidth(gstate, MakeWWFixed(24));
+	GrDrawVLine(gstate, 36, 0, WORD_ROW_Y - 6);            /* x, y1, y2 */
+	GrDrawHLine(gstate, 0, 36, 168);                      /* x1, y, x2 */
+	GrDrawHLine(gstate, 0, WORD_ROW_Y - 5 - 24 + 12, 72);
+	GrSetLineWidth(gstate, MakeWWFixed(2));
+	GrDrawVLine(gstate, 156, 48, 48+12);
+
+
+	/* draw the letter boxes */
+	GrSetLineWidth(gstate, MakeWWFixed(1));
+	GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0);
+	for (i = 0; i < 13; i++) {
+		if (g_letterStatus[i])
+			GrSetAreaColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0);
+		else
+			GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0);
+		GrFillRect(gstate, LTR_COL_ONE_X + i*LTR_BOX_INCREMENT,
+								 LTR_ROW_ONE_Y,
+								 (LTR_COL_ONE_X + i*LTR_BOX_INCREMENT) + LTR_BOX_SIZE,
+								 LTR_ROW_ONE_Y + LTR_BOX_SIZE);
+		GrDrawRect(gstate, LTR_COL_ONE_X + i*LTR_BOX_INCREMENT,
+								 LTR_ROW_ONE_Y,
+								 (LTR_COL_ONE_X + i*LTR_BOX_INCREMENT) + LTR_BOX_SIZE,
+								 LTR_ROW_ONE_Y + LTR_BOX_SIZE);
+		HMDrawLetter(gstate, i);
+		}
+	for (i = 0; i < 13; i++) {
+		if (g_letterStatus[i+13])
+			GrSetAreaColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0);
+		else
+			GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0);
+		GrFillRect(gstate, LTR_COL_ONE_X + i*LTR_BOX_INCREMENT,
+								 LTR_ROW_TWO_Y,
+								 (LTR_COL_ONE_X + i*LTR_BOX_INCREMENT) + LTR_BOX_SIZE,
+								 LTR_ROW_TWO_Y + LTR_BOX_SIZE);
+		GrDrawRect(gstate, LTR_COL_ONE_X + i*LTR_BOX_INCREMENT,
+								 LTR_ROW_TWO_Y,
+								 (LTR_COL_ONE_X + i*LTR_BOX_INCREMENT) + LTR_BOX_SIZE,
+								 LTR_ROW_TWO_Y + LTR_BOX_SIZE);
+		HMDrawLetter(gstate, i+13);
+		}
+
+}
+
+/***********************************************************************
+ *		HMDrawWordBoxes
+ ***********************************************************************
+ * SYNOPSIS:	Draws boxes for the word to be guessed
+ *
+ *
+ * PARAMETERS:	void (GStateHandle gstate)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+void HMDrawWordBoxes (GStateHandle gstate)
+{
+word		i, wordOffset, numLetters;
+
+
+	GrSetLineWidth(gstate, MakeWWFixed(1));
+	numLetters = strlen(g_wordStr);
+	wordOffset = (BOARD_WIDTH - numLetters*LTR_BOX_INCREMENT - LTR_BOX_SPACE)/2;
+	for (i = 0; i < numLetters; i++) {
+		GrDrawRect(gstate, wordOffset + i*LTR_BOX_INCREMENT,
+								 WORD_ROW_Y,
+								 (wordOffset + i*LTR_BOX_INCREMENT) + LTR_BOX_SIZE,
+								 WORD_ROW_Y + LTR_BOX_SIZE);
+		/* and for redraws check to see if we draw the letter */
+		if(g_wordStatus[i]) HMDrawWordLetter(gstate, (byte)i);
+		}
+
+}
+
+/***********************************************************************
+ *		HMDrawWordLetter
+ ***********************************************************************
+ * SYNOPSIS:	Draws letters in the word to be guessed
+ *
+ *
+ * PARAMETERS:	void (GStateHandle gstate, byte whichLetter)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+void HMDrawWordLetter (GStateHandle gstate, byte whichLetter)
+{
+word		width, left, wordOffset, numLetters;
+char		letter[2];
+
+
+	letter[1] = 0;
+	GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(14));
+	GrSetTextStyle(gstate, TS_BOLD, 0);
+	numLetters = strlen(g_wordStr);
+	wordOffset = (BOARD_WIDTH - numLetters*LTR_BOX_INCREMENT - LTR_BOX_SPACE)/2;
+
+	letter[0] = g_wordStr[whichLetter];
+	width = GrTextWidth(gstate, letter, 1);
+	left = (wordOffset + LTR_BOX_SIZE
+						 - wordOffset
+						 - width) / 2;
+	GrDrawText(gstate, wordOffset + whichLetter*LTR_BOX_INCREMENT + left,
+					 WORD_ROW_Y,
+					 letter, 1);
+
+
+}
+
+/***********************************************************************
+ *		HMDrawLetter
+ ***********************************************************************
+ * SYNOPSIS:	Draws each letter in its alphabet box
+ *
+ * PARAMETERS:	void (GStateHandle gstate, byte whichLetter)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+void HMDrawLetter (GStateHandle gstate, byte whichLetter)
+{
+word		width, left;
+char		letter[2];
+
+
+	GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(14));
+	GrSetTextStyle(gstate, TS_BOLD, 0);
+	letter[1] = 0;
+	letter[0] = g_letterStr[whichLetter];
+	if (whichLetter < 13) {
+		width = GrTextWidth(gstate, letter, 1);
+		left = (LTR_COL_ONE_X + LTR_BOX_SIZE
+						 - LTR_COL_ONE_X
+						 - width) / 2;
+		GrDrawText(gstate, LTR_COL_ONE_X + whichLetter*LTR_BOX_INCREMENT + left,
+					 LTR_ROW_ONE_Y,
+					 letter, 1);
+		}
+	else {
+		width = GrTextWidth(gstate, letter, 1);
+		left = (LTR_COL_ONE_X + LTR_BOX_SIZE
+						 - LTR_COL_ONE_X
+						 - width) / 2;
+		GrDrawText(gstate,
+					 LTR_COL_ONE_X + (whichLetter-13)*LTR_BOX_INCREMENT + left,
+					 LTR_ROW_TWO_Y,
+					 letter, 1);
+		}
+
+}
+
+/***********************************************************************
+ *		HMDrawBody
+ ***********************************************************************
+ * SYNOPSIS:	This routine draws the body parts
+ *
+ *
+ *
+ * PARAMETERS:	void (GStateHandle gstate)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+void HMDrawBody (GStateHandle gstate)
+{
+
+
+	GrSetLineWidth(gstate, MakeWWFixed(2));
+	/* head */
+	if (g_whichPart >= 1)
+		GrDrawEllipse(gstate, 136, 60, 136+40, 60+40);
+	/* the torso */
+	if (g_whichPart >= 2)
+		GrDrawVLine(gstate, 156, 100, 180);  /* x, y1, y2 */
+	/* the right arm */
+	if (g_whichPart >= 3)
+		GrDrawLine(gstate, 156, 110, 200, 154);
+	/* the left arm */
+	if (g_whichPart >= 4)
+		GrDrawLine(gstate, 156, 110, 112, 154);
+	/* the right leg */
+	if (g_whichPart >= 5)
+		GrDrawLine(gstate, 156, 180, 206, 236);
+	/* the left leg */
+	if (g_whichPart >= 6)
+		GrDrawLine(gstate, 156, 180, 106, 236);
+	/* right hand */
+	if (g_whichPart >= 7)
+		GrDrawLine(gstate, 200, 154, 210, 144);
+	/* left hand */
+	if (g_whichPart >= 8)
+		GrDrawLine(gstate, 112, 154, 102, 144);
+	/* the right foot */
+	if (g_whichPart >= 9)
+		GrDrawLine(gstate, 206, 236, 216, 226);
+	/* the left foot */
+	if (g_whichPart >= 10)
+		GrDrawLine(gstate, 106, 236, 96, 226);
+
+
+}
+
+/***********************************************************************
+ *		HMDrawTextInBox
+ ***********************************************************************
+ * SYNOPSIS:	Draws opening/winning/losing text in a box
+ *
+ * PARAMETERS:	void (GStateHandle gstate, byte whichText)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+void HMDrawTextInBox(GStateHandle gstate, byte whichText)
+{
+word		width;
+char		textStr[13];
+
+
+	GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(14));
+	GrSetTextStyle(gstate, TS_BOLD, 0);
+
+	MemLock (OptrToHandle(@OpenMsg));
+	switch (whichText) {
+		case OPENING_TEXT:
+			strcpy(textStr, LMemDeref(@OpenMsg));
+			GrSetAreaColor(gstate, CF_INDEX, C_YELLOW, 0, 0);
+			break;
+		case WINNING_TEXT:
+			strcpy(textStr, LMemDeref(@WinMsg));
+			GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GREEN, 0, 0);
+			break;
+		case LOSING_TEXT:
+			strcpy(textStr, LMemDeref(@LoseMsg));
+			GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_RED, 0, 0);
+			break;
+		}
+	MemUnlock (OptrToHandle(@OpenMsg));
+
+	GrSetLineWidth(gstate, MakeWWFixed(2));
+	width = GrTextWidth(gstate, textStr, strlen(textStr));
+	GrFillRect(gstate, 156 - width/2 - 5,
+								 125,
+								 156 + width/2 + 5,
+								 125 + 20);
+	GrDrawRect(gstate, 156 - width/2 - 5,
+								 125,
+								 156 + width/2 + 5,
+								 125 + 20);
+
+	GrDrawText(gstate, 156 - width/2,
+					 125,
+					 textStr, strlen(textStr));
+
+
+}
+
+/***********************************************************************
+ *		HMGrabARandomWord
+ ***********************************************************************
+ * SYNOPSIS:	Grabs a random word from wm word list and puts it in
+ *             g_wordStr
+ *
+ * PARAMETERS:	void (void)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:   The strategy is mostly driven by the way the wmlib works
+ *             and the word list is organized.  The word list is sorted by
+ *             word length (2 to 16) then alphabetically.  The library has
+ *             one routine to find words in two flavors - one to find the
+ *             initial match (if any) and the other to find all/any
+ *             subsequent matches.  Both flavors take the seach word and
+ *             length as arguements.  In HMs case the search word is all
+ *             question marks since we're just looking for a random word.
+ *
+ *             Given this, I first get a word length (randomly from 4 to 10 -
+ *             I picked 4-10 just because it seeemed reasonable) and use
+ *             that to count the number of words of that length in the list.
+ *             Knowing the number of words I can then generate a random
+ *             number between 0 and numWords and use that to retrieve that
+ *             word from the list and make it available to Hang Man.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/2		Initial Revision
+ *
+ ***********************************************************************/
+void HMGrabARandomWord(void)
+{
+word		numWords, i, length, whichWord;
+char		questionStr[] = "??????????";
+Boolean	isFound;
+
+
+	/* zero out the found word buffer for possible length changes */
+	for (i = 0; i < 11; i++) {
+		g_wordParams.WMPS_found[i] = 0;
+		}
+
+	/* get a random length */
+	length = HMGetRandomNum(4, 10);
+
+	/* fill the search buffer */
+	g_wordParams.WMPS_lengthWord = length;
+	if (length < 10)  questionStr[length] = 0;
+	strcpy(g_wordParams.WMPS_search, questionStr);
+
+	/* start the search. */
+	if (WMFindWord(&g_wordParams, TRUE))  {
+		/* We found at least one word - so start counting */
+		numWords = HMCountWords();
+		}
+
+	/* get a random number for the word */
+	whichWord = HMGetRandomNum(0, numWords);
+
+	i = 0;
+	/* grab the first word found - gotta do this to reset stuff in the lib */
+	WMFindWord(&g_wordParams, TRUE);
+	if (!whichWord)  {
+		strcpy(g_wordStr, g_wordParams.WMPS_found);
+		return;
+		}
+	/* and now the rest... */
+	while(i < whichWord - 1)  {
+		isFound = WMFindWord(&g_wordParams, FALSE);
+		if (isFound)
+			i++;
+		}
+	strcpy(g_wordStr, g_wordParams.WMPS_found);
+
+
+}
+
+/***********************************************************************
+ *		HMGrabACustomWord
+ ***********************************************************************
+ * SYNOPSIS:	Grabs a random word from custom word list and puts it in
+ *             g_wordStr
+ *
+ * PARAMETERS:	void (void)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date			Description
+ *	----	----			-----------
+ *	jfh	7/2/02		Initial Revision
+ *
+ ***********************************************************************/
+void HMGrabACustomWord(void)
+{
+ optr		oWordList;
+ word		whichWord;
+
+
+	/* Lock the word list. */
+	MemLock(g_cListMemHan);
+	oWordList = ConstructOptr(g_cListMemHan, g_cListChunkHan);
+
+	/* get a random number for the word */
+	whichWord = HMGetRandomNum(0, ChunkArrayGetCount(oWordList));
+
+	/* Copy the word into the global. */
+	strcpy(g_wordStr, ChunkArrayElementToPtr(oWordList, whichWord, 0));
+
+	MemUnlock(g_cListMemHan);
+
+}
+
+/***********************************************************************
+ *		HMCountWords
+ ***********************************************************************
+ * SYNOPSIS:	Counts the number of x letter words
+ *
+ *
+ * PARAMETERS:	word (void)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/2		Initial Revision
+ *
+ ***********************************************************************/
+word HMCountWords(void)
+{
+word		numWords = 1;
+Boolean	isFound = TRUE;
+
+	while(isFound)  {
+		isFound = WMFindWord(&g_wordParams, FALSE);
+		if (isFound)
+			numWords++;
+		}
+
+	return(numWords);
+
+}
+
+/***********************************************************************
+ *		HMGetRandomNum
+ ***********************************************************************
+ * SYNOPSIS:	gets a random number between 0 and max
+ *
+ *
+ * PARAMETERS:	word (word min, word max)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/3		Initial Revision
+ *
+ ***********************************************************************/
+word HMGetRandomNum(word min, word max)
+{
+word				randNum;
+long double		randomX;
+
+
+	/* initialize randomizer using TimerGetCount as a seed (dword) */
+	FloatRandomize(RGIF_USE_SEED, TimerGetCount());
+    
+	do {
+		/* get a random # between 0(incl) and max(excl) */
+		randomX = max + 1;   /* the 1 is to include max */
+		FloatPushNumber(&randomX);
+		FloatRandomN();
+		FloatPopNumber(&randomX);
+		randNum = (word) randomX;
+		}
+	while (randNum < min);
+
+	return(randNum);
+
+}
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for HangManViewClass
+ ***********************************************************************
+ * SYNOPSIS:	intercepts mouse clicks on the word boxes
+ *             and starts appropriate actions
+ *
+ *
+ * PARAMETERS:	void (MouseReturnParams *retVal,
+ *                   sword xPosition,
+ *                   sword yPosition,
+ *                   word inputState)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/1		Initial Revision
+ *
+ ***********************************************************************/
+@method HangManViewClass, MSG_META_START_SELECT
+{
+WindowHandle	win;
+GStateHandle	gstate;
+byte				i, letterBlock = 26;
+
+
+	/* ignore the click if not in a game */
+	if (g_gameStatus != GAME_IN_PROGRESS) {
+		retVal->flags = MRF_PROCESSED;
+		return;
+		}
+
+	/* where were we clicked? */
+	for (i = 0; i < 13; i++) {
+		if ((xPosition >= LTR_COL_ONE_X + i*LTR_BOX_INCREMENT) &&
+				  (xPosition <= LTR_COL_ONE_X + i*LTR_BOX_INCREMENT + LTR_BOX_SIZE)) {
+			if ((yPosition >= LTR_ROW_ONE_Y) &&
+				  (yPosition <= LTR_ROW_ONE_Y + LTR_BOX_SIZE))
+				letterBlock = i;
+			else if ((yPosition >= LTR_ROW_TWO_Y) &&
+				  (yPosition <= LTR_ROW_TWO_Y + LTR_BOX_SIZE))
+				letterBlock = i+13;
+			}
+		}
+
+	if (letterBlock < 26 && !g_letterStatus[letterBlock]) {
+		/* OK - a valid selection */
+		win = @call self::MSG_GEN_VIEW_GET_WINDOW();
+		gstate = GrCreateState(win);
+
+		HMDoLetterSelect(gstate, letterBlock);
+
+		GrDestroyState(gstate);
+		}
+
+	/* we can say we processed it in either case since there's no other mouse
+    * action anyway */
+	retVal->flags = MRF_PROCESSED;
+
+}
+
+/***********************************************************************
+ *		MSG_META_KBD_CHAR for HangManViewClass
+ ***********************************************************************
+ * SYNOPSIS:	intercepts keypresses for the view
+ *             and starts appropriate actions
+ *
+ *
+ * PARAMETERS:	void (word character,
+ *                   word flags,
+ *                   word state)
+ *
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/6		Initial Revision
+ *
+ ***********************************************************************/
+@method HangManViewClass, MSG_META_KBD_CHAR
+{
+WindowHandle	win;
+GStateHandle	gstate;
+byte				letterBlock = 26;
+
+
+	/* ignore the click if not in a game */
+	if (g_gameStatus != GAME_IN_PROGRESS) {
+		@callsuper();
+		return;
+		}
+
+	if ((character >= 'A' && character <='Z' && (flags >> 8) == 0) ||
+				(character >= 'a' && character <='z' && (flags >> 8) == 0))  {
+		if (flags & CF_FIRST_PRESS)  {
+         /* which letter is it ? */
+			if (character >= 'A' && character <='Z')
+				letterBlock = character - 'A';
+			else letterBlock = character - 'a';
+
+			if (letterBlock < 26 && !g_letterStatus[letterBlock]) {
+				/* OK - a valid selection */
+				win = @call self::MSG_GEN_VIEW_GET_WINDOW();
+				gstate = GrCreateState(win);
+
+				HMDoLetterSelect(gstate, letterBlock);
+
+				GrDestroyState(gstate);
+				}
+			}
+		}
+	else  @callsuper();
+
+
+}
+
+/***********************************************************************
+ *		HMDoLetterSelect
+ ***********************************************************************
+ * SYNOPSIS:	takes action on letter guess
+ *             called by START_SELECT & KEYBOARD_CHAR
+ *
+ * PARAMETERS:	word (GStateHandle gstate, byte whichLetter)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jfh	11/6		Initial Revision (extracted from START_SELECT)
+ *
+ ***********************************************************************/
+void HMDoLetterSelect (GStateHandle gstate, byte whichLetter)
+{
+byte				i;
+Boolean			foundLetter = FALSE;
+
+
+	/* show the clicked letter as selected */
+	GrSetAreaColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0);
+	if (whichLetter < 13) {
+		GrFillRect(gstate, LTR_COL_ONE_X + whichLetter*LTR_BOX_INCREMENT,
+								 LTR_ROW_ONE_Y,
+								 (LTR_COL_ONE_X + whichLetter*LTR_BOX_INCREMENT) + LTR_BOX_SIZE,
+								 LTR_ROW_ONE_Y + LTR_BOX_SIZE);
+		HMDrawLetter(gstate, whichLetter);
+		}
+	else if (whichLetter < 26) {
+		GrFillRect(gstate, LTR_COL_ONE_X + (whichLetter-13)*LTR_BOX_INCREMENT,
+								 LTR_ROW_TWO_Y,
+								 (LTR_COL_ONE_X + (whichLetter-13)*LTR_BOX_INCREMENT) + LTR_BOX_SIZE,
+								 LTR_ROW_TWO_Y + LTR_BOX_SIZE);
+		HMDrawLetter(gstate, whichLetter);
+		}
+	/* mark it selected in our status array - for redraws */
+	g_letterStatus[whichLetter]++;
+
+	/* now see if the selected letter is in our word */
+	for (i = 0; i < strlen(g_wordStr); i++) {
+		if (g_wordStr[i] == 'A' + whichLetter) {
+			/* it is in the word - show the letter */
+			HMDrawWordLetter(gstate, i);
+			foundLetter = TRUE;
+			g_wordStatus[i]++;
+			g_numFound++;
+			/* winner check */
+			if (g_numFound == strlen(g_wordStr))  {
+				/* we have a winner */
+				HMDrawTextInBox(gstate, WINNING_TEXT);
+				g_gameStatus = GAME_WON;
+				if (g_sound) UserStandardSound(SST_NOTIFY);
+					break;
+				}
+			}
+		} /* end of is letter in word for */
+
+	/* if the letter wasn't there draw the next body part */
+	if (!foundLetter) {
+		g_whichPart++;
+		HMDrawBody(gstate);
+		/* and update the status array */
+		g_letterStatus[whichLetter]++;
+		/* loser check */
+		if (g_whichPart >= g_numParts)  {
+			/* Uh oh - a loser */
+			HMDrawTextInBox(gstate, LOSING_TEXT);
+			g_gameStatus = GAME_LOST;
+			/* show the word */
+			for (i = 0; i < strlen(g_wordStr); i++) {
+				HMDrawWordLetter(gstate, i);
+				g_wordStatus[i] = LTR_SEL_IN_WORD;
+				}
+			if (g_sound) UserStandardSound(SST_ERROR);
+			}
+		} /* end of !foundletter if */
+
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox  (char* string1, optr notifyMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    Puts up selected notification box
+ *
+ *
+ ***********************************************************************/
+void NotifyDBox (char* string1, optr notifyMsg)
+{
+
+    /* put up a notification box */
+	 MemLock (OptrToHandle(@OpenMsg));
+    UserStandardDialog((char*)0,
+			  (char*)0,
+			  (char*)0,
+			  string1,
+			  LMemDeref(notifyMsg),
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	 MemUnlock (OptrToHandle(@OpenMsg));
+
+}
+

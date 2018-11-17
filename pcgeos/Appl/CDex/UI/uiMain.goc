@@ -1,0 +1,1304 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GeoDex
+MODULE:		UI
+FILE:		uiMain.ui
+
+AUTHOR:		Ted H. Kim, March 3, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	3/3/92		Initial revision
+	jfh	11/23/04		port to GOC
+
+DESCRIPTION:
+	Contains the main UI definitions for the GeoDex application.
+		
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "cdex.goh"
+@include "Art/app.goh"
+@include "Art/buttons.goh"
+
+/* XXX we'll classdecl here for now  */
+@classdecl	RolDocumentControlClass;
+
+/*---------------------------------------------------------------------------
+	CONSTANTS DEFINITIONS
+---------------------------------------------------------------------------*/
+
+
+/*#define _IMPEX_MERGE	-1
+/*#define _PHONE_ICON	-1
+/*#define _OPTIONS_MENU	-1
+*/
+
+/*
+start AppSCMonikerResource2, data;
+#include "Art/gpcFindSC.ui"
+#include "Art/gpcEmailSC.ui"
+end AppSCMonikerResource2;
+
+
+start Interface;
+end Interface;
+
+start MenuResource;
+end MenuResource;
+
+start SearchResource;
+end SearchResource;
+
+start AppLCMonikerResource, data;
+visMoniker DatafileMonikerList = list {
+	GeoDexDocLCMoniker,
+	GeoDexDocSCMoniker,
+	GeoDexDocTCMoniker
+}
+end	AppLCMonikerResource;
+*/
+
+@start AppResource;
+
+@object RolodexApplicationClass RolodexApp = {
+	GI_visMoniker = list {@GeoDexTextMoniker, @GeoDexLCMoniker,
+		@GeoDexSCMoniker, @GeoDexTinyTCMoniker};
+	GI_comp = @RolodexPrimary, @DialSummons,
+				 @PhoneNumberListBox/*, @ImpexMergeDialog*/;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @RolodexPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @RolUIDocControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @RolUIDocControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		@RolUIDocControl, @RolImportControl, @RolExportControl,
+		@RolodexEditControl, @RolodexSearchControl, @RolPrintControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		/*@UserLevelList,*/ @OptionsMenu;
+
+	ATTR_GEN_INIT_FILE_CATEGORY = "address book";
+	ATTR_GEN_APPLICATION_PRINT_CONTROL = @RolPrintControl;
+//	ATTR_GEN_APPLICATION_ADDITIONAL_TOKENS {
+//			GeodeToken <<'ADBK'>, MANUFACTURER_ID_GENERIC>
+	ATTR_GEN_HELP_FILE = "address";
+
+}
+
+@visMoniker GeoDexTextMoniker = "CAddress Book";
+	   
+@end AppResource;
+
+@start Interface;
+
+@object GenPrimaryClass RolodexPrimary = {
+	GI_comp = @ConfirmBox, /*@ConfirmBox2, */@NotesBox,
+			@FileMenu, @EditMenu, @ShowMenu, @OptionsMenu,
+			@BothView;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+/* The main object that holds the record data in GeoDex */
+@object GenInteractionClass BothView = {
+	GI_comp = @CardView, @BrowseView;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass CardView = {
+	GI_comp = @Card, @PageButtons;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+/* The composite gadget that displays all of the text fields */
+@object LettersCompClass Card = {
+	GI_comp = @MyLetters, @Records;
+/*	interface = Interface;
+	rolodexApp = AppResource;
+*/
+}
+
+/* The letter tab gadget definition */
+@object LettersClass MyLetters = {
+/*	rolodexApp = AppResource;
+	interface = Interface;
+	menu = MenuResource;
+	search = SearchResource;
+*/
+}
+
+/***************************************************************************
+			Record Field Definitions
+***************************************************************************/
+
+@object GenInteractionClass Records = {
+	GI_comp = @LastNameField, @AddrBox, @PhoneFields;
+}
+
+@object GenTextClass LastNameField = {
+	GI_attrs = GA_TARGETABLE;
+	GTXI_destination = process;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = SORT_BUFFER_LENGTH;
+	ATTR_GEN_PROPERTY;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_ROLODEX_CR;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+		((VTDS_10 << VTDCA_SIZE_OFFSET) | VTDF_BERKELEY);
+	ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+	ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+	HINT_FIXED_SIZE = {SST_PIXELS | 220, 0};
+	HINT_DEFAULT_FOCUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenInteractionClass AddrBox = {
+	GI_comp = @AddrField;
+}
+
+@object GenTextClass AddrField = {
+	GI_attrs = GA_TARGETABLE;
+	GTXI_destination = process;
+	GTXI_maxLength = ADDR_FIELD_LENGTH;
+	GTXI_attrs = @default & ~GTA_USE_TAB_FOR_NAVIGATION;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+		((VTDS_10 << VTDCA_SIZE_OFFSET) | VTDF_BERKELEY);
+	ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+	HINT_FIXED_SIZE = {SST_PIXELS | 220, SST_PIXELS | 52};
+	HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+/* Phone number related objects */
+@object GenInteractionClass PhoneFields = {
+	GI_comp = @ScrollButtons, @PhoneNoTypeField, @PhoneNoField;
+	HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS | 1};
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass ScrollButtons = {
+	GI_comp = @ScrollUpTrigger, @ScrollDownTrigger;
+	HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS | 1};
+}
+
+@object GenTriggerClass ScrollUpTrigger = {
+	GI_visMoniker = list {@PhNumUpMoniker};
+	GI_kbdAccelerator = ctrl 'U';
+	GI_attrs = @default | GA_INITIATES_INPUT_HOLD_UP;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_PHONE_UP;
+	HINT_DONT_SHOW_SHORTCUT;
+}
+
+@object GenTriggerClass ScrollDownTrigger = {
+	GI_visMoniker = list {@PhNumDownMoniker};
+	GI_kbdAccelerator = ctrl 'D';
+	GI_attrs = @default | GA_INITIATES_INPUT_HOLD_UP;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_PHONE_DOWN;
+	HINT_DONT_SHOW_SHORTCUT;
+   ATTR_GEN_TRIGGER_ACTION_DATA = 0;
+}
+
+@object GenTextClass PhoneNoTypeField = {
+	GI_attrs = GA_TARGETABLE;
+	GTXI_destination = process;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = PHONE_TYPE_LENGTH;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+		((VTDS_10 << VTDCA_SIZE_OFFSET) | VTDF_BERKELEY);
+	ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+	HINT_FIXED_SIZE = {SST_PIXELS | 40, 0};
+	HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass PhoneNoField = {
+	GI_attrs = GA_TARGETABLE;
+	GTXI_applyMsg = MSG_ROLODEX_PHONE_DOWN_TEXT;
+	GTXI_destination = process;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = PHONE_NO_LENGTH;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+		((VTDS_10 << VTDCA_SIZE_OFFSET) | VTDF_BERKELEY);
+	ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+	ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+	HINT_FIXED_SIZE = {SST_PIXELS | 148, 0};
+	HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+/***************************************************************************
+		The buttons for GeoDex
+****************************************************************************/
+@object GenInteractionClass PageButtons = {
+	GI_comp = @PreviousTrigger, @NextTrigger, @NewTrigger,
+				@NotesTrigger, @CalendarTrigger, @AutoDialTrigger;
+	HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS | 1};
+}
+
+@object GenTriggerClass PreviousTrigger = {
+	GI_visMoniker = list {@PrevMoniker, @PrevText};
+//	kbdAccelerator = specificUI PAGEUP;
+	GI_attrs = @default | GA_INITIATES_INPUT_HOLD_UP;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_PREVIOUS;
+//	HINT_DONT_SHOW_SHORTCUT;
+	ATTR_GEN_FOCUS_HELP = @PreviousHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @PreviousDisabledHelp;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@visMoniker PrevText = "Previous";
+@chunk char PreviousHelp[] = "Display the previous card";
+@chunk char PreviousDisabledHelp[] = "No previous card to display";
+
+@object GenTriggerClass NextTrigger = {
+	GI_visMoniker = list {@NextMoniker, @NextText};
+//	kbdAccelerator = specificUI PAGEDOWN;
+	GI_attrs = @default | GA_INITIATES_INPUT_HOLD_UP;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_NEXT;
+//	HINT_DONT_SHOW_SHORTCUT;
+	ATTR_GEN_FOCUS_HELP = @NextHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @NextDisabledHelp;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+}
+@visMoniker NextText = "Next";
+@chunk char NextHelp[] = "Display the next card";
+@chunk char NextDisabledHelp[] = "No next card to display";
+
+@object GenTriggerClass NewTrigger = {
+	GI_visMoniker = list {@NewMoniker, @NewText};
+	GI_kbdAccelerator = ctrl 'N';
+	GI_attrs = @default | GA_INITIATES_INPUT_HOLD_UP;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_NEW;
+	HINT_DONT_SHOW_SHORTCUT;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+	ATTR_GEN_FOCUS_HELP = @NewHelp;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+}
+@visMoniker NewText = "New";
+@chunk char NewHelp[] = "Create a new card";
+
+@object GenTriggerClass NotesTrigger = {
+	GI_visMoniker = list {@NotesMoniker, @NotesText};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_NOTES;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+	ATTR_GEN_FOCUS_HELP = @NotesHelp;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+}
+@visMoniker NotesText = "Notes";
+@chunk char NotesHelp[] = "Edit notes for this card";
+
+@object GenTriggerClass CalendarTrigger = {
+	GI_visMoniker = list {@CalMoniker, @CalText};
+	GI_states = @default & ~GS_ENABLED;
+//	action = MSG_ROLODEX_CALL_CALENDAR, process;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+	ATTR_GEN_FOCUS_HELP = @CalHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @CalDisabledHelp;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+}
+@visMoniker CalText = "Calendar";
+@chunk char CalHelp[] = "Search Calendar data";
+@chunk char CalDisabledHelp[] = "Select some text to find in Calendar data";
+
+@object GenTriggerClass AutoDialTrigger = {
+	GI_visMoniker = list {@DialMoniker, @DialText};
+	GI_kbdAccelerator = ctrl 'L';
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE;
+//	action = MSG_ROLODEX_AUTO_DIAL, process;
+	HINT_DONT_SHOW_SHORTCUT;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+	ATTR_GEN_FOCUS_HELP = @AutoDialHelp;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+}
+@visMoniker DialText = "Dial";
+@chunk char AutoDialHelp[] = "Use modem to dial phone";
+
+
+@end Interface;
+
+	/* The right side of the both view.  */
+
+@start	SearchResource;
+
+@object GenInteractionClass BrowseView = {
+	GI_comp = @SearchList;
+	GI_states = @default & ~GS_USABLE;
+}
+
+@object GenDynamicListClass SearchList = {
+	GIGI_numSelections = 1;
+	GIGI_destination = process;
+	GIGI_applyMsg = MSG_ROLODEX_FIND_RECORD;
+	GDLI_queryMsg = MSG_ROLODEX_REQUEST_ENTRY_MONIKER;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS =	MSG_ROLODEX_EXPAND_TO_BOTH_VIEW;
+	HINT_FIXED_SIZE = {SST_WIDE_CHAR_WIDTHS | 15, SST_LINES_OF_TEXT | 13, 13};
+}
+
+@object GenInteractionClass FileMenu = {
+	GI_comp = @RolUIDocControl, @RolImportControl, @RolExportControl,
+					@RolPrintControl;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@end SearchResource;
+
+@start	RolDocumentBlock;
+
+@object GenDocumentGroupClass RolAppDocControl = {
+	GDGI_untitledName = "Address Book";
+	GDGI_output = process;
+	GDGI_documentControl = RolUIDocControl;
+	GDGI_protocolMajor = 2;
+	GDGI_protocolMinor = 0;
+	/* don't check handles since we can be launched transparently via
+	   email */
+	ATTR_GEN_DOCUMENT_GROUP_DOCUMENT_HANDLES = 0;
+}
+
+@end	RolDocumentBlock;
+
+@start MenuResource;
+
+/***************************************************************************
+				CONTROLS
+***************************************************************************/
+
+
+	/* UI document control object */
+
+@object RolDocumentControlClass RolUIDocControl = {
+	GDCI_attrs = ((GDCM_SHARED_SINGLE << GDCA_MODE_OFFSET) |
+						GDCA_VM_FILE |
+						GDCA_SUPPORTS_SAVE_AS_REVERT |
+			 			(GDCT_NONE << GDCA_CURRENT_TASK_OFFSET));
+	GDCI_features = (@default | GDCF_SUPPORTS_USER_SETTABLE_DEFAULT_DOCUMENT)
+						  & ~GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT
+						  & ~GDCF_SUPPORTS_TEMPLATES;
+	GDCI_noNameText = "Address Book";
+	GDCI_defaultFile = "My Address Book";
+	GDCI_documentToken = {"adbk", 0};
+	GDCI_documentGroup = RolAppDocControl;
+	GDCI_importGroup = RolImportControl;
+	GDCI_exportGroup = RolExportControl;
+	GDCI_enableDisableList = RolodexEnableList;
+
+	GDCI_dialogOpenDefaultText = "Open Startup:\rOpen the Address Book startup document\r(normally \"My Address Book\").";
+	GDCI_dialogImportText = "Import:\rImport data from another address book to create a new document.";
+	GDCI_dialogUserLevelText = "Change Program Level:\rChange how simple or complex you would like Address Book to be.";
+
+	HINT_GEN_CONTROL_SCALABLE_UI_DATA [3] = {
+		{GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+			UIIL_INTRODUCTORY,
+			GDC_SUGGESTED_INTRODUCTORY_FEATURES},
+		{GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+			UIIL_BEGINNING,
+			GDC_SUGGESTED_BEGINNING_FEATURES},
+		{GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+			UIIL_INTERMEDIATE,
+		 	GDC_SUGGESTED_ADVANCED_FEATURES}
+		};
+}
+
+@chunk optr RolodexEnableList[] = {
+	 @RolodexSearchControl
+};
+
+	/* UI print control object */
+
+@object PrintControlClass RolPrintControl = {
+	GI_states = @default & ~GS_ENABLED;
+	PCI_attrs = @default & ~PCA_PAGE_CONTROLS;
+	PCI_output = process;
+	PCI_docNameOutput = @RolAppDocControl;
+	ATTR_PRINT_CONTROL_APP_UI = @PrintGroup;
+	ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP;
+}
+
+@object GenInteractionClass PrintGroup = {
+	GI_visMoniker = "Address Book Options:";
+	GI_comp = @PrintOptionList, @PrintNotes;
+	GI_states = @default & ~GS_USABLE;
+	HINT_DRAW_IN_BOX;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenItemGroupClass PrintOptionList = {
+	GI_comp = @PrintCurrent, @PrintCurrentAddress, @PrintAll,
+				 @PrintAddress, @PrintPhone;
+	GIGI_selection = 0;
+	GIGI_numSelections = 1;
+	GIGI_destination = process;
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_ROLODEX_PRINT_OPTION;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenItemClass PrintCurrent = {
+	GI_visMoniker = "Current card";
+	GII_identifier = PFF_CUR_REC;
+}
+
+@object GenItemClass PrintCurrentAddress = {
+	GI_visMoniker = "Current card - Address only (for labels / envelopes)";
+	GII_identifier = PFF_CUR_REC_ADDR;
+}
+
+@object GenItemClass PrintAll = {
+	GI_visMoniker = "All cards - Addresses, phone numbers and email";
+	GII_identifier = PFF_ALL;
+}
+
+@object GenItemClass PrintAddress = {
+	GI_visMoniker = "All cards - Addresses only (for labels / envelopes)";
+	GII_identifier = PFF_ALL_ADDR;
+}
+
+@object GenItemClass PrintPhone = {
+	GI_visMoniker = "All cards - Phone numbers and email only";
+	GII_identifier = PFF_ALL_PHONES;
+}
+
+@object GenBooleanGroupClass PrintNotes = {
+	GI_comp = @PrintNotesOnly;
+	GBGI_destination = process;
+}
+
+@object GenBooleanClass PrintNotesOnly = {
+	GI_visMoniker = "Print Notes";
+	GBI_identifier = 1;
+}
+
+@end MenuResource;
+
+		/* Used for printing to text object */
+
+@start TextObjectPrintUI;
+
+@object VisTextClass PrintTextEdit = {
+	VI_bounds = {0, 0, 8*72, 10*72};
+	VI_optFlags = @default & ~VOF_GEOMETRY_INVALID;
+	VTI_text = "";
+	VTI_charAttrRuns = ((VTDS_10 << VTDCA_SIZE_OFFSET) || VTDF_BERKELEY);
+/*	charAttrRuns = ( "VisTextDefaultCharAttr" ) {
+		0, 0, 0,		 /* underline, bold, italic */
+/*		C_BLACK,		 /* color */
+/*			VTDS_10,		 /* size */
+/*			VTDF_BERKELEY		 /* font */
+/*	}
+*/
+}
+
+@end TextObjectPrintUI;
+
+/* this next section is from the uimenu.ui file */
+@start	MenuResource;
+
+/**************************************
+ * Edit Menu
+ **************************************/
+@object GenInteractionClass EditMenu = {
+	GI_comp = @EditUndo, @RolodexEditControl, @EditRecordGroup,
+				 @RolodexSearchControl;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+}
+
+@object GenTriggerClass EditUndo = {
+	GI_visMoniker = 'U', "Undo";
+	GI_states = @default & ~GS_ENABLED;
+	GI_kbdAccelerator = specificUI alt BACKSPACE;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_UNDO;
+}
+
+@object GenEditControlClass RolodexEditControl = {
+	GII_visibility = GIV_SUB_GROUP;
+	ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI =
+		GECTF_CUT | GECTF_COPY | GECTF_PASTE;
+	ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI =
+		GECTF_UNDO | GECTF_SELECT_ALL | GECTF_DELETE;
+	ATTR_GEN_CONTROL_REQUIRE_UI =
+		GECF_CUT | GECF_COPY | GECF_PASTE | GECF_CHAR_MAP;
+	ATTR_GEN_CONTROL_PROHIBIT_UI =
+		GECF_UNDO | GECF_SELECT_ALL | GECF_DELETE | GECF_CLIP_ART;
+}
+
+@object GenInteractionClass EditRecordGroup = {
+	GI_comp = @EditDeleteRecord, @EditCopyRecord, @EditPasteRecord;
+}
+
+@object GenTriggerClass EditDeleteRecord = {
+	GI_visMoniker = 'D', "Delete Record";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_DELETE;
+}
+
+@object GenTriggerClass EditCopyRecord = {
+	GI_visMoniker = 'R', "Copy Record";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_COPY_RECORD;
+}
+
+@object GenTriggerClass EditPasteRecord = {
+	GI_visMoniker = 's', "Paste Record";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_PASTE_RECORD;
+}
+
+/**************************************
+ * View Menu
+ **************************************/
+
+@object GenInteractionClass ShowMenu = {
+	GI_comp = @ShowMenuList;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_VIEW_MENU);
+}
+
+@object GenItemGroupClass ShowMenuList = {
+	GI_comp = @ShowCard, @ShowBrowse, @ShowBoth;
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE;
+	GIGI_applyMsg = MSG_ROLODEX_CHANGE_VIEW;
+	GIGI_destination = process;
+	GIGI_numSelections = 1;
+	GIGI_selection = CARD_VIEW;
+}
+
+@object GenItemClass ShowCard = {
+	GI_visMoniker = 'C', "Card View";
+	GII_identifier = CARD_VIEW;
+}
+@object GenItemClass ShowBrowse = {
+	GI_visMoniker = 's', "Browse View";
+	GII_identifier = BROWSE_VIEW;
+}
+@object GenItemClass ShowBoth = {
+	GI_visMoniker = 'B', "Both View";
+	GII_identifier = BOTH_VIEW;
+}
+
+/**************************************
+ * Options Menu
+ **************************************/
+
+@object GenInteractionClass OptionsMenu = {
+	GI_comp = /*@SetUserLevelDialog, */@OptionsGroup, @SaveResetGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+	ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+}
+
+@object GenInteractionClass OptionsGroup = {
+	GI_comp = @StartUpViewOption, @SortOptions, @PhoneOptions;
+	ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+}
+
+@object GenInteractionClass StartUpViewOption = {
+	GI_visMoniker = 'O', "View On Start-Up";
+	GI_comp = @StartUpViewList;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+}
+
+@object GenItemGroupClass StartUpViewList = {
+	GI_comp = @StartUpCardViewEntry, @StartUpBrowseViewEntry,
+				 @StartUpBothViewEntry;
+	GIGI_numSelections = 1;
+	GIGI_selection = 0;
+	ATTR_GEN_INIT_FILE_KEY = "view";
+}
+
+@object GenItemClass StartUpCardViewEntry = {
+	GI_visMoniker = 'C', "Card View";
+	GII_identifier = 0;
+}
+@object GenItemClass StartUpBrowseViewEntry = {
+	GI_visMoniker = 's', "Browse View";
+	GII_identifier = 1;
+}
+@object GenItemClass StartUpBothViewEntry = {
+	GI_visMoniker = 'B', "Both View";
+	GII_identifier = 2;
+}
+
+@object GenInteractionClass SaveResetGroup = {
+	GI_comp = @SaveOptionsTrigger, @ResetOptionsTrigger;
+}
+
+@object GenTriggerClass SaveOptionsTrigger = {
+	GI_visMoniker = 'v', "Save Configuration";
+	GTI_destination = @RolodexApp;
+	GTI_actionMsg = MSG_META_SAVE_OPTIONS;
+}
+@object GenTriggerClass ResetOptionsTrigger = {
+	GI_visMoniker = 'e', "Reset Configuration";
+//	action = MSG_ROLODEX_APPLICATION_QUERY_RESET_OPTIONS, RolodexApp;
+}
+
+@end	MenuResource;
+
+/*
+#define RESOURCE_FOR_STRINGS	TextResource
+#define RESOURCE_FOR_USER_LEVEL_DIALOG_TOP WindowResource
+#define RESOURCE_FOR_USER_LEVEL_DIALOG_INSIDES UserLevelUI
+
+#define USER_LEVEL_APPLICATION_OBJECT	RolodexApp
+#define USER_LEVEL_SET_USER_LEVEL_MSG	MSG_ROLODEX_APPLICATION_SET_USER_LEVEL
+#define USER_LEVEL_INITIATE_FINE_TUNE_MSG	MSG_ROLODEX_APPLICATION_INITIATE_FINE_TUNE
+#define USER_LEVEL_FINE_TUNE_MSG	MSG_ROLODEX_APPLICATION_FINE_TUNE
+#define USER_LEVEL_CHANGE_USER_LEVEL_MSG	MSG_ROLODEX_APPLICATION_CHANGE_USER_LEVEL
+#define USER_LEVEL_CANCEL_USER_LEVEL_MSG	MSG_ROLODEX_APPLICATION_CANCEL_USER_LEVEL
+#define USER_LEVEL_STATUS_MSG	MSG_ROLODEX_APPLICATION_USER_LEVEL_STATUS */
+@define USER_LEVEL_FINE_TUNE_TEXT	"Fine Tune Address Book Features"
+/*
+#define USER_LEVEL_NO_ADVANCED_LEVEL
+
+#define	USER_LEVEL_INTRODUCTORY_TEXT \
+	"Introductory address book for names, addresses and phone numbers."
+
+#ifdef GPC
+#define	USER_LEVEL_BEGINNING_TEXT	\
+	"Intermediate address book with notes and searching."
+#else
+#define	USER_LEVEL_BEGINNING_TEXT	\
+	"Intermediate address book with notes, searching and quick dial."
+#endif
+
+#define	USER_LEVEL_INTERMEDIATE_TEXT	\
+	"Full-featured address book with multiple views, advanced searching, and a dynamic link to Calendar."
+
+#include "usrLevel.uih"
+
+start UserLevelUI;
+
+FeaturesList = GenBooleanGroup {
+	children =
+		NotesFeatureEntry,
+		GeoPlannerEntry,
+		UtilsMenuEntry,
+		ViewMenuEntry,
+		SearchOptionEntry,
+		SortFeatureEntry
+#if _PHONE_ICON
+		,DialFeatureEntry
+#endif
+		;
+	selectedBooleans = "DEFAULT_FEATURES";
+        hints = { HINT_ORIENT_CHILDREN_VERTICALLY }
+}
+
+NotesFeatureEntry = GenBoolean {
+	moniker = 'N', "Notes Button";
+	identifier = "mask GF_NOTES_FEATURE";
+}
+
+GeoPlannerEntry = GenBoolean {
+#ifdef GPC
+	moniker = 'C', "Calendar Button";
+#else
+	moniker = 'P', "Calendar Button";
+#endif
+	identifier = "mask GF_GEOPLANNER";
+}
+
+UtilsMenuEntry = GenBoolean {
+	moniker = 'U', "Utilities Menu";
+	identifier = "mask GF_UTILS_MENU";
+}
+
+ViewMenuEntry = GenBoolean {
+	moniker = 'V', "View Menu";
+	identifier = "mask GF_VIEW_MENU";
+}
+
+SearchOptionEntry = GenBoolean {
+	moniker = 'S', "Search Options";
+	identifier = "mask GF_SEARCH_FEATURES";
+}
+
+SortFeatureEntry = GenBoolean {
+	moniker = 'O', "Sorting Options";
+	identifier = "mask GF_SORT_OPTION";
+}
+
+#if _PHONE_ICON
+DialFeatureEntry = GenBoolean {
+	moniker = 'D', "Dialing Options";
+	identifier = "mask GF_DIAL_OPTION";
+}
+#endif
+
+end UserLevelUI;
+
+/* and this last section from the uiDialog.ui file */
+
+@start WindowResource;
+
+	/* Dialog box that pops up when you are making a phone call */
+
+@object GenInteractionClass DialSummons = {
+	GI_comp = @DialingMsg, @InstMsg, @TalkTrigger, @CancelTrigger;
+	GII_type = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	ATTR_GEN_HELP_CONTEXT = "dbDialMsg";
+}
+
+@object GenTextClass DialingMsg = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_TAIL_ORIENTED;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 50,
+							 SST_LINES_OF_TEXT | 4};
+}
+
+@object GenTextClass InstMsg = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_TAIL_ORIENTED;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 50,
+							 SST_LINES_OF_TEXT | 2};
+}
+
+@object GenTriggerClass TalkTrigger = {
+	GI_visMoniker = "Talk";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+//	action = MSG_ROLODEX_END_CALL, process;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass CancelTrigger = {
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+//	action = MSG_ROLODEX_END_CALL, process;
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+}
+
+	/* phone number list dialog box */
+
+@object GenInteractionClass PhoneNumberListBox = {
+	GI_comp = @NameDisplay, @InstDisplay, @PhoneNumberListOne,
+		@PhoneNumberListTwo, @PhoneNumberListThree, @PhoneNumberListFour,
+		@PhoneNumberListFive, @PhoneNumberListSix, @PhoneNumberListSeven;
+	GII_type = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	ATTR_GEN_HELP_CONTEXT = "dbPhoneList";
+}
+
+@object GenTextClass NameDisplay = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 50, 0};
+}
+
+@object GenTextClass InstDisplay = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_text = "Please choose the number you wish to dial.";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 50, 0};
+}
+
+@object GenInteractionClass PhoneNumberListOne = {
+	GI_comp = @PhoneNameOne, @PhoneNumberOne;
+	GI_states = @default & ~GS_USABLE;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+}
+@object GenTriggerClass PhoneNameOne = {
+	GI_visMoniker = " ";
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE
+							  | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+//	GTI_actionMsg = MSG_ROLODEX_DIAL_FROM_PHONE_LIST;
+	ATTR_GEN_TRIGGER_ACTION_DATA = 0;
+}
+@object GenTextClass PhoneNumberOne = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 35, 0};
+}
+
+@object GenInteractionClass PhoneNumberListTwo = {
+	GI_comp = @PhoneNameTwo, @PhoneNumberTwo;
+	GI_states = @default & ~GS_USABLE;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+}
+@object GenTriggerClass PhoneNameTwo = {
+	GI_visMoniker = " ";
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE
+							  | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+//	GTI_actionMsg = MSG_ROLODEX_DIAL_FROM_PHONE_LIST;
+	ATTR_GEN_TRIGGER_ACTION_DATA = 1;
+}
+@object GenTextClass PhoneNumberTwo = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 35, 0};
+}
+
+@object GenInteractionClass PhoneNumberListThree = {
+	GI_comp = @PhoneNameThree, @PhoneNumberThree;
+	GI_states = @default & ~GS_USABLE;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+}
+@object GenTriggerClass PhoneNameThree = {
+	GI_visMoniker = " ";
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE
+							  | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+//	GTI_actionMsg = MSG_ROLODEX_DIAL_FROM_PHONE_LIST;
+	ATTR_GEN_TRIGGER_ACTION_DATA = 2;
+}
+@object GenTextClass PhoneNumberThree = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 35, 0};
+}
+
+@object GenInteractionClass PhoneNumberListFour = {
+	GI_comp = @PhoneNameFour, @PhoneNumberFour;
+	GI_states = @default & ~GS_USABLE;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+}
+@object GenTriggerClass PhoneNameFour = {
+	GI_visMoniker = " ";
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE
+							  | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+//	GTI_actionMsg = MSG_ROLODEX_DIAL_FROM_PHONE_LIST;
+	ATTR_GEN_TRIGGER_ACTION_DATA = 3;
+}
+@object GenTextClass PhoneNumberFour = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 35, 0};
+}
+
+@object GenInteractionClass PhoneNumberListFive = {
+	GI_comp = @PhoneNameFive, @PhoneNumberFive;
+	GI_states = @default & ~GS_USABLE;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+}
+@object GenTriggerClass PhoneNameFive = {
+	GI_visMoniker = " ";
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE
+							  | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+//	GTI_actionMsg = MSG_ROLODEX_DIAL_FROM_PHONE_LIST;
+	ATTR_GEN_TRIGGER_ACTION_DATA = 4;
+}
+@object GenTextClass PhoneNumberFive = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 35, 0};
+}
+
+@object GenInteractionClass PhoneNumberListSix = {
+	GI_comp = @PhoneNameSix, @PhoneNumberSix;
+	GI_states = @default & ~GS_USABLE;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+}
+@object GenTriggerClass PhoneNameSix = {
+	GI_visMoniker = " ";
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE
+							  | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+//	GTI_actionMsg = MSG_ROLODEX_DIAL_FROM_PHONE_LIST;
+	ATTR_GEN_TRIGGER_ACTION_DATA = 5;
+}
+@object GenTextClass PhoneNumberSix = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 35, 0};
+}
+
+@object GenInteractionClass PhoneNumberListSeven = {
+	GI_comp = @PhoneNameSeven, @PhoneNumberSeven;
+	GI_states = @default & ~GS_USABLE;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_BOTTOM_JUSTIFY_CHILDREN;
+}
+@object GenTriggerClass PhoneNameSeven = {
+	GI_visMoniker = " ";
+	GI_attrs = @default | GA_INITIATES_INPUT_IGNORE
+							  | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+//	GTI_actionMsg = MSG_ROLODEX_DIAL_FROM_PHONE_LIST;
+	ATTR_GEN_TRIGGER_ACTION_DATA = 6;
+}
+@object GenTextClass PhoneNumberSeven = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 35, 0};
+}
+
+	/* GenInteraction that contains the Notes Field text object */ 
+
+@object NotesDialogClass NotesBox = {
+	GI_visMoniker = "Notes";
+	GI_comp = @NoteText, @CloseTrigger;
+	GI_attrs = GA_TARGETABLE;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+	HINT_INTERACTION_MAKE_RESIZABLE;
+	HINT_CENTER_WINDOW;
+	ATTR_GEN_HELP_CONTEXT = "dbNoteField";
+}
+@object GenTextClass NoteText = {
+	GI_attrs = GA_TARGETABLE;
+	GTXI_destination = process;
+	GTXI_attrs = GTA_INIT_SCROLLING;
+	GTXI_maxLength = NOTE_FIELD_LENGTH;
+	ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+	HINT_DEFAULT_FOCUS;
+	HINT_DEFAULT_TARGET;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 50, SST_LINES_OF_TEXT | 12};
+}
+@object GenTriggerClass CloseTrigger = {
+	GI_visMoniker = "Done";
+	GTI_destination = @NotesBox;
+	GTI_actionMsg = MSG_ROLODEX_SAVE_AFTER_NOTE_EDIT;
+	HINT_SEEK_REPLY_BAR;
+}
+
+	/* Impex Controllers */
+
+@object ImportControlClass RolImportControl = {
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	ICI_dataClasses = IDC_SPREADSHEET;
+	ICI_destination = RolUIDocControl;
+	ICI_message = MSG_GEN_DOCUMENT_CONTROL_OPEN_IMPORT_SELECTED;
+	ATTR_IMPORT_CONTROL_CANCEL_DESTINATION = @RolUIDocControl;
+	ATTR_IMPORT_CONTROL_CANCEL_MESSAGE =
+							MSG_GEN_DOCUMENT_CONTROL_IMPORT_CANCELLED;
+}
+
+@object ExportControlClass RolExportControl = {
+	GI_comp = @ExportClipboard;
+	GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+	ECI_dataClasses = IDC_SPREADSHEET;
+	ECI_destination = process;
+//	ECI_message = MSG_ROLODEX_CREATE_EXPORT_TRANSFER_ITEM;
+}
+
+@object GenTriggerClass ExportClipboard = {
+	GI_visMoniker = "Export to Clipboard";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+//	action = MSG_ROLODEX_EXPORT_TO_CLIPBOARD, process;
+	HINT_SEEK_REPLY_BAR;
+}
+
+	/* Phone number confirm dialog box that pops up */
+	/* when triggered by auto dial button */
+
+@object GenInteractionClass ConfirmBox = {
+	GI_comp = @ConfirmMsg, @ConfirmEditBox, @ConfirmDialTrigger;
+	GII_type = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	ATTR_GEN_HELP_CONTEXT = "dbConfirmBox";
+}
+
+@object GenTextClass ConfirmMsg = {
+	GI_attrs = GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_TAIL_ORIENTED;
+	GTXI_text = "Address Book is about to dial this number.  Make sure you have entered the exact number you wish to dial.";
+}
+
+@object GenTextClass ConfirmEditBox = {
+	GI_attrs = GA_TARGETABLE;
+	GTXI_destination = process;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+}
+
+@object GenTriggerClass ConfirmDialTrigger = {
+	GI_visMoniker = "Dial";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+//	action = MSG_ROLODEX_DIAL_CUR_NUMBER, process;
+	HINT_DEFAULT_DEFAULT_ACTION;
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_ACTION_DATA = 0;
+}
+
+@end WindowResource;
+
+
+@start MenuResource;
+	/* Area Code, Prefix, dialog box */
+
+@object GenInteractionClass PhoneOptions = {
+	GI_visMoniker = 'D', "Dialing Options";
+	GI_comp = @PrefixField, @CurrentAreaCodeField, @AssumedAreaCodeField,
+				 @PhoneListOption, @DialingOptions, @ApplyTrigger;
+	GII_type = GIT_PROPERTIES;
+	GII_visibility = GIV_DIALOG;
+	ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+	HINT_DISMISS_WHEN_DISABLED;
+	HINT_INTERACTION_RELATED_PROPERTIES;
+	ATTR_GEN_HELP_CONTEXT = "dbDialOption";
+}
+
+@object GenTextClass PrefixField = {
+	GI_visMoniker = "Long Distance Prefix:";
+	GI_attrs = GA_TARGETABLE;
+	GTXI_destination = process;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = DIAL_OPTION_TEXT_LENGTH;
+	ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | DIAL_OPTION_TEXT_LENGTH, 0};
+}
+	
+@object GenTextClass CurrentAreaCodeField = {
+	GI_visMoniker = "Current Area Code:";
+	GI_attrs = GA_TARGETABLE;
+	GTXI_destination = process;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = DIAL_OPTION_TEXT_LENGTH;
+	ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | DIAL_OPTION_TEXT_LENGTH, 0};
+}
+
+@object GenTextClass AssumedAreaCodeField = {
+	GI_visMoniker = "Assumed Area Code:";
+	GI_attrs = GA_TARGETABLE;
+	GTXI_destination = process;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = DIAL_OPTION_TEXT_LENGTH;
+	ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | DIAL_OPTION_TEXT_LENGTH, 0};
+}
+
+@object GenItemGroupClass PhoneListOption = {
+	GI_visMoniker = "When Dialing";
+	GI_comp = @ListPhone, @NotListPhone;
+	GIGI_numSelections = 1;
+	GIGI_selection = 0;
+	ATTR_GEN_INIT_FILE_KEY = "dial1";
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenItemClass ListPhone = {
+	GI_visMoniker = "Choose From List of Phone Numbers";
+	GII_identifier = 0;
+}
+
+@object GenItemClass NotListPhone = {
+	GI_visMoniker = "Always Dial First Phone Number";
+	GII_identifier = 1;
+}
+
+@object GenBooleanGroupClass DialingOptions = {
+	GI_comp = @ConfirmNumberOptionEntry, @ResetModemOptionEntry;
+	GBGI_selectedBooleans = DOF_CONFIRM;
+	ATTR_GEN_INIT_FILE_KEY = "dial2";
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenBooleanClass ConfirmNumberOptionEntry = {
+	GI_visMoniker = 'D', "Confirm Number Before Dialing";
+	GBI_identifier = DOF_CONFIRM;
+}
+
+@object GenBooleanClass ResetModemOptionEntry = {
+	GI_visMoniker = 'R', "Reset Modem Before Dialing";
+	GBI_identifier = DOF_RESET;
+}
+
+@object GenTriggerClass ApplyTrigger = {
+	GTI_destination = process;
+	GTI_actionMsg = MSG_ROLODEX_APPLY_DIAL_OPTIONS;
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+}
+
+	/* Sorting options dialog box */
+
+@object GenInteractionClass SortOptions = {
+	GI_visMoniker = 'S', "Sorting Options";
+	GI_comp = @SortOptionList;
+	GII_type = GIT_PROPERTIES;
+	GII_visibility = GIV_DIALOG;
+	HINT_DISMISS_WHEN_DISABLED;
+	ATTR_GEN_HELP_CONTEXT = "dbSortOption";
+}
+
+@object GenItemGroupClass SortOptionList = {
+	GI_comp = @NormalSortEntry, @PhoneBookSortEntry;
+	GIGI_numSelections = 1;
+	GIGI_selection = 1;
+	GIGI_destination = process;
+//	GIGI_applyMsg = MSG_ROLODEX_RESORT;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenItemClass NormalSortEntry = {
+	GI_visMoniker = "Include Spaces and Punctuation";
+	GII_identifier = 0;
+}
+
+@object GenItemClass PhoneBookSortEntry = {
+	GI_visMoniker = "Ignore Spaces and Punctuation (Phone Book Order)";
+	GII_identifier = 1;
+}
+
+	/* Search dialog box */
+	
+@object SearchReplaceControlClass RolodexSearchControl = {
+	GI_visMoniker = 'F', "Find";
+	GI_kbdAccelerator = ctrl 'f';
+	GII_visibility	= GIV_DIALOG;
+	GCI_output = process;
+	HINT_GEN_CONTROL_SCALABLE_UI_DATA [2] = {
+		{GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+			UIIL_INTRODUCTORY,
+			SRC_SUGGESTED_BEGINNING_FEATURES},
+		{GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+			UIIL_INTERMEDIATE,
+			SRC_DEFAULT_FEATURES}
+		};
+	ATTR_GEN_CONTROL_PROHIBIT_UI = SRCF_REPLACE_CURRENT | SRCF_REPLACE_ALL |
+				SRCF_SPECIAL_CHARS | SRCF_PARTIAL_WORDS | SRCF_IGNORE_CASE |
+				SRCF_WILDCARDS | SRCF_REPLACE_ALL_IN_SELECTION;
+	ATTR_GEN_CONTROL_APP_UI = @SearchOptionGroup;
+	ATTR_GEN_HELP_CONTEXT = "dbFind";
+	ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP;
+}
+
+@object GenInteractionClass SearchOptionGroup = {
+	GI_states = @default & ~GS_USABLE;
+	GI_comp = @SearchOptionList;
+}
+
+@object GenBooleanGroupClass SearchOptionList = {
+	GI_visMoniker = "Search Index Field And:";
+	GI_comp = @SearchAddresses, @SearchNotes, @SearchPhones;
+	GBGI_selectedBooleans = SOF_ADDR_SEARCH |
+				 SOF_PHONE_SEARCH |
+				 SOF_NOTE_SEARCH;
+}
+
+@object GenBooleanClass SearchAddresses = {
+	GI_visMoniker = "Addresses";
+	GBI_identifier = SOF_ADDR_SEARCH;
+}
+@object GenBooleanClass SearchNotes = {
+	GI_visMoniker = "Notes";
+	GBI_identifier = SOF_NOTE_SEARCH;
+}
+@object GenBooleanClass SearchPhones = {
+	GI_visMoniker = "Phone Numbers";
+	GBI_identifier = SOF_PHONE_SEARCH;
+}
+
+@end MenuResource;
+
+/*
+#if _IMPEX_MERGE
+
+start ImpexDialogResource;
+
+ImpexMergeDialog = GenInteraction {
+	moniker = "Select Merge Action";
+	visibility = dialog;
+	type = multipleResponse;
+	attributes = modal, notUserInitiatable, initiatedViaUserDoDialog;
+	children = ImpexMergeRecordName,
+		ImpexMergeActionGroup,
+		ImpexMergeForAllTrigger, ImpexMergeForThisTrigger;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT {
+			char	"dbImpexMerge", 0
+		}
+	}
+}
+
+ImpexMergeRecordName = GenText {
+	genAttributes = default +readOnly;
+	moniker = "Duplicate Record Name:";
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+	textDisplayAttributes = singleLineText;
+}
+
+ImpexMergeActionGroup = GenItemGroup {
+	moniker = "Possible Actions:";
+	children = ImpexMergeActionDuplicate,
+		   ImpexMergeActionReplace,
+		   ImpexMergeActionUpdate,
+		   ImpexMergeActionAugment;
+	selection = "IMS_DUPLICATE";
+	numSelections = 1;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_ALLOW_CHILDREN_TO_WRAP
+	}
+}
+
+ImpexMergeActionDuplicate = GenItem {
+	moniker = 'n', "Create new record";
+	identifier = IMS_DUPLICATE;
+}
+
+ImpexMergeActionReplace = GenItem {
+	moniker = 'R', "Replace existing record";
+	identifier = IMS_REPLACE;
+}
+
+ImpexMergeActionUpdate = GenItem {
+	moniker = 'U', "Update existing record";
+	identifier = IMS_UPDATE;
+}
+
+ImpexMergeActionAugment = GenItem {
+	moniker = 'A', "Augment existing record";
+	identifier = IMS_AUGMENT;
+}
+
+ImpexMergeForAllTrigger = GenTrigger {
+	moniker = 'D', "Don't Ask Again";
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word IC_YES
+		},
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION
+	}
+	genAttributes = default +signalInteractionComplete;
+}
+
+ImpexMergeForThisTrigger = GenTrigger {
+	moniker = 'T', "This Conflict Only";
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word IC_NO
+		},
+		HINT_SEEK_REPLY_BAR
+	}
+	genAttributes = default +signalInteractionComplete;
+}
+
+end	ImpexDialogResource;
+#endif /* _IMPEX_MERGE */
+
+
+

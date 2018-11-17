@@ -1,0 +1,1826 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mainUtils.goc
+ *
+ * DESCRIPTION:
+ *	Utilities for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+#include "vm.h"
+#include "sem.h"
+#include "hugearr.h"
+#include <Ansi/stdlib.h>
+#include <geoMisc.h>
+
+
+#ifdef __BORLANDC__
+#pragma codeseg UtilCode
+#endif
+
+void FixupIndexArray(optr indexArray, word index);
+
+
+/**************************************************************
+*          
+* FUNCTION:        GotoTopLevelDirectory
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:
+*         Go to the top-level mail directory
+***************************************************************/
+
+void
+GotoTopLevelDirectory(void)
+{
+    TCHAR *mdName;
+
+    mdName = MailLockStdString(MSS_MAIL_DIR);
+    FileSetCurrentPath(SP_PRIVATE_DATA, mdName);
+    MailUnlockStdString(MSS_MAIL_DIR);
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        GotoMailDirectory()
+* PASS:            subFolder - ptr to name of sub-folder
+* RETURN:          none
+* DESCRIPTION:
+*         Go to a Mail directory
+*
+***************************************************************/
+
+void
+GotoMailDirectory(const TCHAR *subFolder)
+{
+	TCHAR *mdName;
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+		  MemHandle mh;
+	TCHAR *dName;
+	word curAcct;
+@endif
+
+	mdName = MailLockStdString(MSS_MAIL_DIR);
+        FileSetCurrentPath(SP_PRIVATE_DATA, mdName);
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+	curAcct = @call PfAccountList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	mh = @call PfAccountList::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(curAcct);
+	dName = MemLock(mh);
+	FileSetCurrentPath(0, dName);
+	MemFree(mh);
+@else
+	FileSetCurrentPath(0, mdName);
+@endif
+		  if (subFolder) {
+	    FileSetCurrentPath(0, subFolder);
+	}
+        MailUnlockStdString(MSS_MAIL_DIR);
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        LockStrings()
+* PASS:            none
+* RETURN:          ptr to strings block (seg addr)
+***************************************************************/
+
+void *
+LockStrings()
+{
+        return(MemLock(OptrToHandle(@addrBookFileName)));
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        UnlockStrings()
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+
+void
+UnlockStrings()
+{
+        MemUnlock(OptrToHandle(@addrBookFileName));
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        IsEmptyChunk()
+ * PASS:            str - optr of string
+ * RETURN:          non-zero if contains nothing but whitespace
+ * DESCRIPTION:
+ *         Check is a chunk contains a non-empty string,
+ *         i.e., one or more non-whitespace characters
+ ***************************************************************/
+
+Boolean
+IsEmptyChunk(optr str)
+{
+    Boolean nb = FALSE;
+    TCHAR *s;
+
+    MemLock(OptrToHandle(str));
+    s = LMemDeref(str);
+    while (*s && !nb) {
+	nb = !LocalIsSpace(*s);
+	s++;
+    }
+    MemUnlock(OptrToHandle(str));
+    return(!nb);
+}
+
+Boolean
+IsEmptyText(optr textObj)
+{
+    MemHandle mh = @call textObj::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    Boolean nb = FALSE;
+    TCHAR *s;
+
+    s = MemLock(mh);
+    while (*s && !nb) {
+	nb = !LocalIsSpace(*s);
+	s++;
+    }
+    MemFree(mh);
+    return(!nb);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        FitStringInField()
+ * PASS:            gs:     GState to use (attrs set)
+ *                  buf:    string to change (will be modified)
+ *                  width:  width to fit in
+ * RETURN:          none 
+ * DESCRIPTION:
+ *         Truncate a string as necessary to fit in the space allowed.
+ ***************************************************************/
+
+void
+FitStringInField(GStateHandle gs, char *buf, word width)
+{
+	int i = strlen(buf)-1;
+
+	while (i > 0 && GrTextWidth(gs, buf, 0) > width) {
+	    buf[i] = C_ELLIPSIS;
+	    buf[i+1] = '\0';
+	    i--;
+	}
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        GetUIFontHeight()
+ * PASS:            gs - GState to use
+ * RETURN:          gs - font size set
+ *                  height - height of font
+ ***************************************************************/
+
+sword
+GetUIFontHeight(GStateHandle gs)
+{
+        WWFixedAsDWord pointSize;
+
+	GrGetFont(gs, &pointSize);
+	return(pointSize >> 16);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        SetUIFontPointsize()
+ * PASS:            gs - GState to use
+ * RETURN:          gs - font & pointsize set to UI values
+ * DESCRIPTION:
+ *         Set the font & pointsize to those used by the UI
+ ***************************************************************/
+
+void
+SetUIFontPointsize(optr oslf, GStateHandle gs)
+{
+    WWFixedAsDWord pointSize;
+    FontID font;
+    GStateHandle uigs;
+
+    uigs = @call oslf::MSG_VIS_VUP_CREATE_GSTATE();
+    font = GrGetFont(uigs, &pointSize);
+    GrSetFont(gs, font, pointSize);
+    GrDestroyState(uigs);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        RebuildFolderList()
+ * DESCRIPTION:     rebuild the folder list
+ *
+ * PASS:            selection - item to select (MailFolderID)
+ *                  rescan - TRUE to just rescan
+ * RETURN:          none
+ * DESCRIPTION:
+ *         
+ ***************************************************************/
+
+void
+RebuildFolderList(sword selection, Boolean rescan)
+{
+        word numFolders;
+
+	if (selection == MFID_LEAVE_SELECTION) {
+	    selection = @call TheFolderList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	}
+	/*
+	 * if not just rescanning, init the folder name array
+	 */
+	if (!rescan) {
+	    @call TheFolderList::MSG_FOLDER_LIST_INIT_NAME_ARRAY();
+	}
+	numFolders = @call TheFolderList::MSG_FOLDER_LIST_GET_NUM_FOLDERS();
+	@call TheFolderList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numFolders);
+
+	@call TheFolderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, 0);
+	@call TheFolderList::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(0);
+	/*
+	 * close the mail read window so it doesn't display
+	 * anything unpredictable to the user
+	 */
+	@call ReadMailWin::MSG_GEN_DISPLAY_CLOSE();
+}
+
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        ParseDateTimeWithTimezone
+ *
+ * PASS:            dateString - ptr to date/time string
+ *                  timedate - ptr to MailTime structure
+ * RETURN:          -1 if parsed OK
+ *                  timedate - filled in
+ * DESCRIPTION:
+ *         parse a date & time with a timezone
+ *
+ *	1/27/04	jfh	revised so that it reads the English and not
+ *						localized dow and month
+ *
+ *                I'm assuming that the date field is in the proper
+ *                RFC2822 format
+ *
+ * 4/1/04	jfh	Berndt send me an email that crashes - it does NOT
+ *						comply w/RFC2822.  It has no DOW.  So I'm adding a
+ *						check for that instance
+ *
+ ***************************************************************/
+sword
+ParseDateTimeWithTimezone(TCHAR *dateString, MailTime *timedate)
+{
+ char *e1, *e2;
+ word retVal, i;
+ dword numVal;
+ optr month[] = {@JanStr, @FebStr, @MarStr, @AprStr, @MayStr, @JunStr,
+					  @JulStr, @AugStr, @SepStr, @OctStr, @NovStr, @DecStr};
+ char	numStr[10];
+ TimerDateAndTime	time;
+
+
+    /*
+	  * Dy, DD Mmm YY HH:MM:SS +-timezone
+	  * Day, DD Mmm YYYY HH:MM:SS +-timezone - jfh
+	  *
+     * We need to strip off the timezone, if it exists,
+     * otherwise LocalCustomParseDateTime() gets confused.
+     * To do this, we find the last colon, then look for the
+     * first space after it, i.e., the space between the seconds
+     * and the timezone
+	  */
+	e1 = strrchr(dateString, ':');
+	if (e1) {
+		e2 = strchr(e1, ' ');
+		if (e2) {
+			e2[0] = 0;  /* null term dateString after time */
+			/* suck up white space after time */
+			i = 1;
+			while(e2[i] == ' ') {
+				i++;
+				}
+			e2 += i;
+			/* parse the timezone */
+			timedate->MT_timezone = ParseTimezone(e2);
+			}
+		else {
+			/*
+			 * no timezone, use GMT
+			 */
+			timedate->MT_timezone = 0;
+			}
+		}
+
+/*	LockStrings();
+	retVal = LocalCustomParseDateTime(dateString,
+				      LMemDeref(@dateFormatStr),
+				      &timedate->MT_time);
+	if (!retVal) {
+		retVal = LocalCustomParseDateTime(dateString,
+					  LMemDeref(@dateFormatStrAlt1),
+					  &timedate->MT_time);
+		/* Must calculate Day-of-Week, as it is used later */
+/*		if (retVal) {
+			timedate->MT_time.TDAT_dayOfWeek = LocalCalcDayOfWeek(
+										timedate->MT_time.TDAT_year,
+										timedate->MT_time.TDAT_month,
+										timedate->MT_time.TDAT_day);
+			}
+		}
+	UnlockStrings();
+	return(retVal);
+*/
+
+	/* Test to see if the first chars are the DOW or the day.  If a letter
+		we'll assume a DOW, if not we'll assume a day */
+	if (!LocalIsNumChar(dateString[0])) {
+		/* skip the dow, we'll calc it */
+		i = 0;
+		while(dateString[i] != ' ') {
+			i++;
+			}
+		dateString += i;
+		/* suck up white space after dow */
+		i = 0;
+		while(dateString[i] == ' ') {
+			i++;
+			}
+		dateString += i;
+		}
+
+	/* get the day */
+	strcpy(numStr, dateString);
+	i = 0;
+	while(numStr[i] != ' ') {
+		i++;
+		}
+	numStr[i] = 0;
+	UtilAsciiToHex32(numStr, &numVal);
+	timedate->MT_time.TDAT_day = (word)numVal;
+	/* suck up white space after day */
+	dateString += i;
+	i = 0;
+	while(dateString[i] == ' ') {
+		i++;
+		}
+	dateString += i;
+
+	/* get the month */
+	LockStrings();
+	for (i = 0; i < 12; i++) {
+		if (!strncmp(dateString, LMemDeref(month[i]), 3)) {
+			timedate->MT_time.TDAT_month = i + 1;
+			break;
+			}
+		}
+	UnlockStrings();
+	if (i == 12) {
+		/* couldn't match a month - stuff in Dec */
+		timedate->MT_time.TDAT_month = 12;
+		}
+	/* suck up month */
+	i = 0;
+	while(dateString[i] != ' ') {
+		i++;
+		}
+	/* suck up white space after month */
+//	dateString += i;
+//	i = 0;
+	while(dateString[i] == ' ') {
+		i++;
+		}
+	dateString += i;
+
+	/* get the year */
+	strcpy(numStr, dateString);
+	i = 0;
+	while(numStr[i] != ' ') {
+		i++;
+		}
+	numStr[i] = 0;
+	UtilAsciiToHex32(numStr, &numVal);
+   /* OK - I'll test for 2 digit year */
+	if (strlen(numStr) == 2) numVal += 2000;
+	timedate->MT_time.TDAT_year = (word)numVal;
+
+	/* and fill in the day of the week */
+	timedate->MT_time.TDAT_dayOfWeek = LocalCalcDayOfWeek(
+										timedate->MT_time.TDAT_year,
+										timedate->MT_time.TDAT_month,
+										timedate->MT_time.TDAT_day);
+
+	/* suck up white space after year */
+	dateString += i;
+	i = 0;
+	while(dateString[i] == ' ') {
+		i++;
+		}
+	dateString += i;
+
+	/* now I can get the time with the normal routine */
+	retVal = LocalCustomParseDateTime(dateString,
+					  LMemDeref(@timeFormatStr),
+					  &time);
+	/* and copy it into our structure */
+	timedate->MT_time.TDAT_hours = time.TDAT_hours;
+	timedate->MT_time.TDAT_minutes = time.TDAT_minutes;
+	timedate->MT_time.TDAT_seconds = time.TDAT_seconds;
+
+   return (-1);
+
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        ReportWarning()
+ * DESCRIPTION:     report a warning
+ *
+ * PASS:            warnMsg - chunk of warning message in STRINGS
+ *                  opt1Str - argument #1 string (NULL if none)
+ * RETURN:          none
+ ***************************************************************/
+
+void
+ReportWarning(optr warnMsg, TCHAR *opt1Str, TCHAR *opt2Str)
+{
+    MemLock(OptrToHandle(warnMsg));
+    @call MailAppObj::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+	0,       /* dialogMethod */
+	0,       /* dialogOD */
+	NULL,    /* helpContext */
+	NULL,    /* customTriggers */
+	opt2Str,  /* arg2 */
+	opt1Str,  /* arg1 */
+	LMemDeref(warnMsg), /* string */
+	(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+	/* interaction type */
+	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+	);
+    MemUnlock(OptrToHandle(warnMsg));
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        ReportError()
+ * DESCRIPTION:     report an error
+ *
+ * PASS:            errorMsg - chunk of error message in STRINGS
+ *                  optStr - argument #1 string (NULL if none)
+ * RETURN:          none
+ ***************************************************************/
+
+void
+ReportError(optr errorMsg, TCHAR *optStr)
+{
+    MemLock(OptrToHandle(errorMsg));
+    @call MailAppObj::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+	0,       /* dialogMethod */
+	0,       /* dialogOD */
+	NULL,    /* helpContext */
+	NULL,    /* customTriggers */
+	NULL,    /* arg2 */
+	optStr,  /* arg1 */
+	LMemDeref(errorMsg), /* string */
+	(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+	/* interaction type */
+	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+	);
+    MemUnlock(OptrToHandle(errorMsg));
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        ReportOK()
+ * DESCRIPTION:     report an OK condition
+ *
+ * PASS:            okMsg - chunk of OK message in STRINGS
+ *                  opt1Str - argument #1 string (NULL if none)
+ * RETURN:          none
+ ***************************************************************/
+
+void
+ReportOK(optr okMsg, TCHAR *opt1Str)
+{
+    MemLock(OptrToHandle(okMsg));
+
+    @call MailAppObj::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+	0,       /* dialogMethod */
+	0,       /* dialogOD */
+	NULL,    /* helpContext */
+	NULL,    /* customTriggers */
+	NULL,    /* arg2 */
+	opt1Str, /* arg1 */
+	LMemDeref(okMsg), /* string */
+	(CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+	/* interaction type */
+	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+	);
+    MemUnlock(OptrToHandle(okMsg));
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        DoYesNo()
+ * DESCRIPTION:     Put up a yes/no dialog
+ *
+ * PASS:            dlgMsg - chunk of message in STRINGS
+ *                  optStr - argument #1 string (NULL if none)
+ * RETURN:          InteractionCommand of response (IC_YES or IC_NO)
+ ***************************************************************/
+
+static const StandardDialog2ResponseTriggerTable yesNoTrigs = {
+    2,
+    {@yesMoniker, IC_YES}, \
+    {@noMoniker, IC_NO} \
+};
+
+word
+DoYesNo(optr dlgMsg, char *optStr)
+{
+        word retVal;
+
+        (void *) MemLock(OptrToHandle(dlgMsg));
+        retVal = UserStandardDialog(
+			   (char *) NULL,
+			   /* GIT_MULTIPLE_RESPONSE, so custom */
+			   &yesNoTrigs,
+			   /* 1 string argument */
+			   (char *) NULL,
+			   optStr,
+			   /* dialog string */
+			   LMemDeref (dlgMsg),
+			   /* dialog type */
+			   (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+			   /* interaction type */
+			   (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)
+			   );
+	MemUnlock(OptrToHandle(dlgMsg));
+
+	return(retVal);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        DoCustomDB()
+ * DESCRIPTION:     Put up a DB with custom buttons dialog
+ *
+ * PASS:            dlgMsg - chunk of message in STRINGS
+ *                  optStr - argument #1 string (NULL if none)
+ *                  trigs - ptr to StandardDialogResponse table
+ * RETURN:          InteractionCommand of response
+ ***************************************************************/
+
+
+word
+DoCustomDB(optr dlgMsg, char *optStr, byte *trigs)
+{
+        word retVal;
+
+        (void *) MemLock(OptrToHandle(dlgMsg));
+        retVal = UserStandardDialog(
+			   (char *) NULL,
+			   /* GIT_MULTIPLE_RESPONSE, so custom */
+			   (char *) trigs,
+			   /* 1 string argument */
+			   (char *) NULL,
+			   optStr,
+			   /* dialog string */
+			   LMemDeref (dlgMsg),
+			   /* dialog type */
+			   (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+			   /* interaction type */
+			   (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)
+			   );
+	MemUnlock(OptrToHandle(dlgMsg));
+
+	return(retVal);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    MoveMessageFile
+ * PASS:            fileName - source fileName
+ *                  srcDir - source directory
+ *                  destDir - destination directory
+ *                  newName - ptr to location for new name block (0 for none)
+ * RETURN:	    none
+ * DESCRIPTION:
+ *        Move a message from one directory to the another,
+ *        creating a new file name as needed
+ ***********************************************************************/
+
+void
+MoveMessageFile (TCHAR *fileName, TCHAR *srcDir, TCHAR *destDir, MemHandle *newName)
+{
+    PathName destName;
+    FileLongName tempName;
+    MemHandle nameHandle;
+    char *buf;
+    word i,j;
+
+    GotoMailDirectory(srcDir);
+    tempName[0] = NULL;
+    
+    for (i=0;i<9999;+i) {
+	j = (word)TimerGetCount();
+	j = j % 9999;
+	sprintf(tempName,"%d%d.TMP",j,i);
+	sprintf(destName,"..\\%s\\%s",destDir,tempName);
+	if (!FileMove(fileName,destName,NULL, NULL)) {
+	    break;
+	}
+    }
+    EC_ERROR_IF(i >= 9999,-1);
+    /*
+     * if desired, return the name of the new file
+     */
+    if (newName) {
+        nameHandle = MemAlloc(sizeof(FileLongName), HF_DYNAMIC, HAF_STANDARD|HAF_NO_ERR);
+	buf = MemLock(nameHandle);
+	strcpy((TCHAR *)buf, tempName);
+	MemUnlock(nameHandle);
+	*newName = nameHandle;
+    }
+}	/* End of MoveMessageFile	*/
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    ReadAttachments
+ * PASS:            mh - handle of lmem block for chunk array
+ *                  fileHan - handle of file
+ * RETURN:	    none
+ * DESCRIPTION:
+ *        read any attachments for a message
+ ***********************************************************************/
+void
+ReadAttachments(MemHandle mh, FileHandle fileHan)
+{
+    MemHandle hdrHan, hdrData;
+    TCHAR *scp, *hdr, *fName, *afn;
+    AttachFilePath *afp;
+
+    MemLock(mh);
+    ChunkArrayZero(ME_FIRST_CHUNK);
+    /*
+     * get the mail header
+     */
+    hdrHan = MailReadHeaders(fileHan);
+    afn = MailLockStdString(MSS_ATTACH_FIELD_NAME);
+    hdrData = MailGetHeader(hdrHan, afn);
+    MailUnlockStdString(MSS_ATTACH_FIELD_NAME);
+    MemFree(hdrHan);
+    if (hdrData) {
+	/*
+	 * for each attachment, append it to the array
+	 */
+	hdr = MemLock(hdrData);
+	scp = hdr;
+	while (scp) {
+	    scp = strchr(hdr, ';');
+	    if (scp) {
+		scp[0] = 0;
+		afp = ChunkArrayAppend(ME_FIRST_CHUNK, sizeof(AttachFilePath));
+		strcpy(afp->AFP_full, hdr);
+		/*
+		 * find the filename
+		 */
+		fName = strrchr(afp->AFP_full, '\\')+1;
+		if (FileGetPathExtAttributes(afp->AFP_full, FEA_NAME, afp->AFP_file, sizeof(FileLongName))) {
+		    /*
+		     * if an error, just use the DOS name
+		     */
+		    strcpy(afp->AFP_file, fName);
+		} else {
+		    /*
+		     * if a longname, replace the DOS name with it
+		     */
+		    strcpy(fName, afp->AFP_file);
+		}
+		/*
+		 * skip beyond space, if any
+		 */
+		hdr = scp+1;
+		if (*hdr == ' ') {
+		    hdr++;
+		}
+	    }
+	}
+	MemFree(hdrData);
+    }
+    MemUnlock(mh);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    DeleteMessageFile
+ * PASS:            fileName - filename
+ * RETURN:	    error (0 for none)
+ * DESCRIPTION:
+ *        delete a message file and any attachments
+ ***********************************************************************/
+
+Boolean
+_pascal DeleteAttachmentCB(void *el, void *retVal)
+{
+    AttachFilePath *p1 = el;
+    DMStruct *r1 = retVal;
+    StandardPath stdPath;
+    TCHAR *p, *mdName;
+
+    /*
+     * only delete attachments in our directory, i.e., incoming
+     * or forwarded attachments under SP_PRIVATE_DATA\Mail
+     */
+    p = p1->AFP_full;
+    stdPath = FileParseStandardPath(0, &p);
+    mdName = MailLockStdString(MSS_MAIL_DIR);
+    if (stdPath == SP_PRIVATE_DATA && !strncmp(p, mdName, strlen(mdName))) {
+	/*
+	 * set the file writable so we can delete it
+	 */
+	FileSetAttributes(p1->AFP_full, FILE_ATTR_NORMAL);
+	r1->DM_err = FileDelete(p1->AFP_full);
+    }
+    MailUnlockStdString(MSS_MAIL_DIR);
+    return(r1->DM_err && (r1->DM_err != ERROR_FILE_NOT_FOUND));
+}
+
+word
+DeleteMessageFile (TCHAR *fileName)
+{
+    FileHandle fh;
+    MemHandle mh;
+    word err;
+    DMStruct dms;
+
+    mh = CreateChunkArrayBlock(sizeof(AttachFilePath));
+    fh = FileOpen(fileName, FILE_ACCESS_R|FILE_DENY_W);
+    if (!fh) {
+	return(ThreadGetError());
+    }
+    ReadAttachments(mh, fh);
+    FileClose(fh, FALSE);
+    dms.DM_err = 0;
+    ChunkArrayEnum(ME_FIRST_CHUNK, &dms, DeleteAttachmentCB);
+    MemFree(mh);
+    if (!dms.DM_err || (dms.DM_err == ERROR_FILE_NOT_FOUND)) {
+	FileSetAttributes(fileName, FILE_ATTR_NORMAL);
+	err = FileDelete(fileName);
+    } else {
+	err = dms.DM_err;
+    }
+    return(err);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    CreateChunkArrayBlock
+ * PASS:            entrySize - sizeof array entries
+ * RETURN:	    handle of lmem block (locked)
+ * DESCRIPTION:
+ *        create a chunk array in an lmem block
+ ***********************************************************************/
+MemHandle
+CreateChunkArrayBlock (word entrySize)
+{
+    MemHandle mh;
+
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    MemLock(mh);
+    LMemAlloc(mh, 0);
+    ChunkArrayCreateAt(ME_FIRST_CHUNK, entrySize, 0, 0);
+    return(mh);
+}
+
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    EmptyChunkArray
+ * PASS:            mh - handle, if any of array
+ *                  entrySize - size of array entries
+ * RETURN:	    handle of lmem block, locked
+ * DESCRIPTION:
+ *        ensure an empty chunk array exists
+ ***********************************************************************/
+MemHandle
+EmptyChunkArray (MemHandle mh, word entrySize)
+{
+    if (!mh) {
+        /*
+	 * if no block, allocate one
+	 */
+	mh = CreateChunkArrayBlock(entrySize);
+    } else {
+        /*
+	 * reset array to no entries
+	 */
+        MemLock(mh);
+	ChunkArrayZero(ME_FIRST_CHUNK);
+    }
+    return(mh);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    DoReplaceAll
+ * PASS:            textObj - optr of text object
+ *                  searchStr - ptr to search string
+ *                  replaceStr - ptr to replace string
+ * RETURN:	    none
+ * DESCRIPTION:
+ *        Do a replace all on the specified text object
+ ***********************************************************************/
+void
+DoReplaceAll(optr textObj, TCHAR *searchStr, TCHAR *replaceStr)
+{
+    MemHandle mh;
+    SearchReplaceStruct *srch;
+    word sLen = strlen(searchStr)+1;
+    word rLen = strlen(replaceStr)+1;
+
+    /*
+     * allocate and initialize a SearchReplaceStruct
+     */
+    mh = MemAlloc(sizeof(SearchReplaceStruct) + sLen + rLen,
+		  HF_DYNAMIC, HAF_STANDARD|HAF_ZERO_INIT);
+    srch = MemLock(mh);
+    srch->searchSize = sLen;
+    srch->replaceSize = rLen;
+    srch->params = SO_START_FROM_TOP;
+    srch->replyObject = NULL;
+    srch->replyMsg = NULL;
+    /*
+     * copy the strings to immediately after after the struct
+     */
+    strcpy((TCHAR *) srch + sizeof(SearchReplaceStruct), searchStr);
+    strcpy((TCHAR *) srch + sizeof(SearchReplaceStruct) + sLen, replaceStr);
+    /*
+     * do the replace
+     */
+    @call textObj::MSG_REPLACE_ALL_OCCURRENCES(mh, TRUE);
+}
+
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    GetDefaultAccount
+ * PASS:            acctName - ptr to buffer (FileLongName)
+ * RETURN:	    acctName - filled in
+ * DESCRIPTION:
+ *        Get the name of the default account
+ ***********************************************************************/
+char defKey[] = "defacct";
+
+void
+GetDefaultAccount(TCHAR *acctName)
+{
+    word dSize;
+    TCHAR mailCat[INI_CATEGORY_BUFFER_SIZE];
+    TCHAR *mdName;
+
+    @call MailAppObj::MSG_META_GET_INI_CATEGORY(mailCat);
+    if (InitFileReadStringBuffer(mailCat, defKey, acctName, sizeof(FileLongName), &dSize)) {
+	mdName = MailLockStdString(MSS_MAIL_DIR);
+        strcpy(acctName, mdName);
+	MailUnlockStdString(MSS_MAIL_DIR);
+    }
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        OpenMessageListFile
+ * PASS:            folder name
+ *
+ * RETURN:          none 
+ * DESCRIPTION:
+ *  Opens the message list file in the folderName directory
+ *
+ ***************************************************************/
+
+VMFileHandle OpenMessageListFile(TCHAR *folderName)
+{
+    VMFileHandle vmf;
+    
+    GotoMailDirectory(folderName);
+    LockStrings();
+    vmf = VMOpen(LMemDeref(@msglistName),VMAF_FORCE_READ_WRITE ,VMO_OPEN,0);
+    UnlockStrings();
+    return vmf;
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        CreateMessageListFile
+ * PASS:            folder name
+ *
+ * RETURN:          none 
+ * DESCRIPTION:
+ *  Create a new message list file in the folderName directory
+ *
+ ***************************************************************/
+VMFileHandle CreateMessageListFile(TCHAR *folderName)
+{
+    VMFileHandle vmf;
+    VMBlockHandle vmbh;
+    MemHandle mh,mhi;
+    MessageListArray *mla;
+    
+    GotoMailDirectory(folderName);
+    LockStrings();
+    vmf = VMOpen(LMemDeref(@msglistName),VMAF_FORCE_READ_WRITE ,VMO_CREATE,0);
+    UnlockStrings();
+    if (!vmf) {
+        ReportError(@unableToRecoverStr, NULL);
+	return NULL;
+    }
+    
+    vmbh = VMGetMapBlock(vmf);
+    if (!vmbh) {
+	/* Must be a new msglist file
+	 */
+	vmbh = VMAlloc(vmf,sizeof(MessageListArray),0);
+	VMLock(vmf,vmbh,&mh);
+	VMDirty(mh);
+	mla = MemDeref(mh);
+	mla->MLA_sortType = SMBT_DATE;
+	mla->MLA_version = (MLA_MAJOR << 16) & (MLA_MINOR);
+	/* Create the huge array of message entries
+	 */
+	mla->MLA_array = HugeArrayCreate(vmf,sizeof(MessageListStruct),0);
+	/* Create the chunk array for the index to the huge array
+	 */
+	mhi = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+	MemLock(mhi);
+	mla->MLA_indexChunk = ChunkArrayCreate(mhi, sizeof(MessageIndexStruct), 0, 0);
+	MemUnlock(mhi);
+	mla->MLA_indexHandle = VMAttach(vmf,0,mhi);
+	VMLock(vmf,mla->MLA_indexHandle,&mhi);
+	VMDirty(mhi);
+	VMUnlock(mhi);
+	VMUnlock(mh);
+	VMSetMapBlock(vmf,vmbh);
+    } 
+    return vmf;
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        GetMessageListArray
+ * PASS:            VMFileHandle
+ *
+ * RETURN:          none 
+ * DESCRIPTION:
+ *  Get the VMBlockHandle of the message list array in the passed 
+ *  vmfile
+ *
+ ***************************************************************/
+VMBlockHandle GetMessageListArray(VMFileHandle vmf) 
+{
+    VMBlockHandle vmbh, vmbhArray;
+    MemHandle mh;
+    MessageListArray *mla;
+
+    vmbh = VMGetMapBlock(vmf);
+    if (vmbh) {
+	mla = VMLock(vmf,vmbh,&mh);
+	vmbhArray = mla->MLA_array;
+	VMUnlock(mh);
+	return(vmbhArray);
+    } else {
+	return NULL;
+    }
+}
+
+void SetMessageListArray(VMFileHandle vmf, VMBlockHandle vmbhArray) 
+{
+    VMBlockHandle vmbh;
+    MemHandle mh;
+    MessageListArray *mla;
+
+    vmbh = VMGetMapBlock(vmf);
+    VMLock(vmf,vmbh,&mh);
+    mla = MemDeref(mh);
+    mla->MLA_array = vmbhArray;
+    VMDirty(mh);
+    VMUnlock(mh);
+
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        Get/SetMessageListSortType
+ * PASS:            VMFileHandle 
+ *                  SortMessageByType (SetMessageListSortType)
+ *
+ * RETURN:          none 
+ * DESCRIPTION:
+ *  
+ *
+ ***************************************************************/
+SortMessageByType GetMessageListSortType(VMFileHandle vmf)
+{
+    VMBlockHandle vmbh;
+    MemHandle mh;
+    MessageListArray *mla;
+    SortMessageByType sortType;
+
+    vmbh = VMGetMapBlock(vmf);
+    if (vmbh) {
+	mla = VMLock(vmf,vmbh,&mh);
+	sortType = mla->MLA_sortType;
+	VMUnlock(mh);
+	return sortType;
+    } else {
+	/* should never get to this case */
+	EC_ERROR (-1);
+	return SMBT_SENDER;
+    }
+}
+
+void SetMessageListSortType(VMFileHandle vmf, SortMessageByType sortType)
+{
+    VMBlockHandle vmbh;
+    MemHandle mh;
+    MessageListArray *mla;
+    
+    vmbh = VMGetMapBlock(vmf);
+    if (vmbh) {
+	mla = VMLock(vmf,vmbh,&mh);
+	mla->MLA_sortType = sortType;
+	VMDirty(mh);
+	VMUnlock(mh);
+    } else {
+	/* should never get to this case */
+	EC_ERROR (-1);
+    }
+}	
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        LockIndexArray
+ * PASS:            VMFileHandle
+ *
+ * RETURN:          optr
+ * DESCRIPTION:
+ *  Lock the index array to the message list array, fixing up 
+ * the LMemHeader.
+ *
+ ***************************************************************/
+optr LockIndexArray(VMFileHandle vmf, VMBlockHandle *retVMBH)
+{
+    VMBlockHandle vmbh, vmbhIndex;
+    MemHandle mh,mhi;
+    ChunkHandle indexArray;
+    MessageListArray *mla;
+    word *p;
+
+    vmbh = VMGetMapBlock(vmf);
+    VMLock(vmf,vmbh,&mh);
+    VMDirty(mh);
+    mla = MemDeref(mh);
+    vmbhIndex = mla->MLA_indexHandle;
+    VMLock(vmf,vmbhIndex,&mhi);
+    p = MemDeref(mhi);
+    p[0]=mhi;
+    indexArray=mla->MLA_indexChunk;
+    VMUnlock(mh);
+    
+    if (retVMBH) {
+	*retVMBH = vmbhIndex;
+    }
+    return ConstructOptr(mhi,indexArray);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        UnlockIndexArray
+ * PASS:            MemHandle of index array
+ *
+ * RETURN:          nothing
+ * DESCRIPTION:
+ *  Unlock the index array to the message list array
+ *
+ ***************************************************************/
+void UnlockIndexArray(MemHandle mh)
+{
+    VMUnlock(mh);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        ResetIndexArray
+ * PASS:            VMFileHandle
+ *
+ * RETURN:          nothing
+ * DESCRIPTION:
+ *  Delete the existing index array to the message list array, 
+ * and create a new one.
+ *
+ ***************************************************************/
+void ResetIndexArray(VMFileHandle vmf)
+{
+    VMBlockHandle vmbh, vmbhIndex;
+    MemHandle mh,mhi;
+    MessageListArray *mla;
+
+    vmbh = VMGetMapBlock(vmf);
+    VMLock(vmf,vmbh,&mh);
+    mla = MemDeref(mh);
+    vmbhIndex = mla->MLA_indexHandle;
+    if (vmbhIndex) {
+	VMFree(vmf,vmbhIndex);
+    }
+    mhi = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    MemLock(mhi);
+    mla->MLA_indexChunk = ChunkArrayCreate(mhi, sizeof(MessageIndexStruct), 0, 0);
+    MemUnlock(mhi);
+    mla->MLA_indexHandle = VMAttach(vmf,0,mhi);
+    VMUnlock(mh);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        DeleteMessageListArray
+ * PASS:            folder name
+ *
+ * RETURN:          nothing
+ * DESCRIPTION:
+ *  Delete the message list array vm file.
+ *
+ ***************************************************************/
+
+void DeleteMessageListArray(TCHAR *folderName)
+{
+    GotoMailDirectory(folderName);
+    LockStrings();
+    FileDelete(LMemDeref(@msglistName));
+    UnlockStrings();
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        GetMessageArrays
+ * PASS:            folder number
+ *
+ * RETURN:          Boolean
+ *                  vmf, vmbh, indexArray filled in 
+ * DESCRIPTION:
+ *   Returns message list and index list pointers, taking into
+ *   account whether it is the list that is currently in use.
+ *  
+ *   Note:  This routine also grabs TheMessageListLock which should be
+ *          unlocked by the caller.
+ *
+ ***************************************************************/
+
+Boolean GetMessageArrays(word folderNum, VMFileHandle *vmf, VMBlockHandle *vmbh, optr *indexArray) 
+{
+    TCHAR *p1,*p2;
+    MemHandle mh1, mh2;
+    int i, numMsgs;
+    Boolean inuse;
+
+    /* We need to check and see if the current listed folder is the 
+     * the folder that we want to delete.
+     */
+    i = @call TheMessageList::MSG_MAIL_LIST_GET_FOLDER_NUM();
+    mh1 = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(i);
+    p1 = MemLock(mh1); 
+    
+    mh2 = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(folderNum);
+    p2 = MemLock(mh2);
+    i = strlen(p2);
+
+    FilePushDir();
+    GotoMailDirectory(p2);
+
+    ThreadGrabThreadLock(TheMessageListLock);
+    if (!strncmp(p2,p1,i)) {
+	inuse = TRUE;
+	*vmf = @call TheMessageList::MSG_MAIL_LIST_GET_VMF();
+	*vmbh = @call TheMessageList::MSG_MAIL_LIST_GET_MESSAGE_ARRAY();
+	*indexArray = LockIndexArray(*vmf,NULL);
+    } else {
+	inuse = FALSE;
+	FolderGetMessages(p2,-1, &numMsgs, vmf, vmbh);   
+	*indexArray = LockIndexArray(*vmf, NULL);
+    }
+    FilePopDir();
+    MemFree(mh1);
+    MemFree(mh2);
+
+    return inuse;
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    WarnFullFolder
+ * PASS:            numMsgs - # of messages in folder
+ *                  folderNum - MailFolderID of folder
+ * RETURN:	    TRUE if hit warning level
+ * DESCRIPTION:
+ *        Warn the user if appropriate about the # of messages in a folder
+ *	
+ * STRATEGY:
+ *      NOTE: Checking for specific numbers of messages works because
+ *      messages are added one at a time to the list array. If they
+ *      are ever added in bulk, this routine will need to check for ranges,
+ *      possibly comparing the old and new numbers to see if they have
+ *      passed a specific level.
+ *
+ ***********************************************************************/
+#define FOLDER_WARNING_LEVEL_1   400
+#define FOLDER_WARNING_LEVEL_2   450
+#define FOLDER_WARNING_LEVEL_3   500
+
+#define FOLDER_WARN_TRASH  0
+#define FOLDER_WARN_OUTBOX 1
+#define FOLDER_WARN_SENT   2
+#define FOLDER_WARN_OTHER  3
+
+static const optr warn1Table[] = {
+    @warnTrash1,
+    @warnOutbox1,
+    @warnOther1,
+    @warnOther1
+};
+
+static const optr warn3Table[] = {
+    @warnTrash3,
+    @warnOutbox3,
+    @warnOther3,
+    @warnOther3
+};
+
+word
+GetWarningFolder(MailFolderID folderNum)
+{
+    word warnFolder;
+
+    switch (folderNum) {
+    case MFID_TRASH:
+	warnFolder = FOLDER_WARN_TRASH;
+	break;
+    case MFID_OUTBOX:
+	warnFolder = FOLDER_WARN_OUTBOX;
+	break;
+    case MFID_SENT:
+	warnFolder = FOLDER_WARN_SENT;
+	break;
+    default:
+	warnFolder = FOLDER_WARN_OTHER;
+	break;
+    }
+    return(warnFolder);
+}
+
+Boolean
+WarnFullFolder(word numMsgs, MailFolderID folderNum)
+{
+    MemHandle nameHan;
+    TCHAR *folderName, numBuf[UHTA_NULL_TERM_BUFFER_SIZE];
+    optr msgChunk, *msgTab;
+
+
+    /*
+     * figure out which message to use if any
+     */
+    switch (numMsgs) {
+    case FOLDER_WARNING_LEVEL_1:
+    case FOLDER_WARNING_LEVEL_2:
+	msgTab = warn1Table;
+	break;
+    case FOLDER_WARNING_LEVEL_3:
+	msgTab = warn3Table;
+	break;
+    default:
+	msgTab = NULL;
+	break;
+    }
+    if (msgTab) {
+	/*
+	 * get the folder name and number of messages as strings to
+	 * use in the warning message
+	 */
+	nameHan = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(folderNum);
+	folderName = MemLock(nameHan);
+	msgChunk = msgTab[GetWarningFolder(folderNum)];
+	if (msgChunk) {
+	    itoa(numMsgs, numBuf);
+	    /*
+	     * put up a dialog warning the user
+	     */
+	    ReportWarning(msgChunk, folderName, numBuf);
+	    /*
+	     * clean up
+	     */
+	    UnlockStrings();
+	    MemFree(nameHan);
+	    return(TRUE);
+	}
+    }
+    return(FALSE);  
+
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        InsertMessageListArray
+ * PASS:            subj - ptr to subject name
+ *
+ * RETURN:          TRUE if hit a warning level
+ * DESCRIPTION:
+ *  Delete the message list array vm file.
+ *
+ ***************************************************************/
+typedef struct {
+    VMFileHandle       IMS_vmf;
+    VMBlockHandle      IMS_vmbh;
+    MessageIndexStruct *IMS_ptr;
+    dword              IMS_elementIndex;
+    SortMessageByType  IMS_sortType;
+} IMStruct;
+
+TCHAR *
+SkipSubjectRe(TCHAR *subj)
+{
+    TCHAR *ret;
+
+    LockStrings();
+    if (!LocalCmpStringsNoSpaceCase(subj, LMemDeref(@reStr), 3) || !LocalCmpStringsNoSpaceCase(subj, LMemDeref(@fwdStr), 4)) {
+	/*
+	 * if starts with "re:" or "fwd:", ignore it and any leading whitespace
+	 */
+	ret = strchr(subj, ':')+1;
+	while(LocalIsSpace(*ret)) {
+	    ret++;
+	}
+    } else {
+	ret = subj;
+    }
+    UnlockStrings();
+    return(ret);
+}
+
+sword
+CompareMessages(MessageListStruct *e1, MessageListStruct *e2, SortMessageByType sortType)
+{
+    TimerDateAndTime nd1, nd2;
+    TCHAR *s1, *s2;
+    sword retValue;
+
+    LocalNormalizeDateTime(&nd1,
+			   &e1->MLS_time.MT_time,
+			   e1->MLS_time.MT_timezone);
+    LocalNormalizeDateTime(&nd2,
+			   &e2->MLS_time.MT_time,
+			   e2->MLS_time.MT_timezone);
+	switch (sortType) {
+		case SMBT_SUBJECT:
+		case SMBT_SUBJECT_REV:
+			s1 = SkipSubjectRe(e1->MLS_subject);
+			s2 = SkipSubjectRe(e2->MLS_subject);
+			retValue = LocalCmpStrings(s1, s2, 0);
+			if (!retValue)  goto cmpDates;
+			if (sortType == SMBT_SUBJECT_REV) retValue = -retValue;
+			break;
+		case SMBT_SENDER:
+		case SMBT_SENDER_REV:
+			retValue = LocalCmpStrings(e1->MLS_mail, e2->MLS_mail, 0);
+			if (!retValue)  goto cmpDates;
+			if (sortType == SMBT_SENDER_REV) retValue = -retValue;
+			break;
+		case SMBT_DATE:
+		case SMBT_DATE_REV:
+		cmpDates:
+			retValue = LocalCompareDateTimes(&nd1, &nd2);
+			if (retValue)
+				if (sortType == SMBT_DATE_REV) retValue = -retValue;
+			break;
+		}
+    return(retValue);
+}
+
+Boolean _pascal InsertMessageCB(void* element, void *data)
+{
+    IMStruct *ims = data;
+    MessageIndexStruct *ie = element;
+    MessageListStruct *e1,*e2;
+    VMFileHandle vmf;
+    VMBlockHandle vmbh;
+    word elSize;
+    sword retValue;
+
+    vmf = ims->IMS_vmf;
+    vmbh = ims->IMS_vmbh;
+
+    HugeArrayLock(vmf,vmbh,ie->MIS_index,&e1,&elSize);
+    HugeArrayLock(vmf,vmbh,ims->IMS_elementIndex,&e2,&elSize);
+
+    ims->IMS_ptr = ie;
+
+    retValue = CompareMessages(e1, e2, ims->IMS_sortType);
+
+    HugeArrayUnlock(e1);
+    HugeArrayUnlock(e2);
+
+    if (retValue >= 0) {
+	return TRUE;
+    } else {
+	ims->IMS_ptr = NULL;
+	return FALSE;
+    }
+	
+}
+
+Boolean InsertMessageListArray(word folderNum, TCHAR *fileName)
+{
+    VMBlockHandle vmbh;
+    VMFileHandle vmf;
+    optr indexArray;
+    IMStruct ims;
+    MessageListStruct mls;
+    MessageIndexStruct *mis;
+    LSHStruct lshs;
+    TCHAR *folderName;
+    MemHandle mh;
+    word msgCount;
+    Boolean inuse = FALSE, warned;
+
+    /* get the message list and index arrays
+     */
+    inuse = GetMessageArrays(folderNum, &vmf, &vmbh, &indexArray);
+
+    /* Change to the correct folder
+     */
+    FilePushDir();
+    mh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(folderNum);
+    folderName = MemLock(mh);
+    GotoMailDirectory(folderName);
+
+    /* scan through the list of messages to find the correct location to
+     * insert the new message
+     */
+    ims.IMS_vmf = vmf;
+    ims.IMS_vmbh = vmbh;
+    ims.IMS_elementIndex = 0;
+    ims.IMS_sortType = GetMessageListSortType(vmf);
+    ims.IMS_ptr=0;
+
+    strcpy(&mls.MLS_filename, fileName);
+    lshs.LSH_folderNum = folderNum;
+
+    MailListScanHeaders(&mls,&lshs);
+    ims.IMS_elementIndex = HugeArrayAppend(vmf,vmbh,1,&mls);
+
+    ChunkArrayEnum(indexArray,&ims,InsertMessageCB);
+
+    /* Now that we have found the location, add the new 
+     * entry
+     */
+    if (ims.IMS_ptr) {
+	mis = ChunkArrayInsertAt(indexArray,ims.IMS_ptr,0);
+    } else {
+	/* either there are no entries, or this comes after all of 
+	 * the existing entries
+	 */
+	mis= ChunkArrayAppend(indexArray,0);
+    }
+    mis->MIS_index = ims.IMS_elementIndex;
+    mis->MIS_flags = mls.MLS_flags;
+    MemFree(mh);
+
+    /*
+     * see if we should warn the user about overflowing a folder
+     */
+    msgCount = ChunkArrayGetCount(indexArray);
+    warned = WarnFullFolder(msgCount, folderNum);
+
+    /* Close the VMFile only if it was not in use.
+     */
+    UnlockIndexArray(OptrToHandle(indexArray));
+    if (!inuse) {
+	VMClose(vmf,NULL);
+    }
+
+    FilePopDir();
+    ThreadReleaseThreadLock(TheMessageListLock);
+    return(warned);
+
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        DeleteMessageListArrayNL
+ * PASS:            
+ *
+ * RETURN:          nothing
+ * DESCRIPTION:
+ *  Delete entry in message list array.  
+ *  indexArray should already be locked
+ *
+ ***************************************************************/
+extern void DeleteMessageListArrayNL(VMFileHandle vmf, VMBlockHandle vmbh, optr indexArray, word msgIndex)
+{
+    MessageIndexStruct *mis;
+    word elSize;
+
+    ThreadGrabThreadLock(TheMessageListLock);
+    mis = ChunkArrayElementToPtr(indexArray, msgIndex, &elSize);
+    HugeArrayDelete(vmf,vmbh,1,mis->MIS_index);
+    FixupIndexArray(indexArray,mis->MIS_index);
+    ChunkArrayDelete(indexArray, mis);
+    ThreadReleaseThreadLock(TheMessageListLock);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        FindMessageCB
+ * PASS:            
+ *
+ * RETURN:          nothing
+ * DESCRIPTION:
+ *         Return comparison between FMS_fileName and the elements
+ *         filename
+ *
+ ***************************************************************/
+typedef struct {
+    VMFileHandle        FMS_vmf;
+    VMBlockHandle       FMS_vmbh;
+    MessageIndexStruct *FMS_ptr;
+    TCHAR              *FMS_fileName;
+} FindMessageStruct;
+
+Boolean _pascal FindMessageCB(void* element, void *data)
+{
+    FindMessageStruct *fms = data;
+    MessageIndexStruct *ie = element;
+    MessageListStruct *e;
+    VMFileHandle vmf;
+    VMBlockHandle vmbh;
+    word elSize;
+    int retValue;
+
+    vmf = fms->FMS_vmf;
+    vmbh = fms->FMS_vmbh;
+
+    HugeArrayLock(vmf,vmbh,ie->MIS_index,&e,&elSize);
+
+    fms->FMS_ptr = ie;
+
+    retValue = LocalCmpStrings(fms->FMS_fileName, e->MLS_filename,0);
+
+    HugeArrayUnlock(e);
+
+    if (retValue == 0) {
+	return TRUE;
+    } else {
+	fms->FMS_ptr = NULL;
+	return FALSE;
+    }
+	
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        DeleteMessageListArrayName
+ * PASS:            
+ *
+ * RETURN:          nothing
+ * DESCRIPTION:
+ *  Delete entry in message list array.  
+ *  indexArray should already be locked
+ *
+ ***************************************************************/
+
+void DeleteMessageListArrayName(word folderNum, TCHAR *fileName)
+{
+    VMBlockHandle vmbh;
+    VMFileHandle vmf;
+    optr indexArray;
+    Boolean inuse = FALSE;
+    FindMessageStruct fms;
+
+    /* get the message list and index list
+     */
+    inuse = GetMessageArrays(folderNum, &vmf, &vmbh, &indexArray);
+
+    /* Find the message entry to delete
+     */
+    fms.FMS_vmf = vmf;
+    fms.FMS_vmbh = vmbh;
+    fms.FMS_ptr=0;
+    fms.FMS_fileName = fileName;
+
+    ChunkArrayEnum(indexArray,&fms,FindMessageCB);
+    if (fms.FMS_ptr) {
+	HugeArrayDelete(vmf,vmbh,1,fms.FMS_ptr->MIS_index);
+	FixupIndexArray(indexArray,fms.FMS_ptr->MIS_index);
+	ChunkArrayDelete(indexArray,fms.FMS_ptr);
+
+    }
+
+    /* only close the VMFile if it is not in use.
+     */
+    UnlockIndexArray(OptrToHandle(indexArray));
+    if (!inuse) {
+	VMClose(vmf,NULL);
+    }
+    ThreadReleaseThreadLock(TheMessageListLock);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        FindMessageListArrayName
+ * PASS:            
+ *
+ * RETURN:          element number in message list (note that
+ *                  this can only be used before any other
+ *                  operations on the message list)
+ *                  0xffff if not found
+ * DESCRIPTION:
+ *  Find entry in message list array
+ *
+ ***************************************************************/
+
+word FindMessageListArrayName(word folderNum, TCHAR *fileName)
+{
+    VMBlockHandle vmbh;
+    VMFileHandle vmf;
+    optr indexArray;
+    Boolean inuse = FALSE;
+    FindMessageStruct fms;
+    word retVal = 0xffff;
+
+    /* get the message list and index list
+     */
+    inuse = GetMessageArrays(folderNum, &vmf, &vmbh, &indexArray);
+
+    /* Find the message entry
+     */
+    fms.FMS_vmf = vmf;
+    fms.FMS_vmbh = vmbh;
+    fms.FMS_ptr=0;
+    fms.FMS_fileName = fileName;
+
+    ChunkArrayEnum(indexArray,&fms,FindMessageCB);
+    if (fms.FMS_ptr) {
+	retVal = ChunkArrayPtrToElement(indexArray, fms.FMS_ptr);
+    }
+
+    /* only close the VMFile if it is not in use.
+     */
+    UnlockIndexArray(OptrToHandle(indexArray));
+    if (!inuse) {
+	VMClose(vmf,NULL);
+    }
+    ThreadReleaseThreadLock(TheMessageListLock);
+
+    return retVal;
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        UpdateMessageListArrayName
+ * PASS:            
+ *
+ * RETURN:          nothing
+ * DESCRIPTION:
+ *  Delete entry in message list array.  
+ *  indexArray should already be locked
+ *
+ ***************************************************************/
+
+void UpdateMessageListArrayName(word folderNum, TCHAR *fileName)
+{
+    VMBlockHandle vmbh;
+    VMFileHandle vmf;
+    optr indexArray;
+    Boolean inuse = FALSE;
+    FindMessageStruct fms;
+    MessageListStruct *mls;
+    LSHStruct lshs;
+    MemHandle mh;
+    TCHAR *folderName;
+
+    /* get the message list and index list
+     */
+    inuse = GetMessageArrays(folderNum, &vmf, &vmbh, &indexArray);
+
+    /* Change to the correct folder
+     */
+    FilePushDir();
+    mh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(folderNum);
+    folderName = MemLock(mh);
+    GotoMailDirectory(folderName);
+    MemFree(mh);
+
+    /* Find the message entry to delete
+     */
+    fms.FMS_vmf = vmf;
+    fms.FMS_vmbh = vmbh;
+    fms.FMS_ptr=0;
+    fms.FMS_fileName = fileName;
+
+    ChunkArrayEnum(indexArray,&fms,FindMessageCB);
+    if (fms.FMS_ptr) {
+	lshs.LSH_folderNum = folderNum;
+	HugeArrayLock(vmf,vmbh,fms.FMS_ptr->MIS_index,&mls,0);
+	HugeArrayDirty(mls);
+	MailListScanHeaders(mls,&lshs);
+	fms.FMS_ptr->MIS_flags = mls->MLS_flags;
+	VMDirty(OptrToHandle(indexArray));
+	HugeArrayUnlock(mls);
+    }
+
+    FilePopDir();
+    /* only close the VMFile if it is not in use.
+     */
+    UnlockIndexArray(OptrToHandle(indexArray));
+    if (!inuse) {
+	VMClose(vmf,NULL);
+    }
+    ThreadReleaseThreadLock(TheMessageListLock);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        FixupIndexArray
+ * PASS:            indexArray
+ *                  index of huge array element deleted
+ *
+ * RETURN:          nothing
+ * DESCRIPTION:
+ *  Decrement index of every element with an index greater than the 
+ *  passed index.
+ *
+ ***************************************************************/
+Boolean _pascal FixupIndexCB(void* element, void *data)
+{
+    MessageIndexStruct *mis=element;
+    word *index=data;
+
+    if (mis->MIS_index > *index) {
+	mis->MIS_index = mis->MIS_index - 1;
+    }
+    return FALSE;
+}
+
+void FixupIndexArray(optr indexArray, word index)
+{
+    word fixupIndex = index;
+    
+    ChunkArrayEnum(indexArray,&fixupIndex,FixupIndexCB);    
+}

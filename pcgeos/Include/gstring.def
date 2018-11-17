@@ -1,0 +1,3922 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Kernel graphics
+FILE:		gstring.def
+
+AUTHOR:		Jim DeFrisco, 11 October 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	10/11/89	Initial revision
+
+DESCRIPTION:
+	This file contains all the macros required to statically define
+	graphics strings.
+		
+	$Id: gstring.def,v 1.1 97/04/04 14:21:48 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__GSTRING
+
+include	graphics.def
+include	text.def
+
+StartKernel
+
+global GrDrawGString:far
+global GrDrawGStringAtCP:far
+global GrSetGStringPos:far
+global GrCopyGString:far
+global GrDestroyGString:far
+global GrLoadGString:far
+global GrCreateGString:far
+global GrEditGString:far
+global GrGetGStringElement:far
+global GrEndGString:far
+global GrComment:far
+global GrNullOp:far
+global GrSetGStringBounds:far
+global GrLabel:far
+global GrEscape:far
+global GrNewPage:far
+global GrGetGStringBounds:far
+global GrGetGStringBoundsDWord:far
+global GrDeleteGStringElement:far
+global GrParseGString:far
+
+;-
+
+global GRDRAWGSTRING:far
+global GRDRAWGSTRINGATCP:far
+global GRSETGSTRINGPOS:far
+global GRCOPYGSTRING:far
+global GRDESTROYGSTRING:far
+global GRLOADGSTRING:far
+global GRCREATEGSTRING:far
+global GREDITGSTRING:far
+global GRGETGSTRINGELEMENT:far
+global GRENDGSTRING:far
+global GRCOMMENT:far
+global GRNULLOP:far
+global GRESCAPE:far
+global GRNEWPAGE:far
+global GRLABEL:far
+global GRSETGSTRINGBOUNDS:far
+global GRGETGSTRINGBOUNDS:far
+global GRGETGSTRINGBOUNDSDWORD:far
+global GRDELETEGSTRINGELEMENT:far
+global GRPARSEGSTRING:far
+
+;--------------------------------------------------------------------------
+;		Graphic String Constants
+;--------------------------------------------------------------------------
+
+	; these are types used to pass values and for return values for
+	; the routines GrPlayString and GrDrawGString
+
+GSControl 	record 
+    :6,
+    GSC_PARTIAL:1,			; just do one element, and if the 
+					;  element is a complex bitmap, just
+					;  do 1 piece (only for GrCopyGString)
+    GSC_ONE:1,				; just do one element
+    GSC_MISC:1,				; return on MISC opcode
+    GSC_LABEL:1,			; return on GR_LABEL opcode
+    GSC_ESCAPE:1,			; return on GR_ESCAPE opcode
+    GSC_NEW_PAGE:1,			; return when we get to a NEW_PAGE
+    GSC_XFORM:1,			; return on TRANSFORMATIONopcode
+    GSC_OUTPUT:1,			; return on OUTPUT opcode
+    GSC_ATTR:1,				; return on ATTRIBUTE opcode
+    GSC_PATH:1				; return on PATH opcode
+GSControl 	end
+
+GSRetType 	etype	word
+GSRT_COMPLETE 	enum GSRetType
+GSRT_ONE 	enum GSRetType
+GSRT_MISC	enum GSRetType
+GSRT_LABEL	enum GSRetType
+GSRT_ESCAPE  	enum GSRetType
+GSRT_NEW_PAGE 	enum GSRetType
+GSRT_XFORM 	enum GSRetType
+GSRT_OUTPUT 	enum GSRetType
+GSRT_ATTR 	enum GSRetType
+GSRT_PATH 	enum GSRetType
+GSRT_FAULT 	enum GSRetType, 0xffff
+
+	; this enum is passed to GrCreateGString to indicate what type of
+	; handle is being passed.
+GStringType	etype	byte
+GST_CHUNK	enum	GStringType		; write to a memory chunk
+GST_STREAM	enum	GStringType		; write to a stream
+GST_VMEM	enum	GStringType		; write to a vmem block
+GST_PTR		enum	GStringType		; static memory (read only)
+GST_PATH	enum	GStringType		; write to a path (&store in an
+						; lmem chunk). INTERNAL ONLY!
+
+	; this enum is returned from GrEndGString to indicate what errors
+	; have occurred when writing the graphics string
+
+GStringErrorType etype	word
+GSET_NO_ERROR	enum	GStringErrorType	; there was no error
+GSET_DISK_FULL	enum	GStringErrorType	; disk became full, file trunc
+
+	; this enum is passed to GrSetStringPos to indicate how to move
+	; the internal current position
+GStringSetPosType etype	byte
+GSSPT_SKIP_1	enum	GStringSetPosType	; advance 1 element
+GSSPT_RELATIVE	enum	GStringSetPosType	; advance N elements
+GSSPT_BEGINNING	enum	GStringSetPosType	; set to start of gstring
+GSSPT_END	enum	GStringSetPosType	; set to end of gstring
+
+	; this enum is passed to GrDestroyGString to indicate what to do
+	; with the data in the gstring
+GStringKillType	etype	byte
+GSKT_KILL_DATA	enum	GStringKillType		; delete the data too
+GSKT_LEAVE_DATA	enum	GStringKillType		; leave the data alone
+
+	; this is a spec for how the escape code space is allocated for
+	; GR_ESCAPE elements.
+;
+;	CODE RANGE		USE
+;	----------		---
+;	0x0000-0x3fff		System escape codes	(not to be used by
+;							 applications)
+;	0x4000-0x7fff		BSW application escapes	(to be used only by
+;							 GeoWorks)
+;	    0x4000-0x40ff	Codes to match ELEMENT codes (for Clipboard/
+;								draw)
+;	    0x4100-0x41ff	Escape codes for Draw
+;
+;	    0x4200-0x7fff	See GeoworksGStringEscapeCode in
+;				geoworks.def for these escape codes
+;	
+;	0x8000-0xffff		Third party escapes	(used by any non-GW
+;							 application developers)
+
+	; a few defines to help out
+
+GR_FIRST_SYSTEM_ESCAPE	equ	0x0000			; low end of range
+GR_LAST_SYSTEM_ESCAPE	equ	0x3fff			; high end of range
+GR_FIRST_GEOWORKS_ESCAPE	equ	0x4000			; low end of range
+GR_LAST_GEOWORKS_ESCAPE	equ	0x7fff			; high end of range
+GR_FIRST_APPLICATION_ESCAPE equ	0x8000			; low end of range
+GR_LAST_APPLICATION_ESCAPE equ	0xffff			; high end of range
+
+
+GStringElement etype byte,0,1
+
+ifdef	BUILD_KERNEL_GSTRING_TABLES
+
+GSElemInfo	struct
+    GSEI_size	word
+    GSEI_play	fptr
+    GSEI_kern	fptr
+GSElemInfo	ends
+
+GraphicsCommon	segment	resource
+GSElemInfoTab	label	GSElemInfo
+GraphicsCommon	ends
+GSTRING_VAR_BYTE_COUNT	equ 0x40
+GSTRING_VAR_WORD_COUNT	equ 0x80
+GSTRING_VAR_COORD_COUNT	equ 0xc0
+endif
+
+DefGSElement	macro	rootName, gseEnum, playRout, varType, varOff, altKern
+
+gseEnum enum GStringElement
+
+	;; the following code generates a table in a segment of the kernel
+ifdef	BUILD_KERNEL_GSTRING_TABLES
+
+GraphicsCommon	segment	resource
+
+	;; add an entry in the element size table
+ifnb	<varType>
+    ifnb <rootName>
+	sName catstr <Op>,<&rootName>
+	byte	size sName
+    else
+	byte	1
+    endif
+    ifidn <varType>, <bytes>
+	byte	(offset varOff) OR GSTRING_VAR_BYTE_COUNT		
+    endif
+    ifidn <varType>, <words>
+	byte	(offset varOff) OR GSTRING_VAR_WORD_COUNT
+    endif
+    ifidn <varType>, <coords>
+	byte	(offset varOff) OR GSTRING_VAR_COORD_COUNT
+    endif
+else
+    ifnb <rootName>
+	sName catstr <Op>,<&rootName>
+	word	size sName
+    else
+	word	1
+    endif
+endif
+	;; add an entry in the element routine table
+	word	offset	playRout
+	word	handle	playRout
+
+	;; add an entry in the kernel routine table
+
+ifnb	<altKern>
+	fptr	altKern
+else
+    ifnb <rootName>
+	kName catstr <Gr>,<&rootName>
+	fptr	kName
+    else
+	dword	0
+    endif
+endif
+
+GraphicsCommon	ends
+endif
+
+endm
+;
+; GSTRING MISC GROUP		codes 0x00 - 0x0c
+;
+DefGSElement EndGString, GR_END_GSTRING, PENull
+DefGSElement Comment,	GR_COMMENT,	PEComment, bytes, OC_size
+DefGSElement NullOp,	GR_NULL_OP,	PENoArgs
+DefGSElement SetGStringBounds, GR_SET_GSTRING_BOUNDS, PETwoCoords
+DefGSElement	,	GR_MISC_4,	PENull
+DefGSElement	,	GR_MISC_5,	PENull
+DefGSElement	,	GR_MISC_6,	PENull
+DefGSElement	,	GR_MISC_7,	PENull
+DefGSElement	,	GR_MISC_8,	PENull	
+DefGSElement	,	GR_MISC_9,	PENull
+DefGSElement	,	GR_MISC_A,	PENull
+DefGSElement	,	GR_MISC_B,	PENull
+DefGSElement	,	GR_MISC_C,	PENull
+;
+; GSTRING LABEL			code 0x0d
+;
+DefGSElement Label,	GR_LABEL,	PEWordAttr
+;
+; GSTRING ESCAPE		code 0x0e
+;
+DefGSElement Escape,	GR_ESCAPE,	PEComment, bytes, OE_escSize
+;
+; GSTRING NEW PAGE		code 0x0f
+;
+DefGSElement NewPage,	GR_NEW_PAGE,	PEByteAttr
+;
+; GSTRING TRANSFORMATION GROUP	codes 0x10 - 0x1f
+;
+DefGSElement ApplyRotation, GR_APPLY_ROTATION,  PERotate
+DefGSElement ApplyScale, GR_APPLY_SCALE, 	PETransScale
+DefGSElement ApplyTranslation, GR_APPLY_TRANSLATION, PETransScale
+DefGSElement ApplyTransform, GR_APPLY_TRANSFORM, PETMatrix
+DefGSElement ApplyTranslationDWord, GR_APPLY_TRANSLATION_DWORD, PETransScale
+DefGSElement SetTransform, GR_SET_TRANSFORM,	PETMatrix
+DefGSElement SetNullTransform, GR_SET_NULL_TRANSFORM, PENoArgs
+DefGSElement SetDefaultTransform, GR_SET_DEFAULT_TRANSFORM, PENoArgs
+DefGSElement InitDefaultTransform, GR_INIT_DEFAULT_TRANSFORM, PENoArgs
+DefGSElement SaveTransform, GR_SAVE_TRANSFORM,	PENoArgs
+DefGSElement RestoreTransform, GR_RESTORE_TRANSFORM, PENoArgs
+DefGSElement	,	GR_XFORM_1B, PENull
+DefGSElement	,	GR_XFORM_1C, PENull
+DefGSElement	,	GR_XFORM_1D, PENull
+DefGSElement	,	GR_XFORM_1E, PENull
+DefGSElement	,	GR_XFORM_1F, PENull
+;
+; GSTRING OUTPUT GROUP		codes 0x20 - 0x5F
+;
+DefGSElement DrawLine, 	GR_DRAW_LINE,	PETwoCoords
+DefGSElement DrawLineTo, GR_DRAW_LINE_TO, PEOneCoord
+DefGSElement DrawRelLineTo, GR_DRAW_REL_LINE_TO, PERelCoord
+DefGSElement DrawHLine, GR_DRAW_HLINE, PEDrawHalfLine
+DefGSElement DrawHLineTo, GR_DRAW_HLINE_TO, PEDrawHalfLine
+DefGSElement DrawVLine, GR_DRAW_VLINE, PEDrawHalfLine
+DefGSElement DrawVLineTo, GR_DRAW_VLINE_TO, PEDrawHalfLine
+DefGSElement DrawPolyline, GR_DRAW_POLYLINE, PEPolyCoord, coords, ODPL_count
+DefGSElement DrawArc,	GR_DRAW_ARC, PEDrawArcs
+DefGSElement DrawArc3Point, GR_DRAW_ARC_3POINT, PEDrawArcs 
+DefGSElement DrawArc3PointTo, GR_DRAW_ARC_3POINT_TO, PEDrawArcs
+DefGSElement DrawRelArc3PointTo, GR_DRAW_REL_ARC_3POINT_TO, PEDrawArcs
+DefGSElement DrawRect, 	GR_DRAW_RECT, PETwoCoords
+DefGSElement DrawRectTo, GR_DRAW_RECT_TO, PEOneCoord
+DefGSElement DrawRoundRect, GR_DRAW_ROUND_RECT, PEDrawRoundRects
+DefGSElement DrawRoundRectTo, GR_DRAW_ROUND_RECT_TO, PEDrawRoundRects
+
+DefGSElement DrawSpline, GR_DRAW_SPLINE, PEPolyCoord, coords, ODS_count
+DefGSElement DrawSplineTo, GR_DRAW_SPLINE_TO, PEPolyCoord, coords, ODST_count
+DefGSElement DrawCurve, GR_DRAW_CURVE, PECurve
+DefGSElement DrawCurveTo, GR_DRAW_CURVE_TO, PECurve
+DefGSElement DrawRelCurveTo, GR_DRAW_REL_CURVE_TO, PECurve
+DefGSElement DrawEllipse, GR_DRAW_ELLIPSE, PETwoCoords
+DefGSElement DrawPolygon, GR_DRAW_POLYGON, PEPolyCoord, coords, ODPG_count
+DefGSElement DrawPoint, GR_DRAW_POINT, PEOneCoord
+DefGSElement DrawPointAtCP, GR_DRAW_POINT_CP, PENoArgs
+DefGSElement BrushPolyline, GR_BRUSH_POLYLINE, PEPolyCoord, coords, OBPL_count
+DefGSElement DrawChar, GR_DRAW_CHAR, PEDrawChar
+DefGSElement DrawCharAtCP, GR_DRAW_CHAR_CP, PEDrawChar
+if DBCS_PCGEOS
+DefGSElement DrawText, GR_DRAW_TEXT, PEDrawText, words, ODT_len
+DefGSElement DrawTextAtCP, GR_DRAW_TEXT_CP, PEDrawText, words, ODTCP_len
+else
+DefGSElement DrawText, GR_DRAW_TEXT, PEDrawText, bytes, ODT_len
+DefGSElement DrawTextAtCP, GR_DRAW_TEXT_CP, PEDrawText, bytes, ODTCP_len
+endif
+DefGSElement DrawTextField, GR_DRAW_TEXT_FIELD, PETextField
+DefGSElement DrawTextPtr,GR_DRAW_TEXT_PTR, PETextPtr,,,GrDrawText
+
+DefGSElement DrawTextOptr,GR_DRAW_TEXT_OPTR, PETextOptr,,,GrDrawText
+DefGSElement DrawPath,	GR_DRAW_PATH, PENoArgs
+DefGSElement FillRect, GR_FILL_RECT, PETwoCoords
+DefGSElement FillRectTo, GR_FILL_RECT_TO, PEOneCoord
+DefGSElement FillRoundRect, GR_FILL_ROUND_RECT, PEDrawRoundRects
+DefGSElement FillRoundRectTo, GR_FILL_ROUND_RECT_TO, PEDrawRoundRects
+DefGSElement FillArc, GR_FILL_ARC, PEDrawArcs
+DefGSElement FillPolygon, GR_FILL_POLYGON, PEPolyCoord, coords, OFP_count
+DefGSElement FillEllipse, GR_FILL_ELLIPSE, PETwoCoords
+DefGSElement FillPath, GR_FILL_PATH, PEByteAttr
+DefGSElement FillArc3Point, GR_FILL_ARC_3POINT, PEDrawArcs
+DefGSElement FillArc3PointTo, GR_FILL_ARC_3POINT_TO, PEDrawArcs
+DefGSElement FillBitmap, GR_FILL_BITMAP, PEBitmap, bytes, OFB_size
+DefGSElement FillBitmapAtCP, GR_FILL_BITMAP_CP, PEBitmap, bytes, OFBCP_size
+DefGSElement FillBitmapOptr,  GR_FILL_BITMAP_OPTR, PEBitmapOptr,,,GrFillBitmap
+DefGSElement FillBitmapPtr, GR_FILL_BITMAP_PTR, PEBitmapPtr,,,GrFillBitmap
+
+DefGSElement DrawBitmap, GR_DRAW_BITMAP, PEBitmap, bytes, ODB_size
+DefGSElement DrawBitmapAtCP, GR_DRAW_BITMAP_CP, PEBitmap, bytes, ODBCP_size
+DefGSElement DrawBitmapOptr, GR_DRAW_BITMAP_OPTR, PEBitmapOptr,,,GrDrawBitmap
+DefGSElement DrawBitmapPtr, GR_DRAW_BITMAP_PTR, PEBitmapPtr,,,GrDrawBitmap
+DefGSElement BitmapSlice, GSE_BITMAP_SLICE, PESlice,bytes,OBS_size,GrDrawBitmap
+DefGSElement	,	GR_OUTPUT_55,	PENull
+DefGSElement	,	GR_OUTPUT_56,	PENull
+DefGSElement	,	GR_OUTPUT_57,	PENull
+DefGSElement	,	GR_OUTPUT_58,	PENull
+DefGSElement	,	GR_OUTPUT_59,	PENull
+DefGSElement	,	GR_OUTPUT_5A,	PENull
+DefGSElement	,	GR_OUTPUT_5B,	PENull
+DefGSElement	,	GR_OUTPUT_5C,	PENull
+DefGSElement	,	GR_OUTPUT_5D,	PENull
+DefGSElement	,	GR_OUTPUT_5E,	PENull
+DefGSElement	,	GR_OUTPUT_5F,	PENull
+;
+; GSTRING ATTRIBUTE GROUP		codes 0x60 - 0x9F
+;
+DefGSElement SaveState, GR_SAVE_STATE, PENoArgs
+DefGSElement RestoreState, GR_RESTORE_STATE, PENoArgs
+DefGSElement SetMixMode, GR_SET_MIX_MODE, PEByteAttr
+DefGSElement MoveTo, GR_MOVE_TO, PEOneCoord
+DefGSElement RelMoveTo, GR_REL_MOVE_TO, PERelCoord
+DefGSElement CreatePalette, GR_CREATE_PALETTE, PENoArgs
+DefGSElement DestroyPalette, GR_DESTROY_PALETTE, PENoArgs
+DefGSElement SetPaletteEntry, GR_SET_PALETTE_ENTRY, PEOneCoord
+DefGSElement SetPalette, GR_SET_PALETTE, PEPalette, bytes, OSP_num
+DefGSElement SetLineColor, GR_SET_LINE_COLOR, PE3ByteAttr
+DefGSElement SetLineMask, GR_SET_LINE_MASK, PEByteAttr
+DefGSElement SetLineColorMap, GR_SET_LINE_COLOR_MAP, PEByteAttr
+DefGSElement SetLineWidth, GR_SET_LINE_WIDTH, PEOneCoord
+DefGSElement SetLineJoin, GR_SET_LINE_JOIN, PEByteAttr
+DefGSElement SetLineEnd, GR_SET_LINE_END, PEByteAttr
+DefGSElement SetLineAttr, GR_SET_LINE_ATTR, PEAttr
+
+DefGSElement SetMiterLimit, GR_SET_MITER_LIMIT, PEOneCoord
+DefGSElement SetLineStyle, GR_SET_LINE_STYLE, PELineStyle
+DefGSElement SetLineColorIndex,GR_SET_LINE_COLOR_INDEX,PEByteAttr,,,GrSetLineColor
+DefGSElement SetCustomLineMask,GR_SET_CUSTOM_LINE_MASK,PECustomMask,,,GrSetLineMask
+DefGSElement SetCustomLineStyle,GR_SET_CUSTOM_LINE_STYLE,PECustomStyle,words,OSCLS_count,GrSetLineStyle
+DefGSElement SetAreaColor, GR_SET_AREA_COLOR, PE3ByteAttr
+DefGSElement SetAreaMask, GR_SET_AREA_MASK, PEByteAttr
+DefGSElement SetAreaColorMap, GR_SET_AREA_COLOR_MAP, PEByteAttr
+DefGSElement SetAreaAttr, GR_SET_AREA_ATTR, PEAttr
+DefGSElement SetAreaColorIndex,GR_SET_AREA_COLOR_INDEX,	PEByteAttr,,,GrSetAreaColor
+DefGSElement SetCustomAreaMask,GR_SET_CUSTOM_AREA_MASK,PECustomMask,,,GrSetAreaMask
+DefGSElement SetAreaPattern, GR_SET_AREA_PATTERN, PESetPattern
+DefGSElement SetCustomAreaPattern,GR_SET_CUSTOM_AREA_PATTERN,PESetCustPattern,bytes,OSCAP_size,GrSetAreaPattern
+DefGSElement SetTextColor, GR_SET_TEXT_COLOR, PE3ByteAttr
+DefGSElement SetTextMask, GR_SET_TEXT_MASK, PEByteAttr
+DefGSElement SetTextColorMap, GR_SET_TEXT_COLOR_MAP, PEByteAttr
+
+DefGSElement SetTextStyle, GR_SET_TEXT_STYLE, PEWordAttr
+DefGSElement SetTextMode, GR_SET_TEXT_MODE, PEWordAttr
+DefGSElement SetTextSpacePad, GR_SET_TEXT_SPACE_PAD, PESpacePad
+DefGSElement SetTextAttr, GR_SET_TEXT_ATTR, PEAttr
+DefGSElement SetFont, GR_SET_FONT, PESetFont
+DefGSElement SetTextColorIndex,GR_SET_TEXT_COLOR_INDEX,PEByteAttr,,,GrSetTextColor
+DefGSElement SetCustomTextMask,GR_SET_CUSTOM_TEXT_MASK,PECustomMask,,,GrSetTextMask
+DefGSElement SetTrackKern, GR_SET_TRACK_KERN, PEWordAttr
+DefGSElement SetFontWeight, GR_SET_FONT_WEIGHT, PEByteAttr
+DefGSElement SetFontWidth, GR_SET_FONT_WIDTH, PEByteAttr
+DefGSElement SetSuperscriptAttr, GR_SET_SUPERSCRIPT_ATTR, PEWordAttr
+DefGSElement SetSubscriptAttr, GR_SET_SUBSCRIPT_ATTR, PEWordAttr
+DefGSElement SetTextPattern, GR_SET_TEXT_PATTERN, PESetPattern
+DefGSElement SetCustomTextPattern,GR_SET_CUSTOM_TEXT_PATTERN,PESetCustPattern,bytes,OSCTP_size,GrSetTextPattern
+DefGSElement MoveToWWFixed, GR_MOVE_TO_WWFIXED, PERelCoord
+DefGSElement SetTextDirection, GR_SET_TEXT_DIRECTION, PEByteAttr
+
+DefGSElement	,	GR_ATTR_90,	PENull
+DefGSElement	,	GR_ATTR_91,	PENull
+DefGSElement	,	GR_ATTR_92,	PENull
+DefGSElement	,	GR_ATTR_93,	PENull
+DefGSElement	,	GR_ATTR_94,	PENull
+DefGSElement	,	GR_ATTR_95,	PENull
+DefGSElement	,	GR_ATTR_96,	PENull
+DefGSElement	,	GR_ATTR_97,	PENull
+DefGSElement	,	GR_ATTR_98,	PENull
+DefGSElement	,	GR_ATTR_99,	PENull
+DefGSElement	,	GR_ATTR_9A,	PENull
+DefGSElement	,	GR_ATTR_9B,	PENull
+DefGSElement	,	GR_ATTR_9C,	PENull
+DefGSElement	,	GR_ATTR_9D,	PENull
+DefGSElement	,	GR_ATTR_9E,	PENull
+DefGSElement	,	GR_ATTR_9F,	PENull
+;
+; GSTRING PATH GROUP		codes	0xA0 - 0xAF
+;
+DefGSElement BeginPath, GR_BEGIN_PATH, PEOneCoord
+DefGSElement EndPath, GR_END_PATH, PENoArgs
+DefGSElement SetClipRect, GR_SET_CLIP_RECT, PEClipRect
+DefGSElement SetWinClipRect, GR_SET_WIN_CLIP_RECT, PEClipRect
+DefGSElement CloseSubPath, GR_CLOSE_SUB_PATH, PENoArgs
+DefGSElement SetClipPath, GR_SET_CLIP_PATH, PEPathArgs
+DefGSElement SetWinClipPath, GR_SET_WIN_CLIP_PATH, PEPathArgs
+DefGSElement SetStrokePath, GR_SET_STROKE_PATH, PENoArgs
+DefGSElement	,	GR_PATH_A8,	PENull
+DefGSElement	,	GR_PATH_A9,	PENull
+DefGSElement	,	GR_PATH_AA,	PENull
+DefGSElement	,	GR_PATH_AB,	PENull
+DefGSElement	,	GR_PATH_AC,	PENull
+DefGSElement	,	GR_PATH_AD,	PENull
+DefGSElement	,	GR_PATH_AE,	PENull
+DefGSElement	,	GR_PATH_AF,	PENull
+
+NUM_GSTRING_CMDS enum GStringElement
+
+	; these constants are used by the gstring code to determine if
+	; an output routine is going to be called.  Make sure they're
+	; updated if you add an output code !
+
+GSE_FIRST_OUTPUT_OPCODE	equ	GR_DRAW_LINE
+GSE_LAST_OUTPUT_IN_PATH	equ	GR_DRAW_TEXT_PTR
+GSE_LAST_OUTPUT_OPCODE	equ	GR_OUTPUT_5F
+GSE_FIRST_TEXT_OPCODE		equ	GR_DRAW_CHAR
+GSE_LAST_TEXT_OPCODE		equ	GR_DRAW_TEXT_PTR
+GSE_FIRST_MISC_OPCODE	equ	GR_END_GSTRING
+GSE_LAST_MISC_OPCODE	equ	GR_MISC_C
+GSE_FIRST_XFORM_OPCODE	equ	GR_APPLY_ROTATION
+GSE_LAST_XFORM_OPCODE	equ	GR_XFORM_1F
+GSE_FIRST_ATTR_OPCODE	equ	GR_SAVE_STATE
+GSE_LAST_ATTR_OPCODE	equ	GR_ATTR_9F
+GSE_FIRST_PATH_OPCODE	equ	GR_BEGIN_PATH
+GSE_LAST_PATH_OPCODE	equ	GR_PATH_AF
+
+GSE_LAST_OPCODE		equ	NUM_GSTRING_CMDS - 1
+GSE_INVALID		equ	0xff
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Graphics String Macros
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Each macro creates a single graphics string element
+
+PASS:		see each macro individually
+
+RETURN:		nothing
+
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+		create necessary data statements to define element
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		none
+
+REVISION HISTORY:
+		Name	Date		Description
+		----	----		-----------
+		Jim	03/89		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;----------------------------------------------------------------------------
+;
+; GSCheck 	- do some error checking on current state of the string
+;
+; 	args:	cs	- flag indicates whether setting up a condition to
+;			  check (set) or doing error checking (check)
+;		mac	- name of macro setting error condition for 
+;		size	- #bytes that should follow macro (set only)
+;
+;	sample:	
+;		GSCheck	check		; do some error checking
+;		GSCheck	set, GSFillPolygon, pts*4
+;
+;----------------------------------------------------------------------------
+
+GS_INSTRING	=	0
+GS_SET		=	0
+GS_LOC		=	0
+GS_STRING	equ	<no routine>
+
+OutErr	macro	string, var
+ErrMessage <string var>
+endm
+
+GSCheck	macro	cs, mac, size
+    ifidn	<cs>, <check>
+	if	GS_SET
+	    if GS_LOC ne $ 
+		    OutErr <bad data length for gstring macro >,%GS_STRING
+	    endif
+	    GS_SET	 = 0
+	    GS_LOC	 = 0
+	    GS_STRING equ <no routine>
+	endif
+    else
+	GS_SET		= 1
+	GS_LOC		= $ + size
+	GS_STRING	equ <mac>
+    endif
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSBeginString
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Beginning of static graphics string
+
+PASS:		nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+GSBeginString	macro	
+		GSCheck	check			
+    if GS_INSTRING ne 0
+		ErrMessage <invalid graphics string nesting>
+    endif
+    GS_INSTRING	= GS_INSTRING + 1
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSEndString
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	End of static string
+
+PASS:		nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpEndGString	struct
+    OEGS_opcode	GStringElement	GR_END_GSTRING
+OpEndGString	ends
+
+GSEndString	macro
+		GSCheck	check
+    if GS_INSTRING eq 0
+		ErrMessage <invalid graphics string nesting>
+    else
+		OpEndGString <>
+    endif
+    GS_INSTRING	= GS_INSTRING - 1
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSLabel
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Define a graphics string label
+
+PASS:		value for label
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpLabel	struct
+    OL_opcode	GStringElement	GR_LABEL
+    OL_value	word	?
+OpLabel	ends
+
+GSLabel	macro	vlabel
+	GSCheck	check
+	OpLabel	<,vlabel>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSaveState
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Push the current GState
+
+PASS:		nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSaveState	struct
+    OSS_opcode	GStringElement	GR_SAVE_STATE
+OpSaveState	ends
+
+GSSaveState	macro
+		GSCheck	check
+		OpSaveState <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSRestoreState
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Pop the current GState
+
+PASS:		nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpRestoreState	struct
+    ORS_opcode	GStringElement	GR_RESTORE_STATE
+OpRestoreState	ends
+
+GSRestoreState	macro
+		GSCheck	check
+		OpRestoreState <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSaveTransform
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Push the current GState Transformation Matrix
+
+PASS:		nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSaveTransform	struct
+    OST_opcode1	GStringElement	GR_SAVE_TRANSFORM
+OpSaveTransform	ends
+
+GSSaveTransform	macro
+		GSCheck	check
+		OpSaveTransform <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSRestoreTransform
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Pop the current GState Transformation matrix
+
+PASS:		nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpRestoreTransform	struct
+    ORT_opcode	GStringElement	GR_RESTORE_TRANSFORM
+OpRestoreTransform	ends
+
+GSRestoreTransform	macro
+		GSCheck	check
+		OpRestoreTransform <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSNewPage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Form Feed
+
+PASS:		pageEnd	= PageEndCommand
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpNewPage	struct
+    ONP_opcode	GStringElement	GR_NEW_PAGE
+    ONP_pageEnd	PageEndCommand
+OpNewPage	ends
+
+GSNewPage	macro	pageEnd
+		GSCheck	check
+		OpNewPage <, pageEnd>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSEscape
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Graphics String escape
+
+PASS:		esc	- escape code				(word)
+		size	- size of data element, #bytes		(word)
+			  this macro should be followed with the appropriate
+			  sized buffer of element data
+
+		GSEscape	APP_ESCAPE_CODE, 5
+				word	209, 30, 40h, 0, 0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpEscape	struct
+    OE_opcode	GStringElement	GR_ESCAPE
+    OE_escCode	word	?
+    OE_escSize	word	?
+OpEscape	ends
+
+GSEscape	macro	esc, size
+		GSCheck	check
+		OpEscape < ,esc,size>
+		GSCheck	set, GSEscape, <&size>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSComment
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Graphics String comment
+
+PASS:		size	- size of element, #bytes		(word)
+
+		GSComment	5
+				word	209, 30, 40h, 0, 0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpComment	struct
+    OC_opcode	GStringElement	GR_COMMENT
+    OC_size	word	?
+OpComment	ends
+
+GSComment	macro	size
+		GSCheck	check
+		OpComment < ,size>
+		GSCheck	set, GSComment, <&size>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetGStringBounds
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	set Graphics String bounds
+
+PASS:		x1,y1,x2,y2	- left,top,right,bottom of bounds
+
+		GSSetGStringBounds 0,0,50,50
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetGStringBounds struct
+    OSGSB_opcode	GStringElement	GR_SET_GSTRING_BOUNDS
+    OSGSB_x1	word	?
+    OSGSB_y1	word	?
+    OSGSB_x2	word	?
+    OSGSB_y2	word	?
+OpSetGStringBounds ends
+
+GSSetGStringBounds macro	x1,y1,x2,y2
+		GSCheck	check
+		OpSetGStringBounds < ,x1,y1,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSNullOp
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	GString NOP
+
+PASS:		nothing
+
+		GSNullOp
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpNullOp	struct
+    ONO_opcode	GStringElement	GR_NULL_OP
+OpNullOp	ends
+
+GSNullOp	macro	
+		GSCheck	check
+		OpNullOp <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSApplyRotation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Apply rotation to GState Transform
+
+PASS:		angle	- WWFixed rotation angle
+
+		GSApplyRotation	30.0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpApplyRotation	struct
+    OAR_opcode	GStringElement	GR_APPLY_ROTATION
+    OAR_angle	WWFixed	?
+OpApplyRotation	ends
+
+GSApplyRotation	macro	angle
+		GSCheck	check
+		GStringElement	GR_APPLY_ROTATION
+		WWFix	angle
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSApplyScale
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Apply scale to GState Transform
+
+PASS:		xScale	- WWFixed X scale factor 
+		yScale	- WWFixed Y scale factor 
+
+		GSApplyScale 30.0, 25.5
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpApplyScale	struct
+    OAS_opcode	GStringElement	GR_APPLY_SCALE
+    OAS_xScale	WWFixed	?
+    OAS_yScale	WWFixed	?
+OpApplyScale	ends
+
+GSApplyScale	macro	xScale, yScale
+		GSCheck	check
+		GStringElement	GR_APPLY_SCALE
+		WWFix	xScale
+		WWFix	yScale
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSApplyTranslation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Apply translation to GState Transform
+
+PASS:		xTrans	- WWFixed X translation factor 
+		yTrans	- WWFixed Y translation factor 
+
+		GSApplyTranslation 30.0, 25.5
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpApplyTranslation	struct
+    OAT_opcode	GStringElement	GR_APPLY_TRANSLATION
+    OAT_x	WWFixed	?
+    OAT_y	WWFixed	?
+OpApplyTranslation	ends
+
+GSApplyTranslation macro	x, y
+		GSCheck	check
+		GStringElement	GR_APPLY_TRANSLATION
+		WWFix	x
+		WWFix	y
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSApplyTranslationDWord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Apply dword translation to GState Transform
+
+PASS:		xTrans	- DWord X translation factor 
+		yTrans	- DWord Y translation factor 
+
+		GSApplyTranslationDWord 70000, 120000
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpApplyTranslationDWord	struct
+    OADT_opcode	GStringElement	GR_APPLY_TRANSLATION_DWORD
+    OADT_x	sdword	?
+    OADT_y	sdword	?
+OpApplyTranslationDWord	ends
+
+GSApplyTranslationDWord macro	x, y
+		GSCheck	check
+		GStringElement	GR_APPLY_TRANSLATION_DWORD
+		sdword	x
+		sdword	y
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTransform
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current GState transformation
+
+		given a translation matrix with elements:
+
+			[11  12  13]
+			[21  22  23]
+			[31  32  33]
+
+PASS:		e11	- element 11	(WWFixed)
+		e12	- element 12	(WWFixed)
+		e21	- element 21	(WWFixed)
+		e22	- element 22	(WWFixed)
+		e31	- element 31	(DWFixed)
+		e32	- element 32	(DWFixed)
+
+		GSSetTransform 1, 0, 0, 1, 23, 43.5
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTransform	struct
+    OST_opcode	GStringElement	GR_SET_TRANSFORM
+    OST_elem11	WWFixed	?
+    OST_elem12	WWFixed	?
+    OST_elem21	WWFixed	?
+    OST_elem22	WWFixed	?
+    OST_elem31	DWFixed	?
+    OST_elem32	DWFixed	?
+OpSetTransform	ends
+
+GSSetTransform 	macro elem11,elem12,elem21,elem22,elem31,elem32
+		GSCheck	check
+		GStringElement	GR_SET_TRANSFORM
+		WWFix	elem11
+		WWFix	elem12
+		WWFix	elem21
+		WWFix	elem22
+		DWFix	elem31
+		DWFix	elem32
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSApplyTransform
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Concat a matrix with the current GState transformation
+
+		given a translation matrix with elements:
+
+			[11  12  13]
+			[21  22  23]
+			[31  32  33]
+
+PASS:		e11	- element 11	(WWFixed)
+		e12	- element 12	(WWFixed)
+		e21	- element 21	(WWFixed)
+		e22	- element 22	(WWFixed)
+		e31	- element 31	(DWFixed)
+		e32	- element 32	(DWFixed)
+
+		GSApplyTransform 1, 0, 0, 1, 23, 43.5
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpApplyTransform	struct
+    OATr_opcode	GStringElement	GR_APPLY_TRANSFORM
+    OATr_elem11	WWFixed	?
+    OATr_elem12	WWFixed	?
+    OATr_elem21	WWFixed	?
+    OATr_elem22	WWFixed	?
+    OATr_elem31	DWFixed	?
+    OATr_elem32	DWFixed	?
+OpApplyTransform	ends
+
+GSApplyTransform  macro elem11,elem12,elem21,elem22,elem31,elem32
+		GSCheck	check
+		GStringElement	GR_APPLY_TRANSFORM
+		WWFix	elem11
+		WWFix	elem12
+		WWFix	elem21
+		WWFix	elem22
+		DWFix	elem31
+		DWFix	elem32
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetNullTransform
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current GState transformation to the identity matrix
+
+PASS:		nothing
+
+		GSSetNullTransform
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetNullTransform	struct
+    OSNT_opcode	GStringElement	GR_SET_NULL_TRANSFORM
+OpSetNullTransform	ends
+
+GSSetNullTransform macro
+		GSCheck	check
+		OpSetNullTransform <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetDefaultTransform
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Replace the current GState transform with the default matrix
+
+PASS:		nothing
+
+		GSSetDefaultTransform
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetDefaultTransform	struct
+    OSDT_opcode	GStringElement	GR_SET_DEFAULT_TRANSFORM
+OpSetDefaultTransform	ends
+
+GSSetDefaultTransform macro
+		GSCheck	check
+		OpSetDefaultTransform <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSInitDefaultTransform
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current GState transformation as the default matrix
+
+PASS:		nothing
+
+		GSInitDefaultTransform
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpInitDefaultTransform	struct
+    OIDT_opcode	GStringElement	GR_INIT_DEFAULT_TRANSFORM
+OpInitDefaultTransform	ends
+
+GSInitDefaultTransform macro
+		GSCheck	check
+		OpInitDefaultTransform <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawLine
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a line
+
+PASS:		x1,y1,x2,y2	- line endpoints
+
+		GSDrawLine	5,10, 40,60	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawLine	struct
+    ODL_opcode	GStringElement	GR_DRAW_LINE
+    ODL_x1	word	?
+    ODL_y1	word	?
+    ODL_x2	word	?
+    ODL_y2	word	?
+OpDrawLine	ends
+
+GSDrawLine 	macro	x1,y1, x2,y2
+		GSCheck	check
+		OpDrawLine < ,x1,y1,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawLineTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a line from the current pen position
+
+PASS:		x2,y2	- line endpoints
+
+		GSDrawLineTo	40,60	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawLineTo	struct
+    ODLT_opcode	GStringElement	GR_DRAW_LINE_TO
+    ODLT_x2	word	?
+    ODLT_y2	word	?
+OpDrawLineTo	ends
+
+GSDrawLineTo 	macro	x2,y2
+		GSCheck	check
+		OpDrawLineTo < ,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawRelLineTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a relative line from the current pen position
+
+PASS:		x2,y2	- relative line endpoints
+
+		GSDrawRelLineTo	40,60	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawRelLineTo	struct
+    ODRLT_opcode GStringElement	GR_DRAW_REL_LINE_TO
+    ODRLT_x2	WWFixed	
+    ODRLT_y2	WWFixed	
+OpDrawRelLineTo	ends
+
+GSDrawRelLineTo 	macro	x2,y2
+		GSCheck	check
+		GStringElement	GR_DRAW_REL_LINE_TO
+		WWFix	x2
+		WWFix	y2
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawRect
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a rectangle
+
+PASS:		x1,y1,x2,y2	- coordinates of opposite corners
+
+		GSDrawRect	5,10, 40,60	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawRect	struct
+    ODR_opcode	GStringElement	GR_DRAW_RECT
+    ODR_x1	word	?
+    ODR_y1	word	?
+    ODR_x2	word	?
+    ODR_y2	word	?
+OpDrawRect	ends
+
+GSDrawRect 	macro	x1,y1, x2,y2
+		GSCheck	check
+		OpDrawRect < ,x1,y1,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawRectTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a rectangle from the current pen position
+
+PASS:		x2,y2	- coordinates of opposite corners
+
+		GSDrawRectTo	40,60	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawRectTo	struct
+    ODRT_opcode	GStringElement	GR_DRAW_RECT_TO
+    ODRT_x2	word	?
+    ODRT_y2	word	?
+OpDrawRectTo	ends
+
+GSDrawRectTo 	macro	x2,y2
+		GSCheck	check
+		OpDrawRectTo < ,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawHLine
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a horizontal line
+
+PASS:		x1,y1,x2	- line end coordinates 
+
+		GSDrawHLine	40,60	80
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawHLine	struct
+    ODHL_opcode	GStringElement	GR_DRAW_HLINE
+    ODHL_x1	word	?
+    ODHL_y1	word	?
+    ODHL_x2	word	?
+OpDrawHLine	ends
+
+GSDrawHLine 	macro	x1,y1, x2
+		GSCheck	check
+		OpDrawHLine < ,x1,y1,x2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawHLineTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a horizontal line from the current position
+
+PASS:		x2	- other line end coordinates 
+
+		GSDrawHLineTo	80
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawHLineTo	struct
+    ODHLT_opcode GStringElement	GR_DRAW_HLINE_TO
+    ODHLT_x2	word	?
+OpDrawHLineTo	ends
+
+GSDrawHLineTo 	macro	x2
+		GSCheck	check
+		OpDrawHLineTo < ,x2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawVLine
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a vertical line 
+
+PASS:		x1,y1, y2	- other line end coordinates 
+
+		GSDrawVLine	40,50, 80
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawVLine	struct
+    ODVL_opcode	GStringElement	GR_DRAW_VLINE
+    ODVL_x1	word	?
+    ODVL_y1	word	?
+    ODVL_y2	word	?
+OpDrawVLine	ends
+
+GSDrawVLine 	macro	x1,y1, y2
+		GSCheck	check
+		OpDrawVLine < ,x1,y1,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawVLineTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a vertical line from the current position
+
+PASS:		y2	- other line end coordinates 
+
+		GSDrawVLineTo	80
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawVLineTo	struct
+    ODVLT_opcode GStringElement	GR_DRAW_VLINE_TO
+    ODVLT_y2	word	?
+OpDrawVLineTo	ends
+
+GSDrawVLineTo 	macro	y2
+		GSCheck	check
+		OpDrawVLineTo < ,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawRoundRect
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a rounded rectangle 
+
+PASS:		x1,x2,x2,y2	- coordinates of opposite corners
+		radius
+
+		GSDrawRoundRect		40,60	50,80, 	4
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawRoundRect	struct
+    ODRR_opcode	GStringElement	GR_DRAW_ROUND_RECT
+    ODRR_radius	word	?
+    ODRR_x1	word	?
+    ODRR_y1	word	?
+    ODRR_x2	word	?
+    ODRR_y2	word	?
+OpDrawRoundRect	ends
+
+GSDrawRoundRect	macro	x1,y1, x2,y2, radius
+		GSCheck	check
+		OpDrawRoundRect < ,radius,x1,y1,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawRoundRectTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a rounded rectangle from the current position
+
+PASS:		x2,y2	- coordinates of opposite corner
+		radius
+
+		GSDrawRoundRectTo	50,80,	4
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawRoundRectTo	struct
+    ODRRT_opcode GStringElement	GR_DRAW_ROUND_RECT_TO
+    ODRRT_radius word	?
+    ODRRT_x2	 word	?
+    ODRRT_y2	 word	?
+OpDrawRoundRectTo	ends
+
+GSDrawRoundRectTo macro	x2,y2, radius
+		GSCheck	check
+		OpDrawRoundRectTo < ,radius,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawPoint
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a point
+
+PASS:		x1,y1	- coordinates of point
+
+		GSDrawPoint	50,80
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawPoint	struct
+    ODP_opcode	GStringElement	GR_DRAW_POINT
+    ODP_x1	word	?
+    ODP_y1	word	?
+OpDrawPoint	ends
+
+GSDrawPoint	macro	x1,y1
+		GSCheck	check
+		OpDrawPoint < ,x1,y1>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawPoint
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a point at the current pen position
+
+PASS:		nothing
+
+		GSDrawPoint
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawPointAtCP	struct
+    ODPCP_opcode	GStringElement	GR_DRAW_POINT_CP
+OpDrawPointAtCP	ends
+
+GSDrawPointAtCP macro	
+		GSCheck	check
+		OpDrawPointAtCP <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawBitmap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a bitmap
+
+PASS:		x,y	- position to draw bitmap
+		bsize	- #bytes in the bitmap (including header)
+		
+
+	Complex bitmaps have a word of size (size of slice including slice 
+	structure) before each slice. The size of the first slice is output
+	by the macros below.
+
+		GSDrawBitmap	40,60, 16
+		    Bitmap <8, 8, BMC_NOCOMPACT, BMF_MONO>
+		    byte	0ffh, 081h, 081h, 081h, 081h, 081h, 081h, 0ffh 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawBitmap	struct
+    ODB_opcode	GStringElement	GR_DRAW_BITMAP
+    ODB_x	word	
+    ODB_y	word	
+    ODB_size	word	
+OpDrawBitmap	ends
+
+OpBitmapSlice	struct
+    OBS_opcode	GStringElement	GSE_BITMAP_SLICE
+    OBS_size	word	
+OpBitmapSlice	ends
+
+GSDrawBitmap	macro	x,y, bsize
+		GSCheck	check
+		OpDrawBitmap < ,x,y,bsize>
+		GSCheck	set, GSDrawBitmap, <&bsize>
+endm
+
+		; this is for complex ones, it takes another arg for 
+		; overall size
+GSDrawCBitmap	macro	x,y, slice1size, totalSize
+		GSCheck	check
+		OpDrawBitmap < ,x,y,slice1size>
+		GSCheck	set, GSDrawCBitmap, <&totalSize>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawBitmapAtCP
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a bitmap at the current position
+
+PASS:		bsize	- #bytes in the bitmap (including header)
+		
+
+		GSDrawBitmapAtCP	16
+		    Bitmap <8, 8, BMC_NOCOMPACT, BMF_MONO>
+		    byte	0ffh, 081h, 081h, 081h, 081h, 081h, 081h, 0ffh 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawBitmapAtCP	struct
+    ODBCP_opcode	GStringElement	GR_DRAW_BITMAP_CP
+    ODBCP_size	word	?
+OpDrawBitmapAtCP	ends
+
+GSDrawBitmapAtCP macro	bsize
+		GSCheck	check
+		OpDrawBitmapAtCP < ,bsize>
+		GSCheck	set, GSDrawBitmapAtCP, <&bsize>
+endm
+
+
+		; this is for complex ones, it takes another arg for 
+		; overall size
+GSDrawCBitmapAtCP macro	slice1size, totalSize
+		GSCheck	check
+		OpDrawBitmapAtCP < ,slice1size>
+		GSCheck	set, GSDrawCBitmapAtCP, <&totalSize>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawBitmapPtr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a bitmap from a near pointer
+
+PASS:		x,y	- position to draw bitmap
+		offptr	- offset to bitmap in same segment
+		
+		GSDrawBitmapPtr	20,30, <offset somePic>
+...
+somePic	label	byte
+		    Bitmap <8, 8, BMC_NOCOMPACT, BMF_MONO>
+		    byte	0ffh, 081h, 081h, 081h, 081h, 081h, 081h, 0ffh 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawBitmapPtr	struct
+    ODBP_opcode	GStringElement	GR_DRAW_BITMAP_PTR
+    ODBP_x	word	?
+    ODBP_y	word	?
+    ODBP_ptr	nptr	?
+OpDrawBitmapPtr	ends
+
+GSDrawBitmapPtr macro	x,y, offptr
+		GSCheck	check
+		OpDrawBitmapPtr < ,x,y,offset offptr>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawBitmapOptr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a bitmap from an Optr
+
+PASS:		x,y	- position to draw bitmap
+		
+
+		GSDrawBitmapPtr	20,30, <offset somePic>
+...
+somePic	label	byte
+		    Bitmap <8, 8, BMC_NOCOMPACT, BMF_MONO>
+		    byte	0ffh, 081h, 081h, 081h, 081h, 081h, 081h, 0ffh 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawBitmapOptr struct
+    ODBOP_opcode GStringElement	GR_DRAW_BITMAP_OPTR
+    ODBOP_x	word	?
+    ODBOP_y	word	?
+    ODBOP_optr	optr	?
+OpDrawBitmapOptr ends
+
+GSDrawBitmapOptr macro	x,y, chunkptr
+		GSCheck	check
+		OpDrawBitmapOptr < ,x,y,chunkptr>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillBitmap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill a monochrome bitmap
+
+PASS:		x,y	- position to draw it
+		size	- size of bitmap
+
+		GSFillBitmap	40,60, 16
+		    Bitmap <8, 8, BMC_NOCOMPACT, BMF_MONO>
+		    byte	0ffh, 081h, 081h, 081h, 081h, 081h, 081h, 0ffh 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillBitmap	struct
+    OFB_opcode	GStringElement	GR_FILL_BITMAP
+    OFB_x	word	?
+    OFB_y	word	?
+    OFB_size	word	?
+OpFillBitmap	ends
+
+GSFillBitmap	macro	x,y, bsize
+		GSCheck	check
+		OpFillBitmap < ,x,y,bsize>
+		GSCheck	set, GSFillBitmap, <&bsize>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillBitmapAtCP
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill a monochrome bitmap at the current pen position
+
+PASS:		size	- size of bitmap
+
+		GSFillBitmapAtCP	16
+		    Bitmap <8, 8, BMC_NOCOMPACT, BMF_MONO>
+		    byte	0ffh, 081h, 081h, 081h, 081h, 081h, 081h, 0ffh 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillBitmapAtCP	struct
+    OFBCP_opcode	GStringElement	GR_FILL_BITMAP_CP
+    OFBCP_size	word	?
+OpFillBitmapAtCP	ends
+
+GSFillBitmapAtCP macro	bsize
+		GSCheck	check
+		OpFillBitmapAtCP < ,bsize>
+		GSCheck	set, GSFillBitmapAtCP, <&bsize>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillBitmapPtr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill a bitmap from a near pointer
+
+PASS:		x,y	- position to draw bitmap
+		offptr	- offset to bitmap in same segment
+		
+		GSFillBitmapPtr	20,30, <offset somePic>
+...
+somePic	label	byte
+		    Bitmap <8, 8, BMC_NOCOMPACT, BMF_MONO>
+		    byte	0ffh, 081h, 081h, 081h, 081h, 081h, 081h, 0ffh 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillBitmapPtr	struct
+    OFBP_opcode	GStringElement	GR_DRAW_BITMAP_PTR
+    OFBP_x	word	?
+    OFBP_y	word	?
+    OFBP_ptr	nptr	?
+OpFillBitmapPtr	ends
+
+GSFillBitmapPtr macro	x,y, offptr
+		GSCheck	check
+		OpFillBitmapPtr < ,x,y,offset offptr>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillBitmapOptr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill a bitmap from an Optr
+
+PASS:		x,y	- position to fill bitmap
+		
+
+		GSFillBitmapPtr	20,30, <offset somePic>
+...
+somePic	chunk 	Bitmap <8, 8, BMC_NOCOMPACT, BMF_MONO>
+		byte	0ffh, 081h, 081h, 081h, 081h, 081h, 081h, 0ffh 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillBitmapOptr struct
+    OFBOP_opcode GStringElement	GR_FILL_BITMAP_OPTR
+    OFBOP_x	word	?
+    OFBOP_y	word	?
+    OFBOP_optr	optr	?
+OpFillBitmapOptr ends
+
+GSFillBitmapOptr macro	x,y, chunkptr
+		GSCheck	check
+		OpFillBitmapOptr < ,x,y,chunkptr>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawPolyline
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a polyline
+
+PASS:		pts	- number of points
+			  (macro should be followed by the appropriate sized
+			   array of points)
+
+		GSDrawPolyline	4
+		word		10,20, 40,50, 34,75, 100,30
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawPolyline	struct
+    ODPL_opcode	GStringElement	GR_DRAW_POLYLINE
+    ODPL_count	word	?
+OpDrawPolyline	ends
+
+GSDrawPolyline	macro	pts
+		GSCheck	check
+		OpDrawPolyline < ,pts>
+		GSCheck	set, GSDrawPolyline, pts*4
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSBrushPolyline
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Brush a polyline
+
+PASS:		width	- brush width
+		height	- brush height
+		pts	- number of points
+			  (macro should be followed by the appropriate sized
+			   array of points)
+
+		GSBrushPolyline	2,2, 4
+		word		10,20, 40,50, 34,75, 100,30
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpBrushPolyline	struct
+    OBPL_opcode	GStringElement	GR_BRUSH_POLYLINE
+    OBPL_count	word	?
+    OBPL_width  byte	?
+    OBPL_height byte	?
+OpBrushPolyline	ends
+
+GSBrushPolyline	macro	brushW, brushH, pts
+		GSCheck	check
+		OpBrushPolyline < ,pts,brushW,brushH>
+		GSCheck	set, GSBrushPolyline, pts*4
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawEllipse
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw an ellipse
+
+PASS:		x1,y1,x2,y2	- endpoints of a rectangle bounding the ellipse
+
+		GSDrawEllipse	4,10, 30,43
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawEllipse	struct
+    ODE_opcode	GStringElement	GR_DRAW_ELLIPSE
+    ODE_x1	word	?
+    ODE_y1	word	?
+    ODE_x2	word	?
+    ODE_y2	word	?
+OpDrawEllipse	ends
+
+GSDrawEllipse	macro	x1,y1, x2,y2
+		GSCheck	check
+		OpDrawEllipse < ,x1,y1,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawArc
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw an arc
+
+PASS:		x1,y1,x2,y2	- endpoints of rectangle that bounds the
+				  ellipse on which the arc lies
+		ang1,ang2	- starting/ending angles
+		close		- ArcCloseType
+
+		GSDrawArc	ACT_PIE, 4,10, 30,43, 45,60
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawArc	struct
+    ODA_opcode	GStringElement	GR_DRAW_ARC
+    ODA_close	ArcCloseType
+    ODA_x1	word	?
+    ODA_y1	word	?
+    ODA_x2	word	?
+    ODA_y2	word	?
+    ODA_ang1	word	?
+    ODA_ang2	word	?
+OpDrawArc	ends
+
+GSDrawArc	macro	close, x1,y1, x2,y2, ang1, ang2
+		GSCheck	check
+		OpDrawArc < ,close,x1,y1,x2,y2,ang1,ang2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawCurve
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a bezier curve
+
+PASS:		
+
+		GSDrawCurve	4,5  8,10,  20,30,  50,54
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawCurve	struct
+    ODCV_opcode	GStringElement	GR_DRAW_CURVE
+    ODCV_x1	sword	?
+    ODCV_y1	sword	?
+    ODCV_x2	sword	?
+    ODCV_y2	sword	?
+    ODCV_x3	sword	?
+    ODCV_y3	sword	?
+    ODCV_x4	sword	?
+    ODCV_y4	sword	?
+OpDrawCurve	ends
+
+GSDrawCurve	macro	x1,y1,x2,y2,x3,y3,x4,y4
+		GSCheck	check
+		OpDrawCurve < ,x1,y1,x2,y2,x3,y3,x4,y4>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawCurveTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a bezier curve from the current position
+
+PASS:		
+
+		GSDrawCurveTo	8,10,  20,30,  50,54
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawCurveTo	struct
+    ODCVT_opcode GStringElement	GR_DRAW_CURVE_TO
+    ODCVT_x2	sword	?
+    ODCVT_y2	sword	?
+    ODCVT_x3	sword	?
+    ODCVT_y3	sword	?
+    ODCVT_x4	sword	?
+    ODCVT_y4	sword	?
+OpDrawCurveTo	ends
+
+GSDrawCurveTo	macro	x2,y2,x3,y3,x4,y4
+		GSCheck	check
+		OpDrawCurveTo < ,x2,y2,x3,y3,x4,y4>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawRelCurveTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a relative bezier curve from the current position
+
+PASS:		
+
+		GSDrawRelCurveTo	8,10,  20,30,  50,54
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawRelCurveTo	struct
+    ODRCVT_opcode GStringElement	GR_DRAW_REL_CURVE_TO
+    ODRCVT_x2	sword	?
+    ODRCVT_y2	sword	?
+    ODRCVT_x3	sword	?
+    ODRCVT_y3	sword	?
+    ODRCVT_x4	sword	?
+    ODRCVT_y4	sword	?
+OpDrawRelCurveTo	ends
+
+GSDrawRelCurveTo macro	x2,y2,x3,y3,x4,y4
+		GSCheck	check
+		OpDrawRelCurveTo < ,x2,y2,x3,y3,x4,y4>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawSpline
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a spline
+
+PASS:		pts	- number of points
+			  (macro should be followed by the appropriate sized
+			   array of points)
+
+		GSDrawSpline	4
+		word		10,20, 40,50, 34,75, 100,30
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawSpline	struct
+    ODS_opcode	GStringElement	GR_DRAW_SPLINE
+    ODS_count	word	?
+OpDrawSpline	ends
+
+GSDrawSpline	macro	pts
+		GSCheck	check
+		OpDrawSpline < ,pts>
+		GSCheck	set, GSDrawSpline, pts*4
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawSplineTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a spline from the current pen position
+
+PASS:		pts	- number of points
+			  (macro should be followed by the appropriate sized
+			   array of points)
+
+		GSDrawSpline	3
+		word		40,50, 34,75, 100,30
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawSplineTo	struct
+    ODST_opcode	GStringElement	GR_DRAW_SPLINE_TO
+    ODST_count	word	?
+OpDrawSplineTo	ends
+
+GSDrawSplineTo	macro	pts
+		GSCheck	check
+		OpDrawSplineTo < ,pts>
+		GSCheck	set, GSDrawSplineTo, pts*4
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillRect
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill a rectangle
+
+PASS:		x1,y1,x2,y2	- coordinates to opposite corners
+
+;		GSFillRect	5,10, 40,60	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillRect	struct
+    OFFR_opcode	GStringElement	GR_FILL_RECT
+    OFFR_x1	word	?
+    OFFR_y1	word	?
+    OFFR_x2	word	?
+    OFFR_y2	word	?
+OpFillRect	ends
+
+GSFillRect 	macro	x1,y1, x2,y2
+		GSCheck	check
+		OpFillRect < ,x1,y1,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillRectTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill a rectangle from the current pen position
+
+PASS:		x2,y2	- coordinates to opposite corners
+
+		GSFillRectTo	40,60	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillRectTo	struct
+    OFFRT_opcode	GStringElement	GR_FILL_RECT_TO
+    OFFRT_x2	word	?
+    OFFRT_y2	word	?
+OpFillRectTo	ends
+
+GSFillRectTo 	macro	x2,y2
+		GSCheck	check
+		OpFillRectTo < ,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillRoundRect
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill a rounded rectangle 
+
+PASS:		x1,y1,x2,y2	- coordinates of opposite corners
+		radius
+
+		GSFillRoundRect		40,60	50,80,  4
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillRoundRect	struct
+    OFRR_opcode	GStringElement	GR_FILL_ROUND_RECT
+    OFRR_radius	word	?
+    OFRR_x1	word	?
+    OFRR_y1	word	?
+    OFRR_x2	word	?
+    OFRR_y2	word	?
+OpFillRoundRect	ends
+
+GSFillRoundRect	macro	x1,y1, x2,y2, radius
+		GSCheck	check
+		OpFillRoundRect <,radius,x1,y1,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillRoundRectTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill a rounded rectangle from the current position
+
+PASS:		x2,y2	- coordinates of opposite corners
+		radius
+
+		GSFillRoundRectTo	50,80,  4
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillRoundRectTo	struct
+    OFRRT_opcode	GStringElement	GR_FILL_ROUND_RECT_TO
+    OFRRT_radius	word	?
+    OFRRT_x2	word	?
+    OFRRT_y2	word	?
+OpFillRoundRectTo	ends
+
+GSFillRoundRectTo macro	x2,y2, radius
+		GSCheck	check
+		OpFillRoundRectTo <,radius,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillArc
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill an arc
+
+PASS:		x1,y1,x2,y2	- endpoints of rectangle that bounds the
+				  ellipse on which the arc lies
+		ang1,ang2	- starting/ending angles
+		close		- ArcCloseType
+
+		GSFillArc	ACT_CHORD, 4,10, 30,43, 45,60
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillArc	struct
+    OFA_opcode	GStringElement	GR_FILL_ARC
+    OFA_close	ArcCloseType
+    OFA_x1	word	?
+    OFA_y1	word	?
+    OFA_x2	word	?
+    OFA_y2	word	?
+    OFA_ang1	word	?
+    OFA_ang2	word	?
+OpFillArc	ends
+
+GSFillArc	macro	close, x1,y1, x2,y2, ang1, ang2
+		GSCheck	check
+		OpFillArc < ,close, x1,y1,x2,y2,ang1,ang2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillPolygon
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill a polygon
+
+PASS:		pts	- number of points
+			  (macro should be followed by the appropriate sized
+			   array of points)
+		rule	- fill rule
+		
+		GSFillPolygon	4, RFR_ODD_EVEN
+		word		10,20, 40,50, 34,75, 100,30
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillPolygon	struct
+    OFP_opcode	GStringElement	GR_FILL_POLYGON
+    OFP_count	word	?
+    OFP_rule	RegionFillRule	?
+OpFillPolygon	ends
+
+GSFillPolygon	macro	pts, fillrule
+		GSCheck	check
+		OpFillPolygon < ,pts,fillrule>
+		GSCheck	set, GSFillPolygon, pts*4
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawPolygon
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a polygon
+
+PASS:		pts	- number of points
+			  (macro should be followed by the appropriate sized
+			   array of points)
+		
+		GSDrawPolygon	4 
+		word		10,20, 40,50, 34,75, 100,30
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawPolygon	struct
+    ODPG_opcode	GStringElement	GR_DRAW_POLYGON
+    ODPG_count	word	?
+OpDrawPolygon	ends
+
+GSDrawPolygon	macro	pts
+		GSCheck	check
+		OpDrawPolygon < ,pts>
+		GSCheck	set, GSDrawPolygon, pts*4
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillEllipse
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill an ellipse
+
+PASS:		x1,y1,x2,y2	- endpoints of a rectangle bounding the ellipse
+
+		GSFillEllipse	4,10, 30,43
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillEllipse	struct
+    OFE_opcode	GStringElement	GR_FILL_ELLIPSE
+    OFE_x1	word	?
+    OFE_y1	word	?
+    OFE_x2	word	?
+    OFE_y2	word	?
+OpFillEllipse	ends
+
+GSFillEllipse	macro	x1,y1, x2,y2
+		GSCheck	check
+		OpFillEllipse < ,x1,y1,x2,y2>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawChar
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a character
+
+PASS:		x,y	- position to draw character
+		char	- the character itself
+
+		GSDrawChar	5,10, a
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawChar	struct
+    ODC_opcode	GStringElement	GR_DRAW_CHAR
+if DBCS_PCGEOS
+    ODC_char	wchar	?
+else
+    ODC_char	char	?
+endif
+    ODC_x1	word	?
+    ODC_y1	word	?
+OpDrawChar	ends
+
+GSDrawChar	macro	x1,y1, char
+		GSCheck	check
+		GStringElement	GR_DRAW_CHAR
+slen	sizestr <&char>
+
+if (slen gt 1)
+
+DBCS <		wchar	char						>
+SBCS <		byte	char						>
+
+else
+
+DBCS <		wchar	'&char'						>
+SBCS <		byte	'&char'						>
+
+endif
+		word	x1,y1
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawCharAtCP
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a character at the current pen position
+
+PASS:		char	- the character itself
+
+		GSDrawCharAtCP	a
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawCharAtCP	struct
+    ODCCP_opcode	GStringElement	GR_DRAW_CHAR_CP
+if DBCS_PCGEOS
+    ODCCP_char	wchar	?
+else
+    ODCCP_char	char	?
+endif
+OpDrawCharAtCP	ends
+
+GSDrawCharAtCP	macro	char
+		GSCheck	check
+		GStringElement	GR_DRAW_CHAR_CP
+slen	sizestr <&char>
+
+if (slen gt 1)
+DBCS <		wchar	char						>
+SBCS <		byte	char						>
+else
+DBCS <		wchar	'&char'						>
+SBCS <		byte	'&char'						>
+endif
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawText
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw some text
+
+PASS:		x,y	- position to start drawing
+		string	- string
+
+		GSDrawText	5,10, <Draw this string>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawText	struct
+    ODT_opcode	GStringElement	GR_DRAW_TEXT
+    ODT_x1	word	?
+    ODT_y1	word	?
+    ODT_len	word	?
+OpDrawText	ends
+
+GSDrawText	macro	x1,y1, string
+		GSCheck	check
+slen	sizestr	<&string>
+		GStringElement	GR_DRAW_TEXT
+		word	x1,y1
+		word	slen
+DBCS <		wchar	<&string>					>
+SBCS <		byte	<&string>					>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawTextAtCP
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw some text at the current pen position
+
+PASS:		string	- string
+
+		GSDrawTextAtCP	<Draw this string>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawTextAtCP	struct
+    ODTCP_opcode	GStringElement	GR_DRAW_TEXT_CP
+    ODTCP_len	word	?
+OpDrawTextAtCP	ends
+
+GSDrawTextAtCP macro	string
+		GSCheck	check
+slen	sizestr	<&string>
+		GStringElement	GR_DRAW_TEXT_CP
+		word	slen
+DBCS <		wchar	<&string>					>
+SBCS <		byte	<&string>					>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawTextPtr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw some text given a pointer to the text
+
+PASS:		x,y	- position to draw text
+		offset	- offset to text string
+
+		GSDrawTextPtr	someTextString
+
+someTextString label	char
+		char	"Some text string", 0
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawTextPtr	struct
+    ODTP_opcode	GStringElement	GR_DRAW_TEXT_PTR
+    ODTP_x1	word	?
+    ODTP_y1	word	?
+    ODTP_ptr	nptr	?
+OpDrawTextPtr	ends
+
+GSDrawTextPtr 	macro	x,y, offptr
+		GSCheck	check
+		OpDrawTextPtr < ,x,y,offset offptr>
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawTextOptr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw text from an Optr
+
+PASS:		x,y	- position to draw text
+		chunk	- optr to text
+		
+
+		GSDrawTextPtr	20,30, someText
+...
+someText	chunk	"Some more text", 0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawTextOptr	struct
+    ODTO_opcode	GStringElement	GR_DRAW_TEXT_OPTR
+    ODTO_x1	word	?
+    ODTO_y1	word	?
+    ODTO_optr	optr	?
+OpDrawTextOptr	ends
+
+GSDrawTextOptr 	macro	x,y, chunkptr
+		GSCheck	check
+		OpDrawTextOptr < ,x,y,chunkptr>
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawTextField
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw a text field
+
+PASS:		no macro defined for this
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+TFStyleRun	struct
+    TFSR_count	word	?	; character count
+    TFSR_attr	TextAttr <>	; text attributes
+TFStyleRun	ends
+
+OpDrawTextField	struct
+    ODTF_opcode	GStringElement	GR_DRAW_TEXT_FIELD
+    ODTF_saved	GDF_saved <>		; portion of GDF_vars that is saved
+OpDrawTextField	ends
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSMoveTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current pen position
+
+PASS:		x,y	- new pen position
+
+		GSMoveTo	5,10
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpMoveTo	struct
+    OMT_opcode	GStringElement	GR_MOVE_TO
+    OMT_x1	word	?
+    OMT_y1	word	?
+OpMoveTo	ends
+
+GSMoveTo	macro	x1,y1
+		GSCheck	check
+		OpMoveTo < ,x1,y1>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSRelMoveTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current pen position relative to the current one
+
+PASS:		x,y	- new (relative) pen position
+
+		GSRelMoveTo	5,10
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpRelMoveTo	struct
+    ORMT_opcode	GStringElement	GR_REL_MOVE_TO
+    ORMT_x1	WWFixed	
+    ORMT_y1	WWFixed
+OpRelMoveTo	ends
+
+GSRelMoveTo	macro	x1,y1
+		GSCheck	check
+		GStringElement	GR_REL_MOVE_TO
+		WWFix	x1
+		WWFix	y1
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSRelMoveTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current pen position relative to the current one
+
+PASS:		x,y	- new (relative) pen position
+
+		GSRelMoveTo	5,10
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpMoveToWWFixed	struct
+    OMTW_opcode	GStringElement	GR_MOVE_TO_WWFIXED
+    OMTW_x1	WWFixed	
+    OMTW_y1	WWFixed
+OpMoveToWWFixed	ends
+
+GSMoveToWWFixed	macro	x1,y1
+		GSCheck	check
+		GStringElement	GR_MOVE_TO_WWFIXED
+		WWFix	x1
+		WWFix	y1
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetMixMode
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the drawing mix mode
+
+PASS:		mode	- new mode
+
+		GSSetMixMode	MM_XOR
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetMixMode	struct
+    OSMM_opcode	GStringElement	GR_SET_MIX_MODE
+    OSMM_mode	MixMode
+OpSetMixMode	ends
+
+GSSetMixMode	macro	mode
+		GSCheck	check
+		OpSetMixMode < ,mode>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetLineColor
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a new line color
+
+PASS:		r,g,b	- new RGB color components for line objects
+
+		GSSetLineColor	255, 0, 0		; set color red
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetLineColor	struct
+    OSLC_opcode	GStringElement	GR_SET_LINE_COLOR
+    OSLC_color	RGBValue <>
+OpSetLineColor	ends
+
+GSSetLineColor	macro	r,g,b
+		GSCheck	check
+		OpSetLineColor < ,<r,g,b>>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetLineColorIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a new line color
+
+PASS:		r,g,b	- new RGB color components for line objects
+
+		GSSetLineColorIndex	CF_WHITE
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetLineColorIndex	struct
+    OSLCI_opcode	GStringElement	GR_SET_LINE_COLOR_INDEX
+    OSLCI_color	Color
+OpSetLineColorIndex	ends
+
+GSSetLineColorIndex macro index
+		GSCheck	check
+		OpSetLineColorIndex < ,index>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetAreaColor
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a new area color
+
+PASS:		r,g,b	- new RGB color components for area objects
+
+		GSSetAreaColor	255, 0, 0		; set color red
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetAreaColor	struct
+    OSAC_opcode	GStringElement	GR_SET_AREA_COLOR
+    OSAC_color	RGBValue <>
+OpSetAreaColor	ends
+
+GSSetAreaColor	macro	r,g,b
+		GSCheck	check
+		OpSetAreaColor < ,<r,g,b>>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetAreaColorIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a new area color
+
+PASS:		r,g,b	- new RGB color components for area objects
+
+		GSSetAreaColorIndex	CF_WHITE
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetAreaColorIndex	struct
+    OSACI_opcode	GStringElement	GR_SET_AREA_COLOR_INDEX 
+    OSACI_color	Color
+OpSetAreaColorIndex	ends
+
+GSSetAreaColorIndex macro index
+		GSCheck	check
+		OpSetAreaColorIndex < ,index>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextColor
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a new text color
+
+PASS:		r,g,b	- new RGB color components for text objects
+
+		GSSetTextColor	255, 0, 0		; set color red
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextColor	struct
+    OSTC_opcode	GStringElement	GR_SET_TEXT_COLOR
+    OSTC_color	RGBValue <>
+OpSetTextColor	ends
+
+GSSetTextColor	macro	r,g,b
+		GSCheck	check
+		OpSetTextColor < ,<r,g,b>>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextColorIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a new text color
+
+PASS:		r,g,b	- new RGB color components for text objects
+
+		GSSetTextColorIndex	CF_WHITE
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextColorIndex	struct
+    OSTCI_opcode	GStringElement	GR_SET_TEXT_COLOR_INDEX
+    OSTCI_color	Color
+OpSetTextColorIndex	ends
+
+GSSetTextColorIndex macro index
+		GSCheck	check
+		OpSetTextColorIndex < ,index>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetLineMask
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a draw mask
+
+PASS:		mask	- SysDrawMask enum
+
+		GSSetLineMask	SDM_25
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetLineMask	struct
+    OSLM_opcode	GStringElement	GR_SET_LINE_MASK
+    OSLM_mask	SysDrawMask
+OpSetLineMask	ends
+
+GSSetLineMask	macro	index
+		GSCheck	check
+		OpSetLineMask < ,index>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetCustomLineMask
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a custom draw mask
+
+PASS:		nothing
+		(followed by an array of eight bytes)
+
+		GSSetCustomLineMask	
+		byte	0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetCustomLineMask	struct
+    OSCLM_opcode	GStringElement	GR_SET_CUSTOM_LINE_MASK
+    OSCLM_mask		DrawMask
+OpSetCustomLineMask	ends
+
+GSSetCustomLineMask macro 
+		GSCheck	check
+		GStringElement	GR_SET_CUSTOM_LINE_MASK
+		GSCheck	set, GSSetCustomLineMask, 8
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetAreaMask
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a draw mask
+
+PASS:		mask	- SysDrawMask enum
+
+		GSSetAreaMask	SDM_25
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetAreaMask	struct
+    OSAM_opcode	GStringElement	GR_SET_AREA_MASK
+    OSAM_mask	SysDrawMask
+OpSetAreaMask	ends
+
+GSSetAreaMask	macro	index
+		GSCheck	check
+		OpSetAreaMask < ,index>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetCustomAreaMask
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a custom draw mask
+
+PASS:		nothing
+		(followed by an array of eight bytes)
+
+		GSSetCustomAreaMask	
+		byte	0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetCustomAreaMask	struct
+    OSCAM_opcode	GStringElement	GR_SET_CUSTOM_AREA_MASK
+    OSCAM_mask		DrawMask
+OpSetCustomAreaMask	ends
+
+GSSetCustomAreaMask macro 
+		GSCheck	check
+		GStringElement	GR_SET_CUSTOM_AREA_MASK
+		GSCheck	set, GSSetCustomAreaMask, 8
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextMask
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a draw mask
+
+PASS:		mask	- SysDrawMask enum
+
+		GSSetTextMask	SDM_25
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextMask	struct
+    OSTM_opcode	GStringElement	GR_SET_TEXT_MASK
+    OSTM_mask	SysDrawMask
+OpSetTextMask	ends
+
+GSSetTextMask	macro	index
+		GSCheck	check
+		OpSetTextMask < ,index>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetCustomTextMask
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a custom draw mask
+
+PASS:		nothing
+		(followed by an array of eight bytes)
+
+		GSSetCustomTextMask	
+		byte	0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetCustomTextMask	struct
+    OSCTM_opcode	GStringElement	GR_SET_CUSTOM_TEXT_MASK
+    OSCTM_mask		DrawMask
+OpSetCustomTextMask	ends
+
+GSSetCustomTextMask macro 
+		GSCheck	check
+		GStringElement	GR_SET_CUSTOM_TEXT_MASK
+		GSCheck	set, GSSetCustomTextMask, 8
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetLineColorMap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set color map mode
+
+PASS:		mode	- new ColorMapMode
+
+		GSSetLineColorMap	CMT_DITHER
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetLineColorMap	struct
+    OSLCM_opcode	GStringElement	GR_SET_LINE_COLOR_MAP
+    OSLCM_mode	ColorMapMode
+OpSetLineColorMap	ends
+
+GSSetLineColorMap macro	mode
+		GSCheck	check
+		OpSetLineColorMap < ,mode>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetAreaColorMap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set color map mode
+
+PASS:		mode	- new ColorMapMode
+
+		GSSetAreaColorMap	CMT_DITHER
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetAreaColorMap	struct
+    OSACM_opcode	GStringElement	GR_SET_AREA_COLOR_MAP
+    OSACM_mode	ColorMapMode
+OpSetAreaColorMap	ends
+
+GSSetAreaColorMap macro	mode
+		GSCheck	check
+		OpSetAreaColorMap < ,mode>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextColorMap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set color map mode
+
+PASS:		mode	- new ColorMapMode
+
+		GSSetTextColorMap	CMT_CLOSEST
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextColorMap	struct
+    OSTCM_opcode	GStringElement	GR_SET_TEXT_COLOR_MAP
+    OSTCM_mode	ColorMapMode
+OpSetTextColorMap	ends
+
+GSSetTextColorMap macro	mode
+		GSCheck	check
+		OpSetTextColorMap < ,mode>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetLineWidth
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set current line width
+
+PASS:		width	- WWFixed line width
+
+		GSSetLineWidth	1.5
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetLineWidth	struct
+    OSLW_opcode	GStringElement	GR_SET_LINE_WIDTH
+    OSLW_width	WWFixed	
+OpSetLineWidth	ends
+
+GSSetLineWidth 	macro	width
+		GSCheck	check
+		GStringElement	GR_SET_LINE_WIDTH
+		WWFix	width
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetLineStyle
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current line style
+
+PASS:		style	- new style
+
+		GSSetLineStyle	LS_SOLID
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetLineStyle	struct
+    OSLS_opcode	GStringElement	GR_SET_LINE_STYLE
+    OSLS_style	LineStyle
+    OSLS_index	byte	?
+OpSetLineStyle	ends
+
+GSSetLineStyle 	macro	style, index
+		GSCheck	check
+		OpSetLineStyle < ,style,index>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetCustomLineStyle
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a custom line style
+
+PASS:		index	- index into pattern
+		npairs	- number of on-off pairs in style array
+
+		GSSetCustomLineStyle	0, 4
+		    byte	1,1, 2,2, 3,3, 4,4
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetCustomLineStyle	struct
+    OSCLS_opcode	GStringElement	GR_SET_CUSTOM_LINE_STYLE
+    OSCLS_index	word	?
+    OSCLS_count	word	?
+OpSetCustomLineStyle	ends
+
+GSSetCustomLineStyle macro index, npairs
+		GSCheck	check
+		OpSetCustomLineStyle < ,index,npairs>
+		GSCheck	set, GSSetCustomLineStyle, npairs*2
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetLineEnd
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a new line end type
+
+PASS:		end	- new end type
+		
+		GSSetLineEnd	LE_BUTTCAP
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetLineEnd	struct
+    OSLE_opcode	GStringElement	GR_SET_LINE_END
+    OSLE_mode	LineEnd
+OpSetLineEnd	ends
+
+GSSetLineEnd 	macro	end
+		GSCheck	check
+		OpSetLineEnd < ,end>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetLineJoin
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set new line join type
+
+PASS:		join	- new join type	
+
+		GSSetLineJoin	LJ_ROUND
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetLineJoin	struct
+    OSLJ_opcode	GStringElement	GR_SET_LINE_JOIN
+    OSLJ_mode	LineJoin
+OpSetLineJoin	ends
+
+GSSetLineJoin 	macro	join
+		GSCheck	check
+		OpSetLineJoin	< ,join>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetMiterLimit
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set miter limit for line joins
+
+PASS:		limit	- WWFixed miter limit (angle of line)
+
+		GSSetMiterLimit 19.0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetMiterLimit	struct
+    OSML_opcode	GStringElement	GR_SET_MITER_LIMIT
+    OSML_mode	WWFixed	<>
+OpSetMiterLimit	ends
+
+GSSetMiterLimit	macro	limit
+		GSCheck	check
+		GStringElement	GR_SET_MITER_LIMIT
+		WWFix	limit
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetLineAttr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set line attributes
+
+PASS:		r,g,b	- color of line
+		mode	- color map mode
+		mask	- SysDrawMask
+		width	- line width
+		end	- line end
+		join	- line join
+
+		GSSetLineAttr	0,0,255, CMT_CLOSEST,SDM_100,<1.0>, \
+				LE_ROUNDCAP, LJ_MITERED, LS_SOLID
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetLineAttr	struct
+    OSLA_opcode	GStringElement	GR_SET_LINE_ATTR
+    OSLA_attr	LineAttr <>
+OpSetLineAttr	ends
+
+GSSetLineAttr 	macro	r,g,b,mode,mask,width,end,join,style
+		GSCheck	check
+		GStringElement	GR_SET_LINE_ATTR
+		byte	CF_RGB, r, g, b, mask, mode, end, join, style
+		WWFix	width
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetAreaAttr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the area attributes
+
+PASS:		rgb, mode, mask
+
+		GSSetAreaAttr	0,0,255,  CMT_SOLID, SDM_100
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetAreaAttr	struct
+    OSAA_opcode	GStringElement	GR_SET_AREA_ATTR
+    OSAA_attr	AreaAttr <>
+OpSetAreaAttr	ends
+
+GSSetAreaAttr 	macro	r,g,b,mode,mask
+		GSCheck	check
+		GStringElement	GR_SET_AREA_ATTR
+		byte	CF_RGB, r, g, b, mask, mode
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextStyle
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current text style
+
+PASS:		set	- bits to set
+		reset	- bits to reset
+
+		GSSetTextStyle	<mask ST_ITALIC>, <mask ST_BOLD>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextStyle	struct
+    OSTS_opcode	GStringElement	GR_SET_TEXT_STYLE
+    OSTS_set	TextStyle
+    OSTS_reset	TextStyle
+OpSetTextStyle	ends
+
+GSSetTextStyle 	macro	set, reset
+		GSCheck	check
+		OpSetTextStyle < ,set, reset>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextMode
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current text mode
+
+PASS:		set	- bits to set
+		reset	- bits to reset
+
+		GSSetTextMode	<mask TM_KERNING>, <mask TM_FRAC_WIDTH>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextMode	struct
+    OSTMo_opcode	GStringElement	GR_SET_TEXT_MODE
+    OSTMo_set	TextMode	?
+    OSTMo_reset	TextMode	?
+OpSetTextMode	ends
+
+GSSetTextMode 	macro	set, reset
+		GSCheck	check
+		OpSetTextMode < ,set, reset>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextSpacePad
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the amount of padding to add to spaces
+
+PASS:		padding	- Fixed point amount to add 
+
+		GSSetTextSpacePad <2.5>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextSpacePad	struct
+    OSTSP_opcode	GStringElement	GR_SET_TEXT_SPACE_PAD
+    OSTSP_pad	WBFixed	<>
+OpSetTextSpacePad	ends
+
+GSSetTextSpacePad  macro padding
+		GSCheck	check
+		GStringElement	GR_SET_TEXT_SPACE_PAD
+		WBFix	padding
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetFont
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current text font
+
+PASS:		fontID		- typeface ID
+		size		- integer font point size
+		fractional part - of the font
+
+		GSSetFont 	FID_UNIVERSITY, 6, 0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetFont	struct
+    OSF_opcode	GStringElement	GR_SET_FONT
+    OSF_size	WBFixed	<>
+    OSF_id	FontID
+OpSetFont	ends
+
+GSSetFont	macro id, psint, psfrac
+		GSCheck	check
+ifb	<psfrac>
+		OpSetFont < ,<0,psint>,id>
+else
+		OpSetFont < ,<psfrac,psint>,id>
+endif
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextAttr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the text attributes
+
+PASS:		r,colorFlag,g,b, mask, sSet, sReset, mSet, mReset, 
+		pInt, pFrac, fontID, psInt, psFrac, trackKern, customWeight,
+		customWidth >
+
+		GSSetTextAttr 	0,CF_RGB,0,255, SDM_SOLID,
+				<mask TS_ITALIC>, <mask TS_BOLD>,
+				<mask TM_KERNING>, <mask TM_FRAC_WIDTH>,
+				128, 2, FID_UNIVERSITY, 8, 0, 0, FW_NORMAL,
+				FWI_MEDIUM
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextAttr	struct
+    OSTA_opcode	GStringElement	GR_SET_TEXT_ATTR
+    OSTA_attr	TextAttr <>
+OpSetTextAttr	ends
+
+GSSetTextAttr	macro r,cflag,g,b,mask,gPat,gPatDat,sSet,sReset,mSet,mReset,pInt,pFrac,id,psInt,psFrac,trkKrn,fWeight,fWidth
+		GSCheck	check
+		OpSetTextAttr	< , <
+		    <r,cflag,g,b>,mask,<gPat, gPatDat>,sSet,sReset,mSet,mReset,
+		    <pFrac,pInt>,id, <psFrac,psInt>,trkKrn,fWeight,fWidth > > 
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTrackKern
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current track kerning value
+
+PASS:		kernDegree
+
+		GSSetTrackKern	20
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GSSetTrackKern		macro
+		endm
+
+OpSetTrackKern	struct
+    OSTK_opcode	GStringElement	GR_SET_TRACK_KERN
+    OSTK_degree	sword
+OpSetTrackKern	ends
+
+GSSetTrackKern	macro	degree
+		GSCheck check
+		OpSetTrackKern < , degree>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetClipRect
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a clipping rectangle
+
+PASS:		flags	- PathCombineFlags
+		rect	- coordinates for four corners of rectangle
+
+		GSSetClipRect PCT_REPLACE, 0,0,10,30
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetClipRect	struct
+    OSCR_opcode	GStringElement	GR_SET_CLIP_RECT
+    OSCR_flags	PathCombineType
+    OSCR_rect	Rectangle
+OpSetClipRect	ends
+
+GSSetClipRect	macro	flags, rectL, rectT, rectR, rectB
+		GSCheck	check
+		OpSetClipRect < , flags, <rectL, rectT, rectR, rectB> >
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetWinClipRect
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a clipping rectangle
+
+PASS:		flags	- PathCombineFlags
+		rect	- coordinates for four corners of rectangle
+
+		GSSetWinClipRect PCT_REPLACE, 0,0,10,30
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetWinClipRect	struct
+    OSWCR_opcode GStringElement	GR_SET_WIN_CLIP_RECT
+    OSWCR_flags	PathCombineType
+    OSWCR_rect	Rectangle
+OpSetWinClipRect	ends
+
+GSSetWinClipRect	macro	flags, rectL, rectT, rectR, rectB
+		GSCheck	check
+		OpSetWinClipRect < , flags, <rectL, rectT, rectR, rectB> >
+endm
+
+;----------------------------------------------------------------------------
+;                             Path GString Macros
+;----------------------------------------------------------------------------
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSBeginPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Start a path definition
+
+PASS:		combine	- PathCombineType
+
+		GSBeginPath	 PCT_REPLACE
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpBeginPath	struct
+	OBP_opcode	GStringElement GR_BEGIN_PATH
+	OBP_combine	PathCombineType
+	OBP_flags	byte			; really BeginPathFlags
+	OBP_unused	byte			; for future expansion
+OpBeginPath	ends
+
+GSBeginPath	macro	combine
+		GSCheck	check
+		OpBeginPath < ,combine, combine>
+endm
+		
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetClipPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the clip path to the current path definition
+
+PASS:		flags	- PathCombineType
+
+		GSSetClipPath	 PCT_REPLACE
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetClipPath	struct
+    OSCP_opcode	GStringElement GR_SET_CLIP_PATH
+    OSCP_rule	RegionFillRule
+    OSCP_flags	PathCombineType
+OpSetClipPath	ends
+
+GSSetClipPath	macro	rule, flags
+		GSCheck	check
+		OpSetClipPath < ,rule,flags>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetWinClipPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the clip path to the current path definition
+
+PASS:		flags	- PathCombineType
+
+		GSSetWinClipPath	 PCT_REPLACE
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetWinClipPath	struct
+    OSWCP_opcode GStringElement GR_SET_DOC_CLIP_PATH
+    OSWCP_rule	RegionFillRule
+    OSWCP_flags	PathCombineType
+OpSetWinClipPath	ends
+
+GSSetWinClipPath	macro	rule,flags
+		GSCheck	check
+		OpSetWinClipPath < ,rule,flags>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSEndPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Conclude the definition of a path
+
+PASS:		nothing
+
+		GSEndPath
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpEndPath	struct
+	OEP_opcode	GStringElement	GR_END_PATH
+OpEndPath	ends
+
+GSEndPath	macro
+		GSCheck	check
+		OpEndPath <>
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSCloseSubPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Conclude the definition of a sub-path
+
+PASS:		nothing
+
+		GSCloseSubPath
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpCloseSubPath	struct
+	OCSP_opcode	GStringElement	GR_CLOSE_SUB_PATH
+OpCloseSubPath	ends
+
+GSCloseSubPath	macro
+		GSCheck	check
+		OpCloseSubPath <>
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetNullPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current path to the NULL path
+
+PASS:		nothing
+
+		GSSetNullPath
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetNullPath	struct
+	OSNP_opcode	GStringElement	GR_SET_NULL_PATH
+OpSetNullPath	ends
+
+GSSetNullPath	macro
+		GSCheck	check
+		OpSetNullPath <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill the current path
+
+PASS:		fillRule	- ODD_EVEN or WINDING
+
+		GSFillPath RFR_WINDING
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillPath	struct
+	OFLP_opcode	GStringElement GR_FILL_PATH
+	OFLP_rule	RegionFillRule
+OpFillPath	ends
+
+GSFillPath	macro	fillRule
+		GSCheck	check
+		OpFillPath < , fillRule >
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw the current path
+
+PASS:		nothing
+
+		GSDrawPath
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawPath	struct
+	ODRP_opcode	GStringElement GR_DRAW_PATH
+OpDrawPath	ends
+
+GSDrawPath	macro
+		GSCheck	check
+		OpDrawPath <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetStrokePath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current path to the path generated by stroking the 
+		current path.
+
+PASS:		nothing
+
+		GSDrawPath
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetStrokePath	struct
+	OSSP_opcode	GStringElement GR_SET_STROKE_PATH
+OpSetStrokePath	ends
+
+GSSetStrokePath	macro
+		GSCheck	check
+		OpSetStrokePath <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawArc3Point
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw an arc
+
+PASS:		p1,2,3	- 3 points that lie on the arc
+		close	- ArcCloseType enum
+
+		GSDrawArc3Point		ACT_NONE,10,20, 60,50, 100,100
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawArc3Point	struct
+    ODATP_opcode	GStringElement	GR_DRAW_ARC_3POINT
+    ODATP_close		ArcCloseType
+    ODATP_x1		WWFixed	?
+    ODATP_y1		WWFixed	?
+    ODATP_x2		WWFixed	?
+    ODATP_y2		WWFixed	?
+    ODATP_x3		WWFixed	?
+    ODATP_y3		WWFixed	?
+OpDrawArc3Point	ends	
+
+GSDrawArc3Point	macro	close, x1, y1, x2, y2, x3, y3
+		GSCheck	check
+		GStringElement	GR_DRAW_ARC_3POINT
+		word	close
+		WWFix	x1
+		WWFix	y1
+		WWFix	x2
+		WWFix	y2
+		WWFix	x3
+		WWFix	y3
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawArc3PointTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw an arc from the current pen position
+
+PASS:		p 2,3	- 2 points that lie on the arc
+		close	- ArcCloseType enum
+
+		GSDrawArc3PointTo	ACT_NONE,60,50, 100,100
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawArc3PointTo	struct
+    ODATPT_opcode	GStringElement	GR_DRAW_ARC_3POINT_TO
+    ODATPT_close	ArcCloseType
+    ODATPT_x2		WWFixed	?
+    ODATPT_y2		WWFixed	?
+    ODATPT_x3		WWFixed	?
+    ODATPT_y3		WWFixed	?
+OpDrawArc3PointTo	ends	
+
+GSDrawArc3PointTo	macro	close, x2, y2, x3, y3
+		GSCheck	check
+		GStringElement	GR_DRAW_ARC_3POINT_TO
+		word	close
+		WWFix	x2
+		WWFix	y2
+		WWFix	x3
+		WWFix	y3
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDrawRelArc3PointTo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw an arc from the current pen position
+
+PASS:		p 2,3	- 3 points that lie on the arc
+		close	- ArcCloseType enum
+
+		GSDrawRelArc3PointTo	ACT_NONE,60,50, 100,100
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDrawRelArc3PointTo	struct
+    ODRATPT_opcode	GStringElement	GR_DRAW_REL_ARC_3POINT_TO
+    ODRATPT_close	ArcCloseType
+    ODRATPT_x2		WWFixed	?
+    ODRATPT_y2		WWFixed	?
+    ODRATPT_x3		WWFixed	?
+    ODRATPT_y3		WWFixed	?
+OpDrawRelArc3PointTo	ends	
+
+GSDrawRelArc3PointTo	macro	close, x2, y2, x3, y3
+		GSCheck	check
+		GStringElement	GR_DRAW_REL_ARC_3POINT_TO
+		word	close
+		WWFix	x2
+		WWFix	y2
+		WWFix	x3
+		WWFix	y3
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillArc3Point
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill an arc
+
+PASS:		p 1,2,3		- 3 points on the arc
+		closeType	- ArcCloseType
+
+		GSFillArc3Point		ACT_NONE, 10,20, 60,50, 100,100
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillArc3Point	struct
+    OFATP_opcode	GStringElement	GR_FILL_ARC_3POINT
+    OFATP_close		ArcCloseType
+    OFATP_x1		WWFixed	?
+    OFATP_y1		WWFixed	?
+    OFATP_x2		WWFixed	?
+    OFATP_y2		WWFixed	?
+    OFATP_x3		WWFixed	?
+    OFATP_y3		WWFixed	?
+OpFillArc3Point	ends	
+
+GSFillArc3Point	macro	close, x1, y1, x2, y2, x3, y3
+		GSCheck	check
+		GStringElement	GR_FILL_ARC_3POINT
+		word	close
+		WWFix	x1
+		WWFix	y1
+		WWFix	x2
+		WWFix	y2
+		WWFix	x3
+		WWFix	y3
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSFillArc3Point
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fill an arc from the current position
+
+PASS:		p 2,3		- 2 points on the arc
+		closeType	- ArcCloseType
+
+		GSFillArc3PointTo	ACT_NONE, 60,50, 100,100
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpFillArc3PointTo	struct
+    OFATPT_opcode	GStringElement	GR_FILL_ARC_3POINT_TO
+    OFATPT_close	ArcCloseType
+    OFATPT_x2		WWFixed	?
+    OFATPT_y2		WWFixed	?
+    OFATPT_x3		WWFixed	?
+    OFATPT_y3		WWFixed	?
+OpFillArc3PointTo	ends	
+
+GSFillArc3PointTo	macro	close, x2, y2, x3, y3
+		GSCheck	check
+    		GStringElement	GR_FILL_ARC_3POINT_TO
+		word	close
+		WWFix	x2
+		WWFix	y2
+		WWFix	x3
+		WWFix	y3
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetFontWeight
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current "boldness" factor
+
+PASS:		weight	- new font weight
+
+		GSSetFontWeight	<FW_BOLD>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetFontWeight	struct
+    OSFW_opcode	GStringElement	GR_SET_FONT_WEIGHT
+    OSFW_weight	FontWeight
+OpSetFontWeight	ends
+
+GSSetFontWeight	macro	weight
+		GSCheck check
+		OpSetFontWeight < , weight>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetFontWidth
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current "condensed" factor
+
+PASS:		width	- new font condensation
+
+		GSSetFontWidth	<FW_CONDENSED>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetFontWidth	struct
+    OSFWI_opcode	GStringElement	GR_SET_FONT_WIDTH
+    OSFWI_width		FontWidth
+OpSetFontWidth	ends
+
+GSSetFontWidth	macro	width
+		GSCheck check
+		OpSetFontWidth < , width>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetSuperscriptAttr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current superscript attributes
+
+PASS:		pos	- superscript position  	(% of font size)
+		size	- superscript size		(% of font size)
+
+		GSSetSuperscriptAttr	50, 90
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetSuperscriptAttr	struct
+    OSSA_opcode	GStringElement	GR_SET_SUPERSCRIPT_ATTR
+    OSSA_pos	byte	?
+    OSSA_size	byte	?
+OpSetSuperscriptAttr	ends
+
+GSSetSuperscriptAttr	macro	pos, size
+		GSCheck check
+		OpSetSuperscriptAttr < , pos, size>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetSubscriptAttr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current superscript attributes
+
+PASS:		pos	- subscript position  	(% of font size)
+		size	- subscript size	(% of font size)
+
+		GSSetSubscriptAttr	50, 90
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetSubscriptAttr	struct
+    OSSBA_opcode	GStringElement	GR_SET_SUPERSCRIPT_ATTR
+    OSSBA_pos		byte	?
+    OSSBA_size		byte	?
+OpSetSubscriptAttr	ends
+
+GSSetSubscriptAttr	macro	pos, size
+		GSCheck check
+		OpSetSubscriptAttr < , pos, size>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetAreaPattern
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current area pattern
+
+PASS:		pattern	- GraphicPattern
+		size	- size of custom pattern, in bytes
+
+		GSSetAreaPattern	<PT_SOLID,0>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetAreaPattern	struct
+    OSAP_opcode		GStringElement GR_SET_AREA_PATTERN
+    OSAP_pattern	GraphicPattern
+OpSetAreaPattern	ends
+
+GSSetAreaPattern	macro	pattern
+		GSCheck check
+		OpSetAreaPattern < , pattern>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextPattern
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current text pattern
+
+PASS:		pattern	- GraphicPattern
+		size	- size of custom pattern, in bytes
+
+		GSSetTextPattern	<PT_SOLID,0>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextPattern	struct
+    OSTP_opcode		GStringElement GR_SET_TEXT_PATTERN
+    OSTP_pattern	GraphicPattern
+OpSetTextPattern	ends
+
+GSSetTextPattern	macro	pattern
+		GSCheck check
+		OpSetTextPattern < , pattern>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetCustomAreaPattern
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current area pattern
+
+PASS:		pattern	- GraphicPattern
+		size	- size of custom pattern, in bytes
+		data	- custom pattern info
+
+		GSSetCustomAreaPattern	<PT_CUSTOM_BITMAP, 0>, Bitmap <>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetCustomAreaPattern	struct
+    OSCAP_opcode	GStringElement GR_SET_CUSTOM_AREA_PATTERN
+    OSCAP_pattern	GraphicPattern
+    OSCAP_size		word		; size of custom pattern
+    OSCAP_data		label	byte	; beginning of custom data
+OpSetCustomAreaPattern	ends
+
+GSSetCustomAreaPattern	macro	pattern, size
+		GSCheck check
+		OpSetCustomAreaPattern < , pattern, size>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetCustomTextPattern
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current text pattern
+
+PASS:		pattern	- GraphicPattern
+		size	- size of custom pattern, in bytes
+		data	- custom pattern info
+
+		GSSetCustomTextPattern	<PT_CUSTOM_BITMAP, 0>, Bitmap <>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetCustomTextPattern	struct
+    OSCTP_opcode	GStringElement GR_SET_CUSTOM_TEXT_PATTERN
+    OSCTP_pattern	GraphicPattern
+    OSCTP_size		word		; size of custom pattern
+    OSCTP_data		label	byte	; beginning of custom data
+OpSetCustomTextPattern	ends
+
+GSSetCustomTextPattern	macro	pattern, size
+		GSCheck check
+		OpSetCustomTextPattern < , pattern, size>
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSCreatePalette
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Create a custom palette
+
+PASS:		nothing
+
+		GSCreatePalette
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpCreatePalette	 struct
+    OCP_opcode	 GStringElement GR_CREATE_PALETTE
+OpCreatePalette	 ends
+
+GSCreatePalette	macro
+		GSCheck check
+		OpCreatePalette <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSDestroyPalette
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Destroy a custom palette
+
+PASS:		nothing
+
+		GSDestroyPalette
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpDestroyPalette	 struct
+    ODSP_opcode	 GStringElement GR_DESTROY_PALETTE
+OpDestroyPalette	 ends
+
+GSDestroyPalette	macro
+		GSCheck check
+		OpDestroyPalette <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetPaletteEntry
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a custom palette color
+
+PASS:		nothing
+
+		GSSetPaletteEntry	13,  255,0,0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetPaletteEntry	 struct
+    OSPE_opcode	 	GStringElement 	GR_SET_PALETTE_ENTRY
+    OSPE_entry		word	
+    OSPE_color		RGBValue <>
+OpSetPaletteEntry	 ends
+
+GSSetPaletteEntry	macro	entry, red, green, blue
+		GSCheck check
+		OpSetPaletteEntry <,entry, red, green, blue>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetPalette
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set a custom palette
+
+PASS:		start	- entry number to start with
+		entries	- number of RGBValue entries to set
+			  (macro should be followed by correct # entries)
+
+		GSSetPalette	0x45, 3
+		byte	255, 0, 0
+		byte	0, 255, 255
+		byte	128, 255, 128
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetPalette	struct
+    OSP_opcode	GStringElement 	GR_SET_PALETTE
+    OSP_start	byte	
+    OSP_num	word	
+OpSetPalette	ends
+
+GSSetPalette	macro	start, entries
+		GSCheck check
+		OpSetPalette <,start,entries>
+;		GSCheck	set, GSSetPalette, entries*3
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GSSetTextDirection
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the current text directin
+
+PASS:		dir	- directon of text
+
+		GSSetTextDirection dir
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OpSetTextDirection	struct
+    OSTDir_opcode	GStringElement	GR_SET_TEXT_DIRECTION
+    OSTDir_dir	TextDirection	?
+OpSetTextDirection	ends
+
+GSSetTextMode 	macro	dir
+		GSCheck	check
+		OpSetTextDirection < ,dir>
+endm
+
+
+;----------------------------------------------------------------------------
+;----------------------------------------------------------------------------
+
+EndKernel

@@ -1,0 +1,770 @@
+/*
+ *
+ * Project:	Text Library
+ * File:	search.ui
+ *
+ * Author:	Andrew Wilson
+ *
+ *	This file contains the user Interface description for the 
+ * search/replace boxes.
+ *
+ *	$Id: uiSearchReplace.ui,v 1.1 97/04/07 11:17:45 newdeal Exp $
+ *
+ */
+
+#define SPECIAL_CHAR_TEXT_X_OFFSET	16
+#define SPECIAL_CHAR_TEXT_Y_OFFSET	1
+#define INCLUDE_ART(file)	include ../Art/file
+
+#if !NO_CONTROLLERS	/*+++++++++++++++++++++++++++++++++++++++++++++++*/
+
+#ifdef GPC_ART
+start AppTCMonikerResource, data;
+#include "Art/mkrSearchReplaceTC.ui"
+end AppTCMonikerResource;
+#else
+#include "Art/mkrSearchReplace.ui"
+#endif
+
+class NoGraphicsText = GenText {
+}
+
+#ifdef GPC_SEARCH
+class OverrideCenterOnMonikers = GenInteraction {
+}
+#endif
+
+start SearchReplaceControlUI, notDetachable;
+
+/*
+ *	Grouping objects
+ */
+#ifdef GPC_SEARCH
+SearchTop = GenInteraction {
+	genStates = default -usable;
+	children = SearchTopLeft, SearchActionBarTop;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_LEFT_JUSTIFY_MONIKERS,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+SearchTopLeft = GenInteraction {
+	children = SearchText, SearchSpecialCharsMenuGroup;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_LEFT_JUSTIFY_MONIKERS,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+SearchBottom = GenInteraction {
+	genStates = default -usable;
+	children = SearchBottomLeft, SearchActionBarBottom;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_LEFT_JUSTIFY_MONIKERS,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+SearchBottomLeft = GenInteraction {
+	children = ReplaceText, ReplaceSpecialCharsMenuGroup;
+	hints = {
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_LEFT_JUSTIFY_MONIKERS,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+/* for center children on monikers */
+SearchSpecialCharsMenuGroup = GenInteraction {
+	children = SearchSpecialCharsMenu;
+}
+ReplaceSpecialCharsMenuGroup = GenInteraction {
+	children = ReplaceSpecialCharsMenu;
+}
+#endif
+
+/*
+ *	TEXT OBJECTS TO HOLD SEARCH AND REPLACE STRINGS
+ */
+SearchText = NoGraphicsText {
+	moniker = 'F', "Find:";
+#ifndef GPC_SEARCH
+	genStates = default -usable;
+#endif
+	textDisplayAttributes = default +singleLineText;
+	maxLength = "SEARCH_REPLACE_MAX_WORD_LENGTH-1";
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {HINT_DEFAULT_FOCUS,
+		 ATTR_GEN_TEXT_GRAPHIC_RUNS { word SearchGraphicRuns },
+		 ATTR_GEN_TEXT_EXTENDED_FILTER { byte VTEFT_CHARACTER_LEVELER_LEVEL },
+		HINT_MINIMUM_SIZE {
+			word	SpecWidth<SST_PIXELS, 200>
+			word	0
+		},
+		ATTR_VIS_TEXT_MINIMUM_SINGLE_LINE_HEIGHT {
+			WBFixed<0, 15>
+		},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+ReplaceText = NoGraphicsText {
+	moniker = 'W', "Replace With:";
+#ifndef GPC_SEARCH
+	genStates = default -usable;
+#endif
+	textDisplayAttributes = default +singleLineText;
+	maxLength = "SEARCH_REPLACE_MAX_WORD_LENGTH-1";
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TEXT_GRAPHIC_RUNS { word ReplaceGraphicRuns },
+		ATTR_GEN_TEXT_EXTENDED_FILTER { byte VTEFT_CHARACTER_LEVELER_LEVEL },
+		ATTR_VIS_TEXT_MINIMUM_SINGLE_LINE_HEIGHT {
+			WBFixed<0, 15>
+		}
+	}
+}
+chunk SearchGraphicRuns = data {
+    RUN_ARRAY_HEADER(1, SearchGraphicAttrElements)
+    TextRunArrayElement TRAE_END
+}
+
+chunk SearchGraphicAttrElements = data {
+    GRAPHIC_ELEMENT_ARRAY_HEADER(0)
+}
+
+chunk ReplaceGraphicRuns = data {
+    RUN_ARRAY_HEADER(1, ReplaceGraphicAttrElements)
+    TextRunArrayElement TRAE_END
+}
+
+chunk ReplaceGraphicAttrElements = data {
+    GRAPHIC_ELEMENT_ARRAY_HEADER(0)
+}
+
+
+/*
+ *	BUTTONS THAT PUT SPECIAL CHARS IN THE SEARCH TEXT.
+ */
+SearchReplaceMisc = GenInteraction {
+	genStates = default -usable;
+#ifdef GPC_SEARCH
+	children = SearchReplaceOptions,
+			SearchNoteOptions;
+#else
+	children = SearchReplaceSpecialCharsMenu, SearchReplaceOptions,
+			SearchNoteOptions;
+#endif
+	hints = {
+#ifdef GPC_SEARCH
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+#else
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_ELSE,
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+#endif
+
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}	  
+}
+
+#ifdef GPC_SEARCH
+SearchSpecialCharsMenu = GenInteraction {
+#else
+SearchReplaceSpecialCharsMenu = GenInteraction {
+#endif
+	moniker = 'S', "Special Characters";
+	visibility = popup;
+	children = WildcardChars, MiscChars;
+	hints = {
+		HINT_AVOID_MENU_BAR,
+		HINT_INFREQUENTLY_USED
+	       }
+}
+MiscChars = GenInteraction {
+	children = GraphicSpecialChar, TabSpecialChar, CRSpecialChar, PageBreakSpecialChar;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+		}	
+}
+
+
+WildcardChars = GenInteraction {
+	genStates = default -enabled;
+	children = StarSpecialChar, QuestionMarkSpecialChar;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+		}
+}
+StarSpecialChar = GenTrigger {
+	moniker = MyStarSpecialCharMoniker;
+	action = MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT,"TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	SC_WILDCARD
+#ifdef GPC_SEARCH
+			word	0
+#endif
+		}
+	}
+}
+
+QuestionMarkSpecialChar = GenTrigger {
+	moniker = MyQuestionMarkSpecialCharMoniker;
+	action = MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT,"TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	SC_WILDCHAR
+#ifdef GPC_SEARCH
+			word	0
+#endif
+		}
+	}
+}
+
+GraphicSpecialChar = GenTrigger {
+	moniker = MyGraphicSpecialCharMoniker;
+	action = MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT,"TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	SC_GRAPHIC
+#ifdef GPC_SEARCH
+			word	0
+#endif
+		}
+	}
+}
+
+CRSpecialChar = GenTrigger {
+	moniker = MyCRSpecialCharMoniker;
+	action = MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT,"TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	SC_CR
+#ifdef GPC_SEARCH
+			word	0
+#endif
+		}
+	}
+}
+
+PageBreakSpecialChar = GenTrigger {
+	moniker = MyPageBreakSpecialCharMoniker;
+	action = MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT,"TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	SC_PAGE_BREAK
+#ifdef GPC_SEARCH
+			word	0
+#endif
+		}
+	}
+}
+TabSpecialChar = GenTrigger {
+	moniker = MyTabSpecialCharMoniker;
+	action = MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT,"TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	SC_TAB
+#ifdef GPC_SEARCH
+			word	0
+#endif
+		}
+	}
+}
+visMoniker MyStarSpecialCharMoniker = {
+	size = standard;
+	color = gray1;
+	aspectRatio = normal;
+	gstring {
+		GSBeginString
+INCLUDE_ART(mkrWildCardGString.ui)
+		GSDrawTextOptr SPECIAL_CHAR_TEXT_X_OFFSET, SPECIAL_CHAR_TEXT_Y_OFFSET, MatchMultipleCharsText
+		GSEndString
+	}
+}
+visMoniker MyQuestionMarkSpecialCharMoniker = {
+	size = standard;
+	color = gray1;
+	aspectRatio = normal;
+	gstring {
+		GSBeginString
+INCLUDE_ART(mkrWildCharGString.ui)
+		GSDrawTextOptr SPECIAL_CHAR_TEXT_X_OFFSET, SPECIAL_CHAR_TEXT_Y_OFFSET, MatchAnyCharText
+		GSEndString
+	}
+}
+visMoniker MyGraphicSpecialCharMoniker = {
+	size = standard;
+	color = gray1;
+	aspectRatio = normal;
+	gstring {
+		GSBeginString
+INCLUDE_ART(mkrGraphicGString.ui)
+		GSDrawTextOptr SPECIAL_CHAR_TEXT_X_OFFSET, SPECIAL_CHAR_TEXT_Y_OFFSET, MatchGraphicOrSpecialText
+		GSEndString
+	}
+}
+visMoniker MyTabSpecialCharMoniker = {
+	size = standard;
+	color = gray1;
+	aspectRatio = normal;
+	gstring {
+		GSBeginString
+INCLUDE_ART(mkrTabGString.ui)
+		GSDrawTextOptr SPECIAL_CHAR_TEXT_X_OFFSET, SPECIAL_CHAR_TEXT_Y_OFFSET, MatchTabText
+		GSEndString
+	}
+}
+
+visMoniker MyCRSpecialCharMoniker = {
+	size = standard;
+	color = gray1;
+	aspectRatio = normal;
+	gstring {
+		GSBeginString
+INCLUDE_ART(mkrCRGString.ui)
+		GSDrawTextOptr SPECIAL_CHAR_TEXT_X_OFFSET, SPECIAL_CHAR_TEXT_Y_OFFSET, MatchCRText
+		GSEndString
+	}
+}
+visMoniker MyPageBreakSpecialCharMoniker = {
+	size = standard;
+	color = gray1;
+	aspectRatio = normal;
+	gstring {
+		GSBeginString
+INCLUDE_ART(mkrPageBreakGString.ui)
+		GSDrawTextOptr SPECIAL_CHAR_TEXT_X_OFFSET, SPECIAL_CHAR_TEXT_Y_OFFSET, MatchPageBreakText
+		GSEndString
+	}
+}
+#ifdef GPC_SEARCH
+ReplaceSpecialCharsMenu = GenInteraction {
+	moniker = 'S', "Special Characters";
+	visibility = popup;
+	children = RMiscChars;
+	hints = {
+		HINT_AVOID_MENU_BAR,
+		HINT_INFREQUENTLY_USED
+	       }
+}
+RMiscChars = GenInteraction {
+	children = RTabSpecialChar, RCRSpecialChar, RPageBreakSpecialChar;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+		}	
+}
+
+RCRSpecialChar = GenTrigger {
+	moniker = RMyCRSpecialCharMoniker;
+	action = MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT,"TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	SC_CR
+#ifdef GPC_SEARCH
+			word	1
+#endif
+		}
+	}
+}
+
+RPageBreakSpecialChar = GenTrigger {
+	moniker = RMyPageBreakSpecialCharMoniker;
+	action = MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT,"TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	SC_PAGE_BREAK
+#ifdef GPC_SEARCH
+			word	1
+#endif
+		}
+	}
+}
+RTabSpecialChar = GenTrigger {
+	moniker = RMyTabSpecialCharMoniker;
+	action = MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT,"TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	SC_TAB
+#ifdef GPC_SEARCH
+			word	1
+#endif
+		}
+	}
+}
+visMoniker RMyTabSpecialCharMoniker = {
+	size = standard;
+	color = gray1;
+	aspectRatio = normal;
+	gstring {
+		GSBeginString
+INCLUDE_ART(mkrTabGString.ui)
+		GSDrawTextOptr SPECIAL_CHAR_TEXT_X_OFFSET, SPECIAL_CHAR_TEXT_Y_OFFSET, MatchTabText
+		GSEndString
+	}
+}
+
+visMoniker RMyCRSpecialCharMoniker = {
+	size = standard;
+	color = gray1;
+	aspectRatio = normal;
+	gstring {
+		GSBeginString
+INCLUDE_ART(mkrCRGString.ui)
+		GSDrawTextOptr SPECIAL_CHAR_TEXT_X_OFFSET, SPECIAL_CHAR_TEXT_Y_OFFSET, MatchCRText
+		GSEndString
+	}
+}
+visMoniker RMyPageBreakSpecialCharMoniker = {
+	size = standard;
+	color = gray1;
+	aspectRatio = normal;
+	gstring {
+		GSBeginString
+INCLUDE_ART(mkrPageBreakGString.ui)
+		GSDrawTextOptr SPECIAL_CHAR_TEXT_X_OFFSET, SPECIAL_CHAR_TEXT_Y_OFFSET, MatchPageBreakText
+		GSEndString
+	}
+}
+#endif  /* GPC_SEARCH */
+/*
+ *	GEN LIST THAT HOLDS THE VARIOUS STANDARD TEXT SEARCH/REPLACE OPTIONS
+ */
+SearchReplaceOptions = GenBooleanGroup {
+	children = CaseSensitiveOption, PartialWordOption;
+#ifdef GPC_SEARCH
+	selectedBooleans = "mask SO_IGNORE_CASE or mask SO_PARTIAL_WORD";
+#endif
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_ELSE,
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+CaseSensitiveOption = GenBoolean {
+
+#ifdef DO_PIZZA
+	moniker = 'I', "Ignore Case/Width";
+#else
+#ifdef GPC_SEARCH
+	moniker = 'I', "Ignore Case and Accents";
+#else
+	moniker = 'I', "Ignore Case/Accents";
+#endif
+#endif
+
+	identifier = "mask SO_IGNORE_CASE";
+}
+PartialWordOption = GenBoolean {
+	moniker = 'M', "Match Partial Words";
+	identifier = "mask SO_PARTIAL_WORD";
+}
+
+SearchReplyBar = GenInteraction {
+	genStates = default -usable;
+	hints = {
+			HINT_MAKE_REPLY_BAR,
+			HINT_ALLOW_CHILDREN_TO_WRAP,
+		}
+	children =
+#ifndef GPC_SEARCH
+			FindFromTopTrigger,
+			FindNextTrigger, FindPrevTrigger, ReplaceTrigger, 
+			ReplaceAllTrigger, ReplaceAllInSelectionTrigger, 
+#endif
+			CloseTrigger;
+}
+#ifdef GPC_SEARCH
+SearchActionBarTop = OverrideCenterOnMonikers {
+	children = FindNextTrigger, FindPrevTrigger, FindFromTopTrigger;
+	/* size also set dynamically */
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+SearchActionBarBottom = OverrideCenterOnMonikers {
+	children = ReplaceTrigger, ReplaceAllTrigger,
+			ReplaceAllInSelectionTrigger;
+	/* size also set dynamically */
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+#endif
+/* reply triggers */
+
+FindNextTrigger = GenTrigger {
+/*
+ *	These triggers start out disabled until text is typed into the search
+ * 	field.
+ */	
+	genStates = default -enabled;
+	genAttributes = default +initiatesBusyState;
+	moniker = 'N', "Find Next";
+	action = MSG_SRC_FIND_NEXT, "TO_OBJ_BLOCK_OUTPUT";
+#ifdef GPC_SEARCH
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_CENTER_MONIKER
+#if _NDO2000
+	    ,HINT_DEFAULT_DEFAULT_ACTION
+#endif /* _NDO2000 */
+	}
+#else
+	hints = {HINT_DEFAULT_DEFAULT_ACTION,HINT_SEEK_REPLY_BAR}
+#endif
+}
+
+FindPrevTrigger = GenTrigger {
+	genStates = default -enabled;
+	genAttributes = default +initiatesBusyState;
+	moniker = 'P', "Find Previous";
+	action = MSG_SRC_FIND_PREV, "TO_OBJ_BLOCK_OUTPUT";
+#ifdef GPC_SEARCH
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_CENTER_MONIKER
+	}
+#else
+	hints = {HINT_SEEK_REPLY_BAR}
+#endif
+}
+
+ReplaceTrigger = GenTrigger {
+	genStates = default -enabled;
+	genAttributes = default +initiatesBusyState;
+	moniker = 'R', "Replace";
+	action = MSG_REPLACE_CURRENT, "TO_OBJ_BLOCK_OUTPUT";
+#ifdef GPC_SEARCH
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_CENTER_MONIKER
+	}
+#else
+	hints = {HINT_SEEK_REPLY_BAR}
+#endif
+}
+
+ReplaceAllTrigger = GenTrigger {
+	genStates = default -enabled;
+	genAttributes = default +initiatesBusyState;
+	moniker = 'A', "Replace All";
+	action = MSG_REPLACE_ALL_OCCURRENCES, "TO_OBJ_BLOCK_OUTPUT";
+#ifdef GPC_SEARCH
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_CENTER_MONIKER
+	}
+#else
+	hints = {HINT_SEEK_REPLY_BAR}
+#endif
+}
+
+ReplaceAllInSelectionTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'l', "Replace In Selection";
+	genAttributes = default +initiatesBusyState;
+	action = MSG_REPLACE_ALL_OCCURRENCES_IN_SELECTION, "TO_OBJ_BLOCK_OUTPUT";
+#ifdef GPC_SEARCH
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_CENTER_MONIKER
+	}
+#else
+	hints = {HINT_SEEK_REPLY_BAR}
+#endif
+}
+
+CloseTrigger = GenTrigger {
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word	IC_DISMISS
+		}
+	}
+}
+
+FindFromTopTrigger = GenTrigger {
+	genStates = default -enabled;
+
+	genAttributes = default +initiatesBusyState;
+
+	moniker = 'T', "Find From Top";
+
+	action = MSG_SRC_FIND_FROM_TOP, "TO_OBJ_BLOCK_OUTPUT";
+#ifdef GPC_SEARCH
+	hints = {
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_CENTER_MONIKER
+	}
+#else
+	hints = {HINT_SEEK_REPLY_BAR}
+#endif
+}
+
+
+/*
+ *	Graphics to be inserted in the text objects
+ */
+
+chunk	WildcardGString = data {
+	GSBeginString
+INCLUDE_ART(mkrWildCardGString.ui)
+	GSEndString
+}
+
+chunk	WildcharGString = data {
+	GSBeginString
+INCLUDE_ART(mkrWildCharGString.ui)
+	GSEndString
+}
+
+chunk	GraphicGString = data {
+	GSBeginString
+INCLUDE_ART(mkrGraphicGString.ui)
+	GSEndString
+}
+
+chunk	CRGString = data {
+	GSBeginString
+INCLUDE_ART(mkrCRGString.ui)
+	GSEndString
+}
+
+chunk	PageBreakGString = data {
+	GSBeginString
+INCLUDE_ART(mkrPageBreakGString.ui)
+	GSEndString
+}
+
+chunk	TabGString = data {
+	GSBeginString
+INCLUDE_ART(mkrTabGString.ui)
+	GSEndString
+}
+
+
+/*
+ * SEARCH NOTE OPTIONS
+ */
+
+SearchNoteOptions = GenItemGroup {
+	genStates = default +enabled;
+	behaviorType = exclusive;
+	selection = SNOT_EXCLUDE_NOTE;
+	children = IncludeNote, ExcludeNote, NoteOnly;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+IncludeNote = GenItem {
+	genStates = default +enabled;
+	moniker = 'I', "Include Notes";
+	identifier = SNOT_INCLUDE_NOTE;
+}
+
+ExcludeNote = GenItem {
+	genStates = default +enabled;
+	moniker = 'E', "Exclude Notes";
+	identifier = SNOT_EXCLUDE_NOTE;
+
+
+}
+
+NoteOnly = GenItem {
+	genStates = default +enabled;
+	moniker = 'o', "Find in Notes Only";
+	identifier = SNOT_NOTE_ONLY;
+}
+
+
+/*****************************************************************************/
+/* Added these chunks which contain the strings used in the special-chars    */
+/* vis monikers,  5/26/93 -jw						     */
+
+chunk MatchMultipleCharsText	= "- Match Multiple Characters";
+chunk MatchAnyCharText		= "- Match Any Character";
+chunk MatchGraphicOrSpecialText = "- Graphic or Special Text";
+chunk MatchTabText		= "- Tab";
+chunk MatchCRText		= "- Carriage Return";
+chunk MatchPageBreakText	= "- Page Break";
+
+/*****************************************************************************/
+
+end SearchReplaceControlUI;
+
+start SearchReplaceControlToolboxUI, notDetachable;
+
+SearchReplaceToolTrigger = GenTrigger {
+#ifdef GPC_ART
+	moniker = list { SearchReplaceTCMoniker }
+#else
+	TOOL_MONIKER_LIST(SearchReplace)
+#endif
+	genStates = default -usable;
+	action = MSG_GEN_INTERACTION_INITIATE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { ATTR_GEN_FOCUS_HELP { optr SRCName } }
+}
+
+end SearchReplaceControlToolboxUI;
+
+start ControlStrings, data;
+
+chunk SearchNoteOptionsName = "Search Note Option";
+chunk FindFromTopName = "Find From Top option";
+chunk SRCName = "Find and Replace";
+chunk WildcardName = "Find with wildcards";
+chunk MiscCharsName = "Special chars";
+chunk IgnoreCaseName = "Ignore Case option";
+chunk PartialWordName = "Match Partial Words option";
+chunk ReplaceAllName = "Replace All option";
+chunk ReplaceAllInSelectionName = "Replace All In Selection option";
+chunk ReplaceCurrentName = "Replace option";
+chunk FindPrevName = "Find Previous option";
+chunk FindNextName = "Find Next option";
+chunk CloseName = "Close Search Replace Box";
+
+end ControlStrings;
+
+#endif			/* !NO_CONTROLLERS ++++++++++++++++++++++++++++++*/
+
+start TextStrings, data;
+
+#if !NO_CONTROLLERS	/*+++++++++++++++++++++++++++++++++++++++++++++++*/
+
+chunk	GlobalDeleteQueryString = {This will delete all occurrences of the search string in the document.\r\rDo you wish to continue?}
+
+chunk	SearchStringNotFoundString = {The search string was not found anywhere in the document.}
+
+chunk	ReplaceAllInSelectionStringNotFoundString = {The search string was not found in the selected text.}
+
+#endif			/* !NO_CONTROLLERS ++++++++++++++++++++++++++++++*/
+
+/*
+ * the following string is used in Text/Text module, so not commented
+ * by !NO_CONTROLLERS
+ */
+chunk textTransferItemName = {Unnamed Text}
+end TextStrings;
+

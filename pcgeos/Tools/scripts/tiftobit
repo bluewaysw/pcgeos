@@ -1,0 +1,79 @@
+#!/bin/sh
+
+###############################################################################
+# 	Copyright (c) Geoworks 1999 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# FILE: 	tiftobit
+# AUTHOR: 	Gene
+# DESCRIPTION:
+#	Shell script to convert TIFF files to PC/GEOS background bitmaps
+#
+# USAGE:
+#	tiftobit [-c b|w] [-w #] [-h #] <file.tif> <file.bit> <longname>
+#
+#	-c b - crop black edges
+#	-c w - crop white edges
+#
+#	-w # - clip width to #
+#	-h # - clip height to #
+#
+#	$Id: tiftobit,v 1.2 90/09/22 16:10:38 gene Exp $
+#
+###############################################################################
+
+#
+# Process arguments
+#
+crop=
+cwidth=
+cheight=
+while [ $# -gt 3 ]; do
+    case $1 in
+	-c*)	shift
+		crop=`expr substr $1 1 1`
+		shift;;
+	-w*)	shift
+		cwidth=$1
+		shift;;
+	-h*)	shift
+		cheight=$1
+		shift;;
+	*)	;;
+    esac
+done
+file=`basename $1 .tif`
+
+#
+# Convert from TIFF to PBM and XBM
+#
+if [ "$crop" ]; then
+    tifftopgm < $1 | pgmtopbm | pnmcrop -$crop > /tmp/$file.pbm
+else
+    tifftopgm < $1 | pgmtopbm > /tmp/$file.pbm
+fi
+pbmtoxbm < /tmp/$file.pbm > /tmp/$file.xbm
+#
+# Set the width to the next lowest multiple of a byte, because
+# convBM pads to byte boundaries.
+#
+width=`xbmwidth < /tmp/$file.xbm`
+width=`xbmwidth < /tmp/$file.xbm`
+if [ "$cwidth" ]; then
+    if [ $cwidth -le $width ]; then
+	width=$cwidth;
+    fi
+fi
+width=`expr \( $width - 1 \) / 8 \* 8`
+#
+# Set the height to the minimum of the actual height and
+# the (optional) passed clip height.
+#
+height=`xbmheight < /tmp/$file.xbm`
+if [ "$cheight" ]; then
+    if [ $cheight -le $height ]; then
+	height=$cheight;
+    fi
+fi
+height=`expr $height - 1`
+pnmcut 1 1 $width $height < /tmp/$file.pbm | pbmtoxbm | convBM $2 -o "$3"

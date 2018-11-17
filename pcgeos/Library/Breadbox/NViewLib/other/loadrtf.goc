@@ -1,0 +1,66 @@
+/*
+ *      LOADRTF.GOC - view/save files in RTF format
+ *
+ *      by Marcus Groeber, mgroeber@compuserve.com
+ *
+ */
+
+@include <stdapp.goh>
+@include <foam.goh>
+
+#include <ansi\stdio.h>
+#include <ansi\string.h>
+
+@include <nview.goh>
+
+#include <rtflib.h>
+
+
+NViewStatus LoadRTFDoc(FDocumentDir dir, char *file, optr text,
+  PageSetupInfo *page)
+{
+    FileHandle fh;
+    RTFTransferData data;
+    TransError ret;
+
+    FilePushDir();
+    FoamSetDocumentDir(dir);
+    fh = FileOpen(file, FILE_ACCESS_R | FILE_DENY_W);
+    FilePopDir();
+
+    if(!fh)                             /* abort if source file not found */
+      return NVS_CANNOT_OPEN_FILE;
+
+    /* call parser to process file and import it into the text object */
+    ret = RTFImport (fh, text, &data, NULL);
+    *page = data.RTFTD_pageInfo;
+
+    FileClose(fh, TRUE);
+
+    return ret? NVS_CANNOT_IMPORT : NVS_NO_ERROR;
+}
+
+NViewStatus SaveRTFDoc(optr text, PageSetupInfo *page, FDocumentDir dir,
+  char *file)
+{
+    FileHandle fh;
+    RTFTransferData data;
+    TransError ret;
+
+    FilePushDir();
+    FoamSetDocumentDir(dir);
+    fh = FileCreate(file,
+      FILE_CREATE_TRUNCATE | FCF_NATIVE | FILE_ACCESS_RW | FILE_DENY_RW, 0);
+    FilePopDir();     
+
+    if(!fh)                             /* abort if file cannot be created */
+      return NVS_CANNOT_CREATE_FILE;
+
+    /* call filter to process export text from the text object */
+    data.RTFTD_pageInfo = *page;
+    ret = RTFExport (text, fh, &data, NULL);
+
+    FileClose(fh, TRUE);
+
+    return ret? NVS_CANNOT_EXPORT : NVS_NO_ERROR;
+}

@@ -1,0 +1,307 @@
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Memory video Driver
+FILE:		clr4Macro.def
+
+AUTHOR:		Jim DeFrisco, Aug 25, 1989
+
+MACROS:
+		Name		Function
+		----		--------
+		InitDitherIndex
+		NextDitherScan
+		NextDitherWord
+
+REVISION HISTORY:
+		Name	Date		Description
+		----	----		-----------
+		Jim	12/91		Initial version
+
+DESCRIPTION:
+		This file contains macros for the Memory Video driver
+
+	$Id: clr4Macro.def,v 1.1 97/04/18 11:42:51 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitDitherIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Init bx and si to point into the ditherMatrix
+
+PASS:		bReg	- optional register to use for  base dither address.
+			  Uses si if none supplied.
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitDitherIndex		macro	bReg
+ifidn @CurSeg, <Clr4>
+	dgseg	=	cs
+else
+	dgseg	=	ss
+endif
+	mov	bl, dgseg:[ditherTopIndex]	; load index into dither
+	clr	bh
+ifb	<bReg>
+	mov	si, bx				; use si for base
+	add	si, offset dgseg:ditherMatrix	; cs:bx -> ditherMatrix scan
+else
+	mov	bReg, bx
+	add	bReg, offset dgseg:ditherMatrix
+endif
+	mov	bl, dgseg:[ditherLeftIndex]	; use bx for X index
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NextDitherScan
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	bump pointers to next scan of ditherMatrix
+
+PASS:		bReg	- same register passed to InitDitherIndex (could
+			  be blank)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+NextDitherScan		macro	bReg
+ifidn @CurSeg, <Clr4>
+	dgseg	=	cs
+else
+	dgseg	=	ss
+endif
+		local	haveDitherIndex
+		mov	bl, dgseg:[ditherLeftIndex]
+ifb	<bReg>
+		add	si, CLR4_DITHER_WIDTH	;increment pattern pointer
+		cmp	si, (offset ditherMatrix) + CLR4_DITHER_SIZE	
+		jb	haveDitherIndex
+		sub	si, CLR4_DITHER_SIZE
+else
+		add	bReg, CLR4_DITHER_WIDTH
+		cmp	bReg, (offset ditherMatrix) + CLR4_DITHER_SIZE
+		jb	haveDitherIndex
+		sub	bReg, CLR4_DITHER_SIZE
+endif		
+haveDitherIndex:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NextDitherWord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	bump pointers to next byte of ditherMatrix
+
+PASS:		bReg	- same reg passed to InitDitherIndex
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+NextDitherWord		macro	bReg
+ifidn @CurSeg, <Clr4>
+	dgseg	=	cs
+else
+	dgseg	=	ss
+endif
+		local	done
+ifb	<bReg>
+		mov	ax, dgseg:[bx][si]
+else
+		xchg	bReg, si
+		mov	ax, dgseg:[bx][si]
+		xchg	bReg, si
+endif
+		dec	bx
+		jns	done
+		mov	bx, 2
+done:
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NextDitherByte
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	get next byte
+
+PASS:		baseReg	- same reg passed to InitDitherIndex (assumed si)
+		indexReg - reg used for index (assumed bx)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+NextDitherByte		macro	bReg, iReg
+ifidn @CurSeg, <Mono>
+	dgseg	=	cs
+else
+	dgseg	=	ss
+endif
+
+ifnb	<bReg>
+		xchg	bReg, si
+endif
+ifnb	<iReg>
+		xchg	iReg, bx
+endif
+		mov	al, dgseg:[bx][si]
+ifnb	<iReg>
+		xchg	iReg, bx
+endif
+ifnb	<bReg>
+		xchg	bReg, si
+endif
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		BumpDitherIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	bump a register that holds a line index to a dither matrix
+
+PASS:		iReg	- register to bump
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/13/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+BumpDitherIndex		macro	iReg
+	local	haveNext
+	inc	iReg
+	cmp	iReg, CLR4_DITHER_WIDTH-1
+	jb	haveNext
+	clr	iReg
+haveNext:
+endm
+
+
+;NSWAPPED is the default - SWAPPED is created for funky frame buffers that have
+; the least-significant 4 bits of a byte displayed to the *left* of the most-
+; significant 4 bits
+
+SWAPPED	macro	line
+ifdef	LEFT_PIXEL_IN_LOW_NIBBLE
+line
+endif
+endm
+
+NSWAPPED macro	line
+ifndef LEFT_PIXEL_IN_LOW_NIBBLE
+line
+endif
+endm
+
+ShiftRight	macro
+ifdef	USE_186
+SWAPPED <	rol	ax, 4						>
+NSWAPPED <	ror	ax, 4						>
+else
+		xchg	bh, cl
+SWAPPED <	rol	ax, cl						>
+NSWAPPED <	ror	ax, cl						>
+		xchg	bh, cl
+endif
+endm
+
+ShiftLeft	macro
+ifdef	USE_186
+SWAPPED <	ror	ax, 4						>
+NSWAPPED <	rol	ax, 4						>
+else
+		xchg	bh, cl
+SWAPPED <	ror	ax, cl						>
+NSWAPPED <	rol	ax, cl						>
+		xchg	bh, cl
+endif
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ShiftRight/Left
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Shifts the value in AX left/right 4 slots
+
+PASS:		bh - must be 4
+RETURN:		nada
+DESTROYED:	nada
+ 
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	atw	3/ 7/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ShiftRight	macro
+ifdef	USE_186
+SWAPPED <	rol	ax, 4						>
+NSWAPPED <	ror	ax, 4						>
+else
+		xchg	bh, cl
+SWAPPED <	rol	ax, cl						>
+NSWAPPED <	ror	ax, cl						>
+		xchg	bh, cl
+endif
+endm
+
+ShiftLeft	macro
+ifdef	USE_186
+SWAPPED <	ror	ax, 4						>
+NSWAPPED <	rol	ax, 4						>
+else
+		xchg	bh, cl
+SWAPPED <	ror	ax, cl						>
+NSWAPPED <	rol	ax, cl						>
+		xchg	bh, cl
+endif
+endm

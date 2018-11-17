@@ -1,0 +1,145 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Kernel Interface Definition -- .INI file access
+FILE:		initfile.def
+
+AUTHOR:		Adam de Boor, Apr 22, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	4/22/90		Initial revision
+
+
+DESCRIPTION:
+	Interface Definition for accessing the system .ini file
+		
+	$Id: initfile.def,v 1.1 97/04/04 14:22:15 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__INITFILE
+
+StartKernel
+
+global InitFileWriteData:far
+global InitFileWriteString:far
+global InitFileWriteInteger:far
+global InitFileWriteBoolean:far
+global InitFileWriteStringSection:far
+
+global InitFileReadData:far
+global InitFileReadString:far
+global InitFileReadInteger:far
+if DBCS_PCGEOS
+global InitFileReadAllInteger:far
+endif
+global InitFileReadBoolean:far
+global InitFileReadStringSection:far
+global InitFileEnumStringSection:far
+
+global InitFileGetTimeLastModified:far
+global InitFileSave:far
+global InitFileRevert:far
+global INITFILECOMMIT:far
+global InitFileDeleteStringSection:far
+global InitFileDeleteEntry:far
+global InitFileDeleteCategory:far
+global InitFileGrab:far
+global INITFILERELEASE:far
+global InitFileBackupLanguage:far
+global InitFileSwitchLanguages:far
+global InitFileMakeCanonicKeyCategory:far
+
+InitFileCommit	equ	INITFILECOMMIT
+InitFileRelease	equ	INITFILERELEASE
+
+;-
+
+global INITFILEWRITEDATA:far
+global INITFILEWRITESTRING:far
+global INITFILEWRITEINTEGER:far
+global INITFILEWRITEBOOLEAN:far
+global INITFILEWRITESTRINGSECTION:far
+
+global INITFILEREADDATABUFFER:far
+global INITFILEREADDATABLOCK:far
+global INITFILEREADSTRINGBUFFER:far
+global INITFILEREADSTRINGBLOCK:far
+global INITFILEREADINTEGER:far
+if DBCS_PCGEOS
+global INITFILEREADALLINTEGER:far
+endif
+global INITFILEREADBOOLEAN:far
+global INITFILEREADSTRINGSECTIONBUFFER:far
+global INITFILEREADSTRINGSECTIONBLOCK:far
+global INITFILEENUMSTRINGSECTION:far
+
+global INITFILEGETTIMELASTMODIFIED:far
+global INITFILESAVE:far
+global INITFILEREVERT:far
+global INITFILEDELETESTRINGSECTION:far
+global INITFILEDELETEENTRY:far
+global INITFILEDELETECATEGORY:far
+global INITFILEGRAB:far
+global INITFILEMAKECANONICKEYCATEGORY:far
+
+;--------------------------------------------------------------------------
+;	Initfile constants
+;--------------------------------------------------------------------------
+
+MAX_INITFILE_CATEGORY_LENGTH	=	64
+
+; Determine the sort of conversion that will take place when strings
+; are read from the .INI file.
+;
+InitFileCharConvert	etype	byte
+    IFCC_INTACT		enum	InitFileCharConvert	; leave intact
+    IFCC_UPCASE		enum	InitFileCharConvert	; upcase all chars
+    IFCC_DOWNCASE	enum	InitFileCharConvert	; downcase all chars
+
+
+; Used for many of the InitFileRead... routines.
+;
+InitFileReadFlags	record
+    IFRF_CHAR_CONVERT	InitFileCharConvert:2		; character conversion
+    IFRF_READ_ALL:1
+    ; Instructs the initfile routine to read from all the init files,
+    ; where appropriate.  Only used in InitFileEnumStringSection,
+    ; which will enumerate over all string sections in all init files
+
+    IFRF_FIRST_ONLY:1
+    ; Read from the first init file ONLY
+
+    IFRF_SIZE		:12				; size of buffer
+InitFileReadFlags	end
+
+
+; These are left for backward compatability only. Do NOT use them
+;
+INITFILE_INTACT_CHARS		= IFCC_INTACT shl offset IFRF_CHAR_CONVERT
+INITFILE_UPCASE_CHARS		= IFCC_UPCASE shl offset IFRF_CHAR_CONVERT
+INITFILE_DOWNCASE_CHARS		= IFCC_DOWNCASE shl offset IFRF_CHAR_CONVERT
+
+;
+; This enumeration is used for sending out notifications that
+; the Initfile has changed.  We do this to avoid having every
+; client on the GAGCNLT_NOTIFY_INIT_FILE_CHANGED list lock down
+; a block and do string comparisons to see if it's the category/
+; key they're interested in.
+;
+
+InitFileEntry		etype	word
+	IFE_DATE_TIME_FORMAT	enum	InitFileEntry
+	IFE_NUMBER_FORMAT	enum	InitFileEntry
+	IFE_SYSTEM_SOUND	enum	InitFileEntry
+	IFE_INK_THICKNESS	enum	InitFileEntry
+	IFE_CURRENCY_FORMAT	enum	InitFileEntry
+	IFE_PUNCTUATION		enum	InitFileEntry
+	IFE_OWNER_INFO		enum	InitFileEntry
+		; Name, power on lock
+
+EndKernel

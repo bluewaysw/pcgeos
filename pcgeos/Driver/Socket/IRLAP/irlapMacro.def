@@ -1,0 +1,560 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		irlapMacro.def
+
+AUTHOR:		Cody Kwok, May  8, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	5/ 8/94   	Initial revision
+
+
+DESCRIPTION:
+	Internal macros used by IRLAP driver.
+		
+	$Id: irlapMacro.def,v 1.1 97/04/18 11:57:00 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EscapeByte
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	escape a byte by complementing the 6th bit
+
+CALLED BY:	various packet routines
+DESTROYED:	nothing
+EFFECTS:	
+ 	cl - byte complemented if escaped
+PSEUDO CODE/STRATEGY:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	4/ 5/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+EscapeByte	macro	byteToEscape
+	xor	byteToEscape, IRLAP_ESCAPE_COMPLEMENT
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetEscapedByteAL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Read a byte from Serial driver
+
+PASS:		si = DR_STREAM_READ_BYTE
+		ds = station segment
+RETURN:		al = byte read
+		CF = 0 if no error
+		CF = 1 if error from serial driver
+		ZF = 0 if byte was not escaped
+		ZF = 1 if byte was escaped
+DESTROYED:	nothing
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	3/15/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GetEscapedByteAL macro
+		local	xit
+		xchg	si, di
+		mov	ax, STREAM_BLOCK
+		call	ds:IS_serialStrategy	; get next byte (packet addr)
+		jc	xit
+		cmp	al, IRLAP_CONTROL_ESCAPE
+		clc
+		jnz	xit			; ZF not set
+		mov	ax, STREAM_BLOCK
+		call	ds:IS_serialStrategy	; get next byte (packet addr)
+		jc	xit
+		EscapeByte	al		; carry clear
+		cmp	al, al			; ZF set
+xit:	
+		xchg	si, di
+		endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IrlapCheckStation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check that a station is either local or remote i.e. not
+		corrupted.
+
+PASS:		segreg
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	4/17/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IrlapCheckStation	macro	segreg
+		pushf
+		push	ax, bx
+	;
+	; See if event queue handle and event thread handle has proper
+	; relation ship
+	;
+		mov	ax, TGIT_QUEUE_HANDLE
+		mov	bx, segreg:IS_eventThreadHandle
+		call	ThreadGetInfo	; ax = queue handle
+		cmp	segreg:IS_eventQueue, ax
+		ERROR_NE IRLAP_STATION_CORRUPTED
+		pop	ax, bx
+		popf
+
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ChangeState
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Change the local state machine's state
+
+PASS:		segment register of dgroup,  state to change to.
+		[optional] local or remote machine, default to local
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	4/16/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ChangeState		macro 	state, segreg
+if	ERROR_CHECK
+	IrlapCheckStation	segreg, station
+		push	ax
+		movm	segreg:IS_stateLast2, segreg:IS_stateLast1, ax
+		movdw	segreg:IS_eventLast2, segreg:IS_eventLast1, ax
+		movm	segreg:IS_stateLast1, segreg:IS_state, ax
+		movdw	segreg:IS_eventLast1, ss:TPD_callVector, ax
+endif
+		mov	segreg:IS_state, IMS_&state
+if	ERROR_CHECK
+		pop	ax
+endif
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CheckRecoverFromBlocked
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check if we are recovering from a blocked connection.
+		If so, send the proper status indication.
+
+PASS:		ds	= station
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	grisco	4/25/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CheckRecoverFromBlocked		macro
+
+	;
+	; see if we are recovering from a blocked status
+	;
+		test	ds:IS_status, mask ISS_WARNED_USER
+		jz	normalCase
+	;
+	; in this case, we were sort of blocked
+	; notify the user that we recovered from status: BLOCKED
+	;
+		push	cx
+		BitClr	ds:IS_status, ISS_WARNED_USER
+		mov	cx, ISIT_OK
+		call	StatusIndication
+		pop	cx
+normalCase:
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shl4
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shift a reg by 4 to left
+
+PASS:		reg
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	5/ 6/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shl4		macro 	reg
+	shl	reg, 1
+	shl	reg, 1
+	shl	reg, 1
+	shl	reg, 1
+endm
+	
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shr4
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shift a reg by 4 to right
+
+PASS:		reg
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	5/ 6/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shr4		macro 	reg
+
+	shr	reg, 1
+	shr	reg, 1
+	shr	reg, 1
+	shr	reg, 1
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ror4
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	rotate a reg by 4 to left
+		This swaps Nr and Ns of IrlapControlField
+PASS:		reg
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	5/ 6/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ror4		macro 	reg
+	ror	reg, 1
+	ror	reg, 1
+	ror	reg, 1
+	ror	reg, 1
+endm
+
+shl3		macro 	reg
+	shl	reg, 1
+	shl	reg, 1
+	shl	reg, 1
+endm
+
+shr3		macro 	reg
+	shr	reg, 1
+	shr	reg, 1
+	shr	reg, 1
+endm
+	
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		mov_fptr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	mov seg + offset of a piece of data into dest
+
+PASS:		
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	4/14/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+movfptr		macro	dest, source
+	local	drl, drh, srl, srh, regargs
+
+regargs = 0
+_CheckDWordTwoArg	<dest>, <source>, <movfptr>
+_ParseDWordArg	<dest>, drl, drh, regargs, <movfptr>
+_ParseDWordArg	<source>, srl, srh, regargs, <movfptr>
+
+if (regargs gt 0)
+	mov	drh, segment source
+	mov	drl, offset source
+endif
+
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		movm
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS: 	Moves one memory-based word variable to another, using a trash
+		register.
+
+PASS:		dest, src, trash_reg
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	5/16/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+movm		macro	dest, src, reg
+ 	if (.TYPE reg) AND 10h
+		mov	reg, src
+		mov	dest, reg
+ 	else
+		ErrMessage "MOVM must have register argument"
+ 	endif
+endm
+	
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IncVs, IncVr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Inc Vs or Vr with wrapping around
+PASS:		ds = station
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	carry may be set!
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	5/ 2/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IncVs		macro	station
+EC <		WARNING _IRLAP_INC_VS					>
+		add	station:IS_vs, IrlapVsIncrement
+		and	station:IS_vs, mask IICF_NS
+endm
+IncVr		macro	station
+EC <		WARNING _IRLAP_INC_VS					>
+		add	station:IS_vr, IrlapVrIncrement
+		and	station:IS_vr, mask IICF_NR
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IrlapLockPacket
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	HugeLMemLock a buffer
+PASS:		ex) dest = esdi, source = dxbp, trashreg = TRASH_ABX
+DESTROYS:	ax & bx or nothing
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	4/19/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IrlapLockPacket		macro	dest, source, trashreg
+		local	drl, drh, srl, srh
+		regargs = 0
+		_CheckDWordTwoArg <dest>, <source>, <movdw>
+		_ParseDWordArg	<dest>, drl, drh, regargs, <movdw>
+		_ParseDWordArg	<source>, srl, srh, regargs, <movdw>
+		push	bx
+		push	ax
+		mov	bx, srh		; srh = memhandle
+		call	HugeLMemLock
+		mov	drh, ax
+		mov	drl, drh:[srl]
+		pop	ax
+		pop	bx
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IrlapUnlockPacket
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Unlocks an Irlap data packet using HugeLMemUnlock
+
+PASS:		reg = dx for example
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	8/24/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IrlapUnlockPacket	macro	reg, extra
+
+ifdif	<reg>, <bx>
+		
+	ifb	<extra>
+		push	bx
+	elseifdif <extra>, <bx>
+		mov	extra, bx
+	endif
+		mov	bx, reg
+		call	HugeLMemUnlock
+		
+	ifb	<extra>
+		pop	bx
+	elseifdif <extra>, <bx>
+		mov	bx, extra
+	endif
+else
+		call	HugeLMemUnlock
+endif
+		endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StackAllocPacket
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Allocate a packet off the stack
+
+PASS:		size, [segreg], [offset]
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	4/22/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StackAllocPacket		macro	 size, segreg, offset
+if (((size) and 1) eq 1)
+	sub	sp, (size)+1
+else
+	sub	sp, size
+endif
+ifnb	<offset>
+	segmov	segreg, ss, offset
+	mov	offset, sp
+endif
+endm
+	
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		StackDeallocPacket
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	restore stack after packaging
+
+PASS:		size
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	4/22/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+StackDeallocPacket		macro	size
+if (((size) and 1) eq 1)
+	add	sp, (size)+1
+else
+	add	sp, size
+endif
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetDgroup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Puts dgroup in ds or es
+
+PASS:		
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	11/24/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GetDgroup	macro	seg, trash
+if _FXIP
+ifdif <trash>, <bx>
+		mov_tr	trash, bx
+endif
+		mov	bx, handle dgroup
+ifdif <seg>, <ds>
+ifdif <seg>, <es>
+		PrintMessage <You may put dgroup only in ds or es>
+else
+		call	MemDerefES
+endif
+else
+		call	MemDerefDS
+endif	
+ifdif <trash>, <bx>
+		mov_tr	bx, trash
+endif		
+else
+		segmov	seg, dgroup, trash
+endif
+		endm

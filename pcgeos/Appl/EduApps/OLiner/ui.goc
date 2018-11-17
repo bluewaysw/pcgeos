@@ -1,0 +1,1000 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT: Breadbox Outliner
+ * FILE:        ui.goc
+ * AUTHOR:  John F. Howard,   05/03
+ *
+ * DESCRIPTION:
+ *  This file has the UI for the application.
+ *
+ * SOME USER REQUESTS:
+ *	- Text formatting in cards
+ *	- Export to CSV
+ *	- Attach file to a card
+ * - 3. If you do choose to raise the bottom of the Card window to level it up,
+ *		you will be faced with a blank space whenever you've got the date stamp
+ *		running under the Outline window. while this is not necessarily a bad thing,
+ *		could card data go in there?
+ *		eg Card uses 	xx characters/kB
+ *							yy characters/kB remaining
+ * - 4. Could there be an option that when you expand one topic, others are
+ *		automatically shrunk down? (Much like how Internet Explorer favorites work?)
+ *
+ *
+ * WHATS NEW:			First release -- 08/13/03
+ *	11/12/03		jfh	- Fixed Expand/Contract all bug
+ *                   - Fixed erasing all text in a card doesn't auto save bug
+ *                   - Changed card tabs from nav to entered
+ * 11/13/03		jfh	- Added file control tools
+ * 11/18/03		jfh	- Added Move Above feature
+ *                   - Release v1.1
+ *
+ *
+ ***********************************************************************/
+
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+@include "oliner.goh"
+@include "art/btns.goh"
+@include "art/ttools.goh"
+@include "art/ctools.goh"
+@include "art/otools.goh"
+@include "art/appicons.goh"
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+@start	AppResource;
+
+@object GenApplicationClass OLApp =  {
+	GI_comp = @OLPrimary;
+	GI_visMoniker = list {@OLTextMoniker, @OLLCAppMoniker, @OLTCAppMoniker};
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @OLPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @OLDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @OLDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+					@OLDocumentControl, @OLEditControl, @OLSpellControl;
+	ATTR_GEN_HELP_FILE = "OL Help";
+}
+
+@visMoniker OLTextMoniker = "Outliner";
+
+@end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+@start	Interface;
+
+@object GenPrimaryClass OLPrimary =  {
+	GI_comp = @FileMenu, @EditMenu, @TopicMenu, @CardMenu, @OptionsMenu,
+				 @MainToolbar, @MainWindow, @DialogGroup;
+	GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenInteractionClass FileMenu = {
+	GI_comp = @OLDocumentControl, @PrintPreviewGroup, @AboutGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenInteractionClass PrintPreviewGroup = {
+	GI_comp = @PrintPreviewButton;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass PrintPreviewButton = {
+	GI_visMoniker = 'P', "Print Preview";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_PRINT_PREVIEW;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass AboutGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@include "art\bbxreg.goh"
+
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'b', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass AppName = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Outliner";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 36, TS_BOLD);
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2003 Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+@object GenInteractionClass EditMenu = {
+	GI_comp = @OLEditControl, @OLSpellControl, @FindMenuItem;
+	GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+}
+
+@object GenEditControlClass OLEditControl = {
+	GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = GECF_UNDO | GECF_CLIP_ART | GECF_CHAR_MAP;
+	ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = GECTF_UNDO ;
+}
+
+@object SpellControlClass OLSpellControl = {
+	GI_visMoniker = "Check Spelling";
+	GII_visibility = GIV_DIALOG;
+}
+
+@object GenTriggerClass FindMenuItem = {
+	GI_visMoniker = "Find";
+	GI_states = @default & ~GS_ENABLED;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_FIND;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass TopicMenu = {
+	GI_visMoniker = "Topics";
+	GI_comp = @CreateMTopicButton, @CreateSTopicButton, @DeleteTopicTrigger,
+				 @MoveTopicTrigger, @EditTopicTrigger, @TopicSubGroup;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass CreateMTopicButton = {
+	GI_visMoniker = "Create Main Topic";
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_CREATE_TOPIC;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+
+@object GenTriggerClass CreateSTopicButton = {
+	GI_visMoniker = "Create Sub Topic";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_CREATE_TOPIC;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+
+@object GenTriggerClass DeleteTopicTrigger = {
+	GI_visMoniker = "Delete Topic";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_DELETE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+
+@object GenTriggerClass MoveTopicTrigger = {
+	GI_visMoniker = "Move Topic";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_MOVE_BOX;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass EditTopicTrigger = {
+	GI_visMoniker = "Rename Topic";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_EDIT_TOPIC;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass TopicSubGroup = {
+	GI_comp = @ExpandTopicsTrigger, @ContractTopicsTrigger;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass ExpandTopicsTrigger = {
+	GI_visMoniker = "Expand all Topics";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_EXPAND_ALL_TOPICS;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass ContractTopicsTrigger = {
+	GI_visMoniker = "Contract all Topics";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_CONTRACT_ALL_TOPICS;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass CardMenu = {
+	GI_visMoniker = "Cards";
+	GI_comp = @SaveCardButton, @NewCardButton, @DeleteCardTrigger,
+				 @MoveCardTrigger;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass NewCardButton = {
+	GI_visMoniker = "New Card";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_NEW_CARD;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+
+@object GenTriggerClass SaveCardButton = {
+	GI_visMoniker = "Save New Card";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SAVE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+
+@object GenTriggerClass DeleteCardTrigger = {
+	GI_visMoniker = "Delete Card";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_DELETE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+
+@object GenTriggerClass MoveCardTrigger = {
+	GI_visMoniker = "Move Card";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_MOVE_BOX;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass OptionsMenu = {
+	GI_visMoniker = "Options";
+	GI_comp = @CardWinOptTrigger, @ToolBarOptTrigger, @DateStampOptTrigger;
+	GII_visibility = GIV_POPUP;
+}
+
+@visMoniker ShowCardWinMoniker = "Show Card Window";
+@visMoniker HideCardWinMoniker = "Hide Card Window";
+@object GenTriggerClass CardWinOptTrigger = {
+	GI_visMoniker = @HideCardWinMoniker;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_OLINER_PROC_TOGGLE_CARD_WINDOW;
+}
+
+@visMoniker ShowToolBarMoniker = "Show Tool Bar";
+@visMoniker HideToolBarMoniker = "Hide Tool Bar";
+@object GenTriggerClass ToolBarOptTrigger = {
+	GTI_destination = process;
+	GTI_actionMsg = MSG_OLINER_PROC_TOGGLE_TOOL_BAR;
+}
+
+@visMoniker ShowDateStampMoniker = "Show Date Stamp";
+@visMoniker HideDateStampMoniker = "Hide Date Stamp";
+@object GenTriggerClass DateStampOptTrigger = {
+	GTI_destination = process;
+	GTI_actionMsg = MSG_OLINER_PROC_TOGGLE_DATE_STAMP;
+}
+
+@object GenInteractionClass MainToolbar = {
+	GI_comp = @DocumentToolGroup, @ToolSpacer1,
+				 @EditToolToolGroup, @ToolSpacer2, @SpellToolGroup,
+				 @ToolSpacer3, @FindToolGroup,
+				 @ToolSpacer4, @PrintPrevToolGroup, @ToolSpacer5,
+				 @TopicToolGroup, @ToolSpacer6, @ECAllToolGroup,
+				 @ToolSpacer7, @CardToolGroup;
+	GII_visibility = GIV_POPOUT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_TOOLBOX;
+}
+@object GenToolGroupClass DocumentToolGroup = {
+	GTGI_controller = @OLDocumentControl;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass EditToolToolGroup = {
+	GTGI_controller = @OLEditControl;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass SpellToolGroup = {
+	GTGI_controller = @OLSpellControl;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenGlyphClass ToolSpacer1 = {
+	GI_visMoniker = "   ";   
+}
+@object GenGlyphClass ToolSpacer2 = {
+	GI_visMoniker = "   ";
+}
+@object GenGlyphClass ToolSpacer3 = {
+	GI_visMoniker = "   ";
+}
+@object GenGlyphClass ToolSpacer4 = {
+	GI_visMoniker = "   ";
+}
+@object GenGlyphClass ToolSpacer5 = {
+	GI_visMoniker = "   ";
+}
+@object GenGlyphClass ToolSpacer6 = {
+	GI_visMoniker = "   ";
+}
+@object GenGlyphClass ToolSpacer7 = {
+	GI_visMoniker = "   ";
+}
+@object GenInteractionClass FindToolGroup = {
+	GI_comp = @FindTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@object GenTriggerClass FindTool = {
+	GI_visMoniker = list {@FindToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_FIND;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @FindEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @FindDisabledBHelp;
+}
+@chunk char FindEnabledBHelp[] = "Search for a word or phrase";
+@chunk char FindDisabledBHelp[] = "No outline items to Search";
+
+@object GenInteractionClass PrintPrevToolGroup = {
+	GI_comp = @PrintPrevTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@object GenTriggerClass PrintPrevTool = {
+	GI_visMoniker = list {@PrintPrevToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_PRINT_PREVIEW;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @PrintPrevEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @PrintPrevDisabledBHelp;
+}
+@chunk char PrintPrevEnabledBHelp[] = "Preview the printed outline";
+@chunk char PrintPrevDisabledBHelp[] = "No outline to preview";
+
+@object GenInteractionClass TopicToolGroup = {
+	GI_comp = @NewMTopicTool, @NewSTopicTool, @DelTopicTool,
+				 @MoveTopicTool, @EditTopicTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@object GenTriggerClass NewMTopicTool = {
+	GI_visMoniker = list {@NewMTopicToolMoniker};
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_CREATE_TOPIC;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @NewMTopicEnabledBHelp;
+}
+@chunk char NewMTopicEnabledBHelp[] = "Create a new Main Topic";
+
+@object GenTriggerClass NewSTopicTool = {
+	GI_visMoniker = list {@NewSTopicToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_CREATE_TOPIC;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @NewSTopicEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @NewSTopicDisabledBHelp;
+}
+@chunk char NewSTopicDisabledBHelp[] = "Cannot create a new Sub Topic";
+@chunk char NewSTopicEnabledBHelp[] = "Create a new Sub Topic";
+
+@object GenTriggerClass DelTopicTool = {
+	GI_visMoniker = list {@DelTopicToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_DELETE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @DelTopicEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @DelTopicDisabledBHelp;
+}
+@chunk char DelTopicDisabledBHelp[] = "Cannot Delete a topic";
+@chunk char DelTopicEnabledBHelp[] = "Delete the selected Topic";
+
+@object GenTriggerClass MoveTopicTool = {
+	GI_visMoniker = list {@MoveTopicToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_MOVE_BOX;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @MoveTopicEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @MoveTopicDisabledBHelp;
+}
+@chunk char MoveTopicDisabledBHelp[] = "Cannot Move a Topic";
+@chunk char MoveTopicEnabledBHelp[] = "Move the selected Topic";
+
+@object GenTriggerClass EditTopicTool = {
+	GI_visMoniker = list {@EditTopicToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_EDIT_TOPIC;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @EditTopicEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @EditTopicDisabledBHelp;
+}
+@chunk char EditTopicDisabledBHelp[] = "Cannot Rename a Topic - no Topic selected";
+@chunk char EditTopicEnabledBHelp[] = "Rename the selected Topic";
+
+@object GenInteractionClass ECAllToolGroup = {
+	GI_comp = @ExpandTopicsTool, @ContractTopicsTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@object GenTriggerClass ExpandTopicsTool = {
+	GI_visMoniker = list {@ExpandAllToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_EXPAND_ALL_TOPICS;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @ExpandTopicsEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @ExpandTopicsDisabledBHelp;
+}
+@chunk char ExpandTopicsDisabledBHelp[] = "No Topics to expand";
+@chunk char ExpandTopicsEnabledBHelp[] = "Expand all topics";
+
+@object GenTriggerClass ContractTopicsTool = {
+	GI_visMoniker = list {@ContractAllToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_CONTRACT_ALL_TOPICS;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @ContractTopicsEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @ContractTopicsDisabledBHelp;
+}
+@chunk char ContractTopicsDisabledBHelp[] = "No Topics to contract";
+@chunk char ContractTopicsEnabledBHelp[] = "Contract all topics";
+
+@object GenInteractionClass CardToolGroup = {
+	GI_comp = @SaveCardTool, @NewCardTool, @DelCardTool,
+				 @MoveCardTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@object GenTriggerClass NewCardTool = {
+	GI_visMoniker = list {@NewCardToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_NEW_CARD;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @NewCardEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @NewCardDisabledBHelp;
+}
+@chunk char NewCardDisabledBHelp[] = "A blank New Card is already available";
+@chunk char NewCardEnabledBHelp[] = "Create a blank New Card";
+
+@object GenTriggerClass SaveCardTool = {
+	GI_visMoniker = list {@SaveCardToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SAVE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @SaveCardEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @SaveCardDisabledBHelp;
+}
+@chunk char SaveCardDisabledBHelp[] = "No New Card to Save";
+@chunk char SaveCardEnabledBHelp[] = "Save the New Card";
+
+@object GenTriggerClass DelCardTool = {
+	GI_visMoniker = list {@DelCardToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_DELETE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_FOCUS_HELP = @DelCardEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @DelCardDisabledBHelp;
+}
+@chunk char DelCardDisabledBHelp[] = "Cannot Delete a Card - no Card selected";
+@chunk char DelCardEnabledBHelp[] = "Delete the selected Card";
+
+@object GenTriggerClass MoveCardTool = {
+	GI_visMoniker = list {@MoveCardToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_OPEN_MOVE_BOX;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	ATTR_GEN_FOCUS_HELP = @MoveCardEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @MoveCardDisabledBHelp;
+}
+@chunk char MoveCardDisabledBHelp[] = "Cannot Move a Card - no Card selected";
+@chunk char MoveCardEnabledBHelp[] = "Move the selected Card";
+
+@object GenInteractionClass DialogGroup = {
+	GI_comp = @CreateMTopicBox, @CreateSTopicBox, @EditTopicDBox,
+				 @MoveItemDBox, @FindDBox, @PrintPreviewWindow;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	GII_type = GIT_ORGANIZATIONAL;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+
+/* ----------------------------------------------------------------------------
+	 UI Document Control
+-----------------------------------------------------------------------------*/
+@object GenDocumentControlClass OLDocumentControl = {
+	GDCI_documentToken = {"OLd1", 16431};
+	GDCI_noNameText = "No Document";
+	GDCI_features = @default & ~GDCF_SUPPORTS_TEMPLATES;
+	GDCI_documentGroup = OLDocumentGroup;
+	GDCI_enableDisableList = OLEnableList;
+	ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = GDCTF_QUICK_BACKUP ;
+}
+
+@chunk optr OLEnableList[] =  {
+			@MainWindow, @OLSpellControl}; 
+
+@end Interface;
+
+/* ----------------------------------------------------------------------------
+	 App Document Control
+-----------------------------------------------------------------------------*/
+@start DocumentUI;
+
+@object GenDocumentGroupClass OLDocumentGroup = {
+	GDGI_untitledName = "Untitled Outline";
+	GDGI_documentClass = &OLDocumentClass;
+	GDGI_documentControl = OLDocumentControl;
+	GDGI_protocolMajor = 1;
+	GDGI_protocolMinor = 0;
+}
+
+@end DocumentUI;
+
+
+/* ----------------------------------------------------------------------------
+	 Main Window
+-----------------------------------------------------------------------------*/
+@start Interface;
+
+@object GenInteractionClass MainWindow = {
+	GI_comp = @OLListInfo, @OLCardInfo;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+   HINT_DIVIDE_WIDTH_EQUALLY;
+}
+
+/* ----------------------------------------------------------------------------
+	 List Window
+-----------------------------------------------------------------------------*/
+
+@object GenInteractionClass OLListInfo = {
+	GI_comp = @CardDList, @ListDateDisplay;
+	GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object OLDynamicListClass CardDList = {
+	GDLI_numItems = 0;
+	GDLI_queryMsg = MSG_OLINER_DOC_CARD_DLIST_MONIKER_QUERY;
+	GIGI_applyMsg = MSG_OLINER_DOC_CARD_DLIST_APPLY;
+	GIGI_destination = (TO_APP_MODEL);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS =
+								 MSG_OLINER_DOC_CARD_DLIST_DOUBLE_CLICK;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+   /* this sets the height of the individual item lines */
+	HINT_MINIMUM_SIZE = {0, SST_PIXELS | 20};
+}
+
+
+@object GenInteractionClass ListDateDisplay = {
+	GI_comp = @ListCreationDate, @ListModificationDate;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass ListCreationDate = {
+	GI_visMoniker = "Creation Date:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass ListModificationDate = {
+	GI_visMoniker = "Modification Date:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+
+/* ----------------------------------------------------------------------------
+	 card Window
+-----------------------------------------------------------------------------*/
+
+@object GenInteractionClass OLCardInfo = {
+	GI_comp = @CardTitle, @CardText, @CardApply;
+	GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object CardGenTextClass CardTitle = {
+	GI_visMoniker = "Card Title:";
+	GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	GTXI_maxLength = MAX_TITLE_LENGTH;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = (TO_APP_MODEL);
+	GTXI_applyMsg = MSG_OLINER_DOC_SAVE_CARD;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_DEFAULT_FOCUS;
+}
+
+@object CardGenTextClass CardText = {
+	GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+   /* let tabs work as tabs - not for nav 11/12/03*/
+	GTXI_attrs = /*@default | */GTA_INIT_SCROLLING;
+	HINT_TEXT_WHITE_WASH_COLOR ;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+/* a dummy trigger - this feature was added after the rest and I needed
+	a trigger to represent the text apply since all the rest of the actions
+   are triggers */
+@object GenTriggerClass CardApply = {
+	GI_states = @default & ~GS_USABLE;
+}
+
+@visMoniker InTopicMoniker = "Into Topic";
+@visMoniker BelowTopicMoniker = "Below Topic";
+@visMoniker CancelAddMoniker = "Cancel Add";
+@visMoniker CancelMoveMoniker = "Cancel Move";
+
+@end Interface;
+
+/* ----------------------------------------------------------------------------
+	 Various dialog boxes
+-----------------------------------------------------------------------------*/
+@start DialogUI;
+
+/* Create Main Topic Dialog Box ****************************************/
+@object GenInteractionClass CreateMTopicBox = {
+	GI_visMoniker = "Create Main Topic";
+	GI_comp = @MTopicText, @MTopicTrigger;
+	GII_type = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = GIA_MODAL;
+	HINT_INTERACTION_SINGLE_USAGE;
+	ATTR_GEN_HELP_CONTEXT = "Adding";
+}
+@object GenTextClass MTopicText = {
+	GI_visMoniker = "Enter the Name of the new Main Topic:";
+	GTXI_maxLength = MAX_TITLE_LENGTH;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @MTopicTrigger;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_DEFAULT_FOCUS;
+}
+@object GenTriggerClass MTopicTrigger = {
+	GI_visMoniker = "Enter";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SAVE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+/* Create Sub-Topic Dialog Box ****************************************/
+@object GenInteractionClass CreateSTopicBox = {
+	GI_visMoniker = "Create Sub Topic";
+	GI_comp = @STopicText, @STopicTrigger;
+	GII_type = GIT_COMMAND;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = GIA_MODAL;
+	HINT_INTERACTION_SINGLE_USAGE;
+	ATTR_GEN_HELP_CONTEXT = "Adding";
+}
+@object GenTextClass STopicText = {
+	GI_visMoniker = "Enter the Name of the new Sub Topic:";
+	GTXI_maxLength = MAX_TITLE_LENGTH;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @STopicTrigger;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_DEFAULT_FOCUS;
+}
+@object GenTriggerClass STopicTrigger = {
+	GI_visMoniker = "Enter";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SAVE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+/* Edit Topic Dialog Box ****************************************/
+@object GenInteractionClass EditTopicDBox = {
+	GI_visMoniker = "Rename Topic";
+	GI_comp = @ETopicText, @ETopicTrigger;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	GII_attrs = GIA_MODAL;
+	ATTR_GEN_HELP_CONTEXT = "Editing";
+}
+@object GenTextClass ETopicText = {
+	GI_visMoniker = "Enter the new Name of the Topic:";
+	GTXI_maxLength = MAX_TITLE_LENGTH;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @ETopicTrigger;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_DEFAULT_FOCUS;
+}
+@object GenTriggerClass ETopicTrigger = {
+	GI_visMoniker = "Enter";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_CHANGE_ITEM;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+/* Move Item Dialog Box ****************************************/
+@object GenInteractionClass MoveItemDBox = {
+	GI_visMoniker = "Move Item";
+	GI_comp = @MoveItemButtonsTop, @MoveItemButtonsBottom, @MoveItemText,
+				 @MoveIntoTrigger, @MoveAboveTrigger, @MoveBelowTrigger,
+				 @MoveCancel;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = GIA_MODAL;
+   HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+	ATTR_GEN_HELP_CONTEXT = "Moving";
+}
+@object GenInteractionClass MoveItemButtonsTop = {
+	GI_comp = @MoveUpTrigger, @MoveTopTrigger;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+@object RepeatingTriggerClass MoveUpTrigger = {
+	GI_visMoniker = list {@PrevButtonIcon};
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SELECT_MOVE_DESTINATION;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+@object GenTriggerClass MoveTopTrigger = {
+	GI_visMoniker = list {@FirstButtonIcon};
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SELECT_MOVE_DESTINATION;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+@object GenInteractionClass MoveItemButtonsBottom = {
+	GI_comp = @MoveDownTrigger, @MoveBottomTrigger;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+@object RepeatingTriggerClass MoveDownTrigger = {
+	GI_visMoniker = list {@NextButtonIcon};
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SELECT_MOVE_DESTINATION;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+@object GenTriggerClass MoveBottomTrigger = {
+	GI_visMoniker = list {@LastButtonIcon};
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SELECT_MOVE_DESTINATION;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+}
+@object GenTextClass MoveItemText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenTriggerClass MoveIntoTrigger = {
+	GI_visMoniker = "Move Into";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_MOVE_ITEM_APPLY;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass MoveAboveTrigger = {
+	GI_visMoniker = "Move Above";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_MOVE_ITEM_APPLY;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass MoveBelowTrigger = {
+	GI_visMoniker = "Move Below";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_MOVE_ITEM_APPLY;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass MoveCancel = {
+	GI_visMoniker = "Cancel";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_MOVE_ITEM_CANCEL;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+}
+
+/* Search Dialog Box ****************************************/
+@object GenInteractionClass FindDBox = {
+	GI_visMoniker = "Search";
+	GI_comp = @FDBSearchText, @FDBFind, @FDBFindNext, @FDBClose;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	GII_visibility = GIV_DIALOG;
+	ATTR_GEN_HELP_CONTEXT = "Searching";
+}
+
+@object FindGenTextClass FDBSearchText = {
+	GI_visMoniker = "Search for:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = (MAX_TITLE_LENGTH);
+	HINT_DEFAULT_FOCUS;
+}
+
+@object GenTriggerClass FDBFind = {
+	GI_visMoniker = "Find";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SEARCH_OUTLINE;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass FDBFindNext = {
+	GI_visMoniker = "Find Next";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_OLINER_DOC_SEARCH_OUTLINE;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&OLDocumentClass};
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass FDBClose = {
+	GI_visMoniker = "Close";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/* Print Preview Dialog Box ****************************************/
+@object GenTextReportDialogClass PrintPreviewWindow = {
+	GI_visMoniker = "Print Preview" ;
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = GIA_NOT_USER_INITIATABLE;
+	GTRDI_generateMsg = MSG_OLINER_DOC_PRINT_PREVIEW;
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+			SWSS_RATIO | PCT_10, SWSS_RATIO | PCT_10};
+	HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+          SWSS_RATIO | PCT_80, SWSS_RATIO | PCT_80};
+	HINT_INTERACTION_MAKE_RESIZABLE;
+	HINT_TEXT_REPORT_HIDE_PRINT_BW_OPTION;
+	ATTR_GEN_HELP_CONTEXT = "Printing";
+}
+
+@end DialogUI;
+
+@start DataTextSettings, data;
+	 /*---------------------------------------------------------------------*/
+	 @chunk Tab PPrevTabs[] = {
+		SIMPLE_TAB(0.25),
+		SIMPLE_TAB(0.5),
+		SIMPLE_TAB(0.75),
+		SIMPLE_TAB(1.0),
+		SIMPLE_TAB(1.25),
+		SIMPLE_TAB(1.5),
+		SIMPLE_TAB(1.75),
+		SIMPLE_TAB(2.0),
+		SIMPLE_TAB(2.25),
+		TAB_GROUP_END
+	 } ;
+	 /*---------------------------------------------------------------------*/
+	 @chunk VisTextCharAttr PPrevTitleCharAttrs =
+	    CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+			 2, CA_NULL_ELEMENT, FID_DTC_URW_SANS, 14, TS_BOLD, C_BLACK);
+	 /*---------------------------------------------------------------------*/
+	 @chunk VisTextCharAttr PPrevBodyCharAttrs =
+		 CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+			 2, CA_NULL_ELEMENT, FID_DTC_URW_SANS, 12, 0, C_BLACK);
+	 /*---------------------------------------------------------------------*/
+	 @chunk VisTextParaAttr PPrevTitleParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_CENTER, 0, 0, 0);
+	 /*---------------------------------------------------------------------*/
+    /* these have margins at 1/4" intervals */
+	 @chunk VisTextParaAttr PPrevBody0ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 0, 0, 0);
+	 @chunk VisTextParaAttr PPrevBody1ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 2, 0, 2);
+	 @chunk VisTextParaAttr PPrevBody2ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 4, 0, 4);
+	 @chunk VisTextParaAttr PPrevBody3ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 6, 0, 6);
+	 @chunk VisTextParaAttr PPrevBody4ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 8, 0, 8);
+	 @chunk VisTextParaAttr PPrevBody5ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 10, 0, 10);
+	 @chunk VisTextParaAttr PPrevBody6ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 12, 0, 12);
+	 @chunk VisTextParaAttr PPrevBody7ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 14, 0, 14);
+	 @chunk VisTextParaAttr PPrevBody8ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 16, 0, 16);
+	 @chunk VisTextParaAttr PPrevBody9ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 18, 0, 18);
+	 @chunk VisTextParaAttr PPrevBody10ParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 20, 0, 20);
+	 /*---------------------------------------------------------------------*/
+@end DataTextSettings ;
+
+

@@ -1,0 +1,301 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		GeoCalc
+FILE:		geocalcGeode.def
+
+AUTHOR:		Gene Anderson, Feb 12, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eca	2/12/91		Initial revision
+
+
+DESCRIPTION:
+	Standard include file for each (separately assembled) module of the
+	program.
+		
+	$Id: geocalcGeode.def,v 1.3 98/02/23 21:59:03 gene Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Include files common to all modules.
+
+;
+include geos.def
+
+;------------------------------------------------------------------------------
+;  FULL_EXECUTE_IN_PLACE : Indicates that GeoCalc is going to
+;       be used in a system where all geodes (or most, at any rate)
+;       are to be executed out of ROM.  
+;------------------------------------------------------------------------------
+ifndef FULL_EXECUTE_IN_PLACE
+        FULL_EXECUTE_IN_PLACE           equ     FALSE
+endif
+
+;------------------------------------------------------------------------------
+;  The .GP file only understands defined/not defined;
+;  it can not deal with expression evaluation.
+;  Thus, for the TRUE/FALSE conditionals, we define
+;  GP symbols that _only_ get defined when the
+;  condition is true.
+;-----------------------------------------------------------------------------
+if      FULL_EXECUTE_IN_PLACE
+        GP_FULL_EXECUTE_IN_PLACE        equ     TRUE
+endif
+
+if FULL_EXECUTE_IN_PLACE
+include Internal/xip.def
+endif
+
+include	stdapp.def
+include	library.def		; Allows use of the UI library.
+include chunkarr.def		; Chunk array support.
+include timer.def		; Timer support.
+include file.def		; File support.
+include vm.def			; VM file support.
+include char.def
+include system.def
+include dbase.def		; DB file support
+include assert.def		; EC shme
+include Internal/prodFeatures.def
+
+include Objects/processC.def
+include Objects/winC.def
+
+
+;----------------------------------------------------------------------
+; This is the default setting for all the flags for the regular GeoCalc. BY
+; default, all these the following flags are "on". If you need any  of the
+; following features, then you can set the particular flags "off". Jedi is
+; one of the example.
+;
+; _CHARTS	:	If this flag is "on", GeoCalc will support charting
+;			features, and the user is able to create graphical
+;			objects.
+; _USE_IMPEX	:	If this flag is "on", GeoCalc will support import and
+;			export functions.
+; _PT_SIZE	:	If this flag is "on", the user is allowed to adjust
+;			the size of the fonts used in GeoCalc.
+; _CELL_NOTE	:	If this flag is "on", the user can create cell note
+;			for any particular cell in GeoCalc.
+; _HEADER_FOOTER:	If this flag is "on", the user can create header and
+;			footer for the geocalc document.
+; _VIEW_CTRL	:	If this flag is "on", the View menu will appear in the
+;			menu bar. If this flag is "off", there will be no View
+;			menu in the menu bar. "Go to..." function (in the View
+;			menu origially) is moved into the Cell menu.
+; _TEXT_CTRL	:	If this flag is "on", the user can choose what fonts
+;			to use, set the styles and color of the font, set the
+;			char. attr. of the font.
+; _BORDER_C	:	If this flag is "on", the user is able to set the color
+;			of the border of the cell.
+; _TOOL_BAR	:	If this flag is "on", GeoCalc will provide tool bars.
+; _LEVELS	:	If this flag is "on", the user is able to set the user
+;			level in GeoCalc.
+; _WIN_MENU	:	If this flag is "on", there will be Window menu in the
+;			menu bar and GeoCalc supports Multiple document
+;			cotrol.
+; _PROTECT_CELL	:	If this flag is "on", Spreadsheet lib will provide
+;			the cell protection feature. Since this is the new
+;			feature, we don't use it in regular GeoCalc until
+;			it is found to be stable.
+; _USE_FEP	:	If this flag is "on", there will be FEP support
+; _SAVE_TO_STATE:	If this flag is "on", GeoCalc will save to state.  If
+;			off, only the last opened file will be remembered and
+;			re-opened on restart.
+; _SPLIT_VIEWS:		If this flag is "on", GeoCalc will allow the user to
+;			freeze a set of rows & columns on the screen.
+; _BITMAP_EDITING:	On for bitmap editing tools.
+;
+;----------------------------------------------------------------------
+
+	_CHARTS			=	TRUE
+	_USE_IMPEX		=	TRUE
+	_PT_SIZE		=	TRUE
+	_CELL_NOTE		=	TRUE
+	_HEADER_FOOTER		=	TRUE
+	_VIEW_CTRL		=	TRUE
+	_TEXT_OPTS		=	TRUE
+	_BORDER_C		=	TRUE
+	_TOOL_BAR		=	TRUE
+	_LEVELS			=	TRUE
+	_WIN_MENU		=	TRUE
+	_SPLIT_VIEWS		=	TRUE
+	_PROTECT_CELL		=	TRUE
+	_USE_FEP		=	FALSE
+	_SAVE_TO_STATE		=	TRUE
+   	_BUGFIX_GEOCALC_38892	=	FALSE
+	_BITMAP_EDITING		=       FALSE
+
+;----------------------------------------------------------------------
+; This part is the flag setting for Jedi. Basically, we don't need most the
+; features mentioned in the above. So we turn them off here.
+;----------------------------------------------------------------------
+
+	_JEDI			=	FALSE
+
+
+
+;----------------------------------------------------------------------
+; This part is the flag setting for Dove. Basically, we don't need most the
+; features mentioned in the above. So we turn them off here.
+;----------------------------------------------------------------------
+
+	_DOVE			=	FALSE
+
+
+
+;----------------------------------------------------------------------
+; This part is the flag setting for Nike. Nike does not change any of 
+; the default settings for the features listed above, but we still need
+; to define the _NIKE constant here.
+;----------------------------------------------------------------------
+	_NIKE			=	FALSE
+
+;----------------------------------------------------------------------
+; Stuff for Pizza version
+;----------------------------------------------------------------------
+if PZ_PCGEOS
+	_USE_FEP		=	TRUE
+	_SPLIT_VIEWS		=	FALSE
+endif
+
+;------------------------------------------------------------------------------
+;  SUPER_IMPEX: Incorporate the Import/Export system into the Document
+;  Control UI, so that a user can see non-native files in the Open DB,
+;  and can save to non-native formats in the Save As dialog box.
+;
+;  The only formats currently supported are Comma Separate Value (.CSV)
+;  and Lotus 123 (.WKS). To add additional formats, you'll need to:
+;  a) define a new GeoCalcDocumentFileType (geocalcDocument.def)
+;  b) modify the "supportedDOSTypes" & "extensionTable" tables (XXX.asm)
+;  c) support your new format in ExportDocTransparently() by mapping
+;     the format to the position of the format in the Export DB (yes, it
+;     is quite a hack).
+;
+;  Notes:
+;  - there is no support for UI associated with the import or export filter
+;------------------------------------------------------------------------------
+
+ifdef	SUPER_IMPEX
+	_SUPER_IMPEX			equ	TRUE
+	GP_SUPER_IMPEX			equ	TRUE	; for the .GP file
+else
+	_SUPER_IMPEX			equ	FALSE
+endif
+
+;----------------------------------------------------------------------
+; Here we need to define some flags for gp file, so that the gp file
+; knows what resources are needed and what resources that are not 
+; needed.
+;----------------------------------------------------------------------
+if _CHARTS
+	GP_CHARTS		equ	TRUE
+endif
+
+if _USE_IMPEX
+	GP_USE_IMPEX		equ	TRUE
+endif
+
+if _PT_SIZE
+	GP_PT_SIZE		equ	TRUE
+endif
+
+if _CELL_NOTE
+	GP_CELL_NOTE		equ	TRUE
+endif
+
+if _HEADER_FOOTER
+	GP_HEADER_FOOTER	equ	TRUE
+endif
+
+if _VIEW_CTRL
+	GP_VIEW_CTRL		equ	TRUE
+endif
+
+if _TEXT_OPTS
+	GP_TEXT_OPTS		equ	TRUE
+endif
+
+if _BORDER_C
+	GP_BORDER_C		equ	TRUE
+endif
+
+if _TOOL_BAR
+	GP_TOOL_BAR		equ	TRUE
+endif
+
+if _LEVELS
+	GP_LEVELS		equ	TRUE
+endif
+
+if _WIN_MENU
+	GP_WIN_MENU		equ	TRUE
+endif
+
+
+
+UseLib	ui.def			; Use the UI (of course)
+UseLib	spool.def		; Use to spooler to allow printing
+UseLib	cell.def		; Cell Library
+UseLib	math.def		; Floating Point Library
+UseLib	parse.def		; Parser/Evaluator Library
+UseLib	ruler.def		; VisRuler object
+UseLib	ssheet.def		; Spreadsheet object
+
+if _CHARTS
+UseLib	grobj.def		; Graphic Objects Library
+UseLib	chart.def		; Chart Library
+UseLib	Objects/spline.def	; Spline library
+else
+UseLib	Objects/colorC.def
+endif
+
+UseLib	Objects/vTextC.def	; Text object
+
+if _USE_IMPEX
+UseLib	impex.def		; Impex library
+endif
+
+
+if _USE_FEP
+include	Internal/fepDr.def	; FEP
+include initfile.def
+endif
+
+if not _SAVE_TO_STATE
+include	initfile.def
+endif
+
+
+;
+;	Our include files
+;
+include	geocalcConstant.def	; Global constants.
+include geocalcProcess.def	; Definition of GeoCalcProcessClass
+include geocalcMacros.def	; Macros
+include geocalcLevel.def	; User-level constants
+include geocalcContent.def
+
+;------------------------------------------------------------------------------
+;		Resource definitions
+;------------------------------------------------------------------------------
+
+;	LMem resources must be defined here so that ESP knows what they are
+
+Interface	segment lmem
+Interface	ends
+
+MenuUI		segment lmem
+MenuUI		ends
+
+DisplayUI	segment lmem
+DisplayUI	ends
+
+ContentUI	segment lmem
+ContentUI	ends

@@ -1,0 +1,318 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		-
+FILE:		kbdMap.def
+
+AUTHOR:		Gene Anderson, Feb  8, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eca	2/ 8/90		Initial revision
+
+
+DESCRIPTION:
+	Defines what a keyboard map looks like...
+		
+	$Id: kbdMap.def,v 1.2 98/06/17 21:33:11 gene Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__KBD_MAP
+
+include char.def
+include input.def
+include	Objects/uiInputC.def
+include localize.def
+include driver.def
+
+StartDriver	kbd
+
+;
+; CONSTANTS defining the keyboard conversion tableClass =  1
+;
+
+NUM_KEYS	=	85		;number of keys on keyboard
+
+;
+; key type
+;
+KeyTypeFlag etype protominor byte, 0, 1
+;
+; KEY_INVALID	- results in VC_INVALID
+;
+KEY_INVALID enum KeyTypeFlag, 00h
+;
+; KEY_SOLO	- charValue = <data2><data1>
+;
+KEY_SOLO enum KeyTypeFlag, 01h
+;
+; KEY_NON_ALPHA	- charValue =	unshifted: <0x00><char>
+;				shifted:   <0x00><shiftChar>
+;				CAPSLOCK ignored
+;
+KEY_NONALPHA enum KeyTypeFlag, 02h
+;
+; KEY_ALPHA	- charValue =	unshifted: <0x00><char>
+;				shifted:   <0x00><shiftChar>
+;				CAPSLOCK xors shift state
+;
+KEY_ALPHA enum KeyTypeFlag, 03h
+;
+; KEY_PAD	- charValue =	unshifted: <0xff><char>
+;				shifted:   <0xff><shiftChar>
+;				NUMLOCK xors shift state
+;
+KEY_PAD enum KeyTypeFlag, 08h
+;
+; KEY_SHIFT	- charValue =	<0xff><char>
+;				shiftChar - bit(s) in shiftState var
+;
+KEY_SHIFT enum KeyTypeFlag, 09h
+;
+; KEY_TOGGLE	- charValue =	<0xff><char>
+;				shiftChar - bit(s) in toggleState var
+;					(and optionally kbd LED state)
+;
+KEY_TOGGLE enum KeyTypeFlag, 0ah
+;
+; KEY_XSHIFT	- charValue =	<0xff><char>
+;				shiftChar - bit(s) in xState1 var
+;
+KEY_XSHIFT enum KeyTypeFlag, 0bh
+;
+; KEY_XTOGGLE	- charValue =	<0xff><char>
+;				shiftChar - bit(s) in xState1 var
+;					(and optionally LED state var)
+;
+KEY_XTOGGLE enum KeyTypeFlag, 0ch
+;
+; KEY_MISC	- charValue =	unshifted: <0xff><char>
+;				shifted:   <0xff><shiftChar>	
+;				CAPSLOCK ignored
+; This is just like KEY_NONALPHA, except it is for virtual characters
+;
+KEY_MISC enum KeyTypeFlag, 0xd
+
+;
+; KEY_SHIFT_STICK	- charValue =   <0xff><char>
+;					shiftChar - bit(s) in shift to stick
+;
+KEY_SHIFT_STICK	enum KeyTypeFlag, 0xe
+
+
+
+MIN_VIRTUAL_KEY_TYPE	equ	KEY_PAD		;less than is ASCII
+
+;
+; Define which extended entries are virtual
+;		- or -
+; Define which extended entries are accents
+; NOTE: these must be the bits specified
+;
+ExtVirtualBits		record
+   EVB_SHIFT_CTRL_ALT:1	;b7 : <shift><ctrl><alt>-key
+   EVB_CTRL_ALT:1	;b6 : <ctrl><alt>-key
+   EVB_SHIFT_ALT:1	;b5 : <shift><alt>-key
+   EVB_ALT:1		;b4 : <alt>-key
+   EVB_SHIFT_CTRL:1	;b3 : <shift><ctrl>-key
+   EVB_CTRL:1		;b2 : <ctrl>-key
+   EVB_SHIFT:1		;b1 : <shift>-key
+   EVB_KEY:1		;b0 : key
+ExtVirtualBits		end
+
+KeyDataFlags	record
+	KDF_STATE_KEY:1		;no repeats, doesn't affect temp accent status
+	KDF_EXTENDED:1		;KD_extEntry contains number of extended entry
+	KDF_ACCENT:1		;char key is an accent
+	KDF_ACCENTABLE:1	;char key is accentable
+	KDF_TYPE KeyTypeFlag:4	;
+KeyDataFlags	end
+
+if DBCS_PCGEOS
+	; Chars etype covers everything
+else
+
+Character	union
+    C_BSW	Chars		;a printable character
+    C_CTRL	VChar		;a control character or modifier key
+    C_UI	UChar		;a UI-specific key
+Character	end
+endif
+	
+;
+; Equates for KD_keyType
+;
+;for KEY_TOGGLE & KEY_XTOGGLE types:
+;	KD_SET_LED	- need to set LED appropriately
+;
+
+KD_STATE_KEY	=	mask	KDF_STATE_KEY
+KD_EXTENDED	=	mask	KDF_EXTENDED
+KD_ACCENT	=	mask	KDF_ACCENT
+KD_ACCENTABLE	=	mask	KDF_ACCENTABLE
+KD_TYPE		=	mask	KDF_TYPE
+
+KD_SET_LED	=	KD_ACCENTABLE	;for TOGGLE & XTOGGLE types
+
+
+;
+; constants for extended table
+; NOTE: these must be bits 0, 1 and 2
+;
+ExtOffsets	record	EO_UNUSED:5, EO_ALT:1, EO_CTRL:1, EO_SHIFT:1
+
+EXT_SHIFT_MASK		equ	mask EO_SHIFT	;extended key w/SHIFT
+EXT_CTRL_MASK		equ	mask EO_CTRL	;extended key w/CTRL
+EXT_ALT_MASK		equ	mask EO_ALT	;extended key w/ALT
+
+EV_KEY		=	mask EVB_KEY
+EV_SHIFT	=	mask EVB_SHIFT
+EV_CTRL		=	mask EVB_CTRL
+EV_SHIFT_CTRL	=	mask EVB_SHIFT_CTRL
+EV_ALT		=	mask EVB_ALT
+EV_SHIFT_ALT	=	mask EVB_SHIFT_ALT
+EV_CTRL_ALT	=	mask EVB_CTRL_ALT
+EV_SHIFT_CTRL_ALT =	mask EVB_SHIFT_CTRL_ALT
+
+;
+; constants to define table size
+;
+KBD_NUM_RESERVED_BYTES	equ	11		; # of reserved words
+KBD_NUM_EXTSCANCODES	equ	4		; # of extensions to 8 bit scan
+KBD_NUM_EXTSCANMAPS	equ	16		; # of extended scan mappings
+KBD_NUM_ACCENTS		equ	8		; max # of accents
+KBD_NUM_ACCENTABLES	equ	16		; max # of accentable chars
+KBD_NUM_KEYDEFS		equ	079h		; # of key definitions
+KBD_NUM_EXTDEFS		equ	56		; # of extended key definitions
+
+;
+; structures to define table
+;
+
+if DBCS_PCGEOS
+
+KeyDef	struct	
+    KD_keyType		KeyDataFlags		;key type flags
+    KD_char		Chars			;unshifted key
+    KD_shiftChar	Chars			;shifted key
+    KD_extEntry		byte			;# of extended entry, if any
+    align 8
+KeyDef	ends
+
+ExtendedDef	struct
+    EDD_charAccents	ExtVirtualBits		;keys that are accents
+    EDD_ctrlChar	Chars			;<ctrl>-key
+    EDD_shiftCtrlChar	Chars			;<shift><ctrl>-key
+    EDD_altChar		Chars			;<alt>-key
+    EDD_shiftAltChar	Chars			;<shift><alt>-key
+    EDD_ctrlAltChar	Chars			;<ctrl><alt>-key
+    EDD_shiftCtrlAltChar Chars			;<shift><ctrl><alt>-key
+    align 16
+ExtendedDef	ends
+
+else
+
+KeyDef	struct	
+    KD_keyType		KeyDataFlags		;key type flags
+    KD_char		Character		;unshifted key
+    KD_shiftChar	Character		;shifted key
+    KD_extEntry		byte			;# of extended entry, if any
+KeyDef	ends
+
+ExtendedDef	struct
+    EDD_charSysFlags	ExtVirtualBits		;keys that are virtual
+    EDD_charAccents	ExtVirtualBits		;keys that are accents
+    EDD_ctrlChar	Character		;<ctrl>-key
+    EDD_shiftCtrlChar	Character		;<shift><ctrl>-key
+    EDD_altChar		Character		;<alt>-key
+    EDD_shiftAltChar	Character		;<shift><alt>-key
+    EDD_ctrlAltChar	Character		;<ctrl><alt>-key
+    EDD_shiftCtrlAltChar Character		;<shift><ctrl><alt>-key
+ExtendedDef	ends
+
+	;
+	;  The ExtendedDef above does not allow for any other
+	;  character sets than BSW or CNTRL.  For keys that
+	;  generate UIFuncs or Calculator sets, we need to
+	;  have a different mechanism.  
+	;  
+	;  What follows is a not all that nasty hack, but a
+	;  hack none the less.  If the type charSysFlag is
+	;  set for a key, a table of ExtendedExtendedDef's
+	;  are examined to determine if the particular
+	;  key is really supposed to be of another character set
+	;
+	;  Extended character sets are only supported if
+	;  DO_EXTENDED_CHARACTER_SET is set to true for the hardware	
+	;  type in keyboardConstant.def.  SBCS-only.
+	;
+ExtendedExtendedDef	struct
+    EED_di		word			; DI value indicating key
+    EED_bx		word			; BX value indicating key
+    EED_charSet		CharacterSet		; actual character set for key
+ExtendedExtendedDef	ends
+
+endif
+
+NUM_EXTENDED_CHARS	=	6		;# <ctrl> - <shift><ctrl><alt>
+
+;
+; definition of accent entry
+;
+AccentDef	struct
+    AD_accentedValue	Chars	KBD_NUM_ACCENTS dup (?)
+AccentDef	ends
+
+;
+; Special flags for a keyboard table, giving weird attributes of a particular
+; keyboard, if required.
+;
+KbdConvFlags	record
+    :15=0
+    KCF_KBD_HANDLES_TOGGLES:1=0,	; Set if the keyboard itself handles
+					; the toggling of NumLock, CapsLock,
+					; and ScrollLock, not sending
+					; the release until the key is pressed
+					; again (Tandy 1000TX)
+KbdConvFlags	end
+;
+; header for table
+;
+KbdConvHeader	struct
+    KCH_tableID		KeyMapType
+    KCH_tableClass	word	1			; Must be set to 1
+    KCH_keyboardType	KeyboardType
+    KCH_flags		KbdConvFlags <0>
+    KCH_reserved	word		KBD_NUM_RESERVED_BYTES dup (?)
+KbdConvHeader	ends
+
+;
+; map for extended scan codes for PS/2
+;
+ExtendedScanDef	struct
+    EMD_extScanCode	word			;extended scan code
+    EMD_mappedScanCode	byte			;remapped scan code
+ExtendedScanDef	ends
+
+KbdExtScan	struct
+    KES_extScanCodes	byte		KBD_NUM_EXTSCANCODES dup (?)
+    KES_extScanTab	ExtendedScanDef	KBD_NUM_EXTSCANMAPS dup (<>)
+KbdExtScan	ends
+
+;
+; defintion of whole table
+;
+KeyboardTable	struct
+    KT_header		KbdConvHeader
+    KT_extScan		KbdExtScan
+    KT_keyDefTab	KeyDef		KBD_NUM_KEYDEFS dup (<>)
+    KT_extDefTab	ExtendedDef	KBD_NUM_EXTDEFS dup (<>)
+    KT_accentables	Chars		KBD_NUM_ACCENTABLES dup (?)
+    KT_accentTab	AccentDef	KBD_NUM_ACCENTABLES dup (<>)
+KeyboardTable	ends
+
+EndDriver	kbd

@@ -1,0 +1,368 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Kernel Input Manager
+FILE:		imVariable.def
+
+AUTHOR:		Adam de Boor, Jan 28, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	1/28/91		Initial revision
+
+
+DESCRIPTION:
+	Variables for the Input Manager
+		
+	$Id: imVariable.def,v 1.1 97/04/05 01:17:13 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+idata	segment
+
+	IMClass		mask CLASSF_NEVER_SAVED
+
+;------------------------------------------------------------------------------
+; Monitor stuff
+;------------------------------------------------------------------------------
+
+semMonChain		Semaphore	<1,>	; Semaphore for chain usage
+						; Dummy head Monitor
+headMonitor		Monitor		<>	; Set to default values of 0's
+
+combineMonitor		Monitor		<>	; CombineInputMonitor vars
+outputMonitor		Monitor		<>	; OutputMonitor vars
+ptrPerturbMonitor	Monitor		<>	; PtrPerturbMonitor vars
+ife	NO_PEN_SUPPORT
+inkMonitor		Monitor		<>
+endif
+
+if	SINGLE_STEP_PROFILING
+profileMonitor		Monitor		<>	; Detecting profile keypress
+endif	; SINGLE_STEP_PROFILING
+
+;------------------------------------------------------------------------------
+; User preferences
+;------------------------------------------------------------------------------
+
+				; Double-click time: if clicks are more than
+				;  this many ticks apart, they aren't
+				;  considered a double-click.
+doubleClickTime		word		IM_DEFAULT_DOUBLE_CLICK_TIME
+				; req'd distance between clicks (in x or y)
+				; if ptr moved more than this between clicks,
+				;  it's not a double-click.
+doubleClickDistance	word		IM_DEFAULT_DOUBLE_CLICK_DISTANCE
+
+
+				; if the button is held down for at least
+				;  this many ticks then it is considered
+				;  a drag
+dragTime		word		IM_DEFAULT_DRAG_TIME
+				; req'd distance between clicks (in x or y)
+				; if ptr moved more than this during a press,
+				;  then it is considered a drag
+dragDistance		word		IM_DEFAULT_DRAG_DISTANCE
+
+leftHanded		byte		0
+				; non-zero if person wants a left-handed mouse
+
+;------------------------------------------------------------------------------
+; Hardware-driven preferences
+;------------------------------------------------------------------------------
+
+imPtrFlags		PtrFlags
+				; See PtrFlags def for use
+
+imPtrStatus		PtrStatus
+				; See PtrStatus def for use
+
+;------------------------------------------------------------------------------
+; Variables used in Input Final Monitor, for determing mouse pos, states
+; of buttons, shift status, etc.
+;------------------------------------------------------------------------------
+
+				; Current ptr X & Y pos
+pointerXPos		word		IM_DEFAULT_MOUSE_X_POS
+pointerYPos		word		IM_DEFAULT_MOUSE_Y_POS
+
+				; Display location for pointer,
+				; if different than pointer?Pos
+displayXPos		word		IM_DEFAULT_MOUSE_X_POS
+displayYPos		word		IM_DEFAULT_MOUSE_Y_POS
+
+				; Current ptr X & Y pos change
+changeXPos		word		0
+changeYPos		word		0
+
+						; final destination of IM
+						; data
+outputOD		optr
+
+udata	segment
+
+sysCounterAtLastInput	dword	; value of systemCounter at the last user
+				; input.  Can be retrieved by
+				; SysGetInfo(SGIT_COUNTER_AT_LAST_INPUT) from
+				; outside the kernel.
+
+udata	ends
+
+;------------------------------------------------------------------------------
+; PTR event supression
+;------------------------------------------------------------------------------
+if	(QUIET_PTR_SUPPORT)
+						; events aren't sent to UI.
+quietMouseLeft		word		0
+quietMouseTop		word		0
+quietMouseRight		word		4000h
+quietMouseBottom	word		4000h
+endif
+
+
+;------------------------------------------------------------------------------
+;	Button mask lookup table
+;------------------------------------------------------------------------------
+						; bitmap masks for each button
+buttonConvTab		byte	mask BI_B0_DOWN
+			byte	mask BI_B1_DOWN
+			byte	mask BI_B2_DOWN
+			byte	mask BI_B3_DOWN
+
+;------------------------------------------------------------------------------
+; Variables for constraining the pointer. Constraining works by having a
+; monitor in the chain just before the final output monitor. If the constraint
+; monitor detects that the mouse has gone outside the constraints, it forces
+; the position back inside, but sends a MSG_META_LEAVE_CONSTRAIN through the
+; constrainOD in case the object that initiated the constraint wants to
+; do something about it.
+;------------------------------------------------------------------------------
+ 
+ConstrainFlags	record	CF_MONITOR_INSTALLED:1, CF_CONSTRAINING:1, :6
+;
+; CF_MONITOR_INSTALLED	- set if constrain monitor is installed
+; CF_CONSTRAINING	- set if we're constraining at this point in time
+;
+
+constrainFlags		ConstrainFlags	<0,0>
+constrainXMin		word		0	; Limits for pointerXPos
+constrainXMax		word		0
+constrainYMin		word		0	; Limits for pointerYPos
+constrainYMax		word		0
+constrainButtonFlags	word		0
+constrainOD		optr
+
+;-------------------------------------------------------------------------
+;		Move/Resize stuff.
+;-------------------------------------------------------------------------
+ 
+screenXorState	ScreenXorState	<>
+
+xorConstraints	Rectangle	<EOREGREC, EOREGREC, EOREGREC, EOREGREC>
+
+xorButtonFlag		ButtonInfo	; button condition to end xor
+			byte		; for padding so can access as a word
+
+xorBoxFlag	XorFlags
+
+;-------------------------------------------------------------------------
+; Double-press/Drag detection
+;-------------------------------------------------------------------------
+
+					; This table stores the location &
+					; time of each button's press, for
+					; double-click & drag detection
+bpsTable	nptr.ButtonPressStatus \
+		offset buttonPressStatus + 0 * (size ButtonPressStatus),
+		offset buttonPressStatus + 1 * (size ButtonPressStatus),
+		offset buttonPressStatus + 2 * (size ButtonPressStatus),
+		offset buttonPressStatus + 3 * (size ButtonPressStatus)
+
+delayedRelease		word	FALSE		;false
+
+if CONSUME_INPUT_IF_SCREEN_SAVER_ACTIVE
+;
+; used only in CombineInputMonitor
+;
+returnMonitorFlag	MonitorFlags	(mask MF_DATA)
+endif
+
+;-------------------------------------------------------------------------
+; Ptr image stuff
+;-------------------------------------------------------------------------
+
+					; Semaphore for ImSetPtrImage
+semPtrImage		Semaphore	<1,>
+
+
+idata	ends
+
+
+udata	segment
+
+imThread		hptr	?	; Handle of Input Manager
+					;  thread.
+
+					; Last ptr position sent out
+lastSentXPos		word	(?)
+lastSentYPos		word	(?)
+
+delayedReleaseEvent	HandleEvent	<>
+
+					; States relative to input
+					; 	stream at this time:
+
+kbdStrategy		fptr.far	; Keyboard driver strategy rtn
+
+ifdef	SYSTEM_SHUTDOWN_CHAR
+rebootOnReset		byte		; state of input::rebootOnReset flag
+endif	; SYSTEM_SHUTDOWN_CHAR
+
+if	(QUIET_PTR_SUPPORT)
+ptrOptFlags		PtrOptFlags	; non-zero if last ptr value not
+					; sent to UI (because not
+					; requested)
+endif
+
+					; Area on screen where PTR
+
+
+buttonState		byte		; bits 5-2 are state of
+							;	buttons
+shiftState		ShiftState	; keyboard shift state
+
+dragState		byte		; bits 5-2 are state of drag
+					; for each button. If the bit for a
+					; button is set, then the button is
+					; down and we are waiting to see if
+					; the mouse moves far enough or enough
+					; time passes while the button remains
+					; down for this to be a drag event
+
+;------------------------------------------------------------------------------
+; Data relating to the current screen
+;------------------------------------------------------------------------------
+
+						; Handle of root window
+						; that pointer is on
+pointerWin		hptr.Window
+;
+; Driver to contact to move the cursor.
+;
+pointerDriver		fptr.far
+pointerDriverHandle	hptr.GeodeHeader
+
+
+screenXMin		sword		; Limits for pointerXPos
+screenXMax		sword
+screenYMin		sword		; Limits for pointerYPos
+screenYMax		sword
+					; This table stores the location &
+					; time of each button's press, for
+					; double-click & drag detection
+buttonPressStatus	ButtonPressStatus	IM_IM_MAX_BUTTONS dup (<>)
+
+if	(INPUT_MESSAGE_RECEIPT)
+kbdPressesUnprocessed	word		; # of unprocessed kbd events
+					;	which are presses
+kbdReleasesUnprocessed	word		; # of unprocessed kbd events
+					;	which are releases
+endif
+
+drawnXPos		sword		; last location ptr actually
+drawnYPos		sword		;	drawn
+
+;------------------------------------------------------------------------------
+;	Mouse ptr image stuff
+;------------------------------------------------------------------------------
+
+ptrImages		PtrImage IM_IM_NUM_PTR_IMAGE_LEVELS dup (<>)
+curPtrImage		PtrImage <>
+
+;-------------------------------------------------------------------------
+; Screen saver
+;-------------------------------------------------------------------------
+
+screenSaver		ScreenSaver <>	; Screen saver variables
+screenSaverDelay	word		; corresponds to SS_maxCount (updated
+					; whenever SS_maxCount changes)
+
+;-------------------------------------------------------------------------
+; Pen stuff
+;-------------------------------------------------------------------------
+ife	NO_PEN_SUPPORT
+inkCodeBlock	hptr
+inkCallVector	fptr			;Vector to make calls into copied data
+					; block through.
+inkDataHan	hptr.CircularBufferStruct ;Handle of ink data buffer
+inkData		sptr.CircularBufferStruct ;Segment of buffer to store ink data
+inkDefaultGState hptr.GState		  ;Handle of gstate to draw ink through
+inkWin		hptr.Window		;Handle of root window to draw to
+inkGestureCallback	dword
+inkNumStrokes	word			;# strokes in the ink
+
+lockedInkGState	hptr.GState		;Actual gstate we are drawing through
+					; (can either be same as
+					;  inkDefaultGState or app-supplied
+					;  gstate).
+lockedInkWin	hptr.Window		;Handle of window we have locked and
+					; are drawing to.
+inkBrushSize	word			;Brush size
+
+inkWinHasSaveUnder	byte		;TRUE if the current ink window has
+					; save under
+
+inkStatus	InkCollectionState	;What state the ink-collection FSM
+					; is in.
+inkTimerHan	hptr
+inkTimerID	word
+
+inkOldPoint	Point			;Array of 2 points used to draw ink.
+inkCurPoint	Point
+inkSeparator	Point
+
+inkPenSavedCX	word			;We save the incoming event values here
+inkPenSavedDX	word			; for later use.
+inkPenSavedBP	word
+
+inkHandle	hptr.InkHeader		;Handle of block containing ink to be
+					; sent.
+
+inkUpperLeftBounds	Point
+inkLowerRightBounds	Point
+
+saveUnderUpperBound	word
+saveUnderLowerBound	word
+
+haveCalledGestureCallback	byte
+; If non-zero, the system has called the gesture callback at least once for
+; the ink blob currently being entered.
+
+
+if INK_DIGITIZER_COORDS
+;
+; Ink Digitizer Coordinates variables
+;
+		; Handle of digitizer coords circular buffer
+inkCoordsBufferHan	hptr.MouseCoordsCircularBufferStruct
+		; Segment of digitizer coords circular buffer
+inkCoordsBuffer		sptr.MouseCoordsCircularBufferStruct
+
+		; Handle of notification block containing digitizer
+		; coordinates to be sent off
+inkCoordsBlockHan	hptr.InkDigitizerCoordsHeader
+
+endif ; INK_DIGITIZER_COORDS
+
+endif ; NO_PEN_SUPPORT
+
+ifdef	SYSTEM_SHUTDOWN_CHAR
+alreadyReset	byte
+; Used to count # ctrl-alt-dels, so we do a dirty shutdown after the second
+endif	; SYSTEM_SHUTDOWN_CHAR
+
+udata	ends
+

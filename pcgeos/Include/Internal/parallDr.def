@@ -1,0 +1,221 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include
+FILE:		parallDr.def
+
+DECLARER:	Parallel Driver
+INTENDED USERS:	Print spooler
+OVERRIDE CONST:	-
+
+AUTHOR:		Adam de Boor, Jan 12, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	1/12/90		Initial revision
+
+
+DESCRIPTION:
+	Header for users of the parallel port driver. Most of the function
+	and type definitions are found in strDriver.def. Only the added
+	functions and types are defined here.
+		
+	$Id: parallDr.def,v 1.1 97/04/04 14:15:50 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__PARALLDR
+
+StartDriver	parallel
+
+UseDriver Internal/streamDr.def
+
+;
+; Protocol number for this interface. 
+;
+PARALLEL_PROTO_MAJOR	equ STREAM_PROTO_MAJOR+1
+PARALLEL_PROTO_MINOR	equ STREAM_PROTO_MINOR+0
+
+;------------------------------------------------------------------------------
+;		     ADDITIONAL DRIVER FUNCTIONS
+;
+; NOTE: All stream driver functions except DR_STREAM_READ and
+; DR_STREAM_READ_BYTE are valid for the parallel driver and take the same
+; parameters except where noted below. Where streamDriver.def refers to a
+; "stream token", you should pass the unit number (a member of the
+; ParallelPortNum enumerated type)
+;
+;------------------------------------------------------------------------------
+
+;DR_STREAM_OPEN		Alias for DR_STREAM_CREATE defined in strDriver.def
+;	PASS:	ax	= StreamOpenFlags. SOF_NOBLOCK and SOF_TIMEOUT
+;			  are mutually exclusive...
+;		bx	= unit number to open
+;		dx	= output buffer size
+;		bp	= timeout value if SOF_TIMEOUT and not SOF_NOBLOCK
+;	RETURN:	carry set if port couldn't be opened
+;		 (in-use/timed-out/non-existent)
+
+;DR_STREAM_CLOSE	Alias for DR_STREAM_DESTROY defined in strDriver.def
+;	PASS:	ax 	= STREAM_LINGER if should wait for all data to
+;			  make it out the port, or STREAM_DISCARD if any
+;			  pending data should be discarded.
+;		bx	= unit number
+;	RETURN:	nothing
+;
+
+;DR_STREAM_GET_DEVICE_MAP (definition of return value)
+;	PASS:	nothing
+;	RETURN:	ax	= ParallelDeviceMap of available parallel ports.
+;			  For each member of ParallelPortNum, the port exists
+;			  if AX AND (1 SHL PARALLEL_LPT?) is true.
+;
+
+ParallelFunction	etype	word, StreamFunction, 2
+
+DR_PARALLEL_MASK_ERROR	enum	ParallelFunction
+;	PASS:	ax	= ParallelError record indicating errors that
+;			  should be ignored by the driver. This is usually
+;			  needed only if a printer is known to not present
+;			  a valid signal for the error.
+;		bx	= unit number
+;	RETURN:	nothing
+;
+;	The masking of the errors will only persist while the port remains
+;	open. Masks do not accumulate.
+
+DR_PARALLEL_QUERY	enum	ParallelFunction
+;	PASS:	bx	= unit number
+;	RETURN:	ax	= non-zero if printer off-line or busy
+;
+;	This intended to be used at the start of printing to determine if the
+;	printer is ready to go.
+
+DR_PARALLEL_TIMEOUT	enum	ParallelFunction
+;	PASS:	ax	= number of seconds to wait for printer to acknowledge
+;			  a byte before declaring a timeout error
+;		bx	= unit number
+;	RETURN:	nothing
+;
+;	The timeout value is used by the watchdog timer in the parallel driver
+;	as an indication of how fast the printer is expected to respond to data.
+;	The driver will check for an error the indicated number of seconds after
+;	the last data byte goes out, declaring a PE_TIMEOUT error if no other
+;	non-masked error condition is evident. Note that this puts a lower bound
+;	on the amount of time it will take the driver to recognize and notify
+;	user of a port of a printer error. The timeout value should be chosen
+;	with this in mind. The timeout is reset to the default value (5 seconds)
+;	when the port is closed.
+;
+
+DR_PARALLEL_RESTART	enum	ParallelFunction
+;	PASS:	ax	= non-zero if the byte that was pending when the timeout
+;			  occurred is to be re-sent
+;		bx	= unit number
+;	RETURN:	carry set if resend timed out
+;
+;	This call should be used only after a PE_TIMEOUT error has been
+;	received, as the driver will automatically restart the output once any
+;	other error condition clears. In the case of a timeout error, however,
+;	there is no status bit the driver can examine to decide when the printer
+;	is back in service, so it is up to the user of the printer to restart
+;	the output if it decides the timeout wasn't fatal. The byte for which
+;	no acknowledgement was received can either be discarded (if ax is zero
+;	on entry) or re-sent (if ax is non-zero).
+;
+
+DR_PARALLEL_VERIFY	enum	ParallelFunction
+;	PASS:	bx	= unit number to test
+;	RETURN:	ax	= ParallelError record (0 if printer is actually
+;			  there and happy)
+;
+;	This may be used after opening a port to make sure the printer is
+;	responding properly (e.g. to see if the port should perhaps be
+;	thread-driven instead of interrupt-driven). It will actually attempt
+;	to send data down to the printer and make sure it gets there.
+;
+
+DR_PARALLEL_SET_INTERRUPT enum 	ParallelFunction
+;	PASS:	al	= SysDevInterrupt (SDI_PARALLEL or SDI_PARALLEL_ALT) or
+;			  0 for port to be thread-driven
+;		bx	= unit number of closed port
+;	RETURN:	carry set if interrupt could not be changed (port was already
+;		open, e.g.)
+;			ax	= StreamError giving reason for failure
+;
+;	This function is used primarily by the graphical setup and preferences
+;	desk tool to force a port to be thread-driven 
+;		
+
+DR_PARALLEL_STAT_PORT	enum	ParallelFunction
+;	PASS:	bx	= unit number (ParallelPortNum)
+;	RETURN:	carry set if port doesn't exist.
+;		carry clear if port is known:
+;			al	= interrupt level
+;			ah	= non-zero if port is currently open
+;
+
+;XXX: Setting of auto-feed output?
+
+;------------------------------------------------------------------------------
+;		     VARIOUS AND SUNDRY CONSTANTS
+;------------------------------------------------------------------------------
+;
+; Error word reported by the driver.
+;
+ParallelError	record
+    PE_FATAL:1,			; Set if driver encountered some error that
+				;  means it cannot continue. DR_PARALLEL_RESTART
+				;  should *not* be called in this case.
+    PE_TIMEOUT:1,		; Set if no response from printer, but no other
+				;  (non-masked) error is present.
+
+    :2
+    PE_NOPAPER:1,		; Set if no paper
+    PE_OFFLINE:1,		; Set if printer off-line
+    PE_ERROR:1,			; Set if general error
+    :3
+ParallelError	end
+
+;
+; Constants for DR_STREAM_OPEN.
+;
+ParallelPortNum	etype	word, 0, 2
+PARALLEL_LPT1		enum	ParallelPortNum
+PARALLEL_LPT2		enum	ParallelPortNum
+PARALLEL_LPT3		enum	ParallelPortNum
+PARALLEL_LPT4		enum	ParallelPortNum
+
+;
+; Record returned by DR_STREAM_GET_DEVICE_MAP
+;
+ParallelDeviceMap	record
+    :9,
+    PDM_LPT4:1,		; LPT4 exists
+    :1,
+    PDM_LPT3:1,		; LPT3 exists
+    :1,
+    PDM_LPT2:1,		; LPT2 exists
+    :1,
+    PDM_LPT1:1,		; LPT1 exists
+ParallelDeviceMap	end
+
+StreamError	= STREAM_FIRST_DEV_ERROR
+
+STREAM_INTERRUPT_TAKEN	enum	StreamError	; Requested interrupt level
+						;  is already in-use by another
+						;  port.
+
+
+;-----------------------------------------------------------------------------
+;	EXPORTED ROUTINES		
+;-----------------------------------------------------------------------------
+ 
+
+global	ParallelStrategy:far
+; Used by the Netstream driver
+
+EndDriver	parallel

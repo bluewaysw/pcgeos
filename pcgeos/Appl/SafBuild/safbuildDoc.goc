@@ -1,0 +1,1231 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  GeoSafari Builder
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+@include "safbuild.goh"
+@include "global.goh"
+@include <Ansi/stdio.h>
+
+@classdecl	SafBuildDocumentClass;
+@classdecl	SBDocumentControlClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg DocCode
+#endif
+
+void
+ResetQuestionUI(void);
+
+void
+ResetQuestionUI()
+{
+    @call QIndicator::MSG_GEN_VALUE_SET_INTEGER_VALUE(0,1);
+    @call QBLeft::MSG_GEN_VALUE_SET_INTEGER_VALUE(0,1);
+    @call QBTop::MSG_GEN_VALUE_SET_INTEGER_VALUE(0,1);
+    @call QBRight::MSG_GEN_VALUE_SET_INTEGER_VALUE(0,1);
+    @call QBBottom::MSG_GEN_VALUE_SET_INTEGER_VALUE(0,1);
+    @call QQuestion::MSG_VIS_TEXT_DELETE_ALL();
+    @call QAnswer::MSG_VIS_TEXT_DELETE_ALL();
+}
+
+
+/***********************************************************************
+ *	MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize a newly-created document file.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    The map block is allocated, initialized and set for
+ *		    the file.
+ *
+ * STRATEGY: 	    Handle this message by creating our version of an empty
+ *		    document, which is a map block with the DUIMapBlock
+ *		    structure in it and initialized to default values.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;    /* ptr to the locked map block */
+    MemHandle mem;
+    ChunkHandle quiz;
+	 GeodeToken	GEAppToken = {"GEPL", 16431};
+
+    /*
+     * allocate an lmem block and make it the map block
+     */
+	 mapBlock = VMAllocLMem(pself->GDI_fileHandle, LMEM_TYPE_GENERAL, sizeof(SafariMapBlock));
+    VMSetMapBlock(pself->GDI_fileHandle, mapBlock);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    /*
+     * initalize the map block
+     */
+    memset(&mapPtr->SMB_quiz, 0, sizeof(SafariMapBlock)-sizeof(LMemBlockHeader));
+    /*
+     * create a variable-size chunk array for our quiz
+     */
+    quiz = LMemAlloc(mem, 0);
+    ChunkArrayCreateAtHandles(mem, quiz, 0, 0, 0);
+    mapPtr->SMB_quiz = quiz;
+    /*
+     * mark the block dirty
+     */
+    VMDirty(mem);
+    VMUnlock(mem);
+
+	/* and since we want this file to be opened by the player on a double
+		click we tell it here that it was created by the player and not the
+		builder */
+	FileSetHandleExtAttributes(pself->GDI_fileHandle, FEA_CREATOR,
+										&GEAppToken, sizeof(GeodeToken));
+	 /*
+     * return no error
+     */
+    return(FALSE);
+}
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_SAVE_QUIZ
+ ***********************************************************************
+ * SYNOPSIS:	    Note a change in the quiz
+ * PARAMETERS:	    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_SAVE_QUIZ
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+    VMBlockHandle graphic;
+    FileHandle fileHan;
+	 /*GenFilePath *gfp; */
+	 FileLongName gfName;
+	 Boolean gfChanged;
+	 /*DiskHandle diskHan;
+	 PathName pname; */
+
+
+    fileHan = pself->GDI_fileHandle;
+    /*
+     * Find the handle for the document's map block and lock the thing down.
+     */
+    mapBlock = VMGetMapBlock(fileHan);
+    mapPtr = VMLock(fileHan, mapBlock, &mem);
+    /*
+     * update quiz stuff
+     */
+    mapPtr->SMB_number = @call QuizNumber::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    @call QuizDescription::MSG_VIS_TEXT_GET_ALL_PTR(mapPtr->SMB_desc);
+    mapPtr->SMB_flags = @call QuizOptionsList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    mapPtr->SMB_flags |= (@call QuizFilterTypeList::MSG_GEN_ITEM_GROUP_GET_SELECTION() << SFO_FILTER_OFFSET);
+  /*  @call LogoFileName::MSG_VIS_TEXT_GET_ALL_PTR(mapPtr->SMB_logo);
+	 @call Color16FileName::MSG_VIS_TEXT_GET_ALL_PTR(mapPtr->SMB_16color);  */
+	 @call QuizNextFileName::MSG_VIS_TEXT_GET_ALL_PTR(mapPtr->SMB_nextQuiz);
+
+	 /* replace the graphic only if the name has changed */
+	 @call Color256FileName::MSG_VIS_TEXT_GET_ALL_PTR(gfName);
+
+	 if (!strcmp(gfName, mapPtr->SMB_256color)) gfChanged = FALSE;
+	 else {
+		@call Color256FileName::MSG_VIS_TEXT_GET_ALL_PTR(mapPtr->SMB_256color);
+		gfChanged = TRUE;
+    }
+
+	 /*
+     * free any old imbedded graphics
+     */
+/*    if (mapPtr->SMB_iLogo) {
+	SafariFreeBitmap(mapPtr->SMB_iLogo, fileHan);
+	mapPtr->SMB_iLogo = 0;
+    }
+    if (mapPtr->SMB_i16Color) {
+	SafariFreeBitmap(mapPtr->SMB_i16Color, fileHan);
+	mapPtr->SMB_i16Color = 0;
+	 }  */
+	 /* only if the file name has changed */
+	 if (gfChanged) {
+		if (mapPtr->SMB_i256color) {
+			SafariFreeBitmap(mapPtr->SMB_i256color, fileHan);
+			mapPtr->SMB_i256color = 0;
+		}
+    /*
+     * save any new imbedded graphics
+     */
+
+	/* if (mapPtr->SMB_flags & SFO_IMBED_GRAPHICS) { */
+		/* mark app busy */
+		@send SafBuildApp::MSG_GEN_APPLICATION_MARK_BUSY();
+	 /*	gfp = ObjVarFindData(oself, ATTR_GEN_PATH_DATA);
+
+	 	FileSetCurrentPath(gfp->GFP_disk, gfp->GFP_path); */
+		FileSetCurrentPath(SP_DOCUMENT, "GeoExplorer");
+
+
+	/*	graphic = SafariImportBitmap(mapPtr->SMB_logo, fileHan);
+		if (graphic) {
+			mapPtr->SMB_iLogo = graphic;
+		}
+		graphic = SafariImportBitmap(mapPtr->SMB_16color, fileHan);
+		if (graphic) {
+			mapPtr->SMB_i16Color = graphic;
+		}  */
+		graphic = SafariImportBitmap(mapPtr->SMB_256color, fileHan);
+		if (graphic) {
+			mapPtr->SMB_i256color = graphic;
+		}
+      /* XXX need error message for no graphic import */
+
+
+		/* jh move up from below */
+		@call oself::MSG_SAFBUILD_DOCUMENT_SHOW_BITMAP(DC_COLOR_8, 1, 0);
+
+	 	@send SafBuildApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	 }
+	/* } /*end of gfChanged if */
+
+    /*
+     * mark the block dirty and unlock it
+     */
+    VMDirty(mem);
+    VMUnlock(mem);
+
+    /*
+     * close the dialog
+     */
+    @call QuizDB::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+
+    /*
+     * update the bitmap
+     */
+ /*	 @call oself::MSG_SAFBUILD_DOCUMENT_SHOW_BITMAP(DC_COLOR_8, 1, 0); */
+
+	 /*
+     * update common UI
+     */
+    @call oself::MSG_SAFBUILD_DOCUMENT_UPDATE_COMMON_UI();
+}
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_CANCEL_QUIZ
+ ***********************************************************************
+ * SYNOPSIS:	    Cancel changes in the quiz
+ * PASS:	    none
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_CANCEL_QUIZ
+{
+
+	 /* jh - not sure why this is called - just forces another redraw
+	 @call oself::MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT();    */
+    /*
+     * close the dialog
+     */
+    @call QuizDB::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+}
+
+
+/***********************************************************************
+ *	MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+ ***********************************************************************
+ * SYNOPSIS:	    The document has been opened, and any UI required
+ *		    has been created, so initialize the UI itself.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the coordinates are stuffed into the GenValue objects.
+ *
+ * STRATEGY:	    Fetch the coordinates from the map block and set
+ *		    them as the values for the two GenValue objects.
+ *
+ *	    	    If we dealt with multiple documents all displaying
+ *		    through the same set of UI objects, we would likely
+ *	    	    do this on MSG_META_GAINED_MODEL_EXCL instead.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+
+word
+CheckGraphicsFile(TCHAR *filename)
+{
+    word err = 0;
+    dword fSize;
+
+    if (filename[0]) {
+	err = FileGetPathExtAttributes(filename, FEA_SIZE,
+				       &fSize, sizeof(dword));
+	if (err) {
+	    ReportError(@graphicsErrStr, filename);
+	}
+    }
+    return(err);
+}
+
+@method SafBuildDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+	 /*GenFilePath *gfps;*/
+    SafariQuestionStruct *qp;
+    word i, num, eSize, xc;
+    optr arr;
+
+    /*
+     * get the VM block
+     */
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    arr = ConstructOptr(mem, mapPtr->SMB_quiz);
+
+    /*
+     * update the quiz stuff
+     */
+    @call QuizNumber::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+	                            mapPtr->SMB_number, 0);
+    @call QuizDescription::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	                            mapPtr->SMB_desc, 0);
+    @call QuizOptionsList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+	                            mapPtr->SMB_flags & ~SFO_FILTER, 0);
+    @call QuizFilterTypeList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+										 (mapPtr->SMB_flags & SFO_FILTER)
+										  >> SFO_FILTER_OFFSET, 0);
+	 /*@call LogoFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	                            mapPtr->SMB_logo, 0);
+    @call Color16FileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	                            mapPtr->SMB_16color, 0);  */ 
+    @call Color256FileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	                            mapPtr->SMB_256color, 0);
+    @call QuizNextFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	                            mapPtr->SMB_nextQuiz, 0);
+
+    /*
+     * set the current directory for the file selectors
+     */
+  /*	 gfps = ObjVarFindData(oself, ATTR_GEN_PATH_DATA);
+	 if(gfps) {
+		@call SafBuildApp::MSG_SAFBUILD_APP_UPDATE_FILE_SELECTORS(gfps);
+		}
+	 /* jh add the if/else because there may not be a path yet */
+	/* else {  */
+		@call FileChooseSelector::MSG_GEN_PATH_SET("GeoExplorer", SP_DOCUMENT);
+  /*    }  */
+		FileSetCurrentPath(SP_DOCUMENT, "GeoExplorer");
+
+	 /*
+     * fix up the answer bounds if needed
+     */
+    num = ChunkArrayGetCount(arr);
+    for (i = 0; i < num; i++) {
+	qp = ChunkArrayElementToPtr(arr, i, &eSize);
+	if (qp->SQS_bounds.R_left > qp->SQS_bounds.R_right) {
+	    xc = qp->SQS_bounds.R_left;
+	    qp->SQS_bounds.R_left = qp->SQS_bounds.R_right;
+	    qp->SQS_bounds.R_right = xc;
+	    VMDirty(mem);
+	}
+	if (qp->SQS_bounds.R_top > qp->SQS_bounds.R_bottom) {
+	    xc = qp->SQS_bounds.R_top;
+	    qp->SQS_bounds.R_top = qp->SQS_bounds.R_bottom;
+	    qp->SQS_bounds.R_bottom = xc;
+	    VMDirty(mem);
+	}
+    }
+
+    /*
+     * update the bitmap
+     */
+ //   state = @call ShowList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	 @call oself::MSG_SAFBUILD_DOCUMENT_SHOW_BITMAP(DC_COLOR_8, 1, 0);
+
+    /*
+     * complain if the graphics files don't exist
+     */
+ /*	 if (gfps) {
+		FileSetCurrentPath(gfps->GFP_disk, gfps->GFP_path);
+  //  CheckGraphicsFile(mapPtr->SMB_16color);
+		CheckGraphicsFile(mapPtr->SMB_256color);
+  //  CheckGraphicsFile(mapPtr->SMB_logo);
+  		}   */
+
+    VMUnlock(mem);
+    /*
+     * update common UI
+     */
+    ObjDerefGen(oself);
+    pself->SBDI_question = 1;
+    @call oself::MSG_SAFBUILD_DOCUMENT_UPDATE_COMMON_UI();
+
+}
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_UPDATE_COMMON_UI
+ ***********************************************************************
+ * SYNOPSIS:	    Update common UI for a change in the document
+ * PASS:	    none
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_UPDATE_COMMON_UI
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+    word count/*, state*/;
+
+    /*
+     * Find the handle for the document's map block and lock the thing down.
+     */
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+
+    /*
+     * update the UI for the number of questions
+     */
+    count = ChunkArrayGetCount(ConstructOptr(mem, mapPtr->SMB_quiz));
+    if (!count) {
+		@call QBounds::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+		@call QOther::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+		@call QNumber::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    } else {
+		@call QBounds::MSG_GEN_SET_ENABLED(VUM_DLYD);
+		@call QOther::MSG_GEN_SET_ENABLED(VUM_DLYD);
+		@call QNumber::MSG_GEN_SET_ENABLED(VUM_DLYD);
+		@call QNumber::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(count));
+		/*
+		 * if we've reached the maximum # of questions, disable New
+		 */
+		if (count < SAFARI_MAX_QUESTIONS) {
+	    @call QNew::MSG_GEN_SET_ENABLED(VUM_DLYD);
+		} else {
+	    @call QNew::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+		}
+		/*
+		 * if fewer than 2 questions or we're maxed out, disable Insert
+		 */
+		if (count > 1 && count < SAFARI_MAX_QUESTIONS) {
+		 @call QInsert::MSG_GEN_SET_ENABLED(VUM_DLYD);
+		} else {
+		 @call QInsert::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+		}
+	 }
+
+    @call oself::MSG_SAFBUILD_DOCUMENT_SHOW_LEDS();
+
+/*    if (mapPtr->SMB_flags & SFO_QUESTION_SOUNDS) {
+	@call QQSoundGroup::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call QASoundGroup::MSG_GEN_SET_USABLE(VUM_DLYD);
+    } else {
+	@call QQSoundGroup::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call QASoundGroup::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+    }
+*/
+    VMUnlock(mem);
+
+	 /*
+	  * update the bitmap      jh - put this in ATTACH_UI_TO_DOC
+     */
+ //   state = @call ShowList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+ //	 @call oself::MSG_SAFBUILD_DOCUMENT_SHOW_BITMAP(DC_COLOR_8, 1, 0);
+
+    /*
+     * update the question UI
+     */
+    @call oself::MSG_SAFBUILD_DOCUMENT_UPDATE_QUESTION_UI();
+}
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_ADD_QUESTION
+ ***********************************************************************
+ * SYNOPSIS:	    Add another question
+ * PASS:	    			int addOrIns
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *  jh	3/20/15		Added an insert button and trigger data for add/insert
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_ADD_QUESTION
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+    SafariQuestionStruct *qp;
+	 word count, eSize;
+    optr arr;
+
+    /*
+     * first do an update to save any changes
+     */
+    @call oself::MSG_SAFBUILD_DOCUMENT_SAVE_QUESTION();
+
+    /*
+     * Find the handle for the document's map block and lock it
+     */
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    arr = ConstructOptr(mem, mapPtr->SMB_quiz);
+
+	 /*
+	  * add or insert a question to the array?
+	  */
+	 if (addOrIns == Q_ADD) {
+		qp = ChunkArrayAppend(arr, sizeof(SafariQuestionStruct)+4*sizeof(TCHAR));
+		count = ChunkArrayGetCount(arr);
+		pself->SBDI_addOrIns = Q_ADD;
+		}
+	 else {
+		qp = ChunkArrayElementToPtr(arr, pself->SBDI_question, &eSize);
+		ChunkArrayInsertAt(arr, qp, sizeof(SafariQuestionStruct)+4*sizeof(TCHAR));
+		count = pself->SBDI_question + 1;
+		pself->SBDI_addOrIns = Q_INS;
+		}
+
+    qp->SQS_indicator = 0;
+    qp->SQS_bounds.R_left = 0;
+    qp->SQS_bounds.R_top = 0;
+    qp->SQS_bounds.R_right = 0;
+    qp->SQS_bounds.R_bottom = 0;
+    /*
+     * reset the UI
+     */
+    ResetQuestionUI();
+
+	 /*
+     * done with the array
+     */
+    VMDirty(mem);
+    VMUnlock(mem);
+
+    /*
+     * update the UI
+     */
+    @call QNumber::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(count));
+    @call QNumber::MSG_GEN_VALUE_SET_INTEGER_VALUE(count, 0);
+    @call oself::MSG_SAFBUILD_DOCUMENT_UPDATE_COMMON_UI();
+}
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_UPDATE_QUESTION_UI
+ ***********************************************************************
+ * SYNOPSIS:	    Update the UI for a question
+ * PASS:	    			none
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_UPDATE_QUESTION_UI
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+    SafariQuestionStruct *qp;
+    optr arr;
+
+	 word num, eSize, count;
+    TCHAR *strP;
+
+    /*
+     * figure out which question
+     */
+    num = @call QNumber::MSG_GEN_VALUE_GET_INTEGER_VALUE()-1;
+    pself->SBDI_question = num;
+
+    /*
+     * Find the handle for the document's map block and lock it
+     */
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    arr = ConstructOptr(mem, mapPtr->SMB_quiz);
+    /*
+     * get count to see if we're looking beyond our array
+     */
+    count = ChunkArrayGetCount(arr);
+    /*
+     * update the UI
+     */
+    if (!count || num > count) {
+		ResetQuestionUI();
+      @call QDelete::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    } else {
+	/*
+	 * get the question
+	 */
+	qp = ChunkArrayElementToPtr(arr, num, &eSize);
+	strP = (TCHAR *)((byte *)qp + sizeof(SafariQuestionStruct));
+	/*
+	 * update the UI
+	 */
+	@call QIndicator::MSG_GEN_VALUE_SET_INTEGER_VALUE(qp->SQS_indicator+1,0);
+	@call TheGameCard::MSG_SB_GAME_CARD_SET_SELECTION(
+	    qp->SQS_bounds.R_left,
+	    qp->SQS_bounds.R_top,
+	    qp->SQS_bounds.R_right,
+	    qp->SQS_bounds.R_bottom);
+	/*
+	 * immediately followed by question and answer
+	 */
+	@call QQuestion::MSG_VIS_TEXT_REPLACE_ALL_PTR(strP, 0);
+	strP += strlen(strP)+1;
+	@call QAnswer::MSG_VIS_TEXT_REPLACE_ALL_PTR(strP, 0);
+	/*
+	 * immediately followed by question sound and answer sound
+	 */
+/*	strP += strlen(strP)+1;
+	@call QQSound::MSG_VIS_TEXT_REPLACE_ALL_PTR(strP, 0);
+	strP += strlen(strP)+1;
+	@call QASound::MSG_VIS_TEXT_REPLACE_ALL_PTR(strP, 0);
+	/*
+	 * enable or disable 'Delete'
+	 */
+	/*if (num == count-1) { */
+		 @call QDelete::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	/*} else {
+		 @call QDelete::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	} */
+    }
+    /*
+     * make not applyable
+     */
+    @call QuestionDB::MSG_GEN_MAKE_NOT_APPLYABLE();
+    /*
+     * update the LEDs
+     */
+    @call oself::MSG_SAFBUILD_DOCUMENT_SHOW_LEDS();
+
+    /*
+     * done with the array
+     */
+    VMUnlock(mem);
+}
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_SAVE_QUESTION
+ ***********************************************************************
+ * SYNOPSIS:	    save the current question
+ * PASS:	    none
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ * jh		3/20/15		Added insert Q functionality
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_SAVE_QUESTION
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+    SafariQuestionStruct *qp;
+    word num, eSize, qSize, aSize/*, qsSize, asSize*/;
+    TCHAR *strP;
+    optr arr;
+
+    /*
+     * see if we should save or not
+     */
+    if (!@call QApply::MSG_GEN_GET_ENABLED()) {
+	return;
+    }
+	 /* num will be the q#-1 that is being worked in the db.  If it's equal
+		 to the # of elements in the array, it's a straight add.  If it isn't
+		 then it might be a change or an insert. */
+
+	 num = pself->SBDI_question;
+    /*
+     * Find the handle for the document's map block and lock it
+     */
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    arr = ConstructOptr(mem, mapPtr->SMB_quiz);
+    /*
+     * get the question
+     */
+    qp = ChunkArrayElementToPtr(arr, num, &eSize);
+    /*
+     * update from the UI
+     */
+    qp->SQS_indicator = @call QIndicator::MSG_GEN_VALUE_GET_INTEGER_VALUE()-1;
+    qp->SQS_bounds.R_left = @call QBLeft::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    qp->SQS_bounds.R_top = @call QBTop::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    qp->SQS_bounds.R_right = @call QBRight::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    qp->SQS_bounds.R_bottom = @call QBBottom::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    /*
+     * resize for question and answer (1,2) and sounds (3,4)
+     */
+    qSize = @call QQuestion::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    aSize = @call QAnswer::MSG_VIS_TEXT_GET_TEXT_SIZE();
+/*    qsSize = @call QQSound::MSG_VIS_TEXT_GET_TEXT_SIZE();
+	 asSize = @call QASound::MSG_VIS_TEXT_GET_TEXT_SIZE();  */
+    eSize = sizeof(SafariQuestionStruct) +
+	qSize + aSize + /*qsSize + asSize + */sizeof(TCHAR)*4;
+    ChunkArrayElementResize(arr, num, eSize);
+    qp = ChunkArrayElementToPtr(arr, num, &eSize);
+    strP = (TCHAR *)((byte *)qp + sizeof(SafariQuestionStruct));
+    /*
+     * get the question and answer
+     */
+    @call QQuestion::MSG_VIS_TEXT_GET_ALL_PTR(strP);
+    strP += qSize+1;
+    @call QAnswer::MSG_VIS_TEXT_GET_ALL_PTR(strP);
+    /*
+     * get the question sound and answer sound
+     */
+/*    strP += aSize+1;
+    @call QQSound::MSG_VIS_TEXT_GET_ALL_PTR(strP);
+    strP += qsSize+1;
+	 @call QASound::MSG_VIS_TEXT_GET_ALL_PTR(strP);
+
+    /*
+     * done with the array
+     */
+    VMDirty(mem);
+    VMUnlock(mem);
+    /*
+     * make not applyable to indicate saved
+     */
+    @call QuestionDB::MSG_GEN_MAKE_NOT_APPLYABLE();
+}
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_SHOW_BITMAP
+ ***********************************************************************
+ * SYNOPSIS:	    Show the game card bitmap
+ * PASS:	    selection - item ID
+ *                  numSelections - # of selections
+ *                  stateFlags - GenItemGroupStateFlags
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_SHOW_BITMAP
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+    /*GenFilePath *gfp;*/
+
+    /*
+     * update the bitmap path
+     */
+	/* gfp = ObjVarFindData(oself, ATTR_GEN_PATH_DATA);
+    @call TheGameCard::MSG_GAME_CARD_SET_PATH(gfp->GFP_path, gfp->GFP_disk); */
+	 FileSetCurrentPath(SP_DOCUMENT, "GeoExplorer");
+	 @call TheGameCard::MSG_GAME_CARD_SET_PATH("GeoExplorer", SP_DOCUMENT);
+
+    /*
+     * Find the handle for the document's map block and lock it
+     */
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+
+/*    if (selection == DC_COLOR_4) {
+	@call TheGameCard::MSG_GAME_CARD_SET_BITMAP(mapPtr->SMB_16color);
+    } else {
+	/*
+	 * if no 256-color, use 16-color
+	 */
+/*	if (mapPtr->SMB_256color[0]) {   */
+		 @call TheGameCard::MSG_GAME_CARD_SET_BITMAP(mapPtr->SMB_256color);
+/*	} else {
+	    @call TheGameCard::MSG_GAME_CARD_SET_BITMAP(mapPtr->SMB_16color);
+	}
+    }  */
+
+    VMUnlock(mem);
+}
+
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_CHANGE_QUESTION
+ ***********************************************************************
+ * SYNOPSIS:	    Change questions
+ * PASS:	    value - WWFixed
+ *                  stateFlags - GenValueStateFlagsAsWord
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_CHANGE_QUESTION
+
+
+{
+    /*
+     * first do an update to save any changes
+     */
+	 @call oself::MSG_SAFBUILD_DOCUMENT_SAVE_QUESTION();
+
+    /*
+     * update the UI
+     */
+	 @call oself::MSG_SAFBUILD_DOCUMENT_UPDATE_QUESTION_UI();
+}
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_SET_OPTIONS
+ ***********************************************************************
+ * SYNOPSIS:	    set the document viewing options
+ * PASS:	    selectedBooleans
+ *                  indeterminateBooleans
+ *                  modifiedBooleans
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/8/99		Initial Revision
+ *
+ ***********************************************************************/
+/*@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_SET_OPTIONS
+{
+    @call oself::MSG_SAFBUILD_DOCUMENT_SHOW_LEDS();
+}
+
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_SHOW_LEDS
+ ***********************************************************************
+ * SYNOPSIS:	    show or hide the unused LEDs
+ * PASS:	    none
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/8/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_SHOW_LEDS
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+    optr arr;
+    IndicatorState istate;
+    optr ind;
+    word i, count, num, eSize;
+	/* ShowOptions options; */
+    SafariQuestionStruct *qp;
+
+    num = @call QIndicator::MSG_GEN_VALUE_GET_INTEGER_VALUE()-1;
+  /*  options = @call ShowOptionsList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    
+    /*
+     * Find the handle for the document's map block and lock it
+     */
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    arr = ConstructOptr(mem, mapPtr->SMB_quiz);
+
+    /*
+     * enable or disable the LEDs
+     */
+	 if ((mapPtr->SMB_flags & SFO_NO_LEDS)/* || (options & SO_SHOW_LEDS)*/) {
+	istate = IS_DISABLED;
+    } else {
+	istate = 0;
+    }
+    @call LeftIndicatorGroup::MSG_INDICATOR_GROUP_SET_ALL(istate);
+    /*
+     * if LEDs turned on...
+     */
+    if (!(mapPtr->SMB_flags & SFO_NO_LEDS)) {
+	/*
+	 * for each LED used, turn it on, off or disabled
+	 */
+	count = ChunkArrayGetCount(arr);
+	for (i = 0; i < count; i++) {
+	    qp = ChunkArrayElementToPtr(arr, i, &eSize);
+	    ind = @call LeftIndicatorGroup::MSG_INDICATOR_GROUP_GET_NTH(qp->SQS_indicator);
+	    if (qp->SQS_indicator == num) {
+		@call ind::MSG_INDICATOR_SET_STATE(IS_ON);
+	    } else {
+		@call ind::MSG_INDICATOR_SET_STATE(0);
+	    }
+	}
+    }
+
+    VMUnlock(mem);
+}
+
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_DELETE_QUESTION
+ ***********************************************************************
+ * SYNOPSIS:	    Delete the last question
+ * PASS:	    none
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/28/99		Initial Revision
+ *  jh	3/21/15		We'll let it delete any question
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_DELETE_QUESTION
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+	 word count;
+    optr arr;
+
+    /*
+     * Find the handle for the document's map block and lock it
+     */
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    arr = ConstructOptr(mem, mapPtr->SMB_quiz);
+    /*
+	  * Delete the xxlastxx current question
+     */
+	 count = ChunkArrayGetCount(arr);
+	 if (count > 0) {
+		/* jh - Gene used DeleteRange since it takes an index # not an address */
+		ChunkArrayDeleteRange(arr, pself->SBDI_question, 1);
+    }
+    /*
+     * done with the array
+     */
+    VMDirty(mem);
+    VMUnlock(mem);
+    /*
+     * update the UI
+     */
+	 @call oself::MSG_SAFBUILD_DOCUMENT_UPDATE_COMMON_UI();
+}
+
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_DOCUMENT_VERIFY
+ ***********************************************************************
+ * SYNOPSIS:	    Verify the quiz is encoded correctly
+ * PASS:	    none
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *      Check:
+ *          1 missing description
+ *          2,3,4 missing bitmaps
+ *          5 odd number of questions
+ *          6 duplicate LEDs
+ *          7 missing (0,0,0,0) bounds
+ *          8 missing question or answer text
+ *            error if quiz does not use LEDs, else warning
+ *          9 sequential LEDs (3 or more, questions may be in wrong order)
+ *      If OK, suggest:
+ *          - test with mouse
+ *          - test with keyboard
+ *          - test with 16 and 256 color ([safari] force16 = TRUE)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	4/28/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_SAFBUILD_DOCUMENT_VERIFY
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;
+    MemHandle mem;
+    optr arr;
+    word count, errs = 0, warns = 0, qerrs;
+    GenFilePath *gfp;
+    TCHAR buf[128];
+
+    MemLock(OptrToHandle(@vfyQuiz));
+    /*
+     * bring the dialog on screen
+     */
+    @call VerifyText::MSG_VIS_TEXT_DELETE_ALL();
+    @call VerifyDB::MSG_GEN_INTERACTION_INITIATE();
+    @call SafBuildApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /*
+     * go to the correct directory
+     */
+    gfp = ObjVarFindData(oself, ATTR_GEN_PATH_DATA);
+    FileSetCurrentPath(gfp->GFP_disk, gfp->GFP_path);
+    /*
+     * Find the handle for the document's map block and lock it
+     */
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    arr = ConstructOptr(mem, mapPtr->SMB_quiz);
+    count = ChunkArrayGetCount(arr);
+
+    /*
+     * verify quiz elements
+     */
+    VfyAppendChunk(@vfyQuiz);
+    VfyAppendChunk(@vfyDesc);
+    if (@call QuizDescription::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+	VfyAppendChunk(@vfyOK);
+    } else {
+	VfyAppendErrorChunk(@vfyMissing);
+	errs++;
+    }
+  /*  errs += VfyGraphicsFile(mapPtr->SMB_logo, @vfyLogo);
+    errs += VfyGraphicsFile(mapPtr->SMB_16color, @vfy16Color); */
+    errs += VfyGraphics256File(mapPtr->SMB_256color, @vfy256Color);
+
+    /*
+     * verify questions
+     */
+    VfyAppendChunk(@vfyQuestions);
+    sprintf(buf, LMemDeref(@vfyNum), count);
+    VfyAppendStr(buf);
+    /*
+     * 5. check for odd number of questions or none specified
+     */
+    if (count & 1) {
+	errs++;
+	VfyAppendErrorChunk(@vfyOdd);
+    } else if (count == 0) {
+	VfyAppendErrorChunk(@vfyNoQuestions);
+	errs++;
+    } else {
+	VfyAppendChunk(@vfyOK);
+    }
+    /*
+     * 6. check for duplicate LEDs
+     */
+    errs += VfyDuplicateLEDs(arr, mapPtr->SMB_flags & SFO_NO_LEDS);
+    /*
+     * 7. check for missing (0,0,0,0) bounds
+     */
+    errs += VfyZeroBounds(arr);
+    /*
+     * 8. missing question or answer text
+     */
+    warns += VfyMissingText(arr, &qerrs, mapPtr->SMB_flags & SFO_NO_LEDS, (mapPtr->SMB_flags & SFO_FILTER) >> SFO_FILTER_OFFSET);
+    errs += qerrs;
+    /*
+     * 9. sequential LEDs
+     */
+    warns += VfySequentialLEDs(arr, mapPtr->SMB_flags & SFO_NO_LEDS);
+
+    /*
+     * done with the array
+     */
+    VMUnlock(mem);
+
+    /*
+     * display a summary
+     */
+    if (errs + warns == 0) {
+	VfyAppendChunk(@vfyLooksOK);
+    }
+    if (errs) {
+	VfySetColor(C_LIGHT_RED);
+	sprintf(buf, LMemDeref(@vfyErrors1), errs);
+	VfyAppendStr(buf);
+	VfyAppendChunk(@vfyErrors2);
+    }
+    if (warns) {
+	VfySetColor(C_GREEN);
+	sprintf(buf, LMemDeref(@vfyWarnings1), warns);
+	VfyAppendStr(buf);
+	VfyAppendChunk(@vfyWarnings2);
+    }
+    VfySetColor(C_BLACK);
+
+    MemUnlock(OptrToHandle(@vfyQuiz));
+
+    @call SafBuildApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_DOCUMENT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT
+ ***********************************************************************
+ * SYNOPSIS:	    Update a document from 1.0 to 2.0
+ * PASS:	    none
+ * RETURN:          none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	6/23/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildDocumentClass, MSG_GEN_DOCUMENT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT
+{
+    VMBlockHandle mapBlock;
+    SafariMapBlock *mapPtr;    /* ptr to the locked map block */
+    MemHandle mem;
+    VMBlockHandle oldMapBlock;
+    OldSafariMapBlock *oldMapPtr; /* ptr to the old locked map block */
+    MemHandle oldMem;
+    word i, eSize, count;
+    byte *oqp, *qp;
+    optr arr, oldArr;
+    ChunkHandle quiz;
+
+    /*
+     * Find the handle for the old map block and lock the thing down
+     */
+    oldMapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    oldMapPtr = VMLock(pself->GDI_fileHandle, oldMapBlock, &oldMem);
+
+    /*
+     * allocate a new map block and lock it down
+     */
+    mapBlock = VMAllocLMem(pself->GDI_fileHandle, LMEM_TYPE_GENERAL, sizeof(SafariMapBlock));
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    
+    /*
+     * copy the map block header and init the new stuff
+     * DON'T copy the lmem block header
+     */
+    memcpy(&mapPtr->SMB_quiz, &oldMapPtr->SMB_quiz, sizeof(OldSafariMapBlock)-sizeof(LMemBlockHeader));
+    memset(&mapPtr->SMB_nextQuiz, 0, sizeof(SafariMapBlock)-sizeof(OldSafariMapBlock));
+
+    /*
+     * create a variable-size chunk array for our quiz
+     */
+    quiz = LMemAlloc(mem, 0);
+    ChunkArrayCreateAtHandles(mem, quiz, 0, 0, 0);
+    mapPtr->SMB_quiz = quiz;
+
+    /*
+     * copy the old chunk array one element at a time, adding
+     * two NULLs for question and answer sounds
+     */
+    oldArr = ConstructOptr(oldMem, oldMapPtr->SMB_quiz);
+    arr = ConstructOptr(mem, mapPtr->SMB_quiz);
+    count = ChunkArrayGetCount(oldArr);
+    for (i = 0; i < count; i++) {
+	oqp = ChunkArrayElementToPtr(oldArr, i, &eSize);
+	qp = ChunkArrayAppend(arr, eSize+2*sizeof(TCHAR));
+	memcpy(qp, oqp, eSize);
+    }
+
+    /*
+     * mark the new block dirty, unlock it, and make it the map block
+     */
+    VMDirty(mem);
+    VMUnlock(mem);
+    VMSetMapBlock(pself->GDI_fileHandle, mapBlock);
+
+    /*
+     * Free the old map block
+     */
+    VMUnlock(oldMem);
+    VMFree(pself->GDI_fileHandle, oldMapBlock);
+
+    /*
+     * return no error
+     */
+    return(FALSE);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+ *                                             for GPCBnkrDocCtrlClass
+ *
+ * DESCRIPTION:	To direct saves to Banker folder.
+ *              
+ *
+ ***********************************************************************/
+
+@method SBDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+{
+ Boolean		notThere;
+
+
+    @callsuper();
+
+	 notThere = @call fileSelector::MSG_GEN_PATH_SET(
+					 "GeoExplorer", SP_DOCUMENT);
+
+    if(notThere)  @call fileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+}
+
+

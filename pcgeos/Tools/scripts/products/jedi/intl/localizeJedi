@@ -1,0 +1,284 @@
+#!/bin/sh
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Shell scripts
+# FILE: 	localizeJedi
+# AUTHOR: 	Chris Thomas, Sep 25, 1995
+#
+# DESCRIPTION:
+#
+#	Do all the cruft necessary to produce localized jedi geodes
+#
+# USAGE:
+# 	localizeJedi <version> <language>
+#
+#	<version> = 	PC{_EC},
+#			PC_XIP_{EC},
+#			JEDI_XIP
+#
+# 	$Id: localizeJedi,v 1.4 95/09/25 20:28:34 cthomas Exp $
+#
+#
+
+#
+# See if we have any arguments
+#
+
+# set -x
+set +x
+
+case $# in 
+0)
+	echo "Jedi version not specified: See header for args"
+	exit 1
+	;;
+1)
+	echo "Language not specified: See header for args"
+	exit 1
+	;;
+3)
+	echo "Too many arguments:  See header for args"
+	exit 1
+	;;
+*)	;;
+esac
+
+version=$1
+language=$2
+
+case "$language" in
+	Sp* | sp*)
+		lang=Spanish
+		shortLang=sp
+		;;
+	It* | it*)
+		lang=Italian
+		shortLang=it
+		;;
+	Fr* | fr*)
+		lang=French
+		shortLang=fr
+		;;
+	Po* | po*)
+		lang=Port
+		shortLang=po
+		;;
+	Ge* | Gr | ge* | gr)
+		lang=German
+		shortLang=gr
+		;;
+	*)
+		echo "$language not a valid language"
+		exit 1
+		;;
+esac
+
+#
+# determine Ec-ness of version
+#
+case $version in
+*_EC)
+	ec="ec"
+	branchec=".ec"
+	nonec=
+	;;
+*)
+	ec=
+	branchec=
+	nonec="-n"
+	;;
+esac
+
+#
+# Determine whre geodes go
+#
+
+case $version in
+PC_XIP*)
+	destBranch=pcxip$branchec
+	;;
+PC*)
+	destBranch=pc$branchec
+	;;
+JEDI_XIP)
+	destBranch=jedixip$branchec
+	;;
+*)
+	echo "$version not a valid version for Jedi"
+	exit 1
+	;;
+esac
+
+baseDir=/n/company/jedi
+srcDir=$baseDir/src/main/$destBranch
+destBaseDir=$baseDir/dest/$shortLang
+commonSrcDir=$baseDir/src/common/$destBranch
+localSrcDir=$baseDir/src/$shortLang/$destBranch
+destDir=$destBaseDir/$destBranch
+
+#
+# This is the file in the user's home directory where makejedi
+# defaults are stored.  If more variables are added, then this
+# filename should be changed
+
+localizeJediDefault=$HOME/.localizejedi${country}${version}
+
+#
+# Read defaults
+#
+
+if [ -f "$localizeJediDefault" ]; then
+
+    read shipGeodes removeDest copyToDest < $localizeJediDefault
+
+else
+
+    shipGeodes="y"
+    removeDest="y"
+    copyToDest="y"
+
+fi
+
+# Ask the user what to do.
+
+echo -n 'Ship geodes from ReleaseJedi? ('$shipGeodes'): '
+read r_shipGeodes
+shipGeodes=${r_shipGeodes:-$shipGeodes}
+
+echo -n "Remove $destDir? ($removeDest): "
+read r_removeDest
+removeDest=${r_removeDest:-$removeDest}
+
+echo -n "Copy $srcDir to $destDir? ($copyToDest): "
+read r_copyToDest
+copyToDest=${r_copyToDest:-$copyToDest}
+
+#
+# Save user's answer for future reference
+#
+
+echo $shipGeodes $removeDest $copyToDest > $localizeJediDefault
+
+scriptDir=/staff/pcgeos/Tools/scripts/products/jedi/intl
+shipXIP=$scriptDir/shipXIP
+jmakeIntlTree=$scriptDir/jmakeIntlTree
+
+###
+### If desired, ship the geodes
+###
+
+case "$shipGeodes" in
+[Yy]*)
+	echo
+	echo '*** Copying '$version' geodes to localization source tree'
+	echo
+	$shipXIP $version
+	if [ $? -ne 0 ] ; then
+		echo "ERROR: shipXIP for common geodes failed"
+		exit 1
+	fi
+	echo
+	echo '*** Copying '$version' '$language' geodes to localization source tree'
+	echo
+	$shipXIP $version $language
+	if [ $? -ne 0 ] ; then
+		echo "ERROR: shipXIP for ${language}-specific geodes failed"
+		exit 1
+	fi
+	;;
+*)	;;
+esac
+
+#
+# Copy the common and Language specific files into the main directory, so that
+# ResEdit only has to be run on the main directory.
+#
+
+echo '** Merging common and language-specific sources'
+set -x
+if [ -d ${srcDir} ] ; then
+	rm -rf ${srcDir}
+fi
+mkdir -p $srcDir
+
+cp -r $commonSrcDir/* $srcDir
+cp -r $localSrcDir/* $srcDir
+set +x
+
+#
+# Remove dest dir
+#
+
+case "$removeDest" in
+[Yy]*)
+	echo "** Moving $destDir to ${destDir}b"
+	if [ -d ${destDir}b ] ; then
+		rm -rf ${destDir}b
+	fi
+	if [ -d $destDir ] ; then
+		mv -f $destDir ${destDir}b
+		if [ $? -ne 0 ] ; then
+			echo "ERROR: couldn't (re)move destination directory"
+			exit 1;
+		fi
+	fi
+	;;
+*)	;;
+esac
+
+#
+# Copy src to dest
+#
+
+case "$copyToDest" in
+[Yy]*)
+	echo "** Copying $srcDir to $destDir"
+	mkdir -p $destDir
+	cp -pR $srcDir $destBaseDir
+	if [ $? -ne 0 ] ; then
+		echo "ERROR: couldn't copy source tree to destination"
+		exit 1;
+	fi
+	;;
+*)	;;
+esac
+
+###
+### Instruct user to run the localization process now
+###
+
+cat <<EOM
+
+At this point, you should use ResEdit to perform the localization on
+the shipped geodes.
+
+ResEdit parameters should be:
+
+  location of tranlation files = H:\JEDI\TRANS\\$shortLang
+  source path                  = H:\JEDI\SRC\MAIN\\$destBranch
+  destination path             = H:\JEDI\DEST\\$shortLang\\$destBranch
+
+Press RETURN when finished
+EOM
+
+read dummyVar
+
+###
+### Copy the localized geodes back up into the localized installed tree
+###
+
+echo
+echo '*** Copying '$version' '$language' geodes from localization target tree to'
+echo '***   localized Installed tree'
+echo
+
+$jmakeIntlTree LOCALIZED $version $language
+
+if [ $? -ne 0 ] ; then
+	echo "ERROR: Creation of /staff/pcgeos/Jedi$language/Installed failed"
+	exit 1
+fi
+

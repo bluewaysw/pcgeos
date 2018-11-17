@@ -1,0 +1,509 @@
+/*
+ * Project:	PC GEOS
+ * Module:	Text
+ * File:	UI/uiStyleSheetControl.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user interface description for a style
+ *	sheet control
+ *
+ *	$Id: uiStyleSheet.ui,v 1.1 97/04/07 11:15:18 newdeal Exp $
+ *
+ */
+
+#if !NO_CONTROLLERS	/*+++++++++++++++++++++++++++++++++++++++++++++++*/
+
+#ifdef GPC_ART
+start AppTCMonikerResource, data;
+#include "Art/mkrRedefineTC.ui"
+#include "Art/mkrReturnToBaseTC.ui"
+#include "Art/mkrStoreTC.ui"
+#include "Art/mkrRecallTC.ui"
+end AppTCMonikerResource;
+#else
+#include "Art/mkrRedefine.ui"
+#include "Art/mkrReturnToBase.ui"
+#include "Art/mkrStore.ui"
+#include "Art/mkrRecall.ui"
+#endif
+
+#endif			/* !NO_CONTROLLERS ++++++++++++++++++++++++++++++*/
+
+/*
+ * Style Sheet control
+ */
+
+#if !NO_CONTROLLERS	/*+++++++++++++++++++++++++++++++++++++++++++++++*/
+
+start StyleSheetControlUI, notDetachable;
+
+DefineNewStyleBox = GenInteraction {
+	genStates = default -usable;
+	moniker = 'D', "Define New Style";
+	children = CNDescription, CNAttrList, CNName,
+			/* reply triggers */
+			CNDefineTrigger;
+	type = command;
+	visibility = dialog;
+	hints = {
+		HINT_KEEP_INITIALLY_ONSCREEN,
+		ATTR_GEN_HELP_CONTEXT { char "dbDefStl", 0 }
+	}
+}
+
+CNDescription = GenText {
+	genAttributes = readOnly;
+	moniker = "Description";
+	textDisplayAttributes = default +initScrolling;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 50>
+			SpecHeight <SST_LINES_OF_TEXT, 4>
+		}
+	}
+}
+
+CNAttrList = GenBooleanGroup {
+	children = CNDisplayInToolboxEntry;
+}
+
+CNDisplayInToolboxEntry = GenBoolean {
+	moniker = 'T', "Display in Tool Bar Pop-Down List";
+	identifier = "mask SEF_DISPLAY_IN_TOOLBOX";
+}
+
+CNName = GenText {
+	moniker = 'N', "Name:";
+	textDisplayAttributes = default +singleLineText;
+	maxLength = NAME_ARRAY_MAX_NAME_LENGTH;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT, HINT_DEFAULT_FOCUS }
+	applyMsg = MSG_SSC_DEFINE_STYLE;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+}
+
+CNDefineTrigger = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'D', "Define New Style";
+	action = MSG_SSC_DEFINE_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +initiatesInputIgnore;
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+/* --- */
+
+RedefineTrigger = GenTrigger {
+	genStates = default -usable, -enabled;
+	moniker = 'f', "Redefine Style";
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SSC_REDEFINE_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+}
+
+/* --- */
+
+ReturnToBaseStyleTrigger = GenTrigger {
+	genStates = default -usable;
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SSC_RETURN_TO_BASE_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	moniker = 'v', "Revert to Base Style";
+}
+
+/* --- */
+
+ApplyStyleBox = GenInteraction {
+	genStates = default -usable;
+	moniker = 'A', "Apply Style";
+	children = ApplyList;
+	type = properties;
+	visibility = dialog;
+	hints = {
+		HINT_INTERACTION_FAST_RESPONSE_PROPERTIES,
+		HINT_INTERACTION_MAKE_RESIZABLE,
+		HINT_INTERACTION_NO_DISTURB,
+	}
+}
+
+
+ApplyList = GenDynamicList {
+	applyMsg = MSG_SSC_APPLY_BOX_STYLE;
+	queryMsg = MSG_SSC_QUERY_STYLE;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_INITIAL_SIZE {
+#ifdef NIKE_EUROPE
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 25>
+#else
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 15>
+#endif
+			SpecHeight <>
+		}
+	}
+}
+
+/* --- */
+
+ManageStylesBox = GenInteraction {
+	genStates = default -usable;
+	moniker = 'M', "Manage Styles";
+	children = MSList, MSDescription,
+			/* reply triggers */
+			MSApplyTrigger, MSDeleteTrigger, MSDeleteRevertTrigger,
+		  	MSModifyTrigger,
+			/* notUserInitiatable dialog */
+			MSModifyBox;
+	type = properties;
+	visibility = dialog;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dbManStl", 0 }
+	}
+}
+
+MSList = GenDynamicList {
+	applyMsg = MSG_SSC_SELECT_STYLE;
+	queryMsg = MSG_SSC_QUERY_STYLE;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 5>
+			word    5
+		},
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_SSC_STATUS_STYLE
+		}
+	}
+}
+
+MSDescription = GenText {
+	genAttributes = readOnly;
+	moniker = "Description";
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+			word 0
+			SpecHeight <SST_LINES_OF_TEXT, 5>
+		}
+	}
+}
+
+MSApplyTrigger = GenTrigger {
+	/* moniker set by specific UI */
+	action = MSG_SSC_APPLY_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +initiatesInputIgnore;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_APPLY}
+	}
+}
+
+MSDeleteTrigger = GenTrigger {
+	moniker = 'D', "Delete";
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SSC_DELETE_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+MSDeleteRevertTrigger = GenTrigger {
+	moniker = 'R', "Delete and Revert";
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SSC_DELETE_REVERT_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+MSModifyTrigger = GenTrigger {
+	moniker = 'M', "Modify";
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SSC_INITIATE_MODIFY_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_TRIGGER_BRINGS_UP_WINDOW, HINT_SEEK_REPLY_BAR }
+}
+
+/* --- */
+
+MSModifyBox = GenInteraction {
+	children = ModifyTitle, ModifyNameText, ModifyAttrList,
+					BaseStyleList,
+					/* reply triggers */
+					ModifyTrigger;
+	/* change when gadget classes are fixed */
+	/*type = properties;*/
+	type = command;
+	visibility = dialog;
+	attributes = default +modal, +notUserInitiatable;
+	hints = {
+		HINT_KEEP_INITIALLY_ONSCREEN,
+		ATTR_GEN_HELP_CONTEXT { char "dbModStl", 0 }
+	}
+}
+
+ModifyTitle = GenInteraction {
+	children = ModifyGlyph;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+ModifyGlyph = GenGlyph {
+	moniker = "Modify Style";
+	hints = { HINT_CENTER_MONIKER }
+}
+
+ModifyNameText = GenText {
+	moniker = 'N', "Style Name:";
+	textDisplayAttributes = default +singleLineText;
+	maxLength = NAME_ARRAY_MAX_NAME_LENGTH;
+	applyMsg = MSG_SSC_MODIFY_STYLE;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		}
+	}
+}
+
+ModifyAttrList = GenBooleanGroup {
+	children = DisplayInToolboxEntry;
+}
+
+DisplayInToolboxEntry = GenBoolean {
+	moniker = 'T', "Display in Tool Bar Pop-Down List";
+	identifier = "mask SEF_DISPLAY_IN_TOOLBOX";
+}
+
+BaseStyleList = GenDynamicList {
+	queryMsg = MSG_SSC_QUERY_BASE_STYLE;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	moniker = 'B', "Base Style:";
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 4>
+			word    4
+		}
+	}
+}
+
+ModifyTrigger = GenTrigger {
+	moniker = 'M', "Modify";
+	action = MSG_SSC_MODIFY_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		/* change when gadget classes are fixed */
+		/*ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_APPLY},*/
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+/* --- */
+
+LoadStyleSheetBox = GenInteraction {
+	genStates = default -usable;
+	moniker = 'B', "Bring in Style Sheet";
+	children = LoadFileBox,
+			LoadStyleSheetTrigger;
+	type = command;
+	visibility = dialog;
+	hints = {
+		HINT_INTERACTION_SINGLE_USAGE,
+		ATTR_GEN_HELP_CONTEXT { char "dbLoadStl", 0 }
+	}
+}
+
+LoadFileBox = GenFileSelector {
+	fileCriteria = dirs, geosNonExecutables;
+	action = MSG_SSC_LOAD_STYLE_SHEET_FILE_SELECTED, "TO_OBJ_BLOCK_OUTPUT";
+#if !_NDO2000
+	attributes = default +useVirtualRoot;
+#endif
+	hints = {
+		HINT_FILE_SELECTOR_SINGLE_ACTION,
+		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_DOCUMENT>
+		},
+#if !_NDO2000
+		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT {
+			GenFilePath <SP_DOCUMENT, "">
+		}
+#endif
+	}
+}
+
+LoadStyleSheetTrigger = GenTrigger {
+	moniker = 'L', "Load Style Sheet";
+	action = MSG_SSC_LOAD_STYLE_SHEET, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +signalInteractionComplete;
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+/* --- */
+
+SaveRecallGroup = GenInteraction {
+	genStates = default -usable;
+	genAttributes = default +initiatesInputIgnore;
+	children = SaveStyleTrigger, RecallStyleTrigger;
+}
+
+SaveStyleTrigger = GenTrigger {
+	action = MSG_SSC_SAVE_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = default +initiatesInputIgnore;
+	moniker = 'S', "Store Style";
+}
+
+RecallStyleTrigger = GenTrigger {
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SSC_RECALL_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	moniker = 'R', "Recall Style";
+}
+
+end StyleSheetControlUI;
+
+/* --- */
+
+start StyleSheetControlToolboxUI, notDetachable;
+
+RedefineStyleToolTrigger = GenTrigger {
+	genStates = default -usable, -enabled;
+#ifdef GPC_ART
+	moniker = list { RedefineTCMoniker }
+#else
+	TOOL_MONIKER_LIST(Redefine)
+#endif
+	action = MSG_SSC_REDEFINE_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_FOCUS_HELP { optr RedefineStyleHelp },
+		ATTR_GEN_FOCUS_DISABLED_HELP { optr StylesSameHelp }
+	}
+}
+
+ReturnToBaseStyleToolTrigger = GenTrigger {
+	genStates = default -usable, -enabled;
+#ifdef GPC_ART
+	moniker = list { ReturnToBaseTCMoniker }
+#else
+	TOOL_MONIKER_LIST(ReturnToBase)
+#endif
+	action = MSG_SSC_RETURN_TO_BASE_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_FOCUS_HELP { optr ReturnToBaseStyleHelp },
+		ATTR_GEN_FOCUS_DISABLED_HELP { optr StylesSameHelp }
+	}
+}
+
+SaveStyleToolTrigger = GenTrigger {
+	genStates = default -usable;
+	action = MSG_SSC_SAVE_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+#ifdef GPC_ART
+	moniker = list { StoreTCMoniker }
+#else
+	TOOL_MONIKER_LIST(Store)
+#endif
+	hints = { ATTR_GEN_FOCUS_HELP { optr SaveStyleHelp } }
+}
+
+RecallStyleToolTrigger = GenTrigger {
+	genStates = default -usable, -enabled;
+	action = MSG_SSC_RECALL_STYLE, "TO_OBJ_BLOCK_OUTPUT";
+#ifdef GPC_ART
+	moniker = list { RecallTCMoniker }
+#else
+	TOOL_MONIKER_LIST(Recall)
+#endif
+	hints = {
+	    ATTR_GEN_FOCUS_HELP { optr RecallStyleHelp },
+	    ATTR_GEN_FOCUS_DISABLED_HELP { optr RecallStyleDisHelp }
+	}
+}
+
+StylesToolList = GenDynamicList {
+	genStates = default -usable;
+	applyMsg = MSG_SSC_APPLY_TOOLBOX_STYLE;
+	queryMsg = MSG_SSC_QUERY_STYLE;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 12>
+			SpecHeight <>
+		},
+		HINT_MINIMUM_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 1>
+		},
+		ATTR_GEN_FOCUS_HELP {
+			optr	PopupStyleListHelp
+		}
+	}
+}
+
+end StyleSheetControlToolboxUI;
+
+#endif			/* !NO_CONTROLLERS ++++++++++++++++++++++++++++++*/
+
+/*
+ * Strings for controllers
+ */
+
+start ControlStrings, data;
+
+#if !NO_CONTROLLERS	/*+++++++++++++++++++++++++++++++++++++++++++++++*/
+
+chunk SSCName = "Style Sheet";
+
+chunk RecallStyleName = "Recall Style";
+chunk SaveStyleName = "Store Style";
+chunk LoadStyleSheetName = "Load Style Sheet";
+chunk ManageStylesName = "Manage Styles";
+chunk ApplyStyleName = "Apply Style";
+chunk ReturnToBaseStyleName = "Revert to Base Style";
+chunk DefineNewStyleName = "Define New Style";
+chunk PopupStyleListName = "Popup Style List";
+chunk RedefineStyleName = "Redefine Style Based On Selection";
+
+/* Quick-Help strings */
+
+chunk SaveStyleHelp = "Store style of selection for later recall";
+
+chunk RecallStyleHelp = "Recall stored style and apply to selection";
+chunk RecallStyleDisHelp = "Disabled because a style was not stored";
+
+chunk PopupStyleListHelp = "Apply defined style";
+
+chunk RedefineStyleHelp = "Redefine base style to that of selection";
+chunk ReturnToBaseStyleHelp = "Revert selection's style to base style";
+chunk StylesSameHelp = "Style of selection does not differ from base style";
+
+/***/
+
+visMoniker NoBaseStyleMoniker = "<< No Base Style >>";
+
+#endif			/* !NO_CONTROLLERS ++++++++++++++++++++++++++++++*/
+
+chunk IllegalBaseStyleString =
+	"This action would cause a style to be based on itself or on"
+	" a derivitive of itself, which is illegal."
+	"\\\r\\\rError Code: ST-01";
+
+chunk NameAlreadyExistsString =
+	"A style with this name already exists."
+	"\\\r\\\rError Code: ST-02";
+
+chunk IndeterminateString = "<< Indeterminate >>";
+localize "The Bindery application depends on this string to work around a bug in old versions of the Styles library where the DefineNewStyle trigger is not disabled when the selected text has indeterminate style. The Bindery application just checks the first two characters so you can translate the 'Indeterminate' word but please leave '<<' as the first two characters of the string."; 
+
+chunk DistanceSmallerString = "smaller";
+chunk DistanceLargerString = "larger";
+
+end ControlStrings;

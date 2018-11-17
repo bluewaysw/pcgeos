@@ -1,0 +1,1838 @@
+/***************************************************************************
+ *                                                                         *
+ *  Black Box                                                                   *
+ *                                                                         *
+ ***************************************************************************/
+
+
+/***************************************************************************
+ *		Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/gViewCC.goh>
+#include <gstring.h>
+@include <spool.goh>
+@include <Objects/clipbrd.goh>
+#include <Ansi/string.h>
+#include <ansi/stdio.h>
+@include <game.goh>
+@include "pics.goh"
+@include "appicons.goh"
+#include <initfile.h>
+#include <sound.h>
+
+void mycopy(char *s, char *t, word size) ;
+word MyRandom(void) ;
+void ShootLaser(sword x, sword y) ;
+void ClearOldShot(void) ;
+Boolean IsInsideType(byte b) ;
+//void AppendNumToString(char *p_pos, optr string, word num) ;
+
+#define BLACK_BOX_SIZE_SMALL  8
+#define BLACK_BOX_SIZE_MEDIUM 11
+#define BLACK_BOX_SIZE_LARGE  14
+
+#define INITIAL_SIZE  BLACK_BOX_SIZE_MEDIUM
+
+#define DIR_UP    0
+#define DIR_DOWN  1
+#define DIR_LEFT  2
+#define DIR_RIGHT 3
+
+#define LARGEST_SIZE (BLACK_BOX_SIZE_LARGE*BLACK_BOX_SIZE_LARGE)
+
+#define DEFAULT_NUM_LASER_SHOTS 25
+
+#define SHOW_ON_STARTUP   1
+
+byte bbox_field[LARGEST_SIZE] ;
+byte selection_size       = INITIAL_SIZE ;
+word select_x             = 0xFF ;
+word select_y             = 0xFF ;
+byte game_mode            = 0 ;
+word size                 = INITIAL_SIZE ;
+byte time_sec             = 0 ;
+byte time_min             = 0 ;
+byte time_hour            = 0 ;
+word timer_id ;
+word timer_handle ;
+byte num_guesses_left     = 5 ;
+byte num_spots            = 0 ;
+byte num_atoms            = 5 ;
+byte laser_shots          = DEFAULT_NUM_LASER_SHOTS ;
+word player_score         = 1 ;
+Boolean timer_going       = FALSE ;
+char bbox_state_file[30] = "The Black Box High State" ;
+
+char bbox_path[20] = "Game" ;
+char bbox_relativePath[] = "." ;
+word bbox_drive = SP_PUBLIC_DATA ;
+word g_sound;
+
+#define SQUARE_SIZE           16
+
+#define quick_bbox(posx, posy)  ((posx)+((posy)*(size)))
+
+#define DOC_WIDTH             INITIAL_SIZE*SQUARE_SIZE
+#define DOC_HEIGHT            DOC_WIDTH
+
+
+optr Pictures[] = {
+    @BlankPicture,
+    @BallPicture,
+    @GuessPicture,
+    @UpPicture,
+    @DownPicture,
+    @LeftPicture,
+    @RightPicture,
+    @XPicture
+} ;
+
+#define BLACK_BOX_BLANK    0
+#define BLACK_BOX_BALL_PIC 1
+#define BLACK_BOX_GUESS    2
+#define BLACK_BOX_UP       3
+#define BLACK_BOX_DOWN     4
+#define BLACK_BOX_LEFT     5
+#define BLACK_BOX_RIGHT    6
+#define BLACK_BOX_X        7
+#define BLACK_BOX_NOTHING  8
+#define BLACK_BOX_NOTHING2 9
+#define BLACK_BOX_BALL     0x80
+
+#define SOUND_ON 1
+#define SOUND_OFF 2
+#define SOUND_SYSTEM 3
+
+const word shootSoundBuf[] = {     /* from solitaire deal sound */
+	SSE_CHANGE,             0, IP_BASS_DRUM_1, IT_STANDARD_TABLE,
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, FR_BASS_DRUM_1, DYNAMIC_F,
+	SSDTT_TICKS,            5,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word badGuessSoundBuf[] = {     /* from solitaire bad drop sound */
+	SSE_CHANGE,             0, IP_ORCHESTRA_HIT, IT_STANDARD_TABLE,
+	SSE_CHANGE,             1, IP_ORCHESTRA_HIT, IT_STANDARD_TABLE,
+	SSE_CHANGE,             2, IP_ORCHESTRA_HIT, IT_STANDARD_TABLE,
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, MIDDLE_F_SH, DYNAMIC_MF,
+	SSE_VOICE_ON,           1, MIDDLE_A_SH, DYNAMIC_MF,
+	SSE_VOICE_ON,           2, HIGH_C, DYNAMIC_MF,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSE_VOICE_OFF,          1,
+	SSE_VOICE_OFF,          2,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word winSoundBuf[] = {     /* from blackjack win sound */
+	SSE_CHANGE,             0, IP_ACOUSTIC_GRAND_PIANO, IT_STANDARD_TABLE,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_C, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_E, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_G, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, HIGH_C, DYNAMIC_F,
+	SSDTT_TICKS,            15,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_G, DYNAMIC_F,
+	SSDTT_TICKS,            8,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, HIGH_C, DYNAMIC_F,
+	SSDTT_TICKS,            25,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+	MemHandle shootSound, badGuessSound, winSound;
+
+
+/***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************/
+
+    /*---------------------------------------------------------------------*/
+    @class BlackBoxProcessClass, GenProcessClass ;
+        @message void MSG_VIEW_INVALIDATE() ;
+        @message void MSG_VIEW_BLACK_BOX_NEW() ;
+        @message void MSG_VIEW_BLACK_BOX_GIVE_UP() ;
+        @message void MSG_BLACK_BOX_COMPLETED() ;
+        @message void MSG_BLACK_BOX_COMPLETED2() ;
+        @message void MSG_BLACK_BOX_GUESS() ;
+        @message void MSG_BLACK_BOX_REDRAW_SQUARE(sword pos_x, sword pos_y) ;
+        @message void MSG_BLACK_BOX_UPDATE_SCORE() ;
+		  @message void MSG_BLACK_BOX_UPDATE_LASER_SHOTS() ;
+        @message void MSG_BLACK_BOX_UPDATE_NUM_GUESSES() ;
+		  @message void MSG_BLACK_BOX_DID_NOT_WIN() ;
+		  @message void MSG_BLACK_BOX_DID_NOT_WIN2() ;
+        @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_BLACK_BOX_SIZE_CHANGED;
+		  @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_BLACK_BOX_NUM_ATOMS_CHANGED;
+		  @message void MSG_BLACK_BOX_UPDATE_ATOMS_TEXT();
+		  @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_BLACK_BOX_SOUND_CHANGED;
+	 @endc
+
+    @classdecl BlackBoxProcessClass, neverSaved ;
+    /*---------------------------------------------------------------------*/
+
+
+
+    /*---------------------------------------------------------------------*/
+    @class BlackBoxTimerClass, GenGlyphClass ;
+        @message void MSG_BLACK_BOX_CHANGE_TIME() ;
+        @message void MSG_BLACK_BOX_RESET_TIMER() ;
+        @message void MSG_BLACK_BOX_TIMER_CHANGE() ;
+    @endc
+
+    @classdecl BlackBoxTimerClass;
+    /*---------------------------------------------------------------------*/
+
+
+
+    /*---------------------------------------------------------------------*/
+    @class BlackBoxViewClass, GenViewClass ;
+    @endc
+
+    @classdecl BlackBoxViewClass;
+    /*---------------------------------------------------------------------*/
+
+
+
+
+    /*---------------------------------------------------------------------*/
+    @class BlackBoxPrimaryClass, GenPrimaryClass ;
+    @endc
+
+    @classdecl BlackBoxPrimaryClass;
+    /*---------------------------------------------------------------------*/
+
+
+
+
+    /*---------------------------------------------------------------------*/
+    @class BlackBoxContentClass, VisContentClass ;
+    @endc
+
+    @classdecl BlackBoxContentClass ;
+    /*---------------------------------------------------------------------*/
+
+
+
+    /*---------------------------------------------------------------------*/
+    @class BlackBoxAppClass, GenApplicationClass ;
+    @endc
+
+    @classdecl BlackBoxAppClass ;
+    /*---------------------------------------------------------------------*/
+
+
+
+    /*---------------------------------------------------------------------*/
+    @class BlackBoxPauseInterClass, GenInteractionClass ;
+    @endc
+
+    @classdecl BlackBoxPauseInterClass ;
+    /*---------------------------------------------------------------------*/
+
+
+
+/***************************************************************************
+ *		UI Objects
+ ***************************************************************************/
+
+
+
+/*=========================================================================*/
+
+
+
+@start	AppResource ;
+    /*---------------------------------------------------------------------*/
+    @object BlackBoxAppClass BlackBoxApp = {
+        GI_visMoniker = list { @BlackBoxTextMoniker,
+                               @Moniker0,
+                               @Moniker1,
+                               @Moniker4 }
+	   GI_comp       = @BlackBoxPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS)
+                      = @BlackBoxPrimary;
+		  gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
+								@HighScoreControl;
+	 }
+    /*---------------------------------------------------------------------*/
+    @visMoniker BlackBoxTextMoniker =
+        "The Black Box" ;
+    /*---------------------------------------------------------------------*/
+@end	AppResource
+
+
+
+/*=========================================================================*/
+
+
+
+@start	Interface		/* this resource is for misc UI objects */ ; ;
+    /*---------------------------------------------------------------------*/
+    @object BlackBoxPrimaryClass BlackBoxPrimary  = {
+		  GI_comp             = @BlackBoxMainGroup,
+                              @BlackBoxGameMenu,
+										@BlackBoxEditMenu,
+										@BlackBoxOptionsMenu,
+										@BlackBoxDialogs,
+										@QTipsDialogBox ;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+        HINT_SIZE_WINDOW_AS_DESIRED ;
+	   //	  HINT_CENTER_CHILDREN_VERTICALLY ;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  HINT_CENTER_WINDOW;
+		  HINT_PRIMARY_NO_FILE_MENU ;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxMainGroup = {
+		  GI_comp = @BlackBoxMainTopGroup,
+						@BlackBoxPlayField,
+						@BlackBoxMainBottomText;
+		  HINT_CENTER_CHILDREN_VERTICALLY ;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxMainTopGroup = {
+		  GI_comp = @BlackBoxMainGroupButtons,
+				  @BlackBoxMainGroupInfo;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxMainGroupInfo = {
+		  GI_comp = @BlackBoxMainGroupInfoLeft,
+						@BlackBoxMainGroupInfoSpacer,
+						@BlackBoxMainGroupInfoRight ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxMainGroupInfoSpacer = {
+		  HINT_FIXED_SIZE = {SST_PIXELS | 20, 0,0};
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxMainGroupInfoLeft = {
+		  GI_comp = @BlackBoxTimerGroup,
+						@BlackBoxScoreGroup ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxTimerGroup = {
+		  GI_comp = @BlackBoxTimerTitle,
+						@BlackBoxTimer ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass BlackBoxTimerTitle = {
+		  GI_visMoniker    = "Time: " ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object BlackBoxTimerClass BlackBoxTimer = {
+		  GI_visMoniker    = "00:00:00" ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxScoreGroup = {
+		  GI_comp = @BlackBoxScoreTitle,
+						@BlackBoxScore ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass BlackBoxScoreTitle = {
+		  GI_visMoniker    = "Score: " ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass BlackBoxScore = {
+		  GI_visMoniker    = "0" ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxMainGroupInfoRight = {
+		  GI_comp = @BlackBoxLaserShotsGroup,
+						@BlackBoxNumGuessesGroup ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxLaserShotsGroup = {
+		  GI_comp = @BlackBoxLaserShotsTitle,
+						@BlackBoxLaserShots ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass BlackBoxLaserShotsTitle = {
+		  GI_visMoniker    = "Laser Shots Left: " ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass BlackBoxLaserShots = {
+		  GI_visMoniker    = "0" ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxNumGuessesGroup = {
+		  GI_comp = @BlackBoxNumGuessesTitle,
+						@BlackBoxNumGuesses ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass BlackBoxNumGuessesTitle = {
+		  GI_visMoniker    = "Guesses Left: " ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass BlackBoxNumGuesses = {
+		  GI_visMoniker    = "0" ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxMainGroupButtons = {
+		  GI_comp = @BlackBoxFastNew,
+						@BlackBoxGuess ;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+	 }
+	 /*---------------------------------------------------------------------*/
+    @object GenTriggerClass BlackBoxFastNew = {
+        GI_visMoniker   = 'N', "New" ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_VIEW_BLACK_BOX_NEW ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass BlackBoxGuess = {
+        GI_visMoniker   = 'G', "Guess" ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_BLACK_BOX_GUESS ;
+    }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass BlackBoxMainBottomText = {
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxPlayField = {
+        GI_comp = @BlackBoxView, @BlackBoxLostFocusGlyph ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_MINIMUM_SIZE = { SST_PIXELS | 120,
+                              SST_PIXELS | 120,
+                              0 } ;
+        HINT_INITIAL_SIZE = { SST_PIXELS | 240,
+                              SST_PIXELS | 240,
+                              0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass BlackBoxLostFocusGlyph = {
+        GI_comp = @BlackBoxLostFocusGroup ;
+        GI_states = @default & (~GS_USABLE) ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object BlackBoxPauseInterClass BlackBoxLostFocusGroup = {
+        GI_comp = @BlackBoxLostFocusGlyph1,
+                  @BlackBoxLostFocusGlyph2 ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass BlackBoxLostFocusGlyph1 = {
+        GI_visMoniker = "Game" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass BlackBoxLostFocusGlyph2 = {
+        GI_visMoniker = "Paused" ;
+    }
+	 /*---------------------------------------------------------------------*/
+    @object BlackBoxViewClass BlackBoxView = {
+        GVI_attrs      = @default |
+                         GVA_CONTROLLED ;
+        GVI_horizAttrs   = @default |
+							  //    GVDA_SCROLLABLE |
+									GVDA_NO_SMALLER_THAN_CONTENT |
+									GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_vertAttrs    = @default |
+                       //    GVDA_SCROLLABLE |
+									GVDA_NO_SMALLER_THAN_CONTENT |
+                           GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_content      = @BlackBoxContent;
+        GVI_docBounds    = {0, 0, DOC_WIDTH, DOC_HEIGHT};
+        HINT_DEFAULT_TARGET;
+        HINT_DEFAULT_FOCUS;
+        HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object BlackBoxContentClass BlackBoxContent = {
+        VCNI_view         = BlackBoxView ;
+        VCNI_attrs        = @default |
+                            VCNA_SAME_WIDTH_AS_VIEW |
+                            VCNA_SAME_HEIGHT_AS_VIEW |
+                            VCNA_LARGE_DOCUMENT_MODEL |
+                            VCNA_ACTIVE_MOUSE_GRAB_REQUIRES_LARGE_EVENTS ;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxGameMenu = {
+	   GI_comp = @BlackBoxNewOption,
+						@BlackBoxGiveUpOption,
+						@BlackBoxQTipsTrigger,
+						@HighScoreControl;
+		  GI_visMoniker = 'G', "Game" ;
+        GII_visibility = GIV_POPUP ;
+		  ATTR_GEN_INTERACTION_GROUP_TYPE
+                       = (GIGT_FILE_MENU) ;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass BlackBoxQTipsTrigger = {
+		  GI_visMoniker   = 'Q', "Quick Tips" ;
+		  GTI_destination = @QTipsDialogBox ;
+		  GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+		  HINT_TRIGGER_BRINGS_UP_WINDOW;
+    }
+
+	 /*---------------------------------------------------------------------*/
+@object HighScoreClass HighScoreControl = {
+  HSI_fileName = "BlkBox High Scores";
+  HSI_creator = {"BBox", 16431};
+  HSI_highScoreTitle = "Black Box High Scores";
+  @localize {"Title of high score window"};
+}
+
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxEditMenu = {
+		GI_comp        = @BlackBoxCopyToClipboard ;
+		  GII_visibility = GIV_POPUP ;
+		  ATTR_GEN_INTERACTION_GROUP_TYPE
+							  = (GIGT_EDIT_MENU) ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxOptionsMenu = {
+		  GI_comp        = @BlackBoxSoundOpt,
+								 @BlackBoxSizeOption,
+								 @BlackBoxAtomsOption;
+		  GII_visibility = GIV_POPUP ;
+		  ATTR_GEN_INTERACTION_GROUP_TYPE
+							  = (GIGT_OPTIONS_MENU) ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass BlackBoxSoundOpt = {
+		  GI_visMoniker = 'S', "Sound" ;
+		  GI_comp = @SoundGroup;
+		  GII_visibility = GIV_POPUP;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemGroupClass SoundGroup = {
+		  GI_comp          = @SoundOn,
+									@SoundOff,
+									@SystemPref ;
+		  GIGI_selection   = SOUND_SYSTEM ;
+        GIGI_destination = process ;
+		  GIGI_applyMsg = MSG_BLACK_BOX_SOUND_CHANGED ;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenItemClass SoundOn = {
+		  GI_visMoniker = 'S', "Sound On" ;
+		  GII_identifier = SOUND_ON ;
+    }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemClass SoundOff = {
+		  GI_visMoniker = 'O', "Sound Off" ;
+		  GII_identifier = SOUND_OFF ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemClass SystemPref = {
+		  GI_visMoniker = 'P', "Use System Preference" ;
+		  GII_identifier = SOUND_SYSTEM ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 /*---------------------------------------------------------------------*/
+    @object GenInteractionClass BlackBoxDialogs = {
+        GI_comp = @BlackBoxCompletedBox,
+                  @BlackBoxWrongCompletionBox,
+						@BlackBoxBadGuessBox;
+        GII_type = GIT_ORGANIZATIONAL ;
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk char BlackBoxNewGameMsg[] = "Changing this option will end the current game and begin a new one.  Are you sure you want to do this?" ;
+    /*---------------------------------------------------------------------*/
+    @chunk char BlackBoxClearHighScoreMsg[] = "Are you sure you want to clear all high scores?" ;
+    /*---------------------------------------------------------------------*/
+@end Interface
+
+
+
+@start InterfaceOptions ;
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass BlackBoxNewOption = {
+        GI_visMoniker   = 'N', "New Game" ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_VIEW_BLACK_BOX_NEW ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass BlackBoxGiveUpOption = {
+        GI_visMoniker   = 'G', "Give Up" ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_VIEW_BLACK_BOX_GIVE_UP ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass BlackBoxSizeOption = {
+        GI_visMoniker   = 'S', "Size Change" ;
+        GII_visibility  = GIV_POPUP ;
+        GI_comp         = @BlackBoxSizeGroup ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass BlackBoxSizeGroup = {
+        GI_comp          = @BlackBoxSizeSmall,
+                           @BlackBoxSizeMedium,
+                           @BlackBoxSizeLarge ;
+        GIGI_selection   = BLACK_BOX_SIZE_MEDIUM ;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_BLACK_BOX_SIZE_CHANGED;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass BlackBoxSizeSmall = {
+        GI_visMoniker = '1', "1. Small" ;
+        GII_identifier = BLACK_BOX_SIZE_SMALL;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass BlackBoxSizeMedium = {
+        GI_visMoniker = '2', "2. Medium" ;
+        GII_identifier = BLACK_BOX_SIZE_MEDIUM;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass BlackBoxSizeLarge = {
+        GI_visMoniker = '3', "3. Large" ;
+        GII_identifier = BLACK_BOX_SIZE_LARGE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass BlackBoxAtomsOption = {
+        GI_visMoniker   = 'A', "Number Atoms" ;
+        GII_visibility  = GIV_POPUP ;
+        GI_comp         = @BlackBoxAtomsGroup ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass BlackBoxAtomsGroup = {
+        GI_comp          = @BlackBoxAtoms3,
+                           @BlackBoxAtoms5,
+                           @BlackBoxAtoms7,
+                           @BlackBoxAtoms10 ;
+        GIGI_selection   = 5 ;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_BLACK_BOX_NUM_ATOMS_CHANGED;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass BlackBoxAtoms3 = {
+        GI_visMoniker = '3', "3 Atoms" ;
+        GII_identifier = 3;
+    }
+	 /*---------------------------------------------------------------------*/
+    @object GenItemClass BlackBoxAtoms5 = {
+        GI_visMoniker = '5', "5 Atoms" ;
+        GII_identifier = 5;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass BlackBoxAtoms7 = {
+        GI_visMoniker = '7', "7 Atoms" ;
+        GII_identifier = 7;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass BlackBoxAtoms10 = {
+        GI_visMoniker = '0', "10 Atoms" ;
+        GII_identifier = 10;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass BlackBoxCopyToClipboard = {
+		  GI_visMoniker   = 'C', "Copy Game" ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_META_CLIPBOARD_COPY ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceOptions
+
+
+@start InterfaceWin ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass WinnerGlyph = {
+        GI_comp = @WinnerGlyph1,
+                  @WinnerWinGlyph,
+                  @WinnerGlyph2 ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass WinnerGlyph1 = {
+        GI_visMoniker = "CONGRATULATIONS!" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass WinnerWinGlyph = {
+        GI_visMoniker = list { @BlackBoxWinMoniker } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass WinnerGlyph2 = {
+        GI_visMoniker = "You win!" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass BlackBoxCompletedBox = {
+        GI_visMoniker   = "We have a winner!" ;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_NOTIFICATION ;
+        GII_attrs       = @default                         |
+                          GIA_INITIATED_VIA_USER_DO_DIALOG |
+                          GIA_MODAL                        |
+                          GIA_NOT_USER_INITIATABLE         ;
+        GI_comp         = @WinnerGlyph ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceWin
+
+
+@start InterfaceLose ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass BlackBoxWrongCompletionBox = {
+        GI_visMoniker   = "Oooops!" ;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_NOTIFICATION ;
+        GII_attrs       = @default                         |
+                          GIA_INITIATED_VIA_USER_DO_DIALOG |
+                          GIA_MODAL                        |
+                          GIA_NOT_USER_INITIATABLE         ;
+        GI_comp         = @LoserGlyph ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass LoserGlyph = {
+        GI_comp = @LoserLoseGlyph,
+                  @LoserGlyph2 ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass LoserLoseGlyph = {
+        GI_visMoniker = list { @BlackBoxLoseMoniker } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass LoserGlyph2 = {
+        GI_visMoniker = "Sorry, try again" ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceLose
+
+
+
+@start InterfaceBadGuess ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass BlackBoxBadGuessBox = {
+        GI_visMoniker   = "Sorry ... " ;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_NOTIFICATION ;
+        GII_attrs       = @default                         |
+                          GIA_INITIATED_VIA_USER_DO_DIALOG |
+                          GIA_MODAL                        |
+                          GIA_NOT_USER_INITIATABLE         ;
+        GI_comp         = @BlackBoxBadGuessGlyph ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass BlackBoxBadGuessGlyph = {
+        GI_comp = @BadGuessGlyph,
+                  @BadGuessText ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass BadGuessGlyph = {
+        GI_visMoniker = list { @BlackBoxBadGuessMoniker } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass BadGuessText = {
+        GI_visMoniker = "Your guess is incorrect." ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceBadGuess
+
+
+@start QTipsResource;
+@include "art/QTip1.goh"
+@include "art/QTip2.goh"
+@include "art/QTip3.goh"
+
+	 @object GenInteractionClass QTipsDialogBox = {
+		  GI_visMoniker = "The Black Box Quick Tips";
+		  GI_comp = @GoalText,
+						@QuickTipsGroup,
+						@ShowOnStartupGroup,
+						@OKTipsButton;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+	 }
+
+
+	 @object GenTextClass GoalText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "The goal of the game is to guess where the atoms are hidden in the black box.  You will shoot a laser into the box and by observing where the laser exits the black box you can analyze where the atoms are hidden.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+
+	 @object GenBooleanGroupClass ShowOnStartupGroup = {
+		  GI_comp = @ShowOnStartupBoolean;
+	 }
+
+	 @object GenBooleanClass ShowOnStartupBoolean = {
+		  GI_visMoniker = 'S', "Show this Dialog box when The Black Box starts";
+		  GBI_identifier = SHOW_ON_STARTUP;
+	 }
+
+	 @object GenTriggerClass OKTipsButton = {
+		  GI_visMoniker   = 'O', "OK";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+		  HINT_SEEK_REPLY_BAR;
+		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+
+
+	 @object GenInteractionClass QuickTipsGroup = {
+		  GI_comp = @QTip1, @QTip2, @QTip3;
+	 }
+
+	 @object GenInteractionClass QTip1 = {
+		  GI_comp = @QTip1GlyphHolder, @QTip1Text;
+	  	  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+	 @object GenInteractionClass QTip1GlyphHolder = {
+		  GI_comp = @QTip1Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 60, 0,0};
+		  /* ^^^ is based on the width of the widest icon */
+	 }
+
+	 @object GenGlyphClass QTip1Glyph = {
+		  GI_visMoniker = list { @QTip1Moniker };
+	 }
+
+	 @object GenTextClass QTip1Text = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "To shoot the laser, point your mouse cursor anywhere on the white borders of the black box and click the left mouse button.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+	 }
+
+	 @object GenInteractionClass QTip2 = {
+		  GI_comp = @QTip2GlyphHolder, @QTip2Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+	 @object GenInteractionClass QTip2GlyphHolder = {
+		  GI_comp = @QTip2Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 60, 0,0};
+	 }
+
+	 @object GenGlyphClass QTip2Glyph = {
+		  GI_visMoniker = list { @QTip2Moniker };
+	 }
+
+	 @object GenTextClass QTip2Text = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "Mark the squares that do not contain an atom with an 'X'.  Move your mouse pointer over a square and click once.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+	 }
+
+	 @object GenInteractionClass QTip3 = {
+		  GI_comp = @QTip3GlyphHolder, @QTip3Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+	 @object GenInteractionClass QTip3GlyphHolder = {
+		  GI_comp = @QTip3Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 60, 0,0};
+	 }
+
+	 @object GenGlyphClass QTip3Glyph = {
+		  GI_visMoniker = list { @QTip3Moniker };
+	 }
+
+	 @object GenTextClass QTip3Text = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "Mark the squares that you think contain an atom with a '?'.  Move your mouse pointer over a square and click twice.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+	 }
+
+@end QTipsResource
+
+
+/*=========================================================================*/
+@start StringsResource ;
+    @chunk char StringLaserPrefix[] = "Laser Shots Left: ";
+         @localize { "Prefix for laser shots, usually 'Laser Shots Left: '+###" 0-20 } ;
+	 @chunk char StringNumGuessesLeftPrefix[] = "Guesses Left: " ;
+         @localize { "Prefix for remaining guesses, usually 'Number Guesses Left: '+#" 0-30 } ;
+	 @chunk char AtomsText1[] = "Find the " ;
+	 @chunk char AtomsText2[] = " atoms" ;
+@end StringsResource
+/*=========================================================================*/
+
+
+
+/* size_x and size_y must be odd values */
+
+void BlackBoxMake(byte* bbox_field, word size)
+{
+    word x,y,pos ;
+    word i ;
+
+    @send BlackBoxApp::MSG_GEN_APPLICATION_MARK_BUSY() ;
+
+    for (x=0; x<size; x++)  {
+        for (y=0; y<size; y++)  {
+            pos = quick_bbox(x,y) ;
+            bbox_field[pos] = BLACK_BOX_BLANK ;
+            if ((x==0)||(y==0)||(x==(size-1))||(y==(size-1)))
+                bbox_field[pos] = BLACK_BOX_NOTHING ;
+        }
+    }
+
+    for (i=0; i<num_atoms; i++)  {
+        do {
+            do {
+                x = (MyRandom()>>3)&15 ;
+            } while ((x<2) || (x >= (size-2))) ;
+            do {
+                y = (MyRandom()>>4)&15 ;
+            } while ((y<2) || (y >= (size-2))) ;
+            pos = quick_bbox(x,y) ;
+        } while (bbox_field[pos] != BLACK_BOX_BLANK) ;
+        bbox_field[pos] = BLACK_BOX_BALL ;
+    }
+
+    bbox_field[quick_bbox(0, 0)] = BLACK_BOX_NOTHING2 ;
+    bbox_field[quick_bbox(size-1, 0)] = BLACK_BOX_NOTHING2 ;
+    bbox_field[quick_bbox(0, size-1)] = BLACK_BOX_NOTHING2 ;
+    bbox_field[quick_bbox(size-1, size-1)] = BLACK_BOX_NOTHING2 ;
+
+    @send BlackBoxApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+}
+/*-------------------------------------------------------------------------*/
+void BlackBoxDraw(GStateHandle gstate)
+{
+    word x, y ;
+    word pos ;
+    word x_at, y_at ;
+    byte value ;
+    Bitmap *pic ;
+
+    MemLock(OptrToHandle(@BlankPicture)) ;
+    for (y_at=y=0; y<size; y++, y_at += SQUARE_SIZE)  {
+        pos = quick_bbox(0, y) ;
+        for (x_at=x=0; x<size; x++, x_at += SQUARE_SIZE, pos++)  {
+            value=bbox_field[pos] ;
+            if (game_mode == 2)  {
+                if (value&0x80)
+                    value = BLACK_BOX_BALL_PIC ;
+            } else {
+                value &= 0x7F ;
+            }
+				if ((value!=BLACK_BOX_NOTHING) &&
+                (value!=BLACK_BOX_NOTHING2)) {
+                pic = (Bitmap *)LMemDeref(Pictures[value]) ;
+                GrDrawBitmap(gstate, x_at, y_at, pic, NULL) ;
+            }
+
+        }
+    }
+    MemUnlock(OptrToHandle(@BlankPicture)) ;
+}
+/*-------------------------------------------------------------------------*/
+void BlackBoxPlaySound(MemHandle soundHandle)
+{
+ word 		tempo = 8;
+
+
+	 if (g_sound == SOUND_SYSTEM)
+		 /* this routine abides by syst sound setting */
+		 UserStandardSound(SST_CUSTOM_SOUND, soundHandle, 1);
+	 else if (g_sound == SOUND_OFF)  return;
+	 else {
+		 /* this routine doesn't check syst sound setting -
+		  * but we need to supply the tempo */
+		 SoundPlayMusic(soundHandle, SP_GAME, tempo, EOSF_UNLOCK);
+		 }
+}
+
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+	 FileHandle fhandle ;
+	 Boolean initError, tips ;
+
+	 @callsuper() ;
+
+	 @call BlackBoxApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+	 SoundAllocMusic(shootSoundBuf, 1, &shootSound);
+	 SoundAllocMusic(badGuessSoundBuf, 3, &badGuessSound);
+	 SoundAllocMusic(winSoundBuf, 3, &winSound);
+
+	 /* check for quick tips */
+	 initError = InitFileReadBoolean("BlackBox", "showTips", &tips);
+	 if (initError) tips = TRUE;
+	 if (tips) {
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 TRUE);
+		 @send QTipsDialogBox::MSG_GEN_INTERACTION_INITIATE();
+		 }
+	 else
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 FALSE);
+	 /* check for sound */
+	 initError = InitFileReadInteger("BlackBox", "sound", &g_sound);
+	 if (initError) g_sound = SOUND_SYSTEM;
+	 @call SoundGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(g_sound, FALSE) ;
+
+
+	 FilePushDir() ;
+	 FileSetCurrentPath(bbox_drive, bbox_relativePath) ;
+	 FileCreateDir(bbox_path) ;
+	 FileSetCurrentPath(bbox_drive,bbox_path) ;
+
+	 fhandle = FileOpen(bbox_state_file, FILE_ACCESS_R|FILE_DENY_W) ;
+
+	 if (fhandle!=NullHandle)  {
+		  /* Make sure file at beginning */
+		  FilePos(fhandle, 0, FILE_POS_START) ;
+		  FileRead(fhandle, &size, sizeof(word), FALSE) ;
+		  FileRead(fhandle, bbox_field, sizeof(byte)*LARGEST_SIZE, FALSE) ;
+		  FileRead(fhandle, &game_mode, sizeof(byte), FALSE) ;
+		  FileRead(fhandle, &time_sec, sizeof(byte), FALSE) ;
+		  FileRead(fhandle, &time_min, sizeof(byte), FALSE) ;
+		  FileRead(fhandle, &time_hour, sizeof(byte), FALSE) ;
+		  FileRead(fhandle, &num_guesses_left, sizeof(byte), FALSE) ;
+		  FileRead(fhandle, &num_atoms, sizeof(byte), FALSE) ;
+		  FileRead(fhandle, &laser_shots, sizeof(byte), FALSE) ;
+		  FileRead(fhandle, &player_score, sizeof(word), FALSE) ;
+		  FileRead(fhandle, &selection_size, sizeof(byte), FALSE) ;
+		  FileRead(fhandle, &num_spots, sizeof(byte), FALSE) ;
+		  FileClose(fhandle, FALSE) ;
+	/*     is_min = @call BlackBoxPrimary::MSG_GEN_DISPLAY_GET_MINIMIZED() ;
+		if ((game_mode==1)&&(!is_min))  {
+				timer_handle = TimerStart(TIMER_EVENT_CONTINUAL,
+											 @BlackBoxTimer,
+											 120,
+											 MSG_BLACK_BOX_TIMER_CHANGE,
+											 60,
+											 &timer_id) ;
+				timer_going = TRUE ;
+		  }  */
+	 //    @send BlackBoxTimer::MSG_BLACK_BOX_CHANGE_TIME() ;
+		  @send BlackBoxView::MSG_GEN_VIEW_SET_DOC_BOUNDS(
+									 (size*SQUARE_SIZE),
+									 (size*SQUARE_SIZE),
+									 0,
+									 0) ;
+	 /*    @send process::MSG_BLACK_BOX_UPDATE_LASER_SHOTS() ;
+		@send process::MSG_BLACK_BOX_UPDATE_NUM_GUESSES() ; */
+		  @call BlackBoxSizeGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection_size, FALSE) ;
+		  @call BlackBoxAtomsGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(num_atoms, FALSE) ;
+	 } /* end reading file if */
+
+	 @send process::MSG_BLACK_BOX_UPDATE_ATOMS_TEXT() ;
+
+	 /* jfh - start a new game on opening even if one was going when closed */
+	 @send process::MSG_VIEW_BLACK_BOX_NEW() ;
+
+	 FilePopDir() ;
+
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+	 FileHandle fhandle ;
+    Boolean		tips;
+
+	 SoundStopMusic(shootSound);
+	 SoundFreeMusic(shootSound);
+	 SoundStopMusic(badGuessSound);
+	 SoundFreeMusic(badGuessSound);
+	 SoundStopMusic(winSound);
+	 SoundFreeMusic(winSound);
+
+    if (timer_going)
+        TimerStop(timer_handle, timer_id) ;
+    timer_going = FALSE ;
+
+    FilePushDir() ;
+    FileSetCurrentPath(bbox_drive, bbox_relativePath) ;
+    FileCreateDir(bbox_path) ;
+    FileSetCurrentPath(bbox_drive, bbox_path) ;
+    FileDelete(bbox_state_file) ;
+
+    fhandle = FileCreate(bbox_state_file,
+              FILE_CREATE_TRUNCATE |
+              FILE_ACCESS_RW |
+              FILE_DENY_NONE,
+              FILE_ATTR_NORMAL) ;
+
+    if (fhandle!=NullHandle)  {
+        /* Make sure file at beginning */
+        FilePos(fhandle, 0, FILE_POS_START) ;
+        FileWrite(fhandle, &size, sizeof(word), FALSE) ;
+        FileWrite(fhandle, bbox_field, sizeof(byte)*LARGEST_SIZE, FALSE) ;
+        FileWrite(fhandle, &game_mode, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &time_sec, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &time_min, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &time_hour, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &num_guesses_left, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &num_atoms, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &laser_shots, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &player_score, sizeof(word), FALSE) ;
+		  FileWrite(fhandle, &selection_size, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &num_spots, sizeof(byte), FALSE) ;
+        FileClose(fhandle, FALSE) ;
+    }
+    FilePopDir() ;
+
+	 /* set the quick tips if not default */
+	 tips = @call ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(
+																	 SHOW_ON_STARTUP);
+	 InitFileWriteBoolean("BlackBox", "showTips", tips);
+	 InitFileWriteInteger("BlackBox", "sound", g_sound);
+
+	 return (@callsuper()) ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_SOUND_CHANGED
+{
+	 g_sound = selection ;
+}
+
+/*-------------------------------------------------------------------------*/
+@method BlackBoxContentClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    gstate = GrCreateState(win);
+    GrBeginUpdate(gstate);
+
+    BlackBoxDraw(gstate);
+
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_VIEW_INVALIDATE
+{
+    WindowHandle win ;
+    GStateHandle gstate ;
+
+    win = @call BlackBoxView::MSG_GEN_VIEW_GET_WINDOW() ;
+    gstate = GrCreateState(win) ;
+    GrInvalRect(gstate, 0, 0, 2000, 2000) ;
+    GrDestroyState(gstate) ;
+    @call BlackBoxContent::MSG_VIS_INVALIDATE();
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_VIEW_BLACK_BOX_NEW
+{
+    BlackBoxMake(bbox_field, size) ;
+    @call process::MSG_VIEW_INVALIDATE() ;
+    @call BlackBoxView::MSG_GEN_UPDATE_VISUAL(VUM_NOW) ;
+    game_mode = 0 ;
+    num_spots = 0 ;
+
+    if (timer_going)
+        TimerStop(timer_handle, timer_id) ;
+    @call BlackBoxTimer::MSG_BLACK_BOX_RESET_TIMER() ;
+
+    @call process::MSG_BLACK_BOX_UPDATE_SCORE() ;
+    laser_shots = DEFAULT_NUM_LASER_SHOTS ;
+    @call process::MSG_BLACK_BOX_UPDATE_LASER_SHOTS() ;
+    num_guesses_left = 5 ;
+    @call process::MSG_BLACK_BOX_UPDATE_NUM_GUESSES() ;
+    @call BlackBoxGuess::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_SIZE_CHANGED
+{
+    word answer ;
+
+    if (selection!=selection_size) {
+        answer = IC_YES ;
+        if (game_mode == 1)  {
+            answer = UserStandardDialogOptr(
+                NullOptr,
+                NullOptr,
+                NullOptr,
+                NullOptr,
+		        @BlackBoxNewGameMsg,
+		        (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		        (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+        }
+        if (answer == IC_YES)  {
+            size = selection_size = selection ;
+            @send process::MSG_VIEW_BLACK_BOX_NEW() ;
+            @send BlackBoxView::MSG_GEN_VIEW_SET_DOC_BOUNDS(
+                                (size*SQUARE_SIZE),
+                                (size*SQUARE_SIZE),
+                                0,
+                                0) ;
+        } else {
+            @send BlackBoxSizeGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(size, FALSE) ;
+        }
+    }
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_NUM_ATOMS_CHANGED
+{
+    word answer ;
+
+    if (selection!=num_atoms) {
+        answer = IC_YES ;
+        if (game_mode == 1)  {
+            answer = UserStandardDialogOptr(
+                NullOptr,
+                NullOptr,
+                NullOptr,
+                NullOptr,
+		        @BlackBoxNewGameMsg,
+		        (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		        (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+        }
+        if (answer == IC_YES)  {
+				num_atoms = selection ;
+				@send process::MSG_BLACK_BOX_UPDATE_ATOMS_TEXT() ;
+				@send process::MSG_VIEW_BLACK_BOX_NEW() ;
+		  } else {
+            @send BlackBoxAtomsGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(num_atoms, FALSE) ;
+        }
+    }
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_UPDATE_ATOMS_TEXT
+{
+ char		atomStr[20];
+
+
+	 MemLock(OptrToHandle(@AtomsText1));
+	 sprintf(atomStr, "%s%d%s", LMemDeref(@AtomsText1), num_atoms, LMemDeref(@AtomsText2));
+	 MemUnlock(OptrToHandle(@AtomsText1));
+
+	 @call BlackBoxMainBottomText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+												  atomStr, VUM_NOW) ;
+
+}
+
+/*-------------------------------------------------------------------------*/
+@method BlackBoxContentClass, MSG_META_START_SELECT
+{
+    word pos ;
+    byte value ;
+
+    if (game_mode < 2)  {
+        if (game_mode == 0)  {
+                @call BlackBoxTimer::MSG_BLACK_BOX_RESET_TIMER() ;
+                timer_handle = TimerStart(TIMER_EVENT_CONTINUAL,
+                                      @BlackBoxTimer,
+                                      60,
+                                      MSG_BLACK_BOX_TIMER_CHANGE,
+                                      60,
+                                      &timer_id) ;
+                timer_going = TRUE ;
+            game_mode = 1 ;
+        }
+        xPosition /= SQUARE_SIZE ;
+        yPosition /= SQUARE_SIZE ;
+
+        pos = quick_bbox(xPosition, yPosition) ;
+        value = bbox_field[pos]&0x7F ;
+        /* Is the player clicking on a legal square? */
+        switch (value)  {
+            case BLACK_BOX_BLANK:
+                bbox_field[pos] &= BLACK_BOX_BALL ;
+                bbox_field[pos] |= BLACK_BOX_X ;
+                @send process::MSG_BLACK_BOX_REDRAW_SQUARE(xPosition, yPosition) ;
+                break ;
+            case BLACK_BOX_X:
+                bbox_field[pos] &= BLACK_BOX_BALL ;
+                bbox_field[pos] |= BLACK_BOX_GUESS ;
+                @send process::MSG_BLACK_BOX_REDRAW_SQUARE(xPosition, yPosition) ;
+                num_spots++ ;
+                break ;
+            case BLACK_BOX_GUESS:
+                bbox_field[pos] &= BLACK_BOX_BALL ;
+                bbox_field[pos] |= BLACK_BOX_BLANK ;
+                @send process::MSG_BLACK_BOX_REDRAW_SQUARE(xPosition, yPosition) ;
+                num_spots-- ;
+                break ;
+            case BLACK_BOX_UP:
+            case BLACK_BOX_DOWN:
+            case BLACK_BOX_RIGHT:
+            case BLACK_BOX_LEFT:
+            case BLACK_BOX_NOTHING:
+                if (laser_shots)  {
+                    ShootLaser(xPosition, yPosition) ;
+                    laser_shots-- ;
+                    @send process::MSG_BLACK_BOX_UPDATE_LASER_SHOTS() ;
+                }
+        }
+        if (num_spots == num_atoms)
+            @send BlackBoxGuess::MSG_GEN_SET_ENABLED(VUM_NOW) ;
+        else
+            @send BlackBoxGuess::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+    } else {
+        @send BlackBoxGuess::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+    }
+    retVal->flags = MRF_PROCESSED ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_META_CLIPBOARD_COPY
+{
+    ClipboardItemHeader *headerMem ;
+    MemHandle           headerMemHandle ;
+    VMFileHandle        transferVMFile ;
+    VMBlockHandle       dataVMBlock ;
+    VMBlockHandle       headerVMBlock ;
+    GStateHandle        gstate;
+
+    @send BlackBoxApp::MSG_GEN_APPLICATION_MARK_BUSY() ;
+    transferVMFile = ClipboardGetClipboardFile() ;
+
+    gstate = GrCreateGString(transferVMFile, GST_VMEM, &dataVMBlock);
+    BlackBoxDraw(gstate);
+    GrEndGString(gstate);
+
+    headerVMBlock = VMAlloc(transferVMFile, sizeof(ClipboardItemHeader), 1111) ;
+    headerMem = (ClipboardItemHeader *)VMLock(
+                 transferVMFile, headerVMBlock, &headerMemHandle) ;
+    headerMem->CIH_owner = ConstructOptr(GeodeGetProcessHandle(), 0) ;
+    headerMem->CIH_flags = 0 ;
+    headerMem->CIH_name[0] = 'B' ;
+    headerMem->CIH_name[1] = 'B' ;
+    headerMem->CIH_name[2] = 'o' ;
+    headerMem->CIH_name[3] = 'x' ;
+    headerMem->CIH_name[4] = '\0' ;
+    headerMem->CIH_formatCount = 1;
+    headerMem->CIH_sourceID = 0 ;
+    headerMem->CIH_formats[0].CIFI_format =
+        FormatIDFromManufacturerAndType(
+             MANUFACTURER_ID_GEOWORKS,
+             CIF_GRAPHICS_STRING) ;
+    headerMem->CIH_formats[0].CIFI_vmChain =
+        (VMChain)(((dword)(dataVMBlock))<<16L) ;
+    headerMem->CIH_formats[0].CIFI_extra1 = 0 ;
+    headerMem->CIH_formats[0].CIFI_extra2 = 0 ;
+    VMUnlock(headerMemHandle) ;
+    ClipboardRegisterItem(BlockIDFromFileAndBlock(transferVMFile,
+        headerVMBlock),
+        0) ;
+    @send BlackBoxApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_COMPLETED
+{
+    word id ;
+
+    if (timer_going)
+        TimerStop(timer_handle, timer_id) ;
+    game_mode = 2 ;
+    @send process::MSG_VIEW_INVALIDATE() ;
+    TimerStart(
+        TIMER_EVENT_ONE_SHOT,
+        oself,
+        15,
+        MSG_BLACK_BOX_COMPLETED2,
+        0,
+        &id) ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_COMPLETED2
+{
+
+	 BlackBoxPlaySound(winSound);
+
+	 UserDoDialog(@BlackBoxCompletedBox) ;
+
+	 @send HighScoreControl::MSG_HIGH_SCORE_ADD_SCORE(
+					                       (dword) player_score, 0);
+
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_VIEW_BLACK_BOX_GIVE_UP
+{
+    if (timer_going)  {
+        TimerStop(timer_handle, timer_id) ;
+        timer_going = FALSE ;
+    }
+    game_mode = 2 ;
+    @send process::MSG_VIEW_INVALIDATE() ;
+    @send process::MSG_BLACK_BOX_UPDATE_NUM_GUESSES() ;
+}
+
+/*-------------------------------------------------------------------------*/
+@method BlackBoxTimerClass, MSG_BLACK_BOX_CHANGE_TIME
+{
+    char new_time[10] ;
+
+	 new_time[0] = '0'+time_hour/10;
+	 new_time[1] = '0'+time_hour%10;
+	 new_time[2] = ':';
+
+	 new_time[3] = '0'+time_min/10;
+	 new_time[4] = '0'+time_min%10;
+	 new_time[5] = ':';
+
+	 new_time[6] = '0'+time_sec/10;
+	 new_time[7] = '0'+time_sec%10;
+	 new_time[8] = 0;
+
+	 @call BlackBoxTimer::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(new_time, VUM_NOW) ;
+
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxTimerClass, MSG_BLACK_BOX_TIMER_CHANGE
+{
+    time_sec++ ;
+    if (time_sec==60)  {
+        time_sec = 0 ;
+        time_min++ ;
+        if (time_min==60)  {
+            time_min = 0 ;
+            time_hour++ ;
+            if (time_hour == 100)  {
+                time_hour = 99 ;
+            }
+        }
+    }
+	 @send BlackBoxTimer::MSG_BLACK_BOX_CHANGE_TIME() ;
+    if ((time_sec % 5)==0)
+        @send process::MSG_BLACK_BOX_UPDATE_SCORE() ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxTimerClass, MSG_BLACK_BOX_RESET_TIMER
+{
+    time_sec = time_min = time_hour = 0 ;
+    @send BlackBoxTimer::MSG_BLACK_BOX_CHANGE_TIME() ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_REDRAW_SQUARE
+{
+    WindowHandle win ;
+    GStateHandle gstate ;
+    RectDWord    rect = {0,0,2000,2000} ;
+
+    rect.RD_left = SQUARE_SIZE*pos_x ;
+    rect.RD_top = SQUARE_SIZE*pos_y ;
+    rect.RD_right = SQUARE_SIZE*(pos_x+1) ;
+    rect.RD_bottom = SQUARE_SIZE*(pos_y+1) ;
+
+    win = @call BlackBoxView::MSG_GEN_VIEW_GET_WINDOW() ;
+    gstate = GrCreateState(win) ;
+    GrInvalRectDWord(gstate, &rect) ;
+    GrDestroyState(gstate) ;
+}
+/*-------------------------------------------------------------------------*/
+char *convert_word_to_str(char *buffer, word value)
+{
+    word power = 10000 ;
+    byte flag = 0 ;
+    word digit = 0 ;
+
+    while (power)  {
+        digit = '0' + (value/power) ;
+        if ((digit!='0')||(power==1))
+            flag |= 1 ;
+
+        if (flag)  {
+            *(buffer++) = digit ;
+            value %= power ;
+        }
+        power /= 10 ;
+    }
+    *buffer = '\0' ;
+
+    return buffer ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_UPDATE_SCORE
+{
+    char buffer[30] ;
+    sword score_time ;
+    word max_score ;
+
+    max_score = num_atoms * (3 + BLACK_BOX_SIZE_LARGE - size) * 10 ;
+    score_time = ((sword)time_hour)*3600 + ((sword)time_min)*60 + ((sword)time_sec) ;
+    score_time = max_score - ((score_time/5)*5);
+    if (score_time > 0)  {
+		  player_score = score_time ;
+//        AppendNumToString(buffer, @StringScorePrefix, player_score) ;
+		  sprintf(buffer, "%d", player_score);
+
+        @call BlackBoxScore::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer, VUM_NOW) ;
+    }
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_UPDATE_LASER_SHOTS
+{
+    char buffer[30] ;
+
+ //   AppendNumToString(buffer, @StringLaserPrefix, laser_shots) ;
+	 sprintf(buffer, "%d", laser_shots);
+	 @call BlackBoxLaserShots::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer, VUM_NOW) ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_UPDATE_NUM_GUESSES
+{
+    char buffer[40] ;
+    word x,y, pos ;
+    word count ;
+
+    for (count=y=pos=0; y<size; y++)
+        for (x=0; x<size; x++, pos++)
+            if (bbox_field[pos]==BLACK_BOX_GUESS)  {
+                count++ ;
+            } else if (bbox_field[pos] == (BLACK_BOX_BALL|BLACK_BOX_GUESS))  {
+                count++ ;
+            }
+
+//    AppendNumToString(buffer, @StringNumGuessesLeftPrefix, num_guesses_left) ;
+	 sprintf(buffer, "%d", num_guesses_left);
+	 @call BlackBoxNumGuesses::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer, VUM_NOW) ;
+    if ((num_guesses_left==0) || (count != num_atoms) || (game_mode == 2))
+        @call BlackBoxGuess::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+    else
+        @call BlackBoxGuess::MSG_GEN_SET_ENABLED(VUM_NOW) ;
+}
+
+/*-------------------------------------------------------------------------*/
+void mycopy(char *s, char *t, word size)
+{
+    for (; size; size--)
+        *(s++) = *(t++) ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_DID_NOT_WIN
+{
+    word id ;
+
+    if (timer_going)  {
+        TimerStop(timer_handle, timer_id) ;
+        timer_going = FALSE ;
+    }
+    game_mode = 2 ;
+    @send process::MSG_VIEW_INVALIDATE() ;
+    TimerStart(
+        TIMER_EVENT_ONE_SHOT,
+        oself,
+        15,
+        MSG_BLACK_BOX_DID_NOT_WIN2,
+        0,
+        &id) ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_DID_NOT_WIN2
+{
+    UserDoDialog(@BlackBoxWrongCompletionBox) ;
+}
+/*-------------------------------------------------------------------------*/
+word MyRandom()
+{
+    static word rand1 = 0xf32d ;
+    static word rand2 = 0x0103 ;
+    static word rand3 = 0x4326 ;
+    static word rand4 = 0x4878 ;
+    TimerDateAndTime dateAndTime ;
+    word old ;
+
+    TimerGetDateAndTime(&dateAndTime) ;
+    old = rand1 ;
+    rand1 = rand2 ;
+    rand2 = rand3 ;
+    rand3 = rand4 ;
+/*
+    rand4 += dateAndTime.TDAT_minutes + dateAndTime.TDAT_minutes +
+             dateAndTime.TDAT_hours + dateAndTime.TDAT_day ;
+*/
+    rand4 ^= old^rand1^rand2^rand3 ;
+    rand3 += rand1+rand2+rand4 ;
+    rand4 += TimerGetCount() ;
+    return old ;
+}
+/*-------------------------------------------------------------------------*/
+void ClearOldShot()
+{
+    word x,y,pos ;
+
+    for (y=pos=0; y<size; y++)
+        for (x=0; x<size; x++, pos++)
+            switch(bbox_field[pos])  {
+                case BLACK_BOX_UP:
+                case BLACK_BOX_DOWN:
+                case BLACK_BOX_LEFT:
+                case BLACK_BOX_RIGHT:
+                    bbox_field[pos] = BLACK_BOX_NOTHING ;
+                    @send process::MSG_BLACK_BOX_REDRAW_SQUARE(x,y) ;
+                    break ;
+            }
+}
+/*-------------------------------------------------------------------------*/
+void ShootLaser(sword x, sword y)
+{
+    sword dirx[4] = { 0, 0, -1, 1 } ;
+    sword diry[4] = { -1, 1, 0, 0 } ;
+    byte dir ;
+    word pos ;
+    byte left_value ;
+    byte right_value ;
+    byte work_x, work_y ;
+	 byte	i;
+
+	 byte entrance_markers[4] = { BLACK_BOX_UP,
+                                 BLACK_BOX_DOWN,
+                                 BLACK_BOX_LEFT,
+                                 BLACK_BOX_RIGHT } ;
+
+    byte lefts[4]            = { DIR_LEFT,
+                                 DIR_RIGHT,
+                                 DIR_DOWN,
+                                 DIR_UP } ;
+
+    byte rights[4]           = { DIR_RIGHT,
+                                 DIR_LEFT,
+                                 DIR_UP,
+                                 DIR_DOWN } ;
+
+
+	 for (i = 0; i < 7; i++)  {
+		 BlackBoxPlaySound(shootSound);
+		 TimerSleep(2);
+		 }
+
+	 /* Determine direction and mark entrance */
+	 ClearOldShot() ;
+
+    if (x==0)
+       dir = DIR_RIGHT ;
+    if (x==(size-1))
+       dir = DIR_LEFT ;
+    if (y==0)
+       dir = DIR_DOWN ;
+    if (y==(size-1))
+       dir = DIR_UP ;
+
+    pos = quick_bbox(x, y) ;
+    bbox_field[pos] = entrance_markers[dir] ;
+    @send process::MSG_BLACK_BOX_REDRAW_SQUARE(x,y) ;
+
+    x += dirx[dir] ;
+    y += diry[dir] ;
+    pos = quick_bbox(x, y) ;
+
+    while (IsInsideType(bbox_field[pos]))  {
+        if (bbox_field[pos]&BLACK_BOX_BALL)  {
+            /* Hit an atom right on!  Probably first, turn around! */
+            dir ^= 1 ;
+        } else {
+            /* determine if there is something to change the direction */
+            work_x = x + dirx[dir] + dirx[lefts[dir]] ;
+            work_y = y + diry[dir] + diry[lefts[dir]] ;
+            pos = quick_bbox(work_x, work_y) ;
+            left_value = bbox_field[pos] ;
+
+            work_x = x + dirx[dir] + dirx[rights[dir]] ;
+            work_y = y + diry[dir] + diry[rights[dir]] ;
+            pos = quick_bbox(work_x, work_y) ;
+            right_value = bbox_field[pos] ;
+
+            work_x = x + dirx[dir] ;
+            work_y = y + diry[dir] ;
+            pos = quick_bbox(work_x, work_y) ;
+
+            if ((bbox_field[pos]&BLACK_BOX_BALL) ||
+                ((left_value&BLACK_BOX_BALL) &&
+                 (right_value&BLACK_BOX_BALL)))  {
+                /* Reverse direction */
+                dir ^= 1 ;
+            } else if (left_value&BLACK_BOX_BALL) {
+                /* Turn right */
+                dir = rights[dir] ;
+            } else if (right_value&BLACK_BOX_BALL)  {
+                dir = lefts[dir] ;
+            }
+        }
+
+        x += dirx[dir] ;
+        y += diry[dir] ;
+        pos = quick_bbox(x, y) ;
+    }
+
+    bbox_field[pos] = entrance_markers[dir] ;
+    @send process::MSG_BLACK_BOX_REDRAW_SQUARE(x,y) ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxProcessClass, MSG_BLACK_BOX_GUESS
+{
+    word x,y,pos ;
+    word count ;
+
+    for (count=y=pos=0; y<size; y++)
+        for (x=0; x<size; x++, pos++)
+            if (bbox_field[pos]==BLACK_BOX_GUESS)  {
+                count = 0 ;
+                break ;
+            } else if (bbox_field[pos] == (BLACK_BOX_BALL|BLACK_BOX_GUESS))  {
+                count++ ;
+            }
+    num_guesses_left-- ;
+    @send process::MSG_BLACK_BOX_UPDATE_NUM_GUESSES() ;
+    if (num_guesses_left==0)  {
+        @send process::MSG_BLACK_BOX_DID_NOT_WIN() ;
+        @call BlackBoxGuess::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+    } else {
+        if (count == num_atoms)  {
+            @send process::MSG_BLACK_BOX_COMPLETED() ;
+            @call BlackBoxGuess::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+        } else {
+				BlackBoxPlaySound(badGuessSound);
+				UserDoDialog(@BlackBoxBadGuessBox) ;
+		  }
+    }
+}
+/*-------------------------------------------------------------------------*/
+Boolean IsInsideType(byte b)
+{
+    if (b&BLACK_BOX_BALL)
+        return TRUE ;
+
+    if ((b==BLACK_BOX_BLANK) ||
+        (b==BLACK_BOX_GUESS) ||
+        (b==BLACK_BOX_X))
+        return TRUE ;
+
+    return FALSE ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxPrimaryClass, MSG_GEN_DISPLAY_SET_MINIMIZED
+{
+    if (timer_going)
+        TimerStop(timer_handle, timer_id) ;
+    timer_going = FALSE ;
+    @callsuper() ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxPrimaryClass, MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
+{
+    if (game_mode==1)  {
+        timer_handle = TimerStart(TIMER_EVENT_CONTINUAL,
+                              @BlackBoxTimer,
+                              120,
+                              MSG_BLACK_BOX_TIMER_CHANGE,
+                              60,
+                              &timer_id) ;
+        timer_going = TRUE ;
+    }
+    @callsuper() ;
+}
+
+/*-------------------------------------------------------------------------*/
+@method BlackBoxPauseInterClass, MSG_VIS_DRAW
+{
+    Rectangle rect;
+
+    @call oself::MSG_VIS_GET_BOUNDS(&rect) ;
+    GrSaveState(gstate) ;
+    GrSetLineWidth(gstate, MakeWWFixed(1.0)) ;
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+    GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+    GrDrawRect(gstate,
+        rect.R_left-1,
+        rect.R_top-1,
+        rect.R_right+2,
+        rect.R_bottom+2) ;
+    GrFillRect(gstate,
+        rect.R_left-2,
+        rect.R_top-2,
+        rect.R_right+1,
+        rect.R_bottom+1) ;
+    GrDrawRect(gstate,
+        rect.R_left-2,
+        rect.R_top-2,
+        rect.R_right+1,
+        rect.R_bottom+1) ;
+    GrRestoreState(gstate) ;
+
+    @callsuper() ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxAppClass, MSG_META_LOST_TARGET_EXCL
+{
+    if (timer_going)
+        TimerStop(timer_handle, timer_id) ;
+    timer_going = FALSE ;
+    if (game_mode == 1)  {
+        @call BlackBoxView::MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+        @call BlackBoxLostFocusGlyph::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+    @callsuper() ;
+}
+/*-------------------------------------------------------------------------*/
+@method BlackBoxAppClass, MSG_META_GAINED_TARGET_EXCL
+{
+    if (game_mode==1)  {
+        if (timer_going == FALSE)  {
+            timer_handle = TimerStart(TIMER_EVENT_CONTINUAL,
+											 @BlackBoxTimer,
+                                  120,
+                                  MSG_BLACK_BOX_TIMER_CHANGE,
+                                  60,
+                                  &timer_id) ;
+            timer_going = TRUE ;
+        }
+    }
+    @call BlackBoxLostFocusGlyph::MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+    @call BlackBoxView::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+    @callsuper() ;
+}
+/*-------------------------------------------------------------------------*/
+/*void AppendNumToString(char *p_pos, optr string, word num)
+{
+    char *p_src ;
+    word len ;
+
+    MemLock(OptrToHandle(string)) ;
+    p_src = LMemDeref(string) ;
+    strcpy(p_pos, p_src) ;
+    MemUnlock(OptrToHandle(string)) ;
+    len = strlen(p_pos) ;
+    convert_word_to_str(p_pos+len, num) ;
+}
+/*-------------------------------------------------------------------------*/
+
+

@@ -1,0 +1,193 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	PCGEOS
+ * MODULE:	template.ui
+ * FILE:	template.ui
+ *
+ * AUTHOR:  	Gene Anderson: Sep 11, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	9/11/91	  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	Options for TEMPLATE saver
+ *
+ * 	$Id: template.ui,v 1.1 97/04/04 16:47:35 newdeal Exp $
+ *
+ ***********************************************************************/
+#include	"generic.uih"
+#include	"saver.uih"
+#include	"options.uih"
+
+/******************************************************************************
+ *
+ *				OPTIONS TREE
+ *
+ ******************************************************************************/
+
+#define CALL_TEMPLATE(routine) METHOD_SAVER_CALL_SPECIFIC, "enum " #routine
+
+start	TemplateOptions;
+
+TemplateRoot = OptInteraction {
+	category = "template";
+	children =
+		TemplateSpeedList,
+		TemplateClearMode;
+	genStates = default -usable;
+	hints = {
+		HINT_CENTER_BY_MONIKERS
+	}
+}
+
+TemplateSpeedList = OptList {
+	key = "speed";
+	moniker = "Speed:";
+	children = TSSlow, TSMedium, TSFast;
+	action = CALL_TEMPLATE(TemplateSetSpeed);
+}
+
+TSSlow = GenListEntry {
+	moniker = "Slow";
+	method = TEMPLATE_SLOW_SPEED;
+}
+
+TSMedium = GenListEntry {
+	moniker = "Medium";
+	method = TEMPLATE_MEDIUM_SPEED;
+	curState = isOn, isDefault, userIsOn;
+}
+
+TSFast = GenListEntry {
+	moniker = "Fast";
+	method = TEMPLATE_FAST_SPEED;
+}
+
+
+TemplateClearMode = OptList {
+	key = "clearScreen";
+	moniker = "Clear Screen First:";
+	children = TCMYes, TCMNo;
+	action = CALL_TEMPLATE(TemplateSetClearMode);
+	attributes = type exclusive, listMethod, listMethodIsData;
+}
+
+TCMYes = GenListEntry {
+	moniker = "Yes";
+	method = "mask TOF_CLEAR_SCREEN";
+	curState = isOn, isDefault, userIsOn;
+}
+
+TCMNo = GenListEntry {
+	moniker = "No";
+	method = 0;
+}
+
+end	TemplateOptions;
+	
+/******************************************************************************
+ *
+ *				HELP TREE
+ *
+ ******************************************************************************/
+
+start	TemplateHelp;
+
+HelpBox = GenInteraction {
+	moniker = 'H', "Template Help";
+	attributes = default +independentlyDisplayable;
+	children = HelpText, HelpReplyBar;
+	genStates = default -usable;
+	hints = {
+            HINT_SET_WIN_POS_SIZE_ATTR {
+            PosSizeAttrInfo <
+                ; Change indicated fields
+                <
+                    FALSE,          ; WPSF_PERSIST (dont care)
+                    FALSE,          ; WPSF_HINT_FOR_ICON (dont care)
+                    FALSE,          ; WPSF_NEVER_SAVE_STATE (dont care)
+                    TRUE,           ; WPSF_SHRINK_DESIRED_SIZE_TO_FIT_IN_PARENT
+                    TRUE,           ; WPSF_CONSTRAIN_TYPE
+                    FALSE,          ; WPSF_POSITION_TYPE (dont care)
+                    TRUE            ; WPSF_SIZE_TYPE
+                >,
+                ; to indicated values
+                <
+                    0,              ; WPSF_PERSIST (dont care)
+                    0,              ; WPSF_HINT_FOR_ICON (dont care)
+                    0,              ; WPSF_NEVER_SAVE_STATE (dont care)
+                    TRUE,           ; WPSF_SHRINK_DESIRED_SIZE_TO_FIT_IN_PARENT
+                    WCT_KEEP_VISIBLE,; WPSF_CONSTRAIN_TYPE
+                    0,              ; WPSF_POSITION_TYPE (dont care)
+                    WST_AS_RATIO_OF_FIELD  ; WPSF_SIZE_TYPE
+                >,
+		; no position being specified
+                <>,
+		; make help text 3/4 of the screen length-wise, 3/4 the screen
+		; height-wise
+		<
+		    mask SWSS_RATIO or SS_PERCENT75,
+		    mask SWSS_RATIO or SS_PERCENT75
+		>
+	    >
+	    }
+	}
+}
+
+HelpText = GenTextDisplay {
+	text = TextChunk;
+	desiredHeight = 9;		/* 7 */
+	desiredWidth = "6*72";
+	genFont = noGenMapping;
+	textDisplayAttributes = default +desiredHeightIsViewMin, +initScrolling,
+				-dontScrollToChanges, +selectable;
+	type = default -defaultStyle, +multipleStyles,
+			-defaultRuler, +multipleRulers;
+	styleRuns = TextStyleRuns;
+	rulerRuns = TextRulerRuns;
+	hints = {
+		HINT_WASH_COLOR {
+		    SetColorParams <
+			SCP_index <		;SCP_index.
+			    WHITE,		;    SCPI_index
+			    <			;    SCPI_info.
+				0,		;	VTCMM_COLOR_FLAG
+				VTGS_100,	;	VTCMM_GRAY_SCREEN
+				0,		;	VTCMM_TRANSPARENT
+				0,		;	VTCMM_ON_BLACK
+				COLOR_MAP_SOLID	;	VTCMM_COLOR_MAP_MODE
+			    >,
+			    0			;    SCPI_unused
+			>
+		    >
+    	    	}
+	}
+}
+
+#include "templateHelp.ui"
+
+HelpReplyBar = GenInteraction {
+	attributes = default +notIndependentlyDisplayable;
+	hints = {
+		 HINT_MAKE_REPLY_BAR
+		}
+	children = HelpPageUp, HelpPageDown, HelpClose;
+}
+HelpClose = GenTrigger {
+	CLOSE_TRIGGER_VALUES
+	genAttributes = default + completesInteraction;
+}
+HelpPageUp = GenTrigger {
+	moniker = 'U',"Page Up";
+	action = METHOD_TEXT_SCROLL_PAGE_UP, HelpText;
+}
+HelpPageDown = GenTrigger {
+	moniker = 'D',"Page Down";
+	action = METHOD_TEXT_SCROLL_PAGE_DOWN, HelpText;
+}
+
+end	TemplateHelp;

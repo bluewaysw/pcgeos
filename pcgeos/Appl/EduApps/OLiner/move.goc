@@ -1,0 +1,1348 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT: Breadbox Outliner
+ * FILE:        move.goc
+ * AUTHOR:  John F. Howard,   05/03
+ *
+ * DESCRIPTION:
+ *  This file has the move stuff in the doc class for the application.
+ *
+ *
+ ***********************************************************************/
+
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+@include "oliner.goh"
+
+@extern object CardDList;
+@extern object MoveItemDBox;
+@extern object MoveItemText;
+@extern object MoveUpTrigger;
+@extern object MoveDownTrigger;
+@extern object MoveTopTrigger;
+@extern object MoveBottomTrigger;
+@extern object MoveIntoTrigger;
+@extern object MoveBelowTrigger;
+@extern object MoveAboveTrigger;
+
+@extern visMoniker InTopicMoniker;
+@extern visMoniker BelowTopicMoniker;
+@extern visMoniker CancelAddMoniker;
+@extern visMoniker CancelMoveMoniker;
+@extern chunk WhereToMoveMsg;
+@extern chunk ClosedWarningMsg;
+@extern chunk LevelWarningMsg;
+@extern chunk TopicText;
+@extern chunk CardText1;
+@extern chunk MoveText1;
+@extern chunk MoveText2;
+
+/* ----------------------------------------------------------------------------
+	OLDocumentClass code
+-----------------------------------------------------------------------------*/
+#define	POS_NOT 0
+#define	POS_PREV 1
+#define	POS_NEXT 2
+
+/***********************************************************************
+ *
+ * FUNCTION:	CheckMoveOK  (word sel, word moveType, word fromPos, word total)
+ *
+ * CALLED BY:  MOVE_INTO & BELOW
+ *
+ *
+ * STRATEGY:	Returns true if OK to move.  Tests for closed topics and
+ *             for max levels (10)
+ *
+ ***********************************************************************/
+Boolean CheckMoveOK(word sel, word moveType, word fromPos, word total)
+{
+ MemHandle		mh;
+ VMBlockHandle		vmbh;
+ IndexStruct	*indexElement;
+ word				destLevel, fromLevel, maxLevel, i;
+ Boolean			keepChecking;
+ Boolean			closedWarning = FALSE;
+
+
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh ,&mh);
+	indexElement = ChunkArrayElementToPtrHandles(
+				mh, g_indexCArray, sel, 0);
+	destLevel = indexElement->ISS_level;
+	indexElement = ChunkArrayElementToPtrHandles(
+				mh, g_indexCArray, fromPos, 0);
+	fromLevel = indexElement->ISS_level;
+	maxLevel = fromLevel;
+	if (indexElement->ISS_type == T_OPEN_TOPIC) {
+		keepChecking = TRUE;
+		i = 1;
+		while (keepChecking) {
+			indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, fromPos + i, 0);
+			if (indexElement->ISS_level > fromLevel) {
+				/* check it out - type*/
+				if (indexElement->ISS_type == T_CLOSED_TOPIC) {
+					closedWarning = TRUE;
+					keepChecking = FALSE;
+					}
+				else {  // level
+					if (indexElement->ISS_level > maxLevel)
+						maxLevel = indexElement->ISS_level;
+					}
+				/* and end of list check */
+				i++;
+				if ((fromPos + i) == total) {
+					keepChecking = FALSE;
+					}
+				}
+			else keepChecking = FALSE;
+			}  /* end of keepChecking while */
+		}  /* end of T_OPEN_TOPIC if */
+	VMUnlock(mh);
+
+	/* now issue any warnings */
+	if (closedWarning)  {
+		NotifyDBox (0, @ClosedWarningMsg);
+		return (FALSE);
+		}
+	if ((maxLevel - fromLevel + moveType + destLevel) > MAX_LEVELS - 1)  {
+		NotifyDBox (0, @LevelWarningMsg);
+		return (FALSE);
+		}
+
+   return (TRUE);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	SetMoveButtons  (word sel, word total)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+void SetMoveButtons (word sel, word total)
+{
+ Boolean				upEnabled = TRUE;
+ Boolean				downEnabled = TRUE;
+
+
+	/* set the up/down buttons */
+	if (sel == 0) upEnabled = FALSE;
+	if (sel == (total - 1)) downEnabled = FALSE;
+
+	if (upEnabled) {
+		@send MoveUpTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveTopTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send MoveUpTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveTopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	if (downEnabled)  {
+		@send MoveDownTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveBottomTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send MoveDownTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveBottomTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	SetNoMove  ()
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+void SetNoMove (void)
+{
+
+	@send MoveAboveTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	@send MoveIntoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	@send MoveBelowTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	IsPrevNextTopic  (word moverPos,
+ *										 word destPos,
+ *										 IndexStruct moveItem,
+ *										 IndexStruct destItem)
+ *
+ * CALLED BY:	MSG_OLINER_DOC_SELECT_MOVE_DESTINATION
+ *
+ *
+ * STRATEGY:	returns whether topic is prev or next at the same level
+ *             PREV, NEXT, NOT
+ *
+ ***********************************************************************/
+word IsPrevNextTopic (word moverPos, word destPos, word level)
+{
+ word					i, posit = POS_NOT;
+ MemHandle			mh;
+ VMBlockHandle    vmbh;
+ IndexStruct		*indexElement;
+ Boolean				foundSib = FALSE;
+
+
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh ,&mh);
+
+	if (destPos < moverPos) {
+		/* is this the previous topic? Start with the item after dest in the list
+			and go thru until we find an item at our level.  If it is the mover
+			then dest is mover's previous sibling. */
+		i = destPos + 1;
+		while (!foundSib)  {
+			indexElement = ChunkArrayElementToPtrHandles(
+								 mh, g_indexCArray, i, 0);
+			/* is this on our level? */
+			if (indexElement->ISS_level == level) {
+				/* is this the mover? */
+				if (i == moverPos)  {
+					posit = POS_PREV;
+					}
+				foundSib = TRUE;
+				}
+			i++;
+			}
+		}
+
+	else {
+		/* is this the next topic? Start with the item after move in the list
+			and go thru until we find an item at our level.  If it is the dest
+			then dest is mover's next sibling. */
+		i = moverPos + 1;
+		while (!foundSib)  {
+			indexElement = ChunkArrayElementToPtrHandles(
+								 mh, g_indexCArray, i, 0);
+			/* is this on our level? */
+			if (indexElement->ISS_level == level) {
+				/* is this the dest? */
+				if (i == destPos)  {
+					posit = POS_NEXT;
+					}
+				foundSib = TRUE;
+				}
+			i++;
+			}
+		}
+
+   VMUnlock(mh);
+	return (posit);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_OLINER_DOC_OPEN_MOVE_BOX for OLDocumentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method OLDocumentClass, MSG_OLINER_DOC_OPEN_MOVE_BOX
+{
+ word					sel, i;
+ MemHandle			mh;
+ VMBlockHandle    vmbh;
+ IndexStruct		*indexElement;
+ IndexStruct		moveItem;
+ char					tString[MAX_TITLE_LENGTH+1];
+
+
+	/* first see if we need to save any changes to a card */
+	if (g_cardMayHaveChanged)
+		if (!CheckForChanges(pself->OLDI_curSel, oself))
+			return;
+
+	sel = @call CardDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (sel == GIGS_NONE) return;
+	pself->OLDI_cumMove = 0;
+
+	/* find the selection's topic dbHan */
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh ,&mh);
+	indexElement = ChunkArrayElementToPtrHandles(
+				mh, g_indexCArray, sel, 0);
+	pself->OLDI_moveItem = *indexElement;
+	moveItem = pself->OLDI_moveItem;
+
+	/* if it's a type see how many kids in the dlist - to prevent moving
+		into itself */
+	pself->OLDI_kidCount = 0;
+	if (moveItem.ISS_type != T_CARD)  {
+		for (i = 0; i < pself->OLDI_indexItems; i++) {
+			indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, sel + 1 + i, 0);
+			if (indexElement->ISS_level > moveItem.ISS_level)
+				pself->OLDI_kidCount++;
+			else break;
+			}
+		}
+	VMUnlock(mh);
+
+	/* assemble the dbox text */
+	@call MoveItemText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@MoveText1, 0);
+	if (moveItem.ISS_type == T_CARD)
+		@call MoveItemText::MSG_VIS_TEXT_APPEND_OPTR(@CardText1, 0);
+	else
+		@call MoveItemText::MSG_VIS_TEXT_APPEND_OPTR(@TopicText, 0);
+	@call MoveItemText::MSG_VIS_TEXT_APPEND_PTR(" \"", 0);
+	GetItemTitle(moveItem.ISS_dbHan, moveItem.ISS_recNum, &tString);
+	@call MoveItemText::MSG_VIS_TEXT_APPEND_PTR(tString, 0);
+	@call MoveItemText::MSG_VIS_TEXT_APPEND_PTR("\" ", 0);
+	@call MoveItemText::MSG_VIS_TEXT_APPEND_OPTR(@MoveText2, 0);
+
+	/* now set the move buttons */
+	SetMoveButtons(sel, pself->OLDI_indexItems);
+
+	/* and the apply triggers */
+	SetNoMove();
+
+	/* Open the dialog box */
+	@send MoveItemDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_OLINER_DOC_SELECT_MOVE_DESTINATION for OLDocumentClass
+ *                (GEN_TRIGGER_ACTION)
+ *
+ * DESCRIPTION:	Moves the hilite bar to the selected position and sets
+ *                the buttons based on rules on where we can move topics,
+ *						cards, etc.
+ *                11/13/03 - added unlimited Move Above
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method OLDocumentClass, MSG_OLINER_DOC_SELECT_MOVE_DESTINATION
+{
+ word				sel, total, pos;
+ MemHandle		mh;
+ VMBlockHandle		vmbh;
+ IndexStruct	*indexElement;
+ IndexStruct	moveItem, destItem;
+
+
+	total = pself->OLDI_indexItems;
+
+	/* move the hilite bar in the list */
+	if (trigger == @MoveTopTrigger) {
+		pself->OLDI_cumMove = 0 - pself->OLDI_curSel;
+		sel = 0;
+		}
+	if (trigger == @MoveBottomTrigger) {
+		pself->OLDI_cumMove = pself->OLDI_indexItems - pself->OLDI_curSel - 1;
+		sel = pself->OLDI_indexItems - 1;
+		}
+	if (trigger == @MoveUpTrigger) {
+		pself->OLDI_cumMove--;
+		sel = pself->OLDI_curSel + pself->OLDI_cumMove;
+		}
+	if (trigger == @MoveDownTrigger) {
+		pself->OLDI_cumMove++;
+		sel = pself->OLDI_curSel + pself->OLDI_cumMove;
+		}
+	@send CardDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sel, FALSE);
+	/* and set the move buttons */
+	SetMoveButtons(sel, total);
+
+	/* check out the new selection */
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh ,&mh);
+	indexElement = ChunkArrayElementToPtrHandles(mh, g_indexCArray, sel, 0);
+	destItem = *indexElement;
+	VMUnlock(mh);
+	/* and the info on the item we're moving... */
+	moveItem = pself->OLDI_moveItem;
+
+	/* and disable moves using these rules: */
+	/*	- can't move item into, above or below itself  */
+	if (!pself->OLDI_cumMove) {
+		SetNoMove();
+		return;
+		}
+	/*	- can't move item into, above or below any of its children  */
+	if (pself->OLDI_kidCount && (pself->OLDI_cumMove > 0) &&
+			(pself->OLDI_cumMove <= pself->OLDI_kidCount)) {
+		SetNoMove();
+		return;
+		}
+	/*	- can't move item to closed topic  */
+	if (destItem.ISS_type == T_CLOSED_TOPIC) {
+		SetNoMove();
+		return;
+		}
+	/*	- can't move card to its own level 0 parent topic */
+	if (!destItem.ISS_level && (moveItem.ISS_type == T_CARD) &&
+				(moveItem.ISS_dbHan == destItem.ISS_myDBHan)) {
+		SetNoMove();
+		return;
+		}
+
+	/* We've handled the situations where we can't move our item, now to take
+		care of those where we can do into, below, above or all */
+
+	/*	-- If the sel item's level is 0 (main level) and the item to move
+			is a card then the item has to go into the sel topic since
+			we don't allow cards on the main level  */
+	if ((moveItem.ISS_type == T_CARD) & (!destItem.ISS_level))  {
+		@send MoveAboveTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveIntoTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveBelowTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		return;
+		}
+
+	/* -- If the move destination is our mover's parent topic then we'll disable
+			the move into button since we're already in the selected topic. */
+	if (moveItem.ISS_dbHan == destItem.ISS_myDBHan) {
+		@send MoveIntoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveBelowTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveAboveTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		return;
+		}
+
+	/* -- If the move & dest items are in the same topic and on the same level... */
+	if (moveItem.ISS_dbHan == destItem.ISS_dbHan) {
+		/* -- Set the into trigger based on dest type */
+		if (destItem.ISS_type == T_CARD)
+			@send MoveIntoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		else
+			@send MoveIntoTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+		/* -- If already below the preceeding item or already above the next item,
+				disable above & below accordingly. */
+		if (sel + 1 == pself->OLDI_curSel) {
+			@send MoveBelowTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+			@send MoveAboveTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+			}
+		else if (sel - 1 == pself->OLDI_curSel) {
+			@send MoveBelowTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+			@send MoveAboveTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+			}
+		/* -- We also want to disable the above and below buttons if the dest
+				and move items are both topics and would be in the above prev/next
+				scenario if they didn't have children separating them */
+		else if ((destItem.ISS_type != T_CARD) && (moveItem.ISS_type != T_CARD)) {
+			pos = IsPrevNextTopic(pself->OLDI_curSel, sel, moveItem.ISS_level);
+			if (pos == POS_PREV) {
+				@send MoveBelowTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+				@send MoveAboveTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+				}
+			else if (pos == POS_NEXT) {
+				@send MoveBelowTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+				@send MoveAboveTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+				}
+			}
+      /* -- Any other configuration of same child scenario */
+		else  {
+			@send MoveBelowTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+			@send MoveAboveTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+			}
+		return;
+		}
+
+	/*	-- If the destination is a card, the move item goes below or above
+			it in the selected card's parent bdb. */
+	if (destItem.ISS_type == T_CARD) {
+		@send MoveAboveTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveIntoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveBelowTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	/*	-- The selection is a topic - and since we're here it can go either
+			into, below or above. */
+	else  {
+		@send MoveIntoTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveBelowTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MoveAboveTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_OLINER_DOC_MOVE_ITEM_APPLY for OLDocumentClass
+ *							(GEN_TRIGGER_ACTION)
+ *
+ * DESCRIPTION:	Completes the move sending the selection on to
+ *						the into or below message
+ *
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method OLDocumentClass, MSG_OLINER_DOC_MOVE_ITEM_APPLY
+{
+ word				sel;
+
+
+	sel = @call CardDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	if (trigger == @MoveIntoTrigger)
+		@send oself::MSG_OLINER_DOC_MOVE_ITEM_INTO(sel);
+	else if (trigger == @MoveBelowTrigger)
+		@send oself::MSG_OLINER_DOC_MOVE_ITEM_BELOW(sel);
+	else
+		@send oself::MSG_OLINER_DOC_MOVE_ITEM_ABOVE(sel);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OLINER_DOC_MOVE_ITEM_INTO for OLDocumentClass
+ *
+ *
+ * DESCRIPTION:	moves a topic or card into the selected topic at the
+ *						[beginning] change to: end of the items in that topic
+ *
+ * PARAMETERS:   word sel
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method OLDocumentClass, MSG_OLINER_DOC_MOVE_ITEM_INTO
+{
+ MemHandle		mh, vmh, dmh, nmh, mmh;
+ VMMapStruct		*VMmapPtr;
+ VMBlockHandle		vmbh;
+ word				start, check, fromPos, numDels, i, levelOffset, parentPos, insertAt;
+ IndexStruct	*indexElement, *insertElement, *moveElement, *tempElement;
+ IndexStruct	moveItem, destItem;
+ Boolean			keepChecking, appending;
+ ChunkHandle	tempArray;
+
+
+	/* the info on the item we're moving... */
+	moveItem = pself->OLDI_moveItem;
+	fromPos = pself->OLDI_curSel;
+
+	if (!CheckMoveOK(sel, MT_INTO, fromPos, pself->OLDI_indexItems)) return;
+
+	/* get the info on the selected topic into which we'll put our item */
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh ,&mh);
+	indexElement = ChunkArrayElementToPtrHandles(
+				mh, g_indexCArray, sel, 0);
+	destItem = *indexElement;
+	VMUnlock(mh);
+
+	/* get the bdb record we're moving and duplicate it */
+	BasicDBGetRecordByElemNum(g_curDocHan, moveItem.ISS_dbHan,
+										moveItem.ISS_recNum, &dmh);
+	nmh = BasicDBDuplicateRecord(dmh);
+	/* store the duplicated record into the selected topic */
+	BasicDBSaveRecord(g_curDocHan, destItem.ISS_myDBHan, nmh, 0, 0);
+	/* and now delete the original record */
+	BasicDBDeleteRecord(g_curDocHan, moveItem.ISS_dbHan, dmh, 0);
+
+
+	/* now we need to update the mover and destination stuff in the
+		index array */
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh, &mh);
+
+	/* first, delete the move item from its pre-move pos */
+	indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, fromPos, 0);
+	ChunkArrayDeleteHandle(g_indexCArray, indexElement);
+
+	/* and move any kids to the temp array */
+	numDels = 0;
+	if ((moveItem.ISS_type != T_CARD) && moveItem.ISS_numRecs) {
+		/* move all the children of this topic */
+		/* just dump the records to a temp carray, deleting
+			the ones we dumped, then adding them back in the new position */
+		mmh = MemAlloc(2048, HF_SWAPABLE, HAF_LOCK);
+		LMemInitHeap(mmh, LMEM_TYPE_GENERAL, 0,
+				 sizeof(LMemBlockHeader), STD_INIT_HANDLES, STD_INIT_HEAP);
+		/* create the temp chunk array  */
+		tempArray = ChunkArrayCreate(mmh, sizeof(IndexStruct), 0, 0);
+		/* delete em from the index */
+		keepChecking = TRUE;
+		while (keepChecking) {
+			indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, fromPos, 0);
+			if (indexElement->ISS_level > moveItem.ISS_level) {
+				/* add it to the temp array */
+				tempElement = ChunkArrayAppendHandles(mmh, tempArray, 0);
+				tempElement->ISS_type = indexElement->ISS_type;
+				tempElement->ISS_level = indexElement->ISS_level;
+				tempElement->ISS_dbHan = indexElement->ISS_dbHan;
+				tempElement->ISS_recNum = indexElement->ISS_recNum;
+				tempElement->ISS_numRecs = indexElement->ISS_numRecs;
+				tempElement->ISS_myDBHan = indexElement->ISS_myDBHan;
+				/* remove it from the index array */
+				ChunkArrayDeleteHandle(g_indexCArray, indexElement);
+				numDels++;
+				if ((fromPos + numDels) == pself->OLDI_indexItems - 1) {
+					keepChecking = FALSE;
+					}
+				}
+			else keepChecking = FALSE;
+			}  /* end of keepChecking while */
+		} /* end of copy to temp if */
+
+	/* OK - now that we've pulled the move item and any children out of the
+		array, we need to: (1) decrement its parent's numRecs - unless we were at
+		the top level... */
+	if (moveItem.ISS_level)  {
+		/* find our parent - go up until we get to an item 1 level less than us */
+		parentPos = fromPos - 1;
+		keepChecking = TRUE;
+		while (keepChecking) {
+			indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, parentPos, 0);
+			if (indexElement->ISS_level == moveItem.ISS_level - 1) {
+				/* found parent */
+				/* need to check to see if the mover's parent is also the dest.
+					If so we need to update destItem since we'll use it in the
+					adding stuff. */
+				if (indexElement->ISS_dbHan == destItem.ISS_dbHan &&
+							indexElement->ISS_myDBHan == destItem.ISS_myDBHan)
+					destItem.ISS_numRecs--;
+				indexElement->ISS_numRecs--;
+				/* change type if no more items in the folder */
+				if (indexElement->ISS_numRecs == 0) {
+					indexElement->ISS_type = T_EMPTY_TOPIC;
+					}
+				keepChecking = FALSE;
+				}
+			else parentPos--;
+			} /* end of keepChecking while */
+		}  /* end of level if */
+	else  {
+		/* just decrement the number of level 0 items & and save in VMMap */
+		pself->OLDI_numTopItems--;
+		vmbh = VMGetMapBlock(g_curDocHan);
+		VMmapPtr = VMLock(g_curDocHan, vmbh, &vmh);
+		VMmapPtr->VMMS_numTopItems = pself->OLDI_numTopItems;
+		VMDirty(vmh);
+		VMUnlock(vmh);
+		}
+	/* and (2) update the recNums for the remaining elements in the move item's
+		level. First we need to locate the first item at this level. */
+	if (!moveItem.ISS_level || !fromPos) start = 0;
+	else start = parentPos + 1;
+	for (check = start; check < (pself->OLDI_indexItems - numDels - 1); check++)  {
+		indexElement = ChunkArrayElementToPtrHandles(
+							mh, g_indexCArray, check, 0);
+		if (indexElement->ISS_level == moveItem.ISS_level) {
+			if (indexElement->ISS_recNum > moveItem.ISS_recNum)
+					indexElement->ISS_recNum--;
+			}
+		if(indexElement->ISS_level < moveItem.ISS_level) break;
+		}
+
+
+	/* Now the adding part of the move.  Add the move item... */
+	/* see if we're just appending */
+	appending = FALSE;
+	if (sel > fromPos)  {
+		/* do appending check like this if sel is at the original end of the
+			list (before we deleted our movers above the sel) */
+		if (sel == (pself->OLDI_indexItems - 1)) {
+			appending = TRUE;
+			sel -= (1 + numDels);
+			}
+		}
+	else {
+		/* do appending check like this to see if after we deleted our movers
+			sel has now become the last item in the list */
+		if (sel == (pself->OLDI_indexItems - 2 - numDels)) {
+			appending = TRUE;
+			}
+		}
+	if (!appending) {  /* insert it as the dest topic's last item */
+		/* may need to adjust sel if the mover was above it in the list
+			because we already pulled the moving item and kids */
+		if (sel > fromPos)  sel -= (1 + numDels);
+		/* find the end of the selected topic.  Will either be a following
+			item or the end of the list. */
+		appending = TRUE;
+		for (i = sel + 1; i < (pself->OLDI_indexItems - 1 - numDels); i++) {
+			indexElement = ChunkArrayElementToPtrHandles(
+							mh, g_indexCArray, i, 0);
+			if (indexElement->ISS_level <= destItem.ISS_level) {
+				/* found a following item */
+				appending = FALSE;
+				insertAt = i;
+				break;
+				}
+			}
+		}
+	if (appending)
+		insertElement = ChunkArrayAppendHandles(
+							mh, g_indexCArray, 0);
+	else
+		insertElement = ChunkArrayInsertAtHandle(
+		              g_indexCArray, indexElement, 0);
+
+	insertElement->ISS_type = moveItem.ISS_type;
+	insertElement->ISS_level = destItem.ISS_level + 1;
+	insertElement->ISS_dbHan = destItem.ISS_myDBHan;
+	insertElement->ISS_recNum = destItem.ISS_numRecs;
+	insertElement->ISS_numRecs = moveItem.ISS_numRecs;
+	insertElement->ISS_myDBHan = moveItem.ISS_myDBHan;
+	/* and we need to increment the destination topic's numRecs...
+		and maybe its type */
+	destItem.ISS_numRecs++;
+	indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, sel, 0);
+	if (indexElement->ISS_numRecs == 0)  {
+		/* this is the first item in this topic so change its type from
+			empty to open */
+		indexElement->ISS_type = T_OPEN_TOPIC;
+		}
+	indexElement->ISS_numRecs = destItem.ISS_numRecs;
+
+	/* now add any kids back */
+	if (numDels) {
+		for (i = 0; i < numDels; i++) {
+			/* move it */
+			tempElement = ChunkArrayElementToPtrHandles(mmh, tempArray, i, 0);
+			if (appending) {
+				insertElement = ChunkArrayAppendHandles(
+										mh, g_indexCArray, 0);
+				}
+			else {  /* insert it as the next item */
+				moveElement = ChunkArrayElementToPtrHandles(
+										mh, g_indexCArray, insertAt + 1 + i, 0);
+				insertElement = ChunkArrayInsertAtHandle(
+										g_indexCArray, moveElement, 0);
+				}
+			insertElement->ISS_type = tempElement->ISS_type;
+			/* gotta do some level adjustment here */
+			if (moveItem.ISS_level >= (destItem.ISS_level + 1)) {
+				levelOffset = moveItem.ISS_level - (destItem.ISS_level + 1);
+				insertElement->ISS_level = tempElement->ISS_level - levelOffset;
+				}
+			else  {
+				levelOffset = (destItem.ISS_level + 1) - moveItem.ISS_level;
+				insertElement->ISS_level = tempElement->ISS_level + levelOffset;
+				 }
+			insertElement->ISS_dbHan = tempElement->ISS_dbHan;
+			insertElement->ISS_recNum = tempElement->ISS_recNum;
+			insertElement->ISS_numRecs = tempElement->ISS_numRecs;
+			insertElement->ISS_myDBHan = tempElement->ISS_myDBHan;
+			}
+		MemFree(mmh);
+		}
+
+	VMDirty(mh);
+	VMUnlock(mh);
+
+
+	/* update the list */
+	@send CardDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->OLDI_indexItems);
+	/* move the selection to keep it with the moved item */
+	if (appending) insertAt = pself->OLDI_indexItems - 1 - numDels;
+	@send CardDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+												insertAt, FALSE);
+	@send CardDList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@send CardDList::MSG_GEN_APPLY();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OLINER_DOC_MOVE_ITEM_BELOW for OLDocumentClass
+ *
+ *
+ * DESCRIPTION:  moves topic or card below the selected item
+ *
+ * PARAMETERS:   word sel
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method OLDocumentClass, MSG_OLINER_DOC_MOVE_ITEM_BELOW
+{
+ MemHandle		mh, vmh, dmh, nmh, mmh;
+ VMMapStruct		*VMmapPtr;
+ VMBlockHandle		vmbh;
+ word				start, check, fromPos, numDels, i, destParentPos, insPos;
+ word				levelOffset, moveParentPos;
+ IndexStruct	*indexElement, *insertElement, *moveElement, *tempElement;
+ IndexStruct	moveItem, destItem, parentItem;
+ Boolean			keepChecking, appending, updateTop;
+ ChunkHandle	tempArray;
+
+
+	/* the info on the item we're moving... */
+	moveItem = pself->OLDI_moveItem;
+	fromPos = pself->OLDI_curSel;
+
+	if (!CheckMoveOK(sel, MT_SAME, fromPos, pself->OLDI_indexItems)) return;
+
+	/* get the info on the selected item - below which we're moving our guy to */
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh ,&mh);
+	indexElement = ChunkArrayElementToPtrHandles(
+				mh, g_indexCArray, sel, 0);
+	destItem = *indexElement;
+	/* now find the parent of the destination item */
+	if (destItem.ISS_level == 0) {
+		/* the parent is the main db */
+		parentItem.ISS_myDBHan = pself->OLDI_topDBHan;
+		parentItem.ISS_numRecs = pself->OLDI_numTopItems;
+		destParentPos = 0xffff;
+		}
+	else {
+		for (i = sel-1; i < 0xffff; i--) {
+			indexElement = ChunkArrayElementToPtrHandles(
+								mh, g_indexCArray, i, 0);
+			if (indexElement->ISS_myDBHan == destItem.ISS_dbHan)  {
+				/* found it */
+				parentItem = *indexElement;
+				destParentPos = i;
+				break;
+				}
+			}
+		}
+	VMUnlock(mh);
+
+	/* get the bdb record we're moving and duplicate it */
+	BasicDBGetRecordByElemNum(g_curDocHan, moveItem.ISS_dbHan,
+										moveItem.ISS_recNum, &dmh);
+	nmh = BasicDBDuplicateRecord(dmh);
+	/* store the duplicated record into the selected topic */
+	BasicDBSaveRecord(g_curDocHan, parentItem.ISS_myDBHan, nmh, 0, 0);
+	/* and now delete the original record */
+	BasicDBDeleteRecord(g_curDocHan, moveItem.ISS_dbHan, dmh, 0);
+
+
+	/* now we need to update the mover and destination stuff in the
+		index array */
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh, &mh);
+	/* first, the deleting part */
+	/* delete the move item from its pre-move pos */
+	indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, fromPos, 0);
+	ChunkArrayDeleteHandle(g_indexCArray, indexElement);
+
+	/* and move any kids */
+	numDels = 0;
+	if ((moveItem.ISS_type != T_CARD) && moveItem.ISS_numRecs) {
+		/* move all the children of this topic */
+		/* just dump the records to a temp carray, deleting
+			the ones we dumped, then adding them back in the new position */
+		mmh = MemAlloc(2048, HF_SWAPABLE, HAF_LOCK);
+		LMemInitHeap(mmh, LMEM_TYPE_GENERAL, 0,
+				 sizeof(LMemBlockHeader), STD_INIT_HANDLES, STD_INIT_HEAP);
+		/* create the temp chunk array  */
+		tempArray = ChunkArrayCreate(mmh, sizeof(IndexStruct), 0, 0);
+		/* delete em from the index */
+		keepChecking = TRUE;
+		while (keepChecking) {
+			indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, fromPos, 0);
+			if (indexElement->ISS_level > moveItem.ISS_level) {
+				/* add it to the temp array */
+				tempElement = ChunkArrayAppendHandles(mmh, tempArray, 0);
+				tempElement->ISS_type = indexElement->ISS_type;
+				tempElement->ISS_level = indexElement->ISS_level;
+				tempElement->ISS_dbHan = indexElement->ISS_dbHan;
+				tempElement->ISS_recNum = indexElement->ISS_recNum;
+				tempElement->ISS_numRecs = indexElement->ISS_numRecs;
+				tempElement->ISS_myDBHan = indexElement->ISS_myDBHan;
+				/* remove it from the index array */
+				ChunkArrayDeleteHandle(g_indexCArray, indexElement);
+				numDels++;
+				if ((fromPos + numDels) == pself->OLDI_indexItems - 1) {
+					keepChecking = FALSE;
+					}
+				}
+			else keepChecking = FALSE;
+			}  /* end of keepChecking while */
+		MemUnlock(mmh);
+		} /* end of deleting kids if */
+
+	/* OK - now that we've pulled the move item and any children out of the
+		array, we need to: (1) decrement its parent's numRecs - unless we were at
+		the top level... */
+	if (moveItem.ISS_level)  {
+		/* find our parent - go up until we get to an item 1 level less than us */
+		moveParentPos = fromPos - 1;
+		keepChecking = TRUE;
+		while (keepChecking) {
+			indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, moveParentPos, 0);
+			if (indexElement->ISS_level == moveItem.ISS_level - 1) {
+				/* found parent */
+				if (moveParentPos == destParentPos)
+					/* since we use parentItem's numRecs when adding back */
+					parentItem.ISS_numRecs--;
+				indexElement->ISS_numRecs--;
+				/* change type if no more items in the folder */
+				if (indexElement->ISS_numRecs == 0) {
+					indexElement->ISS_type = T_EMPTY_TOPIC;
+					}
+				keepChecking = FALSE;
+				}
+			else moveParentPos--;
+			} /* end of keepChecking while */
+		}  /* end of level if */
+	else  {
+		/* just decrement the number of level 0 items */
+		pself->OLDI_numTopItems--;
+		updateTop = TRUE;
+		}
+
+	/* and (2) update the recNums for the remaining elements in the move item's
+		level. First we need to locate the first item at this level. */
+	if (!moveItem.ISS_level || !fromPos) start = 0;
+	else start = moveParentPos + 1;
+	for (check = start; check < (pself->OLDI_indexItems - numDels - 1); check++)  {
+		indexElement = ChunkArrayElementToPtrHandles(
+							mh, g_indexCArray, check, 0);
+		if (indexElement->ISS_level == moveItem.ISS_level) {
+			if (indexElement->ISS_recNum > moveItem.ISS_recNum)
+					indexElement->ISS_recNum--;
+			}
+		if(indexElement->ISS_level < moveItem.ISS_level) break;
+		}
+
+
+	/* now the adding part of the move.  Add the move item... */
+	/* see if we're just appending */
+	appending = FALSE;
+	if (sel > fromPos)  {
+		/* do appending check like this if sel is at the original end of the
+			list (before we deleted our movers */
+		if (sel == (pself->OLDI_indexItems - 1)) {
+			appending = TRUE;
+			sel -= (1 + numDels);
+			}
+		}
+	else {
+		/* do appending check like this to see if after we deleted our movers
+			sel has now become the last item in the list */
+		if (sel == (pself->OLDI_indexItems - 2 - numDels)) {
+			appending = TRUE;
+			}
+		}
+	if (!appending) {
+		/* insert it as the next item at the selection's level BUT,
+			there may be subtopics using lines so we need to account for
+			any of those */
+		/* may need to adjust sel if the mover was above it in the list
+			because we already pulled the moving item and kids */
+		if (sel > fromPos)  sel -= (1 + numDels);
+		i = sel + 1;
+		keepChecking = TRUE;
+		while (keepChecking) {
+			indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, i, 0);
+			if (indexElement->ISS_level <= destItem.ISS_level) {
+				/* we found our insert point */
+				keepChecking = FALSE;
+				appending = FALSE;
+				insPos = i;
+				}
+			else  {
+				/* check to see if we're at the last item in the dlist */
+				if (i == (pself->OLDI_indexItems - 2 - numDels))  {
+					/* we are */
+					appending = TRUE;
+					keepChecking = FALSE;
+					insPos = i;
+					}
+				else i++;
+				}
+			}  /* end of keepChecking while */
+		} /* end of insert else */
+
+	if (appending)
+		insertElement = ChunkArrayAppendHandles(
+					mh, g_indexCArray, 0);
+	else
+		insertElement = ChunkArrayInsertAtHandle(
+					g_indexCArray, indexElement, 0);
+	insertElement->ISS_type = moveItem.ISS_type;
+	insertElement->ISS_level = destItem.ISS_level;
+	insertElement->ISS_dbHan = destItem.ISS_dbHan;
+	if (!destItem.ISS_level)
+		insertElement->ISS_recNum = pself->OLDI_numTopItems;
+	else
+		insertElement->ISS_recNum = parentItem.ISS_numRecs;
+	insertElement->ISS_numRecs = moveItem.ISS_numRecs;
+	insertElement->ISS_myDBHan = moveItem.ISS_myDBHan;
+
+	/* we need to increment the destination parent's numRecs...
+		and maybe its type */
+	if (destItem.ISS_level) {
+		if (destParentPos > fromPos)  destParentPos -= (1 + numDels);
+		parentItem.ISS_numRecs++;
+		indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, destParentPos, 0);
+		if (indexElement->ISS_numRecs == 0)  {
+			/* this is the first item in this topic so change its type from
+				empty to open */
+			indexElement->ISS_type = T_OPEN_TOPIC;
+			}
+		indexElement->ISS_numRecs = parentItem.ISS_numRecs;
+		}
+	else  {
+		pself->OLDI_numTopItems++;
+		updateTop = TRUE;
+		}
+
+	if (numDels) {
+		/* now add children back at the right place */
+		MemLock(mmh);
+		for (i = 0; i < numDels; i++) {
+			/* move it */
+			tempElement = ChunkArrayElementToPtrHandles(mmh, tempArray, i, 0);
+			if (appending) {
+				insertElement = ChunkArrayAppendHandles(
+										mh, g_indexCArray, 0);
+				}
+			else {  /* insert it as the next item */
+				moveElement = ChunkArrayElementToPtrHandles(
+										mh, g_indexCArray, 1 + i + insPos, 0);
+				insertElement = ChunkArrayInsertAtHandle(
+										g_indexCArray, moveElement, 0);
+				}
+			insertElement->ISS_type = tempElement->ISS_type;
+			/* gotta do some level adjustment here */
+			if (moveItem.ISS_level >= destItem.ISS_level) {
+				levelOffset = moveItem.ISS_level - destItem.ISS_level;
+				insertElement->ISS_level = tempElement->ISS_level - levelOffset;
+				}
+			else  {
+				levelOffset = destItem.ISS_level - moveItem.ISS_level;
+				insertElement->ISS_level = tempElement->ISS_level + levelOffset;
+				 }
+			insertElement->ISS_dbHan = tempElement->ISS_dbHan;
+			insertElement->ISS_recNum = tempElement->ISS_recNum;
+			insertElement->ISS_numRecs = tempElement->ISS_numRecs;
+			insertElement->ISS_myDBHan = tempElement->ISS_myDBHan;
+			}
+		MemFree(mmh);
+		} /* end of adding kids back if */
+
+
+	if (updateTop) {
+		vmbh = VMGetMapBlock(g_curDocHan);
+		VMmapPtr = VMLock(g_curDocHan, vmbh, &vmh);
+		VMmapPtr->VMMS_numTopItems = pself->OLDI_numTopItems;
+		VMDirty(vmh);
+		VMUnlock(vmh);
+		}
+
+	VMDirty(mh);
+	VMUnlock(mh);
+
+
+	/* update the list */
+	@send CardDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->OLDI_indexItems);
+	/* move the selection to keep it with the moved item */
+	if (appending) insPos = pself->OLDI_indexItems - 1 - numDels;
+	@send CardDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+												insPos, FALSE);
+	@send CardDList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@send CardDList::MSG_GEN_APPLY();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OLINER_DOC_MOVE_ITEM_ABOVE for OLDocumentClass
+ *
+ *
+ * DESCRIPTION:  moves topic to the top spot on the list
+ *
+ * PARAMETERS:	  word sel
+ *
+ * 11/18/03		jfh - expanded to include any above move, not just to top
+ *							of list
+ *
+ ***********************************************************************/
+@extern method OLDocumentClass, MSG_OLINER_DOC_MOVE_ITEM_ABOVE
+{
+ MemHandle		mh, vmh, dmh, nmh, mmh;
+ VMMapStruct		*VMmapPtr;
+ VMBlockHandle		vmbh;
+ word				start, check, fromPos, numDels, i, levelOffset, destParentPos;
+ word				insPos, moveParentPos;
+ IndexStruct	*indexElement, *insertElement, *moveElement, *tempElement;
+ IndexStruct	moveItem, destItem, parentItem;
+ Boolean			keepChecking, updateTop;
+ ChunkHandle	tempArray;
+
+
+	/* the info on the item we're moving... */
+	moveItem = pself->OLDI_moveItem;
+	fromPos = pself->OLDI_curSel;
+
+	if (!CheckMoveOK(sel, MT_SAME, fromPos, pself->OLDI_indexItems)) return;
+
+	/* get the info on the selected item - above which we're moving our guy to */
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh ,&mh);
+	indexElement = ChunkArrayElementToPtrHandles(
+				mh, g_indexCArray, sel, 0);
+	destItem = *indexElement;
+	/* now find the parent of the destination item */
+	if (destItem.ISS_level == 0) {
+		/* the parent is the main db */
+		parentItem.ISS_myDBHan = pself->OLDI_topDBHan;
+		parentItem.ISS_numRecs = pself->OLDI_numTopItems;
+		destParentPos = 0xffff;
+		}
+	else {
+		for (i = sel-1; i < 0xffff; i--) {
+			indexElement = ChunkArrayElementToPtrHandles(
+								mh, g_indexCArray, i, 0);
+			if (indexElement->ISS_myDBHan == destItem.ISS_dbHan)  {
+				/* found it */
+				parentItem = *indexElement;
+				destParentPos = i;
+				break;
+				}
+			}
+		}
+	VMUnlock(mh);
+
+	/* get the bdb record we're moving and duplicate it */
+	BasicDBGetRecordByElemNum(g_curDocHan, moveItem.ISS_dbHan,
+										moveItem.ISS_recNum, &dmh);
+	nmh = BasicDBDuplicateRecord(dmh);
+	/* store the duplicated record into the selected topic */
+	BasicDBSaveRecord(g_curDocHan, parentItem.ISS_myDBHan, nmh, 0, 0);
+	/* and now delete the original record */
+	BasicDBDeleteRecord(g_curDocHan, moveItem.ISS_dbHan, dmh, 0);
+
+	/* now we need to update the mover and destination stuff in the
+		index array */
+	vmbh = VMFind(g_curDocHan, NullHandle, INDEX_LIST);
+	VMLock(g_curDocHan, vmbh, &mh);
+	/* first, the deleting part */
+	/* delete the move item from its pre-move pos */
+	indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, fromPos, 0);
+	ChunkArrayDeleteHandle(g_indexCArray, indexElement);
+
+	/* and move any kids */
+	numDels = 0;
+	if ((moveItem.ISS_type != T_CARD) && moveItem.ISS_numRecs) {
+		/* move all the children of this topic */
+		/* just dump the records to a temp carray, deleting
+			the ones we dumped, then adding them back in the new position */
+		mmh = MemAlloc(2048, HF_SWAPABLE, HAF_LOCK);
+		LMemInitHeap(mmh, LMEM_TYPE_GENERAL, 0,
+				 sizeof(LMemBlockHeader), STD_INIT_HANDLES, STD_INIT_HEAP);
+		/* create the temp chunk array  */
+		tempArray = ChunkArrayCreate(mmh, sizeof(IndexStruct), 0, 0);
+		/* delete em from the index */
+		keepChecking = TRUE;
+		while (keepChecking) {
+			indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, fromPos, 0);
+			if (indexElement->ISS_level > moveItem.ISS_level) {
+				/* add it to the temp array */
+				tempElement = ChunkArrayAppendHandles(mmh, tempArray, 0);
+				tempElement->ISS_type = indexElement->ISS_type;
+				tempElement->ISS_level = indexElement->ISS_level;
+				tempElement->ISS_dbHan = indexElement->ISS_dbHan;
+				tempElement->ISS_recNum = indexElement->ISS_recNum;
+				tempElement->ISS_numRecs = indexElement->ISS_numRecs;
+				tempElement->ISS_myDBHan = indexElement->ISS_myDBHan;
+				/* remove it from the index array */
+				ChunkArrayDeleteHandle(g_indexCArray, indexElement);
+				numDels++;
+				if ((fromPos + numDels) == pself->OLDI_indexItems - 1) {
+					keepChecking = FALSE;
+					}
+				}
+			else keepChecking = FALSE;
+			}  /* end of keepChecking while */
+		MemUnlock(mmh);
+		} /* end of deleting kids if */
+
+	/* OK - now that we've pulled the move item and any children out of the
+		array, we need to: (1) decrement its parent's numRecs - unless we were at
+		the top level... */
+	if (moveItem.ISS_level)  {
+		/* find our parent - go up until we get to an item 1 level less than us */
+		moveParentPos = fromPos - 1;
+		keepChecking = TRUE;
+		while (keepChecking) {
+			indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, moveParentPos, 0);
+			if (indexElement->ISS_level == moveItem.ISS_level - 1) {
+				/* found parent */
+				if (moveParentPos == destParentPos)
+					/* since we use parentItem's numRecs when adding back */
+					parentItem.ISS_numRecs--;
+				indexElement->ISS_numRecs--;
+				/* change type if no more items in the folder */
+				if (indexElement->ISS_numRecs == 0) {
+					indexElement->ISS_type = T_EMPTY_TOPIC;
+					}
+				keepChecking = FALSE;
+				}
+			else moveParentPos--;
+			} /* end of keepChecking while */
+		}  /* end of level if */
+	else  {
+		/* just decrement the number of level 0 items */
+		pself->OLDI_numTopItems--;
+		updateTop = TRUE;
+		}
+
+	/* and (2) update the recNums for the remaining elements in the move item's
+		level. First we need to locate the first item at this level. */
+	if (!moveItem.ISS_level || !fromPos) start = 0;
+	else start = moveParentPos + 1;
+	for (check = start; check < (pself->OLDI_indexItems - numDels - 1); check++)  {
+		indexElement = ChunkArrayElementToPtrHandles(
+							mh, g_indexCArray, check, 0);
+		if (indexElement->ISS_level == moveItem.ISS_level) {
+			if (indexElement->ISS_recNum > moveItem.ISS_recNum)
+					indexElement->ISS_recNum--;
+			}
+		if(indexElement->ISS_level < moveItem.ISS_level) break;
+		}
+
+
+	/* now the adding part of the move.  Add the move item... */
+	/* insert it as the prev item at the selection's level */
+	/* may need to adjust sel if the mover was above it in the list
+		because we already pulled the moving item and kids */
+	if (sel > fromPos)  sel -= (1 + numDels);
+	/* set the insertion point */
+	insPos = sel;
+	indexElement = ChunkArrayElementToPtrHandles(mh, g_indexCArray, sel, 0);
+	insertElement = ChunkArrayInsertAtHandle(
+					g_indexCArray, indexElement, 0);
+	insertElement->ISS_type = moveItem.ISS_type;
+	insertElement->ISS_level = destItem.ISS_level;
+	insertElement->ISS_dbHan = destItem.ISS_dbHan;
+	if (!destItem.ISS_level)
+		insertElement->ISS_recNum = pself->OLDI_numTopItems;
+	else
+		insertElement->ISS_recNum = parentItem.ISS_numRecs;
+	insertElement->ISS_numRecs = moveItem.ISS_numRecs;
+	insertElement->ISS_myDBHan = moveItem.ISS_myDBHan;
+
+	/* we need to increment the destination parent's numRecs...
+		and maybe its type */
+	if (destItem.ISS_level) {
+		if (destParentPos > fromPos)  destParentPos -= (1 + numDels);
+		parentItem.ISS_numRecs++;
+		indexElement = ChunkArrayElementToPtrHandles(
+						mh, g_indexCArray, destParentPos, 0);
+		if (indexElement->ISS_numRecs == 0)  {
+			/* this is the first item in this topic so change its type from
+				empty to open */
+			indexElement->ISS_type = T_OPEN_TOPIC;
+			}
+		indexElement->ISS_numRecs = parentItem.ISS_numRecs;
+		}
+	else  {
+		pself->OLDI_numTopItems++;
+		updateTop = TRUE;
+		}
+
+	if (numDels) {
+		/* now add children back at the right place */
+		MemLock(mmh);
+		for (i = 0; i < numDels; i++) {
+			/* move it */
+			tempElement = ChunkArrayElementToPtrHandles(mmh, tempArray, i, 0);
+			moveElement = ChunkArrayElementToPtrHandles(
+										mh, g_indexCArray, 1 + i + insPos, 0);
+			insertElement = ChunkArrayInsertAtHandle(
+										g_indexCArray, moveElement, 0);
+			insertElement->ISS_type = tempElement->ISS_type;
+			/* gotta do some level adjustment here */
+			if (moveItem.ISS_level >= destItem.ISS_level) {
+				levelOffset = moveItem.ISS_level - destItem.ISS_level;
+				insertElement->ISS_level = tempElement->ISS_level - levelOffset;
+				}
+			else  {
+				levelOffset = destItem.ISS_level - moveItem.ISS_level;
+				insertElement->ISS_level = tempElement->ISS_level + levelOffset;
+				 }
+			insertElement->ISS_dbHan = tempElement->ISS_dbHan;
+			insertElement->ISS_recNum = tempElement->ISS_recNum;
+			insertElement->ISS_numRecs = tempElement->ISS_numRecs;
+			insertElement->ISS_myDBHan = tempElement->ISS_myDBHan;
+			}
+		MemFree(mmh);
+		} /* end of adding kids back if */
+
+
+	if (updateTop) {
+		vmbh = VMGetMapBlock(g_curDocHan);
+		VMmapPtr = VMLock(g_curDocHan, vmbh, &vmh);
+		VMmapPtr->VMMS_numTopItems = pself->OLDI_numTopItems;
+		VMDirty(vmh);
+		VMUnlock(vmh);
+		}
+
+	VMDirty(mh);
+	VMUnlock(mh);
+
+
+	/* update the list */
+	@send CardDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->OLDI_indexItems);
+	/* move the selection to keep it with the moved item */
+	@send CardDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(insPos, FALSE);
+	@send CardDList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@send CardDList::MSG_GEN_APPLY();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_OLINER_DOC_MOVE_ITEM_CANCEL for OLDocumentClass
+ *
+ * DESCRIPTION:	Cancels the move
+ *
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method OLDocumentClass, MSG_OLINER_DOC_MOVE_ITEM_CANCEL
+{
+
+	@send CardDList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+												pself->OLDI_curSel, FALSE);
+
+}
+

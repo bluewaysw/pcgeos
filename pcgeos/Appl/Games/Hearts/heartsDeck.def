@@ -1,0 +1,574 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		heartsDeck.def
+
+AUTHOR:		Peter Weck, Mar  1, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PW	3/ 1/93   	Initial revision
+
+
+DESCRIPTION:
+	This file contains the definitions for heartsGame.asm
+		
+		
+	$Id: heartsDeck.def,v 1.1 97/04/04 15:19:25 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+
+;------------------------------------------------------------------------------
+;			Constants
+;------------------------------------------------------------------------------
+
+ADDRESS_OUT_OF_BOUNDS			enum FatalErrors
+NO_CARDS_LEFT_IN_DECK			enum FatalErrors
+BP_WAS_DESTROYED_OVER_METHOD_CALL	enum FatalErrors
+
+NonAcceptanceReasons	etype	byte
+MUST_PLAY_TWO_OF_CLUBS			enum NonAcceptanceReasons
+HEARTS_NOT_BROKEN_YET			enum NonAcceptanceReasons
+MUST_FOLLOW_SUIT			enum NonAcceptanceReasons
+
+ProcedureIndexes	etype	byte, 0, 2
+PASSING_VOID_SUITS_IF_POSSIBLE		enum ProcedureIndexes
+PASSING_VOID_SUITS_UNCONDITIONALLY	enum ProcedureIndexes
+PASSING_DONT_BE_DUMB			enum ProcedureIndexes
+
+
+SIZE_OF_SCORE = 15			;length of score string
+
+SCORE_X_OFFSET = 2			;x-offset from top of deck
+SCORE_Y_OFFSET = -16			;y-offset from top of deck
+
+TWO_OF_CLUBS = 2*13 + 2			;card value
+QUEEN_OF_SPADES = 3*13 + 12		;card value
+JACK_OF_DIAMONDS = 0*13 + 11		;card value
+ACE_VALUE = 14
+
+DIAMONDS = 00h				;card attr bits to indicate suit
+HEARTS = 02h				;byte look like  :
+CLUBS = 04h				;  -----xx-
+SPADES = 06h				;x indicates suit bits
+
+TWO = 10h				;bits set for this rank
+KING = 68h				;bits set for this rank
+QUEEN = 60h				;bits set for this rank
+JACK = 58h				;bits set for this rank
+RANK_ACE = 08h				;bits set for this rank
+
+RANK_VALUE_OF_JACK = 11			;value between 2 and 14 for jack
+RANK_VALUE_OF_QUEEN = 12		;value between 2 and 14 for queen
+
+QUEEN_OF_SPADES_POINTS = 13		;number of points for card
+HEARTS_POINTS = 1			;number of points for card
+JACK_OF_DIAMONDS_POINTS = -10		;number of points for card
+
+MAXIMUM_ABSOLUTE_POINTS = 26+10		;sum of absolute value of cards in deck
+
+RANK_MASK = 78h				;bits which indicate rank
+					;  -xxxx---
+SUIT_MASK = 06h				;bits which indidate suit
+					;  -----xx-
+ID_NUMBER_MASK = 03h			;bits used to indicate which deck ID
+					;  ------xx
+
+MAX_CARD_VALUE = 53			;highest card value
+NUM_PLAYERS = 4				;number of players
+
+MAXIMUM_STRATEGIC_POINTS = 200		;a number greater than the highest
+					;number of strategic points for a card
+MAXIMUM_POINTS_BEFORE_DEFINITELY_BAD = 2
+TEXT_POINT_SIZE = 10
+SCORE_LENGTH = 25			;length of score string used by
+					;GrInvalRect to clear score
+SCORE_HEIGHT = 12			;height of score string used by 
+					;GrInvalRect to clear score
+
+
+
+NAME_LENGTH = 55			;length of name string used by
+					;GrInvalRect to clear score
+NAME_HEIGHT = 12			;height of name string used by 
+					;GrInvalRect to clear score
+
+NAME_VERT_HEIGHT = 55
+NAME_VERT_WIDTH = 8
+
+DRAW_SCORE_HIGHLIGHTED = 1		;indicates to draw score highlighted
+DRAW_SCORE_AS_BEFORE = -1		;indicates to draw the score the same
+					;way it was drawn before.
+
+HOLD_HAND = 1				;indicates a hold hand
+NUMBER_OF_CARDS_IN_TRICK = 4		;the number of cards per trick
+					;which equals number of players
+
+SHOWLASTTRICKDECK_DISPLAY_X_POSITION = 82 
+SHOWLASTTRICKDECK_DISPLAY_Y_POSITION = 127
+
+SHOW_LAST_TRICK_TIMER_INTERVAL = 120	
+SHOW_PASSED_CARDS_TIMER_INTERVAL = 180
+COMPUTER_PLAYER_DELAY_TIMER_INTERVAL = 30
+SHOW_TRICK_BEFORE_TAKING_IT_TIMER_INTERVAL = 150
+
+CARD_Y_MOVEMENT_AMOUNT = 2		;amount to move card by when playing
+CARD_X_MOVEMENT_AMOUNT = 2		;the top card of a deck
+
+MAX_ODDS = 100				;maximum number for choosing which
+					;pass procedure to use.
+
+MANY_CARDS_LEFT = 7			;minimum number of cards remaining
+					;to question how someone leads
+
+;------------------------------------------------------------------------------
+;			Definitions
+;------------------------------------------------------------------------------
+
+
+PassCardData	struct
+
+	PCD_cardNumber		byte
+	PCD_cardAttribute	byte
+
+PassCardData	ends
+
+
+HeartsSuits record
+
+	:4,
+	HS_DIAMONDS : 1
+	HS_HEARTS : 1
+	HS_CLUBS : 1
+	HS_SPADES : 1
+
+HeartsSuits end
+
+
+HeartsAssumptions record
+
+	:6
+	HA_NO_QUEEN : 1			;bit set if not thought to have the
+					;Queen of Spades
+	HA_NO_JACK : 1			;bit set if not thought to have the
+					;Jack of Diamonds
+HeartsAssumptions end
+
+
+PlayerData	struct
+	PD_playerId		byte
+	PD_voidSuits		HeartsSuits
+	PD_points		byte
+	PD_cardAssumptions	HeartsAssumptions
+PlayerData	ends
+
+
+HeartsTrickCards	struct
+	HTC_card1	byte
+	HTC_card2	byte
+	HTC_card3	byte
+	HTC_card4	byte
+HeartsTrickCards	ends
+
+
+TrickData	struct
+	TD_whoLeadId		byte
+	TD_whoTookId		byte
+	TD_cardsPlayed		HeartsTrickCards
+TrickData	ends
+
+
+HeartsPassCards		struct
+	HPC_card1	byte
+	HPC_card2	byte
+	HPC_card3	byte
+HeartsPassCards		ends
+
+
+PassData	struct
+	PD_passerOD		optr
+	PD_cardsPassed		HeartsPassCards
+PassData	ends
+
+
+HeartsPassMethod	struct
+	HPM_numNuetralCards	byte
+	HPM_passProcedure	word
+	HPM_backupProcedure	word
+HeartsPassMethod	ends
+
+
+HeartsPassStyle		struct
+	HPS_oddsOnAlternate	byte			;number between 0 and
+							;99 where 0 means 
+							;always use main
+	HPS_mainMethod		HeartsPassMethod
+	HPS_alternateMethod	HeartsPassMethod
+HeartsPassStyle		ends
+
+
+HeartsShootInfo	record
+	:7,
+
+	HSI_PREVENTING_SHOOT : 1	;This bit indicates that the deck
+					;is currently preventing anyone
+					;from shooting
+HeartsShootInfo end
+
+
+HeartsShootStyle	struct
+	HSS_oddsOnPreventing	byte		;number between 0 and 99
+						;where 0 means never try 
+						;and prevent shooting
+
+	HSS_oddsOnBeingCautious	byte		;measuing how cautious
+						;to be.  Meaningless if
+						;less than odds on preventing
+
+	HSS_currentInfo		HeartsShootInfo
+HeartsShootStyle	ends
+
+
+HeartsDeckAttrs	record
+	:4,
+
+	HDA_HIGHLIGHT_SCORE : 1		;This bit indicates that the score
+					;should be draw highlighted.
+	HDA_DISPLAY_CARDS_UP : 1	;This bit indicates that the cards
+					;in this deck should be dealt face up.
+	HDA_FLIPPING_TAKE_TRICK : 1	;This bit indicates that the deck
+					;has flipped some of its cards
+					;temporarily
+	HDA_COMPUTER_PLAYER : 1		;This bit indicates that the deck
+					;is played by the computer.
+HeartsDeckAttrs	end
+
+
+;------------------------------------------------------------------------------
+;			Object Class include files
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;			Class & Method Definitions
+;------------------------------------------------------------------------------
+
+HeartsDeckClass		class	DeckClass
+
+
+
+MSG_HEARTS_DECK_TRANSFER_NTH_CARD		message
+
+		;Shifts the nth card to make it the first card on the deck,
+		;and then transfers the top card to the other deck
+
+MSG_HEARTS_DECK_SORT_DECK			message
+
+		;Rearranges the cards in the deck in order by suit
+		;and card number
+
+MSG_HEARTS_DECK_SWITCH_CARDS			message
+
+		;switch two card in a deck
+
+MSG_HEARTS_DECK_FIND_SMALLEST_CARD		message
+
+		;Returns the smallest cards value and where in the deck it
+		;is located.
+
+MSG_HEARTS_DECK_PLAY_TOP_CARD			message
+
+		;will move the top card from the deck to the discard
+		;deck
+
+MSG_HEARTS_DECK_TRANSFER_ALL_CARDS_FACE_DOWN	message
+
+		;Transfers all of a decks cards to another deck and
+		;flips the cards face down, as it does so.
+
+MSG_HEARTS_DECK_TAKE_TRICK			message
+
+		;Move the cards to MyDiscardDeck.
+		;Also, it sets up the HeartsBroken instance data for the
+		;parent class.  This method should only be sent to
+		;DiscardDeck, since it is the only proper discard deck.
+
+MSG_HEARTS_DECK_SET_CHUNK_ARRAY			message
+
+		;Creates the chunk-arrays in the same segment as the 
+		;HeartsDeckClass objects, and stores the handles to the 
+		;chunk arrays in the object's instance data.  
+		;The chunk arrays are of variable length, but each entry
+		;is a fixed size
+
+MSG_HEARTS_DECK_GET_CHUNK_ARRAY			message
+
+		;will return a handle to the chunk array of the deck
+
+MSG_HEARTS_DECK_SET_NEIGHBOR			message
+
+		;Set the neighbor instance data for the deck.
+
+MSG_HEARTS_DECK_START_GAME			message
+
+		;Checks to see if the deck has the two of clubs and if
+		;it does, then it starts the game and if not then it
+		;sends the START_GAME message to its neighbor.
+
+MSG_HEARTS_DECK_PLAY_CARD			message
+
+		;Will play the next card if the deck is a computer player
+		;or will give up control to the user if it is the users
+		;turn to play a card.  If 4 cards have been played, then 
+		;it will enable to the take trigger, else it will send
+		;a message to the next player for him to play a card.
+
+MSG_HEARTS_DECK_SHIFT_CARDS			message
+
+		;Will exchange the cx card with the first card and shift
+		;all the other cards down accordingly to preserve the deck
+		;order.
+
+MSG_HEARTS_DECK_TEST_SUIT_CONDITION		message
+
+		;test to see if the deck will accept the card that is
+		;being discarded.
+
+MSG_HEARTS_DECK_FIND_HIGH_OR_LOW		message
+
+		;Returns the number of the card in the deck with the 
+		;highest/lowest card of the suit passed in bp.
+		;Also, can set a zero point so that it will find the highest
+		;card less than a certain number, or the lowest card greater
+		;than a certain number.
+
+MSG_HEARTS_DECK_COUNT_NUMBER_OF_SUIT		message
+
+		;Will return the number of cards of a given suit and the
+		;highest card of that suit.
+
+MSG_HEARTS_DECK_DRAW_SCORE			message
+
+		;Will draw the score of the deck on to the view.  You can
+		;pass it a GState or it will create a one, and you can specify
+		;if you want the score drawn highlighted or not.
+
+MSG_HEARTS_DECK_DRAW_NAME			message
+
+		;Will draw the name of the deck on to the view.  You can
+		;pass it a GState or it will create a one
+
+
+
+MSG_HEARTS_DECK_CALCULATE_SCORE			message
+
+		;Will calculate the amount of points in the deck
+
+MSG_HEARTS_DECK_INCREMENT_SCORE			message
+
+		;Increment both this rounds score and the total score
+
+MSG_HEARTS_DECK_RESET_SCORE			message
+
+		;will set the score instance data to zero for either just
+		;this rounds score, or both this round and the total score.
+
+MSG_HEARTS_DECK_GET_SCORE			message
+
+		;returns the score of this round, or the total score
+
+MSG_HEARTS_DECK_GET_RAW_SCORE			message
+
+		;returns both the positive and negative points recieved for
+		;this round
+
+MSG_HEARTS_DECK_TURN_RED_IF_WINNER		message
+
+		;Will highlight the score of the winner(s).
+
+MSG_HEARTS_DECK_INVERT				message
+
+		;Inverts the top card of the deck
+
+MSG_HEARTS_DECK_PASS_CARDS			message
+
+		;Will pass a number of cards to another player, and then
+		;tell its neighbor to pass cards.
+
+MSG_HEARTS_DECK_COMPLETE_PASS_CARDS		message
+
+		;message sent to MyHand to indicate that the pass cards
+		;have been selected and ready to do the pass, and then
+		;start the game
+
+MSG_HEARTS_DECK_SWITCH_PASS_CARDS		message
+
+		;Will switch the cards for all the people passing cards
+		;and resort the deck.  Note that number of cards to
+		;pass must not be zero because we are looping and not checking
+		;for the initial zero case.
+
+MSG_HEARTS_DECK_CLEAR_INVERTED_NTH_CARD		message
+
+		;Will uninvert the nth card of the deck
+
+MSG_HEARTS_DECK_CLEAR_CHUNK_ARRAY		message
+
+		;Will clear the Chunk array if it points anywhere
+
+MSG_HEARTS_DECK_UNINVERT_CHUNK_ARRAY		message
+
+		;Will uninvert the cards associated with the chunk array
+
+MSG_HEARTS_DECK_CLEAR_PASS_POINTER		message
+
+		;Will clear the passPointer instance data
+
+MSG_HEARTS_DECK_GET_NEIGHBOR_POINTER		message
+
+		;returns the neighborPointer instance data
+
+MSG_HEARTS_DECK_UPDATE_PASS_POINTER		message
+
+		;Will move the pass pointer to the next person to pass to.
+
+MSG_HEARTS_DECK_DONE_FLIPPING			message
+
+		;Will return the flipped cards to MyDiscardDeck from
+		;ShowLastTrickDeck
+
+MSG_HEARTS_DECK_TRANSFER_N_CARDS		message
+
+		;Transfers a specified number of cards to another deck.
+
+MSG_HEARTS_DECK_GET_PUSH_CARD_POSITION		message
+
+		;will return the position where the next card to push should
+		;go.
+
+MSG_HEARTS_DECK_FLIP_CARDS			message
+
+		;Will flip all the cards in the deck and redraw the deck
+
+MSG_HEARTS_DECK_REDRAW_IF_FACE_UP		message
+
+		;Will do a deck redraw if the top card is face up.
+
+MSG_HEARTS_DECK_SET_PASS_TO_POINTER		message
+
+		;Will set the HI_passedCards.PD_passerOD instance data 
+
+MSG_HEARTS_DECK_START_GAME_AFTER_PASSING	message
+
+		;Will clear the inverted cards in MyDeck and then call
+		;HeartsDeckStartGame
+
+MSG_HEARTS_DECK_GET_PASS_STRING			message
+
+		;Will return an Optr to the pass string (the instance data)
+
+MSG_HEARTS_DECK_EXPLAIN				message
+
+		;Will Bring up a dialog box to explain why the card is not
+		;accepted.
+
+MSG_HEARTS_DECK_END_EXPLAINATION		message
+
+		;Will remove the explaination dialog box.
+
+MSG_HEARTS_DECK_GET_PLAYED_CARD_POINTER		message
+
+		;Will return the instance data HI_playedCardPtr
+
+MSG_HEARTS_DECK_GET_PLAYERS_DATA_POINTER	message
+
+		;Will return the instance data HI_playersDataPtr
+
+MSG_HEARTS_DECK_GET_DECK_ID_NUMBER		message
+
+		;Will return the decks ID number
+
+MSG_HEARTS_DECK_CLEAR_STRATEGY_DATA		message
+
+		;Will clear the two chunk arrays pointed to by :
+		;	HI_playedCardPtr & HI_playersDataPtr
+		;Then it will initialize the HI_playersDataPtr by adding
+		;	all the players with no information about them.
+
+MSG_HEARTS_DECK_GET_SCORE_POSITION		message
+
+		;Will return the position where the score should be printed.
+
+
+MSG_HEARTS_DECK_GET_NAME_POSITION		message
+
+		;Will return the position where the name should be printed.
+
+MSG_HEARTS_DECK_GET_PASS_STYLE			message
+
+		;will return the pass style that should be used
+
+MSG_HEARTS_DECK_CHECK_IF_PREVENTING		message
+
+		;Will return the deck ID of the deck that we are trying to 
+		;prevent from shooting, or zero if we're not trying to prevent
+		;shooting.
+
+
+MSG_HEARTS_DECK_COMPUTER_SHOT_MOON_GLOAT 	message
+		;Put up a dialog box gloating about shooting the moon
+		;
+
+;;instance data
+
+	;data for strategies
+
+HI_playedCardPtr	optr		;pointer to a chunk array containing
+					;all the cards played so far.
+					;an array of TrickData
+
+HI_playersDataPtr	optr		;pointer to a chunk array containing
+					;information about each player.
+					;an array of PlayerData
+
+HI_passedCards		PassData	;information about what cards you 
+					;passed and to whom.
+
+HI_receivedCards	PassData	;information about whay you were 
+					;passed and by whom.
+
+	;data for deck
+
+HI_passStyle		HeartsPassStyle		;how deck should pass cards
+HI_shootStyle		HeartsShootStyle	;how deck should deal with 
+						;shooting
+HI_scoreXPosition	word		;x-offset from deck position for score
+HI_scoreYPosition	word		;y-offset from deck position for score
+HI_namePosition		Point		;upper left of name text
+HI_nameYCharAdjust	word		;y separation of each char in name
+HI_chosenCard		byte		;the number of card selected
+HI_deckAttributes	HeartsDeckAttrs	;info about the deck
+HI_deckIdNumber		byte		;distict ID number for player
+HI_chunkPointer		optr		;chunk used for passing cards
+HI_neighborPointer	optr		;pointer to players neighbor
+HI_passPointer		optr		;player to recieve cards from
+HI_passString		lptr		;message to indicate where to pass to
+HI_score		word		;total score for the deck
+HI_thisRoundScore	word		;lower byte is positive points
+					;upper byte is negative points
+HI_timerData		dword		;data for one shot timmer
+HI_nameString		lptr		;text for name of player
+
+
+
+HeartsDeckClass		endc
+

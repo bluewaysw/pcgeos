@@ -1,0 +1,107 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	clean
+# FILE: 	clean
+# AUTHOR: 	Adam de Boor, Sep  4, 1991
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ardeb	9/ 4/91		Initial Revision
+#
+# DESCRIPTION:
+#	A script to clean up after yourself
+#
+#	Usage: clean [no]
+#
+#	If you give the argument "no", then the things that would be
+#	removed will be printed, but not removed.
+#
+#	$Id: clean,v 1.18 97/02/12 17:08:40 stevey Exp $
+#
+###############################################################################
+usageString="Usage: clean [no]"
+if [ $# -gt 1 ]; then
+    echo $usageString
+    exit 0
+elif [ "$1" = "no" ]; then
+        rm=""
+elif [ $# -eq 1 ]; then
+    echo $usageString
+    exit 0
+else
+    rm="-exec rm -f {} ;"
+fi
+
+#
+# Check if the user is cleaning from Installed directory. If so,
+# confirm with user to make sure he/she wants to clean the files.
+#
+# It checks against the path name pattern "*/pcgeos/*Installed*".
+#
+cwd=`pwd`
+if expr "$cwd" : '.*/pcgeos/.*Installed.*' > /dev/null; then
+	echo "*** Attempting to clean from Installed directory ***"
+	echo -n "Continue? [y/n] , default = n: "
+	read response
+	case $response in
+	    [Yy]*)
+		#
+		# continue cleaning up files
+		#
+		;;
+	    *)
+		echo "clean aborted"
+		exit 1
+	esac
+fi
+
+#
+# If lame version of find is being used that doesn't support iname option
+# (i.e., not GNU find), then go back to using -name
+#
+find . -iname AbsolutleyNothingName9389 2> /dev/null
+
+if [ $? -eq 0 ] ; then
+	iname=-iname
+else
+	iname=-name
+fi
+
+find . \( $iname \*.lst -o \
+	  $iname core -o \
+	  $iname tags -o \
+	  $iname \*.out -o \
+	  $iname \*.obj -o \
+	  $iname \*.eobj -o \
+	  $iname \*.gobj -o \
+	  $iname \*.exe -o \
+	  $iname \*.ldf -o \
+	  $iname \*.mdp -o \
+	  $iname \*.dll -o \
+	  $iname \*.rdef -o \
+	  $iname \*.grdef -o \
+	  $iname \*.geo -o \
+	  $iname \*_e.c -o \
+	  $iname \*_g.c -o \
+	  $iname \*.egc -o \
+	  $iname \*.map -o \
+	  $iname \*.mod -o \
+	  $iname \*.o -o \
+	  $iname \*.a -o \
+	  $iname \*.sym -o \
+	  $iname \*~ -o \
+	  $iname \*.rsc -o \
+	  $iname \*.vm -o \
+	  $iname \*.O -o \
+	  $iname \*.pdb -o \
+	  $iname \*.LIB -o \
+	  $iname \#\*\# -o \
+	  $iname \*.backup -o \
+	  $iname LOCK.make \) $rm -print -o \
+	\( \( -name lib -o -name tests -o -name lib.new \) -prune \)
+

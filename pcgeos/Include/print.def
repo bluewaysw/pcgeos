@@ -1,0 +1,151 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Printer Drivers -- External definitions
+FILE:		print.def
+
+AUTHOR:		Don Reeves, May  6, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Don	5/ 6/92		Initial revision
+
+DESCRIPTION:
+	Externally visible printer definitions
+		
+	$Id: print.def,v 1.1 97/04/04 14:22:49 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__PRINT
+
+StartDriver	print
+
+; Different printer modes.
+;
+PrinterMode	etype	byte, 0, 2
+PM_GRAPHICS_LOW_RES	enum	PrinterMode	; lowest quality...fastest...
+PM_GRAPHICS_MED_RES	enum	PrinterMode	; medium quality...slower...
+PM_GRAPHICS_HI_RES	enum	PrinterMode	; best quality...slowest...
+PM_TEXT_DRAFT		enum	PrinterMode	; fastest ascii output
+PM_TEXT_NLQ		enum	PrinterMode	; best quality ascii output
+
+PM_FIRST_TEXT_MODE	equ	PM_TEXT_DRAFT	; equate to make the code easier
+
+
+; PageSize attributes
+;
+PageType	etype	word, 0, 2
+    PT_PAPER		enum PageType
+    PT_ENVELOPE		enum PageType
+    PT_LABEL		enum PageType
+    PT_POSTCARD		enum PageType
+PaperType	equ	PageType
+
+
+
+; Page layout options for paper
+;
+PaperOrientation	etype	byte, 0, 1
+    PO_PORTRAIT		enum	PaperOrientation
+    PO_LANDSCAPE	enum	PaperOrientation
+
+PageLayoutPaper		record
+    :12
+    PLP_ORIENTATION	PaperOrientation:1
+    PLP_TYPE		PageType:3	; PT_PAPER
+PageLayoutPaper		end
+
+
+; Page layout options for envelopes
+;
+EnvelopeOrientation	etype	byte, 0, 1
+    EO_PORTRAIT		enum	EnvelopeOrientation
+    EO_LANDSCAPE	enum	EnvelopeOrientation
+
+PageLayoutEnvelope	record
+    :12
+    PLE_ORIENTATION	EnvelopeOrientation:1
+    PLE_TYPE		PageType:3	; PT_ENVELOPE
+PageLayoutEnvelope	end
+
+
+; Page layout options for labels
+;
+PageLayoutLabel		record
+    :1
+    PLL_ROWS:6				; labels down
+    PLL_COLUMNS:6			; labels across
+    PLL_TYPE		PageType:3	; PT_LABEL
+PageLayoutLabel		end
+
+;
+; Page layout options for postcards
+;
+
+PostcardOrientation	etype	byte, 0, 1
+    PCO_PORTRAIT	enum	PostcardOrientation
+    PCO_LANDSCAPE	enum	PostcardOrientation
+
+PageLayoutPostcard	record
+    :12
+    PLPC_ORIENTATION	PostcardOrientation:1
+    PLPC_TYPE		PageType:3	; PT_POSTCARD
+PageLayoutPostcard	end
+
+
+; A union of all the page layout options. The low two bits must always
+; contain the PageType enumeration.
+;
+PageLayout		union
+    PL_paper		PageLayoutPaper
+    PL_envelope		PageLayoutEnvelope
+    PL_label		PageLayoutLabel
+    PL_postcard		PageLayoutPostcard
+PageLayout		end		
+
+; Margin structure
+;    
+PCMarginParams		struct
+    PCMP_left		word	(?)			; left margin
+    PCMP_top		word	(?)			; top margin
+    PCMP_right		word	(?)			; right margin
+    PCMP_bottom		word	(?)			; bottom margin
+PCMarginParams		ends
+
+; Dimensions structure
+;    
+PCDocSizeParams struct
+    PCDSP_width         dword   (?)                     ; width of the document
+    PCDSP_height        dword   (?)                     ; height of the document
+PCDocSizeParams ends
+
+; PageSizeReport structure & sub-fields
+;
+PageSizeReport		struct
+    PSR_width		dword		; width of the page
+    PSR_height		dword		; height of the page
+    PSR_layout		PageLayout	; layout options
+    PSR_margins		PCMarginParams	; document margins
+PageSizeReport		ends
+
+
+; This enumerated type indicated the type of printer driver
+; that we are dealing with, as printer drivers are really a broad
+; class of output device drivers
+;
+PrinterDriverType	etype	byte, 0
+    PDT_PRINTER		enum	PrinterDriverType
+    PDT_PLOTTER		enum	PrinterDriverType
+    PDT_FACSIMILE	enum	PrinterDriverType
+    PDT_CAMERA		enum	PrinterDriverType
+    PDT_OTHER		enum	PrinterDriverType
+    PDT_ALL		equ	-1		; all printers of all types
+
+PDT_ALL_LOCAL_AND_NETWORK equ	0x00ff
+; Can be passed to SpoolGetNumPrinters
+
+EndDriver	print

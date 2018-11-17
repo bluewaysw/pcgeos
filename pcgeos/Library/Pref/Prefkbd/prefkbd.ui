@@ -1,0 +1,356 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  prefkbd.ui
+ * FILE:	  prefkbd.ui
+ *
+ * AUTHOR:  	  Gene Anderson: Aug 25, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	8/25/92	  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	UI for Keyboard module of Preferences
+ *
+ *
+ * 	$Id: prefkbd.ui,v 1.1 97/04/05 01:28:53 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#include "generic.uih"
+#include "config.uih"
+
+#ifdef GPC_VERSION
+#include "Art/mkrPrefGPC.ui"
+#else
+#include "Art/mkrPrefKbd.ui"
+#endif
+
+class PrefKbdDialog = PrefDialog {
+}
+
+/**************************************************************************
+ *	UI FOR USER LEVEL
+ **************************************************************************/ 
+start	PrefKbdUI;
+
+PrefKbdRoot = PrefKbdDialog {
+	moniker = "Keyboard";
+	prefAttrs = default +rebootIfChanged;
+	attributes = default +modal, +notUserInitiatable;
+	visibility = dialog;
+	type = properties;
+	genStates = default -usable;
+	children =
+		PrefKbdTitleGroup,
+#ifdef GPC_VERSION
+		PrefKbdSubgroup, PrefTriggerGroup;
+#else
+		PrefKbdSubgroup;
+#endif
+	hints = {
+		HINT_INTERACTION_SINGLE_USAGE,
+#ifndef GPC_VERSION
+		HINT_INTERACTION_COMPLEX_PROPERTIES,
+#endif
+                ATTR_GEN_INIT_FILE_CATEGORY {
+                        char "keyboard",0
+                },
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbKeyboard",0
+		} 
+	}
+}
+
+#ifdef GPC_VERSION
+PrefTriggerGroup = GenInteraction {
+    children = PrefKbdOK, PrefKbdClose;
+    hints = {
+	HINT_ORIENT_CHILDREN_HORIZONTALLY
+    }
+}
+
+PrefKbdOK = GenTrigger {
+    moniker = 'C', "Change";
+    genStates = default -enabled;
+    hints = {
+	HINT_SEEK_REPLY_BAR,
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+	    word IC_APPLY
+	}
+    }
+}
+
+PrefKbdClose = GenTrigger {
+    moniker = 'D', "Don't Change";
+    hints = {
+	HINT_SEEK_REPLY_BAR,
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+	    word IC_DISMISS
+	}
+    }
+}
+#endif
+
+PrefKbdTitleGroup = GenInteraction {
+	children =
+		PrefKbdTitle,
+		PrefKbdHelp;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+PrefKbdTitle = TitledGlyph {
+	moniker = list {
+		PrefKbdTextMoniker,
+#ifdef GPC_VERSION
+		PrefGPCMoniker
+#else
+		PrefKbdLCMoniker,
+		PrefKbdLMMoniker,
+		PrefKbdLCGAMoniker
+#endif
+	}
+}
+
+PrefKbdHelp = GenText {
+	genAttributes = readOnly;
+	text = "Use these options to change your keyboard settings.";
+}
+
+
+PrefKbdSubgroup = PrefInteraction {
+	children =
+#ifdef GPC_VERSION
+		KeyboardAttrsGroup;
+#else
+		KeyboardAttrsGroup,
+		KeyboardList;
+#endif
+	hints = {
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+KeyboardAttrsGroup = PrefInteraction vardataReloc {
+	children =
+		KeyboardSettings,
+		KeyboardOptions;
+	hints = {
+		HINT_ORIENT_CHILDREN_ALONG_LARGER_DIMENSION,
+		ATTR_PREF_REBOOT_STRING {
+			UN_OPTR	PrefKbdAttrsRebootString
+		}
+	}
+}
+
+KeyboardSettings = PrefInteraction {
+	children =
+		KeyboardDelayList,
+		KeyboardRepeatList;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+
+/*****************************************************************************/
+
+KeyboardDelayList = PrefItemGroup {
+	prefAttrs = default +rebootIfChanged;
+	moniker = "Keyboard Delay";
+	numSelections  = 1;
+	selection = KBD_DELAY_MEDIUM;
+	children =
+		KeyboardDelayShort, 
+		KeyboardDelayMedium, 
+		KeyboardDelayLong;
+	behaviorType = exclusive;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DRAW_IN_BOX
+	}
+}
+
+KeyboardDelayShort = GenItem {
+	moniker = "Short";
+	identifier = KBD_DELAY_SHORT;
+}
+
+KeyboardDelayMedium = GenItem {
+	moniker = "Medium";
+	identifier = KBD_DELAY_MEDIUM;
+}
+
+KeyboardDelayLong = GenItem {
+	moniker = "Long";
+	identifier = KBD_DELAY_LONG;
+}
+
+/*****************************************************************************/
+
+KeyboardRepeatList = PrefItemGroup {
+	prefAttrs = default +rebootIfChanged;
+	moniker = "Keyboard Repeat Rate";
+	numSelections  = 1;
+	selection = KBD_REPEAT_MEDIUM;
+	children =
+		KeyboardRepeatSlow, 
+		KeyboardRepeatMedium, 
+		KeyboardRepeatFast;
+	behaviorType = exclusive;
+	destination = process;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+KeyboardRepeatSlow = GenItem {
+	moniker = "Slow";
+	identifier = KBD_REPEAT_SLOW;
+}
+
+KeyboardRepeatMedium = GenItem {
+	moniker = "Medium";
+	identifier = KBD_REPEAT_MEDIUM;
+}
+
+KeyboardRepeatFast = GenItem {
+	moniker = "Fast";
+	identifier = KBD_REPEAT_FAST;
+}
+
+KeyboardOptions = PrefInteraction {
+	children =
+		KeyboardAltGrList,
+		KeyboardCapsLockList,
+		KeyboardCtrlList;
+	moniker = "Key Options";
+	genStates = default -usable;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		ATTR_PREF_REQUIRED_FEATURES {
+			word mask PMF_OTHER
+		}
+	}
+}
+
+KeyboardAltGrList = PrefBooleanGroup {
+	prefAttrs = default +rebootIfChanged;
+	children = KeyboardAltGrBoolean;
+	hints = {
+		ATTR_GEN_BOOLEAN_GROUP_INIT_FILE_BOOLEAN,
+		ATTR_GEN_INIT_FILE_KEY {
+			char "keyboardAltGr",0
+		}
+	}
+}
+
+KeyboardAltGrBoolean = GenBoolean {
+	moniker = "Right Alt key functions like Ctrl+Alt";
+	identifier = TRUE;
+}
+
+KeyboardCapsLockList = PrefBooleanGroup {
+	prefAttrs = default +rebootIfChanged;
+	children = KeyboardCapsLockBoolean;
+	hints = {
+		ATTR_GEN_BOOLEAN_GROUP_INIT_FILE_BOOLEAN,
+		ATTR_GEN_INIT_FILE_KEY {
+			char "keyboardShiftRelease",0
+		}
+	}
+}
+
+KeyboardCapsLockBoolean = GenBoolean {
+	moniker = "Pressing Shift releases Caps Lock";
+	identifier = TRUE;
+}
+
+KeyboardCtrlList = PrefBooleanGroup {
+	prefAttrs = default +rebootIfChanged;
+	children = KeyboardCtrlBoolean;
+	hints = {
+		ATTR_GEN_BOOLEAN_GROUP_INIT_FILE_BOOLEAN,
+		ATTR_GEN_INIT_FILE_KEY {
+			char "keyboardSwapCtrl",0
+		}
+	}
+}
+
+KeyboardCtrlBoolean = GenBoolean {
+	moniker = "Exchange Ctrl and Caps lock keys";
+	identifier = TRUE;
+}
+
+/*****************************************************************************/
+
+KeyboardList = PrefTocList vardataReloc {
+	tocFlags = default +extendedDeviceDrivers;
+	tokenChars = "'KBDD'";
+	moniker = "Keyboard";
+	prefAttrs = default +rebootIfChanged;
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX,
+		HINT_DEFAULT_FOCUS,
+		ATTR_GEN_INIT_FILE_KEY { 
+			char "device",0
+		},
+		ATTR_PREF_REBOOT_STRING {
+			UN_OPTR	PrefKbdDriverRebootString
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 50>
+			SpecHeight <SST_LINES_OF_TEXT, 4>
+			word	4
+		},
+		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_KEYBOARD_DRIVERS>
+		},
+		ATTR_PREF_REQUIRED_FEATURES {
+			word mask PMF_OTHER
+		}
+	}
+}
+
+end	PrefKbdUI;
+
+start	Strings, data;
+
+chunk PrefKbdAttrsRebootString = "keyboard settings";
+chunk PrefKbdDriverRebootString = "keyboard driver";
+
+
+visMoniker PrefKbdTextMoniker = "Keyboard";
+
+visMoniker PrefKbdMonikerList = list {
+		PrefKbdTextMoniker,
+#ifdef GPC_VERSION
+		PrefGPCMoniker
+#else
+		PrefKbdLCMoniker,
+		PrefKbdLMMoniker,
+		PrefKbdLCGAMoniker
+#endif
+}
+
+end	Strings;

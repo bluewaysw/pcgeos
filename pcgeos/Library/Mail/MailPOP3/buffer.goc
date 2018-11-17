@@ -1,0 +1,281 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1998.  All rights reserved.
+	GLOBALPC CONFIDENTIAL
+
+PROJECT:        Mail	
+MODULE:		MailPOP3
+FILE:		buffer.goc
+
+AUTHOR:		Ian Porteous, Nov 25, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	porteous	11/25/98   	Initial version.
+
+DESCRIPTION:
+
+Create a buffer between the code that needs to parse the message and 
+the socket in order to improve performance.
+	
+
+	$Id$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+@include <stdapp.goh>
+@include <mailhub.goh>
+@include <mailpop3.goh>
+
+#include "buffer.h"
+
+
+/***********************************************************************
+ *		BufferInit
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize Buffer, setting the socket and allocating 
+ *              a memory block for the buffer
+ * CALLED BY:	
+ * RETURN:	ME_OUT_OF_MEMORY if allocation fails
+ *              Initialize the block structure.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/25/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+BufferInit(BufferBlock *block, Socket sock) 
+{
+    block->BB_socket = sock;
+    block->BB_data = NULL;
+    block->BB_startIndex = 0;
+    block->BB_endIndex = 0;
+    
+    if (block->BB_blockHandle = 
+	MemAlloc(BUFFER_BLOCK_SIZE, HF_SWAPABLE | HF_SHARABLE, 0)) {
+	return ME_NONE;
+    } else {
+	return ME_OUT_OF_MEMORY;
+    }
+} /* End of BufferInit.	*/
+
+
+
+/***********************************************************************
+ *		BufferClose
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Free the mem block allocated for the buffer
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/25/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+BufferClose(BufferBlock *block) 
+{
+    MemFree(block->BB_blockHandle);
+    return ME_NONE;
+}
+
+
+/***********************************************************************
+ *		BufferLockBlock
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Lock the Buffer Block
+ * CALLED BY:	
+ * RETURN:	MailError if lock fails
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/25/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+BufferLockBlock (BufferBlock *block)
+{
+    if (block->BB_data = MemLock(block->BB_blockHandle)) {
+	return ME_NONE;
+    } else {
+	return ME_OUT_OF_MEMORY;
+    }
+}	/* End of BufferLockBlock.	*/
+
+void _pascal
+BufferUnlockBlock (BufferBlock *block)
+{
+    MemUnlock(block->BB_blockHandle);
+    block->BB_data = NULL;
+
+}	/* End of BufferLockBlock.	*/
+
+
+/***********************************************************************
+ *		BufferGetBlock
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Refill the Buffer from the Socket
+ * CALLED BY:	GetNextByte
+ * RETURN:	
+ * SIDE EFFECTS: Buffer is filled with up to BUFFER_TRANSFER_SIZE bytes 
+ *               of data from BB_socket.
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/25/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+BufferGetBlock (BufferBlock *block)
+{
+    int retCount, count;
+    byte *data;
+    MailError me = ME_NONE;
+
+    data = block->BB_data;
+
+    if ((BUFFER_BLOCK_SIZE - (block->BB_endIndex)) >= BUFFER_TRANSFER_SIZE) {
+	/* we can do the transfer in one piece 
+	 */
+	retCount = SocketRecv(block->BB_socket, &(data[block->BB_endIndex]), 
+			   BUFFER_TRANSFER_SIZE, 3600, 0,
+			   (SocketAddress *)0);
+	block->BB_startIndex = block->BB_endIndex;
+	block->BB_endIndex += retCount;
+	if (retCount == 0) 
+	    me = ME_NETWORK_ERROR;
+    } else {
+	/* the transfer will wrap, we need to break it into
+	 * two pieces
+	 */
+	count = BUFFER_BLOCK_SIZE - block->BB_endIndex;
+	retCount = SocketRecv(block->BB_socket, &(data[block->BB_endIndex]), 
+			   count, 3600, 0,(SocketAddress *)0);
+	block->BB_startIndex = block->BB_endIndex;
+	block->BB_endIndex += retCount;
+	if (retCount == count) {
+	    /* there is still data left to read 
+	     */
+	    count = BUFFER_TRANSFER_SIZE - retCount;
+	    block->BB_endIndex = 0;
+	    retCount = SocketRecv(block->BB_socket, 
+				  &(data[block->BB_endIndex]), 
+				  count, 3600, 0,(SocketAddress *)0);
+	    block->BB_endIndex += retCount;
+	} else if (retCount == 0) {
+	    me = ME_NETWORK_ERROR;
+	}
+    }
+
+    return me;
+
+}	/* End of BufferGetBlock.	*/
+
+
+
+/***********************************************************************
+ *		BufferGetNextByte
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the next byte from the buffer.  If the buffer is 
+ *              Empty, get the next byte from the socket
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/25/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+BufferGetNextByte (BufferBlock *block, char *b )
+{
+    MailError ret = ME_NONE;
+
+#if EC
+    if (!block->BB_data) {
+	EC_ERROR(BUFFER_BLOCK_NOT_LOCKED);
+    }
+#endif 
+
+    if (block->BB_startIndex == block->BB_endIndex) {
+	ret = BufferGetBlock(block);
+    } else if (block->BB_startIndex == BUFFER_BLOCK_SIZE) {
+	block->BB_startIndex = 0;
+    }
+
+    *b = block->BB_data[block->BB_startIndex];
+    ++(block->BB_startIndex);
+    return ret;
+}	/* End of BufferGetByte.	*/
+
+
+
+/***********************************************************************
+ *		BufferUndoLastByte
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Undo the removal of one byte from the buffer.  
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS: 
+ *	This can be called BUFFER_BLOCK_SIZE - BLOCK_TRANSFER_SIZE, 
+ *  before there is a problem.
+ *
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/07/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+BufferUndoLastByte (BufferBlock *block)
+{
+#if EC
+    if (!block->BB_data) {
+	EC_ERROR(BUFFER_BLOCK_NOT_LOCKED);
+    }
+#endif 
+    --(block->BB_startIndex);
+    if (block->BB_startIndex < 0) {
+	block->BB_startIndex = BUFFER_BLOCK_SIZE - 1;
+    }
+    return ME_NONE;
+
+}	/* End of BufferUndoLastByte.	*/
+
+
+

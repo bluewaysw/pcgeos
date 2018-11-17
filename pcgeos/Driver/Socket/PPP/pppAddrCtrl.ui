@@ -1,0 +1,299 @@
+/*
+ *	Copyright (c) Geoworks 1995 -- All Rights Reserved
+ *
+ *			GEOWORKS CONFIDENTIAL
+ *
+ * Project:	Socket
+ * Module:	PPP Driver
+ * File:	pppAddrCtrl.ui
+ *
+ * Author:	Jennifer Wu, Apr 20, 1995
+ *
+ * Revision History:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	4/20/95		Initial revision
+ *
+ * Description:
+ *	UI for PPP address controller and password dialog.
+ *
+ *	$Id: pppAddrCtrl.ui,v 1.14 98/08/12 17:22:28 jwu Exp $
+ *
+ */
+
+#include "generic.uih"
+#include "accpnt.uih"
+
+#ifdef PRODUCT_RESPONDER
+	#define _RESPONDER 	1
+#else
+	#define _RESPONDER	0
+#endif
+
+#if _RESPONDER
+#include "foam.uih"
+#endif
+
+
+/*
+ * Subclassed to prevent cut/copy.
+ */
+class PPPSpecialText = GenText {
+}
+
+/* -----------------------------------------------------------------
+ * 
+ * 	PPP Address Controller UI
+ *
+ ------------------------------------------------------------------- */
+
+start PPPAddrCtrlUI, notDetachable;
+
+PPPAddrCtrlDialog = GenInteraction {
+	genStates = default -usable;
+	children = AccPntUI, PhoneText;
+	hints = {
+		HINT_TOOLBOX,
+		HINT_WINDOW_NO_TITLE_BAR,
+	}
+}
+
+AccPntUI = AccessPointControl {
+	moniker = "Access Point";		
+	localize "Label of group specifying the PPP server to connect to.";
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_CENTER_MONIKER,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <>,
+			SpecHeight <SST_LINES_OF_TEXT, 5>
+		},
+	}
+}
+
+PhoneText = GenText {
+	moniker = "Phone #:  ";
+	localize "Phone number of remote PPP host";
+	textDisplayAttributes = default +singleLineText;
+	maxLength = MAX_PHONE_NUMBER_LENGTH;
+	hints = {
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 20>,
+			SpecHeight <>
+		},
+		ATTR_GEN_TEXT_CUSTOM_FILTER {
+			word 	offset PhoneTextFilter
+		},
+	}
+}
+
+/*
+ * A filter to allow only 0-9, '(', ')', '.', '-' and spaces.  
+ * (May change later.)
+ */
+chunk PhoneTextFilter = data {
+	VisTextCustomFilterData <0, 31>		/* everything up to space */
+	VisTextCustomFilterData <33, 39>	/* up to ( */
+	VisTextCustomFilterData <42, 44>	/* up to - */
+	VisTextCustomFilterData <47, 47>	/* up to numbers */
+	VisTextCustomFilterData <58, 127>	/* everything after numbers */
+}
+
+end PPPAddrCtrlUI;
+
+
+
+/* -----------------------------------------------------------------
+ * 
+ * 	PPP Password Dialog UI
+ *
+ ------------------------------------------------------------------- */
+
+start PPPPasswordUI, notDetachable;
+
+
+PasswordDialog = GenInteraction {
+#if  _RESPONDER
+	visibility = popup;
+	children = PasswordTextInteraction,
+		PasswordOKTrigger,
+		PasswordCancelTrigger;
+#else
+	moniker = "PPP Password";
+	localize "Title of PPP authentication dialog box";
+	visibility = dialog;
+	children = ProviderText, 
+		   UsernameText, 
+		   PasswordText,
+		   PasswordOKTrigger,
+		   PasswordCancelTrigger;
+#endif
+	genStates = default -usable;
+	type = properties;
+	attributes = default +sysModal, 
+			     +notUserInitiatable, 
+			     +initiatedViaUserDoDialog;
+	hints = {
+		HINT_INTERACTION_SINGLE_USAGE,
+	}
+}
+
+#if _RESPONDER
+chunk PPPPasswordMonikerText = "Enter Internet access password";
+localize "Prompt string for PPP authentication password";
+
+PasswordTextInteraction = ComplexMoniker {
+	ComplexMoniker = GenInteraction;
+	topText = "offset PPPPasswordMonikerText";	
+	iconBitmap = "CMB_INPUT_TITLE_ICON";
+	children = ProviderText,
+		UsernameText,
+		PasswordTextGroup;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_PLACE_MONIKER_TO_LEFT,
+		ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT,
+		HINT_COMPLEX_MONIKER_DRAW_SEPARATOR,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+/*		HINT_INDENT_CHILDREN {
+			SpecWidth <SST_PIXELS, FOAM_HEADER_ICON_WIDTH>
+			SpecHeight <>
+		}, */
+	}
+}
+
+PasswordTextGroup = GenInteraction {
+	children = PasswordTextFrame;
+	moniker = "Password ";
+	localize "Title of dialog prompting user for PPP password";
+	hints = {
+		HINT_PLACE_MONIKER_TO_LEFT,
+	}
+}
+
+PasswordTextFrame = GreyFrame {
+	children = PasswordText;
+	moniker = "";
+	localize not;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	}
+}
+
+#endif
+
+#if _RESPONDER
+ProviderText = UnderlinedGenText {
+#else
+ProviderText = GenText {
+#endif
+	moniker = "Provider name: ";
+	localize "Label of PPP provider name display";
+	textDisplayAttributes = default +singleLineText;
+	genAttributes = default +readOnly;
+	hints = {
+		HINT_TEXT_CURSOR_AT_START,
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, MAX_TEXT_OBJ_WIDTH>
+			SpecHeight <>
+		},
+	}
+}
+
+#if _RESPONDER
+UsernameText = UnderlinedGenText {
+#else
+UsernameText = GenText {
+#endif
+	moniker = "User name: ";
+	localize "label of read-only PPP username display";
+	textDisplayAttributes = default +singleLineText;
+	genAttributes = default +readOnly;
+	hints = {
+		HINT_TEXT_CURSOR_AT_START,
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, MAX_TEXT_OBJ_WIDTH>
+			SpecHeight <>
+		},
+	}
+}
+
+/*
+ * To make text typed by user appear as asteriks.
+ */
+chunk PPPPasswordStyle = data {
+	CHAR_ATTR_FONT_SIZE_STYLE_COLOR(2, FID_BISON, 13, 0, C_BLACK)
+}
+
+PasswordText = PPPSpecialText vardataReloc {
+#if ! _RESPONDER
+	moniker = "Password ";
+	localize "Label of password input box for PPP authentication";
+#endif
+	textDisplayAttributes = default +singleLineText;	
+	text = "";
+	localize not;
+	maxLength = MAX_PASSWORD_LENGTH;
+	hints = {
+		ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+			I_OPTR PasswordOKTrigger
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, MAX_PASSWORD_TEXT_WIDTH>
+			SpecHeight <>
+		},
+		ATTR_GEN_TEXT_CHAR_ATTR {
+			word PPPPasswordStyle
+		},	
+	}	
+}
+
+#if _RESPONDER
+PasswordOKTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = CMT_OK;
+#else
+PasswordOKTrigger = GenTrigger {
+#endif
+	genStates = default -enabled;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_MENU_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word	IC_APPLY
+		},
+		HINT_SEEK_SLOT {
+			word 	0
+		},
+		HINT_DEFAULT_DEFAULT_ACTION,
+	}		
+}
+
+#if _RESPONDER
+PasswordCancelTrigger = ComplexMoniker {
+	ComplexMoniker = GenTrigger;
+	topText = CMT_CANCEL;
+#else
+PasswordCancelTrigger = GenTrigger {
+#endif
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_SEEK_MENU_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word	IC_DISMISS
+		},
+		HINT_SEEK_SLOT {
+			word 	3
+		}
+	}
+}
+
+end PPPPasswordUI;
+

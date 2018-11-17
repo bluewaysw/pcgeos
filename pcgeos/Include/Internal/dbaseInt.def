@@ -1,0 +1,118 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Database Manager -- Internal structures
+FILE:		dbaseInt.def
+
+AUTHOR:		John Wedgwood, 21-Jun-89
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jcw	21-Jun-89	Initial revision
+
+
+DESCRIPTION:
+	Include file for people using the database manager.
+		
+	$Id: dbaseInt.def,v 1.1 97/04/04 14:15:08 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__DBASE_INT
+
+include lmem.def		;LMemBlockHeader
+
+StartKernel
+
+; One DBItemInfo structure is kept for every item in the group.
+; One DBItemBlockInfo structure is kept for every item-block used by the group.
+; A free list is kept for unallocated structures of both types.
+; The ItemBlockInfo structures are kept in a list to allow quick access to
+;   them.
+; No list of ItemInfo structures is kept.
+
+DBItemBlockInfo	struct
+    DBIBI_next	    nptr.DBItemBlockInfo	; Offset to next list item.
+    DBIBI_block	    nptr			; VMem handle to item-block.
+    DBIBI_refCount  sword			; # of byte items in this block
+DBItemBlockInfo	ends
+
+DBItemInfo	struct
+    DBII_block	nptr.DBItemBlockInfo  ; VMem handle to block item is in
+    DBII_chunk	lptr		      ; Chunk in block.
+DBItemInfo	ends
+
+
+; This structure is the first thing in a group vmem block.
+; There are several data-structures associated with a group. They are:
+;	Item-info	- Information for every item in the group.
+;	Item-blocks	- The blocks which hold the items in this group.
+
+GroupFlags	record	
+	GF_IS_UNGROUP:1		; the current old "ungroup" group
+	GF_NEW_UNGROUP:1	; a member of the new "ungroup" set
+	GF_UNGROUP_FULL:1	; set only if NEW_UNGROUPED set and this
+				;  group block has reached its limit.
+	:13
+GroupFlags	end
+
+DBGroupHeader	struct
+    DBGH_vmemHandle	nptr.DBGroupHeader   	; vm-handle of group block.
+    DBGH_handle		hptr.DBGroupHeader   	; mem-handle of this block.
+    DBGH_flags		GroupFlags <>	   
+    DBGH_itemBlocks	nptr.DBItemBlockInfo 	; Start of item-block list.
+    DBGH_itemFreeList	nptr.DBFreeItemStruct 	; Start of free list.
+    DBGH_blockFreeList	nptr.DBFreeBlockStruct	; Start of free list.
+    DBGH_blockSize	word (0)             	; Size of the group block.
+    DBGH_numItems	word	0	  	; Number of allocated items
+						;  in the group. Set only if
+						;  GF_NEW_UNGROUPED set
+    DBGH_strucs		label byte
+DBGroupHeader	ends
+
+DB_UNGROUP_LOW_WATER_MARK	equ	1536	; Number of items that must be
+						;  left in a formerly full
+						;  ungrouped block before the
+						;  group is declared available
+						;  for allocation again.
+						;  (1536 is approx 75% of max)
+
+; This structure is at the start of every item block.
+
+DBItemBlockHeader	struct
+    DBIBH_standard	LMemBlockHeader <>
+    DBIBH_vmHandle	word		; VM-handle to this block.
+    DBIBH_infoStruct	word		; Offset into group block where the
+					;  DBItemBlockInfo structure for this
+					;  block can be found.
+DBItemBlockHeader	ends
+
+
+; This structure defines the data kept in the database managers map block.
+
+DBMapBlock	struct
+    DBMB_vmemHandle	nptr.DBMapBlock		; VM-handle to block.
+    DBMB_handle		hptr.DBMapBlock		; Mem handle to block.
+    DBMB_mapGroup	nptr.DBGroupHeader	; DB map block.
+    DBMB_mapItem	nptr.DBItemInfo		; DB map item.
+    DBMB_ungrouped	word	(0)		; Current ungrouped.
+    DBMB_newUngrouped	word	0		; Current new ungrouped, so
+						;  if file is used with old
+						;  kernel, the DGBH_numItems
+						;  count doesn't get out of
+						;  whack.
+DBMapBlock	ends
+
+;	VM IDs (from the range reserved for us)
+
+; (enum declarations moved to vm.def)
+
+; Various and sundry constants.
+
+DB_ITEM_BLOCK_DESIRED_SIZE = 8192	; Desired maximum size of an item-block
+
+EndKernel

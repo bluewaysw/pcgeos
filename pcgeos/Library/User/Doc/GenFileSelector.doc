@@ -1,0 +1,252 @@
+COMMENT @CLASS DESCRIPTION-----------------------------------------------------
+
+
+			GenFileSelectorClass
+
+$Id: GenFileSelector.doc,v 1.1.34.1 97/03/29 03:37:45 canavese Exp $
+
+Synopsis
+--------
+	GenFileSelectorClass provides applications with a way to handle
+	file/directory display and selection.  Most applications that deal
+	with datafiles need to allow the user to choose a file to be loaded
+	or to choose a directory to save a file to (much of this behavior
+	can even be handled by the GenUIDocumentControl/GenAppDocumentControl
+	pair (see "Alternatives")).  For the GenFileSelector, depending on
+	the specific UI, there will be ways to move up and down the
+	directory tree and across different volumes, disks and drives.
+	Applications have control of what types of files they want the
+	FileSelector to show, and what the user can do with regard to
+	navigating to different directories and disks.  The FileSelector
+	deals with both GEOS files and DOS files, and can be setup to show
+	either or both or subsets of either based on a variety of search
+	criteria.
+
+Limitations
+-----------
+
+Alternatives
+------------
+	For more complete file handling, consider using GenUIDocumentControl/
+	GenAppDocumentControl.
+
+Implementation Status
+---------------------
+
+See Also
+--------
+	GenUIDocumentControl, GenAppDocumentControl
+
+;------------------------------------------------------------------------------
+;	Description
+;------------------------------------------------------------------------------
+
+Terminology
+-----------
+
+Relationships/Context
+---------------------
+	A GenFileSelector is usually placed in a dialog box (GenSummons or
+	independentlyDisplayable GenInteraction) or a main application window
+	(GenPrimary).  The dialog box will usually have OK/CANCEL type buttons
+	in a reply bar at the bottom.  When a GenFileSelector is used in a
+	"save file"-type dialog box, the dialog box might also have a text
+	object to allow entry of a filename.
+
+Conceptual Overview
+-------------------
+	The GenFileSelector is set up to operate invisibly to the application
+	by default.  It automatically handles directory and volume navigation.
+	When the application needs to get the current selection (usually
+	signalled by some action the user takes, like clicking on an trigger),
+	a MSG_GEN_FILE_SELECTOR_GET_SELECTION sent to GenFileSelector will
+	return the necessary information.
+
+	In addition, the application can be notified on every item that the
+	user selects in the FileSelector listing.  This is done via the action
+	descriptor in the instance data of the GenFileSelector.  If set, the
+	AD will be sent the following information:
+		cx - entry # of selection made
+		bp - GenFileSelectorEntryFlags:
+			GFSEF_TYPE - type of entry that current selection is
+				GFSEF_FILE - if selection is a regular file
+				GFSEF_SUBDIR - if selection is a subdirectory
+				GFSEF_VOLUME - if selection is a volume
+			GFSEF_OPEN - selection opened (double-click)
+			GFSEF_NO_ENTRIES - set if no entries selected
+			GFSEF_LONGNAME - selection is longname file
+			GFSEF_ERROR - set if error opening entry
+					(note that this is asynchronous with
+					 the actual error and should only be
+					 treated as notification)
+			GFSEF_TEMPLATE - set if file is a template (from
+				 GFHF_TEMPLATE)
+			GFSEF_SHARED_MULTIPLE - set if file is shared with
+					multiple writers (from
+					GFHF_SHARED_MULTIPLE)
+			GFSEF_SHARED_SINGLE - set if file is shared with single
+				      writer (from GFHF_SHARED_SINGLE)
+
+Warnings
+--------
+
+Usage: Defining a GenFileSelector
+---------------------------------
+	A GenFileSelector can be set up to show one or more files types.
+	The fileType attributes is used to selected this.  The available
+	types are:  directories, non-GEOS files, GEOS executables, and
+	GEOS non-executables.
+
+To show all normal DOS and GEOS files with normal traversal behavior:
+	NormalFileSelector {
+	}
+
+To show directories only:
+	DirFileSelector = {
+		fileCriteria = dirs;
+	}
+
+To show GeoWrite datafiles and directories with normal traversal behavior and
+starting in standard document directory:
+	WriteFileSelector {
+		fileCriteria = dirs, geosNonExecutables;
+		hints = {
+			ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH {
+				GeodeToken <<'WDAT'>, MANUFACTURER_ID_GEOWORKS>
+			},
+			ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH {
+				GeodeToken <<'WP00'>, MANUFACTURER_ID_GEOWORKS>
+			}
+		}
+		disk = SP_DOCUMENT;
+	}
+
+To show DOS batch files and directories with normal traversal behavior:
+	BatchFileSelector = {
+		fileCriteria = dirs, nonGeosFiles;
+		hints = {
+			ATTR_GEN_FILE_SELECTOR_FILE_NAME_MASK {
+				char '*.BAT', 0
+			}
+		}
+	}
+
+To show all DOS files and directories (read-only, hidden, system) with normal
+traversal behavior:
+	AllDOSFileSelector = {
+		fileCriteria = dirs, nonGeosFiles;
+		hints = {
+			ATTR_GEN_FILE_SELECTOR_FILE_ATTRS {
+				GenFileSelectorFileAttrs <0,0>
+			}
+		}
+	}
+
+These cannot be done without using a file filter routine:
+	show multiple file extensions (e.g. *.BAT & *.COM & *.EXE)
+
+Usage: Interacting with a GenFileSelector
+-----------------------------------------
+	The GenFileSelector is self-contained enough so that just defining
+	one in your application will allow the user to traverse to different
+	directories and different volumes and get a list of files.  However,
+	if your application wants to interact with the GenFileSelector, a
+	little more work is required.
+
+	A typical usage of a GenFileSelector is to allow the user to choose
+	a file that your application will work on.  A dialog box containing
+	the GenFileSelector and "OK" and "Cancel" buttons can will be used.
+	When the user has traversed to the desired volume and directory, a
+	file can be selected by either double-clicked on the filename or by
+	selecting the file and clicking on the "OK" button.  Both methods
+	should be supported.
+
+In-Depth:  Complete control of which files are shown
+----------------------------------------------------
+	Though the file selector has many options for controlling which files 
+	and directories are shown in its file listing, there may be cases when
+	an application needs to further limit the files.  This can be done
+	by setting the 'fileFilter' file criteria (FSFC_FILE_FILTER) and
+	subclassing (see subclassing documentation?) the GenFileSelector and
+	intercepting MSG_GEN_FILE_SELECTOR_FILTER_FILE.  The GenFileSelector
+	sends this message to itself for each file that is accepted by the
+	other file criteria.  If the handler for this message returns carry
+	clear (or "FALSE" in C), the file is NOT filtered out (accepted) and
+	will appear in the file list, if the handler returns carry set (or
+	"TRUE" in C), the file is filtered out (rejected) and will not appear.
+	There is no default handler, so by default, the file is accepted.  To
+	use this filter capability, your subclass should intercept this
+	message and examine the file to decide whether or not to accept it.
+	The parameters of the message are the same as a regular FileEnum
+	callback procedure receives: an fptr to a FileEnumCallbackData
+	structure, containing all the extended attributes retrieved from the
+	file, and the inherited stack frame from FileEnum, which you may
+	need to pass to some of the FileEnum utility routines.
+
+	See the sample application in Appl/SDK_C/FSelSamp.
+
+In-Depth: <Topic #2>
+--------------------
+
+...
+
+See Also
+--------
+	FileEnum
+
+;------------------------------------------------------------------------------
+;	Assembling & Debugging
+;------------------------------------------------------------------------------
+
+Sample Code/Programming Tips
+----------------------------
+	see sample applications in Appl/SDK_Asm/FSelSamp (assembly language
+	version) and in Appl/SDK_C/FSelSamp (C version), also the file
+	filtering sample application in Appl/SDK_C/FSFilter
+
+Include Files Needed
+--------------------
+	Include/Objects/gFSelC.def
+	CInclude/Objects/gFSelC.goh
+
+Assembly Tips
+-------------
+	Changing multiple attributes
+	----------------------------
+
+Debugging Tools & Tips
+----------------------
+
+See Also
+--------
+	Sample Application - Appl/SDK_Asm/FSelSamp
+	Test Application - Appl/TestUI/FileBox
+
+;------------------------------------------------------------------------------
+;	Implementation Notes
+;------------------------------------------------------------------------------
+
+	The GenFileSelector is implemented as a dynamic scrolling list with
+	some additional supporting UI objects.
+
+	All the MSG_*SET* messages that affect generic data are handled
+	here first before they are passed on to the specific UI.
+	
+;------------------------------------------------------------------------------
+;	Most frequently asked questions
+;------------------------------------------------------------------------------
+
+	<anytime someone asks you a question about this object, clear up
+	 the documentation above to explain it, or add an entry here>
+
+
+;------------------------------------------------------------------------------
+;	Inheritance
+;------------------------------------------------------------------------------
+
+< Add entries for every superclass, including instance data, methods & hints,
+  & then document how they are used within this object.   Example: >
+
+<List hints here, explain how, if at all they pertain to this object>
+
+------------------------------------------------------------------------------@

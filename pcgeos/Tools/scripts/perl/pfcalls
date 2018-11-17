@@ -1,0 +1,136 @@
+#!/usr/local/bin/perl
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1996 -- All Rights Reserved
+#
+# PROJECT:	profiling
+# MODULE:	
+# FILE: 	pfcalls
+# AUTHOR: 	Steve Kertes, 1996
+#
+# DESCRIPTION:
+#
+#  Most-Called Functions Tool
+#  --------------------------
+#    Take a huge file (20 megs, probably) that is a big array of integers
+#    and a symbol file produced from the XIP image and generate a list
+#    (unsorted) of the number of times the first instruction of each
+#    function is accessed. The data can be sorted later.
+#	
+# USAGE:
+#        pfcalls prof.data symbols [extra-symbols] | sort
+#
+#        Output is always to standard-out. It can be sorted and
+#        redirected to a file later. 
+#        
+#        The format of the output is "FunctionName<tab>CallCount",
+#        eg:
+#        
+#                FunctionName1<tab>12
+#                FunctionName2<tab>203
+#                ...
+#                
+#
+# 	$Id: pfcalls,v 1.6 96/09/18 16:28:32 kertes Exp $
+#
+#
+##############################################################################
+
+push (@INC, "/staff/pcgeos/$ENV{'USER'}/Tools/scripts/perl");
+push (@INC, "/staff/pcgeos/Tools/scripts/perl");
+
+require "newgetopt.pl";
+require "profilelib.pl";
+
+&NGetOpt("h", "d", "z") || die "can't grab options";
+# -h for help
+# -d for debugging info
+# -z for printing ignored and labled blocks, then quitting
+
+$profileFilename = shift(@ARGV);
+$symbolsFilename = shift(@ARGV);
+$extrasymFileName = shift(@ARGV);
+
+$opt_h = 1 unless ($symbolsFilename ne "");
+
+&displayPFCallsHelp() if $opt_h;
+
+############################################
+
+&openProfile($profileFilename);
+&openSymbols($symbolsFilename);
+&openExtraSyms($extrasymFileName);
+
+if ($opt_z) {
+    &printIgnoredAndLabledLists;
+    exit 0;
+}
+############################################
+
+$address = 0;
+
+#
+# find the count in PROFILE that goes with the address that
+# each routine in SYMBOLS starts at
+#
+while (1) {
+	($offset, $routine) = &readSymbol;
+	last if (($routine eq "") && ($#lableList < 0));
+	print ">>> Offset: \"$offset\"  Symbol: \"$routine\"\n" if $opt_d;
+
+	while (defined($count = &readInteger)) {
+		
+		if ($#lableList >= 0) {
+		    while ($address == $lableList[0]) {
+			&printCallsEntry($lableList[2], $count);
+			splice(@lableList, 0, 4)	# remove entry
+		    }
+		}
+
+		if ($address++ == $offset) {
+			&printCallsEntry($routine, $count);
+			last;
+		}
+	}
+}
+
+############################################
+############################################
+
+############################################
+#
+# displayPFCallsHelp
+#	print usage information, then exit
+#
+sub displayPFCallsHelp {
+	print <<EOM;
+Usage:
+        pfcalls prof.data symbols [extra-symbols]
+
+	The Most-Called Functions Tool
+
+        Output is always to standard-out. It can be sorted and
+        redirected to a file later. 
+        
+        The format of the output is "FunctionName<tab>CallCount",
+        eg:
+        
+                FunctionName1<tab>12
+                FunctionName2<tab>203
+                ...
+                
+EOM
+	exit 0;
+}
+
+############################################
+#
+# printCallsEntry
+#	print a lable and it's count, wow.
+#	
+sub printCallsEntry {
+	local ($lable, $count) = @_;
+	print "$lable\t"."$count\n";
+}
+
+__END__

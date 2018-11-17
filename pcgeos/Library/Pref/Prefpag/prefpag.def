@@ -1,0 +1,187 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Pager	
+FILE:		prefpag.def
+
+AUTHOR:		Jennifer Wu, Mar 10, 1993
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jwu	3/10/93		Initial revision
+
+
+DESCRIPTION:
+	Definitions for Pager preference module
+		
+	$Id: prefpag.def,v 1.1 97/04/05 01:29:42 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;----------------------------------------------------------------------------
+;		Fatal Errors for Pager Preference Module
+;----------------------------------------------------------------------------
+CANNOT_FIND_NAME_OF_SELECTED_APPLICATION	enum FatalErrors
+	; Tried to read the name of the selected application from
+	; the INI file but there is nothing there.
+
+CANNOT_REMOVE_A_PAGER_THAT_IS_NOT_INSTALLED	enum FatalErrors
+	; Error in deleting pager name from drivers list in INI.		
+		
+ITEM_NOT_IN_CHUNK_ARRAY				enum FatalErrors
+	; Error in getting item from the chunk array for a list.
+		
+CANNOT_READ_PORT_FOR_DEVICE			enum FatalErrors
+	; Error in reading the port for the given device.
+
+CANNOT_READ_APPLICATION_FOR_DEVICE		enum FatalErrors
+	; Error in reading the application for the given device.
+		
+INVALID_PORT_NAME				enum FatalErrors
+	; Couldn't find the port whose moniker matches the passed
+	; string.
+
+BLOCK_MOVED_WHEN_IT_SHOULD_NOT_HAVE		enum FatalErrors
+	; This may be overzealous error checking code.  Blocks
+	; may move when using ObjCallInstanceNoLock, but the
+	; handler for MSG_PREF_PAG_DYNAMIC_LIST_GET_ITEM doesn't
+	; do anything that may require this so the block should
+	; never be moving.
+
+CANNOT_GET_PAGER_NAME_FROM_LIST			enum FatalErrors
+	; Attempt to get the moniker of the selected pager from the
+	; list failed.
+
+CANNOT_GET_PORT_NAME_FROM_LIST			enum FatalErrors
+	; Attempt to get the moniker of the selected port from the
+	; list failed.
+
+CANNOT_READ_DRIVER_FOR_DEVICE			enum FatalErrors
+	; Attemt to read the driver for a device failed.
+
+;-----------------------------------------------------------------------------
+;	CONSTANTS		
+;-----------------------------------------------------------------------------
+MONIKER_STRING_LENGTH		equ	100
+PAGER_NAME_LENGTH		equ	40
+PORT_NAME_LENGTH		equ	10
+APPLICATION_NAME_LENGTH		equ	35
+		
+THIRTY_SECONDS			equ	1800  		; 30 * 60 ticks
+ONE_MINUTE			equ	3600		; 60 * 60 ticks
+FIVE_MINUTES			equ	18000		; 5 * ONE_MINUTE
+TEN_MINUTES			equ	36000		; 2 * FIVE_MINUTES
+
+;-----------------------------------------------------------------------------
+;	CLASSES
+;-----------------------------------------------------------------------------
+;;-------------------------------
+;;	PrefPagDialogClass
+;;-------------------------------
+		
+PrefPagDialogClass	class	PrefDialogClass
+
+MSG_PREF_PAG_REMOVE_PAGER		message
+	; Removes the selected pager from the list of installed
+	; pagers in the INI file and updates the dynamic list,
+	; internally and visually.  Notifies the watcher of the
+	; removed pager.
+	; Pass:		nothing
+	; Return:	nothing
+	;		ax, cx, dx, bp -- destroyed
+		
+MSG_PREF_PAG_ADD_PAGER			message
+	; Notifies the watcher that a new pager has been added.
+	; Pass:		nothing
+	; Return:	nothing
+	;		ax, cx, dx, bp -- destroyed
+		
+PrefPagDialogClass	endc
+
+
+;;--------------------------------
+;;   	PrefPagDynamicListClass
+;;--------------------------------
+		
+PrefPagDynamicListClass	class	GenDynamicListClass
+
+MSG_PREF_PAG_INSTALLED_LIST_BUILD_ARRAY		message
+	; Initialize the installed list to contain the names of
+	; all currently installed devices.
+	; Pass:		nothing
+	; Return: 	nothing
+		
+MSG_PREF_PAG_APP_LIST_BUILD_ARRAY		message
+	; Initialize the application list to contain the names of
+	; all applications that can be notified by the watcher.
+	; Pass:		nothing
+	; Return: 	nothing
+		
+MSG_PREF_PAG_GET_INSTALLED_LIST_MONIKER		message
+	; The message used to query the installed list for item
+	; monikers.
+	; Pass:		^lcx:dx	= the list
+	;		bp	= the position of the item requested
+	; Return: 	nothing
+	;		ax, cx, dx, bp	-- destroyed
+		
+MSG_PREF_PAG_GET_APP_LIST_MONIKER		message
+	; The message used to query the installed list for item
+	; monikers.
+	; Pass:		^lcx:dx	= the list
+	;		bp	= the position of the item requested
+	; Return: 	nothing
+	;		ax, cx, dx, bp	-- destroyed
+		
+MSG_PREF_PAG_INSTALLED_DEVICE_SELECTED		message
+	; One of the devices in the installed list has been selected or 
+	; unselected.  Set the PrefPagConfigContainer object to the UI 
+	; of the selected device if something is selected.
+	; Pass:		cx	= current selection, or GIGS_NONE if no selection
+	; Return:	nothing
+
+MSG_PREF_PAG_DYNAMIC_LIST_GET_ARRAY		message	
+	; Get the array of data for the list.
+	; Pass:		nothing
+	; Return:	*ds:si = the chunk array
+	;		ax, cx, dx, bp -- destroyed
+
+MSG_PREF_PAG_DYNAMIC_LIST_DELETE_ITEM		message
+	; Delete an item from the list, internally and visually.
+	; Pass:		dx	= the item to be deleted
+	; Return:	nothing
+
+MSG_PREF_PAG_DYNAMIC_LIST_GET_ITEM		message	
+	; Get the specified item from the list.
+	; Pass:		dx	= the item to get
+	; Return:	cx:dx	= the element
+	;		ax	= the item number of the element
+
+MSG_PREF_PAG_DYNAMIC_LIST_ADD_ITEM		message
+	; Add the item to the list internally and visualy.
+	; Pass:		cx:dx	= the asciiZ string to be added
+	; Return:	nothing
+
+	PPDLI_array	lptr.ChunkArrayHeader
+	; Chunk array of data for the list.
+
+PrefPagDynamicListClass	endc
+		
+;-----------------------------------------------------------------------------
+;	Exported routines		
+;-----------------------------------------------------------------------------
+ 
+PrefPagCode	segment resource
+
+global PrefPagGetPrefUITree:far
+;
+global PrefPagGetModuleInfo:far
+
+PrefPagCode	ends
+
+   
+

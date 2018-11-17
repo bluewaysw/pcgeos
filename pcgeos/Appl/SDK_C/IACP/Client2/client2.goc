@@ -1,0 +1,298 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994 -- All Rights Reserved.
+ *
+ * PROJECT:	GEOS Sample Applications
+ * MODULE:	IACP/Client2
+ * FILE:	client2.goc
+ *
+ * AUTHOR:	Ed Ballot: Aug 9, 1994
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      8/9/94          Initial version
+ *
+ * DESCRIPTION:
+ *      This is the more advanced Client part of a sample application
+ *      suite that demonstrates the use of IACP.  This application will
+ *      send a message to the Server application (launching the server
+ *      if necessary) via IACP.  The message will be directed to the
+ *      server's process class, where is will be handled.
+ *
+ *      A client must do the following to form the IACP connection and
+ *      send a message:
+ *      1) Connect using IACPConnect(), you need the GeodeToken of the
+ *         server.
+ *      2) Encapsulate the message to be sent using @record.
+ *      3) Create a message queue for and encapsulate the completion
+ *         message.
+ *      4) Send the message using IACPSendMessage().
+ *
+ * RCS STAMP:
+ *      $Id: client2.goc,v 1.1 97/04/04 16:40:03 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include files
+ *******************************************************************/
+    @include <stdapp.goh>
+    @include <iacp.goh>
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    @class  Client2ProcessClass, GenProcessClass;
+    @message void MSG_CLIENT2_PROCESS_PRINT_RECEIVED();
+    @message void MSG_CLIENT2_PROCESS_SEND_MESSAGE_VIA_IACP();
+    @endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    @classdecl Client2ProcessClass, neverSaved;
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass Client2App = {
+    GI_visMoniker = list { @Client2Title };
+    GI_comp = @Client2Primary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @Client2Primary;
+}
+
+@visMoniker Client2Title = "IACP Client2";
+
+@end AppResource;
+
+/********************************************************************
+ *		Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass Client2Primary  = {
+    GI_comp = @Client2SendTrigger,
+              @Client2StatusText;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass Client2SendTrigger = {
+    GI_visMoniker = 'S', "Send Message";
+    GTI_actionMsg = MSG_CLIENT2_PROCESS_SEND_MESSAGE_VIA_IACP;
+    GTI_destination = process;
+}
+
+@object GenTextClass Client2StatusText = {
+    GI_visMoniker = "Status Display";
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@end Interface;
+
+/********************************************************************
+ *		Strings Resource
+ * Localizable strings should be placed in their own resource.
+ * When strings are stored in chunks they can be localized using
+ * the ResEdit translation tool.
+ *******************************************************************/
+@start Strings, data;
+
+@chunk char msgSend[] = "Message sent to server\r";
+@localize { "Message sent to the server." };
+
+@chunk char msgCompleted[] = "Completion message received\r";
+@localize { "Message sent to client when server received our message." };
+
+@chunk char msgNoConnect[] = "Can't connect to server\r";
+@localize { "Message displayed when server doesn't reply." };
+
+@end Strings;
+
+/********************************************************************
+ *              Code for Client2ProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_CLIENT2_PROCESS_SEND_MESSAGE_VIA_IACP
+ ********************************************************************
+ * SYNOPSIS:     Uses IACP to shut down the server application.
+ * CONTEXT:      User has envoked the 'Send' trigger.
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Try to get an IACP connection to the server application.
+ *               First create an AppLaunchBlock, which will allow IACP
+ *               to try to launch Server if it is not already launched
+ *               (I am not specifying the path to look for server.geo in,
+ *               so it will only look in the standard Application
+ *               directory for server.geo).  Then, if connection is made,
+ *               send MSG_CLIENT2_PROCESS_PRINT_RECEIVED to the Process
+ *               class of Server application.  If no connection (Server
+ *               is not and could not be launched for some reason), then
+ *               say so.
+ *
+ *               A note about matching messages between applications:
+ *               Messages are converted by Goc to numbers (See section
+ *               5.4.1.1 for more indepth information on this subject).
+ *               The number for a message in a sub-class is largely
+ *               determined by the parent class, so two sub-classes with
+ *               the same parent class can (and likely will) have the
+ *               same message numbers.  This is how I am matching up
+ *               MSG_CLIENT2_PROCESS_PRINT_RECEIVED in client.goc with
+ *               MSG_SERVER_PROCESS_PRINT_RECEIVED in server.goc.
+ *               Both messages are the first new message in their
+ *               respective subclass of GenProcessClass.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EB	8/94	   	Initial Revision
+ *******************************************************************/
+@method Client2ProcessClass, MSG_CLIENT2_PROCESS_SEND_MESSAGE_VIA_IACP
+{
+      /*
+       * i                   - For loop index variable.
+       * iacpConnectionToken - Token for the IACP connection.
+       * serverGeodeToken    - You can dynamically obtain a geode's
+       *                       GeodeToken with the routine
+       *                       FileGetPathExtAttributes(), with
+       *                       parameter attr = FEA_CREATOR.
+       * dispatchedMsgCount  - Counts the number of servers who have
+       *                       received the encapsulated message.
+       * serverCount         - Counts the number of servers connected to.
+       * msgQueue            - Message queue.
+       * hMsgToSend          - Message being sent to server.
+       * hCompletionMsg      - Message sent when IACPSendMessage is done.
+       * hLaunchBlock        - AppLaunchBlock for the server, if it
+       *                       isn't running.
+       */
+    int              i;
+    IACPConnection   iacpConnectionToken;
+      /* Defining "SRVR" as separate characters avoids a
+       * really bizarre HighC compiler error. */
+    GeodeToken       serverGeodeToken = { { 'S', 'R', 'V', 'R' },
+                                          MANUFACTURER_ID_SDK };
+    IACPConnectFlags connectionFlags;
+    word             dispatchedMsgCount;
+    word             serverCount;
+    QueueHandle      msgQueue;
+    EventHandle      hMsgToSend;
+    EventHandle      hCompletionMsg;
+    MemHandle        hLaunchBlock;
+
+      /*
+       * Set the IACP connection token to default to no connnection
+       * since in the beginning there is no connection.
+       * Set the IACP connection flags.
+       */
+    iacpConnectionToken = IACP_NO_CONNECTION;
+    connectionFlags = IACPSM_USER_INTERACTIBLE;
+
+      /* Fill up the AppLaunchBlock (hLaunchBlock) with default launch
+       * information.  If you want to specify the server app's pathname
+       * or something similar, manually add that.  See the description
+       * of AppLaunchBlock in the Routines book.
+       * The launch block is only required if you need to launch the server.
+       * If you know that the server will already be launched, skip this
+       * (and pass NULL as the handle to the launch block parameter in
+       * the IACPConnect routine.
+       */
+    hLaunchBlock = IACPCreateDefaultLaunchBlock(
+        MSG_GEN_PROCESS_OPEN_APPLICATION );
+EC( ECCheckMemHandle( hLaunchBlock ); )
+
+    iacpConnectionToken = IACPConnect( &serverGeodeToken,
+                                       connectionFlags,
+                                       hLaunchBlock,
+                                       NullOptr,
+                                       &serverCount );
+
+      /*
+       * Double check that there is a connection to send to.
+       */
+    if( IACP_NO_CONNECTION != iacpConnectionToken ) {
+
+          /*
+           * Create a message queue to receive the completion messages.
+           * This is only necessary if you want to block the thread
+           * until the message is returned.
+           */
+	msgQueue = GeodeAllocQueue();
+EC(     ECCheckQueueHandle( msgQueue ); )
+
+          /*
+           * Encapsulate the message to be sent.
+           * Make sure to send the message to the correct class and/or
+           * correct travel options, otherwise it could be lost or
+           * even worse be processed by the wrong object.
+           */
+	hMsgToSend= @record Client2ProcessClass::
+            MSG_CLIENT2_PROCESS_PRINT_RECEIVED();
+EC(     ECCheckEventHandle( hMsgToSend ); )
+
+          /*
+           * Encapsulate the completion message. Since we want to
+           * block until the completion message returns, we tell
+           * it to return into the QueueHandle msgQueue.
+           * Note that the handle must be converted to an optr.
+           */
+	hCompletionMsg = @record HandleToOptr( msgQueue )::MSG_META_DUMMY();
+EC(     ECCheckEventHandle( hCompletionMsg ); )
+
+          /*
+           * Send the message using IACPSendMessage().
+           */
+	dispatchedMsgCount = IACPSendMessage( iacpConnectionToken,
+                                              hMsgToSend,
+                                              TO_PROCESS,
+                                              hCompletionMsg,
+                                              IACPS_CLIENT );
+
+          /*
+           * Display the fact that the status message was sent.
+           */
+	@send Client2StatusText::MSG_VIS_TEXT_APPEND_OPTR( @msgSend, 0 );
+
+          /*
+           * QueueGetMessage will block this thread until the completion
+           * message is received. We then discard the completion message
+           * (and free up its event handle) with ObjFreeMessage. Notice
+           * that we wait until messages are received from all servers.
+           */
+	for( i = 0; i < dispatchedMsgCount; i++ ) {
+	    ObjFreeMessage( QueueGetMessage( msgQueue ) );
+        }
+
+          /*
+           * Now free up the handle msgQueue.
+           */
+	GeodeFreeQueue( msgQueue );
+
+          /*
+           * Display the fact that the completion message was received.
+           */
+	@send Client2StatusText::MSG_VIS_TEXT_APPEND_OPTR(
+            @msgCompleted, 0 );
+
+          /*
+           * Make sure to shut down the connection.
+           */
+	IACPShutdown( iacpConnectionToken, NullOptr );
+    }
+    else {
+	@send Client2StatusText::MSG_VIS_TEXT_APPEND_OPTR(
+            @msgNoConnect, 0 );
+    }
+} /* MSG_CLIENT2_PROCESS_SEND_MESSAGE_VIA_IACP */
+

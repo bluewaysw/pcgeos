@@ -1,0 +1,211 @@
+#!/bin/sh -
+#########################################################################
+#				convert					#
+# Convert script for Desktop and File Cabinet				#
+# Run this to create the mkrXXX.ui files for desktop and file cabinet.	#
+# 									#
+# $Id: convert,v 1.5 98/05/05 00:41:14 joon Exp $			#
+#########################################################################
+if [ -f driveicon.sed ]; then
+    di_sed=driveicon.sed
+else
+    di_sed=`otherdir`/driveicon.sed
+fi
+#
+# Convert a pcx file to a moniker, dealing with locating the installed or
+# uninstalled version of the file (doesn't deal with branches, I'm afraid)
+#
+# Usage: cvt <file> <cvtpcx-args>
+#
+cvt() {
+    name=""
+    for a do
+	case $a in
+	    -n*)	name=`expr x$a : 'x-n\(.*\)$'` ;;
+	esac
+    done
+    if [ ! "$name" ]; then
+	echo $0: missing -n arg for cvt
+	exit 1
+    fi
+    file=$1
+    shift
+    if [ ! -f $file ]; then
+	file=`otherdir`/$file
+    fi
+    cvtpcx -f "$@" $file
+    mv mkr$name.ui cmkr$name.ui
+}
+
+#
+# Similar to the above, but the pcx file is cvted to a bitmap, rather
+# than a gstring moniker. Must be given a -n<name> argument to pass to cvtpcx,
+# and result is left in bm<name>.ui, instead of mkr<name>.ui
+#
+cvtbm() {
+    name=""
+    for a do
+	case $a in
+	    -n*)	name=`expr x$a : 'x-n\(.*\)$'` ;;
+	esac
+    done
+    if [ ! "$name" ]; then
+	echo $0: missing -n arg for cvtbm
+	exit 1
+    fi
+    cvt "$@" -g
+    sed -e 's/Moniker =/Bitmap =/' cmkr$name.ui > cbm$name.ui
+    rm -f cmkr$name.ui
+}
+
+
+#########################################################################
+# Application Icons 	(APPICON.PCX)					#
+#########################################################################
+
+#------------------------ File Manager Icon  ---------------------------#
+cvt PCX/appicon.pcx -m13 -t -L -x0 -y0 -dTC -dTM -dTCGA -dLCGA -nFileMgr
+cvt PCX/newmanager.tiny.pcx -m13 -t -z -nFileMgrTiny
+
+#-----------------------  File Cabinet Icon  ---------------------------#
+cvt PCX/appicon.pcx -m13 -t -l -x0 -y41  -dLC -dLM -dLCGA -nFileCabinet
+
+#-----------------------  Generic GEOS App Icon  -----------------------#
+cvt PCX/appicon.pcx -m13 -t -L -x0 -y82  -dLC -dLM -dLCGA -dTM -dTCGA -nGenAppl
+
+#-----------------------  Generic GEOS Doc Icon  -----------------------#
+cvt PCX/appicon.pcx -m13 -t -L -x0 -y123 -dLC -dLM -dLCGA -dTM -dTCGA -nGenDoc
+
+#-----------------------  Generic DOS App Icon  ------------------------#
+cvt PCX/appicon.pcx -m13 -t -L -x0 -y164 -dLC -dLM -dLCGA -dYC -dTM -dTCGA -nDosAppl
+
+#-----------------------  Generic DOS Doc Icon  ------------------------#
+cvt PCX/appicon.pcx -m13 -t -L -x0 -y205 -dLC -dLM -dLCGA -dYC -dTM -dTCGA -nDosData
+
+#-----------------------  Template Icon  -------------------------------#
+cvt PCX/appicon.pcx -m13 -t -l -x0 -y246 -dLC -dLM -dLCGA -nTemplate
+
+
+#########################################################################
+# File Cabinet Icons	(CABICON1.PCX & CABICON2.PCX)			#
+######################################################################### 
+
+#-----------------------  Open Icon  -----------------------------------#
+cvtbm PCX/cabicon1.pcx -rAppIconArea -u -m13 -t -l -x0 -y0   -dLC -dLM -dLCGA -nOpenFile
+
+#-----------------------  Get Info Icon  -------------------------------#
+cvtbm PCX/cabicon1.pcx -rAppIconArea -u -m13 -t -l -x0 -y41  -dLC -dLM -dLCGA -nGetInfo
+
+#-----------------------  Move File Icon  ------------------------------#
+cvtbm PCX/cabicon1.pcx -rAppIconArea -u -m13 -t -l -x0 -y82  -dLC -dLM -dLCGA -nMoveFile
+
+#-----------------------  Copy File Icon  ------------------------------#
+cvtbm PCX/cabicon1.pcx -rAppIconArea -u -m13 -t -l -x0 -y123 -dLC -dLM -dLCGA -nCopyFile
+
+#-----------------------  Duplicate File Icon  -------------------------#
+cvtbm PCX/cabicon1.pcx -rAppIconArea -u -m13 -t -l -x0 -y164 -dLC -dLM -dLCGA -nDupFile
+
+#-----------------------  Rename File Icon  ----------------------------#
+cvtbm PCX/cabicon1.pcx -rAppIconArea -u -m13 -t -l -x0 -y205 -dLC -dLM -dLCGA -nRenameFile
+
+#-----------------------  Format Disk Icon  ----------------------------#
+cvtbm PCX/cabicon2.pcx -rAppIconArea -u -m13 -t -l -x0 -y0   -dLC -dLM -dLCGA -nFormat 
+
+#-----------------------  Close Directory Icon  ------------------------#
+cvtbm PCX/cabicon2.pcx -rAppIconArea -u -m13 -t -l -x0 -y41  -dLC -dLM -dLCGA -nCloseDir
+
+#-----------------------  Open Directory Icon  -------------------------#
+cvtbm PCX/cabicon2.pcx -rAppIconArea -u -m13 -t -l -x0 -y82  -dLC -dLM -dLCGA -nOpenDir
+
+#-----------------------  Create Directory Icon  -----------------------#
+cvtbm PCX/cabicon2.pcx -rAppIconArea -u -m13 -t -l -x0 -y123 -dLC -dLM -dLCGA -nCreateDir
+
+#-----------------------  Exit Icon  -----------------------------------#
+cvtbm PCX/cabicon2.pcx -rAppIconArea -u -m2  -t -l -x0 -y164 -dLC -dLM -dLCGA -nExit
+
+#-----------------------  Help Icon  -----------------------------------#
+cvtbm PCX/cabicon2.pcx -rAppIconArea -u -m2  -t -l -x0 -y205 -dLC -dLM -dLCGA -nHelp
+
+
+#########################################################################
+# Desktop Icons		(DESKICON.PCX)					#
+#########################################################################
+
+#-----------------------  Messy Waste Can Icon  ------------------------#
+###	This bitmap must be done first or the non-bitmap will be overwritten
+cvtbm PCX/deskicon.pcx -rAppIconArea -u -m13 -t -l -x0 -y0   -dLC -dLM -dLCGA -nMessyWasteCan
+###	Non-bitmap
+cvt   PCX/deskicon.pcx -rAppIconArea    -m13 -t -l -x0 -y0   -dLC -dLM -dLCGA -nMessyWasteCan
+
+#-----------------------  MonoFolder Icon  -----------------------------#
+cvt   PCX/deskicon.pcx -rAppIconArea    -m13 -t -l -x0 -y41  -dLC -dLM -dLCGA -nMonoFolder
+sed -e '/cachedSize/s/30/31/' cmkrMonoFolder.ui > q
+rm cmkrMonoFolder.ui
+mv q cmkrMonoFolder.ui
+
+#-----------------------  MultiFolder Icon  ----------------------------#
+cvt   PCX/deskicon.pcx -rAppIconArea    -m13 -t -l -x0 -y82  -dLC -dLM -dLCGA -nMultiFolder
+sed -e '/cachedSize/s/30/31/' cmkrMultiFolder.ui > q
+rm cmkrMultiFolder.ui
+mv q cmkrMultiFolder.ui
+
+#-----------------------  World Directory Icon  ------------------------#
+cvt   PCX/deskicon.pcx -rAppIconArea -u -m13 -t -l -x0 -y123 -dLC -dLM -dLCGA -nWorldDirButton
+
+#---------------------  Document Directory Icon  -----------------------#
+###	This bitmap must be done first or the non-bitmap will be overwritten
+cvt   PCX/deskicon.pcx -rAppIconArea -g -u -m13 -t -l -x0 -y164 -dLM -dLC -dLCGA -nDocDirButton
+sed -e '/cachedSize/s/48/32/' -e 's/Moniker =/Bitmap =/' cmkrDocDirButton.ui > cbmDocDirButton.ui
+rm cmkrDocDirButton.ui
+###	Non-bitmap
+cvt   PCX/deskicon.pcx -rAppIconArea    -m13 -t -l -x0 -y164 -dLC -dLM -dLCGA -nDocDirButton
+
+#-----------------------  Connect Icon  --------------------------------#
+cvt   PCX/deskicon.pcx -rAppIconArea -u -m13 -t -l -x0 -y205 -dLC -dLM -dLCGA -nConnectButton
+
+#-----------------------  Disconnect Icon  -----------------------------#
+cvt   PCX/deskicon.pcx -rAppIconArea -u -m13 -t -l -x0 -y246 -dLC -dLM -dLCGA -nDisconnectButton
+
+#--------------------------  Folder Icon  ------------------------------#
+cvt   PCX/deskicon.pcx                  -m13 -t -L -x0 -y287 -dLC -dLM -dLCGA -dYC -dTM -dTCGA -nFileFolder
+
+
+#########################################################################
+# Disk Drive Icons	(DRIVICON.PCX)					#
+#########################################################################
+
+#-------------------  Three Inch Disk Icon  ----------------------------#
+cvtbm PCX/drivicon.pcx -u -rAppDrives -m13 -t -l -x0 -y0   -dLC -dLM -dLCGA -nThreeInchDisk
+cvt   PCX/drivicon.pcx                -m13 -t -l -x0 -y0   -dLC -dLM -dLCGA -nThreeInchDisk
+
+#---------------------  Five Inch Disk Icon  ----------------------------#
+cvtbm PCX/drivicon.pcx -u -rAppDrives -m13 -t -l -x0 -y41  -dLC -dLM -dLCGA -nFiveInchDisk
+cvt   PCX/drivicon.pcx                -m13 -t -l -x0 -y41  -dLC -dLM -dLCGA -nFiveInchDisk
+
+#-----------------------  Hard Disk Icon  ------------------------------#
+cvtbm PCX/drivicon.pcx -u -rAppDrives -m13 -t -l -x0 -y82  -dLC -dLM -dLCGA -nHardDisk
+cvt   PCX/drivicon.pcx                -m13 -t -l -x0 -y82  -dLC -dLM -dLCGA -nHardDisk
+
+#-------------------------  Ram Disk Icon  -----------------------------#
+cvtbm PCX/drivicon.pcx -u -rAppDrives -m13 -t -l -x0 -y123 -dLC -dLM -dLCGA -nRamDisk
+cvt   PCX/drivicon.pcx                -m13 -t -l -x0 -y123 -dLC -dLM -dLCGA -nRamDisk
+
+#-------------------------  Net Disk Icon  -----------------------------#
+cvtbm PCX/drivicon.pcx -u -rAppDrives -m13 -t -l -x0 -y164 -dLC -dLM -dLCGA -nNetDisk
+cvt   PCX/drivicon.pcx                -m13 -t -l -x0 -y164 -dLC -dLM -dLCGA -nNetDisk
+
+#--------------------------  CD Rom Icon  ------------------------------#
+cvtbm PCX/drivicon.pcx -u -rAppDrives -m2  -t -l -x0 -y205 -dLC -dLM -dLCGA -nCDRom
+cvt   PCX/drivicon.pcx                -m2  -t -l -x0 -y205 -dLC -dLM -dLCGA -nCDRom
+
+#--------------------------  PCMCIA Icon  ------------------------------#
+cvtbm PCX/drivicon.pcx -u -rAppDrives -m13  -t -l -x0 -y246 -dLC -dLM -dLCGA -nPCMCIA
+cvt   PCX/drivicon.pcx                -m13  -t -l -x0 -y246 -dLC -dLM -dLCGA -nPCMCIA
+
+
+#########################################################################
+# Random								#
+#########################################################################
+
+#--------------------------  Preferences Launcher  ---------------------#
+cvt   ../../../Art/Art.20/g20apps3.pcx -m13  -t -l -x0 -y164 -dLC -dLM -dLCGA -nPrefMgrButton

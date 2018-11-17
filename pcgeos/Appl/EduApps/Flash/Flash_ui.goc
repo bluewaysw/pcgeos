@@ -1,0 +1,479 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Breadbox Flashcard
+ * FILE:		flash_ui.goc
+ * AUTHOR:	John F. Howard,   9/97
+ *             based on DC, LES and EDG groundwork
+ *
+ * DESCRIPTION:
+ *	          This file has the UI code for the Flashcard application.
+ *
+ * WHATS NEW:   01 version from Ed DiG
+ *
+ *	7/19/99	deleted Editor .ini stuff
+ *	7/20/99	Added UI for SPN
+ *   7/23/99   Added password on editor
+ *             no longer creates default folder (installer creates it)
+ *	8/16/99	change to GenDoc file functionality
+ *   8/18/99   release 1.0 version           
+ *   10/17/01  updated with RegTM etc
+ *		12/14/14  eliminated big deck & exit buttons
+
+ ***********************************************************************/
+
+/**********************************************************************
+ * Includes                                                           *
+ **********************************************************************/
+
+@include "flash.goh"
+@include "bboxreg.goh"
+@include "appicons.goh"
+@include "docicons.goh"
+@include "passwdui.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Method Declarations
+ ***************************************************************************
+ */
+/* classes defined in flash.goh */
+@classdecl FlashCardProcessClass, neverSaved;
+@classdecl VisFlashContentClass;
+@classdecl VisTitleTextClass;
+/*@classdecl VisFCButtonClass; */
+@classdecl VisFlashDeckClass;
+@classdecl VisFlashCardClass;
+@classdecl VisFCCompClass;
+@classdecl TextEnableClass;
+@classdecl FlashApplicationClass;
+@classdecl FlashDocCtrlClass;
+@classdecl FlashDocumentClass;
+
+
+/* methods in the vis methods .goc file */
+@extern method VisFlashContentClass, MSG_VIS_DRAW;
+@extern method VisFlashContentClass, MSG_VIS_COMP_GET_MINIMUM_SIZE;
+@extern method VisFlashContentClass, MSG_VIS_COMP_GET_CHILD_SPACING;
+@extern method VisFCCompClass, MSG_VIS_COMP_GET_MINIMUM_SIZE;
+@extern method VisFCCompClass, MSG_VIS_COMP_GET_CHILD_SPACING;
+@extern method VisFCCompClass, MSG_VIS_COMP_GET_MARGINS;
+/*@extern method VisFCButtonClass, MSG_VIS_DRAW;
+@extern method VisFCButtonClass, MSG_META_START_SELECT;
+@extern method VisFCButtonClass, MSG_META_END_SELECT;*/
+@extern method VisFlashDeckClass, MSG_VIS_DRAW;
+@extern method VisFlashDeckClass, MSG_META_START_SELECT;
+@extern method VisFlashDeckClass, MSG_META_END_SELECT;
+@extern method VisFlashCardClass, MSG_VIS_DRAW;
+@extern method VisFlashCardClass, MSG_META_START_SELECT;
+@extern method VisFlashCardClass, MSG_META_END_SELECT;
+@extern method VisFlashCardClass, MSG_SET_TO_QUESTION;
+@extern method VisFlashCardClass, MSG_VIS_COMP_GET_MINIMUM_SIZE;
+@extern method VisFlashCardClass, MSG_VIS_COMP_GET_MARGINS;
+/*@extern method VisTitleTextClass, MSG_META_START_SELECT;
+@extern method VisTitleTextClass, MSG_META_END_SELECT; */
+
+/* methods in the editor methods .goc file */
+@extern method FlashCardProcessClass, MSG_OPEN_PWORD_TO_EDITOR;
+@extern method FlashCardProcessClass, MSG_OPEN_EDITOR;
+@extern method FlashCardProcessClass, MSG_CLOSE_EDITOR;
+@extern method FlashCardProcessClass, MSG_ADD_CARD;
+@extern method FlashCardProcessClass, MSG_DELETE_CARD;
+@extern method FlashCardProcessClass, MSG_EDIT_SELECT_CARD;
+
+/* methods in the app methods .goc file */
+@extern method FlashDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE;
+@extern method FlashDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT;
+@extern method FlashDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT;
+@extern method FlashDocumentClass, MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED;
+@extern method FlashDocCtrlClass, MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR;
+
+@extern method FlashCardProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION;
+@extern method FlashCardProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION;
+@extern method FlashCardProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN;
+@extern method TextEnableClass, MSG_META_KBD_CHAR;
+@extern method FlashApplicationClass, MSG_META_KBD_CHAR;
+
+/**********************************************************************
+ * AppResource                                                        *
+ **********************************************************************/
+
+@start AppResource;
+
+@object FlashApplicationClass FlashCardApp = {
+    GI_visMoniker = list {@FCLCAppMoniker,
+					 @FCLMAppMoniker,
+					 @FCTCAppMoniker,
+					 @FlashTextMoniker};
+    GI_comp = @FlashCardPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =
+									 @FlashCardPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+			 @DocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+			 @DocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			 @DocumentControl;
+    ATTR_GEN_INIT_FILE_CATEGORY = "FlashCard";
+    ATTR_GEN_HELP_FILE = "FCHelp";
+}
+
+@visMoniker FlashTextMoniker = "Flash Card";
+@localize {"Name of application"};
+
+@end AppResource;
+
+/**********************************************************************
+ * Interface                                                          *
+ **********************************************************************/
+
+@start Interface;
+
+@object GenPrimaryClass FlashCardPrimary = {
+    GI_visMoniker = "Flash Card";
+    GI_comp = @FlashCardFileMenu, @FlashCardView,
+		    @FCDialogs;
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+		 SWSS_RATIO | PCT_5,  SWSS_RATIO | PCT_5 };
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenInteractionClass FlashCardFileMenu = {
+	 GI_comp = @DocumentControl, /*@AboutGroup,*/ @EditorGroup;
+	 GII_visibility = GIV_POPUP;
+	 ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+	 HINT_SEEK_MENU_BAR;
+}
+
+@object FlashDocCtrlClass DocumentControl = {
+    GDCI_features = @default & ~GDCF_SUPPORTS_TEMPLATES;
+    GDCI_noNameText = "No Deck";
+    GDCI_documentToken = {"FCd1", 16431};
+    GDCI_dialogNewText = "New:\rCreate a new, empty FlashCard File";
+    GDCI_dialogOpenText = "Open:\rOpen an existing FlashCard File";
+    GDCI_documentGroup = DocumentGroup;
+}
+
+@object GenInteractionClass AboutGroup = {
+	 GI_comp = @AboutDBox;
+	 GII_visibility = GIV_SUB_GROUP;
+}
+
+/*@object GenTriggerClass AboutTrigger = {
+    GI_visMoniker = 'A', "About";
+    GTI_destination = AboutDBox;
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+}
+*/
+@object GenInteractionClass EditorGroup = {
+	 GI_comp = @EditorTrigger;
+	 GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass EditorTrigger = {
+    GI_visMoniker = 'E', "Editor";
+    GTI_destination = process;
+	 GTI_actionMsg = MSG_OPEN_PWORD_TO_EDITOR;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+@end Interface;
+
+@start DocumentUI;
+@object GenDocumentGroupClass DocumentGroup ={
+    GDGI_untitledName = "FlashCard Untitled"; 
+    GDGI_protocolMajor = 0;
+    GDGI_protocolMinor = 0;
+    GDGI_documentClass = &FlashDocumentClass;
+    GDGI_documentControl = DocumentControl;
+}
+@end DocumentUI;
+
+/* --------------------------------------------------------------- */
+@start Interface;
+@object GenViewClass FlashCardView = {
+    GVI_docBounds = {0, 0, 600, 400};
+    GVI_horizAttrs = GVDA_DONT_DISPLAY_SCROLLBAR |
+				 GVDA_NO_SMALLER_THAN_CONTENT |
+				 GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs =  GVDA_DONT_DISPLAY_SCROLLBAR |
+				 GVDA_NO_SMALLER_THAN_CONTENT |
+				 GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_content = @FlashCardContent;
+    GVI_attrs = @default | GVA_NO_WIN_FRAME;
+}
+
+@object VisFlashContentClass FlashCardContent = {
+    VCI_comp = @FlashCardTop, @FlashCardMiddle;
+    VCI_geoAttrs = VCGA_ORIENT_CHILDREN_VERTICALLY
+			    | VCGA_HAS_MINIMUM_SIZE ;
+}
+
+@object VisFCCompClass FlashCardTop = {
+	 VCI_comp = /*@FlashCardDeckButton, */@FlashCardTitle/*,
+			@FlashCardExitButton*/;
+    VCI_geoAttrs = VCGA_HAS_MINIMUM_SIZE ;
+}
+
+/*@object VisFCButtonClass FlashCardDeckButton = {
+    VFCBI_pressed = FALSE;
+}
+*/
+@object VisTitleTextClass FlashCardTitle = {
+	 VTI_text = "Deck Description";
+	 VTI_charAttrRuns = ((VTDS_18 << VTDCA_SIZE_OFFSET)
+				    | VTDF_URW_SANS)
+				  /*  | VTDCA_BOLD  */
+				    | (C_BLACK<<VTDCA_COLOR_OFFSET);
+    VTI_paraAttrRuns =
+	   (VisTextDefaultParaAttr) ((0*2) << VTDPA_LEFT_MARGIN_OFFSET) | \
+	   ((0*2) << VTDPA_PARA_MARGIN_OFFSET) | \
+	   ((0*2) << VTDPA_RIGHT_MARGIN_OFFSET) | \
+	   (VTDDT_HALF_INCH << VTDPA_DEFAULT_TABS_OFFSET) | \
+	   (J_CENTER << VTDPA_JUSTIFICATION_OFFSET);
+    VTI_washColor = {C_LIGHT_GREEN, CF_INDEX, 0, 0};
+    /* to center the text vertically */
+	 ATTR_VIS_TEXT_ADD_SPACE_TO_ALL_LINES = 10;
+}
+@end Interface;
+
+
+@start AttrResource, data;
+
+@chunk VisTextCharAttr TitleSPNCharAttrs =
+	CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+		2, CA_NULL_ELEMENT, FID_DTC_URW_SANS, 18, TS_BOLD, C_BLACK);
+@chunk VisTextCharAttr TitleCharAttrs =
+	CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+		2, CA_NULL_ELEMENT, FID_DTC_URW_SANS, 18, /*TS_BOLD*/0, C_BLACK);
+@end AttrResource;
+@start Interface;
+
+
+/*@object VisFCButtonClass FlashCardExitButton = {
+    VFCBI_pressed = FALSE;
+}*/
+
+@object VisFCCompClass FlashCardMiddle = {
+    VCI_comp = @FlashCardsUsed, @CurrentFlashCard, @FlashCardsLeft;
+    VCI_geoDimensionAttrs = HJ_CENTER_CHILDREN_VERTICALLY |
+					   VCGDA_EXPAND_WIDTH_TO_FIT_PARENT |
+					   VCGDA_WIDTH_JUSTIFICATION;
+    VCI_geoAttrs = VCGA_INCLUDE_ENDS_IN_CHILD_SPACING
+			    | VCGA_HAS_MINIMUM_SIZE ;
+}
+
+@object VisFlashDeckClass FlashCardsUsed = {
+}
+
+@object VisFlashCardClass CurrentFlashCard = {
+    VCI_comp = @FlashCardText;
+    VCI_geoAttrs = VCGA_HAS_MINIMUM_SIZE;
+    VCI_geoDimensionAttrs = HJ_BOTTOM_JUSTIFY_CHILDREN |
+					 WJ_CENTER_CHILDREN_HORIZONTALLY;
+    VFDI_QorA = QUESTION;
+}
+
+@object VisTextClass FlashCardText = {
+    VTI_text = "   ";
+    VTI_charAttrRuns = ((VTDS_36 << VTDCA_SIZE_OFFSET)
+				    | VTDF_URW_ROMAN)
+				    | VTDCA_BOLD
+				    | (C_BLACK<<VTDCA_COLOR_OFFSET);
+    VTI_paraAttrRuns =
+	   (VisTextDefaultParaAttr) ((0*2) << VTDPA_LEFT_MARGIN_OFFSET) | \
+	   ((0*2) << VTDPA_PARA_MARGIN_OFFSET) | \
+	   ((0*2) << VTDPA_RIGHT_MARGIN_OFFSET) | \
+	   (VTDDT_HALF_INCH << VTDPA_DEFAULT_TABS_OFFSET) | \
+	   (J_CENTER << VTDPA_JUSTIFICATION_OFFSET);
+}
+@end Interface;
+
+
+@start AttrResource, data;
+@chunk VisTextCharAttr CardSPNCharAttrs =
+	CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+		2, CA_NULL_ELEMENT, FID_DTC_URW_ROMAN, 24, TS_BOLD, C_BLACK);
+@chunk VisTextCharAttr CardCharAttrs =
+	CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+		2, CA_NULL_ELEMENT, FID_DTC_URW_ROMAN, 36, TS_BOLD, C_BLACK);
+@end AttrResource;
+@start Interface;
+
+@object VisFlashDeckClass FlashCardsLeft = {
+}
+
+/* ---------------------------------------------------------------- */
+@object GenInteractionClass FCDialogs = {
+	 GI_comp = @EditDBox,
+		    @PwdAskPasswordDialog, @PwdChangePasswordDialog;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+/* ---------------------------------------------------------------- */
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 't', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Flash Card";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2001 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+/* ---------------------------------------------------------------- */
+@object GenInteractionClass EditDBox = {
+    GI_visMoniker = "Flash Card Editor";
+	 GI_comp = @EMainSection, @EReplyBar;
+	 GII_visibility = GIV_DIALOG;
+    ATTR_GEN_HELP_CONTEXT = "Editor";
+    HINT_WINDOW_NO_SYS_MENU;
+}
+
+@object GenInteractionClass EMainSection = {
+	 GI_comp = @ETitleRow, @EDescription, @QandASection;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass ETitleRow = {
+    GI_comp = @ECardNum, @ETotalCards;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenValueClass ECardNum = {
+    GI_visMoniker = "Card ";
+    GVLI_destination = process;
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_EDIT_SELECT_CARD;
+    HINT_VALUE_NO_ANALOG_DISPLAY;
+}
+
+@object GenTextClass ETotalCards = {
+    GI_visMoniker = " of ";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "0";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = 4;
+    HINT_TEXT_NO_FRAME;
+
+}
+
+@object GenTextClass EDescription = {
+	 GTXI_text = "Deck Description";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (DECK_DESCR_SIZE - 1);
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass QandASection = {
+    GI_comp = @QATextSection, @QADataSection;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass QATextSection = {
+    GI_comp = @EQuestion, @EAnswer;
+}
+
+@object GenTextClass EQuestion = {
+	 GTXI_text = "Question";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (QA_SIZE - 1);
+	 HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 20, 0, 0};
+}
+
+@object GenTextClass EAnswer = {
+    GTXI_text = "Answer";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (QA_SIZE - 1);
+    HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 20, 0, 0};
+}
+
+@object GenInteractionClass QADataSection = {
+    GI_comp = @EQuestionData, @EAnswerData;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass EQuestionData = {
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (QA_DATA_SIZE - 1);
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 40, 0, 0};
+}
+
+@object GenTextClass EAnswerData = {
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (QA_DATA_SIZE - 1);
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 40, 0, 0};
+}
+
+@object GenInteractionClass EReplyBar = {
+    GI_comp = @EAdd, @EDelete, @EClose;
+    HINT_MAKE_REPLY_BAR;
+}
+
+@object GenTriggerClass EAdd = {
+    GI_visMoniker = 'A', "Add";
+    GI_states = (@default) & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_ADD_CARD;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass EDelete = {
+    GI_visMoniker = 'D', "Delete";
+    GI_states = (@default) & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DELETE_CARD;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass EClose = {
+    GI_visMoniker = 's', "Close";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CLOSE_EDITOR;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end Interface;
+
+

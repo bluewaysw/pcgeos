@@ -1,0 +1,1289 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  generic.uih
+ * FILE:	  generic.uih
+ *
+ * AUTHOR:  	  Tony Requist: July 6th, 1989
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	6/6/89	  tony	    Initial version
+ *	7/11/89	  eric      Changed Vis to VisDummy, created real Vis, VisComp,
+ *				and VisText.
+ *
+ * DESCRIPTION:
+ *	Descriptions of classes for the ui compiler (uic).
+ *
+ *
+ * 	$Id: generic.uih,v 1.1 97/04/04 14:22:41 newdeal Exp $
+ *
+ ***********************************************************************/
+
+version20
+
+#include "product.uih"
+
+/*
+ *	VisDummyClass
+ *
+ *	Placeholder so that generic objects are at the correct master class
+ *	level.
+ */
+class VisDummy = meta, master {
+}
+
+/*
+ *	GenClass
+ *
+ *	This class is not used directly by applications, but its subclasses
+ *	(and thus its instance data) are.
+ */
+class Gen = VisDummy, master, variant {
+	genLink = linkComp kbdPath;		/* link to next sibling,
+						 * or to parent if this is
+						 * the last sibling. kbdSearch-
+						 * Path bit set by kbdAcceler-
+						 * atorComps.            */
+	children = compositeComp genLink;	/* link to first child. Says
+						 * that children are linked
+						 * through their genLink field*/
+	moniker = visMonikerComp;		/* Defaults to no moniker */
+	kbdAccelerator = kbdAcceleratorComp;	
+	/* help = helpComp; */
+	/* help = wordComp : 0; */
+	
+	genAttributes = bitFieldComp byte { signalInteractionComplete, 
+		initiatesBusyState, initiatesInputHoldUp, initiatesInputIgnore,
+		readOnly, kbdPath, targetable, notifyVisibility } : {};
+	genStates = bitFieldComp byte {usable, enabled } : usable, enabled;
+}
+
+
+/*
+ *	GenTriggerClass
+ *
+ */
+class GenTrigger = Gen {
+	action = actionComp : null;	/* Action descriptor for when the */
+					/* trigger is triggered */
+}
+
+
+
+/*
+ *	GenApplicationClass
+ *
+ */
+class GenApplication = Gen {
+	static typeComp "AppInstanceReference" : "";
+	static wordComp : 0;	/* App mode method saved for state restore */
+	static byteComp : 0;	/* AppLaunchFlags, passed in MSG_META_ATTACH */
+	appOptFlags = bitFieldComp byte {
+		multipleInitFileCategories
+	} : {};
+	appFeatures =  wordComp : 0;
+	static wordComp : 0;	/* specific UI */
+	appState = bitFieldComp word {
+		unused1, unused2, unused3, singleInstance, quitDetaching,
+		avoidTransparentDetach,
+		trasnparentDetaching,
+		unused4,
+		quitting, detaching, focusable, modelable, notUserInteractable,
+		receivedAppObjectDetach, attachedToStateFile
+	} : focusable, modelable;
+	static wordComp : 0;	/* AppAttachFlags */
+
+	default genStates = default -usable;
+	default genAttributes = default +targetable;
+	appLevel = wordComp : "UIIL_ADVANCED";
+
+	static nptrComp : null; /* iacpConnects */
+}
+
+class GenField = Gen {
+		/* DO NOT SET THESE INTERNAL FLAGS, other than */
+		/* needsWorkspaceMenu, hasDefaultLaunhcer */
+	internalFlags = bitFieldComp byte {
+		detaching, loadBitmap, restoringApps,
+		needsWorkspaceMenu, hasDefaultLauncher,
+		needDefaultLauncher
+	} : {};
+	static optrComp : null;	/* Visible parent */
+	static byteComp : 0;	/* Num applications in chunk below */
+	static byteComp : 0;	/* Num applications that were started up */
+	static byteComp : 0;	/* Num applications that are attaching now */
+	static wordComp : 0;	/* Chunk handle of App instances */
+	static wordComp : 0;	/* Chunk handle of process handles */
+	static wordComp : 0;	/* Chunk handle of GenApplication optr list */
+	static byteComp : 0;	/* number of applications in list above */
+	notificationDestination = optrComp : null;
+	default genStates = default -usable;
+	default genAttributes = default +targetable;
+}
+
+
+/*
+ *	GenDisplayClass
+ *
+ */
+class GenDisplay = Gen {
+	attributes = bitFieldComp byte
+		{ userDismissable } : userDismissable;
+					/* set to permit the user to close
+					 * this window. Each specific UI has
+					 * different gadgets which the user
+					 * will press to accomplish this. */
+	document = optrComp : null;
+	default genAttributes = default +targetable;
+}
+
+
+/*
+ *	GenPrimaryClass
+ *
+ */
+class GenPrimary = GenDisplay {
+	longTermMoniker = visMonikerComp;
+	default genAttributes = default +targetable;
+}
+
+
+/*
+ *	GenDisplayGroupClass
+ *
+ */
+class GenDisplayGroup = Gen {
+	default genAttributes = default +targetable;
+}
+
+
+/*
+ *	GenInteractionClass
+ *
+ */
+class GenInteraction = Gen {
+	type = enumComp byte {
+		organizational,
+		properties,
+		progress,
+		command,
+		notification,
+		affirmation,
+		multipleResponse
+		} : organizational;
+	visibility = enumComp byte {
+		noPreference,
+		popup,
+		subGroup,
+		controlGroup,
+		dialog,
+		popout
+		} : subGroup;
+	attributes = bitFieldComp byte {
+		notUserInitiatable,
+		initiatedViaUserDoDialog,
+		modal,
+		sysModal
+	} : {};
+}
+
+/*
+ *	GenControlClass
+ */
+
+class GenControl = GenInteraction {
+    output = optrComp : null;
+    default genStates = default -enabled;
+}
+
+/*
+ *	GenToolGroupClass
+ */
+
+class GenToolGroup = GenInteraction {
+    controller = optrComp : null;
+    default genStates = default -enabled;
+}
+
+/*
+ *	GenEditControlClass
+ */
+
+class GenEditControl = GenControl, kbdPath {
+	default output = "TO_APP_TARGET";
+	default genStates = default +enabled;
+}
+
+/*
+ *	GenViewControlClass
+ */
+
+class GenViewControl = GenControl, kbdPath {
+	minZoom = wordComp : 25;
+	maxZoom = wordComp : 200;
+	scale = wordComp : 100;
+	viewControlAttrs = bitFieldComp word {
+		adjustForAspectRatio, applyToAll, showHorizontal, showVertical
+	} : showHorizontal, showVertical, applyToAll;
+	default output = "TO_APP_TARGET";
+}
+
+/*
+ *	GenPageControlClass
+ */
+
+class GenPageControl = GenControl {
+	default output = "TO_APP_TARGET";
+}
+
+/*
+ * 	GenPenInputControlClass
+ */
+
+class GenPenInputControl = GenControl {
+	default output = "TO_APP_FOCUS";
+}
+/*
+ *	GenToolControlClass
+ */
+
+class GenToolControl = GenControl {
+	default genStates = default +enabled;
+	default output = null;
+	toolboxList = nptrComp : null;
+	toolGroupList = nptrComp : null;
+}
+
+/*
+ *	GenDisplayControlClass
+ */
+
+class GenDisplayControl = GenControl, kbdPath {
+	default genStates = default +enabled;
+	default output = "TO_APP_TARGET";
+	dcAttributes = bitFieldComp byte {
+		maximizedDisplayNamesOnPrimary
+	} : maximizedDisplayNamesOnPrimary;
+}
+
+/*
+ *	GenGlyphClass
+ *
+ */
+class GenGlyph = Gen {
+}
+
+/*
+ *	GenTextClass
+ *
+ */
+class GenText = Gen {
+	text	  = nptrComp : null;
+	maxLength = wordComp : -1;
+	textDisplayAttributes = bitFieldComp byte {
+		singleLineText,
+		useTabForNavigation,
+		initScrolling,
+		noWordWrapping,
+		allowTextOffEnd,
+		tailOriented,
+		dontScrollToChanges
+	} : useTabForNavigation;
+
+	stateFlags = bitFieldComp byte {
+			indeterminate, modified
+		     } : {};
+
+	destination = optrComp : null;
+	applyMsg = wordComp : 0;
+}
+
+
+/*
+ *	GenViewClass
+ *
+ */
+class GenView = Gen {
+	originX = typeComp "DWFixed" : "0,0"; /* Origin at top/left doc */
+	originY = typeComp "DWFixed" : "0,0";
+
+	docLeft = dwordComp: 0;			/*  scrollable bounds */
+	docTop = dwordComp: 0;
+	docRight = dwordComp : 0;
+	docBottom = dwordComp : 0;	
+
+	horizIncrement = dwordComp : 20;
+	vertIncrement = dwordComp : 15;
+
+	scaleX = typeComp "WWFixed" : "0, 1";	/* Scale factor of 1.0 */
+	scaleY = typeComp "WWFixed" : "0, 1";
+
+	backColorR = byteComp : C_WHITE;
+	backColorFlags = byteComp : 0;
+	backColorG = byteComp : 0;
+	backColorB = byteComp : 0;
+
+	viewAttributes = bitFieldComp word {
+				controlled, genericContents,
+				trackScrolling, dragScrolling,
+				noWinFrame, sameColorAsParentWin,
+				viewSizeFollowsContentSize,
+				windowCoordinateMouseEvents,
+				dontSendPtrEvents, dontSendKbdReleases,
+				sendAllKbdChars, focusable,
+				scaleToFit, adjustForAspectRatio
+				} : focusable;
+	horizAttributes = bitFieldComp byte {scrollable, splittable, 
+				tailOriented, dontDisplayScrollbar, 
+				noLargerThanContent,
+				noSmallerThanContent,
+				sizeAMultipleOfIncrement, keepAspectRatio
+				} : {};
+	vertAttributes = bitFieldComp byte {scrollable, splittable,
+				tailOriented, dontDisplayScrollbar, 
+				noLargerThanContent,
+				noSmallerThanContent,
+				sizeAMultipleOfIncrement, keepAspectRatio
+				} : {};
+	inkType = byteComp : 0;	
+	output = optrComp : null;
+	default genAttributes = default +targetable;
+	horizLink = optrComp : null;
+	vertLink = optrComp : null;
+}
+
+/*
+ *	GenContentClass
+ *
+ */
+class GenContent = Gen {
+	contentAttrs = bitFieldComp byte { 
+		sameWidthAsSubview, 
+		sameHeightAsSubview,
+		largeDocumentModel,
+		windowCoordinateMouseEvents,
+		activeMouseGrabRequiresLargeEvents,
+		viewDocBoundsSetManually,
+		viewDoesNotWinScroll } : {};
+
+	genView = optrComp : null;		/* OD of view we're in */
+}
+
+ 
+/*
+ *	GenItemGroup, et al
+ *
+ */
+class GenItemGroup = Gen {
+	behaviorType = enumComp byte {
+			exclusive,
+			exclusiveNone,
+			extendedSelection,
+			nonExclusive
+		       } : exclusive;
+	selection = wordComp : "GIGS_NONE";
+	numSelections = wordComp : 0;
+	stateFlags = bitFieldComp byte {
+			indeterminate, modified
+		     } : {};
+	destination = optrComp : null;
+	applyMsg = wordComp : 0;
+}
+
+class GenItem = Gen {
+	identifier = wordComp : 0;
+}
+
+class GenBooleanGroup = Gen {
+	selectedBooleans = wordComp : 0;
+	indeterminateBooleans = wordComp : 0;
+	modifiedBooleans = wordComp : 0;
+	destination = optrComp : null;
+	applyMsg = wordComp : 0;
+}
+
+class GenBoolean = Gen {
+	identifier = wordComp : 0;
+}
+
+class GenDynamicList = GenItemGroup {
+	numItems = wordComp : 0;
+	queryMsg = wordComp : 0;
+}
+		
+
+/*
+ *	GenListClass
+ *
+ */
+
+#ifdef	INCLUDE_OLD_LIST_SYMBOLS
+
+class GenList = Gen {
+	attributes = bitFieldComp byte {
+		type:2 = {
+			exclusive,	/* exclusive list */
+			exclusiveNone,	/* exclusive list, can turn off all */
+			nonExclusiveWithOverride,
+					/* non exclusive, with override item
+					 * as first item -- as in "plaintext" */
+			nonExclusive	/* non exclusive */
+		},
+		listMethod,
+		dynamicList,
+		listMethodIsData
+	} : type nonExclusive;
+
+	gadgetAttrs = bitFieldComp byte {
+		delayed,		/* sends AD when MSG_GEN_APPLY arrives */
+		displayOnly,		/* cannot interact with list */
+		inAddMode,		/* for multiple selection-see CUA spec*/
+		sendUserChanges, 
+		sendRedundantChanges,
+		defaultAction:2 = { 
+			activateDefault, nextField, applVerify, applCustom
+		}
+	} : defaultAction activateDefault;
+
+	action = actionComp : null;	/* Action descriptor for the list */
+		/* ALWAYS declare the OD for the list.  However, if you want */
+		/* to use a method w/ each list entry, use a null method here */
+}
+
+
+/*
+ *	GenListEntryClass
+ *
+ */
+class GenListEntry = Gen {
+	curState = bitFieldComp byte {
+		internal1,		/* DO NOT set this */
+		internal2,		/* DO NOT set this */
+		visible,		/* if is visible */
+		internal3,		/* DO NOT set this */
+		internal4,		/* DO NOT set this */
+		isOn,			/* if ACTUAL state is TRUE */
+		userIsOn,		/* if USER state is TRUE */
+		isDefault		/* if is default item in list */
+		} : visible;
+	method = wordComp : MSG_META_DUMMY;
+}
+
+#endif
+
+
+
+/*
+ *	GenGadgetClass
+ *
+ */
+class GenGadget = Gen {
+	attributes = bitFieldComp byte {composite} : {};
+}
+
+
+
+/*
+ *	GenValueClass
+ *
+ */
+class GenValue = Gen {
+	valueFrac = wordComp : 0;
+	value = wordComp : 0;		
+
+	minimumFrac = wordComp : 0;	
+	minimum = wordComp: 0;
+
+	maximumFrac = wordComp : 0;
+	maximum = wordComp: 32766;
+
+	incrementFrac = wordComp : 0;
+	increment = wordComp: 1;
+
+	stateFlags = bitFieldComp byte {
+			indeterminate, modified
+		     } : {};
+
+	displayFormat = enumComp byte {
+			integer, decimal, points, inches, centimeters, 
+			millimeters, picas, europeanPoints, ciceros, 
+			pointsOrMillimeters, inchesOrCentimeters,
+			/*
+			 * WARNING: "percentage" is only available with the
+			 * GenValuePercentageFormat protominor token.  If you
+			 * use this, make sure you add
+			 *	if GVDF_PERCENTAGE eq GVDF_PERCENTAGE
+			 *	endif
+			 * to your .asm file to enforce the correct minor
+			 * protocol for the UI Library.
+			 */
+			percentage
+		       } : integer;
+	destination = optrComp : null;
+	applyMsg = wordComp : 0;
+}
+
+
+/*
+ *	GenDocumentControlClass
+ *
+ */
+class GenDocumentControl = GenControl, kbdPath {
+	default genStates = default +enabled;
+
+	documentTokenChars = byteComp : "TOKEN_CHARS_LENGTH dup (0)";
+	documentTokenID = wordComp : 0;
+	selectorType = enumComp byte {
+		documents, executables, nonGeosFiles, allFiles
+	    } : documents;
+
+	dcAttributes = bitFieldComp word {
+		multipleOpenFiles,
+		mode:2 = {viewer, sharedSingle, sharedMultiple},
+		dosFileDenyWrite,
+		vmFile, native, supportsSaveAsRevert,
+		documentExists,
+		currentTask:4 = {none, new, open, useTemplate, saveAs, copyTo, dialog, type, password, moveTo},
+		doNotSaveFiles, forceDemandPaging
+	} : mode sharedSingle, vmFile,
+		supportsSaveAsRevert,
+		currentTask new;
+
+	features = bitFieldComp word {
+		readOnlySupportsSaveAsRevert, singleFileCleanCanNewOpen,
+		supportsTemplates, supportsUserSettableEmptyDocument,
+		supportsUserSettableDefaultDocument,
+		supportsUserMakingSharedDocuments,
+		displayNameOnPrimary, singleDocument
+	} : readOnlySupportsSaveAsRevert, singleFileCleanCanNewOpen,
+		supportsTemplates, supportsUserSettableEmptyDocument,
+		supportsUserMakingSharedDocuments,
+		displayNameOnPrimary;
+
+	docAttrs = wordComp : 0;
+	docType = wordComp : 0;
+	docFileHandle = wordComp : 0;
+	emptyExists = byteComp : 0;
+	defaultExists = byteComp : 0;
+	enableDisableList = nptrComp : null;
+	openGroup = optrComp : null;
+	importGroup = optrComp : null;
+	useTemplateGroup = optrComp : null;
+	saveAsGroup = optrComp : null;
+	exportGroup = optrComp : null;
+	dialogGroup = optrComp : null;
+	userLevelDialog = optrComp : null;
+	noNameText = nptrComp : null;
+	defaultFile = nptrComp : null;
+	templateDir = nptrComp : null;
+	appDC = optrComp : null;
+	targetDocName = typeComp "FileLongName" : "";
+
+	dialogNewText = nptrComp : null;
+	dialogTemplateText = nptrComp : null;
+	dialogOpenDefaultText = nptrComp : null;
+	dialogImportText = nptrComp : null;
+	dialogOpenText = nptrComp : null;
+	dialogUserLevelText = nptrComp : null;
+
+	dialogNewMoniker = visMonikerComp;
+	dialogTemplateMoniker = visMonikerComp;
+	dialogOpenDefaultMoniker = visMonikerComp;
+	dialogImportMoniker = visMonikerComp;
+	dialogOpenMoniker = visMonikerComp;
+	dialogUserLevelMoniker = visMonikerComp;
+}
+
+/*
+ *	GenDocumentGroupClass
+ *
+ */
+class GenDocumentGroup = Gen {
+	attributes = bitFieldComp word {
+		vmFile, native, supportsAutoSave,
+		automaticChangeNotification, automaticDirtyNotification,
+		applicationThread, vmFileContainsObjects, dontManageChildren,
+		largeContent, automaticUndoInteraction
+	} : vmFile, supportsAutoSave,
+	    automaticChangeNotification, automaticDirtyNotification,
+	    applicationThread, dontManageChildren, automaticUndoInteraction;
+	defaultName = nptrComp : null;
+	documentClass = fptrComp : "GenDocumentClass";
+	genDocument = optrComp: null;
+	output = optrComp : null;
+	uiDC = optrComp : null;
+	genView = optrComp : null;
+	genDisplay = optrComp : null;
+	genDisplayGroup = optrComp : null;
+	protocolMajor = wordComp : 1;
+	protocolMinor = wordComp : 0;
+}
+
+
+/*
+ *	GenDocumentClass
+ *
+ */
+class GenDocument = GenContent {
+	default genStates = default -usable;
+	attributes = wordComp : 0;
+	type = wordComp : 0;
+	operation = wordComp : 0;
+	static wordComp : 0;			/* file handle */
+	fileName = typeComp "FileLongName" : "";
+	display = hptrComp : null;
+}
+
+
+/*
+ *	GenFileSelectorClass
+ *
+ */
+class GenFileSelector = Gen {
+	selection = typeComp "GenFileSelectorSelection" : "";
+
+	fileCriteria = bitFieldComp word {
+		dirs,
+		nonGeosFiles,
+		geosExecutables,
+		geosNonExecutables,
+		maskCaseInsensitive,
+		fileFilter,
+		filterIsC,
+		tokenNoID,
+		useMaskForDirs,
+		useFakeFileSystem}
+		: dirs, nonGeosFiles, geosExecutables, geosNonExecutables;
+	attributes = bitFieldComp word {
+		allowChangeDirs,
+		manualControl,
+		showFixedDisksOnly,
+		showFilesDisabled,
+		hasCloseDirButton,
+		hasOpenDirButton,
+		hasDocumentButton,
+		hasChangeDirectoryList,
+		hasChangeDriveList,
+		hasFileList,
+		useVirtualRoot,
+		showWritableDisksOnly}
+		: allowChangeDirs, hasCloseDirButton, hasOpenDirButton,
+		hasDocumentButton, hasChangeDirectoryList, hasChangeDriveList,
+		hasFileList;
+
+	action = actionComp : null;
+}
+
+
+/*
+ *	VisClass
+ *
+ *	This class is subclassed by visual objects.
+ */
+
+class Vis = meta, master {
+	left   = wordComp : 0;	/* visBounds: outer bounds of visible object */
+	top    = wordComp : 0;
+	right  = wordComp : 0;
+	bottom = wordComp : 0;
+
+	typeFlags = bitFieldComp byte { composite, window, portal,
+		winGroup, content, inputNode } : {};
+
+	attr = bitFieldComp byte { visible, fullyEnabled, managed, drawable,
+		detectable, branchNotMinimizable, notUsed2, realized
+		} : managed, drawable, detectable, fullyEnabled;
+
+	optFlags = bitFieldComp byte { geometryInvalid, updatePath,
+		imageInvalid, imageUpdatePath, windowInvalid,
+		windowUpdatePath, updatePending, inComposite
+		} : geometryInvalid, updatePath,
+		    windowInvalid,windowUpdatePath,
+		    imageInvalid, imageUpdatePath;
+
+	visGeoAttrs = bitFieldComp byte { geometryCalculated, noSizeHints,
+		notifyGeometryValid, dontCenter, useVisSetPosition,
+		useVisCenter, onlyRecalcSizeWhenInvalid, alwaysRecalcSize} : {};
+
+	visSpecAttr = bitFieldComp byte { attached, realizable,
+		branchMinimized, usesDualBuild, customVisParent,
+		simpleGenObj } : {};
+	visLink = linkComp;	/* link to sibling, or if this is last
+				 * sibling, link to parent */
+
+}
+
+/*
+ *	VisCompClass
+ *
+ *	This class is subclassed by visual composite objects.
+ */
+
+class VisComp = Vis {		
+					/* VisCompClass is a subclass of
+					 * VisClass, and is a direct variant,
+					 * not a master class. */
+
+	default typeFlags = composite;	/* override a VisClass default */
+
+	children = compositeComp visLink;
+					/* link to first child -- children
+					  are linked through visLink fields. */
+
+	gadgetExcl = optrComp : null;	/* was: dw lptr */
+
+	gWin = hptrComp : null;		/* was: dw hptr.Window */
+
+	visCompGeoAttrs = bitFieldComp byte { 
+		orientChildrenVertically,
+		includeEndsInChildSpacing,
+		allowChildrenToWrap,
+		onePassOptimization,
+		customManageChildren,
+		hasMinimumSize,
+		wrapAfterChildCount,
+		onlyDrawsInMargins
+	} : {};
+					/* Geometry flags */
+
+	justFlags = bitFieldComp byte { 
+			widthJustification:2 = { 
+				leftJustify,
+				rightJustify,
+				centerHorizontally,
+				fullJustifyHorizontally
+			},
+			expandWidthToFitParent,
+			canTruncateWidthToFitParent,
+			heightJustification:2 = { 
+				topJustify,
+				bottomJustify,
+				centerVertically,
+				fullJustifyVertically
+			},
+			expandHeightToFitParent,
+			canTruncateHeightToFitParent
+		} : {};	/* Justification flags */
+	
+}
+
+/*
+ *	VisContentClass
+ *
+ *	This is the top visible object in a view
+ */
+
+class VisContent = VisComp {		
+					/* VisContentClass is a subclass of
+					 * VisCompClass, and is a direct
+					 * variant, not a master class. */
+
+					/* override a VisClass default */
+	default typeFlags = composite, window, winGroup, content, inputNode;
+
+	view = optrComp : null;	/* OD of our view */
+	portGWin = hptrComp : null;	/* window handle of portal */
+	viewHeight = wordComp : 0;	/* view height, stored internally */
+	viewWidth = wordComp : 0;	/* view width, stored internally */
+
+	contentAttrs = bitFieldComp byte { 
+		sameWidthAsSubview, 
+		sameHeightAsSubview,
+		largeDocumentModel,
+		windowCoordinateMouseEvents,
+		activeMouseGrabRequiresLargeEvents,
+		viewDocBoundsSetManually,
+		viewDoesNotWinScroll } : {};
+
+	static dwordComp : 0;	/* Document offset */
+	static dwordComp : 0;
+				/* Scale factor */
+	static typeComp "WWFixed" : "0, 1";
+	static typeComp "WWFixed" : "0, 1";
+
+	prePassiveMouseGrabList = nptrComp : null;
+
+				/* Implied mouse grab */
+	impMouseGrab = optrComp : null;		/* BasicGrab structure */
+	impMouseGrabData = wordComp : 0;
+	impMouseTranslationX = dwordComp : 0;	/* Translation */
+	impMouseTranslationY = dwordComp : 0;
+						/* Flags */
+	impMouseGrabFlags = byteComp : "mask VIFGF_MOUSE or mask VIFGF_PTR";
+	static byteComp : 0;
+
+				/* Active mouse grab */
+						/* BasicGrab structure */
+	mouseGrab = optrComp : null;
+	mouseGrabData = wordComp : 0;
+	mouseTranslationX = dwordComp : 0;	/* Translation */
+	mouseTranslationY = dwordComp : 0;
+	mouseGrabFlags = byteComp : 0;		/* Flags */
+	static byteComp : 0;
+
+	postPassiveMouseGrabList = nptrComp : null;
+
+				/* BasicGrab structure for kbd grab */
+	kbdGrab = optrComp : null;
+	kbdGrabData = wordComp : 0;
+
+	focusExcl = optrComp : null;
+	focusExclData = wordComp : "mask MAEF_FOCUS";
+
+	targetExcl = optrComp : null;
+	targetExclData = wordComp : "mask MAEF_TARGET";
+
+	static wordComp : 0;		/* HoldUpInputQueue */
+	static wordComp : 0;		/* HoldUpInputCount */
+	static byteComp : 0;		/* HoldUpInputFlags */
+}
+
+
+/*
+ *	VisTextClass
+ *
+ *	This class is subclassed by visual text objects.
+ *	Things that are specified as 'static' should never be set by in a
+ *	.ui file.
+ */
+
+structure ColorQuad = {
+	redOrIndex = byteComp : 0;
+	info = bitFieldComp byte {
+		rgbFlag
+	} : {};
+	blue = byteComp : 0;
+	green = byteComp : 0;
+}
+
+class VisText = Vis {
+	text = nptrComp : null;
+	charAttrRuns = wordComp : "VIS_TEXT_INITIAL_CHAR_ATTR";
+	paraAttrRuns = wordComp : "VIS_TEXT_INITIAL_PARA_ATTR";
+	vmFile = wordComp : 0;
+
+	static nptrComp : null;		/* lmem handle to line structs */
+
+	storage = bitFieldComp byte {
+		large,			/* large text object */
+		multipleCharAttr,	/* Text can have multiple charAttrs */
+		multipleParaAttr,	/* Text can have multiple paraAttrs */
+		types,			/* Text can have types */
+		graphics,		/* Text can have graphics */
+		defaultCharAttr,	/* Requires multipleCharAttr=0:
+					 *    interpret charAttrRuns as
+					 *    VisTextDefaultCharAttr struct */
+		defaultParaAttr,	/* Requires multipleParaAttr=0
+					 *    interpret paraAttrRuns as
+					 *    VisTextDefaultParaAttr struct */
+		styles
+	    } : defaultCharAttr, defaultParaAttr;
+
+	features = bitFieldComp word {
+		noWordWrap,
+		autoHyphenate,
+		allowSmartQuotes,
+		allowUndo,
+		showHiddenText,
+		outlineMode,
+		dontShowSoftPageBreaks,
+		dontShowGraphics,
+		transparent,
+		use50pctTextMask,
+		rightToLeft
+	    } : {};
+
+	states = bitFieldComp byte {
+		editable, 
+		selectable,
+		targetable,
+		oneLine,
+		subclassVirtPhys,
+		overstrikeMode,
+		dirty
+	    } : {};
+	
+	static byteComp : 0;			/* int flags */
+	static byteComp : 0;			/* int sel flags */
+	static byteComp : 0;			/* gs ref count */
+	static hptrComp : null;			/* gstate for calculation. */
+	static wordComp : -1;			/* current region for gstate */
+
+	/*
+	 * Selection variables
+	 */
+	selectStart = dwordComp : 0;		/* Offset to selection start */
+	selectEnd = dwordComp : 0;		/* Offset to selection end */
+	static typeComp "PointDWord" : "0,0";	/* start event position */
+	static dwordComp : 0;			/* select minimum start */
+	static dwordComp : 0;			/* select minimum end */
+	static dwordComp : 0;			/* last offset */
+	static wordComp : 0;			/* goal position */
+
+
+	static wordComp : 0;			/* cursorPos.x */
+	static wordComp : 0;			/* cursorPos.y */
+	static wordComp : 0;			/* cursor region */
+	static wordComp : 0;			/* left offset */
+
+	lrMargin = byteComp : 0;
+	tbMargin = byteComp : 0;
+
+	washColor = ColorQuad : {
+		redOrIndex = "C_WHITE";
+	}
+
+	maxLength = wordComp : 10000;	/* Maximum number of characters */
+
+	filters = bitFieldComp byte {
+		noSpaces,
+		noTabsOrCRs,
+		upcaseChars,
+		filterClass:5 = {
+			none,
+			alpha,
+			numeric,
+			signedNumeric,
+			signedDecimal,
+			floatDecimal,
+			alphaNumeric,
+			filenames,
+			dosFilenames,
+			dosPath,
+			date,	
+			time,
+			dashedAlphaNumeric,
+			normalASCII,
+			dosVolumeNames,
+			dosCharacterSet,
+			allowColumnBreaks
+		}
+	} : filterClass none;
+
+	output = optrComp : null;
+
+	static byteComp : 0;		/* fraction of height of text */
+	static wordComp : 0;		/* integer portion of height of text */
+	static wordComp : -1;		/* last width (opt for CalcHeight) */
+	static wordComp : 0;		/* Timer handle */
+	static wordComp : 0;		/* Timer id */
+}
+
+class VisLargeText = VisText {
+	default maxLength = 0;
+
+	regionArray = nptrComp : null;
+	displayMode = enumComp word { page, condensed, galley, draft } : page;
+	regionSpacing = wordComp : 0;
+	draftRegionWidth = wordComp : 0;
+	draftRegionHeight = wordComp : 4000;
+	totalHeight = dwordComp : 0;
+	displayModeWidth = wordComp : 0;
+	flags = bitFieldComp word { heightNotifyPending } : {};
+	attrs = bitFieldComp word { exactHeight } : {};
+}
+
+/*
+ * Macros for moniker lists for tools
+ */
+
+#define TOOL_MONIKER_LIST(base)\
+	moniker = list { base##TCMoniker, base##TMMoniker, base##TCGAMoniker }
+
+	/* Macro to define a temporary tool */
+#define MKR_TEXT(text) \
+	moniker = list {\
+	    { cachedSize = 15, 15; size = tiny; aspectRatio = normal; \
+	    gstring { \
+		GSBeginString | \
+		GSRelMoveTo -1, 0 | \
+		GSDrawTextAtCP  <text> | \
+		GSEndString \
+	    }}, \
+	    { cachedSize = 15, 10; size = tiny; aspectRatio = verySquished; \
+	    gstring { \
+		GSBeginString | \
+		GSRelMoveTo -1, 0 | \
+		GSDrawTextAtCP  <text> | \
+		GSEndString \
+	    }} \
+	} 
+
+
+/*
+ * Macros for setting up text objects
+ */
+
+/* Macros for typical default attribute structures */
+
+#define DEF_CHAR_ATTR_FONT_SIZE(font, psize) (psize shl offset VTDCA_SIZE or font)
+
+#define DEF_PARA_ATTR_JUST_TABS(just, tabs) \
+				(( (0*2) shl offset VTDPA_LEFT_MARGIN ) or \
+				( (0*2) shl offset VTDPA_PARA_MARGIN ) or \
+				( (0*2) shl offset VTDPA_RIGHT_MARGIN ) or \
+				( tabs shl offset VTDPA_DEFAULT_TABS ) or \
+				( just shl offset VTDPA_JUSTIFICATION ))
+
+#define DEF_PARA_ATTR_CENTER DEF_PARA_ATTR_JUST_TABS(J_CENTER, VTDDT_INCH)
+#define DEF_PARA_ATTR_RIGHT DEF_PARA_ATTR_JUST_TABS(J_RIGHT, VTDDT_INCH)
+
+/* Macros for run arrays */
+
+#define RUN_ARRAY_HEADER(count, elements) TextRunArrayHeader < \
+	<count, size TextRunArrayElement, 0, size TextRunArrayHeader>, \
+	0, elements>
+
+#ifdef DO_DBCS
+#define WAAH(value) <((value)/2) and 0xffff, ((value)/2) shr 16>
+#else
+#define WAAH(value) <(value) and 0xffff, (value) shr 16>
+#endif
+
+#define TRAE(pos, base, type) <WAAH(pos-base), type>
+#define TRAE_ABS(pos, type) <WAAH(pos), type>
+#define TRAE_ALL(type) <WAAH(0), type>
+#define TRAE_END <<TEXT_ADDRESS_PAST_END_LOW, TEXT_ADDRESS_PAST_END_HIGH>, \
+							CA_NULL_ELEMENT>
+
+/* Macros for element arrays */
+
+#define ELEMENT_ARRAY_HEADER(type, struct, count) TextElementArrayHeader < \
+	<<count, size struct, 0, size TextElementArrayHeader>, \
+	EA_FREE_LIST_TERMINATOR>, type, 0>
+
+#define CHAR_ATTR_ELEMENT_ARRAY_HEADER(count) \
+		ELEMENT_ARRAY_HEADER(TAT_CHAR_ATTRS, VisTextCharAttr, count)
+
+#define PARA_ATTR_ELEMENT_ARRAY_HEADER(count) TextElementArrayHeader < \
+	<<count, 0, 0, size TextElementArrayHeader>, \
+	EA_FREE_LIST_TERMINATOR>, TAT_PARA_ATTRS, 0>
+
+#define CHAR_ATTR_FONT_SIZE_STYLE_COLOR(ref, font, psize, tstyle, color) \
+    VisTextCharAttr <<<<ref, 0>>, CA_NULL_ELEMENT>, font, <0, psize>, tstyle, \
+	<color, CF_INDEX, 0>, 0, FWI_MEDIUM, FW_NORMAL, <>, SDM_100, <>, \
+	<C_WHITE, CF_INDEX, 0>, SDM_0, <>, <>>
+
+#define CHAR_ATTR_SS_FONT_SIZE_STYLE_COLOR(ss, ref, font, psize, tstyle, color)\
+    VisTextCharAttr <<<<ref, 0>>, ss>, font, <0, psize>, tstyle, \
+	<color, CF_INDEX, 0>, 0, FWI_MEDIUM, FW_NORMAL, <>, SDM_100, <>, \
+	<C_WHITE, CF_INDEX, 0>, SDM_0, <>, <>>
+
+#define CHAR_ATTR_FONT_SIZE(font, psize) \
+		CHAR_ATTR_FONT_SIZE_STYLE_COLOR(3, font, psize, <>, C_BLACK)
+#define CHAR_ATTR_FONT_SIZE_STYLE(font, psize, tstyle) \
+		CHAR_ATTR_FONT_SIZE_STYLE_COLOR(3, font, psize, tstyle, C_BLACK)
+
+#define PARA_ATTR_SS_JUST_LEFT_RIGHT_PARA_TABS( \
+ 	ss, ref, just, left, right, para, deftabs, tabs) \
+    VisTextParaAttr <<<<ref, 0>>, ss>, \
+	<0, 0, 0, 0, 0, 0, SA_TOP_LEFT>, <C_BLACK, CF_INDEX, 0>, \
+	<just, 0, 0, 0, 0, 0, 0, 0, 0>, left, right, para, \
+	<0, 1>, 0, 0, 0, <C_WHITE, CF_INDEX, 0>, \
+	tabs, 1*8, 2*8, 1*8, SDM_100, SDM_0, <>, <>, deftabs, \
+	VIS_TEXT_DEFAULT_STARTING_NUMBER, \
+	<0,0,0,0>, <>, <>, <>, CA_NULL_ELEMENT, SL_ENGLISH, <>>
+
+#define PARA_ATTR_SS_JUST_LEFT_RIGHT_PARA_TABS_ABOVE_BELOW( \
+	ss, ref, just, left, right, para, deftabs, tabs, above, below) \
+    VisTextParaAttr <<<<ref, 0>>, ss>, \
+	<0, 0, 0, 0, 0, 0, SA_TOP_LEFT>, <C_BLACK, CF_INDEX, 0>, \
+	<just, 0, 0, 0, 0, 0, 0, 0, 0>, left, right, para, \
+	<0, 1>, 0, above, below, <C_WHITE, CF_INDEX, 0>, \
+	tabs, 1*8, 2*8, 1*8, SDM_100, SDM_0, <>, <>, deftabs, \
+	VIS_TEXT_DEFAULT_STARTING_NUMBER, \
+	<0,0,0,0>, <>, <>, <>, CA_NULL_ELEMENT, SL_ENGLISH, <>>
+
+#define PARA_ATTR_JUST_LEFT_RIGHT_PARA_TABS( \
+	ref, just, left, right, para, tabs) \
+	PARA_ATTR_SS_JUST_LEFT_RIGHT_PARA_TABS(CA_NULL_ELEMENT, ref, just, \
+		(left)*PIXELS_PER_INCH, (right)*PIXELS_PER_INCH, \
+		(para)*PIXELS_PER_INCH, PIXELS_PER_INCH/2*8, tabs)
+
+#define TAB_POS_TYPE_LEADER_ANCHOR_GRAY_WIDTH_SPACING( \
+	pos, type, leader, anchor, gray, width, spacing) \
+    Tab <(pos)*PIXELS_PER_INCH, <leader, type>, gray, width, spacing, anchor>
+
+#define TAB_POS_TYPE(pos, type) \
+	TAB_POS_TYPE_LEADER_ANCHOR_GRAY_WIDTH_SPACING(pos, type, TL_NONE, \
+							'.', SDM_100, 0, 0)
+
+#define GRAPHIC_ELEMENT_ARRAY_HEADER(count) \
+		ELEMENT_ARRAY_HEADER(TAT_GRAPHICS, VisTextGraphic, count)
+
+/*
+ * Typical dialog box buttons
+ **/
+
+#define CANCEL_TRIGGER_VALUES \
+	moniker = "VMO_CANCEL", "Cancel";
+
+#define YES_TRIGGER_VALUES \
+	moniker = 'Y', "Yes";
+
+#define NO_TRIGGER_VALUES \
+	moniker = 'N', "No";
+
+/* Typical File menu entries */
+
+#define PRINT_TRIGGER_VALUES \
+	moniker = 'P', "Print"; \
+	kbdAccelerator = control 'p';
+
+
+
+#define CLOSE_TRIGGER_VALUES \
+	moniker = 'C', "Close"; 
+
+
+/* Typical Edit menu entries */
+
+#if NDO_EXTRA_KBD_CUT_COPY_PASTE
+
+#define UNDO_TRIGGER_VALUES 					 \
+	kbdAccelerator = specificUI alt BACKSPACE; 		 \
+	moniker = 'U', "Undo";					 \
+	hints = { 						 \
+	    ATTR_GEN_EXTRA_KBD_ACCELERATORS { 			 \
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_SMALL_Z>,\
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_CAP_Z>   \
+	    } 							 \
+	}
+
+#define CUT_TRIGGER_VALUES 					 \
+	kbdAccelerator = specificUI shift DELETE; 		 \
+	moniker = 't', "Cut";					 \
+	hints = { 						 \
+	    ATTR_GEN_EXTRA_KBD_ACCELERATORS { 			 \
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_SMALL_X>,\
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_CAP_X>   \
+	    } 							 \
+	}
+
+#define COPY_TRIGGER_VALUES 					 \
+	kbdAccelerator = specificUI control INSERT; 		 \
+	moniker = 'C', "Copy";					 \
+	hints = { 						 \
+	    ATTR_GEN_EXTRA_KBD_ACCELERATORS { 			 \
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_SMALL_C>,\
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_CAP_C>   \
+	    } 							 \
+	}
+
+#define PASTE_TRIGGER_VALUES 					 \
+	kbdAccelerator = specificUI shift INSERT;  		 \
+	moniker = 'P', "Paste";					 \
+	hints = { 						 \
+	    ATTR_GEN_EXTRA_KBD_ACCELERATORS { 			 \
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_SMALL_V>,\
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_CAP_V>   \
+	    } 							 \
+	}	
+
+#define SELECT_ALL_TRIGGER_VALUES 				 \
+	kbdAccelerator = specificUI control '/';		 \
+	moniker = 'S', "Select All"; 				 \
+	hints = { 						 \
+	    ATTR_GEN_EXTRA_KBD_ACCELERATORS { 			 \
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_SMALL_A>,\
+	     KeyboardShortcut <0, 0, 1, 0, 0 and 0xf, C_CAP_A>   \
+	    } 							 \
+	}	
+#else
+
+#define UNDO_TRIGGER_VALUES \
+	kbdAccelerator = specificUI alt BACKSPACE; \
+	moniker = 'U', "Undo";
+
+#define CUT_TRIGGER_VALUES \
+	kbdAccelerator = specificUI shift DELETE; \
+	moniker = 't', "Cut";
+
+#define COPY_TRIGGER_VALUES \
+	kbdAccelerator = specificUI control INSERT; \
+	moniker = 'C', "Copy";
+
+#define PASTE_TRIGGER_VALUES \
+	kbdAccelerator = specificUI shift INSERT;  \
+	moniker = 'P', "Paste";
+
+#define SELECT_ALL_TRIGGER_VALUES \
+	moniker = 'S', "Select All"; \
+	kbdAccelerator = specificUI control '/';
+#endif
+
+
+#define SPELL_CHECK_TRIGGER_VALUES      			 \
+	kbdAccelerator = specificUI F7; 			 \
+	moniker = 'h', "Check Spelling";
+
+	#define DELETE_TRIGGER_VALUES \
+	kbdAccelerator = specificUI DELETE;  \
+	moniker = 'D', "Delete";
+
+#define SEARCH_AND_REPLACE_TRIGGER_VALUES \
+	kbdAccelerator = control 'f'; \
+	moniker = 'F', "Find and Replace";
+
+#define SAVE_OPTIONS_TRIGGER_VALUES \
+	moniker = 'v', "Save Configuration";
+
+#define RESET_OPTIONS_TRIGGER_VALUES \
+	moniker = 'e', "Reset Configuration";
+
+/*
+ * Shortcuts for predefined GCN lists
+ */
+#define active_list gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST)
+#define windows_list gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS)
+#define startup_load_options_list gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS)
+#define self_load_options_list gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS)
+
+/***********************************************************************
+ *	HelpControlClass
+ ***********************************************************************/
+
+class HelpControl = GenControl {
+	helpType = byteComp : 0;			/* HCI_helpType */
+	static wordComp : 0;				/* HCI_curFile */
+	static wordComp : 0;				/* HCI_historyBuf */
+	static wordComp : 0;				/* HCI_nameArrayVM */
+	static wordComp : 0;				/* HCI_compressLib */
+	default attributes = default +notUserInitiatable;
+	default visibility = dialog;
+}
+
+#define HELP_TRIGGER_VALUES \
+	hints = { \
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT, \
+		HINT_SEEK_REPLY_BAR, \
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_HELP } \
+	}
+
+#define HELP_PRIMARY_TRIGGER_VALUES \
+	hints = { \
+		HINT_SEEK_TITLE_BAR_RIGHT, \
+		ATTR_GEN_DEFAULT_MONIKER {word GDMT_HELP_PRIMARY} \
+	}
+
+/**********************************************************************
+ *	EMObjectManagerClass
+ **********************************************************************/
+
+class EMObjectManager = meta {
+	static /* expressMenus = */ nptrComp : null;
+	classes = nptrComp : null;
+	static /* numClasses = */ wordComp : 0;
+	attrs = bitFieldComp byte {
+		detaching, detachWithSystem
+	} : {};
+	static /* objectCount = */ wordComp : 0;
+}
+
+class EMTrigger = GenTrigger {
+	static /* ackDest */ optrComp : null;
+}

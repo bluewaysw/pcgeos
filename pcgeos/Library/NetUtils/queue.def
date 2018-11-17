@@ -1,0 +1,110 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Serial/IR Communication protocol
+MODULE:		Utils
+FILE:		queue.def
+
+AUTHOR:		Steve Jang, Mar 22, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	3/22/94   	Initial revision
+
+
+DESCRIPTION:
+	Data structure for queues used in NetLib and HDLC driver.
+		
+	$Id: queue.def,v 1.1 97/04/05 01:25:38 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Constants
+;
+
+; The following is the limits for total queue size and queue length
+; when creating queues
+QUEUE_LOW_MAX_LENGTH		equ	4000		; will generate warning
+QUEUE_LOW_MAX_SIZE		equ	16000		; if exceeded
+QUEUE_MAX_LENGTH		equ	30000		; will generate error
+;QUEUE_MAX_TOTAL_SIZE		equ	64K		; if exceeded
+
+;
+; Current Queue State
+;
+CurrentQueueState		etype	byte
+	CQS_ALIVE		enum	CurrentQueueState
+	CQS_DEAD		enum	CurrentQueueState
+;
+; A queue uses a fixed size memory chunk.
+;
+QueueStruct	struct
+	QS_initLength	word		; initial queue length
+	QS_curLength	word		; current queue length
+	QS_maxLength	word		; maximum queue length
+	QS_totalSize	word		; total size of queue chunk
+	QS_eltSize	word		; the size of each element in bytes
+
+	QS_numEnqueued	word		; current num of enqueued elements
+	QS_front	word		; front of queue(offset)
+	QS_end		word		; end of queue(offset)
+	QS_state	word		; current state of queue
+					; (see CurrentQueueState)
+	QS_syncSem	hptr		; synchronization semaphore
+	QS_enqueueSem	hptr		; P'ed every time something is enqueued
+					; amount of space available in queue
+	QS_dequeueSem	hptr		; P'ed every time something is dequeued
+					; amount of data available in queue
+	QS_buffer	label byte	; buffer space is to be added when
+					; a queue is created
+;
+; NOTE: QS_front and QS_end are actual offsets into QueueStruct. So they are
+;	initially set to (offset QS_buffer).  QS_buffer is defined only for the
+;	sake of its offset.  When we actually create a queue, we attach
+;	appropriate amount of memory at the end of this structure.
+;
+QueueStruct	ends
+
+
+
+; =============================================================================
+;				    EC stuff
+; =============================================================================
+
+QUEUE_IS_CORRUPTED					enum	FatalErrors
+END_QUEUE_OPERATION_WITHOUT_STARTING_ONE		enum	FatalErrors
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ECCheckLMemChunkDSAX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	
+
+PASS:		
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	4/12/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ECCheckLMemChunkDSAX		macro
+		push	ax
+		mov	si, ax
+		mov	si, ds:[si]
+		call	ECCheckLMemChunk
+		pop	ax
+		endm

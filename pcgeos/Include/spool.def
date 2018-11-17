@@ -1,0 +1,2141 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989-1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include - Spool Library Definitions
+FILE:		spool.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	2/90		Initial version
+
+DESCRIPTION:
+	Definitions for users of the spool library, and the various object
+	exported by the library (PrintControl, PageSizeControl).
+
+	$Id: spool.def,v 1.2 98/03/08 17:29:49 gene Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__SPOOL
+
+include		print.def			; external printer definitions
+include		Internal/prodFeatures.def
+
+StartLibrary	spool
+
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+PrintControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;		How printing works
+;-----------------------------------------------------------------------------
+
+; MSG_PRINT_CONTROL_INITIATE_PRINT initiates the user interface to
+; printing.  This is normally sent from the "Print" trigger in the file menu.
+; The user interface normally consists of a dialog box containing printing
+; options.  Some of these options can be specified by the attributes
+; PrintControlAttrs.  The application can also add its own UI components
+; to the print dialog box.
+;
+; When the user interface for printing finishes successfully (usually pressing
+; a "Print" button), MSG_PRINT_CONTROL_PRINT is invoked.  This method
+; creates a graphics string (stored in a VM file) and then sends the following
+; messages:
+;
+;	MSG_PRINT_VERIFY_PRINT_REQUEST	to PCI_output
+;	MSG_PRINT_GET_DOC_NAME 		to PCI_docNameOutput
+;	MSG_PRINT_START_PRINTING	to PCI_output
+;
+; While the application is printing, it might want to send back to the PC
+; an indication of progress (MSG_PRINT_CONTROL_REPORT_PROGRESS).
+; This is done to notify the user of what is occurring, and to allow the
+; user to interrupt a print request before the spooler take control of the
+; print job. See the method description below, and the PrintControlFlags
+; documentation.
+;
+; After all these methods have been responded to (as appropriate), the
+; PrintControl object will clean up some details, and pass the print
+; job request onto the spool library.
+
+
+
+;-----------------------------------------------------------------------------
+;		What every application writer should know...
+;-----------------------------------------------------------------------------
+
+; Using the PrintControl is a relatively easy thing to do, provided some
+; simple rules are followed.  First, some terms:
+;
+;	Printing:	The creation of a GString by an application, which
+;			is stored in a file in the SYSTEM\SPOOL directory.
+;	Spooling:	This file is the spooled, by being queued (if
+;			necessary) on a print queue; and then has several
+;			page width x certain height swath bitmaps generated
+;			and printed.
+;	PrintControl:	The UI object that controls all the UI
+;				aspects of the problem
+;	The Spool Process:	The thread that controls all of the spooling
+;				aspects of the problem.
+;	Spool Threads:		Individual print queues for every printer
+;				active (with jobs) on a system
+;	Print Dialog Box:	The pretty dialog box that appears (usaually)
+;				when you press the "Print..." trigger.
+;	User Print Group:	The application-defined group of UI objects
+;				that can be incorporated into the Print Dialog
+;				Box. NOTE: The root of this UI-tree must be
+;				set NOT_USABLE!!!!
+;	User Print Trigger:	The application-defined trigger or other UI
+;				objects that can be used in place of the
+;				usual "Print..." trigger. Again, these must be
+;				set NOT_USABLE in the .UI file.
+;
+; How to set up your PrintControl object:
+;	* Determine if you want a dialog box. Default:YES
+;	* Determine if you want page controls. Default:YES
+;	* Determine if the application can output text or graphics or both,
+;	  and possibly, what level of detail. Default:ALL outputs possible
+;	* Determine if you want a special print trigger. If so, create the
+;	  object(s), and set the correct instance data. Default:NONE
+;	  Note: The AD of the application-defined trigger should be:
+;		action = MSG_PRINT_CONTROL_INITIATE_PRINT, FooObj;
+;	  where FooObj is of type PrintControl.
+;	* Determine if you want special UI object in the Print Dialog Box.
+;	  If so, create the object, and set the instance data. Default:NONE
+;	* Make the PrintControl a generic child of something (probably
+;		the GenPrimary).
+;	* Add the PrintControl to your Active List!
+;
+; How to use your PrintControl object:
+;	* If working with a multiple page document, use the provided methods
+;	  to allow the PC to display the full range of pages available. Use
+;	  the USER page range to select intelligent default page ranges.
+;	* The document size must be set prior to the time the document is
+;	  spooled. Do this by either setting the document size in the
+;	  .UI file, or sending the approriate method BEFORE send a 
+;	  MSG_PRINT_CONTROL_PRINTING_COMPLETED back to the PC.
+;	* MSG_PRINT_START_PRINTING will be send to PCI_output as
+;	  notification for the application to start printing.
+;	* MSG_PRINT_NOTIFY_PRINT_DB is sent to PCI_output evertime the print
+;	  dialog box comes on/off screen.
+;	* MSG_PRINT_VERIFY_PRINT_REQUEST is sent to PCI_output ONLY if
+;	  the attribute PCA_VERIFY_PRINT is set in PCI_attrs. See the
+;	  method declaration for more information.
+;
+; When printing:
+;	* The printMethod (MSG_PRINT_START_PRINTING) is received by PCI_output
+;	* Send MSG_PRINT_CONTROL_REPORT_PROGRESS to allow visual
+;	  feedback to the user
+;	* Send MSG_PRINT_CONTROL_PRINTING_COMPLETED back to the PC's
+;	  OD when you have completed printing. MAKE SURE THE DOCUMENT SIZE HAS
+;	  BEEN SET CORRECTLY.
+;
+; Check the individual method declarations for additional information...
+
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+MSG_PRINT_CONTROL_INITIATE_PRINT				message
+;
+; Initiate printing. This will normally cause the print dialog box to
+; come up on screen.
+;
+; Context:	Invoked by the user wanting to print a document, by 
+;		(usually) clicking on the print trigger in the file menu.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_PRINT						message
+;
+; Requests the printing process to actually begin.
+;
+; Context:	Invoked by the user clicking on the "Print" trigger in the
+;		print dialog box.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_VERIFY_COMPLETED				message
+;
+; Tells the PrintControl that the print verify has been completed,
+; and either printing will ensure, or it will be cancelled.
+;
+; Context:	Sent in response to MSG_PRINT_VERFIY_PRINTING
+; Source:	Anyone, but most likely the PCI_output object
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX	= TRUE  - continue print job
+;			= FALSE	- cancel printing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_DOC_NAME					message
+;
+; Sets the document name, which will be displayed in the Printer Control Panel
+; If this message in not received by the PrintControl object, the print
+; job will never be released to the spooler.
+;
+; Context:	Sent in response to MSG_PRINT_GET_DOC_NAME
+; Source:	Anyone, but most likely the GenDocumentGroup object
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX:DX	= Null-terminated string of length no greater
+;			  than FILE_LONGNAME_LENGTH + 1.
+;
+; Return:	Nothing
+;		AX, CX, DX - destroyed
+;
+
+MSG_PRINT_CONTROL_REPORT_PROGRESS				message
+;
+; Sent to display the progress of the application spooling a (generally)
+; large or complex image.
+;
+; Context:	Sent by application while printing.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX	= PCProgressType
+;				PCPT_PAGE
+;					DX 	= Page number
+;				PCPT_PERCENT
+;					DX	= Percentage completed
+;				PCPT_TEXT
+;					DX:BP	= Text message to display 
+;			  NOTE: You must have the PCI_attrs field set
+;				properly for any progress dialog box to appear!
+;
+; Return:	AX	= TRUE (to continue printing)
+;			= FALSE (to abort printing)
+;			  	An application should stop drawing to the
+;				provided GState immediately, and send a
+;				MSG_PRINT_CONTROL_PRINTING_CANCELLED
+;				to the PrintControl object.
+;		CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_PRINTING_CANCELLED				message
+;
+; Cancel the print job currently being spooled by the application. Do *not*
+; send both this method and a MSG_PRINT_CONTROL_PRINTING_COMPLETED for
+; a single print job.
+;
+; Context:	Sent by an application to stop spooling a document once
+;		spooling has begun, possibly due to an error. The application
+;		may not use the GState handle it was drawing to once this
+;		message has been sent.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_PRINTING_COMPLETED				message
+;
+; Indicate that the application has finished spooling the document
+;
+; Context:	Sent by the application once it is done "drawing" the
+;		document.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_ATTRS					message
+;
+; Set the attributes for a PrintControl object.
+;
+; Context:	Utility message sent to set the PrintControlAttrs
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX	= PrintControlAttrs
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_ATTRS					message
+;
+; Get the attributes for a PrintControl object
+;
+; Context:	Utility message sent to get PrintControlAttrs
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	CX	= PrintControlAttrs
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE				message
+;
+; Sets the first & last page numbers that are in the document
+;
+; Context:	Sent whenever the number of pages in a document changes, or
+;		a new document is opened. Must be correct prior to sending
+;		MSG_PRINT_CONTROL_PRINTING_COMPLETED
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX	= First page (usually 0 or 1)
+;		DX	= Last page
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_TOTAL_PAGE_RANGE				message
+;
+; Gets the first & last page numbers in a document
+;
+; Context:	Utility message sent to get the number of pages
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	CX	= First page
+;		DX	= Last page
+;			  Note: This is not the range of pages the user has
+;			        selected to be printed. Use the SELECTED
+;			        page range instead.
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE			message
+;
+; Sets the (initial) first & last pages to be printed in a document
+;
+; Context:	Utility message sent to set a common default page range
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX	= First page
+;		DX	= Last page
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_SELECTED_PAGE_RANGE			message
+;
+; Returns the user-selected range of pages to be printed
+;
+; Context:	Sent to obtain the range of pages to be printed, usually
+;		right after the application received MSG_PRINTING_PRINT.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	CX	= First page
+;		DX	= Last page
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_DOC_SIZE					message
+;
+; Sets the dimensions of the document to be printed.
+;
+; Context:	Sent (generally) whenever a new document is opened, or when
+;		the existing document changes size. The size must be accurate
+;		prior to MSG_SPOOL_PRINT_COONTROL_PRINTING_COMPLETED is sent.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX	= Width (in points)
+;		DX	= Height (in points)
+;			  Note: For 32-bit document sizes, use MSG_SPOOL_
+;			        PRINT_CONTROL_SET_EXTENDED_DOC_SIZE
+;
+; Return:	Nothing
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_DOC_SIZE					message
+;
+; Returns the dimensions of the document to be printed.
+;
+; Context:	Utility message sent to get the size of a document
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	CX	= Width (in points)
+;		DX	= Height (in points)
+;			  Note: For 32-bit document sizes, use MSG_SPOOL_
+;			        PRINT_CONTROL_GET_EXTENDED_DOC_SIZE
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_EXTENDED_DOC_SIZE				message
+;
+; Sets the dimensions of the document to be printed.
+;
+; Context:	Sent (generally) whenever a new document is opened, or when
+;		the existing document changes size. The size must be accurate
+;		prior to MSG_SPOOL_PRINT_COONTROL_PRINTING_COMPLETED is sent.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:BP	= PCDocSizeParams
+;
+; Return:	Nothing
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_EXTENDED_DOC_SIZE				message
+;
+; Returns the dimensions of the document to be printed.
+;
+; Context:	Utility message sent to get the size of a document
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:BP	= PCDocSizeParams (empty)
+;
+; Return:	DX:BP	= PCDocSizeParams (filled)
+;			  Note: This will return the correct result, regardless
+;			        of whether 16-bit or 32-bit size were set.
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_DOC_MARGINS				message
+;
+; Sets the margins the user has selected for the current document.
+;
+; Context:	Sent when a new document is opened, or when the margins for the
+;		current document are changed. The margins *must* be set prior
+;		to MSG_PRINT_CONTROL_PRINTING_COMPLETED is sent.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:BP	= PCMarginParams
+;
+; Return:	Nothing
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_DOC_MARGINS				message
+;
+; Gets the margins the user has selected for the current document.
+;
+; Context:	Utility message sent to the PrintControl object
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:BP	= PCMarginParams (empty)
+;
+; Return:	DX:BP	= PCMarginsParams (filled)
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO				message
+;
+; Set all of the information about the document size & orientation
+;
+; Context:	Sent (generally) whenever a new document is opened, or when
+;		the existing document changes size. The size must be accurate
+;		prior to MSG_SPOOL_PRINT_CONTROL_PRINTING_COMPLETED is sent.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:BP	= PageSizeReport structure
+;
+; Return:	Nothing
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_DOC_SIZE_INFO				message
+;
+; Gets the data about the size & orientation of the document to be printed.
+;
+; Context:	Utility message sent to get the size of a document
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:BP	= PageSizeReport buffer
+;
+; Return:	DX:BP	= PageSizeReport filled
+;		Nothing - destroyed
+
+MSG_PRINT_CONTROL_SET_OUTPUT					message
+;
+; Sets the output of the PrintControl object, the object which receives
+; all the printing-related messages.
+;
+; Context:	Sent whenever a different object in an application needs to
+;		communicate with the PrintControl object. Rarely used.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX:DX	= OD of object
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_OUTPUT					message
+;
+; Get the output object's OD of the PrintControl object
+;
+; Context:	Utility message sent to get the output of the PrintControl
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	CX:DX	= OD of the output object
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_DOC_NAME_OUTPUT				message
+;
+; Sets the document name output of the PrintControl object, the object
+; which receives MSG_PRINT_GET_DOC_NAME.
+;
+; Context:	Sent whenever a different object in an application needs to
+;		communicate with the PrintControl object. Rarely used.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX:DX	= OD of document name object
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_DOC_NAME_OUTPUT				message
+;
+; Get the document name output OD of the PrintControl object
+;
+; Context:	Utility message sent to get the output of the PrintControl
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	CX:DX	= OD of the document name object
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_SET_DEFAULT_PRINTER				message
+;
+; Sets the application-default printer, to be used the next time the
+; print dialog box appears.
+;
+; Context:	Used by system utilities or other applications that want
+;		override the user-set default printer.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX	= Printer number (zero-based)
+;			= -1 indicates we should use the system's default
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_DEFAULT_PRINTER				message
+;
+; Returns the application-default printer. Do *not* expect that this indeed
+; is the printer that the user in printing to, as he/she may have been able
+; to change to a new printer. This method is included for orthogonality.
+;
+; Context:	Utility message to get the application-default printer.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	CX	= Printer number (zero-based)
+;			= -1 indicates we should use the system's default
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_PRINT_MODE				message
+;
+; Returns the print-mode selected by the user for printing.
+;
+; Context:	This may be used by applications to adjust their output
+;		depending what type of output has been selected by the user.
+;		It is only useful between the time MSG_PRINTING_PRINT is
+;		received & MSG_PRINT_CONTROL_PRINTING_COMPLETED is sent.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	CL	= PrinterMode (0 if no mode is yet selected)
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_PAPER_SIZE_INFO				message
+;
+; Get the current paper size & orientation selected by the user
+;
+; Context:	Utility message sent to the PrintControl object
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass: 	DX:BP	= PageSizeReport buffer
+;
+; Return:	DX:BP	= PageSizeReport filled
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_PAPER_SIZE				message
+;
+; Return the dimensions of the paper selected for the current printer.
+;
+; Context:	Utility message sent to the PrintControl object
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass: 	Nothing
+;
+; Return:	AX:CX	= Paper width (in points)
+;		BP:DX	= Paper height (in points)
+;
+; Return:	Nothing
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_GET_PRINTER_MARGINS				message
+;
+; Returns the margins enforced by the current printer.
+;
+; Context:	Utility message sent when setting default margins for a
+;		document, or possibly when printing for a non-WYSIWYG app.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX	= TRUE  - to set the document margins to be the same
+;			          as the printer's margins
+;			= FALSE - to not change the document margins
+;
+; Return:	AX	= Left margin
+;		CX	= Top margin
+;		DX	= Right margin
+;		BP	= Bottom margin
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_CALC_DOC_DIMENSIONS				message
+;
+; Calculates and returns the dimensions of the document, based on the
+; currently selected paper size & orientation. The document size &
+; margins will also be set by this message.
+;
+; Context:	Used by non-WYSIWYG applications who want to ensure that
+;		the document created will exactly fit on the paper the user
+;		has selected for the printer, called after MSG_PRINTING_
+;		PRINT has been received.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass: 	DX:BP	= PageSizeReport buffer
+;
+; Return:	DX:BP	= PageSizeReport filled, except that the width
+;			  and height take into account the margin, and
+;			  all layout options (landscape, portrait) have
+;			  been applied.
+;		Nothing - destroyed
+;
+
+MSG_PRINT_CONTROL_CHECK_IF_DOC_WILL_FIT				message
+;
+; Verify that the passed document margins will fit on the current printer
+;
+; Context:	Possibly sent when a user selects new margins for a document
+;		in a Page Setup dialog box.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CX	= TRUE to display warning, FALSE otherwise
+;
+; Return:	AX	= TRUE  - document will fit on the page
+;			= FALSE - document will not fit on the page
+;		CX, DX, BP - destroyed
+;
+
+
+
+
+;-----------------------------------------------------------------------------
+;		Internal Methods
+;-----------------------------------------------------------------------------
+
+; Do *NOT* send any of the following internal methods to the PrintControl.
+; They are for internal use only, but must be declared here so that this
+; class may use them
+;
+
+MSG_PRINT_CONTROL_VERIFY_PRINT					message
+;
+; Sent to allow printing "anyway" after the verification dialog box has
+; appeared.
+;
+; Context:	The user has selected to ignore the warning about the
+;		margins or the document size, and wants to print anyway.
+; Source:	GenTrigger in verify dialog box
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_VERIFY_SCALE					message
+;
+; Sent to allow printing by scaling the document to ensure it fits on the
+; paper selected by the user.
+;
+; Context:	The user has selected to have the document automatically
+;		scaled to fit, after a warning appeared.
+; Source:	GenTrigger in verify dialog box
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_VERIFY_CANCEL					message
+;
+; Sent to stop printing, because of a document/paper margin size conflict
+;
+; Context:	The user selected to Cancel printing after the warning
+;		from the PrintControl appeared.
+; Source:	GenTrigger in verify dialog box
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_CONTROL_ABORT_PRINT_JOB				message
+;
+; Sent to eventually stop printing.
+;
+; Context:	The user selected to Cancel printing while the print
+;		progress dialog box was onscreen.
+; Source:	GenTrigger in progress dialog box
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+
+;-----------------------------------------------------------------------------
+;		Post-2.0 Messages
+;-----------------------------------------------------------------------------
+
+protominor	PostZoomerMessages
+
+MSG_PRINT_CONTROL_INITIATE_OUTPUT_UI				message
+;
+; Display the output (print or fax, currently) dialog box.
+;
+; Context:	Invoked by the user wanting to print a document, by 
+;		(usually) clicking on the print trigger in the file menu.
+;		Generally used just internally, as the PrintControl provides
+;		all the UI one should need for printing.
+; Source:	Anyone
+; Destination:	PrintControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		CL	= PrinterDriverType
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_SET_PRINT_CONTROL_PAGE_SIZE		message
+;
+; Sets the page size to be displayed by the print control.  Internal only,
+; and currently Redwood-only.
+;
+; Context:	Utility message sent to set the page dimensions
+; Source:	Anyone
+; Destination:	PageSizeControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:BP	= PageSizeReport structure
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+protominor	SpoolMailboxSupport
+
+MSG_PRINT_GET_MAILBOX_OBJECT_TYPE	message	
+; Fetch the MailboxObjectType the caller should render, if the print request
+; came via a MailboxSendControl
+;
+; Context:	Called by the recipient of MSG_PRINT_START_PRINTING if the
+;		application supports the MailboxSendControl. It allows
+;		the caller to print things other than the current document.
+; Source:	Anyone
+; Destination:  PrintControlClass
+; Interception: not useful
+;
+; Pass:
+;		nothing
+; Return:
+;		carry set if print request didn't come from the
+;		    MailboxSendControl, so there's no MailboxObjectType to
+;		    return
+;			ax, bp	= destroyed
+;		carry clear if MailboxObjectType returned:
+;			ax	= MailboxObjectType
+;			bp	= transaction handle, in case you need to
+;				  call your MailboxSendControl subclass to
+;				  fetch the value of some data-object UI for
+;				  the transaction
+;		cx, dx - unchanged
+;
+
+MSG_PRINT_CANNOT_PRINT			message
+; Internal message sent by the print dialog box when it finds it cannot
+; fulfill its purpose.
+;
+; Context:	Called by the SpoolSummons object when it initializes and
+;		finds it is hosed.
+; Source:	SpoolSummonsClass
+; Destination:	PrintControlClass
+; Interception:	probably not useful
+;
+; Pass:
+; 		cx = PrintControlErrors
+; Return:
+; 		nothing
+; 		ax, cx, dx, bp - unchanged
+;
+
+
+MSG_PRINT_GET_FIRST_PAGE_OFFSET		message
+;
+; Return the height of the last page of the currently selected cover page.
+; Returns zero if no cover page is being used.
+;
+; Pass:		nothing
+; Return:	dx = height of the cover page
+; Context:     	Called by an application after receiving a 
+;              	MSG_PRINT_START_PRINING and before drawing to the print
+;              	gstate.
+; Source:      	Any application that has a PrintControl
+; Destination: 	PrintConrtolClass
+; Interception:	probably not useful
+;		
+
+
+
+protoreset
+
+
+;-----------------------------------------------------------------------------
+;		Methods imported from MetaClass
+;-----------------------------------------------------------------------------
+
+MSG_PRINT_VERIFY_PRINT_REQUEST			message MetaPrintMessages
+;
+; Sent to request the application to verfiy that state of the application-
+; supplied UI is indeed valid for printing to ensue. The message will be 
+; sent iff the PCA_VERIFY_PRINT attribute is sent in the PrintControl object.
+;
+
+; Context:	Once printing is requested by the user, this message is sent
+;		out, giving the application a chance to cancel the print job.
+; Source:	PrintControl object
+; Destination:	PCI_output
+; Interception: May be intercepted by any object, but it must be intercepted!
+;		To obtain the root of the generic tree to analyze, an
+;		application may want to use MSG_PRINT_CONTROL_GET_APP_PRINT_UI.
+;
+; 		The interceptor *MUST* send back to the passed OD a
+;		MSG_PRINT_CONTROL_VERIFY_COMPLETED, with the
+;		applicable arguments. Failure to do so will cause the
+;		print job to never be completed!
+;
+; Pass:		CX:DX	= OD of the PrintControlClass object
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_START_PRINTING			message MetaPrintMessages
+;
+; Sent to tell the application to begin printing
+;
+; Context:	Once the user has clicked on the Print trigger in the
+;		Print dialog box, a spool file will be created, and this
+;		message will be sent.
+; Source:	PrintControl object
+; Destination:	PCI_output
+; Interception: May be intercepted by any object
+;
+; Pass:		CX:DX	= OD of the PrintControlClass object
+;		BP	= GState handle to print (draw) to
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_GET_DOC_NAME				message MetaPrintMessages
+;
+; Sent to request the name of the document being printed.
+;
+; Context:	Once printing is requested by the user, this message is sent
+;		out, and the document will not be handed off to the spooler
+;		until it is returned.
+; Source:	PrintControl object
+; Destination:	PCI_docNameOutput
+; Interception: Intercepted by the GenDocumentGroupClass, which will then
+;		return the name of the current document. The recipient of
+;		this message *must* respond with MSG_PRINT_CONTROL_SET
+;		DOC_NAME.
+;
+; Pass:		CX:DX	= OD of the PrintControlClass object
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_NOTIFY_PRINT_DB			message MetaPrintMessages
+;
+; Sent to indicate that the print dialog box will either soon be coming
+; onto the screen, or has left the screen.
+;
+; Context:	Used so application may keep UI gadgetry up-to-date only
+;		when necessary.
+; Source:	PrintControl object
+; Destination:	PCI_output
+; Interception: May be intercepted by any object.
+;
+; Pass:		CX:DX	= OD of the PrintControlClass object
+;		BP	= PrintControlStatus
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PRINT_NOTIFY_PRINT_JOB_CREATED		message MetaPrintMessages
+;
+; Sent to indicate that a print job has been created by the spooler in
+; response to an application's request.
+;
+; Context:	Send out by the PrintControl after a successful call to
+;		SpoolAddJob
+; Source:	PrintControl object
+; Destination:	PCI_output
+; Interception: May be intercepted by any object. Applications will need
+;		the passed ID if they want to modify any part of the job's
+;		status, though this behavior is not encouraged. Rather,
+;		let the user manipulate the print jobs by using the
+;		Printer Control Panel.
+;
+; Pass:		CX:DX	= OD of PrintControl object originating job
+;		BP	= Print job ID
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+PrintControlFeatures		record
+    PRINTCF_PRINT_TRIGGER:1			; wants a print trigger
+    PRINTCF_FAX_TRIGGER:1			; wants a fax trigger
+PrintControlFeatures		end
+
+PrintControlToolboxFeatures	record
+    PRINTCTF_PRINT_TRIGGER:1			; wants a print tool trigger
+    PRINTCTF_FAX_TRIGGER:1			; wants a fax tool trigger
+PrintControlToolboxFeatures	end
+
+
+if LIMITED_FAX_SUPPORT
+PRINTC_DEFAULT_FEATURES		equ	mask PRINTCF_PRINT_TRIGGER
+PRINTC_DEFAULT_TOOLBOX_FEATURES equ	mask PRINTCTF_PRINT_TRIGGER
+else
+PRINTC_DEFAULT_FEATURES	equ	mask PRINTCF_PRINT_TRIGGER or \
+					mask PRINTCF_FAX_TRIGGER
+PRINTC_DEFAULT_TOOLBOX_FEATURES	equ	mask PRINTCTF_PRINT_TRIGGER or \
+					mask PRINTCTF_FAX_TRIGGER
+endif
+
+
+MAXIMUM_NUMBER_OF_PRINTERS	equ	255
+MAXIMUM_PRINTER_NAME_LENGTH	equ	64	; MAX_INITFILE_CATEGORY_LENGTH
+
+
+PrinterOutputModes	record
+    POM_unused:3		; leave these bits alone!!!
+    POM_GRAPHICS_LOW:1		; Graphics mode low quality available
+    POM_GRAPHICS_MEDIUM:1	; Graphics mode medium quality available 
+    POM_GRAPHICS_HIGH:1		; Graphics mode high quality available 
+    POM_TEXT_DRAFT:1		; Character mode draft quality available 
+    POM_TEXT_NLQ:1		; Character mode NLQ quality available 
+PrinterOutputModes	end
+
+PRINT_GRAPHICS		equ (mask POM_GRAPHICS_LOW) or \
+			    (mask POM_GRAPHICS_MEDIUM) or \
+			    (mask POM_GRAPHICS_HIGH)
+
+PRINT_TEXT		equ (mask POM_TEXT_DRAFT) or \
+			    (mask POM_TEXT_NLQ)
+
+; The default quality chosen by an application
+;
+PrintQualityEnum	etype	byte, 0, 1
+    PQT_HIGH		enum	PrintQualityEnum	; default to high
+    PQT_MEDIUM		enum	PrintQualityEnum	; default to medium
+    PQT_LOW		enum	PrintQualityEnum	; default to low
+
+PrintControlAttrs	record
+    PCA_NO_PRINTER_CONTROLS:1=0	; Printer selection/options are not available
+    PCA_SEE_IF_DOC_WILL_FIT:1=1	; check if document will fit on paper
+    PCA_MARK_APP_BUSY:1=0	; mark busy while application is printing
+    PCA_VERIFY_PRINT:1=0	; indicate we want to verify before printing
+    PCA_SHOW_PROGRESS:1=0	; show the print progress dialog box
+    PCA_PROGRESS_PERCENT:1=0	; show progress by percentage completed
+    PCA_PROGRESS_PAGE:1=0	; show progress by page completed
+    PCA_FORCE_ROTATION:1=0	; Force rotation of output
+
+    PCA_COPY_CONTROLS:1=1	; Copy controls are available
+    PCA_PAGE_CONTROLS:1=1	; Page range controls are available
+    PCA_QUALITY_CONTROLS:1=1	; Print quality controls are available
+    PCA_USES_DIALOG_BOX:1=1	; A print dialog box should appear
+    PCA_GRAPHICS_MODE:1=1	; Supports graphics mode output
+    PCA_TEXT_MODE:1=1		; Supports text mode output
+    PCA_DEFAULT_QUALITY PrintQualityEnum:2=PQT_HIGH	; default print quality
+PrintControlAttrs	end
+
+PrintControlStatus	etype word
+    PCS_PRINT_BOX_VISIBLE	enum PrintControlStatus	; Print DB is on screen
+    PCS_PRINT_BOX_NOT_VISIBLE	enum PrintControlStatus	; Print DB not on screen
+
+PCProgressType		etype word, 0, 2
+    PCPT_PAGE		enum PCProgressType		; change page number
+    PCPT_PERCENT	enum PCProgressType		; change percent done
+    PCPT_TEXT		enum PCProgressType		; change text message
+
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;
+; Note: Please refer to the documentation under PrintControlClass
+;       for more information on all of the following instance data
+;-----------------------------------------------------------------------------
+
+    PCI_attrs		PrintControlAttrs <>	; (default values defined in
+						; the record itself)
+    PCI_startPage	word	1	; first possible page to print
+    PCI_endPage		word	1	; last possible page to print
+    PCI_startUserPage	word	0	; start of page range to print
+    PCI_endUserPage	word	0x7fff	; end of page range to print
+    PCI_defPrinter	word	-1	; the default printer to use
+    PCI_docSizeInfo	PageSizeReport	; document size information
+    PCI_output		optr		; destination for methods sent out
+    PCI_docNameOutput	optr		; OD for MSG_PRINT_GET_DOC_NAME
+
+;-----------------------------------------------------------------------------
+;		Variable instance data
+;-----------------------------------------------------------------------------
+
+PrintStatusFlags	record
+    PSF_FAX_AVAILABLE:1			; set if a fax driver is available
+    :3
+    PSF_ABORT:1				; user wants to abort printing
+    PSF_RECEIVED_COMPLETED:1		; MSG_PC_PRINTING_COMPLETED received
+    PSF_RECEIVED_NAME:1			; MSG_PC_SET_DOC_NAME received
+    PSF_VERIFIED:1			; PSG_PC_VERIFY_? received
+PrintStatusFlags	end
+
+TempPrintCtrlInstance	struct
+    TPCI_currentSummons	optr		; currently active summons
+    TPCI_progressBox	optr		; OD of progress dialog box
+    TPCI_jobParHandle	hptr		; memory handle to JobParamters
+    TPCI_fileHandle	word		; file handle (if printing)
+    TPCI_gstringHandle	word		; gstring handle (if printing)
+    TPCI_printBlockHan	word		; the printer block handle
+    TPCI_attrs		PrintControlAttrs
+    TPCI_status		PrintStatusFlags
+    TPCI_holdUpCompletionCount	byte	; # of things not wanting the
+					; message stored in 
+					; TEMP_PRINT_COMPLETION_EVENT to
+					; be sent out just yet.
+TempPrintCtrlInstance	ends
+
+TEMP_PRINT_CONTROL_INSTANCE		vardata	TempPrintCtrlInstance
+
+;-----------------------------------------------------------------------------
+;		Attrs
+;-----------------------------------------------------------------------------
+
+ATTR_PRINT_CONTROL_APP_UI		vardata	optr
+;
+; Attribute to allow applications to add their own UI to the Print DB.
+; The generic tree whose optr is stored here nust *not* be set USABLE.
+; This is different from ATTR_GEN_CONTROL_APP_UI, which would add
+; triggers into the menu where your PrintControl object is a child.
+
+
+TempPrintCompletionEventData	struct
+	TPCED_event		hptr
+	TPCED_messageFlags	MessageFlags
+TempPrintCompletionEventData	ends
+;
+TEMP_PRINT_COMPLETION_EVENT		vardata	TempPrintCompletionEventData
+; Internal storage for TempPrintCompletionEventData, the completion event
+; for IACP printing, which is delayed until after printing is complete.
+;
+
+TempPrintAddressControlData	struct
+    TPACD_addrControl	optr			?
+    TPACD_driverType	PrinterDriverType	?
+TempPrintAddressControlData	ends
+
+TEMP_PRINT_CONTROL_ADDRESS_CONTROL	vardata TempPrintAddressControlData
+; Set by MailboxSpoolAddressControl it hooks up with this controller.
+; The optr we use for passing on messages from our output.
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+PrintControlClass	endc
+
+
+
+;----------------------------------------------------------------------------
+;		PageSizeControlClass definition
+;
+; 	If your application maintains the document size information, then
+; you want your PageSizeControl object to act like any other controller.
+; This is the default behavior.
+;
+;	If, instead, you have a simpler application, you will want to use
+; your PageSizeControl object as you would any other generic object. To do
+; this, set the PZCA_ACT_LIKE_GADGET flag. To have the object initialize
+; itself to the default system values, all you must do is set the 
+; PZCA_INITIALIZE flag. Use this instead of stuffing the instance data
+; of the object with pre-defined paper size values, as these values are
+; probably not appropriate for foreign users.
+;----------------------------------------------------------------------------
+
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+PageSizeControlClass	class	GenControlClass
+
+;-----------------------------------
+;		Methods
+;-----------------------------------
+
+MSG_PZC_SET_PAGE_SIZE						message
+;
+; Sets the page size to be displayed by the list
+;
+; Context:	Utility message sent to set the page dimensions
+; Source:	Anyone
+; Destination:	PageSizeControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:BP	= PageSizeReport structure
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_GET_PAGE_SIZE						message
+;
+; Returns the page size that the user has selected.
+;
+; Context:	Utility message sent to get the page dimensions
+; Source:	Anyone
+; Destination:	PageSizeControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:BP	= PageSizeReport structure to be filled
+;
+; Return: 	DX:BP	= PageSizeReport structure, filled
+;		Nothing - destroyed
+;
+
+
+;-----------------------------------
+;		Internal messages
+;-----------------------------------
+
+MSG_PZC_REQUEST_PAGE_SIZE_MONIKER				message
+;
+; Internal messaged used by a GenDynamicList object to request a
+; moniker for an entry in the list of paper sizes
+;
+; Context:	Sent when the GenDynamicList needs a moniker
+; Source:	PageSizeList object
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass:		CX:DX	= OD of GenDynamicList requesting moniker
+;		BP	= Entry number whose moniker is requested
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+		
+MSG_PZC_SET_PAGE_TYPE						message
+;
+; Internal message used to change the type of page the user desires
+;
+; Context:	Sent when the user clicks on PageTypeList entries
+; Source:	GenListEntry, child of PageTypeList
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass: 	CX	= PageType
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_SET_PAGE_SIZE_ENTRY					message
+;
+; Internal message used to change the page size.
+;
+; Context:	Sent when the user clicks on an entry in the PageSizeList
+;		(dynamic list of paper, envelope, or label sizes)
+; Source:	GenListClass object
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass: 	CX	= Entry # that was selected
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_SET_PAGE_WIDTH						message
+;
+; Internal message used to change the page width
+;
+; Context:	Sent when the user dials in a new page width
+; Source:	GenRangeClass object (PageSizeRangeWidth)
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass: 	DX.CX	= Width (in points)
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_SET_PAGE_HEIGHT						message
+;
+; Internal message used to change the page height
+;
+; Context:	Sent when the user dials in a new page width
+; Source:	GenRangeClass object (PageSizeRangeHeight)
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass: 	DX.CX	= Height (in points)
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_SET_PAPER_ORIENTATION					message
+;
+; Internal method used to set the paper orientation
+;
+; Context:	Sent when the user clicks on the portriat or landscape icons
+; Source:	PageSizePaperOrientation children
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass: 	CX	= PaperOrientation
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_SET_ENVELOPE_ORIENTATION				message
+;
+; Internal method used to set the envelope orientation
+;
+; Context:	Sent when the user clicks on one of the four envelope
+;		orientation icons
+; Source:	PageSizeEnvelopeOrientation children
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass: 	CX	= EnvelopeOrientation
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_SET_LABEL_COLUMNS					message
+;
+; Internal method used to change the number of columns of labels
+;
+; Context:	Sent when the user uses the GenRange to change the
+;		number of columns of labels.
+; Source:	PageSizeLabelColumns
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass: 	DX	= # of columns
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_SET_LABEL_ROWS						message
+;
+; Internal method used to change the number of rows of labels
+;
+; Context:	Sent when the user uses the GenRange to change the number
+;		of rows of labels
+; Source:	PageSizeLabelRows
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass: 	DX	= # of rows
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_SET_MARGIN_LEFT						message
+MSG_PZC_SET_MARGIN_TOP						message
+MSG_PZC_SET_MARGIN_RIGHT					message
+MSG_PZC_SET_MARGIN_BOTTOM					message
+;
+; Internal method used to change a margin value
+;
+; Context:	Sent when the user uses the GenRange to change the size
+;		of a margin
+; Source:	PageSizeMargin[Left, Top, Right, Bottom]
+; Destination:	PageSizeControl object
+; Interception: Generally not intercepted.
+;
+; Pass: 	DX.CX	= Margin value (in points)
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+;---------------------------------------------------------------------------
+;		Utility messages
+;---------------------------------------------------------------------------
+
+MSG_PZC_SET_MAXIMUM_WIDTH					message
+;
+; Sets the maximum width for a page
+;
+; Context:	Utility message sent to set the maximum width
+; Source:	Anyone
+; Destination:	PageSizeControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:CX	= Width (in points)
+;
+; Return: 	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_PZC_SET_MAXIMUM_HEIGHT					message
+;
+; Sets the maximum height for a page
+;
+; Context:	Utility message sent to set the maximum width
+; Source:	Anyone
+; Destination:	PageSizeControlClass object
+; Interception: Generally should not be intercepted.
+;
+; Pass:		DX:CX	= Height (in points)
+;
+; Return: 	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+;-----------------------------------
+;		MetaMessages
+;-----------------------------------
+
+MSG_PRINT_REPORT_PAGE_SIZE message MetaPrintMessages
+;
+; Sent to report the page size & layout options the user has selected.
+;
+; Context:	Sent out after a user has clicked on the apply trigger
+;		in the Page Setup DB.
+; Source:	PageSetupControl object
+; Destination:	GCI_output (of GenControlClass)
+; Interception: May be intercepted by any object.
+;
+; Pass:		DX	= size PageSizeReport
+;		SS:BP	= PageSizeReport structure
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+
+;-----------------------------------
+;		Constants
+;-----------------------------------
+
+MINIMUM_PAGE_WIDTH_VALUE	equ	36		; 1/2 inch
+MINIMUM_PAGE_HEIGHT_VALUE	equ	36		; 1/2 inch
+
+if PZ_PCGEOS
+MAXIMUM_PAGE_WIDTH_VALUE	equ	3189		; 112.5 cm
+MAXIMUM_PAGE_HEIGHT_VALUE	equ	3189		; 112.5 cm
+else
+MAXIMUM_PAGE_WIDTH_VALUE	equ	72 * 45		; 45 inches
+MAXIMUM_PAGE_HEIGHT_VALUE	equ	72 * 45		; 45 inches
+endif
+
+MAXIMUM_LABELS_ACROSS		equ	63
+MAXIMUM_LABELS_DOWN		equ	63
+
+PageSizeControlAttrs	record
+
+;   EXTERNAL
+
+    PZCA_ACT_LIKE_GADGET:1		; tells the PageSizeControl object to
+					; act like any other generic gadget,
+					; where one uses messages to set/get
+					; the state of the object.
+
+    PZCA_PAPER_SIZE:1			; tell the PageSizeControl to display
+					; paper, and not document, sizes. Most
+					; applications will NOT want this set.
+
+    PZCA_INITIALIZE:1			; initialize with the default system
+					; values. The flag PZCA_ACT_LIKE_GADGET
+					; must be set if you want to use this
+					; attribute.
+
+    PZCA_LOAD_SAVE_OPTIONS:1		; indicates whether or not this object
+					; should attempt to load/save its
+					; options.
+    :4
+
+;   INTERNAL
+
+    PZCA_NEW_PAGE_TYPE:1		; the PageType has been changed, so
+					; need to perform a full update
+
+    PZCA_SWAP_WIDTH_HEIGHT:1		; set if the width & height values
+					; should be swapped when they are
+					; displayed to the user
+
+    PZCA_SIZE_LIST_INITIALIZED:1	; indicates the dynamic list of page
+					; sizes has been initialized. This
+					; should *never* be set by the app.
+
+    PZCA_IGNORE_UPDATE:1		; ignore request to update UI, as
+					; a later call will occur
+
+    PZCA_PORTRAIT_VALID:1		; portrait-mode is valid for the
+					; selected page dimensions
+
+    PZCA_LANDSCAPE_VALID:1		; landscape-mode is valid for the
+					; selected page dimensions
+    :2
+PageSizeControllAttrs	end
+
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI &
+;                           ATTR_GEN_CONTROL_PROHIBIT_UI)
+;
+PageSizeControlFeatures	record
+    PSIZECF_MARGINS:1		; not part of default features!
+    PSIZECF_CUSTOM_SIZE:1
+    PSIZECF_LAYOUT:1
+    PSIZECF_SIZE_LIST:1
+    PSIZECF_PAGE_TYPE:1
+PageSizeControlFeatures	end
+
+PSIZEC_DEFAULT_FEATURES	equ	mask PSIZECF_PAGE_TYPE or \
+				mask PSIZECF_SIZE_LIST or \
+				mask PSIZECF_LAYOUT or \
+				mask PSIZECF_CUSTOM_SIZE
+
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI &
+;                                   ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+;
+PageSizeControlToolboxFeatures	record
+    PSIZECTF_DIALOG_BOX:1
+PageSizeControlToolboxFeatures	end
+
+PSIZECT_DEFAULT_TOOLBOX_FEATURES	equ	mask PSIZECTF_DIALOG_BOX
+
+
+;-----------------------------------
+;		Instance Data
+;-----------------------------------
+
+    PZCI_attrs		PageSizeControlAttrs
+
+    PZCI_width		dword		; current width
+    PZCI_height		dword		; current height
+    PZCI_layout		PageLayout	; current page/layout information
+    PZCI_margins	PCMarginParams	; current page margin information 
+
+;-----------------------------------------------------------------------------
+;		Variable instance data
+;-----------------------------------------------------------------------------
+
+PageSizeControlMaxDimensions	struct
+    PZCMD_width			dword	; maximum width
+    PZCMD_height		dword	; maximum height
+PageSizeControlMaxDimensions	ends
+
+TEMP_PAGE_SIZE_CONTROL_MAX_DIMENSIONS	vardata	PageSizeControlMaxDimensions
+
+
+;-----------------------------------------------------------------------------
+;		Attrs
+;-----------------------------------------------------------------------------
+
+PageSizeControlChanges	struct
+    PSCC_destination	optr		; destination for message
+    PSCC_message	word		; message to be sent
+;
+;	Pass:		SS:BP	= PageSizeReport
+;			DX	= size PageSizeReport
+;	Returns:	Nothing
+;			AX, CX, DX, BP - may destroy
+;
+PageSizeControlChanges	ends
+
+ATTR_PAGE_SIZE_CONTROL_UI_CHANGES	vardata	PageSizeControlChanges
+;
+; Attribute to allow applications to be made aware of every change made
+; to gadgetry in the PageSizeControl. This is especially useful for apps
+; that want to add UI that will be dependent upon the state of this
+; controller. No effort is made to eliminate the redundant output of data.
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+PageSizeControlClass	endc
+
+
+
+;------------------------------------------------------------------------------
+;		Process class
+;------------------------------------------------------------------------------
+
+
+SpoolProcClass	class	GenProcessClass
+;-----------------------------------------------------------------------------
+;	MESSAGES		
+;-----------------------------------------------------------------------------
+
+
+MSG_SPOOL_SHOW_PRINTER_CONTROL_PANEL		message
+;
+; Brings up the Printer Control Panel.  This message is defined here
+; so that other apps can initiate the control panel.  NO OTHER
+; messages should be sent to the spool's process from outside the
+; spool library.
+;
+; Context:	Sent to the SpoolApplicationClass from the UI
+; Source:	UI (Express Menu)
+; Destination:	SpoolerClass (process) object
+; Interception: Should not be intercepted.
+;
+; Pass:		Nothing
+;
+; Return:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+
+SpoolProcInternalMessages	export DEFAULT_EXPORTED_MESSAGES
+
+ 
+SpoolProcClass	endc
+
+;----------------------------------------------------------------------------
+;		Library routines
+;----------------------------------------------------------------------------
+
+global SpoolCreateSpoolFile:far
+;	pass:		dx:si	- buffer to hold new filename
+;	returns:	dx:si	- buffer filled
+;			ax	- file handle (or zero if unsuccessful)
+;
+;	The call creates a spool file (an empty file whose name is of the
+;	form (SPOOLXXX.DAT), and returns the name and file handle. This
+;	routine is guaranteed to return a unique filename. The file is
+;	located in the SP_SPOOL standard directory.
+;
+
+global SpoolSetDocSize:far
+;	pass:		cx	- TRUE (document is open)
+;			ds:si	- PageSizeReport structure
+;					- or -
+;			cx	- FALSE (document is closed)
+;	returns:	nothing
+;
+; Performs the work of telling the PageSetupControl object in the
+; application the document size.
+;	
+
+global SpoolAddJob:far
+;	pass:		dx:si	- far ptr to JobParameters structure for job
+;	returns:	cx	- print job id
+;
+;	Use this to add a print job to a queue. To use this, you *must*
+;	include Internal/spoolInt.def.
+;	
+
+global SpoolDelJob:far
+;	pass:		cx	- print job id
+;	returns:	ax	- status of operation (SpoolOpStatus enum)
+;					SPOOL_OPERATION_SUCCESSFUL
+;					SPOOL_JOB_NOT_FOUND
+;					SPOOL_QUEUE_EMPTY
+;
+;	Use this routine to delete a job from a queue.
+;
+
+global SpoolInfo:far
+;	pass:		cx - SpoolInfoType
+;
+;			cx - SIT_JOB_INFO
+;				dx - job id
+;
+;			cx - SIT_QUEUE_INFO
+;				dx:si	- pointer to port info of queue to
+;					  get info about
+;				dx	= -1 to determine if any print queues
+;					  are active; only returns
+;						ax = SPOOL_QUEUE_EMPTY or
+;					           = SPOOL_QUEUE_NOT_EMPTY
+;
+;			cx - SIT_JOB_PARAMETERS
+;				dx - job id
+
+;	returns:	bx - handle of block holding data if no error
+;
+;			if SIT_JOB_INFO passed
+;				block contains JobStatus
+;				ax	- status of info (SpoolOpStatus enum)
+;					SPOOL_OPERATION_SUCCESSFUL
+;					SPOOL_JOB_NOT_FOUND
+;
+;			if SIT_QUEUE_INFO
+;				block contains list of job ids
+;				ax	- status of info (SpoolOpStatus enum)
+;					SPOOL_OPERATION_SUCCESSFUL
+;
+;			if SIT_JOB_PARAMETERS passed
+;				block contains JobParameters
+;				ax	- status of info (SpoolOpStatus enum)
+;					SPOOL_OPERATION_SUCCESSFUL
+;					SPOOL_JOB_NOT_FOUND
+;
+;	Use this routine to get info about the jobs in a queue. You *must*
+;	include Internal/spoolInt.def to use this function.
+;
+
+global SpoolHurryJob:far
+;	pass:		cx	- print job id
+;	returns:	ax	- status of operation (SpoolOpStatus enum)
+;					SPOOL_OPERATION_SUCCESSFUL
+;					SPOOL_JOB_NOT_FOUND
+;					SPOOL_QUEUE_EMPTY
+;
+;	Use this routine to push a job to the front of its print queue.  It
+;	will not replace the currently active job, but be placed as the next 
+; 	job in line.
+;
+
+global SpoolDelayJob:far
+;	pass:		cx	- print job id
+;	returns:	ax	- status of operation (SpoolOpStatus enum)
+;					SPOOL_OPERATION_SUCCESSFUL
+;					SPOOL_JOB_NOT_FOUND
+;					SPOOL_QUEUE_EMPTY
+;
+;	Use this routine to push a job to the end of its print queue.
+;
+
+global SpoolModifyPriority:far
+;	pass:		cx	- print job id
+;			dl	- new base priority to set
+;	returns:	ax	- status of operation (SpoolOpStatus enum)
+;					SPOOL_OPERATION_SUCCESSFUL
+;					SPOOL_JOB_NOT_FOUND
+;					SPOOL_QUEUE_EMPTY
+;
+;	Use this routine to modify the priority of the thread that is
+;	processing a queue.  All print queue threads start out with
+;	PRIORITY_LOW.  The highest priority you can set is PRIORITY_STANDARD
+;
+
+global SpoolVerifyPrinterPort:far
+;	pass:		ds:si	- far ptr to port info for queue 
+;				  (PrintPortInfo structure)
+;	returns:	ax	- status of operation (SpoolOpStatus enum)
+;					SPOOL_OPERATION_SUCCESSFUL
+;					SPOOL_CANT_VERIFY_PORT
+;
+;	Use this routine to check for the existance of a printer port.
+;	This function will also change the port to be thread driven instead
+;	of interrupt driven (and change the .ini file) if it finds that 
+;	interrupt operation is not possible with the port (because of a faulty
+;	port or a damaged printer, for example).  Currently, this on affects
+;	parallel ports.  Serial ports are not tested in this way. You *must*
+;	include Internal/spoolInt.def to use this function.
+;
+
+global SpoolGetNumPaperSizes:far
+;	pass:		bp	- PageType
+;			
+;	returns:	cx	- number of paper sizes to be displayed
+;			dx	- default paper size
+;
+;	Use this routine to find the number of paper sizes, both
+;	pre-defined & user-defined, that should appear in a paper size list
+;
+
+global SpoolGetPaperString:far
+;	pass:		ax	- paper size number
+;			bp	- PageType
+;			es:di	- buffer in which to place string
+;				  (of size MAX_PAPER_STRING_LENGTH)
+;
+;	returns:	cx	- actual length of the string
+;			es:di	- null-terminated string copied into buffer
+;			carry	- clear (success)
+;					- or -
+;			carry	- set   (failure)		
+;
+;	Use this routine to determine the strings to be displayed for
+;	a specific paper size. Note that a PaperSizes enum is *not*
+;	passed, but rather a paper size number, which must be between
+;	0 and the value returned by SpoolGetNumPaperSizes().
+;
+
+global SpoolGetPaperSize:far
+;	pass:		ax	- paper size number
+;			bp	- PageType
+;			
+;	returns:	ax	- default PageLayout
+;			cx	- width of paper size (in points)
+;			dx	- length of paper size (in points)
+;			
+;
+;	Use this routine for determining the dimensions of a paper
+;	size. Note that a PaperSizes enum is *not* passed, but rather a number
+;	between 0 and the value value returned by SpoolGetNumPaperSizes().
+;
+
+global SpoolConvertPaperSize:far
+;	pass:		cx	- width (points)
+;			dx	- height (points)
+;			bp	- PageType
+;
+;	returns:	ax	- page size #, or -1 if no match
+;
+;	Converts a width, and height into a page size #, depending upon the
+;	type of page that is requested.
+;
+
+global SpoolCreatePaperSize:far
+;	pass:		es:di	- paper size string (name to display to user)
+;			bp	- PageType
+;			cx	- width  (in points)
+;			dx	- length (in points)
+;			ax	- default PageLayout
+;			
+;	returns:	ax	- paper size number (as stored in the .INI file)
+;			carry	- clear (successfully added)
+;					- or -
+;			carry	- set (operation failed)
+;
+;	This routine defines & stores a new paper size, for later use
+;	by the user.
+;
+
+global SpoolDeletePaperSize:far
+;	pass:		bp	- PageType
+;			ax	- paper size number (as stored in the .INI file)
+;			
+;	returns:	carry	- clear (successful deletion)
+;					- or -
+;			carry	- set (operation failed)
+;
+;	This routine deletes a user-defined paper size
+;
+
+global SpoolGetPaperSizeOrder:far
+;	pass:		???
+;			
+;	returns:	???
+;
+;	???
+;
+
+global SpoolSetPaperSizeOrder:far
+;	pass:		???
+;			
+;	returns:	???
+;
+;	???
+;
+
+global SpoolGetNumPrinters:far
+;	pass:		cl	- PrinterDriverType or PDT_ALL
+;
+;	returns:	ax	- number of installed printers
+;
+;	Returns the number of printers of the passed type currently
+;	installed in the system.
+;
+
+global SpoolGetPrinterString:far
+;	pass:		es:di	- buffer (of length GEODE_MAX_DEVICE_NAME_SIZE)
+;				  to hold printer name string
+;			ax	- printer # (zero-based)
+;
+;	returns:	cx	- length of string
+;			dl	- PrinterDriverType
+;			carry	- set if error, else clear
+;			dh - destroyed
+;
+;	Fills a buffer with the requested null-terminated printer name string.
+;
+
+global SpoolGetPrinterInfo:far
+;	pass:		???
+;
+;	returns:	???
+;
+;	- currently unimplemented -
+;
+
+global SpoolCreatePrinter:far
+;	pass:		es:di	- name for new printer
+;			cl	- PrinterDriverType
+;
+;	returns:	ax	- # for new printer
+;			carry	- set if printer already exists
+;
+;	Adds the printer to the list of currently installed printers (appends,
+;	actually), and returns the new printer #
+;
+;	This routine is normally called from within the PrefMgr.
+;
+
+global SpoolDeletePrinter:far
+;	pass:		ax	- printer # to delete
+;
+;	returns:	nothing
+;
+;	Deletes the requested printer from the system.
+;
+;	This routine is normally called from within the PrefMgr.
+;
+
+global SPOOLGETDEFAULTPRINTER:far
+SpoolGetDefaultPrinter	equ 	SPOOLGETDEFAULTPRINTER
+;	pass:		nothing
+;
+;	returns:	ax	- # for system-default printer
+;
+;	Returns the system-default printer, which is used (for example)
+;	by the PrintControlClass as the default printer to print to.
+;
+;	This routine is normally called from within the PrefMgr.
+;
+
+global SpoolSetDefaultPrinter:far
+;	pass:		ax	- new default printer #
+;
+;	returns:	nothing
+;
+;	Sets the system-default printer, used (for example) by the
+;	PrintControlClass as the default printer to print to.
+;
+;	This routine is normally called from within the PrefMgr.
+;
+
+global	SpoolMapToPrinterFont:far
+;	pass:	cx      =       requested FontID
+;               dx      =       requested Point Size
+;               bl      =       requested pitch value
+;               es      =       PState segment.
+;               ds      =       device info resource segment address
+;
+;	returns:cx      =       corrected FontID
+;               dx      =       corrected Point Size
+;               bl      =       corrected pitch value
+;
+;       use the fontID to match the typeface available in the printer.
+;       use the pointsize to select proportional fonts. The = or next smaller
+;       size gets used. If the size is less than the smallest size, then
+;       the average width of the string is computed and the string is treatesd
+;       like a fixed pitch font. For fixed pitch fonts, the next larger pitch
+;       value is used. This is the next smaller font width. If nothing is
+;       smaller than the passed font, then the smallest available is used.
+;
+
+global	SpoolUpdateTranslationTable:far
+;	pass:	dx      =       handle of the extended driver info resource
+;               es      =       PState segment.
+;
+;	returns:nothing
+;
+;	Load the PState Translation table with the proper country-specific
+;	ASCII codes.
+;
+
+global	SpoolGetDefaultPageSizeInfo:far
+;	pass:		ds:si	- PageSizeReport buffer
+;
+;	returns:	ds:si	- PageSizeReport filled
+;
+;	Get the default PageSizeReport information
+;
+
+global	SpoolSetDefaultPageSizeInfo:far
+;	pass:		ds:si	- PageSizeReport
+;
+;	returns:	nothing
+;
+;	Set the default PageSizeReport information
+;
+
+global	SpoolPrinterNameToMedium:far
+;	pass:		ds:si	= null-terminated printer name
+;	returns:	carry set if couldn't allocate memory
+;			carry clear if ok:
+;				al	= MUT_MEM_BLOCK
+;				bx	= handle of medium unit block holding
+;					  name
+;				cxdx	= MANUFACTURER_ID_GEOWORKS/GMID_PRINTER
+;
+;	Converts a printer name into arguments suitable for sending out
+;	medium notification or for checking to see if the medium is available
+;	or connected. Of use primarily to the spooler itself and to the
+;	spool transport driver.
+;
+
+;----------------------------------------------------------------------------
+;	C Versions
+;----------------------------------------------------------------------------
+
+global 	SPOOLSETDOCSIZE:far
+global	SPOOLGETDEFAULTPAGESIZEINFO:far
+global	SPOOLSETDEFAULTPAGESIZEINFO:far
+
+global	SPOOLGETNUMPAPERSIZES:far
+global	SPOOLGETPAPERSTRING:far
+global	SPOOLGETPAPERSIZE:far
+global	SPOOLCONVERTPAPERSIZE:far
+global	SPOOLGETPAPERSIZEORDER:far
+global	SPOOLSETPAPERSIZEORDER:far
+global	SPOOLCREATEPAPERSIZE:far
+global	SPOOLDELETEPAPERSIZE:far
+
+global	SPOOLGETNUMPRINTERS:far
+global	SPOOLGETPRINTERSTRING:far
+global	SPOOLCREATEPRINTER:far
+global	SPOOLDELETEPRINTER:far
+global	SPOOLSETDEFAULTPRINTER:far
+
+global	SPOOLCREATESPOOLFILE:far
+
+global	SPOOLDELJOB:far
+global	SPOOLINFO:far
+global	SPOOLHURRYJOB:far
+global	SPOOLDELAYJOB:far
+global	SPOOLMODIFYPRIORITY:far
+global	SPOOLVERIFYPRINTERPORT:far
+
+;----------------------------------------------------------------------------
+;		Constants and Structure Definitions
+;----------------------------------------------------------------------------
+
+		; for dealing with paper sizes, use a buffer this big
+		;
+MAX_PAPER_STRING_LENGTH		= 48	; includes NULL-terminator
+
+		; total number of paper sizes for each PageType
+		;
+MAX_PRE_DEFINED_PAPER_SIZES	= 128
+MAX_USER_DEFINED_PAPER_SIZES	= 128
+MAX_PAPER_SIZES			= MAX_PRE_DEFINED_PAPER_SIZES + \
+				  MAX_USER_DEFINED_PAPER_SIZES
+
+		; this enum is returned by some of the spool library 
+		; routines
+SpoolOpStatus	etype	word, 0, 1
+SPOOL_OPERATION_SUCCESSFUL	enum	SpoolOpStatus
+SPOOL_JOB_NOT_FOUND		enum	SpoolOpStatus
+SPOOL_QUEUE_EMPTY		enum	SpoolOpStatus
+SPOOL_QUEUE_NOT_EMPTY		enum	SpoolOpStatus
+SPOOL_QUEUE_NOT_FOUND		enum	SpoolOpStatus
+SPOOL_CANT_VERIFY_PORT		enum	SpoolOpStatus
+SPOOL_OPERATION_FAILED		enum	SpoolOpStatus
+
+		; a structure to hold the time stamp for a print spool job
+SpoolTimeStruct	struct
+    STS_second	byte			; second of the minute (0-59)
+    STS_minute	byte			; minute of the hour (0-59)
+    STS_hour	byte			; hour of the day (0-23)
+SpoolTimeStruct	ends
+
+		; Structure for names of spool files.
+if DBCS_PCGEOS
+SpoolFileName   struct
+    SFN_base	wchar    "spool"
+    SFN_num	wchar	"000"
+    SFN_ext	wchar    ".dat", 0
+SpoolFileName   ends
+else
+SpoolFileName   struct
+    SFN_base	char    "spool"
+    SFN_num	char	"000"
+    SFN_ext	char    ".dat", 0
+SpoolFileName   ends
+endif
+		;Passed to SpoolInfo
+SpoolInfoType	etype	protominor word, 0, 2
+    SIT_JOB_INFO	enum	SpoolInfoType
+    SIT_QUEUE_INFO	enum	SpoolInfoType
+protominor	SpoolNewPost21
+    SIT_JOB_PARAMETERS	enum	SpoolInfoType
+protoreset
+
+SpoolJobPrinting etype byte
+    SJP_NOT_PRINTING		enum	SpoolJobPrinting, FALSE
+    SJP_PRINTING_NO_PAGE_INFO	enum	SpoolJobPrinting, TRUE
+    SJP_PRINTING		enum	SpoolJobPrinting, TRUE-1
+    
+		; When SpoolInfo is passed SIT_JOB_INFO, it returns a
+		; JobStatus structure.
+		;
+if DBCS_PCGEOS
+JobStatus	struct	
+		; DO NOT CHANGE THE ORDER OF THESE FIRST FOUR ITEMS
+    JS_fname		wchar 13 dup (?)	; std DOS (8.3) spool filename
+    JS_parent		wchar FILE_LONGNAME_LENGTH+1 dup (?) ; parent app's name
+    JS_documentName 	wchar FILE_LONGNAME_LENGTH+1 dup (?) ; document name
+    JS_numPages		word			; # pages in document
+    JS_time		SpoolTimeStruct <>	; time spooled
+    JS_printing		SpoolJobPrinting
+    JS_curPage		word			; current *physical* page being
+						;  printed, iff JS_printing is
+						;  SJP_PRINTING
+    JS_totalPage	word			; total *physical* pages that
+						;  make up the job, iff
+						;  JS_printing is SJP_PRINTING
+JobStatus	ends
+else
+JobStatus	struct	
+		; DO NOT CHANGE THE ORDER OF THESE FIRST FOUR ITEMS
+    JS_fname		char 13 dup (?)		; std DOS (8.3) spool filename
+    JS_parent		char FILE_LONGNAME_LENGTH+1 dup (?) ; parent app's name
+    JS_documentName 	char FILE_LONGNAME_LENGTH+1 dup (?) ; document name
+    JS_numPages		word			; # pages in document
+    JS_time		SpoolTimeStruct <>	; time spooled
+    JS_printing		SpoolJobPrinting	; 
+    JS_curPage		word			; current *physical* page being
+						;  printed, iff JS_printing is
+						;  SJP_PRINTING
+    JS_totalPage	word			; total *physical* pages that
+						;  make up the job, iff
+						;  JS_printing is SJP_PRINTING
+JobStatus	ends
+endif
+EndLibrary	spool

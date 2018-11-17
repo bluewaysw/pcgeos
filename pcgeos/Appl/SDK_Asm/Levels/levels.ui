@@ -1,0 +1,311 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	Levels (Sample PC/GEOS application)
+ * File:	levels.ui
+ *
+ * Author:	Tony Requist
+ *
+ * RCS STAMP:
+ *	$Id: levels.ui,v 1.1 97/04/04 16:33:39 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+#include "generic.uih"
+#include "Objects/Text/tCtrl.uih"
+
+class LevelsApplication = GenApplication {
+	barStates = wordComp : "DEFAULT_BAR_STATES";
+	default appFeatures = "DEFAULT_FEATURES";
+}
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+start	AppResource;
+
+LevelsApp = LevelsApplication vardataReloc {
+	children = LPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = LPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		UserLevelList, ShowBarList;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		ByFeature, ByLevel, ByReparent;
+
+	moniker = list {
+		LTextMoniker
+	}
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+		char	"levels", 0
+		},
+		ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER {
+			UN_OPTR SaveOptionsTrigger
+		}
+	}
+}
+
+visMoniker LTextMoniker = "UI Levels Sample Application";
+
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl must be a child of the primary, and must be
+ * on the active list.
+ */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+LPrimary = GenPrimary {
+	children =
+		OptionsMenu,
+		ByFeature,
+		ByLevel,
+		AMenu,
+		FakeTools,
+		FooTrigger,
+		DorfTrigger,
+		WhiffleTrigger,
+		FooText;
+	hints = {ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, HINT_SIZE_WINDOW_AS_DESIRED}
+}
+
+ByFeature = TextStyleControl {
+	moniker = 'B', "By Feature";
+	visibility = popup;
+	hints = {
+	    HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		 GCSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_OFF,
+		 mask LF_COMPLEX_TEXT,
+		 mask TSCF_PLAIN or mask TSCF_BOLD or \
+		 mask TSCF_ITALIC or mask TSCF_UNDERLINE or \
+		 mask TSCF_SUBSCRIPT or mask TSCF_SUPERSCRIPT>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_OFF,
+		 mask LF_SIMPLE_TEXT,
+		 mask TSCF_PLAIN or mask TSCF_BOLD or \
+		 mask TSCF_ITALIC or mask TSCF_UNDERLINE>,
+		<GCSUIC_ADD_NORMAL_FEATURES_IF_APP_FEATURE_ON,
+		 mask LF_MORE_TEXT,
+		 mask TSCF_STRIKE_THRU>}
+	}
+}
+
+ByLevel = TextStyleControl {
+	moniker = 'L', "By Level";
+	visibility = popup;
+	hints = {
+	    HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		 GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTRODUCTORY,
+		 mask TSCF_PLAIN or mask TSCF_BOLD>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 mask TSCF_PLAIN or mask TSCF_BOLD or \
+		 mask TSCF_ITALIC or mask TSCF_UNDERLINE>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_ADVANCED,
+		 mask TSCF_PLAIN or mask TSCF_BOLD or \
+		 mask TSCF_ITALIC or mask TSCF_UNDERLINE or \
+		 mask TSCF_SUPERSCRIPT or mask TSCF_SUBSCRIPT>}
+	}
+}
+
+
+AMenu = GenInteraction {
+	moniker = 'R', "Reparent";
+	visibility = popup;
+	children =
+		Child1,
+		Child2,
+		ByReparent;
+}
+
+Child1 = GenTrigger {
+	moniker = '1', "Child #1";
+}
+
+Child2 = GenTrigger {
+	moniker = '2', "Child #2";
+}
+
+ByReparent = TextStyleControl {
+	moniker = 'C', "Child";
+	visibility = popup;
+}
+
+FakeTools = GenInteraction {
+	moniker = "Fake Tools";
+	children = SnarfToolbar, ZonkToolbar;
+	hints = { HINT_DRAW_IN_BOX }
+}
+
+SnarfToolbar = GenTrigger {
+	moniker = "Snarf Tools";
+}
+
+ZonkToolbar = GenTrigger {
+	moniker = "Zonk Tools";
+}
+
+
+FooTrigger = GenTrigger {
+	moniker = "Foo (beginner mode and above)";
+}
+
+DorfTrigger = GenTrigger {
+	moniker = "Dorf (intermediate mode and above)";
+}
+
+WhiffleTrigger = GenTrigger {
+	moniker = "Whiffle (advanced mode)";
+}
+
+FooText = GenText {
+	text = "random text for the style menus";
+	genAttributes = targetable;
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		HINT_DEFAULT_TARGET
+	}
+}
+
+end Interface;
+
+/* ----------------------------------------------------------------------------
+	 Options menu
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+OptionsMenu = GenInteraction {
+	children = SetUserLevelDialog, OptionsGroup, SaveResetGroup;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE
+			{ GenInteractionGroupType GIGT_OPTIONS_MENU } }
+}
+
+end Interface;
+
+start OptionsMenuUI;
+
+OptionsGroup = GenInteraction {
+	children = ShowToolsPopup;
+}
+
+SaveResetGroup = GenInteraction {
+	children = SaveOptionsTrigger, ResetOptionsTrigger;
+}
+
+/* --- */
+
+ShowToolsPopup = GenInteraction {
+	moniker = 'S', "Show Tools";
+	children = ShowBarList;
+	visibility = popup;
+}
+
+ShowBarList = GenBooleanGroup {
+	children = ShowSnarfBarEntry, ShowZonkBarEntry;
+        hints = { ATTR_GEN_INIT_FILE_KEY { char "showBars", 0 } }
+	applyMsg = MSG_LEVELS_APPLICATION_UPDATE_BARS;
+	destination = LevelsApp;
+	selectedBooleans = "DEFAULT_BAR_STATES";
+}
+
+ShowSnarfBarEntry = GenBoolean {
+	moniker = 'S', "Snarf Bar";
+	identifier = "mask LBS_SHOW_SNARF_BAR";
+}
+
+ShowZonkBarEntry = GenBoolean {
+	moniker = 'Z', "Zonk Bar";
+	identifier = "mask LBS_SHOW_ZONK_BAR";
+}
+
+
+SaveOptionsTrigger = GenTrigger {
+	SAVE_OPTIONS_TRIGGER_VALUES
+	action = MSG_META_SAVE_OPTIONS, LevelsApp;
+}
+
+ResetOptionsTrigger = GenTrigger {
+	RESET_OPTIONS_TRIGGER_VALUES
+	action = MSG_LEVELS_APPLICATION_QUERY_RESET_OPTIONS, LevelsApp;
+}
+
+end OptionsMenuUI;
+
+/* ------------------------------- */
+#define RESOURCE_FOR_STRINGS			Strings
+#define RESOURCE_FOR_USER_LEVEL_DIALOG_TOP	OptionsMenuUI
+#define RESOURCE_FOR_USER_LEVEL_DIALOG_INSIDES	UserLevelUI
+
+#define USER_LEVEL_APPLICATION_OBJECT	LevelsApp
+#define USER_LEVEL_SET_USER_LEVEL_MSG	MSG_LEVELS_APPLICATION_SET_USER_LEVEL
+#define USER_LEVEL_INITIATE_FINE_TUNE_MSG	\
+			MSG_LEVELS_APPLICATION_INITIATE_FINE_TUNE
+#define USER_LEVEL_FINE_TUNE_MSG	MSG_LEVELS_APPLICATION_FINE_TUNE
+#define USER_LEVEL_CHANGE_USER_LEVEL_MSG		\
+			MSG_LEVELS_APPLICATION_CHANGE_USER_LEVEL
+#define USER_LEVEL_CANCEL_USER_LEVEL_MSG		\
+			MSG_LEVELS_APPLICATION_CANCEL_USER_LEVEL
+#define USER_LEVEL_STATUS_MSG MSG_LEVELS_APPLICATION_USER_LEVEL_STATUS
+#define USER_LEVEL_FINE_TUNE_TEXT	"Fine Tune Levels App Features"
+
+#include <usrLevel.uih>
+
+/***/
+
+start UserLevelUI;
+
+FeaturesList = GenBooleanGroup {
+	children =
+		FooEntry,
+		DorfEntry,
+		WhiffleEntry,
+		SimpleTextEntry,
+		ComplexTextEntry,
+		MoreTextEntry;
+	selectedBooleans = "DEFAULT_FEATURES";
+        hints = { HINT_ORIENT_CHILDREN_VERTICALLY }
+}
+
+FooEntry = GenBoolean {
+	moniker = 'F', "Foo Features";
+	identifier = "mask LF_FOO_FEATURES";
+}
+
+DorfEntry = GenBoolean {
+	moniker = 'D', "Dorf Stuff";
+	identifier = "mask LF_DORF_STUFF";
+}
+
+WhiffleEntry = GenBoolean {
+	moniker = 'W', "Whiffle Attributes";
+	identifier = "mask LF_WHIFFLE_ATTRIBUTES";
+}
+
+SimpleTextEntry = GenBoolean {
+	moniker = 'S', "Simple Text";
+	identifier = "mask LF_SIMPLE_TEXT";
+}
+
+ComplexTextEntry = GenBoolean {
+	moniker = 'C', "Complex Text";
+	identifier = "mask LF_COMPLEX_TEXT";
+}
+
+MoreTextEntry = GenBoolean {
+	moniker = 'M', "More Text";
+	identifier = "mask LF_MORE_TEXT";
+}
+
+end UserLevelUI;

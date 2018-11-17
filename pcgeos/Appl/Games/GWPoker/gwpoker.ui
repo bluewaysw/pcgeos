@@ -1,0 +1,975 @@
+/*
+ * Project:	PC GEOS
+ * Module:	GWPoker
+ * File:	gwpoker.ui
+ *
+ * Author:	Jon Witort
+ *
+ *	This file contains the user Interface description for this
+ * application.
+ *
+ * RCS STAMP: $Id: gwpoker.ui,v 1.1 97/04/04 15:19:59 newdeal Exp $
+ */
+
+#include "generic.uih"
+#include "cards.uih"
+#include "game.uih"
+/*#include "Art/mkrPoker.ui"
+*/
+#include "Art/mkpoker.ui"
+
+structure HandAnalysis = {
+	nAces = byteComp : 0;
+	nTwos = byteComp : 0;
+	nThrees = byteComp : 0;
+	nFours = byteComp : 0;
+	nFives = byteComp : 0;
+	nSixes = byteComp : 0;
+	nSevens = byteComp : 0;
+	nEights = byteComp : 0;
+	nNines = byteComp : 0;
+	nTens = byteComp : 0;
+	nJackss = byteComp : 0;
+	nQueens = byteComp : 0;
+	nKings = byteComp : 0;
+	nWildcards = byteComp : 0;
+	nDiamonds = byteComp : 0;
+	nHearts = byteComp : 0;
+	nClubs = byteComp : 0;
+	nSpades = byteComp : 0;
+
+	highestIfAceHigh = byteComp : 0;
+	lowestIfAceHigh = byteComp : 0;
+	highestIfAceLow = byteComp : 0;
+	lowestIfAceLow = byteComp : 0;
+
+	variety = byteComp : 0;
+
+	mostOfAKind = byteComp : 0;
+	rankOfMostOfAKind = byteComp : 0;
+}
+
+class	PokerGame = Game {
+	cash = dwordComp : 0;
+	markers = wordComp : 1;
+	flasherTimer = hptrComp : null;
+	flasherTimerID = wordComp : 0;
+	flasher = optrComp : null;
+	wager = wordComp : 0;
+	status = enumComp byte {
+		waitingForNewGame,
+		waitingToReplaceCards,
+		busy
+	} : waitingForNewGame;
+
+	payoffSchema = nptrComp : null;
+	handAnalysis = HandAnalysis : {}
+	haveName = wordComp : 0;
+}
+
+class	PayoffVisComp = VisComp {
+}
+
+class PayoffDisplay = VisText {
+	soundNumber = wordComp : 0;
+	pokerHandName = nptrComp : null;
+	oddsGiven = wordComp : 0;
+	oddsTaken = wordComp : 0;
+	default attr = default -detectable;
+	default paraAttrRuns = "PAYOFF_PARA_ATTR";
+	default washColor = {
+		redOrIndex = "C_TABLE";
+	}
+}
+
+class InstDisplay = VisText {
+	soundNumber = wordComp : 0;
+	pokerHandName = nptrComp : null;
+	oddsGiven = wordComp : 0;
+	oddsTaken = wordComp : 0;
+	default attr = default -detectable;
+}
+
+class	PokerHighScore = HighScore {
+}
+
+class	PokerInteraction = GenInteraction {
+	askedForLoanNameThisGame = wordComp : 0;
+}
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+start	Interface;
+
+PokerApp = GenApplication vardataReloc {
+	moniker = list {
+		PokerTextMoniker,	
+	 /*	PokerLCMoniker,
+		PokerLMMoniker,
+		PokerSCMoniker,
+		PokerSMMoniker,
+		PokerSCGAMoniker,
+		PokerYCMoniker,
+		PokerYMMoniker,
+		PokerTMMoniker,
+		PokerTCGAMoniker
+	  */
+		PokerAppMoniker,
+		PokerTinyMoniker
+	}
+	children = PokerPrimary;	/* only one child for now */
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+			PokerPrimary;
+	active_list = HallOfFame, HallOfShame;
+	gcnList (MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			PokerCardBackSelector;
+	hints = {
+	  /*	ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER {
+			UN_OPTR SaveOptionsTrigger
+		},  */
+		ATTR_GEN_HELP_FILE {
+		    char "poker", 0
+		}
+	}
+}
+
+visMoniker PokerTextMoniker = "Poker";
+
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+
+PokerPrimary = GenPrimary {
+	children = GameMenu, OptionsMenu, PokerView,
+		MoneyTriggers, PokerSummonsGroup, PokerBustedBox;
+	hints = {
+	 /*	HINT_PRIMARY_FULL_SCREEN,   */
+	 	HINT_SIZE_WINDOW_AS_DESIRED, 
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_CENTER_WINDOW,
+		HINT_PRIMARY_NO_FILE_MENU,
+		/*
+		 * Motif will automatically add a help trigger and
+		 * place it in the title bar if ATTR_GEN_HELP_CONTEXT is
+		 * placed on the GenPrimary.
+		 */
+		ATTR_GEN_HELP_CONTEXT {
+			char "TOC", 0
+		},
+		ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT,
+		HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP,
+		ATTR_GEN_WINDOW_KBD_OVERRIDE {
+			word	KO_NO_KEYBOARD
+		}
+	}
+}
+
+PokerSummonsGroup = PokerInteraction {
+	attributes =  notUserInitiatable;
+	type = organizational;
+	visibility = dialog;
+	children = GetLoanBox;
+}
+
+
+end Interface;
+
+
+/*-----------------------------------------------------------------------------
+	UI Objects within Primary window
+-----------------------------------------------------------------------------*/
+
+/******************************************************************************
+				Deck
+******************************************************************************/
+start	Interface;
+
+GameMenu = GenInteraction {
+	visibility = popup;
+	moniker = 'G', "Game";
+	children =	BorrowTrigger,
+			CashOutTrigger,
+			HallOfFame,
+			HallOfShame;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_INTERACTION_GROUP_TYPE {
+			GenInteractionGroupType GIGT_FILE_MENU
+			}
+	}
+}
+
+BorrowTrigger = GenTrigger {
+	moniker = 'B', "Borrow 100";
+	action = MSG_BORROW_ONE_HUNDRED_DOLLARS, MyPlayingTable;
+}
+
+FreeMillionTrigger = GenTrigger {
+	moniker = 'M', "Free Million!";
+	action = MSG_FREE_MILLION, MyPlayingTable;
+}
+
+CashOutTrigger = GenTrigger {
+	moniker = 'C', "Cash Out";
+	action = MSG_SOLITAIRE_CASH_OUT, MyPlayingTable;
+}
+
+HallOfFame = PokerHighScore {
+	fileName = "GeoPoker Hall of Fame";
+	creator = {
+		<'GPOK'>, MANUFACTURER_ID_GEOWORKS
+	}
+	highScoreTitle = "The Big Shots";
+	scoreType = ST_MONEY;
+	hints = {
+		ATTR_HIGH_SCORE_SCORE_TITLE_MONIKER {
+			lptr WonString
+		},
+		ATTR_HIGH_SCORE_SHOW_SCORES_TRIGGER_MONIKER {
+			lptr ShowHallOfFame
+		}/*,
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP,
+		ATTR_GEN_HELP_CONTEXT {
+			char "Big Shot", 0
+		} */
+	}
+	highScoreLine2 = "You have one of the biggest payoffs ever!";
+	highScoreLine4 = "Please sign in the Hall of Fame:";
+}
+visMoniker ShowHallOfFame = 'F', "Hall Of Fame";
+chunk WonString = "Won";
+HallOfShame = PokerHighScore {
+	fileName = "GeoPoker Hall of Shame";
+	creator = {
+		<'GPOK'>, MANUFACTURER_ID_GEOWORKS
+	}
+	highScoreTitle = "The Hit List";
+	scoreType = ST_MONEY;
+	hints = {
+		ATTR_HIGH_SCORE_SCORE_TITLE_MONIKER {
+			lptr OwesString
+		},
+		ATTR_HIGH_SCORE_SHOW_SCORES_TRIGGER_MONIKER {
+			lptr ShowHallOfShame
+		}/*,
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP,
+		ATTR_GEN_HELP_CONTEXT {
+			char "Hit List", 0
+		} */
+	}
+	highScoreLine1 = "Uh oh...";
+	highScoreLine2 = "You have one of the biggest debts ever!";
+	highScoreLine4 = "The boss insists that you sign your name:";
+}
+visMoniker ShowHallOfShame = 'S', "Hall Of Shame";
+chunk OwesString = "Owes";
+
+OptionsMenu = GenInteraction {
+	moniker = 'O', "Options";
+	visibility = popup;
+	children = PokerCardBackSelector, SoundInteraction, 
+/*			FadeInteraction, 	*/
+			WildInteraction, SaveOptionsTrigger;
+}
+
+PokerCardBackSelector = CardBackSelector {
+	moniker = 'C', "Change Card Backs";
+	type = properties;
+	visibility = dialog;
+/*	hints = {
+	    ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP
+	}   */
+}
+
+
+/*
+FadeInteraction = GenInteraction {
+	children = FadeList;
+	visibility = subGroup;
+}
+
+FadeList = GenBooleanGroup {
+	children = FadeEntry;
+	applyMsg = MSG_SOLITAIRE_SET_FADE_STATUS;
+	destination = MyPlayingTable;
+	selectedBooleans = 1;
+}
+
+FadeEntry = GenBoolean {
+	moniker = 'F', "Fade Cards";
+	identifier = 1;
+}
+
+*/
+
+SoundInteraction = GenInteraction {
+	visibility = popup;
+	moniker = 'S', "Sound";
+	children = SoundList;
+}
+
+SoundList = GenItemGroup {
+	children = SoundOnEntry, SoundOffEntry, SoundSystemDefaultEntry;
+	selection = "GSS_SOUND_USE_SYSTEM_DEFAULT";
+	numSelections = 1;
+}
+
+SoundOnEntry = GenItem {
+	moniker = 'S',"Sound On";
+	identifier = "GSS_SOUND_ON";
+}
+
+SoundOffEntry = GenItem {
+	moniker = 'O',"Sound Off";
+	identifier = "GSS_SOUND_OFF";
+}
+
+SoundSystemDefaultEntry = GenItem {
+	moniker = 'P', "Use System Preference";
+	identifier = "GSS_SOUND_USE_SYSTEM_DEFAULT";
+}
+
+WildInteraction = GenInteraction {
+	visibility = subGroup;
+	moniker = 'W',"Wild Card?";
+	children = WildList;
+}
+
+WildList = GenItemGroup {
+	children = NoWildEntry, JokersWildEntry, DeucesWildEntry;
+	applyMsg = MSG_SET_WILD;
+	destination = MyPlayingTable;
+	selection = "NO_WILD";
+	hints = {
+	    HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+NoWildEntry = GenItem {
+	moniker = 'N', "No Wild Cards";
+	identifier = "NO_WILD";
+}
+
+JokersWildEntry = GenItem {
+	moniker = 'J', "Jokers Wild";
+	identifier = "JOKERS_WILD";
+}
+
+DeucesWildEntry = GenItem {
+	moniker = 'D', "Deuces Wild";
+	identifier = "DEUCES_WILD";
+}
+
+SaveOptionsTrigger = GenTrigger {
+	moniker = 'O', "Save Options";
+	action = MSG_POKER_SAVE_OPTIONS, process;
+}
+
+MoneyTriggers = GenInteraction {
+	children = MoneyTextInteraction, PlusTriggersInteraction,
+		MinusTriggersInteraction;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+			HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ELSE,
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+			HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+MoneyTextInteraction = GenInteraction {
+	children = CashTextDisplay, BetTextDisplay;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+CashTextDisplay = GenText {
+	textDisplayAttributes = default +singleLineText, +noWordWrapping;
+	genAttributes = default +readOnly;
+
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_FIXED_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 14>
+				SpecHeight <>
+			},
+		HINT_ELSE,
+			HINT_FIXED_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 14>
+				SpecHeight <>
+			},
+		HINT_ENDIF
+	}
+}
+
+chunk CashText = {Cash : }
+
+BetTextDisplay = GenText {
+	textDisplayAttributes = default +singleLineText, +noWordWrapping;
+	genAttributes = default +readOnly;
+
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_FIXED_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 12>
+				SpecHeight <>
+			},
+		HINT_ELSE,
+			HINT_FIXED_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 12>
+				SpecHeight <>
+			},
+		HINT_ENDIF
+
+	}
+}
+
+chunk BetText = {Bet : }
+
+
+PlusTriggersInteraction = GenInteraction {
+	children = 	OneDollarTrigger,
+			FiveDollarTrigger,
+			TwentyFiveDollarTrigger, 
+			OneHundredDollarTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+MinusTriggersInteraction = GenInteraction {
+	children = 	MinusOneDollarTrigger,
+			MinusFiveDollarTrigger,
+			MinusTwentyFiveDollarTrigger, 
+			MinusOneHundredDollarTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_HORIZONTALLY_TINY},
+			HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+
+
+OneDollarTrigger = GenTrigger {
+	moniker = " +1";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	1
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+
+FiveDollarTrigger = GenTrigger {
+	moniker = " +5";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	5
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+TwentyFiveDollarTrigger = GenTrigger {
+	moniker = " +25";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	25
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 4>
+			SpecHeight <>
+		}
+	}
+}
+OneHundredDollarTrigger = GenTrigger {
+	moniker = "+100";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	100
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 4>
+			SpecHeight <>
+		}
+	}
+}
+MinusOneDollarTrigger = GenTrigger {
+	moniker = " -1";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	-1
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+
+MinusFiveDollarTrigger = GenTrigger {
+	moniker = " -5";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	-5
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 3>
+			SpecHeight <>
+		}
+	}
+}
+MinusTwentyFiveDollarTrigger = GenTrigger {
+	moniker = " -25";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	-25
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 4>
+			SpecHeight <>
+		}
+	}
+}
+MinusOneHundredDollarTrigger = GenTrigger {
+	moniker = "-100";
+	action = MSG_ADJUST_WAGER_AND_CASH_FROM_TRIGGERS, MyPlayingTable;
+	hints  = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	-100
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 4>
+			SpecHeight <>
+		}
+	}
+}
+
+
+
+chunk YouWonText = {You Won : }
+chunk YouLostText = {You Lost : }
+
+
+PokerBustedBox	= GenInteraction {
+	visibility = dialog;
+	type = multipleResponse;
+	attributes = notUserInitiatable;
+	children = BrokeText,BrokeBorrowOneHundredTrigger,BrokeCashOutTrigger;
+}
+
+BrokeText = GenText {
+	genAttributes = readOnly;
+	text = "You are broke, busted, spent, strapped, penniless, empty handed, wiped out, sans cash and otherwise destitute. \\\r\\\rWhat would you like to do?";
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+BrokeCashOutTrigger = GenTrigger {
+	moniker = "Cash Out";
+	action = MSG_SOLITAIRE_CASH_OUT, MyPlayingTable;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+BrokeBorrowOneHundredTrigger = GenTrigger {
+	moniker = "Borrow 100";
+	action = MSG_BORROW_ONE_HUNDRED_DOLLARS, MyPlayingTable;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+
+
+PokerView = GenView {
+	output = MyPlayingTable;
+	backColorR = C_TABLE;
+	horizAttributes = default +noLargerThanContent;
+	vertAttributes = default +noLargerThanContent;
+
+	hints = {
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 620>
+			SpecHeight<SST_PIXELS, 340>
+		},
+		HINT_DEFAULT_TARGET
+	}
+}
+
+GetLoanBox = GenInteraction {
+        attributes = default +modal, +initiatedViaUserDoDialog;
+	type = notification;
+	visibility = dialog;
+	children = GetLoanTitle1, GetLoanTitle2, LoanSpaceGlyph,
+		   GetLoanGlyph, GetLoanText;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+	}
+}
+
+GetLoanTitle1 = GenGlyph {
+	moniker = "Your 100 loan has been approved.";
+}
+GetLoanTitle2 = GenGlyph {
+	moniker = "We trust that repayment will be swift...";
+}
+
+LoanSpaceGlyph = GenGlyph {
+	moniker = " ";
+}
+
+GetLoanGlyph = GenGlyph {
+	moniker = "Please sign here";
+}
+
+GetLoanText = GenText {
+	maxLength = 32;
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		HINT_DEFAULT_FOCUS
+	}
+}
+
+end Interface;
+
+start StuffResource;
+
+MyPlayingTable = PokerGame {
+	view = PokerView;
+	children = 	InstructionDisplay,
+			Instruction2Display,
+			ThePayoffChart,
+			MyHand,
+			Deck1,
+			Deck2,
+			Deck3,
+			Deck4,
+			Deck5;
+	hand = MyHand;
+	left = 0;
+	top = 0;
+	right = 620;
+	bottom = 340;
+
+	payoffSchema = NoWildPayoffSchema;
+	
+	visCompGeoAttrs = default +customManageChildren;
+
+	initialFadeMask = SDM_100;		/* no fading */
+
+}
+
+chunk JokersWildPayoffSchema = data {
+	PayoffSchema <
+		JOKERS_WILD,			/* wild status */
+		5000,				/* maximum win */
+		100,				/* five of a kind payoff */
+		50,				/* royal flush payoff */
+		50,				/* straight flush payoff */
+		20,				/* four of a kind payoff */
+		10,				/* full house payoff */
+		6,				/* flush payoff */
+		4,				/* straight payoff */
+		2,				/* three of a kind payoff */
+		1,				/* two pair payoff */
+		0,				/* high pair payoff */
+		0,				/* low pair payoff */
+		CR_WILD				/* minimum pair */
+	>
+}
+
+chunk DeucesWildPayoffSchema = data {
+	PayoffSchema <
+		DEUCES_WILD,			/* wild status */
+		5000,				/* maximum win */
+		25,				/* five of a kind payoff */
+		15,				/* royal flush payoff */
+		15,				/* straight flush payoff */
+		8,				/* four of a kind payoff */
+		6,				/* full house payoff */
+		4,				/* flush payoff */
+		2,				/* straight payoff */
+		1,				/* three of a kind payoff */
+		1,				/* two pair payoff */
+		0,				/* high pair payoff */
+		0,				/* low pair payoff */
+		CR_WILD				/* minimum pair */
+	>
+}
+
+chunk NoWildPayoffSchema = data {
+	PayoffSchema <
+		NO_WILD,			/* wild status */
+		5000,				/* maximum win */
+		0,				/* five of a kind payoff */
+		100,				/* royal flush payoff */
+		100,				/* straight flush payoff */
+		50,				/* four of a kind payoff */
+		20,				/* full house payoff */
+		8,				/* flush payoff */
+		5,				/* straight payoff */
+		3,				/* three of a kind payoff */
+		2,				/* two pair payoff */
+		1,				/* high pair payoff */
+		0,				/* low pair payoff */
+		CR_JACK				/* minimum pair */
+	>
+}
+
+
+MyHand = Hand {
+}
+
+Deck1 = Deck {
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 0;
+
+	offsetFromDownCardX = 0;
+	offsetFromDownCardY = 0;
+}
+
+Deck2 = Deck {
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 0;
+
+	offsetFromDownCardX = 0;
+	offsetFromDownCardY = 0;
+}
+
+Deck3 = Deck {
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 0;
+
+	offsetFromDownCardX = 0;
+	offsetFromDownCardY = 0;
+}
+
+Deck4 = Deck {
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 0;
+
+	offsetFromDownCardX = 0;
+	offsetFromDownCardY = 0;
+}
+
+Deck5 = Deck {
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 0;
+
+	offsetFromDownCardX = 0;
+	offsetFromDownCardY = 0;
+}
+
+ThePayoffChart = PayoffVisComp {
+	children = 	FiveOfAKindDisplay,
+			StraightFlushDisplay,
+			FourOfAKindDisplay,
+			FullHouseDisplay,
+			FlushDisplay,
+			StraightDisplay,
+			ThreeOfAKindDisplay,
+			TwoPairDisplay,
+			PairDisplay,
+			LostDisplay;
+
+	visCompGeoAttrs = default +orientChildrenVertically;
+	attr = default -detectable;
+}
+
+InstructionDisplay = InstDisplay {
+	text = "Deal Me!";
+	charAttrRuns = MaxPayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+Instruction2Display = InstDisplay {
+	text = "";
+	charAttrRuns = MaxPayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+chunk InsertText = "Busted!";
+chunk DealText = "Deal Me!";
+chunk BlankText = "";
+chunk DiscardText = "Select cards to Discard:";
+chunk KeepEmAllText = "Keep 'em All";	
+chunk DealMe1Text = "Deal Me 1";
+chunk DealMe2Text = "Deal Me 2";
+chunk DealMe3Text = "Deal Me 3";
+chunk DealMe4Text = "Deal Me 4";
+chunk DealMe5Text = "Bummer!";
+chunk KeptYourBetText = "You Broke Even";
+
+
+chunk PaysText = ": ";
+chunk ToText = " for ";
+
+FiveOfAKindDisplay = PayoffDisplay {
+	soundNumber = "PS_FIVEOFAKIND";
+	text = "default";
+	pokerHandName = data {
+		char	"Five of a Kind", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+StraightFlushDisplay = PayoffDisplay {
+	soundNumber = "PS_STRAIGHTFLUSH";
+	text = "default";
+	pokerHandName = data {
+		char	"Straight Flush", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+FourOfAKindDisplay = PayoffDisplay {
+	soundNumber = "PS_FOUROFAKIND";
+	text = "default";
+	pokerHandName = data {
+		char	"Four of a Kind", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+FullHouseDisplay = PayoffDisplay {
+	soundNumber = "PS_FULLHOUSE";
+	text = "default";
+	pokerHandName = data {
+		char	"Full House", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+FlushDisplay = PayoffDisplay {
+	soundNumber = "PS_FLUSH";
+	text = "default";
+	pokerHandName = data {
+		char	"Flush", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+StraightDisplay = PayoffDisplay {
+	soundNumber = "PS_STRAIGHT";
+	text = "default";
+	pokerHandName = data {
+		char	"Straight", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+ThreeOfAKindDisplay = PayoffDisplay {
+	soundNumber = "PS_THREEOFAKIND";
+	text = "default";
+	pokerHandName = data {
+		char	"Three of a Kind", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+TwoPairDisplay = PayoffDisplay {
+	soundNumber = "PS_TWOPAIR";
+	text = "default";
+	pokerHandName = data {
+		char	"Two Pair", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+PairDisplay = PayoffDisplay {
+	soundNumber = "PS_PAIR";
+	text = "default";
+	pokerHandName = data {
+		char	"Jacks or Better", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+LostDisplay = PayoffDisplay {
+	soundNumber = "PS_LOST_HAND";
+	text = "default";
+	pokerHandName = data {
+		char	"Absolutely Nothing", 0;
+	}
+	charAttrRuns = WhitePayoffStyle;
+	storage = default -defaultCharAttr;
+}
+
+
+chunk MaxPayoffStyle = data {
+	CHAR_ATTR_FONT_SIZE_STYLE_COLOR(0, FID_BERKELEY, 10, <>,
+			C_TEXT)
+}
+
+
+chunk WhitePayoffStyle = data {
+	CHAR_ATTR_FONT_SIZE_STYLE_COLOR(0, FID_BERKELEY, 10, 0,
+			C_TEXT)
+}
+
+chunk RedPayoffStyle = data {
+	CHAR_ATTR_FONT_SIZE_STYLE_COLOR(0, FID_BERKELEY, 10, 0,
+			C_TABLE)
+}
+
+chunk	WonMoneyText = data {
+	char "After paying off your debt to the house, you had ", C_CTRL_A,
+	" left over. The boss ain't gonna like this...", 0;
+}
+
+chunk	EvenMoneyText = "After paying off your debts, you came out exactly even. Consider yourself lucky, and better luck next time...";
+
+chunk	LostMoneyText = data {
+	char "After emptying your pockets to repay your debt, you find yourse",
+	"lf ", C_CTRL_A," short. I think you'd better make a run for it...", 0;
+}
+
+
+end StuffResource;
+
+
+

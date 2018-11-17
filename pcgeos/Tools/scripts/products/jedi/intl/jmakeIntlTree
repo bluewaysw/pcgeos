@@ -1,0 +1,181 @@
+#! /bin/sh -
+
+#
+# This script provides a easy way to create the Installed tree of 
+# international version of Jedi, from a translated GEOS tree
+#
+# Syntax:
+#	jmakeIntlTree (ALL | LOCALIZED) <version> <language>
+#
+# Example:
+#	jmakeIntlTree ALL PC_DEMO French
+#
+# ALL	-- copy every data files and geodes to the international Installed
+#	   directory.
+# LOCALIZED	-- copy only localized geodes to the international Installed
+#		   directory.
+#
+# <version>	-- it is one of the following version:
+#			PC
+#			PC_EC
+#			PC_XIP
+#			PC_XIP_EC
+#			JEDI_XIP
+#
+# <language>    -- One of:
+#			French
+#			German
+#			Italian
+#			Portugese (or Port)
+#			Spanish
+
+#
+# $Id: jmakeIntlTree,v 1.5 95/10/04 12:16:06 cthomas Exp $
+#
+
+# set -x
+
+#
+# Check for valid input parameter.
+#
+case $# in
+0)	echo "usage: $0 (ALL | LOCALIZED) <version> <language>. Please read the header of this script for details."
+	exit 1 ;;
+1)	echo "usage: $0 -- Not enough arguments."
+	exit 1 ;;
+2)	echo "usage: $0 -- Not enough arguments."
+	exit 1 ;;
+3)	if [ $1 != "ALL" -a $1 != "LOCALIZED" ]; then
+		echo "$0 -- The 1st argument is invalid."
+		exit 1
+	fi
+	#
+	# Checking the <version> argument will be done by the
+	# jediGeodes script
+	#
+	;;
+*)	echo "$0 -- Too many arguments."
+	exit 1 ;;
+esac
+
+option=$1
+version=$2
+
+case $3 in
+	Sp* | sp*)
+		language=Spanish
+		shortLang=sp
+		;;
+	It* | it*)
+		language=Italian
+		shortLang=it
+		;;
+	Fr* | fr*)
+		language=French
+		shortLang=fr
+		;;
+	Po* | po*)
+		language=Port
+		shortLang=po
+		;;
+	Ge* | Gr | ge* | gr)
+		language=German
+		shortLang=gr
+		;;
+	*)
+		echo "$3 not a valid language"
+		exit 1
+		;;
+esac
+
+
+
+#
+# determine Ec-ness of version
+#
+
+case $version in
+*_EC)
+	ec="ec"
+	branchec=".ec"
+	;;
+*)
+	ec=
+	branchec=
+	;;
+esac
+
+#
+# Determine whre geodes go
+#
+
+case $version in
+PC_XIP*)
+	srcBranch=pcxip
+	;;
+PC*)
+	srcBranch=pc
+	;;
+JEDI_XIP)
+	srcBranch=jedixip
+	;;
+esac
+
+prefixDir=/staff/pcgeos/Jedi${language}
+srcBaseDir=/n/company/jedi/dest/${shortLang}
+srcDir=$srcBaseDir/${srcBranch}${branchec}
+engDir=/staff/pcgeos/ReleaseJedi
+
+tempDir="tmp.$$"
+destDir=$prefixDir/Installed
+scriptDir=/staff/pcgeos/Tools/scripts/products/jedi/intl
+
+
+PWD=`pwd`
+export PWD
+
+#
+# Get the list of geodes to use
+# 
+
+fileList=`jediGeodes $version ${language}_ALL`
+
+#
+# These geodes MUST be the same as the english versions, or
+# the localized Jedi will fall on its face
+#
+englishOnly="pccom.geo pccomec.geo"
+
+echo "Go to ${srcDir}."
+cd $srcDir
+
+
+#
+# Move the localized geodes to a big whole directory.
+#
+echo "Go to the parent directory; create the temporary directory ${tempDir}. "
+cd ..
+mkdir $tempDir
+
+echo "Start copying files from ${srcDir} to ${tempDir}."
+if ${scriptDir}/copyToOneDir $srcDir $tempDir
+then
+    echo "Restore Unix file names..."
+    (cd $tempDir; ${scriptDir}/fixDOSnames $ec)
+
+    echo "Start moving files to the corresponding directories in ${destDir}..."
+    ${scriptDir}/makeIntlTree $option $tempDir $destDir "$fileList" "$englishOnly"
+
+    if [ $? -eq 0 ]; then
+	echo "Moving files done, cleaning up..."
+	\rm -fr $tempDir
+
+	cd $PWD
+	exit 0
+    fi
+    \rm -fr $tempDir
+    exit 1
+else
+    \rm -fr $tempDir
+    exit 1
+fi

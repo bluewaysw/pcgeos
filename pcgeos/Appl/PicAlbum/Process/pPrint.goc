@@ -1,0 +1,103 @@
+@include "PicAlbum.goh"
+@include <ExtGraph.goh>
+
+
+@extern object PrintWidthValue;
+@extern object PrintHeightValue;
+@extern object PAViewPrintControl;
+@extern object PrintSizeAspectRatio;
+
+extern VMFileHandle G_tempVMFile;
+extern VMBlockHandle G_bitmapHandle;
+extern optr G_printValueChanged;
+extern FileLongName G_pictureName;
+
+
+@extern method PAProcessClass, MSG_PA_INITIATE_PRINT
+{
+	WWFixedAsDWord maxWidth, maxHeight;
+	SizeAsDWord bmSize = BmpGetBitmapSize(G_tempVMFile, G_bitmapHandle, 0);
+
+	/* set maximum width based on memory requirements of scanline,
+	   assuming 8 bits (1 byte) per pixel and 64K scanline buffer */
+	maxWidth = GrUDivWWFixed(MakeWWFixed(0xfff0), MakeWWFixed(DWORD_WIDTH(bmSize)));
+	/* set maximum height assuming maintaining aspect ratio */
+	maxHeight = GrMulWWFixed(maxWidth, GrUDivWWFixed(MakeWWFixed(DWORD_HEIGHT(bmSize)), MakeWWFixed(DWORD_WIDTH(bmSize))));
+	@call PrintWidthValue::MSG_GEN_VALUE_SET_MAXIMUM(maxWidth);
+	@call PrintHeightValue::MSG_GEN_VALUE_SET_MAXIMUM(maxHeight);
+	@call PrintWidthValue::MSG_GEN_VALUE_SEND_STATUS_MSG(1);
+
+	@call PAViewPrintControl::MSG_PRINT_CONTROL_INITIATE_PRINT();
+}
+
+@extern method PAProcessClass, MSG_PA_PRINT_SIZE_WIDTH_STATUS
+{
+	SizeAsDWord bmSize = BmpGetBitmapSize(G_tempVMFile, G_bitmapHandle, 0);
+
+	G_printValueChanged = @PrintWidthValue;
+	if (@call PrintSizeAspectRatio::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS()) {
+		@call PrintHeightValue::MSG_GEN_VALUE_SET_VALUE(GrMulWWFixed(value, GrUDivWWFixed(MakeWWFixed(DWORD_HEIGHT(bmSize)), MakeWWFixed(DWORD_WIDTH(bmSize)))), 0);
+	}
+}
+
+@extern method PAProcessClass, MSG_PA_PRINT_SIZE_HEIGHT_STATUS
+{
+	SizeAsDWord bmSize = BmpGetBitmapSize(G_tempVMFile, G_bitmapHandle, 0);
+
+	G_printValueChanged = @PrintHeightValue;
+	if (@call PrintSizeAspectRatio::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS()) {
+		@call PrintWidthValue::MSG_GEN_VALUE_SET_VALUE(GrMulWWFixed(value, GrUDivWWFixed(MakeWWFixed(DWORD_WIDTH(bmSize)), MakeWWFixed(DWORD_HEIGHT(bmSize)))), 0);
+	}
+}
+
+@extern method PAProcessClass, MSG_PA_PRINT_SIZE_ASPECT_STATUS
+{
+	if (selectedBooleans) {
+		@call G_printValueChanged::MSG_GEN_VALUE_SEND_STATUS_MSG(1);
+	}
+}
+
+@extern method PAProcessClass, MSG_PRINT_START_PRINTING {
+
+	PCMarginParams margins;
+	WWFixedAsDWord printWidth, printHeight;
+	SizeAsDWord pixelSize;
+
+	@call printCtrlOD::MSG_PRINT_CONTROL_GET_PRINTER_MARGINS(
+						&margins, TRUE);
+
+	printWidth = @call PrintWidthValue::MSG_GEN_VALUE_GET_VALUE();
+	printHeight = @call PrintHeightValue::MSG_GEN_VALUE_GET_VALUE();
+
+	pixelSize = BmpGetBitmapSize(G_tempVMFile, G_bitmapHandle, 0);
+
+	GrSaveState(gstate);
+
+	GrApplyScale(gstate, 
+		GrSDivWWFixed(
+			printWidth,
+			GrSDivWWFixed(MakeWWFixed(DWORD_WIDTH(pixelSize)), MakeWWFixed(72))
+			),
+		GrSDivWWFixed(
+			printHeight,
+			GrSDivWWFixed(MakeWWFixed(DWORD_HEIGHT(pixelSize)), MakeWWFixed(72))
+			)
+	);
+
+	printWidth = GrMulWWFixed(printWidth, MakeWWFixed(72));
+	printHeight = GrMulWWFixed(printHeight, MakeWWFixed(72));
+
+    @call printCtrlOD::MSG_PRINT_CONTROL_SET_DOC_SIZE(IntegerOf(printWidth), IntegerOf(printHeight));
+
+	GrDrawHugeBitmap(gstate, 0, 0, G_tempVMFile, G_bitmapHandle);
+
+	GrRestoreState(gstate);
+	GrNewPage(gstate, PEC_FORM_FEED);
+
+	@send printCtrlOD::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}
+
+@extern method PAProcessClass, MSG_PRINT_GET_DOC_NAME {
+
+	@call printCtrlOD::MSG_PRINT_CONTROL_SET_DOC_NAME(G_pictureName);
+}

@@ -1,0 +1,212 @@
+@include <stdapp.goh>
+@include <socket.goh>
+
+@include "utils.goh"
+#include <ansi/string.h>
+#include <ansi/stdlib.h>
+#include <ansi/stdio.h>
+#include <sockmisc.h>
+
+@include "newsread.goh"
+@include "extern.goh"
+@include "Localize/strings.goh"
+@include "UIClass/statdiag.goh"
+@include "options.goh"
+#include "news.h"
+#include "newssock.h"
+@include "newsdata.goh"
+
+/**********************************************************************
+ * Globals                                                            *
+ **********************************************************************/
+
+extern Socket NewsSocket;
+extern MemHandle G_socketData ;
+#define NEWS_SOCKET_BUFFER_SIZE         4000
+extern word G_socketDataPos ;
+extern word G_socketDataLen ;
+extern char TCPDomain[] ;
+#define TCP_DOMAIN_LEN  5
+/* FR */
+#define SGETC_LONG_TIMEOUT  (60*60)
+#define QUICK_TIMEOUT       (0)
+extern word sgetc(void) ;
+extern ResolvedTCPAddress   G_hostaddr ;
+extern void sputs(char *line);
+
+
+/**********************************************************************
+ * Internal Functions                                                 *
+ **********************************************************************/
+
+Boolean
+ICheckForAuthorizationRequest(TCHAR *buf);
+
+Boolean 
+ISendAuthorization(char *lineBuf);
+
+/*-------------------------------------------------------------------------
+ | Routine:  GetGroups
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Get all the news groups on the server.
+ |
+ | Outputs:
+ |    word                        -- Number of groups
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |    FR   11/01/98  Bug fixes
+ |
+ *-----------------------------------------------------------------------*/
+word GetGroups()
+{
+    char *buffer, *statusMsg;
+    word count1, groups = 0, updateCount = 0 ;
+    Boolean isCancelled ;
+    Boolean retry ;
+    Boolean result_215 ;
+    char lineBuf[1024] ;
+
+
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TITLE_OPTR(
+                @DownloadStatusStarting) ;
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TEXT_OPTR(
+                @DownloadStatusStarting2);
+    @send DownloadGroupsDialog::MSG_STATUS_DIALOG_OPEN(TRUE, TRUE, 0, FALSE) ;
+
+    /* Start with a clear consciouns ... er ... buffer */
+    NewsDataClearUnsubGroups() ;
+
+
+@ifdef COMPILE_OPTION_ALWAYS_USE_AUTH_OPTION
+    /*
+     * if "always send user name and password" is selected, do so
+     */
+    if (@call ServerOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & SERVER_OPTS_USE_AUTH) {
+	ISendAuthorization(lineBuf);
+    }
+@endif
+
+    /* Get the response and error code */
+    do {
+
+        retry = FALSE;
+
+        /* Send out the request for a list command */
+        sputs("LIST\r\n");
+
+        buffer = sgets(lineBuf) ;
+
+        if(!buffer) {
+      
+            @call DownloadGroupsDialog::MSG_STATUS_DIALOG_CLOSE() ;
+        
+            return(0);
+        }
+
+        if(ICheckForAuthorizationRequest(buffer)) {
+        
+            if(ISendAuthorization(lineBuf)) {
+
+                @call DownloadGroupsDialog::MSG_STATUS_DIALOG_CLOSE() ;
+
+                return(0) ;
+            }
+
+            retry = TRUE ;
+        }
+
+    
+    } while(retry) ;
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+    @call DebugText::MSG_VIS_TEXT_APPEND_PTR("\r", 0);
+#endif
+    result_215 = (strncmp(buffer, "215", 3) == 0);
+
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_CLOSE() ;
+
+    /* Fail if we got a bad code */
+    if(!result_215) {
+
+        DisconnectFromServer(FALSE) ;
+        ErrorMessage(@ErrorGettingGroupList);
+
+        return(0);
+    }
+
+    MemLock(OptrToHandle(@GroupDownloadStatus));
+    statusMsg = LMemDeref(@GroupDownloadStatus);
+
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TITLE_OPTR(
+                                                            @GroupDownloadTitle) ;
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TEXT_PTR("");
+    @send DownloadGroupsDialog::MSG_STATUS_DIALOG_OPEN(TRUE, TRUE, 0, FALSE) ;
+
+    /* Loop through the whole list of newsgroups */
+    while(1) {
+
+        isCancelled = @call DownloadGroupsDialog::MSG_STATUS_DIALOG_IS_CANCELLED() ;
+        if (isCancelled)
+            break ;
+
+        /* Get a line */
+        buffer = sgets(lineBuf);
+        if (buffer == 0)  {
+            
+            /* If we didn't get anything, its an error and we need to abort */
+            ErrorMessage(@ErrorGettingGroupList);
+            isCancelled = TRUE ;
+            break ;
+        }
+
+#ifdef COMPILE_OPTION_DEBUG_WINDOW
+        /* Show the received line to the debug screen */
+        @call DebugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+        @call DebugText::MSG_VIS_TEXT_APPEND_PTR("\r", 0);
+#endif
+
+        /* If we got a single period, this is the end of the list */
+        if (strcmp(buffer, ".") == 0) {
+            break;
+        }
+
+        /* Look for a space to jump to the end of the newsgroup name */
+        count1 = strcspn(buffer, " ");
+        if (count1 > MAX_GROUP_NAME_SIZE) {
+            count1 = MAX_GROUP_NAME_SIZE;
+        }
+        buffer[count1] = 0;
+
+        /* Add to the list */
+        NewsDataCreateUnsubGroup(buffer) ;
+
+        groups++;
+        updateCount++;
+
+        /* Update the count display */
+        if (updateCount == 100) {
+
+            sprintf(buffer, statusMsg, groups);
+            @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TEXT_PTR(buffer) ;
+            updateCount = 0;
+        }
+    }
+
+    /* Ok, we're done */
+    MemUnlock(OptrToHandle(@GroupDownloadStatus));
+
+    if (isCancelled)  {
+        /* Disconnect */
+        DisconnectFromServer(FALSE) ;
+    }
+
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_CLOSE() ;
+
+    return(groups);
+}

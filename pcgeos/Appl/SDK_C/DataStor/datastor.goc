@@ -1,0 +1,977 @@
+ /***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1996 - All Rights Reserved
+ *
+ * PROJECT:	 GEOS Sample Applications
+ * MODULE:	 DataStore Library (Sample GEOS application)
+ * FILE:	 datastore.goc
+ *
+ * AUTHOR:	  Lee Ann Fujii, 12/96
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LAF	12/96		Initial version
+ *
+ * DESCRIPTION:
+ *	This sample application demonstrates some of the main functionality
+ *	of the DataStore Library.  Specifically, this app:
+ *		- creates the "Exchange Rate" datastore upon launch
+ *		- provides UI for the user to enter a new record
+ *		- provides an Options menu for searching, index building,
+ *		  and enumerating
+ *		- deletes the "Exchange Rates" datastore when closed
+ *	
+ *	It is processed by GOC, compiled by your favorite C compiler, 
+ *	and linked by Glue to produce a runnable .geo file.
+ *
+ *	$Id: datastor.goc,v 1.1 97/04/04 16:41:37 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <datastor.goh> 	/* DataStore Library header file */
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <math.h> 	/* this application uses FloatNums */
+
+/*
+ ***************************************************************************
+ *		Functions & Global Variables
+ ***************************************************************************
+ */
+
+    /* restrict size of text fields */
+#define MAX_FIELD_LENGTH 40
+
+    /* restrict size of file names */
+#define MAX_FILE_NAME_LENGTH 25
+
+    /* callback routine for DataStoreRecordEnum() */
+Boolean	EnumCallback(RecordHeader *record, void *enumData);
+
+    /* 
+     * global "session token;" used in all DataStore routines
+     * to identify the calling application
+     */
+word	dsToken;
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/*
+ * Here we define "DataStoreProcessClass" as a subclass of the system provided
+ * "GenProcessClass."  As this application is launched, the system creates an
+ * instance of this class, which will handle all application-related events
+ * (messages).  The application thread will be responsible for running this
+ * object, meaning that whenever this object handles a message, we will be
+ * executing in the application thread.
+ *
+ * You will find no object in this file declared to be of this class. Instead,
+ * it is specified as the class for the application thread in "datastore.gp."
+ */
+
+@class	DataStoreProcessClass, GenProcessClass;
+
+@message void	MSG_DS_PROCESS_ADD_RECORD();
+@message void	MSG_DS_PROCESS_SEARCH_DS();
+@message void	MSG_DS_PROCESS_BUILD_INDEX();
+@message void	MSG_DS_PROCESS_ENUMERATE_DS();
+
+@endc;   /* end of class definition */
+
+/*
+ * Each object class requires a "class record" be stored in fixed memory
+ * for it. The class record is used by the GEOS message system for the
+ * delivery of messages sent to an object of the class. The class record needs
+ * to be defined in the file where the methods (i.e., the routines defined
+ * with @method) for the class are defined. The @classdecl GOC directive
+ * tells GOC to create the class record here.
+ *
+ * The neverSaved flag is necessary because ProcessClass objects are
+ * hybrid objects. It tells the system that no object of this class will
+ * ever be loaded from or stored to a file.
+ */
+
+@classdecl	DataStoreProcessClass, neverSaved;
+
+/*
+ ***************************************************************************
+ *		              UI Objects
+ ***************************************************************************
+ */
+
+/*
+ *		Application Object
+ *
+ * The very top-level generic object of an application MUST be a GenApplication
+ * object. The datastore.gp file contains an "appobj" statement which indicates
+ * that this "DataStoreApp" object is in fact the top-level UI object.
+ *
+ * This object should be in its own resource, as it is all that needs to be in
+ * memory when the application is iconified. As such, its resource should be
+ * as small as possible.
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass DataStoreApp = {
+
+    /*
+     * While the application object isn't shown on the screen, it has a list
+     * of VisMonikers for three purposes:
+     *	1) the GenPrimary (see below) inherits the moniker when it comes up
+     *	   on screen.
+     *	2) when GeoManager needs to display an icon for the application, and
+     *	   there's none for it in the token database, it launches the app and
+     *	   sends a message to the application object to install its list of
+     *	   monikers in the token database under the application's token.
+     *	3) when the GenPrimary is minimized, it uses the most appropriate
+     *	   graphical moniker from this list for the application's icon.
+     *	   If there's an abbreviated-text moniker in the list, that's used
+     *	   as the icon title; otherwise, any regular-text moniker is used.
+     */
+    GI_visMoniker = list { @DataStoreMoniker };
+
+    /*
+     * The GenApplication object has at least one child: the main application
+     * window.
+     */
+    GI_comp = @DataStorePrimary;
+
+    /*
+     * The main window should appear on-screen when the application is
+     * launched, so place it on the GAGCNLT_WINDOWS GCN list. This causes
+     * the application object to bring it on-screen at the appropriate time.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @DataStorePrimary;
+}
+
+@visMoniker DataStoreMoniker = "C DataStore Sample Application";
+
+@end	AppResource;
+
+
+/*
+ *		            Primary window
+ *
+ * Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed.
+ */
+
+@start	Interface;		/* this resource is for misc UI objects */
+
+@object GenPrimaryClass DataStorePrimary  = {
+    GI_comp = @EditMenu, @OptionMenu, @DisplayText;
+}
+
+/*********************EDIT MENU****************************/
+@object GenInteractionClass EditMenu = {
+    GI_comp = @AddRecBox;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = { GIGT_EDIT_MENU };
+}
+
+	/*	Add Data     */
+
+@object GenInteractionClass AddRecBox = {
+    GI_visMoniker = "Add Record";
+    GI_comp = @CountryField, @CurrencyField, @RateField, @AddTrig;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+    HINT_LEFT_JUSTIFY_MONIKERS;
+}
+
+@object GenTextClass CountryField = {
+    GI_visMoniker = "Country:";
+	/* restrict input to maximum field length */
+    GTXI_maxLength = MAX_FIELD_LENGTH;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@object GenTextClass CurrencyField = {
+    GI_visMoniker = "Currency:";
+	/* restrict input to maximum field length */
+    GTXI_maxLength = MAX_FIELD_LENGTH;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@object GenValueClass RateField = {
+    GI_visMoniker = "Rate:";
+    GVLI_displayFormat = GVDF_DECIMAL;
+    GVLI_increment = MakeWWFixed(.01);
+    GVLI_value = MakeWWFixed(.1);
+}
+
+@object GenTriggerClass AddTrig = {
+    GI_visMoniker = "Add";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DS_PROCESS_ADD_RECORD;
+    HINT_SEEK_REPLY_BAR;
+}
+
+/*********************OPTION MENU****************************/
+@object GenInteractionClass OptionMenu = {
+    GI_comp = @SearchDSBox, @BuildIndexTrig, @EnumTrig;
+	/* keep menu disabled until user adds data */
+    GI_states = @default & ~GS_ENABLED;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = { GIGT_OPTIONS_MENU };
+}
+
+	/*	Search	  */
+
+@object GenInteractionClass SearchDSBox = {
+    GI_visMoniker = "Search DataStore";
+    GI_comp = @SearchText, @SearchTrig;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GII_attrs = @default | GIA_MODAL; /* builds a "cancel" button */
+}
+
+@object GenTextClass SearchText = {
+    GI_visMoniker = "Search for a Country:";
+	/* restrict input to maximum field length */
+    GTXI_maxLength = MAX_FIELD_LENGTH;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@object GenTriggerClass SearchTrig = {
+    GI_visMoniker = "Search";
+	/* make the dialog dismiss itself */
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DS_PROCESS_SEARCH_DS;
+    HINT_SEEK_REPLY_BAR;
+}
+
+	/*	Build Index	  */
+
+@object GenTriggerClass BuildIndexTrig = {
+    GI_visMoniker = "Build Index";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_actionMsg = MSG_DS_PROCESS_BUILD_INDEX;
+    GTI_destination = process;
+}
+
+	/*	Enumerate	  */
+
+@object GenTriggerClass EnumTrig = {
+    GI_visMoniker = "Enumerate";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_actionMsg = MSG_DS_PROCESS_ENUMERATE_DS;
+    GTI_destination = process;
+}
+
+/*********************DISPLAY OBJECT****************************/
+@object GenTextClass DisplayText = {
+    GI_visMoniker = "Exchange Rates DataStore";
+    
+    ATTR_GEN_TEXT_FLOAT_DECIMAL; /* allow decimals */
+    ATTR_GEN_TEXT_ALLOW_SPACES; /* allow spaces */
+    HINT_TEXT_WHITE_WASH_COLOR; /* make the background white */
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+}
+
+@end Interface;
+
+/*
+ ***************************************************************************
+ *		          Functions
+ ***************************************************************************
+ */
+
+/********************************************************************
+ *                  WWFixedAsDWordToFloatNum
+ ********************************************************************
+ * SYNOPSIS:	 Converts a WWFixedAsDWord value to a FloatNum
+ *		 (GEOS 80 bit floating point number)
+ *		 
+ * CALLED BY:	 MSG_DS_PROCESS_ADD_RECORD
+ *
+ * PARAMETERS:	 WWFixedAsDWord	numWWFixed
+ *		 
+ * RETURNS:      FloatNum	numFloat
+ * 
+ * STRATEGY:     Use conversion routine from /Appl/SDK_C/FP2Asc/fp2asc.goc
+ *               
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LAF	12/96		Initial version
+ *******************************************************************/
+FloatNum 
+WWFixedAsDWordToFloatNum( WWFixedAsDWord numWWFixed )
+{
+      /*
+       * intPart    - Integer portion of fixed-point number.
+       * fracPart   - Fractional portion of fixed-point number.
+       * numIEEE64  - The IEEE version of the number.
+       * numGeos80  - The Geos 80-bit version of the number.
+       */
+    int            intPart;
+    word           fracPart;
+    double         numIEEE64;
+    long double	   numGeos80;
+
+      /*
+       * Convert from WWFixedAsDWord to IEEE64 format.
+       */
+    intPart = IntegerOf( numWWFixed );
+    fracPart = FractionOf( numWWFixed );
+    numIEEE64 = (double)intPart + ( (double)fracPart / 65536 );
+
+      /*
+       * Convert IEEE64 to Geos80 FP number.
+       */
+    FloatIEEE64ToGeos80( &numIEEE64 );
+    FloatPopNumber( &numGeos80 );
+
+    return numGeos80;
+
+}
+
+/*
+ ***************************************************************************
+ *		Code for DataStoreProcessClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *	MSG_GEN_PROCESS_OPEN_APPLICATION for DataStoreProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Create the Exchange Rate datastore.  This datastore is
+ * 		sharable and contains four fields:  "timestamp,"
+ *		"country," "currency" and "exchange rate."
+ *		The "country" field is designated as the key field.
+ *
+ * PARAMETERS:	AppAttachFlags	attachFlags,
+ *		MemHandle	launchBlock,
+ *		MemHandle	extraState
+ *
+ * RETURN:	Void.
+ *
+ * STRATEGY:	@callsuper to do the usual open stuff.
+ *		Set up parameters for new datastore then call
+ *		DataStoreCreate().  If new datastore is successfully
+ *		created, add additional (non-key) fields.
+ *		(Note:  no data is added in
+ *	    	this routine; see MSG_DS_PROCESS_ADD_RECORD.)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LAF	12/96		Initial version
+ ***********************************************************************/
+@method DataStoreProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    DataStoreCreateParams	params;	/* parameters for new datastore */
+    FieldDescriptor		field; /* attributes for a new field */
+    FieldID			fid; /* identifier for a field */
+
+	/* name of new datastore */
+    static TCHAR dsName[] = "Exchange Rates";
+
+        /* names of fields to add */
+    TCHAR field1[] = "country";
+    TCHAR field2[] = "currency";
+    TCHAR field3[] = "exchange rate";
+
+	/* let system do the usual open set-up */
+    @callsuper();
+
+        /* define the "country" field; this will become the key field. */
+    field.FD_name = field1;
+    field.FD_data.FD_type = DSFT_STRING;
+    field.FD_data.FD_category = FC_NAME;
+    field.FD_data.FD_flags = 0; /* default sort direction is ascending */
+
+	/* set parameters for new datastore file */
+    params.DSCP_name = dsName;		/* name of new datastore */
+    params.DSCP_flags = DSF_TIMESTAMP;	/* add a timestamp field */
+    params.DSCP_keyList = &field;	/* key field(s) */
+    params.DSCP_keyCount = 1; 		/* number of fields in the key */
+
+	/* object to receive notification when the datastore is modified */
+    params.DSCP_notifObject = oself;
+
+	/*
+	 * access rights when the datastore is opened;
+	 * default is sharable (to make access exclusive to the opening
+	 * app, pass DSOF_EXCLUSIVE).
+	 */
+    params.DSCP_openFlags = 0; 
+
+	/* 
+	 * Create the new datastore file.  If there's a problem
+	 * creating it, put up an "error" dialog box; if it's successfully
+	 * created, add the additional fields.
+	 */
+    if ( DataStoreCreate(&params, &dsToken) != DSE_NO_ERROR )
+    {
+	UserStandardDialog( (TCHAR *) 0, 
+			    (TCHAR *) 0, 
+			    (TCHAR *) 0, 
+			    (TCHAR *) 0,
+			  "Could not create the datastore file used \
+			  in this application.  Exit and restart.",
+			  (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) );
+	return;
+    }
+
+	/* add currency field */
+    field.FD_name = field2;
+    field.FD_data.FD_type = DSFT_STRING;
+    field.FD_data.FD_category = FC_NONE;
+    field.FD_data.FD_flags = 0; /* default sort direction is ascending */
+    DataStoreAddField(dsToken, &field, &fid);
+
+	/* add exchange rate field */
+    field.FD_name = field3;
+    field.FD_data.FD_type = DSFT_FLOAT;
+    field.FD_data.FD_category = FC_NONE;
+    field.FD_data.FD_flags = 0; /* default sort direction is ascending */
+    DataStoreAddField(dsToken, &field, &fid);
+
+	/* 
+	 * Now that we're done creating the new datastore, close it.
+	 */
+    DataStoreClose(dsToken);
+}
+
+/***********************************************************************
+ *	MSG_GEN_PROCESS_CLOSE_APPLICATION for DataStoreProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Deletes the "Exchange Rates" datastore when user
+ *		exits the application.
+ *
+ * PARAMETERS:  None.
+ *
+ * RETURN:	MemHandle (handle to extra state block)
+ *		This app returns NULL since nothing is saved to state.
+ *
+ * STRATEGY:	Call DataStoreDelete() to delete the file
+ *		then @callsuper() to do the usual close procedure.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LAF	12/96		Initial version
+ ***********************************************************************/
+@method DataStoreProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+	/* delete the named datastore */
+    DataStoreDelete ( "Exchange Rates" );
+
+	/* let system do regular close housekeeping */
+    return @callsuper();
+}
+
+/***********************************************************************
+ *	       MSG_DS_PROCESS_ADD_RECORD for DataStoreProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Adds a new record (plus data) to the "Exchange Rates"
+ *		datastore.
+ *
+ * PARAMETERS:	None.
+ *
+ * RETURN:	Void.   
+ *
+ * STRATEGY:	- Get text from text input object into a buffer.
+ *		- Open the datastore.
+ *	    	- Call DataStoreNewRecord() to add a new record.
+ *		- Use a "for" loop to write the inputted text to its
+ *		  corresponding field and to get the inputted text
+ *		  into a display object.  (Add tabs and a newline
+ *		  to help format the displayed text.)
+ *		- Save the record to the file.
+ *		- Close the datastore.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LAF	12/96		Initial version
+ ***********************************************************************/
+@method DataStoreProcessClass, MSG_DS_PROCESS_ADD_RECORD
+{
+	/* 
+	 * Buffer to hold inputted text and converted FloatNum value. 
+	 * This buffer needs to be of size ...NORMAL_BUF_LEN to
+	 * accommodate the Float-to-Ascii value.
+	 */
+    TCHAR	     buffer[FLOAT_TO_ASCII_NORMAL_BUF_LEN];
+    word	     textLen, i;
+    WWFixedAsDWord   rate;
+    FloatNum	     rateAsFloat; /* rate value converted to FloatNum */
+    optr	     child; 	/* to reference the input objects */
+
+	/* 
+	 * When saving changes to a record, DataStoreSaveRecord() returns
+	 * both the record number and record ID of the saved record.
+	 */
+    dword	recordNum, recordID;
+
+	/* open the "Exchange Rates" datastore */
+    if( DSE_NO_ERROR == DataStoreOpen("Exchange Rates", oself, 0, &dsToken) )
+    {
+	    /* add a new record */
+	if( DSDE_NO_ERROR == DataStoreNewRecord(dsToken) )
+	{
+		/* 
+		 * Get data from each input object and write
+	 	 * the data to the corresponding field.
+		 * NOTE:  Because this datastore contains a TIMESTAMP
+		 * field, the country field is field 1 (not 0).
+		 * So we have to add "1" to i when we call
+		 * DataStoreSetField().
+		 */
+	    for ( i = 0; i < 3; i++ )
+	    {
+		    /* get optr of each input object */
+	        child = @call AddRecBox::MSG_GEN_FIND_CHILD_AT_POSITION(i);
+
+		if ( i < 2 )
+		{
+			/* get text from text object into a buffer */
+		    textLen = @call child::MSG_VIS_TEXT_GET_ALL_PTR(buffer);
+
+			/* write text from buffer to the correct field */
+		    DataStoreSetField( dsToken, 
+				       NULL, 
+				       i+1, 
+				       (void *)buffer, 
+				       textLen );
+
+			/* get text into the display object */
+		    @call DisplayText::MSG_VIS_TEXT_APPEND_PTR(
+							buffer, 
+							textLen );
+
+			/* add a tab between fields */
+		    strcpy( buffer, "\t" );
+		    @call DisplayText::MSG_VIS_TEXT_APPEND_PTR(
+							buffer,
+							strlen(buffer) );
+
+			/* clear the text (input) object */
+		    @call child::MSG_VIS_TEXT_DELETE_ALL();
+		}
+		else
+		{
+			/* get input from GenValue object (RateField) */
+		    rate = @call child::MSG_GEN_VALUE_GET_VALUE();
+
+			/* 
+			 * Since MSG...GET_VALUE returns a WWFixedAsDWord,
+			 * we need to convert it to a FloatNum to store
+			 * it properly in the datastore file.
+			 */
+		    rateAsFloat = WWFixedAsDWordToFloatNum( rate );
+
+			/* write converted value to the exch rate field */
+		    DataStoreSetField( dsToken, 
+				       NULL, 
+				       i+1, 
+				       &rateAsFloat, 
+				       sizeof(rateAsFloat) );
+			/* 
+			 * Now convert the float value to ASCII so
+			 * we can display it in the display text object
+			 * (DisplayText) along with the other inputted data.
+			 */
+		    textLen = FloatFloatToAscii_StdFormat( 
+							buffer,
+						        &rateAsFloat,
+							FFAF_FROM_ADDR,
+							7,
+							5 );
+
+     		    @call DisplayText::MSG_VIS_TEXT_APPEND_PTR( buffer, 
+							        textLen );
+			/* add a newline between records */
+		    strcpy( buffer, "\r" );
+		    @call DisplayText::MSG_VIS_TEXT_APPEND_PTR(
+						buffer,
+						strlen(buffer) );
+
+			/* clear the GenValue object */
+	   	    @call child::MSG_GEN_VALUE_SET_VALUE(
+						MakeWWFixed(.1),
+						FALSE );
+		}
+	    } /* end of for loop */
+
+		/* save data to the datastore file */
+      	    DataStoreSaveRecord(dsToken, 0, 0, &recordNum, &recordID);
+	}
+	DataStoreClose(dsToken);
+    }
+	/* now that data has been added, enable the "Options" menu */
+    @send OptionMenu::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+}
+
+/***********************************************************************
+ *	       MSG_DS_PROCESS_SEARCH_DS for DataStoreProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Searches for a string on the Country field.
+ *		Searches all records in the "Exchange Rates" datastore.
+ *		Allows use of "*" as a multiple character wild card.
+ *
+ * PARAMETERS:	None.
+ *
+ * RETURN:	Void.       
+ *
+ * STRATEGY:	- Get text from text input object into a buffer.  (If
+ *		  no text was entered, put up error dialog and return.)
+ *		- Open the datastore.
+ *	    	- Check for presence of wild card(s); if found, replace
+ *		  with constant defined in /CInclude/Objects/vTextC.goh.
+ *		- Set up search parameters.
+ *		- Call DataStoreStringSearch() to do the search.
+ *		- If a match is found, put up a dialog that displays the
+ *		  matching record number and contents of its "country" field
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LAF	12/96		Initial version
+ ***********************************************************************/
+@method DataStoreProcessClass, MSG_DS_PROCESS_SEARCH_DS
+{
+    SearchParams	params;
+    TCHAR		buffer[MAX_FIELD_LENGTH + 1], *bufferPtr;
+    TCHAR		match[2]; /* to hold RecordNum of matching record */
+    word		textLen, size, i;
+    MemHandle		dummy;
+    RecordID		recordID;
+
+	/* get text from text input object */
+    textLen = @call SearchText::MSG_VIS_TEXT_GET_ALL_PTR(buffer);
+
+	/* if no text was entered, put up an error dialog  */
+    if ( textLen == 0 )
+    {
+	UserStandardDialog( (TCHAR *) 0, 
+	                    (TCHAR *) 0, 
+			    (TCHAR *) 0, 
+			    (TCHAR *) 0,
+			    "No text was entered.",
+			  (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) );
+	return;
+    }
+
+	/* open the datastore */
+    if( DSE_NO_ERROR == DataStoreOpen("Exchange Rates", oself, 0, &dsToken) )
+    {
+	    /* check for wild cards */
+	for ( i = 0; i < textLen; i++ )
+	{
+	    if ( buffer[i] == '*' )
+	    {
+		buffer[i] = WC_MATCH_MULTIPLE_CHARS;
+	    }
+	}
+
+	    /* 
+	     * Set up search parameters.
+	     */
+	params.SP_searchType = ST_FIELD; /* search by FieldID */
+	params.SP_startRecord = 0;	 /* start search at first record */
+	params.SP_maxRecords = -1;   /* search all records
+					until a match is found or there
+				        are no more records to search */
+	params.SP_startField = 1;    /* search "country" field only */
+	params.SP_category = 0;      /* used to specify a field category if
+				        SP_searchType is ST_CATEGORY */
+	params.SP_searchString = buffer; /* string to search for */
+	params.SP_flags = SF_IGNORE_CASE;
+
+	    /*
+	     * Do the search.  If a match is found, display the
+	     * matching record number and the contents of its "country"
+	     * field in a dialog box.  If no match is found, put up 
+	     * an error dialog.
+	     */
+	if ( DSE_NO_ERROR ==  DataStoreStringSearch(dsToken, &params) )
+	{
+		/* 
+		 * Load the the matching record, i.e., make it
+		 * the "current" record.  
+		 * NOTE:  DataStoreStringSearch() returns the record
+		 * number of the last examined record in SP_startRecord.
+		 */
+	    if( DSDE_NO_ERROR == DataStoreLoadRecordNum( 
+						dsToken,
+						params.SP_startRecord, 
+						&recordID) )
+	    {
+		bufferPtr = buffer;
+		size = sizeof(buffer);		
+
+		    /* 
+		     * Retrieve contents of the "country" field.
+		     * NOTE:  in the following code, we reference
+		     * the field by its name (as opposed to its FieldID).
+		     */
+		DataStoreGetField( dsToken, 
+				   "country", 
+				   0,
+				   (void **)&bufferPtr, 
+				   &size, 
+				   &dummy );
+
+		    /* get the field's size */
+		DataStoreGetFieldSize( dsToken, "country", 0, &size );
+		
+		    /* null-terminate the string */
+		buffer[size] = '\0';
+
+		    /* write matching record number to a string */
+		sprintf( match, "%u", params.SP_startRecord );
+
+	        UserStandardDialog( (TCHAR *) 0, 
+			            (TCHAR *) 0, 
+			            (TCHAR *) buffer, 
+			            (TCHAR *) match,
+			  "Matching Record:\r\01 - \02",
+			  (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+		    /* empty the record buffer */
+		DataStoreDiscardRecord(dsToken);
+	    }
+	}
+	else
+	{
+	     UserStandardDialog( (TCHAR *) 0, 
+	                         (TCHAR *) 0, 
+			         (TCHAR *) 0, 
+			         (TCHAR *) 0,
+			  "No match found.",
+			  (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) );
+	}
+	    /* 
+	     * Regardless of whether a match was found, close the
+	     * the datastore.
+	     */
+	DataStoreClose(dsToken);
+    }
+}
+
+/***********************************************************************
+ *	  MSG_DS_PROCESS_BUILD_INDEX for DataStoreProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Builds an index based on the "currency" field
+ *		in descending order.  (Storage order remains based on the
+ *		key field, which is the "country" field.)
+ *
+ * PARAMETERS:	None.
+ *
+ * RETURN:	Void.   
+ *
+ * STRATEGY:	- Set up index parameters.
+ *		- Open the datastore.	    	    
+ *	    	- Call DataStoreBuildIndex() to build the index.
+ *		- Call MemLock() to get a pointer to the index block.
+ *		- Increment the pointer past the IndexArrayBlockHeader
+ *		  to add "extra" data.  (This is dummy data.)
+ *		- Unlock the block.
+ *		- Put up a dialog if index is successfully built.
+ *		- Close the datastore.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LAF	12/96		Initial version
+ ***********************************************************************/
+@method DataStoreProcessClass, MSG_DS_PROCESS_BUILD_INDEX
+{
+	/* index parameters */
+    DataStoreIndexCallbackParams	params;
+
+	/* handle of allocated block containing the index */
+    MemHandle				indexHandle;
+
+	/* extra data to be added to the index block */
+    TCHAR				indexData[] = "Index created today.";
+
+	/* open the datastore */
+    if( DSE_NO_ERROR == DataStoreOpen("Exchange Rates", oself, 0, &dsToken) )
+    {
+	    /*  set up index parameters */
+	params.DSICP_indexField = 2; /* field on which to base index */
+	params.DSICP_sortOrder = SO_DESCENDING; /* sort direction */
+	params.DSICP_cbData = NULL; /* used only with a callback */ 
+
+	    /* build the index */
+	if ( DSSE_NO_ERROR == DataStoreBuildIndex( 
+				dsToken, 
+				&indexHandle,
+				sizeof(IndexArrayBlockHeader)+
+				LocalStringSize(indexData)+sizeof(TCHAR),
+				&params, 
+				NULL) )
+	{
+		/* 
+		 * the block containing the index begins with
+		 * a header followed by "extra data" (if any)
+		 * and then the index itself
+		 */
+	    IndexArrayBlockHeader *pIndex;
+
+		/* lock the block down */
+	    MemLock(indexHandle);
+
+		/* dereference its handle to get a pointer */
+	    pIndex = MemDeref(indexHandle);
+
+		/* increment the pointer past the block header */
+	    pIndex++; 
+
+		/* now copy the "extra data" to the block */
+	    strcpy( (TCHAR *) pIndex, indexData );
+
+		/* 
+		 * Now that we're through with the block,
+		 * be sure to unlock it.
+		 */
+	    MemUnlock(indexHandle);
+
+		/* notify the user that the index has been built */
+	    UserStandardDialog( (TCHAR *) 0, 
+			        (TCHAR *) 0, 
+			        (TCHAR *) 0,
+			        (TCHAR *) 0,
+			  "Index successfully built.",
+			  (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) );
+	}
+	DataStoreClose(dsToken);
+    }
+}
+
+/***********************************************************************
+ *	MSG_DS_PROCESS_ENUMERATE_DS for DataStoreProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Enumerates through each record of the datastore
+ *		to find the maximum value of the "exchange rate" field.
+ *
+ * PARAMETERS:	None.
+ *
+ * RETURN:	Void.   
+ *
+ * STRATEGY:	- Set enumData to 0 for initial comparison.
+ *	    	- Open the datastore.
+ *	    	- Call DataStoreRecordEnum() to enumerate.
+ *		- Have callback return FALSE so that enumeration
+ *		  continues until there are no more records.
+ *		- At end of enumeration, convert "max" value
+ *		  to ASCII (from a FloatNum).
+ *		- Display "max" value in a dialog box.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	LAF	12/96		Initial version
+ ***********************************************************************/
+@method DataStoreProcessClass, MSG_DS_PROCESS_ENUMERATE_DS
+{
+    FloatNum	enumData = 0; /* data passed to the callback */
+    RecordNum	startRec = 0; /* record at which to start enumeration */
+    TCHAR	buffer[FLOAT_TO_ASCII_NORMAL_BUF_LEN];
+
+	/* open the datastore */
+    if( DSE_NO_ERROR == DataStoreOpen("Exchange Rates", oself, 0, &dsToken) )
+    {
+	    /* 
+	     * Enumerate through the datastore starting at the first record;
+	     * find the maximum value of the "exchange rate" field.
+	     */
+	if( DSE_NO_MORE_RECORDS == DataStoreRecordEnum( dsToken,
+							&startRec, 
+							0, 
+							&enumData, 
+							EnumCallback) )
+	{
+		/* convert float value to ASCII */
+	    FloatFloatToAscii_StdFormat( buffer,
+					 &enumData,
+					 FFAF_FROM_ADDR | FFAF_NO_TRAIL_ZEROS,
+					 7,
+					 5 );
+
+		/* display the max value in a dialog */
+	    UserStandardDialog( (TCHAR *) 0, 
+			        (TCHAR *) 0, 
+			        (TCHAR *) 0,
+			        (TCHAR *) buffer,
+			  "Maximum value of \"exchange rate\" field is \01.",
+			  (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) );
+ 	}
+	DataStoreClose(dsToken);
+    }
+}
+
+/***********************************************************************
+ *	       EnumCallback for MSG_DS_PROCESS_ENUMERATE_DS
+ ***********************************************************************
+ * SYNOPSIS:	Called by DataStoreRecordEnum() on each record.
+ *		Finds the max value in the "exchange rate" field.
+ *
+ * PARAMETERS:	RecordHeader	*record
+ *		void		*enumData
+ *
+ * RETURN:	FALSE to continue enumeration
+ *
+ * STRATEGY:	- Compare each record to the value in EnumData.
+ *		- If the value in the record is greater than
+ *		  the current value of enumData, write the record's
+ *		  value to enumData.
+ *		- Continue enumeration through entire datastore until
+ *		  there are no more records to examine.
+ ***********************************************************************/
+Boolean 
+EnumCallback( RecordHeader	*record, 
+	      void 		*enumData )
+{
+    FloatNum	*rateBufferPtr;
+    FieldType	type;
+    word	size;
+
+	/* get a pointer to the "exchange rate" field (FieldID = 3) */
+    if( DSDE_NO_ERROR == DataStoreGetFieldPtr( dsToken, record, 3, 
+		(void **)&rateBufferPtr, &type, &size) )
+    {
+	    /* compare the value in the field to the value of enumData */
+	if ( *rateBufferPtr > *((FloatNum *)enumData) )
+	{
+		/*
+		 * If the field's value is greater than the
+		 * value of enumData, write the field's value
+		 * to enumData.
+		 */
+	    *((FloatNum *)enumData) = *rateBufferPtr;
+	}
+    }
+	/* return FALSE to continue enumeration */
+    return FALSE;
+}
+

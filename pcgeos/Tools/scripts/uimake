@@ -1,0 +1,94 @@
+#!/bin/sh -
+#
+#	File: uimake
+#
+#	This file is a shell script to produce a .geo file from a .ui file
+#
+#	Usage: uimake <file>
+#
+#	$Id: uimake,v 1.4 89/09/24 16:19:14 adam Exp $
+#
+
+files=""
+doasap=""
+for i in "$@"; do
+    case $i in
+    	-a) doasap="1"
+	    ;;
+    	-x) set -x
+	    ;;
+	*)  files="$files $i"
+	    ;;
+    esac
+done
+
+if [ -z "$files" ]; then
+    echo ""
+    echo "    Usage: uimake [-a] <file>"
+    echo ""
+    echo "This program takes <file>.ui and produces <file>.geo"
+    echo ""
+else
+    cwd=`pwd`
+    rootdir=`expr $cwd : '\(.*/pcgeos\)/'`
+    develroot=`expr $cwd : '\(.*/pcgeos/[^/]*\)/*'`
+    for i in $files; do
+
+	if [ ! -f $i.ui ]
+	then
+	    echo File $i.ui not found
+	    exit 1
+	fi
+
+	echo uic $i.ui...
+	if uic -p /usr/public/lib/gcc/cpp \
+		-I$develroot/Include -I$rootdir/Include -DUIMAKE \
+						$i.ui -o $i.rdef; then
+	    : do nothing
+	else
+	    echo "Errors encountered."
+	    exit 1
+	fi
+
+	echo create $i.rasm...
+	if [ -f template.asm ]
+	then
+		sed -e "
+			s/FILENAME/$i/g
+		" template.asm > $i.rasm
+	else
+		sed -e "
+			s/FILENAME/$i/g
+		" $rootdir/Include/template.asm > $i.rasm
+	fi
+
+	echo masm86 $i.rasm...
+	if masm86 +u -Ml -t -I$develroot/Include -I$rootdir/Include \
+						$i.rasm -o $i.obj; then
+	    : do nothing
+	else
+	    echo "Errors encountered."
+	    exit 1
+	fi
+
+	if [ $doasap ]; then
+	    echo asap $i.rasm...
+	    asap -o - -I$rootdir/Include $i.rasm | sed \
+				-f /staff/pcgeos/Tools/gTrimTcl.sed > $i.tcl
+	fi
+
+	echo link $i.obj...
+	if link86 +u -map -ni \
+		-L$develroot/Include -L$rootdir/Installed/Include $i.obj \
+						-lkernel.lobj -o $i.exe; then
+	    : do nothing
+	else
+	    echo "Errors encountered."
+	    exit 1
+	fi
+
+	echo exe2geos $i...
+	exe2geos -m $i
+
+    done #for
+fi

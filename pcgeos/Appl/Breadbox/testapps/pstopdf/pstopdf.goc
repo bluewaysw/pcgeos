@@ -1,0 +1,144 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Test Applications
+ * MODULE:	PS to PDF
+ * FILE:		ps2pdf.goc
+ * AUTHOR:	jfh  4/14
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <ansi/string.h>
+@include "ps2pdf.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+@class	TestProcessClass, GenProcessClass ;
+	@message void MSG_TEST_DROP_TO_DOS();
+
+@endc
+
+@classdecl	TestProcessClass, neverSaved ;
+
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass TestApp = {
+	 GI_visMoniker = list { @TestTextMoniker }
+	 GI_comp = @TestPrimary;
+	 gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TestPrimary;
+}
+
+@visMoniker TestTextMoniker = "PS to PDF";
+
+@end	AppResource
+
+@start	Interface;
+
+@object GenPrimaryClass TestPrimary  = {
+	 GI_comp = @PSNameEntryWindow, @StatusWindow, @DoItButton;
+	 HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenTextClass PSNameEntryWindow = {
+	 GI_visMoniker = "Enter PS File Name:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = 13;
+	 GTXI_text = "NAME.PS";
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass StatusWindow = {
+	 GI_visMoniker = "What's happening:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTriggerClass DoItButton = {
+	GI_visMoniker = "Do It";
+	GTI_actionMsg = MSG_TEST_DROP_TO_DOS;
+	GTI_destination = process;
+}
+
+@end Interface
+
+/*
+ ***************************************************************************
+ *		Code for TestProcessClass
+ ***************************************************************************
+ */
+
+  /***********************************************************************
+ *
+ * MESSAGE:	MSG_TEST_DROP_TO_DOS for TestProcessClass
+ *
+ * DESCRIPTION:
+ *  We'll be putting the GS510 files a folder in PRIVDATA\SPOOL and
+ *  directing the .PS printer output to SPOOL.  The PDF file will go
+ *  to SPOOL due to limits on arguement length in DOSBox.  After converion
+ *  we'll have the batch file move the PDF to DOS_ROOM
+ *
+ *
+ ***********************************************************************/
+@method TestProcessClass, MSG_TEST_DROP_TO_DOS
+{
+	char		name[13];
+	word	p2perror;
+
+	p2perror = 0;
+
+	/* get the file name */
+	@call PSNameEntryWindow::MSG_VIS_TEXT_GET_ALL_PTR(name);
+
+	/* show what's going on */
+	@call StatusWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR("Converting...", 0);
+
+   /* drop to DOS and do the conversion using the lib routine */
+	/*p2perror = */ConvertToPDF(/*&name*/);
+
+	/* tell user we're done */
+	@call StatusWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR("Done!", 0);
+
+	/* XXX at some point we want to delete the .PS file */
+
+ /*	if(p2perror) {
+		@call StatusWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR("Some DOSExec error", 0);
+		}
+ */
+}
+
+
+
+
+
+

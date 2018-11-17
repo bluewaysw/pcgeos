@@ -1,0 +1,974 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Sample Applications
+MODULE:		Mailbox Library Samples
+FILE:		songlistMailbox.goc
+
+AUTHOR:		Chung Liu, Dec  9, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+	SLProcessMETA_MAILBOX_CREATE_MESSAGE
+	SLCreateAppRef
+	SLCreateCurrentSongBody
+	SLCreateCurrentRecordBody
+	SLCreateCurrentArtistBody
+	SLCreateCurrentAllArtistsBody
+	SLFillInRMArgs
+
+	SLProcessMETA_MAILBOX_NOTIFY_MESSAGE_AVAILABLE
+	SLMergeSLDataTrees
+	SLAddArtistsCallback
+	SLMergeDataBlock
+	SLAddRecordsCallback
+	SLAddSongsCallback
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	12/ 9/94   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: songlistMailbox.goc,v 1.1 97/04/04 16:40:14 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@include <songlistConstant.goh>
+@include <songlistUI.goh>
+#include <songlistProcess.h>
+#include <songlistUtils.h>
+@include <songlistMailbox.goh>
+
+@classdecl SLSendControlClass;
+
+
+/***********************************************************************
+ *		MSG_META_MAILBOX_CREATE_MESSAGE for SLProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Create the message body, and call back the 
+ *                  MailboxSendControl object to register the message.
+ * PARAMETERS:	    void (optr sendControl, word transHandle)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/12/94   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method SLProcessClass, MSG_META_MAILBOX_CREATE_MESSAGE
+{
+    /* The list of formats in which this application can create the message
+     * body is very short -- only SMDFID_SONGLIST_TREE/MANUFACTURER_ID_SDK.
+     * Applications that can generate various data formats should list them
+     * all, to be passed to MSG_MAILBOX_SEND_CONTROL_CHOOSE_FORMAT.  
+     * The preferred format for the application should be listed first, 
+     * because transport drivers that use the generic data driver 
+     * interface (such as the Socket Transport Driver) simply select the 
+     * first format listed.
+     */
+    MailboxDataFormat possibleFormats[] = {
+	{SMDFID_SONGLIST_TREE, MANUFACTURER_ID_SDK },
+	{GMDFID_END_OF_LIST, MANUFACTURER_ID_GEOWORKS }
+    };
+    MailboxDataFormat dataFormat;
+    MSCRegisterMessageArgs rmArgs;
+    VMTreeAppRef appRef;
+    char *summary = "Song List Data";
+    MailboxObjectType objType;
+
+    /* Ask the send control what data type the user selected */
+    objType = @call sendControl::
+    	MSG_MAILBOX_SEND_CONTROL_GET_OBJECT_TYPE(transHandle);
+
+    /* Ask the send control to pick a format to use.  The send control in
+     * turn will ask the transport driver selected by the user by calling
+     * DR_MBTD_CHOOSE_FORMAT.  
+     */
+    dataFormat = @call sendControl::
+	MSG_MAILBOX_SEND_CONTROL_CHOOSE_FORMAT(possibleFormats, transHandle);
+    
+    /* Check if we can use the format we asked for. */
+    if (dataFormat.MDF_manuf == MANUFACTURER_ID_SDK
+	&& dataFormat.MDF_id == SMDFID_SONGLIST_TREE) {
+	
+	/* No problem. We can create a message body in the data format
+	 * SMDFID_SONGLIST_TREE/MANUFACTURER_ID_SDK.  After the message
+	 * body is created, we are returned an app-ref to the body.
+	 * In our case, the app-ref is of type VMTreeAppRef, because 
+	 * the VM Tree Data Driver is used to store the message body.
+	 */
+	if (SLCreateAppRef(objType, &appRef)) {
+	    /* Message body was created successfully, and appRef was filled
+	     * in with the VMTreeAppRef to the created body.  Proceed by
+	     * properly setting up the arguments an calling the send control
+	     * to register the message.
+	     */
+	    SLFillInRMArgs(&rmArgs, &appRef, summary);
+	    @call sendControl::
+		MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE(&rmArgs,
+							  transHandle);
+	    
+	} else {
+	    /* The message body could not be created, possibly because
+	     * objType is not valid within the current context.  For 
+	     * example, if objType is MOT_CURRENT_SONG, but there is not
+	     * a song currently selected, then a body cannot be created.
+	     * Whatever the case, the user was already notified of the
+	     * reason for failure with a dialog box put up from within
+	     * the call to SLCreateAppRef().  We only have to tell the
+	     * send control that no message will be created for the
+	     * transHandle we were passed.
+	     */
+	    @call sendControl::
+		MSG_MAILBOX_SEND_CONTROL_CANCEL_MESSAGE(transHandle, 0);
+	}
+    } else {
+	/* The send control told us that the transport driver selected
+	 * cannot use the data format we requested.  Probably we are
+	 * dealing with a special kind of transport driver that needs to
+	 * interpret the contents of the message body data, and therefore
+	 * accepts only a limited set of data formats.
+	 *
+	 * The send control handles canceling the transaction for us.
+	 *
+	 * Note that the send control also produces an error message, but
+	 * we want to be really sure the user knows what's up... :)
+	 */
+	UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0,
+			   "The transport option selected does not support the data format for this application.", 
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+    }
+}	/* End of MSG_META_MAILBOX_CREATE_MESSAGE.	*/
+
+
+/***********************************************************************
+ *		MSG_META_MAILBOX_MESSAGE_REGISTERED for SLProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Clean up after a message registration has been tried
+ * PARAMETERS:	    void (MemHandle args)
+ * SIDE EFFECTS:    VM file for the body is closed
+ *		    body is deleted if message couldn't be registered
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	4/27/95		Initial Revision
+ *
+ ***********************************************************************/
+@extern method SLProcessClass, MSG_META_MAILBOX_MESSAGE_REGISTERED
+{
+    const MSCMessageRegisteredArgs *argsPtr;
+    const VMTreeAppRef 	    	*appRef;
+
+    /* Lock down the info about the registration so we can see what the
+     * result was and get a pointer to the body reference
+     */
+    argsPtr = (const MSCMessageRegisteredArgs *)MemLock(args);
+    appRef = MSCMRA_BODY_REF(argsPtr, VMTreeAppRef);
+
+    if (argsPtr->MSCMRA_error != ME_SUCCESS) {
+	/* The message couldn't be registered, so we have to delete the
+	 * body, since we stored it in the VM store
+	 */
+	VMFreeVMChain(appRef->VMTAR_vmFile, appRef->VMTAR_vmChain);
+    }
+
+    /* The message body was created in a VM file from the Mailbox
+     * Library's VM store.  Thus we need to inform the Mailbox 
+     * Library that we are done using the file.  If the message was
+     * successfully registered, the blocks we created for the message body
+     * remain in the file. They will get deleted after the message is
+     * successfully transmitted because we passed the MMF_DELETE_BODY_AFTER_-
+     * TRANSMISSION flag when registering the message.
+     */
+    MailboxDoneWithVMFile(appRef->VMTAR_vmFile);
+    MemUnlock(args);
+}
+
+/***********************************************************************
+ *		SLCreateAppRef
+ ***********************************************************************
+ * SYNOPSIS:	Create a message body and fill in the app-ref for the body.
+ *              If the message body can't be created, the user is notified
+ *              of the reason through a dialog box.
+ *             
+ * CALLED BY:	SLProcessMETA_MAILBOX_CREATE_MESSAGE
+ * RETURN:	TRUE if body was created and *appRefp was filled in.
+ *              FALSE if couldn't create the message body.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/12/94   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+SLCreateAppRef (MailboxObjectType objType, VMTreeAppRef *appRefp)
+{
+    /* The MailboxObjectType selected by the user determines what will
+     * go into the message body.  Sometimes objType is not valid within
+     * the context of the application -- in this case the user is notified
+     * through a dialog box, and this function returns FALSE.
+     */
+    if (objType == MOT_ALL_ARTISTS) {
+	return (SLCreateAllArtistsBody(appRefp));
+    } else if (objType == MOT_CURRENT_ARTIST) {
+	return (SLCreateCurrentArtistBody(appRefp));
+    } else if (objType == MOT_CURRENT_RECORD) {
+	return (SLCreateCurrentRecordBody(appRefp));
+    } else if (objType == MOT_CURRENT_SONG) {
+	return (SLCreateCurrentSongBody(appRefp));
+    }
+
+    /* Should never get to this point because all legal objType values
+     * are accounted for.
+     */
+    return (FALSE);
+}	/* End of SLCreateAppRef.	*/
+
+
+/***********************************************************************
+ *		SLCreateCurrentSongBody
+ ***********************************************************************
+ * SYNOPSIS:	Create a message body containg the currently selected
+ *              song, and fill in appRefp with the app-ref for the body.
+ * CALLED BY:	SLCreateAppRef()
+ * RETURN:	TRUE if body was created.
+ *              FALSE if body couldn't be created.  Dialog box informs the
+ *              user of the failure reason.
+ *              song selection.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/12/94   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+SLCreateCurrentSongBody (VMTreeAppRef *appRefp)
+{
+    VMFileHandle vmfh;
+    word vmStatus;
+    VMBlockHandle songBlock, recordBlock, artistBlock, topBlock;
+    
+    if (SONGLIST_CURRENT_SONG_BLOCK) {
+	/* Since the body created is a VM tree, we ask the Mailbox Library's
+	 * VM store to provide us with a VM file.  This way we can mark the
+	 * data non-volatile (MMF_BODY_DATA_VOLATILE flag clear) when 
+	 * registering the message, saving the data driver the work of
+	 * copying the body data into its own storage area.
+	 */
+	vmfh = MailboxGetVMFile(4, &vmStatus);  /* note that we add 4 blocks
+						 * to the VM file.  See below
+						 * how the body is created.
+						 */
+	if (vmfh) {
+	    /* The message body for a single song is a tree structured like
+	     * the data model for this application, except that only the
+	     * song's artist and record, and the song itself, are included.
+	     */
+	    songBlock = SLAllocAndInitDataBlockLikeThisOther
+		(SONGLIST_VM_FILE, SONGLIST_CURRENT_SONG_BLOCK,
+		 SL_SONG_ID, vmfh);
+	    recordBlock = SLAllocAndInitDataBlockLikeThisOther
+		(SONGLIST_VM_FILE, SONGLIST_CURRENT_RECORD_BLOCK,
+		 SL_RECORD_ID, vmfh);
+	    SLVMTreeAddChild(vmfh, recordBlock, songBlock);
+	    artistBlock = SLAllocAndInitDataBlockLikeThisOther
+		(SONGLIST_VM_FILE, SONGLIST_CURRENT_ARTIST_BLOCK,
+		 SL_ARTIST_ID, vmfh);
+	    SLVMTreeAddChild(vmfh, artistBlock, recordBlock);
+	    topBlock = SLAllocAndInitDataBlockLikeThisOther
+		(SONGLIST_VM_FILE, SONGLIST_VM_MAP_BLOCK,
+		 SL_MAP_ID, vmfh);
+	    SLVMTreeAddChild(vmfh, topBlock, artistBlock);
+	    
+	    /* Fill in *appRefp with the app-ref for the body. */
+	    appRefp->VMTAR_vmFile = vmfh;
+	    appRefp->VMTAR_vmChain = VMCHAIN_MAKE_FROM_VM_BLOCK(topBlock);
+	    return (TRUE);
+	} else {
+	    /* Unable to get a VM file from the VM store.  Whatever the reason,
+	     * inform the user that we cannot proceed.
+	     */
+	    UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0,
+			       "Unable to get a file to store the message body.",
+			       (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			       (GIT_NOTIFICATION <<
+				CDBF_INTERACTION_TYPE_OFFSET));
+	    return (FALSE);
+	}
+    } else {
+	/* The careless user wants to send MOT_CURRENT_SONG without 
+	 * having first selected a song.
+	 */
+	UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0,
+			   "There is no current song selection.",
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_NOTIFICATION <<
+			    CDBF_INTERACTION_TYPE_OFFSET));
+	return (FALSE);
+    }
+}	/* End of SLCreateCurrentSongBody.	*/
+
+
+/***********************************************************************
+ *		SLCreateCurrentRecordBody
+ ***********************************************************************
+ * SYNOPSIS:	Create a message body containing the currently selected
+ *              record, and fill in *appRefp with the app-ref for the body.
+ * CALLED BY:	SLCreateAppRef()
+ * RETURN:	TRUE if body was created.
+ *              FALSE if body couldn't be created.  Dialog box informs the
+ *              user of the failure reason.
+ *              song selection.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/12/94   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+SLCreateCurrentRecordBody (VMTreeAppRef *appRefp)
+{
+    VMFileHandle vmfh;
+    word vmStatus;
+    VMChain recordChain;
+    VMBlockHandle topBlock, artistBlock;
+
+    if (SONGLIST_CURRENT_RECORD_BLOCK) {
+	/* Create the body in a VM file provided by the VM Store. 
+	 * See comments in SLCreateCurrentSongBody() detailing the reason.
+	 * If we wanted, we could pre-compute the number of blocks that
+	 * will be added to the VM file; however, we can also pass
+	 * expectedNumBlocks = 0, which tells the VM store to assume a
+	 * default number of blocks will be added to the file.
+	 */
+	vmfh = MailboxGetVMFile(0, &vmStatus);  
+	if (vmfh) {
+	    /* The message body is a tree structured like the data tree for
+	     * this application, except that only the record's artist, the
+	     * record itself, and the songs for the record are includeed.
+	     */
+	    recordChain = VMCopyVMChain
+		(SONGLIST_VM_FILE,
+		 VMCHAIN_MAKE_FROM_VM_BLOCK(SONGLIST_CURRENT_RECORD_BLOCK),
+		 vmfh);
+	    artistBlock = SLAllocAndInitDataBlockLikeThisOther
+		(SONGLIST_VM_FILE, SONGLIST_CURRENT_ARTIST_BLOCK,
+		 SL_ARTIST_ID, vmfh);
+	    SLVMTreeAddChild(vmfh,
+			     artistBlock,
+			     VMCHAIN_GET_VM_BLOCK(recordChain));
+
+	    topBlock = SLAllocAndInitDataBlockLikeThisOther
+		(SONGLIST_VM_FILE, SONGLIST_VM_MAP_BLOCK,
+		 SL_MAP_ID, vmfh);
+	    SLVMTreeAddChild(vmfh, topBlock, artistBlock);
+	    
+	    appRefp->VMTAR_vmFile = vmfh;
+	    appRefp->VMTAR_vmChain = VMCHAIN_MAKE_FROM_VM_BLOCK(topBlock);
+	    return (TRUE);
+	} else {
+	    /* Unable to get a VM file from the VM store.  Whatever the reason,
+	     * inform the user that we cannot proceed. */
+	    UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0,
+			       "Unable to get a file to store the message body.",
+			       (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			       (GIT_NOTIFICATION <<
+				CDBF_INTERACTION_TYPE_OFFSET));
+	    return (FALSE);
+	}
+    } else {
+	/* The careless user wants to send MOT_CURRENT_SONG without 
+	 * having first selected a song. */
+	UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0,
+			   "There is no current record selection.",
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_NOTIFICATION <<
+			    CDBF_INTERACTION_TYPE_OFFSET));
+	return (FALSE);
+    }
+}	/* End of SLCreateCurrentRecordBody.	*/
+
+
+/***********************************************************************
+ *		SLCreateCurrentArtistBody
+ ***********************************************************************
+ * SYNOPSIS:	Create a message body containing the currently selected
+ *              artist, plus all the records and songs by that artist.
+ *              Fill in *appRefp with the app-ref for the body.
+ * CALLED BY:	SLCreateAppRef()
+ * RETURN:	TRUE if body was created.
+ *              FALSE if body couldn't be created.  Dialog box informs the
+ *              user of the failure reason.
+ *              song selection.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/12/94   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+SLCreateCurrentArtistBody (VMTreeAppRef *appRefp)
+{
+    VMFileHandle vmfh;
+    word vmStatus;
+    VMChain artistChain;
+    VMBlockHandle topBlock;
+
+    if (SONGLIST_CURRENT_ARTIST_BLOCK) {
+	/* Create the body in a VM store file.  Use default number of
+	 * expected blocks. 
+	 */
+	vmfh = MailboxGetVMFile(0, &vmStatus);
+	if (vmfh) {
+	    /* The message body for an artist is structured like the
+	     * data tree for the application, except that the only child of
+	     * the map block is the subtree headed by the currently selected
+	     * artist. */
+	    artistChain = VMCopyVMChain
+		(SONGLIST_VM_FILE,
+		 VMCHAIN_MAKE_FROM_VM_BLOCK(SONGLIST_CURRENT_ARTIST_BLOCK),
+		 vmfh);
+	    topBlock = SLAllocAndInitDataBlockLikeThisOther
+		(SONGLIST_VM_FILE, SONGLIST_VM_MAP_BLOCK,
+		 SL_MAP_ID, vmfh);
+	    SLVMTreeAddChild(vmfh,
+			     topBlock,
+			     VMCHAIN_GET_VM_BLOCK(artistChain));
+	    
+	    appRefp->VMTAR_vmFile = vmfh;
+	    appRefp->VMTAR_vmChain = VMCHAIN_MAKE_FROM_VM_BLOCK(topBlock);
+	    return(TRUE);
+	} else {
+	    /* Unable to get a VM file from the VM store.  Whatever the reason,
+	     * inform the user that we cannot proceed. */
+	    UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0,
+			       "Unable to get a file to store the message body.",
+			       (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			       (GIT_NOTIFICATION <<
+				CDBF_INTERACTION_TYPE_OFFSET));
+	    return (FALSE);
+	}
+    } else {
+	/* The careless user wants to send MOT_CURRENT_SONG without 
+	 * having first selected a song. */
+	UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0,
+			   "There is no current record selection.",
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_NOTIFICATION <<
+			    CDBF_INTERACTION_TYPE_OFFSET));
+	return(FALSE);
+    }
+}	/* End of SLCreateCurrentArtistBody.	*/
+
+
+/***********************************************************************
+ *		SLCreateAllArtistsBody
+ ***********************************************************************
+ * SYNOPSIS:	Create a message body containing all the data in the 
+ *              application's current data tree, and fill in *appRefp
+ *              with the app-ref for the body.
+ * CALLED BY:	SLCreateAppRef()
+ * RETURN:	TRUE if body was created.
+ *              FALSE if body couldn't be created.  Dialog box informs the
+ *              user of the failure reason.
+ *              song selection.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/12/94   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+SLCreateAllArtistsBody (VMTreeAppRef *appRefp)
+{
+    VMFileHandle vmfh;
+    word vmStatus;
+    VMChain copyChain;
+
+    /* Create the body in a VM store file.  See comments in 
+     * SLCreateCurrentSongBody() detailing the reason. */
+    vmfh = MailboxGetVMFile(0, &vmStatus);
+    if (vmfh) {
+	/* The message body in this case is an exact copy of the 
+	 * application's data tree.
+	 */
+	copyChain = VMCopyVMChain
+	    (SONGLIST_VM_FILE,
+	     VMCHAIN_MAKE_FROM_VM_BLOCK(SONGLIST_VM_MAP_BLOCK),
+	     vmfh);
+	appRefp->VMTAR_vmFile = vmfh;
+	appRefp->VMTAR_vmChain = copyChain;
+	return (TRUE);
+    } else {
+	/* Unable to get a VM file from the VM store.  Whatever the reason,
+	 * inform the user that we cannot proceed. */
+	UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0,
+			   "Unable to get a file to store the message body.",
+			   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			   (GIT_NOTIFICATION <<
+			    CDBF_INTERACTION_TYPE_OFFSET));
+	return(FALSE);
+    }
+}	/* End of SLCreateAllArtistsBody.	*/
+
+
+/***********************************************************************
+ *		SLFillInRMArgs
+ ***********************************************************************
+ * SYNOPSIS:	Fill in *rmArgsp with the arguments to pass to MSG_MAILBOX_
+ *              SEND_CONTROL_REGISTER_MESSAGE, in order to register the 
+ *              message.
+ * CALLED BY:	SLProcessMETA_MAILBOX_CREATE_MESSAGE
+ * RETURN:	void
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+SLFillInRMArgs (MSCRegisterMessageArgs *rmArgsp,
+		VMTreeAppRef *appRefp,
+		char *summary)
+{
+    /* The message format is SMDFID_SONGLIST_TREE/MANUFACTURER_ID_SDK.
+     * Messages in this format are stored in VM trees, so use the
+     * VM Tree Data Driver. */
+    rmArgsp->MSCRMA_bodyFormat.MDF_id = SMDFID_SONGLIST_TREE;
+    rmArgsp->MSCRMA_bodyFormat.MDF_manuf = MANUFACTURER_ID_SDK;
+    rmArgsp->MSCRMA_bodyStorage.MS_id = GMSID_VM_TREE;
+    rmArgsp->MSCRMA_bodyStorage.MS_manuf = MANUFACTURER_ID_GEOWORKS;
+
+    /* Point to appRefp, which was already filled in with the message body. */
+    rmArgsp->MSCRMA_bodyRef = (void *)appRefp;
+    rmArgsp->MSCRMA_bodyRefLen = sizeof(VMTreeAppRef);
+
+    /* Message body is NOT volatile because we created it in a VM Store,
+     * and it won't be deleted after message registration is completed.
+     * This also means that MMF_DELETE_BODY_AFTER_TRANSMISSION must be set,
+     * so that the message body is cleaned up when all is transmitted.
+     */
+    rmArgsp->MSCRMA_flags = MMF_DELETE_BODY_AFTER_TRANSMISSION |
+	(MDV_DELIVER << MMF_VERB_OFFSET) |  
+	    (MMP_FIRST_CLASS << MMF_PRIORITY_OFFSET);
+
+    /* Use the summary that was passed in. */
+    rmArgsp->MSCRMA_summary = summary;
+
+    /* Deliver the message to this same application on the destination
+     * machine; therefore, use the same token. */
+    GeodeGetInfo(0, GGIT_TOKEN_ID, &(rmArgsp->MSCRMA_destApp));
+
+    /* No fancy start/end bound settings. */
+    rmArgsp->MSCRMA_startBound = MAILBOX_NOW;
+    rmArgsp->MSCRMA_endBound = MAILBOX_ETERNITY;
+    
+}	/* End of SLFillInRMArgs.	*/
+
+/*
+ *              Receiving Messages
+ *
+ * The methods and functions below deal with receiving messages. 
+ * 
+ * When sending messages, we set MSCRMA_destApp to our own token, causing
+ * the message to be delivered to this same application on the destination
+ * machine.  Therefore this application needs to handle both sending and
+ * receiving messages.
+ * 
+ * When an incoming message is available in the system inbox, the application's
+ * process receives MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE.  The method 
+ * for MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE must then ask the Mailbox
+ * Library for the body of the message, and then process the body data
+ * accordingly.
+ * 
+ * In the case of this application, we merge incoming message data with
+ * the data tree of the application.
+ */
+
+
+/***********************************************************************
+ *		MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE for SLProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    A message is waiting for us in the system inbox. 
+ *                  Process the message if possible.
+ * PARAMETERS:	    Boolean (MailboxMessage msg)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/12/94   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method SLProcessClass, MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE
+{
+    VMTreeAppRef appRef;
+    word appRefSize;
+
+    /* This method is only passed a token that refers to the message.
+     * To get to the message body, we need to get the message's app-ref.
+     *
+     * When asking for the message's app-ref, it is necessary to pass a
+     * buffer in which to store the app-ref.  The type of app-ref is 
+     * determined by the body format used.  
+     *
+     * In this case, we know ahead of time what the body format will be, 
+     * because we only send messages in one single body format, namely  
+     * SMDFID_SONGLIST_TREE/MANUFACTURER_ID_SDK.  However, if a multiple
+     * formats are possible, we could first call MailboxGetBodyFormat() 
+     * to get the data format 
+     */
+    appRefSize = sizeof(VMTreeAppRef);
+
+    /* Try to get the body.  If we can't, it may be because the message
+     * body file cannot be accessed, or something like that.  In case of
+     * failure, the message will remain in the inbox, and next time the
+     * application is started, we can try again.
+     */
+    if (MailboxGetBodyRef(msg, &appRef, &appRefSize) == ME_SUCCESS) {
+	/* App-ref to the body was successfully obtained.  Let's take what
+	 * is in the body, and merge it with our own data tree. */
+	SLMergeSLDataTrees(appRef.VMTAR_vmFile,
+			   VMCHAIN_GET_VM_BLOCK(appRef.VMTAR_vmChain));
+	
+	/* Need to notify Mailbox Library when we are done using the 
+	 * message body.  This gives the VM store a chance to close the
+	 * VM file, if no one else is using it. 
+	 */
+	MailboxDoneWithBody(msg, &appRef, appRefSize);
+	
+	/* Remove the message from the Inbox. */
+	MailboxAcknowledgeMessageReceipt(msg);
+
+	/* Delete the message, otherwise it will just hang around forever,
+	 * taking up space in the VM file. */
+	MailboxDeleteMessage(msg);
+    }
+
+    return (TRUE);		/* Signal GEOS message (not necessarily inbox
+				 * message) handled */
+
+}	/* End of MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE.	*/
+
+
+/***********************************************************************
+ *		SLMergeSLDataTrees
+ ***********************************************************************
+ * SYNOPSIS:	Merge the passed SLDataBlock tree with our own data. 
+ * CALLED BY:	SLProcessMETA_MAILBOX_NOTIFY_MESSAGE_AVAILABLE
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+SLMergeSLDataTrees (VMFileHandle vmfh,
+		    VMBlockHandle vmbh)
+{
+    /* The block vmbh is just like the map block in our own data tree.
+     * It is the parent of all artist blocks. 
+     */
+    SLVMTreeEnum(vmfh, vmbh, &SLAddArtistsCallback, SONGLIST_VM_MAP_BLOCK);
+
+    /* When done merging the trees, we need to update the notes displayed. */
+    SLUpdateText(SONGLIST_VM_FILE,
+		 SONGLIST_CURRENT_ARTIST_BLOCK,
+		 SONGLIST_CURRENT_RECORD_BLOCK,
+		 SONGLIST_CURRENT_SONG_BLOCK);
+}	/* End of SLMergeSLDataTrees.	*/
+
+
+/***********************************************************************
+ *		SLAddArtistsCallback
+ ***********************************************************************
+ * SYNOPSIS:	Add or merge the artist block to our own data.  This function
+ *              is called for each artist block in the body of the incoming 
+ *              message.
+ * CALLED BY:	SLMergeSLDataTrees through SLVMTreeEnum
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+SLAddArtistsCallback(VMFileHandle vmfh,
+		     VMBlockHandle vmbh,       /* artist block */
+		     word n,
+		     VMBlockHandle mapBlock)   /* map block */
+{
+    SLDataBlock *dataPtr;
+    MemHandle dataHandle;
+    char *name;
+    VMBlockHandle artistMatch, newBlock;
+
+    /* Check if we already have an artist block with the same name field as 
+     * the incoming block */
+    dataPtr = VMLock(vmfh, vmbh, &dataHandle);
+    name = (char *)dataPtr + dataPtr->SLDB_nameOffset;
+    artistMatch = SLFindDataBlock(SONGLIST_VM_FILE, name, SL_ARTIST_ID);
+    if (artistMatch) {
+	/* An artist block with the same name field already exists. 
+	 * Merge the notes fields of the existing block and the new block.
+	 */
+	SLMergeDataBlock(vmfh, vmbh, artistMatch);
+	newBlock = artistMatch;
+    } else {
+	/* There is no artist block with the same name field as the incoming
+	 * block.  Create a new block in the application data tree containing
+	 * the same info as the incoming block. */
+	newBlock = SLAllocAndInitDataBlockLikeThisOther
+	    (vmfh, vmbh, SL_ARTIST_ID, SONGLIST_VM_FILE);
+
+	/* Link the new artist block we just created to the rest of the
+	 * data tree.  */
+	SLVMTreeAddChild(SONGLIST_VM_FILE, mapBlock, newBlock);
+
+	/* Reflect on the artist list that we added one more artist. */
+	@call SLArtistList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(GDLP_LAST, 1);
+    }
+    VMUnlock(dataHandle);
+
+    /* Enumerate through the children of the new artist block (the children
+     * of an artist block are all records), adding them to the application's
+     * data tree. */
+    SLVMTreeEnum(vmfh, vmbh, &SLAddRecordsCallback, newBlock);
+
+    return (FALSE);
+}	/* End of SLAddArtistsCallback.	*/
+
+
+/***********************************************************************
+ *		SLMergeDataBlock
+ ***********************************************************************
+ * SYNOPSIS:	A SLDataBlock in the application's data tree (matchBlock) 
+ *              has the same name field as a block in the incoming message. 
+ *              Merge new block's notes with the matchBlock's existing notes
+ *              in the way the user wants.
+ * CALLED BY:	SLAddArtistsCallback, etc.
+ * RETURN:	void
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+SLMergeDataBlock (VMFileHandle vmfh,
+		  VMBlockHandle vmbh,
+		  VMBlockHandle matchBlock)  /* block in SONGLIST_VM_FILE */
+{
+    word selection;
+    char *name, *newNotes;
+    SLDataBlock *newBlockPtr;
+    MemHandle newBlockHandle;
+    
+    /* Place the name of the block we're merging in the merge options dialog,
+     * so that the user knows what we are merging. */
+    newBlockPtr = (SLDataBlock *)VMLock(vmfh, vmbh, &newBlockHandle);
+    name = (char *)newBlockPtr + newBlockPtr->SLDB_nameOffset;
+    @call SLMergeSLDataText::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+
+    UserDoDialog(@SLMergeSLDataDialog);
+
+    /* get a pointer to the notes in the new block */
+    newNotes = (char *)newBlockPtr + newBlockPtr->SLDB_notesOffset;
+
+    /* See what merge option the user picked. */
+    selection = @call SLMergeSLDataItemGroup::
+	MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (selection) {
+    case SLMII_APPEND_ITEM_IDENTIFIER:
+	SLAppendNotes(SONGLIST_VM_FILE, matchBlock, newNotes);
+	break;
+    case SLMII_DELETE_ITEM_IDENTIFIER:
+	break;
+    case SLMII_USE_ITEM_IDENTIFIER:
+	SLReplaceNotes(SONGLIST_VM_FILE, matchBlock, newNotes);
+	break;
+    default:
+	break;
+    }
+    VMUnlock(newBlockHandle);
+}	/* End of SLMergeDataBlock.	*/
+
+
+/***********************************************************************
+ *		SLAddRecordsCallback
+ ***********************************************************************
+ * SYNOPSIS:	Add or merge the record block to our own data.  This function
+ *              is called for each record block in the body of the incoming 
+ *              message.
+ * CALLED BY:	SLAddArtistsCallback through SLVMTreeEnum
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	12/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+SLAddRecordsCallback (VMFileHandle vmfh,
+		      VMBlockHandle vmbh,       /* record block to add. */
+		      word n,
+		      VMBlockHandle artistBlock)
+{
+    SLDataBlock *dataPtr;
+    MemHandle dataHandle;
+    char *name;
+    VMBlockHandle recordMatch, newBlock;
+    
+    /* Check if we already have a record block with the same name field as 
+     * the incoming block.  An inconsistency can arise here, where a match
+     * is found in an existing record block with the same name, but by
+     * a different artist.  Oh, well... Not a big deal. */
+    dataPtr = VMLock(vmfh, vmbh, &dataHandle);
+    name = (char *)dataPtr + dataPtr->SLDB_nameOffset;
+    recordMatch = SLFindDataBlock(SONGLIST_VM_FILE, name, SL_RECORD_ID);
+    if (recordMatch) {
+	/* A record block with the same name field already exists. 
+	 * Merge the notes fields of the existing block and the new block.
+	 */
+	SLMergeDataBlock(vmfh, vmbh, recordMatch);
+	newBlock = recordMatch;
+    } else {
+	/* There is no record block with the same name field as the incoming
+	 * block.  Create a new block in the application data tree containing
+	 * the same info as the incoming block. */
+	newBlock = SLAllocAndInitDataBlockLikeThisOther
+	    (vmfh, vmbh, SL_RECORD_ID, SONGLIST_VM_FILE);
+
+	/* Link the new record block we just created to the rest of the
+	 * data tree.  */
+	SLVMTreeAddChild(SONGLIST_VM_FILE, artistBlock, newBlock);
+
+	/* Reflect on the record list that we added one more record. */
+	@call SLRecordList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(GDLP_LAST, 1);
+    }
+    VMUnlock(dataHandle);
+
+    /* Enumerate through the children of the new record block (the children
+     * of a record block are all songs), adding them to the application's
+     * data tree. */
+    SLVMTreeEnum(vmfh, vmbh, &SLAddSongsCallback, newBlock);
+
+    return (FALSE);
+}	/* End of SLAddRecordsCallback.	*/
+
+
+/***********************************************************************
+ *		SLAddSongsCallback
+ ***********************************************************************
+ * SYNOPSIS:	Add or merge the song block to our own data.  This function
+ *              is called for each song block in the body of the incoming 
+ *              message.
+ * CALLED BY:	SLAddRecordsCallback through SLVMTreeEnum
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	CL	1/ 9/95   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+SLAddSongsCallback (VMFileHandle vmfh,
+		    VMBlockHandle vmbh,       /* song block to add. */
+		    word n,
+		    VMBlockHandle recordBlock)
+{
+    SLDataBlock *dataPtr;
+    MemHandle dataHandle;
+    char *name;
+    VMBlockHandle songMatch, newBlock;
+    
+    /* Check if we already have a song block with the same name field as 
+     * the incoming block.  An inconsistency can arise here, where a match
+     * is found in an existing song block with the same name, but by
+     * a different artist or record.  Oh, well... Not a big deal. */
+    dataPtr = VMLock(vmfh, vmbh, &dataHandle);
+    name = (char *)dataPtr + dataPtr->SLDB_nameOffset;
+    songMatch = SLFindDataBlock(SONGLIST_VM_FILE, name, SL_SONG_ID);
+    if (songMatch) {
+	/* A song block with the same name field already exists. 
+	 * Merge the notes fields of the existing block and the new block.
+	 */
+	SLMergeDataBlock(vmfh, vmbh, songMatch);
+	newBlock = songMatch;
+    } else {
+	/* There is no song block with the same name field as the incoming
+	 * block.  Create a new block in the application data tree containing
+	 * the same info as the incoming block. */
+	newBlock = SLAllocAndInitDataBlockLikeThisOther
+	    (vmfh, vmbh, SL_SONG_ID, SONGLIST_VM_FILE);
+
+	/* Link the new song block we just created to the rest of the
+	 * data tree.  */
+	SLVMTreeAddChild(SONGLIST_VM_FILE, recordBlock, newBlock);
+
+	/* Reflect on the song list that we added one more song. */
+	@call SLSongList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(GDLP_LAST, 1);
+    }
+    VMUnlock(dataHandle);
+    return (FALSE);
+}	/* End of SLAddSongsCallback.	*/
+

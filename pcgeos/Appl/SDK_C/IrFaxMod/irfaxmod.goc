@@ -1,0 +1,1157 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		SDK_C/IrFaxMode Application
+FILE:		IrFaxModApp.goc
+
+AUTHOR:		Edwin Yu, Feb  1, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EY	2/ 1/96   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: irfaxmod.goc,v 1.1 97/04/04 16:40:35 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <streamC.h>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+@class	IrFaxModAppProcessClass, GenProcessClass;
+
+/* Define messages for this class here. Most commonly, UI objects will
+ * send these messages to the application thread when they've been activated
+ * by the user. */
+@message void MSG_IFMAP_IRCOMM_CONNECT();
+@message void MSG_IFMAP_IRCOMM_DISCONNECT();
+@message void MSG_IFMAP_SERIAL_CONNECT();
+@message void MSG_IFMAP_SERIAL_DISCONNECT();
+
+@message void MSG_IFMAP_IR_DATA_CALLBACK(word numAvail = cx, 
+					 StreamToken stream = dx,
+					 StreamRoles side = bp);
+@message void MSG_IFMAP_SERIAL_DATA_CALLBACK (word numAvail = cx, 
+					      StreamToken stream = dx,
+					      StreamRoles side = bp);
+@message void MSG_IFMAP_IR_MODEM_CALLBACK(SerialModemStatus status = cx,
+					  StreamToken stream = dx );
+@message void MSG_IFMAP_SERIAL_MODEM_CALLBACK(SerialModemStatus status = cx,
+					      StreamToken stream = dx );
+
+@endc;   /* end of class definition */
+
+/*
+ *****************************************************************************
+ *		Class Declarations
+ *****************************************************************************
+ */
+/*
+ * Each object class requires a "class record" be stored in fixed memory
+ * for it. The class record is used by the GEOS message system for the
+ * delivery of messages sent to an object of the class. The class record 
+ * needs to be defined in the file where the methods (i.e. the routines 
+ * defined with @method) for the class are defined. The @classdecl GOC 
+ * directive tells GOC to create the class record here.
+ *
+ * The neverSaved flag is necessary because ProcessClass objects are
+ * hybrid objects. It tells the system that no object of this class will
+ * ever be loaded from or stored to a file.
+ *
+ */
+@classdecl	IrFaxModAppProcessClass, neverSaved;
+
+/*
+ *****************************************************************************
+ *		Global Variables
+ *****************************************************************************
+ */
+#define	IRBUF_SIZE	1000	/* size of buffer in the ircomm driver */
+#define	SEBUF_SIZE	1000	/* size of buffer in the serial driver */
+#define PUSHDS	_inline(0x1e)	/* push	ds */
+#define POPDS	_inline(0x1f)	/* pop	ds */
+
+
+static	Handle	serialDriver		= NullHandle;
+static	Handle	ircommDriver		= NullHandle;
+static	word	serialComPort		= 0;			/* COM1 */
+static	word	ircommComPort		= 2 | 0x8000; /* COM1+SERIAL_PASSIVE */
+word	flowControl		= 3;			/* SMC_RTS & SMC_DTR */
+word	ircommModem		= SMC_CTS;
+word	ircommModemStatus	= SMS_RTS | SMS_DTR;
+static	Boolean	serialPortOpen		= FALSE;
+static	Boolean	ircommPortOpen		= FALSE;
+static	MemHandle	serialBuffer	= NullHandle;
+static	MemHandle	ircommBuffer	= NullHandle;
+
+/*
+ *****************************************************************************
+ *		Global Functions prototypes
+ *****************************************************************************
+ */
+void ChannelSetup (Handle driver, word comPort, word ibuf, word obuf,
+		   Boolean *portOpen);
+void ChannelShutDown (Handle driver, word comPort, Boolean *portOpen);
+StreamError ReportStreamError (word streamError);
+SerialError ReportSerialError (word serialError);
+
+/*
+ *****************************************************************************
+ *		UI Objects
+ *****************************************************************************
+ */
+/* ---------------------------------------------------------------------------
+ *		Application Object
+ *
+ * The very top-level generic object of an application MUST be a GenApplication
+ * object. The IrFaxModApp.gp file contains "appobj" statement which indicates
+ * that this "IrFaxModApp" object is in fact the top-level UI object.
+ *
+ * This object should be in its own resource, as it is all that need be in
+ * memory when the application is iconified. As such, its resource should be
+ * as small as possible.
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass IrFaxModApp = {
+
+    /*
+     * While the application object isn't shown on the screen, it has a list
+     * of VisMonikers for three purposes:
+     *	1) the GenPrimary (see below) inherits the moniker when it comes up
+     *	   on screen.
+     *	2) when GeoManager needs to display an icon for the application, and
+     *	   there's none for it in the Token Database, it launches the app and
+     *	   sends a message to the application object to install its list of
+     *	   monikers in the token database under the application's token.
+     *	3) when the GenPrimary is minimized, it uses the most appropriate
+     *	   graphical moniker from this list for the application's icon.
+     *	   if there's an abbreviated-text moniker in the list, that's used
+     *	   as the icon title. else any regular-text moniker is used.
+     */
+    GI_visMoniker = list { @IrFaxModTextMoniker }
+
+    /*
+     * The GenApplication object has at least one child: the main application
+     * window.
+     */
+    GI_comp = @IrFaxModAppPrimary;
+
+    /*
+     * The main window should appear on-screen when the application is
+     * launched, so place it on the GAGCNLT_WINDOWS GCN list. This causes
+     * the application object to bring it on-screen at the appropriate time.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @IrFaxModAppPrimary;
+}
+
+@visMoniker IrFaxModTextMoniker = "C Ircomm Serial Testing Application";
+
+@end	AppResource;
+
+
+
+/* ---------------------------------------------------------------------------
+ *		Primary window
+ *
+ * Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed.
+ */
+
+@start	Interface;		/* this resource is for misc UI objects */
+
+@object GenPrimaryClass IrFaxModAppPrimary  = {
+
+    GI_comp = @IrFaxModCtrlBox,
+	      @IrFaxModErrorDisplay,
+	      @IrFaxModCommandDisplay,
+	      @IrFaxModResponseDisplay;
+
+	HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenInteractionClass IrFaxModCtrlBox = {
+	GI_comp = @IrFaxModSerialCtrl, @IrFaxModIrcommCtrl;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass IrFaxModIrcommCtrl = {
+	GI_visMoniker = "Ircomm:";
+	GI_comp = @IrFaxModIrcommConnect,
+		  @IrFaxModIrcommDisconnect;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenTriggerClass IrFaxModIrcommConnect = {
+	GI_visMoniker = 'C', "Connect";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IFMAP_IRCOMM_CONNECT;
+}
+
+@object GenTriggerClass IrFaxModIrcommDisconnect = {
+	GI_visMoniker = 'D', "Disconnect";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IFMAP_IRCOMM_DISCONNECT;
+}
+
+@object GenInteractionClass IrFaxModSerialCtrl = {
+	GI_visMoniker = "Fax/Modem:";
+	GI_comp = @IrFaxModSerialConnect,
+		  @IrFaxModSerialDisconnect;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenTriggerClass IrFaxModSerialConnect = {
+	GI_visMoniker = 'C', "Connect";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IFMAP_SERIAL_CONNECT;
+}
+
+@object GenTriggerClass IrFaxModSerialDisconnect = {
+	GI_visMoniker = 'D', "Disconnect";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_IFMAP_SERIAL_DISCONNECT;
+}
+
+@object GenTextClass IrFaxModErrorDisplay = {
+    GI_visMoniker	= "Error Buffer:";
+    GI_attrs		= @default | GA_READ_ONLY;
+    GTXI_text		= "";
+    HINT_FIXED_SIZE	= { 0, SST_LINES_OF_TEXT | 2, 0 };
+}
+
+@object GenTextClass IrFaxModCommandDisplay = {
+    GI_visMoniker	= "TO FAX:  ";
+    GI_attrs		= @default | GA_READ_ONLY;
+    GTXI_text		= "";
+    HINT_FIXED_SIZE     = { 0, SST_LINES_OF_TEXT | 8, 0};
+}
+
+@object GenTextClass IrFaxModResponseDisplay = {
+    GI_visMoniker	= "FROM FAX:";
+    GI_attrs		= @default | GA_READ_ONLY;
+    GTXI_text		= "";
+    HINT_FIXED_SIZE     = { 0, SST_LINES_OF_TEXT | 8, 0};
+}
+
+@end Interface;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Localizable Constants
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	ConstantData, data;
+
+@chunk	char DriverLoadErrorString [] = 
+	"Unable to load either or both of serial and ircomm drivers!";
+@chunk	char StreamErrorMinus1 [] = "STREAM_NOT_IMPLEMENTED\r";
+@chunk	char StreamError1 [] = "STREAM_WOULD_BLOCK\r";
+@chunk	char StreamError2 [] = "STREAM_CLOSING\r";
+@chunk	char StreamError3 [] = "STREAM_CANNOT_ALLOC\r";
+@chunk	char StreamError4 [] = "STREAM_BUFFER_TOO_LARGE\r";
+@chunk	char StreamError5 [] = "STREAM_CLOSED\r";
+@chunk	char StreamError6 [] = "STREAM_SHORT_READ_WRITE\r";
+@chunk	char StreamError7 [] = "STREAM_NO_DEVICE\r";
+@chunk	char StreamError8 [] = "STREAM_DEVICE_IN_USE\r";
+@chunk	char StreamError9 [] = "STREAM_POWER_ERROR\r";
+@chunk	char StreamErrors  [] = "Unknown Stream Error\r";
+@chunk	char StreamError256 [] = "STREAM_NO_FREE_PORTS\r";
+@chunk	char MemAllocError [] = "Can't do memory allocation\r";
+
+/*
+ * The various SerialErrors (bits)
+ */
+@chunk	char SerialErrorBit4 [] = "SERIAL_ERROR_BREAK\r";
+@chunk	char SerialErrorBit3 [] = "SERIAL_ERROR_FRAME\r";
+@chunk	char SerialErrorBit2 [] = "SERIAL_ERROR_PARITY\r";
+@chunk	char SerialErrorBit1 [] = "SERIAL_ERROR_OVERRUN\r";
+
+@end	ConstantData
+
+
+/*
+ ***************************************************************************
+ *		Code for IrFaxModAppProcessClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_APPLICATION for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Perform all application startup duties
+ * PARAMETERS:	    @message void MSG_GEN_PROCESS_OPEN_APPLICATION(
+ *				AppAttachFlags attachFlags = cx,
+ *				MemHandle launchBlock = dx,
+ *				MemHandle extraState = bp)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+	GeodeLoadError gle;
+
+	/* The DOS filename of driver that we want to use.	*/
+#if	ERROR_CHECK
+	char *driver1 = "serialec.geo";
+	char *driver2 = "ircommec.geo";
+#else
+	char *driver1 = "serial.geo";
+	char *driver2 = "ircomm.geo";
+#endif
+
+	/* Let the superclass do its thing. */
+	@callsuper();
+
+	/* Move to the SYSTEM directory (that's where the libraries are). */
+	FilePushDir ();
+	FileSetStandardPath (SP_SYSTEM);
+
+	/* Load the serial driver.	*/
+	if ((NullHandle == (serialDriver = GeodeUseDriver(driver1,0,0,&gle)))
+	   || (NullHandle == (ircommDriver=GeodeUseDriver(driver2,0,0,&gle))))
+	{
+	/*
+	 * Inform the user that the serial driver was *not* loaded.
+	 *
+	 * Lock down the block containing the (localizable) error
+	 * message strings.
+	 * Inform the user.
+	 * Unlock the string block.
+	 */
+	MemLock (OptrToHandle (@DriverLoadErrorString));
+        UserStandardDialog
+		((char *) NULL,
+		 /* not GIT_MULTIPLE_RESPONSE, so no custom triggers  */
+		 (char *) NULL,
+		 /* No string arguments. */
+		 (char *) NULL,
+		 (char *) NULL,
+		 /* dialog string */
+		 LMemDeref (@DriverLoadErrorString),
+		 /* dialog type */
+		 (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		 /* interaction type */
+		 (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+	MemUnlock (OptrToHandle (@DriverLoadErrorString));
+	}
+
+	FilePopDir();
+
+}	/* End of MSG_GEN_PROCESS_OPEN_APPLICATION.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Perform all application shutdown duties
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+	/* Get rid of the serial driver. */
+	if (serialDriver) {
+		ChannelShutDown (serialDriver, serialComPort, &serialPortOpen);
+		GeodeFreeDriver (serialDriver);
+	}
+
+	/* Get rid of the ircomm driver. */
+	if (ircommDriver) {
+		ChannelShutDown (ircommDriver, ircommComPort, &ircommPortOpen);
+		GeodeFreeDriver (ircommDriver);
+	}
+
+	 /* Continue shutting down the rest of the application, as normal. */
+	@callsuper();
+
+	/* We aren't saving any state information so return NULL. */
+	return (NullHandle);
+
+}	/* End of MSG_GEN_PROCESS_CLOSE_APPLICATION.	*/
+
+
+/***********************************************************************
+ *		MSG_IFMAP_IRCOMM_CONNECT for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Establish a (either active or passive) connection
+ *		    with a remote communication app via the ircomm port.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *	A note: The reason that I use StreamSetMessageNotify instread
+ *		of StreamGeneralNotifyRoutine is that the code segment
+ * 		may move around and the function address may become
+ *		invalid.  So, the function pointer may point to invalid
+ *		address.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_IFMAP_IRCOMM_CONNECT
+{
+	StreamNotifyType	streamNotifyType;
+
+	/* 
+	 * open the ircomm port and specify the size of buffers for the
+         * port. 
+	 */
+	SerialSetRole(ircommDriver, ircommComPort, SR_DCE);
+	ChannelSetup(ircommDriver, ircommComPort, IRBUF_SIZE, IRBUF_SIZE, 
+		     &ircommPortOpen);
+
+	if (ircommPortOpen) {
+
+		/* Set up the channel's flow control handling */
+		SerialSetFlowControl(ircommDriver, ircommComPort,
+				     flowControl, ircommModem,
+				     ircommModemStatus);
+
+		streamNotifyType = ((1 << STREAM_TYPE_READER_OFFSET) |
+	    		(SERIAL_EVENT_MODEM << STREAM_TYPE_EVENT_OFFSET) |
+			(STREAM_MODE_MESSAGE << STREAM_TYPE_HOW_OFFSET));
+
+		/* Set up a modem notifier routine */
+		StreamSetMessageNotify (ircommDriver, ircommComPort,
+					streamNotifyType,
+					MSG_IFMAP_IR_MODEM_CALLBACK,
+					oself);
+
+		streamNotifyType = ((1 << STREAM_TYPE_READER_OFFSET) |
+    			(STREAM_EVENT_DATA << STREAM_TYPE_EVENT_OFFSET) |
+			(STREAM_MODE_MESSAGE << STREAM_TYPE_HOW_OFFSET));
+	
+		/* Set up a data notifier routine */
+		StreamSetMessageNotify (ircommDriver, ircommComPort,
+					streamNotifyType,
+					MSG_IFMAP_IR_DATA_CALLBACK,
+					oself);
+
+	}
+
+}	/* End of MSG_IFMAP_IRCOMM_CONNECT.	*/
+
+
+/***********************************************************************
+ *		MSG_IFMAP_IRCOMM_DISCONNECT for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Close the Ircomm port.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 4/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_IFMAP_IRCOMM_DISCONNECT
+{
+	ChannelShutDown (ircommDriver, ircommComPort, &ircommPortOpen);
+}	/* End of MSG_IFMAP_IRCOMM_CONNECT.	*/
+
+
+/***********************************************************************
+ *		MSG_IFMAP_SERIAL_CONNECT for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Establish a connection with modem via a serial port.
+ * PARAMETERS:	    void(void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *	A note: The reason that I use StreamSetMessageNotify instread
+ *		of StreamGeneralNotifyRoutine is that the code segment
+ * 		may move around and the function address may become
+ *		invalid.  So, the function pointer may point to invalid
+ *		address.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_IFMAP_SERIAL_CONNECT
+{
+	StreamNotifyType	streamNotifyType;
+
+	/* open the serial port and specify the size of buffers for the
+	 * port
+	 */
+	ChannelSetup(serialDriver, serialComPort, SEBUF_SIZE, SEBUF_SIZE,
+		     &serialPortOpen);
+
+	if (serialPortOpen) {
+
+		/* The reason we don't call SerialFlowControl because
+		   the default setting enabls serial interrupt and allow
+		   modem to respond */
+		/* SerialSetFlowControl(serialDriver, serialComPort,
+				     flowControl, serialModem,
+				     serialModemStatus); */
+
+		streamNotifyType = ((1 << STREAM_TYPE_READER_OFFSET) |
+	    		(SERIAL_EVENT_MODEM << STREAM_TYPE_EVENT_OFFSET) |
+			(STREAM_MODE_MESSAGE << STREAM_TYPE_HOW_OFFSET));
+
+		/* Set up a modem notifier routine */
+		StreamSetMessageNotify (serialDriver, serialComPort,
+					streamNotifyType,
+					MSG_IFMAP_SERIAL_MODEM_CALLBACK,
+					oself);
+
+		streamNotifyType = ((1 << STREAM_TYPE_READER_OFFSET) |
+    			(STREAM_EVENT_DATA << STREAM_TYPE_EVENT_OFFSET) |
+			(STREAM_MODE_MESSAGE << STREAM_TYPE_HOW_OFFSET));
+	
+		/* Set up a data notifier routine */
+		StreamSetMessageNotify (serialDriver, serialComPort,
+					streamNotifyType,
+					MSG_IFMAP_SERIAL_DATA_CALLBACK,
+					oself);
+	}
+
+}	/* End of MSG_IFMAP_SERIAL_CONNECT.	*/
+
+
+
+/***********************************************************************
+ *		MSG_IFMAP_SERIAL_DISCONNECT for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Close the serial port
+ * PARAMETERS:	    void(void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_IFMAP_SERIAL_DISCONNECT
+{
+	ChannelShutDown (serialDriver, serialComPort, &serialPortOpen);
+}	/* End of MSG_IFMAP_SERIAL_DISCONNECT.	*/
+
+
+
+/***********************************************************************
+ *		ChannelSetup
+ ***********************************************************************
+ * SYNOPSIS:	Open a port, allocate input/output buffers for the port.
+ * CALLED BY:	MSG_IFMAP_SERIAL_CONNECT, MSG_IFMAP_IR_CONNECT
+ * PARAMETERS:	void(Handle driver,word comPort,word inbuf,word obout)
+ * RETURN:
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+void ChannelSetup (Handle driver, word comPort, word ibuf, word obuf,
+		   Boolean *portOpen)
+{
+	/* Is there a driver loaded? */
+	if (driver != NullHandle) {
+		/* Close the current communication channel if any. */
+		ChannelShutDown (driver, comPort, portOpen);
+
+		/* Open the port and allocate the input/output buffers */
+		if(! ReportStreamError(SerialOpen(driver, comPort, 
+			      	       STREAM_OPEN_NO_BLOCK, ibuf, obuf, 0))) {
+			*portOpen = TRUE;
+		}
+	}
+}	/* End of ChannelSetup.	*/
+
+
+
+/***********************************************************************
+ *		ChannelShutDown
+ ***********************************************************************
+ * SYNOPSIS:	Shutdown the current serial communication channel.
+ * CALLED BY:	Internal
+ * PASS:	void(Handle driver, word comPort, Boolean portOpen)
+ * RETURN:	void
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+void ChannelShutDown (Handle driver, word comPort, Boolean *portOpen)
+{
+    SerialModem serialStatus = 0;
+
+    /* Close the currently open port (if any).	*/
+    if (*portOpen)
+	{
+	/* Flush both sides of the stream.	*/
+    	SerialFlush (driver, comPort, STREAM_ROLES_BOTH);
+
+	SerialGetModem (driver, comPort, &serialStatus);
+
+	if (driver == serialDriver)
+		/* Drop the RTS/DTR signal to stop modem sending more
+		   data */
+		serialStatus = serialStatus & ~SERIAL_MODEM_RTS 
+				            & ~SERIAL_MODEM_DTR;
+	else if (driver == ircommDriver)
+		/* Drop the CTS/DSR signal to stop win app sending more
+		   data. */
+		serialStatus = serialStatus & ~SERIAL_MODEM_CTS
+					    & ~SERIAL_MODEM_DSR;
+
+    	SerialSetModem (driver, comPort, serialStatus);
+
+	/* Actually close the port itself.	*/
+    	SerialClose (driver, comPort, FALSE);
+	*portOpen = FALSE;
+	}
+
+}	/* End of ChannelShutDown.	*/
+
+
+
+/***********************************************************************
+ *		ReportDataSentToFax
+ ***********************************************************************
+ * SYNOPSIS:	Displays the data sent to the fax/modem
+ * CALLED BY:	Internal
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	grisco	3/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+ReportDataSentToFax (word numBytes, byte *buffer)
+{
+
+
+	@call IrFaxModCommandDisplay::MSG_VIS_TEXT_APPEND_PTR ((char *)buffer,numBytes);
+
+}	/* End of ReportDataSentToFax.	*/
+
+
+
+
+/***********************************************************************
+ *		ReportDataReceivedFromFax
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	grisco	3/21/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+ReportDataReceivedFromFax (word numBytes, byte *buffer)
+{
+	@call	IrFaxModResponseDisplay::MSG_VIS_TEXT_APPEND_PTR ((char *)buffer,numBytes);
+}	/* End of ReportDataReceivedFromFax.	*/
+
+
+
+
+/***********************************************************************
+ *		ReportStreamError
+ ***********************************************************************
+ * SYNOPSIS:	Report a StreamError
+ * CALLED BY:	Internal
+ * PASS:	word streamError
+ * RETURN:	StreamError passed in
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 5/96   	Initial Revision
+ *
+ ***********************************************************************/
+StreamError ReportStreamError (word streamError)
+{
+	optr	errorString;
+
+	/* Figure out which error string to print out */
+	switch	(streamError) {
+		case 0:		errorString = 0;
+				break;
+		case -1:	errorString = (optr)&StreamErrorMinus1;
+				break;
+		case 1:		errorString = (optr)&StreamError1;
+				break;
+		case 2:		errorString = (optr)&StreamError2;
+				break;
+		case 3:		errorString = (optr)&StreamError3;
+				break;
+		case 4:		errorString = (optr)&StreamError4;
+				break;
+		case 5:		errorString = (optr)&StreamError5;
+				break;
+		case 6:		errorString = (optr)&StreamError6;
+				break;
+		case 7:		errorString = (optr)&StreamError7;
+				break;
+		case 8:		errorString = (optr)&StreamError8;
+				break;
+		case 9:		errorString = (optr)&StreamError9;
+				break;
+		case 256:	errorString = (optr)&StreamError256;
+				break;
+		default:	errorString = (optr)&StreamErrors;
+				break;
+	}
+	if (errorString) {
+		/* Inform the user of the stream error.	*/
+		@call IrFaxModErrorDisplay::MSG_VIS_TEXT_APPEND_OPTR
+							(errorString, 0);
+	}
+	/* return error (if any) */
+	return streamError;
+}
+
+
+/***********************************************************************
+ *	MSG_IFMAP_SERIAL_MODEM_CALLBACK for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Called when serial port is notified(by the modem) 
+ *		    to turn on/off some of the modem lines on the 
+ *		    ircomm port.
+ * PARAMETERS:	    void (SerialModemStatus status, StreamToken stream)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *	The DCE(fax modem) de-asserts the CTS line when it wants the
+ *	DTE(win95 fax app) to stop sending data.  It re-asserts the 
+ *	CTS line when it's ok for the DTE to send data again.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_IFMAP_SERIAL_MODEM_CALLBACK
+{
+     SerialModem irStatus = 0;
+
+     PUSHDS;	/* we preserve ds(which contains the dgroup segment 
+		 * address of the current thread) because 
+		 * GeodeLoadDGroup will destroy ds */
+
+     /* 
+      * Load the IrFaxMod application's dgroup in ds.  The reason is
+      * that the Irlmp thread executes this callback routine with Irlmp
+      * thread's dgroup and is unable to access IrFaxMod app's global
+      * variables.
+      */
+     GeodeLoadDGroup(OptrToHandle(@IrFaxModApp));
+
+     if (!ircommPortOpen) {	/* ircomm port hasn't been opened yet. */
+	POPDS;			/* restore ds */
+	return;
+     }
+
+     if ((status & SMS_CTS_CHANGED) || (status & SMS_DSR_CHANGED)) {
+
+	SerialGetModem (ircommDriver, ircommComPort, &irStatus);
+
+	if (status & SMS_CTS_CHANGED) {
+		if (status & SMS_CTS)
+			irStatus = irStatus | SMC_CTS;
+		else
+			irStatus = irStatus & ~SMC_CTS;
+	}
+
+	if (status & SMS_DSR_CHANGED) {
+		if (status & SMS_DSR)
+			irStatus = irStatus | SMC_DSR;
+		else
+			irStatus = irStatus & ~SMC_DSR;
+	}
+
+    	SerialSetModem (ircommDriver, ircommComPort, irStatus);
+     }
+
+     POPDS;			/* restore ds */
+     return;
+}	/* End of MSG_IFMAP_SERIAL_MODEM_CALLBACK.	*/
+
+
+/***********************************************************************
+ *		MSG_IFMAP_SERIAL_DATA_CALLBACK for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Called when the serial port got some data to 
+ *		    pass to the ircomm port.
+ * PARAMETERS:	    void (word numAvail, StreamToken stream,
+ *			  StreamRoles side);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_IFMAP_SERIAL_DATA_CALLBACK
+{
+     word		bytesRead	= 0;
+     byte		*readBuffPtr	= NULL;
+     word		errorCode	= 0;
+
+     PUSHDS;	/* we preserve ds(which contains the dgroup segment 
+		 * address of the current thread) because 
+		 * GeodeLoadDGroup will destroy ds */
+
+     /* 
+      * Load the IrFaxMod application's dgroup in ds.  The reason is
+      * that the Irlmp thread executes this callback routine with Irlmp
+      * thread's dgroup and is unable to access IrFaxMod app's global
+      * variables.
+      */
+     GeodeLoadDGroup(OptrToHandle(@IrFaxModApp));
+
+     if (!ircommPortOpen) {	/* ircomm port hasn't been opened yet! */
+	POPDS;			/* restore ds */
+	return;
+     }
+
+     if (NullHandle == serialBuffer) {
+	/*
+	 * Alloc a buffer to read from the serial (fax modem)
+	 */
+	if (NullHandle == (serialBuffer = 
+				MemAlloc(SEBUF_SIZE+1,
+					 HF_DYNAMIC,
+					 HAF_STANDARD))) {
+		/* Can't alloc buffer */
+		@call IrFaxModErrorDisplay::MSG_VIS_TEXT_APPEND_OPTR
+			(@MemAllocError, 0);
+		POPDS;		/* restore ds */
+		return;
+	}
+    }
+
+    /* Lock down the read buffer block */
+    readBuffPtr = MemLock (serialBuffer);
+
+    /*
+     * SerialRead from serial(Modem)
+     */
+    if ( !( (ReportStreamError (SerialRead (serialDriver, serialComPort,
+				STREAM_NO_BLOCK, SEBUF_SIZE,
+				readBuffPtr, &bytesRead))) ||
+	    (ReportStreamError (StreamGetError (serialDriver, serialComPort,
+				STREAM_ROLES_READER, &errorCode))))) {
+	if (errorCode) {
+	    ReportSerialError(errorCode);
+	}
+	else {
+	    /*
+	     * SerialWrite to the ircomm, ie. win95 fax app
+	     */
+	    ReportDataReceivedFromFax (bytesRead, readBuffPtr);
+	    ReportStreamError (SerialWrite (ircommDriver, ircommComPort,
+				STREAM_BLOCK, bytesRead,
+				readBuffPtr, &bytesRead));
+	}
+    }
+
+    /* Unlock the buffers.	*/
+    MemUnlock (serialBuffer);
+
+    POPDS;			/* restore ds */
+    return;
+}	/* End of MSG_IFMAP_SERIAL_DATA_CALLBACK.	*/
+
+
+/***********************************************************************
+ *		MSG_IFMAP_IR_MODEM_CALLBACK for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Called when ircomm is notified(by the window 
+ *		    communication app) to turn on/off some of the modem
+ *		    lines on the serial port
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *	DTE(win95 fax app) de-asserts the RTS line to stop the other 
+ *	side(modem) and re-asserts RTS when it can receive again.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_IFMAP_IR_MODEM_CALLBACK
+{
+     PUSHDS; 	/* we preserve ds(which contains the dgroup segment 
+		 * address of the current thread) because 
+		 * GeodeLoadDGroup will destroy ds */
+
+     /* 
+      * Load the IrFaxMod application's dgroup in ds.  The reason is
+      * that the Irlmp thread executes this callback routine with Irlmp
+      * thread's dgroup in ds and is unable to access IrFaxMod app's 
+      * global variables.
+      */
+     GeodeLoadDGroup(OptrToHandle(@IrFaxModApp));
+
+     SerialModem serialStatus = 0;
+
+     if (!serialPortOpen) {	/* serial port hasn't been opened yet! */
+	POPDS;			/* restore ds */
+	return;
+     }
+
+     if ((status & SMS_RTS_CHANGED) || (status & SMS_DTR_CHANGED)) {
+
+	SerialGetModem (serialDriver, serialComPort, &serialStatus);
+
+	if (status & SMS_RTS_CHANGED) {
+		if (status & SMS_RTS)
+			serialStatus = serialStatus | SMC_RTS;
+		else
+			serialStatus = serialStatus & ~SMC_RTS;
+	}
+	if (status & SMS_DTR_CHANGED) {
+		if (status & SMS_DTR)
+			serialStatus = serialStatus | SMC_DTR;
+		else
+			serialStatus = serialStatus & ~SMC_DTR;
+	}
+
+    	SerialSetModem (serialDriver, serialComPort, serialStatus);
+     }
+
+     POPDS;			/* restore ds */
+     return;
+}	/* End of MSG_IFMAP_IR_MODEM_CALLBACK.	*/
+
+
+
+/***********************************************************************
+ *		MSG_IFMAP_IR_DATA_CALLBACK for IrFaxModAppProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Called when the ircomm port got some data to 
+ *		    pass to the serial port.
+ * PARAMETERS:	    void (word numAvail, StreamToken stream, 
+ *		          StreamRoles side);
+ * SIDE EFFECTS:    
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method IrFaxModAppProcessClass, MSG_IFMAP_IR_DATA_CALLBACK
+{
+     word		bytesRead	= 0;
+     byte		*readBuffPtr	= NULL;
+     word		errorCode	= 0;
+     StreamRoles testVar;
+
+     PUSHDS;	/* we preserve ds(which contains the dgroup segment 
+		 * address of the current thread) because 
+		 * GeodeLoadDGroup will destroy ds */
+
+     /* 
+      * Load the IrFaxMod application's dgroup in ds.  The reason is
+      * that the Irlmp thread executes this callback routine with Irlmp
+      * thread's dgroup and is unable to access IrFaxMod app's global
+      * variables.
+      */
+     GeodeLoadDGroup(OptrToHandle(@IrFaxModApp));
+
+     if (!serialPortOpen) {	/* serial port hasn't been opened yet! */
+	POPDS;
+	return;
+     }
+
+     if (NullHandle == ircommBuffer) {
+	/*
+	 * Alloc a buffer to read from the serial (fax modem)
+	 */
+	if (NullHandle == (ircommBuffer = 
+				MemAlloc(IRBUF_SIZE+1,
+					 HF_DYNAMIC,
+					 HAF_STANDARD))) {
+		/* Can't alloc buffer */
+		@call IrFaxModErrorDisplay::MSG_VIS_TEXT_APPEND_OPTR
+			(@MemAllocError, 0);
+		POPDS;
+		return;
+	}
+    }
+
+    /* Lock down the read buffer block */
+    readBuffPtr = MemLock (ircommBuffer);
+
+    /*
+     * SerialRead from ircomm (win95 fax app)
+     */
+    if ( !( (ReportStreamError (SerialRead (ircommDriver, ircommComPort,
+				STREAM_NO_BLOCK, IRBUF_SIZE,
+				readBuffPtr, &bytesRead))) ||
+	    (ReportStreamError (StreamGetError (ircommDriver, ircommComPort,
+				STREAM_ROLES_READER, &errorCode))))) {
+	if (errorCode) {
+	    ReportSerialError(errorCode);
+	}
+	else {
+	    /*
+	     * SerialWrite to the serial, ie. fax modem
+	     */
+	    ReportDataSentToFax (bytesRead,readBuffPtr);
+	    ReportStreamError (SerialWrite (serialDriver, serialComPort,
+				STREAM_BLOCK, bytesRead,
+				readBuffPtr, &bytesRead));
+	}
+    }
+
+    /* Unlock the buffers.	*/
+    MemUnlock (ircommBuffer);
+
+    POPDS;
+    return;
+}	/* End of MSG_IFMAP_IR_DATA_CALLBACK.	*/
+
+
+
+
+/***********************************************************************
+ *		ReportSerialError
+ ***********************************************************************
+ * SYNOPSIS:	Report an error.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	NOTE:  ALL the global variables used in the callback function
+ *	       MUST be declared 'static'.  Else, the driver thread 
+ *	       won't be able to know.
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EY	2/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+SerialError ReportSerialError (word serialError)
+{
+	optr	errorString;
+	word	unknownError = 0;
+	char	hexString[50] = "Unknown serial errors";
+	int	i;
+
+	for (i = 1; i != 0; i<<=1) {
+
+	    /* Only set bits represent errors */
+	    if (serialError & i) {
+
+		    /* Figure out which error string to print out */
+		    switch	(i) {
+			case 1<<1:	errorString = (optr)&SerialErrorBit1;
+					break;
+			case 1<<2:	errorString = (optr)&SerialErrorBit2;
+					break;
+			case 1<<3:	errorString = (optr)&SerialErrorBit3;
+					break;
+			case 1<<4:	errorString = (optr)&SerialErrorBit4;
+					break;
+			default:	errorString = 0;
+					unknownError += i;
+					break;
+		    }
+		    if (errorString) {
+		        /* Inform the user of the serial error.	*/
+		        @call IrFaxModErrorDisplay::MSG_VIS_TEXT_APPEND_OPTR
+							(errorString, 0);
+		    }
+	    }
+	}
+
+	if (unknownError) {
+	    @call IrFaxModErrorDisplay::MSG_VIS_TEXT_APPEND_PTR(hexString, 0);
+	}
+
+	/* & return error */
+	return serialError;
+
+}	/* End of ReportSerialError.	*/

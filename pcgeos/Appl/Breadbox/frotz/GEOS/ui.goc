@@ -1,0 +1,922 @@
+/***********************************************************************
+
+       Copyright (c) Gerd Boerrigter 1997 -- All Rights Reserved
+
+  PROJECT:      FROTZ for GEOS - an interpreter for all Infocom games.
+  MODULE:       Generic User Interface Resource definition
+  FILE:         ui.goc
+
+  AUTHOR:       Gerd Boerrigter
+
+  RCS STAMP:
+    $Id: $
+
+  DESCRIPTION:
+    This file contains the generic UI tree for Frotz.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-05-15  GerdB     Initial Version (Nokia 9000).
+    98-06-12  GerdB     Added Desktop version.
+	 02-09-17  jfh			Pulled Nokia ifdefs (for clarity)
+									and did a few updates & tewaks
+***********************************************************************/
+
+@include <stdapp.goh>
+#include <ansi/stdio.h>
+#include <ansi/string.h>
+#include <sem.h>
+
+#include "frotz.h"
+@include "Geos/Frotz.goh"
+/*@include <Geos/iexpire.goh>   */
+
+@include "gfzicons.goh"
+@include "bboxreg.goh"
+
+
+@classdecl FrotzProcessClass;
+
+/***********************************************************************
+    Global Variables
+***********************************************************************/
+
+/* Fold our error constants in with other GEOS error constants
+   using GOC trick. (Define a global of type FatalErrors.) */
+/* FatalErrors fatalErrors; */
+/* Warnings    warnings; */
+
+/* This semaphore will be used to stop the z-machine interpreter
+   if waiting for user input. */
+SemaphoreHandle waitForInputSem;
+/* this thread is allocated here in OPEN_APP and Vd in main */
+SemaphoreHandle waitForFinished;
+ThreadHandle    zmachineThread;
+
+FileHandle story_disk_handle;
+char story_path[ PATH_BUFFER_SIZE ];
+char story_name[ MAX_FILE_NAME + 1 ];
+
+SemaphoreHandle waitForNameSem;
+
+Boolean zMachineStarted = FALSE;
+
+extern int finished;
+
+FILE* debug_fp;
+
+
+
+
+/*  UI Objects
+    This section defines the generic UI tree of the application.
+    Different UI objects will be in different resources.  Any number
+    of generic objects may be declared in this section. */
+
+@start ApplicationResource;
+
+	 @object GenApplicationClass FrotzApp = {
+		  GI_visMoniker = list {
+				@GFrotzAppIcon,
+  				@GFrotzTinyIcon,
+				@FrotzTextMoniker       /* simple text moniker */
+        }
+		  GI_comp = @FrotzPrimary;
+		  /* The main window should appear on-screen when the application
+           is launched, so place it on the GAGCNLT_WINDOWS GCN list.
+           This causes the application object to bring it on-screen at
+           the appropriate time. */
+        gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+            @FrotzPrimary;
+		  /* Specify the INI file category [Con 6.3] under which to save
+           all options for this application. */
+        ATTR_GEN_INIT_FILE_CATEGORY = "Frotz";
+	     ATTR_GEN_HELP_FILE = "GFrotzHelp";
+	 }
+
+
+    @visMoniker FrotzTextMoniker = "GeoFrotz";
+
+@end ApplicationResource;
+
+/* Primary window */
+
+@start InterfaceResource;
+
+	 @object GenPrimaryClass FrotzPrimary = {
+		  GI_comp = @FrotzFileMenu,
+                  @FrotzFileNameDialog,
+	 //					@FrotzView,
+						@FrotzStatusText,
+						@FrotzText,
+						@FrotzInput;
+		  /* jfh - take away user dismissability */
+		  GDI_attributes = 0;
+		  HINT_PRIMARY_NO_FILE_MENU;
+		  HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_TARGET;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+    }
+
+	 /* jfh - this isn't a real file menu, it just looks sorta like it.
+	  * the user can't quit the app from here - needs to wuit from game.*/
+	 @object GenInteractionClass FrotzFileMenu = {
+		  GI_visMoniker = 'F', "File";
+		  GI_comp = @FrotzOpenStoryDialog,
+						@AboutDBox,
+						@FrotzExitTrigger;
+        GII_visibility = GIV_POPUP;
+//		  ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_FILE_MENU );
+    }
+
+	 /* jfh - we need a way to exit if there is no game going... */
+	 @object GenTriggerClass FrotzExitTrigger = {
+		  GI_visMoniker   = 'E', "Exit GeoFrotz";
+		  GTI_destination = FrotzApp;
+		  GTI_actionMsg   = MSG_META_QUIT;
+	 }
+
+/*	 @object FrotzViewClass FrotzView = {
+		  GVI_content = @FrotzContent;
+		  GVI_attrs = @default | GVA_GENERIC_CONTENTS
+                             | GVA_SAME_COLOR_AS_PARENT_WIN
+                             | GVA_SEND_ALL_KBD_CHARS;
+	 }
+
+    @object GenContentClass FrotzContent = {
+        GCI_genView = @FrotzView;
+        GCI_attrs = (@default) | VCNA_SAME_WIDTH_AS_VIEW
+                               | VCNA_SAME_HEIGHT_AS_VIEW;
+		  GI_comp = @FrotzStatusText,
+						@FrotzText;
+		  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+    }
+*/
+
+    @chunk VisTextCharAttr FrotzStatusCharAttr =
+            CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+					 2, CA_NULL_ELEMENT, FID_DTC_URW_MONO, 16, 0, C_WHITE );
+    @object FrotzOutputTextClass FrotzStatusText = {
+        GI_attrs  = @default | GA_READ_ONLY;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_text = "";
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_TEXT_WASH_COLOR = {
+				C_BLACK,
+				CF_INDEX,
+				0, 0
+		  };
+		  ATTR_GEN_TEXT_CHAR_ATTR = @FrotzStatusCharAttr;
+	 }
+
+    @chunk VisTextCharAttr FrotzMainCharAttr =
+            CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+					 2, CA_NULL_ELEMENT, FID_DTC_URW_MONO, 14, TS_BOLD, C_WHITE );
+	 @object FrotzOutputTextClass FrotzText = {
+        GI_attrs  = @default | GA_READ_ONLY;
+        GTXI_attrs = @default | GTA_INIT_SCROLLING
+                              | GTA_TAIL_ORIENTED;
+        GTXI_text = "";
+		  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_TEXT_WASH_COLOR = {
+				C_BLUE,
+				CF_INDEX,
+				0, 0
+		  };
+		  ATTR_GEN_TEXT_CHAR_ATTR = @FrotzMainCharAttr;
+    }
+
+    @object FrotzInputTextClass FrotzInput = {
+		  GI_visMoniker = "Command:";
+		  GI_attrs  = @default | GA_TARGETABLE;
+		  GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_text = "";
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_DEFAULT_FOCUS;
+		  HINT_DEFAULT_TARGET;
+		  HINT_TEXT_WHITE_WASH_COLOR;
+    }
+
+	 @end InterfaceResource;
+
+
+    @start MenuResource;
+
+    /***********************************************************************
+     *   Menue
+     **********************************************************************/
+
+    /*
+	  * FrotzOpenStoryDialog
+     */
+	 @object GenInteractionClass FrotzOpenStoryDialog = {
+		  GI_visMoniker = 'S', "Select Game";
+		  GI_comp        = @FrotzStoryFileSelector,
+								 @FrotzOpenStoryTrigger;
+        GII_type       = GIT_COMMAND;
+        GII_visibility = GIV_DIALOG;
+		  GII_attrs = @default | GIA_MODAL;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+		  ATTR_GEN_HELP_CONTEXT = "Select";
+	 }
+
+	 @object GenFileSelectorClass FrotzStoryFileSelector = {
+		  GFSI_fileCriteria    = (FSFC_DIRS | FSFC_NON_GEOS_FILES);
+		  GFSI_destination     = process;
+        GFSI_notificationMsg = MSG_FROTZ_FILE_SELECTION_CHANGED;
+		  HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+        ATTR_GEN_PATH_DATA = {SP_DOCUMENT, 0};
+    }
+
+	 @object GenTriggerClass FrotzOpenStoryTrigger = {
+		  GI_visMoniker   = "Open";
+		  GTI_destination = process;
+		  GTI_actionMsg   = MSG_FROTZ_STORY_OPENED;
+		  ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+		  HINT_SEEK_REPLY_BAR;
+		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+
+
+
+    /*
+     * FileNameDialog
+     */
+	 @visMoniker SaveMoniker = "Save Game";
+	 @visMoniker RestoreMoniker = "Restore Game";
+	 @visMoniker FileMoniker = "File";
+
+	 @object GenInteractionClass FrotzFileNameDialog = {
+		  GI_visMoniker = FileMoniker;
+		  GI_comp = @FrotzFileNameGroup,
+						@SaveRestoreFileSelector,
+						@FrotzSaveTrigger,
+						@FrotzRestoreTrigger;
+		  GII_visibility = GIV_DIALOG;
+//        GII_type = GIT_COMMAND;
+        GII_attrs = @default | GIA_MODAL
+                             | GIA_INITIATED_VIA_USER_DO_DIALOG;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+		  ATTR_GEN_HELP_CONTEXT = "Save/Restore";
+	 }
+
+	 @object GenInteractionClass FrotzFileNameGroup = {
+		  GI_comp = @FrotzSaveFileName,
+						@SaveFileNameWarn1,
+						@SaveFileNameWarn2;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+	 }
+
+@object GenTextClass FrotzSaveFileName = {
+    GI_visMoniker = "File Name:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = 8;
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+    ATTR_GEN_TEXT_MAKE_UPPERCASE;
+	 ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @FrotzSaveTrigger;
+	 HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 16, 0, 0};
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenGlyphClass SaveFileNameWarn1 = {
+	 GI_visMoniker = "This should be an 8 character DOS file name.";
+}
+
+@object GenGlyphClass SaveFileNameWarn2 = {
+	 GI_visMoniker = ".SAV will be added by GeoFrotz.";
+}
+
+@object GenFileSelectorClass SaveRestoreFileSelector = {
+    GFSI_fileCriteria = FSFC_MASK_CASE_INSENSITIVE |
+				    FSFC_NON_GEOS_FILES;
+	 GFSI_attrs = FSA_HAS_FILE_LIST;
+	 ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.SAV"};
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+	 @object GenTriggerClass FrotzSaveTrigger = {
+		  GI_visMoniker = "Save";
+//		  GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+		  GTI_actionMsg = MSG_FROTZ_SAVE_RESTORE;
+		  GTI_destination = process;
+		  HINT_SEEK_REPLY_BAR;
+//		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+	 @object GenTriggerClass FrotzRestoreTrigger = {
+		  GI_visMoniker = "Restore";
+//		  GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+		  GTI_actionMsg = MSG_FROTZ_SAVE_RESTORE;
+		  GTI_destination = process;
+		  HINT_SEEK_REPLY_BAR;
+//		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+
+
+/*    @object GenInteractionClass FrotzFileNameLine1Group = {
+        GI_comp = @FrotzFileNameLine1A,
+                  @FrotzFileNameExtension,
+                  @FrotzFileNameLine1B;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_MINIMIZE_CHILD_SPACING;
+	 }
+
+    @object GenGlyphClass FrotzFileNameLine1A = {
+        GI_visMoniker = "Enter file name (\"";
+    }
+    @object GenGlyphClass FrotzFileNameExtension = {
+    }
+    @object GenGlyphClass FrotzFileNameLine1B = {
+		  GI_visMoniker = "\" will be added).";
+    }
+
+    @object GenInteractionClass FrotzFileNameLine2Group = {
+        GI_comp = @FrotzFileNameLine2A,
+                  @FrotzFileNameDefaultName,
+                  @FrotzFileNameLine2B;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_MINIMIZE_CHILD_SPACING;
+    }
+
+    @object GenGlyphClass FrotzFileNameLine2A = {
+        GI_visMoniker = "Default is ";
+    }
+    @object GenGlyphClass FrotzFileNameDefaultName = {
+    }
+    @object GenGlyphClass FrotzFileNameLine2B = {
+        GI_visMoniker = ":";
+    }
+
+*/
+
+    /*
+	  * FrotzAboutDialog
+     */
+/*	 @object GenInteractionClass FrotzAboutDialog = {
+        GI_visMoniker  = 'A', "About";
+        @localize { "Name of dialog containing author and copyright information." };
+        GI_comp = @FrotzAboutGroup;
+        GII_type = GIT_NOTIFICATION;
+        GII_visibility = GIV_DIALOG;
+    }
+
+    @object GenInteractionClass FrotzAboutGroup = {
+        GI_comp = @FrotzAboutLine1,
+                  @FrotzAboutLine2,
+                  @FrotzAboutLine3,
+                  @FrotzAboutLine4,
+                  @FrotzAboutLine5,
+                  @FrotzAboutLine6;
+		  ATTR_GEN_HELP_CONTEXT = "Copyright";
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+    }
+
+    @object GenGlyphClass FrotzAboutLine1 = {
+        GI_visMoniker = "Frotz for GEOS -- An Interpreter for all Infocom Games";
+    }
+
+    @object GenGlyphClass FrotzAboutLine2 = {
+        GI_visMoniker = "Ported by Gerd Boerrigter from";
+    }
+
+    @object GenGlyphClass FrotzAboutLine3 = {
+        GI_visMoniker = "Frotz Version 2.32 for DOS";
+    }
+
+    @object GenGlyphClass FrotzAboutLine4 = {
+        GI_visMoniker = "written by Stefan Jokisch in 1995-97";
+    }
+
+    @object GenGlyphClass FrotzAboutLine5 = {
+    //    GI_visMoniker = list { @CompanyTextMoniker };
+    //    GI_visMoniker = list { @CompanyTextMoniker,
+    //                           @CompanyMoniker
+    //    };
+	 }
+
+    @object GenGlyphClass FrotzAboutLine6 = {
+        GI_visMoniker = "Copyright \xA9 1998 Breadbox Computer Company";
+        @localize { "Copyright." };
+    }
+
+    @visMoniker CompanyTextMoniker = "Breadbox Computer Company";
+*/
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'A', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "GeoFrotz";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Infocom Game Interpreter";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2002 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+@end MenuResource;
+
+@start StringResource, data;
+
+	 @chunk TCHAR DelWarnString[] = "Are you sure you want to overwrite: \001 ?";
+
+@end StringResource;
+
+
+/***********************************************************************
+    FrotzProcessClass
+***********************************************************************/
+
+/***********************************************************************
+	 MSG_FROTZ_START_GAME
+------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-06-12  GerdB     Initial Version
+	 02-09-19  jfh			added exit trigger stuff
+***********************************************************************/
+@method FrotzProcessClass, MSG_FROTZ_START_GAME
+{
+	 FilePushDir();
+	 FileSetCurrentPath( story_disk_handle, story_path );
+
+    zmachineThread = ThreadCreate(
+		  PRIORITY_HIGH, 0, main,
+        4096, GeodeGetProcessHandle() );
+
+    if ( zmachineThread == NullHandle ) {
+        /* Error, if thread could not created */
+    }
+    else {
+		  zMachineStarted = TRUE;
+
+		  @send FrotzExitTrigger::
+					 MSG_GEN_SET_NOT_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+		  @send FrotzOpenStoryDialog::
+					 MSG_GEN_SET_NOT_ENABLED( VUM_NOW );
+	 }
+    FilePopDir();
+
+} /* MSG_FROTZ_START_GAME */
+
+
+/***********************************************************************
+    MSG_FROTZ_FILE_SELECTION_CHANGED
+------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name    Description
+    --------  ------  -----------
+    98-06-12  Gerd    Initial Version
+
+***********************************************************************/
+@method FrotzProcessClass, MSG_FROTZ_FILE_SELECTION_CHANGED
+/*  void GEN_FILE_SELECTOR_NOTIFICATION_MSG
+    (
+    word entryNum,
+    GenFileSelectorEntryFlags entryFlags
+    ) */
+{
+    if ( GFS_GET_ENTRY_FLAGS( entryFlags ) & GFSEF_OPEN )
+    {
+        if ( GFS_GET_ENTRY_TYPE( entryFlags ) == GFSET_FILE )
+        {
+            @call self::MSG_FROTZ_STORY_OPENED();
+        }
+    }
+} /* MSG_FROTZ_FILE_SELECTION_CHANGED */
+
+
+/***********************************************************************
+    MSG_FROTZ_STORY_OPENED
+------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name    Description
+    --------  ------  -----------
+    98-06-12  Gerd    Initial Version
+
+***********************************************************************/
+@method FrotzProcessClass, MSG_FROTZ_STORY_OPENED
+{
+    dword entryFlags;
+
+    /* Just get flags and entry no. */
+    entryFlags = @call FrotzStoryFileSelector::
+                     MSG_GEN_FILE_SELECTOR_GET_SELECTION( NULL );
+
+
+    if ( GFS_GET_ENTRY_FLAGS( entryFlags ) & GFSEF_OPEN )
+    {
+        if ( GFS_GET_ENTRY_TYPE( entryFlags ) == GFSET_FILE )
+        {
+            /* File name */
+            (void) @call FrotzStoryFileSelector::
+                MSG_GEN_FILE_SELECTOR_GET_SELECTION( story_name );
+
+            /* Path */
+            (void) @call FrotzStoryFileSelector::
+					 MSG_GEN_PATH_GET( story_path, PATH_BUFFER_SIZE );
+
+            /* Disk Handle */
+            story_disk_handle = @call FrotzStoryFileSelector::
+                MSG_GEN_PATH_GET_DISK_HANDLE();
+
+            /* Dialogbox schlieáen */
+            (void) @call FrotzStoryFileSelector::
+                MSG_GEN_GUP_INTERACTION_COMMAND( IC_DISMISS );
+
+            (void) @call self::MSG_FROTZ_START_GAME();
+        }
+    }
+    else
+    {
+        /* let the FileSelector determine the file type, and open
+           only if the selection is a directory */
+        if ( @call FrotzStoryFileSelector::
+                 MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
+                     GFS_GET_ENTRY_NUMBER( entryFlags )))
+        {
+            /* UserStandardSound(SST_ERROR); */
+        }
+    }
+} /* MSG_FROTZ_STORY_OPENED */
+
+/***********************************************************************
+    MSG_GEN_PROCESS_OPEN_APPLICATION
+------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name    Description
+    --------  ------  -----------
+    98-06-07  Gerd    Initial Version
+
+***********************************************************************/
+@method FrotzProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    @callsuper();
+
+	 /* Initialize the semaphore. No thread can grab it, that means the
+       grabbing process will block until it is released. */
+    waitForInputSem = ThreadAllocSem( 0 );
+    waitForNameSem = ThreadAllocSem( 0 );
+	 waitForFinished = ThreadAllocSem( 0 );
+
+	 /* install the tiny icon */
+//	 @call FrotzApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+
+//    if ( extraState == NullHandle ) {
+        @send FrotzOpenStoryDialog::MSG_GEN_INTERACTION_INITIATE();
+//    } else {
+        /* Restore last session. */
+//    }
+
+} /* MSG_GEN_PROCESS_OPEN_APPLICATION */
+
+
+/***********************************************************************
+	 FrotzResetGeos
+************************************************************************
+
+	 Make some cleanup for the Geos part of Frotz, after the z-machine is
+	 closing, just before the z-machine Thread is detroyed.
+
+REVISION HISTORY:
+	 Date      Name      Description
+	 --------  --------  -----------
+    98-06-15  GerdB     Initial version.
+	 02-09-18  jfh			changed to enabled vs NOT enabled
+***********************************************************************/
+void FrotzResetGeos( void )
+{
+		  zMachineStarted = FALSE;
+
+		  @send FrotzExitTrigger::
+					 MSG_GEN_SET_ENABLED( VUM_DELAYED_VIA_APP_QUEUE );
+	 @send FrotzOpenStoryDialog::
+				MSG_GEN_SET_ENABLED( VUM_NOW );
+
+} /* FrotzResetGeos */
+
+
+void FrotzDoQuit( void )
+{
+	 @call FrotzApp::MSG_META_QUIT();
+
+ } /* FrotzDoQuit */
+
+
+/***********************************************************************
+	 MSG_GEN_PROCESS_CLOSE_APPLICATION
+------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name    Description
+	 --------  ------  -----------
+	 98-06-07  Gerd    Initial Version
+***********************************************************************/
+@method FrotzProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+	 /* kill Z-machine thread */
+	 finished = 9999;
+
+	 /* Just in case we're blocking on input, V (release) the pup. */
+	 if (waitForInputSem) ThreadVSem( waitForInputSem );
+
+	 /* jfh - if we P this sem it just waits forever and we never quit. */
+/*	 if ( zMachineStarted ) {
+		  /* Wait until Z-machine is finished. */
+ /*		  ThreadPSem( waitForFinished );
+	 }
+ */
+	 @call FrotzText::MSG_FROTZ_OUTPUT_FREE_TIMER();
+	 @call FrotzStatusText::MSG_FROTZ_OUTPUT_FREE_TIMER();
+
+	 /* Free the semaphore. */
+	 ThreadFreeSem( waitForInputSem );
+	 ThreadFreeSem( waitForNameSem );
+	 ThreadFreeSem( waitForFinished );
+
+	 return @callsuper();
+
+} /* MSG_GEN_PROCESS_CLOSE_APPLICATION */
+
+
+/***********************************************************************
+	 MSG_FROTZ_SAVE_RESTORE
+------------------------------------------------------------------------
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name    Description
+    --------  ------  -----------
+    98-06-10  Gerd    Initial Version
+
+***********************************************************************/
+@method FrotzProcessClass, MSG_FROTZ_SAVE_RESTORE
+{
+
+	ThreadVSem( waitForNameSem );
+
+} /* MSG_FROTZ_SAVE_RESTORE */
+
+
+//@classdecl FrotzViewClass;
+
+
+
+/***********************************************************************
+    os_fatal
+************************************************************************
+
+    Display an error message, then exits the application.
+
+REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+	 97-02-19  GerdB     Initial version.
+	 02-09-18  jfh       added game reset
+
+***********************************************************************/
+void
+os_fatal (
+    const char *str
+    )
+{
+
+	 UserStandardDialog( (char *)0, (char *)0, (char *)0, str,
+			"Fatal Error: \001\r",
+			(CDT_ERROR <<
+			CDBF_DIALOG_TYPE_OFFSET) |
+			(GIT_NOTIFICATION <<
+			CDBF_INTERACTION_TYPE_OFFSET) );
+
+	 FrotzResetGeos();
+
+} /* os_fatal */
+
+
+/***********************************************************************
+    os_read_file_name
+************************************************************************
+
+  Return the name of a file. Flag can be one of:
+
+     FILE_SAVE     - Save game file
+     FILE_RESTORE  - Restore game file
+     FILE_SCRIPT   - Transscript file
+     FILE_RECORD   - Command file for recording
+     FILE_PLAYBACK - Command file for playback
+     FILE_SAVE_AUX - Save auxilary ("preferred settings") file
+     FILE_LOAD_AUX - Load auxilary ("preferred settings") file
+
+  The length of the file name is limited by MAX_FILE_NAME. Ideally
+  an interpreter should open a file requester to ask for the file
+  name. If it is unable to do that then this function should call
+  print_string and read_string to ask for a file name.
+
+
+REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-06-10  GerdB     Initial version.
+	 02-09-19  jfh       added dbox moniker
+	 02-09-23  jfh			made it a file selector
+
+***********************************************************************/
+int
+os_read_file_name (char *file_name, const char *default_name, int flag)
+{
+	 word dialogReturn;
+
+	 char *extension;
+    FileHandle fp;
+	 bool result;
+ FileSelectorAttrs	attrs;
+ char	name[13];
+
+    bool saved_replay = istream_replay;
+    bool saved_record = ostream_record;
+
+	 /* Turn off playback and recording temporarily */
+    istream_replay = FALSE;
+    ostream_record = FALSE;
+
+    /* Select appropriate extension */
+
+	 extension = ".aux";
+
+	 if (flag == FILE_SAVE || flag == FILE_RESTORE)
+		  extension = ".SAV";
+    if (flag == FILE_SCRIPT)
+		  extension = ".SCR";
+    if (flag == FILE_RECORD || flag == FILE_PLAYBACK)
+		  extension = ".REC";
+
+	 /* start out in the folder that the game was in */
+	 @call SaveRestoreFileSelector::MSG_GEN_PATH_SET (
+					 story_path, story_disk_handle);
+
+	 attrs = @call SaveRestoreFileSelector::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+
+	 /* show the right moniker and UI objects */
+	 if (flag == FILE_SAVE) {
+		@send FrotzFileNameDialog::MSG_GEN_USE_VIS_MONIKER(
+							OptrToChunk(@SaveMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send FrotzFileNameGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FrotzSaveTrigger::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FrotzRestoreTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		/* set default name */
+		strcpy(name, default_name);
+		if (strchr (name, '.'))
+			name[strlen(name)-4] = 0;
+
+		@call FrotzSaveFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+		@send SaveRestoreFileSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+							attrs | FSA_SHOW_FILES_DISABLED);
+		}
+	 else if (flag == FILE_RESTORE) {
+		@send FrotzFileNameDialog::MSG_GEN_USE_VIS_MONIKER(
+							OptrToChunk(@RestoreMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send FrotzFileNameGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FrotzSaveTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send FrotzRestoreTrigger::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send SaveRestoreFileSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+							attrs & ~FSA_SHOW_FILES_DISABLED);
+		}
+	 else  {  /* I don't think this can happen - jfh */
+		@send FrotzFileNameDialog::MSG_GEN_USE_VIS_MONIKER(
+							OptrToChunk(@FileMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	 /* Input file name (reserve four bytes for a file name extension) */
+
+/*    @send FrotzFileNameExtension::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                extension, VUM_DELAYED_VIA_APP_QUEUE );
+    @send FrotzFileNameDefaultName::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+					 default_name, VUM_DELAYED_VIA_APP_QUEUE );
+*/
+
+	 @send FrotzFileNameDialog::MSG_GEN_INTERACTION_INITIATE();
+
+	 ThreadPSem( waitForNameSem );
+
+	 /* ok the user has clicked either Save or Restore */
+	 if (flag == FILE_SAVE) {
+		@call FrotzSaveFileName::MSG_VIS_TEXT_GET_ALL_PTR(file_name);
+		strcat (file_name, extension);
+		}
+	 else if (flag == FILE_RESTORE) {
+		@call SaveRestoreFileSelector::
+			              MSG_GEN_FILE_SELECTOR_GET_SELECTION(file_name);
+		}
+
+    @send FrotzFileNameDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+	 /* Use the default name if nothing was typed */
+
+/*    if (file_name[0] == 0)
+		  strcpy (file_name, default_name);
+	 if (strchr (file_name, '.') == NULL)
+		  strcat (file_name, extension);
+
+    /* Make sure it is safe to use this file name */
+
+    result = TRUE;
+
+    /* OK if the file is opened for reading */
+
+    if (flag != FILE_SAVE && flag != FILE_SAVE_AUX && flag != FILE_RECORD)
+        goto finished;
+
+    /* OK if the file does not exist */
+
+#ifdef __GEOS__
+    fp = FileOpen( file_name, ( FILE_ACCESS_R | FILE_DENY_W ) );
+    if ( NullHandle == fp ) {
+#else
+    if ((fp = fopen (file_name, "rb")) == NULL) {
+#endif
+        goto finished;
+    }
+
+    /* OK if user wants to overwrite */
+	 {
+    MemHandle mh;
+
+    mh = OptrToHandle( @DelWarnString );
+    MemLock( mh );
+
+    dialogReturn = UserStandardDialog(
+            (char *)0, (char *)0, (char *)0, file_name,
+            LMemDeref( @DelWarnString ),
+            ( ( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET ) |
+              ( GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET ))
+    );
+    MemUnlock( mh );
+    }
+    result = ( IC_YES == dialogReturn );
+
+finished:
+
+    /* Restore state of playback and recording */
+
+    istream_replay = saved_replay;
+    ostream_record = saved_record;
+
+    return result;
+
+}/* os_read_file_name */
+
+
+

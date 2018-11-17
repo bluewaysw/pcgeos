@@ -1,0 +1,176 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT: Breadbox Test Taker
+ * FILE:        ttkr.goh
+ * AUTHOR:  John F. Howard,   01/03
+ *
+ * DESCRIPTION:
+ *  This file has the global variables
+ *      and structures for the application.    
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <gstring.h>
+#include <ansi/string.h>
+#include <token.h>  /* for assigning doc token */
+#include <math.h>
+#include <initfile.h>
+#include <basicdb.h>
+
+/*
+ ***************************************************************************
+ *      Global variables and definitions
+ ***************************************************************************
+ */
+
+/* constants for ack d boxes */
+#define ACK_YES 1
+#define ACK_NO 2
+
+/* ATTENTION!!!!!!!
+ * These need to be the same as in TGen!!!!!!!!!!
+ */
+#define QTYPE_MC 1
+#define QTYPE_TF 2
+#define QTYPE_FILL 3
+
+#define MC_SELECT_A 1
+#define MC_SELECT_B 2
+#define MC_SELECT_C 3
+#define MC_SELECT_D 4
+#define MC_SELECT_E 5
+#define MC_SELECT_F 6
+
+#define TF_TRUE 1
+#define TF_FALSE 2
+
+#define MAX_QUESTION_LENGTH 500
+#define MAX_CHOICE_LENGTH 250
+#define MAX_TITLE_LENGTH 100
+
+/* for the bank index callbacks */
+#define VFC_TYPE 1
+#define VFC_ALPHA 2
+
+/* category constants for the data fields */
+/* CAUTION - do not add anything between CAT_MCCHOICE_A and
+ *           CAT_MCCHOICE_F!!!!! */
+#define FIELD_CAT_Q_TYPE 1
+#define FIELD_CAT_QUESTION 2
+#define FIELD_CAT_MCCHOICE_A 3
+#define FIELD_CAT_MCCHOICE_B 4
+#define FIELD_CAT_MCCHOICE_C 5
+#define FIELD_CAT_MCCHOICE_D 6
+#define FIELD_CAT_MCCHOICE_E 7
+#define FIELD_CAT_MCCHOICE_F 8
+#define FIELD_CAT_ANSWER 9
+#define FIELD_CAT_FREE_ANS_LINES 10 
+#define FIELD_CAT_WEIGHT 11   /* not used yet */
+/*  next 3 added for protocol 1.1 tgen files */
+#define FIELD_CAT_STU_ANS 12
+#define FIELD_CAT_ANS_WRONG 13
+#define FIELD_CAT_ANS_RIGHT 14
+#define FIELD_CAT_BANK_ID 15
+#define FIELD_CAT_LAST 16
+
+/*
+ ***************************************************************************
+ *      Globals
+ ***************************************************************************
+ */
+
+extern word g_numQuestions;
+extern word g_ansQuestions;
+extern Boolean g_nameAndDateSaved;
+
+/*
+ ***************************************************************************
+ *      Prototypes
+ ***************************************************************************
+ */
+
+sword _pascal TypesIndexCallBack (MemHandle m1,
+						  MemHandle m2,
+						  word valueForCallback);
+void SetQADBoxType(byte type);
+void SetTestUIAsCompleted(void);
+void SetTestUIAsNotCompleted(void);
+word AckDBox (char* string1, char* string2, optr ackMsg);
+void NotifyDBox (char* string1, optr notifyMsg);
+
+
+/*
+ ***************************************************************************
+ *      Structure Definitions
+ ***************************************************************************
+ */
+
+/* a map structure for computer test header stuff (shared with the test
+	gen app) */
+typedef struct {
+
+	 word						TMS_numQuestions;
+	 word						TMS_ansQuestions;
+	 VMBlockHandle			TMS_testDBHan;
+	 char						TMS_nameLine[MAX_TITLE_LENGTH];
+	 char						TMS_dateLine[MAX_TITLE_LENGTH];
+	 char						TMS_titleLine1[MAX_TITLE_LENGTH];
+	 char						TMS_titleLine2[MAX_TITLE_LENGTH];
+	 char						TMS_titleLine3[MAX_TITLE_LENGTH];
+	 Boolean					TMS_finished;
+    Boolean					TMS_studentGradable;
+	 char						TMS_bankName[FILE_LONGNAME_BUFFER_SIZE];
+                            /* not used in TTkr but used for grading in TGen */
+} TestMapStruct;
+
+
+
+/*
+ ***************************************************************************
+ *      Class & Message Definitions
+ ***************************************************************************
+ */
+@class  TTkrProcessClass, GenProcessClass ;
+	/* General Messages */
+	@endc
+
+/* This class is for checking entry win close */
+@class	TTkrQAInteractionClass, GenInteractionClass;
+@endc
+
+/* This class is to get the size of the summary question dlist */
+@class   TTkrGenDynamicListClass  GenDynamicListClass;
+@endc
+
+@class  TTkrDocumentClass, GenDocumentClass;
+	/* instance data to store doc file specific info */
+	@instance VMBlockHandle TTDI_testDBHan = NullHandle;
+	@instance word TTDI_selectedQ = GIGS_NONE;
+	@instance byte TTDI_openEntryType = 0;
+	@instance Boolean TTDI_showGrade = FALSE;
+	@instance Boolean TTDI_finished = FALSE;
+
+	/* General Messages */
+	@message void /*(GEN_TRIGGER_ACTION)*/ MSG_TTKR_DOCUMENT_OPEN_QA_FORM();
+	@message void MSG_TTKR_DOCUMENT_SAVE_ENTRY();
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG)
+									 MSG_TTKR_DOCUMENT_SUMMARY_DLIST_MONIKER_QUERY;
+   @message (GEN_ITEM_GROUP_STATUS_MSG) MSG_TTKR_DOCUMENT_SUMMARY_DLIST_STATUS;
+//	@message void MSG_TTKR_DOCUMENT_SUMMARY_DLIST_DBL_CLICK();
+	@message void MSG_TTKR_DOCUMENT_TEST_COMPLETED();
+	@message void MSG_TTKR_DOCUMENT_TEST_NOT_COMPLETED();
+	@message void MSG_TTKR_DOCUMENT_GRADE_TEST();
+
+@endc  /* TGenDocumentClass */
+
+
+

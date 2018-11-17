@@ -1,0 +1,160 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1999.  All rights reserved.
+
+PROJECT:	GlobalPC
+MODULE:		Hardware definitions.
+FILE:		gpchw.def
+
+AUTHOR:		Allen Yuen, Sep 01, 1999
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ayuen	9/01/99   	Initial revision
+
+DESCRIPTION:
+
+	Definitions for GPC hardware.
+		
+	$Id$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+
+;----------------------------------------------------------------------
+; Video BIOS Extension constants
+;----------------------------------------------------------------------
+
+; From vidcomConstant.def:
+VIDEO_BIOS		=	10h	; video bios interrupt number
+
+VBIOS_EXT_INTERRUPT		equ	VIDEO_BIOS
+; Pass:		ah	= VBIOS_EXT_MAJOR_COMMAND
+
+
+
+VBIOS_EXT_MAJOR_COMMAND		equ	50h
+; Pass:		al	= VBiosExtFunc
+
+
+VBiosExtFunc			etype	byte
+
+VEF_DISPLAY_SPLASH_SCR		enum	VBiosExtFunc, 00h
+; Pass:		dl	= 0x00
+;		es:di	= splash screen data
+; Return:	al	= 0x50 if function supported
+;		ah	= 0x00 on success, 0x01 on failure
+; Destroyed:	nothing
+
+
+
+
+
+;----------------------------------------------------------------------
+; BIOS OEM Extension constants
+;----------------------------------------------------------------------
+
+BIOS_OEM_EXT_INTERRUPT		equ	15h
+; Pass:		ah	= BIOS_OEM_EXT_MAJOR_COMMAND
+
+
+
+BIOS_OEM_EXT_MAJOR_COMMAND	equ	0f0h
+; Pass:		al	= BiosOemExtFunc
+
+
+
+BiosOemExtFunc			etype	byte
+; All BiosOemExtFunc returns CF clear if supported, and CF set otherwise.
+
+BOEF_VERSION_DETECT		enum	BiosOemExtFunc, 00h
+
+BOEF_FRONT_PANEL_LED_CTRL	enum	BiosOemExtFunc, 10h
+; Pass:		bl	= BoefFrontPanelLedCtrlFunc
+
+	BoefFrontPanelLedCtrlFunc	etype	byte
+	BFPLCF_GET_STATUS	enum	BoefFrontPanelLedCtrlFunc, 00h
+	; Pass:		nothing
+	; Return:	al	= current LEDState
+	; Destroyed:	ah
+
+	BFPLCF_SET_STATUS	enum	BoefFrontPanelLedCtrlFunc, 01h
+	; Pass:		cl	= desired LEDState
+	;		ch	= 00h
+	; Return:	al	= new LEDState
+	; Destroyed:	ah
+
+	LEDState	record
+	:5
+	LS_CD:1				; modem carrier detected
+	:1
+	LS_PWR:1			; power indicator
+	LEDState	end
+
+BOEF_FRONT_PANEL_SWITCH_CTRL	enum	BiosOemExtFunc, 11h
+; Pass:		bl	= BoefFrontPanelSwitchCtrlFunc
+
+	BoefFrontPanelSwitchCtrlFunc	etype	byte
+	BFPSCF_GET_STATUS	enum	BoefFrontPanelSwitchCtrlFunc, 00h
+	; Pass:		nothing
+	; Return:	al	= current SwitchEnableState
+	;		ah.high	= current SwitchState
+	;		ah.low	= current SwitchStateChange
+	; Destroyed:	nothing
+
+	BFPSCF_SET_STATUS	enum	BoefFrontPanelSwitchCtrlFunc, 01h
+	; Pass:		cl	= SwitchChangeRequest
+	;		ch	= 00h
+	; Return:	al	= new SwitchEnableState
+	; Destroyed:	ah
+
+	SwitchEnableState	record
+	:5
+	SES_VLO:1			; Volume Decrease button enable
+	SES_VHI:1			; Volume Increase button enable
+	SES_PWR:1			; Power button enable
+	SwitchEnableState	end
+
+	SwitchState	record
+	:1
+	SS_VLO:1			; state of Volume Decrease button
+	SS_VHI:1			; state of Volume Increase button
+	SS_PWR:1			; state of Power button
+	SwitchState	end
+
+	SwitchStateChange	record
+	:1
+	SSC_VLO:1			; Volume Decrease button state change
+	SSC_VHI:1			; Volume Increase button state change
+	:1
+	SwitchStatechange	end
+
+	SwitchChangeRequest	record
+	:5
+	SCR_VLO:1			; desired state of SES_VLO
+	SCR_VHI:1			; desired state of SES_VHI
+	SCR_PWR:1			; desired state of SES_PWR
+	SwitchChangeRequest	end
+
+BOEF_SET_VIDEO_TIMEOUT		enum	BiosOemExtFunc, 12h
+; Pass:		bl	= # of 16-second increments (0 and 1 not allowed, 0xff
+;			  disables timeout)
+; Return:	al	= 0 if okay, unchanged if error (invalid timeout value)
+; Destroyed:	ah
+
+BOEF_MASTER_VOL_STATUS		enum	BiosOemExtFunc, 20h
+BOEF_INT_AMP_STATUS		enum	BiosOemExtFunc, 21h
+BOEF_STEREO_DEV_VOL_STATUS	enum	BiosOemExtFunc, 22h
+BOEF_MONO_DEV_VOL_STATUS	enum	BiosOemExtFunc, 23h
+BOEF_SPEAKER_DYNAMICS_LEVEL	enum	BiosOemExtFunc, 24h
+BOEF_EXPANDER_LEVEL		enum	BiosOemExtFunc, 25h
+BOEF_BASS_LEVEL			enum	BiosOemExtFunc, 26h
+BOEF_TREBLE_LEVEL		enum	BiosOemExtFunc, 27h
+BOEF_NUDGE_MASTER_VOL		enum	BiosOemExtFunc, 28h
+BOEF_SKIP_SPLASH_SCREEN_STATE	enum	BiosOemExtFunc, 30h

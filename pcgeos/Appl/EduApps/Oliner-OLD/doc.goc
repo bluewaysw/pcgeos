@@ -1,0 +1,456 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT: Breadbox Outliner
+ * FILE:        doc.goc
+ * AUTHOR:  John F. Howard,   05/03
+ *
+ * DESCRIPTION:
+ *  This file has the doc class for the application.
+ *
+ *
+ ***********************************************************************/
+
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+@include "oliner.goh"
+
+@extern object CardDList;
+@extern object CardTitle;
+@extern object CardText;
+
+@extern chunk BDBCreateError;
+@extern chunk BDBCreateIndexError;
+@extern chunk ErrMsgCouldntCreateNewRec;
+@extern chunk ErrMsgCouldntSaveRec;
+@extern chunk BDBGetRecordError;
+@extern chunk ConfirmDeleteItem;
+
+@classdecl  OLDocumentClass;
+
+
+/* ----------------------------------------------------------------------------
+	OLDocumentClass code
+-----------------------------------------------------------------------------*/
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE for
+ *                                    OLDocumentClass
+ *
+ *
+ * DESCRIPTION: Called to initialize a newly created document.
+ *
+ *
+ ***********************************************************************/
+@method OLDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+{
+ VMMapStruct		*VMmapPtr;
+ MemHandle			mh;
+ VMBlockHandle		vmbh;
+ BasicDBError		error;
+ Boolean				badDB = FALSE;
+
+
+	/* create the top level database */
+	error = BasicDBCreate(pself->GDI_fileHandle, &pself->OLDI_topDBHan, FALSE);
+	if (error)  {
+		NotifyDBox(0, @BDBCreateError);
+		badDB = TRUE;
+		}
+	else {
+		/* create the type index array */
+		error = BasicDBIndexCreate(pself->GDI_fileHandle,
+							pself->OLDI_topDBHan,
+							BDBILF_AUTO_UPDATE,
+							VFC_TYPE,
+							&pself->OLDI_topTypeIndex);
+		if (error) {
+			NotifyDBox(0, @BDBCreateIndexError);
+			badDB = TRUE;
+			}
+		/* and the alpha index array */
+		error = BasicDBIndexCreate(pself->GDI_fileHandle,
+							pself->OLDI_topDBHan,
+							BDBILF_AUTO_UPDATE,
+							VFC_ALPHA,
+							&pself->OLDI_topAlphaIndex);
+		if (error) {
+			NotifyDBox(0, @BDBCreateIndexError);
+			badDB = TRUE;
+			}
+		}
+
+
+	if (!badDB) {
+		/* ok - we have our DB and indices so carry on... */
+		pself->OLDI_numTopItems = 0;
+
+		/* start out with no sort */
+		pself->OLDI_topCurrentIndex = 0;
+
+		/* now a VM Map Block */
+		vmbh = VMAlloc(pself->GDI_fileHandle, sizeof(VMMapStruct), 0);
+		VMSetMapBlock(pself->GDI_fileHandle, vmbh);
+		VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+
+		/* store some globals we'll need */
+		VMmapPtr->VMMS_topDBHan = pself->OLDI_topDBHan;
+		VMmapPtr->VMMS_topTypeIndex = pself->OLDI_topTypeIndex;
+		VMmapPtr->VMMS_topAlphaIndex = pself->OLDI_topAlphaIndex;
+		VMmapPtr->VMMS_topCurrentIndex = 0;
+		VMmapPtr->VMMS_numTopItems = 0;
+
+
+		VMDirty(mh);
+		VMUnlock(mh);
+		}
+
+	return(badDB);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT for
+ *                                    OLDocumentClass
+ *
+ *
+ * DESCRIPTION: Called to initialize a newly opened document.
+ *
+ *
+ ***********************************************************************/
+@method OLDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+{
+ VMMapStruct        *VMmapPtr;
+ MemHandle      mh;
+ VMBlockHandle      vmbh;
+
+
+	g_curDocHan = pself->GDI_fileHandle;
+	/* get our VMmap block */
+	vmbh = VMGetMapBlock(g_curDocHan);
+	VMmapPtr = VMLock(g_curDocHan, vmbh, &mh);
+	/* retrieve saved info to get started */
+	pself->OLDI_topDBHan = VMmapPtr->VMMS_topDBHan;
+	pself->OLDI_topTypeIndex = VMmapPtr->VMMS_topTypeIndex;
+	pself->OLDI_topAlphaIndex = VMmapPtr->VMMS_topAlphaIndex;
+	pself->OLDI_topCurrentIndex = VMmapPtr->VMMS_topCurrentIndex;
+	pself->OLDI_numTopItems = VMmapPtr->VMMS_numTopItems;
+
+	VMUnlock(mh);
+
+	g_topDBHan = pself->OLDI_topDBHan;
+	g_curDBHan = g_topDBHan;
+   g_curLevel = 0;
+
+	@send CardDList::MSG_EXTUI_TREE_INITIALIZE();
+   @send CardDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT for
+ *                                    OLDocumentClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method OLDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+{
+
+   g_curDocHan = 0;
+	g_topDBHan = 0;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OLINER_DOC_CREATE_FOLDER for OLDocumentClass
+ *
+ * DESCRIPTION:	
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method OLDocumentClass, MSG_OLINER_DOC_CREATE_FOLDER
+{
+ BasicDBError		error;
+ BasicDBRecordID    recordID;
+ Boolean			wasProblem = FALSE;
+ Boolean			savedOK;
+ MemHandle		mh, vmh;
+ VMMapStruct		*VMmapPtr;
+ VMBlockHandle		vmbh, nextDBHan, nextDBAlphaIndex, nextDBTypeIndex;
+ word				type, sel;
+ Boolean			badDB = FALSE;
+
+
+	/* if there's a selection in CardDList then we add the topic to that
+		selected topic's bdb */
+	sel = @call CardDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (sel == GIGS_NONE)  g_curDBHan = g_topDBHan;
+	else  g_curDBHan = g_selDBHan;
+
+	/* create the next level database */
+	error = BasicDBCreate(g_curDocHan, &nextDBHan, FALSE);
+	if (error)  {
+		NotifyDBox(0, @BDBCreateError);
+		badDB = TRUE;
+		}
+	else {
+		/* create the type index array */
+		error = BasicDBIndexCreate(g_curDocHan,
+							nextDBHan,
+							BDBILF_AUTO_UPDATE,
+							VFC_TYPE,
+							&nextDBTypeIndex);
+		if (error) {
+			NotifyDBox(0, @BDBCreateIndexError);
+			badDB = TRUE;
+			}
+		/* and the alpha index array */
+		error = BasicDBIndexCreate(g_curDocHan,
+							nextDBHan,
+							BDBILF_AUTO_UPDATE,
+							VFC_ALPHA,
+							&nextDBAlphaIndex);
+		if (error) {
+			NotifyDBox(0, @BDBCreateIndexError);
+			badDB = TRUE;
+			}
+		}
+	if (badDB) return;
+
+	/* create a new record */
+	mh = MakeNewRecord(g_curDBHan);
+	if(!mh) {
+		NotifyDBox(0, @ErrMsgCouldntCreateNewRec);
+		return;
+		}
+
+	/* save the data */
+	type = T_TOPIC;
+	savedOK = SaveData(mh, type, nextDBHan, nextDBTypeIndex, nextDBAlphaIndex);
+
+	if (savedOK) {
+		/* store the record */
+		error = BasicDBSaveRecord(g_curDocHan,
+						g_curDBHan,
+						mh,
+						TypesIndexCallBack,
+					   &recordID);
+		if (error) wasProblem = TRUE;
+		}  /* end of saved ok if */
+	else wasProblem = TRUE;
+
+	if (wasProblem) {
+		NotifyDBox(0, @ErrMsgCouldntSaveRec);
+		return;
+		}
+
+	/* ok - update & save the mapblock stuff */
+	if (g_curDBHan == g_topDBHan) {
+		pself->OLDI_numTopItems++;
+		vmbh = VMGetMapBlock(g_curDocHan);
+		VMmapPtr = VMLock(g_curDocHan, vmbh, &vmh);
+		VMmapPtr->VMMS_numTopItems = pself->OLDI_numTopItems;
+		VMDirty(vmh);
+		VMUnlock(vmh);
+		}
+
+
+	@send CardDList::MSG_EXTUI_TREE_INITIALIZE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OLINER_DOC_SAVE_CARD for OLDocumentClass
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:		we've already checked for text in title line - data may
+ *                be blank though
+ *
+ *
+ ***********************************************************************/
+@method OLDocumentClass, MSG_OLINER_DOC_SAVE_CARD
+{
+ BasicDBError		error;
+ BasicDBRecordID    recordID;
+ Boolean			wasProblem = FALSE;
+ Boolean			savedOK;
+ MemHandle		mh, vmh;
+ VMMapStruct		*VMmapPtr;
+ VMBlockHandle		vmbh;
+ word				type, sel;
+// ExtUITreeCacheElement lineData ;
+
+
+	/* if there's a selection in CardDList then we add the card to that
+		selected topic's bdb */
+	sel = @call CardDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (sel == GIGS_NONE)  g_curDBHan = g_topDBHan;
+	else  g_curDBHan = g_selDBHan;
+//	@call CardDList::MSG_EXTUI_TREE_GET_LINE_ATTRS(sel, &lineData) ;
+
+	/* create a new record */
+	mh = MakeNewRecord(g_curDBHan);
+	if(!mh) {
+		NotifyDBox(0, @ErrMsgCouldntCreateNewRec);
+		return;
+		}
+
+	/* save the data */
+	type = T_CARD;
+	savedOK = SaveData(mh, type, 0, 0, 0);
+
+	if (savedOK) {
+		/* store the record */
+		error = BasicDBSaveRecord(g_curDocHan,
+						g_curDBHan,
+						mh,
+						TypesIndexCallBack,
+					   &recordID);
+		if (error) wasProblem = TRUE;
+		}  /* end of saved ok if */
+	else wasProblem = TRUE;
+
+	if (wasProblem) {
+		NotifyDBox(0, @ErrMsgCouldntSaveRec);
+		return;
+		}
+
+	/* ok - update & save the mapblock stuff */
+	if (g_curDBHan == g_topDBHan) {
+		pself->OLDI_numTopItems++;
+		vmbh = VMGetMapBlock(g_curDocHan);
+		VMmapPtr = VMLock(g_curDocHan, vmbh, &vmh);
+		VMmapPtr->VMMS_numTopItems = pself->OLDI_numTopItems;
+		VMDirty(vmh);
+		VMUnlock(vmh);
+		}
+
+
+//	@send CardDList::MSG_EXTUI_TREE_INITIALIZE();
+	/* the above ends up redrawing the entire tree with all the folders
+		closed.  so we'll see if we can just add the card leaving open
+		folders open.
+		- arg1 is cache so we'll try the cache of the 'parent'
+		- arg2 is start so we'll try
+		- arg2 is count so we'll use 1  */
+//	@send CardDList::MSG_EXTUI_TREE_ADD_ITEMS(lineData.EUITCE_cache, lineData.EUITCE_index, 1);
+	/* that didn't cause a redraw so we'll try adding this line... */
+//	@send CardDList::MSG_EXTUI_TREE_UPDATE_NODE(lineData.EUITCE_cache);
+	/* well, neither of these routines is done in the extui lib so... */
+	@send CardDList::MSG_EXTUI_TABLE_ADD_LINES(sel, 1);
+
+   /* and clear the card data */
+	@send CardTitle::MSG_VIS_TEXT_DELETE_ALL();
+	@send CardText::MSG_VIS_TEXT_DELETE_ALL();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OLINER_DOC_DELETE_ITEM for OLDocumentClass
+ *
+ * DESCRIPTION:	only good for top level right now
+ *
+ * PARAMETERS:
+ *                
+ *
+ *
+ ***********************************************************************/
+@method OLDocumentClass, MSG_OLINER_DOC_DELETE_ITEM
+{
+ word			sel;
+ BasicDBError		error;
+ MemHandle		mh, vmh;
+ VMMapStruct		*VMmapPtr;
+ VMBlockHandle		vmbh;
+ word					type;
+ BasicDBFieldID	fieldID;
+ VMBlockHandle		aIndexHan, tIndexHan, childDBHan;
+
+
+	sel = @call CardDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (sel == GIGS_NONE) return;
+
+	/* confirm the delete */
+	if(AckDBox(0, 0, @ConfirmDeleteItem) == ACK_NO) return;
+
+	/* grab the record from the db */
+	if (pself->OLDI_topCurrentIndex)
+		error = BasicDBGetRecordByIndex(g_curDocHan,
+									  g_curDBHan,
+									  pself->OLDI_topCurrentIndex,
+									  sel, &mh);
+	else
+		error = BasicDBGetRecordByElemNum(g_curDocHan,
+									  g_curDBHan,
+									  sel, &mh);
+
+	if (error) {
+		NotifyDBox(0, @BDBGetRecordError);
+		return;
+		}
+
+	/* check to see if this was a topic - if so free its bdb blocks */
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_TYPE, 1);
+	BasicDBGetFieldData(mh, fieldID, &type, sizeof(word));
+	/* if topic get the bdb handles */
+	if (type == T_TOPIC) {
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_TOPIC_ASORTHAN, 1);
+		BasicDBGetFieldData(mh, fieldID, &aIndexHan, sizeof(VMBlockHandle));
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_TOPIC_TSORTHAN, 1);
+		BasicDBGetFieldData(mh, fieldID, &tIndexHan, sizeof(VMBlockHandle));
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_TOPIC_DBHAN, 1);
+		BasicDBGetFieldData(mh, fieldID, &childDBHan, sizeof(VMBlockHandle));
+		VMFree(g_curDocHan, aIndexHan);
+		VMFree(g_curDocHan, tIndexHan);
+		VMFree(g_curDocHan, childDBHan);
+		}
+	/* and delete the record */
+	BasicDBDeleteRecord(g_curDocHan, g_curDBHan, mh, TypesIndexCallBack);
+
+	/* ok - update & save the mapblock stuff */
+	if(g_curDBHan == g_topDBHan) {
+		pself->OLDI_numTopItems--;
+		vmbh = VMGetMapBlock(g_curDocHan);
+		VMmapPtr = VMLock(g_curDocHan, vmbh, &vmh);
+		VMmapPtr->VMMS_numTopItems = pself->OLDI_numTopItems;
+		VMDirty(vmh);
+		VMUnlock(vmh);
+		}
+
+	/* update the ui */
+	@send CardDList::MSG_EXTUI_TREE_INITIALIZE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OLINER_DOC_GET_NUM_TOP_ITEMS for OLDocumentClass
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method OLDocumentClass, MSG_OLINER_DOC_GET_NUM_TOP_ITEMS
+{
+
+	return(pself->OLDI_numTopItems);
+
+}
+

@@ -1,0 +1,202 @@
+#!/usr/local/bin/perl
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1996 -- All Rights Reserved
+#
+# PROJECT:	profiling
+# MODULE:	
+# FILE: 	pftimes
+# AUTHOR: 	Steve Kertes, 1996
+#
+# DESCRIPTION:
+#
+#  Most-Time-In Functions Tool
+#  ---------------------------
+#    Take a huge file (20 megs, probably) that is a big array of integers
+#    and a symbol file produced from the XIP image and generate a list
+#    (unsorted) of the number of instructions executed in each function.
+#    The data can be sorted later.
+#
+# USAGE:
+#        pftimes prof.data symbols [extra-symbols] | sort
+#
+#        Output is always to standard-out. It can be sorted and
+#        redirected to a file later. 
+#        
+#        The format of the output is "FunctionName<tab>InstructionCount",
+#        eg:
+#        
+#                FunctionName1<tab>120000
+#                FunctionName2<tab>40003
+#                ...
+#	
+#	
+#	The format for the extra-symbols files is like this:
+#	
+#	start-address  end-address [lable]
+#	
+#	0000014 000019
+#	0000014 00001b
+#	000003b 00003d Vidio
+#	
+#	if a lable is left off then the addresses in that range will
+#	will be ignored in the counts for the symbols.
+#	
+#	if there is a lable then a count will be printed for it that looks
+#	like the normal output.
+#	
+#	you probably want to make two entries for labled blocks, one with
+#	the lable, and a second without it so the addresses will be ignored
+#	in the normal counting. then again, maybe you don't want to do that.
+#	
+#	the lables are sorted in order of start address, sorry if you want
+#	them in the order they are in the file.
+#	
+# 	$Id: pftimes,v 1.5 96/09/18 16:28:37 kertes Exp $
+#
+#
+##############################################################################
+
+push (@INC, "/staff/pcgeos/$ENV{'USER'}/Tools/scripts/perl");
+push (@INC, "/staff/pcgeos/Tools/scripts/perl");
+
+require "newgetopt.pl";
+require "profilelib.pl";
+
+&NGetOpt("h", "d", "z") || die "can't grab options";
+# -h for help
+# -d for debugging info
+# -z for printing the ignored and lable blocks then exiting
+
+$profileFilename  = shift(@ARGV);
+$symbolsFilename  = shift(@ARGV);
+$extrasymFileName = shift(@ARGV);
+
+$opt_h = 1 if ($symbolsFilename eq "");
+
+&displayPFTimesHelp() if $opt_h;
+
+############################################
+
+&openProfile($profileFilename);
+&openSymbols($symbolsFilename);
+&openExtraSyms($extrasymFileName);
+
+if ($opt_z) {
+    &printIgnoredAndLabledLists;
+    exit 0;
+}
+
+############################################
+
+$address 	= 0;
+
+($nextOffset, $nextRoutine) = &readSymbol;
+while (1) {
+	($offset, $routine) = ($nextOffset, $nextRoutine);
+	last if $routine eq "";
+	print ">>> Offset: \"$offset\"  Symbol: \"$routine\"\n" if $opt_d;
+
+	($nextOffset, $nextRoutine) = &readSymbol;
+	#
+	# skip counts until we get to the offset of the current routine
+	#
+	while ($address < $offset) {
+		$count = &readInteger;
+		print "### $count\n" if $opt_d;
+
+		&checkForLabledBlock($count, $address);
+
+		++$address;
+	}
+
+	#
+	# count until we hit the offset of the next routine.
+	# if this is the last routine then we will finish out
+	# the profile data.  this is important since the labled
+	# blocks need to be checked for all the data!
+	#
+	$countSum = 0;
+	while ($count = &readInteger) {
+		print ">>> $address\t$count\t\t" if $opt_d;
+
+		&checkForLabledBlock($count, $address);
+
+		$countSum += &computeNewCount($count, $address);
+		print "Total: $countSum\n" if $opt_d;
+
+		last if (++$address == $nextOffset);
+	}
+	&printTimeInEntry($routine, $countSum);
+}
+
+&printLableCounts;
+
+exit 0;
+
+############################################
+############################################
+
+############################################
+#
+# displayPFTimesHelp
+#	print usage information, then exit
+#	
+sub displayPFTimesHelp {
+	print <<EOM;
+Usage:
+        pftimes prof.data symbols [extra-symbols] | sort
+
+	Most-Time-In Functions tool
+
+        Output is always to standard-out. It can be sorted and
+        redirected to a file later. 
+        
+        The format of the output is "FunctionName<tab>InstructionCount",
+        eg:
+        
+                FunctionName1<tab>120000
+                FunctionName2<tab>40003
+                ...
+	
+EOM
+	exit 0;
+}
+
+############################################
+#
+# computeNewCount
+#	right now this just checks to see if the passed address should
+#	be ignored.  if it is ignored return 0, otherwise return the passed
+#	count.
+#	
+sub computeNewCount {
+	local ($newCount, $thisAddress) = @_;
+
+	return (&isThisAddressIgnored($thisAddress) ? 0 : $newCount);
+}
+
+############################################
+#
+# printTimeInEntry
+#	print out a lable and it's count, wow.
+#	
+sub printTimeInEntry {
+	local ($lable, $count) = @_;
+	print "$lable\t"."$count\n";
+}
+
+############################################
+#
+# printLableCounts
+#	prints all the labled blocks with their counts
+#
+sub printLableCounts {
+    local ($a);
+    for ($a=0 ; $a < $#lableList ; $a += 4) {
+	&printTimeInEntry($lableList[$a+2], $lableList[$a+3]);
+    }
+}
+############################################
+
+__END__

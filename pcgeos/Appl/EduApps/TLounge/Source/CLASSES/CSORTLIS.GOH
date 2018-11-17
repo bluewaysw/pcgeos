@@ -1,0 +1,415 @@
+/***************************************************************************
+ *  FILE:  CSORTLIS.GOH
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Module:   SortDynamicListClass
+ |           Copyright (c) 1997 Breadbox Computer Company
+ | Description:
+ |    The SortDynamicListClass is a sub-class of the GenDynamicListClass
+ |    and uses all the same traits except that it keeps the list in memory
+ |    as a list of fixed length strings (user-defined).  The strings
+ |    are automatically sorted case insensitive.  A maximum number of
+ |    strings is also defined (usually around 100).
+ |    The strings are stored in a ChunkArray.
+ |
+ | Usage:
+ |    Use SortDynamicListClass just like a GenDynamicListClass except
+ |    you make that object the receiver of the query msg (note this
+ |    requires the destination to be this object and to receive all
+ |    regular messages).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |                   (LES = Lysle Shields)
+ |
+ *-----------------------------------------------------------------------*/
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  SortDynamicListClass
+ *=========================================================================*/
+
+    @classdecl SortDynamicListClass ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFindElement                                      * INTERNAL *
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Searches the chunk array for a matching name.  In addition, the
+ |    list is assumed to be organized alphabetically and stops on the
+ |    name that is after where it should be.  Otherwise, it returns
+ |    a pointer to the matching entry.
+ |
+ | Inputs:
+ |    optr array                  -- Chunk array to search
+ |    char *p_item                -- Query item to search
+ |    word *index                 -- Pointer to returned index
+ |
+ | Outputs:
+ |    char *                      -- Pointer to found element, else returns
+ |                                   the next element in the list of
+ |                                   where it should be.  NULL is returned
+ |                                   if at the end of the list.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+char *IFindElement(optr array, char *p_item, word *index)
+{
+    word i ;
+    word num ;
+    char *p_element ;
+    sword diff ;
+    word size ;
+
+    num = ChunkArrayGetCount(array) ;
+    for (i=0; i<num; i++)  {
+	   p_element = ChunkArrayElementToPtr(array, i, &size) ;
+	   diff = LocalCmpStringsNoCase(p_item, p_element, 1000);
+	   if (diff <= 0)
+		  break ;
+    }
+
+    /* Null means you are at the end of the list */
+    if (i==num)
+        p_element = NULL ;
+
+    *index = i ;
+
+    return p_element ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  SortDynamicListClass::MSG_SORT_LIST_ADD_ITEM
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Add a new into the array and the dynamic list.
+ |
+ | Inputs:
+ |    char *p_item                -- String to add to the list.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+@method SortDynamicListClass, MSG_SORT_LIST_ADD_ITEM
+{
+    MemHandle mem ;
+    ChunkHandle chunk ;
+    char *p_element ;
+    optr array ;
+    word num ;
+    word size ;
+    word index ;
+
+    size = pself->SDLI_entrySize-1 ;
+
+    /* Add a new item to the list */
+    /* If we don't have an array, create one */
+    if (pself->SDLI_array == NullHandle)  {
+	   mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+	   MemLock(mem) ;
+	   pself = ObjDerefGen(oself) ;
+	   chunk = ChunkArrayCreate(mem, pself->SDLI_entrySize, 0, 0) ;
+	   pself = ObjDerefGen(oself) ;
+	   pself->SDLI_array = ConstructOptr(mem, chunk) ;
+	   @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0) ;
+	   MemUnlock(mem) ;
+    }
+
+    array = pself->SDLI_array ;
+    MemLock(OptrToHandle(array)) ;
+
+    /* Only add if there is room.  Else don't add it */
+    num = ChunkArrayGetCount(array) ;
+    if (num < pself->SDLI_maxEntries)  {
+	   /* Find the first element that is equal or after this name */
+	   p_element = IFindElement(array, p_item, &index) ;
+
+        /* Don't add duplicates */
+        if (LocalCmpStringsNoCase(p_item, p_element, 1000) != 0)  {
+            if (p_element == NULL)  {
+                /* If NULL is returned, we need to add at the end */
+                p_element = ChunkArrayAppend(array, size) ;
+            } else {
+                /* Not NULL, insert a new item in the middle */
+                p_element = ChunkArrayInsertAt(array, p_element, size) ;
+            }
+            strncpy(p_element, p_item, size) ;
+            @call oself::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(index, 1) ;
+        }
+    }
+
+    MemUnlock(OptrToHandle(array)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  SortDynamicListClass::MSG_SORT_LIST_DELETE_ITEM
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Delete an item in the array by the given name.
+ |
+ | Inputs:
+ |    char *p_item                -- Name to find to delete.  If not found,
+ |                                   nothing happens.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+@method SortDynamicListClass, MSG_SORT_LIST_DELETE_ITEM
+{
+    char *p_element ;
+    optr array ;
+    word index ;
+    word size ;
+
+    array = pself->SDLI_array ;
+    size = pself->SDLI_entrySize-1 ;
+    if (array)  {
+        MemLock(OptrToHandle(array)) ;
+
+	   /* Find the element */
+	   p_element = IFindElement(array, p_item, &index) ;
+
+	   if ((p_element) && (strncmp(p_element, p_item, size)==0))  {
+		  /* Only delete if we found it */
+		  ChunkArrayDelete(array, p_element);
+		  @call oself::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(index, 1) ;
+	   }
+	   MemUnlock(OptrToHandle(array)) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  SortDynamicListClass::MSG_SORT_LIST_RENAME_ITEM
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Rename an item in the list as found by the given name.  If the name
+ |    is not found, nothing happens.
+ |
+ | Inputs:
+ |    char *p_oldItem             -- Name to find to rename
+ |    char *p_newItem             -- What to change the name to
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+@method SortDynamicListClass, MSG_SORT_LIST_RENAME_ITEM
+{
+    char *p_element ;
+    optr array ;
+    word index ;
+    word size ;
+
+    array = pself->SDLI_array ;
+    size = pself->SDLI_entrySize-1 ;
+    if (array)  {
+        MemLock(OptrToHandle(array)) ;
+
+        /* Find the element */
+        p_element = IFindElement(array, p_oldItem, &index) ;
+
+	   if ((p_element) && (strncmp(p_element, p_oldItem, size)==0))  {
+            /* Only delete if we found it */
+		  @call oself::MSG_SORT_LIST_DELETE_ITEM(p_oldItem) ;
+		  @call oself::MSG_SORT_LIST_ADD_ITEM(p_newItem) ;
+	   }
+
+	   MemUnlock(OptrToHandle(array)) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  SortDynamicListClass::MSG_SORT_LIST_QUERY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    This method is activated by having the message sent to itself.
+ |    It finds the index position in the chunk array and changes the
+ |    moniker to match the entry.
+ |
+ | Inputs:
+ |    optr list                   -- List being queried
+ |    word item                   -- Index of item being queried
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+@method SortDynamicListClass, MSG_SORT_LIST_QUERY
+{
+    word num ;
+    optr array ;
+    word size ;
+    char *p_element ;
+
+    array = pself->SDLI_array ;
+    if (array)  {
+        MemLock(OptrToHandle(array)) ;
+
+        /* Only add if there is room.  Else don't add it */
+        num = ChunkArrayGetCount(array) ;
+        if (item < num)  {
+            p_element = ChunkArrayElementToPtr(array, item, &size) ;
+            @call oself::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, p_element) ;
+        }
+
+        MemUnlock(OptrToHandle(array)) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  SortDynamicListClass::MSG_SORT_LIST_ADD_ITEM_QUIETLY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Adds an item, but does not automatically update the GenDynamicList
+ |    to show.
+ |
+ | Inputs:
+ |    char *p_item                -- String to add to the list.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+@method SortDynamicListClass, MSG_SORT_LIST_ADD_ITEM_QUIETLY
+{
+    MemHandle mem ;
+    ChunkHandle chunk ;
+    char *p_element ;
+    optr array ;
+    word num ;
+    word size ;
+    word index ;
+
+    size = pself->SDLI_entrySize-1 ;
+
+    /* Add a new item to the list */
+    /* If we don't have an array, create one */
+    if (pself->SDLI_array == NullHandle)  {
+        mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+        MemLock(mem) ;
+        pself = ObjDerefGen(oself) ;
+        chunk = ChunkArrayCreate(mem, pself->SDLI_entrySize, 0, 0) ;
+        pself = ObjDerefGen(oself) ;
+        pself->SDLI_array = ConstructOptr(mem, chunk) ;
+        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0) ;
+        MemUnlock(mem) ;
+    }
+
+    array = pself->SDLI_array ;
+    MemLock(OptrToHandle(array)) ;
+
+    /* Only add if there is room.  Else don't add it */
+    num = ChunkArrayGetCount(array) ;
+    if (num < pself->SDLI_maxEntries)  {
+        /* Find the first element that is equal or after this name */
+        p_element = IFindElement(array, p_item, &index) ;
+
+        /* Don't add duplicates */
+        if (LocalCmpStringsNoCase(p_item, p_element, 1000) != 0)  {
+            if (p_element == NULL)  {
+                /* If NULL is returned, we need to add at the end */
+                p_element = ChunkArrayAppend(array, size) ;
+            } else {
+                /* Not NULL, insert a new item in the middle */
+                p_element = ChunkArrayInsertAt(array, p_element, size) ;
+            }
+            strncpy(p_element, p_item, size) ;
+        }
+    }
+
+    MemUnlock(OptrToHandle(array)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  SortDynamicListClass::MSG_SORT_LIST_UPDATE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Correctly updates the list based on the number of items.  This
+ |    method is used in conjunction with MSG_SORT_LIST_ADD_ITEM_QUIETLY.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+@method SortDynamicListClass, MSG_SORT_LIST_UPDATE
+{
+    optr array ;
+
+    array = pself->SDLI_array ;
+
+    if (array)  {
+        MemLock(OptrToHandle(array)) ;
+        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(ChunkArrayGetCount(array)) ;
+        MemUnlock(OptrToHandle(array)) ;
+    } else {
+        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  SortDynamicListClass::MSG_SORT_LIST_CLEAR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Destroy all the items in the chunk array and clear the UI list.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+@method SortDynamicListClass, MSG_SORT_LIST_CLEAR
+{
+    optr array ;
+
+    array = pself->SDLI_array ;
+
+    if (array)  {
+        MemFree(OptrToHandle(array)) ;
+        pself->SDLI_array = NullHandle;
+        @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0) ;
+    }
+}
+
+
+
+/***************************************************************************
+ *  END OF FILE:  SOURCE\UI\CSORTLIS.GOH
+ ***************************************************************************/
+

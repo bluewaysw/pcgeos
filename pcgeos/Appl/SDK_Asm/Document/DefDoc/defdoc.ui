@@ -1,0 +1,189 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	DefDoc (Sample PC/GEOS application)
+ * File:	defdoc.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user Interface description for this
+ * application. This file is written in a language called ESPIRE, which is
+ * compiled by the UIC compiler. See Spec/User/uic.doc for info.
+ *
+ * IMPORTANT NOTE:
+ *	This sample application is primarily intended to demonstrate a
+ *	model for handling documents.  Basic parts of a PC/GEOS application
+ *	are not documented heavily here.  See the "Hello" sample application
+ *	for more detailed documentation on the standard parts of a PC/GEOS
+ *	application.
+ *
+ * RCS STAMP:
+ *	$Id: defdoc.ui,v 1.1 97/04/04 16:33:20 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+#include "generic.uih"
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+start	AppResource;
+
+DDApp = GenApplication {
+	children = DDPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = DDPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		DDDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		DDDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		DDDocumentControl;
+	moniker = list {
+		DDTextMoniker
+	}
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+		char	"defdoc", 0
+		}
+	}
+}
+
+visMoniker DDTextMoniker = "Default Document Sample Application";
+
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl must be a child of the primary, and must be
+ * on the active list.
+ */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+DDPrimary = GenPrimary {
+	children = DDFileMenu, DDView;
+	hints = { ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, HINT_SIZE_WINDOW_AS_DESIRED }
+}
+
+DDFileMenu = GenInteraction {
+	children = DDDocumentControl;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_FILE_MENU } }
+}
+
+/* ----------------------------------------------------------------------------
+	 UI Document Control
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl should be put in the same resource as the
+ * GenPrimary (for efficiency).  The GenDocumentControl will build the
+ * file menu.
+ */
+
+DDDocumentControl = GenDocumentControl {
+	/*
+	 * Document file's token
+	 */
+	documentTokenChars = "'S', 'A', 'M', 'P'";
+	documentTokenID = "MANUFACTURER_ID_GEOWORKS";
+	/*
+	 * Creator's file's token
+	 */
+	/*
+	 * Text to display in the header area of the primary when no
+	 * document is open.
+	 */
+	noNameText = "No Document";
+	/*
+	 * Special attributes: we have a default document and we do not
+	 * allow setting the empty document (to avoid user confusion)
+	 */
+	dcAttributes = default currentTask none;
+	features = default +supportsUserSettableDefaultDocument,
+				-supportsUserSettableEmptyDocument,
+				-supportsTemplates;
+	/*
+	 * Name of the default file (if the user has not set one)
+	 */
+	defaultFile = "DefDoc Default Document";
+	/*
+	 * Pointer to the GenDocumentGroup
+	 */
+	appDC = DDDocumentGroup;
+	/*
+	 * List of objects to enable/disable based on whether or not a
+	 * document exists
+	 */
+	enableDisableList = DDUIEnableList;
+}
+
+chunk DDUIEnableList = data {
+	UN_OPTR	DDView
+}
+
+end Interface;
+
+/* ----------------------------------------------------------------------------
+	 Document Group
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread.
+ */
+
+start DocumentUI;
+
+DDDocumentGroup = GenDocumentGroup {
+	/*
+	 * Name for untitled documents
+	 */
+	defaultName = "DD Untitled";
+	/*
+	 * Class for document objects
+	 */
+	documentClass = "DDDocumentClass";
+	/*
+	 * GenView to automatically connect documents to
+	 */
+	genView = DDView;
+	/*
+	 * Document protocol
+	 */
+	protocolMajor = "DOCUMENT_PROTOCOL_MAJOR";
+	protocolMinor = "DOCUMENT_PROTOCOL_MINOR";
+	/*
+	 * Pointer to the GenDocumentControl
+	 */
+	uiDC = DDDocumentControl;
+}
+
+end DocumentUI;
+
+/*-----------------------------------------------------------------------------
+	GenView object
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+DDView = GenView {
+	/*
+	 * All objects in the enableDisable list of the GenDocumentControl
+	 * start life disbaled (by default)
+	 */
+	genStates = default -enabled;
+	docRight = "DOCUMENT_WIDTH";
+	docBottom = "DOCUMENT_HEIGHT";
+	horizAttributes = default +scrollable;
+	vertAttributes = default +scrollable;
+}
+
+end Interface;

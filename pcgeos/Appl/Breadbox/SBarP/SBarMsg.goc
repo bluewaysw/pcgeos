@@ -1,0 +1,243 @@
+/**************************************************************
+Copyright 1994-98 Clemens Kochinke & Breadbox Computer Company
+
+Application:      Startbar
+Module:           Methods for Startbar
+File:             sbarmsg.goc
+Date:             12/31/1997
+Author:           Clemens Kochinke
+****************************************************************/
+@include <sbarapp.goh>
+@include <Objects/sbarutil.goh>
+
+extern Boolean G_autohideOn;
+extern Boolean G_barIsShowing ;
+extern TimerHandle G_timeTimerAutoHide ;
+extern word G_timeIdAutoHide ;
+
+#define AUTO_HIDE_TIMEOUT      50   /* ticks */
+
+void StopAutoHideTimer(void)
+{
+    /* Interupt the last timer (if going) */
+    if (G_timeTimerAutoHide)  {
+        TimerStop(G_timeTimerAutoHide, G_timeIdAutoHide) ;
+        G_timeIdAutoHide = NullHandle ;
+    }
+}
+
+@extern method StartBarPrimaryClass, MSG_STARTBAR_PRIMARY_SHOW
+{
+    if (!G_barIsShowing)  {
+        StopAutoHideTimer() ;
+        @send self::MSG_GEN_ADD_GEOMETRY_HINT(
+             HINT_KEEP_ENTIRELY_ONSCREEN,
+             0,
+             VUM_DELAYED_VIA_UI_QUEUE);
+        @send self::MSG_GEN_ADD_GEOMETRY_HINT(
+             HINT_EXTEND_WINDOW_TO_BOTTOM_RIGHT,
+             0,
+             VUM_DELAYED_VIA_UI_QUEUE);
+        @call self::MSG_GEN_SET_WIN_POSITION(
+             GET_MM_AND_TYPE(VUM_DELAYED_VIA_UI_QUEUE, WPT_AT_RATIO),
+             (SWSS_RATIO | PCT_0),
+             (SWSS_RATIO | PCT_100));
+        G_barIsShowing = TRUE;
+    }
+}
+
+@extern method StartBarPrimaryClass, MSG_STARTBAR_PRIMARY_HIDE
+{
+    if (G_barIsShowing)  {
+        StopAutoHideTimer() ;
+
+        @send self::MSG_GEN_REMOVE_GEOMETRY_HINT(
+                  HINT_KEEP_ENTIRELY_ONSCREEN,
+                  VUM_DELAYED_VIA_UI_QUEUE);
+        @call self::MSG_GEN_SET_USABLE(VUM_NOW);
+        @call self::MSG_GEN_SET_WIN_POSITION(
+                  GET_MM_AND_TYPE(VUM_DELAYED_VIA_UI_QUEUE, WPT_AT_RATIO),
+                  (SWSS_RATIO | PCT_0),
+                  (SWSS_RATIO | PCT_100) );
+        G_barIsShowing = FALSE ;
+    }
+}
+
+@extern method StartBarPrimaryClass, MSG_META_RAW_UNIV_ENTER
+{
+    @call oself::MSG_STARTBAR_PRIMARY_SHOW() ;
+}
+
+@extern method StartBarPrimaryClass, MSG_META_RAW_UNIV_LEAVE
+{
+    if (G_autohideOn)  {
+        /* Interupt the last timer (if going) */
+        StopAutoHideTimer() ;
+
+        /* Don't do anything if we are already showing */
+        if (G_barIsShowing)  {
+            /* Hide in AUTO_HIDE_TIMEOUT time */
+            G_timeTimerAutoHide =
+                TimerStart(
+                    TIMER_EVENT_ONE_SHOT,
+                    oself,
+                    AUTO_HIDE_TIMEOUT,
+                    MSG_STARTBAR_PRIMARY_HIDE,
+                    0,
+                    &G_timeIdAutoHide) ;
+        }
+    }
+}
+
+@start TextRes, data;
+    /*---------------------------------------------------------------------*/
+    @chunk char LaunchErr[] =
+                    "The program is not in World or System\\Sysappl "
+                    "and cannot be started.";
+    /*---------------------------------------------------------------------*/
+@end TextRes;
+
+@if 1
+@extern method StartBarProcessClass, MSG_STARTBAR_OPEN_PREF
+{
+    static GeodeToken      PrefToken = { "PMGR" , 0 };
+    static GeodeToken      MngrToken = { "DESK" , 0 };
+    static GeodeToken      VolumeToken = { "bvol" , 16431 };
+    static GeodeToken      ModemToken = { "LnPd" , 16431 };
+    static GeodeToken      MixerToken = { "MIXR" , 16431 };
+    static GeodeToken      ConfigToken = { "gco3" , 16431 };
+    static GeodeToken      FindToken = { "FFnd" , 16431 };
+    static GeodeToken      NewDeskToken = { "nDSK" , 0 };
+
+    GeodeToken      Token2Use; /* must remain as is */
+    char *          p_appname;
+
+    switch(whichApp){
+        case STARTBAR_OPEN_PREF_PREF_MANAGER:
+            Token2Use = PrefToken;
+            p_appname = "prefmgr" ;
+            break;
+        case STARTBAR_OPEN_PREF_GEOMANAGER:
+            Token2Use = MngrToken;
+            p_appname = "manager" ;
+            break;
+        case STARTBAR_OPEN_PREF_VOLUME:
+            Token2Use = VolumeToken;
+            p_appname = "volume" ;
+            break;
+        case STARTBAR_OPEN_PREF_LAUNCHPAD:
+            Token2Use = ModemToken;
+            p_appname = "wwwlp" ;
+            break;
+        case STARTBAR_OPEN_PREF_MIXER:
+            Token2Use = MixerToken;
+            p_appname = "mixer" ;
+            break;
+        case STARTBAR_OPEN_PREF_CONFIGURE:
+            Token2Use = ConfigToken;
+            p_appname = "geocon3" ;
+            break;
+        case STARTBAR_OPEN_PREF_FILE_FIND:
+            Token2Use = FindToken;
+            p_appname = "fifind" ;
+            break;
+        case STARTBAR_OPEN_PREF_NEWDESK:
+            Token2Use = NewDeskToken;
+            p_appname = "newdesk" ;
+            break;
+    }
+
+    StartbarUtilLoadApplication(Token2Use, p_appname) ;
+}
+@endif
+
+/***********************************************************
+  Since this application can be auto-launched, there should
+  be no state file saved because the user would just end up
+  with tons of such files until the system complains that
+  it cannot create a new one.
+ ***********************************************************/
+
+
+@extern method StartBarProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+    VMFileHandle stateFile;
+
+    stateFile = NullHandle;
+
+    return(stateFile);
+}
+
+
+
+/*******************************************************
+  Update the NewDeal graphic on left side of
+  "Cascading Menu"
+ *******************************************************/
+@if 0
+@extern method StartBarSideTitleClass, MSG_VIS_DRAW
+{
+    SizeAsDWord size ;
+    word sizex, sizey ;
+    sword x, y ;
+    Rectangle rect ;
+    char *p_text ;
+
+    @callsuper() ;
+
+    pself = ObjDerefGen(oself) ;
+
+    if (pself->SBSTI_title)  {
+        @call oself::MSG_VIS_GET_BOUNDS(&rect) ;
+
+        x = rect.R_left ;
+        y = rect.R_top ;
+
+        size = @call oself::MSG_VIS_GET_SIZE() ;
+        sizex = DWORD_WIDTH(size) ;
+        sizey = DWORD_HEIGHT(size) ;
+
+        GrSaveState(gstate) ;
+        GrSetAreaColor(
+            gstate,
+            pself->SBSTI_backColor.CQ_info,
+            pself->SBSTI_backColor.CQ_redOrIndex,
+            pself->SBSTI_backColor.CQ_green,
+            pself->SBSTI_backColor.CQ_blue) ;
+        GrFillRect(gstate, x, y, x+sizex, y+sizey);
+
+        GrApplyRotation(gstate, MakeWWFixed(90));
+        GrSetTrackKern(gstate, 10);
+
+        GrSetFont(gstate, FID_DTC_FRANKLIN_GOTHIC, MakeWWFixed(16.0));
+
+        GrSetTextColor(
+            gstate,
+            pself->SBSTI_shadowColor.CQ_info,
+            pself->SBSTI_shadowColor.CQ_redOrIndex,
+            pself->SBSTI_shadowColor.CQ_green,
+            pself->SBSTI_shadowColor.CQ_blue) ;
+        p_text = LMemDerefHandles(OptrToHandle(oself), pself->SBSTI_title) ;
+        GrDrawText(gstate,x-sizey-4,y-1, p_text, 0); // was 4,1
+
+        GrSetTextColor(
+            gstate,
+            pself->SBSTI_textColor.CQ_info,
+            pself->SBSTI_textColor.CQ_redOrIndex,
+            pself->SBSTI_textColor.CQ_green,
+            pself->SBSTI_textColor.CQ_blue) ;
+        p_text = LMemDerefHandles(OptrToHandle(oself), pself->SBSTI_title) ;
+        GrDrawText(gstate,x-sizey-3,y, p_text, 0); // was 4,1
+
+        GrRestoreState(gstate) ;
+    }
+}
+@endif
+
+
+
+/*---------------------------------*/
+
+
+
+

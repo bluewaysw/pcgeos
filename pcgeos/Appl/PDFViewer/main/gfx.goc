@@ -1,0 +1,2685 @@
+//========================================================================
+//
+// Gfx.cc
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifdef __GNUC__
+#pragma implementation
+#endif
+
+@include "pdfvu.goh"
+#include <graphics.h>
+#include <localize.h>
+
+@include "gfx.goh"
+@include "parser.goh"
+@include "lexer.goh"
+@include "obj.goh"
+@include "diction.goh"
+@include "gfxFont.goh"
+@include "gfxState.goh"
+@include "array.goh"
+@include "stream.goh"
+
+#define GdoubleToWordRounded(x)		GdoubleToWord((x) + IntToGdouble(0.5))
+
+#pragma warn -par
+
+/*
+ * extern decls
+ */
+
+extern GBool stopLoadingImage;
+
+/*
+ * Forward decls
+ */
+
+GBool GfxGo(Gfx *this, Parser *parser);
+void GfxExecOp(Gfx *gfx, Obj *cmd, Obj args[], int numArgs, Operator *pOpTab);
+Operator *GfxFindOp(char *name, Operator *opTab);
+GBool GfxCheckArg(Obj *arg, TchkType type);
+void setTextTransform(Gfx *gfx);
+void resetTextTransform(Gfx *gfx);
+void doShowText(Gfx *gfx, GooString *s);
+void GfxUpdateFont(Gfx *gfx);
+void GfxDoImage(Gfx *gfx, Stream *str, GBool inlineImg);
+void GfxDoForm(Gfx *gfx, Obj *str);
+void buildImageStream(Gfx *gfx, Stream **str);
+GBool GfxLookupXObject(Gfx *this, char *name, Obj *obj);
+
+void GfxDrawImageMask(Gfx *gfx, Stream *str, word width, word height, 
+		      GBool invert, GBool inlineImage);
+void GfxDrawImage(Gfx *gfx, Stream *str, word width, word height, 
+		  GfxImageColorMap *colorMap, GBool inlineImage);
+
+
+static void opMoveSetShowText(Gfx *gfx, Obj args[], int numArgs);
+static void opSave(Gfx *gfx, Obj args[], int numArgs);
+static void opRestore(Gfx *gfx, Obj args[], int numArgs);
+static void opConcat(Gfx *gfx, Obj args[], int numArgs);
+static void opSetDash(Gfx *gfx, Obj args[], int numArgs);
+static void opSetFlat(Gfx *gfx, Obj args[], int numArgs);
+static void opSetLineJoin(Gfx *gfx, Obj args[], int numArgs);
+static void opSetLineCap(Gfx *gfx, Obj args[], int numArgs);
+static void opSetMiterLimit(Gfx *gfx, Obj args[], int numArgs);
+static void opSetLineWidth(Gfx *gfx, Obj args[], int numArgs);
+static void opSetExtGState(Gfx *gfx, Obj args[], int numArgs);
+static void opSetFillGray(Gfx *gfx, Obj args[], int numArgs);
+static void opSetStrokeGray(Gfx *gfx, Obj args[], int numArgs);
+static void opSetFillCMYKColor(Gfx *gfx, Obj args[], int numArgs);
+static void opSetStrokeCMYKColor(Gfx *gfx, Obj args[], int numArgs);
+static void opSetFillRGBColor(Gfx *gfx, Obj args[], int numArgs);
+static void opSetStrokeRGBColor(Gfx *gfx, Obj args[], int numArgs);
+static void opSetFillColorSpace(Gfx *gfx, Obj args[], int numArgs);
+static void opSetStrokeColorSpace(Gfx *gfx, Obj args[], int numArgs);
+static void opSetFillColor(Gfx *gfx, Obj args[], int numArgs);
+static void opSetStrokeColor(Gfx *gfx, Obj args[], int numArgs);
+static void opSetFillColorN(Gfx *gfx, Obj args[], int numArgs);
+static void opSetStrokeColorN(Gfx *gfx, Obj args[], int numArgs);
+static void opMoveTo(Gfx *gfx, Obj args[], int numArgs);
+static void opLineTo(Gfx *gfx, Obj args[], int numArgs);
+static void opCurveTo(Gfx *gfx, Obj args[], int numArgs);
+static void opCurveTo1(Gfx *gfx, Obj args[], int numArgs);
+static void opCurveTo2(Gfx *gfx, Obj args[], int numArgs);
+static void opRectangle(Gfx *gfx, Obj args[], int numArgs);
+static void opClosePath(Gfx *gfx, Obj args[], int numArgs);
+static void opEndPath(Gfx *gfx, Obj args[], int numArgs);
+static void opStroke(Gfx *gfx, Obj args[], int numArgs);
+static void opCloseStroke(Gfx *gfx, Obj args[], int numArgs);
+static void opFill(Gfx *gfx, Obj args[], int numArgs);
+static void opEOFill(Gfx *gfx, Obj args[], int numArgs);
+static void opFillStroke(Gfx *gfx, Obj args[], int numArgs);
+static void opCloseFillStroke(Gfx *gfx, Obj args[], int numArgs);
+static void opEOFillStroke(Gfx *gfx, Obj args[], int numArgs);
+static void opCloseEOFillStroke(Gfx *gfx, Obj args[], int numArgs);
+static GBool doEndPath(GfxState *state);
+static void opClip(Gfx *gfx, Obj args[], int numArgs);
+static void opEOClip(Gfx *gfx, Obj args[], int numArgs);
+static void opBeginText(Gfx *gfx, Obj args[], int numArgs);
+static void opEndText(Gfx *gfx, Obj args[], int numArgs);
+static void opSetCharSpacing(Gfx *gfx, Obj args[], int numArgs);
+static void opSetFont(Gfx *gfx, Obj args[], int numArgs);
+static void opSetTextLeading(Gfx *gfx, Obj args[], int numArgs);
+static void opSetTextRender(Gfx *gfx, Obj args[], int numArgs);
+static void opSetTextRise(Gfx *gfx, Obj args[], int numArgs);
+static void opSetWordSpacing(Gfx *gfx, Obj args[], int numArgs);
+static void opSetHorizScaling(Gfx *gfx, Obj args[], int numArgs);
+static void opTextMove(Gfx *gfx, Obj args[], int numArgs);
+static void opTextMoveSet(Gfx *gfx, Obj args[], int numArgs);
+static void opSetTextMatrix(Gfx *gfx, Obj args[], int numArgs);
+static void opTextNextLine(Gfx *gfx, Obj args[], int numArgs);
+static void opShowText(Gfx *gfx, Obj args[], int numArgs);
+static void opMoveShowText(Gfx *gfx, Obj args[], int numArgs);
+static void opMoveSetShowText(Gfx *gfx, Obj args[], int numArgs);
+static void opShowSpaceText(Gfx *gfx, Obj args[], int numArgs);
+//long getNextChar16(GfxFontEncoding16 *enc, Guchar *p, long *c16);
+static void opXObject(Gfx *gfx, Obj args[], int numArgs);
+static void opBeginImage(Gfx *gfx, Obj args[], int numArgs);
+static void opImageData(Gfx *gfx, Obj args[], int numArgs);
+static void opEndImage(Gfx *gfx, Obj args[], int numArgs);
+static void opSetCharWidth(Gfx *gfx, Obj args[], int numArgs);
+static void opSetCacheDevice(Gfx *gfx, Obj args[], int numArgs);
+static void opBeginIgnoreUndef(Gfx *gfx, Obj args[], int numArgs);
+static void opEndIgnoreUndef(Gfx *gfx, Obj args[], int numArgs);
+static void opBeginMarkedContent(Gfx *gfx, Obj args[], int numArgs);
+static void opEndMarkedContent(Gfx *gfx, Obj args[], int numArgs);
+static void opMarkPoint(Gfx *gfx, Obj args[], int numArgs);
+
+
+@start OPTABLE, data;
+//------------------------------------------------------------------------
+// Operator table
+//------------------------------------------------------------------------
+
+@chunk Operator opTab[] = {
+  {"\"",  3, {tchkNum,    tchkNum,    tchkString},
+          &opMoveSetShowText},
+  {"'",   1, {tchkString},
+          &opMoveShowText},
+  {"B",   0, {tchkNone},
+          &opFillStroke},
+  {"B*",  0, {tchkNone},
+          &opEOFillStroke},
+  {"BDC", 2, {tchkName,   tchkProps},
+          &opBeginMarkedContent},
+  {"BI",  0, {tchkNone},
+          &opBeginImage},
+  {"BMC", 1, {tchkName},
+          &opBeginMarkedContent},
+  {"BT",  0, {tchkNone},
+          &opBeginText},
+  {"BX",  0, {tchkNone},
+          &opBeginIgnoreUndef},
+  {"CS",  1, {tchkName},
+          &opSetStrokeColorSpace},
+  {"DP",  2, {tchkName,   tchkProps},
+          &opMarkPoint},
+  {"Do",  1, {tchkName},
+          &opXObject},
+  {"EI",  0, {tchkNone},
+          &opEndImage},
+  {"EMC", 0, {tchkNone},
+          &opEndMarkedContent},
+  {"ET",  0, {tchkNone},
+          &opEndText},
+  {"EX",  0, {tchkNone},
+          &opEndIgnoreUndef},
+  {"F",   0, {tchkNone},
+          &opFill},
+  {"G",   1, {tchkNum},
+          &opSetStrokeGray},
+  {"ID",  0, {tchkNone},
+          &opImageData},
+  {"J",   1, {tchkInt},
+          &opSetLineCap},
+  {"K",   4, {tchkNum,    tchkNum,    tchkNum,    tchkNum},
+          &opSetStrokeCMYKColor},
+  {"M",   1, {tchkNum},
+          &opSetMiterLimit},
+  {"MP",  1, {tchkName},
+          &opMarkPoint},
+  {"Q",   0, {tchkNone},
+          &opRestore},
+  {"RG",  3, {tchkNum,    tchkNum,    tchkNum},
+          &opSetStrokeRGBColor},
+  {"S",   0, {tchkNone},
+          &opStroke},
+  {"SC",  -4, {tchkNum,   tchkNum,    tchkNum,    tchkNum},
+          &opSetStrokeColor},
+  {"SCN", -5, {tchkSCN,   tchkSCN,    tchkSCN,    tchkSCN,
+	       tchkSCN},
+          &opSetStrokeColorN},
+  {"T*",  0, {tchkNone},
+          &opTextNextLine},
+  {"TD",  2, {tchkNum,    tchkNum},
+          &opTextMoveSet},
+  {"TJ",  1, {tchkArray},
+          &opShowSpaceText},
+  {"TL",  1, {tchkNum},
+          &opSetTextLeading},
+  {"Tc",  1, {tchkNum},
+          &opSetCharSpacing},
+  {"Td",  2, {tchkNum,    tchkNum},
+          &opTextMove},
+  {"Tf",  2, {tchkName,   tchkNum},
+          &opSetFont},
+  {"Tj",  1, {tchkString},
+          &opShowText},
+  {"Tm",  6, {tchkNum,    tchkNum,    tchkNum,    tchkNum,
+	      tchkNum,    tchkNum},
+          &opSetTextMatrix},
+  {"Tr",  1, {tchkInt},
+          &opSetTextRender},
+  {"Ts",  1, {tchkNum},
+          &opSetTextRise},
+  {"Tw",  1, {tchkNum},
+          &opSetWordSpacing},
+  {"Tz",  1, {tchkNum},
+          &opSetHorizScaling},
+  {"W",   0, {tchkNone},
+          &opClip},
+  {"W*",  0, {tchkNone},
+          &opEOClip},
+  {"b",   0, {tchkNone},
+          &opCloseFillStroke},
+  {"b*",  0, {tchkNone},
+          &opCloseEOFillStroke},
+  {"c",   6, {tchkNum,    tchkNum,    tchkNum,    tchkNum,
+	      tchkNum,    tchkNum},
+          &opCurveTo},
+  {"cm",  6, {tchkNum,    tchkNum,    tchkNum,    tchkNum,
+	      tchkNum,    tchkNum},
+          &opConcat},
+  {"cs",  1, {tchkName},
+          &opSetFillColorSpace},
+  {"d",   2, {tchkArray,  tchkNum},
+          &opSetDash},
+  {"d0",  2, {tchkNum,    tchkNum},
+          &opSetCharWidth},
+  {"d1",  6, {tchkNum,    tchkNum,    tchkNum,    tchkNum,
+	      tchkNum,    tchkNum},
+          &opSetCacheDevice},
+  {"f",   0, {tchkNone},
+          &opFill},
+  {"f*",  0, {tchkNone},
+          &opEOFill},
+  {"g",   1, {tchkNum},
+          &opSetFillGray},
+  {"gs",  1, {tchkName},
+          &opSetExtGState},
+  {"h",   0, {tchkNone},
+          &opClosePath},
+  {"i",   1, {tchkNum},
+          &opSetFlat},
+  {"j",   1, {tchkInt},
+          &opSetLineJoin},
+  {"k",   4, {tchkNum,    tchkNum,    tchkNum,    tchkNum},
+          &opSetFillCMYKColor},
+  {"l",   2, {tchkNum,    tchkNum},
+          &opLineTo},
+  {"m",   2, {tchkNum,    tchkNum},
+          &opMoveTo},
+  {"n",   0, {tchkNone},
+          &opEndPath},
+  {"q",   0, {tchkNone},
+          &opSave},
+  {"re",  4, {tchkNum,    tchkNum,    tchkNum,    tchkNum},
+          &opRectangle},
+  {"rg",  3, {tchkNum,    tchkNum,    tchkNum},
+          &opSetFillRGBColor},
+  {"s",   0, {tchkNone},
+          &opCloseStroke},
+  {"sc",  -4, {tchkNum,   tchkNum,    tchkNum,    tchkNum},
+          &opSetFillColor},
+  {"scn", -5, {tchkSCN,   tchkSCN,    tchkSCN,    tchkSCN,
+	       tchkSCN},
+          &opSetFillColorN},
+  {"v",   4, {tchkNum,    tchkNum,    tchkNum,    tchkNum},
+          &opCurveTo1},
+  {"w",   1, {tchkNum},
+          &opSetLineWidth},
+  {"y",   4, {tchkNum,    tchkNum,    tchkNum,    tchkNum},
+          &opCurveTo2},
+};
+
+@end OPTABLE;
+
+/*
+ * I wish I knew how to have the compiler count these ...
+ * (The #define below doesn't work on the @chunk.)
+ */
+// #define numOps (sizeof(opTab) / sizeof(Operator))
+
+#define numOps 71
+
+//------------------------------------------------------------------------
+// Gfx
+//------------------------------------------------------------------------
+
+//Gfx::Gfx(OutputDev *out1, int pageNum, Dict *resDict,
+//	 int dpi, double x1, double y1, double x2, double y2, GBool crop,
+//	 double cropX1, double cropY1, double cropX2, double cropY2,
+//	 int rotate) {
+void GfxInit(Gfx *this, Handle gstring, Dict *resDict, XRef *xref,
+	     VMFileHandle vmFile1) {
+
+  Obj obj1;
+
+  // start the resource stack
+  this->res = gmalloc( sizeof(GfxResources) );
+  GfxResourcesInit(this->res, NULL);
+
+  // build font dictionary
+  this->res->fonts = NULL;
+  if (resDict) {
+    DictLookup(resDict, "Font", &obj1, xref);
+    if (isDict(&obj1)) {
+      this->res->fonts = gmalloc( sizeof(GfxFontDict) );
+      GfxFontDictInit(this->res->fonts, getDict(&obj1), xref);
+    }
+    ObjFree(&obj1);
+  }
+
+  // get XObject dictionary
+  if (resDict)
+    DictLookup(resDict, "XObject", &this->res->xObjDict, xref);
+  else
+    initNull(&this->res->xObjDict);
+
+  // get colorspace dictionary
+  if (resDict)
+    DictLookup(resDict, "ColorSpace", &this->res->colorSpaceDict, xref);
+  else
+    initNull(&this->res->colorSpaceDict);
+
+  // initialize
+//  out = out1;
+//  state = new GfxState(dpi, x1, y1, x2, y2, rotate, out->upsideDown());
+  this->state = gmalloc( sizeof(GfxState) );
+  GfxStateInit(this->state, gstring);
+
+  this->fontChanged = gFalse;
+//  clip = clipNone;
+  this->ignoreUndef = 0;
+//  out->startPage(pageNum, state);
+//  out->setDefaultCTM(state->getCTM());
+//  out->updateAll(state);
+
+  this->parser = 0;
+  this->xref = xref;
+  this->vmFile = vmFile1;
+  this->nImages = 0;
+
+#if 0
+  // set crop box
+  if (crop) {
+    state->moveTo(cropX1, cropY1);
+    state->lineTo(cropX2, cropY1);
+    state->lineTo(cropX2, cropY2);
+    state->lineTo(cropX1, cropY2);
+    state->closePath();
+    out->clip(state);
+    state->clearPath();
+  }
+#endif
+}
+
+void GfxFree(Gfx *this) {
+  GfxResources *resPtr;
+
+  while (this->res) {
+    resPtr = this->res->next;
+    GfxResourcesFree(this->res);
+    gfree(this->res);
+    this->res = resPtr;
+  }
+  if (this->state) {
+    GfxStateFree(this->state);
+    gfree(this->state);
+  }
+/*
+ * The parser pointer is usually cleared and freed by someone else;
+ * Remove the warning if this becomes a normal call.
+ */
+  if (this->parser) {
+      EC_WARNING(-1);
+      ParserFree(this->parser);
+      gfree(this->parser);
+  }
+}
+
+void GfxResourcesInit(GfxResources *this, GfxResources *next1) {
+    this->next = next1;
+    this->fonts = NULL;
+    initNull(&this->xObjDict);
+    initNull(&this->colorSpaceDict);
+}
+
+void GfxResourcesFree(GfxResources *this) {
+    if (this->fonts) {
+	GfxFontDictFree(this->fonts);
+	gfree(this->fonts);
+    }
+    ObjFree(&this->xObjDict);
+    ObjFree(&this->colorSpaceDict);
+}
+
+
+GBool GfxDisplay(Gfx *this, Obj *obj) {
+  Obj obj2;
+  long i;
+  Parser parser;
+  Lexer *lexer;
+  XRef *xref = this->xref;
+  GBool goRetval;
+
+  if (isArray(obj)) {
+    for (i = 0; i < ObjArrayGetLength(obj); ++i) {
+      ObjArrayGet(obj, i, &obj2, xref);
+      if (!isStream(&obj2)) {
+	EC_WARNING(-1);
+//	error(-1, "Weird page contents");
+	ObjFree(&obj2);
+	return gFalse;
+      }
+      ObjFree(&obj2);
+    }
+  } else if (!isStream(obj)) {
+    EC_WARNING(-1);
+//    error(-1, "Weird page contents");
+    return gFalse;
+  }
+//  parser = new Parser(new Lexer(obj));
+
+  lexer = gmalloc( sizeof(Lexer) );	/* ParserFree frees this */
+  LexerInitFromObj(lexer, obj, xref);
+  ParserInit(&parser, lexer);
+
+  this->parser = &parser;
+  goRetval = GfxGo(this, &parser);
+  ParserFree(&parser);
+  this->parser = 0;
+
+  return goRetval;
+}
+
+GBool GfxGo(Gfx *this, Parser *parser) {
+  Obj obj;
+  Obj args[maxArgs];
+  Operator *pOpTab;
+  long streamStart;
+  long streamLen;
+  int numCmds, numArgs;
+  short i;
+  GfxState *state = this->state;
+
+  // scan a sequence of objects
+  numCmds = 0;
+  numArgs = 0;
+/*
+ * save stream start pos for progress update
+ */
+  streamStart = ParserGetPos(parser);
+  streamLen = ParserGetLength(parser);
+/*
+ * Lock down op table
+ */
+  MemLock(OptrToHandle(@opTab));
+  pOpTab = LMemDeref(@opTab);
+/*
+ * Loop over commands
+ */
+  ParserGetObj(parser, &obj);
+  while (!isEOF(&obj)) {
+
+    // got a command - execute it
+    if (isCmd(&obj)) {
+      GfxExecOp(this, &obj, args, numArgs, pOpTab);
+      ObjFree(&obj);
+      for (i = 0; i < numArgs; ++i)
+	ObjFree(&args[i]);
+      numArgs = 0;
+
+      // periodically update display
+      if (++numCmds > 200) {
+	  numCmds = 0;
+	  PDFUpdateProgress(ParserGetPos(parser) - streamStart,
+			    streamLen);
+      }
+
+    // got an argument - save it
+    } else if (numArgs < maxArgs) {
+      ObjCopy(&args[numArgs++], &obj);
+      ObjFree(&obj);
+
+    // too many arguments - something is wrong
+    } else {
+	EC_WARNING(-1);
+//      error(getPos(), "Too many args in content stream");
+      ObjFree(&obj);
+    }
+
+    // grab the next object
+    ParserGetObj(parser, &obj);
+  }
+  ObjFree(&obj);
+/*
+ * Unlock the op table
+ */
+  MemUnlock(OptrToHandle(@opTab));
+
+  // args at end with no command
+  if (numArgs > 0) {
+      EC_WARNING(-1);
+//    error(getPos(), "Leftover args in content stream");
+    for (i = 0; i < numArgs; ++i)
+      ObjFree(&args[i]);
+  }
+
+/*
+ * My initial idea in returning a value was to allow the user to abort the
+ * translation; if you implement such a thing, make sure all Objects are 
+ * ObjFree'd and the optable is unlocked before returning.
+ */
+
+  return gTrue;
+}
+
+
+void GfxExecOp(Gfx *gfx, Obj *cmd, Obj args[], int numArgs, Operator *pOpTab) {
+  Operator *op;
+  char *name;
+  int i;
+
+  // find operator
+  name = getName(cmd);
+  if (!(op = GfxFindOp(name, pOpTab))) {
+//    if (ignoreUndef == 0)
+//	EC_WARNING(-1);
+//      error(getPos(), "Unknown operator '%s'", name);
+    return;
+  }
+
+  // type check args
+  if (op->numArgs >= 0) {
+    if (numArgs != op->numArgs) {
+	EC_WARNING(-1);
+//      error(getPos(), "Wrong number (%d) of args to '%s' operator",
+//	    numArgs, name);
+      return;
+    }
+  } else {
+    if (numArgs > -op->numArgs) {
+	EC_WARNING(-1);
+//      error(getPos(), "Too many (%d) args to '%s' operator",
+//	    numArgs, name);
+      return;
+    }
+  }
+  for (i = 0; i < numArgs; ++i) {
+    if (!GfxCheckArg(&args[i], op->tchk[i])) {
+	EC_WARNING(-1);
+//      error(getPos(), "Arg #%d to '%s' operator is wrong type (%s)",
+//	    i, name, args[i].getTypeName());
+      return;
+    }
+  }
+
+  // do it
+  ProcCallFixedOrMovable_cdecl((op->func), gfx, args, numArgs);
+}
+
+Operator *GfxFindOp(char *name, Operator *opTab) {
+  short a, b, m, cmp;
+
+  a = -1;
+  b = numOps;
+  // invariant: opTab[a] < name < opTab[b]
+  while (b - a > 1) {
+    m = (a + b) / 2;
+    cmp = strcmp(opTab[m].name, name);
+    if (cmp < 0)
+      a = m;
+    else if (cmp > 0)
+      b = m;
+    else
+      a = b = m;
+  }
+  if (cmp != 0)
+    return NULL;
+  return &opTab[a];
+}
+
+GBool GfxCheckArg(Obj *arg, TchkType type) {
+  switch (type) {
+  case tchkBool:   return isBool(arg);
+  case tchkInt:    return isInt(arg);
+  case tchkNum:    return isNum(arg);
+  case tchkString: return isString(arg);
+  case tchkName:   return isName(arg);
+  case tchkArray:  return isArray(arg);
+  case tchkProps:  return isDict(arg) || isName(arg);
+  case tchkSCN:    return isNum(arg) || isName(arg);
+  case tchkNone:   return gFalse;
+  }
+  return gFalse;
+}
+
+
+GfxFont *GfxLookupFont(Gfx *this, char *name) {
+  GfxFont *font;
+  GfxResources *resPtr;
+
+  for (resPtr = this->res; resPtr; resPtr = resPtr->next) {
+    if (resPtr->fonts) {
+      if ((font = GfxFontDictLookup(resPtr->fonts, name)))
+	return font;
+    }
+  }
+//  error(getPos(), "unknown font tag '%s'", name);
+  EC_WARNING(-1);
+  return NULL;
+}
+
+GBool GfxLookupXObject(Gfx *this, char *name, Obj *obj) {
+  GfxResources *resPtr;
+
+  for (resPtr = this->res; resPtr; resPtr = resPtr->next) {
+    if (isDict(&resPtr->xObjDict)) {
+	ObjDictLookup(&resPtr->xObjDict, name, obj, this->xref);
+	if (!isNull(obj))
+	    return gTrue;
+	ObjFree(obj);
+    }
+  }
+  EC_WARNING(-1);
+//  error(getPos(), "XObject '%s' is unknown", name);
+  return gFalse;
+}
+
+
+//int Gfx::getPos() {
+//  return parser->getPos();
+//}
+
+void GfxLookupColorSpace(Gfx *this, char *name, Obj *obj) {
+  GfxResources *resPtr;
+
+  for (resPtr = this->res; resPtr; resPtr = resPtr->next) {
+    if (isDict(&resPtr->colorSpaceDict)) {
+	ObjDictLookup(&resPtr->colorSpaceDict, name, obj, this->xref);
+	if (!isNull(obj))
+	    return;
+	ObjFree(obj);
+    }
+  }
+  initNull(obj);
+}
+
+
+//------------------------------------------------------------------------
+// graphics state operators
+//------------------------------------------------------------------------
+
+void opSave(Gfx *gfx, Obj args[], int numArgs) {
+//  out->saveState(state);
+//  state = state->save();
+
+    GfxStateSave(gfx->state);		/* Save PDF-local state */
+    GrSaveState(gfx->state->gstring);	/* Save GEOS state */
+}
+
+void opRestore(Gfx *gfx, Obj args[], int numArgs) {
+//  state = state->restore();
+//  out->restoreState(state);
+
+    GfxStateRestore(gfx->state);
+    GrRestoreState(gfx->state->gstring);
+}
+
+void opConcat(Gfx *gfx, Obj args[], int numArgs) {
+    TransMatrix tm;
+    sdword tmp;
+
+//  state->concatCTM(args[0].getNum(), args[1].getNum(),
+//		   args[2].getNum(), args[3].getNum(),
+//		   args[4].getNum(), args[5].getNum());
+//  out->updateCTM(state, args[0].getNum(), args[1].getNum(),
+//		 args[2].getNum(), args[3].getNum(),
+//		 args[4].getNum(), args[5].getNum());
+//  fontChanged = gTrue;
+
+/* this is painful... */
+
+    tmp = GdoubleToWWFixed(getNum(&args[0]));
+
+    tm.TM_e11.WWF_int = IntegerOf(tmp);
+    tm.TM_e11.WWF_frac = FractionOf(tmp);
+    tmp = getNum(&args[1]);
+    tm.TM_e12.WWF_int = IntegerOf(tmp);
+    tm.TM_e12.WWF_frac = FractionOf(tmp);
+    tmp = getNum(&args[2]);
+    tm.TM_e21.WWF_int = IntegerOf(tmp);
+    tm.TM_e21.WWF_frac = FractionOf(tmp);
+    tmp = getNum(&args[3]);
+    tm.TM_e22.WWF_int = IntegerOf(tmp);
+    tm.TM_e22.WWF_frac = FractionOf(tmp);
+    tmp = getNum(&args[4]);
+    tm.TM_e31.DWF_int = IntegerOf(tmp);
+    tm.TM_e31.DWF_frac = FractionOf(tmp);
+    tmp = getNum(&args[5]);
+    tm.TM_e32.DWF_int = IntegerOf(tmp);
+    tm.TM_e32.DWF_frac = FractionOf(tmp);
+
+    GrApplyTransform(gfx->state->gstring, &tm);
+}
+
+void opSetDash(Gfx *gfx, Obj args[], int numArgs) {
+  Array *a;
+  long length;
+  Obj obj;
+//  double *dash;
+  long i;
+  byte dash[MAX_DASH_ARRAY_PAIRS*2];	/* 10-long array */
+  Handle gstring = gfx->state->gstring;
+
+  a = getArray(&args[0]);
+  length = ArrayGetLength(a);
+  if (length == 0) {
+      GrSetLineStyle(gstring, LS_SOLID, 0, 0, 0);
+      //   dash = NULL;
+  } else {
+    for (i = 0; i < length && i < MAX_DASH_ARRAY_PAIRS*2; ++i) {
+      ArrayGet(a, i, &obj, gfx->xref);
+#ifdef USE_NATIVE_FLOAT_TYPE
+      dash[i] = (0x8000 + getNum(&obj)) >> 16;
+#else
+      dash[i] = (byte) (0.5 + getNum(&obj));
+#endif
+      if (!dash[i]) dash[i] = 1;	/* 0 not allowed */
+      ObjFree(&obj);
+    }
+    if (length == 1) {		/* single # implies two...*/
+	dash[1] = dash[0];
+	length = 2;
+    }
+    GrSetLineStyle(gstring, LS_CUSTOM, 
+		   GdoubleToWord(getNum(&args[1])),
+		   dash, length/2);
+  }
+//  state->setLineDash(dash, length, args[1].getNum());
+//  out->updateLineDash(state);
+}
+
+void opSetFlat(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setFlatness((int)args[0].getNum());
+//  out->updateFlatness(state);
+}
+
+void opSetLineJoin(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setLineJoin(args[0].getInt());
+//  out->updateLineJoin(state);
+
+/* line-join types 0,1,2 are the same in PDF and GEOS */
+
+    GrSetLineJoin(gfx->state->gstring, getInt(&args[0]));
+}
+
+void opSetLineCap(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setLineCap(args[0].getInt());
+//  out->updateLineCap(state);
+
+/* line-cap types 0,1,2 correspond between PDF and GEOS */
+
+    GrSetLineEnd(gfx->state->gstring, getInt(&args[0]));
+}
+
+void opSetMiterLimit(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setMiterLimit(args[0].getNum());
+//  out->updateMiterLimit(state);
+
+    GrSetMiterLimit(gfx->state->gstring, 
+		    GdoubleToWWFixed(getNum(&args[0])));
+}
+
+void opSetLineWidth(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setLineWidth(args[0].getNum());
+//  out->updateLineWidth(state);
+
+    GrSetLineWidth(gfx->state->gstring, 
+		   GdoubleToWWFixed(getNum(&args[0])));
+}
+
+void opSetExtGState(Gfx *gfx, Obj args[], int numArgs) {
+}
+
+//------------------------------------------------------------------------
+// color operators
+//------------------------------------------------------------------------
+/*
+ * Note:  Text is normally drawn in "fill" mode; for efficiency, in that 
+ * mode I draw the text directly (instead of describing the path then 
+ * filling it).  So, we have to set the text color when we set the area 
+ * color so text has the correct color.
+ */
+
+void opSetFillGray(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setFillColorSpace(new GfxColorSpace(colorGray));
+//  state->setFillGray(args[0].getNum());
+//  out->updateFillColor(state);
+
+    GrSetAreaColor(gfx->state->gstring, CF_GRAY, 
+		   GdoubleToWord(getNum(&args[0]) * 255), 
+		   0, 0);
+
+    GrSetTextColor(gfx->state->gstring, CF_GRAY, 
+		   GdoubleToWord(getNum(&args[0]) * 255), 
+		   0, 0);
+}
+
+void opSetStrokeGray(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setStrokeColorSpace(new GfxColorSpace(colorGray));
+//  state->setStrokeGray(args[0].getNum());
+//  out->updateStrokeColor(state);
+
+    GrSetLineColor(gfx->state->gstring, CF_GRAY, 
+		   GdoubleToWord(getNum(&args[0]) * 255), 
+		   0, 0);
+}
+
+void opSetFillCMYKColor(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setFillColorSpace(new GfxColorSpace(colorCMYK));
+//  state->setFillCMYK(args[0].getNum(), args[1].getNum(),
+//		     args[2].getNum(), args[3].getNum());
+//  out->updateFillColor(state);
+
+    word c, m, y, k;
+    sword r, g, b;
+
+    c = GdoubleToWord(255 * getNum(&args[0]));
+    m = GdoubleToWord(255 * getNum(&args[1]));
+    y = GdoubleToWord(255 * getNum(&args[2]));
+    k = GdoubleToWord(255 * getNum(&args[3]));
+
+    if ((r = 255 - (c + k)) < 0)
+	r = 0;
+    if ((g = 255 - (m + k)) < 0)
+	g = 0;
+    if ((b = 255 - (y + k)) < 0)
+	b = 0;
+
+    GrSetAreaColor(gfx->state->gstring, CF_RGB, r, g, b);
+
+    GrSetTextColor(gfx->state->gstring, CF_RGB, r, g, b);
+}
+
+void opSetStrokeCMYKColor(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setStrokeColorSpace(new GfxColorSpace(colorCMYK));
+//  state->setStrokeCMYK(args[0].getNum(), args[1].getNum(),
+//		       args[2].getNum(), args[3].getNum());
+//  out->updateStrokeColor(state);
+
+    word c, m, y, k;
+    sword r, g, b;
+
+    c = GdoubleToWord(255 * getNum(&args[0]));
+    m = GdoubleToWord(255 * getNum(&args[1]));
+    y = GdoubleToWord(255 * getNum(&args[2]));
+    k = GdoubleToWord(255 * getNum(&args[3]));
+
+    if ((r = 255 - (c + k)) < 0)
+	r = 0;
+    if ((g = 255 - (m + k)) < 0)
+	g = 0;
+    if ((b = 255 - (y + k)) < 0)
+	b = 0;
+
+    GrSetLineColor(gfx->state->gstring, CF_RGB, r, g, b);
+}
+
+void opSetFillRGBColor(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setFillColorSpace(new GfxColorSpace(colorRGB));
+//  state->setFillRGB(args[0].getNum(), args[1].getNum(), args[2].getNum());
+//  out->updateFillColor(state);
+
+    GrSetAreaColor(gfx->state->gstring, CF_RGB, 
+		   GdoubleToWord(getNum(&args[0]) * 255),
+		   GdoubleToWord(getNum(&args[1]) * 255),
+		   GdoubleToWord(getNum(&args[2]) * 255));
+
+    GrSetTextColor(gfx->state->gstring, CF_RGB, 
+		   GdoubleToWord(getNum(&args[0]) * 255),
+		   GdoubleToWord(getNum(&args[1]) * 255),
+		   GdoubleToWord(getNum(&args[2]) * 255));
+}
+
+void opSetStrokeRGBColor(Gfx *gfx, Obj args[], int numArgs) {
+//  state->setStrokeColorSpace(new GfxColorSpace(colorRGB));
+//  state->setStrokeRGB(args[0].getNum(), args[1].getNum(), args[2].getNum());
+//  out->updateStrokeColor(state);
+
+    GrSetLineColor(gfx->state->gstring, CF_RGB, 
+		   GdoubleToWord(getNum(&args[0]) * 255),
+		   GdoubleToWord(getNum(&args[1]) * 255),
+		   GdoubleToWord(getNum(&args[2]) * 255));
+}
+
+void opSetFillColorSpace(Gfx *gfx, Obj args[], int numArgs) {
+#if 0
+  Obj obj;
+  GfxColorSpace *colorSpace;
+  double x[4];
+
+  lookupColorSpace(args[0].getName(), &obj);
+  if (obj.isNull())
+    colorSpace = new GfxColorSpace(&args[0]);
+  else
+    colorSpace = new GfxColorSpace(&obj);
+  obj.free();
+  if (colorSpace->isOk()) {
+    state->setFillColorSpace(colorSpace);
+  } else {
+    delete colorSpace;
+    error(getPos(), "Bad colorspace");
+  }
+  x[0] = x[1] = x[2] = x[3] = 0;
+  state->setFillColor(x);
+  out->updateFillColor(state);
+#endif
+}
+
+void opSetStrokeColorSpace(Gfx *gfx, Obj args[], int numArgs) {
+#if 0
+  Obj obj;
+  GfxColorSpace *colorSpace;
+  double x[4];
+
+  lookupColorSpace(args[0].getName(), &obj);
+  if (obj.isNull())
+    colorSpace = new GfxColorSpace(&args[0]);
+  else
+    colorSpace = new GfxColorSpace(&obj);
+  obj.free();
+  if (colorSpace->isOk()) {
+    state->setStrokeColorSpace(colorSpace);
+  } else {
+    delete colorSpace;
+    error(getPos(), "Bad colorspace");
+  }
+  x[0] = x[1] = x[2] = x[3] = 0;
+  state->setStrokeColor(x);
+  out->updateStrokeColor(state);
+#endif
+}
+
+void opSetFillColor(Gfx *gfx, Obj args[], int numArgs) {
+
+    if (numArgs == 1) {
+	opSetFillGray(gfx, args, numArgs);
+
+    } else if (numArgs == 3) {
+	opSetFillRGBColor(gfx, args, numArgs);
+
+    } else if (numArgs == 4) {
+	opSetFillCMYKColor(gfx, args, numArgs);
+
+    } else {
+	EC_WARNING(-1);
+    }
+}
+
+void opSetStrokeColor(Gfx *gfx, Obj args[], int numArgs) {
+
+    if (numArgs == 1) {
+	opSetStrokeGray(gfx, args, numArgs);
+
+    } else if (numArgs == 3) {
+	opSetStrokeRGBColor(gfx, args, numArgs);
+
+    } else if (numArgs == 4) {
+	opSetStrokeCMYKColor(gfx, args, numArgs);
+
+    } else {
+	EC_WARNING(-1);
+    }
+}
+
+void opSetFillColorN(Gfx *gfx, Obj args[], int numArgs) {
+#if 0
+  double x[4];
+  long i;
+
+  x[0] = x[1] = x[2] = x[3] = 0;
+  for (i = 0; i < numArgs && i < 4; ++i) {
+    if (args[i].isNum())
+      x[i] = args[i].getNum();
+    else
+      break;
+  }
+  state->setFillColor(x);
+  out->updateFillColor(state);
+#endif
+}
+
+void opSetStrokeColorN(Gfx *gfx, Obj args[], int numArgs) {
+#if 0
+  double x[4];
+  long i;
+
+  x[0] = x[1] = x[2] = x[3] = 0;
+  for (i = 0; i < numArgs && i < 4; ++i) {
+    if (args[i].isNum())
+      x[i] = args[i].getNum();
+    else
+      break;
+  }
+  state->setStrokeColor(x);
+  out->updateStrokeColor(state);
+#endif
+}
+
+//------------------------------------------------------------------------
+// path segment operators
+//------------------------------------------------------------------------
+
+void opMoveTo(Gfx *gfx, Obj args[], int numArgs) {
+    Handle gstring = gfx->state->gstring;
+
+//  state->moveTo(args[0].getNum(), args[1].getNum());
+    if (gfx->state->pathType != PATH_NORMAL) {
+	GrBeginPath(gstring, PCT_REPLACE);	/* new path */
+	gfx->state->pathType = PATH_NORMAL;
+    }
+    GrMoveTo(gstring, 
+	     GdoubleToWordRounded(getNum(&args[0])),
+	     GdoubleToWordRounded(getNum(&args[1])));
+    GrDrawLineTo(gstring, 
+	     GdoubleToWordRounded(getNum(&args[0])),
+	     GdoubleToWordRounded(getNum(&args[1])));
+}
+
+void opLineTo(Gfx *gfx, Obj args[], int numArgs) {
+//  if (!state->isCurPt()) {
+//    error(getPos(), "No current point in lineto");
+//    return;
+//  }
+//  state->lineTo(args[0].getNum(), args[1].getNum());
+    GrDrawLineTo(gfx->state->gstring, 
+		 GdoubleToWordRounded(getNum(&args[0])),
+		 GdoubleToWordRounded(getNum(&args[1])));
+}
+
+void opCurveTo(Gfx *gfx, Obj args[], int numArgs) {
+    Point p[3];
+    Handle gstring = gfx->state->gstring;
+
+    p[0].P_x = GdoubleToWordRounded(getNum(&args[0]));
+    p[0].P_y = GdoubleToWordRounded(getNum(&args[1]));
+    p[1].P_x = GdoubleToWordRounded(getNum(&args[2]));
+    p[1].P_y = GdoubleToWordRounded(getNum(&args[3]));
+    p[2].P_x = GdoubleToWordRounded(getNum(&args[4]));
+    p[2].P_y = GdoubleToWordRounded(getNum(&args[5]));
+
+//dbg    GrDrawLineTo(gstring, p[2].P_x, p[2].P_y);
+    GrDrawCurveTo(gstring, p);
+}
+
+void opCurveTo1(Gfx *gfx, Obj args[], int numArgs) {
+    Point p[3];
+    XYValueAsDWord curPos;
+    Handle gstring = gfx->state->gstring;
+
+    curPos = GrGetCurPos(gstring);
+
+    p[0].P_x = (curPos & 0xffff);
+    p[0].P_y = (curPos>>16);
+    p[1].P_x = GdoubleToWordRounded(getNum(&args[0]));
+    p[1].P_y = GdoubleToWordRounded(getNum(&args[1]));
+    p[2].P_x = GdoubleToWordRounded(getNum(&args[2]));
+    p[2].P_y = GdoubleToWordRounded(getNum(&args[3]));
+
+//dbg    GrDrawLineTo(gstring, p[2].P_x, p[2].P_y);
+    GrDrawCurveTo(gstring, p);
+}
+
+void opCurveTo2(Gfx *gfx, Obj args[], int numArgs) {
+    Point p[3];
+    Handle gstring = gfx->state->gstring;
+
+    p[0].P_x = GdoubleToWordRounded(getNum(&args[0]));
+    p[0].P_y = GdoubleToWordRounded(getNum(&args[1]));
+    p[2].P_x = p[1].P_x = GdoubleToWordRounded(getNum(&args[2]));
+    p[2].P_y = p[1].P_y = GdoubleToWordRounded(getNum(&args[3]));
+
+//dbg    GrDrawLineTo(gstring, p[2].P_x, p[2].P_y);
+    GrDrawCurveTo(gstring, p);
+}
+
+void opRectangle(Gfx *gfx, Obj args[], int numArgs) {
+    sword x, y;
+    Handle gstring = gfx->state->gstring;
+
+    if (gfx->state->pathType != PATH_NORMAL) {
+	GrBeginPath(gstring, PCT_REPLACE);	/* new path */
+	gfx->state->pathType = PATH_NORMAL;
+    }
+    GrDrawRect(gstring,
+	       x = GdoubleToWordRounded(getNum(&args[0])),
+	       y = GdoubleToWordRounded(getNum(&args[1])),
+	       x + GdoubleToWordRounded(getNum(&args[2])),
+	       y + GdoubleToWordRounded(getNum(&args[3])));
+}
+
+void opClosePath(Gfx *gfx, Obj args[], int numArgs) {
+//  if (!state->isPath()) {
+//    error(getPos(), "No current point in closepath");
+//    return;
+//  }
+//  state->closePath();
+
+    GrCloseSubPath(gfx->state->gstring);
+}
+
+//------------------------------------------------------------------------
+// path painting operators
+//------------------------------------------------------------------------
+
+void opEndPath(Gfx *gfx, Obj args[], int numArgs) {
+    doEndPath(gfx->state);
+}
+
+void opStroke(Gfx *gfx, Obj args[], int numArgs) {
+//  if (!state->isCurPt()) {
+//    //error(getPos(), "No path in stroke");
+//    return;
+//  }
+//  if (state->isPath())
+//    out->stroke(state);
+//  doEndPath();
+
+    if (doEndPath(gfx->state))
+	GrDrawPath(gfx->state->gstring);
+}
+
+void opCloseStroke(Gfx *gfx, Obj args[], int numArgs) {
+    Handle gstring = gfx->state->gstring;
+
+#if 0
+  if (!state->isCurPt()) {
+    //error(getPos(), "No path in closepath/stroke");
+    return;
+  }
+  if (state->isPath()) {
+    state->closePath();
+    out->stroke(state);
+  }
+  doEndPath();
+#endif
+
+    GrCloseSubPath(gstring);
+    if (doEndPath(gfx->state))
+	GrDrawPath(gstring);
+}
+
+void opFill(Gfx *gfx, Obj args[], int numArgs) {
+#if 0
+  if (!state->isCurPt()) {
+    //error(getPos(), "No path in fill");
+    return;
+  }
+  if (state->isPath())
+    out->fill(state);
+  doEndPath();
+#endif
+
+    if (doEndPath(gfx->state))
+	GrFillPath(gfx->state->gstring, WINDING);
+}
+
+void opEOFill(Gfx *gfx, Obj args[], int numArgs) {
+#if 0
+  if (!state->isCurPt()) {
+    //error(getPos(), "No path in eofill");
+    return;
+  }
+  if (state->isPath())
+    out->eoFill(state);
+  doEndPath();
+#endif
+
+    if (doEndPath(gfx->state))
+	GrFillPath(gfx->state->gstring, ODD_EVEN);
+}
+
+void opFillStroke(Gfx *gfx, Obj args[], int numArgs) {
+#if 0
+  if (!state->isCurPt()) {
+    //error(getPos(), "No path in fill/stroke");
+    return;
+  }
+  if (state->isPath()) {
+    out->fill(state);
+    out->stroke(state);
+  }
+  doEndPath();
+#endif
+
+    if (doEndPath(gfx->state)) {
+	GrFillPath(gfx->state->gstring, WINDING);
+	GrDrawPath(gfx->state->gstring);
+    }
+}
+
+void opCloseFillStroke(Gfx *gfx, Obj args[], int numArgs) {
+    Handle gstring = gfx->state->gstring;
+
+#if 0
+  if (!state->isCurPt()) {
+    //error(getPos(), "No path in closepath/fill/stroke");
+    return;
+  }
+  if (state->isPath()) {
+    state->closePath();
+    out->fill(state);
+    out->stroke(state);
+  }
+  doEndPath();
+#endif
+
+    GrCloseSubPath(gstring);
+    if (doEndPath(gfx->state)) {
+	GrFillPath(gstring, WINDING);
+	GrDrawPath(gstring);
+    }
+}
+
+void opEOFillStroke(Gfx *gfx, Obj args[], int numArgs) {
+    Handle gstring = gfx->state->gstring;
+
+#if 0
+  if (!state->isCurPt()) {
+    //error(getPos(), "No path in eofill/stroke");
+    return;
+  }
+  if (state->isPath()) {
+    out->eoFill(state);
+    out->stroke(state);
+  }
+  doEndPath();
+#endif
+
+    if (doEndPath(gfx->state)) {
+	GrFillPath(gstring, ODD_EVEN);
+	GrDrawPath(gstring);
+    }
+}
+
+void opCloseEOFillStroke(Gfx *gfx, Obj args[], int numArgs) {
+    Handle gstring = gfx->state->gstring;
+
+#if 0
+  if (!state->isCurPt()) {
+    //error(getPos(), "No path in closepath/eofill/stroke");
+    return;
+  }
+  if (state->isPath()) {
+    state->closePath();
+    out->eoFill(state);
+    out->stroke(state);
+  }
+  doEndPath();
+#endif
+
+    GrCloseSubPath(gstring);
+    if (doEndPath(gfx->state)) {
+	GrFillPath(gstring, ODD_EVEN);
+    GrDrawPath(gstring);
+    }
+}
+
+GBool doEndPath(GfxState *state) {
+    Handle gstring = state->gstring;
+
+#if 0
+  if (state->isPath()) {
+    if (clip == clipNormal)
+      out->clip(state);
+    else if (clip == clipEO)
+      out->eoClip(state);
+  }
+  clip = clipNone;
+  state->clearPath();
+#endif
+
+    GrEndPath(gstring);
+
+    if (state->pathType == PATH_NORMAL) {
+	state->pathType = PATH_NONE;
+	return gTrue;
+    }
+
+    if (state->pathType == PATH_CLIP) {
+	GrSetClipPath(gstring, PCT_INTERSECTION, WINDING);
+    } else if (state->pathType == PATH_CLIP_EO) {
+	GrSetClipPath(gstring, PCT_INTERSECTION, ODD_EVEN);
+    }
+
+    state->pathType = PATH_NONE;
+    return gFalse;
+}
+
+//------------------------------------------------------------------------
+// path clipping operators
+//------------------------------------------------------------------------
+
+void opClip(Gfx *gfx, Obj args[], int numArgs) {
+//  clip = clipNormal;
+    gfx->state->pathType = PATH_CLIP;
+}
+
+void opEOClip(Gfx *gfx, Obj args[], int numArgs) {
+//  clip = clipEO;
+    gfx->state->pathType = PATH_CLIP_EO;
+}
+
+//------------------------------------------------------------------------
+// text object operators
+//------------------------------------------------------------------------
+
+void opBeginText(Gfx *gfx, Obj args[], int numArgs) {
+
+  GrSaveTransform(gfx->state->gstring);
+
+  GfxStateSetTextMat(gfx->state, IntToGdouble(1), IntToGdouble(0), 
+		     IntToGdouble(0), IntToGdouble(1), 
+		     IntToGdouble(0), IntToGdouble(0));
+
+  GfxStateTextMoveTo(gfx->state, IntToGdouble(0), IntToGdouble(0));
+
+//  out->updateTextMat(state);
+//  out->updateTextPos(state);
+  gfx->fontChanged = gTrue;
+}
+
+void opEndText(Gfx *gfx, Obj args[], int numArgs) {
+
+    GrRestoreTransform(gfx->state->gstring);
+}
+
+//------------------------------------------------------------------------
+// text state operators
+//------------------------------------------------------------------------
+
+void opSetCharSpacing(Gfx *gfx, Obj args[], int numArgs) {
+    GfxStateSetCharSpace(gfx->state, getNum(&args[0]));
+//  out->updateCharSpace(state);
+}
+
+void opSetFont(Gfx *gfx, Obj args[], int numArgs) {
+  GfxFont *font;
+
+  if (!(font = GfxLookupFont(gfx, getName(&args[0]))))
+    return;
+  GfxStateSetFont(gfx->state, font, getNum(&args[1]));
+  gfx->fontChanged = gTrue;
+}
+
+void opSetTextLeading(Gfx *gfx, Obj args[], int numArgs) {
+  GfxStateSetLeading(gfx->state, getNum(&args[0]));
+}
+
+void opSetTextRender(Gfx *gfx, Obj args[], int numArgs) {
+  GfxStateSetRender(gfx->state, getInt(&args[0]));
+//  out->updateRender(state);
+}
+
+void opSetTextRise(Gfx *gfx, Obj args[], int numArgs) {
+  GfxStateSetRise(gfx->state, getNum(&args[0]));
+//  out->updateRise(state);
+}
+
+void opSetWordSpacing(Gfx *gfx, Obj args[], int numArgs) {
+//  out->updateWordSpace(state);
+  GfxStateSetWordSpace(gfx->state, getNum(&args[0]));
+
+//  GfxStateSetWordSpace(gfx->state, getNum(&args[0]));
+  GrSetTextSpacePad(gfx->state->gstring, 
+		    FONT_SCALING_FACTOR * GdoubleToWWFixed(getNum(&args[0])));
+}
+
+void opSetHorizScaling(Gfx *gfx, Obj args[], int numArgs) {
+  GfxStateSetHorizScaling(gfx->state, getNum(&args[0]));
+//  out->updateHorizScaling(state);
+}
+
+//------------------------------------------------------------------------
+// text positioning operators
+//------------------------------------------------------------------------
+
+void opTextMove(Gfx *gfx, Obj args[], int numArgs) {
+  gdouble tx, ty;
+
+  tx = gfx->state->lineX + getNum(&args[0]);
+  ty = gfx->state->lineY + getNum(&args[1]);
+  GfxStateTextMoveTo(gfx->state, tx, ty);
+//  out->updateTextPos(state);
+}
+
+void opTextMoveSet(Gfx *gfx, Obj args[], int numArgs) {
+  gdouble tx, ty;
+  GfxState *state = gfx->state;
+
+  tx = state->lineX + getNum(&args[0]);
+  ty = getNum(&args[1]);
+  GfxStateSetLeading(state, -ty);
+  ty += state->lineY;
+  GfxStateTextMoveTo(state, tx, ty);
+//  out->updateTextPos(state);
+}
+
+void opSetTextMatrix(Gfx *gfx, Obj args[], int numArgs) {
+  GfxState *state = gfx->state;
+
+  GfxStateSetTextMat(state, getNum(&args[0]), getNum(&args[1]),
+		     getNum(&args[2]), getNum(&args[3]),
+		     getNum(&args[4]), getNum(&args[5]));
+
+  GfxStateTextMoveTo(state, IntToGdouble(0), IntToGdouble(0));
+
+//  out->updateTextMat(state);
+//  out->updateTextPos(state);
+  gfx->fontChanged = gTrue;
+}
+
+void opTextNextLine(Gfx *gfx, Obj args[], int numArgs) {
+  gdouble tx, ty;
+  GfxState *state = gfx->state;
+
+  tx = state->lineX;
+  ty = state->lineY - GfxStateGetLeading(state);
+  GfxStateTextMoveTo(state, tx, ty);
+//  out->updateTextPos(state);
+}
+
+//------------------------------------------------------------------------
+// text string operators
+//------------------------------------------------------------------------
+
+void opShowText(Gfx *gfx, Obj args[], int numArgs) {
+  if (!GfxStateGetFont(gfx->state)) {
+      EC_WARNING(-1);
+//    error(getPos(), "No font in show");
+    return;
+  }
+  setTextTransform(gfx);
+  doShowText(gfx, getString(&args[0]));
+  resetTextTransform(gfx);
+}
+
+void opMoveShowText(Gfx *gfx, Obj args[], int numArgs) {
+  gdouble tx, ty;
+  GfxState *state = gfx->state;
+
+  if (!GfxStateGetFont(state)) {
+      EC_WARNING(-1);
+//    error(getPos(), "No font in move/show");
+    return;
+  }
+  tx = state->lineX;
+  ty = state->lineY - GfxStateGetLeading(gfx->state);
+  GfxStateTextMoveTo(state, tx, ty);
+//  out->updateTextPos(state);
+  setTextTransform(gfx);
+  doShowText(gfx, getString(&args[0]));
+  resetTextTransform(gfx);
+}
+
+void opMoveSetShowText(Gfx *gfx, Obj args[], int numArgs) {
+  gdouble tx, ty;
+  GfxState *state = gfx->state;
+
+  if (!GfxStateGetFont(state)) {
+      EC_WARNING(-1);
+//    error(getPos(), "No font in move/set/show");
+    return;
+  }
+  GfxStateSetWordSpace(state, getNum(&args[0]));
+  GfxStateSetCharSpace(state, getNum(&args[1]));
+  tx = state->lineX;
+  ty = state->lineY - GfxStateGetLeading(state);
+  GfxStateTextMoveTo(state, tx, ty);
+//  out->updateWordSpace(state);
+//  out->updateCharSpace(state);
+//  out->updateTextPos(state);
+  setTextTransform(gfx);
+  doShowText(gfx, getString(&args[2]));
+  resetTextTransform(gfx);
+}
+
+void opShowSpaceText(Gfx *gfx, Obj args[], int numArgs) {
+  Array *a;
+  Obj obj;
+  long i;
+  GfxState *state = gfx->state;
+
+  if (!GfxStateGetFont(state)) {
+      EC_WARNING(-1);
+//    error(getPos(), "No font in show/space");
+    return;
+  }
+  a = getArray(&args[0]);
+  setTextTransform(gfx);
+  for (i = 0; i < ArrayGetLength(a); ++i) {
+    ArrayGet(a, i, &obj, gfx->xref);
+    if (isNum(&obj)) {
+	GfxStateTextShift(state, 
+			  -(getNum(&obj) / 1000) *
+			  GdoubleToWord(GfxStateGetFontSize(state)));
+//      out->updateTextShift(state, obj.getNum());
+    } else if (isString(&obj)) {
+      doShowText(gfx, getString(&obj));
+    } else {
+	EC_WARNING(-1);
+//      error(getPos(), "Element of show/space array must be number or string");
+    }
+    ObjFree(&obj);
+  }
+  resetTextTransform(gfx);
+}
+
+#define WWFixedToDWord(ww) (((long)ww.WWF_int << 16) | ww.WWF_frac)
+
+void setTextTransform(Gfx *gfx)
+{
+  GfxFont *font;
+  Handle gstring = gfx->state->gstring;
+  char ch;
+  WWFixedAsDWord geosWidthM, pdfWidthM;
+
+  if (gfx->fontChanged) {
+//    out->updateFont(state);
+
+      GfxUpdateFont(gfx);
+      gfx->fontChanged = gFalse;
+/*
+ * Set font-width factor, based on width of 'm' char
+ */
+      font = GfxStateGetFont(gfx->state);
+
+      if (!font->fontWidthFactor) {
+
+      if ((ch = GfxFontFindChar(font, 'm')) == 0)
+          pdfWidthM = 0;
+      else
+    	  pdfWidthM = MakeWWFixed(font->widths[(unsigned char)ch]) / 1000;
+
+	  if (pdfWidthM) {
+/*
+ * geosWidthM should also be divided by the font size; the pdfwidths are based
+ * on a 1-pt font.  We fold the font size factor in as a multiplication below.
+ */
+	      geosWidthM = GrTextWidthWWFixed(gstring, "m", 1) / FONT_SCALING_FACTOR;
+
+	      if (geosWidthM) {
+		  font->fontWidthFactor = 
+		      GrUDivWWFixed(
+			  GrMulWWFixed(
+			      GdoubleToWWFixed(GfxStateGetFontSize(gfx->state)), pdfWidthM),
+			  geosWidthM);
+	      } else {
+		  font->fontWidthFactor = 1L<<16;
+	      }
+	      
+	  } else {
+	      /* No pdf width */
+	      font->fontWidthFactor = 1L<<16;
+	  }
+/*
+ * Tweaks: disallow font expansion, or compression more than a factor of 3.
+ * Why disallow expansion?  It seems to cause more text collisions than it avoids.
+ */
+	  if (font->fontWidthFactor > (1L<<16)) {
+	      font->fontWidthFactor = 1L<<16;
+	  } else
+/*
+ * This much compression is usually an error; go with factor of 1.
+ * (I have a case where 'm' is not used in any string for that font, so the pdf 
+ * generator assigns it a bogus width of 250 (instead of around 700-900).  Thus,
+ * that font's strings get horribly compressed for no reason.)
+ */
+	  if (font->fontWidthFactor < 0x5555) {
+	      font->fontWidthFactor = 1L<<16;
+	  }
+      }
+      /* Don't forget the horizontal scaling. */
+      font->fontWidthFactor = GrMulWWFixed(font->fontWidthFactor,
+	      GfxStateGetHorizScaling(gfx->state));
+
+      GrSetFontWidth(gstring, IntegerOf(font->fontWidthFactor * 100));
+
+  } /* if fontChanged */
+
+  GrSaveTransform(gstring);
+
+/*
+ * Apply text rise (super/sub scripting)
+ */
+  GrApplyTranslation(gstring, 
+		     0,
+		     GfxStateGetRise(gfx->state));
+
+/* text matrix already applied; apply font scaling factor, flip writing */
+  GrApplyScale(gstring, MakeWWFixed(1) / FONT_SCALING_FACTOR,
+		(-1L<<16)/FONT_SCALING_FACTOR);
+}
+
+void resetTextTransform(Gfx *gfx)
+{
+  GrRestoreTransform(gfx->state->gstring);
+}
+
+void doShowText(Gfx *gfx, GooString *s) {
+  GfxFont *font;
+//  GfxFontEncoding16 *enc;
+//  Guchar c8;
+//  long c16;
+//  GooString *s16;
+//  long m, n;
+//  double dx, dy, width, w, h;
+  WWFixedAsDWord width, fWidth;
+  Handle gstring = gfx->state->gstring;
+//  PointWWFixed curPos, curPos2;
+//  WWFixedAsDWord stringWidth;
+  word len;
+  word render;
+  short i;
+  char *cp;
+
+  font = GfxStateGetFont(gfx->state);
+  /*
+   * If the font has a charset and is symbolic, it probably has drawing commands for the glyphs
+   * embedded in its FontFile.  So, draw nothing.
+   */
+  if (font->hasCharSet && (font->flags & fontSymbolic)) {
+      return;
+  }
+
+	/* For efficiency: if we're in the normal rendering mode,
+	 * we simply draw the text directly; otherwise, we draw the
+	 * path, then stroke it.
+	 */
+
+  render = GfxStateGetRender(gfx->state);
+  if (render != 0) 
+  {
+      GrBeginPath(gstring, PCT_REPLACE);
+  }
+
+
+  //----- 16-bit font
+  if (GfxFontIs16Bit(font)) {
+#if 0
+    enc = font->getEncoding16();
+    if (out->useDrawChar()) {
+      out->beginString(state, s);
+      s16 = NULL;
+    } else {
+      s16 = new GString("  ");
+    }
+    state->textTransformDelta(0, state->getRise(), &dx, &dy);
+    p = (Guchar *)s->getCString();
+    n = s->getLength();
+    while (n > 0) {
+      m = getNextChar16(enc, p, &c16);
+      width = state->getFontSize() * state->getHorizScaling() *
+	      font->getWidth16(c16) +
+	      state->getCharSpace();
+      if (c16 == ' ')
+	width += state->getWordSpace();
+      state->textTransformDelta(width, 0, &w, &h);
+      if (out->useDrawChar()) {
+	out->drawChar16(state, state->getCurX() + dx, state->getCurY() + dy,
+			w, h, c16);
+      } else {
+	s16->setChar(0, (char)(c16 >> 8));
+	s16->setChar(1, (char)c16);
+	out->drawString16(state, s16);
+      }
+      state->textShift(width);
+      n -= m;
+      p += m;
+    }
+    if (out->useDrawChar())
+      out->endString(state);
+    else
+      delete s16;
+#endif
+
+  //----- 8-bit font
+  } else {
+/*
+ * Draw a string.
+ * PDF maintains a seperate "text transformation matrix", which we have
+ * to fold in when drawing text.
+ * Our gstate is upside down relative to PDF-standard, so we have to
+ * flip the y-axis to make the chars come out upside-right.
+ */
+/*
+ * The text matrix is now set overall when in text mode.
+ * We still have to flip the chars, though, and apply any rise or horiz
+ * scaling.  The FONT_SCALING_FACTOR is to overcome precision problems in
+ * specifying small fonts (e.g., 1-pt), which seems to be done a lot.
+ */
+
+	len = GStrGetLength(s);
+	if (len != 0) {
+	    /* Draw 'em accurately */
+        
+	    cp = GStrGetCString(s);
+	    for (i = 0; i < len; i++, cp++)
+	    {
+		char c = GfxFontMapChar(font, *cp, ' ');
+		
+		/* If the character's not a space, */
+		if (c != C_SPACE)
+		{
+		    /* Move to the correct position if drawing past the first
+		       character or drawing to a path. */
+		    if (i > 0 || render != 0)
+			GrMoveToWWFixed(gstring,
+				gfx->state->curTextX * FONT_SCALING_FACTOR,
+				-gfx->state->lineY * FONT_SCALING_FACTOR);
+		    
+		    /* Draw a character */
+		    if (c == C_FI_LIGATURE)
+			GrDrawTextAtCP(gstring, "fi", 2);
+		    else
+			GrDrawCharAtCP(gstring, (byte)c);
+		}
+		
+		/* Update what the x position should be */
+		fWidth = GfxFontGetWidthChar(font, *cp);
+		width = 
+		    GrMulWWFixed(
+			GrMulWWFixed(
+			    GdoubleToWWFixed(GfxStateGetFontSize(gfx->state)),
+			    GfxStateGetHorizScaling(gfx->state)
+			    ),
+			fWidth
+			);
+		width += GdoubleToWWFixed(GfxStateGetCharSpace(gfx->state));
+		if (*cp == ' ')
+		    width += GdoubleToWWFixed(GfxStateGetWordSpace(gfx->state));
+		gfx->state->curTextX += width;
+	    }
+	}
+  }
+  
+  if (render != 0) {
+      GrEndPath(gstring);
+      
+      if (render == 0 || render == 2 || render == 4 || render == 6) {
+	  GrFillPath(gstring, ODD_EVEN);
+      }
+      if (render == 1 || render == 2 || render == 5 || render == 6) {
+	  GrDrawPath(gstring);
+      }
+      if (render >= 4) {
+	  GrSetClipPath(gstring, PCT_INTERSECTION, ODD_EVEN);
+      }
+  }
+  
+  /* Setup the current pen position for the next character (assuming there
+     IS a next character). */
+  GrMoveToWWFixed(gstring,
+		  gfx->state->curTextX * FONT_SCALING_FACTOR,
+		  -gfx->state->lineY * FONT_SCALING_FACTOR);
+}
+
+#if 0
+long getNextChar16(GfxFontEncoding16 *enc, Guchar *p, long *c16) {
+  int n;
+  int code;
+  int a, b, m;
+
+  n = enc->codeLen[*p];
+  if (n == 1) {
+    *c16 = enc->map1[*p];
+  } else {
+    code = (p[0] << 8) + p[1];
+    a = 0;
+    b = enc->map2Len;
+    // invariant: map2[2*a] <= code < map2[2*b]
+    while (b - a > 1) {
+      m = (a + b) / 2;
+      if (enc->map2[2*m] <= code)
+	a = m;
+      else if (enc->map2[2*m] > code)
+	b = m;
+      else
+	break;
+    }
+    *c16 = enc->map2[2*a+1] + (code - enc->map2[2*a]);
+  }
+  return n;
+}
+#endif
+
+//------------------------------------------------------------------------
+// marked content operators
+//------------------------------------------------------------------------
+
+void opBeginMarkedContent(Gfx *gfx, Obj args[], int numArgs) {
+#if 0
+  if (printCommands) {
+    printf("  marked content: %s ", args[0].getName());
+    if (numArgs == 2)
+      args[2].print(stdout);
+    printf("\n");
+  }
+#endif
+}
+
+void opEndMarkedContent(Gfx *gfx, Obj args[], int numArgs) {
+}
+
+void opMarkPoint(Gfx *gfx, Obj args[], int numArgs) {
+#if 0
+  if (printCommands) {
+    printf("  mark point: %s ", args[0].getName());
+    if (numArgs == 2)
+      args[2].print(stdout);
+    printf("\n");
+  }
+#endif
+}
+
+/*
+ * updateFont actually goes with the output device object, but I didn't
+ * port that code so I'm adding it here.
+ */
+void GfxUpdateFont(Gfx *gfx) {
+
+    GfxState *state = gfx->state;
+    GfxFont *font = gfx->state->font;
+    FontID fontID;
+    TextStyle style = 0;
+
+/*
+ * 1st approximation: just use the correct font type (serif, sans-serif, or 
+ * fixed-width) at the specified size.
+ * Also check flags for italic or bold rendering.  (I'm not sure yet if that flag
+ * is set properly based on the font name, e.g. CourierBold, or if it's just
+ * read from the flags param in the font dict.)
+ */
+
+    
+    if (font->flags & fontFixedWidth) {
+	fontID = FID_DTC_URW_MONO;
+
+    } else if (font->flags & fontSerif) {
+	fontID = FID_DTC_URW_ROMAN;
+/*
+ * The 'symbol' flag is set a lot of the time, even for regular text fonts.  
+ * I don't know why.  I don't know how to distinguish a 'real' symbol font from
+ * a bogus one; and we rarely actually see use of the symbol font, so: don't use
+ * it.
+ *
+ * Correction: most of the common cases of fonts flagging themselves as
+ * symbol are handled now.  Let the symbol font show once more!  -Dave 1/26/2000
+ */
+    } else if (font->flags & fontSymbolic) {
+ 	fontID = FID_DTC_URW_SYMBOLPS;
+//	fontID = FID_DTC_URW_SANS;
+
+    } else {
+	fontID = FID_DTC_URW_SANS;
+    }
+
+    if (font->flags & fontItalic)
+	style |= TS_ITALIC;
+
+    if (font->flags & fontBold)
+	style |= TS_BOLD;
+
+    GrSetFont(state->gstring,
+	      fontID,
+	      GdoubleToWWFixed( FONT_SCALING_FACTOR * GfxStateGetFontSize(state)) );
+
+    GrSetTextStyle(state->gstring,
+		   style,
+		   ~style);
+}
+
+
+#pragma codeseg GFXImage
+
+//------------------------------------------------------------------------
+// XObject operators
+//------------------------------------------------------------------------
+
+void opXObject(Gfx *gfx, Obj args[], int numArgs) {
+#if 1
+  Obj obj1, obj2;
+
+  if (!GfxLookupXObject(gfx, getName(&args[0]), &obj1))
+    return;
+  if (!ObjIsStream(&obj1, "XObject")) {
+      EC_WARNING(-1);
+//    error(getPos(), "XObject '%s' is wrong type", args[0].getName());
+    ObjFree(&obj1);
+    return;
+  }
+  DictLookup(ObjStreamGetDict(&obj1), "Subtype", &obj2, gfx->xref);
+  if (isNameSame(&obj2, "Image"))
+    GfxDoImage(gfx, getStream(&obj1), gFalse);
+  else if (isNameSame(&obj2, "Form"))
+    GfxDoForm(gfx, &obj1);
+  else if (isName(&obj2))
+      EC_WARNING(-1);
+//    error(getPos(), "Unknown XObject subtype '%s'", obj2.getName());
+  else
+      EC_WARNING(-1);
+//    error(getPos(), "XObject subtype is missing or wrong type");
+  ObjFree(&obj2);
+  ObjFree(&obj1);
+#endif
+}
+
+void GfxDoImage(Gfx *gfx, Stream *str, GBool inlineImg) {
+#if 1
+  Dict *dict;
+  Obj obj1, obj2;
+  word width, height;
+  short bits;
+  GBool mask;
+  GfxColorSpace colorSpace;
+  GfxImageColorMap colorMap;
+  GBool invert;
+
+  /*
+   * After the first 100 images or so, we run out of resources...
+   */
+
+  if (gfx->nImages++ > 100) {
+      if (gfx->nImages < 105) EC_WARNING(-1);  /* give a few warnings */
+      return;
+  }
+
+  // get stream dict
+  dict = StreamGetDict(str);
+
+  // get size
+  DictLookup(dict, "Width", &obj1, gfx->xref);
+  if (isNull(&obj1)) {
+    ObjFree(&obj1);
+    DictLookup(dict, "W", &obj1, gfx->xref);
+  }
+  if (!isInt(&obj1))
+    goto err2;
+  width = getInt(&obj1);
+  ObjFree(&obj1);
+  DictLookup(dict, "Height", &obj1, gfx->xref);
+  if (isNull(&obj1)) {
+    ObjFree(&obj1);
+    DictLookup(dict, "H", &obj1, gfx->xref);
+  }
+  if (!isInt(&obj1))
+    goto err2;
+  height = getInt(&obj1);
+  ObjFree(&obj1);
+
+  // image or mask?
+  DictLookup(dict, "ImageMask", &obj1, gfx->xref);
+  if (isNull(&obj1)) {
+    ObjFree(&obj1);
+    DictLookup(dict, "IM", &obj1, gfx->xref);
+  }
+  mask = gFalse;
+  if (isBool(&obj1))
+    mask = getBool(&obj1);
+  else if (!isNull(&obj1))
+    goto err2;
+  ObjFree(&obj1);
+
+  // bit depth
+  DictLookup(dict, "BitsPerComponent", &obj1, gfx->xref);
+  if (isNull(&obj1)) {
+    ObjFree(&obj1);
+    DictLookup(dict, "BPC", &obj1, gfx->xref);
+  }
+  if (!isInt(&obj1))
+    goto err2;
+  bits = getInt(&obj1);
+  ObjFree(&obj1);
+
+  // display a mask
+  if (mask) {
+
+    // check for inverted mask
+    if (bits != 1)
+      goto err1;
+    invert = gFalse;
+    DictLookup(dict, "Decode", &obj1, gfx->xref);
+    if (isNull(&obj1)) {
+      ObjFree(&obj1);
+      DictLookup(dict, "D", &obj1, gfx->xref);
+    }
+    if (isArray(&obj1)) {
+      ObjArrayGet(&obj1, 0, &obj2, gfx->xref);
+      if (isInt(&obj2) && getInt(&obj2) == 1)
+	invert = gTrue;
+      ObjFree(&obj2);
+    } else if (!isNull(&obj1)) {
+      goto err2;
+    }
+    ObjFree(&obj1);
+
+    // draw it
+//    out->drawImageMask(state, str, width, height, invert, inlineImg);
+    GfxDrawImageMask(gfx, str, width, height, invert, inlineImg);
+
+  } else {
+
+    // get color space and color map
+    DictLookup(dict, "ColorSpace", &obj1, gfx->xref);
+    if (isNull(&obj1)) {
+      ObjFree(&obj1);
+      DictLookup(dict, "CS", &obj1, gfx->xref);
+    }
+    if (isName(&obj1)) {
+      GfxLookupColorSpace(gfx, getName(&obj1), &obj2);
+      if (!isNull(&obj2)) {
+	ObjFree(&obj1);
+	ObjCopy(&obj1, &obj2);
+	ObjFree(&obj2);
+      } else {
+	ObjFree(&obj2);
+      }
+    }
+    GfxColorSpaceInit(&colorSpace, &obj1, gfx->xref);
+    ObjFree(&obj1);
+    if (!colorSpace.ok) {
+      GfxColorSpaceFree(&colorSpace);
+      goto err1;
+    }
+    DictLookup(dict, "Decode", &obj1, gfx->xref);
+    if (isNull(&obj1)) {
+      ObjFree(&obj1);
+      DictLookup(dict, "D", &obj1, gfx->xref);
+    }
+    GfxImageColorMapInit(&colorMap, bits, &obj1, &colorSpace, gfx->xref);
+    ObjFree(&obj1);
+    if (!colorMap.ok) {
+      GfxImageColorMapFree(&colorMap);
+      goto err1;
+    }
+
+    // draw it
+//    out->drawImage(state, str, width, height, colorMap, inlineImg);
+    GfxDrawImage(gfx, str, width, height, &colorMap, inlineImg);
+    GfxImageColorMapFree(&colorMap);
+  }
+
+  return;
+
+ err2:
+  ObjFree(&obj1);
+ err1:
+  EC_WARNING(-1);
+//  error(getPos(), "Bad image parameters");
+#endif
+}
+
+void GfxDoForm(Gfx *gfx, Obj *str) {
+#if 0
+  Parser *oldParser;
+  GfxResources *resPtr;
+  Dict *dict;
+  Dict *resDict;
+  Object matrixObj, bboxObj;
+  double m[6];
+  Object obj1, obj2;
+  int i;
+
+  // get stream dict
+  dict = str->streamGetDict();
+
+  // check form type
+  dict->lookup("FormType", &obj1);
+  if (!(obj1.isInt() && obj1.getInt() == 1)) {
+    obj1.free();
+    error(getPos(), "Unknown form type");
+    return;
+  }
+  obj1.free();
+
+  // get matrix and bounding box
+  dict->lookup("Matrix", &matrixObj);
+  if (!matrixObj.isArray()) {
+    matrixObj.free();
+    error(getPos(), "Bad form matrix");
+    return;
+  }
+  dict->lookup("BBox", &bboxObj);
+  if (!bboxObj.isArray()) {
+    matrixObj.free();
+    bboxObj.free();
+    error(getPos(), "Bad form bounding box");
+    return;
+  }
+
+  // push new resources on stack
+  dict->lookup("Resources", &obj1);
+  if (obj1.isDict()) {
+    resDict = obj1.getDict();
+    res = new GfxResources(res);
+    res->fonts = NULL;
+    resDict->lookup("Font", &obj2);
+    if (obj2.isDict())
+      res->fonts = new GfxFontDict(obj2.getDict());
+    obj2.free();
+    resDict->lookup("XObject", &res->xObjDict);
+    resDict->lookup("ColorSpace", &res->colorSpaceDict);
+    obj1.free();
+  }
+
+  // save current graphics state
+  out->saveState(state);
+  state = state->save();
+
+  // save current parser
+  oldParser = parser;
+
+  // set form transformation matrix
+  for (i = 0; i < 6; ++i) {
+    matrixObj.arrayGet(i, &obj1);
+    m[i] = obj1.getNum();
+    obj1.free();
+  }
+  state->concatCTM(m[0], m[1], m[2], m[3], m[4], m[5]);
+  out->updateCTM(state, m[0], m[1], m[2], m[3], m[4], m[5]);
+
+  // set form bounding box
+  for (i = 0; i < 4; ++i) {
+    bboxObj.arrayGet(i, &obj1);
+    m[i] = obj1.getNum();
+    obj1.free();
+  }
+  state->moveTo(m[0], m[1]);
+  state->lineTo(m[0]+m[2], m[1]);
+  state->lineTo(m[0]+m[2], m[1]+m[3]);
+  state->lineTo(m[0], m[1]+m[3]);
+  state->closePath();
+  out->clip(state);
+  state->clearPath();
+
+  // draw the form
+  display(str);
+
+  // free matrix and bounding box
+  matrixObj.free();
+  bboxObj.free();
+
+  // restore parser
+  parser = oldParser;
+
+  // restore graphics state
+  state = state->restore();
+  out->restoreState(state);
+
+  // pop resource stack
+  resPtr = res->next;
+  delete res;
+  res = resPtr;
+
+  return;
+#endif
+}
+
+//------------------------------------------------------------------------
+// in-line image operators
+//------------------------------------------------------------------------
+
+void opBeginImage(Gfx *gfx, Obj args[], int numArgs) {
+#if 1
+  Stream *str;
+  long c1, c2;
+
+/*
+ * This can't be allocated "Stream str" on the stack, because StreamFree
+ * might try to free it (if there are chained streams).
+ */
+  str = gmalloc(sizeof(Stream));
+
+  // build dict/stream
+  buildImageStream(gfx, &str);
+
+  // display the image
+  if (str->kind != strEOF) {
+    GfxDoImage(gfx, str, gTrue);
+  
+    // skip 'EI' tag
+    c1 = StreamGetChar(str);
+    c2 = StreamGetChar(str);
+    while (!(c1 == 'E' && c2 == 'I') && c2 != EOF) {
+      c1 = c2;
+      c2 = StreamGetChar(str);
+    }
+    if (c2 == EOF)
+	EC_WARNING(-1);		/* no EI tag */
+
+    StreamFree(str);
+    gfree(str);
+  }
+#endif
+}
+
+void buildImageStream(Gfx *gfx, Stream **str) {
+#if 1
+  Obj dict;
+  Obj obj;
+  char *key;
+
+  // build dictionary
+  initDict(&dict);
+  ParserGetObj(gfx->parser, &obj);
+  while (!isCmdSame(&obj, "ID") && !isEOF(&obj)) {
+    if (!isName(&obj)) {
+	EC_WARNING(-1);
+//      error(getPos(), "Inline image dictionary key must be a name object");
+      ObjFree(&obj);
+      ParserGetObj(gfx->parser, &obj);
+    } else {
+      key = copyString(getName(&obj));
+      ObjFree(&obj);
+      ParserGetObj(gfx->parser, &obj);
+      if (isEOF(&obj) || isError(&obj))
+	break;
+      ObjDictAdd(&dict, key, &obj);
+    }
+    ParserGetObj(gfx->parser, &obj);
+  }
+  if (isEOF(&obj))
+      EC_WARNING(-1);
+//    error(getPos(), "End of file in inline image");
+  ObjFree(&obj);
+
+  // make stream
+  SubStreamInit(*str, LexerGetStream(gfx->parser->lexer), &dict);
+  *str = StreamAddFilters(*str, &dict, gfx->xref);
+  ObjFree(&dict);
+
+  return;
+#endif
+}
+
+void opImageData(Gfx *gfx, Obj args[], int numArgs) {
+//  error(getPos(), "Internal: got 'ID' operator");
+    EC_WARNING(-1);
+}
+
+void opEndImage(Gfx *gfx, Obj args[], int numArgs) {
+//  error(getPos(), "Internal: got 'EI' operator");
+    EC_WARNING(-1);
+}
+
+//------------------------------------------------------------------------
+// type 3 font operators
+//------------------------------------------------------------------------
+
+void opSetCharWidth(Gfx *gfx, Obj args[], int numArgs) {
+//  error(getPos(), "Encountered 'd0' operator in content stream");
+    EC_WARNING(-1);
+}
+
+void opSetCacheDevice(Gfx *gfx, Obj args[], int numArgs) {
+//  error(getPos(), "Encountered 'd1' operator in content stream");
+    EC_WARNING(-1);
+}
+
+//------------------------------------------------------------------------
+// compatibility operators
+//------------------------------------------------------------------------
+
+void opBeginIgnoreUndef(Gfx *gfx, Obj args[], int numArgs) {
+//  ++ignoreUndef;
+}
+
+void opEndIgnoreUndef(Gfx *gfx, Obj args[], int numArgs) {
+//  if (ignoreUndef > 0)
+//    --ignoreUndef;
+}
+
+
+/***********************************************************************
+ *		GfxDrawImageMask
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Draw mask encoded in Stream str as a bitmap at 0,0.
+ * CALLED BY:	GfxDoImage
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *
+ * DrawImageMask is another output-device method handled by me in Gfx instead.
+ *
+ *
+ * Problems: 
+ *
+ * The mask is supposed to be drawn in the current color, which I don't do.
+ * Perhaps the bitmap could be given a palette, with its one color the current
+ * color?
+ *
+ * On my first try, the mask was drawn inverted, so I simply reversed the sense
+ * of the "invert" test.  I'm not sure if the correct thing was this, or changing
+ * the MixMode, but:
+ *
+ * I'm not sure the MixMode is really ANDing the bitmap onto the page (and thus
+ * letting the src show through).  I changed the MixMode to MM_OR once, but I 
+ * got the same result on the page!  That doesn't sound right.
+ *
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mevissen	5/21/99   	Initial Revision
+ *
+ ***********************************************************************/
+void GfxDrawImageMask(Gfx *gfx, Stream *str, word width, word height, 
+		      GBool invert, GBool inlineImage) {
+
+  Guchar pixBuf[4];
+  word i, j;
+
+    VMBlockHandle bitmap;
+    GStateHandle bmState;
+    byte *line;
+    dword nElements;
+    word size;
+    Handle gstring = gfx->state->gstring;
+    byte pixByte;
+    MixMode mixMode;
+/*
+ * reverse the sense of the 'invert' test
+*/
+    invert = !invert;
+
+  // initialize the image stream
+  StreamResetImage(str, width, 1, 1);
+
+/*
+ * reset cancel flag
+ */
+  stopLoadingImage = gFalse;
+/*
+ * Put up the image-progress dialog
+ */
+  if (!inlineImage) PDFPutUpImageProgress();
+
+/*
+ * We have to adjust the scaling according to the image size; the transform matrix
+ * is set in the pdf file to scale an image assuming it fits in a 1 unit x 1 unit square.
+ * An n x m image is thus n x m too big.
+ */
+  GrSaveTransform(gstring);
+  GrApplyScale(gstring, 
+	       (1L<<16)/width,
+	       (1L<<16)/height);
+/*
+ * Create a bitmap in the scratch VM file.
+ * (XXX: I never delete the bitmap; I assume that's okay, as the vm
+ * file is deleted when the pdf file is closed.)
+ */
+
+    bitmap = GrCreateBitmap(BMF_MONO | BMT_COMPLEX,
+			    width,
+			    height,
+			    gfx->vmFile,
+			    0,
+			    &bmState);
+
+    GrDestroyBitmap(bmState, BMD_LEAVE_DATA);
+/*
+ * Fill the bitmap w/pixel data.
+ * I read the data even if the bitmap was not created, so the stream ptr for
+ * inline images is updated correctly.
+ *
+ * XXX: opBeginImage looks for an 'EI' tag after an inline image, so I think
+ * we can bail on error any time we want.
+ */
+
+    if (bitmap) {
+	// read image
+	for (i = 0; i < height; ++i) {
+	/*
+	 * Get the ptr for the line in the bitmap.
+	 * As usual, the pdf object has to be flipped in the y direction because
+	 * pdf coords are defined with +y going up the page.
+	 */
+	    nElements = HugeArrayLock(gfx->vmFile,
+				      bitmap,
+				      height - 1 - i,  /* flip the image */
+				      &line,
+				      &size);
+
+	    // for each column (line)...
+	    pixByte = 0;
+	    for (j = 0; j < width; ++j) {
+
+		// get image pixel
+		StreamGetImagePixel(str, pixBuf);
+
+		if (nElements & 0xffff0000) {
+
+		    pixByte = (pixByte << 1) | (pixBuf[0] & 1);
+
+		/* collect 8 bits, write them to bitmap */
+
+		    if ((j & 0x7) == 0x7) {
+			if (invert) pixByte = ~pixByte;
+			*line++ = pixByte;
+		    }
+		}
+	    }
+
+	    if (nElements & 0xffff0000) {
+
+		/* take care of last odd # bits */
+
+		if ((width & 0x7) != 0) {
+		    if (invert) pixByte = ~pixByte;
+		    *line++ = pixByte;
+		}
+/*
+ * dirty/unlock the bitmap line data.
+ */
+		HugeArrayDirty(line);
+		HugeArrayUnlock(line);
+	    }
+/*
+ * Update the image-progress dialog every so often (every 32 lines)
+ */
+	    if (!(i & 0x1f)) {
+		PDFUpdateImageProgress(i, height);
+	    }
+/*
+ * Check 'cancel' flag
+ */
+	    if (stopLoadingImage) break;
+	}
+    }
+/*
+ * Draw the bitmap into our gstring at coords (0,0).
+ * Do it as a mask (ie, ANDing onto the screen.)
+ * XXX: We're really supposed to color in with the current color.
+ */
+    if (bitmap && !stopLoadingImage) {
+	mixMode = GrGetMixMode(gstring);
+	GrSetMixMode(gstring, MM_AND);
+	GrDrawHugeBitmap(gstring,
+			 0, 0,
+			 gfx->vmFile,
+			 bitmap);
+
+/* Restore original mix mode */
+
+	GrSetMixMode(gstring, mixMode);
+    }
+/*
+ * Restore the transformation matrix
+ */
+    GrRestoreTransform(gstring);
+/*
+ * Take down the image-decode progress dialog
+ */
+    if (!inlineImage) PDFTakeDownImageProgress();
+}
+
+
+/***********************************************************************
+ *		GfxDrawImage
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Pass a stream; it copies the image data to a bitmap and
+ *		draws the bitmap to the page's gstring.
+ * CALLED BY:	GfxDoImage
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *
+ * DrawImage is another output-device method handled by me in Gfx.
+ *
+ * To do:
+ *	For efficiency, indexed images should be handled as bitmaps with 
+ *	a palette.  (I assume that's more efficient; as it is, the index
+ *	values are decoded to their rgb values and stored.)
+ *
+ *	For efficency, I assume grayscale images should be 8- or 4- bit
+ *	bitmaps.  However, my first stab at it didn't work and I gave up.
+ *	(The 8-bit bitmaps created by the commented-out code below are
+ *	colored really funky.)
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mevissen	5/17/99   	Initial Revision
+ *
+ ***********************************************************************/
+void GfxDrawImage(Gfx *gfx, Stream *str, word width, word height, 
+		  GfxImageColorMap *colorMap, GBool inlineImage) {
+
+  Guchar pixBuf[4];
+  short nComps, nBits;
+  GfxColor color;
+  word i, j;
+  word sampledWidth, sampledHeight, arrayInd;
+    VMBlockHandle bitmap;
+    GStateHandle bmState;
+    byte *line;
+    dword nElements;
+    word size;
+    Handle gstring = gfx->state->gstring;
+    BMFormat format;
+    word xSamp, ySamp, xMod, yMod;
+//    GBool gray;
+/*
+ * Some pdf files have pages that are one big image.  (A really bad idea.)
+ * Anyway, we can't handle images that are too big, so we cut them down
+ * to size with simple (every Nth pixel) sampling.
+ */
+    xSamp = width/1500 + 1;
+    ySamp = height/1500 + 1;
+
+    sampledWidth = width / xSamp;
+    sampledHeight = height / ySamp;
+
+  // set up
+  nComps = GfxImageColorMapGetNumPixelComps(colorMap);
+  nBits = GfxImageColorMapGetBits(colorMap);
+
+  // initialize the image stream
+  StreamResetImage(str, width, nComps, nBits);
+/*
+ * reset cancel flag
+ */
+  stopLoadingImage = gFalse;
+/*
+ * Put up the image-progress dialog
+ */
+  if (!inlineImage) PDFPutUpImageProgress();
+
+/*
+ * We have to adjust the scaling according to the image size; the transform matrix
+ * is set in the pdf file to scale an image assuming it fits in a 1 unit x 1 unit square.
+ * An n x m image is thus n x m too big.
+ */
+  GrSaveTransform(gstring);
+  GrApplyScale(gstring, 
+	       (1L<<16)/sampledWidth,
+	       (1L<<16)/sampledHeight);
+/*
+ * Create a bitmap in the scratch VM file.
+ * (XXX: I never delete the bitmap; I assume that's okay, as the vm
+ * file is deleted when the pdf file is closed.)
+ */
+/*
+ * See comment in header.  I never got 8-bit bitmaps to work.
+ */
+#if 0
+    switch(colorMap->mode) {
+    case colorGray:
+	format = BMF_8BIT | BMT_COMPLEX;
+	gray = gTrue;
+	break;
+    case colorCMYK:
+    case colorRGB:
+	format = BMF_24BIT | BMT_COMPLEX;
+	gray = gFalse;
+	break;
+    }
+#endif
+
+    format = BMF_24BIT | BMT_COMPLEX;
+    bitmap = GrCreateBitmap(format,
+			    sampledWidth,
+			    sampledHeight,
+			    gfx->vmFile,
+			    0,
+			    &bmState);
+
+    GrDestroyBitmap(bmState, BMD_LEAVE_DATA);
+/*
+ * Fill the bitmap w/pixel data.
+ * I read the data even if the bitmap was not created, so the stream ptr for
+ * inline images is updated correctly.
+ *
+ * XXX: opBeginImage looks for an 'EI' tag after an inline image, so I think
+ * we can bail on error any time we want.
+ */
+
+  // read image
+    if (bitmap) {
+	arrayInd = sampledHeight;
+	for (i = 0; i < height; ++i) {
+	/*
+	 * Get the ptr for the line in the bitmap.
+	 * As usual, the pdf object has to be flipped in the y direction because
+	 * pdf coords are defined with +y going up the page.
+	 */
+	    yMod = i % ySamp;
+	    if (yMod == 0) {
+		arrayInd--;
+	    }
+	    nElements = HugeArrayLock(gfx->vmFile,
+				      bitmap,
+				      arrayInd,
+				      &line,
+				      &size);
+
+	    xMod = 0;
+	    // for each column (line)...
+	    for (j = 0; j < width; ++j) {
+
+		// get image pixel
+		StreamGetImagePixel(str, pixBuf);
+		/*
+		 * If we got the bitmap line locked down,
+		 * and sampling is correct, transfer the pixel
+		 */
+		if (nElements & 0xffff0000 &&
+		    (xMod == 0) &&
+		    (yMod == 0)) {
+
+		// draw image pixel
+		    GfxImageColorMapGetColor(colorMap, pixBuf, &color);
+		    *line++ = (byte)color.r;
+//		if (!gray) {
+		    *line++ = (byte)color.g;
+		    *line++ = (byte)color.b;
+//		}
+		}
+		if (++xMod == xSamp) xMod = 0;
+	    }
+/*
+ * dirty/unlock the bitmap line data.
+ */
+	    if (nElements & 0xffff0000) {
+		HugeArrayDirty(line);
+		HugeArrayUnlock(line);
+	    }
+/*
+ * Update the image-progress dialog every so often (every 32 lines)
+ */
+	    if (!(i & 0x1f)) {
+		PDFUpdateImageProgress(i, height);
+	    }
+/*
+ * Check 'cancel' flag
+ */
+	    if (stopLoadingImage) break;
+	}
+    }
+/*
+ * Draw the bitmap into our gstring at coords (0,0) 
+ */
+    if (bitmap && !stopLoadingImage) 
+	GrDrawHugeBitmap(gstring,
+			 0, 0,
+			 gfx->vmFile,
+			 bitmap);
+/*
+ * Restore the transformation matrix
+ */
+    GrRestoreTransform(gstring);
+/*
+ * Take down the image-decode progress dialog
+ */
+    if (!inlineImage) PDFTakeDownImageProgress();
+}

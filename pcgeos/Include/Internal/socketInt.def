@@ -1,0 +1,328 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Network extensions
+MODULE:		Socket library
+FILE:		socketInt.def
+
+AUTHOR:		Eric Weber, May 16, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EW	5/16/94   	Initial revision
+
+
+DESCRIPTION:
+	Interface to the network library for drivers.
+		
+	$Id: socketInt.def,v 1.1 97/04/04 14:13:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__SOCKETINT
+
+StartLibrary 	socket
+
+COMMENT |--------------------------------------------------------------------
+
+The socket strategy routines are used by the driver to pass information or
+requests to the library.  They are deliberately modeled after a driver strategy
+routine, although it is not located in fixed memory.  SocketRegister is
+used only for SCO_ADD_DOMAIN or SCO_GET_PROTOCOL, all other functions should
+go to the routine returned from SCO_ADD_DOMAIN, which will differ depending
+on the driver type.
+
+-----------------------------------------------------------------------------|
+
+global	SocketRegister:far
+;
+;   PASS
+;	di 	- SocketClientOperation (SCO_ADD_DOMAIN or SCO_GET_PROTOCOL)
+;       others as defined below
+;   RETURN
+;	see below
+
+EndLibrary 	socket
+
+
+COMMENT |--------------------------------------------------------------------
+
+The following data types define the format that packet headers will be in as
+they are passed between the library and the driver.
+
+When passing data to the driver, the library will reserve a fixed amount of
+space between the header and the data, to allow room for the driver to build
+its own header information.  The amount of space reserved is determined by the
+values supplied by the driver during registration.  When the driver passes
+data to the library, it may put an arbitrary amount of space between the end
+of the header and the top of the data, and sets the dataOffset field
+accordingly.
+
+All sequenced packets are sent and received in the context of a link.  A link
+is a reliable, sequenced, bidirectional path between two machines.  Links are
+created and destroyed by the driver either in response to requests from the
+library, or requests from the remote party on a link.  Each link has a handle
+assigned by the driver; this handle must not be zero.
+
+If PacketHeader changes, must change corresponding C definition in 
+Internal/socketDr.h.  If sizes of header structure definitions change, be 
+sure to update PACKET_HEADER_MAX_SIZE if maximum changes.
+
+-----------------------------------------------------------------------------|
+
+NULL_LINK_HANDLE		equ	0
+NULL_CONNECTION_HANDLE		equ	NULL_LINK_HANDLE
+
+PacketType	etype	2,0,1
+	PT_SEQUENCED	enum	PacketType
+	PT_DATAGRAM	enum	PacketType
+
+PacketFlags	record
+	PF_LINK		:1		; used internally by socket library
+	:4
+	PF_OPEN_LINK	:1		; used by datagrams to open link
+	PF_TYPE		PacketType:2
+PacketFlags	end
+
+PacketHeader		struct
+	PH_dataSize	word
+	PH_dataOffset	word		; offset in bytes
+	PH_flags	PacketFlags
+	PH_domain	word		; see comment below for explanation
+	PH_reserved	byte		; reserved for future use
+PacketHeader		ends
+		
+	COMMENT |---------------------------------------------------------
+	 PH_domain is the client handle for packets passed from socket 
+	 library to driver, else it is the domain handle of driver when  
+	 packet is passed to the socket library.
+	-----------------------------------------------------------------|
+
+SequencedPacketHeader	struct
+	SPH_common	PacketHeader	; MUST be first
+	SPH_link	word		; connection handle, if data driver
+SequencedPacketHeader	ends
+
+DatagramPacketHeader	struct
+	DPH_common	PacketHeader	; MUST be first
+	DPH_addrSize	byte
+	DPH_addrOffset	byte		; offset in bytes
+	DPH_localPort	word
+	DPH_remotePort	word		
+DatagramPacketHeader	ends
+
+;
+; The largest of the header structures.  Drivers which don't care
+; which specific header structure is used, but need to allocate enough
+; space for all headers should use this constant.  
+;
+PACKET_HEADER_MAX_SIZE	equ	(size DatagramPacketHeader)
+
+;---------------------------------------------------------------------------
+;	If this is changed, update CInclude/Internal/socketDr.h also.
+;	Not all drivers will support half closes.
+;---------------------------------------------------------------------------
+
+SocketCloseType		etype	word, 0, 1
+SCT_FULL	enum	SocketCloseType		; close entire connection
+SCT_HALF	enum	SocketCloseType		; close one end only
+
+SocketDriverType	etype	byte, 0, 1
+SDT_DATA	enum	SocketDriverType
+SDT_LINK	enum	SocketDriverType
+
+SocketClientOperation	etype	word,0,2
+
+SCO_GET_PROTOCOL	enum	SocketClientOperation
+;
+;    SYNOPSIS
+;       When a driver loads the socket library or a higher level driver,
+;	it should use this function to verify the protocol level of the
+;	library/driver interface.  The result should be compared to
+;	the caller's notion of SOCKET_PROTO_MAJOR and SOCKET_PROTO_MINOR
+;	as follows:
+;
+;		major protocol - must be identical
+;		minor protocol - must be identical, or higher in the
+;				 caller then the callee
+; 
+;	 When the library loads a driver or a driver loads a lower level
+;	 driver, this is unnecessary, since the numbers can be passed
+;	 to GeodeUseDriver.  (the protocol of the driver is the protocol
+;	 of its upward interface)
+;
+;    PASS:
+;	nothing
+;    RETURN:
+;	cx	- major protocol
+;	dx	- minor protocol
+;    DESTROYS:
+;	nothing
+;
+
+
+SCO_ADD_DOMAIN		enum	SocketClientOperation
+;    SYNOPSIS
+;	If the driver loads the library, it uses this function to register
+;	itself.  Note that the library always initiates unregistration,
+;	so there is no SCO_REMOVE_DOMAIN call.  Same for link drivers 
+;	that load data layer driver.
+;
+;	The recipient should increment the ref count of the driver to
+;	prevent the driver from exiting prematurely.
+;
+;    PASS
+;	ax	- client handle 
+;	ch	- min header size for outgoing sequenced packets
+;	cl	- min header size for outgoing datagram packets
+;	dl	- SocketDriverType
+;	ds:si	- domain name (null terminated)
+;	es:bx	- driver entry point
+;	bp	- driver handle
+;    RETURN
+;	carry set if failed, else
+;	bx	- domain handle
+;	cx:dx	- vfptr to strategy routine for client operations (library
+;                 only)
+;    DESTROYS:
+;	nothing
+;
+
+SCO_LINK_OPENED		enum	SocketClientOperation
+;    PASS
+;	ds:si	- address
+;	cx	- address size
+;	ax	- link handle   (must be nonzero)
+;	bx	- domain handle
+;    RETURN
+;	nothing
+;    DESTROYS:
+;	nothing
+;
+
+SCO_LINK_CLOSED		enum	SocketClientOperation
+SCO_CONNECTION_CLOSED	equ	SCO_LINK_CLOSED
+;    PASS
+;	ax	- link handle or connection handle 
+;	bx	- domain handle
+;	cx	- SocketCloseType
+;	dx	- SocketDrError (SDE_NO_ERROR if normal close)
+;    RETURN
+;	nothing
+;    DESTROYS:
+;	nothing
+;
+
+SCO_RECEIVE_PACKET	enum	SocketClientOperation
+;    SYNOPSIS	
+;		Deliver packet to the socket library.  If error is 
+;		returned, caller is responsible for freeing packet.
+;    PASS
+;	cxdx 	- packet
+;    RETURN
+;	dxax	- remaining space in receive buffer (in bytes)
+;	carry set if error
+;    DESTROYS:
+;	nothing
+;
+
+SCO_CONNECT_REQUESTED	enum	SocketClientOperation
+;    SYNOPSIS 
+;	determine if there is a user listening on this connection
+;
+;    PASS
+;	ax	= connection handle (non-zero)
+;	bx	= domain handle
+;	cx	= local port number requested
+;	dx	= remote port
+;    RETURN
+;	carry set if no listener or if listen queue is full
+;	otherwise
+;	carry clear 
+;		NOTE:  If carry clear is returned, the driver 
+;		       MUST be called with either DR_SOCKET_ATTACH
+;		       or DR_SOCKET_REJECT in the near future or else
+;		       the temporary connection will NOT be destroyed.
+;    DESTROYS: nothing
+;
+
+SCO_CONNECT_CONFIRMED	enum	SocketClientOperation
+;    SYNOPSIS
+;	a connection requested by the library has now been established
+;    PASS
+;	ax	= connection handle
+;	bx	= domain handle
+;
+;    RETURN:   nothing
+;    DESTROYS: nothing
+;
+
+SCO_CONNECT_FAILED	enum	SocketClientOperation
+;    SYNOPSIS
+;	a connection requested by the library did not succeed
+;    PASS
+;	ax	= connection handle
+;	bx	= domain handle
+;	dx	= SocketDrError (SDE_CONNECTION_REFUSED
+;				 SDE_CONNECTION_TIMEOUT
+;				 SDE_INSUFFICIENT_MEMORY
+;				 SDE_LINK_OPEN_FAILED
+;				 SDE_DRIVER_NOT_FOUND
+;				 SDE_INVALID_ADDR_FOR_LINK)
+;
+;    RETURNS: 	nothing
+;    DESTROYS:	nothing
+;
+
+SCO_EXCEPTION		enum	SocketClientOperation
+;	SYNOPSIS: error notificaiton for datagrams
+;	
+;	PASS:	ax	= SocketDrException
+;		bx	= local port number
+;		dx	= domain handle
+;	RETURN: nothing
+;       DESTROYS: nothing
+;
+
+SCO_RECEIVE_URGENT_DATA	enum	SocketClientOperation
+;	SYNOPSIS: deliver urgent data to the socket library
+;
+;	PASS:	ax	= connection handle
+;		bx	= domain handle
+;		cx	= size of data
+;		ds:si	= data (not null-terminated)
+;	RETURN:	nothing
+;	DESTROYS: nothing
+;
+
+SCO_GET_INFO		enum	SocketClientOperation
+;	SYNOPSIS: get some information from the socket library
+;
+; 	PASS:	ax	= SocketClientInfoType
+;		dx	= domain handle
+;	RETURN:	carry set if info not available
+;	DESTROYS: nothing
+;
+;	Other parameters for each SocketClientInfoType
+;	 SCIT_RECV_BUF
+;	 	Pass:	bx	= connection
+;		Return:	dxax	= space available in recv buffer
+;	
+	
+SocketClientInfoType	etype	word, 0, 2
+SCIT_RECV_BUF		enum	SocketClientInfoType ; amount of space available
+						     ;  in receive buffer for 
+						     ;  the connection
+
+;---------------------------------------------------------------------------
+;			Fatal Errors
+;---------------------------------------------------------------------------
+ERROR_INVALID_SOCKET_CLIENT_OPERATION		enum	FatalErrors
+
+

@@ -1,0 +1,372 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  GeoSafari Builder
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi/string.h>
+@include <win.h>
+@include <safari.goh>
+@include <initfile.h>
+
+#define VUM_DLYD  VUM_DELAYED_VIA_APP_QUEUE
+
+#define Q_ADD 1
+#define Q_INS 2
+
+/*typedef WordFlags ShowOptions; */
+/*#define SO_SHOW_LEDS 0x0001  */
+
+typedef enum {
+    SAFARI_BUILDER_DELETE_LAST_QUESTION_NOT_SELECTED
+} FatalErrors;
+
+typedef	struct {
+    LMemBlockHeader   SMB_meta;
+    ChunkHandle       SMB_quiz;
+    word              SMB_number;
+    SafariGameDesc    SMB_desc;
+    SafariFileOptions SMB_flags;
+    FileLongName      SMB_logo;
+    FileLongName      SMB_16color;
+    FileLongName      SMB_256color;
+} OldSafariMapBlock;
+
+/**************************************************************************
+ *		Class & Message Definitions
+ *************************************************************************/
+
+@class	SafBuildProcessClass, GenProcessClass;
+
+@message void MSG_SAFBUILD_PROCESS_PLAY_SOUND(TCHAR *filename, TCHAR *path);
+/*
+ * Play a WAV file
+ * Pass:   filename - ptr to filename
+ *         path - ptr to path
+ * Return: none
+ */
+
+@endc
+
+@class  SafBuildAppClass, GenApplicationClass;
+
+@message void MSG_SAFBUILD_APP_UPDATE_FONT_TRIGGERS();
+/*
+ * Update the Add/Delete Font triggers
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_APP_ADD_FONT();
+/*
+ * Add the fonts to Artist
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_APP_REMOVE_FONT();
+/*
+ * Remove the fonts from Artist
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_APP_UPDATE_FILE_SELECTORS(GenFilePath *filePath);
+/*
+ * Update the directory for the file selectors
+ * Pass:   filePath - GenFilePath
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_APP_GENERATE_LOGO_FILE();
+/*
+ * Generate the logo file
+ * Pass:   none
+ * Return: none
+ */
+
+@endc
+
+@class	SafBuildDocumentClass, GenDocumentClass;
+
+@message void MSG_SAFBUILD_DOCUMENT_SAVE_QUIZ();
+/*
+ * Update the document based on changes to the quiz
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_DOCUMENT_CANCEL_QUIZ();
+/*
+ * Cancel changes to the quiz
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_DOCUMENT_SAVE_QUESTION();
+/*
+ * Update the document based on changes to a question
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_DOCUMENT_UPDATE_COMMON_UI();
+/*
+ * Update common UI based on document changes
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_DOCUMENT_ADD_QUESTION(word addOrIns);
+/*
+ * Add or insert a new question
+ * Pass:   addOrIns
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_DOCUMENT_DELETE_QUESTION();
+/*
+ * Delete a question
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_DOCUMENT_UPDATE_QUESTION_UI();
+/*
+ * Update the UI based on changes to a question
+ * Pass:   none
+ * Return: none
+ */
+
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SAFBUILD_DOCUMENT_SHOW_BITMAP;
+/*
+ * jh this is now constant at 256 color
+ * Show a bitmap
+ * Pass:   selection - item ID
+ *         numSelections - # selections
+ *         stateFlags - GenItemGroupStateFlags
+ * Return: none
+ */
+
+@message (GEN_VALUE_STATUS_MSG) MSG_SAFBUILD_DOCUMENT_CHANGE_QUESTION;
+/*
+ * Change questions
+ * Pass:   value - WWFixed
+ *         stateFlags - GenValueStateFlagsAsWord
+ * Return: none
+ */
+
+/*@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_SAFBUILD_DOCUMENT_SET_OPTIONS;
+/*
+ * Set document viewing options
+ * Pass:   selectedBooleans
+ *         indeterminateBooleans
+ *         modifiedBooleans
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_DOCUMENT_SHOW_LEDS();
+/*
+ * Show the appropriate LEDs
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFBUILD_DOCUMENT_VERIFY();
+/*
+ * Verify the quiz is encoded correctly
+ * Pass:   none
+ * Return: none
+ */
+
+	 @instance word SBDI_question;  /* the current q # */
+	 @instance word SBDI_addOrIns;  /* are we adding or inserting a q? */
+
+@endc
+
+/* This is to intercept doc stuff for save to folder */
+@class	SBDocumentControlClass, GenDocumentControlClass;
+@endc
+
+/*
+ * QuizDialogClass:
+ */
+
+@class  QuizDialogClass, GenInteractionClass;
+
+@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_QUIZ_DIALOG_CHANGE_NEXT_QUIZ;
+/*
+ * Change the file for the next quiz
+ * Pass:   entryNum - entry #
+ *         entryFlags - GenFileSelectorEntryFlags
+ * Return: none
+ */
+
+@endc
+
+
+/*
+ * QuestionDialogClass:
+ */
+
+@class QuestionDialogClass, GenInteractionClass;
+
+/*@message void MSG_QUESTION_DIALOG_SHOW_HIDE();
+/*
+ * Show or hide part of the dialog so more of the quiz is visible
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_QUESTION_DIALOG_SET_INDICATOR(word indNum);
+/*
+ * An indicator has been clicked on
+ * Pass:   indNum - indicator #
+ * Return: none
+ */
+
+@message (GEN_VALUE_STATUS_MSG) MSG_QUESTION_DIALOG_SET_INDICATOR_GV;
+/*
+ * The indicator setting has been changed
+ * Pass:   value - WWFixedAsDWord
+ *         stateFlags - GenValueStateFlagsAsWord
+ * Return: none
+ */
+
+@message void MSG_QUESTION_DIALOG_CLOSE();
+/*
+ * Close the question dialog
+ * Pass:   none
+ * Return: none
+ */
+
+@message (GEN_VALUE_APPLY_MSG) MSG_QUESTION_DIALOG_CHANGE_SELECTION_LEFT;
+/*
+ * Change one selection value
+ * Pass:   value - WWFixed
+ *         stateFlags - GenValueStateFlagsAsWord
+ * Return: none
+ */
+
+@message (GEN_VALUE_APPLY_MSG) MSG_QUESTION_DIALOG_CHANGE_SELECTION_RIGHT;
+/*
+ * Change one selection value
+ * Pass:   value - WWFixed
+ *         stateFlags - GenValueStateFlagsAsWord
+ * Return: none
+ */
+
+@message (GEN_VALUE_APPLY_MSG) MSG_QUESTION_DIALOG_CHANGE_SELECTION_TOP;
+/*
+ * Change one selection value
+ * Pass:   value - WWFixed
+ *         stateFlags - GenValueStateFlagsAsWord
+ * Return: none
+ */
+
+@message (GEN_VALUE_APPLY_MSG) MSG_QUESTION_DIALOG_CHANGE_SELECTION_BOTTOM;
+/*
+ * Change one selection value
+ * Pass:   value - WWFixed
+ *         stateFlags - GenValueStateFlagsAsWord
+ * Return: none
+ */
+
+@message Boolean MSG_QUESTION_DIALOG_ON_SCREEN();
+/*
+ * See if the dialog is on screen
+ * Pass:   none
+ * Return: none
+ */
+
+    @instance Boolean QDI_onScreen;
+
+@endc
+
+/*
+ * SBIndicatorClass: adds indicator # for selection
+ */
+@class SBIndicatorClass, IndicatorClass;
+
+    @instance word SBII_number;
+
+@endc
+
+/*
+ * SBGameCardClass: adds selecting answer bounds
+ */
+@class SBGameCardClass, GameCardClass;
+
+@message void MSG_SB_GAME_CARD_DRAW_SELECTION(GStateHandle gs);
+/*
+ * Draw the selection, if any
+ * Pass:   gs - GState handle
+ * Return: none
+ */
+
+@message void MSG_SB_GAME_CARD_SET_SELECTION(word left, word top, word right, word bottom);
+/*
+ * Set the selection
+ * Pass:   (left,top,right,bottom) - bounds
+ * Return: none
+ */
+
+@message void MSG_SB_GAME_CARD_CLOSE_FILE();
+/*
+ * Close any file
+ * Pass:    none
+ * Return:  none
+ */
+
+    @instance Rectangle SBGCI_selection;
+    @instance Point     SBGCI_anchor;
+
+@endc
+
+typedef enum {
+/*    SBFT_LOGO,
+	 SBFT_16COLOR, */
+    SBFT_256COLOR,
+/*    SBFT_QUESTION_WAV,
+    SBFT_ANSWER_WAV, */
+    SBFT_NEXT_QUIZ
+} SBFileType;
+
+/*
+ * SBFileChooseClass: select a graphics file
+ */
+@class SBFileChooseClass, GenInteractionClass;
+
+@message void MSG_SB_FILE_CHOOSE_SET_TYPE(SBFileType fileType);
+/*
+ * Set the type for the file selector and bring it on screen
+ * Pass:   graphicType - SBFileType
+ * Return: none
+ */
+
+@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_SB_FILE_CHOOSE_CHANGE_FILE;
+/*
+ * Change the file
+ * Pass:   entryNum - entry #
+ *         entryFlags - GenFileSelectorEntryFlags
+ * Return: none
+ */
+
+
+/*@message void MSG_SB_FILE_CHOOSE_PLAY_WAV();
+/*
+ * Play the currently selected WAV file
+ * Pass:   none
+ * Return: none
+ */
+
+	 @instance SBFileType SBFCI_type;
+
+@endc

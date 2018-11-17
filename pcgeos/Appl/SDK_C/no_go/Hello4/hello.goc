@@ -1,0 +1,214 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  SDK_C/Hello4 (Sample Asm UI/C implemenation)
+ * FILE:	  hello.goc
+ *
+ * AUTHOR:  	  John D. Mitchell: June 10, 1992
+ *
+ * ROUTINES:
+ *	Name	  	    Description
+ *	----	  	    -----------
+ * MTHD	HelloProcess::MSG_META_EXPOSED
+ * INT	HelloDraw	    Draw a line of text into the document
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	6/10/92	  JDM	    Initial version
+ *
+ * DESCRIPTION:
+ *	This is the C portion of the mixed C/assembly sample application.
+ *	It will be compiled by GOC and then linked by Glue to produce a
+ *	geode.
+ *
+ *	Having the UI in UIC (.ui) format and the handlers in GOC (.goc)
+ *	format causes some interesting things...  The biggest is the fact
+ *	that any UI classes that you define have to be defined in three
+ *	(yes, 3! :-) places (the .goc file that contains the message
+ *	handlers for that class, the .ui file that contains the UIC
+ *	definitions of the UI objects of that class, and the .asm file that
+ *	includes the UIC compiled UI definitions (.rdef).  Note though that
+ *	the actual *declaration* of the class must only be in the GOC file.
+ *
+ *	$Id: hello.goc,v 1.1 97/04/04 16:38:08 newdeal Exp $
+ *	
+ *
+ ***********************************************************************/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class Definitions & Declarations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * Here we define "HelloProcessClass" as a subclass of the system provided
+ * "GenProcessClass". As this application is launched, an instance of this class
+ * will be created, and will handle all application-related events (messages).
+ * The application thread will be responsible for running this object,
+ * meaning that whenever this object handles a message, we will be executing
+ * in the application thread.
+ *
+ * You will find no object in this file declared to be of this class. Instead,
+ * it is specified as the class for the application thread in "hello.gp".
+ *
+ * Note that this class must be defined both here and in the assembly file
+ * that includes the .ui file.
+ */
+
+@class	HelloProcessClass, GenProcessClass;
+
+/* Define messages for this class here. Most commonly, UI objects will
+ * send these messages to the application thread when they've been activated
+ * by the user. */
+
+@endc	/* End of HelloProcessClass definition.	*/
+
+/*
+ * Each object class requires a "class record" be stored in fixed memory
+ * for it. The class record is used by the PC/GEOS message system for the
+ * delivery of messages sent to an object of the class. The class record needs
+ * to be defined in the file where the methods (i.e. the routines defined
+ * with @method) for the class are defined. The @classdecl GOC directive
+ * tells GOC to create the class record here.
+ *
+ * The neverSaved flag is necessary because ProcessClass objects are
+ * hybrid objects. It tells the system that no object of this class will
+ * ever be loaded from or stored to a file.
+ */
+@classdecl	HelloProcessClass, neverSaved;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Externally declared objects
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * The UI code for this application is written in UIC code (in .ui files).
+ * To use those objects here in C we just have to let the compiler and
+ * linker know to pull those definitions in here.
+ */
+@extern	object		HelloApp;
+@extern	visMoniker	HelloTextMoniker;
+@extern	object		HelloPrimary;
+@extern	object		HelloView;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HelloProcessClass Implementation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *				HelloDraw
+ ***********************************************************************
+ * SYNOPSIS:	    Redraws the entire document, given a graphics state
+ *		    through which to draw.
+ * CALLED BY:	    (INTERNAL) HelloProcess::MSG_META_EXPOSED
+ * RETURN:	    nothing
+ * SIDE EFFECTS:    various aspects of the gstate are altered
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	3/91		Initial Revision
+ *
+ ***********************************************************************/
+void
+HelloDraw(GStateHandle gstate)		/* GState to draw to */
+{
+/* These constants are used in the code below: */
+
+#define TEXT_POINT_SIZE         48.0        /* point size */
+#define TEXT_ROTATION           -15 	    /* angle of rotation (degrees) */
+#define TEXT_X_POSITION         30          /* x position, in document coords */
+#define TEXT_Y_POSITION         0           /* y position, in document coords */
+
+    /*
+     * First change some of the default GState values, such as font
+     */
+    GrSetFont(gstate, FID_DTC_URW_ROMAN, MakeWWFixed(TEXT_POINT_SIZE));
+
+    /*
+     * Set the text color to something nice (Light Blue is Nice, by definition)
+     */
+    GrSetTextColor(gstate, CF_INDEX, C_LIGHT_BLUE, 0, 0);
+
+    /*
+     * Apply a rotation to the transformation matrix, so the text
+     * will be drawn at an angle.
+     */
+    GrApplyRotation(gstate, MakeWWFixed(TEXT_ROTATION));
+
+    /*
+     * Draw some text onto the document
+     */
+    GrDrawText(gstate,
+	       TEXT_X_POSITION, TEXT_Y_POSITION,
+	       "The quick brown fox jumped over the lazy dog.",
+	       0);  /* 0 means length is unknown (string is null-terminated) */
+}
+
+/***********************************************************************
+ *		MSG_META_EXPOSED for HelloProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Redraw the recently-exposed portion of the View
+ * PARAMETERS:	    void (WindowHandle win)
+ * SIDE EFFECTS:    the invalid region of the window is cleared out
+ *
+ * STRATEGY:	    This message is sent by the windowing system when a
+ *	    	    portion of the GenView has become invalid, either
+ *	    	    because a window that was obscuring it has been moved,
+ *	    	    or because some called GrInvalRect.
+ *
+ *	    	    We redraw the entire document, after telling the
+ *		    graphics system we're drawing to the invalid portion
+ *		    of the window.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method HelloProcessClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+    /*
+     * Get a default graphics state that we can use while drawing.
+     */
+    gstate = GrCreateState(win);
+    /*
+     * Start a window update. This tells the windowing system that we are in
+     * the process of drawing to the invalid portion of this window.
+     * GrBeginUpdate/GrEndUpdate are necessary only when handling
+     * MSG_META_EXPOSED. For drawing at other times, all you need do is create
+     * a graphics state and draw through it.
+     */
+    GrBeginUpdate(gstate);
+
+    /*
+     * Draw the pattern into the window (pass the GState). Breaking the exposure
+     * and general drawing into two routines allows the display to be updated
+     * by other routines without having to invalidate the window.
+     */
+    HelloDraw(gstate);
+
+    /*
+     * Now indicate that we are done drawing to the invalid area and free the
+     * gstate.
+     */
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}

@@ -1,0 +1,1041 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1993 -- All Rights Reserved
+
+PROJECT:	GEOS	
+MODULE:		Fax
+FILE:		faxctrl.def
+
+AUTHOR:		Andy Chiu, Oct 27, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	10/27/93   	Initial revision
+
+
+DESCRIPTION:
+	Contains definitions for the library that contains UI controllers
+	for the fax project.		
+		
+	$Id: faxctrl.def,v 1.1 97/04/04 14:24:44 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__FAXCTRL
+
+StartLibrary	faxctrl
+
+UseLib	ui.def
+UseLib	mailbox.def
+UseLib  Objects/vTextC.def
+include	fax.def
+
+
+
+
+;***************************************************************************
+;*				Constants				   *
+;***************************************************************************
+
+
+;***************************************************************************
+;*		Structures for the DestinationControlClass		   *
+;***************************************************************************
+DCCUpdate		etype	byte,	2, 2
+DCCU_MEM_BLOCK		enum DCCUpdate
+DCCU_SEGMENT		enum DCCUpdate
+
+;***************************************************************************
+;*		Definition for the DestinationControlClass		   *
+;***************************************************************************
+
+DestinationControlClass		class	GenControlClass
+
+;---------------------------------------------------------------------------
+;			Messages
+;---------------------------------------------------------------------------
+
+MSG_DC_UPDATE_UI			message
+; Loads the UI and the local DAInfo info with data from a passed FaxDestination
+; data block.  The block can either be pointed to by a segment, or as a handle
+; to a memory block that is then freed.
+;
+;	PASS:		cx - handle or segment to a FaxDestination block
+;			dx - offset to FaxDestination block in memory if
+;			     DCCUF_SEGMENT is set in bp.
+;			bp - DCCUF_MEM_BLOCK if cx contains a memhandle
+;			   - DCCUF_SEGMENT if cx:dx points to a FaxDestination
+;			     block.
+;	RETURN:		nothing
+;	DESTROYED:	the passed block
+
+MSG_DC_CLEAR_UI			message
+;
+; Clears the UI of this controller, but leave the DialAssistInfo alone.
+;
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYED:	the passed block
+
+MSG_DC_APPLY				message
+;
+; This message checks the local UI for a fax number, and if one
+; exists loads data from the local UI and local DialAssistInfo
+; block into a passed FaxDestinationPlusDAInfo data block.  Also
+; updates the "Last 10" list in the fax info file (and in open
+; QuickNumber objects).
+;
+; If there was no fax phone number, the Last 10 list will
+; not be updated and the passed FaxDestinationPlusDAInfo buffer
+; will not be filled.
+;
+;	PASS:		cx:dx	- FaxDestination block to fill
+;
+;	RETURN:		carry set if there was not a legal fax phone number,
+;			carry clear (and a filled structure) otherwise.
+;
+;	DESTROYED:	ax, cx, dx, bp
+
+MSG_DC_INITIATE_DIAL_ASSIST		message
+;
+; Sent by the Dial Assist... trigger.  Indicates that we should bring up the
+; Dial Assist dialog box with the latest info.
+;
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYED:	the passed info mem block
+;
+
+MSG_DC_HANDLE_QUICK_NUMBER_SELECTION	message
+;
+; Sent when an item was selected from the Quick Numbers ("Last 10") list.
+; Passes a FaxDestinationBasics block with info to be placed in the UI.  The
+; block will be freed after.
+;
+;	PASS:		bp 	- handle to FaxDestinationBasics block
+;	RETURN:		nothing
+;	DESTROYED:	the passed info mem block
+;
+
+MSG_DC_TOGGLE_MANUAL_DIAL		message
+;
+; Sent by the Manual Dial list in the dial assist UI.  If the item is selected,
+; then the Fax # text object is disabled.  If the item is deselected, the
+; object is enabled.
+;
+
+MSG_DC_FAX_NUMBER_TEXT_CHANGE		message
+;
+; Sent when the fax number text object becomes empty or not empty.
+;
+;	PASS:		bp 	- non-zero if text is becoming non-empty
+;	RETURN:		nothing
+
+;---------------------------------------------------------------------------
+;			Instance data
+;---------------------------------------------------------------------------
+
+	;
+	; Handle to the local DialAssistInfo block
+	;
+	DCI_dialAssistInfo	 hptr.DialAssistInfo	0
+
+	DCI_currentDestOrigin	word	0
+
+DestinationControlClass		endc
+
+DCDestOriginFlags	record
+	DCDOF_EXISTING_DEST	:1
+	DCDOF_OTHER		:1
+DCDestOriginFlags	end
+
+DCFeatures	record
+	DCF_FAX_NUMBER	:1
+	DCF_MANUAL_DIAL	:1
+	DCF_DIAL_ASSIST	:1
+	DCF_RECIPIENT	:1
+	DCF_COMPANY	:1
+DCFeatures	end
+
+DC_DEFAULT_FEATURES	equ	mask DCF_FAX_NUMBER or \
+				mask DCF_MANUAL_DIAL or \
+				mask DCF_RECIPIENT or \
+				mask DCF_COMPANY or \
+				mask DCF_DIAL_ASSIST
+
+DestinationOptions 	etype	byte,	0, 2
+DO_FAX_NUMBER		enum	DestinationOptions
+DO_MANUAL_DIAL		enum	DestinationOptions
+DO_DIAL_ASSIST		enum	DestinationOptions
+DO_RECIPIENT		enum	DestinationOptions
+DO_COMPANY		enum	DestinationOptions
+
+;
+; The FaxDestinationChange structure is sent by the destination controller to
+; signal things have changed.
+;
+; Most important is the "legal address entered" flag in the FDC_flags field.
+; Second most important is the "detination has been modified" flag. ;)
+
+FaxDestinationStatus	record
+	FDS_LEGAL_ADDRESS_ENTERED		:1
+	FDS_DESTINATION_MODIFIED		:1
+FaxDestinationStatus	end
+
+FaxDestinationChange	struct
+	FDC_flags	FaxDestinationStatus
+FaxDestinationChange	end
+
+;***************************************************************************
+;*		Definition for the DialAssistControlClass		   *
+;***************************************************************************
+
+DialAssistControlClass		class	GenControlClass
+
+;---------------------------------------------------------------------------
+;			Messages
+;---------------------------------------------------------------------------
+
+MSG_DAC_UPDATE_UI			message
+;
+; Loads the controller's UI with information (DAInfo) passed in a block.  Takes
+; a handle to the mem block containing the DAInfo, which will be immediately
+; freed.
+;
+;	PASS:		cx - handle to a DAInfo block
+;	RETURN:		nothing
+;	DESTROYED:	the passed block
+
+MSG_DAC_APPLY			message
+;
+; This message is generated by the Apply trigger in the UI, and indicates that
+; the info in the controller's UI should be sent to the output of the
+; controller.
+;
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYED:	nothing
+
+MSG_DAC_CANCEL			message
+;
+; This message is generated by the Cancel trigger in the UI.  The GCN list on
+; which this controller sits is given a null status, so the owner will need to
+; send a new status before the controller comes up again.
+;
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYED:	nothing
+
+MSG_DAC_MAKE_DEFAULT		message
+;
+; This message is generated by the "Make Default" trigger in the UI.  The
+; controller takes the current values in the UI and saves it to the fax
+; information file for later use as the default.
+;
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYED:	nothing
+
+MSG_DAC_USE_SYS_DEFAULT		message
+;
+; This message is generated by the "Use System Default" item in the UI.  The
+; controller takes the current values in the fax information file, loads up the
+; UI with them, and sets the UI not usable if the item is selected, or sets the
+; UI enabled if the item is not selected.
+;
+;	PASS:	cx	- current selection, or first selection in item 
+;			  group, if more than one selection, or GIGS_NONE 
+;		      	  of no selection
+;		bp 	- number of selections
+;		dl 	- GenItemGroupStateFlags
+;	RETURN:		nothing
+;	DESTROYED:	nothing special
+
+;---------------------------------------------------------------------------
+;			Instance data
+;---------------------------------------------------------------------------
+
+DialAssistControlClass		endc
+
+DACFeatures	record
+	DACF_INSTRUCTIONS	:1
+	DACF_ACCESS		:1
+	DACF_LONG_DISTANCE	:1
+	DACF_BILLING_CARD	:1
+DACFeatures	end
+
+DAC_DEFAULT_FEATURES	equ	mask DACF_INSTRUCTIONS or \
+				mask DACF_ACCESS or \
+				mask DACF_LONG_DISTANCE or \
+				mask DACF_BILLING_CARD
+
+DialAssistOptions 	etype	byte,	0, 2
+DAO_ACCESS		enum	DialAssistOptions
+DAO_LONG_DISTANCE	enum	DialAssistOptions
+DAO_BILLING_CARD	enum	DialAssistOptions
+
+
+;***************************************************************************
+;*		Definition for the FaxMailboxAddressControlClass
+;***************************************************************************
+
+FaxMailboxAddressControlClass		class	MailboxSpoolAddressControlClass
+
+;---------------------------------------------------------------------------
+;			Messages
+;---------------------------------------------------------------------------
+
+MSG_FMAC_USE_COVER_PAGE			message
+; Sent by the cover sheet item group when the user presses it.  If the item is
+; selected, then enable the "Set up cover sheet" trigger.  Otherwise, disable
+; it.
+;
+
+MSG_FMAC_INITIATE_MULTIPLE_DESTINATIONS		message
+; Sent by a trigger to indicate that the multiple destinations list should now
+; appear.  The contents of the current destination controller are loaded into
+; the multiple destinations controller.
+;
+
+MSG_FMAC_APPLY					message
+; Sent by the fax trigger in the main mailbox controller.
+; As of now, sends an apply off to the main destination controller if there is
+; just one destination, or packages things up if there are multiple
+; destinations.
+;
+
+MSG_FMAC_CANCEL					message
+; Sent by the Cancel trigger in the main mailbox controller.
+; Closes the window.
+;
+
+MSG_FMAC_DESTINATION_LIST_QUERY			message
+; Sent by the multiple destination dynamic list when it wants a moniker.
+; The mailbox address controller returns the human-readable text in the address
+; list.
+;
+
+MSG_FMAC_DESTINATION_LIST_APPLY			message
+; Sent by the multiple destination dynamic list when the selection has changed.
+; The mailbox address controller will update the destination controller to show
+; the item selected.
+;
+; Pass:
+;		cx -- current selection, or first selection in item 
+;		      group, if more than one selection, or GIGS_NONE 
+;		      of no selection
+;		bp -- number of selections
+;		dl -- GenItemGroupStateFlags
+
+MSG_FMAC_ADD_MULTIPLE_DESTINATION		message
+; Sent by the Add trigger to indicate that the current Destination should be
+; added to the address list.
+;
+; If there is something wrong with the destination, an error message will be
+; displayed.  If the destination is already in the list, it will be selected in
+; the list UI.
+;
+
+MSG_FMAC_MODIFY_MULTIPLE_DESTINATION		message
+; Sent by the "Modify" trigger to replace the contents of the current
+; selection with the destination controller's contents.
+;
+
+MSG_FMAC_DELETE_MULTIPLE_DESTINATION		message
+; Sent by the Delete trigger to remove the current selection from the
+; destination list.
+;
+
+MSG_FMAC_DONE_EDITING_MULTIPLE_DESTINATIONS	message
+; Sent by the Done trigger to indicate that we're done editing the destination
+; list.  Closes the dialog box.
+;
+
+MSG_FMAC_INITIATE_DIAL_ASSIST		message
+;
+; Sent by the Dial Assist... trigger.  Indicates that we should bring up the
+; Dial Assist dialog box with the latest info.
+;
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYED:	nothing special
+;
+
+MSG_FMAC_INITIATE_COVER_PAGE		message
+;
+; Sent by the Set up cover sheet... trigger.  Indicates that we should bring
+; up the cover sheet controller after saving off the local info to the
+; clipboard. 
+;
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYED:	nothing special
+;
+
+			
+
+;---------------------------------------------------------------------------
+;			Class-specific structures
+;---------------------------------------------------------------------------
+FMACEditingStateFlags	record
+	FMACESF_MODIFY	:1		;enable modify trigger only
+	FMACESF_DELETE  :1		;enable delete trigger only
+FMACEditingStateFlags 	end
+;
+; Assorted flags for the mailbox controller.
+;
+FMACFlags	record
+	FMACFL_MULTIPLE_DESTINATIONS	:1
+	FMACFL_COVERPAGE_SAVED		:1
+	FMACFL_EDITING_EXISTING_DEST	:1
+	FMACFL_USING_A_COVERPAGE	:1
+	FMACFL_COVERPAGE_IS_HEADER	:1
+FMACFlags	end
+
+
+;---------------------------------------------------------------------------
+;			Instance data
+;---------------------------------------------------------------------------
+	;
+	; The handle of the block that contains the fax destinations'
+	; TransAddrList chunkarray is stored here.  A zero implies
+	; that no destinations have been set.
+	;
+	FMACI_transAddrBlock		hptr	0
+
+	;
+	; The chunk handle of the fax destinations' TransAddrList chunkarray is
+	; stored here.
+	;
+	FMACI_transAddrHandle		hptr	0
+
+	;
+	; Handle to the DialAssistInfo block that will be applied to all
+	; destinations in the list.
+	;
+	FMACI_dialAssistInfo	 	hptr.DialAssistInfo	0
+
+	;
+	; VMFile handle and block to the current coverpage info.
+	;
+	FMACI_coverPageFile		hptr	0
+	FMACI_coverPageBlock		hptr	0
+
+	;
+	; VMFile handle and block to the *recent* coverpage info.
+	;
+	FMACI_lastCoverPageFile		hptr	0
+	FMACI_lastCoverPageBlock	hptr	0
+
+	;
+	; Some flags we need to keep track of:
+	; 	* Are there multiple destinations, or just one?
+	;	* Have we saved the coversheet info to a file?
+	;	* Are we using a coverpage at all?
+	;	(Others?)
+	;
+	FMACI_flags			FMACFlags	0
+
+	;
+	; Handle and offset to the coverpage transAddrData block.
+	;
+	FMACI_transData			dword		0
+
+FaxMailboxAddressControlClass		endc
+
+FMACFeatures	record
+	FMACF_MULTIPLE_DESTINATIONS	:1
+	FMACF_COVER_PAGE_CONTROLS	:1
+	FMACF_SENDER_AND_TRANS_OPTIONS	:1
+FMACFeatures	end
+
+FMAC_DEFAULT_FEATURES	equ	mask FMACF_MULTIPLE_DESTINATIONS    or \
+				mask FMACF_SENDER_AND_TRANS_OPTIONS or \
+				mask FMACF_COVER_PAGE_CONTROLS
+
+FaxMailboxAddressControlOptions 	etype	byte,	0, 2
+FMACO_COVER_PAGE_CAN_BE_HEADER		enum	FaxMailboxAddressControlOptions
+FMACO_MULTIPLE_DESTINATIONS		enum	FaxMailboxAddressControlOptions
+FMACO_COVER_PAGE_CONTROLS		enum	FaxMailboxAddressControlOptions
+FMACO_SENDER_AND_TRANS_OPTIONS		enum	FaxMailboxAddressControlOptions
+
+;---------------------------------------------------------------------------
+;		Routines exported for general consumption
+;---------------------------------------------------------------------------
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	CoverPage Controller for Tiramisu.
+MODULE:		
+FILE:		coverpg.def
+
+AUTHOR:		Jim Wood, Jul 15, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimw	7/15/94   	Initial revision
+
+
+DESCRIPTION:
+	
+		Formerly its own .def, now part of faxctrl.def!	
+	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+
+; 
+
+CoverPageControlClass	class	GenControlClass
+;-- errors
+
+
+CPC_NO_SCRAP_BLOCK			enum	FatalErrors
+; No scrap block information, but it's needed.
+
+CPC_SCRAPBOOK_CORRUPTED			enum 	FatalErrors
+; Error when there's no map block in the scrapbook file.  This means something
+; is way wrong.
+
+CPC_NO_UPDATE_FILE_HANDLE		enum	FatalErrors
+; IF you try to bring up the controller without a valid info block file
+; handle, you're hosed bub.
+
+CPC_NO_UPDATE_BLOCK_HANDLE		enum	FatalErrors
+; No info block handle.  Not much we can do without one.
+
+
+
+
+CPC_NO_SCRAP_INFO_BLOCK_HANDLE		enum FatalErrors
+
+CPC_BAD_DISK_SAVE	enum FatalErrors
+
+CPC_HOW_CAN_SP_TEMPLATE_NOT_EXIST? 	enum FatalErrors
+
+
+
+
+
+;-- constants
+
+
+CPC_SCRAPBOOK_MONIKER_TEXT_INDENT_SIZE		equ 	20
+CPC_SCRAP_MONIKER_BITMAP_INDENT_SIZE		equ 	5
+CPC_SCRAP_MONIKER_TEXT_INDENT_SIZE		equ	38
+
+
+
+CPC_MAX_MSG_PAD_HEIGHT	equ	100
+CPC_MAX_MSG_PAD_WIDTH 	equ	100
+
+; Size of the message pad ink to load.  (all of it)
+
+CPC_MESSAGE_PAD_DOC_WIDTH		equ	0xffff
+CPC_MESSAGE_PAD_DOC_HEIGHT		equ	0xffff
+
+; Initial height and width of the preview view
+
+CPC_PREVIEW_INITIAL_WIDTH		equ	250
+CPC_PREVIEW_INITIAL_HEIGHT		equ	300
+
+
+; Character attributes for the msg pad
+
+CPC_MSG_PAD_CHAR_ATTRS	equ	(CPC_TEXT_FONT_SIZE_DEFAULT shl offset VTDCA_SIZE) or (CPC_TEXT_FONT_DEFAULT)
+
+
+; This is a table index count used to initialize the msg pad.
+
+CPC_MSG_PAD_TRIGGER_COUNT		equ	3
+
+; Another table index count 
+
+CPC_NUMBER_OF_INI_KEYS		equ 	3
+CPC_KEY_OFFSET_TABLE_SIZE	equ	CPC_NUMBER_OF_INI_KEYS *2
+
+CPCDisableEnableUIType	etype	word	, 0, 2
+	CPCDEUIT_ENABLE		enum	CPCDisableEnableUIType
+	CPCDEUIT_DISABLE	enum	CPCDisableEnableUIType
+
+; Definitions of the components of the CPCSourceStringsTable.
+
+ 
+
+;====================================================================
+
+;-------------------------------------------------------
+;	GenItem Idenitifiers for changing message pad input mode. 	
+;-----------------------------------------------------
+;
+; 	These identifiers are used for two things.  First, they're
+;	used to identify which edit mode the message pad is in; either
+;	text or ink.  Second, they're used as offsets into the following
+;	table:
+;
+;	EditObjectMessageTable	word	\
+;		MSG_INK_DELETE_LAST_GESTURE,
+;		MSG_CPC_INK_CLEAR_INK,
+;		MSG_VIS_TEXT_DO_KEY_FUNCTION,
+;		MSG_VIS_TEXT_DELETE_ALL
+;
+;	The identifier's interpretaion as an offset allows
+;	the routine CPCSetEditTools to load the proper
+;	messages for changing the action messages of the delete and
+;	backspace triggers. 
+;
+TextInkMode	etype	word, 0, 4
+		TIM_INK		enum 	TextInkMode
+		TIM_TEXT	enum	TextInkMode
+
+
+
+						;set in block sent to owner
+CoverPageDisplayMode	etype	word, 0, 2
+		CPDM_MESSAGE	enum	CoverPageDisplayMode
+		CPDM_SELECTION  enum	CoverPageDisplayMode
+
+; Scrap array struct
+
+ScrapArrayElement	struct
+	SAE_name	FileLongName		;Name of the scrap
+	SAE_handle	word			;vm block handle of the scrap
+ScrapArrayElement	ends
+
+
+
+if DBCS_PCGEOS
+CPSpoolFileNameType	type 	13 dup (wchar)
+else
+CPSpoolFileNameType	type 	13 dup (char)
+endif
+
+
+
+
+; Cover page change flags
+
+ChangeFlags	record
+	:3
+	CF_COVER_PAGE_HAS_MSG:1		;Set when the cover page has a msg!
+	CF_RECEIVER_LIST_CHOICE:1	;List choice has changed
+	CF_COVER_PAGE:1			;Scrapinfo has changed
+	CF_MSG_PAD_INK:1		;Ink info has changed
+	CF_MSG_PAD_TEXT:1		;Text info has changed
+ChangeFlags	end
+
+
+
+
+;misc flags
+
+CoverPageFlags	record
+	:5
+	CPF_SELECTOR_IS_UP:1		;Need to know when this is true, so we
+					;no what to do on msg pad DONE
+	CPF_MSG_EXISTS:1		; used to WARN user when changing
+					;msg pad when msg exists.
+	CPF_COVER_PAGE_CHANGED:1	;Second condition to check ^
+CoverPageFlags	end
+
+
+
+
+;-----------------------------------------------------------------------------
+;		Messages
+;-----------------------------------------------------------------------------
+
+MSG_CPC_UPDATE_UI				message
+;
+;	Handles the update of the cover page controller UI.
+;	Used instead of MSG_META_NOTIFY_WITH_DATA_BLOCK, so we
+;	can get along without another gcn list.
+;
+;	PASS:		ds:di = CPC instance data
+;			cx    = Block handle of 
+;
+
+
+
+
+
+MSG_CPC_SAVE_MSG_PAD_INFO			message
+;
+;	Copies the text and ink objects (as transfers) to their
+;	respective places in the vm tree.
+;
+;	PASS:		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_RESET_MSG_PAD				message
+;
+;	Loads up the msg pad objects with the last saved versions of text
+;	ink.
+;	
+;	PASS:		ds:di	= CoverPageControlClass instance data 
+;
+
+
+	
+MSG_CPC_BRING_UP_MSG_PAD			message
+;
+;	Loads the ink and text objects if needed and
+;	initiates the msg pad interaction.
+;
+;	PASS:	*ds:si	= CoverPageControlClass object
+;		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_BRING_UP_COVER_PAGE_SELECTOR		message
+;
+; Brings up the main CPC dialog box.  
+; 
+;
+
+MSG_CPC_SET_SELECTOR_VISIBILITY			message
+;
+; Sets the visibility flag 
+;
+;
+
+
+MSG_CPC_DONE_WITH_MSG_PAD			message
+;
+; This decides what to do next based on whether the msg db was
+; called from the selction db or from the owner.   IF called from
+; the selection db, it does the normal msg saving stuff.  If called from
+; the owner, it will issue an update to the owner in addition.
+;
+;	PASS:	*ds:si - CPC object
+
+
+MSG_CPC_SAVE_COVER_PAGE_DEFAULTS 		message
+;
+;	Saves the cover page info to the .ini.
+;
+;	PASS:		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_SEND_OUT_UPDATE				message
+;
+;	Build a tree and send it to the owner.  We get this
+;	on apply
+;
+;	PASS:	*ds:si	= CoverPageControlClass object
+;		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_SEND_OUT_NO_CHANGE			message
+;
+;	Called when cancel is hit on the contrtoller.
+;	We just clean up after ourselves.
+;
+;	PASS:	*ds:si	= CoverPageControlClass object
+;		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_SET_MSG_PAD_INPUT_MODE			message
+;
+;	Sets the correct object in the msg pad editable
+;	PASS:	ds:si	= CoverPageControlClass instance
+;		cx	= current selection
+;
+
+
+MSG_CPC_REQUEST_ITEM_MONIKER	 		message
+;
+;	The dynamic list calls this routine when it needs the
+;	moniker of an  item in the list. 
+;
+;	PASS:	*ds:si	= controller instnace
+;		ds:di	= controller instance data
+;		bp	= number of item to return
+;		^lcx:dx	= the dynamic list requesting the moniker
+;
+
+
+MSG_CPC_CHANGE_SCRAP				message
+;
+;	Changes the scrap name in instance data.
+;
+;	PASS:	ds:di	= instance data
+;		cx	= selection number
+;
+
+
+MSG_CPC_CHANGE_VISIBLE_SCRAPBOOK		message
+;
+;	Changes the dynamic list to show the scraps of a
+;	newly selected scrapbook.
+;
+;	PASS:	*ds:si	= CoverPageControlClass object
+;		ds:di	= CoverPageControlClass instance data
+;		ds:bx	= CoverPageControlClass object (same as *ds:si)
+;		bp	=  GenFileSelectorEntryFlags
+;		cx	= selection number
+;
+
+
+MSG_CPC_HANDLE_SCRAP_LIST_DOUBLE_CLICK	message
+;
+;	Just forces the file selector interaction to come up.
+;	PASS:	ds:di = instance data
+
+
+
+MSG_CPC_BRING_UP_PREVIEW			message
+;
+;	Does a merge if needed. then initiates the interaction.
+;
+;	PASS:	*ds:si	= CoverPageControlClass 
+;		ds:di	= CoverPageControlClass instance data	
+;
+
+
+MSG_CPC_SET_RECEIVER_LIST_CHOICE		message
+;
+;	Sets instance data with current choice for this.
+;	ds:di	= instance data
+;	cx	= booleans currently selected
+;
+
+
+
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+CPCFeatures	record
+	:5
+	CPCF_PAGE_SELECTION:1
+	CPCF_MESSAGE_PAD:1
+	CPCF_PREVIEW:1
+CPCFeatures	end
+
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+CPCToolboxFeatures	record
+	:5
+	CPCTF_PAGE_SELECTION:1
+	CPCTF_MESSAGE_PAD:1
+	CPCTF_PREVIEW:1
+CPCToolboxFeatures 	end
+
+CPC_DEFAULT_FEATURES 	equ mask CPCF_PAGE_SELECTION \
+			or mask CPCF_MESSAGE_PAD \
+		        or mask CPCF_PREVIEW  
+
+CPC_DEFAULT_TOOLBOX_FEATURES 	equ mask CPCTF_PAGE_SELECTION \
+				or mask CPCTF_MESSAGE_PAD \
+			      	or mask CPCTF_PREVIEW
+
+
+
+;----------------------------------------------------------------------
+;instance variables for the cover page controller
+;-----------------------------------------------------------------------
+
+	CPCI_coverPageFlags		word	;Cover page change flgs
+
+	CPCI_changeFlags		word	;What's changed;
+						;msg or maybe the scrapo info
+	
+	CPCI_scrapInfoHandle		word	;mem heap handle of SI
+	CPCI_lastScrapPosition		word	;for reverting
+	CPCI_receiverListChoice		word	;first or all
+
+	CPCI_passedFileHandle		word	;Vm file of tree
+	CPCI_passedRootHandle		word	;Vm blk handle of tree
+
+
+	CPCI_inkInfo			DBGroupAndItem	;Msg Pad Ink	
+	CPCI_textInfo			word		;Msg Pad text
+
+	CPCI_msgPadHeight		word		;height of current pad
+	CPCI_msgPadWidth		word		;width of current pad
+	
+	CPCI_currentScrapbookName	FileLongName	;name of current Scbook
+	
+	CPCI_scrapListArrayBlockHandle	hptr		;scrap list blk handle
+	CPCI_scrapListArrayOffset	word		; "    "        offset
+		
+CoverPageControlClass	endc
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Scrap List Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CPCScrapListClass	class 	GenDynamicListClass	
+	
+CPCScrapListClass	endc
+
+
+
+
+MessagePadTextFlags	record
+
+	:5
+	MPTF_CHANGING_SIZE:1	;set when changing size
+				;no checking if we are
+
+	MPTF_FIRST_WARNING:1	;Set when the user has
+				;been warned about over-input
+
+	MPTF_AT_MAX_HEIGHT:1	;Set when input should be held up because the
+				;msg pad is full.
+
+MessagePadTextFlags 	end
+
+
+CPCMessagePadTextClass class VisTextClass 
+;----------------
+; Instance data
+;---------------
+	CPCMPTI_flags		MessagePadTextFlags
+	CPCMPTI_msgHeight	word
+
+;------------
+; Messages
+;------------
+
+
+MSG_CPC_MSG_PAD_TEXT_SET_MSG_HEIGHT	message
+;
+;	Just set the instance data.
+;
+;	PASS: 	cx = new hieght to set
+;	RETURN: nothing
+
+
+
+MSG_CPC_MSG_PAD_TEXT_GET_LINE_OFFSET	message
+;
+;	Get's the line offset, and/or Checks to see if the line exists.
+;
+;	PASS:	ds:di	= CPCTextClass instance data
+;	dx	line number we can't allow
+;
+;	RETURN:	cx	= line offset
+;		carry set if line DOESN"T EXIST.
+;
+	
+MSG_CPC_MSG_PAD_TEXT_SET_SIZE_FLAG	message
+;
+;	Set the flag saying we're changing size or not.
+;
+;	PASS:	ds:di	= CPCMessagePadTextClass instance data
+;		bp	= TRUE to set, FALSE to clear
+;
+
+CPCMessagePadTextClass	endc
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Message Pad Ink Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ifdef	PEN_BASED
+CPCMessagePadInkClass	class	InkClass
+
+
+
+MSG_CPCMP_INK_SET_NOT_DIRTY		message
+;
+; Sets the ink object not dirty.
+; PASS/RETURN	: nothing
+;
+
+MSG_CPCMP_INK_SET_DIRTY			message
+;
+; Sets the ink object dirty
+; PASS/RETURN 	: nothing
+;
+
+
+MSG_CPCMP_INK_CHECK_DIRTY		message
+;
+;	PASS 	: nothing
+;	RETURN	: carry set if dirty.
+;
+
+
+MSG_CPCMP_INK_CLEAR_INK		message
+;
+;	Clears all ink from the message pad
+;
+;	PASS:	*ds:si	= CPCInkClass object
+;		ds:di	= CPCInkClass instance data
+;
+
+
+
+CPCMessagePadInkClass	endc
+endif
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Message Pad Content Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CPCMessagePadContentClass class  VisContentClass
+
+MSG_CPC_MSG_PAD_REDRAW_INK		message
+;
+;	Redraw ink object.
+;
+;	PASS: 	ds:si 	= content instance
+
+CPCMessagePadContentClass	endc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Preview Content Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CPCPreviewContentClass	class	VisContentClass
+
+	CPCPCI_gString	word		;current gstring to draw on VisDraw
+	
+MSG_CPC_PREVIEW_CONTENT_SET_GSTRING	message
+;
+;	Set the gstring handle instance data.
+;
+;	PASS:	ds:di	= CPCPreviewContentClass instance data
+;		cx	= gstring handle
+;	
+
+
+CPCPreviewContentClass	endc
+
+
+CPCMessageViewClass	class	GenViewClass
+CPCMessageViewClass	endc	
+
+
+EndLibrary	faxctrl

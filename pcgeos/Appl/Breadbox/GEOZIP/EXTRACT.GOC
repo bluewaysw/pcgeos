@@ -1,0 +1,926 @@
+/**************************************************************************
+ *	File:		Extract.goc
+ *			Routinen und Methoden zum Auspacken eines Archives
+ *      Copyright:      (c) by RABE-Soft 8/97
+ *      Sonstiges:      -
+ *
+ **************************************************************************/
+
+
+@include <stdapp.goh>
+#include <stdio.h>
+#include <ansi\stdlib.h>
+#include <ansi\string.h>
+#include <file.h>
+
+#include "unzip.h"
+@include "geozip.goh"
+@include "process.goh"
+@include "zipui.goh"
+@include "extract.goh"
+#include "debug\debuginf.h"
+
+
+
+
+
+/* ------------------------------------------------------------------*/
+/* UnterstÅtzung der DialogBox zum Auspacken der Dateien	     */
+/* ------------------------------------------------------------------*/
+
+
+/*--------------------- MSG_GZIP_EXTRACT_DIR_SELECTED ---------------------
+ *      Aufgabe:        Notification-Handler des File_selecturs
+ *      Zusammenhang:   Anzeige des kompletten Strings
+ *      Strategie:
+ *      Parameter:      void ( void)
+ ---------------------------------------------------------------------------*/
+@extern method GZipProcessClass, MSG_GZIP_EXTRACT_DIR_SELECTED {
+char    path[PATH_BUFFER_SIZE],
+	fullPath[PATH_BUFFER_SIZE],
+	*p;
+DiskHandle dh;
+
+	if ( entryFlags & GFSEF_OPEN ) {
+		return;
+		}
+/* Selektionsstring basteln und anzeigen */
+	dh = @call ExtractFileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@call ExtractFileSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(path);
+	p= fullPath;    /* p zeigt nachher auf das Ende des Strings */
+	FileConstructFullPath(&p,PATH_BUFFER_SIZE,dh,path,TRUE);
+	@call ExtractDirShower::MSG_VIS_TEXT_REPLACE_ALL_PTR(fullPath,0);
+
+	}
+
+/*--------------------- MSG_GZIP_EXTRACT_CREATE_SUBDIR ---------------------
+ *      Aufgabe:        Anlegen eines neuen Verzeichnisses
+ *      Zusammenhang:
+ *      Strategie:
+ *      Parameter:
+ ---------------------------------------------------------------------------*/
+@extern method GZipProcessClass, MSG_GZIP_EXTRACT_CREATE_SUBDIR {
+DiskHandle      dh;
+char    fileName[PATH_BUFFER_SIZE];
+int err;
+
+     /* Infos holen */
+	dh = @call ExtractFileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@call ExtractFileSelector::MSG_GEN_PATH_GET(fileName,PATH_BUFFER_SIZE);
+     /* StandardPfad auf ausgewÑhltes Verzeichnis einstellen */
+	FilePushDir();
+	FileSetCurrentPath(dh,fileName);
+	@call ExtractCreateInput::MSG_VIS_TEXT_GET_ALL_PTR(fileName);
+	err = FileCreateDir(fileName);
+	if ( err ) {
+		if ( err == ERROR_FILE_EXISTS ) {
+			ErrorBox(@ErrDirExist);
+			}
+		else ErrorBox(@ErrCreateDir);
+		}
+	@send ExtractFileSelector::MSG_GEN_FILE_SELECTOR_RESCAN();
+	@send ExtractFileSelector::MSG_GEN_FILE_SELECTOR_SET_SELECTION(fileName);
+	FilePopDir();
+	}
+
+/*@extern method GZipProcessClass, MSG_GZIP_EXTRACT_FLAGS_CHANGED
+{
+	if ( selectedBooleans & GEF_OVERWRITE_ALL )
+		@send ExtractOverwriteROTooBoolean::MSG_GEN_SET_ENABLED(VUM_NOW);
+	else	@send ExtractOverwriteROTooBoolean::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+
+/*--------------------- MSG_GZIP_DOC_START_EXTRACT ---------------------
+ *      Aufgabe:        Offnet ein Fenster um die Extraction zu starten
+ *      Zusammenhang:   Message-Handler des Triggers
+ *      Strategie:
+ *      Parameter:      void ( void)
+ ---------------------------------------------------------------------------*/
+@extern method GZipDocumentClass, MSG_GZIP_DOC_START_EXTRACT {
+//char moniker[22]="Go to ";
+ //	strcat(moniker,pself->GDI_fileName);
+  //	@call ExtractHomeTrigger::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(moniker,VUM_NOW);
+	@send ExtractDialog::MSG_GEN_INTERACTION_INITIATE();
+	}
+
+/*@extern method GZipDocumentClass, MSG_GZIP_DOC_REQUEST_HOME {
+  GenFilePath	gfp;
+  @call oself::MSG_GEN_PATH_GET(gfp.GFP_path,sizeof(PathName));
+  gfp.GFP_disk = @call oself::MSG_GEN_PATH_GET_DISK_HANDLE();
+  pself = ObjDerefGen(oself);
+  @call ExtractFileSelector::MSG_GEN_PATH_SET(gfp.GFP_path,gfp.GFP_disk);
+  }
+*/
+
+/*--------------------- MSG_GZIP_DOC_DO_EXTRACT ---------------------
+ *      Aufgabe:	Auspacken der Selektierten Dateien
+ *      Zusammenhang:
+ *      Strategie:
+ *      Parameter:
+ ---------------------------------------------------------------------------*/
+
+@extern method GZipDocumentClass, MSG_GZIP_DOC_DO_EXTRACT
+{
+  word  currentFile = 0;
+  word size,pathOffs;
+  IndexArrayBlockHeader * iPtr;
+  DiskHandle dh;
+  char path[256];
+  int maxFiles = 0;
+  int n, entryType;
+  void * p;
+  MemHandle unzDesc;
+  VMFileHandle tempFile;
+  VMBlockHandle entryArray, indexArray;
+  dword currentIndex, index;
+
+
+  unzDesc = pself->GZDI_unzDesc;		/* pself-Zugriffe cachen */
+  tempFile = pself->GZDI_tempFile;
+  entryArray = pself->GZDI_entryArray;
+  indexArray = pself->GZDI_indexArray;
+  currentIndex = pself->GZDI_currentIndex;
+
+// jfh  if ( isShare ) { DisplayShareBox(@ShareWareText,@shareHct); }
+
+/* Reichlich blîd, da· die Document-Class die Info-Box und
+   den Extract-FileSelector der Applikation kennen mu·
+   Andererseits: An der Info-Box lÑ·t sich nichts Ñndern und das
+   Verlegen der Abfrage in des Extract-FileSelectors in eine
+   Process-Message bringt nicht viel, weil
+	1. Es sowieso im gleichen Thread lÑuft
+	2. die Message-Struktur nur verkompliziert wird	*/
+
+  @send ExtractArchiveInfo::MSG_EAI_INITIATE
+			(pself->GDI_fileName,pself->GZDI_selectedSize);
+
+  // Pfad und Diskhandle zum extract-Ziel holen
+  dh = @call ExtractFileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+  pself = ObjDerefGen(oself);
+  @call ExtractFileSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(path);
+
+  // globale Variablen initialisieren
+/*  globalExtractFlags = @call ExtractCreateFlagsSelector::
+		MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+  /* instead of grabbing them we'll set them here */
+  globalExtractFlags = GEF_USE_OLD_DOS_NAME_FOR_GEOS_FILES;
+
+  // Wenn "öberschreibe alle" nicht aktiv ist,
+  // soll er bei RO auf jeden Fall nachfragen
+  if ( !(globalExtractFlags & GEF_OVERWRITE_ALL) )
+		globalExtractFlags &= ~((word)GEF_OVERWRITE_RO_TOO);
+
+
+
+/*  globalExtractFlags |= @call ExtractDirnameSelector::
+		MSG_GEN_ITEM_GROUP_GET_SELECTION();
+  /* and here too we'll set and not ask */
+  globalExtractFlags |= GEF_DIRNAME_OVERWRITE;
+
+  cancelExtract = FALSE;
+
+  // ermitteln des Path-Offsets um Åbergeordnete Verzeichnisse auszublenden
+  if ( globalExtractFlags & GEF_CREATE_ROOT )
+	{
+	pathOffs = 0;
+	}
+  else	{
+	HugeArrayLock(tempFile,indexArray, currentIndex,(void**)&iPtr, &size);
+	pathOffs = strlen(iPtr->pathName);
+	HugeArrayUnlock(iPtr);
+	}
+
+
+  FilePushDir();
+  FileSetCurrentPath(dh,path);
+
+  n =  @call @GetDocUIOptr(FileList)::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+  if ( n==0 )
+	{
+	// alles selektiert-> alles auspacken!
+	GZipExtractSubdir(unzDesc, tempFile, entryArray, indexArray, currentIndex, pathOffs, 0);
+	}
+  else
+    {	// einzelne Selektionen -> nachschauen
+    maxFiles = @call @GetDocUIOptr(FileList)::
+					MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+
+    for (currentFile = 0; currentFile < maxFiles; currentFile++)
+      {
+      if ( @call @GetDocUIOptr(FileList)::
+				MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(currentFile))
+	{
+	entryType = IndexArrayLockEntry(tempFile, indexArray,entryArray,
+			currentIndex, currentFile, &p, &index);
+	if ( entryType == IA_ET_FILE ) {
+		strcpy(path,((FileInZip*)p)->name);	// fÅr Fehlerbox
+		GZipExtractFile(unzDesc,p,pathOffs);
+		}
+	HugeArrayUnlock(p);
+	if ( entryType == IA_ET_DIR )
+		GZipExtractSubdir(unzDesc, tempFile, entryArray, indexArray, index, pathOffs, 1);
+
+	if ( cancelExtract ) currentFile = maxFiles;	// Stop-Trigger oder Fehler
+
+	}
+      }	/* for ( ) */
+
+    } /*  if (n == 0) ... ExtractSubdir()
+	  else... jeden Eintrag mit for() abklappern */
+
+  FilePopDir();
+  @send ExtractArchiveInfo::MSG_EAI_ENDE();
+}	/* MSG_GZIP_DOC_DO_EXTRACT */
+
+/*@extern method GZipDocumentClass, MSG_GZIP_DOC_TEST_FILES {
+// jfh UserDoDialog(@GeosInfoBox);
+}
+*/
+
+/*--------------------- FileToolCreatePath ---------------------
+ *	Aufgabe:	Anlegen eines Pfades auf einem DatentrÑger
+ *	Strategie:
+ *	Return:		-1, wenn sich der Pfad nicht anlegen lÑ·t
+ *			oder Fehlercode von FileToolCreateSubdir()
+ *			OK: TRUE ( ==0 )
+ ---------------------------------------------------------------------------*/
+int FileToolCreatePath (DiskHandle dh, char *path) {
+DiskHandle ndh;
+int ret;
+
+	if ( dh==0) return (-1);	/* kein Handle: kein DatentrÑger */
+	FilePushDir();
+	ndh = FileSetCurrentPath(dh,"\\");
+	if ( ndh == 0 ) {
+		FilePopDir();
+		return (-1);
+		}
+	ret = FileToolCreateSubdir(path);		/* Vezeichnis anlegen, b.Bed. rekursiv*/
+	FilePopDir();
+	return ret;
+	}
+
+
+/*--------------------- FileToolCreateSubdir ---------------------
+ *	Aufgabe:	Anlegen Unterverzeichnisses relativ zu Working Dir
+ *			Bei Bedarf rekursiver Aufruf
+ *	Strategie:
+ *	Return:		 -1, wenn sich der Pfad nicht anlegen lÑ·t
+ *			oder Fehlercode von FileCreateDir()
+ *			OK: FALSE  ( == 0 )
+ ---------------------------------------------------------------------------*/
+
+int _INFO_FOR_CreateDir(char * path )
+{
+int err;
+char c = 0;
+char * p, *blp;
+
+	if ( strlen(path) < 33) return FileCreateDir(path);
+
+	blp = 0;
+
+
+	for ( p = path; *p != 0; p++ ) if ( *p == '\\' ) blp = p;	/* blp auf letztes '\' */
+	if ( blp == 0 ) blp = path;
+
+	if (strlen(blp) > 32 )
+		{
+		c = blp[32];
+		blp[32] = 0;
+		}
+	err = FileCreateDir(path);
+	if ( c ) blp[32] = c;		/* restore */
+
+	return err;
+}
+
+int FileToolCreateSubdir( char *path ) {
+int 	i,err;
+char	z;
+
+/* versuchen normal anzulegen, zu lange Namen ausbremsen */
+	err = FileCreateDir(path);
+	if (err == 0 || err == ERROR_FILE_EXISTS ) {
+		/* erfolgreich angelegt oder existiert schon */
+		return FALSE;
+		}
+/* Schreibschutzfehler extra behandeln */
+	if ( err == ERROR_WRITE_PROTECTED ) {
+		return ERROR_WRITE_PROTECTED;
+		}
+/* es hat nicht geklappt: Versuchen einzukÅrzen und neu zu rufen */
+	i = strlen(path);
+	if ( i==0 )
+	{
+	return (-1);	/* leere Strings ausbremsen */
+	}
+
+	while ( i != 0 && path[i] != '\\' ) i--;	/* Backslash finden */
+	z = path[i];
+	path[i] = 0;	/* String einkÅrzen */
+			/* i ist Null, wenn kein Backslash enthalten ist, oder er
+			 * am Anfang stand -> es hat nicht geklappt */
+	if ( i != 0 ) err = FileToolCreateSubdir(path);	/* rekursiver Aufruf */
+		else	err = (-1);
+	path[i] = z;				/* alten String restaurieren */
+	if ( err == 0 ) {
+/* nochmal versuchen normal anzulegen, zu lange Namen ausbremsen */
+		err = FileCreateDir(path);
+
+		if (err == 0 || err == ERROR_FILE_EXISTS ) {
+			/* erfolgreich angelegt oder existiert schon */
+			return 0;
+			}
+		}
+	return err;
+	}
+
+
+/*--------------------- GZipExtractFile ---------------------
+ *	Aufgabe:	Basisroutine zum Auspacken einer bestimmten Datei
+ *			incl. Fehlermeldung
+ *	Return:		TRUE wenn Fehler
+ ---------------------------------------------------------------------------*/
+Boolean GZipExtractFile(MemHandle unzDesc, FileInZip * fizp,int pathOffs)
+{
+int n, error,err;
+char element[256];
+char *p;
+
+  if ( cancelExtract ) return FALSE;
+
+  /* focus on file to be opened */
+  error = UnzGoToFileAt(unzDesc, &fizp->quickLocateParams);
+  if ( error  == UNZ_OK)
+    {
+    error = UnzOpenCurrentFile(unzDesc);
+    if( error == UNZ_OK)	/* open file for reading */
+	{                                       // OK, file focused
+	strcpy(element,fizp->name);
+	for (n=0; element[n] != 0; n++ ) {
+		if ( element[n] == '/' ) element[n] = '\\';
+		if ( element[n] == ' ' ) element[n] = '_';
+		}
+	FileToolMakeParentPath(element,TRUE);
+
+	// create/change path with respect to pathOffs
+	FilePushDir();
+	if ( strlen(element) < pathOffs ) pathOffs = 0;		// be sure
+	if ( element[pathOffs] == '\\' ) pathOffs++;
+
+	err = FileToolCreateSubdir(&(element[pathOffs]));
+	if ( err== (-1) ) {
+		DisplayErrorBox(&(element[pathOffs]),GZIP_CREATE_PATH_ERROR);
+		cancelExtract = TRUE;
+		}
+	if ( err == ERROR_WRITE_PROTECTED ) {
+		ErrorBox(@VolumeWriteProtected);
+		cancelExtract = TRUE;
+		}
+
+	FileSetCurrentPath(0,&(element[pathOffs]));
+	error = GZipExtractOpenedFile(unzDesc, fizp);	// Kapselung
+	err = UnzCloseCurrentFile(unzDesc);
+	if(  err != UNZ_OK )
+		if (!error) error = err; 	// evt alten errorCode erhalten
+	if ( error ) {
+		char * blp=0;
+
+		for(p = fizp->name; *p!=0; p++)
+			if( (*p=='/') || *p=='\\') blp=p;
+		if (blp == 0) blp = fizp->name;
+		if ((*blp == '\\') || (*blp == '/') ) blp++;
+		err = FileDelete(blp);	// keine halben Dateien
+		      }
+	FilePopDir();
+	}	/* UnzOpenCurrentFile(unzDesc); */
+    }          /* UnzGoToFileAt(); */
+    if ( error != UNZ_OK )
+	{
+	DisplayErrorBox(fizp->name,error);
+	}
+
+  return error;
+}
+
+/*--------------------- GZipExtractOpenedFile ---------------------
+ *	Aufgabe:	Ausgelagerte Routine zum Auspacken einer bereits im
+ *			ZIP-Archiv lokalisierten und geîffneten Datei
+ *	Return:		TRUE (!=0) wenn Fehler, fÅr Fehlermeldung
+ *			FALSE (==0) wenn kein Fehler oder
+ *				Fehler, aber Meldung ist bereits erfolgt
+ ---------------------------------------------------------------------------*/
+int GZipExtractOpenedFile(MemHandle unzDesc, FileInZip * fizp)
+{
+byte *buf;
+int writeError, zipError;
+char *name;
+FileHandle dest;
+int read, written;
+int i;
+dword toread, isread;
+
+
+  if ( cancelExtract ) return FALSE;
+
+  name = NULL;
+  for(i=0; fizp->name[i]; i++)
+	if(fizp->name[i]=='/' || fizp->name[i]=='\\')
+	  name = fizp->name + i + 1;
+
+  if(name==NULL)
+	name = fizp->name;
+
+  if(*name==0) return GZIP_NO_ERROR;       /* do nothing with directories */
+
+  
+
+  @call ExtractArchiveInfo::MSG_EAI_NEW_FILE(name,fizp->uncompressedSize);
+  toread = fizp->uncompressedSize;
+  isread = 0;
+
+
+  /* allocate a buffer for the decompressed data */
+  buf = malloc(READ_BUF_SIZE);
+  if(!buf)	return GZIP_EXTRACT_ERROR;	// Fehler melden
+
+  /* open output file. */
+  read = UnzReadCurrentFile(unzDesc, buf, READ_BUF_SIZE);
+  isread += (dword)read;
+
+  if ( (int)read < 0) {
+	free(buf);
+	return read; /* read <0 == ErrorCode */
+	}
+  dest = GZipCreateDestinationFile(name,buf,read,fizp->name);
+  if(!dest) {
+	free (buf);
+	return GZIP_NO_ERROR;	// Error window already displayed in
+	}		// GZipCreateDestinationFile()
+
+
+  /* write to file */
+  writeError = GZIP_NO_ERROR;	// Prinzip Hoffnung
+  zipError = GZIP_EXTRACT_ERROR;	// .. oder auch nicht
+  while( (read > 0) && (isread <= toread) )
+	{
+	@send ExtractArchiveInfo::MSG_EAI_BYTES_EXTRACTED((dword)read);
+	written = FileWrite(dest, buf, read, FALSE);
+	writeError = ( written != read);
+	if ( writeError ) break;
+	read = UnzReadCurrentFile(unzDesc, buf, READ_BUF_SIZE);
+	if ( read >= 0) isread += (dword)read;
+	}
+  if ( writeError )
+	{
+	if (  written != (-1) )		// -1 == kein short_r_w
+			writeError = GZIP_EXTRACT_DISK_FULL_ERROR;
+		else	writeError = GZIP_EXTRACT_ERROR;
+	}
+
+  if( isread == toread )                 /* ended because of EOF: we're ok */
+	{
+	zipError = GZIP_NO_ERROR;
+	FileSetDateAndTime(dest, fizp->modDate);
+	}
+  else  {
+	zipError = UNZ_CRCERROR;
+	}
+  // AufrÑumen
+  i = FileClose(dest, FALSE);
+  i = FileSetPathExtAttributes(name,FEA_FILE_ATTR,&(fizp->fileAttrs),1);
+  free(buf);
+
+  if ( writeError ) return writeError;		// writeError hat Vorrang
+  return zipError;
+  }
+
+/*--------------------- GZipCreateFile ---------------------
+ *	Aufgabe:	Anlegen einer DOS- oder Geos-Datei
+ *	Strategie:	verwendet gloablExtractFlags um evt. vorhandene Dateien
+ *			automatisch zu Åberschreiben. Wenn nicht wird nachgefragt.
+ *	Seiteneffekte:	globalExtractFlags wird u.U. verÑndert (User select: ALLE)
+ *	Return:		Handle der neu angelegten Datei,
+ *			Nullhandle wenn Fehler
+ ---------------------------------------------------------------------------*/
+FileHandle GZipCreateFile(char * fileName, Boolean isDos) {
+FileHandle fh;
+word	flags;
+int ret;
+
+
+	flags = (FILE_CREATE_ONLY | FILE_ACCESS_RW | FILE_DENY_RW);
+	if ( isDos )
+		{
+		flags |= FCF_NATIVE;
+		}
+	fh = FileCreate(fileName, flags, 0);
+	if ( fh )
+		{
+		return fh;	// Null Probleme
+		}
+
+if ( ThreadGetError() == ERROR_WRITE_PROTECTED ) {
+	ErrorBox(@VolumeWriteProtected);
+	cancelExtract = TRUE;
+	return 0;
+	}
+
+if ( globalExtractFlags & GEF_OVERWRITE_ALL ) {
+			ret = IC_DEL;
+			}
+		else {
+			char * t;
+			MemLock(HandleOf(@AskOverwriteText));
+			t = LMemDeref(@AskOverwriteText);
+			ret = UserStandardDialog(0,(char*)&overwriteResponseTable,
+				0, fileName, t,
+				(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET)
+				| (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) );
+			MemUnlock(HandleOf(@AskOverwriteText));
+		     }
+	switch ( ret ) 	{
+	case IC_CANCEL:	cancelExtract = TRUE;	// Abbrechen
+	case IC_SKIP:	fh = 0;			// öbergehen
+			break;
+	case IC_ALL:	globalExtractFlags |= GEF_OVERWRITE_ALL; // Alle
+	case IC_DEL:	// öberschreiben
+			if (GZipDeleteFile(fileName) ) fh = 0;  // Skip/Cancel
+			else {  // Datei sollte gelîscht sein
+			  fh = FileCreate(fileName, flags, 0);
+			  if ( fh == 0 )   {	// SchreibgeschÅtzt, offen...
+				DisplayErrorBox(fileName,ERROR_ACCESS_DENIED);
+				}
+			  }
+			break;
+	default:	fh = 0;
+		}
+	return fh;
+	}
+
+
+/*--------------------- GZipCreateDestinationFile ---------------------
+ *	Aufgabe:	Anlegen einer auszupackenden Datei
+ *	Strategie:	Anhand des Åbergebenen (schon aus dem Archiv gelesenen)
+ *			Puffers wird geprÅft, ob es sich um eine DOS oder GEOS-
+ *			Datei handelt.
+ *			Eine DOS_Datei wird versucht direkt anzulegen
+ *			Eine GEOS-Datei wird unter ihrem Geos-Namen angelegt und
+ *			daraus der DOS-Name ermittelt. Dann wird die Datei als
+ *			DOS-Datei (!) geîffnet.
+ *	Seiteneffekte:	globalExtractFlags wird u.U. verÑndert
+ *	Return:		Handle der neu angelegten Datei,
+ *			Nullhandle wenn Fehler
+ ---------------------------------------------------------------------------*/
+FileHandle GZipCreateDestinationFile( char * dosName, void * buf,
+					int readedBytes, char * fullPath)
+{
+FileHandle fh;
+FileLongName	geosName;
+@ifdef NO_LONGNAME_SUPPORT
+char newDosName[34];
+@else
+char *newDosName;
+@endif
+//int n;
+
+@ifndef NO_LONGNAME_SUPPORT
+	newDosName = malloc(strlen(dosName) + 34);
+	if(!newDosName)
+		return 0;
+@endif
+
+	memcpy(newDosName,dosName,33);
+	newDosName[33] = 0;
+@ifdef NO_LONGNAME_SUPPORT
+	for (n=0; n<33; n++)
+		{
+		char c;
+		c = newDosName[n];
+		if (c == ' ') newDosName[n] = '_';
+		if ( (c >='a') && ( c<='z') ) newDosName[n]-=0x20;
+		}
+@endif
+
+	/* if the file is shorter than 256 bytes, then it can't be a GEOS file */
+	if  (readedBytes < 256)
+	{
+		fh = GZipCreateFile(newDosName,TRUE);
+		goto end;
+	}
+
+	/* definatly a DOS file */
+	if  ( ((dword*)buf)[0] != GEOS_HEADER_MAGIC )
+	{
+		fh = GZipCreateFile(newDosName,TRUE);
+		goto end;
+	}
+
+	if ( strcmp(newDosName,"@DIRNAME.000") == 0 )
+	// Dirname-Datei ist anzulegen  
+		{
+		if ( globalExtractFlags & GEF_DIRNAME_CANCEL )
+		   {
+		   DisplayErrorBox( fullPath,GZIP_DIRNAME_FOUND_BREAK);
+		   cancelExtract = TRUE;
+		   fh =  0;
+		   goto end;
+		   }
+		if ( globalExtractFlags & GEF_DIRNAME_IGNORE )
+		   {
+		   fh = 0;
+		   goto end;
+		   }
+		// kann nur noch Overwrite dirname.000 sein
+		GZipDeleteFile(newDosName);
+		fh = GZipCreateFile(newDosName,TRUE);
+		goto end;
+		}
+
+	if ( globalExtractFlags & GEF_USE_OLD_DOS_NAME_FOR_GEOS_FILES )
+	{
+		fh = GZipCreateFile(newDosName,TRUE);
+		goto end;
+	}
+
+	memcpy(geosName, &((char*)buf)[4] ,32);
+	geosName[32] = 0;
+	// "normale" Geos-Datei ist anzulegen, Geos-Name beachten!
+	fh = GZipCreateFile(geosName, FALSE);
+	if (fh) {
+		FileClose(fh,FALSE);
+		fh = FileOpen(geosName, FILE_ACCESS_RW | FILE_DENY_RW | 0x80);
+		}
+
+end:
+@ifndef NO_LONGNAME_SUPPORT
+	free(newDosName);
+@endif
+	return fh;
+	}
+
+
+
+/*--------------------- GZipExtractSubdir ---------------------
+ *	Aufgabe:	Unterverzeichnis komlett auspacken
+ *	Strategie:	Jeder Eintrag wird abgeklappert, ist es eine Datei
+ *			wird sie ausgepackt, ist es win Unetrverzeichnis
+ *			ruft sich die Routine rekursiv
+ ---------------------------------------------------------------------------*/
+void GZipExtractSubdir(MemHandle unzDesc, VMFileHandle tempFile,
+	VMBlockHandle entryArray, VMBlockHandle indexArray, dword index, int pathOffs, word level)
+{
+  IndexArrayBlockHeader * iPtr;
+  FileInZip * p;
+  word size,count, entryType, n;
+  dword lockedIndex;
+
+  if ( cancelExtract ) return;
+
+  HugeArrayLock(tempFile,indexArray,index,(void**)&iPtr,&size);
+  count = iPtr->dirCount + iPtr->fileCount;	// Anzahl der EintrÑge
+  if ( iPtr->parentLink != IA_NO_PARENT ) count++;	// parent braucht 1 Eintrag
+  HugeArrayUnlock(iPtr);
+
+  for ( n=0 ; n<count; n++ )
+    {
+    entryType = IndexArrayLockEntry(tempFile, indexArray,entryArray,
+		index, n, &p, &lockedIndex);
+    if ( entryType == IA_ET_FILE ) {
+
+		if(!level)
+		{	 
+			char *name_p;
+
+			name_p = p->name;
+			DirListParseNameFromPath(&name_p);
+			if(LocalCmpStringsNoCase(name_p, "@DIRNAME.000", 0))
+			{
+				GZipExtractFile(unzDesc,p, pathOffs);
+			}
+		}
+		else
+			GZipExtractFile(unzDesc,p, pathOffs);
+	}
+    HugeArrayUnlock(p);
+    if ( entryType == IA_ET_DIR )
+		GZipExtractSubdir(unzDesc, tempFile, entryArray, indexArray, lockedIndex, pathOffs, level + 1);
+    }
+}
+
+
+
+void DisplayErrorBox(char *fileName,int errorCode)
+{
+  optr info;
+  char * p;
+  int ret, type = GIT_NOTIFICATION;
+
+  switch ( errorCode)  {
+     case	GZIP_SHORT_VIEW: info =@ViewNotAll;
+		break;
+     case	Z_DATA_ERROR:
+     case  	UNZ_CRCERROR:	info = @CRCError;
+		break;
+     case	ERROR_SHARING_VIOLATION:
+     case	ERROR_ACCESS_DENIED:	info = @AccessDeniedError;
+		break;
+     case	GZIP_EXTRACT_DISK_FULL_ERROR: info = @DiskFullError;
+		type = GIT_AFFIRMATION;
+		break;
+     case	GZIP_EXTRACT_NOT_FOUND_ERROR: info = @FileInArchivNotFound;
+		type = GIT_AFFIRMATION;
+		break;
+     case	GZIP_EXTRACT_ERROR:	info = @ExtractError;
+		break;
+     case	GZIP_DIRNAME_FOUND_BREAK:	info = @DirnameFound;
+		break;
+     case	UNZ_ERRNO:
+     case	UNZ_BADZIPFILE:
+     case	GZIP_INVALID_ZIP_FILE:	info = @InvalidZipFile;
+		break;
+     case	UNZ_UNKNOWNZIPMETHOD:
+     case	GZIP_UNSUPPORTED_ZIP_METHOD:	info = @UnsupportedZipFormat;
+		type = GIT_AFFIRMATION;
+		break;
+     case	GZIP_ENCRYPTED_FILES_FOUND: info = @EncryptedFilesFound;
+		break;
+     case	GZIP_UNKNOWN_METHODS_FOUND: info = @UnsupportedFilesFound;
+		break;
+     case	UNZ_ENCRYPTION_ERROR:
+     case	GZIP_FILE_IS_ENCRYPTED: info =@PasswordEncrypted;
+		type = GIT_AFFIRMATION;
+		break;
+     case	GZIP_CREATE_PATH_ERROR: info = @ErrCreatePath;
+		break;
+     case	GZIP_OPEN_FOR_ZIP_ERROR: info = @ErrorOpenForZip;
+		break;
+     case	GZIP_WRITE_TO_ZIP_ERROR: info = @ErrorWriteToZip;
+		break;
+     case 	GZIP_OPEN_DRIVE_ERROR:	info = @ErrorNoDiskInDrive;
+		break;
+     case 	GZIP_OPEN_PATH_ERROR:	info = @ErrorPathNotFound;
+		break;
+     case 	GZIP_APP_NOT_FOUND_ERROR:  info = @ErrorAppNotFound;
+		break;
+     case 	GZIP_APP_NOT_EXECUTABLE_ERROR:  info = @ErrorAppNotExecutable;
+		break;
+     case	GZIP_COMMON_FILE_ERROR:
+     default:
+	{
+	info = @CommonFileError;
+	}
+  }
+
+  MemLock(HandleOf(info));
+  p = LMemDeref(info);
+  ret = UserStandardDialog ( 0,0,0,fileName,p,\
+	  (( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) | \
+	   ( type << CDBF_INTERACTION_TYPE_OFFSET)) );
+  MemUnlock(HandleOf(info));
+
+  if ( (ret == IC_NO) || (ret == IC_NULL) ) cancelExtract = TRUE;
+  }
+
+/* int GZipDeleteFile (char * fileName )
+	return: TRUE, wenn der User öbergehen oder Abbrechen
+		angefordert hat
+*/
+Boolean GZipDeleteFile (char * fileName )
+  {
+  word attrs, ret, err;
+  Boolean skip = FALSE;
+
+  err = FileDelete(fileName);
+  if ( !err ) {
+	return FALSE;
+	}
+  attrs = FileGetAttributes(fileName);
+  if ( ThreadGetError() == ERROR_FILE_NOT_FOUND )
+	{
+	return FALSE;
+	}
+  if ( !( attrs & FA_RDONLY ) )
+	{
+
+@if @debugFlag
+DebugInfo1("unerwarteter Fehler %d\r",err);  /* z.B.versuch offene Datei zu Åbershreiben!*/
+@endif
+
+	return FALSE;
+	}
+
+  if ( globalExtractFlags & GEF_OVERWRITE_RO_TOO ) {
+	ret = IC_DEL;
+	}
+	else {
+		char * t;
+		MemLock(HandleOf(@AskROFileText));
+		t = LMemDeref(@AskROFileText);
+		ret = UserStandardDialog(0,(char*)&overwriteResponseTable,
+			0, fileName, t,
+			(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET)
+			| (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) );
+		MemUnlock(HandleOf(@AskROFileText));
+	     }
+  switch ( ret ) 	{
+	case IC_CANCEL:	cancelExtract = TRUE;	// Abbrechen
+	case IC_SKIP:   skip = TRUE;
+			break;			// öbergehen
+	case IC_ALL:	globalExtractFlags |= GEF_OVERWRITE_RO_TOO; // Alle
+	case IC_DEL:    attrs = 0;		// öberschreiben
+			FileSetPathExtAttributes(fileName,FEA_FILE_ATTR,&attrs,1);
+			err = FileDelete(fileName);
+		}
+@if @debugFlag
+DebugInfo1("DeleteFehler %d\r",err);
+@endif
+  return skip;
+  }
+
+
+/*###########################################################################
+	ExtractArchiveInfoClass: InfoBox Åber das Auspacken von Dateien
+/*###########################################################################*/
+@classdecl ExtractArchiveInfoClass;
+/*
+	@instance dword EAII_archivSize = 0;
+	@instance dword EAII_fileSize = 0;
+	@instance dword EAII_archivExtracted = 0;
+	@instance dword EAII_fileExtracted = 0;
+  */
+/*--------------------- MSG_EAI_INITIATE ---------------------
+ *      Aufgabe:	Archiv zur Anzeige bringen, innere Werte initialisieren
+ *      Parameter: 	void (char * archivName, dword toExtractSize )
+ ---------------------------------------------------------------------------*/
+@method ExtractArchiveInfoClass, MSG_EAI_INITIATE {
+  pself->EAII_archivSize = toExtractSize;
+  pself->EAII_fileSize = 0;
+  pself->EAII_archivExtracted = 0;
+  pself->EAII_fileExtracted = 0;
+
+
+  if ( archivName == 0 ) {
+	@send ExtractArchivNameText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send ExtractArchivProzentBar::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	}
+  else	{
+	@send ExtractArchivNameText::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send ExtractArchivProzentBar::MSG_GEN_SET_USABLE(VUM_NOW);
+	@call ExtractArchivNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(archivName,0);
+	}
+
+  @call ExtractFileText::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
+  @send ExtractFileProzentBar::MSG_BARGRAF_SET_VALUE(0);
+  @send ExtractArchivProzentBar::MSG_BARGRAF_SET_VALUE(0);
+  @send ExtractArchivProzentBar::MSG_BARGRAF_SET_MAXIMUM(toExtractSize);
+  @send ExtractStopTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+  @send oself::MSG_GEN_INTERACTION_INITIATE();
+  }
+
+/*--------------------- MSG_EAI_NEW_FILE ---------------------
+ *      Aufgabe:	neue Datei wird angezeigt
+ *	Parameter void ( char * fileName, dword fileSize )
+ ---------------------------------------------------------------------------*/
+@method ExtractArchiveInfoClass, MSG_EAI_NEW_FILE  {
+  pself->EAII_fileSize = fileSize;
+  pself->EAII_fileExtracted = 0;
+  @call ExtractFileText::MSG_VIS_TEXT_REPLACE_ALL_PTR(fileName,0);
+  @send ExtractFileProzentBar::MSG_BARGRAF_SET_VALUE(0);
+  @send ExtractFileProzentBar::MSG_BARGRAF_SET_MAXIMUM(fileSize);
+  }
+
+/*--------------------- MSG_EAI_BYTES_EXTRACTED ---------------------
+ *      Aufgabe:	Anzeigen eines neuen Prozentsatzes
+ *	Parameter 	void ( dword anz )
+ ---------------------------------------------------------------------------*/
+@method ExtractArchiveInfoClass, MSG_EAI_BYTES_EXTRACTED  {
+
+  pself->EAII_fileExtracted += anz;
+  pself->EAII_archivExtracted += anz;
+  if ( pself->EAII_fileSize ) {
+	@send ExtractFileProzentBar::MSG_BARGRAF_SET_VALUE(pself->EAII_fileExtracted);
+	}
+  if ( pself->EAII_archivSize ) {
+	@send ExtractArchivProzentBar::MSG_BARGRAF_SET_VALUE(pself->EAII_archivExtracted);
+	}
+  }
+
+/*--------------------- MSG_EAI_STOP ---------------------
+ *      Aufgabe:	Handler fÅr Stop-Schalter: break Extract!
+ ---------------------------------------------------------------------------*/
+@method ExtractArchiveInfoClass, MSG_EAI_STOP {
+  UserStandardSound(SST_NOTIFY);
+  cancelExtract = TRUE;
+  @send ExtractStopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+  }
+
+/*--------------------- MSG_EAI_ENDE ---------------------
+ *      Aufgabe:	Anzeige beenden
+ ---------------------------------------------------------------------------*/
+@method ExtractArchiveInfoClass, MSG_EAI_ENDE
+  {
+  @send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+  }

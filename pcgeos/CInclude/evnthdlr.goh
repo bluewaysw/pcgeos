@@ -1,0 +1,235 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Event Handler Library
+MODULE:		
+FILE:		evnthdlr.goh
+
+AUTHOR:		Brian Chin, Oct 11, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	10/11/96   	Initial version.
+
+DESCRIPTION:
+
+	
+
+	$Id: evnthdlr.goh,v 1.1 97/04/04 16:00:21 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __EVNTHDLR_GOH
+@define __EVNTHDLR_GOH
+
+@optimize
+@deflib evnthdlr
+
+#include <timer.h>
+
+/* ---------------------------------------------------------------------------
+ *	EventHandlerClass
+ * -------------------------------------------------------------------------*/
+
+@class	EventHandlerControlClass, GenControlClass;
+
+/* Internal messages */
+@message void MSG_EH_UPDATE_EVENT_LIST();
+@message void MSG_EH_SHOW_EVENT_SUMMARY();
+@message void MSG_EH_SHOW_EVENT_LIST_ITEM();
+@message void MSG_EH_EVENT_LIST_QUERY_MSG();
+@message void MSG_EH_EVENT_ACKNOWLEDGE();
+@message void MSG_EH_EVENT_ACTION();
+@message void MSG_EH_MODIFY_EVENT_MENU();
+
+typedef struct {
+    GeodeToken	SEI_eraToken;
+    word    	SEI_eraEventID;
+    word    	SEI_acknowledgeMessage;
+    word    	SEI_eventActionMessage;
+} SelectedEventInfo;
+
+@vardata SelectedEventInfo TEMP_EH_SELECTED_EVENT_INFO;
+
+@endc
+
+/*---------------------------------------------------------------------------
+ *	Exported functions
+ * -------------------------------------------------------------------------*/
+
+/*
+ * Event flags
+ */
+typedef WordFlags EventHandlerEventFlags;
+#define EHEF_ALARM  	    0x8000  	/* event is alarm */
+#define EHEF_PHONE_ICON	    0x4000  	/* phone can show icon for event */
+
+/*
+ * Return values for register routines
+ */
+typedef enum /* word */ {
+	EHRE_NO_ERROR,	    	/* event registered successfully */
+	EHRE_FILE_ERROR,    	/* error opening events file */
+	EHRE_INVALID_EVENT, 	/* date/time for outstanding event is
+				   earlier or equal to the current
+				   system date/time */
+	EHRE_RTCM_ERROR,    	/* other problem with registering outstanding
+				   event */
+	EHRE_EVENT_NOT_FOUND	/* tried to remove occurred or outstanding
+				   event that doesn't exists */
+} EHRError;
+
+/*
+ * prototype for messages sent to ERA
+ */
+@prototype void EVENT_HANDLER_ERA_MESSAGE(word eraEventID = cx);
+
+/*
+ * SYNOPSIS:    Add outstanding event.
+ * 		
+ * PASS:        EventHandlerEventFlags ehFlags - flags for event
+ *	    	TimerCompressedDate dueDate - date event will occur
+ *	    	word dueTime - time event will occur (high byte - hours
+ *	    	    	    	    	    	    	low byte - minutes)
+ *	    	GeodeToken *eraToken - GeodeToken of event raising application
+ *	    	word eraEventID - ERA-specific ID for event, sent with
+ *	    	    	    	    request to display summary dialog, or
+ *	    	    	    	    to execute event action
+ *	    	TCHAR *eventTitle - title of event to appear in event list
+ *	    	Bitmap *eventBitmap - bitmap for event to appear in event list
+ *	    	    	    	    	and event list button in title bar
+ *	    	word eventBitmapSize - byte size of Bitmap structure pointed
+ *	    	    	    	    	to by eventBitmap
+ *	    	TCHAR *summary - summary of event to display in event summary
+ *	    	    	    	    dialog
+ *	    	TCHAR *summaryTitle - title for event summary dialog 
+ *	    	Bitmap *summaryBitmap - bitmap for event summary dialog
+ *	    	word summaryBitmapSize - size of Bitmap structure pointed to
+ *	    	    	    	    	    by summaryBitmap
+ *	    	TCHAR *eventActionName - name of action button to appear in
+ *	    	    	    	    	    event summary dialog
+ *	    	word messageAcknowledge - sent to ERA process with eraEventID
+ *	    	    	    	    	when event occurs and user acknowledges
+ *	    	    	    	    	event
+ *	    	word messageEventAction - sent to ERA process with eraEventID
+ * 	    	    	    	    	when event occurs and user selects
+ *	    	    	    	    	action button in event summary dialog
+ *	    	word messageOccurs - sent to ERA process with eraEventID when
+ *	    	    	    	    	event occurs
+ *  
+ * RETURNS:     0 if successful, else EHRErrorcode
+ */
+extern EHRError _far _cdecl \
+    EventHandlerRegisterOutstandingEvent(EventHandlerEventFlags ehFlags,
+				     TimerCompressedDate dueDate,
+				     word dueTime,
+				     GeodeToken *eraToken,
+				     word eraEventID,
+				     TCHAR *eventTitle,
+				     Bitmap *eventBitmap,
+				     word eventBitmapSize,
+				     TCHAR *summary,
+				     TCHAR *summaryTitle,
+				     Bitmap *summaryBitmap,
+				     word summaryBitmapSize,
+				     TCHAR *eventActionName,
+				     word messageAcknowledge,
+				     word messageEventAction,
+				     word messageOccurs);
+
+/*
+ * SYNOPSIS:    Add occurred event.
+ * 		
+ * PASS:        EventHandlerEventFlags ehFlasg - flags for event
+ *	    	GeodeToken *eraToken - GeodeToken of event raising application
+ *	    	word eraEventID - ERA-specific ID for event, sent with
+ *	    	    	    	    request to display summary dialog, or
+ *	    	    	    	    to execute event action
+ *	    	TCHAR *eventTitle - title of event to appear in event list
+ *	    	Bitmap *eventBitmap - bitmap for event to appear in event list
+ *	    	    	    	    	and event list button in title bar
+ *	    	word eventBitmapSize - byte size of Bitmap structure pointed
+ *	    	    	    	    	to by eventBitmap
+ *	    	TCHAR *summary - summary of event to display in event summary
+ *	    	    	    	    dialog
+ *	    	TCHAR *summaryTitle - title for event summary dialog 
+ *	    	Bitmap *summaryBitmap - bitmap for event summary dialog
+ *	    	word summaryBitmapSize - size of Bitmap structure pointed to
+ *	    	    	    	    	    by summaryBitmap
+ *	    	TCHAR *eventActionName - name of action button to appear in
+ *	    	    	    	    	    event summary dialog
+ *	    	word messageAcknowledge - sent to ERA process with eraEventID
+ *	    	    	    	    	when event occurs and user acknowledges
+ *	    	    	    	    	event
+ *	    	word messageEventAction - sent to ERA process with eraEventID
+ *	    	    	    	    	when event occurs and user selects
+ *	    	    	    	    	action button in event summary dialog
+ *  
+ * RETURNS:     0 if successful, else EHRError code
+ */
+extern EHRError _far _cdecl \
+    EventHandlerRegisterOccurredEvent(EventHandlerEventFlags ehFlags,
+				  GeodeToken *eraToken,
+				  word eraEventID,
+				  TCHAR *eventTitle,
+				  Bitmap *eventBitmap,
+				  word eventBitmapSize,
+				  TCHAR *summary,
+				  TCHAR *summaryTitle,
+				  Bitmap *summaryBitmap,
+				  word summaryBitmapSize,
+				  TCHAR *eventActionName,
+				  word messageAcknowledge,
+				  word messageEventAction);
+
+/*
+ * SYNOPSIS:	Remove outstanding event.
+ *
+ * PASS:    	GeodeToken *eraToken - GeodeToken of ERA
+ *	    	word eraEventID - ERA-specific ID for event
+ *
+ * RETURNS: 	0 if sucessful, else EHRError code
+ */
+extern EHRError _far _cdecl \
+    EventHandlerRemoveOutstandingEvent(GeodeToken *eraToken, word eraEventID);
+
+/*
+ * SYNOPSIS:	Remove occurred event.
+ *
+ * PASS:    	GeodeToken *eraToken - GeodeToken of ERA
+ *	    	word eraEventID - ERA-specific ID for event
+ *
+ * RETURNS: 	0 if sucessful, else EHRError code
+ */
+extern EHRError _far _cdecl \
+    EventHandlerRemoveOccurredEvent(GeodeToken *eraToken, word eraEventID);
+
+#ifdef __HIGHC__
+pragma Alias(EventHandlerRegisterOutstandingEvent, "EVENTHANDLERREGISTEROUTSTANDINGEVENT");
+pragma Alias(EventHandlerRegisterOccurredEvent, "EVENTHANDLERREGISTEROCCURREDEVENT");
+pragma Alias(EventHandlerRemoveOutstandingEvent, "EVENTHANDLERREMOVEOUTSTANDINGEVENT");
+pragma Alias(EventHandlerRemoveOccurredEvent, "EVENTHANDLERREMOVEOCCURREDEVENT");
+#endif
+
+/* 
+ * Unlike _pascal APIs, which are assumed by BCC to be all uppercase, 
+ * _cdecl APIs are case sensitive. If we don't define these, we will end up
+ * calling ASM routines directly.
+ */
+#ifdef __BORLANDC__
+#define EventHandlerRegisterOutstandingEvent EVENTHANDLERREGISTEROUTSTANDINGEVENT
+#define EventHandlerRegisterOccurredEvent EVENTHANDLERREGISTEROCCURREDEVENT
+#define EventHandlerRemoveOutstandingEvent EVENTHANDLERREMOVEOUTSTANDINGEVENT
+#define EventHandlerRemoveOccurredEvent EVENTHANDLERREMOVEOCCURREDEVENT
+#endif
+
+@endlib
+
+@endif

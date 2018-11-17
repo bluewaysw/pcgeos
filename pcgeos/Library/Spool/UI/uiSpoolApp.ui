@@ -1,0 +1,181 @@
+/*****************************************************************************
+ * Project:	PC GEOS
+ * Module:	Spool
+ * File:	UI/uiSpoolApp.ui
+ *
+ * Author:	Jim DeFrisco
+ *
+ *	This file contains the user interface description for the application
+ *	part of the spooler
+ *
+ *	$Id: uiSpoolApp.ui,v 1.1 97/04/07 11:10:40 newdeal Exp $
+ *
+ *****************************************************************************/
+
+
+/****************************************
+ * Class definitions
+ ****************************************/
+
+class	SpoolApplication = GenApplication {
+}
+
+class	SpoolEMOM = EMObjectManager {
+}
+
+/****************************************
+ * The Spool app resource
+ ****************************************/
+
+start	SpoolAppUI;
+
+spoolAppObj = SpoolApplication {
+#if	_CONTROL_PANEL
+	children = PrinterControlPanel;
+#endif
+	moniker = list {
+		SpoolTextMoniker
+	}
+	genAttributes = default -targetable;
+	appState = default +avoidTransparentDetach, +notUserInteractable,
+			   -focusable, -modelable;
+#if	_CONTROL_PANEL
+	active_list = spoolEMOM;
+#endif
+}
+
+visMoniker SpoolTextMoniker = "PC GEOS Spooler";
+
+#if	_CONTROL_PANEL
+spoolEMOM = SpoolEMOM {
+	classes = data {
+		EMOMBeginClassArray	1
+		EMOMDefClass	EMTriggerClass, \
+				CEMCIF_CONTROL_PANEL, \
+				CEMCIP_SPOOL_CONTROL_PANEL, \
+				00
+	}
+}
+#endif	
+
+end 	SpoolAppUI;
+
+
+#if _PRINTING_DIALOG
+
+start	PrintDialogUI;
+
+PrintingDialogBox = GenInteraction {
+	moniker = "Printing Progress";
+	children =
+		PDPrintingGlyph,
+		PDCancelledGlyph,
+		PDCancelTrigger,
+#if !_NO_PAUSE_RESUME_UI
+		PDPausedGlyph,
+		PDPauseTrigger,
+		PDResumeTrigger,
+#endif
+		PDExplanation,
+		PDChoice,
+		PDCloseTrigger;
+	genStates = default -usable;
+	attributes = default +notUserInitiatable, +sysModal;
+	type = organizational;
+	visibility = dialog;
+	hints = {
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+PDPrintingGlyph = GenGlyph {
+	moniker = "Printing in progress, please wait...";
+}
+
+PDCancelledGlyph = GenGlyph {
+	moniker  = "Printing is being cancelled, please wait...";
+	genStates = default -usable;
+}
+
+PDExplanation = GenText {
+	text = "\\\rYou can cancel printing at any point by clicking on the \\\"Cancel Printing\\\" button, or you can allow printing to continue while you do other work by clicking on the \\\"Close\\\" button.\\\r\\\rIf you later decide you want to cancel printing, you can do so by clicking on the \\\"Printer Status\\\" button located in the Computer Utilities area.";
+	genAttributes = default +readOnly;
+    	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_75>
+			SpecHeight <>
+		}
+	}
+}
+
+PDChoice = GenBooleanGroup ignoreDirty {
+	children =
+		PDChoiceNeverAgain;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+PDChoiceNeverAgain = GenBoolean ignoreDirty {
+	moniker = "Don't Show this Screen Again";
+	identifier = 1;
+}
+
+PDCancelTrigger = GenTrigger {
+ 	moniker = "VMO_CANCEL", "Cancel Printing";
+	/* We do not need to specify any vardata for this object, even
+	 * though the message requires our OD to be passed in CX:DX,
+	 * because the system automatically sends that information. */
+	action = MSG_SPOOL_KILL_FIRST_JOB, process;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+#if !_NO_PAUSE_RESUME_UI
+PDPausedGlyph = GenGlyph {
+	moniker = "Printing is paused. Press Resume to continue.";
+	genStates = default -usable;
+}
+
+PDPauseTrigger = GenTrigger {
+	moniker = 'P', "Pause";
+	/* We do not need to specify any vardata for this object, even
+	 * though the message requires our OD to be passed in CX:DX,
+	 * because the system automatically sends that information. */
+	action = MSG_SPOOL_PAUSE_FIRST_JOB, process;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+PDResumeTrigger = GenTrigger {
+	genStates = default -usable;
+	moniker = 'R', "Resume";
+	/* We do not need to specify any vardata for this object, even
+	 * though the message requires our OD to be passed in CX:DX,
+	 * because the system automatically sends that information. */
+	action = MSG_SPOOL_PAUSE_FIRST_JOB, process;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+#endif /* !_NO_PAUSE_RESUME_UI */
+
+PDCloseTrigger = GenTrigger {
+	CLOSE_TRIGGER_VALUES
+	action = MSG_GEN_INTERACTION_ACTIVATE_COMMAND, PrintingDialogBox;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+		    word    IC_DISMISS
+		}
+	}
+}
+
+end	PrintDialogUI;
+
+#endif	/* #if _PRINTING_DIALOG */

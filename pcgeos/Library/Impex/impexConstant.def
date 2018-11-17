@@ -1,0 +1,286 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Impex
+FILE:		impexConstant.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	3/91		Initial version
+
+DESCRIPTION:
+	This file contains constants global to the Impexer
+
+	$Id: impexConstant.def,v 1.1 97/04/05 00:55:36 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+;------------------------------------------------------------------------------
+;  FULL_EXECUTE_IN_PLACE : Indicates that the impex lib is going to
+;       be used in a system where all geodes (or most, at any rate)
+;       are to be executed out of ROM.  
+;------------------------------------------------------------------------------
+ifndef FULL_EXECUTE_IN_PLACE
+        FULL_EXECUTE_IN_PLACE           equ     FALSE
+endif
+
+;------------------------------------------------------------------------------
+;  The .GP file only understands defined/not defined;
+;  it can not deal with expression evaluation.
+;  Thus, for the TRUE/FALSE conditionals, we define
+;  GP symbols that _only_ get defined when the
+;  condition is true.
+;-----------------------------------------------------------------------------
+if      FULL_EXECUTE_IN_PLACE
+        GP_FULL_EXECUTE_IN_PLACE        equ     TRUE
+endif
+
+;------------------------------------------------------------------------------
+; True to allow floppy based libs.  A warning -- some things are probably
+; hard coded, and there's at least one bug with mapping being lost because
+; of the two-dialog box format.
+;------------------------------------------------------------------------------
+ALLOW_FLOPPY_BASED_LIBS			equ	FALSE
+
+
+;------------------------------------------------------------------------------
+; ANNOUNCE_NO_IDEA_FORMAT : True to announce the type of file format after
+; the user has done an import via "No Idea". Not really useful if only a
+; small number of formats are supported.
+;------------------------------------------------------------------------------
+ifdef	ANNOUNCE_NO_IDEA_FORMAT
+	_ANNOUNCE_NO_IDEA_FORMAT	equ	TRUE
+else
+	_ANNOUNCE_NO_IDEA_FORMAT	equ	FALSE
+endif
+
+
+;------------------------------------------------------------------------------
+; Feature constants defined in Include/product.def.
+;------------------------------------------------------------------------------
+FeatureFlag	_DOS_LONG_NAME_SUPPORT, FALSE
+
+
+
+;------------------------------------------------------------------------------
+;		Structures that make up the FormatInfo structure
+;------------------------------------------------------------------------------
+
+; ImpexLibraryDescriptor and its associated structures
+;
+SBCS <ImpexFileName	type	 FILE_LONGNAME_BUFFER_SIZE dup (char)>
+DBCS <ImpexFileName	type	 FILE_LONGNAME_BUFFER_SIZE/2 dup (wchar)>
+
+ImpexLibraryDescriptor	struct
+    ILD_fileName 	ImpexFileName   <>	; file name of library
+ImpexLibraryDescriptor	ends
+
+
+; Impex FormatDescriptor and its associated structures
+;
+IMPEX_FILE_MASK_STRING_LENGTH	equ 12
+
+SBCS <ImpexFileMask	type   IMPEX_FILE_MASK_STRING_LENGTH dup (char)>
+DBCS <ImpexFileMask	type   IMPEX_FILE_MASK_STRING_LENGTH dup (wchar)>
+
+ImpexFormatDescriptor	struct
+    IFD_library		lptr.ImpexLibraryDescriptor
+    IFD_defaultFileMask	ImpexFileMask		; pointer to file specification
+    IFD_importUIFlag	hptr			; unrelocated import UI
+    IFD_exportUIFlag	hptr			; unrelocated export UI
+    IFD_formatNumber	word			; format number within library
+    IFD_dataClass	ImpexDataClasses	; data class for this format
+    IFD_formatNameLen	word			; length of format name 
+if DBCS_PCGEOS
+    IFD_formatName	label	wchar 		; name of this format
+else
+    IFD_formatName	label	char 		; name of this format
+endif
+ImpexFormatDescriptor	ends
+
+
+; FormatInfo block (an LMem block) is built out by a FormatListClass object,
+; and stores all available translation libraries & formats conforming to
+; the request ImpexDataClasses
+;
+FormatInfo		struct
+    FI_header		LMemBlockHeader         ; Common stuff
+    FI_libraries	lptr.ChunkArrayHeader 	; Array of lptrs to
+                                                ; ImpexLibraryDescriptor
+    FI_formats		lptr.ChunkArrayHeader   ; Array of lptrs to
+                                                ; ImpexFormatDescriptor
+FormatInfo		ends
+
+
+
+;------------------------------------------------------------------------------
+;		ImpexThreadInfo structures
+;------------------------------------------------------------------------------
+
+ImpexThreadAction	etype	byte, 0, 1
+    ITA_IMPORT		enum	ImpexThreadAction
+    ITA_EXPORT		enum	ImpexThreadAction
+
+ImpexThreadState	record
+    ITS_IMPORTING_NO_IDEA:1			; the user chose No Idea
+						;  but we think we've figured
+						;  out the format
+    ITS_WILL_ANNOUNCE_FORMAT:1			; import using No Idea
+						;  has succeeded, so we'll
+						;  tell user the format
+    ITS_ERROR:1					; an error occurred during
+						;  import or export
+    ITS_THREAD_DETACHING:1			; the thread is detaching
+    ITS_APP_DETACHING:1				; the application is detaching
+
+    ITS_TRANSPARENT_IMPORT_EXPORT:1		; we're transparently doing an
+						;  import or export (via the
+						;  DocumentControl)
+
+    ITS_ACTION		ImpexThreadAction:1	; importing or exporting?
+ImpexThreadState	end
+
+; ImpexThreadInfo contains all the non-changeable information that a spawned
+; Thread will need to complete its translation	
+;
+ImpexThreadInfo		struct
+    ; These are filled in/used by the ImpexThreadProcess during import/export
+    ;
+    ITI_inputIgnored	BooleanByte		; input has been ignored
+    ITI_notifyDialog	optr			; OD of notify dialog box
+    ITI_srcDestFile	hptr			; file handle for above
+    ITI_libraryHandle	hptr			; handle of library in use
+    ITI_formatOptions	hptr			; block holding format options
+    ITI_xferVMFile	hptr			; VM file handle of xfer format
+    ITI_xferVMFileName	FileLongName		; name of above
+
+    ; These are initialized by the Import/ExportControlClass object
+    ;
+    ITI_handle		hptr			; self-referencing block handle
+    ITI_state		ImpexThreadState	; cleanup state data
+    ITI_ignoreInput	BooleanByte		; TRUE (hold up input) or FALSE
+    ITI_libraryDesc	ImpexLibraryDescriptor
+    ITI_formatDesc	ImpexFormatDescriptor
+    ITI_formatUI	hptr			; block holding format UI
+    ITI_appObject	optr			; OD of application object
+    ITI_impexOD		optr			; Import/ExportControlClass OD
+    ITI_pathBuffer	PathName		; path for import or export file
+    ITI_pathDisk	hptr			; disk handle for path
+    ITI_notifySource	optr			; OD of "source" notify box
+    ITI_appDest		optr			; import/export destination OD
+    ITI_appMessage	word			; message to send to above OD
+    ITI_srcDestName	FileLongName		; source file name if import
+						; output file name if export
+    ITI_formatName	label	char		; format name if No Idea import
+ImpexThreadInfo		ends
+
+
+
+;------------------------------------------------------------------------------
+;		ImpexError enumeration
+;------------------------------------------------------------------------------
+
+ImpexError					etype	word, 0, 4
+IE_INSUFFICIENT_MEMORY				enum	ImpexError
+
+IE_COULD_NOT_OPEN_XLIB				enum	ImpexError
+IE_COULD_NOT_LOAD_XLIB				enum	ImpexError
+IE_ERROR_READING_XLIB				enum	ImpexError
+IE_ERROR_INVALID_XLIB				enum	ImpexError
+
+IE_FILE_ALREADY_EXISTS				enum	ImpexError
+IE_FILE_ALREADY_OPEN				enum	ImpexError
+IE_TOO_MANY_OPEN_FILES				enum	ImpexError
+IE_FILE_MISC_ERROR				enum	ImpexError
+
+IE_FILE_WRITE_PROTECTED				enum	ImpexError
+IE_FILE_NO_DISK_SPACE				enum	ImpexError
+
+IE_BAD_FILE_PATH				enum	ImpexError
+IE_COULD_NOT_CREATE_VM_FILE			enum	ImpexError
+IE_COULD_NOT_SPAWN_THREAD			enum	ImpexError
+
+IE_MAP_SOURCE_FIELD_ERROR			enum	ImpexError
+IE_MAP_DEST_FIELD_ERROR				enum	ImpexError
+IE_MAP_NO_MAP_ENTRY_ERROR			enum	ImpexError
+
+IE_NO_IDEA_FORMAT				enum	ImpexError
+IE_ANNOUNCING_FORMAT				enum	ImpexError
+
+IE_INVALID_FILE_NAME				enum	ImpexError
+
+IE_NO_FORMATS_AVAILABLE				enum	ImpexError
+
+IE_TRANSPARENT_NO_IDEA_FORMAT			enum	ImpexError
+
+if FLOPPY_BASED_DOCUMENTS
+IE_IMPORT_SOURCE_FILE_TOO_LARGE			enum	ImpexError
+endif
+
+
+;------------------------------------------------------------------------------
+;		Flags to pass when putting up a dialog box.
+;------------------------------------------------------------------------------
+
+IMPEX_ERROR	equ ((GIT_NOTIFICATION shl offset CDBF_INTERACTION_TYPE) or \
+		      (CDT_ERROR shl offset CDBF_DIALOG_TYPE))
+
+IMPEX_NOTIFICATION	equ ((GIT_NOTIFICATION \
+				shl offset CDBF_INTERACTION_TYPE) or \
+		      	      (CDT_NOTIFICATION shl offset CDBF_DIALOG_TYPE))
+
+IMPEX_QUESTION	equ ((GIT_AFFIRMATION shl offset CDBF_INTERACTION_TYPE) or \
+		      (CDT_QUESTION shl offset CDBF_DIALOG_TYPE))
+
+
+;------------------------------------------------------------------------------
+;		Fatal Errors
+;------------------------------------------------------------------------------
+
+ILLEGAL_IMPEX_DATA_CLASSES				enum	FatalErrors
+; The ImpexDataClasses which were passed with
+; MSG_IMPORT_CONTROL_SET_DATA_CLASSES or MSG_EXPORT_CONTROL_SET_DATA_CLASSES
+; are invalid.
+;
+ILLEGAL_IMPEX_ERROR_PASSED				enum	FatalErrors
+; The ImpexError which was passed to LockImpexError is invalid.
+;
+IMPEX_PASSED_NO_ERROR_TO_DISPLAY_TRANS_ERROR		enum	FatalErrors
+; The TransError passed to DisplayTransError was TE_NO_ERROR.
+;
+IMPEX_PASSED_ILLEGAL_TRANS_ERROR			enum	FatalErrors
+; The TransError passed to DisplayTransError was invalid.
+;
+IMPEX_INVALID_ARG_PASSED_TO_CREATE_TEMP_FILE		enum	FatalErrors
+; Either ImpexCreateTempFile or ImpexDeleteTempFile was called without
+; either IMPEX_TEMP_VM_FILE or IMPEX_TEMP_NATIVE_FILE being passed.
+;
+IMPEX_IF_TRANS_ERROR_THEN_ALSO_NO_IDEA_FORMAT		enum	FatalErrors
+; Some translation library's TransGetFormat routine returned a TransError
+; in AX without also returning NO_IDEA_FORMAT in CX, as it is required
+; to do.
+;
+TRANSLATION_LIB_RETURNED_BOGUS_FORMAT_NUMBER		enum	FatalErrors
+; Some translation library's TransGetFormat routine returned a format
+; number, indicating that it recognized the format of the source file;
+; however, none of the formats defined for that library have this number.
+;
+IMPORT_CONTROL_ILLEGAL_ATTRS				enum	FatalErrors
+; The ImportControlAttrs which were passed with
+; MSG_IMPORT_CONTROL_SET_ATTRS are invalid.
+;
+EXPORT_CONTROL_ILLEGAL_ATTRS				enum	FatalErrors
+; The ExportControlAttrs which were passed with
+; MSG_EXPORT_CONTROL_SET_ATTRS are invalid.
+;
+IMPEX_THREAD_LIST_HANDLE_MUST_EXIST_TO_UNLOCK		enum	FatalErrors
+; Either ThreadListPLock or ThreadListUnlockV was called when the
+; threadList variable in dgroup was zero.
+;
+IMPEX_NECESSARY_CONTROL_FEATURE_MISSING			enum	FatalErrors
+; Either the ImportControl or the ExportControl is missing its
+; FileSelector or its FormatList.
+;

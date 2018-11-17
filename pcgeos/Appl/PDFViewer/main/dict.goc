@@ -1,0 +1,94 @@
+//========================================================================
+//
+// Dict.cc
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifdef __GNUC__
+#pragma implementation
+#endif
+
+@include "pdfvu.goh"
+#include <Ansi/string.h>
+@include "obj.goh"
+@include "xref.goh"
+@include "diction.goh"
+
+//------------------------------------------------------------------------
+// Dict
+//------------------------------------------------------------------------
+
+void DictInit(Dict *dict) {
+  dict->entries = NULL;
+  dict->size = dict->length = 0;
+  dict->ref = 1;
+}
+
+void DictFree(Dict *dict) {
+  long i;
+
+  for (i = 0; i < dict->length; ++i) {
+    gfree(dict->entries[i].key);
+    ObjFree(&dict->entries[i].val);
+  }
+  gfree(dict->entries);
+}
+
+void DictAdd(Dict *dict, char *key, Obj *val) {
+  if (dict->length + 1 > dict->size) {
+    dict->size += 8;
+    dict->entries = (DictEntry *)grealloc(dict->entries, dict->size * sizeof(DictEntry));
+  }
+  dict->entries[dict->length].key = key;
+  ObjCopy(&dict->entries[dict->length].val, val);
+  ++dict->length;
+}
+
+DictEntry *DictFind(Dict *dict, char *key) {
+  long i;
+
+  for (i = 0; i < dict->length; ++i) {
+    if (!strcmp(key, dict->entries[i].key))
+      return &dict->entries[i];
+  }
+  return NULL;
+}
+
+GBool DictIs(Dict *dict, char *type) {
+  DictEntry *e;
+
+  return (e = DictFind(dict, "Type")) && isNameSame(&e->val, type);
+}
+
+void DictLookup(Dict *dict, char *key, Obj *obj, XRef *xref) {
+  DictEntry *e;
+
+  (e = DictFind(dict, key)) ? ObjFetch(obj, &e->val, xref) : initNull(obj);
+}
+
+void DictLookupNF(Dict *dict, char *key, Obj *obj) {
+  DictEntry *e;
+
+  (e = DictFind(dict, key)) ? ObjCopy(obj, &e->val) : initNull(obj);
+}
+
+char *DictGetKey(Dict *dict, long i) {
+  return dict->entries[i].key;
+}
+
+void DictGetVal(Dict *dict, long i, Obj *obj, XRef *xref) {
+  ObjFetch(obj, &dict->entries[i].val, xref);
+}
+
+void DictGetValNF(Dict *dict, long i, Obj *obj) {
+  ObjCopy(obj, &dict->entries[i].val);
+}
+
+  // Reference counting.
+  long DictIncRef(Dict *dict) { return ++dict->ref; }
+  long DictDecRef(Dict *dict) { return --dict->ref; }
+
+  // Get number of entries.
+  long DictGetLength(Dict *dict) { return dict->length; }

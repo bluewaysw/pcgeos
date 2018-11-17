@@ -1,0 +1,197 @@
+/***********************************************************************
+ *
+ *      Copyright (c) Geoworks 1996 -- All Rights Reserved.
+ *
+ * PROJECT:	Sample Applications
+ * MODULE:	GenGlyph test
+ * FILE:	glyph.goc
+ *
+ * AUTHOR:	Tony Requist: April 1, 1991
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    4/1/91          Initial version
+ *      NF      9/18/96         Changed "ChunkOf" to "OptrToChunk"
+ *
+ * DESCRIPTION:
+ *      This file source code for the GenGlyph sample application.
+ *      This application shows the usage of a GenGlyph UI object
+ *      [Obj 6]. A GenGlyph is a simple UI object used most often to
+ *      only display a visual moniker.
+ *
+ *
+ * RCS STAMP:
+ *	$Id: glyph.goc,v 1.1 97/04/04 16:37:10 newdeal Exp $
+ *
+ **********************************************************************/
+
+/*
+ ***********************************************************************
+ *		Include files
+ ***********************************************************************
+ */
+
+@include <stdapp.goh>
+
+/*
+ ***********************************************************************
+ *		Class & Message Definitions
+ ***********************************************************************
+ */
+
+
+@class GlyphProcessClass, GenProcessClass;
+
+@message void MSG_GPC_CHANGE_MONIKER();
+/* Changes MyGlyph */
+
+@endc;
+
+@classdecl GlyphProcessClass, neverSaved;
+
+/*
+ ***********************************************************************
+ *		UI Objects
+ ***********************************************************************
+ */
+
+@start AppResource;
+
+@object GenApplicationClass GlyphApp = {
+    GI_visMoniker = list { @GlyphTextMoniker };
+    GI_comp = @GlyphPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @GlyphPrimary;
+}
+
+@visMoniker GlyphTextMoniker = "C Glyph Sample Application";
+
+@end AppResource;
+
+  /* This resource is for misc UI objects. */
+@start	Interface;
+
+@object GenPrimaryClass GlyphPrimary  = {
+    GI_comp = @MyGlyph,
+              @ChangeGlyph;
+}
+
+@object GenGlyphClass MyGlyph = {
+    /*
+     * The moniker for the glyph display.  The GenGlyph's role in life is to
+     * display this moniker. The moniker is defined outside the object so
+     * we have a label for it when we go changing the moniker.
+     */
+    GI_visMoniker = list { @Moniker1 };
+}
+
+@visMoniker Moniker1 = "What do we want?";
+@visMoniker Moniker2 = "Functionality!";
+@visMoniker Moniker3 = "When do we want it?";
+@visMoniker Moniker4 = "Now!";
+
+@object GenTriggerClass ChangeGlyph = {
+      /*
+       * This trigger sends out the message that changes the moniker for
+       * MyGlyph. The moniker of this trigger will also change with each
+       * action.
+       */
+    GI_visMoniker = list { @AnswerMoniker };
+    GTI_actionMsg = MSG_GPC_CHANGE_MONIKER;
+    GTI_destination = process;
+}
+
+@visMoniker AnswerMoniker = "Answer";
+@visMoniker QuestionMoniker = "Question";
+
+@end Interface;
+
+/*
+ ***********************************************************************
+ *		Code for GlyphProcessClass
+ ***********************************************************************
+ */
+
+/***********************************************************************
+ *		MSG_GPC_CHANGE_MONIKER for GlyphProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:		This message Changes the moniker for MyGlyph,
+ *			cyclying through the labels for MyGlyph's
+ *			other monikers.
+ *
+ * PARAMETERS:		None.
+ *
+ * SIDE EFFECTS:	This message also changes the moniker for the
+ *			trigger associated with this action, to update
+ *			what type of response will be elicidated
+ *			within the MyGlyph.
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	chris	1/8/92		Initial Revision
+ *
+ **********************************************************************/
+@method GlyphProcessClass, MSG_GPC_CHANGE_MONIKER {
+    ChunkHandle oldGlyphMoniker;
+    ChunkHandle newGlyphMoniker;
+    ChunkHandle newTriggerMoniker;
+
+    /* Retrieve the current visual moniker for MyGlyph
+     * and change monikers based on that value.Swap between
+     * one moniker or the other. For fun, we'll change the
+     * trigger's moniker as well.
+     */
+
+    oldGlyphMoniker = @call MyGlyph::MSG_GEN_GET_VIS_MONIKER();
+
+    /* Since all of these monikers reside in the same chunk, their
+     * individual ChunkHandles are unique. Upon startup, however, the
+     * ChunkHandle returned by MSG_GEN_GET_VIS_MONIKER may point to
+     * the start of a moniker *list* and not the actual moniker. If
+     * this is the case, the actual moniker in use is Moniker1 so we
+     * switch it to Moniker2.
+     * This code merely cycles through the monikers we have set up.
+     * Upon encountering the fourth moniker MyGlyph switches to use
+     * the first moniker.
+     */
+    if (OptrToChunk(@Moniker1) == oldGlyphMoniker) {
+      newGlyphMoniker = OptrToChunk(@Moniker2);
+      newTriggerMoniker = OptrToChunk(@QuestionMoniker);
+
+    }
+    else if (OptrToChunk(@Moniker2) == oldGlyphMoniker) {
+      newGlyphMoniker = OptrToChunk(@Moniker3);
+      newTriggerMoniker = OptrToChunk(@AnswerMoniker);
+
+    }
+    else if (OptrToChunk(@Moniker3) == oldGlyphMoniker) {
+      newGlyphMoniker = OptrToChunk(@Moniker4);
+      newTriggerMoniker = OptrToChunk(@QuestionMoniker);
+
+    }
+    else if (OptrToChunk(@Moniker4) == oldGlyphMoniker) {
+      newGlyphMoniker = OptrToChunk(@Moniker1);
+      newTriggerMoniker = OptrToChunk(@AnswerMoniker);
+    }
+    /* This is the catch-all case, necessary because the
+     * application begins with the ChunkHandle pointing to
+     * the list of monikers and not the actual Moniker1.
+     */
+    else {
+      newGlyphMoniker = OptrToChunk(@Moniker2);
+      newTriggerMoniker = OptrToChunk(@QuestionMoniker);
+    }
+
+
+    /* Change the monikers. We'll delay the first one to
+     * ensure they both get updated together.
+     */
+    @call MyGlyph::MSG_GEN_USE_VIS_MONIKER(newGlyphMoniker,
+                                           VUM_DELAYED_VIA_APP_QUEUE);
+    @call ChangeGlyph::MSG_GEN_USE_VIS_MONIKER(newTriggerMoniker, VUM_NOW);
+} /* MSG_GPC_CHANGE_MONIKER */
+

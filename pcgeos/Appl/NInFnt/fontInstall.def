@@ -1,0 +1,447 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		(Generic) Font Installation
+FILE:		fontInstall.def
+
+AUTHOR:		John D. Mitchell
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	91.04.12	Initial version
+	JDM	91.04.25	Added style, weight, FontID.
+	JDM	91.05.14	Added list handle instance data.
+	JDM	91.05.20	Normalized the Style & Weight strings.
+	JDM	91.05.28	Added many new strings to the tables.
+	JDM	91.05.29	Added more new strings to the tables.
+	JDM	91.06.04	Added EC code.
+
+DESCRIPTION:
+	This file contains the assembly class, structure type, and
+	the font style & weight string/attribute definitions for
+	font installation.
+
+	$Id: fontInstall.def,v 1.1 97/04/04 16:16:42 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Fatal Error Constants
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+STRING_NOT_TERMINATED	enum	FatalErrors
+STRING_CANT_BE_NULL	enum	FatalErrors
+CANT_LOCK_GLOBAL_BLOCK	enum	FatalErrors
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Constant Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; MaxFontNameLength is the maximum number of characters (including
+; terminator) that is valid for a font name string.
+;
+MAX_FONT_NAME_LENGTH	EQU	(20)
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Dynamic GenList for Font Installation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FontInstallListClass	class	GenListClass
+
+;
+; FontInfoBlockHandle contains the handle to the global block that
+; holds all of the font information.
+FIL_fontInfoBlockHandle hptr
+
+;
+; FontInfoArrayHandle contains the handle to the dynamically
+; allocated chunk array that will be filled with the FontConvertEntrys'.
+;
+FIL_fontInfoArrayHandle lptr
+
+;
+; FontNumElements contains the count of valid elements in the
+; above chunk array.
+;
+FIL_fontNumElements	word
+
+;
+; ListHandle contains the handle of the list object.
+;
+FIL_listHandle	word
+
+;
+; METHOD DEFINITIONS:  these methods are defined for this class.
+;
+METHOD_FONT_INSTALL_LIST_INIT			method
+METHOD_FONT_INSTALL_LIST_KILL			method
+METHOD_FONT_INSTALL_LIST_PUT_ENTRY		method
+METHOD_FONT_INSTALL_LIST_SET_SELECTED_FONT	method
+METHOD_FONT_INSTALL_LIST_GET_SELECTED_FONT	method
+METHOD_FONT_INSTALL_LIST_GET_FONT_NAME		method
+METHOD_FONT_INSTALL_LIST_SET_FONT_NAME		method
+METHOD_FONT_INSTALL_LIST_SET_SELECTED_FONT_NAME	method
+METHOD_FONT_INSTALL_LIST_CONVERT_SELECTED_FONT	method
+
+
+FontInstallListClass	endc
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Structure Types
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	FontThreadInfoEntry	contains the filename of the font file
+			that contains the named font.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FontThreadInfoEntry	struc
+	FTIE_infoBlock		hptr		; Global block handle.
+	FTIE_arrayHandle	hptr		; Chunk Array handle.
+	FTIE_currItem		word		; Selected array entry.
+FontThreadInfoEntry	ends
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	FontInfoEntry	contains the filename of the font file
+			that contains the named font.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FontInfoEntry	struc
+	FIE_font	fptr			; Font name.
+	FIE_file	fptr			; Font file name (8.3).
+	FIE_weight	fptr			; Font weight.
+;
+;	This field is *only* for List internal use!
+;
+	FIE_normFont	lptr			; Normalized font name.
+FontInfoEntry	ends
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Font Style & Weight String Tables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	FontStringAttributeEntry	is a word-sized union containing
+			either a TextStyles or FontWeight descriptor.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FontStringAttributeEntry	union
+	FSAE_word	word			; Word sized union.
+	FSAE_textStyle	TextStyles		; Text style.
+	FSAE_fontWeight FontWeight		; Font weight.
+FontStringAttributeEntry	end
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	FontStringAttrTableEntry	contains the generic definitions
+			for the string lmem pointer and associated word
+			sized attribute value.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FontStringAttrTableEntry	struc
+	FSATE_string	lptr				; Lmem block.
+	FSATE_attribute FontStringAttributeEntry	; Style/weight.
+FontStringAttrTableEntry	ends
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	FontInstallStyleData	contains the string chunks for each of
+			the style identifier words and there associated
+			TextStyles descriptor.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FontInstallStyleData	segment lmem	LMEM_TYPE_GENERAL
+
+StyleStringAttrTable	chunk
+	FontStringAttrTableEntry		\
+		<				\
+		DemiStyleString1,		\
+		<FSAE_word 0>			\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		DemiStyleString2,		\
+		<FSAE_word 0>			\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		SemiStyleString1,		\
+		<FSAE_word 0>			\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		SemiStyleString2,		\
+		<FSAE_word 0>			\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		BlackStyleString1,		\
+		<FSAE_textStyle mask ST_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		BlackStyleString2,		\
+		<FSAE_textStyle mask ST_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		BoldStyleString1,		\
+		<FSAE_textStyle mask ST_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		BoldStyleString2,		\
+		<FSAE_textStyle mask ST_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		ItalicStyleString1,		\
+		<FSAE_textStyle mask ST_ITALIC> \
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		ItalicStyleString2,		\
+		<FSAE_textStyle mask ST_ITALIC> \
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		OutlineStyleString1,		\
+		<FSAE_textStyle mask ST_OUTLINE>\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		OutlineStyleString2,		\
+		<FSAE_textStyle mask ST_OUTLINE>\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		HeavyFaceStyleString1,		\
+		<FSAE_textStyle mask ST_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		HeavyFaceStyleString2,		\
+		<FSAE_textStyle mask ST_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		HeavyStyleString1,		\
+		<FSAE_textStyle mask ST_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		HeavyStyleString2,		\
+		<FSAE_textStyle mask ST_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		DemiStyleString3,		\
+		<FSAE_word 0>			\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		DemiStyleString4,		\
+		<FSAE_word 0>			\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		SemiStyleString3,		\
+		<FSAE_word 0>			\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		SemiStyleString4,		\
+		<FSAE_word 0>			\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		0,				\
+		<FSAE_textStyle 0>		\
+		>
+StyleStringAttrTable	endc
+
+;
+; The strings are each given their own chunks so that the Resource
+; Editor won't barf.
+; NOTE:	These strings must be duplicated.  One must be in the same
+;	normalized format as if NormalizeFontInfoEntry had worked on them,
+;	and the other regularly Capitalized.
+;	Also, strings that are sub-string of other strings in the table
+;	must be placed *after* the super-string.
+;
+DemiStyleString1	chunk.char	'DEMI BOLD', 0
+DemiStyleString2	chunk.char	'Demi Bold', 0
+SemiStyleString1	chunk.char	'SEMI BOLD', 0
+SemiStyleString2	chunk.char	'Semi Bold', 0
+BlackStyleString1	chunk.char	'BLACK', 0
+BlackStyleString2	chunk.char	'Black', 0
+BoldStyleString1	chunk.char	'BOLD', 0
+BoldStyleString2	chunk.char	'Bold', 0
+ItalicStyleString1	chunk.char	'ITALIC', 0
+ItalicStyleString2	chunk.char	'Italic', 0
+OutlineStyleString1	chunk.char	'OUTLINE', 0
+OutlineStyleString2	chunk.char	'Outline', 0
+HeavyFaceStyleString1	chunk.char	'HEAVYFACE', 0
+HeavyFaceStyleString2	chunk.char	'Heavyface', 0
+HeavyStyleString1	chunk.char	'HEAVY', 0
+HeavyStyleString2	chunk.char	'Heavy', 0
+DemiStyleString3	chunk.char	'DEMI', 0
+DemiStyleString4	chunk.char	'Demi', 0
+SemiStyleString3	chunk.char	'SEMI', 0
+SemiStyleString4	chunk.char	'Semi', 0
+
+
+FontInstallStyleData	ends
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	FontInstallWeightData	contains the string chunks for each of
+			the weight identifier words and associated
+			FontWeight descriptor.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FontInstallWeightData	segment lmem	LMEM_TYPE_GENERAL
+
+WeightStringAttrTable	chunk
+	FontStringAttrTableEntry		\
+		<				\
+		UltraLightWeightString,		\
+		<FSAE_fontWeight FW_ULTRA_LIGHT>\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		ExtraLightWeightString,		\
+		<FSAE_fontWeight FW_EXTRA_LIGHT>\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		LightWeightString,		\
+		<FSAE_fontWeight FW_LIGHT>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		BookWeightString,		\
+		<FSAE_fontWeight FW_BOOK>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		NormalWeightString,		\
+		<FSAE_fontWeight FW_NORMAL>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		DemiWeightString1,		\
+		<FSAE_fontWeight FW_DEMI>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		DemiWeightString2,		\
+		<FSAE_fontWeight FW_DEMI>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		SemiWeightString1,		\
+		<FSAE_fontWeight FW_DEMI>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		SemiWeightString2,		\
+		<FSAE_fontWeight FW_DEMI>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		UltraBoldWeightString,		\
+		<FSAE_fontWeight FW_ULTRA_BOLD> \
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		ExtraBoldWeightString,		\
+		<FSAE_fontWeight FW_EXTRA_BOLD> \
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		BoldWeightString,		\
+		<FSAE_fontWeight FW_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		BlackWeightString,		\
+		<FSAE_fontWeight FW_BLACK>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		ThinWeightString,		\
+		<FSAE_fontWeight FW_EXTRA_LIGHT>\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		MediumWeightString,		\
+		<FSAE_fontWeight FW_DEMI>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		HeavyWeightString,		\
+		<FSAE_fontWeight FW_EXTRA_BOLD>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		RomanWeightString,		\
+		<FSAE_fontWeight FW_NORMAL>	\
+		>
+	FontStringAttrTableEntry		\
+		<				\
+		0,				\
+		<FSAE_fontWeight 0>		\
+		>
+WeightStringAttrTable	endc
+
+;
+; The strings are each given their own chunks so that the Resource
+; Editor won't barf.
+; NOTE:	These strings must be in the same normalized format as if
+;	NormalizeFontInfoEntry had worked on them.
+;	Also, strings that are sub-string of other strings in the table
+;	must be placed *after* the super-string.
+;
+UltraLightWeightString	chunk.char	'ULTRA LIGHT', 0
+ExtraLightWeightString	chunk.char	'EXTRA LIGHT', 0
+LightWeightString	chunk.char	'LIGHT', 0
+BookWeightString	chunk.char	'BOOK', 0
+NormalWeightString	chunk.char	'NORMAL', 0
+DemiWeightString1	chunk.char	'DEMI BOLD', 0
+DemiWeightString2	chunk.char	'DEMI', 0
+SemiWeightString1	chunk.char	'SEMI BOLD', 0	;aka 'Demi Bold'
+SemiWeightString2	chunk.char	'SEMI', 0	;aka 'Demi'
+UltraBoldWeightString	chunk.char	'ULTRA BOLD', 0
+ExtraBoldWeightString	chunk.char	'EXTRA BOLD', 0
+BoldWeightString	chunk.char	'BOLD', 0
+BlackWeightString	chunk.char	'BLACK', 0
+ThinWeightString	chunk.char	'THIN', 0	;aka 'Extra Light'
+MediumWeightString	chunk.char	'MEDIUM', 0	;aka 'Demi'
+HeavyWeightString	chunk.char	'HEAVY', 0	;aka 'Extra Bold'
+RomanWeightString	chunk.char	'ROMAN', 0	;aka 'Normal'
+
+
+FontInstallWeightData	ends

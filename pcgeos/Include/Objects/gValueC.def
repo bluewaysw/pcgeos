@@ -1,0 +1,1096 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Objects
+FILE:		gValue.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	chris	1/92		Initial version
+
+DESCRIPTION:
+	Object definitions for GenValueClass.   
+
+	$Id: gValueC.def,v 1.1 97/04/04 14:17:45 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	_GVALUEC
+
+StartLibrary	ui
+		
+include ui.def
+
+global	GenValueSendMsg:far
+		
+GenValueClass	class	GenClass
+
+
+;------------------------------------------------------------------------------
+;	Messages
+;------------------------------------------------------------------------------
+
+MSG_GEN_VALUE_SET_VALUE			message
+;
+; Sets the value for the object.  The indeterminate state of the object is
+; also passed.  The modified state of all booleans will be cleared;  to mark
+; the object modified, call MSG_GEN_VALUE_SET_MODIFIED_STATE.  
+;
+; Context:	Can be called externally at any time; is also used internally
+;		when responding to user actions.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		dx.cx -- signed <integer>.<fraction> value to set
+;		bp -- non-zero if indeterminate
+; Return:	carry set if GVLI_value changed
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_SET_INTEGER_VALUE		message
+;
+; Sets an integer (word-sized) value for the object.
+; The high (integer) word of GVLI_value is set to the passed value.  The low
+; (fractional) word is set to zero.  The indeterminate state 
+; of the object is also passed.  The modified state of all booleans will be 
+; cleared;  to mark the object modified, call MSG_GEN_VALUE_SET_MODIFIED_STATE.
+;
+; Context:	Can be called externally at any time; is also used internally
+;		when responding to user actions.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		cx -- signed integer value to set
+;		bp -- non-zero if indeterminate
+; Return:	carry set if GVLI_value changed
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_GET_VALUE			message
+;
+; Returns the current value of the object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	dx.cx -- signed <integer>.<fraction> value
+;		ax, bp -- destroyed
+
+
+MSG_GEN_VALUE_SET_MINIMUM			message
+;
+; Sets the minimum value for the object.  The current value is adjusted
+; accordingly. The minimum value will subsequently affect any user input.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		dx.cx -- signed <integer>.<fraction> minimum value to set
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_GET_MINIMUM		message
+;
+; Returns the current minimum value of the object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	dx.cx -- signed <integer>.<fraction> minimum value
+;		ax, bp -- destroyed
+
+MSG_GEN_VALUE_SET_MAXIMUM			message
+;
+; Sets the maximum value for the object.  The current value is adjusted
+; accordingly. The maximum value will subsequently affect any user input.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		dx.cx -- signed <integer>.<fraction> maximum value to set
+; Return:	nothing
+;		ax, bp -- destroyed
+;
+
+MSG_GEN_VALUE_GET_MAXIMUM		message
+;
+; Returns the current maximum value of the object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	dx.cx -- signed <integer>.<fraction> maximum value
+;		ax, bp -- destroyed
+
+
+MSG_GEN_VALUE_SET_INCREMENT			message
+;
+; Sets the increment value for the object.  The current value is unchanged.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		dx.cx -- signed <integer>.<fraction> increment value to set
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_GET_INCREMENT		message
+;
+; Returns the current increment value of the object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	dx.cx -- signed <integer>.<fraction> increment value
+;		ax, bp -- destroyed
+
+
+MSG_GEN_VALUE_SET_INDETERMINATE_STATE	message
+;
+; Allows setting the object's indeterminate state.    Does not affect the stored
+; value.  See GVSF_INDETERMINATE for more info.
+;
+; Context:	Can be sent any time
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cx -- non zero to set the value indeterminate
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_IS_INDETERMINATE		message
+; 
+; A boolean message for querying the object to see if its selection is 
+; currently indeterminate.  See GVSF_INDETERMINATE for more info.
+;
+; Context:	Can be sent any time
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	carry set if item group is indeterminate.
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_SET_MODIFIED_STATE		message
+;
+; Values are normally marked as "not modified" anytime their state is
+; set, marked "modified" anytime the user interacts with them, and marked
+; "not modified" again on MSG_APPLY.  This primitive provides a way to 
+; control the modified status outside of these events.
+;
+; Pass:		cx -- non-zero to mark modified, zero to mark not modified.
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+
+MSG_GEN_VALUE_IS_MODIFIED			message
+; 
+; A boolean message for querying the object to see if its value has been
+; modified by the user since the last apply.  See GVSF_MODIFIED for more 
+; info.
+;
+; Context:	Can be sent any time
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	carry set if item group is modified.
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_SET_DISPLAY_FORMAT			message
+;
+; Sets the display type for the object.  The current value is unchanged, but
+; the display will be updated if necessary.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cl -- GenValueDisplayFormat
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_GET_DISPLAY_FORMAT		message
+;
+; Returns the current display type of the object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	al -- GenValueDisplayFormat
+;		ah, cx, dx, bp -- destroyed
+
+
+MSG_GEN_VALUE_SEND_STATUS_MSG		message
+;
+; Causes value object to send out the "Status" message as specified in
+; ATTR_GEN_VALUE_STATUS_MSG.  The message will include the current
+; state of the object, as well as the "change" flag we pass here.
+; This message will still function even if the object is not enabled 
+; not usable.
+; 
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		cx -- non-zero if GVSF_MODIFIED bit should be passed set in
+;		      status message
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+;------------------------------------------------------------------------------
+;	Other instance data Messages
+;------------------------------------------------------------------------------
+
+MSG_GEN_VALUE_GET_DESTINATION		message
+;
+; Returns the current destination object, as specified in GVLI_destination.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	^lcx:dx -- the current destination object
+;		ax, bp -- destroyed
+;
+
+MSG_GEN_VALUE_SET_DESTINATION		message
+;
+; Sets a new destination object, as specified in GVLI_destination.  Apply
+; messages and status messags are sent out to this object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		^lcx:dx -- destination object
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_GET_APPLY_MSG		message
+; 
+; Returns the current apply message for the value object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		nothing
+; Return:	ax -- the current apply message
+;		cx, dx, bp -- destroyed
+;
+
+
+MSG_GEN_VALUE_SET_APPLY_MSG		message
+; 
+; Sets a new apply message for the value object.  
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Generally not intercepted.
+;
+; Pass:		cx -- new notification message
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+;------------------------------------------------------------------------------
+; 	Range length messages
+;------------------------------------------------------------------------------
+
+MSG_GEN_VALUE_SET_RANGE_LENGTH		method
+;
+; Allows the GenValue to display a value range (if supported by the specific UI); rather than a single value.   Setting a range length of zero will cause the
+; object to display a single value.  GVLI_value may need to be adjusted to
+; reflect its new maximum (GVLI_value can only be incremented to GVLI_maximum
+; minus the range length).  See HINT_VALUE_DISPLAYS_RANGE for more details.
+;
+; Context:	Can be called at any time, although if a GenValue is made
+; 		usable with no range length, and the specific UI chooses an
+;		object that can only display a single value, the specific UI
+;		WILL NOT reincarnate the object in order to display the range.
+; Source:	No restrictions
+; Destination:	A GenValue object.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		dx.cx -- signed <integer>.<fraction> range length to set.
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+MSG_GEN_VALUE_GET_RANGE_LENGTH		method
+;
+; Retrieves the current value range.  If HINT_VALUE_DISPLAYS_RANGE is not
+; present, returns zero (displaying a single value).  See HINT_VALUE_DISPLAYS_-
+; RANGE for more details.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		dx.cx -- signed <integer>.<fraction> increment value to set
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+MSG_GEN_VALUE_ADD_RANGE_LENGTH		method
+;
+; Adds current range length to the value.  If HINT_VALUE_DISPLAYS_RANGE is not
+; present, does nothing.   Does not affect indeterminate or modified state.
+; See HINT_VALUE_DISPLAYS_RANGE for more details.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+MSG_GEN_VALUE_SUBTRACT_RANGE_LENGTH		method
+;
+; Subtracts current range length to the value.  If HINT_VALUE_DISPLAYS_RANGE is
+; not present, does nothing.   Does not affect indeterminate or modified state.
+; See HINT_VALUE_DISPLAYS_RANGE for more details.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	A GenValueObject.
+; Interception:	Generally not intercepted.
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+;------------------------------------------------------------------------------
+; 	Miscellanious messages
+;------------------------------------------------------------------------------
+
+MSG_GEN_VALUE_GET_VALUE_TEXT		message
+;
+; This message can be used for getting a textual representation for either the 
+; current value, minimum value, maximum value, or increment.  Is not affected
+; by the indeterminate state of the object.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Can be intercepted by a subclass of GenValue to allow custom
+; 		text formats to be displayed on the screen.  Someone subclassing
+;		this message for that reason would also want to subclass 
+;		MSG_GEN_VALUE_SET_VALUE_FROM_TEXT to correctly parse text to
+;		yield a new value.     
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		cx:dx -- pointer to buffer to put text, must be at least
+;			 GEN_VALUE_MAX_TEXT_LEN bytes long.
+;		bp -- GenValueType
+; Return:	cx.dx -- buffer, filled in with the textual representation
+;		ax, bp -- destroyed
+
+GEN_VALUE_MAX_TEXT_LEN	equ	30
+
+
+GenValueType	etype word
+	GVT_VALUE	 enum GenValueType	  ; The current value 
+	GVT_MINIMUM	 enum GenValueType	  ; The minimum value
+	GVT_MAXIMUM	 enum GenValueType	  ; The maximum value 
+	GVT_INCREMENT	 enum GenValueType	  ; The increment value 
+	GVT_LONG	 enum GenValueType	  ; The longest value we can
+						  ;   create
+	GVT_RANGE_LENGTH enum GenValueType	  ; The end of the displayed
+						  ;   range, if applicable
+	GVT_RANGE_END	 enum GenValueType	  ; The last value in the range,
+						  ;   if applicable
+	GVT_VALUE_AS_RATIO_OF_AVAILABLE_RANGE \
+			 enum GenValueType	  ; The current value, expressed
+						  ;   as a ratio of max-min-
+						  ;   range (if any)
+
+MSG_GEN_VALUE_SET_VALUE_FROM_TEXT	message
+;
+; Sets the current value, minimum, maximum, or increment based on the passed
+; text.   Clears the indeterminate state of the object, and does not change the
+; modified status of the object.  See MSG_GEN_VALUE_SET_INDETERMINATE_STATE and
+; MSG_GEN_VALUE_SET_MODIFIED_STATE to alter either of these.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Can be intercepted by a subclass of GenValue to allow custom
+; 		text formats to be displayed on the screen.  Someone subclassing
+;		this message for that reason would also want to subclass 
+;		MSG_GEN_VALUE_GET_VALUE_TEXT to correctly create the text they
+;		want based on the current value.   When subclassing this
+; 		message, one should either use MSG_GEN_VALUE_SET_VALUE to
+;		ensure that the object redraws, or if setting the GVLI_value
+;		is somehow inappropriate to call the GenClass's superclass 
+;		(i.e. the specific UI) for MSG_GEN_VALUE_SET_VALUE to get the
+;		object to redraw.   For using an alternate storage type, see 
+;		discussion.
+;
+; Pass:		cx:dx -- pointer to text
+;		bp    -- GenValueType
+; Return:	carry set if value instance data changed
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_GET_VALUE_RATIO		message
+;
+; This message can be used for getting the slider-style ratio for either the 
+; current value, minimum value, maximum value, or increment.  The ratio refers
+; to the percentage of the value between the minimum and the maximum of the
+; object (minimum = 0.0, maximum = 1.0).
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	Can be intercepted by a subclass of GenValue to allow custom
+; 		text formats to be displayed on the screen.  Someone subclassing
+;		this message for that reason would also want to subclass 
+;		MSG_GEN_VALUE_SET_VALUE_FROM_TEXT to correctly parse text to
+;		yield a new value.     
+; 		For using an alternate storage type, see discussion.
+;
+; Pass:		bp -- GenValueType
+; Return:	dx.cx -- WWFixed ratio
+;		ax, bp -- destroyed
+
+MSG_GEN_VALUE_SET_VALUE_FROM_RATIO	message
+;
+; Sets the current value, minimum, maximum, or increment based on a ratio
+; of the current value within the current minimum and maximum.   
+; Clears the indeterminate state of the object, and does not change the
+; modified status of the object.  See MSG_GEN_VALUE_SET_INDETERMINATE_STATE and
+; MSG_GEN_VALUE_SET_MODIFIED_STATE to alter either of these.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	For using an alternate storage type, see discussion.
+;
+; Pass:		dx.cx    -- WWFixed ratio (0.0 is minimum, 1.0 is maximum)
+;		bp	 -- GenValueType
+; Return:	carry set if value instance data changed
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_INCREMENT			message
+;
+; Add the current increment amount to the current value.  
+; Clears the indeterminate state of the object, and does not change the
+; modified status of the object.  See MSG_GEN_VALUE_SET_INDETERMINATE_STATE and
+; MSG_GEN_VALUE_SET_MODIFIED_STATE to alter either of these.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	carry set if value instance data changed
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_DECREMENT			message
+;
+; Subtract the current increment amount from the current value.
+; Clears the indeterminate state of the object, and does not change the
+; modified status of the object.  See MSG_GEN_VALUE_SET_INDETERMINATE_STATE and
+; MSG_GEN_VALUE_SET_MODIFIED_STATE to alter either of these.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	carry set if value instance data changed
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_SET_VALUE_TO_MINIMUM	message
+;
+; Set the current value to the minimum value.
+; Clears the indeterminate state of the object, and does not change the
+; modified status of the object.  See MSG_GEN_VALUE_SET_INDETERMINATE_STATE and
+; MSG_GEN_VALUE_SET_MODIFIED_STATE to alter either of these.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	carry set if value instance data changed
+;		ax, cx, dx, bp -- destroyed
+;
+	
+MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM	message
+;
+; Set the current value to the maximum value.
+; Clears the indeterminate state of the object, and does not change the
+; modified status of the object.  See MSG_GEN_VALUE_SET_INDETERMINATE_STATE and
+; MSG_GEN_VALUE_SET_MODIFIED_STATE to alter either of these.
+;
+; Context:	Can be called at any time.
+; Source:	No restrictions
+; Destination:	Any GenValue object.
+; Interception:	For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	carry set if value instance data changed
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_VALUE_GET_TEXT_FILTER		message
+;
+; Textually oriented GenValue objects may send this to itself to get the 
+; filtering to use on textual-style GenValue objects.  By default, the 
+; object uses numeric-only with no spaces and no tabs on normal format, no-tabs
+; on distance formats.    Special subclasses of the GenRange for doing floating
+; point instance data or enumerated types may wish to change the filter as
+; appropriate.
+;
+; Context:	Can be called at any time.
+; Source:	The GenValue object
+; Destination:	Itself.
+; Interception:	For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	al -- VisTextFilters
+;		ah, cx, dx, bp -- destroyed
+; 
+
+MSG_GEN_VALUE_GET_MAX_TEXT_LEN		message
+;
+; Textually oriented GenValue object may send this to itself to get the number 
+; of characters that will be allowed to be typed into the object.  By default,
+; the number will be calculated from the minimums and maximums specified.  
+; Special subclasses of the GenRange for doing floating point instance data or 
+; enumerated types may wish to change the filter as appropriate.
+;
+; Context:	Can be called at any time.
+; Source:	The GenValue object
+; Destination:	Itself.
+; Interception:	For using an alternate storage type, see discussion.
+;
+; Pass:		nothing
+; Return:	ax -- maximum number of characters to be allowed.
+;		cx, dx, bp -- destroyed
+; 
+
+MSG_GEN_VALUE_SET_OUT_OF_DATE		message
+;
+; An internal message used to set the GenValue out-of-date.  It is sent when 
+; the user first types in a non-modified GenValue object, and cleared any time
+; a new value is set in the object.
+;
+; Context:	Can be called at any time.
+; Source:	The GenValue object
+; Destination:	Itself.
+; Interception:	Not usually intercepted.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+; 
+
+MSG_GEN_VALUE_SELECT_TEXT		message
+;
+; Directs a GenValue to select its text for editing, if appropriate for the
+; specific UI implementation.
+;
+; Context:	Can be called at any time.
+; Source:	Anyone
+; Destination:	Any GenValue object
+; Interception:	Not usually intercepted.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+; 
+
+;------------------------------------------------------------------------------
+; 	Vardata
+;------------------------------------------------------------------------------
+
+ATTR_GEN_VALUE_STATUS_MSG	vardata		word
+;
+;	Allows a message to be specified for receiving notification of the
+;	gadget's current status following user interaction, or the app's
+;	forcing of the message via MSG_GEN_VALUE_SEND_STATUS_MSG.
+;	attribute takes a word argument specifying the message to be sent out.
+;	The parameters for the notification message differs from the normal
+; 	apply notification:
+;
+;	 Pass:	dx.cx -- signed <integer>.<fraction> current calue
+;		bp -- GenValueStateFlags
+;		      GVSF_MODIFIED will be set if a user activation has
+;		      just changed the status of the object.  If message is a 
+;		      result of MSG_GEN_VALUE_SEND_STATUS_MSG being sent, 
+;	  	      then this bit will hold the value passed in that message.
+;	 Return: nothing
+;		 ax, cx, dx, bp -- destroyed
+;
+
+ATTR_GEN_VALUE_DECIMAL_PLACES				vardata		word
+	;In a textually displayed GenValue object, allows the programmer to
+	;specify the number of decimal places accuracy to use when displaying
+	;the value.  The default is 3 decimal places for any display type
+	;other than GVDF_INTEGER (which displays no fraction).   Argument for
+	;decimal places can be 0, 1, 2, 3, or 4 only, due to limitations in
+	;the storage format.
+
+ATTR_GEN_VALUE_METRIC_INCREMENT				vardata		WWFixed
+	;Allows user to specify a particular metric increment to use.
+	;By default, the GenValue will take the US increment specified in
+	;GVLI_increment and convert it to a close approximation in metric units,
+	;rounding in a reasonable way.  This attribute allows the user to 
+	;specifically choose the metric increment they want, overriding what
+	;the GenValue chooses.
+
+HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS	vardata	
+	;Instructs a textually oriented GenValue object to navigate to the next
+	;field when the user presses return.  The default behavior is to 
+	;activate the object with the interaction default (usually an apply 
+	;trigger of some kind).
+
+HINT_VALUE_CUSTOM_RETURN_PRESS				vardata		word
+	;Allows a textually oriented GenValue object to send the specified 
+	;message to the destination when the user presses return.  The default 
+	;behavior is to activate the object with the interaction default 
+	;(usually an apply trigger of some kind).  
+
+ATTR_GEN_VALUE_RUNS_ITEM_GROUP				vardata		optr
+	;When the user hits return on this object, it will use its text to
+	;try to set a selection on the specified item group.  Similarly, it
+	;will set up the item group to update this object when its selection
+	;changes.
+
+ATTR_GEN_VALUE_SET_MODIFIED_ON_REDUNDANT_SELECTION	vardata
+	; In GenValue objects that are not currently indeterminate in state,
+	; if the user does some action that doesn't change the internal value
+	; of the object (i.e. pressing return without changing the textual
+	; value, incrementing or decrementing when at the beginning or end of
+	; the object's range) by default no change in state takes place, and
+	; thus is not normally considered to be a "modification".  Setting this 
+	; attribute, however, will cause the group to be marked as modified in 
+	; such situations. The apply message will then be sent out in response 
+	; to a subsequent MSG_GEN_APPLY sent to the object.
+
+HINT_VALUE_INCREMENTABLE				vardata
+	; Notes that increment and decrement gadgets for user manipulation
+	; of the value are appropriate where available by the specific UI.
+	; This is usually the default behavior for textual GenValue objects.
+
+HINT_VALUE_NOT_INCREMENTABLE				vardata
+	; Notes that increment and decrement gadgets for user manipulation
+	; of the value are generally inappropriate for this object and should
+	; not be displayed if possible.  Usually in a text-oriented GenValue, 
+	; controls will be added for this behavior.  
+
+HINT_VALUE_X_SCROLLER			vardata
+	;Use as x scrollbar for a view.  We don't want to make this one
+	;public.
+HINT_VALUE_Y_SCROLLER			vardata
+	;Use as y scrollbar for a view.  We don't want to make this one
+	;public.
+
+HINT_VALUE_DISPLAYS_RANGE	vardata	WWFixed
+	;This attribute is used for GenValue objects that don't display a 
+	;single value between their minimum and maximum, but actually a range 
+	;of values. Scrollers and sliders may display this range in some way, 
+	;often by the size of the thumb.  This is especially useful for 
+	;scroller GenValues which work with views, since the a certain area of 
+	;a document is displayed out of the possible document bounds.  When 
+	;using this attribute, GVLI_value refers to the starting value of the 
+	;range to display, and the length of the range is stored in this 
+	;attribute, using MSG_GEN_VALUE_SET_RANGE_LENGTH, and retrieved via 
+	;MSG_GEN_VALUE_GET_RANGE_LENGTH.  The range length affects GVLI_value; 
+	;GVLI_value can only be incremented up to GVLI_maximum minus the range 
+	;length.  If this attribute is not present, the range length is 
+	;presumed to be zero (i.e. displaying a single value).  This function 
+	;may not be supported by all ranges in the specific UI.
+
+HINT_VALUE_ANALOG_DISPLAY				vardata
+	; Suggests that values be displayed in an analog fashion, i.e. via a
+	; slider rather than numerically displayed.
+
+GenValueIntervals	struc
+	GVI_numMajorIntervals	word		;total number of major intervals
+						;  to display over the range
+	GVI_numMinorIntervals	word		;total number of minor intervals
+						;  to display over the range
+GenValueIntervals	ends
+
+HINT_VALUE_DISPLAY_INTERVALS		vardata		GenValueIntervals
+	;If possible, put hash marks at various intervals along the range of
+	;values in the object.  Used most often with analog-style displays.
+	;GVI_numMajorIntervals and GVI_numMinorIntervals can be used to display
+	;larger and smaller marks.  One argument or the other can be made zero 
+	;for homogeneous markings.
+
+HINT_VALUE_CONSTRAIN_TO_INTERVALS	vardata	
+	;If present, suggests that the object constrain the value to the
+	;minor interval present in HINT_VALUE_DISPLAY_INTERVALS.
+
+HINT_VALUE_SHOW_MIN_AND_MAX		vardata
+	;Instructs the object to display minimum and maximum values, if 
+	;possible.
+
+HINT_VALUE_IMMEDIATE_DRAG_NOTIFICATION	vardata
+	;Send out status and/or apply messages constantly during dragging,
+	;if available under the specific UI.
+
+HINT_VALUE_DELAYED_DRAG_NOTIFICATION	vardata
+	;Delay status and/or apply messages until the user releases the mouse
+	;after dragging, if available under the specific UI.
+
+HINT_VALUE_ORIENT_HORIZONTALLY		vardata
+HINT_VALUE_ORIENT_VERTICALLY		vardata
+	;Hints for orienting slider-style GenValue gadget.
+
+HINT_VALUE_DIGITAL_DISPLAY		vardata
+HINT_VALUE_NO_DIGITAL_DISPLAY		vardata
+	;Hints controlling whether the value should be displayed numerically,
+	;if possible.
+
+HINT_VALUE_NO_ANALOG_DISPLAY		vardata
+	;Use if an analog display is inappropriate in this situation.  In the
+	;current displays, an analog display is not used by default anyway.
+
+HINT_VALUE_NOT_DIGITALLY_EDITABLE	vardata
+	;This hint will turn off textual editing of a GenValue if applicable.
+	;Only useful if there are up/down arrows or a slider to go along with
+	;the digital display.  To leave out the numeric value entirely, use
+	;HINT_VALUE_NO_DIGITAL_DISPLAY instead.
+
+HINT_VALUE_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS	vardata
+	;Directs the specific UI to avoid expanding a GenValue object to
+	;accept pen input, if applicable.
+
+HINT_VALUE_WRAP				vardata
+	;Incrementing past maximum causes value to wrap to minimum.
+	;Decrementing past minimum causes value to wrap to maximum.
+
+HINT_VALUE_FRAME			vardata
+	;Directs the specific UI to draw the frame of the object. Most
+	;useful when used with HINT_VALUE_NOT_DIGITALLY_EDITABLE.
+
+HINT_VALUE_ITEM_GROUP_GADGET		vardata
+	;Internal hint that specific UIs can use to differentiate
+	;between scrollers that scroll lists and other scrollers.
+	;Not to be made public.
+
+HINT_VALUE_MERGE_ANALOG_AND_DIGITAL_DISPLAYS vardata
+	;Requests that the analog and digital displays overlay one another
+	;in an aesthetically appealing fashion. Motif, for example, will
+	;use a solid bar with the number displayed in the middle as light
+	;text on the dark background, and dark text on the light background.
+
+HINT_VALUE_SEPARATE_ANALOG_AND_DIGITAL_DISPLAYS vardata
+	;Requests that the analog and digital displays be kept separate.
+
+protoreset
+
+protominor UINewForResponder
+
+HINT_VALUE_UNDERLINE				vardata
+HINT_VALUE_NO_UNDERLINE				vardata
+	;For specific UI's that support underlines, turns them on or off.
+
+protoreset
+
+protominor UINewForPenelope
+
+MinMaxMonikers	struc
+	MMM_min	lptr.VisMoniker			; chunk handle of moniker to
+						;	use for minimum value
+						;	or 0 for none
+	MMM_max	lptr.VisMoniker			; chunk handle of moniker to
+						;	use for maximum value
+						;	or 0 for none
+MinMaxMonikers	ends
+
+HINT_VALUE_MIN_MAX_MONIKERS			vardata	MinMaxMonikers
+	;
+	; Specifies monikers to use for showing min and max values in
+	; analog GenValues (sliders).  Currently only supported in
+	; Odie.
+	;
+
+HINT_VALUE_NO_FRAME				vardata
+	;
+	; Requests that specific UI not draw frame around object, where
+	; applicable.
+	;
+
+
+protoreset
+
+GenValueStateFlags record
+	GVSF_INDETERMINATE:1,
+		;Set if the current value is indeterminate.  This means
+		;that for whatever data is being represented, there is more
+		;than one value.  GVLI_value in this case should refer
+		;to the state at the beginning of the data being represented.
+
+	GVSF_MODIFIED:1,
+		;As stored in instance data, & sent in MSG_APPLY:
+		;
+		;Whether or not the object is "modified".  Cleared anytime
+		;state is set, set anytime user changes the state of
+		;the object and cleared on MSG_APPLY or MSG_GEN_VALUE_SET_VALUE.
+		;This status may further be modified using
+		;MSG_GEN_VALUE_SET_MODIFIED_STATE.  It may be checked
+		;using MSG_GEN_VALUE_IS_MODIFIED.  The apply message is
+		;normally  only sent out on MSG_APPLY if this bit is non-zero,
+		;though this behavior can be overridden using
+		;ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED
+		;
+		;As sent in status message:
+		;
+		;GVSF_MODIFIED will be set if the user has done something
+		;to change the state of the item group.  If message is the 
+		;result of a MSG_GEN_VALUE_SEND_STATUS_MSG being sent, then this
+		;bit will be the value passed in that message.
+
+	GVSF_OUT_OF_DATE:1,
+		;This flag is set when the GenValue object's internal value is
+		;out of date with what has been typed by the user.  The GenValue
+		;object does not update its internal value on every user key
+		;press, since the typed value may be temporarily out-of-range
+		;as they type.  The GenValue is then updated on a return press
+		;by the user, a query for the value, on an increment or 
+		;decrement, or as it is being taken offscreen.  The GVSF_OUT_-
+		;OF_DATE flag is most useful on status messages, to instruct
+		;the status message recipient to not try to process the value
+		;passed.  This allows the GenValue to send a status message 
+		;when the user first types in a GenValue, in order to let the
+		;recipient know that the GenValue has been modified.
+	:5
+GenValueStateFlags end
+
+
+GenValueDisplayFormat	etype	protominor byte
+	GVDF_INTEGER			enum	GenValueDisplayFormat
+		;Display as an integer value.  The value will be displayed with
+		;no decimal places, regardless of any fraction in the current
+		;value or the presence of ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_DECIMAL			enum	GenValueDisplayFormat
+		;Display as a decimal value.  By default, the value's fraction,
+		;if any, will be displayed using 3 decimal places. This can be 
+		;changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_POINTS			enum 	GenValueDisplayFormat
+		;Display as a distance, as points, regardless of whether metric
+		;or US units are set for the given application.
+		;The stored value is considered to be in units of "Points", i.e.
+		;1/72 of an inch.
+		;By default, the value will be displayed with up to 3 decimal
+		;places. This can be changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_INCHES			enum	GenValueDisplayFormat
+		;Display as a distance, in inches, regardless of whether metric
+		;or US units are set for the given application.
+		;The stored value is considered to be in units of "Points", i.e.
+		;1/72 of an inch.
+		;By default, the value will be displayed with up to 3 decimal
+		;places. This can be changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_CENTIMETERS		enum	GenValueDisplayFormat
+		;Display as a distance, in centimeters, regardless of whether 
+		;metric or US units are set for the given application.
+		;The stored value is considered to be in units of "Points", i.e.
+		;1/72 of an inch.
+		;By default, the value will be displayed with up to 3 decimal
+		;places. This can be changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_MILLIMETERS		enum	GenValueDisplayFormat
+		;Display as a distance, in millimeters, regardless of whether 
+		;metric or US units are set for the given application.
+		;The stored value is considered to be in units of "Points", i.e.
+		;1/72 of an inch.
+		;By default, the value will be displayed with up to 3 decimal
+		;places. This can be changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_PICAS			enum	GenValueDisplayFormat
+		;Display as a distance, in picas, regardless of whether metric
+		;or US units are set for the given application.
+		;The stored value is considered to be in units of "Points", i.e.
+		;1/72 of an inch.
+		;By default, the value will be displayed with up to 3 decimal
+		;places. This can be changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_EUR_POINTS			enum	GenValueDisplayFormat
+		;Display as a distance, in European points, regardless of 
+		;whether metric or US units are set for the given application.
+		;The stored value is considered to be in units of "Points", i.e.
+		;1/72 of an inch.
+		;By default, the value will be displayed with up to 3 decimal
+		;places. This can be changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_CICEROS			enum	GenValueDisplayFormat
+		;Display as a distance, in ciceros, regardless of whether metric
+		;or US units are set for the given application.
+		;The stored value is considered to be in units of "Points", i.e.
+		;1/72 of an inch.
+		;By default, the value will be displayed with up to 3 decimal
+		;places. This can be changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_POINTS_OR_MILLIMETERS	enum 	GenValueDisplayFormat
+		;Display as a distance, as points or millimeters, depending on 
+		;whether metric or US units are set for the given application.
+		;The stored value is considered to be in units of "Points", i.e.
+		;1/72 of an inch.
+		;By default, the value will be displayed with up to 3 decimal
+		;places. This can be changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+	GVDF_INCHES_OR_CENTIMETERS	enum 	GenValueDisplayFormat
+		;Display as a distance, as inches or centimeters, depending on 
+		;whether metric or US units are set for the given application.
+		;The stored value is considered to be in units of "Points", i.e.
+		;1/72 of an inch.
+		;By default, the value will be displayed with up to 3 decimal
+		;places. This can be changed with ATTR_GEN_VALUE_DECIMAL_PLACES.
+
+protominor	GenValuePercentageFormat
+	
+	GVDF_PERCENTAGE			enum	GenValueDisplayFormat
+		;Display as a percentage. Similar to GVDF_DECIMAL, except
+		;there's a % at the end of the string. By default, the value
+		;will be displayed with no decimal places if there is no
+		;fraction. If there is a fraction, 2 decimal places will be
+		;used unless overridden by ATTR_GEN_VALUE_DECIMAL_PLACES.
+		;The presence of ATTR_GEN_VALUE_DECIMAL_PLACES will force that
+		;many decimal places to always be used.
+	
+protoreset				
+
+;------------------------------------------------------------------------------
+;	Instance data
+;------------------------------------------------------------------------------
+
+
+GVLI_value		WWFixed			0
+	;The current value of the object.  Can be set via MSG_GEN_VALUE_SET_-
+	;VALUE, or obtained via MSG_GEN_VALUE_GET_VALUE.
+
+GVLI_minimum		WWFixed			0
+	;The current minimum value for the object.  All user input into the
+	;object will be adjusted to stay above this value.  This can be set
+	;via MSG_GEN_VALUE_SET_MINIMUM and obtained via MSG_GEN_VALUE_GET_-
+	;MINIMUM.
+
+GVLI_maximum		WWFixed			<0ffffh, 7fffh>
+	;The current maximum value for the object.  All user input into the
+	;object will be adjusted to stay below this value.   This can be set
+	;via MSG_GEN_VALUE_SET_MAXIMUM and obtained via MSG_GEN_VALUE_GET_-
+	;MAXIMUM.
+
+GVLI_increment		WWFixed			<0, 1>
+	;If applicable in the specific UI, the increment amount for the object.
+	;The user may be presented with increment/decrement tools such as up/
+	;down arrows.  This value can be set via MSG_GEN_VALUE_SET_INCREMENT
+	;and obtained via MSG_GEN_VALUE_GET_INCREMENT.   If the display type is
+	;GVDF_POINTS_OR_MILLIMETERS or GVDF_INCHES_OR_CENTIMETERS, the 
+	;increment specified will be used only when displaying US units.  When 
+	;displaying metric units, GenValue will calculate an equivalent metric 
+	;increment, rounding appropriately.   This increment can be overridden 
+	;via ATTR_GEN_VALUE_METRIC_INCREMENT.
+
+GVLI_stateFlags		GenValueStateFlags	0
+	;GenValueStates, for the indeterminate and user-modified flags.
+	;These can be set via MSG_GEN_VALUE_SET_INDETERMINATE_STATE and
+	;MSG_GEN_VALUE_SET_MODIFIED_STATE.  Indeterminate state can be changed
+	;and modified state cleared automatically when sending a MSG_GEN_VALUE-
+	;SET_VALUE.   The states of these flags are passed in
+	;notifications, or can be obtained via MSG_GEN_VALUE_IS_MODIFIED 
+	;and MSG_GEN_VALUE_IS_INDETERMINATE.
+
+GVLI_displayFormat	GenValueDisplayFormat
+	;Information on how to display the value.  This can be set via
+	;MSG_GEN_VALUE_SET_DISPLAY_TYPE and obtained via MSG_GEN_VALUE_GET_-
+	;DISPLAY_TYPE.
+
+GVLI_destination	optr
+	;The destination of any messages sent out by the object.  This can
+	;be set via MSG_GEN_VALUE_SET_DESTINATION, and retrieved via
+	;MSG_GEN_VALUE_GET_DESTINATION.
+
+GVLI_applyMsg		word	0
+	;Message to send out to the destination on MSG_APPLY.  This message can
+	;be set via MSG_GEN_VALUE_SET_APPLY_MSG and obtained via MSG_GEN_VALUE_-
+	;GET_APPLY_MSG.  The arguments passed in the notify message are as 
+	;follows:
+	;
+	; Pass:		dx.cx -- signed <integer>.<fraction> current value
+	;		bp low -- GenValueStateFlags
+	; Return:	nothing
+	;		ax, cx, dx, bp -- destroyed
+	;
+
+GenValueClass	endc
+
+EndLibrary	ui
+

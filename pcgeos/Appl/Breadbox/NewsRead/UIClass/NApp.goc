@@ -1,0 +1,311 @@
+@include <StdApp.goh>
+@include "UIClass/NApp.goh"
+@include "Extern.goh"
+@include "NewsRead.goh"
+#include <Internal/ppp.h>
+#include <initfile.h>
+
+word UserGetDisplayType(void) ;
+
+
+@classdecl NewsApplicationClass ;
+@classdecl NewsComposerWindowClass ;
+@classdecl NewsReadWindowClass ;
+
+@method NewsApplicationClass, MSG_META_NOTIFY {
+
+    if( (manufID == MANUFACTURER_ID_GEOWORKS) &&
+        (notificationType == GWNT_PPP_STATUS_NOTIFICATION)   ) {
+    
+        if((data & PPPStatusBits) == PPP_STATUS_OPEN) {
+
+@ifdef COMPILE_OPTION_HAS_MENU_BAR
+            @send NewsMenuDisconnect::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send NewsMenuConnect::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send NewsMenuDisconnect::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send NewsMenuConnect::MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+@endif
+        }
+
+        if(((word)data & (word) PPPStatusBits) == (word) PPP_STATUS_CLOSED) {
+      
+@ifdef COMPILE_OPTION_HAS_MENU_BAR
+            @send NewsMenuDisconnect::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send NewsMenuConnect::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send NewsMenuDisconnect::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send NewsMenuConnect::MSG_GEN_SET_USABLE(VUM_NOW) ;
+@endif
+        }
+    }
+    else
+	@callsuper();
+}
+
+@method NewsApplicationClass, MSG_META_KBD_CHAR {
+
+	optr focusObj ;
+	@call oself::MSG_META_GET_FOCUS_EXCL(&focusObj);
+	
+	if(focusObj == @NewsPrimary) {
+
+		if(
+			((character & 0x00FF) == ' ') 
+		) {
+
+			if(!((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE))) {
+
+				@send process::MSG_NEWS_DOWNLOAD_ARTICLE();
+			
+	//			return(TRUE) ;
+			}
+
+		} else if(
+			(character == (VC_INS | (((word)CS_CONTROL) << 8))) &&
+			((flags >> 8) & (SS_LCTRL|SS_RCTRL))
+		){
+
+			if(!((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE))) {
+				EventHandle event ;
+
+				event = @record NewsTextClass::MSG_META_CLIPBOARD_COPY() ;
+
+				@send self::MSG_META_SEND_CLASSED_EVENT(event, TO_APP_TARGET);
+			
+	//			return(TRUE) ;
+			}
+		} else if(
+			(character == (VC_ENTER | (((word)CS_CONTROL) << 8))) 
+		){
+
+			if(!((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE))) {
+				
+				@send process::MSG_NP_MAIN_LIST_DOUBLE_PRESS(0, 0, 0);
+			
+	//			return(TRUE) ;
+			}
+		} else if(
+			(character == (VC_DOWN | (((word)CS_CONTROL) << 8))) //&&
+	//		((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE)) &&
+	//		!((flags >> 8) & (SS_LCTRL|SS_RCTRL|SS_LSHIFT|SS_RSHIFT))
+		){
+
+			/* article, thread, group (focus) down */
+	//		@send process::MSG_NP_ARTICLE_LIST_NEXT_ARTICLE_THREAD_GROUP() ;
+			@call NewsArticleList::MSG_META_GRAB_FOCUS_EXCL() ;
+
+			@callsuper() ;
+		} else if(
+			(character == (VC_UP | (((word)CS_CONTROL) << 8))) //&&
+	//		((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE)) &&
+	//		!((flags >> 8) & (SS_LCTRL|SS_RCTRL|SS_LSHIFT|SS_RSHIFT))
+		){
+
+			/* article, thread, group (focus) down */
+	//		@send process::MSG_NP_ARTICLE_LIST_PREV_ARTICLE_THREAD_GROUP() ;
+
+			@call NewsArticleList::MSG_META_GRAB_FOCUS_EXCL() ;
+			
+			@callsuper() ;
+		} else {
+			@callsuper() ;
+		}
+
+	//        @call self::MSG_META_FUP_KBD_CHAR(character, flags, state);   
+	//	return(@callsuper()) ;
+	} else {
+	
+		@callsuper() ;
+	}
+}
+
+/*************************************************************************/
+
+void
+GetDefaultFontSize(FontID *fid, WWFixed *psize)
+{
+    /*
+     * use 14 point Berkeley on TV
+     * use 12 point Sans on monitors
+     */
+    psize->WWF_frac = 0;
+    if (((UserGetDisplayType() >> 8) & DT_DISP_ASPECT_RATIO) == (DAR_TV << DT_DISP_ASPECT_RATIO_OFFSET)) {
+	psize->WWF_int = 14;
+	*fid = FID_BERKELEY;
+    } else {
+	psize->WWF_int = 12;
+	*fid = FID_DTC_URW_SANS;
+    }
+}
+
+/*************************************************************************/
+
+const char cfontKey[]="cfont";
+const char csizeKey[]="csize";
+const char rfontKey[]="rfont";
+const char rsizeKey[]="rsize";
+const char headerKey[]="header";
+
+@method NewsApplicationClass, MSG_META_LOAD_OPTIONS
+{
+    char catBuf[INI_CATEGORY_BUFFER_SIZE];
+    FontID fid;
+    WWFixed psize;
+@ifdef COMPILE_OPTION_HAS_MENU_BAR
+    Boolean headerState = TRUE ;
+@endif
+
+    /*
+     * call our superclass to do most of the work
+     */
+    @callsuper();
+    /*
+     * get our INI category
+     */
+    @call oself::MSG_META_GET_INI_CATEGORY(catBuf);
+    /*
+     * get the font and pointsize and set them in the text objects
+     *   rfont, rsize = read message, print message
+     */
+    GetDefaultFontSize(&fid, &psize);
+    InitFileReadInteger(catBuf, rfontKey, &fid);
+    @call ArticleText::MSG_VIS_TEXT_SET_FONT_ID(fid,
+						 TEXT_ADDRESS_PAST_END, 0);
+    InitFileReadInteger(catBuf, rsizeKey, &psize.WWF_int);
+    @call ArticleText::MSG_VIS_TEXT_SET_POINT_SIZE(psize,
+						    TEXT_ADDRESS_PAST_END, 0);
+
+    /*
+     * get the font and pointsize and set them in the text objects
+     *   cfont, csize = compose message
+     */
+    GetDefaultFontSize(&fid, &psize);
+    InitFileReadInteger(catBuf, cfontKey, &fid);
+    @call NewsPostText::MSG_VIS_TEXT_SET_FONT_ID(fid,
+						    TEXT_ADDRESS_PAST_END, 0);
+    InitFileReadInteger(catBuf, csizeKey, &psize.WWF_int);
+    @call NewsPostText::MSG_VIS_TEXT_SET_POINT_SIZE(psize,
+						     TEXT_ADDRESS_PAST_END, 0);
+
+@ifdef COMPILE_OPTION_HAS_MENU_BAR
+    InitFileReadInteger(catBuf, headerKey, &headerState);
+
+    if(headerState) {
+    
+        @send NewsShowHeader::MSG_GEN_ACTIVATE() ;
+    } else {
+
+        @send NewsHideHeader::MSG_GEN_ACTIVATE() ;
+    }
+@endif
+}
+
+@method NewsApplicationClass, MSG_META_QUIT  {
+
+    @call oself::MSG_META_SAVE_OPTIONS();
+
+    @callsuper() ;
+}
+
+@method NewsApplicationClass, MSG_META_SAVE_OPTIONS
+{
+    VisTextCharAttr attrs;
+    VisTextCharAttrDiffs diffs;
+    char catBuf[INI_CATEGORY_BUFFER_SIZE];
+@ifdef COMPILE_OPTION_HAS_MENU_BAR
+    Boolean headerState ;
+@endif
+
+    /*
+     * call our superclass to do most of the work
+     */
+    @callsuper();
+    /*
+     * get our INI category
+     */
+    @call oself::MSG_META_GET_INI_CATEGORY(catBuf);
+    /*
+     * get the fonts and pointsizes and save them
+     */
+    @call ArticleText::MSG_VIS_TEXT_GET_CHAR_ATTR(0,
+						   &diffs,
+						   &attrs,
+						   0,
+						   0);
+    InitFileWriteInteger(catBuf, rfontKey, attrs.VTCA_fontID);
+    InitFileWriteInteger(catBuf, rsizeKey, attrs.VTCA_pointSize.WBF_int);
+
+    @call NewsPostText::MSG_VIS_TEXT_GET_CHAR_ATTR(0,
+						      &diffs,
+						      &attrs,
+						      0,
+						      0);
+    InitFileWriteInteger(catBuf, cfontKey, attrs.VTCA_fontID);
+    InitFileWriteInteger(catBuf, csizeKey, attrs.VTCA_pointSize.WBF_int);
+
+@ifdef COMPILE_OPTION_HAS_MENU_BAR
+    headerState = @call NewsHideHeader::MSG_GEN_GET_USABLE() ;
+
+    InitFileWriteInteger(catBuf, headerKey, headerState);
+@endif
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_IMPLIED_WIN_CHANGE for NewsApplicationClass
+ *
+ * DESCRIPTION:      Makes the cursor on the PC dbox an arrow
+ *                     vs hourglass
+ *                   Snagged from BrianCs hack in Browser
+ *
+ * Revision History:
+ *    Who  Date:     Comments:
+ *    ---  --------  ---------
+ *    JFH  02/07/00  Created.
+ *
+ *
+ ***********************************************************************/
+@method NewsApplicationClass, MSG_META_IMPLIED_WIN_CHANGE
+{
+ EventHandle evt;
+
+
+    @callsuper();
+    /* if modal parental control dialog is up, clear busy cursor */
+    if (G_startupPassword &&
+		inputObj &&
+		ObjTestIfObjBlockRunByCurThread(OptrToHandle(inputObj)) &&
+		@call inputObj::MSG_META_IS_OBJECT_IN_CLASS(&GenInteractionClass) &&
+		(@call inputObj::MSG_GEN_INTERACTION_GET_ATTRS() & GIA_MODAL)) {
+	  WinGeodeSetPtrImage(GeodeGetProcessHandle(), 0);
+	  evt = @record GenClass::MSG_GEN_SYSTEM_SET_PTR_IMAGE(0, PIL_SYSTEM);
+	  @call self::MSG_GEN_CALL_SYSTEM(evt);
+    }
+
+}
+
+
+
+@method NewsComposerWindowClass, MSG_GEN_DISPLAY_CLOSE
+{
+    /*
+     * lower ourselves so other mail windows come to top
+     */
+    @call oself::MSG_GEN_LOWER_TO_BOTTOM();
+    /*
+     * just make ourselves not usable
+     */
+    @call oself::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+}
+
+@method NewsReadWindowClass, MSG_GEN_DISPLAY_CLOSE
+{
+    /*
+     * lower ourselves so other mail windows come to top
+     */
+    @call oself::MSG_GEN_LOWER_TO_BOTTOM();
+    /*
+     * just make ourselves not usable
+     */
+    @call oself::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+}
+

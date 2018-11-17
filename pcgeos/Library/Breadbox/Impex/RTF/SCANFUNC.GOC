@@ -1,0 +1,343 @@
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include "scan.h"
+#include "output.h"
+#include "groups.h"
+#include "charset.h"
+#include "global.h"
+
+#pragma option -w-par
+
+/*
+typedef Boolean ScanFunc(WWFixedAsDWord fxParam, void* pData, ScanSourceType sst,
+  ScanDestType sdt, char* control, word extra);
+*/
+
+ScanFunc EmitSuperSub
+	{
+	int n = 0;
+	char out[SCAN_LABEL_MAX_LENGTH];
+	TextStyle pt = (TextStyle)IntegerOf(fxParam) & (TS_SUPERSCRIPT | TS_SUBSCRIPT);
+
+	/* Emit an initial "nosupersub" to turn off previous super/sub formatting. */
+	if (!StringCopyWord(control, out, SCAN_LABEL_MAX_LENGTH, 1)
+	  || !RTFOutputAddControl(out, FALSE))
+		return FALSE;
+
+	/* Now apply the new formatting, if any. */
+	if (pt)
+		{
+		if (pt & TS_SUBSCRIPT)
+			n = 3;
+		else	/* pt & TS_SUPERSCRIPT */
+			n = 2;
+		if (!StringCopyWord(control, out, SCAN_LABEL_MAX_LENGTH, n)
+		  || !RTFOutputAddControl(out, FALSE))
+			return FALSE;
+		}
+	return TRUE;
+	}
+
+/*  This function multiplies the parameter by extra before emitting it via the
+	standard method. */
+ScanFunc MultiplyByExtra
+	{
+	return ScanEmitControlFromData(IntegerOf(fxParam) * extra, sdt, control, 0);
+	}
+
+ScanFunc EmitJustification
+	{
+	word just = (IntegerOf(fxParam) & VTPAA_JUSTIFICATION)
+	  >> VTPAA_JUSTIFICATION_OFFSET;
+
+	return ScanEmitControlFromData(just, sdt, control, 0);
+	}
+
+/* 	The left margin can be emitted verbatim, but the paragraph margin is an
+	offset from the left in RTF. */
+ScanFunc EmitLeftAndParaMargins
+	{
+	VisTextParaAttr* pAttr = (VisTextParaAttr*)pData;
+	WWFixedAsDWord fxPara = ScanConvertData(&pAttr->VTPA_paraMargin, SST_133, 0)
+	  - fxParam;
+
+	return (ScanEmitControlFromData(IntegerOf(fxParam) * 20, sdt, control, 1)
+	  && ScanEmitControlFromData((sword)IntegerOf(fxPara) * 20, sdt, control, 2));
+	}
+
+/*	extra determines which word in control is emitted. */
+ScanFunc LookupColor
+	{
+	int index;
+
+	if (!GroupColorTableFindColorByQuad((ColorQuad*)&fxParam, &index))
+		return TRUE;		/* couldn't find color, emit nothing. */
+	else
+		return ScanEmitControlFromData(index, SDT_VALUE, control, extra);
+	}
+
+/*  System draw masks for percentage mask fall between SDM_100 (25)
+    and SDM_0 (89), with 64 degrees of precision.
+    The parameter has units of hundredths of a %. */
+Boolean EmitShading(SystemDrawMask mask, char* control, word nWord)
+	{
+	WWFixedAsDWord fxShading;
+	if (mask >= SDM_100 && mask <= SDM_0)
+		{
+		fxShading = GrMulWWFixed (MakeWWFixed(SDM_0 - mask),
+		  MakeWWFixed(156.25));
+		return ScanEmitControlFromData(IntegerOf(fxShading), SDT_VALUE,
+		  control, nWord);
+		}
+	else
+		return TRUE;
+	}
+
+Boolean EmitPattern(GraphicPattern hatch, char* control, word nWord)
+	{
+	char out[SCAN_LABEL_MAX_LENGTH];
+	const char* patterns = "vert horiz bdiag fdiag";
+	int len;
+
+	if (hatch.HP_type == PT_SYSTEM_HATCH && hatch.HP_data < 4)
+		{
+		if (!StringCopyWord(control, out, SCAN_LABEL_MAX_LENGTH, nWord))
+			return FALSE;
+		len = strlen(out);
+		if (!StringCopyWord(patterns, out + len, SCAN_LABEL_MAX_LENGTH - len,
+		  (int)hatch.HP_data + 1))
+		 	return FALSE;
+		return RTFOutputAddControl(out, FALSE);
+		}
+	else
+		return TRUE;
+	}
+
+/* 	Word order in control: shading, pattern prefix, fg color, bg color. */
+Boolean EmitPatternShadingColor(SystemDrawMask mask, GraphicPattern hatch,
+	ColorQuad* color, char* control, void* pData)
+	{
+	ColorQuad cq;
+	cq.CQ_info = CF_INDEX;
+	if (mask == SDM_0)
+		/* Depends on character attribute reset to turn off. */
+		{
+		cq.CQ_redOrIndex = C_WHITE;
+		if (!EmitShading(mask, control, 1)
+		  || !LookupColor(*(dword*)&cq, pData, 0, 0, control, 4))
+		  	return FALSE;
+		}
+	else if (hatch.HP_type == PT_SYSTEM_HATCH)
+		{
+		/* Emit pattern with fg(color), bg(C_WHITE) */
+		cq.CQ_redOrIndex = C_WHITE;
+		if (!EmitPattern(hatch, control, 2)
+		  || !LookupColor(*(dword*)color, pData, 0, 0, control, 3)
+		  || !LookupColor(*(dword*)&cq, pData, 0, 0, control, 4))
+			return FALSE;
+		}
+	else
+		{
+		if (mask == SDM_100)
+			{
+			/* Emit 0 shading with bg(color) */
+			if (!EmitShading(SDM_0, control, 1)
+			  || !LookupColor(*(dword*)color, pData, 0, 0, control, 4))
+			  	return FALSE;
+			}
+		else
+			{
+			/* Emit N shading with fg(color), bg(C_WHITE) */
+			cq.CQ_redOrIndex = C_WHITE;
+			if (!EmitShading(mask, control, 1)
+			  || !LookupColor(*(dword*)color, pData, 0, 0, control, 3)
+			  || !LookupColor(*(dword*)&cq, pData, 0, 0, control, 4))
+				return FALSE;
+			}
+		}
+	return TRUE;
+	}
+
+ScanFunc EmitParaBG
+	{
+	VisTextParaAttr* pAttr = (VisTextParaAttr*)pData;
+	return EmitPatternShadingColor(pAttr->VTPA_bgGrayScreen,
+	  pAttr->VTPA_bgPattern, (ColorQuad*)&fxParam, control, pData);
+	}
+
+ScanFunc EmitCharBG
+	{
+	VisTextCharAttr* pAttr = (VisTextCharAttr*)pData;
+	if (pAttr->VTCA_extendedStyles & VTES_BACKGROUND_COLOR)
+		return EmitPatternShadingColor(pAttr->VTCA_bgGrayScreen,
+		  pAttr->VTCA_bgPattern, (ColorQuad*)&fxParam, control, pData);
+	else
+		return TRUE;
+	}
+
+/* 	Since this function sets the codepage for emitting normal text, this should
+	only be used in normal document text and not in, say, a stylesheet. */
+ScanFunc EmitFontID
+	{
+	int index;
+	
+	if (GroupFontTableFindFontIndex(IntegerOf(fxParam), &index))
+		{
+		RTFSetCodePage (GroupFontTableGetCodePage(index));
+		return ScanEmitControlFromData(index, sdt, control, 0);
+		}
+	else
+		return TRUE;
+	}
+
+ScanFunc ColumnRule
+	{
+	if (IntegerOf(fxParam) > 0)
+		return RTFOutputAddControl(control, FALSE);
+	else
+		return TRUE;
+	}
+
+Boolean EmitOneTab(Tab* pTab, char* control)
+	{
+	long int pos;
+	const char* leads = "tldot tlul tlhyph";
+	int index = 0;
+	int nTabType = 0;
+
+	if (pTab->T_lineWidth > 0)
+		{
+		/* Treat it as a bar tab if a lineWidth exists. */
+		nTabType = 2;
+		}
+	else
+		{
+		/* tabkind: right, centered, decimal. */
+		index = pTab->T_attr & TabType;
+		if (index)
+			if (!ScanEmitControlFromData(0, SDT_NONE, control, index + 2))
+				return FALSE;
+		nTabType = 1;
+		}
+	/* tablead: dot, line, or bullet (hyphen) */
+	index = (pTab->T_attr & TabLeader) >> TabLeader_OFFSET;
+	if (index)
+		if (!ScanEmitControlFromData(0, SDT_NONE, leads, index))
+			return FALSE;
+	/* tabdef: tx or tb */
+	pos = ((dword)pTab->T_position * 5) >> 1;	/* was (x*20)>>3 */
+	return ScanEmitControlFromData(pos, SDT_VALUE, control, nTabType);
+	}
+
+void CalcDefaultTabs(VisTextParaAttr* pAttr, word width, word* lastPos,
+  word* firstPos)
+	{
+	/* Calculate the right margin in absolute points from left margin. */
+	/* All numbers are in 13.3 format. */
+	word right = (DefaultDocAttrs.RTFDA_pageInfo.PSI_page.XYS_width << 3)
+	  - DefaultDocAttrs.RTFDA_pageInfo.PSI_rightMargin
+	  - DefaultDocAttrs.RTFDA_pageInfo.PSI_leftMargin
+	  - pAttr->VTPA_rightMargin - pAttr->VTPA_leftMargin;
+	/* firstPos will be at first default position just beyond the last tab. */
+	*firstPos = ((*lastPos / width) + 1) * width;
+	/* New lastPos will be at default position on or before right margin. */
+	*lastPos = (right / width) * width;
+	}
+
+/*	All tabs are emitted here.  If the default tabs setting doesn't match the
+	document default, default tabs will be emitted up to (and including) the
+	right margin.  */
+ScanFunc EmitTabs
+	{
+	int nTabs = IntegerOf(fxParam);
+	VisTextMaxParaAttr* pAttr = (VisTextMaxParaAttr*)pData;
+	Tab defaultTab;
+	Tab* pTab = pAttr->VTMPA_tabs;
+	word defTabWidth = pAttr->VTMPA_paraAttr.VTPA_defaultTabs;
+	word lastTabPos = 0;
+
+	/* Emit normal tabs. */
+	for (nTabs = IntegerOf(fxParam), pTab = pAttr->VTMPA_tabs; nTabs;
+	  nTabs--, pTab++)
+		{
+		if (!EmitOneTab(pTab, control))
+			return FALSE;
+		lastTabPos = pTab->T_position;
+		}
+
+	/* Emit default tabs. */
+	if (defTabWidth > 0 && defTabWidth != DefaultParaAttrs.VTPA_defaultTabs)
+		{
+		/* Calculate first and final tab positions, and setup default tab. */
+		CalcDefaultTabs(pAttr, defTabWidth, &lastTabPos, &defaultTab.T_position);
+		defaultTab.T_lineWidth = 0;
+		defaultTab.T_attr = TT_LEFT | (TL_NONE << TabLeader_OFFSET);
+
+		for (; defaultTab.T_position <= lastTabPos;
+		  defaultTab.T_position += defTabWidth)
+			{
+			if (!EmitOneTab(&defaultTab, control))
+				return FALSE;
+			}
+		}
+	return TRUE;
+	}
+
+#define EMIT_BORDERS_NUM_FLAGS 5
+
+ScanFunc EmitBorders
+	{
+	@extern chunk CSBorders;
+	/*"brdrl brdrt brdrr brdrb brdrbtw brdrs brdrdb brdrsh brdrw brdrcf brsp";*/
+	VisTextParaBorderFlags flags = (VisTextParaBorderFlags)IntegerOf(fxParam);
+	const VisTextParaBorderFlags aFlags[EMIT_BORDERS_NUM_FLAGS] = {VTPBF_LEFT,
+		VTPBF_TOP, VTPBF_RIGHT, VTPBF_BOTTOM, VTPBF_DRAW_INNER_LINES};
+	ColorQuadAsDWord color = *(ColorQuadAsDWord*)
+		&((VisTextParaAttr*)pData)->VTPA_borderColor;
+	word space = ((word)(((VisTextParaAttr*)pData)->VTPA_borderSpacing) * 5) >> 1;
+	word width = ((word)(((VisTextParaAttr*)pData)->VTPA_borderWidth) * 5) >> 1;
+	int idx = (flags & VTPBF_DOUBLE) ? 7 : 6;
+	int i;
+
+	/* Emit all borders with their styles. */
+	control = LMemDeref(@CSBorders);
+	if (!control)
+		return FALSE;
+	for (i = 0; i < EMIT_BORDERS_NUM_FLAGS; i++)
+		{
+		if (flags & aFlags[i])
+			{
+			/* Emit border type. */
+			if (!ScanEmitControlFromData(0, SDT_NONE, control, i + 1))
+				return FALSE;
+			/* Emit border style: single or double, and optional shadow. */
+			if (!ScanEmitControlFromData(0, SDT_NONE, control, idx))
+				return FALSE;
+			if (flags & VTPBF_SHADOW)
+				if (!ScanEmitControlFromData(0, SDT_NONE, control, 8))
+					return FALSE;
+			/* Emit border width. */
+			if (!ScanEmitControlFromData(width, SDT_VALUE, control, 9))
+				return FALSE;
+			/* Emit border color. */
+			if (!LookupColor(color, pData, SST_DWORD, SDT_VALUE, control, 10))
+				return FALSE;
+			/* Emit border spacing. */
+			if (!ScanEmitControlFromData(space, SDT_VALUE, control, 11))
+				return FALSE;
+			}
+		}
+	return TRUE;
+	}
+
+ScanFunc OutputButtonStyle
+{
+#if _DO_HELP
+     RTFOutputAddChar(171);
+     RTFOutputAddString("BUTTON");
+     RTFOutputAddChar(187);
+#endif
+    RTFOutputAddString("\\shad\\chbrdr\\brdrsh\\brdrs\\brdrw10");
+    return TRUE;
+}

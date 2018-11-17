@@ -1,0 +1,107 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		File System Drivers
+FILE:		cvgfsMacro.def
+
+AUTHOR:		Jeremy Dashe, Jan 20, 1994
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jeremy	1/20/94		Initial revision
+	todd	9/12/94		Made general for all VG-230 platforms
+	Joon	1/19/96		Adapted for compressed GFS
+
+
+DESCRIPTION:
+	This file contains macros for the Compress Vadem GFS driver.
+		
+	$Id: cvgfsMacro.def,v 1.1 97/04/18 11:46:48 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		ApplyPatch
+
+DESCRIPTION:	This macro applies a byte patch to a buffer that was
+		just filled from reading a GFS.  A patch is based on
+		an offset from the top of the GFS, so this macro
+		figures out which part of the buffer needs the patch,
+		then applies it.
+
+ARGUMENTS:
+		patchTable - offset of the patch data
+		patchSize  - number of bytes in the patch
+		patchStart - starting point of the patch from the top of the GFS
+		patchEnd   - ending point of the patch from the top of the GFS
+
+PASS IN:
+		bpbx - the buffer's GFS starting offset
+		dxax - the buffer's GFS ending offset
+		ds   - segment of the patch tables
+		es   - segment of the destination buffer
+
+		On the stack - the destination buffer's starting offset
+
+DETROYS:	di
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ApplyPatch	macro	patchTable, patchSize, patchStart, patchEnd
+		local	addDestinationForPatch, getPatchEndBoundary, doPatch
+
+		pop	di			; es:di <- start of read buffer
+		push	di
+	
+		push	si, cx, bp, bx, dx, ax 
+
+		mov	si, offset patchTable	; ds:si <- patch data
+		mov	cx, patchSize		; cx <- number of bytes in patch
+	
+	;
+	; Figure out the destination of the patch.  If the patch start
+	; is higher than the GFS start, then add the difference to the
+	; destination offset.
+	;
+	; If the patch start is lower than the GFS start, then add
+	; the difference to the source offset and shrink the size of
+	; the byte count.
+	;
+		subdw	bpbx, patchStart
+		js	addDestinationForPatch
+	;
+	; The patch begins lower than the read region.  Reset the
+	; number of bytes read and the starting point of the patch.
+	;
+		add	si, bx
+EC <		ERROR_C	PATCH_OFFSET_TOO_BIG			>
+		sub	cx, bx
+EC <		ERROR_C	PATCH_SIZE_TOO_SMALL			>
+		jmp	getPatchEndBoundary
+
+addDestinationForPatch:
+		neg	bx
+		add	di, bx			; es:di <- place for the patch
+
+getPatchEndBoundary:
+		subdw	dxax, patchEnd
+		jns	doPatch
+	;
+	; The patch ends past the end of the read buffer.  Shorten the
+	; number of bytes accordingly.
+	;
+		neg	ax
+		sub	cx, ax
+
+doPatch:
+		rep	movsb
+
+		pop	si, cx, bp, bx, dx, ax 
+
+	endm

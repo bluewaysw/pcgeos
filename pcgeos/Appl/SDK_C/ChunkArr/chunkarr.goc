@@ -1,0 +1,1150 @@
+/***********************************************************************
+ *
+ *      Copyright (c) Geoworks 1996 -- All Rights Reserved
+ *
+ * PROJECT:       GEOS
+ * MODULE:        ChunkArray (Sample GEOS application)
+ * FILE:          chunkarr.goc
+ *
+ * AUTHOR:        Ed Ballot, 1/96
+ *
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      1/4/96    EB        Initial version
+ *      1/19/96	  PPC	    Added Replace, Insert, Show functions
+ *
+ * DESCRIPTION:
+ *	This file illustrates creating a chunk array, manipulating it,
+ *	and saving/restoring the chunk array in a VM file.
+ *
+ *	One of the difficulties with storing a ChunkArray in a VM file
+ *	is retrieving the optr of the ChunkArray upon re-opening the file.
+ *	If the ChunkArray is the first item in its memory block, then the
+ *	optr can be retrieved by accessing the block's LMemBlockHeader.
+ *	LMBH_offset is the offset to the chunk handle table, so simply
+ *	reading the first handle at LMBH_offset will give the ChunkHandle
+ *	of the ChunkArray.  Here's an example:
+ *
+ *      	ptrLMemBlockHeader = VMLock(theVMFile, theVMBlock,
+ *					&memHandleOfTheVMBlock);
+ *		chunkArrayOptr = ConstructOptr(memHandleOfTheVMBlock,
+ *					ptrLMemBlockHeader->LMBH_offset);
+ *
+ *	In this sample application, we will create a VM file in which to
+ *	store the chunk array.  To simplify retrieval of the block containing
+ *	the chunk array, we will store that block in the VM file's mapblock.
+ *
+ *	Sorting the chunk array is useful, but this sample application uses
+ *	variable-length array elements, so you can't use ChunkArraySort().
+ *	In any case, here's how to set the callback for ChunkArraySort: it
+ *	must be declared as follows (although the routine and variable names
+ *	may of course differ):
+ *
+ *              sword _pascal MyCallback(void *el1, void *el2,
+ *					 word *valueForCallback)
+ *
+ *	The call to ChunkArraySort would then look like this:
+ *
+ *		ChunkArraySort(chunkArrayOptr, value, MyCallback);
+ *
+ *	This sample application also shows how to use the ChunkArrayEnum()
+ *	routine.  ChunkArrayEnum() also uses a callback, which you provide.
+ *	The callback routine is called for each element in the ChunkArray;
+ *	as long as the callback routine returns FALSE.  Once the callback
+ *	returns TRUE, the enumeration stops.
+ *
+ *	The ChunkArray routines used in this sample application are
+ *	(in alphabetical order):
+ *
+ *		ChunkArrayAppendHandles()
+ *		ChunkArrayCreate()
+ *		ChunkArrayDeleteHandle()
+ *		ChunkArrayElementResizeHandles()
+ *		ChunkArrayElementToPtrHandles()
+ *		ChunkArrayEnumHandles()
+ *		ChunkArrayGetCountHandles()
+ *		ChunkArrayInsertAtHandle()
+ *		ChunkArrayPtrToElementHandle()
+ *
+ *	$Id: chunkarr.goc,v 1.1 97/04/04 16:40:37 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *              Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+#include <chunkarr.h>
+
+
+
+/*
+ ***************************************************************************
+ *              Function prototypes
+ ***************************************************************************
+ */
+void GetChunkArrayHandleAndChunk (VMFileHandle vmfile,
+				  MemHandle *mh,
+				  ChunkHandle *ch);
+void UpdateArrayIndexMaxValue (MemHandle caBlock,
+			       ChunkHandle caChunk);
+Boolean _pascal DisplayElementText (void *el,
+				    void *retVal);
+
+
+
+/*
+ ***************************************************************************
+ *              Class & Message Definitions
+ ***************************************************************************
+ */
+@class  CAProcessClass, GenProcessClass;
+@message void MSG_CAPROCESS_ADD_ELEMENT();
+@message void MSG_CAPROCESS_REPLACE_ELEMENT();
+@message void MSG_CAPROCESS_INSERT_ELEMENT();
+@message void MSG_CAPROCESS_DELETE_ELEMENT();
+@message void MSG_CAPROCESS_DISPLAY_ALL_ELEMENTS();
+@message (GEN_VALUE_STATUS_MSG) MSG_CAPROCESS_DISPLAY_ONE_ELEMENT;
+@endc;
+
+@class CAAppClass, GenApplicationClass;
+@message VMFileHandle MSG_CAA_GET_VMFILE_HANDLE();
+@message void MSG_CAA_SET_VMFILE_HANDLE(VMFileHandle vmfile);
+@message Boolean MSG_CAA_GET_CONTINUE_ENUMERATE();
+@message void MSG_CAA_SET_CONTINUE_ENUMERATE();
+@message void MSG_CAA_CLEAR_CONTINUE_ENUMERATE();
+    /*
+     * This variable holds the handle of the VM file in which the
+     * chunk array is stored.
+     */
+    @instance VMFileHandle CAAI_vmfile = NullHandle;
+    /*
+     * This variable holds a value that determines whether the chunkArray
+     * enumeration should continue.
+     */
+    @instance Boolean CAAI_continueEnumerate = TRUE;
+@endc;
+
+@classdecl      CAProcessClass, neverSaved;
+@classdecl      CAAppClass;
+
+
+
+/*
+ ***************************************************************************
+ *              UI Objects
+ ***************************************************************************
+ */
+/*
+ *		App Resource
+ *
+ * The application object is stored in its own resource, to minimize
+ * the application's memory usage when the app is in engine mode.
+ */
+@start  AppResource;
+
+@object CAAppClass CAApp = {
+    GI_visMoniker = list { @CATextMoniker };
+    GI_comp = @CAPrimary,
+	      @CAAppMenu;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @CAPrimary;
+}
+
+@visMoniker CATextMoniker = "ChunkArray Sample Application";
+
+@end    AppResource;
+
+
+/*
+ *		AppMenu Resource
+ *
+ * AppMenu objects are typically stored in their own resource.
+ */
+@start  AppMenuResource;
+
+@object GenInteractionClass CAAppMenu = {
+    GI_comp = @HelpDBox;
+    GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass HelpDBox = {
+    GI_visMoniker = 0, "Help";
+    GI_comp = @HelpText;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    GII_attrs = @default | GIA_MODAL;
+}
+
+@object GenTextClass HelpText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text =
+"    Enter text in the text field.\r\
+  Append: Append text as new element of\r\
+	  the ChunkArray.\r\
+  Replce: Replace text of an element.\r\
+  Insert: Insert text as new element at the\r\
+	  current index.\r\
+  Delete: Delete a ChunkArray item.\r\
+  Show:   Display array elements in dialog box.\r\
+    Change 'Array Index' to see the contents of the ChunkArray \
+at any index.\r";
+}
+
+@end	AppMenuResource;
+
+
+
+/*
+ *		Interface Resource
+ *
+ * All the UI objects are stored in this object block.
+ */
+@start  Interface;
+
+@object GenPrimaryClass CAPrimary  = {
+    GI_comp = /* Client area UI */
+	      @SeeHelp,
+	      @ElementText,
+	      @ArrayIndex,
+	      /* Function bar UI */
+	      @F1_AppendElementTrig,
+	      @F2_ReplaceElementTrig,
+	      @F3_InsertElementTrig,
+	      @F4_DeleteElementTrig,
+	      @F5_ShowArrayTrig,
+	      /* Program-controlled dialog box */
+	      @EnumDisplayDBox;
+
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass SeeHelp = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "\rFor instructions on how to use this application, \
+open the Help dialog box from the App Menu.\r";
+}
+
+/*
+ * This object allows the user to enter text, either as
+ * a new chunkArray element, or to replace the text of an
+ * existing element.
+ */
+@object GenTextClass ElementText = {
+    GI_visMoniker = "Element text:";
+    GTXI_text = "";
+
+    /* This attr will prevent user from adding null-sized elements */
+    ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = {
+	@F1_AppendElementTrig};
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+}
+
+/*
+ * This object displays the current chunkArray element.
+ */
+@object GenValueClass ArrayIndex = {
+    GI_visMoniker = "Element index:";
+    GVLI_destination = process;
+
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_CAPROCESS_DISPLAY_ONE_ELEMENT;
+    /* max value will be updated according to size of chunk array */
+    HINT_VALUE_SHOW_MIN_AND_MAX;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+}
+
+/*
+ * This object allows the user to append a new element to the array.
+ */
+@object GenTriggerClass F1_AppendElementTrig = {
+    GI_visMoniker = "Append";
+    GI_states = (@default) & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CAPROCESS_ADD_ELEMENT;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = {0};
+}
+
+/*
+ * This object allows the user to replace the text of an element.
+ */
+@object GenTriggerClass F2_ReplaceElementTrig = {
+    GI_visMoniker = "Replce";
+    GI_states = (@default) & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CAPROCESS_REPLACE_ELEMENT;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = {1};
+}
+
+/*
+ * This object allows the user to insert a new element into the array.
+ */
+@object GenTriggerClass F3_InsertElementTrig = {
+    GI_visMoniker = "Insert";
+    GI_states = (@default) & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CAPROCESS_INSERT_ELEMENT;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = {2};
+}
+
+/*
+ * This object allows the user to delete an element from the array.
+ */
+@object GenTriggerClass F4_DeleteElementTrig = {
+    GI_visMoniker = "Delete";
+    GI_states = (@default) & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CAPROCESS_DELETE_ELEMENT;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = {3};
+}
+
+/*
+ * This object will cause each element's text to be displayed,
+ * in a dialog box, using an enumeration through the array.
+ */
+@object GenTriggerClass F5_ShowArrayTrig = {
+    GI_visMoniker = "Show";
+    GI_states = (@default) & ~GS_ENABLED;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_CAPROCESS_DISPLAY_ALL_ELEMENTS;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = {4};
+}
+
+
+/*
+ * This object will display the contents of the chunkArray,
+ * via the ChunkArrayEnumHandles() routine.
+ *
+ * We make this dbox a MULTIPLE_RESPONSE because we need to have
+ * a custom STOP trigger: it needs to send a message to change an
+ * instance variable of the @CAApp object, so that the enumeration
+ * can be halted.
+ */
+@object GenInteractionClass EnumDisplayDBox = {
+    GI_visMoniker = "ChunkArray Contents";
+    GI_comp = @DisplayElementIndex,
+	      @DisplayElementContents,
+	      @DisplayBoxStopTrig;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_MULTIPLE_RESPONSE;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenValueClass DisplayElementIndex = {
+    GI_visMoniker = "Index:";
+    GI_attrs = @default | GA_READ_ONLY;
+
+    HINT_VALUE_NOT_INCREMENTABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenTextClass DisplayElementContents = {
+    GI_visMoniker = "Text:";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "";
+
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_CENTER_MONIKER;
+    HINT_TEXT_FRAME;
+}
+
+@object GenTriggerClass DisplayBoxStopTrig = {
+    GI_visMoniker = 'S', "Stop";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_actionMsg = MSG_CAA_CLEAR_CONTINUE_ENUMERATE;
+    GTI_destination = @CAApp;
+
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@end	Interface;
+
+
+
+
+/*
+ *	Dialog Strings Resource
+ *
+ * These strings are used in the program-controlled dialog box.
+ * It's a good idea to put strings in chunks in their own resource,
+ * so that they can be localized, if necessary.
+ */
+@start	DialogStringResource, data;
+
+@chunk char DialogStr[] = "Index:  \001\rContents: \002";
+
+@end	DialogStringResource;
+
+
+
+/*
+ ***************************************************************************
+ *               Code for CAProcessClass
+ ***************************************************************************
+ */
+/***********************************************************************
+ *		 GetChunkArrayHandleAndChunk
+ ***********************************************************************
+ * SYNOPSIS:	 Utility routine which retrieves the chunkarray, which is
+ *		 in the vmfile's mapblock.
+ * CALLED BY:	 Internal
+ * PARAMETERS:   void (VMFileHandle vmfile, MemHandle *mh, ChunkHandle *ch)
+ * RETURN:	 handle and chunk of chunk array
+ * SIDE EFFECTS: VMBlock is locked.
+ * TIP:		 Make sure to VMUnlock() after calling this routine!
+ *
+ * STRATEGY:     Get the vmfile's mapblock (which contains the chunk array)
+ *               Lock the block and pull the chunk array's chunk handle
+ *               from the header structure of the LMemBlock.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      1/96            Initial Version
+ *
+ ***********************************************************************/
+  void
+GetChunkArrayHandleAndChunk (VMFileHandle vmfile, MemHandle *mh,
+			     ChunkHandle *ch)
+{
+    VMBlockHandle	vmBlock;
+    LMemBlockHeader	*ptrLMemBlockHeader;
+
+EC( ECVMCheckVMFile( vmfile ); )
+    vmBlock = VMGetMapBlock(vmfile);
+EC( ECVMCheckVMBlockHandle( vmfile, vmBlock ); )
+    ptrLMemBlockHeader = VMLock(vmfile, vmBlock, mh);
+EC( ECCheckMemHandle( *mh ); )
+EC( ECCheckBounds( ptrLMemBlockHeader ); )
+    *ch = ptrLMemBlockHeader->LMBH_offset;
+
+} /* End of GetChunkArrayHandleAndChunk */
+
+
+
+/***********************************************************************
+ *		 UpdateArrayIndexMaxValue
+ ***********************************************************************
+ * SYNOPSIS:	 Utility routine which retrives the ChunkArray's size,
+ *		 and updates the maximum value of the ArrayIndex.
+ * CALLED BY:	 Internal
+ * PARAMETERS:   void (MemHandle caBlock, ChunkHandle caChunk)
+ * RETURN:	 nothing
+ * SIDE EFFECTS: none
+ *
+ * STRATEGY:     Get the size of the ChunkArray, then update the GenValue.
+ *		 These actions are performed using system-defined messages
+ *		 for the classes involved.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     1/96            Initial Version
+ *
+ ***********************************************************************/
+  void
+UpdateArrayIndexMaxValue (MemHandle caBlock, ChunkHandle caChunk)
+{
+    word arraySize;
+
+    /* decrement size because array is 0-based */
+    arraySize = ChunkArrayGetCountHandles(caBlock, caChunk) - 1;
+    @call ArrayIndex::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(arraySize));
+
+} /* End of UpdateArrayIndexMaxValue */
+
+
+
+/***********************************************************************
+ *		 DisplayElementText -- a callback routine
+ ***********************************************************************
+ * SYNOPSIS:	 Displays an element in a dialog box's text and GenValue
+ *		 fields.  This is the callback routine for
+ *		 ChunkArrayEnumHandles(), to display all the array elements.
+ * CALLED BY:	 Internal
+ * PARAMETERS:   void (void *el, void *retVal)
+ * RETURN:	 Any necessary return value can be returned in retVal
+ * SIDE EFFECTS: 
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     1/96            Initial Version
+ *
+ ***********************************************************************/
+  Boolean
+_pascal DisplayElementText (void *el, void *retVal)
+{
+#pragma argsused
+    VMFileHandle	vmfile;
+    MemHandle		chunkArrayBlock;
+    ChunkHandle		chunkArrayChunk;
+    word		index;
+    Boolean		continueEnumerate;
+
+    vmfile = @call application::MSG_CAA_GET_VMFILE_HANDLE();
+EC( ECVMCheckVMFile( vmfile ); )
+    GetChunkArrayHandleAndChunk(vmfile, &chunkArrayBlock, &chunkArrayChunk);
+EC( ECCheckLMemOD( ConstructOptr(chunkArrayBlock, chunkArrayChunk) ); )
+    /*
+     * Get element's index
+     */
+    index = ChunkArrayPtrToElementHandle(chunkArrayChunk, el);
+    VMUnlock(chunkArrayBlock);
+    /*
+     * Display element's index and text in dialog box
+     */
+    @call DisplayElementIndex::MSG_GEN_VALUE_SET_INTEGER_VALUE(index, 0);
+    @call DisplayElementContents::MSG_VIS_TEXT_REPLACE_ALL_PTR(el, 0);
+    TimerSleep(120);
+
+    /*
+     * The Stop trigger, when hit, will clear the CAAI_continueEnumeration
+     * variable.  So, if CAAI_continueEnumeration = FALSE,
+     *  return TRUE to halt the enumeration.
+     * Else, return FALSE so enumeration continues to all array elements.
+     *
+     * If we don't halt the enumeration, even though the Stop trigger
+     * dismisses the dialog box, the enumeration will continue in the
+     * background, making the app seem sluggish to the user (as well as
+     * delaying shutting down the app, if the user tries to exit it,
+     * and delaying starting a new enumeration).
+     */
+    continueEnumerate = @call application::MSG_CAA_GET_CONTINUE_ENUMERATE();
+    if ( continueEnumerate == FALSE ) {
+	return(TRUE);		/* halts enumeration */
+    } else {
+	return(FALSE);		/* continues enumeration */
+    }
+} /* End of DisplayElementText */
+
+
+
+
+/***********************************************************************
+ *                MSG_GEN_PROCESS_OPEN_APPLICATION
+ *		  for CAProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Open chunk array data file and initialize the objects.
+ * PARAMETERS:    void (AppAtachFlags attachFlags, MemHandle launchBlock,
+ *                      MemHandle extraState);
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:      Open the file and store the file's handle
+ *                If the file had to be created then
+ *                    Create the chunk array and put it in the map block
+ *                Otherwise initialize the ArrayIndex and ElementText to display
+ *                the contents of the chunk array element.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      1/96            Initial Version
+ *
+ ***********************************************************************/
+@method CAProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    word          openStatus;
+    VMFileHandle  vmfile;
+    VMBlockHandle vmBlock;
+    MemHandle     chunkArrayBlock;
+    ChunkHandle   chunkArrayChunk;
+    WWFixedAsDWord currentValue;
+    GenValueStateFlagsAsWord stateFlags = {0,0};
+
+    @callsuper();
+
+    /*
+     * Tell VMOpen to open the file for read and write.  If the file
+     * doesn't exist, then create it.  Also, use standard compression.
+     */
+    vmfile = VMOpen( "ChunkArrayData",
+		VMAF_FORCE_READ_WRITE, VMO_CREATE, 0);
+EC( ECVMCheckVMFile( vmfile ); )
+
+    /*
+     * Set the vmfile here because it will be needed in the call to
+     * MSG_CAPROCESS_DISPLAY_ONE_ELEMENT
+     */
+    @call application::MSG_CAA_SET_VMFILE_HANDLE(vmfile);
+
+    /*
+     * Now check to see whether the file needed to be created (rather than
+     * simply opening the file).
+     */
+    openStatus = ThreadGetError();
+    if (openStatus == VM_CREATE_OK) {
+	vmBlock = VMAllocLMem(vmfile, LMEM_TYPE_GENERAL, 0);
+EC(     ECVMCheckVMBlockHandle( vmfile, vmBlock ); )
+	VMLock(vmfile, vmBlock, &chunkArrayBlock);
+	/*
+	 * Create a chunk array with variable-sized elements.
+	 */
+	chunkArrayChunk = ChunkArrayCreate(chunkArrayBlock, 0, 0, 0);
+EC(     ECCheckLMemODHandles( chunkArrayBlock, chunkArrayChunk ); )
+	VMSetMapBlock(vmfile, vmBlock);
+	VMUnlock(chunkArrayBlock);
+    } else {
+	/*
+	 * Set the correct maximum value of ArrayIndex
+	 */
+	GetChunkArrayHandleAndChunk(vmfile, &chunkArrayBlock,
+				    &chunkArrayChunk);
+EC(     ECCheckLMemODHandles( chunkArrayBlock, chunkArrayChunk ); )
+	UpdateArrayIndexMaxValue(chunkArrayBlock, chunkArrayChunk);
+	VMUnlock(chunkArrayBlock);
+	/*
+	 * Synchronize the ElementText with the ArrayIndex
+	 */
+	currentValue = @call ArrayIndex::MSG_GEN_VALUE_GET_VALUE();
+	@call process::MSG_CAPROCESS_DISPLAY_ONE_ELEMENT(currentValue,
+						     stateFlags);
+    }
+} /* End of MSG_GEN_PROCESS_OPEN_APPLICATION */
+
+
+
+/***********************************************************************
+ *                MSG_GEN_PROCESS_CLOSE_APPLICATION
+ *		  for CAProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Save any changes to the vmfile and close it.
+ * PARAMETERS:    MemHandle (void)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:      update the vmfile
+ *                close the vmfile. By passing FILE_NO_ERRORS we are
+ *                telling the system that if an error occurs, a
+ *                FatalError should be sent. This is not always how
+ *                you should handle errors, since the user won't like
+ *                it when the system reboots because of a file error.
+ *                Keep in mind that this is just for an example.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      1/96            Initial Version
+ *
+ ***********************************************************************/
+@method CAProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    VMFileHandle vmfile;
+
+    vmfile = @call application::MSG_CAA_GET_VMFILE_HANDLE();
+EC( ECVMCheckVMFile( vmfile ); )
+    VMUpdate(vmfile);
+    VMClose(vmfile, FILE_NO_ERRORS);
+
+    return(@callsuper());
+} /* End of MSG_GEN_PROCESS_CLOSE_APPLICATION */
+
+
+
+/***********************************************************************
+ *                MSG_CAPROCESS_ADD_ELEMENT,
+ *		  MSG_CAPROCESS_REPLACE_ELEMENT,
+ *		  MSG_CAPROCESS_INSERT_ELEMENT for CAProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Get text string from ElementText and use as:
+ *		  (a) contents of new element appended to,
+ *		  (b) replacement contents of current element, or
+ * 		  (c) contents of new element inserted into
+ *		  the chunk array.
+ * PARAMETERS:    void (void)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:      If there is text to save then:
+ *		      Append/replace/insert item in chunk array,
+ *                    Update the ArrayIndex to reference this new element,
+ *                    Update the vmfile
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      1/96            Initial Version
+ *	PPC	1/96		Added Replace & Insert
+ *
+ ***********************************************************************/
+@method CAProcessClass, MSG_CAPROCESS_ADD_ELEMENT,
+			MSG_CAPROCESS_REPLACE_ELEMENT,
+			MSG_CAPROCESS_INSERT_ELEMENT
+{
+    word          textSize, oldSize;
+    VMFileHandle  vmfile;
+    MemHandle     chunkArrayBlock;
+    ChunkHandle   chunkArrayChunk;
+    char          *element;
+    word	  index;
+
+    /*
+     * Add a byte for the null-terminator
+     */
+    textSize = @call ElementText::MSG_VIS_TEXT_GET_TEXT_SIZE() + 1;
+
+    /*
+     * Only add/edit an element if there's text
+     */
+    if ( textSize ) {
+
+	vmfile = @call application::MSG_CAA_GET_VMFILE_HANDLE();
+EC(     ECVMCheckVMFile( vmfile ); )
+	GetChunkArrayHandleAndChunk(vmfile, &chunkArrayBlock,
+				    &chunkArrayChunk);
+EC(     ECCheckLMemODHandles( chunkArrayBlock, chunkArrayChunk ); )
+	switch ( message ) {
+
+	/*
+	 * Append an element which holds the text
+	 */
+	case MSG_CAPROCESS_ADD_ELEMENT:
+
+	    element = ChunkArrayAppendHandles(chunkArrayBlock,
+					      chunkArrayChunk,
+					      textSize);
+EC(         ECCheckBounds( element ); )
+	    /*
+	     * Set the new maximum value of ArrayIndex
+	     */
+	    UpdateArrayIndexMaxValue(chunkArrayBlock, chunkArrayChunk);
+	    /*
+	     * Set ArrayIndex to display current element
+	     */
+	    @call ArrayIndex::MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM();
+	    /*
+	     * Now that there's an element, enable the replace, insert,
+	     * delete, and show triggers
+	     */
+	    @call F2_ReplaceElementTrig::MSG_GEN_SET_ENABLED(
+		VUM_DELAYED_VIA_APP_QUEUE);
+	    @call F3_InsertElementTrig::MSG_GEN_SET_ENABLED(
+		VUM_DELAYED_VIA_APP_QUEUE);
+	    @call F4_DeleteElementTrig::MSG_GEN_SET_ENABLED(
+		VUM_DELAYED_VIA_APP_QUEUE);
+	    @call F5_ShowArrayTrig::MSG_GEN_SET_ENABLED(
+	        VUM_DELAYED_VIA_APP_QUEUE);
+	    break;
+
+
+	/*
+	 * Replace the element's text with new text
+	 */
+	case MSG_CAPROCESS_REPLACE_ELEMENT:
+	    /*
+	     * Which element?
+	     */
+	    index = @call ArrayIndex::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	    /*
+	     * Resize the element, to hold the new text
+             */
+	    ChunkArrayElementResizeHandles(chunkArrayBlock,
+					   chunkArrayChunk,
+					   index,
+					   textSize);
+	    /*
+	     * Get a pointer to the element, to copy the new text into it
+	     */
+	    element = ChunkArrayElementToPtrHandles(chunkArrayBlock,
+					     chunkArrayChunk,
+					     index,
+					     &textSize);
+EC(         ECCheckBounds( element ); )
+	    break;
+
+
+	/*
+	 * Insert a new element which is the size of the text
+	 */
+	case MSG_CAPROCESS_INSERT_ELEMENT:
+	    /*
+	     * Get current element; we'll insert a new element there
+	     */
+	    index = @call ArrayIndex::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	    element = ChunkArrayElementToPtrHandles(chunkArrayBlock,
+					     chunkArrayChunk,
+					     index,
+					     &oldSize);
+EC(         ECCheckBounds( element ); )
+	    /*
+	     * Going into the routine, element shows where to insert the
+	     * new element.  Coming out of the routine, element is the
+	     * newly inserted element.
+	     */
+	    element = ChunkArrayInsertAtHandle(chunkArrayChunk,
+					       element,
+					       textSize);
+EC(         ECCheckBounds( element ); )
+	    /*
+	     * Set the new maximum value of ArrayIndex
+	     */
+	    UpdateArrayIndexMaxValue(chunkArrayBlock, chunkArrayChunk);
+
+	    break;
+
+	} /* switch */
+
+
+	/*
+	 * Fill in the newly created or edited element
+	 */
+	@call ElementText::MSG_VIS_TEXT_GET_ALL_PTR(element);
+
+	/*
+	 * Since the chunk array was modified, dirty it before unlocking.
+	 * Otherwise Geos doesn't know that the data in the block has
+	 * changed and the changes may be lost.
+	 */
+	VMDirty(chunkArrayBlock);
+	VMUnlock(chunkArrayBlock);
+
+    } /* if textSize */
+
+} /* End of MSG_CAPROCESS_[ADD|REPLACE|INSERT]_ELEMENT */
+
+
+
+/***********************************************************************
+ *                MSG_CAPROCESS_DELETE_ELEMENT for CAProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Delete the current element from the chunk array.
+ * PARAMETERS:    void (void)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:      If there are elements in the array then:
+ *                    Delete the currently displayed element
+ *                    Update ArrayIndex and ElementText
+ *                    Update the vmfile
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      1/96            Initial Version
+ *
+ ***********************************************************************/
+@method CAProcessClass, MSG_CAPROCESS_DELETE_ELEMENT
+{
+    VMFileHandle  vmfile;
+    MemHandle     chunkArrayBlock;
+    ChunkHandle   chunkArrayChunk;
+    word          arraySize;
+    WWFixedAsDWord currentValue;
+    char	  *element;
+    word          elementSize;
+
+    vmfile = @call application::MSG_CAA_GET_VMFILE_HANDLE();
+EC( ECVMCheckVMFile( vmfile ); )
+    GetChunkArrayHandleAndChunk(vmfile, &chunkArrayBlock,
+				&chunkArrayChunk);
+EC( ECCheckLMemODHandles( chunkArrayBlock, chunkArrayChunk ); )
+
+    arraySize = ChunkArrayGetCountHandles(chunkArrayBlock, chunkArrayChunk);
+
+    /*
+     * Only do this if there's an element to delete from the chunk array
+     */
+    if ( arraySize ) {
+
+	currentValue = @call ArrayIndex::MSG_GEN_VALUE_GET_VALUE();
+	element = ChunkArrayElementToPtrHandles(chunkArrayBlock,
+				  chunkArrayChunk,
+				  IntegerOf(currentValue),
+				  &elementSize);
+EC(     ECCheckBounds( element ); )
+	ChunkArrayDeleteHandle(chunkArrayChunk, element);
+
+	/*
+	 * Set the new maximum value of ArrayIndex
+	 */
+	UpdateArrayIndexMaxValue(chunkArrayBlock, chunkArrayChunk);
+	/*
+	 * Make the ArrayIndex send its status message so that the display
+	 * will be updated.  FALSE means that the GenValue is no longer
+	 * in the 'modified' state.
+	 */
+	@send ArrayIndex::MSG_GEN_VALUE_SEND_STATUS_MSG(FALSE);
+	/*
+	 * Since the chunk array was modified, dirty it before unlocking.
+	 * Otherwise Geos doesn't know that the data in the block has
+	 * changed and the changes may be lost.
+	 */
+	VMDirty(chunkArrayBlock);
+	VMUnlock(chunkArrayBlock);
+
+    } /* if arraySize */
+
+} /* End of MSG_CAPROCESS_DELETE_ELEMENT */
+
+
+
+
+/***********************************************************************
+ *                MSG_CAPROCESS_DISPLAY_ONE_ELEMENT
+ *		  for CAProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Display the element indexed by the ArrayIndex.
+ * PARAMETERS:    void (WWFixedAsDWord value,
+ *                      GenValueStateFlagsAsWord stateFlags)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:      Get the chunk array from the vmfile.
+ *                Get the element of 'value'
+ *                Replace the current display with the new text
+ *                (or, delete the text in the display if the element
+ *                is zero-sized).
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      1/96            Initial Version
+ *
+ ***********************************************************************/
+@method CAProcessClass, MSG_CAPROCESS_DISPLAY_ONE_ELEMENT
+{
+    VMFileHandle  vmfile;
+    MemHandle     chunkArrayBlock;
+    ChunkHandle   chunkArrayChunk;
+    char	  *element;
+    word          elementSize;
+
+    vmfile = @call application::MSG_CAA_GET_VMFILE_HANDLE();
+EC( ECVMCheckVMFile( vmfile ); )
+    GetChunkArrayHandleAndChunk(vmfile,
+			&chunkArrayBlock, &chunkArrayChunk);
+EC( ECCheckLMemODHandles( chunkArrayBlock, chunkArrayChunk ); )
+
+    element = ChunkArrayElementToPtrHandles(chunkArrayBlock,
+				  chunkArrayChunk,
+				  IntegerOf(value),
+				  &elementSize);
+EC( ECCheckBounds( element ); )
+
+    /*
+     * If there is something to display, then display it, and
+     * allow the user to replace or insert text at this element.
+     * Otherwise, the chunk array must be empty, so clear the display.
+     */
+    if ( elementSize ) {
+	/*
+	 * Subtract 1, since msg expects length of str, not including
+	 * the null-terminator
+	 */
+	@call ElementText::MSG_VIS_TEXT_REPLACE_ALL_PTR(element,
+	    elementSize-1);
+	@call F2_ReplaceElementTrig::MSG_GEN_SET_ENABLED(
+	    VUM_DELAYED_VIA_APP_QUEUE);
+	@call F3_InsertElementTrig::MSG_GEN_SET_ENABLED(
+	    VUM_DELAYED_VIA_APP_QUEUE);
+	@call F4_DeleteElementTrig::MSG_GEN_SET_ENABLED(
+	    VUM_DELAYED_VIA_APP_QUEUE);
+	@call F5_ShowArrayTrig::MSG_GEN_SET_ENABLED(
+	    VUM_DELAYED_VIA_APP_QUEUE);
+    } else {
+	/*
+	 * Empty array: clear display...
+	 */
+	@send ElementText::MSG_VIS_TEXT_DELETE_ALL();
+	/*
+	 * ... anddisable the replace, insert, delete, and show trigs
+	 */
+	@call F2_ReplaceElementTrig::MSG_GEN_SET_NOT_ENABLED(
+	    VUM_DELAYED_VIA_APP_QUEUE);
+	@call F3_InsertElementTrig::MSG_GEN_SET_NOT_ENABLED(
+	    VUM_DELAYED_VIA_APP_QUEUE);
+	@call F4_DeleteElementTrig::MSG_GEN_SET_NOT_ENABLED(
+	    VUM_DELAYED_VIA_APP_QUEUE);
+	@call F5_ShowArrayTrig::MSG_GEN_SET_NOT_ENABLED(
+	    VUM_DELAYED_VIA_APP_QUEUE);
+    }
+
+    VMUnlock(chunkArrayBlock);
+} /* End of MSG_CAPROCESS_DISPLAY_ONE_ELEMENT */
+
+
+
+
+/***********************************************************************
+ *                MSG_CAPROCESS_DISPLAY_ALL_ELEMENTS for CAProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Display the contents of each element of the array.
+ * PARAMETERS:    void (void)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:      Use ChunkArrayEnumHandles() to work through the array.
+ *		  Requires setting up a callback routine, that will
+ *		  be called for each element.  The callback routine is
+ *		  DisplayElementText().
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     1/96            Initial Version
+ *
+ ***********************************************************************/
+@method CAProcessClass, MSG_CAPROCESS_DISPLAY_ALL_ELEMENTS
+{
+    VMFileHandle  vmfile;
+    MemHandle     chunkArrayBlock;
+    ChunkHandle   chunkArrayChunk;
+    word	  dispBuffer;
+
+    vmfile = @call application::MSG_CAA_GET_VMFILE_HANDLE();
+EC( ECVMCheckVMFile( vmfile ); )
+    GetChunkArrayHandleAndChunk(vmfile,
+			&chunkArrayBlock, &chunkArrayChunk);
+EC( ECCheckLMemODHandles( chunkArrayBlock, chunkArrayChunk ); )
+
+    /*
+     * Set continueEnumerate to TRUE
+     */
+    @call application::MSG_CAA_SET_CONTINUE_ENUMERATE();
+    /*
+     * Initialize the display objects in the dialog box
+     */
+    @call DisplayElementIndex::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, 0);
+    @call DisplayElementContents::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+    /*
+     * Open up the dialog box in which to display the array's contents
+     */
+    @call EnumDisplayDBox::MSG_GEN_INTERACTION_INITIATE();
+    /*
+     * Enumerate through the array, calling DisplayElementText()
+     * for each element.
+     */
+    ChunkArrayEnumHandles(chunkArrayBlock, chunkArrayChunk,
+			  &dispBuffer, DisplayElementText);
+
+    VMUnlock(chunkArrayBlock);
+
+    /*
+     * Dismiss the dialog box in which to display the array's contents
+     */
+    @call EnumDisplayDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+} /* End of MSG_CAPROCESS_DISPLAY_ALL_ELEMENTS */
+
+
+
+
+/*
+ ***************************************************************************
+ *                Code for CAAppClass
+ ***************************************************************************
+ */
+/***********************************************************************
+ *                MSG_CAA_GET_VMFILE_HANLE for CAAppClass
+ ***********************************************************************
+ * SYNOPSIS:      Return the vmfilehandle stored in CAAI_vmfile.
+ * PARAMETERS:    VMFileHandle (void)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:      return the vmfilehandle stored in CAAI_vmfile
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      1/96            Initial Version
+ *
+ ***********************************************************************/
+@method CAAppClass, MSG_CAA_GET_VMFILE_HANDLE
+{
+    return(pself->CAAI_vmfile);
+}
+
+
+
+/***********************************************************************
+ *                MSG_CAA_SET_VMFILE_HANLE for CAAppClass
+ ***********************************************************************
+ * SYNOPSIS:      Set CAAI_vmfile to the passed vmfilehandle.
+ * PARAMETERS:    void (VMFileHandle)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:      set CAAI_vmfile to the passed vmfilehandle
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      1/96            Initial Version
+ *
+ ***********************************************************************/
+@method CAAppClass, MSG_CAA_SET_VMFILE_HANDLE
+{
+    pself->CAAI_vmfile = vmfile;
+}
+
+
+
+/***********************************************************************
+ *                MSG_CAA_GET_CONTINUE_ENUMERATE for CAAppClass
+ ***********************************************************************
+ * SYNOPSIS:      Return the Boolean value stored in
+ *		  CAAI_continueEnumerate.
+ * PARAMETERS:    Boolean (void)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC	2/96		Initial Version
+ *
+ ***********************************************************************/
+@method CAAppClass, MSG_CAA_GET_CONTINUE_ENUMERATE
+{
+    return(pself->CAAI_continueEnumerate);
+}
+
+
+/***********************************************************************
+ *                MSG_CAA_[SET|CLEAR]_CONTINUE_ENUMERATE for CAAppClass
+ ***********************************************************************
+ * SYNOPSIS:      [Sets to TRUE|clears to FALSE] the Boolean value stored
+ *		  in CAAI_continueEnumerate.
+ * PARAMETERS:    void (void)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     2/96            Initial Version
+ *
+ ***********************************************************************/
+@method CAAppClass, MSG_CAA_SET_CONTINUE_ENUMERATE
+{
+    pself->CAAI_continueEnumerate = TRUE;
+}
+
+
+
+@method CAAppClass, MSG_CAA_CLEAR_CONTINUE_ENUMERATE
+{
+    pself->CAAI_continueEnumerate = FALSE;
+}
+

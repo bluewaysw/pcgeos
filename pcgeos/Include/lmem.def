@@ -1,0 +1,190 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		lmem.def
+
+AUTHOR:		John Wedgwood, Apr 13, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jcw	4/13/89		Initial revision
+
+
+DESCRIPTION:
+	Include file for people using the local memory manager.
+		
+	$Id: lmem.def,v 1.1 97/04/04 14:23:26 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__LOCALMEM
+
+StartKernel
+
+global MemAllocLMem:far
+global LMemInitHeap:far
+global LMemAlloc:far
+global LMemFree:far
+global LMemReAlloc:far
+global LMemInsertAt:far
+global LMemDeleteAt:far
+global LMemContract:far
+
+;-
+
+global MEMALLOCLMEM:far
+global LMEMINITHEAP:far
+global LMEMREALLOC:far
+global LMEMINSERTAT:far
+global LMEMDELETEAT:far
+global LMEMCONTRACT:far
+global LMEMGETCHUNKSIZE:far
+global LMEMALLOC:far
+global LMEMFREE:far
+global LMEMDEREF:far
+
+;------------------------------------------------------------------------
+;	Definitions for local memory block structures
+;------------------------------------------------------------------------
+
+;	Types of local memory blocks
+
+LMemType 		etype word
+LMEM_TYPE_GENERAL 	enum LMemType
+LMEM_TYPE_WINDOW 	enum LMemType
+LMEM_TYPE_OBJ_BLOCK 	enum LMemType
+LMEM_TYPE_GSTATE 	enum LMemType
+LMEM_TYPE_FONT_BLK 	enum LMemType
+LMEM_TYPE_GSTRING 	enum LMemType
+LMEM_TYPE_DB_ITEMS	enum LMemType
+
+;	Flags for a local memory block
+
+LocalMemoryFlags	record
+	LMF_HAS_FLAGS:1		;True if block has a flags block
+	LMF_IN_RESOURCE:1	;True if block is just loaded from resource
+	LMF_DETACHABLE:1	;True if block is detachable
+	LMF_DUPLICATED:1	;True if block created by ObjDuplicateResource
+	LMF_RELOCATED:1		;True if block is being relocated
+	LMF_AUTO_FREE:1		;Indicates that block may be freed when in-use
+				;count hits 0.
+	LMF_IN_LMEM_ALLOC:1	;EC ONLY -- In the middle of an LMemAlloc, do
+				;not try to do a ECLMemValidateHeap
+				;INTERNAL FLAG -- DO NOT MODIFY
+	LMF_IS_VM:1		;True if block is stored in VM file and should
+				; be marked dirty whenever a chunk is marked
+				; dirty.
+	LMF_NO_HANDLES:1	;Block does not have handles (malloc like)
+				;Chunk handles are actually pointers
+				;to the chunks, and needn't be dereferenced.
+
+	LMF_NO_ENLARGE:1	;Do not enlarge block to try to alloc
+	LMF_RETURN_ERRORS:1	;Return errors when allocation impossible
+	:1
+	:1
+	LMF_DEATH_COUNT:3	;Means nothing if 0, else is # of death
+				;methods left which must hit
+				;BlockDeathCommon before it will destroy
+				;the block. Used by MSG_FREE_DUPLICATE &
+				;MSG_REMOVE_BLOCK
+LocalMemoryFlags	end
+
+;	Structure at the beginning of every local-memory block.
+
+LMemBlockHeader	struct
+    LMBH_handle		hptr			; handle to this block.
+    LMBH_offset		nptr.word		; offset to handle table.
+    LMBH_flags		LocalMemoryFlags <>
+    LMBH_lmemType	LMemType LMEM_TYPE_GENERAL; type of the block.
+    LMBH_blockSize	word			; size of the block.
+    LMBH_nHandles	word			; # of handles allocated.
+    LMBH_freeList	lptr			; pointer to first free block.
+    LMBH_totalFree	word			; sum of sizes of free blocks.
+LMemBlockHeader	ends
+
+;------------------------------------------------------------------------
+;	Constants and structures passed to local memory routines
+;------------------------------------------------------------------------
+
+; Standard values to pass to LMemInitHeap
+
+STD_INIT_HEAP		= 256		; size of heap to start with. (si)
+STD_INIT_HANDLES	= 16		; # of handles to start with. (cx)
+
+STD_LMEM_OBJECT_FLAGS	equ	(mask LMF_HAS_FLAGS or mask LMF_RELOCATED)
+
+;------------------------------------------------------------------------
+;	Macros for local memory chunks
+;------------------------------------------------------------------------
+
+;	Offset from a pointer to a chunk to the size of that chunk.
+;	THIS SHOULD ONLY BE USED IN EXCEPTIONAL CIRCUMSTANCES.
+;
+LMC_size	=	-2	; offset to size of block.
+
+;---
+
+;
+; Macros for getting the size of a local memory chunk.
+;
+; ChunkSizePtr( segment, ptr, result );
+; ChunkSizeHandle( segment, handle, result );
+;
+ChunkSizePtr	macro	chunkSegment, chunkPtr, result
+	local	boff
+
+EC <	cmp	chunkPtr, -1						>
+EC <	jne	boff							>
+ifdef	_Kernel
+ if	@CurSeg eq kcode
+  EC <	call	ChunkSizePtrError					>
+ else
+  EC <	ERROR	CAN_NOT_USE_CHUNKSIZEPTR_MACRO_ON_EMPTY_CHUNKS		>
+ endif
+else
+ EC <	ERROR	CAN_NOT_USE_CHUNKSIZEPTR_MACRO_ON_EMPTY_CHUNKS		>
+endif
+EC <boff:								>
+
+	mov	result, chunkSegment:[chunkPtr].LMC_size
+	dec	result
+	dec	result
+endm
+
+;---
+
+ChunkSizeHandle	macro	chunkSegment, chunkHandle, result
+	local	done, quit
+
+ifdif	<result>,<si>	
+	push	si		; result somewhere other than SI, but we
+				;  need a trash register, so SI is it
+endif
+if (((.type (chunkHandle)) and 0x2010) eq 0x2010) or \
+    (((.type (chunkHandle)) and 0x812) eq 0x802)
+	; chunkHandle is either an indirectable register or it's an lmem chunk
+	mov	si, chunkSegment:[chunkHandle]
+else
+	; chunkHandle is a non-indirectable register or something not 
+	; an lmem chunk, so load it into si before indirecting
+	mov	si, chunkHandle
+	mov	si, chunkSegment:[si]
+endif
+	inc	si
+	je	done
+	mov	si, chunkSegment:[si-1].LMC_size
+	dec	si
+	dec	si
+done:
+ifdif	<result>,<si>	
+	mov	result, si
+	pop	si
+endif
+
+endm
+
+EndKernel

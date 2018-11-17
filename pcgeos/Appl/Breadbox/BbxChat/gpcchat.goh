@@ -1,0 +1,218 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/***************************************************************************
+ *  FILE:  GPCCHAT.GOH
+ ***************************************************************************/
+	  
+/* Set this to dump all incoming messages to file */
+/* @define DUMP_TO_FILE    */
+
+/***************************************************************************
+ *		Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <socket.goh>
+#include <sockmisc.h>
+#include <initfile.h>
+@include <Objects\Text\TCtrlC.goh>
+@include <accpnt.goh>
+
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <ansi\stdlib.h>
+#include <ansi\ctype.h>
+
+@include <parentc.goh>
+@include <Objects\gSysC.goh>
+
+#define   IRC_DOMAIN    "TCPIP"
+#define   IRC_TIMEOUT   (60*60)
+
+#define   RPL_LISTSTART      321
+#define   RPL_LIST           322
+#define   RPL_LISTEND        323
+#define   RPL_TOPIC          332
+#define   RPL_NOTOPIC        331
+#define   RPL_NAMREPLY       353
+#define   RPL_ENDOFNAMES     366
+#define   RPL_MOTD           372
+#define   RPL_NO_MOTD        422
+#define   RPL_MOTDSTART      375
+#define   RPL_ENDOFMOTD      376
+#define   RPL_NICKNAMEINUSE  433
+#define   RPL_NO_SUCH_CHAN   403 
+
+#define	MAIN_ENTRY_PASTE	10
+#define	MAX_PRIV_MSGS	5
+#define	PRIV_DBOX_START  3  /* based on # of kids in @IRCDialogs */
+#define   NICK_LEN 51
+#define   GPC_NICK_LEN 15
+
+typedef struct {
+     TcpAccPntExtendedAddress UTA_link;
+     TCHAR                    UTA_ip[MAX_IP_ADDR_STRING_LENGTH];
+} UnresolvedTCPAddress;
+
+typedef struct {
+     SocketAddress            RTA_sock;
+     TcpAccPntResolvedAddress RTA_addr;
+} ResolvedTCPAddress;
+
+typedef struct {
+	char            PHS_nick[NICK_LEN];
+	Boolean		 PHS_ignore;
+} PeopleHereStruct;
+
+/*=========================================================================*
+ *  Global data:
+ *=========================================================================*/
+
+extern ResolvedTCPAddress   hostaddr;
+extern word G_ircError ;
+extern Socket G_sock;
+extern TimerHandle G_timer;
+extern word G_timerID ;
+
+extern char G_currentChannel[80];
+extern char G_currentNick[NICK_LEN];
+extern char G_firstChannel[80];
+extern char G_prevChannel[80];
+
+extern Boolean logging;
+extern FileHandle LogFileHandle;
+@ifdef DUMP_TO_FILE
+extern FileHandle DumpFileHandle;
+@endif
+extern word G_numPrivMsgs;
+extern optr G_privMsgArray;
+extern optr G_chanOpenArray;
+extern word G_numChansOpen;
+extern optr G_curDisplay;
+extern optr G_curList;
+
+extern Boolean G_ImAnOper;
+extern Boolean g_canSlash;
+extern word	g_personSelected;
+//extern Boolean g_onTV;
+extern word g_sysPointSize;
+
+extern Boolean g_notified;
+extern Boolean G_startupPassword;
+
+extern Boolean g_pastMOTD;
+//extern Boolean g_isCUI;
+
+/* jfh - added 1/23/01 to allow use of other chat servers... also
+ * activates the change nick option on the main menu */
+extern Boolean g_isOpenSystem;
+
+/*  PROTOTYPES  *******************************************************/
+
+void IRCSendData(char *p_data, word len);
+void IRCSendString(char *p_str);
+Boolean IRCOpen(char *siteName, word sitePort, word accPnt);
+void IRCClose(void);
+char *SkipSpaces(char *p_text);
+char *GetSpaceDelimited(char *p_text, char *section, word sectionLimit);
+void ParseNicknameFromServerString(char *p_server,
+							char *p_nickname,
+							word nickMaximum);
+void DisplayText(char *p_msg, optr whichDisplay, Boolean needTrans);
+void DisplayMsg(char *p_msg, optr whichDisplay, Boolean needTrans);
+void DisplayError(void);
+void OutputTextPastColon(char *p_msg);
+Boolean IsValidNick(char nick[NICK_LEN]);
+word GetValueOfKey(char *key, char *value);
+
+    /*---------------------------------------------------------------------*/
+    @class IRCProcessClass, GenProcessClass ;
+   //     @message void MSG_IRC_CLOSE_TIP();
+    	   @message (GEN_TRIGGER_ACTION) MSG_IRC_SEND_LINE ; 
+	   @message void MSG_IRC_START_CONNECT() ;
+        @message void MSG_IRC_END_CONNECT() ;
+        @message void MSG_IRC_DO_CONNECT() ;
+        @message void MSG_IRC_POLL_SOCKET() ;
+        @message void MSG_IRC_START_POLL_TIMER() ;
+		  @message void MSG_IRC_HANDLE_INCOMING_MESSAGE(
+		                     char *p_msg, Boolean needTrans, Boolean wasTrunc) ;
+	   @message void MSG_IRC_CHANGE_NICKNAME();
+	   @message void MSG_IRC_CONNECTION_ESTABLISHED() ;
+        @message void MSG_IRC_CONNECTION_SEVERED() ;
+	   @message void MSG_IRC_START_LOGGING();
+	   @message void MSG_IRC_APPEND_LOGGING();
+        @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_APPEND_LOG_SELECTOR_ACTION; 
+	   @message void MSG_IRC_STOP_LOGGING();
+	   @message (GEN_TRIGGER_ACTION) MSG_IRC_CLOSE_PRIV;
+	   @message (GEN_TRIGGER_ACTION) MSG_IRC_SEND_PRIV;
+	   @message void MSG_IRC_RECEIVE_PRIV(char *p_nick, char *p_text);
+	   @message void MSG_IRC_ABSORB_DBLCLICK();
+	   @message void MSG_IRC_GO_TO_CHAT_PORTAL();
+	   @message void MSG_IRC_OPENING_AUI_CHOICE();
+           @message void MSG_IRC_OPEN_PRIVATE_MESSAGE();
+           @message void MSG_IRC_SEND_IGNORE();
+    @endc
+    /*---------------------------------------------------------------------*/
+
+    @class IRCApplicationClass, GenApplicationClass ;
+		@message void MSG_IRC_LEAVE_CHANNEL() ;
+		@message void MSG_IRC_NEW_CHANNEL();
+		@message void MSG_IRC_ADD_CHANNEL();
+    @endc
+    
+    @class ChannelGenDisplayClass, GenDisplayClass ;
+    @endc
+
+    @class NickGenTextClass, GenTextClass ;
+    @endc
+    
+    @class MyGenFileSelectorClass, GenFileSelectorClass;
+    @endc
+
+    @class ChatTextClass, GenTextClass;
+    @message void MSG_IRC_CHAT_SEND_LINE();
+    @endc
+
+    @class PrivTextClass, GenTextClass;
+    @endc
+
+    @class ChatGenInteractionClass, GenInteractionClass;
+    @endc
+
+    /*---------------------------------------------------------------------*/
+    @class GenTextLimitClass, GenTextClass ;
+	   @instance word GTXLI_maxLines = 100 ;
+	   @instance word GTXLI_cutLines = 80 ;
+	   @message void MSG_GEN_TEXT_LIMIT_TRIM_LINES() ;
+    @endc
+    /*---------------------------------------------------------------------*/
+
+@class SortDynamicListClass, GenDynamicListClass ;
+    @instance word SDLI_maxEntries = 100 ;
+    @instance optr SDLI_array = NullHandle ;
+    @message void MSG_SORT_LIST_ADD_ITEM(char *p_item) ;
+    @message void MSG_SORT_LIST_ADD_ITEM_QUIETLY(char *p_item) ;
+    @message Boolean MSG_SORT_LIST_RENAME_ITEM(char *p_oldItem, char *p_newItem) ;
+    @message Boolean MSG_SORT_LIST_DELETE_ITEM(char *p_item) ;
+    @message void MSG_SORT_LIST_CLEAR() ;
+    @message void MSG_SORT_LIST_UPDATE() ;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_SORT_LIST_QUERY ;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SORT_LIST_APPLY;
+    @message void MSG_OPEN_PRIVATE_MESSAGE();
+    @message void MSG_SEND_IGNORE();
+    @message optr MSG_SORT_LIST_GET_ARRAY_OPTR();
+@endc ;
+
+    
+

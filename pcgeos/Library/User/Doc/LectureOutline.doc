@@ -1,0 +1,226 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		Outline
+
+DESCRIPTION:	UI Presentation outline for
+		One-Day Developer's Conference
+
+	$Id: LectureOutline.doc,v 1.2.34.1 97/03/29 03:36:54 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+
+
+The basic approach is:
+
+	1) Goals. 
+		This section is designed to build energy, excitement about
+	   	our outrageously cool UI
+
+	2) The Generic UI object set.
+		Basics.  The idea is to make it seem simple & powerful, handling
+		all the ugly stuff internally, so that app developer can focus
+		on their app.  Build up to high-level cool stuff done by system.
+
+	3) Some Characteristics common to all Generic UI Objects.
+		Detail neat aspects of VisualMonikers, Hints, & existence of
+		Geometry Manager.
+
+	4) Life Cycle of an Application with regards to the UI.
+		By this time, they're wondering just two things:  How do I use
+		it, & what the heck is left for ME to have to do?   This section
+		is designed to give them a cozy understanding of how they'll
+		piece together a UI, what their code will be doing, & what
+		freedoms exist.
+
+
+The actual outline is as follows (Note: this has been entered into a nice
+GeoWrite document & cleaned up somewhat as well):
+
+        1) Goals
+		Efficiency
+			-> Extraction of commmonly needed code into
+			   system libraries, for smaller apps, quicker
+			   development
+			-> Speed, Memory usage
+
+		Isolation of Application from User Interface Implementation
+			-> Results:
+				-> Interface consistency
+				-> Ability to improve/change user interface
+				   technology transparently to applications,
+				   including:
+					-> Multiple Specific UIs
+					-> Scalable UI
+					-> UI enhancement (Spell checker/Pen...)
+			-> Accomplished via Generic, Object-Oriented API:
+				-> Functional Abstraction, in multiple levels
+				-> Storage of Subjective Design Considerations/
+		      		   distillation of component's Essense, Context
+		      		   into data format.
+				-> Shift of design burden towards specific UI
+				-> Provisions for customization
+
+		A nice environment for our users!
+			-> MOTIF compliant interface
+			-> Express menu for EZ access to applications
+			-> Tear-off, sub-menus
+			-> System state save on shutdown, restore on startup
+			-> Growing list of modules which plug naturally into
+			   the system-wide UI:
+				-> Printer control panel, Print to [file/FAX/
+				   preview/etc, etc.], DOS-switching, Spell-
+				   checking, Help
+
+        2) The Generic UI Object Set
+	    -> Application UI is constructed via tree of Generic Objects
+
+		GenApplication
+		GenPrimary
+		GenInteraction (summons)
+			-> Menus
+			-> Dialog boxes
+			-> Modal windows
+			-> Standard summons types
+			-> Property boxes
+		Gadget
+			GenGlyph
+			GenTrigger
+				-> data option
+			GenList/GenListEntry
+				-> checked menu items
+				-> checkboxes
+				-> scrolling list
+			GenValue
+			GenText (display/edit)
+			GenFileSelector
+			Custom  (GenGadget/GenSpinGadget)
+		GenView/GenContent
+		High Level
+			Gen[App/UI]DocumentControl/GenDocument
+			GenEditControl
+			GenDisplayControl/GenDisplay
+			GenHelpControl
+		Library extensions possible (SpoolPrintControl, IMPEX)
+
+	3) Some Characteristics common to all Generic UI Objects
+		VisualMoniker
+			-> Icon/text/color/size independance
+			-> TOKEN.DB to cache app monikers
+		Hints
+			-> Variable-sized, open-ended data storage for
+				extensibility
+			-> Command (Help specific UI decide what to do)
+			-> Declarative  (Give specific UI enough info to do
+			   		 the right thing, provide general info
+					 for future/other specific UI's)
+			-> Some possibilities for the future
+			   	(short/long menus, help...)
+
+		Note:  No visual positions/bounds!
+			-> Built-in Geometry Manager
+			-> Solves problem of variable specific-UI gadget sizes
+			-> Simplifies localization
+
+	4) Life Cycle of an Application with regards to the UI
+		Static Declaration
+			-> Declare object model at compile time, using UIC
+			-> Objects can be placed in multiple resources,
+			   linked across blocks
+			-> Programming option of object -vs- procedural
+
+		Thread model
+			-> Separate thread for UI, or one thread for all
+			-> Can remote call to UI thread, but not other way
+
+		Startup
+			-> Default behavior of GenProcessClass
+			-> UI_OPEN_APPLICATION
+
+		Communication
+			-> References from code (by name)
+			-> Storage of OD's as created
+			-> Flavors of ObjMessage
+			-> By traversal: GUP/CallChildren/FindParent/
+				GUP_QUERY_CLASS, etc.
+
+		Dynamic Alteration: (Instantiation/Manipulation/Destruction)
+			-> ObjInstantiate, ObjDuplicateResource, GEN_COPY_TREE
+			-> GEN_SET_[NOT]_USABLE, GEN_ADD/REMOVE_CHILD
+			-> OBJ_FREE, ObjFreeDuplicate, GEN_DESTROY
+
+		Typical Interactions with object set:
+			GenDocumentControl/GenDocument
+				-> Respond to requests to open/close/save/save
+				   as files, or create a new one.
+			GenView
+				-> Handle exposure, relay user requests for 
+				   view scaling/implement alternate view modes,
+				   implement user interaction within view.
+				   (Back to input handling in a bit...)
+			GenInteraction (summons)
+				-> Initiate/Dismiss if handling manually
+				-> Use of UserDoDialog/UserStandardDialog
+				-> Property box interaction
+			Gadgets (Triggers, lists, etc.):
+				-> Enable/disable as applicable
+				-> Update states/lists/monikers
+				-> Respond to user selections/invocations
+			Custom gadgets (infrequently used)
+				-> Implement completely, using low-level
+				   generic & visible methods to help out.
+			GenText
+				-> Whatever options offerred by app would
+				   be processed & requests sent on to
+				   text object.  Implements all selection/
+				   type insertion itself.  Interaction with
+				   larger document would have to be taken
+				   care of.
+			GenEditControl
+				-> Interact w/clipboard to implement cut/copy
+				   past for your data types  (Note code is
+				   fairly trivial for text object case)
+			GenDisplayControl/GenDisplay
+				-> Open & close new displays as need.
+				   Windows menu auto-updates
+			GenHelpControl
+				-> Nothing to do but notify help system of
+				   current context, (if context sensitive help
+				   desired), hyper-link document is presented,
+				   executed by UI
+			SpoolPrintControl
+				??????
+
+		Input Model (For implementing View interior or custom Gadget):
+			Mouse
+				-> Implied grab
+				-> View support for mouse
+				   (auto-grab, auto-scroll)
+				-> Mouse methods (types, double-click, drag)
+				-> Visible tree:  Control via Mouse grab,
+				   GAINED/LOST
+				-> Quick transfer
+			Focus/Target, Kbd
+				-> Focus, target definitions
+				-> Hierarchical, benefits
+				-> Control via Hints/Methods/Routines,
+				   GAINED/LOST
+				-> Text object does everything for you, but
+				   if handling yourself:  KBD method
+			 	   (CharValue, much info)
+				-> Default processing of kbd shortcuts,
+				   mnemonics
+			Input flow control
+				-> Application input state (busy, hold-up,
+				   ignore, controlled via GenApplication object)
+				-> Brief note on IM:  monitors, screen saver,
+				   mouse constrain, bump possibilities.
+
+		Going down
+			-> UI_CLOSE_APPLICATION
+			-> State saving
+

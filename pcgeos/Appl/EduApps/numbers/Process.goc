@@ -1,0 +1,308 @@
+/***********************************************************************
+ *
+ *  Copyright (c) Cool Lava Productions 1998 -- All Rights Reserved
+ *                Breadbox Computer Company
+ * PROJECT:   Kids' NUMBERS
+ * MODULE:    Process
+ * FILE:      process.goc
+ *
+ * AUTHOR:    Duane E. Char
+ *
+ * REVISION HISTORY:
+ *  Date        Name                Description
+ *  ----        ----                -----------
+ ************************************************************************/
+
+//@include <stdapp.goh>
+@define __NUMBERS_PROCESS_GOC
+@include "numbers.goh"
+@include "password.goh"
+#include <ansi/string.h>
+#include <initfile.h>
+#include <token.h>
+
+@classdecl      NumbersProcessClass, neverSaved;
+
+@extern method NumbersProcessClass, MSG_VME_VALUE_APPLY;
+@extern method NumbersProcessClass, MSG_VME_SEND_A_MESSAGE;
+@extern method NumbersProcessClass, MSG_VME_LOAD_PAGE;
+@extern method NumbersProcessClass, MSG_VME_ADD_PAGE;
+@extern method NumbersProcessClass, MSG_VME_DELETE_PAGE;
+@extern method NumbersProcessClass, MSG_VME_SAVE_PAGE;
+@extern method NumbersProcessClass, MSG_VME_TEXT_STATUS;
+
+/***************************************************************************
+ * MSG_GEN_PROCESS_INSTALL_TOKEN
+ ***************************************************************************
+ * SYNOPSIS:    Sent by desktop to get process to install its token and
+ *              moniker lists.
+ *
+ * PARAMETERS:  none
+ *
+ * STRATEGY:    Call the superclass to install the application icon.
+ *              Check and install the document icon.
+ *
+ **************************************************************************/
+@method NumbersProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+dword tokenChars = TOKEN_CHARS(FILE_TOKEN[0], FILE_TOKEN[1], (dword)FILE_TOKEN[2],
+      (dword)FILE_TOKEN[3]);
+TokenFlags tokenFlags;
+
+    /* Install application icon. */
+    @callsuper();
+    
+    if (!TokenGetTokenInfo(tokenChars, MANUFACTURER_ID_BREADBOX, &tokenFlags))
+        TokenDefineToken(tokenChars, MANUFACTURER_ID_BREADBOX,
+          @NumbersDocIconList, 0);
+}
+
+/***********************************************************************
+ *      MSG_GEN_PROCESS_OPEN_APPLICATION for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Set up application's data structures. 
+ *              Called by system
+ * PARAMETERS:      void(AppAttachFlags         attachFlags,
+ *                   MemHandle          launchBlock,
+ *                   MemHandle          extraState);
+ *
+ * STRATEGY:    Application is starting up, either because user
+ *               has started the application or because the whole
+ *               system is re-starting.
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION 
+{
+	 Boolean		initReadErr, isOn;
+    char			uiStr[50];
+    word			size;
+    optr            content;
+    DisplayScheme   display;
+
+    /* if we're on a Yago machine set the flag */
+    g_onYago = FALSE;
+    initReadErr = InitFileReadStringBuffer("ui",
+								 "specific",
+								 &uiStr,
+								 50,
+								 &size);
+    if (!initReadErr)  {
+	  if (!strcmp(uiStr, "yago.geo")) {
+		/* it is a Bro UI...
+		 * now check to see if it is BroWorks on a PC */
+		initReadErr = InitFileReadStringBuffer("ui",
+								 "productName",
+								 &uiStr,
+								 50,
+								 &size);
+
+		if (strcmp(uiStr, "Yago PC-Demo"))  g_onYago = TRUE;
+		}
+	  }
+
+
+    /* Set the proper content for the view depending on the screen aspect ratio. */
+    @call application::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&display);
+    if (((display.DS_displayType & DT_DISP_ASPECT_RATIO)
+        >> DT_DISP_ASPECT_RATIO_OFFSET) == DAR_VERY_SQUISHED)
+        content = @NumbersContentSS;
+    else
+        content = @NumbersContentLS;
+
+    g_isColor = !((display.DS_displayType & DT_DISP_CLASS) == DC_GRAY_1);
+        
+    @call NumbersView::MSG_GEN_VIEW_SET_CONTENT(content);
+	 @callsuper();
+
+
+	 LoadSounds() ;
+    SoundStart() ;
+	 InitFileReadBoolean("knumbers", "soundOn", &isOn);
+    if (!isOn)
+        @call oself::MSG_KN_PROCESS_TOGGLE_SOUND_ON_OFF() ;
+
+}
+
+/***********************************************************************
+ *      MSG_GEN_PROCESS_CLOSE_APPLICATION for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Free up the memory we allocated.  Actually, we could
+ *                probably rely on the system to do this for us.
+ *              Called by system
+ * PARAMETERS:  MemHandle(void);    
+ *
+ * SIDE EFFECTS:    Find the VM file, lock it, and get a random record
+ *		from it.
+ *
+ * STRATEGY:    Application is shutting down, either because of user
+ *               exit or because whole system is shutting down.
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *  DC      3/98        Initial Revision
+ *  DC  7/98            done
+ *
+ ***********************************************************************/
+@method NumbersProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+    SoundStop() ;
+	 @callsuper();
+    return NULL;
+}
+
+@method NumbersProcessClass, MSG_KN_PROCESS_TOGGLE_SOUND_ON_OFF
+{
+    if (G_soundIsOn)  {
+        G_soundIsOn = FALSE ;
+		  @call NumbersSoundOnOff::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+						@SoundOffMoniker,
+                  VUM_DELAYED_VIA_UI_QUEUE) ;
+    } else {
+        G_soundIsOn = TRUE ;
+		  @call NumbersSoundOnOff::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                  @SoundOnMoniker,
+                  VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+	 InitFileWriteBoolean("knumbers", "soundOn", G_soundIsOn);
+}
+
+@method NumbersProcessClass, MSG_KN_PROCESS_UPDATE_SOUND
+{
+    UpdateSound() ;
+    G_soundTimer = TimerStart(
+                   TIMER_EVENT_ONE_SHOT,
+                   ConstructOptr(GeodeGetCodeProcessHandle(), 0),
+                   1,
+						 MSG_KN_PROCESS_UPDATE_SOUND,
+                   1,
+                   &G_soundTimerId) ;
+}
+
+/***********************************************************************
+ *      MSG_PROCESS_GET_DB_INFO for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Get another random record
+ *              Called by user when pressing the NEXT PAGE	button
+ * PARAMETERS:  Boolean fromEditor
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:    Lock the VM file and get a random record for display
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersProcessClass, MSG_PROCESS_GET_DB_INFO {
+ DBGroupAndItem          mapitem;
+ DBItem                  pageitem;
+ DBGroup                 ourgroup;
+ PageStruct              *ps;
+ ListNode                *tmp;
+ int							 i;
+// optr content;
+
+	if (g_dbFileHan == NullHandle)
+        return;
+        
+/*	if (!fromEditor)
+		if(g_linesDrawn < 7) return; /* if the user has not completed all 7
+												  matches, then force a return to the
+												  screen.  This prevents the user from
+												  just skipping around */
+
+/* lock the VM file and extract the info from the DBMapItem */
+	mapitem = DBGetMap(g_dbFileHan);
+	ps = (PageStruct *) DBLockUngrouped(g_dbFileHan, mapitem);
+
+/*now extract the number of records, the first DBItem and the DBGroup */
+	g_numPages = ps->VME_size;  /* needed only when returning from editor */
+	pageitem = ps->VME_head;
+	ourgroup = ps->VME_group;
+	DBUnlock(ps);
+	
+
+/* instead of doing a randomize where we may get the same page again, we'll
+	get the next page in our shuffled array of pages */
+	for (i=0; i < g_shuffledPages[g_pageNumber]; i++) {
+		tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+		pageitem = tmp->LN_next;
+		DBUnlock(tmp);
+	}
+/* extract info from random record, put into global vars */
+	tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+	strcpy(g_dbWord1, tmp->word1);
+	strcpy(g_dbDef1, tmp->def1);
+	strcpy(g_dbWord2, tmp->word2);
+	strcpy(g_dbDef2, tmp->def2);
+	strcpy(g_dbWord3, tmp->word3);
+	strcpy(g_dbDef3, tmp->def3);
+	strcpy(g_dbWord4, tmp->word4);
+	strcpy(g_dbDef4, tmp->def4);
+	strcpy(g_dbWord5,tmp->word5);
+	strcpy(g_dbDef5, tmp->def5);
+	strcpy(g_dbWord6, tmp->word6);
+	strcpy(g_dbDef6, tmp->def6);
+	strcpy(g_dbWord7, tmp->word7);
+	strcpy(g_dbDef7, tmp->def7);
+	DBUnlock(tmp);
+
+//	 content = @call NumbersView::MSG_GEN_VIEW_GET_CONTENT();
+//	@send content::MSG_VIS_CONTENT_NEW_PAGE(); /*display this new record*/
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_RESTART_SAME_DRILL for NumbersProcessClass
+ *
+ * DESCRIPTION:	Called by trigger on score dbox
+ *
+ *
+ ***********************************************************************/
+@method NumbersProcessClass, MSG_RESTART_SAME_DRILL
+{
+ optr		content;
+
+
+	ShufflePages();
+   g_pageNumber = 0;
+   @call self::MSG_PROCESS_GET_DB_INFO(FALSE);
+	content = @call NumbersView::MSG_GEN_VIEW_GET_CONTENT();
+	@send content::MSG_VIS_CONTENT_BEGIN_GAME();
+//	@send content::MSG_VIS_CONTENT_NEW_PAGE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_PWORD_TO_EDITOR for NumbersProcessClass
+ *
+ * DESCRIPTION:	Checks the password before opening the editor dialog box
+ *
+ *
+ ***********************************************************************/
+@extern method NumbersProcessClass, MSG_OPEN_PWORD_TO_EDITOR
+{
+
+
+    /* check for proper password */
+	 if(!PwdCheckPasswordInINI(
+		  "Numbers",
+		  "pword",
+		  TRUE,
+		  TRUE)) return;
+
+    VMELoadFileCommon();
+    @send VMEEditor::MSG_GEN_INTERACTION_INITIATE();;
+
+}
+
+
+

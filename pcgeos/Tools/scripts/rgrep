@@ -1,0 +1,91 @@
+#!/bin/sh -
+#
+#	Script to recursively search directories and grep source files.
+#
+#	$Id: rgrep,v 1.26 98/03/12 18:10:22 allen Exp $
+#
+
+ignoreFlag=""
+
+grepCmd=egrep
+
+#
+# Option passed to 'find' to indicate whether it is case-sensitive or
+# case-insensitive search for file names. This option is only good for
+# GNU find that supports "-iname" option.
+#
+findcaseOption=-name
+
+while [ $# -gt 0 ]; do
+    case $1 in
+	-G)	grepCmd=grep;;
+	-F)	grepCmd=fgrep;;
+	
+	# Handle special grep options that require a second argument
+	# and pass them in grepOptions.
+	-f)	if [ $# -lt 2 ]; then
+		    echo "Not enough args for $1"
+		    exit 1
+		fi
+
+		grepOptions="$grepOptions $1 $2"
+		shift;;
+
+	# Pass this only if you have GNU find in your path
+	-nocase)
+		findcaseOption=-iname;;
+
+	-*)	grepOptions="$grepOptions $1";;
+	*)	break;;
+    esac
+
+    shift
+done
+
+if [ $# -eq 0 ]; then
+    echo 'Usage: rgrep [-G] [-F] [-nocase] [<grep options>]* pattern [path...]'
+    echo '    -G      Use grep instead of egrep'
+    echo '    -F      Use fgrep instead of egrep'
+    echo '    -nocase Match files case-insensitively (only if you have'
+    echo '            GNU find in your path)'
+    exit 0
+fi
+
+pattern="$1"
+shift
+
+if [ $# -eq 0 ]; then
+    pathlist="."
+else
+    pathlist="$*"
+fi
+
+find $pathlist $findcaseOption RCS -prune -o \( \
+		$findcaseOption \*.bas -o \
+		$findcaseOption \*.c -o \
+		$findcaseOption \*.cc -o \
+		$findcaseOption \*.cpp -o \
+		$findcaseOption \*.h -o \
+		$findcaseOption \*.ih -o \
+		$findcaseOption \*.hi -o \
+		$findcaseOption \*.uih -o \
+		$findcaseOption \*.asm -o \
+		$findcaseOption \*.def -o \
+		$findcaseOption \*.ui -o \
+		$findcaseOption \*.gp -o \
+		$findcaseOption \*.goc -o \
+		$findcaseOption \*.goh -o \
+		$findcaseOption \*.txt -o \
+		$findcaseOption \*.mk -o \
+		$findcaseOption \*.el -o \
+		$findcaseOption \*.tcl -o \
+		$findcaseOption \*.java -o \
+		$findcaseOption \*.pl -o \
+		$findcaseOption \*.filetree -o \
+		$findcaseOption \*.build \
+	\) -print | xargs $grepCmd -n $grepOptions "$pattern" /dev/null
+
+
+
+
+

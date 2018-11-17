@@ -1,0 +1,157 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+ *
+ * PROJECT:	  
+ * MODULE:	  UI Specification
+ * FILE:	  mailboxOutbox.uih
+ *
+ * AUTHOR:  	  Adam de Boor: May 10, 1994
+ *
+ * REVISION HISTORY:
+ *	Name	  Date	    Description
+ *	----	  ----	    -----------
+ *	ardeb	  5/10/94   Initial version
+ *
+ * DESCRIPTION:
+ *	
+ *
+ *
+ * 	$Id: mailboxOutbox.uih,v 1.1 97/04/05 01:19:57 newdeal Exp $
+ *
+ ***********************************************************************/
+
+class	OutboxProgress = MailboxProgressBox {
+	default visibility = dialog;
+	default type = progress;
+	transport = typeComp "MailboxTransport" : "";
+	transOption = wordComp : 0;
+	medium = typeComp "MediumType" : "";
+	lastMode = wordComp : 0;
+#if _TRANSMIT_THREADS_KEYED_BY_MEDIUM
+	templateMoniker = visMonikerComp;
+#endif	/* _TRANSMIT_THREADS_KEYED_BY_MEDIUM */
+
+/*
+ * Required hints:
+ *    ATTR_GEN_WINDOW_CUSTOM_PARENT { hptr 0 }
+ *    ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY { LayerPriority LAYER_PRIO_ON_TOP }
+ */
+}
+
+#if	_CONTROL_PANELS
+class	OutboxMessageList = MessageList {
+	transmitQueue = dwordComp : 0;
+	transmitID = wordComp : 0;
+	currentTime = typeComp "FileDateAndTime" : "";
+	sigAddrBytes = wordComp : 0;
+	default attrs = default +checkBeforeRemoval, sourceQueue outbox;
+}
+#endif	/* _CONTROL_PANELS */
+
+#if	! _OUTBOX_SEND_WITHOUT_QUERY
+class	OutboxSendableConfirmation = MessageSendableNotifyDialog {
+	useIdleTimeout = byteComp : BB_FALSE;
+	idleTimerHandle = hptrComp : null;
+	idleTimerID = wordComp : 0;
+}
+#endif	/* ! _OUTBOX_SEND_WITHOUT_QUERY */
+
+#define	OC_SUPER	GenInteraction
+
+class	OutboxConfirmation = OC_SUPER {
+	default type = notification;
+	default visibility = dialog;
+	message = typeComp "MailboxMessage" : "";
+	talID = wordComp : 0;
+}
+
+#if	_QUERY_DELETE_AFTER_PERMANENT_ERROR
+
+class	OutboxErrorRetry = GenInteraction {
+	default type = multipleResponse;
+	default visibility = popup;
+	message = typeComp "MailboxMessage" : "";
+	talID = wordComp : 0;
+	delay = wordComp : 0;
+}
+
+#endif	/* _QUERY_DELETE_AFTER_PERMANENT_ERROR */
+
+#if	_CONTROL_PANELS || _POOF_MESSAGE_CREATION
+
+class	OutboxTransportList = GenDynamicList {
+	monikerSource = nptrComp : null;
+	attrs = bitFieldComp byte {
+		initialized, notifyOfInitialSet
+	} : {};
+}
+
+#endif	/* _CONTROL_PANELS || _POOF_MESSAGE_CREATION */
+
+class	OutboxTransportMenu = GenInteraction {
+	attrs = bitFieldComp byte {
+		bringsUpWindow
+	} : {};
+	destination = optrComp : null;
+	actionMsg = wordComp : 0;
+	monikerSource = nptrComp : null;
+}
+
+class	OutboxTransportMonikerSource = meta {
+	transports = nptrComp : null;
+	type = enumComp byte {
+			panel, menuUI, toolUI, filtered
+		} : panel;
+	filter = wordComp : 0;
+}
+
+#if	_CONTROL_PANELS
+class	OutboxDetails = MessageDetails {
+	curID = wordComp : 0;
+}
+#endif	/* _CONTROL_PANELS */
+
+#if	_CONTROL_PANELS
+class	OutboxControlPanel = MessageControlPanel {
+}
+#endif	/* _CONTROL_PANELS */
+
+#if	_POOF_MESSAGE_CREATION
+class	OutboxPoofMenu = GenInteraction {
+	attrs = bitFieldComp byte {
+		bringsUpWindow
+	} : {};
+}
+#endif	/* _POOF_MESSAGE_CREATION */
+
+#if	_RESPONDER_OUTBOX_CONTROL
+
+class	OutboxControlHeaderView	= GenView {
+}
+
+class	OutboxControlHeaderGlyph = GenGlyph {
+}
+
+#endif	/* _RESPONDER_OUTBOX_CONTROL */
+
+#define	OCMLSuper	OutboxMessageList
+
+class	OutboxControlMessageList = OCMLSuper {
+	default attrs = default +checkBeforeRemoval, sourceQueue outbox;
+}
+
+#if	_OUTBOX_FEEDBACK
+
+class 	OutboxFeedbackNote = FlashingNote {
+	msg = dwordComp : 0;
+	dialog = optrComp : null;
+}
+
+class	OutboxFeedbackGlyph = GenGlyph {
+ 	static /* timer */ wordComp : 0;
+	static /* timerID */ wordComp : 0;
+	static /* curFrame */ wordComp : 0;
+}
+
+#endif	/* _OUTBOX_FEEDBACK */

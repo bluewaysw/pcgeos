@@ -1,0 +1,190 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Breadbox Word Search Maker
+ * FILE:		wsm.goh
+ * AUTHOR:	Dave Hunter   6/99
+ *
+ *
+ * DESCRIPTION:
+ *	          
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <token.h>
+#include <gstring.h>
+#include <initfile.h>
+
+/***************************************************************************
+ * Constants
+ **************************************************************************/
+
+#define MANUFACTURER_ID_BREADBOX    16431
+
+#define GRID_MIN_SIZE       5
+#define GRID_MAX_SIZE       40
+#define GRID_DEFAULT_SIZE   10
+#define WORD_MIN_SIZE       3
+#define WORD_MAX_SIZE       30
+#define WORD_LIST_MAX_SIZE  50
+#define DEFAULT_LEVEL       WSL_EASY
+#define WORD_LIST_ELEMENT_SIZE  ( WORD_MAX_SIZE + 1 )
+
+#define GRID_SPACE          ( ' ' )
+
+#define GRID_NUM_CALC_TRIES             5
+#define GRID_NUM_RANDOM_PLACE_TRIES     5
+
+#define WSM_DOCUMENT_PROTOCOL_MAJOR     1
+#define WSM_DOCUMENT_PROTOCOL_MINOR     0
+
+#define WSMS_SQUARE     0x0001
+#define WSMS_ANSWERS    0x0002
+#define WSMS_INTERSECT  0x0004
+
+#define DRAW_GRID_MARGINS               20
+#define DRAW_GRID_SPACE_SIZE            20
+#define DRAW_GRID_ANSWER_OUTLINE        8
+#define DRAW_GRID_TEXT_SIZE             14
+#define DRAW_GRID_TEXT_FONT             FID_DTC_URW_MONO
+#define DRAW_GRID_ANSWER_CORNER_RADIUS  5
+#define DRAW_GRID_MAX_SCALE_FACTOR      MakeWWFixed( 1.5 )
+#define WWFIXED_SQRT_TWO                MakeWWFixed( 1.414214 )
+
+#define PRINT_WORD_MIN_TEXT_SIZE    MakeWWFixed( 4.0 )
+#define PRINT_WORD_STEP_TEXT_SIZE   MakeWWFixed( 1.0 )
+#define PRINT_WORD_MAX_TEXT_SIZE    MakeWWFixed( 14.0 )
+#define PRINT_WORD_COLUMN_SPACING   (0.5 * 72)
+#define PRINT_WORD_TEXT_FONT        FID_DTC_URW_MONO
+#define PRINT_WORD_TEXT_BOX_WIDTH   (6 * 72)
+#define PRINT_WORD_TEXT_BOX_HEIGHT  (2 * 72)
+#define PRINT_WORD_TEXT_BOX_LEFT    (1.25 * 72)
+#define PRINT_WORD_TEXT_BOX_TOP     (8 * 72)
+#define PRINT_GRID_BOUNDS_LEFT      (1.25 * 72)
+#define PRINT_GRID_BOUNDS_TOP       (1.5 * 72)
+#define PRINT_GRID_BOUNDS_RIGHT     (7.25 * 72)
+#define PRINT_GRID_BOUNDS_BOTTOM    (7.5 * 72)
+#define PRINT_HEADER_BOUNDS_LEFT    (1.25 * 72)
+#define PRINT_HEADER_BOUNDS_RIGHT   (7.25 * 72)
+#define PRINT_HEADER_BOUNDS_TOP     (1 * 72)
+#define PRINT_HEADER_TEXT_FONT      FID_DTC_URW_ROMAN
+#define PRINT_HEADER_TEXT_SIZE      MakeWWFixed( 18.0 )
+
+#define ACK_NO 1
+#define ACK_YES 2
+
+#define ADD_WORD_DUPE			WORD_LIST_MAX_SIZE+1
+#define ADD_WORD_LIST_FULL		WORD_LIST_MAX_SIZE+2
+
+/***************************************************************************
+ * Structures and Types
+ **************************************************************************/
+
+typedef struct                          /* Document Map Block structure */
+{
+    VMBlockHandle WSMDM_heapBlock;      /* LMem heap block handle */
+    ChunkHandle WSMDM_wordListChunk;    /* word list chunk handle */
+    ChunkHandle WSMDM_wordSearchChunk;  /* word search chunk handle */
+    ChunkHandle WSMDM_answersChunk;     /* answers array chunk handle */
+}
+WSMDocumentMap;
+
+typedef enum                            /* Word placement method */
+{
+	 WSL_EASY = 0,                       /* Only right or down */
+    WSL_MEDIUM,                         /* Left, right, up, down */
+    WSL_HARD                            /* All directions */
+}
+WordSearchLevel;
+
+typedef struct
+{
+    ChunkArrayHeader WSH_meta;          /* Required header */
+    word WSH_width;                     /* Width of grid */
+    word WSH_height;                    /* Height of grid */
+    WordSearchLevel WSH_level;          /* Level of difficulty */
+    word WSH_settings;                  /* Booleans from WSMSettingsOther */
+}
+WordSearchHeader;
+
+typedef struct                          /* Word search answer descriptor */
+{
+	 byte WSAE_row;                      /* Row of first letter */
+    byte WSAE_column;                   /* Column of first letter */
+	 byte WSAE_direction;                /* Direction of word */
+    byte WSAE_length;                   /* Length of word */
+}
+WordSearchAnswerElement;
+
+/***************************************************************************
+ * Globals
+ **************************************************************************/
+
+extern VMFileHandle fhDocument;
+extern optr oDocument;
+extern VMBlockHandle bhDocHeap;
+extern ChunkHandle chDocWordList;
+extern ChunkHandle chDocWordSearch;
+extern ChunkHandle chDocAnswers;
+extern Boolean bWSInitialized;
+extern Boolean onYago;
+
+/***************************************************************************
+ * Function defines
+ **************************************************************************/
+
+void WSMInitializeWordSearch(optr ows, optr oans);
+void WSMClearWordSearch(void);
+void WSMSetLetter(optr ows, word x, word y, char c);
+char WSMGetLetter(optr ows, word x, word y);
+Boolean WSMCalculateWordSearch(void);
+Boolean WSMPlaceWord(char *pWord, optr ows, optr oans, WordSearchLevel eLevel,
+                     word nRows, word nCols, word nDirs, word x, word y, word d,
+                     Boolean bTestEntireGrid, Boolean bSpacesOnly);
+Boolean WSMTestWordPlacement(char *pWord, optr ows, WordSearchLevel eLevel,
+                             word rows, word cols, sword x, sword y, word d,
+                             Boolean bSpacesOnly, optr oans);
+void WSMFillBlankSpaces(optr ows);
+word WSMGetNumDirections(WordSearchLevel eLevel);
+Boolean WSMGetOppositeDirection(WordSearchLevel eLevel, word *peDir);
+void WSMGetDirectionOffsets(WordSearchLevel eLevel, word nDir, 
+                            sword *pndx, sword *pndy);
+void WSMGetDocBounds(WordSearchHeader *pwsh, RectDWord *pr);
+void WSMDrawHeader(GStateHandle gstate, Boolean drawNameBlock);
+void WSMDrawWordSearch(GStateHandle gstate, word nLeftBound, word nTopBound, 
+                       word nRightBound, word nBottomBound, Boolean bPrinting);
+void WSMDrawAnswers(GStateHandle gstate, optr oans, WordSearchHeader *pwsh);
+void WSMDrawWordList(GStateHandle gstate);
+void NotifyDBox (char* string1, optr notifyMsg);
+word WSMAddWord(char* wordToAdd);
+
+word MyRandom(word range);
+
+/***************************************************************************
+ * Class definitions
+ **************************************************************************/
+
+@class WSMProcessClass, GenProcessClass;
+	 @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_WSM_PROCESS_QUERY_WORD_LIST;
+	 @message void MSG_WSM_PROCESS_ADD_WORD();
+	 @message void MSG_WSM_PROCESS_DELETE_WORD();
+	 @message void MSG_WSM_PROCESS_CALCULATE();
+	 @message (GEN_VALUE_STATUS_MSG) MSG_WSM_PROCESS_STATUS_WIDTH;
+	 @message (GEN_VALUE_STATUS_MSG) MSG_WSM_PROCESS_STATUS_HEIGHT;
+	 @message (GEN_VALUE_APPLY_MSG) MSG_WSM_PROCESS_APPLY_SETTINGS_WIDTH;
+	 @message (GEN_VALUE_APPLY_MSG) MSG_WSM_PROCESS_APPLY_SETTINGS_HEIGHT;
+	 @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_WSM_PROCESS_APPLY_SETTINGS_LEVEL;
+	 @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_WSM_PROCESS_APPLY_SETTINGS_OTHER;
+	 @message (GEN_BOOLEAN_GROUP_STATUS_MSG) MSG_WSM_PROCESS_SETTINGS_OTHER_CHANGED;
+	 @message void MSG_WSM_IMPORT_WORD_LIST();
+	 @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_WSM_IMPORT_SELECTOR_ACTION;
+@endc;
+
+@class WSMDocumentControlClass, GenDocumentControlClass;
+@endc;
+
+
+

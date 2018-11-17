@@ -1,0 +1,751 @@
+/********************************************************************
+ *
+ *      Copyright (c) Geoworks 1990, 1994 -- All Rights Reserved.
+ *
+ * PROJECT:     InkTest Sample Application
+ * MODULE:      Static Objects and Methods
+ * FILE:        inktest.goc
+ *
+ * AUTHOR:      Allen Schoonmaker: July 9, 1992
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      7/9/92          Initial version
+ *      NF      9/19/96         Cleaned up and fixed the following:
+ *                              MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE
+ *
+ * DESCRIPTION:
+ *      This application demonstrates simple use of an ink object
+ *      and ink controller. This particular sample app shows the
+ *      use of the inkfix library, which uses an ink object that
+ *      can be placed at a non-zero origin. The original Zoomer
+ *      ink library can only handle ink objects that have a
+ *      zero-based origin.
+ *
+ *      Note that because ink use is applicable only on pen-based
+ *      systems, this application neither displays its ink tools nor
+ *      accepts ink input when run on the desktop platform.
+ *
+ * NAMING CONVENTION:
+ * Variables:
+ *   Prefix:
+ *      a   - array
+ *      p   - pointer (usually used by itself)
+ *   Base Type:
+ *      b   - boolean
+ *      cr  - character
+ *      fh  - FileHandle
+ *      mh  - MemHandle
+ *      vmh - VMBlockHandle
+ *
+ * RCS STAMP:
+ *      $Id: inktest.goc,v 1.1 97/04/04 16:39:07 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    @include <spool.goh>
+    @include <Objects/gViewCC.goh>
+    @include <pen.goh>
+    @include <Objects/inkfix.goh>
+
+/********************************************************************
+ *              Constants
+ *******************************************************************/
+      /* Protocol numbers for the document. */
+    #define DOCUMENT_PROTOCOL_MAJOR 1
+    #define DOCUMENT_PROTOCOL_MINOR 0
+
+      /* Size of the document. */
+    #define DOCUMENT_WIDTH  36 * 17
+    #define DOCUMENT_HEIGHT 36 * 22
+
+      /* Bounds of the ink object. */
+    #define INK_LEFT    40
+    #define INK_RIGHT  400
+    #define INK_TOP     20
+    #define INK_BOTTOM 140
+
+      /* Macro to create group/item identifier using the
+       * structure that MSG_INK_SAVE_TO_DB_ITEM returns. */
+    #define MAKE_INK_ID( info ) (DBGroupAndItem) \
+        ((( (DBGroupAndItem)info.DBR_group ) << 16 ) | info.DBR_item )
+
+/********************************************************************
+ *              Data Types
+ *******************************************************************/
+      /*
+       * This is the map block for our document.
+       * It holds the identifier for the ink item.
+       */
+    typedef struct {
+        DBGroupAndItem ITMB_inkGroupItem;
+    } ITMapBlock;
+
+/********************************************************************
+ *              Class Definitions
+ *******************************************************************/
+    @class InkTestProcessClass, GenProcessClass;
+    @endc;
+
+      /* We're going to add some messages and instance
+       * data to the default document class. */
+    @class InkTestDocumentClass, GenDocumentClass;
+    @message void MSG_IT_DOCUMENT_MARK_DIRTY();
+        @instance optr ITDI_inkObj;
+        @instance optr ITDI_parentObj;
+    @endc;
+
+      /* We need to intercept the MSG_VIS_DRAW.
+       * Note that we're using the FixedInkClass, as that
+       * is the one that can be at a non-zero origin. */
+    @class MyInkClass, FixedInkClass;
+    @endc;
+
+/********************************************************************
+ *              Class Declarations
+ *******************************************************************/
+    @classdecl InkTestProcessClass, neverSaved;
+    @classdecl InkTestDocumentClass;
+      /* Don't need to save ink object since we
+       * save it to a VM file manually. */
+    @classdecl MyInkClass, neverSaved;
+
+/********************************************************************
+ *              Static Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *              Application Resource
+ *******************************************************************/
+@start Application;
+
+@object GenApplicationClass InkTestApp = {
+    GI_visMoniker = list { @InkTestTextMoniker };
+    GI_comp = @ITPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @ITPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, MGCNLT_APP_STARTUP ) =
+        @ITUIDocumentControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST ) =
+        @ITUIDocumentControl,
+        @ITViewControl,
+        @ITDisplayControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS ) =
+        @ITUIDocumentControl,
+        @ITEditControl,
+        @ITInkControl,
+        @ITDisplayControl,
+        @ITViewControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS ) =
+        @ITToolControl;
+    ATTR_GEN_INIT_FILE_CATEGORY = "inktest";
+    ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER = @ITSaveOptionsButton;
+}
+
+@visMoniker InkTestTextMoniker = "InkTest";
+
+@end Application;
+
+/********************************************************************
+ *              Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass ITPrimary = {
+    GI_comp = @ITFileMenu,
+              @ITEditMenu,
+              @ITOptionsMenu,
+              @ITInkMenu,
+              @ITViewMenu,
+              @ITWindowMenu,
+              @ITToolbar,
+              @ITDisplayGroup;
+    HINT_KEEP_INITIALLY_ONSCREEN;
+}
+
+@object GenInteractionClass ITFileMenu = {
+    GI_comp = @ITUIDocumentControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_FILE_MENU );
+}
+
+@object GenDocumentControlClass ITUIDocumentControl = {
+    GDCI_noNameText = "No Document";
+    GDCI_documentToken = { "SMPD", MANUFACTURER_ID_GEOWORKS };
+    GDCI_defaultFile = "C InkTest Default Document";
+    GDCI_templateDir = "INKTEST";
+    GDCI_attrs = @default | GDCA_MULTIPLE_OPEN_FILES;
+    GDCI_features = @default & ~GDCF_NAME_ON_PRIMARY;
+    GDCI_documentGroup = @ITDocumentGroup;
+}
+
+  /* The Edit menu and controller */
+@object GenInteractionClass ITEditMenu = {
+    GI_comp = @ITEditControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_EDIT_MENU );
+}
+
+@object GenEditControlClass ITEditControl = {
+    GII_visibility = GIV_SUB_GROUP;
+    HINT_SAME_CATEGORY_AS_PARENT;
+}
+
+  /* Options menu - ToolControl, toolbox, and save button. */
+@object GenInteractionClass ITOptionsMenu = {
+    GI_comp = @ITToolControl,
+              @ITToolbox,
+              @ITSaveOptionsButton;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_OPTIONS_MENU );
+}
+
+@object GenToolControlClass ITToolControl = {
+    GI_visMoniker = 'T', "Customize Tool Bars";
+    GTCI_toolboxList = @ITToolboxList;
+    GTCI_toolGroupList = @ITToolGroupList;
+    GII_visibility = GIV_DIALOG;
+    HINT_SAME_CATEGORY_AS_PARENT;
+}
+
+@chunk optr ITToolGroupList[] = {
+    @ITInkTools,
+    @ITEditTools
+};
+
+@chunk optr ITToolboxList[] = {
+    @ITToolbar, @ITToolbarName,
+    @ITToolbox, @ITToolboxName
+};
+
+@chunk char ITToolbarName[] = "Toolbar";
+@chunk char ITToolboxName[] = "Floating Toolbox";
+
+@object GenInteractionClass ITToolbox = {
+    GI_visMoniker = 'F', "Floating Toolbox";
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_DIALOG;
+    HINT_CENTER_WINDOW;
+    HINT_INTERACTION_MAKE_RESIZABLE;
+    HINT_TOOLBOX;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass ITSaveOptionsButton = {
+    GI_visMoniker = 'S', "Save options";
+    GTI_actionMsg = MSG_META_SAVE_OPTIONS;
+    GTI_destination = @InkTestApp;
+}
+
+  /* Ink menu and ink controller */
+@object GenInteractionClass ITInkMenu = {
+    GI_visMoniker = 'I', "Ink";
+    GI_comp = @ITInkControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object InkControlClass ITInkControl = {
+    GII_visibility = GIV_SUB_GROUP;
+    ATTR_GEN_DESTINATION_CLASS = (ClassStruct*)&InkClass;
+}
+
+  /* View menu and view control */
+@object GenInteractionClass ITViewMenu = {
+    GI_comp = @ITViewControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_VIEW_MENU );
+}
+
+@object GenViewControlClass ITViewControl = {
+    GII_visibility = GIV_SUB_GROUP;
+    GVCI_attrs = @default & ~GVCA_SHOW_HORIZONTAL
+                          & ~GVCA_SHOW_VERTICAL
+                          | GVCA_APPLY_TO_ALL;
+    HINT_SAME_CATEGORY_AS_PARENT;
+    HINT_GEN_CONTROL_MODIFY_INITIAL_UI = {
+        { GCUF_USER_TOOLBOX_UI }, 0, 0,
+        { GVCTF_PAGE_UP | GVCTF_PAGE_DOWN |
+          GVCTF_SHOW_HORIZONTAL | GVCTF_SHOW_VERTICAL }, 0
+    };
+    ATTR_GEN_CONTROL_PROHIBIT_UI = {
+        GVCF_SCALE_TO_FIT | GVCF_ADJUST_ASPECT_RATIO |
+        GVCF_CUSTOM_SCALE | GVCF_REDUCE
+    };
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = {
+        GVCTF_SCALE_TO_FIT | GVCTF_ADJUST_ASPECT_RATIO |
+        GVCTF_APPLY_TO_ALL
+    };
+}
+
+  /* Window menu and display control */
+@object GenInteractionClass ITWindowMenu = {
+    GI_comp = @ITDisplayControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_WINDOW_MENU );
+}
+
+@object GenDisplayControlClass ITDisplayControl = {
+}
+
+  /* DisplayGroup - Manages multiple displays */
+@object GenDisplayGroupClass ITDisplayGroup = {
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_TARGET;
+}
+
+  /* The Toolbar and toolgroups */
+@object GenInteractionClass ITToolbar = {
+    GI_comp = @ITInkTools,
+              @ITEditTools;
+    HINT_TOOLBOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenToolGroupClass ITInkTools = {
+    GTGI_controller = @ITInkControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass ITEditTools = {
+    GTGI_controller = @ITEditControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@end Interface;
+
+/********************************************************************
+ *              DocGroup Resource
+ * The GenDocumentGroup object will manage the creation and
+ * basic life of each of the GenDocuments.
+ *******************************************************************/
+@start DocGroup;
+
+@object GenDocumentGroupClass ITDocumentGroup = {
+    GDGI_untitledName = "IT Untitled";
+    GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+    GDGI_documentClass = (ClassStruct*)&InkTestDocumentClass;
+    GDGI_documentControl = @ITUIDocumentControl;
+    GDGI_genDisplayGroup = @ITDisplayGroup;
+    GDGI_genDisplay = @ITDisplay;
+    GDGI_genView = @ITView;
+}
+
+@end DocGroup;
+
+/********************************************************************
+ *              DisplayUI Resource
+ * This resource is duplicated for each document. It holds the
+ * visual objects that will represent the document.
+ *******************************************************************/
+@start DisplayUI;
+
+@object GenDisplayClass ITDisplay = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @ITView;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_DEFAULT_TARGET;
+}
+
+@object GenViewClass ITView = {
+      /*
+       * NOTE: You can change the default GenViewInkType,
+       * but with caveats:
+       * 1) If you want to have multiple objects under the
+       *    content (for example, if you want to have a trigger
+       *    under there also), you will need to change the type
+       *    to "GVIT_QUERY_OUTPUT". You will also want to remove
+       *    the IF_ONLY_CHILD_OF_CONTENT flag from the ink object
+       *    (it is set in ITDocumentAttachUIToDocument) if you
+       *    want to have ink go to any other object under the content.
+       */
+    GVI_inkType = GVIT_QUERY_OUTPUT;
+    GVI_attrs = @default | GVA_CONTROLLED;
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE
+                              | GVDA_DONT_DISPLAY_SCROLLBAR
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs = @default | GVDA_SCROLLABLE
+                             | GVDA_DONT_DISPLAY_SCROLLBAR
+                             | GVDA_NO_LARGER_THAN_CONTENT;
+    HINT_DEFAULT_TARGET;
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@end DisplayUI;
+
+/********************************************************************
+ *              Function Definitions
+ *******************************************************************/
+
+/********************************************************************
+ *              LoadInkData
+ ********************************************************************
+ * SYNOPSIS:     Loads data from the file into the ink object.
+ * CALLED BY:    MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Allocate a new vm block and set it as the map
+ *               block. Then lock it down so we can dirty it and
+ *               set the ink flag to zero. Unlock the block and
+ *               return no error.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      6/26/92         Initial version
+ *******************************************************************/
+void
+LoadInkData( FileHandle docFileHandle,
+             optr       inkObj )
+  /*
+   * docFileHandle -
+   * inkObj        -
+   */
+{
+      /*
+       * vmhMapBlock - Map block vmem handle.
+       * mhMapBlock  - Map block mem handle.
+       * pMapBlock   - Pointer to map block.
+       * idbf        -
+       * ink         -
+       */
+    VMBlockHandle vmhMapBlock;
+    MemHandle     mhMapBlock;
+    ITMapBlock *  pMapBlock;
+    InkDBFrame    idbf;
+    dword         ink;
+
+      /*
+       * Get the ink information from the map block.
+       */
+EC( ECVMCheckVMFile( docFileHandle ); )
+    vmhMapBlock = VMGetMapBlock( docFileHandle );
+EC( ECVMCheckVMBlockHandle( docFileHandle, vmhMapBlock ); )
+    pMapBlock = VMLock( docFileHandle, vmhMapBlock, &mhMapBlock );
+EC( ECCheckMemHandle( mhMapBlock ); )
+EC( ECCheckBounds( pMapBlock ); )
+    ink = pMapBlock->ITMB_inkGroupItem;
+    VMUnlock( mhMapBlock );
+
+      /*
+       * Have the ink object load the data from the block.
+       */
+    idbf.IDBF_VMFile = docFileHandle;
+    idbf.IDBF_DBGroupAndItem = ink;
+    idbf.IDBF_DBExtra = 0;
+    idbf.IDBF_bounds.R_left = 0;
+    idbf.IDBF_bounds.R_top = 0;
+    @call inkObj::MSG_INK_LOAD_FROM_DB_ITEM( &idbf );
+} /* LoadInkData */
+
+/********************************************************************
+ *              Code for InkTestDocumentClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+ ********************************************************************
+ * SYNOPSIS:     Initialize the document file (newly created).
+ * PARAMETERS: 	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Allocate a new vm block and set it as the map
+ *               block. Then lock it down so we can dirty it and
+ *               set the ink flag to zero. Unlock the block and
+ *               return no error.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      6/26/92         Initial version
+ *******************************************************************/
+@method InkTestDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE {
+      /*
+       * vmhMapBlock - Map block vmem handle.
+       * mhMapBlock  - Map block mem handle.
+       * pMapBlock   - Pointer to map block.
+       */
+    VMBlockHandle vmhMapBlock;
+    MemHandle     mhMapBlock;
+    ITMapBlock *  pMapBlock;
+
+EC( ECVMCheckVMFile( pself->GDI_fileHandle ); )
+    vmhMapBlock = VMAlloc( pself->GDI_fileHandle,
+                           sizeof( ITMapBlock ), 0 );
+EC( ECVMCheckVMBlockHandle( pself->GDI_fileHandle, vmhMapBlock ); )
+    VMSetMapBlock( pself->GDI_fileHandle, vmhMapBlock );
+    pMapBlock = VMLock( pself->GDI_fileHandle, vmhMapBlock, &mhMapBlock );
+EC( ECCheckMemHandle( mhMapBlock ); )
+EC( ECCheckBounds( pMapBlock ); )
+    pMapBlock->ITMB_inkGroupItem = 0;
+    VMDirty( mhMapBlock );
+    VMUnlock( mhMapBlock );
+
+    return( FALSE );
+} /* MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE */
+
+/********************************************************************
+ *              MSG_IT_DOCUMENT_MARK_DIRTY
+ ********************************************************************
+ * SYNOPSIS:     The ink object has been made dirty by the user,
+ *               so we must mark the document dirty as well.
+ * PARAMETERS: 	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Get the map block and mark the block dirty, so
+ *               it will be saved later.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      6/26/92         Initial version
+ *******************************************************************/
+@method InkTestDocumentClass, MSG_IT_DOCUMENT_MARK_DIRTY {
+      /*
+       * vmhMapBlock - Map block vmem handle.
+       * mhMapBlock  - Map block mem handle.
+       */
+    MemHandle     mhMapBlock;
+    VMBlockHandle vmhMapBlock;
+
+EC( ECVMCheckVMFile( pself->GDI_fileHandle ); )
+    vmhMapBlock = VMGetMapBlock( pself->GDI_fileHandle );
+EC( ECVMCheckVMBlockHandle( pself->GDI_fileHandle, vmhMapBlock ); )
+    VMLock( pself->GDI_fileHandle, vmhMapBlock, &mhMapBlock );
+EC( ECCheckMemHandle( mhMapBlock ); )
+    VMDirty( mhMapBlock );
+    VMUnlock( mhMapBlock );
+} /* MSG_IT_DOCUMENT_MARK_DIRTY */
+
+/********************************************************************
+ *              MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+ ********************************************************************
+ * SYNOPSIS:     Creates an ink object and adds it as a Vis child
+ *               to ourself, and initializes it.
+ * PARAMETERS: 	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Basically create the parent and ink objects using
+ *               the new inkfix classes. Then set them up for size
+ *               and add them to the document object as children.
+ *               Load the ink data from the document into the
+ *               ink object.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      6/26/92         Initial version
+ *******************************************************************/
+@method InkTestDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT {
+      /*
+       * newObj    - The newly created ink object.
+       * parentObj - Its parent object (part of inkfix).
+       */
+    optr newObj;
+    optr parentObj;
+
+    @callsuper();
+
+    @call self::MSG_VIS_SET_SIZE( DOCUMENT_WIDTH, DOCUMENT_HEIGHT );
+
+      /*
+       * The ink object on the Zoomer has bugs in it that
+       * cause it to behave incorrectly if it is at a non-zero
+       * x or y offset. We use the FixedInk object and the
+       * InkParent object from the inkfix library to work around
+       * these bugs. If we didn't need to put an ink object at a
+       * non-0,0 offset in the parent content, *or* if we didn't
+       * need to work on a Zoomer, then we could just put an ink
+       * object in (we wouldn't need objects from the Inkfix
+       * library or anything).
+       */
+    parentObj = ObjInstantiate( OptrToHandle( oself ),
+                                (ClassStruct*)&InkParentClass );
+EC( ECCheckLMemOD( parentObj ); )
+    newObj = ObjInstantiate ( OptrToHandle( oself ),
+                              (ClassStruct*)&MyInkClass );
+EC( ECCheckLMemOD( newObj ); )
+
+      /*
+       * Save the optrs of the new ink and parent objects.
+       */
+    pself = ObjDerefGen( oself );
+    pself->ITDI_inkObj = newObj;
+    pself->ITDI_parentObj = parentObj;
+
+      /*
+       * Set the size of the parent object using the constants
+       * we defined earlier. Set the size of the ink object,
+       * and set it to support undo and be controlled.
+       * Set the object and message to be notified when
+       * the ink object becomes dirty.
+       */
+    @call parentObj::MSG_VIS_SET_SIZE( INK_RIGHT - INK_LEFT,
+                                       INK_BOTTOM - INK_TOP );
+    @call parentObj::MSG_VIS_SET_POSITION( INK_LEFT, INK_TOP );
+    @call newObj::MSG_VIS_SET_SIZE( INK_RIGHT - INK_LEFT,
+                                    INK_BOTTOM - INK_TOP );
+    @call newObj::MSG_VIS_SET_POSITION( INK_LEFT, INK_TOP );
+    @call newObj::MSG_INK_SET_FLAGS( IF_HAS_UNDO | IF_CONTROLLED, 0 );
+    @call newObj::MSG_INK_SET_DIRTY_AD( MSG_IT_DOCUMENT_MARK_DIRTY,
+                                        oself );
+
+      /*
+       * Add the parent object as a child of the document.
+       * Add the ink object as a child of the parent object.
+       * Have the ink grab the target (so it will interact
+       * with the Edit menu).
+       */
+    @call self::MSG_VIS_ADD_CHILD( parentObj, CCO_FIRST );
+    @call parentObj::MSG_VIS_ADD_CHILD( newObj, CCO_FIRST );
+    @call newObj::MSG_META_GRAB_TARGET_EXCL();
+
+      /*
+       * Load the ink data from the file.
+       */
+    pself = ObjDerefGen( oself );
+    LoadInkData( pself->GDI_fileHandle, newObj );
+} /* MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT */
+
+/********************************************************************
+ *              MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+ ********************************************************************
+ * SYNOPSIS:     Destroys any objects that we've created for
+ *               this document.
+ * PARAMETERS: 	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Get the optrs to the ink and parent objects and
+ *               send the self-destruct message to them.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      6/29/92         Initial version
+ *******************************************************************/
+@method InkTestDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT {
+    /*
+     * doomedInk    - Ink object to be destroyed.
+     * doomedParent - Parent object to be destroyed.
+     */
+  optr doomedInk;
+  optr doomedParent;
+
+  doomedInk = pself->ITDI_inkObj;
+  doomedParent = pself->ITDI_parentObj;
+
+  @callsuper();
+
+  @send doomedInk::MSG_VIS_DESTROY( VUM_DELAYED_VIA_APP_QUEUE );
+  @send doomedParent::MSG_VIS_DESTROY( VUM_DELAYED_VIA_APP_QUEUE );
+} /* MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT */
+
+/********************************************************************
+ *              MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE
+ ********************************************************************
+ * SYNOPSIS:     Write data from text object to file.
+ * PARAMETERS: 	 void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Basically get the map block and use the existing
+ *               group/item identifier to have the ink object
+ *               save its data to the document. It will return a
+ *               new group/item identifier which we will save to
+ *               the map block.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      AS      6/29/92         Initial version
+ *      NF      9/20/96         Changed VMSetMapBlock to
+ *                              VMGetMapBlock. Oops.
+ *******************************************************************/
+@method InkTestDocumentClass, MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE {
+      /*
+       * vmhMapBlock - Map block vmem handle.
+       * mhMapBlock  - Map block mem handle.
+       * pMapBlock   - Pointer to map block.
+       * idbf        -
+       * DBValue     - Returned from MSG_INK_SAVE_TO_DB_ITEM.
+       * inkObj      - The ink object being saved.
+       */
+    VMBlockHandle vmhMapBlock;
+    MemHandle     mhMapBlock;
+    ITMapBlock *  pMapBlock;
+    InkDBFrame    idbf;
+    DBReturn      DBValue;
+    optr          inkObj;
+
+      /*
+       * Get the map block and retrieve the group and item
+       * identifier for the ink item.
+       */
+EC( ECVMCheckVMFile( pself->GDI_fileHandle ); )
+    vmhMapBlock = VMGetMapBlock( pself->GDI_fileHandle );
+EC( ECVMCheckVMBlockHandle( pself->GDI_fileHandle, vmhMapBlock ); )
+    pMapBlock = VMLock( pself->GDI_fileHandle, vmhMapBlock, &mhMapBlock );
+EC( ECCheckMemHandle( mhMapBlock ); )
+EC( ECCheckBounds( pMapBlock ); )
+
+      /*
+       * Set up the ink database frame so we can
+       * save it to the document.
+       */
+    idbf.IDBF_VMFile = pself->GDI_fileHandle;
+    idbf.IDBF_DBGroupAndItem = pMapBlock->ITMB_inkGroupItem;
+    idbf.IDBF_DBExtra = 0;
+    idbf.IDBF_bounds.R_left = 0;
+    idbf.IDBF_bounds.R_top = 0;
+    idbf.IDBF_bounds.R_right = 0xFFFF;
+    idbf.IDBF_bounds.R_bottom = 0xFFFF;
+
+      /*
+       * Have the ink object save its data to the
+       * document using the info we provided.
+       * Save the returned database group/item identifier.
+       * Mark the map block dirty and unlock it.
+       */
+    inkObj = pself->ITDI_inkObj;
+EC( ECCheckLMemOD( inkObj ); )
+    @call inkObj::MSG_INK_SAVE_TO_DB_ITEM( &DBValue, &idbf );
+    pMapBlock->ITMB_inkGroupItem = MAKE_INK_ID( DBValue );
+    VMDirty( mhMapBlock );
+    VMUnlock( mhMapBlock );
+} /* MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE */
+
+/********************************************************************
+ *              MSG_VIS_DRAW
+ ********************************************************************
+ * SYNOPSIS:	 Draws a rectangle around the ink
+ * PARAMETERS:   void
+ * RETURN:	 void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass to pass the message
+ *               to other visual objects. Then get our visual
+ *               bounds and use that to draw a rectangle of a
+ *               particular color (black).
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      atw     10/25/93        Initial Revision
+ *******************************************************************/
+@method MyInkClass, MSG_VIS_DRAW {
+      /*
+       * bounds - Bounds of the ink object.
+       */
+    Rectangle bounds;
+
+    @callsuper();
+
+    @call self::MSG_VIS_GET_BOUNDS( &bounds );
+    GrSetLineColor( gstate, CF_INDEX, C_BLACK, 0, 0 );
+    GrDrawRect( gstate, bounds.R_left - 1, bounds.R_top - 1,
+                bounds.R_right, bounds.R_bottom );
+} /* MSG_VIS_DRAW */
+

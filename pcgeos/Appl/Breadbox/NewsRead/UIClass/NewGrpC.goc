@@ -1,0 +1,304 @@
+@include <StdApp.goh>
+
+@include "NewsRead.goh"
+@include "Extern.goh"
+@include "NewsData.goh"
+
+
+@class NewsGroupsItemClass, GenItemClass ;
+@endc ;
+
+
+/**********************************************************************
+ *  News Groups Class (UI tool for listing)
+ **********************************************************************/
+
+@classdecl NewsGroupsClass ;
+@classdecl NewsGroupsItemClass ;
+
+
+#define MAX_NEWSGROUP_SUB_LIST_ITEMS 2000
+typedef struct {
+    word numItems ;
+    word index[MAX_NEWSGROUP_SUB_LIST_ITEMS] ;
+} T_newsgroupSubList ;
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsGroupsClass::MSG_NEWS_GROUPS_INITIALIZE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Get the information for a single list item
+ |
+ | Inputs:
+ |    optr list                   -- Which list needs the moniker
+ |    word item                   -- What item on the list is needed
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/03/98  Created
+ |    LES  11/05/98  Modified to support sublist
+ |
+ *-----------------------------------------------------------------------*/
+@method NewsGroupsClass, MSG_NEWS_GROUPS_INITIALIZE
+{
+    T_newsgroupSubList *p_list ;
+
+    /* Show the sublist (if it exists) or else the complete list */
+    if (pself->MGI_subList)  {
+        p_list = MemLock(pself->MGI_subList) ;
+        @call ANDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(p_list->numItems) ;
+        MemUnlock(pself->MGI_subList) ;
+
+        @call ANDShowAll::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    } else {
+        /* just show their name */
+        @call ANDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+                  NewsDataCountUnsubNewsgroups()) ;
+        @call ANDShowAll::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+
+    @call AddNewsgroupDialog::MSG_ADD_NEWS_DIALOG_CHANGED() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsGroupsClass::MSG_NEWS_GROUPS_QUERY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Get the information for a single list item
+ |
+ | Inputs:
+ |    optr list                   -- Which list needs the moniker
+ |    word item                   -- What item on the list is needed
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/03/98  Created
+ |    LES  11/05/98  Modified to support sublist
+ |    LES  11/06/98  Added isFound variable to track if out of range.
+ |
+ *-----------------------------------------------------------------------*/
+@method NewsGroupsClass, MSG_NEWS_GROUPS_QUERY
+{
+    word itemLookup ;
+    T_newsgroupSubList *p_list ;
+    Boolean isFound ;
+    UnsubscribedGroupEntry *p_group ;
+    word loopCount, itemCount ;
+    optr viewChild ;
+
+    itemLookup = item ;
+
+    /* If we have a sublist, translate the index */
+    isFound = TRUE ;
+    if (pself->MGI_subList)  {
+        p_list = MemLock(pself->MGI_subList) ;
+        if (item < p_list->numItems)  {
+            itemLookup = p_list->index[item] ;
+        } else {
+            isFound = FALSE ;
+        }
+        MemUnlock(pself->MGI_subList) ;
+    }
+
+    if (isFound)  {
+        if (itemLookup < NewsDataCountUnsubNewsgroups())  {
+            p_group = NewsDataUnsubGroupLock(itemLookup) ;
+            @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                      item,
+                      p_group->UGE_text);
+            NewsDataUnsubGroupUnlock(p_group) ;
+
+            isFound = TRUE ;
+        } else {
+            isFound = FALSE ;
+        }
+    }
+
+    if (!isFound)
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, "???");
+
+    /* adjust doc bounds */
+    viewChild = @call oself::MSG_SPEC_GET_SPECIFIC_VIS_OBJECT(0) ;
+ 
+    if(viewChild) {
+
+        RectDWord bounds ;
+        word maxWidth = 0 ;
+        optr contentObj ;
+
+        contentObj = @call viewChild::MSG_GEN_VIEW_GET_CONTENT() ;
+
+        if(contentObj) {
+
+            loopCount = 0 ;
+            itemCount = @call oself::MSG_GEN_COUNT_CHILDREN() ;
+            while(loopCount < itemCount) {
+
+                optr childObj = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(loopCount) ;
+        
+                if(childObj) {
+
+                    dword size ;
+
+                    size = @call childObj::MSG_VIS_GET_SIZE() ;
+                
+                    if(DWORD_WIDTH(size) > maxWidth) {
+                    
+                        maxWidth = DWORD_WIDTH(size) ;
+                    }
+                }
+
+                loopCount++ ;
+            }
+
+            @call viewChild::MSG_GEN_VIEW_GET_DOC_BOUNDS(&bounds) ;
+
+            @call viewChild::MSG_GEN_VIEW_SET_DOC_BOUNDS(
+                                bounds.RD_bottom,
+                                bounds.RD_left + maxWidth,
+                                bounds.RD_top,
+                                bounds.RD_left) ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsGroupsClass::MSG_NEWS_GROUPS_SELECTED_ITEM
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change the text for the selected item.
+ |
+ | Inputs:
+ |    word selection              -- Item selected
+ |    word numSelections          -- Ignored.
+ |    GenItemGroupStateFlags stateFlags -- Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/03/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method NewsGroupsClass, MSG_NEWS_GROUPS_SELECTED_ITEM
+{
+    word itemLookup ;
+    T_newsgroupSubList *p_list ;
+    UnsubscribedGroupEntry *p_group ;
+
+    itemLookup = selection ;
+
+    /* If we have a sublist, translate the index */
+    if (pself->MGI_subList)  {
+        p_list = MemLock(pself->MGI_subList) ;
+        itemLookup = p_list->index[selection] ;
+        MemUnlock(pself->MGI_subList) ;
+    }
+
+    /* Only bother if we have a text object to affect */
+    if (pself->NGI_textObj)  {
+        p_group = NewsDataUnsubGroupLock(itemLookup) ;
+
+        @call (pself->NGI_textObj)::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_group->UGE_text, 0) ;
+
+        NewsDataUnsubGroupUnlock(p_group) ;
+    }
+
+    @call AddNewsgroupDialog::MSG_ADD_NEWS_DIALOG_CHANGED() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsGroupsClass::MSG_NEWS_GROUPS_CLEAR_SUB_LIST
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Clears an old newsgroup (if it exists).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/05/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method NewsGroupsClass, MSG_NEWS_GROUPS_CLEAR_SUB_LIST
+{
+    if (pself->MGI_subList)  {
+        MemFree(pself->MGI_subList) ;
+        pself->MGI_subList = NullHandle ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsGroupsClass::MSG_NEWS_GROUPS_APPEND_TO_SUB_LIST
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Add one more item to the list (doesn't check for duplicates).
+ |
+ | Inputs:
+ |    word entry                  -- New item to search by
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if added, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/05/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method NewsGroupsClass, MSG_NEWS_GROUPS_APPEND_TO_SUB_LIST
+{
+    T_newsgroupSubList *p_list ;
+    Boolean added ;
+
+    if (!pself->MGI_subList)  {
+        /* Create a sub-list with zero items */
+        pself->MGI_subList =
+            MemAlloc(
+                sizeof(T_newsgroupSubList),
+                HF_DYNAMIC,
+                HAF_ZERO_INIT) ;
+    }
+
+    if (pself->MGI_subList)  {
+        p_list = MemLock(pself->MGI_subList) ;
+
+        /* Add the item (if room) */
+        if (p_list->numItems < MAX_NEWSGROUP_SUB_LIST_ITEMS)  {
+            p_list->index[p_list->numItems++] = entry ;
+            added = TRUE ;
+        } else {
+            added = FALSE ;
+        }
+
+        MemUnlock(pself->MGI_subList) ;
+    }
+
+    return added ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsGroupsClass::MSG_NEWS_GROUPS_SHOW_ALL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Clear the complete list
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method NewsGroupsClass, MSG_NEWS_GROUP_SHOW_ALL
+{
+    @call oself::MSG_NEWS_GROUPS_CLEAR_SUB_LIST() ;
+    @call oself::MSG_NEWS_GROUPS_INITIALIZE() ;
+    @call ANDSearchText::MSG_VIS_TEXT_DELETE_ALL() ;
+}

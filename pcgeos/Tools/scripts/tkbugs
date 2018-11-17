@@ -1,0 +1,2494 @@
+#!/usr/public/wish -f
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	ibugs.tcl
+# FILE: 	ibugs.tcl
+# AUTHOR: 	David Loftesness, Mar 17, 1993
+#
+# COMMANDS:
+# 	Name			Description
+#	----			-----------
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	DL	3/17/93		Initial Revision
+#
+# DESCRIPTION:
+#	
+#
+#	$Id: tkbugs,v 1.39 95/08/17 17:16:42 ron Exp $
+#
+###############################################################################
+
+# neat commands to try
+# tkwait  (make sure a variable is set)
+
+set entryFont {-Adobe-Helvetica-Medium-R-Normal--*-120-*}
+set labelFont {-Adobe-Helvetica-Bold-R-Normal--*-120-*}
+set textFont {*-Courier-Medium-R-Normal-*-120-*}
+set buttonFont {-Adobe-Helvetica-Bold-R-Normal--*-120-*}
+set listFont {-Adobe-Helvetica-Bold-R-Normal--*-120-*}
+
+#
+# Default strings
+#
+
+set PrintString "lpr -h"
+#
+# Don't change this string without changing format commands in getBugs
+#
+set selectString "select	serial_no, severity, geode,
+	synopsis, whose, open_date, status, date_entered, type"
+set fromString "from	bugs"
+
+set whereString {
+where 	 	duplicate = NULL 
+	and 	status in ("OPEN", "RAW", "IN DEBATE")
+}
+#	and 	type = "BUG"
+
+set cwhereString(default) "$whereString"
+set cwhereString(sdk) 	  {
+where 		duplicate = NULL 
+	and 	status in ("OPEN", "RAW", "IN DEBATE")
+	and	geode in ("sdk", "icon")
+}
+
+set cwhereString(ron) {select syscolumns.name, systypes.name, syscolumns.length
+ from syscolumns, sysobjects, systypes 
+ where  syscolumns.id=sysobjects.id and sysobjects.name= 'bugs' 
+ and syscolumns.usertype= systypes.usertype "
+}
+
+set orderString "
+order by 	/* substring (next_action ,2 ,1), */
+	substring (reverse (severity),3,1) +
+	substring (severity,1,1), geode, serial_no "
+
+set selectComment {
+/*
+ *  Do not modify the select statement if you want the output in a window
+ */
+}
+
+
+#
+# I know this string is ugly, but I just copied it from /usr/public/mooz
+# Maybe Don will fix it to what he really wants.
+#
+set moozString "
+	((product like \"%ZOOMER%\") or (product not like \"%WIZARD%\"
+	and product not like \"%RETAIL%\")) and
+	geode not in (\"swat\", \"chart\", \"clock\", \"compat\", \"email\",
+	\"esp\", \"geocalc\", \"geofile\", \"geowrite\", \"geodex\", \"goc\",
+	 \"grobj\", \"icon\", \"impex\", \"import\", \"notetaker\", 
+	\"resedit\", \"setup\", \"spell\", \"bitmap\", \"calculator\",
+	\"dumper\", \"glue\", \"ibm\", \"install\", \"banner\", \"wizapp\", 
+	\"spline\", \"iclas\", \"pmake\", \"geodraw\", \"taskswitch\", 
+	\"concentration\", \"mouse\", \"video\", \"scrapbook\", 
+	\"geoplanner\", \"geocomm\", \"perf\", \"wshellba\",
+	\"palm\", \"aol\", \"intuit\", \"unknown\")
+	"
+
+set today [exec date "+%d %m 19%y"]
+set defaultDate [exec date "+%h %d 19%y"]
+proc min { x y } {
+	if {$x < $y} {return $x}
+	return $y
+}
+
+set StatusButtonsList {
+	{FIXED}
+	{OPEN}
+	{CLOSED}
+	{RAW}
+	{IN DEBATE}
+	{SUSPENDED}
+	{CLARIFY}
+	{REPRODUCE}
+}
+#	{{duplicate} {DUPLICATE}}
+set TypeButtonsList {
+	{BUG}
+	{USABILITY PROBLEM}
+	{DOCUMENTATION PROB.}
+	{TECH DOC}
+	{FEATURE REQUEST}
+	{API}
+	{BEHAVIORAL NUANCE}
+	{VISUAL NUANCE}
+	{ERRONEOUS}
+}
+
+set SeverityButtonsList {
+	CRASH
+	HIGH
+	MEDIUM
+	LOW
+}
+
+set ReproducibleButtonsList {
+	ALWAYS
+	USUALLY
+	RARELY
+	NEVER
+	"NOT ATTEMPTED"
+}
+
+proc getStringFromPersonText { nameFromText } {
+
+#	set nameFromText [.entry.entry get]
+	set extraString "and whose = \"$nameFromText\" "
+	genericbug  $extraString
+}
+
+proc getStringFromGeodeText { nameFromText} {
+#	set nameFromText [.entry.entry get]
+	set extraString "and geode = \"$nameFromText\" "
+	genericbug  $extraString
+
+}
+proc getStringFromProdText { nameFromText} {
+#	set nameFromText [.entry.entry get]
+
+	global selectString
+	global whereString
+	global orderString
+	set searchString [concat $selectString from "$nameFromText"  $whereString  \
+			  $orderString]
+	doUI $searchString
+	catch {destroy .entry}
+
+}
+
+
+proc getBugs { han sqlScript s wn} {
+
+	global today defaultDate
+#	puts stdout "($han) ($sqlScript)"
+
+	Query $han $sqlScript
+	global bugList$wn
+
+	set bugList$wn {}
+
+	set curSelection [$s.list curselection]
+	if {$curSelection == {}} {set curSelection 0}
+	#
+	# clear the listbox
+	#
+	$s.list	delete 0 end
+	
+	set i 1
+	for {set bug [sybnext $han]} {$bug != {}} {set bug [sybnext $han]} {
+		set thisItem $bug
+#		puts stdout "\[$bug\]"	
+
+		set theDate [lindex $thisItem 5]
+		if {$theDate == {} } {set theDate [lindex $thisItem 7]}
+		if {[llength $theDate]==1} {
+			scan $theDate "%4d%2d%2d" year month day
+#			puts stdout "($month $day $year)"
+			set daysOld [DateDiffLow $today $year $month $day]
+		} else {
+			if {$theDate == {} } {set theDate $defaultDate}
+#			puts stdout "($today) ($theDate)"
+			set daysOld [DateDiff $today $theDate]
+#			set daysOld 0
+		}
+
+
+		set newItem [format "%05d  " [lindex $thisItem 0]]
+		append newItem [format "%.3s "  [lindex $thisItem 1]]
+		append newItem [format "%-6.6s " [lindex $thisItem 8]]
+		append newItem [format "%-8.8s " [lindex $thisItem 2]]
+		append newItem [format "%-6.6s " [lindex $thisItem 4]]
+		append newItem [format "%-6.6s " [lindex $thisItem 6]]
+		append newItem [format "(%03d) " $daysOld]  
+#		append newItem [format "%-5.5s   " [lindex $thisItem 3]]
+
+		append newItem [format %-80s [lindex $thisItem 3]]
+
+		$s.list insert end $newItem
+
+#		puts stdout $bug
+		lappend bugList$wn [lindex $bug 0]
+		
+		incr i
+	}
+	$s.list select from $curSelection
+	return $i
+}
+proc DateDiff {today theDate} {
+	set day [lindex $theDate 1]
+	set month [lindex $theDate 0]
+	set year [lindex $theDate 2]
+	set month [monthToInt $month]
+	DateDiffLow $today $year $month $day
+}
+proc DateDiffLow {today year month day} {
+	return [expr {[dbabsday [lindex $today 0] [lindex $today 1] [lindex $today 2]]- [dbabsday $day $month $year]}]
+}
+
+proc bugWindow {number} {
+	global argv
+#	puts stdout "Number: $number"
+	catch {destroy .bug$number}
+	toplevel .bug$number
+	MakeTextFrame .bug$number.m 
+	.bug$number.m.text insert 0.1 [getbug $number]
+	.bug$number.m.text configure -state disabled
+	pack append .bug$number .bug$number.m top
+
+	button .bug$number.modify -text Modify -command "modifyBug $number"
+	button .bug$number.close -text Close -command "destroy .bug$number"
+	button .bug$number.print -text Print -command "PrintBug $number"
+	button .bug$number.trans -text "History" -command "BugTrans $number"
+#	if { [lindex $argv 0] == "edit"} {
+		pack append .bug$number .bug$number.modify left .bug$number.print left .bug$number.trans left .bug$number.close bottom
+#	} 
+#	pack append .bug$number .bug$number.close bottom 
+}
+
+proc BugTrans {number } {
+	global han
+	Query $han "SELECT entered_by, geode, whose, severity, status, type
+	       FROM bugtrans
+	       WHERE serial_no = $number"
+	set result "Entered, geode, whose, severity, status, type\n"
+	append result "--------------------------------------------\n"
+	set row [sybnext $han]
+	while {$row != {}} {
+		foreach field "$row" {
+			
+			append result [format "%-12.12s" $field]
+		}
+		append result "\n"
+		set row [sybnext $han]
+	}
+	WarningBox "$result" {} [list Close "doNothing"]
+	global winNumber
+	global listFont
+	.warning$winNumber.msg configure -font $listFont
+}
+
+proc PrintBug {number } {
+
+	#
+	# This is kinda slow
+	#
+
+	set str [getbug $number]
+
+	set counter 0
+	set len [string length $str]
+	for {set i 0} { $i < $len } {incr i} {
+		#
+		# If this word ends before 71 chars, 
+		# append it to outstring, otherwise,
+		# append NL word
+		#
+		incr counter
+		set c [string index $str $i]
+		if {$c == {}} {break}
+		if {$c == "\n"} {
+			append outString "$word"
+			set word {}
+			set counter 0
+			append outString $c
+			continue
+		}
+		if {$counter >= 71} {
+			append outString "\n"
+			set counter [string length $word]
+			if {$counter >= 71 } {
+				append outString "$word"
+				append outString "\n"
+				set counter 0
+				set word {}
+			}
+		}
+		append word "$c"
+		if {$c == " "} {
+			append outString $word
+			set word {}
+		}
+	}
+#	puts stdout "$outString"
+#	exec echo "$str" | fmt
+	exec echo $outString | pr | lpr -h
+}	
+
+proc doUI { sqlScript} {
+	global bugsummary winNumber
+	global han
+	global listFont
+	incr winNumber
+
+	wm maxsize . 800 600
+	catch {destroy .summary$winNumber}
+	toplevel .summary$winNumber
+
+	frame .summary$winNumber.buttons -relief sunken
+
+	button .summary$winNumber.buttons.modify -text Modify 		\
+		-command "modifyBug \[getCurrentBug .summary$winNumber.fr $winNumber\]"
+	pack append .summary$winNumber.buttons				\
+			.summary$winNumber.buttons.modify {left frame w}
+
+	button .summary$winNumber.buttons.update -text Rescan 		\
+		-command "getBugs $han \{$sqlScript\} .summary$winNumber.fr $winNumber"
+	pack append .summary$winNumber.buttons				\
+			.summary$winNumber.buttons.update {left frame w}
+
+	button .summary$winNumber.buttons.show -text Show 		\
+		-command "bugWindow \[getCurrentBug .summary$winNumber.fr $winNumber\]"
+	pack append .summary$winNumber.buttons 				\
+			.summary$winNumber.buttons.show left
+
+	button .summary$winNumber.buttons.close -text Close 		\
+			-command "destroy .summary$winNumber"
+	pack append .summary$winNumber.buttons 				\
+			.summary$winNumber.buttons.close right
+
+	button .summary$winNumber.buttons.print -text "Print Summary"	\
+			-command "PrintList .summary$winNumber.fr.list"
+	pack append .summary$winNumber.buttons .summary$winNumber.buttons.print right
+	
+
+
+	frame .summary$winNumber.fr
+
+	listbox .summary$winNumber.fr.list 				\
+		-font "$listFont"					\
+		-xscroll ".summary$winNumber.fr.scrollx set"		\
+		-exportselection no -bd 3 -relief raised
+
+	scrollbar .summary$winNumber.fr.scrollx -relief sunken 		\
+			-orient horizontal 				\
+			-command ".summary$winNumber.fr.list xview" -bd 1 -relief sunken
+
+	bindListBox .summary$winNumber.fr.list 				\
+			".summary$winNumber.buttons.show invoke" 	\
+			".summary$winNumber.buttons.close invoke"
+	focus .summary$winNumber.fr.list
+
+	pack append .summary$winNumber.fr .summary$winNumber.fr.scrollx \
+		{top fillx}
+	pack append .summary$winNumber.fr .summary$winNumber.fr.list left
+
+
+	set i [getBugs $han $sqlScript .summary$winNumber.fr $winNumber]
+	set lines [min $i 20]
+	if {$i > 20 } {
+		scrollbar .summary$winNumber.fr.scroll -relief sunken \
+		-orient vertical \
+		-command "listBoxScroll .summary$winNumber.fr.list $i $lines"
+		pack append .summary$winNumber.fr .summary$winNumber.fr.scroll \
+		{right filly}
+		.summary$winNumber.fr.list configure -yscroll ".summary$winNumber.fr.scroll set"
+	}
+
+	.summary$winNumber.fr.list configure -geometry 100x$lines
+
+	pack append .summary$winNumber .summary$winNumber.fr top
+	pack append .summary$winNumber.fr .summary$winNumber.fr.list top
+	pack append .summary$winNumber .summary$winNumber.buttons bottom
+
+
+
+	tk_listboxSingleSelect .summary$winNumber.fr.list
+
+
+}
+
+
+
+proc getCurrentBug { l wn} {
+
+	global bugList$wn
+#	puts stdout $l
+#	puts stdout "[$l.list curselection]"
+	set bn [lindex [$l.list curselection] 0]
+	if {$bn == {} } {return }
+	set name bugList$wn
+	set num [lindex [expr $$name] $bn]
+#	puts stdout "BW: $name - $num - "
+	return $num
+}
+
+
+
+######################################################################
+#		getbug
+######################################################################
+#
+# SYNOPSIS:	returns as the report for a give bug.
+#		this wilbe put in a text field
+#
+# PASS:		bugNumber
+#
+# RETURN:	String: {bug report}
+#
+# SIDE EFFECTS:
+#	Requires:	bug number exists
+#
+#	Asserts:	????
+#
+# CHECKS:		????
+#
+# PSEUDO CODE/STRATEGY:	????
+#
+# KNOWN BUGS/CAVEATS/IDEAS:	????
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	RB	4/24/93	Initial version.
+#
+######################################################################
+
+proc getbug { number } {
+
+	global	han
+
+	Query $han "select
+	/* 0 */ 	serial_no, partner_no, duplicate, synopsis, geode,
+	/* 5 */		whose, severity, type, reproducible, reproduced_by,
+	/* 10 */	verified, status, open_date, fixed_date, change_date,
+	/* 15 */	reporter, comment, report, test_no, version, 
+	/* 20 */	last_modified, date_entered,
+	/* 22 */	product1, product2, product3, 	product4, product5,
+	/* 27 */	product6, product7, product8, product9, product10,
+	/* 31 */	product11, product12, product13, product14,
+	/* 35 */	product15, product16, product17, product18,
+	/* 39 */	product19, product20
+		
+		from bugs where serial_no = $number"
+
+	set rpt [sybnext $han]
+
+
+	set numb [lindex $rpt 0]
+	set synopsis [lindex $rpt 3]
+	set geode [lindex $rpt 4]
+	set whose [lindex $rpt 5]
+	set severity [lindex $rpt 6]
+	set repro [lindex $rpt 8]
+	set status [lindex $rpt 11]
+	set reporter [lindex $rpt 15]
+	set date_ent [lindex $rpt 21]
+	set comment [lindex $rpt 16]
+	set report [lindex $rpt 17]
+	set test_no [lindex $rpt 18]
+	set version [lindex $rpt 19]
+	set last_mod [lindex $rpt 20]
+	set type [lindex $rpt 7]
+	set reproduced [lindex $rpt 9]
+	set open_date [lindex $rpt 12]
+	set fixed_date [lindex $rpt 13]
+	set duplicate [lindex $rpt 2]
+	set change_date [lindex $rpt 14]
+	
+	set longString [
+		format "Serial: %s\tSeverity: %s\tStatus: %s\tWhose: %s\nGeode:%s\n" $numb $severity $status $whose $geode
+	]
+
+	append longString [
+		format "Reproducible?: %s\n\nSynopsis: %s\n\n" $repro $synopsis 
+	]
+	append longString "REPORT: \n"
+	append longString [
+		format "%s\n\n Comment: %s\nReporter: %s\n\n" $report $comment $reporter
+	]
+	if {$date_ent != {} } {
+		append longString [
+			format "Date entered: %-12.12s\t\t" $date_ent
+		]
+	}
+	if {$open_date != {} } {
+		append longString [
+			format "Open Date: %-12.12s\t\t" $open_date
+		]
+	}
+	if {$last_mod != {} } { 
+		append longString [
+			format "Modified: %-12.12s\n"  $last_mod
+		]
+	}
+	if {$version != {} } {
+		append longString [
+			format "Version: %s\n\n" $version
+		]
+	}
+
+	return $longString
+}	
+
+
+proc genericbug { extraString} {
+	global selectString
+	global whereString
+	global orderString
+	global fromString
+
+	set searchString [concat $selectString $fromString $whereString  \
+			  $extraString $orderString]
+	doUI $searchString
+	catch {destroy .entry}
+
+}
+
+proc geodeOrPersonBugs { command labl} {
+
+	wm deiconify .
+	wm focusmodel . active
+	grab .
+	catch {destroy .entry}
+	frame .entry -relief raised -bd 2
+	pack append . .entry {left fillx}
+	label .entry.label -text $labl
+	pack append .entry .entry.label left
+	entry .entry.entry  -width 20 -text "Geode: " -bd 2 -insertwidth 2
+	pack append .entry .entry.entry {left fillx}
+	focus .entry.entry 
+	emacsBindEntry .entry.entry
+	bind .entry.entry <Control-l> "DisplayListOfGeodes .entry.entry"
+	bind .entry.entry <Escape> "destroy .entry"
+	.entry.entry delete 0 end
+	bind .entry.entry <Return> "$command "
+	bind .entry.entry <KP_Enter> "$command "
+}
+
+
+
+proc allwiz { } {
+	global selectString
+	global orderString
+	set extraString {where status in ("OPEN", "IN DEBATE", "RAW")
+			 and geode != "ibm"}
+
+	set searchString [concat $selectString "from wizard1" $extraString \
+			  $orderString]
+
+	doUI $searchString
+}
+proc bullet { } {
+	global selectString
+	global orderString
+	set extraString {where status in ("OPEN", "IN DEBATE", "RAW")
+			 and product6 = "yes"}
+
+	set searchString [concat $selectString "from bugs" $extraString \
+			  $orderString]
+
+	doUI $searchString
+}
+
+proc sdkbugs { } {
+	global selectString
+	set extraString {
+where 		duplicate = NULL
+	and 	not (status = "CLOSED")
+	and 	geode in ("sdk", "swat", "goc", "glue", "icon", "resedit", "sampleapp", "tcl")
+	}
+	set orderString {
+order by 
+	status, 
+	substring (reverse (severity),3,1) +
+	substring (severity,1,1), geode, serial_no 
+	}
+	set searchString [concat $selectString "from bugs" $extraString \
+			  $orderString]
+	doUI $searchString
+}
+proc mooz {} {
+	global selectString
+	global	orderString
+	global	fromString
+	global	whereString
+	global	moozString
+
+	set searchString [concat $selectString $fromString $whereString "and" $moozString \
+			$orderString]
+	doUI $searchString
+}
+
+
+
+
+
+proc customQuery {han } {
+	global	winNumber
+	global	selectString selectComment
+	global 	cwhereString
+	global	orderString
+	global	fromString
+
+	incr	winNumber
+
+	catch {destroy .custom$winNumber}
+	
+	toplevel .custom$winNumber
+#	frame 	.custom$winNumber.fr
+
+
+	frame .custom$winNumber.menu -relief raised -bd 2
+	pack append .custom$winNumber .custom$winNumber.menu {top fillx}
+
+	menubutton .custom$winNumber.menu.file -text "File" 		\
+			-menu .custom$winNumber.menu.file.menu -bd 3
+	pack append .custom$winNumber.menu .custom$winNumber.menu.file left
+	menu .custom$winNumber.menu.file.menu
+
+	menubutton .custom$winNumber.menu.opt -text "Options" 		\
+			-menu .custom$winNumber.menu.opt.menu -bd 3
+	pack append .custom$winNumber.menu .custom$winNumber.menu.opt left
+	menu .custom$winNumber.menu.opt.menu
+
+
+	MakeTextFrameWithLabel 	.custom$winNumber.fr "Input Query:" 	\
+			"-bd 3 -relief raised"
+
+	MakeTextFrameWithLabel  .custom$winNumber.out "Result:" 	\
+			"-bd 3 -relief sunken -height 10"
+
+	frame .custom$winNumber.bfram
+	pack append .custom$winNumber .custom$winNumber.bfram bottom
+
+	pack append .custom$winNumber .custom$winNumber.fr top
+	
+	pack append .custom$winNumber .custom$winNumber.out {bottom frame e}
+	
+	set t .custom$winNumber.fr.text
+
+	
+	$t insert end "$selectComment"
+	$t insert end "$selectString"
+	$t insert end "\n\n\n"
+	$t tag add Select 1.0 "insert -1 chars"
+
+	$t insert end "$fromString"
+	$t insert end "\n\n\n"
+	$t tag add From Select.last "insert -1 chars"
+
+	$t insert end "$cwhereString(default)"
+	$t insert end "\n\n\n"
+
+	$t tag add Where From.last "insert -1 chars"
+	$t insert end "$orderString"
+
+	$t tag add Order Where.last "insert -1 chars"
+	
+
+	set m .custom$winNumber.menu.file.menu
+	
+	$m add command -command "SaveQuery $t" -label "Save Query"
+	$m add separator
+	$m add command -command "destroy .custom$winNumber" -label EXIT -underline 0
+
+	set m .custom$winNumber.menu.opt.menu
+	$m add command -command "doUI \[.custom$winNumber.fr.text get 0.1 end\]" -label "query to window"
+	$m add command -command "showOutput $han .custom$winNumber.out.text \[.custom$winNumber.fr.text get 0.1 end\]" -label "query to text"
+
+	$m add command -command "TclOutputText .custom$winNumber.out.text" -label "tcl output"
+	$m add command -command "SwitchTag $t Where \{$cwhereString(sdk)\}" -label switch
+
+
+
+#	pack append .custom$winNumber.bfram .custom$winNumber.bfram.tclit left
+#	pack append .custom$winNumber.bfram .custom$winNumber.bfram.query left
+#	pack append .custom$winNumber.bfram .custom$winNumber.bfram.wquery left
+#	pack append .custom$winNumber.bfram .custom$winNumber.bfram.close left
+#	pack append .custom$winNumber.bfram .custom$winNumber.bfram.switch left
+#	pack append .custom$winNumber.bfram .custom$winNumber.bfram.save left
+	
+}
+	
+proc showOutput { fhan txt query} {
+
+
+	$txt delete 0.1 end
+	global han
+
+	Query $han $query 
+
+	for {set bug [sybnext $han]} {$bug != {} } {set bug [sybnext $han]} {
+		$txt insert end [list $bug ]
+		$txt insert end "\n"
+	}
+}				
+set tclTestString {foreach b [$txt get 0.1 end] {
+BugOutputFormat $b
+}
+}
+	
+proc TclOutputText { txt} { 
+	puts stdout [$txt get 0.1 end]
+	global tclTestString
+	eval $tclTestString
+}
+	
+proc BugOutputFormat {bug } {
+	puts stdout [format "%d %-6.6s %s" [lindex $bug 0] [lindex $bug 1] [lindex $bug 3]]
+}
+
+###########################################
+#
+# Notes :
+#
+#
+
+#	set ss "where whose in (\"ron\" )  
+#		and fixed_date like \"Apr 24 1993%\"
+#		"
+
+
+
+
+######################################################################
+#		mkListBox
+######################################################################
+#
+# SYNOPSIS:	makes a list box of items passed in from a list
+#
+# PASS:		l	- the path for the created list box
+#		x	- width of list
+#		y	- height of list
+#		title	- title to display on top of list
+#		boarder	- boarder width
+#
+# RETURN:	Void.
+#
+# SIDE EFFECTS:
+#	Requires:	????
+#
+#	Asserts:	????
+#
+# CHECKS:		????
+#
+# PSEUDO CODE/STRATEGY:	????
+#
+# KNOWN BUGS/CAVEATS/IDEAS:	????
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	dlitwin	4/30/93	Initial version.
+#
+######################################################################
+proc mkListBox {l list x y title border} {
+    frame $l -relief raised -bd $border
+
+    label $l.title -text $title
+    pack append $l $l.title top
+
+    listbox $l.lst -relief sunken -geometry ${x}x$y -yscroll "$l.scroll set"
+    bind $l <B2-Motion
+
+    scrollbar $l.scroll -relief sunken \
+	-command "listBoxScroll $l.lst [llength $list] $y"
+    pack append $l $l.scroll {right filly} $l.lst {left expand fill}
+
+    eval "$l.lst insert 0 $list"
+}
+
+
+
+
+######################################################################
+#		listBoxScroll
+######################################################################
+#
+# SYNOPSIS:	make the scrolling of the list box a little less
+#		retarded, such that you can't scroll into a situation
+#		where the last item is the top of the list.  Whenever
+#		the list needs to scroll the last item will always
+#		remain on the bottom.
+#
+# PASS:		l	- path of the listbox
+#		length	- length of the list
+#		height	- height of list (viewable portion)
+#		item	- list item to be on top
+#
+# RETURN:	Void.
+#
+# SIDE EFFECTS:
+#	Requires:	????
+#
+#	Asserts:	????
+#
+# CHECKS:		????
+#
+# PSEUDO CODE/STRATEGY:	????
+#
+# KNOWN BUGS/CAVEATS/IDEAS:	????
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	dlitwin	5/ 6/93	Initial version.
+#
+######################################################################
+proc listBoxScroll {l length height item} {
+    if {$item >= $height} {
+	if {[expr $length-$item] < $height} {
+	    $l yview [expr $length-$height]
+	} else {
+	    $l yview $item
+	}
+    } else {
+	$l yview $item
+    }
+}
+
+proc listBoxScrollX {l length height item} {
+    if {$item >= $height} {
+	if {[expr $length-$item] < $height} {
+	    $l xview [expr $length-$height]
+	} else {
+	    $l xview $item
+	}
+    } else {
+	$l xview $item
+    }
+}
+
+proc monthToInt { monthName } {
+	case $monthName {
+		{Jan} {return 1}
+		{Feb} {return 2}
+		{Mar} {return 3}
+		{Apr} {return 4}
+		{May} {return 5}
+		{Jun} {return 6}
+		{Jul} {return 7}
+		{Aug} {return 8}
+		{Sep} {return 9}
+		{Oct} {return 10}
+		{Nov} {return 11}
+		{Dec} {return 12}
+	}
+}
+
+proc modifyBug { bugNumber } {
+
+	global	han
+	global	StatusButtonsList
+	global	TypeButtonsList
+	global	SeverityButtonsList
+	global	ReproducibleButtonsList
+
+
+	Query $han "select
+	/* 0 */ 	serial_no, partner_no, duplicate, synopsis, geode,
+	/* 5 */		whose, severity, type, reproducible, reproduced_by,
+	/* 10 */	verified, status, open_date, fixed_date, change_date,
+	/* 15 */	reporter, comment, report, test_no, version, 
+	/* 20 */	last_modified, date_entered,
+	/* 22 */	product1, product2, product3, 	product4, product5,
+	/* 27 */	product6, product7, product8, product9, product10,
+	/* 31 */	product11, product12, product13, product14,
+	/* 35 */	product15, product16, product17, product18,
+	/* 39 */	product19, product20
+		
+		from bugs where serial_no = $bugNumber"
+
+	set rpt [sybnext $han]
+
+
+	set numb [lindex $rpt 0]
+	set synopsis [lindex $rpt 3]
+	set geode [lindex $rpt 4]
+	set whose [lindex $rpt 5]
+	set severity [lindex $rpt 6]
+	set reproducible [lindex $rpt 8]
+	set status [lindex $rpt 11]
+	set reporter [lindex $rpt 15]
+	set date_ent [lindex $rpt 21]
+	set comment [lindex $rpt 16]
+	set report [lindex $rpt 17]
+	set test_no [lindex $rpt 18]
+	set version [lindex $rpt 19]
+	set last_mod [lindex $rpt 20]
+	set type [lindex $rpt 7]
+	set reproduced [lindex $rpt 9]
+	set open_date [lindex $rpt 12]
+	set fixed_date [lindex $rpt 13]
+	set duplicate [lindex $rpt 2]
+	set change_date [lindex $rpt 14]
+
+
+
+	catch {destroy .modify$bugNumber }
+	toplevel .modify$bugNumber
+
+
+		set tr [frame .modify$bugNumber.toprow]
+		pack append .modify$bugNumber $tr {top fillx}
+
+	#
+	# Status buttons field
+	#
+		frame $tr.status 
+		label $tr.status.label -text "Status: "
+		pack append $tr.status $tr.status.label left
+		AddRadioButtonsToMenu $StatusButtonsList $tr.status "$status" selectedButton${bugNumber}status 
+		pack append $tr $tr.status {left frame nw }
+
+	#
+	# Type buttons field
+	#
+		frame $tr.type
+		label $tr.type.label -text "Type: "
+		pack append $tr.type $tr.type.label left
+		AddRadioButtonsToMenu $TypeButtonsList $tr.type "$type" selectedButton${bugNumber}type
+		pack append $tr $tr.type {left frame n}
+
+	#
+	# Severity buttons field
+	#
+		frame $tr.severity
+		label $tr.severity.label -text "Severity: "
+		pack append $tr.severity $tr.severity.label left
+		AddRadioButtonsToMenu $SeverityButtonsList $tr.severity "$severity" selectedButton${bugNumber}severity
+		pack append $tr $tr.severity {left frame n}
+
+	#
+	# Reproducible buttons field
+	#
+		frame $tr.reproducible
+		label $tr.reproducible.label -text "Reproducible: "
+		pack append $tr.reproducible $tr.reproducible.label left
+		AddRadioButtonsToMenu $ReproducibleButtonsList $tr.reproducible "$reproducible" selectedButton${bugNumber}reproducible
+		pack append $tr $tr.reproducible {left frame n}
+
+	#
+	# whose list field
+	#
+		frame .modify$bugNumber.whose 
+		label .modify$bugNumber.whose.label -text "Whose: "
+		pack append .modify$bugNumber.whose .modify$bugNumber.whose.label left
+		entry .modify$bugNumber.whose.entry 
+		.modify$bugNumber.whose.entry insert 0 $whose
+		pack append .modify$bugNumber.whose .modify$bugNumber.whose.entry top
+		pack append .modify$bugNumber .modify$bugNumber.whose {top frame nw}
+		emacsBindEntry .modify$bugNumber.whose.entry
+	#
+	# Geode list field
+	#
+		frame .modify$bugNumber.geode
+		label .modify$bugNumber.geode.label -text "(Ctrl-l) Geode: "
+		pack append .modify$bugNumber.geode .modify$bugNumber.geode.label left
+		entry .modify$bugNumber.geode.entry
+		.modify$bugNumber.geode.entry insert 0 $geode
+		pack append .modify$bugNumber.geode .modify$bugNumber.geode.entry top
+		pack append .modify$bugNumber .modify$bugNumber.geode {top frame nw}
+		bind .modify$bugNumber.geode.entry <Control-l> "DisplayListOfGeodes .modify$bugNumber.geode.entry"
+		bind .modify$bugNumber.geode.label <ButtonPress> "DisplayListOfGeodes .modify$bugNumber.geode.entry"
+		emacsBindEntry .modify$bugNumber.geode.entry
+
+	#
+	# Synopsis entry field
+	#
+		frame .modify$bugNumber.synopsis
+		label .modify$bugNumber.synopsis.label -text "Synopsis: "
+		pack append .modify$bugNumber.synopsis .modify$bugNumber.synopsis.label left
+		entry .modify$bugNumber.synopsis.entry -width 70
+		.modify$bugNumber.synopsis.entry insert 0 $synopsis
+		pack append .modify$bugNumber.synopsis .modify$bugNumber.synopsis.entry top
+		pack append .modify$bugNumber .modify$bugNumber.synopsis {top frame nw}
+		emacsBindEntry .modify$bugNumber.synopsis.entry
+	#
+	# Report Text field
+	#
+
+		MakeTextFrameWithLabel .modify$bugNumber.textfr "Report: "
+		.modify$bugNumber.textfr configure -relief raised -bd 4
+		.modify$bugNumber.textfr.text configure -bd 2 -width 70 -height 15 
+
+		pack append .modify$bugNumber .modify$bugNumber.textfr {top frame nw}
+		.modify$bugNumber.textfr.text insert 0.0 "$report"
+
+	#
+	# Product Box
+	#
+#		MakeProductListFromBugNumber pblist$bugNumber $bugNumber
+#		set pb [MakeProductBox pblist$bugNumber [GetPos .modify$bugNumber]]
+		set pb foo
+
+	#
+	# Window Options buttons	
+	#
+		frame .modify$bugNumber.options 
+		# puts stdout "(.modify$bugNumber) ($bugNumber)"
+		button .modify$bugNumber.options.modify -text "Modify" \
+					-command "updateBug .modify$bugNumber $bugNumber [list $last_mod] 0 $pb pblist$bugNumber"
+		button .modify$bugNumber.options.modifyMail -text "Modify with Mail" \
+					-command "updateBug .modify$bugNumber $bugNumber [list $last_mod] 1 $pb pblist$bugNumber"
+		button .modify$bugNumber.options.cancel -text "Cancel" \
+					-command "destroy .modify$bugNumber ; catch {destroy .geodes}"
+		pack append .modify$bugNumber.options .modify$bugNumber.options.cancel right
+		pack append .modify$bugNumber.options .modify$bugNumber.options.modify left
+		pack append .modify$bugNumber.options .modify$bugNumber.options.modifyMail left
+		pack append .modify$bugNumber .modify$bugNumber.options bottom
+	
+	
+}	
+##############################################################################
+#	AddButtonsToFrame
+##############################################################################
+#
+# SYNOPSIS:	Adds radio buttons to to a frame
+# PASS:		list of button names and text values
+#		{ { text}
+#	 	  {text} ... }
+#		frame to add to
+#		text of button that should be selected
+# CALLED BY:	
+# RETURN:	 list of variables corresponding to value of button
+# SIDE EFFECTS:	none
+#
+# STRATEGY:
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#       ron 	9/19/93   	Initial Revision
+#
+##############################################################################
+proc    AddButtonsToFrame { buttonList parent textKey maxOnLine} {
+
+	global selectedButton$parent
+	set count 0
+	set f $parent
+	foreach btn $buttonList {
+		if {$count==0 || [expr {$count % $maxOnLine}]==0} {
+			frame $parent.bf$count
+			pack append $parent $parent.bf$count {top frame nw}
+			set f $parent.bf$count
+		}
+		checkbutton $f.[lindex $btn 0] -text [lindex $btn 1] -font 6x12 -variable selectedButton${parent}[lindex $btn 1] -font 6x12
+		pack append $f $f.[lindex $btn 0] {left frame nw}
+
+		if {[lindex $btn 1]==$textKey} {
+			$f.[lindex $btn 0] select
+		}
+		incr count
+	}
+}
+
+##############################################################################
+#	AddRadioButtonsToMenu
+##############################################################################
+#
+# SYNOPSIS:	Adds radio buttons to to a menu
+# PASS:		list of button text values
+#		{{ text}
+#	 	  {text} ... }
+#		menu to add to
+#		text of button that should be selected
+#		variable name of selection
+# CALLED BY:	
+# RETURN:	nothing
+# SIDE EFFECTS:	none
+#
+# STRATEGY:
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#       ron 	9/19/93   	Initial Revision
+#
+##############################################################################
+proc    AddRadioButtonsToMenu { buttonList parent textKey var} {
+
+	global $var
+	global selectedButton$parent
+
+	menubutton $parent.mb -text "$textKey" -menu $parent.mb.m	\
+		 -bd 1 -relief raised
+	menu $parent.mb.m
+	pack append $parent $parent.mb {top frame nw}
+
+	foreach btn $buttonList {
+	    $parent.mb.m add radiobutton 		\
+		 -label "$btn"				\
+		 -variable $var				\
+		 -font 6x12 				\
+		-command "$parent.mb configure -text \"$btn\" "
+	}
+	set $var "$textKey"
+}
+##############################################################################
+#	GetStatusFromSelected
+##############################################################################
+#
+# SYNOPSIS:	given the name of the button, return the text associated with it
+# PASS:		list of button names and text values
+#		{{ name} { text}
+#	 	 { name} {text} ... }
+#		frame to add to
+# CALLED BY:	
+# RETURN:	nothing
+# SIDE EFFECTS:	none
+#
+# STRATEGY:
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#       ron 	9/19/93   	Initial Revision
+#
+##############################################################################
+proc GetStatusFromSelected {buttonName buttonNameList} {
+	foreach btn $buttonNameList {
+		if {[lindex $btn 0]==$buttonName} {
+			return [lindex $btn 1]
+		}
+	}
+	return {}
+}	
+
+proc updateBug {w number last_mod mailFlag boxToDestroy listPtr} {
+
+	global han
+	global $listPtr
+	global StatusButtonsList
+	global TypeButtonsList
+	global SeverityButtonsList
+	global	ReproducibleButtonsList
+
+	global	selectedButton${number}type
+	global	selectedButton${number}severity
+	global selectedButton${number}status
+	global selectedButton${number}reproducible
+
+	set type [set selectedButton${number}type]
+	set status [set selectedButton${number}status]
+	set severity [set selectedButton${number}severity]
+	set reproducible [set selectedButton${number}reproducible]
+
+	#
+	# see if the bug has changed while we were changing it
+	#
+	
+		Query $han "select last_modified from bugs where serial_no = $number"
+		set lm [lindex [sybnext $han] 0]
+		if {$lm != $last_mod} {
+			WarningBox "Someone else has modified the bug.  Your chnages may overwrite their changes.  You should compare the changes.  I will bring up the new version for you.  Click to continue with or abort your changes" "bugWindow $number" [list "Update anyway" "updateBug $w $number \"$lm\" $mailFlag"] [list "Abort change" "catch {destroy $w}"]
+			return	
+
+		}
+
+	AppendTimeStamp $w.textfr.text
+	set report [$w.textfr.text get 0.1 end]
+	set whose [$w.whose.entry get]
+	set geode [$w.geode.entry get]
+	set synopsis [$w.synopsis.entry get]
+
+	#
+	# see if whose is a valid field
+	#
+	set valid [CreateGeodeList ]
+	if {[lsearch $valid $geode] == -1} {
+		# not a valid geode
+		WarningBox "\"$geode\" is not a valid geode.  Hit ctrl-l in the geode field to get a list." {} [list "Close" {}]
+		return
+	}
+
+	#
+	# make sure synopis has no single ", convert to ""
+	#
+	regsub	-all \" $synopsis \"\" synopsis
+#	puts stdout "($synopsis)"
+
+	regsub	-all \" $report \"\" report
+#	set tmpFile [open /tmp/bugUpdate w+]
+#	puts $tmpFile "$report" nonewline
+#	close	$tmpFile
+    
+	set setString "update bugs set"
+	if {$status != {}} {
+		append setString " status = \"$status\" "
+	}
+	if {$whose != {}} {
+		append setString ", whose = \"$whose\" "
+	}
+	if {$whose == {} } {
+		append setString ", whose = NULL "
+	}
+	if {$geode != {} } { 
+		append setString ", geode = \"$geode\" "
+	}
+	if {$type != {} } {
+		append setString ", type = \"$type\" "
+	}
+	if {$reproducible != {} } {
+		append setString ", reproducible = \"$reproducible\" "
+	}
+	if {$severity != {} } {
+		append setString ", severity = \"$severity\" "
+	}
+	# add space after synopsis in case it ends in "
+	append setString ", synopsis = \"$synopsis\" "
+	append setString ", report = \"$report\" "
+	append setString "where serial_no = $number"
+
+#	puts stdout $setString
+#	return 
+	Query $han "begin tran"
+ 	Query $han $setString
+#	puts stdout updated
+# 	Query $han "select report from bugs
+#				where serial_no = $number"
+# 	sybwritetext $han bugs.report 1 "/tmp/bugUpdate"
+	Query $han "commit tran"
+#	UpdateBugWithProductList $number $listPtr
+
+	#
+	# Send Mail
+	#
+	if {$mailFlag} {
+		SendMail $number $whose
+	}
+
+	#
+	# remove modify bug window
+	# and update open bug number window
+	#
+	catch {destroy $w}
+	catch {destroy .geodes}
+	catch {destroy $boxToDestroy}
+	catch {.bug$number.m.text configure -state normal
+		.bug$number.m.text delete 1.0 end
+		.bug$number.m.text insert 1.0 [getbug $number]
+		.bug$number.m.text configure -state disabled}
+
+}
+
+proc SendKeyToParent {bnd win} {
+	if {$win == "."} { return }
+	set parent [string range $win 0 [expr [string last . $win]-1]]
+	if {$parent == {} } {
+		set parent "."
+	}
+	set cmd [bind $parent "$bnd"]
+#	puts stdout "($bnd) ($parent) ($cmd)"
+	if {$cmd == {} } {
+		SendKeyToParent "$bnd" $parent
+	} else {
+		eval $cmd
+	}
+
+}
+proc emacsBindText {textObject} {
+
+	bind $textObject <Control-a> "BegLine $textObject"
+	bind $textObject <Home> "BegLine $textObject"
+	bind $textObject <Control-e> "EndLine $textObject"
+
+	bind $textObject <Control-n> "NextLine $textObject"
+	bind $textObject <Down> "NextLine $textObject"
+	bind $textObject <Control-p> "PrevLine $textObject"
+	bind $textObject <Up> "PrevLine $textObject"
+
+	bind $textObject <Control-b> "BackChar $textObject"
+	bind $textObject <Left> "BackChar $textObject"
+	bind $textObject <Control-f> "ForwardChar $textObject"
+	bind $textObject <Right> "ForwardChar $textObject"
+
+	bind $textObject <Meta-b> "BegWord $textObject"
+	bind $textObject <Meta-f> "EndWord $textObject"	
+	bind $textObject <Control-Left> "BegWord $textObject"
+	bind $textObject <Control-Right> "EndWord $textObject"
+
+	bind $textObject <Control-k> "KillToEnd $textObject"
+	bind $textObject <Control-x> "KillRegion $textObject"
+
+	bind $textObject <Control-w> "KillBackwardWord $textObject"
+
+	bind $textObject <Control-d> "KillChar $textObject"
+	bind $textObject <Control-v> "InsertSelection $textObject"
+	bind $textObject <Button-2> "InsertSelection $textObject"
+#	bind $textObject <Double-ButtonPress-1> "\[selection clear\]"
+	bind $textObject <KP_Enter> "$textObject insert insert \\n"
+
+	bind $textObject "<Control-q> <Control-Any-KeyPress>" "$textObject insert insert %A"
+
+	bind $textObject <Control-c> "CapitalizeRegion $textObject"
+	bind $textObject <Control-Key> "SendKeyToParent \"<Control-Key-%K>\" %W"
+	bind $textObject <Meta-Key> "SendKeyToParent \"<Meta-Key-%K>\" %W"
+	bind $textObject <Escape> +"doNothing"
+}
+
+proc InsertSelection { to } {
+	catch {$to insert insert [selection get]}
+}
+proc KillBackwardWord { to } {
+	if {[$to compare insert == "insert wordstart"]} {
+		$to delete "insert -1 chars wordstart" "insert"
+	} else {
+		$to delete "insert wordstart" "insert"
+	}
+}
+proc KillChar { to } {
+	$to delete insert "insert +1 chars"
+}
+proc KillToEnd { to } {
+	if {[$to compare insert == "insert lineend"]} {
+		$to delete insert "insert +1 chars"
+	} else {
+		$to delete insert "insert lineend"
+	}
+}
+
+proc KillRegion { to } {
+	catch {$to delete sel.first sel.last}
+	$to yview -pickplace insert
+}
+proc BegWord { to } {
+	BackChar $to
+	$to mark set insert "insert wordstart"
+	$to yview -pickplace insert
+}
+proc BackChar { to } {
+	$to mark set insert "insert - 1 chars"
+	$to yview -pickplace insert
+}
+proc EndWord { to } {
+	$to mark set insert "insert wordend"
+	$to yview -pickplace insert
+}
+proc ForwardChar { to } {
+	$to mark set insert "insert +1 chars"
+	$to yview -pickplace insert
+}
+proc NextLine { to } {
+	$to mark set insert "insert +1 lines"
+	$to yview -pickplace insert
+}	
+proc PrevLine { to } {
+	$to mark set insert "insert -1 lines"
+	$to yview -pickplace insert
+}	
+proc BegLine { to } {
+	$to mark set insert "insert linestart"
+	$to yview -pickplace insert
+}
+proc EndLine { to } {
+	$to mark set insert "insert lineend"
+	$to yview -pickplace insert
+}
+
+proc doNothing { } { }
+proc emacsBindEntry {textObject} {
+	bind $textObject <Control-a> \
+		[concat $textObject icursor 0]
+	bind $textObject <Control-e> \
+		[concat $textObject icursor end]
+	bind $textObject <Control-f> \
+		[concat $textObject icursor "\[expr \[$textObject index insert\]+1\] " ]
+	bind $textObject <Control-b> \
+		[concat $textObject icursor "\[expr \[$textObject index insert\]-1\] " ]
+	bind $textObject <Right> \
+		[concat $textObject icursor "\[expr \[$textObject index insert\]+1\] " ]
+#	bind $textObject <Left> \
+#		[concat $textObject icursor "\[expr \[$textObject index insert\]-1\] " ]
+	bind $textObject <Control-k>  "EntryDeleteToEnd $textObject"
+	bind $textObject <Control-d>  "EntryDeleteChar $textObject"
+	bind $textObject <Return> +"doNothing"
+	bind $textObject <Control-Key> +"doNothing"
+	bind $textObject <Escape> +"doNothing"
+	bind $textObject <Left> "$textObject insert insert 4"
+	bind $textObject <Right> "$textObject insert insert 6"
+	bind $textObject <Up> "$textObject insert insert 8"
+	bind $textObject <Down> "$textObject insert insert 2"
+	bind $textObject <R13> "$textObject insert insert 1"
+	bind $textObject <R15> "$textObject insert insert 3"
+	bind $textObject <R11> "$textObject insert insert 5"
+	bind $textObject <R7> "$textObject insert insert 7"
+	bind $textObject <R9> "$textObject insert insert 9"
+	bind $textObject <Insert> "$textObject insert insert 0"
+
+
+#bind Entry <Left> {%W icursor [expr [%W index insert]-1]}
+#bind Entry <Right> {%W icursor [expr [%W index insert]+1]}
+#bind Entry <Delete> {%W delete insert}
+
+}
+proc EntryDeleteToEnd {e} {
+	$e delete insert end
+}
+proc EntryDeleteChar {e} {
+	$e delete insert
+}
+
+proc bindListBox {lb cmd1 cmd2 } {
+	bind $lb <j> "ClearAndSetLB $lb +1"
+	bind $lb <k> "ClearAndSetLB $lb -1"
+	bind $lb <Down> "ClearAndSetLB $lb +1"
+	bind $lb <Up> "ClearAndSetLB $lb -1"
+	bind $lb <Control-n> "ClearAndSetLB $lb +1"
+	bind $lb <Control-p> "ClearAndSetLB $lb -1"
+	bind $lb <Return> $cmd1 
+	bind $lb <space> $cmd1
+	bind $lb <Escape> $cmd2
+	bind $lb <c> $cmd2
+	bind $lb <Double-Button-1> $cmd1
+}
+
+proc ClearAndSetLB {lb val} {
+	set cs [$lb curselection]
+	if {$cs == {}} {set cs 0}
+	$lb select clear
+	$lb select from [expr $cs$val]
+	CenterSelected $lb
+#	$lb yview $cs
+}
+
+
+#####################################################
+#	CenterSelected
+############################################
+# 
+# CenterSelected listbox
+#
+# only use on single selectable listboxes
+# this will make sure the selected item is on the screen.
+# (in the center, if possible)
+#
+
+proc CenterSelected {lb} {
+	set gm [lindex [$lb configure -geometry] 4]
+	scan $gm %dx%d width height
+
+	set len [$lb size]
+
+	if {$len <= $height} return
+	set cs [$lb curselection]
+	if {$cs == {}} {set cs 0}
+
+	if {[expr "$len - $cs < $height/2"]} {
+		set cs [expr "$len - $height/2"]
+	}
+
+	if {[expr "$cs < $height/2"]} {
+		set cs [expr "$height/2"]
+	}
+
+	$lb yview [expr "$cs - $height/2"]
+}
+
+
+######################################################################
+#		MakeTextFrame
+######################################################################
+#
+# SYNOPSIS:	Makes a frame with text object and scrollbars in it
+#
+# PASS:		frameName - name of newly create frame
+#
+#
+# RETURN:	Void.
+#
+# SIDE EFFECTS:
+#	Requires:	????
+#
+#	Asserts:	????
+#
+# CHECKS:		????
+#
+# PSEUDO CODE/STRATEGY:	????
+#
+# KNOWN BUGS/CAVEATS/IDEAS:	????
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ron	9/23/93	Initial version.
+#
+######################################################################
+proc MakeTextFrame { frameName} {
+	frame $frameName
+
+#    label frameName.title -text $title
+#    pack append $l $l.title top
+
+	text $frameName.text -yscroll "$frameName.scroll set" -wrap word
+	pack append $frameName $frameName.text top
+
+	scrollbar $frameName.scroll -relief sunken \
+		-command "TextScroll $frameName.text"
+	pack append $frameName $frameName.scroll {right filly} $frameName.text {left expand fill}
+	emacsBindText $frameName.text
+}
+
+######################################################################
+#		MakeTextFrameWithLabel
+######################################################################
+#
+# SYNOPSIS:	Makes a frame with text object and scrollbars in it
+#
+# PASS:		frameName - name of newly create frame
+#
+#
+# RETURN:	Void.
+#
+# SIDE EFFECTS:
+#	Requires:	????
+#
+#	Asserts:	????
+#
+# CHECKS:		????
+#
+# PSEUDO CODE/STRATEGY:	????
+#
+# KNOWN BUGS/CAVEATS/IDEAS:	????
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ron	9/23/93	Initial version.
+#
+######################################################################
+proc MakeTextFrameWithLabel { frameName title {textOptions {} }} {
+	frame $frameName
+
+	label $frameName.title -text $title -font "-Adobe-Helvetica-Bold-R-Normal--*-120-*"
+	pack append $frameName $frameName.title {left frame nw}
+
+	text $frameName.text -yscroll "$frameName.scroll set" -wrap word \
+		-font {*-Courier-Medium-R-Normal-*-120-*} 
+	if {$textOptions != {}} {
+		eval "$frameName.text configure $textOptions"
+	}
+
+	pack append $frameName $frameName.text {top }
+
+	scrollbar $frameName.scroll -relief sunken \
+		-command "TextScroll $frameName.text"
+	pack append $frameName $frameName.scroll {right filly} $frameName.text {left expand fill}
+	emacsBindText $frameName.text
+}
+
+
+proc TextScroll {to y} {
+	$to yview $y
+}
+
+proc PrintList {lb } {
+	global PrintString
+	for {set c 0} {$c < [$lb size]} {incr c} {
+		set line [$lb get $c]
+		append outString $line
+		append outString "\n"
+	}
+	exec echo $outString | enscript -r -h
+}
+	
+
+proc WarningBox { msg cmd args } {
+
+	global winNumber
+	incr winNumber
+	catch {destroy .warning$winNumber}
+	
+	toplevel .warning$winNumber
+
+	message .warning$winNumber.msg -text $msg -width 400
+	pack append .warning$winNumber .warning$winNumber.msg top
+
+	set n 0
+	foreach b $args {
+		button .warning$winNumber.b$n -text [lindex $b 0] -command "[lindex $b 1] ; destroy .warning$winNumber"
+
+		pack append .warning$winNumber .warning$winNumber.b$n left
+		incr n
+	}
+
+	eval "$cmd"
+}
+
+proc GetGeodeRule {} {
+	global han
+	Query $han {select text from syscomments where id = object_id ("geode_choice")}
+	set res [sybnext $han]
+	while {$res != {} } {
+		append rule $res
+		set res [sybnext $han]
+	}
+	return $rule
+}
+	
+proc CreateGeodeList { } {
+
+	global han
+	sybsql $han {
+		select geode from prod_geode_xref where product = "GENERAL"
+		order by geode
+	}
+	set g [sybnext $han]
+	while {$g != {}} {
+		lappend res $g
+		set g [sybnext $han]
+	}
+	return "$res"
+}
+proc  MakeTclEditWindow { } {
+	toplevel .tclEdit
+	MakeTextFrameWithLabel .tclEdit.text "Tcl command:" "-bd 3 -relief raised -height 10"
+	MakeTextFrameWithLabel .tclEdit.out "Tcl command:" "-bd 3 -relief raised -height 10"
+	pack append .tclEdit .tclEdit.text top
+	pack append .tclEdit .tclEdit.out top
+	button .tclEdit.apply -command {EvalTcl .tclEdit.text.text .tclEdit.out.text} -text Apply
+	bind .tclEdit.text.text <Control-j> ".tclEdit.apply configure -state active ; .tclEdit.apply invoke ; .tclEdit.apply configure -state normal"
+	pack append .tclEdit .tclEdit.apply bottom
+
+	proc EvalTcl {textIn textOut} {
+		set txt [$textIn get 1.0 end]
+		catch {ueval "$txt"} result
+			$textOut insert end "$result\n"
+	}
+}
+
+
+
+
+
+proc DisplayListOfProducts {entry } {
+
+	set prods [CreateProductList ]
+	set applyCommand "$entry delete 0 end; 
+			  $entry insert insert \[lindex \[list $prods\] \[.prods.lb.lst curselection\]\];
+			  catch {destroy .prods}"
+	set closeCommand "catch {destroy .prods}"
+
+
+	PopupList Prods: .prods $entry "$prods" "$applyCommand" "$closeCommand"
+	tk_listboxSingleSelect .prods.lb.lst
+	
+
+}
+
+
+
+proc DisplayListOfGeodes {entry } {
+
+	set geodes [CreateGeodeList ]
+	set applyCommand "$entry delete 0 end; 
+			  $entry insert insert \[lindex \[list $geodes\] \[.geodes.lb.lst curselection\]\];
+			  catch {destroy .geodes}"
+	set closeCommand "catch {destroy .geodes}"
+
+
+	PopupList Geodes: .geodes $entry "$geodes" "$applyCommand" "$closeCommand"
+	tk_listboxSingleSelect .geodes.lb.lst
+	
+
+}
+#
+# The name of the list will be $rootname.lb.lst
+#
+proc PopupList {title rootname entry list applyCommand closeCommand} {
+	catch {destroy $rootname}
+	toplevel $rootname
+	mkListBox $rootname.lb "$list" 12 15 "$title" 2
+	pack append $rootname $rootname.lb top
+	bindListBox $rootname.lb.lst  "$applyCommand" "$closeCommand"
+	focus $rootname.lb.lst
+	button $rootname.apply -text Apply -command "$applyCommand"
+	button $rootname.close -text Close -command "$closeCommand"
+	pack append $rootname $rootname.apply left
+	pack append $rootname $rootname.close right
+	$rootname.lb.lst select from 0
+}
+
+proc CapitalizeRegion {to} {
+	$to tag add capr "insert linestart" "insert lineend"
+	set txt [$to get capr.first capr.last]
+	$to insert capr.first [string tolower $txt]
+	$to delete capr.first capr.last
+}
+
+proc SwitchTag {txt tag string} {
+	set end [lindex [$txt tag range $tag] 1]
+	$txt insert $end "$string"
+	$txt delete $tag.first $end
+}
+
+#
+# Debugging thing
+#
+
+proc DisplayTags {txt } {
+	set names [$txt tag names]
+	foreach n "$names" {
+		puts stdout "$n [$txt tag ranges $n]"
+	}
+}
+
+proc SendMail {serial_no whose} {
+
+	set mailString [MakeMailString $serial_no]
+
+	exec echo $mailString | /usr/ucb/mail -s "Bug Update: $serial_no" "$whose"
+
+}
+
+
+proc SaveQuery {txt} {
+	EntryBox "New Name for Button:" "SaveQueryToFile [list [$txt get 1.0 end]] [list _ENTRY_] " {}
+}
+
+#
+# Replace _ENTRY_ in cmd string with the data from the entry
+#
+
+proc EntryBox {title cmd bindings} {
+
+	global	winNumber
+	global labelFont entryFont
+	global sillyWin
+	incr winNumber
+	toplevel .entry$winNumber
+	if {[info exists sillyWin]} {
+		wm positionfrom .entry$winNumber user
+	}
+
+	set w .entry$winNumber
+
+	label $w.label -text "$title" -font $labelFont
+	entry $w.entry -font $entryFont
+	
+	set thisEntry "\[$w.entry get\]"
+
+	bind $w.entry <space> "doNothing"
+	bind $w.entry <Escape> "destroy $w"
+	foreach b $bindings {
+		regsub -all _ENTRY_ [list $b] $w.entry b
+#		puts stdout "[lindex $b 0] '[lindex $b 1]' $w.entry"
+#		bind $w.entry [lindex $b 0] "[lindex $b 1]"
+		set b [lindex $b 0]
+#		puts	stdout " [lindex $b 0]"
+		bind $w.entry [lindex $b 0] [lindex $b 1]
+	}
+	focus $w.entry
+
+	#
+	# FIX to do something reasonable with ()'s in entry
+	#
+
+	
+	bind $w.entry <Return> "regsub -all _ENTRY_ [list $cmd] \[$w.entry get\] foo; eval \$foo ; destroy $w"
+	bind $w.entry <KP_Enter> "regsub -all _ENTRY_ [list $cmd] \[$w.entry get\] foo; eval \$foo ; destroy $w"
+	emacsBindEntry $w.entry
+
+	pack append $w $w.label left
+	pack append $w $w.entry left
+
+
+	if {[info exists sillyWin]} {
+	#
+	# place right under tkbugs
+	#
+		update		
+		set tkg [wm geometry .]
+		# form is wXh+l+t
+		set wg [wm geometry .entry$winNumber]
+		scan $tkg "%dx%d+%d+%d" tmp h1 lft top
+		scan $wg "%dx%d+%d+%d" width height tmp tmp
+		set top [expr $top+$h1]
+#		puts stdout "($tkg) ($wg) ($width) ($height) ($lft) ($top)"
+		wm geometry .entry$winNumber ${width}x${height}+${lft}+${top}
+	}
+
+}
+
+proc SaveQueryToFile {query queryName} {
+	global majorButtons
+	global defaultsFile
+#	puts stdout "(query) ($queryName)"
+	#
+	# fix so you can not have both "Foo" and "foo" as names
+	#
+	if {[info exists majorButtons($queryName)]} {
+		WarningBox "Sorry that name is already being used" [list Close "doNothing"]
+		return
+	}
+	set majorButtons($queryName) "doUI  [list $query] "
+	button .b2.[string tolower $queryName] -text $queryName -command "$majorButtons($queryName)"
+	pack append .b2 .b2.[string tolower $queryName] left
+	set f [open $defaultsFile a+]
+#	puts stdout $f
+	puts $f "#######################################################################"
+	puts $f "set majorButtons($queryName) \{ doUI \{ $query \} \}"
+	close $f
+}
+	
+
+proc Query {han query} {
+	global sybmsg
+#	puts stdout a
+	if {[catch {[sybsql $han "$query"]} result]==1} {
+		#
+		# there was an error, return error in box
+		#
+		set foo "$sybmsg(msgtext)"
+#		foreach x "[array names sybmsg]" {
+#			puts stdout "$x:\t$sybmsg($x)"
+#		}
+#		puts stdout b
+		if {$foo != {} } {
+			WarningBox "$foo" {} [list "Close" {}]
+		}
+#			WarningBox "$sybmsg(msgno): $sybmsg(dberr): $result" {} [list "Close" {}]
+#		set $sybmsg(msgtext) {}
+		return {}
+	}
+#	puts stdout c
+	return "$result"
+}
+	
+
+
+
+
+
+
+
+proc MakeMailString {number } {
+
+	global	han
+
+	Query $han "select
+	/* 0 */ 	serial_no, partner_no, duplicate, synopsis, geode,
+	/* 5 */		whose, severity, type, reproducible, reproduced_by,
+	/* 10 */	verified, status, open_date, fixed_date, change_date,
+	/* 15 */	reporter, comment, report, test_no, version, 
+	/* 20 */	last_modified, date_entered,
+	/* 22 */	product1, product2, product3, 	product4, product5,
+	/* 27 */	product6, product7, product8, product9, product10,
+	/* 31 */	product11, product12, product13, product14,
+	/* 35 */	product15, product16, product17, product18,
+	/* 39 */	product19, product20
+		
+		from bugs where serial_no = $number"
+
+	set rpt [sybnext $han]
+
+
+	set numb [lindex $rpt 0]
+	set synopsis [lindex $rpt 3]
+	set geode [lindex $rpt 4]
+	set whose [lindex $rpt 5]
+	set severity [lindex $rpt 6]
+	set repro [lindex $rpt 8]
+	set status [lindex $rpt 11]
+	set reporter [lindex $rpt 15]
+	set date_ent [lindex $rpt 21]
+	set comment [lindex $rpt 16]
+	set report [lindex $rpt 17]
+	set test_no [lindex $rpt 18]
+	set version [lindex $rpt 19]
+	set last_mod [lindex $rpt 20]
+	set type [lindex $rpt 7]
+	set reproduced [lindex $rpt 9]
+	set open_date [lindex $rpt 12]
+	set fixed_date [lindex $rpt 13]
+	set duplicate [lindex $rpt 2]
+	set change_date [lindex $rpt 14]
+	set verified [lindex $rpt 10]
+
+	set fl "%-16.16s    %s\n"
+	set mailString    "\t\t\t*********************\n"
+	append mailString "\t\t\t* tkbugs Bug Report *\n"
+	append mailString "\t\t\t*********************\n\n"
+	append mailString "\t\t\t$last_mod\n\n\n"
+
+	append mailString 					\
+	[format $fl "Bugs ID Number:" $numb]			\
+	[format $fl "Synopsis:" $synopsis]			\
+	[format $fl "Geode:" $geode]				\
+	[format $fl "Whose:" $whose]				\
+	[format $fl "Version:" $version]			\
+	[format $fl "Severity:" $severity]			\
+	[format $fl "Reproducible:" $repro]			\
+	[format $fl "Reproduced By:" $reproduced]		\
+	[format $fl "Verified:" $verified]			\
+	[format $fl "Status:" $status]				\
+	[format $fl "type:" $type]				\
+	[format "\n\nreport:\n%s" $report]			\
+	[format "\n\ncomment:\n%s" $comment]			\
+	[format "\n\nreporter:\n%s" $reporter]			\
+	[format "\n\nDate Entered: %s\n" $date_ent]
+
+	return "$mailString"
+}
+
+
+
+proc ibug { win listPtr boxToDestroy args } {
+	global han
+	global $listPtr
+
+#	puts stdout "--$args--"
+	foreach a "$args" {
+#		puts stdout "[lindex $a 0] [lindex $a 1]"
+		set [lindex $a 0] [ueval [lindex $a 1]]
+
+	}
+	regsub	-all \" $synopsis \"\" synopsis
+	regsub	-all \" $report \"\" report
+
+	if {[info exists whose]} {
+		if {$whose == {}} {
+			set whose NULL
+		} else {
+			set whose \"$whose\"
+		}
+	} else {
+		set whose NULL
+	}
+
+#	puts stdout "$synopsis"
+	Query $han "
+		declare @s_no int
+		execute ins_bugs @s_no output,
+		@change_date = NULL,
+		@synopsis = \"$synopsis\",
+		@status = \"$status\",
+		@geode = \"$geode\",
+		@severity = \"$severity\",
+		@type = \"$type\",
+		@reproducible = \"$reproducible\",
+		@whose = $whose
+		
+		update bugs
+		set report = \"$report\"
+		where serial_no = @s_no
+	"
+#	sybnext $han
+	set serial [sybretval $han]
+	if {$serial != {} } {
+#		UpdateBugWithProductList $serial $listPtr
+		catch {destroy $win}
+		catch {destroy $boxToDestroy}
+		catch {unset $listPtr}
+		WarningBox "Bug $serial created" {}  [list Close "doNothing"]
+		#
+		# Get owner of bug to send mail to
+		#
+		Query $han "select whose from bugs where serial_no = $serial"
+		set w [sybnext $han]
+#		puts stdout "($serial) ($w)"
+		SendMail $serial $w
+		
+		
+	}
+}
+
+
+proc InsertBugWindow { } {
+
+	global	han
+	global	StatusButtonsList
+	global	TypeButtonsList
+	global	SeverityButtonsList
+	global	ReproducibleButtonsList
+
+	global	winNumber
+	incr winNumber
+	set bugNumber $winNumber
+
+
+	catch {destroy .insert$bugNumber }
+	toplevel .insert$bugNumber
+
+
+		set tr [frame .insert$bugNumber.toprow]
+		pack append .insert$bugNumber $tr {top fillx}
+
+	#
+	# Status buttons field
+	#
+		frame $tr.status 
+		label $tr.status.label -text "Status: "
+		pack append $tr.status $tr.status.label left
+		AddRadioButtonsToMenu $StatusButtonsList $tr.status "OPEN" selectedButton${bugNumber}statusI
+		pack append $tr $tr.status {left frame nw }
+
+	#
+	# Type buttons field
+	#
+		frame $tr.type
+		label $tr.type.label -text "Type: "
+		pack append $tr.type $tr.type.label left
+		AddRadioButtonsToMenu $TypeButtonsList $tr.type "BUG" selectedButton${bugNumber}typeI
+		pack append $tr $tr.type {left frame n}
+
+	#
+	# Severity buttons field
+	#
+		frame $tr.severity
+		label $tr.severity.label -text "Severity: "
+		pack append $tr.severity $tr.severity.label left
+		AddRadioButtonsToMenu $SeverityButtonsList $tr.severity "" selectedButton${bugNumber}severityI
+		pack append $tr $tr.severity {left frame n}
+
+	#
+	# Reproducible buttons field
+	#
+		frame $tr.reproducible
+		label $tr.reproducible.label -text "Reproducible: "
+		pack append $tr.reproducible $tr.reproducible.label left
+		AddRadioButtonsToMenu $ReproducibleButtonsList $tr.reproducible "NOT ATTEMPTED" selectedButton${bugNumber}reproducibleI
+		pack append $tr $tr.reproducible {left frame n}
+
+	#
+	# whose list field
+	#
+		frame .insert$bugNumber.whose 
+		label .insert$bugNumber.whose.label -text "Whose: "
+		pack append .insert$bugNumber.whose .insert$bugNumber.whose.label left
+		entry .insert$bugNumber.whose.entry 
+		pack append .insert$bugNumber.whose .insert$bugNumber.whose.entry top
+		pack append .insert$bugNumber .insert$bugNumber.whose {top frame nw}
+		emacsBindEntry .insert$bugNumber.whose.entry
+	#
+	# Geode list field
+	#
+		frame .insert$bugNumber.geode
+		label .insert$bugNumber.geode.label -text "(Ctrl-l) Geode: "
+		pack append .insert$bugNumber.geode .insert$bugNumber.geode.label left
+		entry .insert$bugNumber.geode.entry
+		pack append .insert$bugNumber.geode .insert$bugNumber.geode.entry top
+		pack append .insert$bugNumber .insert$bugNumber.geode {top frame nw}
+		bind .insert$bugNumber.geode.entry <Control-l> "DisplayListOfGeodes .insert$bugNumber.geode.entry"
+		bind .insert$bugNumber.geode.label <ButtonPress> "DisplayListOfGeodes .insert$bugNumber.geode.entry"
+		emacsBindEntry .insert$bugNumber.geode.entry
+
+	#
+	# Synopsis entry field
+	#
+		frame .insert$bugNumber.synopsis
+		label .insert$bugNumber.synopsis.label -text "Synopsis: "
+		pack append .insert$bugNumber.synopsis .insert$bugNumber.synopsis.label left
+		entry .insert$bugNumber.synopsis.entry -width 70
+		pack append .insert$bugNumber.synopsis .insert$bugNumber.synopsis.entry top
+		pack append .insert$bugNumber .insert$bugNumber.synopsis {top frame nw}
+		emacsBindEntry .insert$bugNumber.synopsis.entry
+	#
+	# Report Text field
+	#
+
+
+
+		MakeTextFrameWithLabel .insert$bugNumber.textfr "Report: "
+		.insert$bugNumber.textfr configure -relief raised -bd 4
+		.insert$bugNumber.textfr.text configure -bd 2 -width 70 -height 15 
+
+		pack append .insert$bugNumber .insert$bugNumber.textfr {top frame nw}
+	#
+	# Product Box
+	#
+#		set pb [MakeProductBox pblist$bugNumber [GetPos .insert$bugNumber]]
+		set pb foo
+
+	#
+	# Window Options buttons	
+	#
+		frame .insert$bugNumber.options 
+		# puts stdout "(.insert$bugNumber) ($bugNumber)"
+		button .insert$bugNumber.options.insert -text "Insert" \
+  		-command "AppendTimeStamp .insert$bugNumber.textfr.text; \
+		ibug				\
+	.insert$bugNumber			\
+	pblist$bugNumber			\
+	 $pb					\
+	\[list type \"set selectedButton${bugNumber}typeI \" \] \
+	\[list severity \"set selectedButton${bugNumber}severityI\" \] \
+	\[list status \"set selectedButton${bugNumber}statusI\" \] \
+	\[list reproducible \"set selectedButton${bugNumber}reproducibleI\" \]\
+	\[list geode \".insert$bugNumber.geode.entry get\" \] \
+	\[list whose \".insert$bugNumber.whose.entry get\" \] \
+	\[list synopsis \".insert$bugNumber.synopsis.entry get\" \] \
+	\[list report \".insert$bugNumber.textfr.text get 1.0 end\" \] \
+	
+			"
+			
+
+		button .insert$bugNumber.options.cancel -text "Cancel" \
+					-command "destroy .insert$bugNumber ; catch {destroy .geodes} ; catch {destroy $pb}"
+		pack append .insert$bugNumber.options .insert$bugNumber.options.cancel right
+		pack append .insert$bugNumber.options .insert$bugNumber.options.insert left
+		pack append .insert$bugNumber .insert$bugNumber.options bottom
+	
+	
+}	
+
+
+
+
+
+proc GetListOfProducts { } {
+	sybsql $han {select product, view_name from prod_view_xref}
+	set l [sybnext $han]
+	while {$l != {} } {
+		append lst $l
+		set l [sybnext $han]
+	}	
+}
+
+
+
+if {[info exists run] == 0} {
+
+#
+# Set up UI
+# MAINROOT
+#
+	set winNumber 0
+	set globalDefaults "/usr/public/lib/tk/tkbugs.defaults"
+	set defaultsFile "~/.tkstring"
+
+	set user [lindex $argv 0]
+	if {$user == {}} {
+		set user [exec whoami]
+	}
+	catch {source $globalDefaults}
+	catch {source $defaultsFile}
+	set han none
+
+	wm focusmodel . active
+	focus default .
+#	bind . <Meta-x> exit
+	catch {destroy .buttons}
+#	frame .menu 
+#	pack append . .menu {top frame w }
+	frame .buttons
+	menubutton .buttons.event -text "File Options" -menu .buttons.event.m -bd 5 -relief raised
+	menu .buttons.event.m
+	pack 	append .buttons .buttons.event left
+	set m .buttons.event.m
+	$m add command -label "Tcl Edit" -command MakeTclEditWindow
+	$m add command -label "Custom Query" -command "customQuery $han"
+	$m add command -label "reload" -command "source /staff/pcgeos/$user/Tools/scripts/tkbugs"
+	$m add separator
+	$m add command -label "EXIT" -command exit -underline 1
+
+	
+	set han [sybconnect $user $user]
+	sybuse $han engineering
+#	button .buttons.load -text ReLoad -command "source tkbugs"
+#	button .buttons.exit -text EXIT -command exit
+	button .buttons.person -text personbugs -command \
+		{EntryBox "Person:" {getStringFromPersonText _ENTRY_} {}}
+	button .buttons.allwiz -text AllWiz -command {allwiz }
+	button .buttons.bullet -text Bullet -command {bullet }
+	button .buttons.sdkbugs -text SDK -command {sdkbugs }
+	button .buttons.insert -text "Create New" -command InsertBugWindow
+#	button .buttons.mooz -text Mooz -command {mooz }
+	button .buttons.geode -text geodebugs -command \
+		{EntryBox "Geode: " {getStringFromGeodeText _ENTRY_} \
+		{
+		 {<Control-l> {DisplayListOfGeodes _ENTRY_} }
+		}}
+	button .buttons.prod -text productbugs -command \
+		{EntryBox "Products: " {getStringFromProdText _ENTRY_} \
+		{
+		 {<Control-l> {DisplayListOfProducts _ENTRY_} }
+		}}
+	button .buttons.getbug -text getbug -command \
+		{EntryBox "Bug Number:"  {bugWindow _ENTRY_} {} }
+#	button .buttons.custom -text "Custom Query" -command "customQuery $han"
+	button .buttons.modify -text "Modify Bug" -command \
+		{EntryBox "Modify bug" {modifyBug _ENTRY_} {}}
+		
+	frame .b2 
+
+	if {[info exists majorButtons] } {
+		foreach b "[array names majorButtons]" {
+			button .b2.[string tolower $b] -text $b -command "$majorButtons($b)"
+			pack append .b2 .b2.[string tolower $b] left
+		}
+	}
+
+
+#	pack append .buttons .buttons.exit right
+#	pack append .buttons .buttons.custom right
+#	if {$user == "ron"} {
+#		pack append .buttons .buttons.load right
+#	}
+	pack append .buttons .buttons.modify left
+	pack append .buttons .buttons.getbug left
+	pack append .buttons .buttons.person left
+	pack append .buttons .buttons.geode left
+	pack append .buttons .buttons.prod left
+	pack append .buttons .buttons.allwiz left
+	pack append .buttons .buttons.bullet left
+	pack append .buttons .buttons.sdkbugs left
+	pack append .buttons .buttons.insert left
+#	pack append .buttons .buttons.mooz left
+
+	label .users -text "Being run as: $user" -font "$buttonFont"
+	pack append . .users {top frame w}
+	pack append . .buttons top
+	pack append . .b2 top
+#	if {[info exists UserLevel] && [expr {$UserLevel >= 10}]} {
+#		MakeTclEditWindow 
+#	}
+#	if {$user != "ron"} { 
+#		catch {set f [open /staff/ron/tclusers a+]}
+#		catch {puts $f "$user $today"}
+#		catch {close $f}
+#	}
+}
+
+set run 1
+
+
+proc ueval { args } {
+	return [uplevel 2 eval $args]
+}
+
+
+############
+# Todo:
+
+# fix in summary window
+# claim in summary window
+# reorganize file
+# lots of custom stuff
+
+#  Query $syb "select text from syscomments \
+#		      where id = object_id(\"$objname\")"
+#
+# TODO:
+# Finish insert
+#
+# more emacs bindings
+# pass focus correctly between windows
+# allow to TAB between fields
+#
+# add database perusal (like wisql)
+
+
+
+#
+# returns a list of {longName, viewName}
+proc QueryProductList { } {
+	global han
+
+#	Query $han {
+#	        SELECT  b1.short, b1.product, v1.view_name, b1.field_name
+#	        FROM bugs_prod_xref b1, prod_view_xref v1
+#	        WHERE b1.product = v1.product
+#	}
+
+	Query $han {
+	        SELECT field_name, product
+	        FROM bugs_prod_xref b1
+		WHERE product != "UNASSIGNED"
+		ORDER BY product
+	}
+
+	set row [sybnext $han]
+	while {$row != {} } {
+		lappend result $row
+		set row [sybnext $han]
+	}
+	return $result
+}
+
+#
+# product: [list longName, product]
+proc MakeProductFrame {product parentFrame searchText} {
+	
+	global uniqueNumber
+	if [info exists uniqueNumber] {
+		incr uniqueNumber
+	} else {
+		set uniqueNumber 0
+	}	
+
+	set f [frame $parentFrame.f$uniqueNumber]
+#	puts stdout "$product"
+	label $f.label -text [lindex "$product" 1]
+	pack append $f $f.label {right frame e}
+	AddButtonsToFrame {{y " YES" } {n " NO"} } $f $searchText 2
+	return $f
+}
+#
+# A product list is:
+# { {field_name (english name), product_name (product field of db), frame_name (frame of buttons)}
+#   { . . . }
+#   { . . . } }
+#
+
+proc MakeProductList {parent} {
+	set list [QueryProductList]
+	set f [frame $parent.pl]
+	pack append $parent $f {top frame w}
+	set c 0
+	foreach l "$list" {
+
+		set sf [MakeProductFrame "$l" $f m]
+		pack append $f $sf {top frame w}
+		lappend result [concat $l $sf ]
+		incr c
+	}
+#	puts stdout "$result"
+	return "$result"
+}
+
+
+proc SetValuesInListFromBug {listPtr productList} {
+	global $listPtr
+	if [info exists $listPtr] {	
+		set row [lindex [set $listPtr] $c]
+		set v [lindex $row 2]
+		global selectedButton$v
+		set s [set selectedButton$v]
+		if {$s == "y"} {set s Y}
+		if {$s == "n"} {set s N}
+	} else {
+		set s m
+	}
+}
+
+
+proc MakeProductBox {listPtr where} {
+	global winNumber
+	global $listPtr
+	incr winNumber
+	catch {destroy .product$winNumber}
+	set tl [toplevel .product$winNumber]
+	wm geom .product$winNumber $where
+
+	set list [MakeProductList $tl] 
+#	puts stdout "$list"
+	
+	frame $tl.bf -relief sunken -bd 2 
+	pack	append $tl $tl.bf bottom
+
+	set $listPtr "$list"
+
+
+#	button $tl.bf.close -text "Close" -command "destroy $tl"
+#	button $tl.bf.apply -text "Apply" -command "set $listPtr \"$list\" "
+#	pack append $tl.bf $tl.bf.apply left $tl.bf.close right
+
+	return $tl
+}
+	
+
+#
+# list: {longName, fieldName, valuePtr} {longName, fieldName, valuePtr}  ...
+#
+proc UpdateBugWithProductList {bugNumber listPtr} {
+	global han
+	global $listPtr
+	if ![info exists $listPtr] { return}
+	set l [set $listPtr]
+	set firstTime 1
+	foreach item "$l" {
+		if {!$firstTime} {
+			append setString ", "
+		}
+		set v [lindex $item 2]
+		global selectedButton$v
+		set s {NULL}
+		case [set selectedButton$v] {
+			{y} {set s {"yes"}}
+			{n} {set s {"no"}}
+		}
+		append setString "[lindex $item 0] = $s"
+		set firstTime 0
+	}
+#	puts stdout "UPDATE bugs set $setString where serial_no = $bugNumber"
+
+	Query $han "UPDATE bugs set $setString where serial_no = $bugNumber"
+}
+	
+proc GetPos {win} {
+	update		
+	set tkg [wm geometry $win]
+	# form is wXh+l+t
+	scan $tkg "%dx%d+%d+%d" wid tmp lft top
+	incr lft -200
+#	puts stdout $lft
+	if {$lft<0} {
+		set lft [expr $lft+200+$wid+60]
+	}
+	return "+$lft+$top"
+}
+
+proc MakeProductListFromBugNumber {listPtr number} {
+	global $listPtr
+	global han
+
+	set pl [QueryProductList]
+
+
+	#
+	# Create a select list
+	#
+	set selectString "select "
+	foreach p $pl {
+		
+		append selectString "[lindex $p 0], "
+	}
+	# never used
+	append selectString "serial_no "	
+
+	append selectString "\nfrom bugs where serial_no = $number"
+	
+#	puts stdout "$selectString"
+	Query $han $selectString
+	set result [sybnext $han]
+
+}
+
+#
+# return a list of names of product views
+#
+proc CreateProductList {} {
+	global han
+	Query $han 	"select /* product, */ view_name
+			from prod_view_xref "
+		
+	
+	for {set result [sybnext $han]} \
+		{$result != {}}	\
+		{set result [sybnext $han] } {
+		lappend reslist $result
+	}
+
+	return $reslist
+}
+
+proc MakeTimeStamp {} {
+	global user
+	set DEL "***"
+	set formatString "+%n        $DEL On: %D  %r     By: $user $DEL"
+	set date [exec date "$formatString" ]
+	regsub -all " 0" "$date" " " date
+	regsub -all /0 "$date" / date
+	return $date
+}
+
+proc AppendTimeStamp {textObject} {
+	set lastLine [$textObject get \
+                  [$textObject index "end linestart"] \
+                  [$textObject index "end lineend"]]
+
+        if ![regexp { +\*\*\* On: .+ By: .+ \*\*\*} $lastLine] {
+	   $textObject insert end [MakeTimeStamp]
+	}
+ }
+

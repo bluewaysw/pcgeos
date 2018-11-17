@@ -1,0 +1,369 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Crosswrod
+MODULE:		ClueList
+FILE:		cwordClueList.def
+
+AUTHOR:		Peter Trinh, May 11, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/11/94   	Initial revision
+
+
+DESCRIPTION:
+	This file contains constants, structures, records and macros
+	for the ClueList Module.  It also contains the class
+	definition for CwordClueListClass.
+		
+	$Id: cwordClueList.def,v 1.1 97/04/04 15:13:21 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;------------------------------------------------------------------------------
+;		Constants
+;------------------------------------------------------------------------------
+CLUE_TEXT_WIDTH			equ	140
+; 	The maximum number of pixels that each line of the ClueList
+; 	may display.
+
+CLUE_TEXT_NUM_PAD_SPACES	equ	3
+;	Pad for indentation wrapped clue texts.
+
+
+CLUE_TEXT_DELTA			equ	4
+;	To ensure that the very last character doesn't get clipped due
+;	to the border of the clue list.
+
+
+CLUE_LIST_MIN_ITEMS_DISPLAYED	equ	2
+;	This is the minimum number of ClueList items shown at one time.
+;	We picked two because it would prevent the users from being
+;	confused between which way the clues will scroll when one
+;	clicks on either the up/down scroller arrow.
+
+CLUE_DEF_NUM_WRAP_ROWS		equ	6
+;	This is the default value.  It indicates the max number of
+;	rows that will be used to support clue text wrapping.
+
+;------------------------------------------------------------------------------
+;		Types, Structs, and Records
+;------------------------------------------------------------------------------
+ListItemInfo	record
+	LII_SPLIT:1		; part of a split string
+	LII_BAD_FIELD:1		; used for EC
+	:6			; nth line of a split string
+				; max = 64 rows for one clue text
+ListItemInfo	end
+
+; The status returned by ClueListGetNthSplit
+ClueListSplitStatus	etype	word
+	CLSS_NO_SPLIT	enum	ClueListSplitStatus
+	CLSS_SPLIT	enum	ClueListSplitStatus
+	CLSS_BAD_ETYPE	enum	ClueListSplitStatus
+
+
+; Pass this structure to the ClueList initialization routines.
+ClueListInitParams	struct
+	CLIP_gState	hptr.GState
+	CLIP_engine	hptr
+	CLIP_acrossClue	ClueTokenType
+	CLIP_downClue	ClueTokenType
+	CLIP_direction	DirectionType
+	CLIP_listToHighlight word	;0 means hightligh both lists 
+					;otherwise hightlight DirectionType list
+	CLIP_space	word	
+		; reserved space for the method handler, so don't need
+		; to set when passing the structure
+ClueListInitParams	ends
+
+
+; Pass this structure to the InitMap routine.
+ClueListInitMapParams	struct
+	CLIMP_getNextClueToken	nptr
+		; a nptr to the routine to retrieve the next clue
+		; token 
+	CLIMP_gState		hptr.GState
+;;;;;;;;;;;;;;
+; Return value
+;;;;;;;;;;;;;;
+	CLIMP_numItems		word
+		; the number of items in the map
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DO NOT set the following fields.  ClueListInitMap will use these as
+; local variables.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	CLIMP_numWrapRows	word
+		; the maxium number of rows that will be used to
+		; support text wrapping.
+	CLIMP_lineWidth		word
+		; the displayable width of the clues
+	CLIMP_bufferPtr		nptr
+		; ptr to pass to the Engine to retrieve the clue text
+	CLIMP_indentFlag	word
+		; if TRUE, then will account for indentation during split
+	CLIMP_indentWidth	word
+		; the size of the indentation to account for
+	CLIMP_clueListObj	lptr
+		; the chunk handle of the ClueList object.
+ClueListInitMapParams	ends
+
+
+ClueListGetSplitParams	struct
+	CLGSP_gState		hptr.GState
+	CLGSP_splitNumber	ListItemInfo
+		; If the split flag is set: then the split we're
+		; looking for.  1st - nothing eg. 2nd split is the 2nd
+		; line of the split clue text to display.
+	CLGSP_strPtr		fptr
+		; Ptr to the string to split
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DO NOT set the following fields.  ClueListGetNthSplit will use these
+; as local variables.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	CLGSP_strHandle		hptr
+		; Handle to block containing the padded and split
+		; string.  This is for
+ClueListGetSplitParams	ends	
+
+
+
+
+
+;------------------------------------------------------------------------------
+;		Class Definitions
+;------------------------------------------------------------------------------
+
+CwordClueListClass	class	GenDynamicListClass
+
+;------------------------------------------------------------------------------
+;		Messages
+;------------------------------------------------------------------------------
+
+MSG_CWORD_CLUE_LIST_INITIALIZE_OBJECT			message
+;
+; This message is sent to a CwordClueListClass object in order to
+; initialize it.
+;
+; Context:	This message is sent out during the building of the
+; 		data-structure for the Crossword Project.
+;
+; Source:	Unrestricted
+; Destination:  ClueList object
+; Interception: Usually not intercepted
+;
+; Pass:		cx	= DirectionType
+;		dx	= EngineToken
+;
+; Return:	ax	= CLUE_LIST_FAILED_INIT if failed initialization.
+;			or destroyed
+;
+;		nothing - destroyed
+;
+
+MSG_CWORD_CLUE_LIST_CLEAN_UP				message
+;
+; This message is sent to a CwordClueListClass object in order to
+; clean up (free up the map and other data).
+;
+; Context:	This message is sent out during the destruction of the 
+; 		data-structure for the Crossword Project.
+;
+; Source:	Unrestricted
+; Destination:  ClueList object
+; Interception: Usually not intercepted
+; Pass:		Nothing
+; Return:	Nothing
+;		Nothing - destroyed
+;
+
+MSG_CWORD_CLUE_LIST_APPLY_MSG				message
+;
+; The message that is sent every time the DynamicList changes its
+; states, usually when the user selects an item in the group.
+;
+; Context:	This message is sent out every time the ClueList is
+; 		modified. 
+; Source:	ClueList object
+; Destination:  ClueList object
+; Interception: Usually not intercepted
+;
+; Pass:		cx	= current selection, or first selection in
+; 			item group, if more than one selection, or
+; 			GIGS_NONE of no selection 
+;		bp	= number of selections
+;		dl	= GenItemGroupStateFlags
+;		
+; Return:	nothing
+;		ax,cx,dx,bp - destroyed
+;
+
+MSG_CWORD_CLUE_LIST_QUERY_MSG				message
+;
+; The message that is sent every time the DynamicList needs the
+; moniker of a given item.
+;
+; Context:	This message is sent out every time the ClueList
+; 		the moniker of a given list element.
+; Source:	ClueList object
+; Destination:  ClueList object
+; Interception: Usually not intercepted
+;
+; Pass:		^lcx:dx = the ClueList requesting the moniker
+;		bp	= the position of the item requested
+;		
+; Return:	nothing
+;		ax,cx,dx,bp - destroyed
+;
+
+MSG_CWORD_CLUE_LIST_DISPLAY_ITEM			message
+;
+; Displays the item corresponding to the given ClueToken.
+;
+; Context:	This message is sent out in response to
+; 		MSG_CWORD_CLUE_LIST_QUERY_MSG
+; Source:	Unrestricted
+; Destination:  ClueList object
+; Interception: Usually not intercepted
+;
+; Pass:		cx	= ClueTokenType
+;		
+; Return:	nothing
+;		nothing - destroyed
+;
+
+MSG_CWORD_CLUE_LIST_GET_NTH_SPLIT			message
+;
+; Will return the nth portion of a split string with the appropriate
+; padding of '>' and a null-terminator.
+;
+; Context:	This message is sent when the list needs to display one
+; 		of its item.
+; Source:	Unrestricted
+; Destination:  ClueList object
+; Interception: Usually not intercepted
+;
+; Pass:		ss:bp	= ClueListGetSplitParams
+;		
+; Return:	cx:dx	= the correct portion of original string with
+; 			  paddings.
+;		nothing - destroyed
+;
+
+MSG_CWORD_CLUE_LIST_TOGGLE_VISIBILITY	message
+;
+; Will toggle between being USABLE and NOT_USABLE depending on the
+; current state.
+;
+; Context:	Unrestricted.
+; Source:	Unrestriced.
+; Destination:  CwordBoardClass object
+; Interception: Unlikely
+;
+; Pass:		nothing
+; Return:	nothing
+;		nothing - destroyed
+;
+
+
+
+
+;------------------------------------------------------------------------------
+;		Instance Data
+;------------------------------------------------------------------------------
+	CCLI_direction	DirectionType	
+;		Used to indentify this ClueList object.
+;
+	CCLI_map	lptr.ChunkArray		; handle to map
+;		The map is used to get us the ClueToken corresponding
+;		to the position of the item in the DynamicList.
+;
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+; INTERNAL INSTANCE DATA
+;;;;;;;;;;;;;;;;;;;;;;;;
+	CCLI_numWrapRows	word
+;		Used to indicate the maximum number of rows that will
+;		be filled in by the clue text wrapping due to text
+;		width limitation.  Eg. if a clue text is 3 times
+;		wider than the allowable text width (CCLI_textWidth),
+;		and if CCLI_numWrapRows is set to 2, then only two
+;		third of the clue text will be displayed.
+	CCLI_lineWidth		word
+;		Given in pixels, this indicates the maximum number of
+;		pixels that can be displayed on one clue line.  
+	CCLI_numVisible		word
+;		Indicates the number of items in the list are visible
+;		at one time.  This is important when we select clues
+;		that split.
+
+CwordClueListClass	endc
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SkipOverHyphenation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Given the ptr of the string, will skip over the
+		following hyphenation characters: C_SPACE,
+		C_ASCII_TILDE.  Will assume that we'll never encounter
+		the null-terminator. 
+
+		WARNING: this version doesn't support DBCS.
+
+PASS:		segmt	- segment of str
+		offst	- offset of str, char before hyphenation char
+
+RETURN:		offst	- first non hyphenation character.
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	8/18/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SkipOverHyphenation		macro	segmt, offst
+
+local	skipOverSpacesAndTilde
+
+ifb	<offst>
+	ErrorMessage <SkipOverHyphenation expects 2 arguments.>
+endif
+
+skipOverSpacesAndTilde:
+	inc	offst
+EC <	tst	{byte}segmt:[offst]				>
+EC <	ERROR_Z	NOT_EXPECTING_NULL_CHAR				>
+	cmp	{byte}segmt:[offst], C_SPACE
+	je	skipOverSpacesAndTilde
+	cmp	{byte}segmt:[offst], C_ASCII_TILDE
+	je	skipOverSpacesAndTilde
+
+		endm
+
+
+
+idata	segment
+
+	CwordClueListClass
+
+idata	ends
+
+
+
+
+
+

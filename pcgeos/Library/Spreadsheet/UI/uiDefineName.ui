@@ -1,0 +1,424 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	PCGEOS
+ * MODULE:	Spreadsheet Library UI
+ * FILE:	uiDefineName.ui
+ *
+ * AUTHOR:  	Cheng: Jul 14, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	7/92	  cheng	    Initial version
+ *
+ * DESCRIPTION:
+ *	
+ *	Notes:	Geos char 0xd1 is an "em" dash.  Unicode uses 0x2014.
+ *		To build string, we use CPP's string concatenation.
+ *
+ * 	$Id: uiDefineName.ui,v 1.1 97/04/07 11:13:06 newdeal Exp $
+ *
+ ***********************************************************************/
+
+class SSDNText = GenText {
+}
+
+start	StringsUI, data;
+
+#if DO_DBCS
+#define  CH_EM_DASH   "-"
+#else
+ #define  CH_EM_DASH   "\\xd1"
+#endif
+
+chunk deleteNameMessage = "Are you sure you want to delete the name \\\"\\1\\\"?";
+
+chunk nameOpErrMsg      = "Error encountered \\1 name\\2";
+
+chunk addingStr         = "defining";
+
+chunk changingStr       = "changing";
+
+chunk nullStr           = "";
+
+
+chunk badNameStr        = CH_EM_DASH "The name you provided is not valid"
+" or contains invalid characters. Names can only contain letters"
+" and underscores (_)."
+"\\r\\rError Code: SS-01";
+
+chunk badCellRefStr     = CH_EM_DASH "The definition you provided contains"
+" an invalid cell reference. Cell references have an alphabetic column"
+" and a numeric row (e.g., A1) and can be made absolute with $ signs"
+" (e.g, $A$1)."
+"\\r\\rError Code: SS-02";
+
+chunk badColStr         = "\\xdThe column portion of a cell reference in"
+" the definition is invalid."
+" Cell references have an alphabetic column and a numeric row"
+" (e.g., A1) and can be made absolute with $ signs (e.g, $A$1)."
+"\\r\\rError Code: SS-03";
+
+chunk badRowStr         = "\\xdThe row portion of a cell reference in"
+" the definition is invalid."
+" Cell references have an alphabetic column and a numeric row"
+" (e.g., A1) and can be made absolute with $ signs (e.g, $A$1)."
+"\\r\\rError Code: SS-04";
+
+chunk noNameStr         = CH_EM_DASH "No name was provided for this definition."
+" Enter a valid name and try again."
+"\\r\\rError Code: SS-05";
+
+chunk noDefStr          = CH_EM_DASH "No definition was provided."
+" The definition for a name consists of a valid formula, cell or"
+" range reference."
+"\\r\\rError Code: SS-06";
+
+chunk nameAlreadyDefinedStr = CH_EM_DASH "The name you provided already exists."
+" Enter a new name and try again."
+"\\r\\rError Code: SS-07";
+
+chunk badDefStr         = CH_EM_DASH "The definition for this name contains"
+" a mistake. It must be a valid formula, cell or range reference."
+"\\r\\rError Code: SS-08";
+
+
+chunk tooManyNamesStr   = CH_EM_DASH "No more names can be defined."
+" If you wish, you can delete some unnecessary names and try again."
+"\\r\\rError Code: SS-09";
+
+end	StringsUI;
+
+start SSDefineNameControlUI, notDetachable;
+
+/****************************************************************************
+ *	"DefineName DB"
+ ***************************************************************************/
+
+DefineNameDB = GenInteraction ignoreDirty {
+	genStates = default -usable;
+	children =
+#ifdef GPC
+	    DefineNameLeftGroup,
+	    DefineNameTriggers,
+	    NameAddNameDB,
+	    NameChangeNameDB;
+	hints = {
+	    HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+#else
+		DefineNameList,
+		NameDefText,
+		NameAddTrigger,
+		NameChangeTrigger,
+		NameDeleteTrigger,
+		NameAddNameDB,
+		NameChangeNameDB;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+#endif
+}
+
+#ifdef GPC
+DefineNameLeftGroup = GenInteraction {
+    children = DefineNameList, NameDefText;
+}
+DefineNameTriggers = GenInteraction {
+    moniker = " "; /* dummy moniker to line up with list */
+    children = NameAddTrigger, NameChangeTrigger, NameDeleteTrigger;
+    hints = {
+	HINT_PLACE_MONIKER_ABOVE,
+	HINT_CUSTOM_CHILD_SPACING {
+	    word 2
+	}
+    }
+}
+#endif
+
+/****************************************************************************
+ *	DefineNameList
+ ***************************************************************************/
+
+DefineNameList = GenDynamicList vardataReloc {
+	moniker = "List of Names:";
+	behaviorType = exclusive;
+	numSelections = 1;
+	queryMsg = MSG_DNC_REQUEST_MONIKER;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_FIXED_SIZE {
+#ifdef GPC
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 35>
+#else
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+#endif
+			SpecHeight <SST_LINES_OF_TEXT, 4>
+			word 4
+		},
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+			word MSG_DNC_INIT_CHANGE_NAME
+		},
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_DNC_NAME_UPDATE_DEFINITION
+		}
+	}
+}
+
+/****************************************************************************
+ *	NameBottomGroup
+ ***************************************************************************/
+
+NameDefText = GenText {
+	moniker = "Definition:";
+	genAttributes = readOnly;
+	textDisplayAttributes = singleLineText;
+	maxLength = "MAX_NAME_LENGTH-1";
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DRAW_IN_BOX,
+	}
+}
+
+/****************************************************************************
+ *	Triggers
+ ***************************************************************************/
+
+NameAddTrigger = GenTrigger ignoreDirty {
+	moniker = 'N', "New";
+	action = MSG_DNC_INIT_ADD_NAME, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = signalInteractionComplete;
+	hints = {
+#ifdef GPC
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_CENTER_MONIKER,
+#else
+		HINT_SEEK_REPLY_BAR,
+#endif
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+NameChangeTrigger = GenTrigger ignoreDirty {
+	moniker = 'C', "Change";
+	action = MSG_DNC_INIT_CHANGE_NAME, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = signalInteractionComplete;
+	hints = {
+#ifdef GPC
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_CENTER_MONIKER,
+#else
+		HINT_SEEK_REPLY_BAR,
+#endif
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+NameDeleteTrigger = GenTrigger ignoreDirty {
+	moniker = 'D', "Delete";
+	action = MSG_DNC_DELETE_NAME, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = signalInteractionComplete;
+	hints = {
+#ifdef GPC
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	    HINT_CENTER_MONIKER
+#else
+		HINT_SEEK_REPLY_BAR
+#endif
+	}
+}
+
+/****************************************************************************
+ *	NameAddNameDB
+ ***************************************************************************/
+
+NameAddNameDB = GenInteraction {
+	type = command;
+	visibility = dialog;
+	attributes = default +notUserInitiatable, +modal;
+	children =
+		NameAddDefGroup,
+#ifdef GPC
+	    NameAddAllowRelative,
+	    NameAddCellRef,
+#endif
+		NameAddOK;
+	hints = { ATTR_GEN_HELP_CONTEXT {char "dbAddName", 0} }
+}
+
+NameAddDefGroup = GenInteraction {
+	moniker = "Add a New Name";
+	children = NameAddNameEdit, NameAddNameDefEdit;
+	hints = {
+		HINT_PREVENT_DEFAULT_OVERRIDES,
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_DRAW_IN_BOX
+	}
+}
+
+NameAddNameEdit = SSDNText {
+	moniker = 'N', "Name:";
+	maxLength = "MAX_NAME_LENGTH-1";
+	textDisplayAttributes =
+		singleLineText,
+		useTabForNavigation;
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		ATTR_VIS_TEXT_EXTENDED_FILTER {
+			byte VTEFT_CHARACTER_LEVELER_LEVEL;
+		}
+	}
+}
+
+NameAddNameDefEdit = GenText {
+	moniker = 'D', "Definition:";
+	maxLength = "MAX_NAME_DEF_LENGTH-1";
+	textDisplayAttributes =
+		singleLineText,
+		useTabForNavigation;
+}
+
+NameAddOK = GenTrigger {
+	moniker = "OK";
+	action = MSG_DNC_ADD_NAME, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION
+	}
+}
+
+#ifdef GPC
+NameAddAllowRelative = GenBooleanGroup {
+    children = NameAddAllowRelativeItem;
+    destination = "TO_OBJ_BLOCK_OUTPUT";
+    applyMsg = MSG_DNC_ADD_ALLOW_RELATIVE_STATUS;
+}
+
+NameAddAllowRelativeItem = GenBoolean {
+    moniker = "Allow Relative Name References";
+    identifier = 1;
+}
+
+NameAddCellRef = GenText {
+    moniker = "Relative referenes are relative to:";
+    genStates = default -enabled;
+    textDisplayAttributes = singleLineText;
+    genAttributes = default +readOnly;
+    hints = {
+	HINT_FIXED_SIZE {
+	    SpecWidth <SST_AVG_CHAR_WIDTHS, 10>
+	    SpecHeight <SST_LINES_OF_TEXT, 1>
+	    word 1
+	}
+    }
+}
+#endif
+
+/****************************************************************************
+ *	NameChangeNameDB
+ ***************************************************************************/
+
+NameChangeNameDB = GenInteraction {
+	type = command;
+	visibility = dialog;
+	attributes = default +notUserInitiatable, +modal;
+	children =
+		NameChangeDefGroup,
+#ifdef GPC
+	    NameChangeAllowRelative,
+	    NameChangeCellRef,
+#endif
+		NameChangeOK;
+	hints = { ATTR_GEN_HELP_CONTEXT {char "dbChgName", 0} }
+}
+
+NameChangeDefGroup = GenInteraction {
+	moniker = "Change Name";
+	children = NameChangeNameEdit, NameChangeNameDefEdit;
+	hints = {
+		HINT_PREVENT_DEFAULT_OVERRIDES,
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_DRAW_IN_BOX
+	}
+}
+
+NameChangeNameEdit = SSDNText {
+	moniker = 'N', "Name:";
+	maxLength = "MAX_NAME_LENGTH-1";
+	textDisplayAttributes =
+		singleLineText,
+		useTabForNavigation;
+	hints = {
+		HINT_DEFAULT_FOCUS,
+		ATTR_VIS_TEXT_EXTENDED_FILTER {
+			byte VTEFT_CHARACTER_LEVELER_LEVEL
+		}
+	}
+}
+
+NameChangeNameDefEdit = GenText {
+	moniker = 'D', "Definition:";
+	maxLength = "MAX_NAME_DEF_LENGTH-1";
+	textDisplayAttributes =
+		singleLineText,
+		useTabForNavigation;
+}
+
+NameChangeOK = GenTrigger {
+	moniker = "OK";
+	action = MSG_DNC_CHANGE_NAME, "TO_OBJ_BLOCK_OUTPUT";
+	genAttributes = signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION
+	}
+}
+
+#ifdef GPC
+NameChangeAllowRelative = GenBooleanGroup {
+    children = NameChangeAllowRelativeItem;
+    destination = "TO_OBJ_BLOCK_OUTPUT";
+    applyMsg = MSG_DNC_CHANGE_ALLOW_RELATIVE_STATUS;
+}
+
+NameChangeAllowRelativeItem = GenBoolean {
+    moniker = "Allow Relative Name References";
+    identifier = 1;
+}
+
+NameChangeCellRef = GenText {
+    moniker = "Relative referenes are relative to:";
+    genStates = default -enabled;
+    textDisplayAttributes = singleLineText;
+    genAttributes = default +readOnly;
+    hints = {
+	HINT_FIXED_SIZE {
+	    SpecWidth <SST_AVG_CHAR_WIDTHS, 10>
+	    SpecHeight <SST_LINES_OF_TEXT, 1>
+	    word 1
+	}
+    }
+}
+#endif
+
+
+end SSDefineNameControlUI;
+
+/****************************************************************************
+ *	Strings for controllers
+ ***************************************************************************/
+
+start ControlStrings, data;
+
+chunk SSDNName = "Apply";
+chunk DefineNameName = "Name";
+
+end ControlStrings;
+
+#undef CH_EM_DASH

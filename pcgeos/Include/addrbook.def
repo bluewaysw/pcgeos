@@ -1,0 +1,282 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		addrbook.def
+
+AUTHOR:		Eric Weber, Jun 30, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EW	6/30/93   	Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: addrbook.def,v 1.1 97/04/04 14:03:06 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __ADDRESS_BOOK
+
+StartLibrary addrbook
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;	CONSTANTS
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;	TYPES
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;
+; The UserAddressFlags are 
+UserAddressFlags	record
+	UAF_GEOS_USER:1
+	:7
+UserAddressFlags	end
+
+AddressBookNameType	etype	word, 1, 1
+	ABNE_USER	enum	AddressBookNameType
+	ABNE_GROUP	enum	AddressBookNameType
+
+AddressBookErrors	etype	byte, 0, 1
+	ABE_NONE			enum	AddressBookErrors
+	ABE_VM_ERROR			enum	AddressBookErrors
+	ABE_NOT_AN_ADDRESS_BOOK		enum	AddressBookErrors
+	ABE_WRONG_PROTOCOL		enum	AddressBookErrors
+	ABE_NAME_NOT_FOUND		enum	AddressBookErrors
+	ABE_NAME_EXISTS			enum	AddressBookErrors
+	ABE_NAME_IS_GROUP		enum	AddressBookErrors
+	ABE_NAME_IS_USER		enum	AddressBookErrors
+	ABE_ADDRESS_NOT_INITIALIZED	enum	AddressBookErrors
+	ABE_MEMBER_NOT_FOUND		enum	AddressBookErrors
+	ABE_MEMBER_EXISTS		enum	AddressBookErrors
+	ABE_ENUMERATION_ABORTED		enum	AddressBookErrors
+	ABE_SERVICE_NOT_FOUND		enum	AddressBookErrors
+	ABE_SERVICE_EXISTS		enum	AddressBookErrors
+	ABE_EXPANSION_LOOP		enum	AddressBookErrors
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;	EXPORTED FUNCTIONS
+;
+; Note on error handling:
+;   all functions return carry set on error, and an error code in ax
+;   if there is no error, carry is clear and ax is ABE_NONE, unless
+;   documented otherwise
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global	AddrBookCreate:		far
+;
+; PASS:   ds:dx - filename
+; RETURN: 
+;         carry - set on error
+;	  ax    - AdressBookError
+
+global	AddrBookOpen:		far
+;
+; PASS:   ds:dx - filename
+; RETURN: bx    - file handle
+;	  carry - set on error
+;	  ax    - AdressBookError
+
+;
+; using users
+;
+
+global	AddrBookAddUser:		far
+;
+; PASS: 	bx	- file handle
+;		ds:si	- user name
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+
+global	AddrBookDeleteUser:		far
+;
+; PASS:		bx	- file handle
+;		ds:si	- user name
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+global	AddrBookRenameUser:		far
+;
+; PASS:		bx	- file handle
+;		ds:si	- old user name
+;		es:di	- new user name
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+global	AddrBookChangeUserAddress:	far
+;
+; PASS:		bx	- file handle
+;		ds:si	- user name
+;		es:di	- new address
+;		al	- UserAddressFlags
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+global	AddrBookGetUserAddress:	far
+;
+; PASS:		bx	- file handle
+;		ds:si	- user name
+;		es:di	- buffer for address
+;		cx	- length of buffer
+; RETURN:	if error
+;		   carry - set
+;		   ax - error code (AddressBookErrors)
+;		otherwise
+;		   carry - clear
+;		   es:di - filled in with address
+;		   cx    - length of address, or -1 if truncated to fit
+;		   ax    - UserAddressFlags
+;
+
+; grappling with groups
+;
+global	AddrBookAddGroup:		far
+;
+; PASS:		bx	- file handle
+;		ds:si	- group name
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+global	AddrBookDeleteGroup:	far
+;
+; PASS:		bx	- file handle
+;		ds:si	- group name
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+global	AddrBookRenameGroup:	far
+;
+; PASS:		bx	- file handle
+;		ds:si	- group name
+;		es:di	- new group name
+; RETURN:	carry	- set on error
+;		ax	- AddressBookError
+;
+global	AddrBookAddGroupMember:	far
+;
+; PASS:		bx	- file handle
+;		ds:si	- group name
+;		es:di	- user name
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+global	AddrBookDeleteGroupMember:	far
+;
+; PASS:		bx	- file handle
+;		ds:si	- group name
+;		es:di	- user name
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+global	AddrBookGetGroupSize: far
+;
+; PASS		bx	- file handle
+;		ds:si	- group name
+; RETURN:	cx	- number of members in group
+;
+global	AddrBookGetSize: far
+;
+; PASS:		bx	- file handle
+; RETURN:	cx	- number of users and groups
+;
+global	AddrBookEnumerateGroup:	far
+;
+; PASS:	on stack
+;		file handle	(pushed first)
+;		fptr to group name
+;		fptr to callback routine
+;	cx,dx,bp	- set for callback
+;
+; RETURN:	carry	- set on error
+;		ax	- AddressBookError
+;		cx,dx,bp - returned from callback
+;
+; callback routine:
+;     PASS:	ds:si		- group member name
+;		cx,dx,bp 	- data from previous callback
+;     RETURN:   carry		- set to abort enumeration
+;		cx,dx,bp 	- data for next callback
+;		
+global	AddrBookEnumerateNames: far
+;
+; PASS: on stack
+;		file handle 				[pushed first]
+;		fptr to callback routine
+;		fptr to first name to be enumerated
+;             -or-
+;               segment 0, offset = index to start at
+;		(word) count of names to enumerate 	[pushed last]
+;	cx,dx,bp	- set for callback
+; RETURN:
+;	carry		- set on error
+;	ax		- AddressBookError
+;	cx,dx,bp	- returned from callback
+;
+; callback routine:
+;	PASS:	ds:si	 - user or group name
+;		es:di	 - address
+;		ax	 - index
+;		cx,dx,bp - data from previous callback
+;		carry	 - set if name is a user, clear if a group
+;	RETURN:	carry	 - set to abort enumeration
+;		cx,dx,bp - data for next callback
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; sorting out services
+;
+global	AddrBookAddService:		far
+;
+; PASS:		bx	- file handle
+;		ds:si	- service name
+;		ax,cx,dx - GeodeToken
+;			cx - Token ID
+;			dxax - Token chars
+;
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+
+global	AddrBookDeleteService:	far
+;
+; PASS:		bx	- file handle
+;		ds:si	- service name
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+
+;
+; accessing addresses
+;
+
+
+global	AddrBookExpandAddresses:	far
+;
+; PASS:		bx	- address book file handle
+;		^vdx:ax	- huge array of names to expand
+;		^vcx:bp	- huge array to which expansion should be appended,
+;			  or cx=0 to leave expansion in source array
+;
+; RETURN:	carry	- set on error
+;		ax    - AdressBookError
+;
+
+EndLibrary   addrbook
+

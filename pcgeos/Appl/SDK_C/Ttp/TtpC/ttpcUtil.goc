@@ -1,0 +1,309 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Irlmp Library
+FILE:		ttpcUtils.goc
+
+AUTHOR:		Andy Chiu, May 13, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	5/13/96   	Initial version.
+
+DESCRIPTION:
+	Ttp Client test application for Irlmp Library	
+
+	$Id: ttpcUtil.goc,v 1.1 97/04/04 16:41:05 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@define __TTPC_UTILS_GOC
+@include "ttpc.goh"
+
+
+/***********************************************************************
+ *		TUShowStatus
+ ***********************************************************************
+ * SYNOPSIS:	Show what the current status is.
+ * CALLED BY:	TUShowStatusOptr
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TUShowStatus (char *status)
+{
+    @call GeodeGetCodeOptrNS(@TtpCStatus)::
+	MSG_GEN_REPLACE_VIS_MONIKER_TEXT(status, VUM_DELAYED_VIA_APP_QUEUE);
+
+}	/* End of TUShowStatus.	*/
+
+
+
+/***********************************************************************
+ *		TUShowStatusOptr
+ ***********************************************************************
+ * SYNOPSIS:	Show a string to indicat status
+ * CALLED BY:	INTERNAL
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TUShowStatusOptr (optr status)
+{
+    MemLock(OptrToHandle(status));
+    
+    TUShowStatus(LMemDeref(status));
+    
+    MemUnlock(OptrToHandle(status));
+
+}	/* End of TUShowStatusOptr.	*/
+
+
+/***********************************************************************
+ *		TUSetIrlapAddr
+ ***********************************************************************
+ * SYNOPSIS:	Set the irlap address value
+ * CALLED BY:	TtpCIrlmpDiscoveryCallback
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TUSetIrlapAddr (void)
+{
+    char strBuf[UHTA_NULL_TERM_BUFFER_SIZE];
+    
+    UtilHex32ToAscii(strBuf, irlapAddr, UHTAF_NULL_TERMINATE);
+
+    @call GeodeGetCodeOptrNS(@TtpCIrlapAddr)::
+	MSG_VIS_TEXT_REPLACE_ALL_PTR(strBuf, 0);
+
+}	/* End of TUSetIrlapAddr.	*/
+
+
+
+/***********************************************************************
+ *		TUGetLocalLsap
+ ***********************************************************************
+ * SYNOPSIS:	Get the local lsap
+ * CALLED BY:	method MSG_TP_CONNECT_REQUEST
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+word
+_pascal TUGetLocalLsap (void)
+{
+    WWFixedAsDWord lsap;
+
+    lsap = @call GeodeGetCodeOptrNS(@TtpCLocalLsap)::
+	MSG_GEN_VALUE_GET_VALUE();
+    
+    return IntegerOf(lsap);
+
+}	/* End of TUGetLocalLsap.	*/
+
+
+
+/***********************************************************************
+ *		TUGetRemoteLsap
+ ***********************************************************************
+ * SYNOPSIS:	Get the remote lsap number
+ * CALLED BY:	method MSG_TP_CONNECT_REQUEST
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+word
+_pascal TUGetRemoteLsap (void)
+{
+    WWFixedAsDWord lsap;
+
+    lsap = @call GeodeGetCodeOptrNS(@TtpCRemoteLsap)::
+	MSG_GEN_VALUE_GET_VALUE();
+
+    return IntegerOf(lsap);
+
+}	/* End of TUGetRemoteLsap.	*/
+
+
+/***********************************************************************
+ *		TUSetLocalLsap
+ ***********************************************************************
+ * SYNOPSIS:	Set the local lsap gen value
+ * CALLED BY:	method MSG_TP_CONNECT_REQUEST
+ *              method MSG_TP_DISCOVER_REQUEST
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TUSetLocalLsap (word lsap)
+{
+    @call GeodeGetCodeOptrNS(@TtpCLocalLsap)::
+	MSG_GEN_VALUE_SET_INTEGER_VALUE(lsap, 0);
+
+}	/* End of TUSetLocalLsap.	*/
+
+
+/***********************************************************************
+ *		TUSetRecvText
+ ***********************************************************************
+ * SYNOPSIS:	Add to the text received.
+ * CALLED BY:	various places originating from TtpCTtpCallback
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TUSetRecvText (IrlmpDataArgs *dataArgs)
+{
+    char *text;
+
+    if (dataArgs->IDA_dataSize) {
+	HugeLMemLock(HandleOf(dataArgs->IDA_data));
+	text = LMemDeref(dataArgs->IDA_data);
+	text += dataArgs->IDA_dataOffset;
+
+	@call GeodeGetCodeOptrNS(@TtpCRecvText)::
+	    MSG_VIS_TEXT_APPEND_PTR(text, dataArgs->IDA_dataSize);
+
+	HugeLMemUnlock(HandleOf(dataArgs->IDA_data));
+    }
+
+}	/* End of TUSetRecvText.	*/
+
+
+/***********************************************************************
+ *		TUGetSendText
+ ***********************************************************************
+ * SYNOPSIS:	Get the send text
+ * CALLED BY:	method MSG_TP_CONNECT_REQUEST and
+ *              method MSG_TP_DATA_REQUEST
+ *              method MSG_TP_DISCONNECT_REQUEST
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TUGetSendText (IrlmpDataArgs *dataArgs)
+{
+    dword textSize;
+    optr  newBufOptr;
+    char  *dataBuf;
+
+    textSize = @call GeodeGetCodeOptrNS(@TtpCSendText)::
+	MSG_VIS_TEXT_GET_TEXT_SIZE();
+
+    if (textSize) {
+	/* Add the irlmp header size and the null */
+	textSize ++;
+	HugeLMemAllocLock(hugeLMemHandle, (word) textSize + TTP_HEADER_SIZE,
+			  FOREVER_WAIT,
+			  &newBufOptr);
+
+	dataBuf = LMemDeref(newBufOptr);
+	dataBuf += TTP_HEADER_SIZE;
+	
+	@call GeodeGetCodeOptrNS(@TtpCSendText)::
+	    MSG_VIS_TEXT_GET_ALL_PTR(dataBuf);
+
+	HugeLMemUnlock(HandleOf(newBufOptr));
+	dataArgs->IDA_data = newBufOptr;
+	dataArgs->IDA_dataOffset = TTP_HEADER_SIZE;
+    }
+
+    dataArgs->IDA_dataSize = (word) textSize;
+}	/* End of TUGetSendText.	*/
+
+
+/***********************************************************************
+ *		TUClearSendText
+ ***********************************************************************
+ * SYNOPSIS:	Clear the send text object
+ * CALLED BY:	method MSG_TP_CONNECT_REQUEST
+ *              method MSG_TP_DATA_REQUEST
+ *              method MSG_TP_DISCONNECT_REQUEST
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	5/13/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+_pascal TUClearSendText (void)
+{
+    @call GeodeGetCodeOptrNS(@TtpCSendText)::MSG_VIS_TEXT_DELETE_ALL();
+
+}	/* End of TUClearSendText.	*/
+

@@ -1,0 +1,719 @@
+/***********************************************************************
+ *
+ *      Copyright (c) Geoworks 1996 -- All Rights Reserved
+ *
+ * PROJECT:       GEOS
+ * MODULE:        Procedural Thread (Sample GEOS application)
+ * FILE:          procthrd.goc
+ *
+ * AUTHOR:        Paul Chen, 4/96
+ *
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      4/96      PPC       Initial version
+ *
+ * DESCRIPTION:
+ *      Every GEOS application can automatically be multi-threaded:
+ *      it can have both a process thread, and a ui thread.  Sometimes,
+ *      however, it may be necessary to spawn more threads dynamically.
+ *      This sample application shows how to create a procedural thread,
+ *      using ThreadCreate().
+ *
+ *	This application also shows how to use semaphores and the
+ *	semaphore routines (ThreadAllocSem(), ThreadPSem(), ThreadVSem(),
+ *	ThreadPTimedSem(), and ThreadFreeSem(): see the Routines book
+ *	for additional documentation on these routines).
+ *
+ *      [ To see how to create an event-driven thread, see the EvntThrd
+ *      sample application.  For more complete documentation on multiple
+ *	threads and sempahores in GEOS, see Concepts, Appendix B:
+ *	"Threads and Semaphores." ]
+ *
+ *      Procedural threads are useful for off-loading processing from
+ *      either of the standard thread of a GEOS application.  This can
+ *      prevent overburdening either the process thread or the ui thread.
+ *      The new procedural thread created runs a program-specified
+ *      routine, and exits automatically when the routine finishes.
+ *
+ *      This sample application creates a procedural thread which runs
+ *      the routine DrawGraphics, which draws some graphics into PTView.
+ *
+ *      Whenever you create a new thread, you are usually responsible for
+ *      destroying it.  A procedural thread, however, exits automatically
+ *      once the routine it's running has finished.  The only time we need
+ *      to kill the thead is if the user exits the application while the
+ *      procedural thread is still running.  We handle this case by
+ *	allocating global semaphores to indicate if the thread is running,
+ *	and if it should destroy itself.
+ *
+ *	When the user exits the app, MSG_META_DETACH is sent to our process
+ *	object.  In that handler, we check the appropriate semaphore, and
+ *	if it's set, we know that the procedural thread is still running.
+ *	We then set the other semaphore, which tells the thread that it's
+ *	time to quit: it calls ThreadDestroy() to kill itself.
+ *
+ *	Also remember that before you destroy a thread, you must "clean
+ *	up" resources it's used:  release any semaphores or thread locks,
+ *	unlock any locked memory resources, etc.
+ *
+ *      Although not necessary for this sample application,
+ *      MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE is subclassed to prevent
+ *      a statefile from being created, since this application gains
+ *      nothing by saving to state.
+ *
+ *      $Id: procthrd.goc,v 1.1 97/04/04 16:41:01 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *              Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+#include <sem.h>	/* for semaphore routines */
+
+/*
+ ***************************************************************************
+ *              Global constants/variables and function prototypes
+ ***************************************************************************
+ */
+/*
+ * These two semaphores will enable us to destroy the dynamic thread
+ * if it is still running when the user exits the application.
+ *
+ * The procedural thread will grab newThreadIsRunning whenever it is
+ * running.  When exiting, the handler for MSG_META_DETACH can check use
+ * the semaphore to see if the thread is running; if so, it will grab
+ * newThreadShouldExit.  The procedural thread checks this semaphore while
+ * it's running, and if it finds it grabbed, then knows to ThreadDestroy()
+ * itself.  This way, no new threads are left running when the spawning
+ * application has exited.
+ */
+SemaphoreHandle newThreadIsRunning;
+SemaphoreHandle	newThreadShouldExit;
+
+/* ThreadDestroy() error code */
+#define	THREAD_EXIT_DUE_TO_APP_EXITING	0
+/*
+ * These constants are used in the DrawGraphics() routine, for drawing
+ * grahics into the PTView object.
+ */
+#define DOC_WIDTH       300     /* size of document to draw into */
+#define DOC_HEIGHT      300
+#define PIE_X1          20      /* position of pie design to draw */
+#define PIE_Y1          20
+#define PIE_X2          210
+#define PIE_Y2          200
+#define NUM_COLORS      16      /* number of standard GEOS colors */
+
+//void TestIfThreadShouldExit (SemaphoreHandle newThreadShouldExit);
+Boolean TestIfThreadShouldExit (SemaphoreHandle newThreadShouldExit);
+word InitNewProcThread (word calledByNewThread);
+void DrawGraphics (GStateHandle gstate, word calledByNewThread);
+
+void KillDrawingThread(void);
+
+ /*
+ ***************************************************************************
+ *              Class & Message Definitions
+ ***************************************************************************
+ */
+/*
+ * Our application's process object.
+ */
+@class  PTProcessClass, GenProcessClass;
+	@message void MSG_PTP_CREATE_PROCEDURAL_THREAD();
+	@message void MSG_PTP_STOP_PROCEDURAL_THREAD();
+@endc;
+
+/*
+ * ProcessClass objects never have instance data to save to state,
+ * so mark them as such.
+ */
+@classdecl      PTProcessClass, neverSaved;
+
+
+
+/*
+ ***************************************************************************
+ *              UI Objects
+ ***************************************************************************
+ */
+/*
+ *      Application Resource
+ *
+ * The application object usually resides in its own resource, so when
+ * the application is in the background, its memory usage is minimized.
+ */
+@start  AppResource;
+
+@object GenApplicationClass PTApp = {
+    GI_visMoniker = list { @PTTextMoniker };
+    GI_comp = @PTPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @PTPrimary;
+}
+
+@visMoniker PTTextMoniker = "Proc Thread Sample Application";
+
+@end    AppResource;
+
+
+/*
+ *      Interface Resource
+ *
+ * This resource holds the UI objects for the application.
+ */
+@start  Interface;
+
+@object GenPrimaryClass PTPrimary  = {
+    GI_comp = @F1_CreateProcThreadTrigger, @StopProcThreadTrigger,
+	      @PTHelp,
+	      @PTView;
+
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTriggerClass F1_CreateProcThreadTrigger = {
+	 GI_visMoniker = 'C', "Create";
+	 GTI_destination = process;
+	 GTI_actionMsg = MSG_PTP_CREATE_PROCEDURAL_THREAD;
+	 HINT_SEEK_MENU_BAR;
+//	 HINT_SEEK_SLOT = {0};
+}
+
+@object GenTriggerClass StopProcThreadTrigger = {
+	 GI_visMoniker = 'S', "Stop";
+	 GTI_destination = process;
+	 GTI_actionMsg = MSG_PTP_STOP_PROCEDURAL_THREAD;
+	 HINT_SEEK_MENU_BAR;
+//	 HINT_SEEK_SLOT = {0};
+}
+
+@object GenTextClass PTHelp = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text =
+"\r'Create' spawns a new procedural thread, \
+which runs DrawGraphics() to draw graphics into the view below.\r";
+}
+
+@object GenViewClass PTView = {
+    GVI_content = process;
+    /*
+     * The view is non-scrollable.
+     */
+    GVI_horizAttrs = (@default | GVDA_NO_LARGER_THAN_CONTENT) &
+		~GVDA_SCROLLABLE;
+    GVI_vertAttrs  = (@default | GVDA_NO_LARGER_THAN_CONTENT) &
+		~GVDA_SCROLLABLE;
+    GVI_docBounds = {0, 0, DOC_WIDTH, DOC_HEIGHT};
+}
+
+@end    Interface;
+
+
+
+
+/*
+ *      Constant Data Resource
+ *
+ * This resource holds strings that are used in the application.
+ * Placing strings in their own resource allows them to be localized
+ * using the GEOS localization tool, ResEdit.
+ */
+@start  ConstantData, data;
+
+@chunk char CannotCreateThread[] =
+"Error: Cannot create thread, ThreadError = \001";
+
+@end    ConstantData;
+
+/*
+ ***************************************************************************
+ *                Code for PTProcessClass or new procedural thread
+ ***************************************************************************
+ */
+/***********************************************************************
+ *                Routine DrawGraphics
+ ***********************************************************************
+ * SYNOPSIS:      Draw some graphics into PTView.  This routine is run
+ *                by a new procedural thread that's created dynamically
+ *                by ThreadCreate().
+ * PARAMETERS:    void (GStateHandle gstate, word calledByNewThread)
+ * SIDE EFFECTS:  Draws graphics to the PTView object.
+ *
+ * STRATEGY:      calledByNewThread = 1 if DrawGraphics() called by new
+ *		  procedural thread; we use this to draw a bit slower,
+ *		  so user can distinguish a regular redraw from drawing
+ *		  being done by the new thread.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     4/96            Initial Version
+ *
+ ***********************************************************************/
+void DrawGraphics (GStateHandle gstate, word calledByNewThread)
+{
+ word        i, angleFrom;
+ Color       fillColor = C_BLACK;
+ word        arcIncrement = 180/NUM_COLORS;  /* want 16 arc segments */
+
+	GrSetLineWidth(gstate, MakeWWFixed(3));
+	GrDrawArc(gstate, PIE_X1, PIE_Y1, PIE_X2, PIE_Y2, 0, 180, PIE);
+	for ( i=0; i<NUM_COLORS; i++ ) {
+		GrSetAreaColor(gstate, CF_INDEX, fillColor, 0, 0);
+		angleFrom = i * arcIncrement;
+		GrFillArc(gstate, PIE_X1, PIE_Y1, PIE_X2, PIE_Y2, angleFrom, 180, PIE);
+		GrDrawArc(gstate, PIE_X1, PIE_Y1, PIE_X2, PIE_Y2, 0, 180, PIE);
+		fillColor = ++fillColor % NUM_COLORS;
+
+		if ( calledByNewThread ) {
+			/* Test if user exited app while new thread is running. */
+			if (TestIfThreadShouldExit(newThreadShouldExit)) {
+				/* reset arc */
+		GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+		GrFillArc(gstate, PIE_X1, PIE_Y1, PIE_X2, PIE_Y2, 0, 180, PIE);
+		GrDrawArc(gstate, PIE_X1, PIE_Y1, PIE_X2, PIE_Y2, 0, 180, PIE);
+				KillDrawingThread();
+				}
+			else
+				/* Delay 1/2 second, for aesthetic effect. */
+				TimerSleep(30);
+			}
+		}
+
+} /* End of DrawGraphics */
+
+
+/*
+ ***************************************************************************
+ *                Code for new procedural thread
+ ***************************************************************************
+ */
+/***********************************************************************
+ *                Routine TestIfThreadShouldExit
+ ***********************************************************************
+ * SYNOPSIS:	  Code run by the procedural thread calls this utility
+ *		  routine to test the newThreadShouldExit semaphore, to
+ *		  see if it should exit.
+ * PARAMETERS:    void (SemaphoreHandle newThreadShouldExit)
+ * SIDE EFFECTS:  Draws graphics to the PTView object.
+ *
+ * STRATEGY:	  If the newThreadShouldExit semaphore is set, then
+ *		  the thread releases the newThreadIsRunning semaphore
+ *		  and calls ThreadDestroy() to kill itself.      
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     4/96            Initial Version
+ *
+ ***********************************************************************/
+Boolean TestIfThreadShouldExit (SemaphoreHandle newThreadShouldExit)
+{
+ SemaphoreError semError;
+
+	/* Should this thread exit? (Has the user exited the app?) */
+	semError = ThreadPTimedSem(newThreadShouldExit, 1);
+	if ( semError == SE_TIMEOUT ) {
+		/* Yes, ShouldExit semaphore was set: time to exit! */
+	 /*	ThreadVSem(newThreadIsRunning);
+	 /*	ThreadDestroy(THREAD_EXIT_DUE_TO_APP_EXITING,
+				NullOptr,
+				0); */
+		return (TRUE);
+		}
+	else {
+		/*
+		 * Else, ShouldExit wasn't set: not time to exit.
+		 * Release newThreadShouldExit semaphore.
+		 */
+		ThreadVSem(newThreadShouldExit);
+		return (FALSE);
+		}
+
+} /* End of TestIfThreadShouldExit */
+
+void KillDrawingThread(void)
+{
+
+	ThreadVSem(newThreadIsRunning);
+	ThreadDestroy(THREAD_EXIT_DUE_TO_APP_EXITING,
+				NullOptr,
+				0);
+
+}
+
+/***********************************************************************
+ *                Routine InitNewProcThread
+ ***********************************************************************
+ * SYNOPSIS:      Perform initialization for running DrawGraphics by
+ *		  new procedural thread.
+ * PARAMETERS:    word (word calledByNewThread)
+ * SIDE EFFECTS:  Draws graphics to the PTView object.
+ *
+ * STRATEGY:      Grab newThreadIsRunning semaphore to indicate that
+ *		  the new thread is running.  Test if the thread
+ *		  should exit (because the user exited the app).  If
+ *		  not, call DrawGraphics() to draw the graphics, then
+ *		  release the IsRunning semaphore, to show the thread
+ *		  has exited.
+ *
+ *		  calledByNewThread is passed in by the OS when the
+ *		  new thread runs this routine.  It tells DrawGraphics()
+ *		  that it's being called by the new thread, instead of
+ *		  just in response to a system redraw event.
+ *
+ *		  This routine is passed to ThreadCreate(), to be run
+ *		  by the new procedural thread.  The definition of
+ *		  ThreadCreate() mandates that the called routine should
+ *		  return a word value.  Hence, we must define
+ *		  InitNewProcThread() to return a word value.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     4/96            Initial Version
+ *
+ ***********************************************************************/
+word InitNewProcThread (word calledByNewThread)
+{
+ WindowHandle        win;
+ GStateHandle        gstate;
+
+	/* New thread is running now: grab the IsRunning semaphore */
+	ThreadPSem(newThreadIsRunning);
+
+	if (TestIfThreadShouldExit(newThreadShouldExit))
+		KillDrawingThread();;
+
+	/* Set up the graphics environment */
+	win = @call PTView::MSG_GEN_VIEW_GET_WINDOW();
+	gstate = GrCreateState(win);
+
+	/* Draw graphics into PTView. */
+	DrawGraphics(gstate, calledByNewThread);
+
+	GrDestroyState(gstate);
+
+	/*
+	 * Re-enable the CreateProcThreadTrigger, so user can create
+	 * another new procedural thread.
+	 */
+	@send F1_CreateProcThreadTrigger::MSG_GEN_SET_ENABLED(
+		VUM_DELAYED_VIA_APP_QUEUE);
+	@send StopProcThreadTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+	/*
+	 * Release the IsRunning semaphore, because this procedural thread
+	 * will destroy itself once this routine finishes, and we don't want
+	 * to leave the semaphore locked, or else the user won't ever be able
+	 * to start another procedural thread.
+	 */
+	ThreadVSem(newThreadIsRunning);
+
+	/*
+	 * Have to return a word value, so why not calledByNewThread?
+	 */
+	return(calledByNewThread);
+
+} /* End of InitNewProcThread */
+
+/*
+ ***************************************************************************
+ *                Code for PTProcessClass
+ ***************************************************************************
+ */
+/***********************************************************************
+ *      MSG_GEN_PROCESS_OPEN_APPLICATION for CrashProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Allocate the two global semaphores, to control
+ *                killing the new procedural thread, if necessary.
+ *
+ * PARAMETERS:    void (word attachFlags,
+ *                      MemHandle launchBlock,
+ *                      MemHandle extraState)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     4/96            Initial version
+ *
+ ***********************************************************************/
+@method PTProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+
+	@callsuper();
+
+	/*
+	 * Allocate each semaphore so only 1 thread can grab it.
+	 */
+	newThreadIsRunning = ThreadAllocSem(1);
+	newThreadShouldExit = ThreadAllocSem(1);
+
+} /* End of MSG_GEN_PROCESS_OPEN_APPLICATION */
+
+
+/***********************************************************************
+ *                MSG_PTP_CREATE_PROCEDURAL_THREAD for PTProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Create a procedural thread to draw graphics into the
+ *                PTView.  Also, disable the CreateProcThreadTrigger
+ *                (this app can only create one new thread at a time).
+ * PARAMETERS:    void (void)
+ * SIDE EFFECTS:  New procedural thread will call DrawGraphics() to
+ *		  draw some graphics into the PTView.
+ *
+ * STRATEGY:      Create the procedural thread.  The recommended stack
+ *                size for a thread is 512 bytes.  If the thread works
+ *                with UI objects, then 3kb is suggested.  See the docs
+ *		  for more information on suggested stack sizes
+ *		  [Routines, ThreadCreate()].
+ *
+ *                If the thread cannot be created, report the problem.
+ *                Otherwise, run DrawGraphics().  Pass 1 as data to
+ *		  InitNewThread(), who will pass it to DrawGraphics()
+ *		  to tell it it's being called by the new thread.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     4/96            Initial Version
+ *
+ ***********************************************************************/
+@method PTProcessClass, MSG_PTP_CREATE_PROCEDURAL_THREAD
+{
+ ThreadHandle newThread;
+ word         threadErr;
+ char         errStr[10];
+
+	/*
+	 * Create the procedural thread.  If the thread could not be created,
+	 * then put up a dialog to say such.
+	 */
+	newThread = ThreadCreate(PRIORITY_STANDARD,
+			     /* set calledByNewThread = 1 */
+			     1,
+			     InitNewProcThread,	/* routine to run */
+			     /* use 3k stack, since drawing to UI object */
+			     3076,
+			     /* owning geode is this one, ProcThrd */
+			     GeodeGetProcessHandle());
+
+	if ( newThread == NullHandle ) {
+		/* Could not create thread! */
+		threadErr = ThreadGetError();
+		LocalFixedToAscii(errStr, MakeWWFixed(threadErr), 0);
+
+		MemLock(OptrToHandle(@CannotCreateThread));
+		UserStandardDialog(
+				(char *)0, (char *)0, (char *)0, errStr,
+				LMemDeref(@CannotCreateThread),
+				((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+				(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+		MemUnlock(OptrToHandle(@CannotCreateThread));
+		}
+	else {
+		/*
+		 * Disable the CreateEventThreadTrigger .
+		 */
+		@send F1_CreateProcThreadTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send StopProcThreadTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+
+} /* End of MSG_PTP_CREATE_PROCEDURAL_THREAD */
+
+/***********************************************************************
+ *                MSG_PTP_STOP_PROCEDURAL_THREAD for PTProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Mimic MSG_META_DETACH to stop the drawing
+ *
+ *
+ * PARAMETERS:    void (void)
+ * SIDE EFFECTS:
+ *
+ *
+ * STRATEGY:	Check the newThreadIsRunning semaphore.  If we can't
+ *		  			grab the semaphore, the thread is running: grab
+ *		  			newThreadShouldExit, to signal that thread that it's
+ *		  			time to exit.  Then wait for newThreadIsRunning to
+ *		  			become grabbable (the procedural thread will release
+ *		  			that semaphore when it's exited).  Then release the
+ *		  			semaphores.
+ *
+ *		  			If the thread wasn't running, then release the
+ *		  			newThreadIsRunning semaphore that we just grabbed.
+ *
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jfh     9/03            Initial Version
+ *
+ ***********************************************************************/
+@method PTProcessClass, MSG_PTP_STOP_PROCEDURAL_THREAD
+{
+
+	/* Is the procedural thread still running? */
+	if ( ThreadPTimedSem(newThreadIsRunning, 1) == SE_TIMEOUT ) {
+		/*
+		 * Yes, a procedural thread is running!
+		 * Tell the new thread it's time to go!
+		 */
+		ThreadPSem(newThreadShouldExit);
+
+		/* Wait for the new thread to say it's done! */
+		ThreadPSem(newThreadIsRunning);
+		/*
+		 * When we get newThreadExited, then the thread is done:
+		 * release the semaphores
+		 */
+		ThreadVSem(newThreadShouldExit);
+		}
+
+	/* Release the newThreadIsRunning semaphore that we grabbed */
+	ThreadVSem(newThreadIsRunning);
+
+	/* reset the triggers */
+	@send F1_CreateProcThreadTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send StopProcThreadTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+} /* End of MSG_META_DETACH */
+
+
+/***********************************************************************
+ *                MSG_META_DETACH for PTProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      The application receives this message if the user
+ *                exits the application.  We have to shut down the
+ *                new thread, if it exists, because simply exiting
+ *                the app won't automatically exit the new thread.
+ *                It's not a good idea to leave threads alive in the
+ *		  system; they can cause GEOS to hang.
+ * PARAMETERS:    void (word callerID, optr caller)
+ * SIDE EFFECTS:  none
+ *
+ * STRATEGY:      Check the newThreadIsRunning semaphore.  If we can't
+ *		  grab the semaphore, the thread is running: grab
+ *		  newThreadShouldExit, to signal that thread that it's
+ *		  time to exit.  Then wait for newThreadIsRunning to
+ *		  become grabbable (the procedural thread will release
+ *		  that semaphore when it's exited).  Then release the
+ *		  semaphores.
+ *
+ *		  If the thread wasn't running, then release the
+ *		  newThreadIsRunning semaphore that we just grabbed.
+ *
+ *		  In both cases, free the semaphores before exiting.
+ *
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      PPC     4/96            Initial Version
+ *
+ ***********************************************************************/
+@method PTProcessClass, MSG_META_DETACH
+{
+
+	/* Is the procedural thread still running? */
+	if ( ThreadPTimedSem(newThreadIsRunning, 1) == SE_TIMEOUT ) {
+		/*
+		 * Yes, a procedural thread is running!
+		 * Tell the new thread it's time to go!
+		 */
+		ThreadPSem(newThreadShouldExit);
+
+		/* Wait for the new thread to say it's done! */
+		ThreadPSem(newThreadIsRunning);
+		/*
+		 * When we get newThreadExited, then the thread is done:
+		 * release the semaphores
+		 */
+		ThreadVSem(newThreadShouldExit);
+		}
+
+	/* Release the newThreadIsRunning semaphore that we grabbed */
+	ThreadVSem(newThreadIsRunning);
+	/* Free the semaphores */
+	ThreadFreeSem(newThreadIsRunning);
+	ThreadFreeSem(newThreadShouldExit);
+
+	@callsuper();
+
+} /* End of MSG_META_DETACH */
+
+
+/***********************************************************************
+ *                MSG_META_EXPOSED for PTProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      Redraw the recently-exposed portion of the View.
+ * PARAMETERS:    void (WindowHandle win)
+ * SIDE EFFECTS:  The invalid region of the window is cleared out.
+ *
+ * STRATEGY:      This message is sent by the windowing system when a
+ *                portion of the GenView has become invalid, either
+ *                because a window that was obscuring it has been
+ *                moved or because GrInvalRect() was called.
+ *
+ *                We redraw the entire document, after telling the
+ *                graphics system we're drawing to the invalid part
+ *                of the window.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    4/91            Initial Revision
+ *
+ ***********************************************************************/
+@method PTProcessClass, MSG_META_EXPOSED
+{
+ GStateHandle gstate;
+
+	gstate = GrCreateState(win);
+	GrBeginUpdate(gstate);
+	/*
+	 * Pass 0 (for calledByNewThread) to tell DrawGraphics() that
+	 * it's drawing in response to a system-initiated redraw.
+	 */
+	DrawGraphics(gstate, 0);
+	GrEndUpdate(gstate);
+	GrDestroyState(gstate);
+
+} /* End MSG_META_EXPOSED */
+
+
+/***********************************************************************
+ *                MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+ *                      for PTProcessClass
+ ***********************************************************************
+ * SYNOPSIS:      We don't want to save to state so return NullHandle.
+ * PARAMETERS:    MemHandle (VMFileHandle)
+ * SIDE EFFECTS:  no state file created for application
+ *
+ * STRATEGY:      Since PDAs generally do not have a lot of memory,
+ *                not saving to state can conserve it.  This is
+ *                accomplished by returning a null handle.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      EB      1/96            Initial Version
+ *
+ ***********************************************************************/
+@method PTProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+
+	/*
+	 * Since no state file is being saved, don't even call superclass.
+	 */
+	return (NullHandle);
+
+} /* End of MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE */
+

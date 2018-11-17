@@ -1,0 +1,133 @@
+$Id: ALGORITHMS,v 1.1.29.1 97/03/29 04:31:56 canavese Exp $
+Creation of the VisBitmap:
+--------------------------
+When the VisBitmap receives a METHOD_VIS_OPEN, it checks its visual bounds and
+allocates a bitmap of the same size.  It also allocates a block of memory in
+which to store temporary changes in the form of graphics strings. This block
+is currently 4000 bytes long (an arbitrary number that seems big enough for
+must edits). Both the bitmap and scratch block are currently freed during a
+METHOD_VIS_CLOSE.
+
+The VisBitmap also instantiates a text object so that the user can add text to
+the bitmap if desired.  The text object contains a one-way upward visual
+linkage to the VisBitmap so that it can make visual upward queries, etc., but
+it not subject to the downward visible actions, like METHOD_EXPOSED's, etc.
+
+
+Edit/Undo:
+----------
+Tools do not make edits directly to the bitmap; if they did, then there
+would be no way to undo those changes without a copy of the original bitmap.
+Instead, the user's changes are first stored to a graphics string, which is
+then written through to the bitmap when the user indicates that the
+edit was a good one.  If the change is not a good one, and the user chooses to
+discard his edits, then the graphics string is not written to the bitmap.
+
+The tools are currently table driven (soon to be changed to a more object
+oriented aproach). A new tool requires 4 new routines:
+
+	1 - a routine telling the VisBitmap what to do when the user first
+	    clicks with the tool.
+
+	2 - a routine telling the VisBitmap what to do if the user drags
+	    the tool around.
+
+	3 - a routine telling the VisBitmap what to do when the user releases
+	    the mouse button.
+
+	4 - a routine telling the VisBitmap what to do with the last edit
+	    before beginning a new one.
+
+The VisBitmap receives the methods, does any generic operations that it needs
+to, then indexes the proper routine through a table which looks like:
+
+;
+;	This is the table of routines that describe to the VisBitmap what
+;	to do when it receives a METHOD_PTR
+;
+ptrToolTable	nptr	PtrPencil		;ptr procedure for pencil tool
+		nptr	PtrEraser		;ptr procedure for eraser tool
+		nptr	PtrBrush		;ptr procedure for brush tool
+		nptr	PtrLine			;ptr procedure for line tool
+		...
+
+A graphics string is generally created at the beginning of the user's edits,
+then filled up with graphics operations through the 4 routines. Once the
+editing is done, either beginning a new edit or selecting a new tool will cause
+the graphics string to be written through to the bitmap, and at that point can
+no longer be undone. If the user chooses to undo before the next edit, then
+a flag is set to indicate that the graphics string should not be written to
+the bitmap, and a METHOD_EXPOSED is sent to the bitmap so that it can hide
+the user's changes. If the user selects undo again, the flag is cleared, and
+another METHOD_EXPOSED is generated, which causes both the bitmap and the
+graphics string to redraw, bringing back the user's last changes.
+
+_______________________________________________________________________________
+
+				May 30, 1991
+_______________________________________________________________________________
+
+Tools are no longer table driven; instead they are separate objects. So far
+the tools that pretty much work are the pencil, the line, and the text tool.
+The class tree looks like this:
+
+				VisClass
+				   |
+				ToolClass
+				   |
+		+------------------+--------------------+
+		|		   |			|
+	   TextToolClass     PencilToolClass	   DragToolClass
+							|
+						   LineToolClass
+
+The only code within LineToolClass is a METHOD_DRAW that draws a line. The
+rectangle tool, ellipse tool, etc., will be done once I go to the trouble
+of creating the class and writing the METHOD_DRAW. PencilToolClass will most
+likely be pushed down a level to make way for the some more general
+DrawWhileDragToolClass, which will contain things like BrushToolClass and
+EraserToolClass, etc.
+Tools are created on demand; the VisBitmap receives a METHOD_BITMAP_CREATE_TOOL
+and a pointer to the class of the desired tool. An object of that class is
+instantiated, and a one-way upward visual link is created between the tool
+and the bitmap via a METHOD_TOOL_AFTER_CREATE, a somewhat uninspired name for
+a method that is sent to the tool object after it is created.
+
+Topics for the meeting:
+-----------------------
+
+	* VisBitmapVisOpen in bitmap.asm
+
+		Should the things done in this procedure really happen
+		during the visually opening? From the standpoint of wanting
+		VisBitmapVisClose to be a reciprocal procedure, I think not.
+
+	* CreateNewGString in bitmapUtils.asm
+
+		How can this be modified to work with virtual memory?
+
+	* CreateNewBitmap in bitmapUtils.asm
+
+		How should the resolution of the bitmap be specified? How
+		about the color map modes?
+
+	* CreateScratchBlock in bitmaspUtils.asm
+
+		Is 4000 bytes a good amount of memory to dedicate to the
+		gstrings? What happens when the user exceeds this limit?
+
+	* VisBitmapVUPCreateGState in bitmap.asm
+
+		Will there be any troubles returning a clipped gstate?
+
+The way the system works now, the tool object requests a gstate to make
+changes to; in a perfect world without UNDO, we would pass the gstate of
+the bitmap itself. Although we cannot afford to do this (because of undo),
+we must provide some way for tools to access the bitmap in the case that
+their operation is a function of the existing bitmap.
+
+_______________________________________________________________________________
+
+				June 12, 1991
+_______________________________________________________________________________
+
