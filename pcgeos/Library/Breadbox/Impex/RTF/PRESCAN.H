@@ -1,2 +1,0 @@
-Boolean PrescanColorAndFontTables(optr source);
-

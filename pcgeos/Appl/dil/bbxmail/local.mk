@@ -1,5 +1,0 @@
-#
-
-GEODE           = bbxmail
-
-#include <$(SYSMAKEFILE)>

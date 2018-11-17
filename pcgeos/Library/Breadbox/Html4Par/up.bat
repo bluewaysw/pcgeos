@@ -1,1 +1,0 @@
-copy html4parec.geo c:\arkec\localpc\geos2000\system\html4pae.geo

@@ -1,4 +1,0 @@
-FILEDDMANAGER.obj \
-FILEDDMANAGER.eobj: 
-
-FileDDEC.geo FileDD.geo : GEOS.LDF MAILBOX.LDF 

@@ -1,5 +1,0 @@
-#
-
-GEODE           = bbxmlib
-
-#include <$(SYSMAKEFILE)>

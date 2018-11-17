@@ -1,3 +1,0 @@
-TYPE	= library
-
-#include <$(SYSMAKEFILE)>

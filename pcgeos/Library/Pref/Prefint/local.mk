@@ -1,6 +1,0 @@
-# $Id: local.mk,v 1.1 98/04/24 00:09:27 gene Exp $
-
-PROTOCONST	= PREF_MODULE
-ASMFLAGS	+= -DSCRAMBLED_INI_STRINGS
-
-#include <$(SYSMAKEFILE)>
