@@ -92,9 +92,11 @@
 # Remove .EXPORTSAME restriction on compilations
 #
 .c.obj		:
-	$(CC) $(CFLAGS) $(.IMPSRC)
+	$(CC) $(CFLAGS) $(.IMPSRC:S/\//\\/g)
 
-CC		= wcc386 -D_LINUX -zq -bt=linux -zlf -ei
+#CC		= wcc386 -D_LINUX -zq -bt=linux -zlf -ei
+CC		= wcc386 -zq -bt=nt -zlf -ei
+
 AS		= wlink -c
 WLINK = wlink
 
@@ -112,11 +114,11 @@ CFLAGS_COMMON	=  -hd -d2 -w3 -zp4 -j
 # directory) and where to place the result.  Under NT, this DOES NOT WORK
 # for the final link.
 #
-CFLAGS		+= $(CFLAGS_COMMON) -fo=$(.TARGET) \
-				$(.INCLUDES:N*/Include*:S/^-I/-i=/g) \
+CFLAGS		+= $(CFLAGS_COMMON) -fo=$(.TARGET:S/\//\\/g) \
+				$(.INCLUDES:S/^-I/-i=/g:S/\//\\/g) \
                    -i=$(.TARGET:H) -i=. $(XCFLAGS) \
-									 -i=/home/frehwagen/watcom-v2/lh \
-									 -i=/home/frehwagen/watcom-v2/h
+									 -i="$(WATCOM)/lh" \
+									 -i="$(WATCOM)/h"
 
 #
 # Flags to pass to cl WHEN LINKING.
@@ -156,10 +158,13 @@ MAKETOOL	: .USE
 	$(WLINK) $(CLINKFLAGS) $(.LIBS) $(.LIBS:S,$,/$(.TARGET:H),g) \
 			$(.ALLSRC:M*.obj:S/^/file /g) \
 			$(.ALLSRC:M*.lib:S/^/lib /g) \
-			library /home/frehwagen/watcom-v2/lib386/linux/clib3r.lib \
-			library /home/frehwagen/watcom-v2/lib386/math387r.lib \
-			library /home/frehwagen/watcom-v2/lib386/linux/emu387.lib \
-			FORMAT ELF \
+#			library /home/frehwagen/watcom-v2/lib386/linux/clib3r.lib \
+#			library /home/frehwagen/watcom-v2/lib386/math387r.lib \
+#			library /home/frehwagen/watcom-v2/lib386/linux/emu387.lib \
+#			FORMAT ELF \
+			library kernel32 \
+			SYSTEM NT_WIN \
+			RU CON \
 			$(XLINKFLAGS)
 #endif
 #if $(TYPE) != "library"
