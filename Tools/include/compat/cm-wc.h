@@ -41,7 +41,7 @@
  ***********************************************************************/
 
 #include <math.h>
-#include <io.h>
+//#include <io.h>
 
 #define HAVE_DIRENT
 #define HAVE_BCMP
