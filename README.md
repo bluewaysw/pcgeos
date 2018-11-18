@@ -9,3 +9,5 @@ It is the place to collabare on further developments.
 - Unzip WATCOM tools from the latest release-zip for instance to C:\WATCOM-V2
 - add C:\WATCOM-V2\binnt to your system path variable
 - add WATCOM env variable: WATCOM=c:\WATCOM-V2
+
+Document is work in progress.... stay tuned!
