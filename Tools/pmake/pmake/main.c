@@ -722,6 +722,9 @@ main (int argc, char** argv)
     Var_Set ("MAKE", argv[0], VAR_GLOBAL);
     Var_Set (MAKEFLAGS, "", VAR_GLOBAL);
     Var_Set ("MFLAGS", "", VAR_GLOBAL);
+#if defined(_LINUX)
+	Var_Set ("linux", "", VAR_GLOBAL);
+#endif
 
     /*
      * First snag any flags out of the PMAKE environment variable.
