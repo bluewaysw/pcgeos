@@ -291,7 +291,7 @@ typedef enum {
     IP_ELECTRIC_MUTED_GUITAR,
     IP_OVERDRIVEN_GUITAR,
     IP_DISTORTION_GUITAR,
-	 IP_GUITAR_HARMONICS,
+    IP_GUITAR_HARMONICS,
     IP_ACOUSTIC_BASS,
     IP_ELECTRIC_FINGERED_BASS,
     IP_ELECTRIC_PICKED_BASS,
@@ -441,6 +441,8 @@ typedef enum {
 #define		IP_ACCORDIAN		IP_ACCORDION
 #define 	IP_STRING_ENSEMBLE_1	IP_STRING_ENSAMBLE_1
 #define 	IP_STRING_ENSEMBLE_2	IP_STRING_ENSAMBLE_2
+#define 	IP_MUSIC_BOX		IP_MUSIC_BOC
+
 
 /*	This one started life correctly (tremolo) and got
 	changed to "tremelo" somehow, and then back.  */
