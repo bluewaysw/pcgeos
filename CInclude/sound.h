@@ -270,7 +270,7 @@ typedef enum {
     IP_CLAVICORD,
     IP_CELESTA,
     IP_GLOCKENSPIEL,
-    IP_MUSIC_BOC,
+    IP_MUSIC_BOX,
     IP_VIBRAPHONE,
     IP_MARIMBA,
     IP_XYLOPHONE,
@@ -308,8 +308,8 @@ typedef enum {
     IP_PIZZICATO_STRINGS,
     IP_ORCHESTRAL_HARP,
     IP_TIMPANI,
-    IP_STRING_ENSAMBLE_1,
-    IP_STRING_ENSAMBLE_2,
+    IP_STRING_ENSEMBLE_1,
+    IP_STRING_ENSEMBLE_2,
     IP_SYNTH_STRINGS_1,
     IP_SYNTH_STRINGS_2,
     IP_CHOIR_AAHS,
@@ -439,8 +439,10 @@ typedef enum {
 
 /*	Some of the patches were spelled improperly...	*/
 #define		IP_ACCORDIAN		IP_ACCORDION
-#define 	IP_STRING_ENSEMBLE_1	IP_STRING_ENSAMBLE_1
-#define 	IP_STRING_ENSEMBLE_2	IP_STRING_ENSAMBLE_2
+#define 	IP_STRING_ENSAMBLE_1	IP_STRING_ENSEMBLE_1
+#define 	IP_STRING_ENSAMBLE_2	IP_STRING_ENSEMBLE_2
+#define		IP_MUSIC_BOC		IP_MUSIC_BOX
+
 
 /*	This one started life correctly (tremolo) and got
 	changed to "tremelo" somehow, and then back.  */
