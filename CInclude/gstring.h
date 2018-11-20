@@ -1172,7 +1172,7 @@ typedef struct {
 } OpSetClipRect;
 
 #define GSSetClipRect(path,rl_sw,rt_sw,rr_sw,rb_sw) 			\
-	GR_SET_CLIP_RECT,GOC_SW(rl_sw), 				\
+	GR_SET_CLIP_RECT,GOC_WORD(path),GOC_SW(rl_sw), 				\
 	GOC_SW(rt_sw),GOC_SW(rr_sw),GOC_SW(rb_sw)
 	
 typedef struct {
@@ -1182,7 +1182,7 @@ typedef struct {
 } OpSetWinClipRect;
 
 #define GSSetWinClipRect(path,rl_sw,rt_sw,rr_sw,rb_sw) 			\
-	GR_SET_WIN_CLIP_RECT,GOC_SW(rl_sw), 				\
+	GR_SET_WIN_CLIP_RECT,GOC_WORD(path),GOC_SW(rl_sw), 				\
 	GOC_SW(rt_sw),GOC_SW(rr_sw),GOC_SW(rb_sw)
 
 typedef struct {
