@@ -266,8 +266,8 @@ typedef enum {
     IP_HONKY_TONK_PIANO, 
     IP_ELECTRIC_PIANO_1,
     IP_ELECTRIC_PIANO_2,
-    IP_HARPSICORD,
-    IP_CLAVICORD,
+    IP_HARPSICHORD,
+    IP_CLAVICHORD,
     IP_CELESTA,
     IP_GLOCKENSPIEL,
     IP_MUSIC_BOX,
@@ -442,6 +442,8 @@ typedef enum {
 #define 	IP_STRING_ENSAMBLE_1	IP_STRING_ENSEMBLE_1
 #define 	IP_STRING_ENSAMBLE_2	IP_STRING_ENSEMBLE_2
 #define		IP_MUSIC_BOC		IP_MUSIC_BOX
+#define		IP_HARPSICORD		IP_HARPSICHORD
+#define		IP_CLAVICORD		IP_CLAVICHORD
 
 
 /*	This one started life correctly (tremolo) and got
