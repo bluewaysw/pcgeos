@@ -1172,7 +1172,7 @@ typedef struct {
 } OpSetClipRect;
 
 #define GSSetClipRect(path,rl_sw,rt_sw,rr_sw,rb_sw) 			\
-	GR_SET_CLIP_RECT,GOC_SW(rl_sw), 				\
+	GR_SET_CLIP_RECT,GOC_WORD(path),GOC_SW(rl_sw), 				\
 	GOC_SW(rt_sw),GOC_SW(rr_sw),GOC_SW(rb_sw)
 	
 typedef struct {
@@ -1182,7 +1182,7 @@ typedef struct {
 } OpSetWinClipRect;
 
 #define GSSetWinClipRect(path,rl_sw,rt_sw,rr_sw,rb_sw) 			\
-	GR_SET_WIN_CLIP_RECT,GOC_SW(rl_sw), 				\
+	GR_SET_WIN_CLIP_RECT,GOC_WORD(path),GOC_SW(rl_sw), 				\
 	GOC_SW(rt_sw),GOC_SW(rr_sw),GOC_SW(rb_sw)
 
 typedef struct {
@@ -1203,12 +1203,12 @@ typedef struct {
 #define GSSetClipPath(flags)			GR_SET_CLIP_PATH,(flags)
 
 typedef struct {
-	GStringElement	OSWCP_opcode;	/* GR_SET_DOC_CLIP_PATH */
+	GStringElement	OSWCP_opcode;	/* GR_SET_WIN_CLIP_PATH */
 	RegionFillRule	OSWCP_rule;
 	PathCombineType	OSWCP_flags;
 } OpSetWinClipPath;
 
-#define GSSetWinClipPath(flags)			GR_SET_DOC_CLIP_PATH,(flags)
+#define GSSetWinClipPath(flags)			GR_SET_WIN_CLIP_PATH,(flags)
 
 typedef struct {
 	GStringElement	OEP_opcode;	/* GR_END_PATH */
