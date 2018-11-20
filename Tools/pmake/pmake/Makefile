@@ -3,28 +3,61 @@ o_files = arch.o compat.o cond.o customslib.o dir.o job.o main.o make.o parse.o 
 
 .c.obj
 	wcc386 -bt=nt-i="$(%WATCOM)/h/nt" -i="$(%WATCOM)/h" -i="../../include" -i="../src/lib/include" -i="../src/lib/lst" -i="../customs" -fo=$*.obj $<
+
 .c.o
 	wcc386 -bt=linux -D_LINUX -i="$(%WATCOM)/lh" -i="$(%WATCOM)/h" -i="../../include" -i="../src/lib/include" -i="../src/lib/lst" -i="../customs" -fo=$*.o $<
 
 lst.lib:	.procedure
+!ifdef __LINUX__
 		cd ../lib/lst
+!else
+		cd ..\lib\lst
+!endif
 		wmake lst.lib all
+!ifdef __LINUX__
 		cd ../../pmake
+!else
+		cd ..\..\pmake
+!endif
 
 liblst.so:	.procedure
+!ifdef __LINUX__
 		cd ../lib/lst
+!else
+		cd ..\lib\lst
+!endif
 		wmake liblst.so all
+!ifdef __LINUX__
 		cd ../../pmake
+!else
+		cd ..\..\pmake
+!endif
 
 sprite.lib:	.procedure
+!ifdef __LINUX__
 		cd ../lib/sprite
+!else
+		cd ..\lib\sprite
+!endif
 		wmake sprite.lib all
+!ifdef __LINUX__
 		cd ../../pmake
+!else
+		cd ..\..\pmake
+!endif
 
 libsprite.so:	.procedure
+!ifdef __LINUX__
 		cd ../lib/sprite
+!else
+		cd ..\lib\sprite
+!endif
 		wmake libsprite.so all
+!ifdef __LINUX__
 		cd ../../pmake
+!else
+		cd ..\..\pmake
+!endif
 
 pmake.exe: $(obj_files) sprite.lib lst.lib
 		  %write pmake.lnk NAME   $@
@@ -36,8 +69,7 @@ pmake.exe: $(obj_files) sprite.lib lst.lib
 		  %write pmake.lnk FILE   {$(obj_files)}
 		  wlink  @pmake.lnk
 
-
-pmake: $(o_files) libsprite.so liblst.so
+pmake.e: $(o_files)
   %write pmake.lnk NAME   $@
 	%write pmake.lnk FORMAT ELF
   %write pmake.lnk libfile ../lib/sprite/libsprite.so
@@ -48,8 +80,11 @@ pmake: $(o_files) libsprite.so liblst.so
   %write pmake.lnk FILE   {$(o_files)}
   wlink  @pmake.lnk
 
-install: pmake.exe pmake .procedure
-	cp pmake.exe ../../../bin/pmake.exe
-	cp pmake ../../../bin/pmake
-#	copy pmake.exe ..\..\..\bin\pmake.exe
-#	copy pmake ..\..\..\bin/pmake
+install: pmake.exe pmake.e .procedure
+!ifdef __LINUX__
+  cp pmake.exe ../../../bin/pmake.exe
+  cp pmake.e ../../../bin/pmake
+!else
+	copy pmake.exe ..\..\..\bin\pmake.exe
+	copy pmake.e ..\..\..\bin\pmake
+!endif
