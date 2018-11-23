@@ -171,12 +171,6 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
 	     * scrod, but maybe if enough people complain to MetaWare about
 	     * it, something'll happen...yeah right. -- ardeb
 	     */
-		char tmp = bp[*bp+1];
-		bp[*bp+1] = 0;
-		printf("*** %x %s\r\n", name, bp+1);
-		bp[*bp+1] = tmp;
-
-
 	    if (((*bp == namelen) &&
 		 (geosRelease >= 2 ?
 		  (strncmp((char *)bp+1, namestr, namelen) == 0) :

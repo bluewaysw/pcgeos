@@ -1028,7 +1028,6 @@ ObjDupType(word   	    type,   	/* Type to copy */
 					 * file */
 	   word   	    *typeDest)  /* Place to store duplicate */
 {
-		printf("ObjDupType\n"); fflush(stdout);
     if (type & OTYPE_SPECIAL) {
 	/*
 	 * If special, there's nothing else to copy.
@@ -1037,17 +1036,12 @@ ObjDupType(word   	    type,   	/* Type to copy */
     } else {
 	ObjType	src;
 
-  printf("ObjTypeHeader num=%d %d\n", ((ObjTypeHeader*)tbase)->num, sizeof(ObjTypeHeader));
-	printf("ObjDupType %x %x\n", tbase, ((genptr)tbase + type)); fflush(stdout);
 	src = *(ObjType *)((genptr)tbase + type);
-	printf("ObjDupType %x %x %x\n", src.words[0], src.words[1],
-								*(((dword*)&src)+1)); fflush(stdout);
 
 	/*
 	 * Copy any nested type first.
 	 */
 	if (!OTYPE_IS_STRUCT(src.words[0])) {
-		printf("ObjDupType\n"); fflush(stdout);
 	    ObjDupType(src.words[1], dp, fh, tbase, &src.words[1]);
 	}
 
@@ -1065,7 +1059,6 @@ ObjDupType(word   	    type,   	/* Type to copy */
 	     */
 	    void	*base;
 
-			printf("ObjDupType2\n"); fflush(stdout);
 	    dp->typeSize += sizeof(ObjType);
 	    (void)MemReAlloc(dp->tmem, dp->typeSize, 0);
 	    MemInfo(dp->tmem, (genptr *)&base, (word *)NULL);
@@ -1076,14 +1069,7 @@ ObjDupType(word   	    type,   	/* Type to copy */
 	    /*
 	     * A structure needs to have the structure name duplicated
 	     */
-
-ID	    id = 0;
-			 {
-			 printf("ObjDupType3 %x %x %d %s\n", symbols, OTYPE_STRUCT_ID(&src), OTYPE_STRUCT_ID(&src), ""
-		 /*ST_Lock(fh,OTYPE_STRUCT_ID(&src))*/); fflush(stdout);
-			 //ST_Unlock(fh, OTYPE_STRUCT_ID(&src));
-		 }
-	    id = ST_Dup(fh, OTYPE_STRUCT_ID(&src),
+	    ID id = ST_Dup(fh, OTYPE_STRUCT_ID(&src),
 				symbols, strings);
 
 	    OTYPE_ID_TO_STRUCT(id,dp->nextType);
@@ -1100,7 +1086,6 @@ ID	    id = 0;
 	*typeDest = dp->typeOff;
 	dp->nextType += 1;
 	dp->typeOff += sizeof(ObjType);
-	printf("ObjDupType4\n"); fflush(stdout);
     }
 }
 
@@ -1145,9 +1130,7 @@ ObjEnterStruct(VMHandle    	fh, 	    /* Object file */
      * required for looking up an ID will be comparable to that for looking
      * up a symbol.
      */
-		printf("ObjEnterStruct\n");
     id = ST_Dup(fh, os->name, symbols, strings);
-		printf("ObjEnterStruct2\n");
 
     if (!Sym_Find(symbols, dp->sd->syms, id, &otherBlock, &otherOff, FALSE)) {
 	/*
@@ -1221,14 +1204,11 @@ ObjEnterStruct(VMHandle    	fh, 	    /* Object file */
 		 * Adjust the "next" pointer.
 		 */
 		dp->nextSym->u.sField.next = dp->symOff + sizeof(ObjSym);
-		printf("VMLOCK %d\n", otherBlock); fflush(stdout);
 		/*
 		 * Duplicate the field type description.
 		 */
-		printf("AAA %x %d\n", dp->tbase, dp->nextSym->u.sField.type);
 		ObjDupType(dp->nextSym->u.sField.type, dp, fh,
 			     dp->tbase, &dp->nextSym->u.sField.type);
-					 printf("BBB\n");
 
 		if ((os->name != NullID) && all) {
 		    Sym_Enter(symbols, dp->sd->syms, dp->nextSym->name,
@@ -2376,7 +2356,6 @@ Obj_EnterTypeSyms(const char   	*file,	/* File name */
 	 * the block in symSize for later checks.
 	 */
 	data.syms = sd->symT;
-	printf("VMLock syms: %x\n", data.syms); fflush(stdout);
 	osh = (ObjSymHeader *)VMLock(symbols, data.syms, &data.mem);
 	MemInfo(data.mem, (genptr *)NULL, &n);
 	data.symSize = n;
@@ -2387,7 +2366,6 @@ Obj_EnterTypeSyms(const char   	*file,	/* File name */
 	 * Extract info for associated type block too
 	 */
 	data.types = osh->types;
-	printf("VMLock types: %x\n", data.types); fflush(stdout);
 	data.nextType = (ObjType *)VMLock(symbols, data.types, &data.tmem);
 	MemInfo(data.tmem, (genptr *)NULL, &n);
 	data.typeSize = n;
@@ -2402,11 +2380,9 @@ Obj_EnterTypeSyms(const char   	*file,	/* File name */
 	data.syms = 0;
 	data.symSize = data.symOff = 0;
 
-	printf("VMLock1: %x\n", sd->symT); fflush(stdout);
 	osh = (ObjSymHeader *)VMLock(symbols, sd->symT, NULL);
 
 	data.types = osh->types;
-	printf("VMLock2: %x\n", data.types); fflush(stdout);
 	data.nextType = (ObjType *)VMLock(symbols, data.types, &data.tmem);
 	data.typeSize = n;
 	data.typeOff = sd->typeNext;
@@ -2429,19 +2405,9 @@ Obj_EnterTypeSyms(const char   	*file,	/* File name */
     while (next != 0) {
 	VMBlockHandle	tempNext;
 
-	printf("VMLock3: %x %x %x\n", next, fh, symbols); fflush(stdout);
 	osh = (ObjSymHeader *)VMLock(fh, next, &mem);
-	printf("VMLock4: %x %x %x %x\n", next, fh, symbols, osh->types); fflush(stdout);
-	{
-		 word blkSize;
-		 VMID idPtr;
-	 VMInfo(symbols, osh->types, &blkSize, 0, &idPtr);
- }
- printf("VMLock5: %x %x %x %x\n", next, fh, symbols, osh->types); fflush(stdout);
 
  	data.tbase = VMLock(fh, osh->types, NULL);
-	printf("VMLock6: %x %x %x %x\n", next, fh, symbols, osh->types); fflush(stdout);
-	printf("VMLock6b: %x %d\n", data.tbase, osh->num); fflush(stdout);
 
 	/*
 	 * Figure number of symbols in this block
@@ -2450,30 +2416,24 @@ Obj_EnterTypeSyms(const char   	*file,	/* File name */
 
 	for (os = ObjFirstEntry(osh, ObjSym); n > 0; ) {
 
-		printf("ObjFirstEntry %x\n", os->name);
 	    switch(os->type) {
 		case OSYM_STRUCT:
 		case OSYM_RECORD:
 		case OSYM_UNION:
-		printf("DONE\n"); fflush(stdout);
 		    retval = ObjEnterStruct(fh, &os, &n, &data,
 					    !(flags & OETS_TOP_LEVEL_ONLY)) &&
 			retval;
 		    break;
 		case OSYM_TYPEDEF:
-		printf("DONE2\n"); fflush(stdout);
 		    retval = ObjEnterTypedef(fh, &os, &n, &data) && retval;
 		    break;
 		case OSYM_ETYPE:
-		printf("DONE3\n"); fflush(stdout);
 		    retval = ObjEnterEType(fh, &os, &n, &data) && retval;
 		    break;
 		case OSYM_CONST:
-		printf("DONE4\n"); fflush(stdout);
 		    retval = ObjEnterConst(fh, &os, &n, &data) && retval;
 		    break;
 		case OSYM_EXTTYPE:
-		printf("DONE5\n"); fflush(stdout);
 		    retval = ObjEnterExtType(fh, &os, &n, &data) && retval;
 		    break;
 		default:

@@ -2337,7 +2337,6 @@ main(argc, argv)
      * first so we can determine if an external symbol is in a library for
      * Certain Deficient Object File Formats That Shall Remain Nameless.
      */
-	printf("DEBUG6\r\n");
     if (fileOps->flags & FILE_USES_GEODE_PARAMS) {
 	Parse_GeodeParams(paramfile, outfile, TRUE);
     }
@@ -2367,7 +2366,6 @@ main(argc, argv)
      * Create the global segment now. Makes life easier for some object
      * file handlers.
      */
-	printf("DEBUG7\r\n");
     globalSeg = Seg_AddSegment(0, NullID, NullID, SEG_GLOBAL, 0, 0);
 
     /*
