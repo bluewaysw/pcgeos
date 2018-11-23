@@ -292,7 +292,7 @@ typedef ByteEnum Chars;
 #define C_DOTACCENT   0xfa
 #define C_RING   0xfb
 #define C_CEDILLA   0xfc
-#define C_HUNGARUMLAT   0xfd
+#define C_HUNGARUMLAUT   0xfd
 #define C_OGONEK   0xfe
 #define C_CARON   0xff
 
@@ -341,6 +341,9 @@ typedef ByteEnum Chars;
 #define C_PRODUCT	C_U_PI
 #define C_RADICAL	C_ROOT
 #define C_LOZENGE	C_DIAMONDBULLET
+
+/* some former spelling errors */
+#define C_HUNGARUMLAT   C_HUNGARUMLAUT
 
 #endif /* DBCS */
 #endif
