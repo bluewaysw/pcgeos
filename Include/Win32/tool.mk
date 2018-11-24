@@ -90,15 +90,23 @@
 
 .SUFFIXES	: .o
 
+#if defined(linux)
+CC_IMPSRC = $(.IMPSRC)
+#else
+CC_IMPSRC = $(.IMPSRC:S/\//\\/g)
+#endif
+
 #
 # Remove .EXPORTSAME restriction on compilations
 #
 .c.obj		:
-	$(CC) -bt=nt $(CFLAGS) $(.IMPSRC:S/\//\\/g) \
+	$(CC) -bt=nt $(CFLAGS) \
+									 "$(CC_IMPSRC)" \
 									 -i="$(WATCOM)/h/nt" \
 									 -i="$(WATCOM)/h" 
 .c.o		:
-	$(CC) -D_LINUX -bt=linux  $(CFLAGS) $(.IMPSRC:S/\//\\/g) \
+	$(CC) -D_LINUX -bt=linux $(CFLAGS) \
+									 "$(CC_IMPSRC)" \
 									 -i="$(WATCOM)/lh" \
 									 -i="$(WATCOM)/h" 
 
@@ -122,9 +130,15 @@ CFLAGS_COMMON	=  -hd -d2 -w3 -zp4 -j
 # directory) and where to place the result.  Under NT, this DOES NOT WORK
 # for the final link.
 #
+#if defined(linux)
+CFLAGS		+= $(CFLAGS_COMMON) -fo=$(.TARGET) \
+				$(.INCLUDES:S/^-I/-i=/g) \
+                   -i=$(.TARGET:H) -i=. $(XCFLAGS)
+#else
 CFLAGS		+= $(CFLAGS_COMMON) -fo=$(.TARGET:S/\//\\/g) \
 				$(.INCLUDES:S/^-I/-i=/g:S/\//\\/g) \
                    -i=$(.TARGET:H) -i=. $(XCFLAGS)
+#endif
 
 #
 # Flags to pass to cl WHEN LINKING.
@@ -216,7 +230,8 @@ all		: $(MACHINES)
 $(INSTALLALL)	: ${.TARGET:S/^install//}   	.NOEXPORT
 # if $(TYPE) != "library"
 #if defined(linux)
-	: install for linux missing
+	for i in $(.ALLSRC:S/.$//g) ; \
+	do cp $(echo "$i." | sed 's/.exe.$/.exe/') $(DEST)/$(basename "$i") ; done
 #else
 	for %I in ($(.ALLSRC:S/\//\\/g)) do copy /Y %I $(DEST:S/\//\\/g)
 #endif

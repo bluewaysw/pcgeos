@@ -187,8 +187,12 @@ PRODUCT_VMS	!= echo $(PRODUCT_VMS) | tr ' ' '\012' | egrep -v "${EXEMPTPRODUCTS}
 # which application/library/driver is being made. It's also useful to have
 # anyway.
 #
+#if defined(linux)
+CURRENT_DIR	!= pwd
+#else
 CURRENT_DIR	!= cd
 CURRENT_DIR	:= $(CURRENT_DIR:S,\\,/,g)
+#endif
 
 ##
 ## Deal with having pieces of the Installed tree on local disks, not under

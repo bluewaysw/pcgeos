@@ -162,8 +162,8 @@ ${MACHINES:S%$%.md/printobj.exe%g} : $(win32poOBJS) $(win32LIBS)
 			RU CON \
 			$(XLINKFLAGS)
 
-linux	: ${.TARGET:S%$%.md/printobj.e%}    	    .JOIN
-${MACHINES:S%$%.md/printobj.e%g} : $(linuxpoOBJS) $(linuxLIBS) 
+linux	: ${.TARGET:S%$%.md/printobj.%}    	    .JOIN
+${MACHINES:S%$%.md/printobj.%g} : $(linuxpoOBJS) $(linuxLIBS) 
 	$(WLINK) $(CLINKFLAGS)  \
 			DEBUG ALL \
 			$(.ALLSRC:M*.o:S/^/file /g) \
