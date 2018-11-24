@@ -677,7 +677,7 @@ Dir_FindFile (char *name, Lst path)
 #endif
 		  
 	    } else {
-		name[i] = (char) toupper(name[i]);
+		/*name[i] = (char) toupper(name[i]);*/
 	    }
 	}
     }
@@ -1113,7 +1113,7 @@ DirAddDir(Lst path, char *name)
     /*
      * I'm desperate, man...
      */
-    Parse_UpCaseString(name);
+    /*Parse_UpCaseString(name);*/
 #endif /* _WIN32 */
     
     ln = Lst_Find (openDirectories, (ClientData)name, DirFindName);
@@ -1255,7 +1255,8 @@ DirAddDir(Lst path, char *name)
 			       \'s at all under Win32 */
 			    filename[i] = '/';
 			} else {
-			    filename[i] = (char) toupper(dp->d_name[i]);
+			    /*filename[i] = (char) toupper(dp->d_name[i]);*/
+				filename[i] = (char) (dp->d_name[i]);
 			}
 			i++;
 		    }

@@ -352,6 +352,10 @@ NotifyInt(NotifyType	why,	/* What are you telling me? */
     if (why != NOTIFY_DEBUG) {
 	putc('\n', stderr);
     }
+
+printf("LINE\n");
+	fflush(stderr);
+	fflush(stdout);
 }
 
 
@@ -1027,7 +1031,6 @@ main(argc, argv)
 	    }
 	}
     }
-
 
     /*
      * Perform initial pass over source code.

@@ -772,7 +772,7 @@ Suff_AddSuffix (char *str)
 	 * files.
 	 */
 	for (cp = s->name; *cp; cp++) {
-	    *cp = (char) toupper(*cp);
+	    /**cp = (char) toupper(*cp);*/
 	}
 #endif /* defined(_MSDOS) || defined (_WIN32) */
 

@@ -86,18 +86,26 @@
 # installed (or have it installed in a different directory), then
 # this won't be correct.  But for now...
 #
-.PATH.h		: c:/progra~1/devstudio/vc/include c:/watcom-v2/h c:/watcom-v2/h/nt
+#.PATH.h		: c:/progra~1/devstudio/vc/include c:/watcom-v2/h c:/watcom-v2/h/nt
+
+.SUFFIXES	: .o
 
 #
 # Remove .EXPORTSAME restriction on compilations
 #
 .c.obj		:
-	$(CC) $(CFLAGS) $(.IMPSRC:S/\//\\/g)
+	$(CC) -bt=nt $(CFLAGS) $(.IMPSRC:S/\//\\/g) \
+									 -i="$(WATCOM)/h/nt" \
+									 -i="$(WATCOM)/h" 
+.c.o		:
+	$(CC) -D_LINUX -bt=linux  $(CFLAGS) $(.IMPSRC:S/\//\\/g) \
+									 -i="$(WATCOM)/lh" \
+									 -i="$(WATCOM)/h" 
 
-#CC		= wcc386 -D_LINUX -zq -bt=linux -zlf -ei
-CC		= wcc386 -zq -bt=nt -zlf -ei
+#CC		= wcc386 -zq -zlf -ei
+CC		= wcc386 -zq -zlf -ei -d9 
 
-AS		= wlink -c
+AS		= wlink -c 
 WLINK = wlink
 
 #
@@ -116,9 +124,7 @@ CFLAGS_COMMON	=  -hd -d2 -w3 -zp4 -j
 #
 CFLAGS		+= $(CFLAGS_COMMON) -fo=$(.TARGET:S/\//\\/g) \
 				$(.INCLUDES:S/^-I/-i=/g:S/\//\\/g) \
-                   -i=$(.TARGET:H) -i=. $(XCFLAGS) \
-									 -i="$(WATCOM)/lh" \
-									 -i="$(WATCOM)/h"
+                   -i=$(.TARGET:H) -i=. $(XCFLAGS)
 
 #
 # Flags to pass to cl WHEN LINKING.
@@ -126,6 +132,8 @@ CFLAGS		+= $(CFLAGS_COMMON) -fo=$(.TARGET:S/\//\\/g) \
 CLINKFLAGS	+=  name $(.TARGET)
 
 YFLAGS		+= $(XYFLAGS)
+
+DEST		?= $(ROOT_DIR)/bin
 
 #if defined(LIBS) && $(LIBS) == "-lkernel.lobj"
 LIBS		=
@@ -147,35 +155,35 @@ CLEANALL	:= $(MACHINES:S/^/clean/g)
 DEPENDALL	:= $(MACHINES:S/^/depend/g)
 INSTALLALL	:= $(MACHINES:S/^/install/g)
 
-#if !target(MAKETOOL)
-#
-# To make the CFLAGS definition work, we have to make <mach> depend on
-# <mach>.md/$(NAME), then use that to create the executable.
-# For <mach>.md/$(NAME), we use dynamic sources to make it depend on
-# $(<mach>OBJS) (i.e. the objects for the executable on that machine).
-#
-MAKETOOL	: .USE
-	$(WLINK) $(CLINKFLAGS) $(.LIBS) $(.LIBS:S,$,/$(.TARGET:H),g) \
-			$(.ALLSRC:M*.obj:S/^/file /g) \
-			$(.ALLSRC:M*.lib:S/^/lib /g) \
-#			library /home/frehwagen/watcom-v2/lib386/linux/clib3r.lib \
-#			library /home/frehwagen/watcom-v2/lib386/math387r.lib \
-#			library /home/frehwagen/watcom-v2/lib386/linux/emu387.lib \
-#			FORMAT ELF \
-			library kernel32 \
-			SYSTEM NT_WIN \
-			RU CON \
-			$(XLINKFLAGS)
-#endif
 #if $(TYPE) != "library"
 
 #
 # Create an executable from the appropriate objects and libraries
 #
 
-$(MACHINES)	: ${.TARGET:S%$%.md/$(NAME).exe%}    	    .JOIN
-${MACHINES:S%$%.md/$(NAME).exe%g} : $(win32OBJS) $(LIBS) $(win32LIBS) \
-				  MAKETOOL
+win32	: ${.TARGET:S%$%.md/$(NAME).exe%}    	    .JOIN
+${MACHINES:S%$%.md/$(NAME).exe%g} : $(win32OBJS) $(win32LIBS) 
+	$(WLINK) $(CLINKFLAGS)  \
+			DEBUG WATCOM ALL \
+			$(.ALLSRC:M*.obj:S/^/file /g) \
+			$(.ALLSRC:M*.lib:S/^/lib /g) \
+			library kernel32 \
+			SYSTEM NT_WIN \
+			RU CON \
+			$(XLINKFLAGS)
+
+linux	: ${.TARGET:S%$%.md/$(NAME).%}    	    .JOIN
+${MACHINES:S%$%.md/$(NAME).%g} : $(linuxOBJS) $(linuxLIBS) 
+	$(WLINK) $(CLINKFLAGS)  \
+			DEBUG ALL \
+			$(.ALLSRC:M*.o:S/^/file /g) \
+			$(.ALLSRC:M*.a:S/^/lib /g) \
+			library $(WATCOM)/lib386/linux/clib3r.lib \
+			library $(WATCOM)/lib386/math387r.lib \
+			library $(WATCOM)/lib386/linux/emu387.lib \
+			FORMAT ELF \
+			$(XLINKFLAGS)
+
 
 #else
 
@@ -184,18 +192,42 @@ ${MACHINES:S%$%.md/$(NAME).exe%g} : $(win32OBJS) $(LIBS) $(win32LIBS) \
 # instead of relying on ar stuff.  Also, tlib expects \ instead of /.
 #
 
-MAKELIB		: .USE .PRECIOUS
+linux	: ${.TARGET:S%$%.md/lib$(NAME).a%}  .JOIN
+${MACHINES:S%$%.md/lib$(NAME).a%g} : ${.TARGET:H:R:S/^/\$(/:S%$%OBJS)%} \
+		 		$(LIBS) \
+                ${.TARGET:H:R:S/^/\$(/:S%$%LIBS)%} 
+	wlib "$(.TARGET)" $(linuxOBJS)
+
+win32	: ${.TARGET:S%$%.md/$(NAME).lib%}  .JOIN
+${MACHINES:S%$%.md/$(NAME).lib%g} : ${.TARGET:H:R:S/^/\$(/:S%$%OBJS)%} \
+		 		$(LIBS) \
+                ${.TARGET:H:R:S/^/\$(/:S%$%LIBS)%} 
 	wlib "$(.TARGET)" $(win32OBJS)
 
-$(MACHINES)	: ${.TARGET:S%$%.md/$(NAME).lib%}  .JOIN
-${MACHINES:S%$%.md/$(NAME).lib%g} : $(win32OBJS) $(LIBS) $(win32LIBS) \
-		MAKELIB
+
 #endif
 
 #
 # Now the simple target to run the proper thing
 #
 all		: $(MACHINES)
+
+#ifndef NO_SPEC_INSTALL
+$(INSTALLALL)	: ${.TARGET:S/^install//}   	.NOEXPORT
+# if $(TYPE) != "library"
+#if defined(linux)
+	: install for linux missing
+#else
+	for %I in ($(.ALLSRC:S/\//\\/g)) do copy /Y %I $(DEST:S/\//\\/g)
+#endif
+# else
+	: Libraries aren't usually installed
+# endif
+#endif
+
+#ifndef NO_INSTALL
+install		:: $(INSTALLALL)
+#endif
 
 mkmf		::
 	mkmf -f $(MAKEFILE)

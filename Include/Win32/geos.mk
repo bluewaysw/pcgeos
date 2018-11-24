@@ -477,9 +477,9 @@ OPTIONAL_LIB		?=
 #OPTIONAL_LIB_TAIL	= Library/BorlandRTL/BORLAND.OBJ
 OPTIONAL_LIB_TAIL	=
 #if exists($(DEVEL_DIR)/$(OPTIONAL_LIB_TAIL))
-OPTIONAL_LIB		+= -l$(DEVEL_DIR)/$(OPTIONAL_LIB_TAIL)
+#OPTIONAL_LIB		+= -l$(DEVEL_DIR)/$(OPTIONAL_LIB_TAIL)
 #else
-OPTIONAL_LIB		+= -l$(ROOT_DIR)/Installed/$(OPTIONAL_LIB_TAIL)
+#OPTIONAL_LIB		+= -l$(ROOT_DIR)/Installed/$(OPTIONAL_LIB_TAIL)
 #endif
 #
 #			      LIBRARIAN
@@ -581,7 +581,7 @@ CCOM_MODEL	?= -ml
 CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
 		   	-os -ol -ol+ -hc -s \
 		   	$(CCOM_MODEL) \
-            $(.INCLUDES:N*/Include*:S/^-I/-i=/g) \
+            $(.INCLUDES:N*/Include*:S/\//\\/g:S/^-I/-i=/g) \
 						-i="$(WATCOM)/h" \
 		   	 		`$(PRODUCT_FLAGS) highc $(PRODUCT)` \
 					$(XCCOMFLAGS)
@@ -750,7 +750,7 @@ GPFILE		= $(GEODE).gp
 SETLIBFLAG	?=
 #if $(PRODUCT) != "NDO2000"
 LINK		: .USE
-	rm -f $(.TARGET:S|/|\\|g)
+	del -f $(.TARGET:S|/|\\|g)
 	$(LINK) \
 	  $(.TARGET:M*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
 	  $(.TARGET:M*.geo:N*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
@@ -764,7 +764,7 @@ LINK		: .USE
 	  $(LINKFLAGS) -o $(.TARGET) $(.ALLSRC:N*.gp:N*.ldf) $(OPTIONAL_LIB) $(GEOERRFL)
 #else
 LINK		: .USE
-	rm -f $(.TARGET:S|/|\\|g)
+	del -f $(.TARGET:S|/|\\|g)
 	$(LINK) \
 	  $(.TARGET:M*EC.GEO:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
 	  $(.TARGET:M*.GEO:N*EC.GEO:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
@@ -853,14 +853,14 @@ LINK		: .USE
 	$(GOC) $(GOCFLAGS) -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)
 	$(CCOM) $(CCOMFLAGS) -fo=$(.TARGET:S/\//\\/g) $(.TARGET:R:S/\//\\/g).nc $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
-	rm $(.TARGET:R:S|/|\\|g).nc
+	del $(.TARGET:R:S|/|\\|g).nc
 #endif
 
 .goc.eobj	:
 	$(GOC) -DDO_ERROR_CHECKING $(GOCFLAGS) -o $(.TARGET:R).ec $(.IMPSRC) $(GEOERRFL)
 	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo=$(.TARGET:S/\//\\/g) $(.TARGET:R:S/\//\\/g).ec $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
-	rm $(.TARGET:R:S|/|\\|g).ec
+	del $(.TARGET:R:S|/|\\|g).ec
 #endif
 
 clean	: .NOTMAIN

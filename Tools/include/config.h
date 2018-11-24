@@ -164,6 +164,13 @@
 
 #endif /* unix */
 
+#ifdef _WIN32
+
+#define HAVE_GETOPT
+
+#endif
+
+
 /***********************************************************************
  *
  * #include compiler-specific header file

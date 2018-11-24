@@ -30,9 +30,14 @@ CFLAGS	 	+= -fstrength-reduce -fcombine-regs \
 LIBS		= $(.TARGET:H)/libutils.a
 .PATH.a		: ../utils $(INSTALL_DIR:H)/utils
 #else
-.SUFFIXES	: .lib
-LIBS		= $(.TARGET:H)/utils.lib $(.TARGET:H)/compat.lib
+.SUFFIXES	: .lib .a
+
+linuxLIBS		:= $(.TARGET:H)/libutils.a $(.TARGET:H)/libcompat.a
+win32LIBS		:= $(.TARGET:H)/utils.lib $(.TARGET:H)/compat.lib
+
 .PATH.lib	: ../utils $(INSTALL_DIR:H)/utils \
+	 	  ../compat $(INSTALL_DIR:H)/compat
+.PATH.a	: ../utils $(INSTALL_DIR:H)/utils \
 	 	  ../compat $(INSTALL_DIR:H)/compat
 #endif
 YFLAGS		= -dv
@@ -63,6 +68,7 @@ $(MACHINES:S|$|.md/scan.o|g): $(TABLES)
 #
 # Initial values arrived at empirically -- best values < $(MAX)
 #
+#if 0
 GPFLAGS		= -agSDptlTC
 
 MAX		= 20
@@ -121,6 +127,7 @@ flopcode.h	: flopcodes.gperf
 	    -H hashFlopcode $(.ALLSRC) > $@
 flopcodes.opt	:: 
 	MAX=$(MAX) opt -o -j1 $(GPFLAGS) -k2-5,'$$' flopcodes.gperf
+#endif
 
 allopt		: $(TABLES:S/.h$/.opt/g)
 
@@ -135,6 +142,7 @@ sun3poOBJS	= sun3.md/printobj.o
 isipoOBJS	= isi.md/printobj.o isi.md/isinf.o
 sparcpoOBJS	= sparc.md/printobj.o
 win32poOBJS	= win32.md/printobj.obj
+linuxpoOBJS	= linux.md/printobj.o
 
 #if defined(unix)
 $(MACHINES)	: ${.TARGET:S%$%.md/printobj%}	    	    .JOIN
@@ -142,9 +150,29 @@ ${MACHINES:S%$%.md/printobj%g}	: MAKETOOL \
                   ${.TARGET:H:R:S/^/\$(/:S%$%poOBJS)%} \
 		  $(LIBS) 
 #else
-$(MACHINES)	: ${.TARGET:S%$%.md/printobj.exe%}    	    .JOIN
-${MACHINES:S%$%.md/printobj.exe%g} : $(win32poOBJS) $(LIBS) $(win32LIBS) \
-				  MAKETOOL
+
+win32	: ${.TARGET:S%$%.md/printobj.exe%}    	    .JOIN
+${MACHINES:S%$%.md/printobj.exe%g} : $(win32poOBJS) $(win32LIBS) 
+	$(WLINK) $(CLINKFLAGS)  \
+			DEBUG WATCOM ALL \
+			$(.ALLSRC:M*.obj:S/^/file /g) \
+			$(.ALLSRC:M*.lib:S/^/lib /g) \
+			library kernel32 \
+			SYSTEM NT_WIN \
+			RU CON \
+			$(XLINKFLAGS)
+
+linux	: ${.TARGET:S%$%.md/printobj.e%}    	    .JOIN
+${MACHINES:S%$%.md/printobj.e%g} : $(linuxpoOBJS) $(linuxLIBS) 
+	$(WLINK) $(CLINKFLAGS)  \
+			DEBUG ALL \
+			$(.ALLSRC:M*.o:S/^/file /g) \
+			$(.ALLSRC:M*.a:S/^/lib /g) \
+			library $(WATCOM)/lib386/linux/clib3r.lib \
+			library $(WATCOM)/lib386/math387r.lib \
+			library $(WATCOM)/lib386/linux/emu387.lib \
+			FORMAT ELF \
+			$(XLINKFLAGS)
 #endif
 
 

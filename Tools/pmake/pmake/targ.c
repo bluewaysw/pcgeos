@@ -122,7 +122,7 @@ Targ_NewGN (char *name)
     MallocCheck (gn, sizeof (GNode));
     gn->name = Str_New (name);
 #if defined (_MSDOS) || defined (_WIN32)
-    Parse_UpCaseString(gn->name);
+    /*Parse_UpCaseString(gn->name);*/
 #endif /* defined (_MSDOS) || defined (_WIN32) */
 
     gn->path = NULL;
@@ -175,7 +175,7 @@ Targ_FindNode (char *name, int flags)
 			      /* an entry for the node */
 
 #if defined (_MSDOS) || defined (_WIN32)
-    Parse_UpCaseString(name);
+    /*Parse_UpCaseString(name);*/
 #endif /* defined (_MSDOS) || defined (_WIN32) */
 
     if (flags & TARG_CREATE) 

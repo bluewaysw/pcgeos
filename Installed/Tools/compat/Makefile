@@ -31,18 +31,14 @@
 #include	<geos.mk>
 #include	<gpath.mk>
 
-MACHINES	=  sparc win32
+MACHINES	= linux win32
 MAKEFILE	= Makefile
 NAME		= compat
 SYSMAKEFILE	= tool.mk
 TYPE		= library
 
-#if	defined(sun) && defined(sparc)
-DEFTARGET	= sparc
-#elif	defined(sun)
-DEFTARGET	= sun3
-#elif   defined(isi)
-DEFTARGET	= isi
+#if	defined(linux)
+DEFTARGET	= linux
 #else
 DEFTARGET	= win32
 #endif
@@ -50,11 +46,11 @@ DEFTARGET	= win32
 MISRCS          = bcmp.c bcopy.c bzero.c compat.c dirent.c ffs.c getopt.c\
                   mkstemp.c pagesize.c queue.c
 
-sparcSRCS       = $(MISRCS) sparc.md/
-sparcOBJS       = sparc.md/bcmp.o sparc.md/bcopy.o sparc.md/bzero.o\
-                  sparc.md/compat.o sparc.md/dirent.o sparc.md/ffs.o\
-                  sparc.md/getopt.o sparc.md/mkstemp.o sparc.md/pagesize.o\
-                  sparc.md/queue.o
+linuxSRCS       = $(MISRCS) linux.md/
+linuxOBJS       = linux.md/bcmp.o linux.md/bcopy.o linux.md/bzero.o\
+                  linux.md/compat.o linux.md/dirent.o linux.md/ffs.o\
+                  linux.md/getopt.o linux.md/mkstemp.o linux.md/pagesize.o\
+                  linux.md/queue.o
 sparcLIBS       =
 
 win32SRCS       = $(MISRCS) win32.md/
@@ -74,7 +70,7 @@ SUBDIRS         =
 #endif
 
 #if	exists(sparc.md/dependencies.mk)
-#include	"sparc.md/dependencies.mk"
+#include	"linux.md/dependencies.mk"
 #endif
 
 #if	exists(win32.md/dependencies.mk)
