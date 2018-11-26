@@ -34,18 +34,14 @@
 #include	<geos.mk>
 #include	<gpath.mk>
 
-MACHINES	=  sparc win32
+MACHINES	= linux win32
 MAKEFILE	= Makefile
 NAME		= uicpp
 SYSMAKEFILE	= tool.mk
 TYPE		= tool
 
-#if	defined(sun) && defined(sparc)
-DEFTARGET	= sparc
-#elif	defined(sun)
-DEFTARGET	= sun3
-#elif   defined(isi)
-DEFTARGET	= isi
+#if	defined(linux)
+DEFTARGET	= linux
 #else
 DEFTARGET	= win32
 #endif
@@ -53,10 +49,10 @@ DEFTARGET	= win32
 MISRCS          = cccp.c cexp.c cexp.y obstack.c obstack.h tm-i386.h\
                   version.c
 
-sparcSRCS       = $(MISRCS) sparc.md/
-sparcOBJS       = sparc.md/cccp.o sparc.md/cexp.o sparc.md/obstack.o\
-                  sparc.md/version.o
-sparcLIBS       =
+linuxSRCS       = $(MISRCS) linux.md/
+linuxOBJS       = linux.md/cccp.o linux.md/cexp.o linux.md/obstack.o\
+                  linux.md/version.o
+linuxLIBS       =
 
 win32SRCS       = $(MISRCS) win32.md/
 win32OBJS       = win32.md/cccp.obj win32.md/cexp.obj win32.md/obstack.obj\
@@ -64,7 +60,7 @@ win32OBJS       = win32.md/cccp.obj win32.md/cexp.obj win32.md/obstack.obj\
 win32LIBS       =
 
 
-SUBDIRS         = CVS
+SUBDIRS         = 
 
 #if exists(local.mk)
 #include	"local.mk"
@@ -72,8 +68,8 @@ SUBDIRS         = CVS
 #include	<$(SYSMAKEFILE)>
 #endif
 
-#if	exists(sparc.md/dependencies.mk)
-#include	"sparc.md/dependencies.mk"
+#if	exists(linux.md/dependencies.mk)
+#include	"linux.md/dependencies.mk"
 #endif
 
 #if	exists(win32.md/dependencies.mk)
