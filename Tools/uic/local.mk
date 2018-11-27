@@ -33,7 +33,8 @@ LIBS		= $(.TARGET:H)/libutils.a
 #else
 .SUFFIXES	: .lib .a
 linuxLIBS		= $(.TARGET:H)/libutils.a $(.TARGET:H)/libcompat.a
-.PATH.a		: ../utils $(INSTALL_DIR:H)/utils
+.PATH.a		: ../utils $(INSTALL_DIR:H)/utils \
+		  ../compat $(INSTALL_DIR:H)/compat
 win32LIBS		= $(.TARGET:H)/utils.lib $(.TARGET:H)/compat.lib
 .PATH.lib	: ../utils $(INSTALL_DIR:H)/utils \
 		  ../compat $(INSTALL_DIR:H)/compat
