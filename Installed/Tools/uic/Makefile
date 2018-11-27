@@ -34,18 +34,14 @@
 #include	<geos.mk>
 #include	<gpath.mk>
 
-MACHINES	=  sparc win32
+MACHINES	= linux win32
 MAKEFILE	= Makefile
 NAME		= uic
 SYSMAKEFILE	= tool.mk
 TYPE		= tool
 
-#if	defined(sun) && defined(sparc)
-DEFTARGET	= sparc
-#elif	defined(sun)
-DEFTARGET	= sun3
-#elif   defined(isi)
-DEFTARGET	= isi
+#if	defined(linux)
+DEFTARGET	= linux
 #else
 DEFTARGET	= win32
 #endif
@@ -54,11 +50,11 @@ MISRCS          = map.c map.h output.c parse.c parse.h parse.y scan.c\
                   semantic.c strwid.c strwid.h symbol.c symbol.h uic.c\
                   uic.h
 
-sparcSRCS       = $(MISRCS) sparc.md/
-sparcOBJS       = sparc.md/map.o sparc.md/output.o sparc.md/parse.o\
-                  sparc.md/scan.o sparc.md/semantic.o sparc.md/strwid.o\
-                  sparc.md/symbol.o sparc.md/uic.o
-sparcLIBS       =
+linuxSRCS       = $(MISRCS) linux.md/
+linuxOBJS       = linux.md/map.o linux.md/output.o linux.md/parse.o\
+                  linux.md/scan.o linux.md/semantic.o linux.md/strwid.o\
+                  linux.md/symbol.o linux.md/uic.o
+linuxLIBS       =
 
 win32SRCS       = $(MISRCS) win32.md/
 win32OBJS       = win32.md/map.obj win32.md/output.obj win32.md/parse.obj\
@@ -67,7 +63,7 @@ win32OBJS       = win32.md/map.obj win32.md/output.obj win32.md/parse.obj\
 win32LIBS       =
 
 
-SUBDIRS         = CVS dos win
+SUBDIRS         = 
 
 #if exists(local.mk)
 #include	"local.mk"
@@ -76,7 +72,7 @@ SUBDIRS         = CVS dos win
 #endif
 
 #if	exists(sparc.md/dependencies.mk)
-#include	"sparc.md/dependencies.mk"
+#include	"linux.md/dependencies.mk"
 #endif
 
 #if	exists(win32.md/dependencies.mk)
