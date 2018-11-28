@@ -38,7 +38,7 @@
 #define bcopy(source,dest,count) memcpy(dest,source,count)
 #endif
 
-#ifndef _LINUX
+#if !defined(_LINUX) && !defined(_WIN32)
 /* MetaBlam's alloca trashes the stack and leads to death. */
 #define alloca(size) alloca_isnt_portable_you_goob_so_dont_use_it()
 #endif

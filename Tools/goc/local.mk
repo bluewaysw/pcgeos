@@ -39,8 +39,10 @@ CFLAGS		+= -isystem ../utils -isystem .
 YFLAGS		= -dv
 LIBS		= $(.TARGET:H)/$(LIBPREFIX)utils.$(LIBSUFFIX)
 #if !defined(unix)
-LIBS		+= $(.TARGET:H)/$(LIBPREFIX)compat.$(LIBSUFFIX) \
-		   $(.TARGET:H)/$(LIBPREFIX)utils.$(LIBSUFFIX)
+win32LIBS	= $(.TARGET:H)/compat.lib \
+		   $(.TARGET:H)/utils.lib
+linuxLIBS	= $(.TARGET:H)/libcompat.a \
+		   $(.TARGET:H)/libutils.a
 #endif
 
 .PATH.h		:  #clear for now
@@ -51,8 +53,10 @@ LIBS		+= $(.TARGET:H)/$(LIBPREFIX)compat.$(LIBSUFFIX) \
 .PATH.goh	:
 .PATH.goh	: . $(INSTALL_DIR)
 
-.SUFFIXES	   : .$(LIBSUFFIX)
-.PATH.$(LIBSUFFIX) : ../utils $(INSTALL_DIR:H)/utils \
+.SUFFIXES	   : .a .lib
+.PATH.a : ../utils $(INSTALL_DIR:H)/utils \
+		     ../compat $(INSTALL_DIR:H)/compat
+.PATH.lib : ../utils $(INSTALL_DIR:H)/utils \
 		     ../compat $(INSTALL_DIR:H)/compat
 
 #include    <$(SYSMAKEFILE)>

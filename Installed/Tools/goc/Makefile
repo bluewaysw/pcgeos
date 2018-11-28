@@ -34,18 +34,14 @@
 #include	<geos.mk>
 #include	<gpath.mk>
 
-MACHINES	=  sparc win32
+MACHINES	= linux win32
 MAKEFILE	= Makefile
 NAME		= goc
 SYSMAKEFILE	= tool.mk
 TYPE		= tool
 
-#if	defined(sun) && defined(sparc)
-DEFTARGET	= sparc
-#elif	defined(sun)
-DEFTARGET	= sun3
-#elif   defined(isi)
-DEFTARGET	= isi
+#if	defined(linux)
+DEFTARGET	= linux
 #else
 DEFTARGET	= win32
 #endif
@@ -55,12 +51,12 @@ MISRCS          = buf.c buf.h cond.c cond.h depends.c depends.h goc.c goc.h\
                   scan.c scan.h semantic.c sprite.h stringt.c stringt.h\
                   strwid.c strwid.h symbol.c symbol.h
 
-sparcSRCS       = $(MISRCS) sparc.md/
-sparcOBJS       = sparc.md/buf.o sparc.md/cond.o sparc.md/depends.o\
-                  sparc.md/goc.o sparc.md/map.o sparc.md/output.o\
-                  sparc.md/parse.o sparc.md/scan.o sparc.md/semantic.o\
-                  sparc.md/stringt.o sparc.md/strwid.o sparc.md/symbol.o
-sparcLIBS       =
+linuxSRCS       = $(MISRCS) linux.md/
+linuxOBJS       = linux.md/buf.o linux.md/cond.o linux.md/depends.o\
+                  linux.md/goc.o linux.md/map.o linux.md/output.o\
+                  linux.md/parse.o linux.md/scan.o linux.md/semantic.o\
+                  linux.md/stringt.o linux.md/strwid.o linux.md/symbol.o
+linuxLIBS       =
 
 win32SRCS       = $(MISRCS) win32.md/
 win32OBJS       = win32.md/buf.obj win32.md/cond.obj win32.md/depends.obj\
@@ -71,7 +67,7 @@ win32OBJS       = win32.md/buf.obj win32.md/cond.obj win32.md/depends.obj\
 win32LIBS       =
 
 
-SUBDIRS         = CVS dos win
+SUBDIRS         = 
 
 #if exists(local.mk)
 #include	"local.mk"
@@ -79,8 +75,8 @@ SUBDIRS         = CVS dos win
 #include	<$(SYSMAKEFILE)>
 #endif
 
-#if	exists(sparc.md/dependencies.mk)
-#include	"sparc.md/dependencies.mk"
+#if	exists(linux.md/dependencies.mk)
+#include	"linux.md/dependencies.mk"
 #endif
 
 #if	exists(win32.md/dependencies.mk)

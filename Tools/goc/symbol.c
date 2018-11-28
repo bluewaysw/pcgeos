@@ -171,7 +171,13 @@ Symbol_OutputProtoMinorRelocations(char *inFileName)
      *  Switch code segments so we can discard it in the linker
      */
 #ifdef _WIN32
-    cp = WinUtil_LastPathSep(truncatedInFileName);
+    cp = (char *) strrchr(truncatedInFileName, '/');
+    {
+	char* cp2 = (char*)  strrchr(truncatedInFileName, '\\');
+	if( (cp == NULL) || (( cp2 != NULL) && ( cp2 < cp ))) {
+		cp = cp2;
+	}
+    }
 #else
     cp = (char *) strrchr(truncatedInFileName,
 #if defined(_LINUX)
