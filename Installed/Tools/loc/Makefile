@@ -34,34 +34,30 @@
 #include	<geos.mk>
 #include	<gpath.mk>
 
-MACHINES	=  sparc win32
+MACHINES	= linux win32
 MAKEFILE	= Makefile
 NAME		= loc
 SYSMAKEFILE	= tool.mk
 TYPE		= tool
 
-#if	defined(sun) && defined(sparc)
-DEFTARGET	= sparc
-#elif	defined(sun)
-DEFTARGET	= sun3
-#elif   defined(isi)
-DEFTARGET	= isi
+#if	defined(linux)
+DEFTARGET	= linux
 #else
 DEFTARGET	= win32
 #endif
 
 MISRCS          = parse.c parse.h parse.y
 
-sparcSRCS       = $(MISRCS) sparc.md/
-sparcOBJS       = sparc.md/parse.o
-sparcLIBS       =
+linuxSRCS       = $(MISRCS) linux.md/
+linuxOBJS       = linux.md/parse.o
+linuxLIBS       =
 
 win32SRCS       = $(MISRCS) win32.md/
 win32OBJS       = win32.md/parse.obj
 win32LIBS       =
 
 
-SUBDIRS         = CVS
+SUBDIRS         = 
 
 #if exists(local.mk)
 #include	"local.mk"
@@ -69,8 +65,8 @@ SUBDIRS         = CVS
 #include	<$(SYSMAKEFILE)>
 #endif
 
-#if	exists(sparc.md/dependencies.mk)
-#include	"sparc.md/dependencies.mk"
+#if	exists(linux.md/dependencies.mk)
+#include	"linux.md/dependencies.mk"
 #endif
 
 #if	exists(win32.md/dependencies.mk)

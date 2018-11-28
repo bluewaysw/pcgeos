@@ -29,9 +29,12 @@ CFLAGS		= -DYYDEBUG=1 -DLEXDEBUG=1
 LIBS		= $(.TARGET:H)/libutils.a
 .PATH.a		: ../utils $(INSTALL_DIR:H)/utils
 #else
-LIBS            = $(.TARGET:H)/utils.lib $(.TARGET:H)/compat.lib
-.SUFFIXES       : .lib
+win32LIBS            = $(.TARGET:H)/utils.lib $(.TARGET:H)/compat.lib
+linuxLIBS            = $(.TARGET:H)/libutils.a $(.TARGET:H)/libcompat.a
+.SUFFIXES       : .lib .a
 .PATH.lib	: ../compat $(INSTALL_DIR:H)/compat \
+		  ../utils $(INSTALL_DIR:H)/utils
+.PATH.a		: ../compat $(INSTALL_DIR:H)/compat \
 		  ../utils $(INSTALL_DIR:H)/utils
 #endif
 YFLAGS		= -dv

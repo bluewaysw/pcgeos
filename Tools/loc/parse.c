@@ -399,7 +399,7 @@ static const short yycheck[] = {     0,
 #ifdef __GNUC__
 #define alloca __builtin_alloca
 #else /* not GNU C.  */
-#if (!defined (__STDC__) && defined (sparc)) || defined (__sparc__)
+#if (!defined (__STDC__) && defined (sparc)) || defined (__sparc__) || defined(__WATCOMC__)
 #include <alloca.h>
 #else /* not sparc */
 #if defined (MSDOS) && !defined (__TURBOC__)
