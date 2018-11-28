@@ -90,13 +90,14 @@ The linker places the protocol and revision number in several places:
 #include <compat/string.h>
 #include <time.h>
 
-//#if defined _MSC_VER
+#if defined _MSC_VER
 #    include <io.h>             /* for mktemp() */
 #include <unistd.h>
-//#define mktemp _mktemp
-//#else
+#define mktemp _mktemp
+#else
 //#    include <dir.h>		/* for mktemp() */
-//#endif /* defined _MSC_VER */
+#include <unistd.h>
+#endif /* defined _MSC_VER */
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN

@@ -1,8 +1,10 @@
 
 #ifndef unix
-.SUFFIXES	: .lib
-LIBS		= $(.TARGET:H)/compat.lib
+.SUFFIXES	: .lib .a
+win32LIBS		= $(.TARGET:H)/compat.lib
+linuxLIBS		= $(.TARGET:H)/libcompat.a
 .PATH.lib	: ../compat $(INSTALL_DIR:H)/compat
+.PATH.a		: ../compat $(INSTALL_DIR:H)/compat
 #endif
 
 #include <$(SYSMAKEFILE)>
