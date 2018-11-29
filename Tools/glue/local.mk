@@ -28,9 +28,12 @@ CFLAGS		+= -fstrength-reduce -fcombine-regs \
 LIBS		= $(.TARGET:H)/libutils.a
 .PATH.a		: ../utils $(INSTALL_DIR:H)/utils
 #else
-LIBS		= $(.TARGET:H)/utils.lib  $(.TARGET:H)/compat.lib
-.SUFFIXES	: .lib
+win32LIBS	= $(.TARGET:H)/utils.lib  $(.TARGET:H)/compat.lib
+linuxLIBS	= $(.TARGET:H)/libutils.a  $(.TARGET:H)/libcompat.a
+.SUFFIXES	: .lib .a
 .PATH.lib	: ../utils $(INSTALL_DIR:H)/utils \
+		  ../compat $(INSTALL_DIR:H)/compat
+.PATH.a		: ../utils $(INSTALL_DIR:H)/utils \
 		  ../compat $(INSTALL_DIR:H)/compat
 #endif
 
@@ -46,8 +49,8 @@ LIBS		= $(.TARGET:H)/utils.lib  $(.TARGET:H)/compat.lib
 #XLINKFLAGS = -link -DEFAULTLIB:kernel32.lib
 #include    <$(SYSMAKEFILE)>
 
-TABLES		= tokens.h segattrs.h
-$(MACHINES:S|$|.md/parse.o|g): $(TABLES)
+#TABLES		= tokens.h segattrs.h
+#$(MACHINES:S|$|.md/parse.o|g): $(TABLES)
 
 #
 # Initial values arrived at empirically -- best values < $(MAX)
@@ -59,19 +62,19 @@ GPFLAGS		= -agSDptlC
 
 MAX		= 20
 # -i1 gives 58
-tokens.h	: tokens.gperf
-	$(GPERF) -i1 -o -j1 $(GPFLAGS) -k1-3 $(.ALLSRC) > $@
+#tokens.h	: tokens.gperf
+#	$(GPERF) -i1 -o -j1 $(GPFLAGS) -k1-3 $(.ALLSRC) > $@
 tokens.opt	::
 	MAX=$(MAX) opt -o -j1 $(GPFLAGS) -k1-3 tokens.gperf
 
 # -i16 gives 14
-segattrs.h	: segattrs.gperf
-	$(GPERF) -i16 -o -j1 $(GPFLAGS) -N findSegAttr -H hashSegAttr $(.ALLSRC) > $@
+#segattrs.h	: segattrs.gperf
+#	$(GPERF) -i16 -o -j1 $(GPFLAGS) -N findSegAttr -H hashSegAttr $(.ALLSRC) > $@
 segattrs.opt	::
 	MAX=$(MAX) opt -o -j1 $(GPFLAGS) segattrs.gperf
 
 
-allopt		: $(TABLES:S/.h$/.opt/g)
+#allopt		: $(TABLES:S/.h$/.opt/g)
 
 #if defined(unix)
 CFLAGS		:= $(CFLAGS:N-finline-functions)

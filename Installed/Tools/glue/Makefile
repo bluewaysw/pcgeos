@@ -34,18 +34,14 @@
 #include	<geos.mk>
 #include	<gpath.mk>
 
-MACHINES	=  sparc win32
+MACHINES	= linux win32
 MAKEFILE	= Makefile
 NAME		= glue
 SYSMAKEFILE	= tool.mk
 TYPE		= tool
 
-#if	defined(sun) && defined(sparc)
-DEFTARGET	= sparc
-#elif	defined(sun)
-DEFTARGET	= sun3
-#elif   defined(isi)
-DEFTARGET	= isi
+#if	defined(linux)
+DEFTARGET	= linux
 #else
 DEFTARGET	= win32
 #endif
@@ -56,18 +52,18 @@ MISRCS          = borland.c borland.h codeview.c codeview.h com.c cv.h\
                   output.c output.h parse.c parse.h parse.y pass1ms.c\
                   pass1vm.c pass2ms.c pass2vm.c segattrs.h segment.c sym.c\
                   sym.h tokens.h vector.c vector.h vm.c codeview32.c\
-									codeview32.h
+                  codeview32.h
 
-sparcSRCS       = $(MISRCS) sparc.md/
-sparcOBJS       = sparc.md/borland.o sparc.md/codeview.o sparc.md/com.o\
-                  sparc.md/exe.o sparc.md/font.o sparc.md/geo.o\
-                  sparc.md/kernel.o sparc.md/library.o sparc.md/main.o\
-                  sparc.md/msl.o sparc.md/msobj.o sparc.md/obj.o\
-                  sparc.md/output.o sparc.md/parse.o sparc.md/pass1ms.o\
-                  sparc.md/pass1vm.o sparc.md/pass2ms.o sparc.md/pass2vm.o\
-                  sparc.md/segment.o sparc.md/sym.o sparc.md/vector.o\
-                  sparc.md/vm.o sparc.md/codeview32.o
-sparcLIBS       =
+linuxSRCS       = $(MISRCS) linux.md/
+linuxOBJS       = linux.md/borland.o linux.md/codeview.o linux.md/com.o\
+                  linux.md/exe.o linux.md/font.o linux.md/geo.o\
+                  linux.md/kernel.o linux.md/library.o linux.md/main.o\
+                  linux.md/msl.o linux.md/msobj.o linux.md/obj.o\
+                  linux.md/output.o linux.md/parse.o linux.md/pass1ms.o\
+                  linux.md/pass1vm.o linux.md/pass2ms.o linux.md/pass2vm.o\
+                  linux.md/segment.o linux.md/sym.o linux.md/vector.o\
+                  linux.md/vm.o linux.md/codeview32.o
+linuxLIBS       =
 
 win32SRCS       = $(MISRCS) win32.md/
 win32OBJS       = win32.md/borland.obj win32.md/codeview.obj\
@@ -82,7 +78,7 @@ win32OBJS       = win32.md/borland.obj win32.md/codeview.obj\
 win32LIBS       =
 
 
-SUBDIRS         = CVS dos win
+SUBDIRS         = 
 
 #if exists(local.mk)
 #include	"local.mk"
@@ -90,8 +86,8 @@ SUBDIRS         = CVS dos win
 #include	<$(SYSMAKEFILE)>
 #endif
 
-#if	exists(sparc.md/dependencies.mk)
-#include	"sparc.md/dependencies.mk"
+#if	exists(linux.md/dependencies.mk)
+#include	"linux.md/dependencies.mk"
 #endif
 
 #if	exists(win32.md/dependencies.mk)
