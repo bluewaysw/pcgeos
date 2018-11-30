@@ -6,12 +6,15 @@
 		  ../../include $(INSTALL_DIR:H)/include
 
 #ifndef unix
-.SUFFIXES	: .lib
-LIBS		= $(.TARGET:H)/compat.lib $(.TARGET:H)/lst.lib \
-		  $(.TARGET:H)/sprite.lib 
+.SUFFIXES	: .lib .a
+win32LIBS		= $(.TARGET:H)/compat.lib lst.lib sprite.lib 
+linuxLIBS		= $(.TARGET:H)/libcompat.a liblst.a libsprite.a 
 .PATH.lib	: ../../compat $(INSTALL_DIR:H)/compat \
-		  ../../pmake/lib/sprite $(INSTALL_DIR:H)/pmake/lib/sprite \
-		  ../../pmake/lib/lst $(INSTALL_DIR:H)/pmake/lib/lst
+		  ../../pmake/lib/sprite $(INSTALL_DIR:H:H)/pmake/lib/sprite \
+		  ../../pmake/lib/lst $(INSTALL_DIR:H:H)/pmake/lib/lst
+.PATH.a		: ../../compat $(INSTALL_DIR:H)/compat \
+		  ../../pmake/lib/sprite $(INSTALL_DIR:H:H)/pmake/lib/sprite \
+		  ../../pmake/lib/lst $(INSTALL_DIR:H:H)/pmake/lib/lst
 #endif
 
 
