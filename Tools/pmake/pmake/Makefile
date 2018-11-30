@@ -26,7 +26,7 @@ liblst.so:	.procedure
 !else
 		cd ..\lib\lst
 !endif
-		wmake liblst.so all
+		wmake liblst.a all
 !ifdef __LINUX__
 		cd ../../pmake
 !else
@@ -52,7 +52,7 @@ libsprite.so:	.procedure
 !else
 		cd ..\lib\sprite
 !endif
-		wmake libsprite.so all
+		wmake libsprite.a all
 !ifdef __LINUX__
 		cd ../../pmake
 !else
@@ -70,15 +70,15 @@ pmake.exe: $(obj_files) sprite.lib lst.lib
 		  wlink  @pmake.lnk
 
 pmake.e: $(o_files)
-  %write pmake.lnk NAME   $@
+	%write pmake.lnk NAME   $@
 	%write pmake.lnk FORMAT ELF
-  %write pmake.lnk libfile ../lib/sprite/libsprite.so
-  %write pmake.lnk libfile ../lib/lst/liblst.so
+	%write pmake.lnk libfile ../lib/sprite/libsprite.a
+	%write pmake.lnk libfile ../lib/lst/liblst.a
 	%write pmake.lnk library $(%WATCOM)/lib386/linux/clib3r.lib
 	%write pmake.lnk library $(%WATCOM)/lib386/linux/emu387.lib
 	%write pmake.lnk library $(%WATCOM)/lib386/math387r.lib
-  %write pmake.lnk FILE   {$(o_files)}
-  wlink  @pmake.lnk
+	%write pmake.lnk FILE   {$(o_files)}
+	wlink  @pmake.lnk
 
 install: pmake.exe pmake.e .procedure
 !ifdef __LINUX__

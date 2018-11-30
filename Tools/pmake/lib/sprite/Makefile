@@ -9,8 +9,8 @@ o_files = buf.o getopt.o hash.o list.o option.o strtod.o strtol.o sys.o
 sprite.lib: $(obj_files)
   wlib $@ +buf.obj +getopt.obj +hash.obj +list.obj +option.obj +strtod.obj +strtol.obj +sys.obj
 
-libsprite.so: $(o_files)
+libsprite.a: $(o_files)
 	wlib $@ +buf.o +getopt.o +hash.o +list.o +option.o +strtod.o +strtol.o +sys.o
 
-all: sprite.lib libsprite.so
+all: sprite.lib libsprite.a
 	

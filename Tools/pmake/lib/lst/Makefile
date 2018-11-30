@@ -9,7 +9,7 @@ o_files = lstAppnd.o lstAtEnd.o lstAtFnt.o lstCat.o lstClose.o lstCur.o lstDatum
 lst.lib: $(obj_files)
   wlib $@ +lstAppnd.obj +lstAtEnd.obj +lstAtFnt.obj +lstCat.obj +lstClose.obj +lstCur.obj +lstDatum.obj +lstDeQ.obj +lstDest.obj +lstDupl.obj +lstEnQ.obj +lstFake.obj +lstFind.obj +lstFindF.obj +lstFirst.obj +lstForE.obj +lstForEF.obj +lstIndex.obj +lstInit.obj +lstIns.obj +lstIsEnd.obj +lstIsMT.obj +lstLast.obj +lstLnth.obj +lstMembr.obj +lstMove.obj +lstNext.obj +lstOpen.obj +lstPred.obj +lstPrev.obj +lstRem.obj +lstRepl.obj +lstSetC.obj +lstSucc.obj
 
-liblst.so: $(o_files)
+liblst.a: $(o_files)
 	 wlib $@ +lstAppnd.o +lstAtEnd.o +lstAtFnt.o +lstCat.o +lstClose.o +lstCur.o +lstDatum.o +lstDeQ.o +lstDest.o +lstDupl.o +lstEnQ.o +lstFake.o +lstFind.o +lstFindF.o +lstFirst.o +lstForE.o +lstForEF.o +lstIndex.o +lstInit.o +lstIns.o +lstIsEnd.o +lstIsMT.o +lstLast.o +lstLnth.o +lstMembr.o +lstMove.o +lstNext.o +lstOpen.o +lstPred.o +lstPrev.o +lstRem.o +lstRepl.o +lstSetC.o +lstSucc.o
 
-all:	liblst.so lst.lib
+all:	liblst.a lst.lib
