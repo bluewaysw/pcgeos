@@ -43,8 +43,11 @@ typedef unsigned char U_CHAR;
 
 #include <compat/file.h>
 #include <compat/string.h>
-#include <stdlib.h>		/* okay, 'cuz no utils */
+#include <compat/stdlib.h>
+//#include <stdlib.h>		/* okay, 'cuz no utils */
 #include <time.h>		/* for __DATE__ and __TIME__ */
+
+#include "fileargs.h"
 
 /* External declarations.  */
 
@@ -497,9 +500,9 @@ main (argc, argv)
   char *in_fname, *out_fname;
   int f, i;
   FILE_BUF *fp;
-  char **pend_files = (char **) xmalloc (argc * sizeof (char *));
-  char **pend_defs = (char **) xmalloc (argc * sizeof (char *));
-  char **pend_undefs = (char **) xmalloc (argc * sizeof (char *));
+  char **pend_files;
+  char **pend_defs;
+  char **pend_undefs;
   int inhibit_predefs = 0;
   const int no_standard_includes = 1; /* this is always true for uicpp */
 
@@ -515,7 +518,17 @@ main (argc, argv)
   char dummy[5];		/* needed to ensure alloca doesn't die */
   dummy[0] = 0;
 #endif
+  progname = argv[0];
+  
+  if ((argc == 2) && HAS_ARGS_FILE(argv))
+  {
+    GetFileArgs(ARGS_FILE(argv), &argc, &argv);
+  }
+  pend_files = (char **) xmalloc (argc * sizeof (char *));
+  pend_defs = (char **) xmalloc (argc * sizeof (char *));
+  pend_undefs = (char **) xmalloc (argc * sizeof (char *));
 
+  
 #ifdef RLIMIT_STACK
   /* Get rid of any avoidable limit on stack size.  */
   {
@@ -529,14 +542,14 @@ main (argc, argv)
   }
 #endif /* RLIMIT_STACK defined */
 
-  progname = argv[0];
+  
 #ifdef VMS
   {
     /* Remove directories from PROGNAME.  */
     char *s;
     extern char *rindex ();
 
-    progname = savestring (argv[0]);
+    progname = savestring (progname);
 
     if (!(s = rindex (progname, ']')))
       s = rindex (progname, ':');
@@ -761,7 +774,6 @@ main (argc, argv)
       }
     }
   }
-
   /* Now that dollars_in_ident is known, initialize is_idchar.  */
   initialize_char_syntax ();
 
@@ -2632,7 +2644,9 @@ get_filename:
 
       /* For -M, add this file to the dependencies.  */
       if (print_deps > (system_header_p || (system_include_depth > 0))) {
-	deps_output (fname, strlen (fname));
+      deps_output (fbeg, fend - fbeg);
+	  //deps_output (" ", 0);	
+	  //deps_output (fname, strlen (fname));
 	deps_output (" ", 0);
       }
     }
@@ -3783,7 +3797,7 @@ skip_if_group (ip, any)
 
 	    temp = if_stack;
 	    if_stack = if_stack->next;
-	    free (temp);
+	    free ((char*) temp);
 	    break;
 	  }
 	  break;
@@ -3857,7 +3871,7 @@ do_endif (buf, limit, op, keyword)
   else {
     IF_STACK_FRAME *temp = if_stack;
     if_stack = if_stack->next;
-    free (temp);
+    free ((char*) temp);
     output_line_command (&instack[indepth], op, 1, same_file);
   }
 }
@@ -5038,7 +5052,7 @@ delete_macro (hp)
     free (d);
   }
 #endif
-  free (hp);
+  free ((char*) hp);
 }
 
 /*
