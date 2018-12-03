@@ -520,7 +520,7 @@ GEODES := $(GEODE)GCM.$(GSUFF) $(GEODES)
 #endif
 
 
-#if !empty(SRCS:M*.GOC)
+#if !empty(SRCS:M*.GOC) || !empty(SRCS:M*.goc) 
 GOCDEPENDS      = GOC GOC $(GOC) -M $(GOCFLAGS) ENDFLAGS
 #else
 GOCDEPENDS	?=
@@ -530,13 +530,13 @@ GOCDEPENDS	?=
 ## The asmflags are needed because cpp is used to do dependencies
 ## for .ui files (thus needing to be able to find the .uih files
 ## in CInclude).
-COMPILER_DEPENDS       = CPP BORLAND $(CPP) $(CCOMFLAGS) $(ASMFLAGS:M-I*)
+COMPILER_DEPENDS       = CPP BORLAND $(CPP) $(CCOMFLAGS:M-I*) $(CCOMFLAGS:M-i=*) $(CCOMFLAGS:M-D*) $(ASMFLAGS:M-I*)
 #endif
 
-#if !empty(SRCS:M*.C) || !empty(SRCS:M*.GOC) || (defined(UI_TO_RDFS) && !empty(UI_TO_RDFS))
+#if !empty(SRCS:M*.C) || !empty(SRCS:M*.GOC) || !empty(SRCS:M*.c) || !empty(SRCS:M*.goc) ||  (defined(UI_TO_RDFS) && !empty(UI_TO_RDFS))
 ## Remove -ml and -dc because cpp32 can't handle it, and it doesn't make
 ## any difference as far as generating dependencies goes.
-CDEPENDS        = $(COMPILER_DEPENDS:N-[md]?) ENDFLAGS
+CDEPENDS        = $(COMPILER_DEPENDS:N-[md]?:S/\\/\//g:S/-i=/-I/g) ENDFLAGS
 #else
 CDEPENDS	?=
 #endif
@@ -566,7 +566,8 @@ MODULES =
 ## directories that are longer than 8.3 (e.g.,
 ## -Is:\pcgeos\LongProductName\Include).  cpp.exe from bc45 and earlier
 ## can't handle that...
-CPP	= cpp -pcl 
+CPP	= uicpp -M
+#wcc -pcl 
 #endif
 
 #ifndef ASM_TO_OBJS
@@ -584,11 +585,17 @@ $(DEPFILE) : $(SRCS) $(GPFILE)
 #endif
 ##	-del $(.TARGET:X\\[*\\].*).BAK
 ##	-copy $(.TARGET) $(.TARGET:X\\[*\\].*).BAK
-	$(MAKEDPND) $(ROOT_DIR) $(DEVEL_DIR) $(INSTALL_DIR) -o$(.TARGET:S|DEPENDENCIES.MK|dependencies.mk|) `$(PRODUCT_FLAGS) goc $(PRODUCT)` $(CMODULES) ENDCMODULES $(MODULES) ENDASMMODULES $(GOCDEPENDS) $(CDEPENDS) $(ASMDEPENDS) $(SRCS:M*.GOC) $(SRCS:M*.C) $(UI_TO_RDFS) $(ASM_TO_OBJS) ENDFILES
+	$(MAKEDPND) $(ROOT_DIR) $(DEVEL_DIR) $(INSTALL_DIR) -o$(.TARGET:S|DEPENDENCIES.MK|dependencies.mk|) `$(PRODUCT_FLAGS) goc $(PRODUCT)` $(CMODULES) ENDCMODULES $(MODULES) ENDASMMODULES $(GOCDEPENDS) $(CDEPENDS) $(ASMDEPENDS) $(SRCS:M*.GOC) $(SRCS:M*.goc) $(SRCS:M*.C) $(SRCS:M*.c) $(UI_TO_RDFS) $(ASM_TO_OBJS) ENDFILES
 #if exists($(.ALLSRC:M*.gp))
 	findlbdr $(.ALLSRC:M*.gp) $(.TARGET) $(GEODES)
-#elif exists($(INSTALL_DIR)\$(GEODE).GP)
-	findlbdr $(INSTALL_DIR)\$(GEODE).GP $(.TARGET) $(GEODES)
+#elif exists($(.ALLSRC:M*.GP))
+	findlbdr $(.ALLSRC:M*.GP) $(.TARGET) $(GEODES)
+#elif exists($(INSTALL_DIR)/$(GEODE).GP)
+	findlbdr $(INSTALL_DIR)/$(GEODE).GP $(.TARGET) $(GEODES)
+#elif exists($(INSTALL_DIR)/$(GEODE).gp)
+	findlbdr $(INSTALL_DIR)/$(GEODE).gp $(.TARGET) $(GEODES)
 #elif exists($(GEODE).GP)
 	findlbdr $(GEODE).GP $(.TARGET) $(GEODES)
+#elif exists($(GEODE).gp)
+	findlbdr $(GEODE).gp $(.TARGET) $(GEODES)
 #endif

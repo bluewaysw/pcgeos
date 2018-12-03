@@ -31,18 +31,14 @@
 #include	<geos.mk>
 #include	<gpath.mk>
 
-MACHINES	=  win32
+MACHINES	= linux win32
 MAKEFILE	= Makefile
 NAME		= makedpnd
 SYSMAKEFILE	= tool.mk
 TYPE		= tool
 
-#if	defined(sun) && defined(sparc)
-DEFTARGET	= sparc
-#elif	defined(sun)
-DEFTARGET	= sun3
-#elif   defined(isi)
-DEFTARGET	= isi
+#if	defined(linux)
+DEFTARGET	= linux
 #else
 DEFTARGET	= win32
 #endif
@@ -53,8 +49,11 @@ win32SRCS       = $(MISRCS) win32.md/
 win32OBJS       = win32.md/fileargs.obj win32.md/makedpnd.obj
 win32LIBS       =
 
+linuxSRCS       = $(MISRCS) linux.md/
+linuxOBJS       = linux.md/fileargs.o linux.md/makedpnd.o
+linuxLIBS       =
 
-SUBDIRS         = CVS
+SUBDIRS         = 
 
 #if exists(local.mk)
 #include	"local.mk"
@@ -66,5 +65,8 @@ SUBDIRS         = CVS
 #include	"win32.md/dependencies.mk"
 #endif
 
+#if	exists(linux.md/dependencies.mk)
+#include	"linux.md/dependencies.mk"
+#endif
 
 # Allow mkmf

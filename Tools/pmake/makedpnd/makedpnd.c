@@ -67,8 +67,8 @@
 #    define WIN32_LEAN_AND_MEAN
 #    include <windows.h>
 #    define MAX_PATH_LENGTH (MAX_PATH)
-#elsif defined(_LINUX)
-#    define MAX_PATH_LENGTH (MAX_PATH)
+#elif defined(_LINUX)
+#    define MAX_PATH_LENGTH (PATH_MAX)
 #else /* _MSDOS or unix */
 #    define MAX_PATH_LENGTH 80
 #endif /* defined(_WIN32) */
@@ -111,7 +111,7 @@ static fpos_t	 gocargsfpos;
 static fpos_t	 cargsfpos;
 static fpos_t	 asmargsfpos;
 
-static char	*outfile        = "TMPXXXXXX";
+static char	*outfile        = "         ";
 static int	 cModules       = 0;
 static int	 asmModules     = 0;
 static int	 saveAsmModules = 0;              /* used for finding
@@ -181,16 +181,16 @@ static void
 SigIntHandler (int signo)
 {
     if (gocargsfile != NULL) {
-//	(void) unlink(gocargsfile);
+	(void) unlink(gocargsfile);
     }
     if (cargsfile   != NULL) {
-//	(void) unlink(cargsfile);
+	(void) unlink(cargsfile);
     }
     if (asmargsfile != NULL) {
-//	(void) unlink(asmargsfile);
+	(void) unlink(asmargsfile);
     }
     if (outfile     != NULL) {
-//	(void) unlink(outfile);
+	(void) unlink(outfile);
     }
 
 #if defined(_MSDOS)
@@ -235,7 +235,7 @@ ParseArgs(char **argv, int st, int args, char **command, char *token)
 {
     FILE   *fp;
 #ifdef _LINUX
-		int    fd;
+    int    fd;
 #endif
     char   *argsfile;
     fpos_t *argsfpos;
@@ -259,45 +259,23 @@ ParseArgs(char **argv, int st, int args, char **command, char *token)
      */
     strcpy(argsfile, "TMPXXXXXX");
 #if defined(_LINUX)
-printf("argsfile %s\n", argsfile);
-unlink(argsfile);
-		fd = mkstemp(argsfile);
-		if (fd == -1) {
-			fprintf(stderr, "makedpnd: \"%s\": ", argsfile);
-			perror("");
-			exit(1);
-		}
-		fp = fdopen(fd, "w+t");
-		printf("argsfile2 %s\n", argsfile);
+    fd = mkstemp(argsfile);
+    if (fd == -1) {
+	fprintf(stderr, "makedpnd: \"%s\": ", argsfile);
+	perror("");
+	exit(1);
+    }
+    fp = fdopen(fd, "w+t");
 #else
-  	mktemp(argsfile);
-  	fp = fopen(argsfile, "wt"); /* overwrite, if it happens to exist */
+    mktemp(argsfile);
+    fp = fopen(argsfile, "wt"); /* overwrite, if it happens to exist */
 #endif
-  	if (fp == NULL) {
-			fprintf(stderr, "makedpnd: \"%s\": ", argsfile);
-			perror("");
-			exit(1);
-  	}
-		{
-			ssize_t r;
-			int fno;
-			int MAXSIZE = 0xFFF;
-	    char proclnk[0xFFF];
-	    char filename[0xFFF];
-printf("mktemp %s\n", argsfile);
-fno = fileno(fp);
-sprintf(proclnk, "/proc/self/fd/%d", fno);
-        r = readlink(proclnk, filename, MAXSIZE);
-        if (r < 0)
-        {
-            printf("failed to readlink\n");
-            exit(1);
-        }
-        filename[r] = '\0';
-        printf("fp -> fno -> filename: %p -> %d -> %s\n",
-                fp, fno, filename);
-printf("fileno %d\n", fno);
-}
+    if (fp == NULL) {
+	fprintf(stderr, "makedpnd: \"%s\": ", argsfile);
+	perror("");
+	exit(1);
+    }
+    
     /* start from index args, all the argv elements are arguments
      * to the command, so go until we hit the token
      */
@@ -358,8 +336,8 @@ ApplyCommand(char    **argv,
 #endif
     char     cwd[MAX_PATH_LENGTH];
 #ifdef _LINUX
-		int 		fd;
-		char*		cmdline2 = NULL;
+    int 		fd;
+    char*		cmdline2 = NULL;
 #endif
     FILE    *fp;                                 /* the argument file handle */
     int      accessOk;                           /* int to test for the
@@ -374,16 +352,14 @@ ApplyCommand(char    **argv,
     char    *argsfile;
     Boolean  found              = FALSE;
 
-		printf("filetype: %d\n", filetype);
     switch (filetype) {
 	case FT_ESP:
-	printf("asmargs: %s\n", asmargsfile);
-	    	fp = fopen(asmargsfile, "r+t");
+		fp = fopen(asmargsfile, "r+t");
 		if (fp == NULL) {
 		    fprintf(stderr, "makedpnd: ");
 		    perror(asmargsfile);
 		}
-	    	argsfpos = &asmargsfpos;
+		argsfpos = &asmargsfpos;
 		argsfile = asmargsfile;
 		break;
 
@@ -392,22 +368,22 @@ ApplyCommand(char    **argv,
 	case FT_METAWARE:
 	case FT_MICROSOFT6:
 	case FT_MICROSOFT7:
-	    	fp       = fopen(cargsfile, "r+t");
+		fp = fopen(cargsfile, "r+t");
 		if (fp == NULL) {
 		    fprintf(stderr, "makedpnd: ");
 		    perror(cargsfile);
 		}
-	    	argsfpos = &cargsfpos;
+		argsfpos = &cargsfpos;
 		argsfile = cargsfile;
 		break;
 
 	case FT_GOC:
-	    	fp       = fopen(gocargsfile, "r+t");
+		fp = fopen(gocargsfile, "r+t");
 		if (fp == NULL) {
 		    fprintf(stderr, "makedpnd: ");
 		    perror(gocargsfile);
 		}
-	    	argsfpos = &gocargsfpos;
+		argsfpos = &gocargsfpos;
 		argsfile = gocargsfile;
 		break;
     }
@@ -418,8 +394,7 @@ ApplyCommand(char    **argv,
 	return NULL;
     }
     fseek(fp, *argsfpos, SEEK_SET);
-		ftruncate(fp, *argsfpos);
-
+    
     /*
      * If we are doing a UI file, go through the asm modules
      * until we find the file. Or look through all the C modules
@@ -440,7 +415,7 @@ ApplyCommand(char    **argv,
      */
     memset(fullfilename, ' ', MAX_PATH_LENGTH);
 #ifdef _LINUX
-		if (getcwd(cwd, MAX_PATH_LENGTH) == NULL) {
+    if (getcwd(cwd, MAX_PATH_LENGTH) == NULL) {
 #else
     if (Compat_GetCwd(cwd, MAX_PATH_LENGTH) == NULL) {
 #endif
@@ -464,26 +439,23 @@ ApplyCommand(char    **argv,
 
 	printf("\nSearching for %s in %s ", argv[args], installDir);
 	accessOk = HAS_READ_ACCESS(fullfilename);
-	#ifdef _LINUX
-				if(accessOk) {
+#ifdef _LINUX
+	if(accessOk) {
 
-						struct stat info;
+		struct stat info;
 
-						printf("ffn %s\n", fullfilename);
-						if( stat( fullfilename, &info ) != 0 ) {
-							accessOk = FALSE;
-						}
-						else if( info.st_mode & S_IFDIR ) {
-							accessOk = FALSE;
-						}
-				}
-	#endif
-
+		if( stat( fullfilename, &info ) != 0 ) {
+		    accessOk = FALSE;
+		}
+		else if( info.st_mode & S_IFDIR ) {
+		    accessOk = FALSE;
+		}
+	}
+#endif
     }
 
     /* If the file is not in the current directory look through the
      * module directories for it */
-		 printf("accesOk %d %d\n", accessOk, filetype);
     if (!accessOk && filetype != FT_ESP) {
 	int sm = startModule;
 
@@ -492,18 +464,17 @@ ApplyCommand(char    **argv,
 	    printf("\nSearching for %s in %s ", argv[args], argv[sm]);
 	    accessOk = HAS_READ_ACCESS(fullfilename);
 #ifdef _LINUX
-			if(accessOk) {
+	    if(accessOk) {
 
-					struct stat info;
+		struct stat info;
 
-					printf("ffn %s\n", fullfilename);
-					if( stat( fullfilename, &info ) != 0 ) {
-						accessOk = FALSE;
-					}
-					else if( info.st_mode & S_IFDIR ) {
-						accessOk = FALSE;
-					}
-			}
+		if( stat( fullfilename, &info ) != 0 ) {
+		    accessOk = FALSE;
+		}
+		else if( info.st_mode & S_IFDIR ) {
+		    accessOk = FALSE;
+		}
+	    }
 #endif
 	    if (accessOk) {
 		found = TRUE;
@@ -516,9 +487,7 @@ ApplyCommand(char    **argv,
 	/* if we haven't found the file, and we are in a local development
 	 * tree, then try the installed one
 	 */
-	 printf("found check\n"); fflush(stdout);
 	if (found == FALSE) {
-		printf("found FALSE\n");
 	    sm = startModule;
 	    while (sm > endModule) {
 	    	sprintf(fullfilename, "%s/%s/%s",
@@ -558,20 +527,19 @@ ApplyCommand(char    **argv,
 
 	    printf("\nSearching for %s in %s", argv[args], installDir);
 	    accessOk = HAS_READ_ACCESS(fullfilename);
-			#ifdef _LINUX
-						if(accessOk) {
+#ifdef _LINUX
+	    if(accessOk) {
 
-								struct stat info;
+		struct stat info;
 
-								printf("ffn %s\n", fullfilename);
-								if( stat( fullfilename, &info ) != 0 ) {
-									accessOk = FALSE;
-								}
-								else if( info.st_mode & S_IFDIR ) {
-									accessOk = FALSE;
-								}
-						}
-			#endif
+		if( stat( fullfilename, &info ) != 0 ) {
+		    accessOk = FALSE;
+		}
+		else if( info.st_mode & S_IFDIR ) {
+		    accessOk = FALSE;
+		}
+	    }
+#endif
 	    /*
 	     * try an installed manager file
 	     */
@@ -581,14 +549,14 @@ ApplyCommand(char    **argv,
 			argv[args],
 			argv[args]);
 
-			{
-				int  i= strlen(installDir) + strlen(argv[args]) + 2;
-				int total = i + strlen(argv[args]);
-				while(i< total) {
-					fullfilename[i] = tolower(fullfilename[i]);
-					i++;
-				}
+		{
+			int  i= strlen(installDir) + strlen(argv[args]) + 2;
+			int total = i + strlen(argv[args]);
+			while(i< total) {
+				fullfilename[i] = tolower(fullfilename[i]);
+				i++;
 			}
+		}
 		printf("\nSearching for %sMANAGER.ASM in %s/%s ",
 		       argv[args], installDir, argv[args]);
 		accessOk = HAS_READ_ACCESS(fullfilename);
@@ -643,25 +611,20 @@ ApplyCommand(char    **argv,
 	cp = strrchr(cfilename, '.');
 	strcpy(cp + 1, "cpp");
 	fwrite(cfilename, 1, strlen(cfilename), fp);
-	fputc('\n', fp);
+	fputc(' ', fp);
     }
 
     printf("-- Found it.\n");
     printf(processing_string, fullfilename);
-    fwrite(fullfilename, 1, strlen(fullfilename), fp);
-		fwrite("          ", 1, 10, fp);
-//#ifndef _LINUX
+    fwrite(fullfilename, 1, MAX_PATH_LENGTH, fp);
+    
     if (filetype != FT_MICROSOFT6) {
-#ifndef _LINUX
 	fclose(fp);
-#else
-#endif
 	//cmdline[i++] = ' ';
 	cmdline[i]   = '@';
-	strcpy(cmdline + i + 1, "TMPXXXXXX"/*argsfile*/);
-printf("cmdargs: %s\n", cmdline);
+	strcpy(cmdline + i + 1, argsfile);
     }
-//#endif
+    
     /*
      * we must redirect the ouput to a file since MetaBlam refuses to send
      * the stuff out to a file, therefore we must use system, rather than
@@ -672,7 +635,7 @@ printf("cmdargs: %s\n", cmdline);
 #ifndef _LINUX
         case FT_UI:
 #endif
-        case FT_BORLAND: /* no redirection here */
+        //case FT_BORLAND: /* no redirection here */
 	    break;
 
 	/* now our good friends microblam in there highly advanced and much
@@ -684,10 +647,6 @@ printf("cmdargs: %s\n", cmdline);
 	 * variable, not optimal, but since every other type of file I deal
 	 * with works using the argument file this was easier... */
 	case FT_MICROSOFT6:
-#ifdef _LINUX
-case FT_UI:
-	default:
-#endif
 	{
 	    long fpos;
 	    int	 len;
@@ -702,49 +661,28 @@ case FT_UI:
 	    cl[fpos + len] = '\0';
 	    putenv(cl);
 	    fclose(fp);
-
-			fp = fopen("TMPXXXXXX", "wb");
-			fwrite(cl+len, 1, fpos, fp);
-			fclose(fp);
-
-printf("cl: %s\n", cl+3);
-fflush(stdout);
 	}
-		/* FALLTHRU! */
-#ifndef _LINUX
-	default:
+#ifdef _LINUX
+	case FT_UI:
+	case FT_BORLAND: /* no redirection here */
 #endif
+		/* FALLTHRU! */
+	default:
 	    strcpy(outfile, "TMPXXXXXX");
 #ifdef _LINUX
-{
-	printf("ERROR? %s\n", outfile);
-	outfile[0] = 'T';
-	outfile[1] = 'M';
-	outfile[2] = 'P';
-	outfile[3] = 'X';
-	outfile[4] = 'X';
-	outfile[5] = 'X';
-	outfile[6] = 'X';
-	outfile[7] = 'X';
-	outfile[8] = 'X';
-	outfile[9] = 0;
-	//strcat(outfile, "TMPXXXXXX");
-	printf("ERROR? %s\n", outfile);
-			fd = mkstemp(outfile);
-			if (fd == -1) {
-				printf("ERROR: %s\n", outfile);
-				fprintf(stderr, "makedpnd: ");
-				perror(outfile);
-				outfile[0] = '\0';
+	    fd = mkstemp(outfile);
+	    if (fd == -1) {
+		fprintf(stderr, "makedpnd: ");
+		perror(outfile);
+		outfile[0] = '\0';
 
-				return outfile;
-			}
-			close(fd);
-			fptr = open(outfile, O_CREAT | O_RDWR, S_IREAD | S_IWRITE);
-}
+		return outfile;
+	    }
+	    close(fd);
+	    fptr = open(outfile, O_CREAT | O_RDWR, S_IREAD | S_IWRITE);
 #else
 	    mktemp(outfile);
-      fptr = open(outfile, O_CREAT | O_RDWR, S_IREAD | S_IWRITE);
+	    fptr = open(outfile, O_CREAT | O_RDWR, S_IREAD | S_IWRITE);
 #endif
 	    if (!fptr) {
 		fprintf(stderr, "makedpnd: ");
@@ -753,11 +691,10 @@ fflush(stdout);
 
 		return outfile;
 	    }
-			printf("here\n");
 	    fflush(stdout);
 	    oldstdout = dup(STDOUT);	/* save old STDOUT descriptor */
 	    dup2(fptr, STDOUT);	        /* redirect STDOUT to our file */
-		  close(fptr);
+	    close(fptr);
     }
 
     *cpid = spawnlp(P_WAIT, command, command, /*cl ? cl+3:*/cmdline, NULL);
@@ -770,9 +707,7 @@ fflush(stdout);
 	    break;
 
 	case FT_UI:
-	case FT_BORLAND:
-	    break;
-
+        case FT_BORLAND:
 	case FT_GOC:
 	case FT_ESP:
 	    /* let error go through for makedpnd mode */
@@ -780,9 +715,6 @@ fflush(stdout);
 	    /* FALL THRU */
 	default:
 	    /* if we redirected STDOUT, then fix it back up.... */
-#ifdef _LINUX
-			free(cl);
-#endif
 	    fflush(stdout);
 	    dup2(oldstdout, STDOUT);
 	    close(oldstdout);
@@ -820,19 +752,17 @@ ScanNextWord(FILE *fp, char *buf, int *index)
 
     condenseQuote = 0;
     do {
-			if(*index == BUFSIZE) {
-				int a = 0;
-				while(a < BUFSIZE) {
-					if(buf[a] == 0) {
-						buf[a] = ' ';
-					}
-					a++;
-				}
-
-
-				buf[BUFSIZE-1] = 0,
-				fprintf(stderr, "buf %d %s\n", c, buf);
+	if(*index == BUFSIZE) {
+		int a = 0;
+		while(a < BUFSIZE) {
+			if(buf[a] == 0) {
+				buf[a] = ' ';
 			}
+			a++;
+		}
+
+		buf[BUFSIZE-1] = 0;
+	}
 	assert (*index < BUFSIZE);
 
 	if (c == EOF) {
@@ -1055,7 +985,7 @@ FindRelativePath(char *buf, int *end)
      * See if we can make it relative to the current path.
      */
 #ifdef _LINUX
-		if (getcwd(cwd, MAX_PATH_LENGTH) == NULL) {
+    if (getcwd(cwd, MAX_PATH_LENGTH) == NULL) {
 #else
     if (Compat_GetCwd(cwd, MAX_PATH_LENGTH) == NULL) {
 #endif
@@ -1498,9 +1428,125 @@ cleanup_and_exit:
 
     if (err) {
 	if (cargsfile   != NULL) { unlink(cargsfile);   }
-	if (asmargsfile != NULL) { unlink(asmargsfile); printf("unlink\n"); }
+	if (asmargsfile != NULL) { unlink(asmargsfile); }
 	if (gocargsfile != NULL) { unlink(gocargsfile); }
-	if (outfile     != NULL) { /*unlink(outfile);*/     }
+	if (outfile     != NULL) { unlink(outfile); }
+	exit(err);
+    }
+}
+
+/*********************************************************************
+ *			GetDependsFromCppOutput_Uicpp
+ *********************************************************************
+ * SYNOPSIS: go throught the output of the Processors and get the
+ *	     depenndenncies info they so kindly spit out
+ * CALLED BY:	ProcessFile
+ * RETURN:  nothing
+ * SIDE EFFECTS:    add dependencies from file to DEPENDS_FILE
+ * STRATEGY:	add the beginning of each line is the path and filename
+ *	    	as well as line number info
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	7/24/92		Initial version
+ *
+ *********************************************************************/
+static void
+GetDependsFromCppOutput_Uicpp(FILE *depfile, char *filename)
+{
+    FILE       *fp;
+    signed char        c;
+    char       *buf, *tmpPtr;
+    int	        lineno, i = 0, err = 0, lasti = 0, tempi;
+    Hash_Table	ht;
+    int	        length = LINE_START - 2;
+    int	        stdapp = 0;
+
+    Hash_InitTable(&ht, INIT_BUCKETS, HASH_STRING_KEYS, -1);
+    Malloc(buf, BUFSIZE, char *);    /* input buffer */
+
+    fp = fopen(filename, "rt");
+    if (fp == NULL) {
+	fprintf(stderr, "makedpnd: \"%s\": ", filename);
+	perror("");
+	EXIT(1);
+    }
+
+    /* first get the first line, this is the name of the source file */
+    i = 0;
+    c = ScanNextWord(fp, buf, &i);  /* scan in filename */
+    i = 0;
+    c = ScanNextWord(fp, buf, &i);  /* scan in filename */
+
+
+    lasti = 0;
+    while (1) {
+	i = lasti;
+	c = ScanNextWord(fp, buf, &i);  /* scan in filename */
+	if (c == EOF) {
+	    //fprintf(stderr, "makedpnd: error: bad output file\n");
+	    //EXIT(1);
+	    break;
+	}
+
+	buf[i] = '\0';
+
+	if (strcmp(buf + lasti, "/")) {
+	    char   *suffix;
+
+	    suffix = strrchr(buf + lasti, '.');
+	    if (stricmp(suffix, ".GOH") && stricmp(suffix,".POH")) {
+		FindRelativePath(buf + lasti, &i);
+                if (buf[lasti] && FilterDuplicates(&ht, buf + lasti) != FALSE) {
+		    int	notstdapp;
+
+		    suffix = buf + lasti + strlen(buf + lasti);
+		    while(!IS_PATHSEP(*suffix) && suffix > (buf + lasti)) {
+			suffix--;
+		    }
+
+		    if (suffix > (buf + lasti)) {
+			notstdapp = stricmp(suffix + 1, "STDAPP.H");
+		    } else {
+			notstdapp = stricmp(suffix, "STDAPP.H");
+		    }
+
+		    lasti = WriteStringToDepfile(buf, &length, lasti,
+						 i, depfile);
+
+		    if (notstdapp == 0 && !got_stdapp_h) {
+			stdapp       = 1;
+			got_stdapp_h = 1;
+		    }
+		}
+	    }
+	}
+    }
+
+cleanup_and_exit:
+    if (!err) {
+	fwrite(buf, 1, strlen(buf), depfile);
+	if (stdapp) {
+	    fwrite("\nSTDAPP.H      : ", 1, 17, depfile);
+	    length = LINE_START - 2;
+	    lasti = 0;
+	    if (GetStdappStuff(depfile, 0, &length, &lasti, buf)) {
+		err = 1;
+	    } else {
+		fwrite(buf, 1, strlen(buf), depfile);
+	    }
+	}
+    }
+
+    Hash_DeleteTable(&ht);
+    free(buf);
+    if(fp) fclose(fp);
+
+    if (err) {
+	if (cargsfile   != NULL) { unlink(cargsfile);   }
+	if (asmargsfile != NULL) { unlink(asmargsfile); }
+	if (gocargsfile != NULL) { unlink(gocargsfile); }
+	if (outfile     != NULL) { unlink(outfile); }
 	exit(err);
     }
 }
@@ -1539,11 +1585,11 @@ ProcessFile(FILE     *depfile,   /* DEPENDS_FILE file handle */
      */
     memset(objfile, ' ', MAX_PATH_LENGTH);
     strcpy(objfile, filename);
-    //while(objfile[i] != '.') {
+    while(objfile[i] != '.') {
 	//objfile[i] = (char) toupper(objfile[i]);
-	//i++;
-  //  }
-    //i++;
+	i++;
+    }
+    i++;
 
     switch (filetype) {
 	case FT_ESP:
@@ -1609,7 +1655,6 @@ ProcessFile(FILE     *depfile,   /* DEPENDS_FILE file handle */
     }
 
     outfile = ApplyCommand(argv, args, command, filetype, &cpid);
-		printf("of %s\n", outfile); fflush(stdout);
     if (cpid != 0) {
 	fprintf(stderr, "makedpnd: error running %s\n", command);
 
@@ -1622,25 +1667,10 @@ ProcessFile(FILE     *depfile,   /* DEPENDS_FILE file handle */
 	return 0;
     }
 
-    if (filetype == FT_BORLAND /*|| filetype == FT_UI*/) {
-	char	*cp;
-
-	strcpy(outfile, filename);
-	cp = outfile;
-	while(*cp++ != '.') {
-		;
-	}
-	strcpy(cp, "i");
-} else if(filetype == FT_UI) {
-
-	strcpy(outfile, "outfile.i");
-}
-fprintf(stderr, "of %s\n", outfile); fflush(stderr);
-
     /* now GOC has been run, and so has CPP */
     switch (filetype) {
         case FT_BORLAND:
-	    GetDependsFromCppOutput_Borland(depfile, outfile);
+	    GetDependsFromCppOutput_Uicpp(depfile, outfile);
 	    break;
 
 	case FT_MICROSOFT6:
@@ -1654,19 +1684,19 @@ fprintf(stderr, "of %s\n", outfile); fflush(stderr);
 	    GetDependsFromAsmOutput_Esp(depfile, outfile);
 	    if (cpid != 0)
 	    {
-//		unlink(outfile);
+		unlink(outfile);
 		return 0;	/* error code */
 	    }
 	    break;
 
 	case FT_UI:
-	printf("of %s\n", outfile); fflush(stdout);
 	    //GetDependsFromCppOutput_Borland(depfile, outfile);
+	    GetDependsFromCppOutput_Uicpp(depfile, outfile);
 	    break;
     }
 
     putc('\n', depfile);
-    //(void) unlink(outfile);
+    (void) unlink(outfile);
     return 1;
 }
 
@@ -1792,7 +1822,7 @@ main(int argc, char **argv)
     	fclose(fp);
     	return;
 #endif
-
+printf("TEST\n");fflush(stdout);
     if ((argc == 2) && HAS_ARGS_FILE(argv)) {
 	GetFileArgs(ARGS_FILE(argv), &argc, &argv);
     }
@@ -1990,9 +2020,9 @@ main(int argc, char **argv)
 	    fflush(stdout);
 	    if (!ProcessFile(fp, argv[i], argv, i, cfiletype, ccommand))
 	    {
-                fprintf(stderr, "makedpnd: %s removed\n", dependsFile);
+		fprintf(stderr, "makedpnd: %s removed\n", dependsFile);
 		fclose(fp);
-                (void) unlink(dependsFile);
+		(void) unlink(dependsFile);
 		err = 1;
 		goto cleanup_and_exit;
 	    }
@@ -2028,7 +2058,6 @@ cleanup_and_exit:
     }
     if (asmargsfile != NULL) {
 	(void) unlink(asmargsfile);
-	printf("unlink\n");
     }
     if (gocargsfile != NULL) {
 	(void) unlink(gocargsfile);
