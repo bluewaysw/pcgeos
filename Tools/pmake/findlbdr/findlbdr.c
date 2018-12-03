@@ -96,13 +96,13 @@ ScanForGPDepends(FILE *gp, FILE *depends)
 	     */
 	    cp = buf;
 	    while (!isspace(c) && c != ';' && cp != &buf[sizeof(buf)-1]) {
-		*cp++ = (char) toupper(c);
+		*cp++ = (char) /*toupper*/(c);
 		c     = (char) getc(gp);
 		if (c == EOF) {
 			break;
 		}
 	    }
-	    strcpy(cp, ".LDF ");
+	    strcpy(cp, ".ldf ");
 	    /*
 	     * Since strlen does not count the null, it is not output
 	     * to the file, which is what we want.
