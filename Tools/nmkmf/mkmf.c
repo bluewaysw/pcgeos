@@ -39,12 +39,20 @@ static char *rcsid =
 #  include    <compat/dirent.h>
 #  define     dirent direct
 #  define     strncmpi strnicmp         /* tested with Visual C++ 6.0 */
+#  include    <windows.h>
+#elif defined(_LINUX)
+#  include    <compat/dirent.h>
+#  define     dirent direct
+#  define     strncmpi strnicmp    
+#define MAX_PATH (256)
 #else
 #  include    <dirent.h>
 #endif
 
+#ifndef _LINUX
 #include    <direct.h>
 #include    <io.h>               /* for access() */
+#endif
 #include    <sys/stat.h>
 
 #if defined(_MSDOS)
@@ -2187,13 +2195,13 @@ SpawnPmakeDepend (void)
 
     if (!CreateProcess(NULL, "pmake depend", NULL, NULL, TRUE, 0, NULL,
 		       NULL, &startInfo, &procInfo)) {
-	WinUtil_PrintError("mkmf: Failed to spawn \"pmake depend\"");
+	fprintf(stderr, "mkmf: Failed to spawn \"pmake depend\"");
 	return 1;
     }
 
     switch(WaitForSingleObject(procInfo.hProcess, INFINITE)) {
     case WAIT_FAILED:
-	WinUtil_PrintError("mkmf: Failed to wait for pmake (id %x)",
+	fprintf(stderr, "mkmf: Failed to wait for pmake (id %x)",
 			   procInfo.dwProcessId);
 	exitCode = 1;
 	break;
@@ -2207,7 +2215,7 @@ SpawnPmakeDepend (void)
 
     case WAIT_OBJECT_0:
 	if (!GetExitCodeProcess(procInfo.hProcess, &exitCode)) {
-	    WinUtil_PrintError("mkmf");
+	    fprintf(stderr, "mkmf");
 	    exitCode = 1;
 	}
 	break;

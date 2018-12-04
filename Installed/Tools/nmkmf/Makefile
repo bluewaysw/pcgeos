@@ -57,7 +57,7 @@ win32OBJS       = win32.md/mkmf.obj
 win32LIBS       =
 
 
-SUBDIRS         = CVS
+SUBDIRS         = 
 
 #if exists(local.mk)
 #include	"local.mk"
@@ -65,8 +65,8 @@ SUBDIRS         = CVS
 #include	<$(SYSMAKEFILE)>
 #endif
 
-#if	exists(sparc.md/dependencies.mk)
-#include	"sparc.md/dependencies.mk"
+#if	exists(linux.md/dependencies.mk)
+#include	"linux.md/dependencies.mk"
 #endif
 
 #if	exists(win32.md/dependencies.mk)

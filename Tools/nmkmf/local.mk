@@ -6,12 +6,19 @@
 		  ../pmake/src/lib/include $(INSTALL_DIR:H)/pmake/src/lib/include
 
 #ifndef unix
-.SUFFIXES	: .lib
-LIBS		= $(.TARGET:H)/compat.lib $(.TARGET:H)/lst.lib \
-	 	  $(.TARGET:H)/winutil.lib
+.SUFFIXES	: .lib .a
+win32LIBS		= $(.TARGET:H)/compat.lib lst.lib \
+	 	  $(.TARGET:H)/utils.lib
+linuxLIBS		= $(.TARGET:H)/libcompat.a liblst.a \
+  	 	  $(.TARGET:H)/libutils.a
 .PATH.lib	: ../compat $(INSTALL_DIR:H)/compat \
 		  ../pmake/lib/lst $(INSTALL_DIR:H)/pmake/lib/lst \
-		  ../winutil $(INSTALL_DIR:H)/winutil
+		  ../utils $(INSTALL_DIR:H)/utils \
+		  ../../pmake/lib/lst $(INSTALL_DIR:H:H)/pmake/lib/lst
+.PATH.a		: ../compat $(INSTALL_DIR:H)/compat \
+		  ../pmake/lib/lst $(INSTALL_DIR:H)/pmake/lib/lst \
+		  ../utils $(INSTALL_DIR:H)/utils \
+		  ../../pmake/lib/lst $(INSTALL_DIR:H:H)/pmake/lib/lst
 #endif
 
 
