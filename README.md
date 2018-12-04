@@ -3,6 +3,8 @@ This repository is the offical place to hold all the source codes around the PC/
 interface and its sophisticated applications. It is the source to build SDK and release version of PC/GEOS.
 It is the place to collabare on further developments.
 
+The basement of this repository is the source code used to build Breadbox Ensemble 4.13 reduced by some modules identified as critical in regard to the license choosen for the repository.
+
 # How to build?
 
 ## Install WATCOM
