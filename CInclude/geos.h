@@ -218,7 +218,7 @@ typedef	byte ByteEnum;
 typedef	sword Boolean;
 typedef unsigned int wchar;
 
-#if defined _MSDOS && _MSC_VER
+#if (defined _MSDOS && _MSC_VER) || defined __WATCOMC__
 typedef void __based(void)* ChunkHandle;
 #else
 typedef word ChunkHandle;
