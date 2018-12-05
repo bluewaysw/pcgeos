@@ -583,7 +583,7 @@ CCOM_MODEL	?= -ml
 # s -> no stack checking
 
 CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
-		   	-os -ol -ol+ -hc -s \
+			-os -ol -ol+ -hc -s -ecc \
 		   	$(CCOM_MODEL) \
             $(.INCLUDES:N*/Include*:S/\//\\/g:S/^-I/-i=/g) \
 						-i="$(WATCOM)/h" \
