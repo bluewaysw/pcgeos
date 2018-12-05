@@ -1,0 +1,1251 @@
+/*
+ ***************************************************************************
+ * Copyright (c) 2010-2016 by YoYu-Productions
+ *
+ * PROJECT:     GeoLadder
+ * MODULE:      GOC code file
+ * FILE:        MAIN\VISOBJ.GOC
+ *
+ * AUTHOR:      Andreas Bollhalder
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ *                  INCLUDE FILES
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <Objects/visC.goh>
+
+@include <ladder.goh>
+@include <ui/appui.goh>
+
+#include <ansi/stdio.h>
+#include <ansi/string.h>
+
+
+/*
+ ***************************************************************************
+ *                  LOCAL DECLARATIONS
+ ***************************************************************************
+ */
+
+// Lookup table for level element characters
+static const char LEC[] =
+{
+  LSD_C_BASE, LSD_C_BASE2, LSD_C_LADDER, LSD_C_WALL,
+  LSD_C_EXIT, LSD_C_EMIT, LSD_C_RECV, LSD_C_GOLD,
+  LSD_C_BALL, LSD_C_TRAP
+};
+
+static const char RFN[] = RNKS_F_NAME;
+static const char RPS[] = RNKS_P_SUB;
+static const char RNN[] = RNK_NO_NAME;
+
+static void _pascal DestroyGState(void);
+static void _pascal ClearText(word pos, word len);
+static void _pascal DrawChar(word pos, char character);
+static void _pascal DrawText(word pos, char *text, sword len);
+static void _pascal DrawValue(word pos, word val);
+
+
+/*
+ ***************************************************************************
+ *                  GLOBAL VARIABLES
+ ***************************************************************************
+ */
+
+GStateHandle g_gstateHandle = NullHandle;  // Graphic state
+
+
+/*
+ ***************************************************************************
+ *                  FUNCTIONS
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *                  DestroyGState
+ ***********************************************************************
+ * SYNOPSIS:        Destroy the globale GState.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a valid GStateHandle.
+ *                  2/ Destroy the GState and set the GStateHandle
+ *                     to a NullHandle.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal DestroyGState(void)
+{
+  // Check if the global GState is valid
+  if (g_gstateHandle != NullHandle) {
+    // Destroy the global GState and set it invalid
+    GrDestroyState(g_gstateHandle);
+    g_gstateHandle = NullHandle;
+  }
+}
+
+/***********************************************************************
+ *                  ClearText
+ ***********************************************************************
+ * SYNOPSIS:        Clear the text in the view.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word pos,
+ *                         word len )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a valid GStateHandle.
+ *                  2/ Use the function GrFillRect() to draw a black
+ *                     rectangle into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal ClearText(word pos, word len)
+{
+  sword x, y;
+  // Only draw the changes if we have a valid GState
+  if (g_gstateHandle != NullHandle)
+  {
+    // C trancates a divison of integers
+    // -> ((pos - col) / LVL_COLS) == (pos / LVL_COLS)
+    x = (pos % SCN_COLS) * FNT_WIDTH;
+    y = (pos / SCN_COLS) * FNT_HEIGHT;
+    GrFillRect(g_gstateHandle,
+      x, y,
+      x + len * FNT_WIDTH, y + FNT_HEIGHT + 1);
+  }
+}
+
+/***********************************************************************
+ *                  DrawChar
+ ***********************************************************************
+ * SYNOPSIS:        Draw a character into the view.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word pos,
+ *                         char character )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a valid GStateHandle and the
+ *                     character is not a space.
+ *                  2/ Calculate the x and y position.
+ *                  3/ Use the function GrDrawChar() to draw the
+ *                     character into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal DrawChar(word pos, char character)
+{
+  // Only draw the changes if we have a valid GState
+  if ((g_gstateHandle != NullHandle) && (character != C_SPACE))
+  {
+    // C truncates a divison of integers
+    // -> ((pos - col) / LVL_COLS) == (pos / LVL_COLS)
+    GrDrawChar(g_gstateHandle,
+      (pos % SCN_COLS) * FNT_WIDTH,
+      (pos / SCN_COLS) * FNT_HEIGHT, character);
+  }
+}
+
+/***********************************************************************
+ *                  DrawText
+ ***********************************************************************
+ * SYNOPSIS:        Draw a text into the view.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word pos,
+ *                         char *text,
+ *                         sword len )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Loop trought the text and call DrawChar() for
+ *                     every character to draw it into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static void _pascal DrawText(word pos, char *text, sword len)
+{
+  sword i;
+  for (i = 0; i < len; i++)
+  {
+    DrawChar(pos + i, *(text + i));
+  }
+}
+
+/***********************************************************************
+ *                  DrawValue
+ ***********************************************************************
+ * SYNOPSIS:        Draw a value into the view.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word pos,
+ *                         word val )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Use the C function sprintf() to render the value
+ *                     into the string representation.
+ *                  2/ Call DrawText() to draw the value into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *      boa     2016-01-21    Fixed sprintf formating
+ *
+ ***********************************************************************/
+static void _pascal DrawValue(word pos, word val)
+{
+  static char ldv[5 + 1];
+  sprintf(&ldv, "%5u", val);
+  DrawText(pos, &ldv, sizeof(ldv));
+}
+
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderScreenClass
+ ***************************************************************************
+ */
+
+@classdecl LadderScreenClass;
+
+/***********************************************************************
+ *                  MSG_META_CONTENT_VIEW_WIN_OPENED
+ *                  for LadderScreenClass
+ ***********************************************************************
+ * SYNOPSIS:        Create a new GState when the window of the view has
+ *                  been startet (brought to the screen).
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word viewWidth,
+ *                         word viewHeight,
+ *                         WindowHandle viewWindow )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Create a new GState with the provided
+ *                     WindowHandle and save the GStateHandle in a
+ *                     global variable.
+ *                  2/ Set the defaults for drawing into the view.
+ *                  3/ Call super for default actions.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderScreenClass, MSG_META_CONTENT_VIEW_WIN_OPENED  // 97 Bytes
+{
+  // Initialize the global GState
+  g_gstateHandle = GrCreateState(viewWindow);
+  // Setup default configuration
+  GrSetFont(g_gstateHandle, FNT_TYPE, FNT_SIZE);
+  GrSetTextColor(g_gstateHandle, CF_INDEX, C_LIGHT_GREEN, 0, 0);
+  GrSetAreaColor(g_gstateHandle, CF_INDEX, C_BLACK, 0, 0);
+  // Do super
+  @callsuper();
+}
+
+/***********************************************************************
+ *                  MSG_META_CONTENT_VIEW_WIN_CLOSED
+ *                  for LadderScreenClass
+ ***********************************************************************
+ * SYNOPSIS:        Destroy the GState when the window of the view is
+ *                  finally destroyed.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( WindowHandle viewWindow )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Destroy the GState associated with the global
+ *                     GStateHandle.
+ *                  2/ Call super for default actions.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderScreenClass, MSG_META_CONTENT_VIEW_WIN_CLOSED  // 23 Bytes
+{
+  // Destroy the global GState
+  DestroyGState();
+  // Do super
+  @callsuper();
+}
+
+/***********************************************************************
+ *                  MSG_META_CONTENT_VIEW_CLOSING
+ *                  for LadderScreenClass
+ ***********************************************************************
+ * SYNOPSIS:        Destroy the GState when the window of the view is
+ *                  shut down (taken from the screen).
+ * CALLED BY:       Internal
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Destroy the GState associated with the global
+ *                     GStateHandle.
+ *                  2/ Call super for default actions.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderScreenClass, MSG_META_CONTENT_VIEW_CLOSING  // 20 Bytes
+{
+  // Destroy the global GState
+  DestroyGState();
+  // Do super
+  @callsuper();
+}
+
+/***********************************************************************
+ *                  MSG_VIS_DRAW
+ *                  for LadderScreenClass
+ ***********************************************************************
+ * SYNOPSIS:        Draw our content.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( DrawFlags drawFlags,
+ *                         GStateHandle gstate )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a valid optr.
+ *                  2/ Decode the TString and draw the text into
+ *                     the view.
+ *                  3/ Inform our children to draw them self.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderScreenClass, MSG_VIS_DRAW  // 302 Bytes
+{
+  byte i, cmd, len, *p_data;
+  char c;
+  word n, pos;
+  optr o;
+  o = pself->LSI_screen;
+  // Check if we have valid data
+  if (o != NullOptr)
+  {
+    // Lock and dereference the data
+    MemLock(OptrToHandle(o));
+    p_data = LMemDeref(o);
+    // Initialize the position
+    pos = 0;
+    // Draw the text
+    for (n = 0; n < LMemGetChunkSize(o); n++, p_data++)
+    {
+      // Get the command from current byte
+      cmd = *p_data & TSC_M;
+      // Handle cursor set command
+      if (cmd == TSP_T_SET)
+      {
+        // Get the high bits for the position from the current byte
+        pos = *p_data & TSP_M_HI;
+        pos <<= 8;
+        // Get the low bits for the position from the next byte
+        n++; p_data++;
+        pos |= *p_data;
+        continue;
+      }
+      // Get the length from current byte
+      len = *p_data & LSL_M;
+      // If the length is 0, get the length from next byte
+      if (len == 0)
+      {
+        n++; p_data++;
+        len = *p_data;
+      }
+      // Handle cursor move command
+      if (cmd == TSP_T_MOVE)
+      {
+        pos += len;
+        continue;
+      }
+      // If the command is draw char, get the character from the next byte
+      if (cmd == TSD_T_CHAR)
+      {
+        n++; p_data++;
+        c = *p_data;
+      }
+      // Handle the draw command
+      for (i = 0; i < len; i++, pos++)
+      {
+        // Handle draw text command
+        if (cmd == TSD_T_TEXT)
+        {
+          n++; p_data++;
+          c = *p_data;
+        }
+        DrawChar(pos, c);
+      }
+    }
+    // Unlock the data
+    MemUnlock(OptrToHandle(o));
+    // Inform the childs to draw them self
+    @send @visChildren::MSG_VIS_DRAW(drawFlags, g_gstateHandle);
+  }
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderTextClass
+ ***************************************************************************
+ */
+
+@classdecl LadderTextClass;
+
+
+/***********************************************************************
+ *                  MSG_VIS_DRAW
+ *                  for LadderTextClass
+ ***********************************************************************
+ * SYNOPSIS:        Draw our content.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( DrawFlags drawFlags,
+ *                         GStateHandle gstate )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a valid optr.
+ *                  2/ Draw the text into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderTextClass, MSG_VIS_DRAW  // 84 Bytes
+{
+  optr o;
+  o = pself->LTI_text;
+  // Check if we have valid data
+  if (o != NullOptr)
+  {
+    // Lock and dereference the text
+    MemLock(OptrToHandle(o));
+    // Draw the text
+    DrawText(pself->VI_bounds.R_left, LMemDeref(o), LMemGetChunkSize(o));
+    // Unlock the text
+    MemUnlock(OptrToHandle(o));
+  }
+}
+
+/***********************************************************************
+ *                  MSG_TXT_SET_TEXT, MSG_TXT_UPDATE_TEXT
+ *                  for LadderTextClass
+ ***********************************************************************
+ * SYNOPSIS:        Set our optr and draw our text.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( optr text )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set our value.
+ *                  2/ (b) MSG_TXT_UPDATE_TEXT:
+ *                         Additionally draw our text into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderTextClass, MSG_TXT_SET_TEXT,  // 71 Bytes
+                         MSG_TXT_UPDATE_TEXT
+{
+  // Set the new text
+  pself->LTI_text = text;
+  // Draw the new text if requested
+  if (message == MSG_TXT_UPDATE_TEXT)
+  {
+    // Clear the background
+    ClearText(pself->VI_bounds.R_left, pself->VI_bounds.R_right);
+    // Draw the text
+    @send oself::MSG_VIS_DRAW(0, g_gstateHandle);
+  }
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderValueClass
+ ***************************************************************************
+ */
+
+@classdecl LadderValueClass;
+
+
+/***********************************************************************
+ *                  MSG_VIS_DRAW
+ *                  for LadderValueClass
+ ***********************************************************************
+ * SYNOPSIS:        Draw our content.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( DrawFlags drawFlags,
+ *                         GStateHandle gstate )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a valid optr.
+ *                  2/ Draw the value into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderValueClass, MSG_VIS_DRAW  // 22 Bytes
+{
+  DrawValue(pself->VI_bounds.R_left, pself->LVI_value);
+}
+
+/***********************************************************************
+ *                  MSG_VAL_SET_VALUE, MSG_VAL_UPDATE_VALUE
+ *                  for LadderValueClass
+ ***********************************************************************
+ * SYNOPSIS:        Set our value and draw our value.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word value )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set our value.
+ *                  2/ (b) MSG_VAL_UPDATE_VALUE:
+ *                         Additionally draw our text into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderValueClass, MSG_VAL_SET_VALUE,  // 79 Bytes
+                          MSG_VAL_UPDATE_VALUE
+{
+  // Set the new value
+  pself->LVI_value = value;
+  // Draw the new value if requested
+  if (message == MSG_VAL_UPDATE_VALUE)
+  {
+    // Clear the background
+    ClearText(pself->VI_bounds.R_left + 5 - pself->VI_bounds.R_right, pself->VI_bounds.R_right);
+    // Draw the value
+    @send oself::MSG_VIS_DRAW(0, g_gstateHandle);
+  }
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderRankClass
+ ***************************************************************************
+ */
+
+@classdecl LadderRankClass;
+
+
+/***********************************************************************
+ *                  MSG_VIS_DRAW
+ *                  for LadderRankClass
+ ***********************************************************************
+ * SYNOPSIS:        Draw our content.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( DrawFlags drawFlags,
+ *                         GStateHandle gstate )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Draw the ranking list into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderRankClass, MSG_VIS_DRAW  // 78 Bytes
+{
+  word i, pos;
+  for (i = 0; i < RNKS; i++)
+  {
+    pos = pself->VI_bounds.R_left + i * SCN_COLS;
+    DrawValue(pos, pself->LRI_file.ranks[i].score);
+    DrawText(pos + 9, &pself->LRI_file.ranks[i].name, RNK_NAME_LEN);
+  }
+}
+
+/***********************************************************************
+ *                  MSG_RNK_IS_NEW_RANK
+ *                  for LadderRankClass
+ ***********************************************************************
+ * SYNOPSIS:        Check if we have a new rank.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word score )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ We have a new rank if the provided score is
+ *                     greater then the last one.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderRankClass, MSG_RNK_IS_NEW_RANK  // 28 Bytes
+{
+  return (score > pself->LRI_file.ranks[RNKS - 1].score) ? L_TRUE : L_FALSE;
+}
+
+/***********************************************************************
+ *                  MSG_RNK_LOAD
+ *                  for LadderRankClass
+ ***********************************************************************
+ * SYNOPSIS:        Load the ranking list from the file.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    No error is thrown if the ranking list could not
+ *                  be read to the file.
+ *
+ * STRATEGY:        1/ Open our file.
+ *                  2/ If the file does not exist, initialize the
+ *                     ranking list with default values. Create a
+ *                     new file and save the ranking list into it.
+ *                     If the saving failed, silently return.
+ *                  3/ Else read the ranking list from the file.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderRankClass, MSG_RNK_LOAD  // 203 Bytes
+{
+  // XXX: -> Move to MSG_VIS_OPEN / MSG_META_INITIALIZE ?!?
+  word i, id;
+  FileHandle fh;
+  // Set the identification
+  pself->LRI_file.id = RNKS_V_ID;
+  // Set the working path
+  FileSetCurrentPath(RNKS_P_TOP, &RPS);
+  // Open the ranks file
+  fh = FileOpen(&RFN, FILE_ACCESS_RW | FILE_DENY_RW);
+  // Check if we could open the ranks file ...
+  if (fh == NullHandle)
+  {
+    // ... if not, initialize the ranks structure
+    memset(&pself->LRI_file.ranks, LSD_C_SPACE, sizeof(pself->LRI_file.ranks));
+    // Fill the ranks structure with the default values
+    for (i = 0; i < RNKS; i++)
+    {
+      // Write the rank default score
+      pself->LRI_file.ranks[i].score = PNT_TIME;
+      // Write the rank no name
+      strcpy(pself->LRI_file.ranks[i].name, &RNN);
+    }
+    // Create the file
+    fh = FileCreate(&RFN, (FILE_ACCESS_RW | FILE_DENY_RW), FA_ARCHIVE);
+    // Check if we could create the file ...
+    if (fh == NullHandle)
+    {
+      // ... simply return if not
+      return;
+    }
+    // Write the ranks to the file
+    FileWrite(fh, &pself->LRI_file, sizeof(pself->LRI_file), 0);
+  }
+  else
+  {
+     // Read the id from the file
+    FileRead(fh, &id, sizeof(id), 0);
+    // Check the identification
+    if (id == RNKS_V_ID)
+    {
+      // Read the ranks from the file
+      FileRead(fh, &pself->LRI_file.ranks, sizeof(pself->LRI_file.ranks), 0);
+    }
+  }
+  // Close the ranks file
+  FileClose(fh, 0);
+}
+
+/***********************************************************************
+ *                  MSG_RNK_SAVE_RANK
+ *                  for LadderRankClass
+ ***********************************************************************
+ * SYNOPSIS:        Add a rank our ranking list and save the list into
+ *                  our file.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word score,
+ *                         void *name )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    No error is thrown if the ranking list could not
+ *                  be written to the file.
+ *
+ * STRATEGY:        1/ Find the position for the provided rank.
+ *                  2/ Update the ranking list.
+ *                  3/ Save the ranking list into our file. If saving
+ *                     failed, silently return.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderRankClass, MSG_RNK_SAVE_RANK  // 230 Bytes
+{
+  word i, id, pos;
+  FileHandle fh;
+  // Find the rank position
+  for (pos = 0; pos < RNKS; pos++)
+  {
+    if (score > pself->LRI_file.ranks[pos].score)
+    {
+      break;
+    }
+  }
+  // Update the ranks
+  for (i = RNKS; i > pos; i--)
+  {
+    // Check position
+    if (i > (pos + 1))
+    {
+      // Copy the rank
+      memcpy(&pself->LRI_file.ranks[i - 1], &pself->LRI_file.ranks[i - 2], sizeof(RankEntry));
+    }
+    else
+    {
+      // Update the rank score
+      pself->LRI_file.ranks[i - 1].score = score;
+      // Update the rank name from the input buffer
+      memcpy(&pself->LRI_file.ranks[i - 1].name, name, RNK_NAME_LEN);
+    }
+  }
+  // Set the working path
+  FileSetCurrentPath(RNKS_P_TOP, &RPS);
+  // Open the ranks file
+  fh = FileOpen(&RFN, FILE_ACCESS_RW | FILE_DENY_RW);
+  // Check if we could open the ranks file ...
+  if (fh == NullHandle)
+  {
+    // ... simply return if not
+    return;
+  }
+  // Read the id from the file
+  FileRead(fh, &id, sizeof(id), 0);
+  // Check the identification
+  if (id == RNKS_V_ID)
+  {
+    // Write the ranks to the file
+    FileWrite(fh, &pself->LRI_file.ranks, sizeof(pself->LRI_file.ranks), 0);
+  }
+  // Close the ranks file
+  FileClose(fh, 0);
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderLevelClass
+ ***************************************************************************
+ */
+
+@classdecl LadderLevelClass;
+
+
+/***********************************************************************
+ *                  MSG_VIS_DRAW
+ *                  for LadderLevelClass
+ ***********************************************************************
+ * SYNOPSIS:        Draw our content.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( DrawFlags drawFlags,
+ *                         GStateHandle gstate )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a valid optr.
+ *                  2/ Draw the level into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderLevelClass, MSG_VIS_DRAW  // 80 Bytes
+{
+  optr o;
+  o = pself->LLI_buffer;
+  // Check if we have valid data
+  if (o != NullOptr)
+  {
+    // Lock and dereference the buffer
+    MemLock(OptrToHandle(o));
+    // Draw the text
+    DrawText(0, LMemDeref(o), LMemGetChunkSize(o));
+    // Unlock the buffer
+    MemUnlock(OptrToHandle(o));
+  }
+}
+
+/***********************************************************************
+ *                  MSG_LVL_LOAD_LEVEL
+ *                  for LadderLevelClass
+ ***********************************************************************
+ * SYNOPSIS:        Load our content.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( optr level )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a valid optr.
+ *                  2/ Decode the LString and draw the text into
+ *                     our buffer.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderLevelClass, MSG_LVL_LOAD_LEVEL  // 463 Bytes
+{
+  byte i, cmd, len, *p_data;
+  char c, *p_buffer;
+  word n, dir, pos;
+  optr o;
+  o = pself->LLI_buffer;
+  // Check if we have valid data
+  if (o != NullOptr)
+  {
+    // Lock and dereference the level buffer
+    MemLock(OptrToHandle(o));
+    p_buffer = LMemDeref(o);
+    // Clear the level buffer
+    memset(p_buffer, LSD_C_SPACE, LVL_COLS * (LVL_ROWS - 1));
+    // Draw base line
+    memset(p_buffer + LVL_COLS * (LVL_ROWS - 1), LSD_C_BASE, LVL_COLS);
+    // Lock and dereference the level data
+    MemLock(OptrToHandle(level));
+    p_data = LMemDeref(level);
+    // Initialize the direction and position
+    dir = DIR_E;
+    pos = 0;
+    // Load the level data into the screen buffer
+    for (n = 0; n < LMemGetChunkSize(level); n++, p_data++)
+    {
+      // Get the command from current byte
+      cmd = *p_data & LSC_M;
+      // Handle cursor set commands
+      if ((cmd == LSP_T_SET) || (cmd == LSP_T_SET_AND_DRAW))
+      {
+        // Get the direction
+        dir = ((*p_data & LSO_M) == LSO_T_H) ? DIR_E : DIR_S;
+        // Get the high bits for the position from the current byte
+        pos = *p_data & LSP_M_HI;
+        pos <<= 8;
+        // Get the low bits for the position from the next byte
+        n++; p_data++;
+        pos |= *p_data;
+        // If the command is draw too, draw the next byte
+        if (cmd == LSP_T_SET_AND_DRAW)
+        {
+          n++; p_data++;
+          *(p_buffer + pos) = *p_data;
+          pos += dir;
+        }
+        continue;
+      }
+      // Get the length from current byte
+      len = *p_data & LSL_M;
+      // If the length is 0, get the length from next byte
+      if (len == 0)
+      {
+        n++; p_data++;
+        len = *p_data;
+      }
+      // Handle cursor move command
+      if (cmd == LSP_T_MOVE)
+      {
+        pos += len * dir;
+        continue;
+      }
+      // Handle draw text command
+      if (cmd == LSD_T_TEXT)
+      {
+        for (i = 0; i < len; i++)
+        {
+          p_data++;
+          *(p_buffer + pos) = *p_data;
+          pos += dir;
+        }
+        n += len;
+        continue;
+      }
+      // If the command is draw char, get the character from the next byte
+      if (cmd == LSD_T_CHAR)
+      {
+        n++; p_data++;
+        c = *p_data;
+      }
+      // Else get the character from the static level elements lookup table
+      else
+      {
+        c = LEC[cmd >> 4];
+      }
+      // Handle the draw command
+      for (i = 0; i < len; i++)
+      {
+        *(p_buffer + pos) = c;
+        pos += dir;
+      }
+    }
+    // Unlock the level data
+    MemUnlock(OptrToHandle(level));
+    // Unlock the level buffer
+    MemUnlock(OptrToHandle(o));
+  }
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderActorsClass
+ ***************************************************************************
+ */
+
+@classdecl LadderActorsClass;
+
+
+/***********************************************************************
+ *                  MSG_VIS_DRAW
+ *                  for LadderActorsClass
+ ***********************************************************************
+ * SYNOPSIS:        Draw our content.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( DrawFlags drawFlags,
+ *                         GStateHandle gstate )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a valid optr.
+ *                  2/ Draw the actors into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderActorsClass, MSG_VIS_DRAW  // 66 Bytes
+{
+  word i, pos;
+  // Draw the actors
+  for (i = 0; i < pself->LAI_count; i++)
+  {
+    pos = pself->LAI_actors[i].pos;
+    ClearText(pos, 1);
+    DrawChar(pos, pself->LAI_actors[i].face);
+  }
+}
+
+/***********************************************************************
+ *                  MSG_ACT_DRAW
+ *                  for LadderActorsClass
+ ***********************************************************************
+ * SYNOPSIS:        Force the drawing of our content.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Call MSG_VIS_DRAW of our self.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderActorsClass, MSG_ACT_DRAW  // 30 Bytes
+{
+  @send oself::MSG_VIS_DRAW(0, g_gstateHandle);
+}
+
+/***********************************************************************
+ *                  MSG_ACT_ADD
+ *                  for LadderActorsClass
+ ***********************************************************************
+ * SYNOPSIS:        Add an actor to our list.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word lpos,
+ *                         char lface,
+ *                         word cpos,
+ *                         char cface )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we already have an entry for the
+ *                     provided positions. If we have one for the
+ *                     current position, update the face.
+ *                  2/ Add the entries we did not have.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+#define ACT_ADD_NOT_FOUND 0
+#define ACT_ADD_FOUND 1
+@method LadderActorsClass, MSG_ACT_ADD  // 190 Bytes
+{
+  word i, ce, le, pos;
+  ce = ACT_ADD_NOT_FOUND;
+  le = ACT_ADD_NOT_FOUND;
+  for (i = 0; i < pself->LAI_count; i++)
+  {
+    pos = pself->LAI_actors[i].pos;
+    if (lpos == pos)
+    {
+      le = ACT_ADD_FOUND;
+    }
+    if (cpos == pos)
+    {
+      ce = ACT_ADD_FOUND;
+      pself->LAI_actors[i].face = cface;
+    }
+  }
+  i = pself->LAI_count;
+  if ((lpos != POS_NONE) && (le == ACT_ADD_NOT_FOUND))
+  {
+    pself->LAI_actors[i].pos = lpos;
+    pself->LAI_actors[i].face = lface;
+    i++;
+  }
+  if ((cpos != POS_NONE) && (ce == ACT_ADD_NOT_FOUND))
+  {
+    pself->LAI_actors[i].pos = cpos;
+    pself->LAI_actors[i].face = cface;
+    i++;
+  }
+  pself->LAI_count = i;
+}
+
+/***********************************************************************
+ *                  MSG_ACT_RESET
+ *                  for LadderActorsClass
+ ***********************************************************************
+ * SYNOPSIS:        Reset our count to 0.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set our count to 0.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderActorsClass, MSG_ACT_RESET  // 9 Bytes
+{
+  // Reset the counter
+  pself->LAI_count = 0;
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderInputClass
+ ***************************************************************************
+ */
+
+@classdecl LadderInputClass;
+
+
+/***********************************************************************
+ *                  MSG_VIS_DRAW
+ *                  for LadderInputClass
+ ***********************************************************************
+ * SYNOPSIS:        Draw our content.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( DrawFlags drawFlags,
+ *                         GStateHandle gstate )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Draw the input into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderInputClass, MSG_VIS_DRAW  // 32 Bytes
+{
+  // Draw the text
+  DrawText(pself->VI_bounds.R_left, &pself->LII_text, pself->LII_pos);
+}
+
+/***********************************************************************
+ *                  MSG_INP_ADD_CHAR
+ *                  for LadderInputClass
+ ***********************************************************************
+ * SYNOPSIS:        Add a character to the input.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( char character )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Add the character to our input.
+ *                  2/ Draw the added character into the view.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderInputClass, MSG_INP_ADD_CHAR  // 59 Bytes
+{
+  word pos;
+  pos = pself->LII_pos;
+  // Check for last
+  if (pos < RNK_NAME_LEN)
+  {
+    // Store the character
+    pself->LII_text[pos] = character;
+    DrawChar(pself->VI_bounds.R_left + pself->LII_pos, character);
+    // Increase the position
+    pself->LII_pos++;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_INP_DEL_CHAR, MSG_INP_RESET
+ *                  for LadderInputClass
+ ***********************************************************************
+ * SYNOPSIS:        Delete the last character or reset the input.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we are not at zero position.
+ *                  2/ (a) MSG_INP_DEL_CHAR:
+ *                         Decrease our position and write a space to
+ *                         the last position.
+ *                         Update the view.
+ *                     (b) MSG_INP_RESET:
+ *                         Set our position to zero and fill our input
+ *                         with spaces.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderInputClass, MSG_INP_DEL_CHAR,  // 84 Bytes
+                          MSG_INP_RESET
+{
+  word pos;
+  pos = pself->LII_pos;
+  // Check if we have valid data and do not stay on zero position
+  if (pos != 0)
+  {
+    // Do the rigth thing depending the message
+    switch (message)
+    {
+    case MSG_INP_DEL_CHAR:
+      // Decrease the position
+      pos--;
+      // Delete the text at the current position
+      pself->LII_text[pos] = C_SPACE;
+      // Clear the background
+      ClearText(pself->VI_bounds.R_left + pos, 1);
+      break;
+    case MSG_INP_RESET:
+      // Reset the text
+      memset(&pself->LII_text, C_SPACE, RNK_NAME_LEN);
+      // Reset to position
+      pos = 0;
+//    break;
+    }
+    pself->LII_pos = pos;
+  }
+}
+
+/***********************************************************************
+ *                  MSG_INP_GET_INPUT
+ *                  for LadderInputClass
+ ***********************************************************************
+ * SYNOPSIS:        Copy the input into the provided buffer.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void *buffer )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Simply use memcpy() to copy our content into
+ *                     the provided buffer.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderInputClass, MSG_INP_GET_INPUT  // 28 Bytes
+{
+  memcpy(buffer, &pself->LII_text, RNK_NAME_LEN);
+}
+
+
+/* End of VISOBJ.GOC */

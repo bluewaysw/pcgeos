@@ -1,0 +1,2731 @@
+/*
+ ***************************************************************************
+ * Copyright (c) 2010-2011 by YoYu-Productions
+ *
+ * PROJECT:     GeoLadder
+ * MODULE:      GOC code file
+ * FILE:        UI\APPUI.GOC
+ *
+ * AUTHOR:      Andreas Bollhalder
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ *                  INCLUDE FILES
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+@include <ladder.goh>
+@include <art/appmon.goh>
+
+
+/*
+ ***************************************************************************
+ *                  DEFINITIONS
+ ***************************************************************************
+ */
+
+// Makro to handle text string position
+#define TSPOS(r, c) ((TSP_T_SET) | ((((r) * LVL_COLS + (c)) >> 8) & TSP_M_HI)), (((r) * LVL_COLS + (c)) & TSP_M_LO)
+
+// Makro to handle level string command, direction and position
+#define LSPOS(p, r, c) ((p) | ((((r) * LVL_COLS + (c)) >> 8) & LSP_M_HI)), (((r) * LVL_COLS + (c)) & LSP_M_LO)
+
+
+/*
+ ***************************************************************************
+ *                  RESOURCE Application
+ ***************************************************************************
+ */
+
+@start APPLICATION;
+
+@object LadderApplicationClass LadderApplication = {
+  GI_visMoniker = list {
+    @LadderTextMoniker,
+    @LadderIcon15x15,
+    @LadderIcon48x30
+  }
+  GI_comp = @LadderPrimary;
+  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @LadderPrimary;
+@ifdef I8N_DE
+  ATTR_GEN_HELP_FILE = "GeoLadder Hilfe";
+@endif
+@ifdef I8N_EN
+  ATTR_GEN_HELP_FILE = "GeoLadder Help";
+@endif
+  HINT_APP_IS_ENTERTAINING;
+}
+
+@visMoniker LadderTextMoniker = "GeoLadder";
+
+@end APPLICATION;
+
+
+/*
+ ***************************************************************************
+ *                  RESOURCE Interface
+ ***************************************************************************
+ */
+
+@start INTERFACE;
+
+@object GenPrimaryClass LadderPrimary = {
+  GI_comp = @LadderView;
+  ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE;
+  ATTR_GEN_HELP_CONTEXT = "TOC";
+  HINT_DISPLAY_NOT_RESIZABLE;
+  HINT_PRIMARY_NO_FILE_MENU;
+  HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenViewClass LadderView = {
+  GVI_attrs = @default
+    | GVA_NO_WIN_FRAME
+    | GVA_DONT_SEND_KBD_RELEASES
+    | GVA_DONT_SEND_PTR_EVENTS;
+  GVI_color = { C_BLACK, 0, 0, 0 };
+  // XXX: -> To be corrected after implementation of CP/M font !!!
+  HINT_FIXED_SIZE = { SCN_COLS * FNT_WIDTH, SCN_ROWS * FNT_HEIGHT + 2, 0 };
+}
+
+// Menu
+@object LadderScreenClass LadderMenu = {
+  VCI_comp =
+    @LadderMenuDiff, @LadderMenuSound,
+    @LadderMenuRank,
+    @LadderMenuLastScore,
+    @LadderMenuInfo;
+  LSI_screen = @ScreenMenu;
+}
+
+@ifdef I8N_DE
+@object LadderValueClass LadderMenuDiff = {
+  VI_bounds = {
+    17 + SCN_COLS * 11, 0,
+    1, 0
+  };
+  LVI_value = PLY_DIFF_MIN;
+}
+@endif
+@ifdef I8N_EN
+@object LadderValueClass LadderMenuDiff = {
+  VI_bounds = {
+    15 + SCN_COLS * 11, 0,
+    1, 0
+  };
+  LVI_value = PLY_DIFF_MIN;
+}
+@endif
+
+@ifdef I8N_DE
+@object LadderTextClass LadderMenuSound = {
+  VI_bounds = {
+    21 + SCN_COLS * 12, 0,
+    3, 0
+  };
+  LTI_text = @TextMenuOff;
+}
+@endif
+@ifdef I8N_EN
+@object LadderTextClass LadderMenuSound = {
+  VI_bounds = {
+    19 + SCN_COLS * 12, 0,
+    3, 0
+  };
+  LTI_text = @TextMenuOff;
+}
+@endif
+
+@object LadderRankClass LadderMenuRank = {
+  VI_bounds = {
+    43 + SCN_COLS * 15, 0,
+    0, 0
+  };
+}
+
+@ifdef I8N_DE
+@object LadderValueClass LadderMenuLastScore = {
+  VI_bounds = {
+    55 + SCN_COLS * 21, 0,
+    4, 0
+  };
+  LVI_value = 1;
+}
+@endif
+@ifdef I8N_EN
+@object LadderValueClass LadderMenuLastScore = {
+  VI_bounds = {
+    52 + SCN_COLS * 21, 0,
+    4, 0
+  };
+  LVI_value = 1;
+}
+@endif
+
+@object LadderTextClass LadderMenuInfo = {
+  VI_bounds = {
+    1 + SCN_COLS * (SCN_ROWS - 1), 0,
+    SCN_COLS - 2, 0
+  };
+}
+
+// Instruction
+@object LadderScreenClass LadderHelp = {
+  LSI_screen = @ScreenHelp;
+}
+
+// Load level
+@object LadderScreenClass LadderLoad = {
+  VCI_comp = @LadderLoadRound, @LadderLoadLevel, @LadderLoadName;
+  LSI_screen = @ScreenLoad;
+}
+
+@ifdef I8N_DE
+@object LadderTextClass LadderLoadName = {
+  VI_bounds = {
+    28  + SCN_COLS * 9, 0,
+    21, 0
+  };
+}
+@endif
+@ifdef I8N_EN
+@object LadderTextClass LadderLoadName = {
+  VI_bounds = {
+    28  + SCN_COLS * 9, 0,
+    22, 0
+  };
+}
+@endif
+
+@object LadderValueClass LadderLoadRound = {
+  VI_bounds = {
+    39 + SCN_COLS * 12, 0,
+    2, 0
+  };
+  LVI_value = 1;
+}
+
+@object LadderValueClass LadderLoadLevel = {
+  VI_bounds = {
+    39 + SCN_COLS * 13, 0,
+    1, 0
+  };
+  LVI_value = 1;
+}
+
+// Play
+@object LadderScreenClass LadderPlay = {
+  VCI_comp =
+    @LadderPlayLevel, @LadderPlayActors,
+    @LadderPlayLads, @LadderPlayRound,
+    @LadderPlayScore, @LadderPlayTime,
+    @LadderInfo;
+  LSI_screen = @ScreenPlay;
+}
+
+@object LadderLevelClass LadderPlayLevel = {
+  VI_bounds = {
+    0, 0,
+    SCN_COLS * FNT_WIDTH, LVL_ROWS * FNT_HEIGHT
+  };
+  LLI_buffer = @LevelBuffer;
+}
+
+@object LadderActorsClass LadderPlayActors = {
+  VI_bounds = {
+    0, 0,
+    SCN_COLS * FNT_WIDTH, LVL_ROWS * FNT_HEIGHT
+  };
+  LAI_count = 0;
+/*
+  // XXX: -> Dynamic allocation possible ???
+  LAI_actors[ACTS_MAX] = {
+    { POS_NONE, 0 }
+  };
+*/
+}
+
+@object LadderValueClass LadderPlayLads = {
+  VI_bounds = {
+    5 + SCN_COLS * 20, 0,
+    3, 0
+  };
+  LVI_value = LAD_D_LIVES;
+}
+
+@object LadderValueClass LadderPlayRound = {
+  VI_bounds = {
+    20 + SCN_COLS * 20, 0,
+    2 * FNT_WIDTH, 0
+  };
+  LVI_value = 1;
+}
+
+@ifdef I8N_DE
+@object LadderValueClass LadderPlayScore = {
+  VI_bounds = {
+    37 + SCN_COLS * 20, 0,
+    4, 0
+  };
+  LVI_value = 1;
+}
+@endif
+@ifdef I8N_EN
+@object LadderValueClass LadderPlayScore = {
+  VI_bounds = {
+    36 + SCN_COLS * 20, 0,
+    4, 0
+  };
+  LVI_value = 1;
+}
+@endif
+
+@object LadderValueClass LadderPlayTime = {
+  VI_bounds = {
+    71 + SCN_COLS * 20, 0,
+    2, 0
+  };
+  LVI_value = 32;
+}
+
+// Game end
+@object LadderScreenClass LadderLast = {
+  LSI_screen = @ScreenLast;
+}
+
+// Game over
+@object LadderScreenClass LadderOver = {
+  LSI_screen = @ScreenOver;
+}
+
+// High score
+@object LadderScreenClass LadderHigh = {
+  VCI_comp =
+    @LadderHighComp, @LadderHighName,
+    @LadderInfo;
+  LSI_screen = @ScreenHigh;
+}
+
+@object LadderTextClass LadderHighComp = {
+  VI_bounds = {
+    1 + SCN_COLS * 10, 0,
+    40, 0
+  };
+}
+
+@ifdef I8N_DE
+@object LadderInputClass LadderHighName = {
+  VI_bounds = {
+    23 + SCN_COLS * 12, 0,
+    RNK_NAME_LEN, 0
+  };
+}
+@endif
+@ifdef I8N_EN
+@object LadderInputClass LadderHighName = {
+  VI_bounds = {
+    18 + SCN_COLS * 12, 0,
+    RNK_NAME_LEN, 0
+  };
+}
+@endif
+
+@object LadderTextClass LadderInfo = {
+  VI_bounds = {
+    1 + SCN_COLS * (SCN_ROWS - 2), 0,
+    SCN_COLS - 2, 0
+  };
+}
+
+@end INTERFACE;
+
+
+/*
+ ***************************************************************************
+ *                  RESOURCE Text
+ ***************************************************************************
+ */
+
+@start TEXT, data;
+
+@ifdef I8N_DE
+@chunk byte ScreenMenu[] = {
+  // Title
+  TSPOS(0, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE, 21,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 7,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSPOS(1, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE, 21,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 7,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE, 22,
+  TSD_T_TEXT + 2, 't', 'm', // Text "tm"
+  TSPOS(2, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 4, 'a', // Text "aaaa"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 5, 'd', // Text "ddddd"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 5, 'd', // Text "ddddd"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 4, 'e', // Text "eeee"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 7, 'r', // Text "rrrrrrr"
+  TSPOS(3, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'e', // Text "ee"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'e', // Text "ee"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSPOS(4, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 6, 'e', // Text "eeeeee"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSPOS(5, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'e', // Text "ee"
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSPOS(6, 11),
+  TSD_T_CHAR + 8, 'L', // Text "LLLLLLLL"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'a', // Text "aaa"
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'd', // Text "ddd"
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'd', // Text "ddd"
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 4, 'e', // Text "eeee"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  // Informations
+  TSPOS(8, 1),
+  TSD_T_TEXT, 45,
+    'O', 'r', 'i', 'g', 'i', 'n', 'a', 'l', ' ', 'i', 's', 't', ' ',
+    '(', 'c', ')', ' ', 'i', 'n', ' ', '1', '9', '8', '2', ',', ' ',
+    '1', '9', '8', '3', ' ', 'Y', 'a', 'h', 'o', 'o', ' ',
+    'S', 'o', 'f', 't', 'w', 'a', 'r', 'e',
+  TSPOS(9, 1),
+  TSD_T_TEXT, 52,
+    'A', 'd', 'a', 'p', 't', 'i', 'e', 'r', 't', ' ', 'f', C_LU_DIERESIS, 'r', ' ',
+    'P', 'C', '/', 'G', 'E', 'O', 'S', ' ', 'i', 'n', ' ',
+    '2', '0', '1', '1', ' ', 'v', 'o', 'n', ' ',
+    'A', 'n', 'd', 'r', 'e', 'a', 's', ' ',
+    'B', 'o', 'l', 'l', 'h', 'a', 'l', 'd', 'e', 'r',
+  TSPOS(11, 40),
+  TSD_T_TEXT + 13,
+    'V', 'e', 'r', 's', 'i', 'o', 'n', ' ', ':', ' ', '0', '.', '4',
+  TSPOS(12, 40),
+  TSD_T_TEXT, 17,
+    'T', 'e', 'r', 'm', 'i', 'n', 'a', 'l', ':', ' ',
+    'P', 'C', '/', 'G', 'E', 'O', 'S',
+  TSPOS(11, 1),
+  TSD_T_TEXT, 19,
+    'S', 'c', 'h', 'w', 'i', 'e', 'r', 'i', 'g', 'k', 'e', 'i', 't', 's', 'g', 'r', 'a', 'd', ':',
+  TSPOS(12, 1),
+  TSD_T_TEXT + 10,
+    'T', 'o', 'n', 'a', 'u', 's', 'g', 'a', 'b', 'e',
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 1, ':', // Text ":"
+  // Main menu
+  TSPOS(14, 1),
+  TSD_T_TEXT, 16,
+    'P', ' ', '=', ' ', 'S', 't', 'a', 'r', 't', 'e', ' ',
+    'S', 'p', 'i', 'e', 'l',
+  TSPOS(15, 1),
+  TSD_T_TEXT, 29,
+    'D', ' ', '=', ' ', C_UA_DIERESIS, 'n', 'd', 'e', 'r', 'e', ' ',
+    'S', 'c', 'h', 'w', 'i', 'e', 'r', 'i', 'g', 'k', 'e', 'i', 't', 's', 'g', 'r', 'a', 'd',
+  TSPOS(16, 1),
+  TSD_T_TEXT, 21,
+    'S', ' ', '=', ' ', C_UA_DIERESIS, 'n', 'd', 'e', 'r', 'e', ' ',
+    'T', 'o', 'n', 'a', 'u', 's', 'g', 'a', 'b', 'e',
+  TSPOS(17, 1),
+  TSD_T_TEXT, 23,
+    'I', ' ', '=', ' ', 'Z', 'e', 'i', 'g', 'e', ' ',
+    'I', 'n', 's', 't', 'r', 'u', 'k', 't', 'i', 'o', 'n', 'e', 'n',
+  TSPOS(18, 1),
+  TSD_T_TEXT, 20,
+    'E', ' ', '=', ' ', 'B', 'e', 'e', 'n', 'd', 'e', ' ',
+    'G', 'e', 'o', 'L', 'a', 'd', 'd', 'e', 'r',
+  TSPOS(21, 1),
+  TSD_T_TEXT, 21,
+    'W', C_LA_DIERESIS, 'h', 'l', 'e', ' ', 'e', 'i', 'n', 'e', 's', ' ',
+    'v', 'o', 'n', ' ', 'o', 'b', 'e', 'n', ':',
+  // Ranking list and last score
+  TSPOS(14, 40),
+  TSD_T_TEXT + 9,
+    'R', 'a', 'n', 'g', 'l', 'i', 's', 't', 'e',
+  TSPOS(15, 40),
+  TSD_T_TEXT + 2,
+    '1', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(16, 40),
+  TSD_T_TEXT + 2,
+    '2', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(17, 40),
+  TSD_T_TEXT + 2,
+    '3', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(18, 40),
+  TSD_T_TEXT + 2,
+    '4', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(19, 40),
+  TSD_T_TEXT + 2,
+    '5', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(21, 40),
+  TSD_T_TEXT + 14,
+    'L', 'e', 't', 'z', 't', 'e', ' ', 'P', 'u', 'n', 'k', 't', 'e', ':',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0' // Text "00"
+};
+@endif
+@ifdef I8N_EN
+@chunk byte ScreenMenu[] = {
+  // Title
+  TSPOS(0, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE, 21,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 7,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSPOS(1, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE, 21,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 7,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE, 22,
+  TSD_T_TEXT + 2, 't', 'm', // Text "tm"
+  TSPOS(2, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 4, 'a', // Text "aaaa"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 5, 'd', // Text "ddddd"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 5, 'd', // Text "ddddd"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 4, 'e', // Text "eeee"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 7, 'r', // Text "rrrrrrr"
+  TSPOS(3, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'e', // Text "ee"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'e', // Text "ee"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSPOS(4, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 6, 'e', // Text "eeeeee"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSPOS(5, 11),
+  TSD_T_CHAR + 2, 'L', // Text "LL"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'e', // Text "ee"
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  TSPOS(6, 11),
+  TSD_T_CHAR + 8, 'L', // Text "LLLLLLLL"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'a', // Text "aaa"
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'a', // Text "aa"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'd', // Text "ddd"
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'd', // Text "ddd"
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'd', // Text "dd"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 4, 'e', // Text "eeee"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'r', // Text "rr"
+  // Informations
+  TSPOS(8, 1),
+  TSD_T_TEXT, 44,
+    'O', 'r', 'i', 'g', 'i', 'n', 'a', 'l', ' ', 'i', 's', ' ',
+    '(', 'c', ')', ' ', 'i', 'n', ' ', '1', '9', '8', '2', ',', ' ',
+    '1', '9', '8', '3', ' ', 'Y', 'a', 'h', 'o', 'o', ' ',
+    'S', 'o', 'f', 't', 'w', 'a', 'r', 'e',
+  TSPOS(9, 1),
+  TSD_T_TEXT, 49,
+    'A', 'd', 'a', 'p', 't', 'e', 'd', ' ', 'f', 'o', 'r', ' ',
+    'P', 'C', '/', 'G', 'E', 'O', 'S', ' ', 'i', 'n', ' ',
+    '2', '0', '1', '1', ' ', 'b', 'y', ' ',
+    'A', 'n', 'd', 'r', 'e', 'a', 's', ' ',
+    'B', 'o', 'l', 'l', 'h', 'a', 'l', 'd', 'e', 'r',
+  TSPOS(11, 40),
+  TSD_T_TEXT + 13,
+    'V', 'e', 'r', 's', 'i', 'o', 'n', ' ', ':', ' ', '0', '.', '4',
+  TSPOS(12, 40),
+  TSD_T_TEXT, 17,
+    'T', 'e', 'r', 'm', 'i', 'n', 'a', 'l', ':', ' ',
+    'P', 'C', '/', 'G', 'E', 'O', 'S',
+  TSPOS(11, 1),
+  TSD_T_TEXT, 17,
+    'D', 'i', 'f', 'f', 'i', 'c', 'u', 'l', 't', 'y', ' ',
+    'L', 'e', 'v', 'e', 'l', ':',
+  TSPOS(12, 1),
+  TSD_T_TEXT + 12,
+    'S', 'o', 'u', 'n', 'd', ' ', 'O', 'u', 't', 'p', 'u', 't',
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, ':', // Text ":"
+  // Main menu
+  TSPOS(14, 1),
+  TSD_T_TEXT + 13,
+    'P', ' ', '=', ' ', 'P', 'l', 'a', 'y', ' ', 'G', 'a', 'm', 'e',
+  TSPOS(15, 1),
+  TSD_T_TEXT, 21,
+    'D', ' ', '=', ' ', 'C', 'h', 'a', 'n', 'g', 'e', ' ',
+    'D', 'i', 'f', 'f', 'i', 'c', 'u', 'l', 't', 'y',
+  TSPOS(16, 1),
+  TSD_T_TEXT, 16,
+    'S', ' ', '=', ' ', 'C', 'h', 'a', 'n', 'g', 'e', ' ',
+    'S', 'o', 'u', 'n', 'd',
+  TSPOS(17, 1),
+  TSD_T_TEXT, 21,
+    'I', ' ', '=', ' ', 'S', 'h', 'o', 'w', ' ',
+    'I', 'n', 's', 't', 'r', 'u', 'c', 't', 'i', 'o', 'n', 's',
+  TSPOS(18, 1),
+  TSD_T_TEXT, 18,
+    'E', ' ', '=', ' ', 'E', 'x', 'i', 't', ' ',
+    'G', 'e', 'o', 'L', 'a', 'd', 'd', 'e', 'r',
+  TSPOS(21, 1),
+  TSD_T_TEXT, 23,
+    'E', 'n', 't', 'e', 'r', ' ', 'o', 'n', 'e', ' ',
+    'o', 'f', ' ', 't', 'h', 'e', ' ', 'a', 'b', 'o', 'v', 'e', ':',
+  // Ranking list and last score
+  TSPOS(14, 40),
+  TSD_T_TEXT + 11,
+    'H', 'i', 'g', 'h', ' ', 'S', 'c', 'o', 'r', 'e', 's',
+  TSPOS(15, 40),
+  TSD_T_TEXT + 2,
+    '1', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(16, 40),
+  TSD_T_TEXT + 2,
+    '2', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(17, 40),
+  TSD_T_TEXT + 2,
+    '3', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(18, 40),
+  TSD_T_TEXT + 2,
+    '4', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(19, 40),
+  TSD_T_TEXT + 2,
+    '5', ')',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSPOS(21, 40),
+  TSD_T_TEXT + 11,
+    'L', 'a', 's', 't', ' ', 'S', 'c', 'o', 'r', 'e', ':',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0' // Text "00"
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char TextMenuOff[] = {
+  'A', 'u', 's'
+};
+@endif
+@ifdef I8N_EN
+@chunk char TextMenuOff[] = {
+  'O', 'f', 'f'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char TextMenuOn[] = {
+  'E', 'i', 'n'
+};
+@endif
+@ifdef I8N_EN
+@chunk char TextMenuOn[] = {
+  'O', 'n'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Stim1[] = {
+  'D', 'u', ' ', 'i', 's', 's', 't', ' ', 'Q', 'u', 'i', 'c', 'h', 'e', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Stim1[] = {
+  'Y', 'o', 'u', ' ', 'e', 'a', 't', ' ', 'q', 'u', 'i', 'c', 'h', 'e', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Stim2[] = {
+  'K', 'o', 'm', 'm', ' ', 's', 'c', 'h', 'o', 'n', ',', ' ', 'w', 'i', 'r', ' ',
+  'h', 'a', 'b', 'e', 'n', ' ', 'n', 'i', 'c', 'h', 't', ' ', 'd', 'e', 'n', ' ',
+  'g', 'a', 'n', 'z', 'e', 'n', ' ', 'T', 'a', 'g', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Stim2[] = {
+  'C', 'o', 'm', 'e', ' ', 'o', 'n', ',', ' ', 'w', 'e', ' ',
+  'd', 'o', 'n', '\'', 't', ' ', 'h', 'a', 'v', 'e', ' ',
+  'a', 'l', 'l', ' ', 'd', 'a', 'y', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Stim3[] = {
+  'F', 'a', 'n', 'g', 'e', 'n', ' ', 'w', 'i', 'r', ' ', 'a', 'n', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Stim3[] = {
+  'L', 'e', 't', '\'', 's', ' ', 'g', 'o', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Stim4[] = {
+  'W', 'a', 'r', 't', 'e', ' ', 'n', 'i', 'c', 'h', 't', ' ', 'a', 'u', 'f', ' ',
+  'G', 'E', 'O', 'S', '3', '2', ',', ' ', 's', 'p', 'i', 'e', 'l', ' ',
+  'm', 'i', 't', ' ', 'm', 'i', 'r', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Stim4[] = {
+  'D', 'o', 'n', '\'', 't', ' ', 'w', 'a', 'i', 't', ' ', 'f', 'o', 'r', ' ',
+  'G', 'E', 'O', 'S', '3', '2', ',', ' ', 'p', 'l', 'a', 'y', ' ',
+  'w', 'i', 't', 'h', ' ', 'm', 'e', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char TextMenuExit[] = {
+  'B', 'e', 'e', 'n', 'd', 'e', '.', '.', '.'
+};
+@endif
+@ifdef I8N_EN
+@chunk char TextMenuExit[] = {
+  'E', 'x', 'i', 't', 'i', 'n', 'g', '.', '.', '.'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk byte ScreenHelp[] = {
+  TSPOS(1, 1),
+  TSD_T_TEXT, 69,
+    'D', 'u', ' ', 'b', 'i', 's', 't', ' ', 'e', 'i', 'n', ' ',
+    'L', 'a', 'd', ',', ' ', 'g', 'e', 'f', 'a', 'n', 'g', 'e', 'n', ' ',
+    'i', 'n', ' ', 'e', 'i', 'n', 'e', 'm', ' ',
+    'I', 'r', 'r', 'g', 'a', 'r', 't', 'e', 'n', '.', ' ', ' ',
+    'D', 'e', 'i', 'n', 'e', ' ', 'M', 'i', 's', 's', 'i', 'o', 'n', ' ',
+    'i', 's', 't', ',', ' ', 'd', 'i', 'e',
+  TSPOS(2, 1),
+  TSD_T_TEXT, 69,
+    'n', 'o', 'c', 'h', ' ', 'n', 'i', 'e', ' ',
+    'g', 'e', 's', 'e', 'h', 'e', 'n', 'e', 'n', ' ',
+    'd', 'u', 'n', 'k', 'l', 'e', 'n', ' ',
+    'G', C_LA_DIERESIS, 'n', 'g', 'e', ' ', 'z', 'u', ' ',
+    'e', 'r', 'f', 'o', 'r', 's', 'c', 'h', 'e', 'n', ' ', 'u', 'n', 'd', ' ',
+    'v', 'e', 'r', 's', 't', 'e', 'c', 'k', 't', 'e', ' ',
+    'S', 'c', 'h', C_LA_DIERESIS, 't', 'z', 'e',
+  TSPOS(3, 1),
+  TSD_T_TEXT, 26,
+    'u', 'n', 'd', ' ',
+    'R', 'e', 'i', 'c', 'h', 't', C_LU_DIERESIS, 'm', 'm', 'e', 'r', ' ',
+    'z', 'u', ' ', 'f', 'i', 'n', 'd', 'e', 'n', '.',
+  TSPOS(5, 1),
+  TSD_T_TEXT, 68,
+    'D', 'u', ' ', 's', 't', 'e', 'u', 'e', 'r', 's', 't', ' ',
+    'd', 'a', 's', ' ', 'L', 'a', 'd', ' ', 'd', 'u', 'r', 'c', 'h', ' ',
+    'D', 'r', C_LU_DIERESIS, 'c', 'k', 'e', 'n', ' ', 'd', 'e', 'r', ' ',
+    'P', 'f', 'e', 'i', 'l', 't', 'a', 's', 't', 'e', 'n', ' ',
+    'u', 'n', 'd', ' ', 'l', C_LA_DIERESIS, 's', 's', 't', ' ', 'e', 's', ' ',
+    'd', 'u', 'r', 'c', 'h',
+  TSPOS(6, 1),
+  TSD_T_TEXT, 70,
+    'D', 'r', C_LU_DIERESIS, 'c', 'k', 'e', 'n', ' ', 'd', 'e', 'r', ' ',
+    'L', 'e', 'e', 'r', 't', 'a', 's', 't', 'e', ' ',
+    's', 'p', 'r', 'i', 'n', 'g', 'e', 'n', '.', ' ', ' ',
+    'D', 'r', C_LU_DIERESIS, 'c', 'k', ' ', 'e', 'i', 'n', 'e', ' ',
+    'b', 'e', 'l', 'i', 'e', 'b', 'i', 'g', 'e', ' ',
+    'T', 'a', 's', 't', 'e', ' ', 'u', 'm', ' ', 'd', 'a', 's', ' ',
+    'L', 'a', 'd',
+  TSPOS(7, 1),
+  TSD_T_TEXT, 69,
+    'z', 'u', ' ', 's', 't', 'o', 'p', 'p', 'e', 'n', '.', ' ', ' ',
+    'A', 'c', 'h', 't', 'e', ' ', 'a', 'u', 'f', ' ', 'd', 'i', 'e', ' ',
+    'f', 'a', 'l', 'l', 'e', 'n', 'd', 'e', 'n', ' ',
+    'S', 't', 'e', 'i', 'n', 'e', ',', ' ', 'a', 'u', 'c', 'h', ' ',
+    'D', 'e', 'r', ' ', 'S', 't', 'e', 'i', 'n', 'e', ' ',
+    'g', 'e', 'n', 'a', 'n', 'n', 't', '.',
+  TSPOS(8, 1),
+  TSD_T_TEXT, 68,
+    'S', 'u', 'c', 'h', 'e', ' ', 'u', 'n', 'd', ' ',
+    'e', 'r', 'g', 'r', 'e', 'i', 'f', 'e', ' ', 'd', 'i', 'e', ' ',
+    'S', 'c', 'h', C_LA_DIERESIS, 't', 'z', 'e', ' ',
+    '(', 'a', 'n', 'g', 'e', 'z', 'e', 'i', 'g', 't', ' ', 'a', 'l', 's', ' ',
+    '$', ')', ' ', 'B', 'E', 'V', 'O', 'R', ' ', 'd', 'i', 'e', ' ',
+    'B', 'o', 'n', 'u', 's', 'z', 'e', 'i', 't',
+  TSPOS(9, 1),
+  TSD_T_TEXT, 15,
+    'a', 'b', 'g', 'e', 'l', 'a', 'u', 'f', 'e', 'n', ' ', 'i', 's', 't', '.',
+  TSPOS(11, 1),
+  TSD_T_TEXT, 71,
+    'E', 'i', 'n', ' ', 'n', 'e', 'u', 'e', 's', ' ', 'L', 'a', 'd', ' ',
+    'w', 'i', 'r', 'd', ' ', 'f', C_LU_DIERESIS, 'r',
+    ' ', 'a', 'l', 'l', 'e', ' ', '1', '0', '\'', '0', '0', '0', ' ',
+    'P', 'u', 'n', 'k', 't', 'e', ' ',
+    'v', 'e', 'r', 'g', 'e', 'b', 'e', 'n', '.', ' ', ' ',
+    'E', 'x', 't', 'r', 'a', 'p', 'u', 'n', 'k', 't', 'e', ' ',
+    'w', 'e', 'r', 'd', 'e', 'n',
+  TSPOS(12, 1),
+  TSD_T_TEXT, 66,
+    'f', C_LU_DIERESIS, 'r', ' ', 'd', 'a', 's', ' ',
+    'E', 'i', 'n', 's', 'a', 'm', 'm', 'e', 'l', 'n', ' ', 'v', 'o', 'n', ' ',
+    'G', 'o', 'l', 'd', 's', 't', 'a', 't', 'u', 'e', 'n', ' ',
+    '(', 'a', 'n', 'g', 'e', 'z', 'e', 'i', 'g', 't', ' ', 'a', 'l', 's', ' ',
+    '&', ')', ' ', 'v', 'e', 'r', 'g', 'e', 'b', 'e', 'n', '.', ' ', ' ',
+    'D', 'u',
+  TSPOS(13, 1),
+  TSD_T_TEXT, 63,
+    'e', 'r', 'h', C_LA_DIERESIS, 'l', 's', 't', ' ', 'd', 'i', 'e', ' ',
+    'r', 'e', 's', 't', 'l', 'i', 'c', 'h', 'e', ' ',
+    'B', 'o', 'n', 'u', 's', 'z', 'e', 'i', 't', ' ', 'w', 'e', 'n', 'n', ' ',
+    'D', 'u', ' ', 'd', 'e', 'n', ' ', 'L', 'e', 'v', 'e', 'l', ' ',
+    'b', 'e', 'e', 'n', 'd', 'e', 't', ' ', 'h', 'a', 's', 't', '.',
+  TSPOS(15, 1),
+  TSD_T_TEXT, 47,
+    'D', 'e', 'n', 'k', ' ', 'd', 'a', 'r', 'a', 'n', ',', ' ',
+    'v', 'i', 'e', 'l', 'e', ' ', 'W', 'e', 'g', 'e', ' ',
+    'f', C_LU_DIERESIS, 'h', 'r', 'e', 'n', ' ', 'n', 'a', 'c', 'h', ' ',
+    'R', 'o', 'm', '.', ' ', '(', 'S', 'y', 'h', 'r', 'a', ')',
+  TSPOS(17, 1),
+  TSD_T_TEXT, 64,
+    'D', 'r', C_LU_DIERESIS, 'c', 'k', 'e', ' ', 'P', ' ', 'u', 'm', ' ',
+    'd', 'a', 's', ' ', 'S', 'p', 'i', 'e', 'l', ' ', 'z', 'u', ' ',
+    'p', 'a', 'u', 's', 'i', 'e', 'r', 'e', 'n', ' ', 'o', 'd', 'e', 'r', ' ',
+    'E', 'S', 'C', 'a', 'p', 'e', ' ', 'u', 'm', ' ', 'e', 's', ' ',
+    'z', 'u', ' ', 'b', 'e', 'e', 'n', 'd', 'e', 'n', '.',
+  TSPOS(19, 1),
+  TSD_T_TEXT + 15,
+    'V', 'i', 'e', 'l', ' ', 'G', 'l', C_LU_DIERESIS, 'c', 'k', ' ',
+    'L', 'a', 'd', '.',
+  TSPOS(22, 1),
+  TSD_T_TEXT, 42,
+    'D', 'r', C_LU_DIERESIS, 'c', 'k', ' ', 'E', 'S', 'C', ' ', 'u', 'm', ' ',
+    'z', 'u', 'm', ' ',
+    'H', 'a', 'u', 'p', 't', 'm', 'e', 'n', C_LU_DIERESIS, ' ',
+    'z', 'u', 'r', C_LU_DIERESIS, 'c', 'k', 'z', 'u', 'k', 'e', 'h', 'r', 'e', 'n', ':'
+};
+@endif
+@ifdef I8N_EN
+@chunk byte ScreenHelp[] = {
+  TSPOS(1, 1),
+  TSD_T_TEXT, 64,
+    'Y', 'o', 'u', ' ', 'a', 'r', 'e', ' ', 'a', ' ', 'L', 'a', 'd', ' ',
+    't', 'r', 'a', 'p', 'p', 'e', 'd', ' ', 'i', 'n', ' ', 'a', ' ',
+    'm', 'a', 'z', 'e', '.', ' ', ' ',
+    'Y', 'o', 'u', 'r', ' ', 'm', 'i', 's', 's', 'i', 'o', 'n', ' ',
+    'i', 's', ' ', 't', 'o', ' ', 'e', 'x', 'p', 'l', 'o', 'r', 'e', ' ',
+    't', 'h', 'e',
+  TSPOS(2, 1),
+  TSD_T_TEXT, 62,
+    'd', 'a', 'r', 'k', ' ', 'c', 'o', 'r', 'r', 'i', 'd', 'o', 'r', 's', ' ',
+    'n', 'e', 'v', 'e', 'r', ' ', 'b', 'e', 'f', 'o', 'r', 'e', ' ',
+    's', 'e', 'e', 'n', ' ', 'b', 'y', ' ', 'h', 'u', 'm', 'a', 'n', ' ',
+    'e', 'y', 'e', 's', ' ', 'a', 'n', 'd', ' ', 'f', 'i', 'n', 'd', ' ',
+    'h', 'i', 'd', 'd', 'e', 'n',
+  TSPOS(3, 1),
+  TSD_T_TEXT, 21,
+    't', 'r', 'e', 'a', 's', 'u', 'r', 'e', 's', ' ', 'a', 'n', 'd', ' ',
+    'r', 'i', 'c', 'h', 'e', 's', '.',
+  TSPOS(5, 1),
+  TSD_T_TEXT, 62,
+    'Y', 'o', 'u', ' ', 'c', 'o', 'n', 't', 'r', 'o', 'l', ' ',
+    'L', 'a', 'd', ' ', 'b', 'y', ' ', 't', 'y', 'p', 'i', 'n', 'g', ' ',
+    't', 'h', 'e', ' ', 'd', 'i', 'r', 'e', 'c', 't', 'i', 'o', 'n', ' ',
+    'b', 'u', 't', 't', 'o', 'n', 's', ' ', 'a', 'n', 'd', ' ',
+    'j', 'u', 'm', 'p', 'i', 'n', 'g', ' ', 'b', 'y',
+  TSPOS(6, 1),
+  TSD_T_TEXT, 61,
+    't', 'y', 'p', 'i', 'n', 'g', ' ', 'S', 'P', 'A', 'C', 'E', '.', ' ', ' ',
+    'T', 'y', 'p', 'e', ' ', 'a', 'n', 'y', ' ', 'o', 't', 'h', 'e', 'r', ' ',
+    'k', 'e', 'y', ' ', 't', 'o', ' ', 's', 't', 'o', 'p', ' ',
+    'L', 'a', 'd', '.', ' ', ' ', 'B', 'u', 't', ' ',
+    'b', 'e', 'w', 'a', 'r', 'e', ' ',  'o', 'f',
+  TSPOS(7, 1),
+  TSD_T_TEXT, 64,
+    't', 'h', 'e', ' ', 'f', 'a', 'l', 'l', 'i', 'n', 'g', ' ',
+    'r', 'o', 'c', 'k', 's', ' ', 'c', 'a', 'l', 'l', 'e', 'd', ' ',
+    'D', 'e', 'r', ' ', 'r', 'o', 'c', 'k', 's', '.', ' ', ' ',
+    'Y', 'o', 'u', ' ', 'm', 'u', 's', 't', ' ', 'f', 'i', 'n', 'd', ' ',
+    'a', 'n', 'd', ' ', 'g', 'r', 'a', 's', 'p', ' ', 't', 'h', 'e',
+  TSPOS(8, 1),
+  TSD_T_TEXT, 53,
+    't', 'r', 'e', 'a', 's', 'u', 'r', 'e', ' ',
+    '(', 's', 'h', 'o', 'w', 'n', ' ', 'a', 's', ' ', '$', ')', ' ',
+    'B', 'E', 'F', 'O', 'R', 'E', ' ', 't', 'h', 'e', ' ',
+    'b', 'o', 'n', 'u', 's', ' ', 't', 'i', 'm', 'e', ' ',
+    'r', 'u', 'n', 's', ' ', 'o', 'u', 't', '.',
+  TSPOS(10, 1),
+  TSD_T_TEXT, 64,
+    'A', ' ', 'n', 'e', 'w', ' ', 'L', 'a', 'd', ' ', 'w', 'i', 'l', 'l', ' ',
+    'b', 'e', ' ', 'a', 'w', 'a', 'r', 'd', 'e', 'd', ' ', 'f', 'o', 'r', ' ',
+    'e', 'v', 'e', 'r', 'y', ' ', '1', '0', '\'', '0', '0', '0', ' ',
+    'p', 'o', 'i', 'n', 't', 's', '.', ' ', ' ', 'E', 'x', 't', 'r', 'a', ' ',
+    'p', 'o', 'i', 'n', 't', 's',
+  TSPOS(11, 1),
+  TSD_T_TEXT, 60,
+    'a', 'r', 'e', ' ', 'a', 'w', 'a', 'r', 'd', 'e', 'd', ' ',
+    'f', 'o', 'r', ' ', 't', 'o', 'u', 'c', 'h', 'i', 'n', 'g', ' ',
+    't', 'h', 'e', ' ', 'g', 'o', 'l', 'd', ' ',
+    's', 't', 'a', 't', 'u', 'e', 's', ' ',
+    '(', 's', 'h', 'o', 'w', 'n', ' ', 'a', 's', ' ', '&', ')', '.', ' ', ' ',
+    'Y', 'o', 'u',
+  TSPOS(12, 1),
+  TSD_T_TEXT, 62,
+    'w', 'i', 'l', 'l', ' ', 'r', 'e', 'c', 'e', 'i', 'v', 'e', ' ',
+    't', 'h', 'e', ' ', 'b', 'o', 'n', 'u', 's', ' ', 't', 'i', 'm', 'e', ' ',
+    'p', 'o', 'i', 'n', 't', 's', ' ', 't', 'h', 'a', 't', ' ',
+    'a', 'r', 'e', ' ', 'l', 'e', 'f', 't', ' ', 'w', 'h', 'e', 'n', ' ',
+    'y', 'o', 'u', ' ', 'h', 'a', 'v', 'e',
+  TSPOS(13, 1),
+  TSD_T_TEXT, 19,
+    'f', 'i', 'n', 'i', 's', 'h', 'e', 'd', ' ', 't', 'h', 'e', ' ',
+    'l', 'e', 'v', 'e', 'l', '.',
+  TSPOS(15, 1),
+  TSD_T_TEXT, 58,
+    'R', 'e', 'm', 'e', 'm', 'b', 'e', 'r', ',', ' ',
+    't', 'h', 'e', 'r', 'e', ' ', 'i', 's', ' ', 'm', 'o', 'r', 'e', ' ',
+    't', 'h', 'a', 'n', ' ', 'o', 'n', 'e', ' ', 'w', 'a', 'y', ' ',
+    't', 'o', ' ', 's', 'k', 'i', 'n', ' ', 'a', ' ', 'c', 'a', 't', '.', ' ',
+    '(', 'C', 'h', 'u', 'm', ')',
+  TSPOS(17, 1),
+  TSD_T_TEXT, 50,
+    'T', 'y', 'p', 'e', ' ', 'a', ' ', 'P', ' ', 't', 'o', ' ',
+    'p', 'a', 'u', 's', 'e', ' ', 't', 'h', 'e', ' ', 'g', 'a', 'm', 'e', ' ',
+    'o', 'r', ' ', 'a', 'n', ' ', 'E', 'S', 'C', 'a', 'p', 'e', ' ',
+    't', 'o', ' ', 'e', 'n', 'd', ' ', 'i', 't', '.',
+  TSPOS(19, 1),
+  TSD_T_TEXT + 14,
+    'G', 'o', 'o', 'd', ' ', 'l', 'u', 'c', 'k', ' ', 'L', 'a', 'd', '.',
+  TSPOS(22, 1),
+  TSD_T_TEXT, 32,
+    'T', 'y', 'p', 'e', ' ', 'E', 'S', 'C', ' ', 't', 'o', ' ',
+    'r', 'e', 't', 'u', 'r', 'n', ' ', 't', 'o', ' ', 'm', 'a', 'i', 'n', ' ',
+    'm', 'e', 'n', 'u', ':'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk byte ScreenOver[] = {
+  // Title
+  TSPOS(1, 10),
+  TSD_T_CHAR + 4, 'G', // Text 'GGGG'
+  TSP_T_MOVE, 30,
+  TSD_T_CHAR + 4, 'O', // Text 'OOOO'
+  TSPOS(2, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE, 26,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSPOS(3, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 10,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'R', // Text 'RRRR'
+  TSPOS(4, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 3, 'G', // Text 'GGG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'M', // Text 'MM'
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'M', // Text 'MM'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 1, 'R',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'R',
+  TSPOS(5, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'A', // Text 'AAA'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'E', // Text 'EEEE'
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 4, 'E', // Text 'EEEE'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 4, 'R', // Text 'RRRR'
+  TSPOS(6, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 1, 'R',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'R',
+  TSPOS(7, 10),
+  TSD_T_CHAR + 4, 'G', // Text 'GGGG'
+  TSP_T_MOVE, 4,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE, 3,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE, 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE, 7,
+  TSD_T_CHAR + 4, 'O', // Text 'OOOO'
+  TSP_T_MOVE, 6,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE, 4,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 1, 'R',
+  TSP_T_MOVE, 3,
+  TSD_T_CHAR + 1, 'R',
+  // Text
+  TSPOS(10, 1),
+  TSD_T_TEXT, 70,
+    'D', 'u', ' ', 'h', 'a', 's', 't', ' ', 'a', 'l', 'l', 'e', ' ',
+    'L', 'a', 'd', 's', ' ', 'v', 'e', 'r', 'l', 'o', 'r', 'e', 'n', ',', ' ',
+    'b', 'e', 'v', 'o', 'r', ' ', 'D', 'u', ' ', 'd', 'e', 'n', ' ',
+    'l', 'e', 't', 'z', 't', 'e', 'n', ' ', 'S', 'c', 'h', 'a', 't', 'z', ' ',
+    'g', 'e', 'f', 'u', 'n', 'd', 'e', 'n', ' ', 'h', 'a', 's', 't', '.',
+  TSPOS(11, 1),
+  TSD_T_TEXT, 71,
+  'D', 'e', 's', 'h', 'a', 'l', 'b', ' ',
+  'b', 'l', 'e', 'i', 'b', 's', 't', ' ', 'D', 'u', ' ', 'i', 'm', ' ',
+  'I', 'r', 'r', 'g', 'a', 'r', 't', 'e', 'n', ' ',
+  'g', 'e', 'f', 'a', 'n', 'g', 'e', 'n', ' ', 'u', 'n', 'd', ' ',
+  'm', 'u', 's', 't', ' ', 'n', 'o', 'c', 'h', ' ',
+  'e', 'i', 'n', 'm', 'a', 'l', ' ', 'v', 'o', 'n', ' ',
+  'V', 'o', 'r', 'n', 'e',
+  TSPOS(12, 1),
+  TSD_T_TEXT + 9,
+  'b', 'e', 'g', 'i', 'n', 'n', 'e', 'n', '.',
+  TSPOS(22, 1),
+  TSD_T_TEXT, 28,
+    'D', 'r', C_LU_DIERESIS, 'c', 'k', ' ', 'E', 'N', 'T', 'E', 'R', ' ',
+    'u', 'm', ' ',
+    'f', 'o', 'r', 't', 'z', 'u', 'f', 'a', 'h', 'r', 'e', 'n', ':'
+};
+@endif
+@ifdef I8N_EN
+@chunk byte ScreenOver[] = {
+  // Title
+  TSPOS(1, 10),
+  TSD_T_CHAR + 4, 'G', // Text 'GGGG'
+  TSP_T_MOVE, 30,
+  TSD_T_CHAR + 4, 'O', // Text 'OOOO'
+  TSPOS(2, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE, 26,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSPOS(3, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 10,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'R', // Text 'RRRR'
+  TSPOS(4, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 3, 'G', // Text 'GGG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 2, 'M', // Text 'MM'
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 2, 'M', // Text 'MM'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 1, 'R',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'R',
+  TSPOS(5, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 3, 'A', // Text 'AAA'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'E', // Text 'EEEE'
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 4, 'E', // Text 'EEEE'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 4, 'R', // Text 'RRRR'
+  TSPOS(6, 8),
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'G', // Text 'GG'
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, 'O', // Text 'OO'
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 1,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'E',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 1, 'R',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'R',
+  TSPOS(7, 10),
+  TSD_T_CHAR + 4, 'G', // Text 'GGGG'
+  TSP_T_MOVE, 4,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE, 3,
+  TSD_T_CHAR + 1, 'A',
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE, 3,
+  TSD_T_CHAR + 1, 'M',
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE, 7,
+  TSD_T_CHAR + 4, 'O', // Text 'OOOO'
+  TSP_T_MOVE, 6,
+  TSD_T_CHAR + 1, 'V',
+  TSP_T_MOVE, 4,
+  TSD_T_CHAR + 5, 'E', // Text 'EEEEE'
+  TSP_T_MOVE, 2,
+  TSD_T_CHAR + 1, 'R',
+  TSP_T_MOVE, 3,
+  TSD_T_CHAR + 1, 'R',
+  // Text
+  TSPOS(10, 1),
+  TSD_T_TEXT, 70,
+  'Y', 'o', 'u', ' ', 'l', 'o', 's', 't', ' ', 'a', 'l', 'l', ' ',
+  'l', 'a', 'd', 's', ' ', 'b', 'e', 'f', 'o', 'r', 'e', ' ',
+  'y', 'o', 'u', ' ', 'r', 'e', 'a', 'c', 'h', 'e', 'd', ' ',
+  't', 'h', 'e', ' ', 'u', 'l', 't', 'i', 'm', 'a', 't', 'e', ' ',
+  't', 'r', 'e', 'a', 's', 'u', 'r', 'e', '.', ' ', ' ',
+  'H', 'e', 'n', 'c', 'e', ' ', 'y', 'o', 'u',
+  TSPOS(11, 1),
+  TSD_T_TEXT, 63,
+  's', 't', 'a', 'y', ' ', 't', 'r', 'a', 'p', 'p', 'e', 'd', ' ',
+  'i', 'n', ' ', 't', 'h', 'e', ' ', 'm', 'a', 'z', 'e', ' ',
+  'a', 'n', 'd', ' ', 'm', 'u', 's', 't', ' ', 't', 'r', 'y', ' ',
+  'a', 'g', 'a', 'i', 'n', ' ', 'f', 'r', 'o', 'm', ' ', 't', 'h', 'e', ' ',
+  'b', 'e', 'g', 'i', 'n', 'n', 'i', 'n', 'g', '.',
+  TSPOS(22, 1),
+  TSD_T_TEXT, 24,
+  'T', 'y', 'p', 'e', ' ', 'R', 'E', 'T', 'U', 'R', 'N', ' ',
+  't', 'o', ' ', 'c', 'o', 'n', 't', 'i', 'n', 'u', 'e', ':'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk byte ScreenLast[] = {
+  // Title
+  TSPOS(1, 15),
+  TSD_T_CHAR + 8, 'T', // Text "TTTTTTTT"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text "EEEEE"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 8, 'E', // Text "EEEEEEEE"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'D', // Text "DDDD"
+  TSPOS(2, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E', // Text "E"
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'N', // Text "NN"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSPOS(3, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 5, 'H', // Text "HHHHH"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'E', // Text "EEEE"
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSP_T_MOVE + 8,
+  TSD_T_TEXT + 5,
+    'N', ' ', 'N', ' ', 'N',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSPOS(4, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E', // Text "E"
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 6, 'E', // Text "EEEEEEEE"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'N', // Text "NN"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSPOS(5, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text "EEEEE"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'D', // Text "DDDD"
+  TSPOS(6, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE, 22,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSPOS(7, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE, 22,
+  TSD_T_CHAR + 8, 'E', // Text "EE"
+  TSPOS(10, 1),
+  TSD_T_TEXT, 68,
+    'D', 'u', ' ', 'b', 'i', 's', 't', ' ', 'd', 'e', 'm', ' ',
+    'I', 'r', 'r', 'g', 'a', 'r', 't', 'e', 'n', ' ',
+    'e', 'n', 't', 'k', 'o', 'm', 'm', 'e', 'n', ' ', 'u', 'n', 'd', ' ',
+    'w', 'i', 'e', 'd', 'e', 'r', ' ', 'f', 'r', 'e', 'i', '.', ' ', ' ',
+    'B', 'e', 'i', 'm', ' ', 'V', 'e', 'r', 'l', 'a', 's', 's', 'e', 'n', ' ',
+    'd', 'e', 's',
+  TSPOS(11, 1),
+  TSD_T_TEXT, 66,
+    'I', 'r', 'r', 'g', 'a', 'r', 't', 'e', 'n', ' ',
+    'i', 'm', 'p', 'l', 'o', 'd', 'e', 'r', 't', ' ', 'e', 's', ' ',
+    'i', 'n', ' ', 'e', 'i', 'n', 'e', ' ',
+    'w', 'u', 'n', 'd', 'e', 'r', 's', 'c', 'h', C_LO_DIERESIS, 'n', 'e', ',', ' ',
+    'g', 'r', C_LU_DIERESIS, 'n', ' ',
+    'f', 'u', 'n', 'k', 'e', 'l', 'n', 'd', 'e', ' ',
+    'G', 'e', 'o', 'd', 'e', '.',
+  TSPOS(13, 1),
+  TSD_T_TEXT, 69,
+    'M', 'i', 't', ' ', 'd', 'e', 'n', ' ',
+    'S', 'c', 'h', C_LA_DIERESIS, 't', 'z', 'e', 'n', ' ', 'u', 'n', 'd', ' ',
+    'R', 'e', 'i', 'c', 'h', 't', C_LU_DIERESIS, 'm', 'm', 'e', 'r', 'n', ' ',
+    'k', 'a', 'u', 'f', 't', 's', 't', ' ', 'd', 'u', ' ',
+    'e', 'i', 'n', 'e', ' ', 'a', 'l', 't', 'e', ' ',
+    'L', 'e', 'i', 't', 'e', 'r', 'n', 'f', 'a', 'b', 'r', 'i', 'k', '.',
+  TSPOS(14, 1),
+  TSD_T_TEXT, 54,
+    'D', 'o', 'r', 't', ' ', 'w', 'i', 'r', 's', 't', ' ', 'D', 'u', ' ',
+    'L', 'e', 'i', 't', 'e', 'r', 'n', ' ', 'b', 'i', 's', ' ', 'a', 'n', ' ',
+    'd', 'a', 's', ' ', 'E', 'n', 'd', 'e', 'r', ' ', 'd', 'e', 'r', ' ',
+    'Z', 'e', 'i', 't', ' ', 'b', 'a', 'u', 'e', 'n', '.',
+  TSPOS(22, 1),
+  TSD_T_TEXT, 28,
+    'D', 'r', C_LU_DIERESIS, 'c', 'k', ' ', 'E', 'N', 'T', 'E', 'R', ' ',
+    'u', 'm', ' ',
+    'f', 'o', 'r', 't', 'z', 'u', 'f', 'a', 'h', 'r', 'e', 'n', ':'
+};
+@endif
+@ifdef I8N_EN
+@chunk byte ScreenLast[] = {
+  // Title
+  TSPOS(1, 15),
+  TSD_T_CHAR + 8, 'T', // Text "TTTTTTTT"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text "EEEEE"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 8, 'E', // Text "EEEEEEEE"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'D', // Text "DDDD"
+  TSPOS(2, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E', // Text "E"
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 2, 'N', // Text "NN"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSPOS(3, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 5, 'H', // Text "HHHHH"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'E', // Text "EEEE"
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSP_T_MOVE + 8,
+  TSD_T_TEXT + 5,
+    'N', ' ', 'N', ' ', 'N',
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSPOS(4, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'E', // Text "E"
+  TSP_T_MOVE + 9,
+  TSD_T_CHAR + 6, 'E', // Text "EEEEEEEE"
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 2, 'N', // Text "NN"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'D', // Text "D"
+  TSPOS(5, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'H', // Text "H"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 5, 'E', // Text "EEEEE"
+  TSP_T_MOVE + 5,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSP_T_MOVE + 8,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 3,
+  TSD_T_CHAR + 1, 'N', // Text "N"
+  TSP_T_MOVE + 2,
+  TSD_T_CHAR + 4, 'D', // Text "DDDD"
+  TSPOS(6, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE, 22,
+  TSD_T_CHAR + 2, 'E', // Text "EE"
+  TSPOS(7, 18),
+  TSD_T_CHAR + 2, 'T', // Text "TT"
+  TSP_T_MOVE, 22,
+  TSD_T_CHAR + 8, 'E', // Text "EE"
+  TSPOS(10, 1),
+  TSD_T_TEXT, 65,
+    'Y', 'o', 'u', ' ', 'e', 's', 'c', 'a', 'p', 'e', 'd', ' ',
+    't', 'h', 'e', ' ', 'm', 'a', 'z', 'e', ' ', 'a', 'n', 'd', ' ',
+    'a', 'r', 'e', ' ', 'f', 'r', 'e', 'e', ' ',
+    'a', 'g', 'a', 'i', 'n', '.', ' ', ' ',
+    'W', 'h', 'i', 'l', 'e', ' ', 'l', 'e', 'a', 'v', 'i', 'n', 'g', ' ',
+    't', 'h', 'e', ' ', 'm', 'a', 'z', 'e', ',',
+  TSPOS(11, 1),
+  TSD_T_TEXT, 51,
+    'i', 't', ' ', 'i', 'm', 'p', 'l', 'o', 'd', 'e', 'd', ' ',
+    'i', 'n', 't', 'o', ' ', 'a', ' ',
+    'w', 'o', 'n', 'd', 'e', 'r', 'f', 'u', 'l', ' ',
+    'g', 'r', 'e', 'e', 'n', ' ',
+    's', 'p', 'a', 'r', 'k', 'l', 'i', 'n', 'g', ' ',
+    'g', 'e', 'o', 'd', 'e', '.',
+  TSPOS(13, 1),
+  TSD_T_TEXT, 67,
+    'W', 'i', 't', 'h', ' ', 't', 'h', 'e', ' ',
+    't', 'r', 'e', 'a', 's', 'u', 'r', 'e', 's', ' ', 'a', 'n', 'd', ' ',
+    'r', 'i', 'c', 'h', 'e', 's', ' ', 'y', 'o', 'u', ' ',
+    'b', 'o', 'u', 'g', 'h', 't', ' ', 'a', 'n', ' ', 'o', 'l', 'd', ' ',
+    'f', 'a', 'c', 't', 'o', 'r', 'y', ' ', 'o', 'f', ' ',
+    'l', 'a', 'd', 'd', 'e', 'r', 's', '.',
+  TSPOS(14, 1),
+  TSD_T_TEXT, 54,
+    'T', 'h', 'e', 'r', 'e', ' ', 'y', 'o', 'u', ' ',
+    'w', 'i', 'l', 'l', ' ', 'a', 's', 's', 'e', 'm', 'b', 'l', 'e', ' ',
+    'l', 'a', 'd', 'd', 'e', 'r', 's', ' ', 'u', 'n', 't', 'i', 'l', ' ',
+    't', 'h', 'e', ' ', 'e', 'n', 'd', ' ', 'o', 'f', ' ',
+    't', 'i', 'm', 'e', '.',
+  TSPOS(22, 1),
+  TSD_T_TEXT, 24,
+    'T', 'y', 'p', 'e', ' ', 'R', 'E', 'T', 'U', 'R', 'N', ' ',
+    't', 'o', ' ', 'c', 'o', 'n', 't', 'i', 'n', 'u', 'e', ':'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk byte ScreenHigh[] = {
+  // Title
+  TSPOS(6, 15),
+  TSD_T_TEXT, 48,
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!',
+  // Text
+  TSPOS(12, 1),
+  TSD_T_TEXT, 21,
+    'G', 'i', 'b', ' ', 'd', 'e', 'i', 'n', 'e', 'n', ' ', 'N', 'a', 'm', 'e', 'n', ' ', 'e', 'i', 'n', ':'
+};
+@endif
+@ifdef I8N_EN
+@chunk byte ScreenHigh[] = {
+  // Title
+  TSPOS(6, 15),
+  TSD_T_TEXT, 48,
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!', ' ',
+    'Y', 'A', 'H', 'O', 'O', '!',
+  // Text
+  TSPOS(12, 1),
+  TSD_T_TEXT, 16,
+    'E', 'n', 't', 'e', 'r', ' ', 'y', 'o', 'u', 'r', ' ',
+    'n', 'a', 'm', 'e', ':'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Comp1[] = {
+  'D', 'u', ' ', 'h', 'a', 's', 't', ' ', 'd', 'a', 's', ' ',
+  'w', 'i', 'r', 'k', 'l', 'i', 'c', 'h', ' ', 'n', 'i', 'c', 'h', 't', ' ',
+  'v', 'e', 'r', 'd', 'i', 'e', 'n', 't', ' ', 'a', 'b', 'e', 'r', '.', '.', '.'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Comp1[] = {
+  'Y', 'o', 'u', ' ', 'r', 'e', 'a', 'l', 'l', 'y', ' ',
+  'd', 'o', 'n', '\'', 't', ' ', 'd', 'e', 's', 'e', 'r', 'v', 'e', ' ',
+  't', 'h', 'i', 's', ' ', 'b', 'u', 't', '.', '.', '.'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Comp2[] = {
+  'N', 'i', 'c', 'h', 't', ' ', 's', 'c', 'h', 'l', 'e', 'c', 'h', 't', ' ',
+  'f', C_LU_DIERESIS, 'r', ' ', 'e', 'i', 'n', ' ', 'j', 'u', 'n', 'g', 'e', 's', ' ',
+  'L', 'a', 'd', '.'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Comp2[] = {
+  'N', 'o', 't', ' ', 'b', 'a', 'd', ' ', 'f', 'o', 'r', ' ', 'a', ' ',
+  'y', 'o', 'u', 'n', 'g', ' ', 'L', 'a', 'd', '.'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Comp3[] = {
+  'F', 'a', 'n', 't', 'a', 's', 't', 'i', 's', 'c', 'h', '!', ' ', ' ',
+  'D', 'u', ' ', 'z', C_LA_DIERESIS, 'h', 'l', 's', 't', '!', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Comp3[] = {
+  'A', 'm', 'a', 'z', 'i', 'n', 'g', '!', ' ', ' ', 'Y', 'o', 'u', ' ',
+  'r', 'a', 't', 'e', '!', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Comp4[] = {
+  'S', 'i', 'e', 'h', 't', ' ', 'a', 'u', 's', ' ', 'a', 'l', 's', ' ',
+  'h', C_LA_DIERESIS, 't', 't', 'e', 'n', ' ', 'w', 'i', 'r', ' ', 'h', 'i', 'e', 'r', ' ',
+  'e', 'i', 'n', 'e', 'n', ' ', 'L', 'a', 'd', '-', 'D', 'e', 'r', ' ', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Comp4[] = {
+  'L', 'o', 'o', 'k', 's', ' ', 'l', 'i', 'k', 'e', ' ', 'w', 'e', ' ',
+  'h', 'a', 'v', 'e', ' ', 'a', ' ', 'L', 'a', 'd', '-', 'D', 'e', 'r', ' ',
+  'h', 'e', 'r', 'e', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Comp5[] = {
+  'S', 'u', 'p', 'e', 'r', '!', ' ', ' ', 'D', 'u', ' ', 'b', 'i', 's', 't', ' ',
+  'n', 'u', 'n', ' ', 'e', 'i', 'n', ' ', 'L', 'a', 'd', '-', 'W', 'i', 'z', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Comp5[] = {
+  'Y', 'e', 'a', 'h', '!', ' ', ' ', 'N', 'o', 'w', ' ', 'y', 'o', 'u', ' ',
+  'a', 'r', 'e', ' ', 'a', ' ', 'L', 'a', 'd', '-', 'W', 'i', 'z', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Comp6[] = {
+  'W', 'o', 'w', '!', ' ', ' ', 'D', 'u', ' ', 'b', 'i', 's', 't', ' ',
+  'n', 'u', 'n', ' ', 'e', 'i', 'n', ' ',
+  'L', 'a', 'd', '-', 'G', 'u', 'r', 'u', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Comp6[] = {
+  'W', 'o', 'w', '!', ' ', ' ', 'Y', 'o', 'u', ' ', 'a', 'r', 'e', ' ',
+  'n', 'o', 'w', ' ', 'a', ' ', 'L', 'a', 'd', '-', 'G', 'u', 'r', 'u', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char Comp7[] = {
+  'D', 'u', ' ', 'b', 'i', 's', 't', ' ', 'e', 'i', 'n', ' ',
+  'w', 'a', 'h', 'r', 'e', 'r', ' ',
+  'L', 'a', 'd', '-', 'M', 'e', 'i', 's', 't', 'e', 'r', '!', '!', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char Comp7[] = {
+  'Y', 'o', 'u', ' ', 'a', 'r', 'e', ' ', 'a', ' ', 't', 'r', 'u', 'e', ' ',
+  'L', 'a', 'd', '-', 'M', 'a', 's', 't', 'e', 'r', '!', '!', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char TextHighSave[] = {
+  'A', 'k', 't', 'u', 'a', 'l', 'i', 's', 'i', 'e', 'r', 'e', ' ',
+  'R', 'a', 'n', 'g', 'l', 'i', 's', 't', 'e', '.', '.', '.'
+};
+@endif
+@ifdef I8N_EN
+@chunk char TextHighSave[] = {
+  'U', 'p', 'd', 'a', 't', 'i', 'n', 'g', ' ', 'h', 'i', 'g', 'h', ' ',
+  's', 'c', 'o', 'r', 'e', 's', '.', '.', '.'
+};
+@endif
+
+@end TEXT;
+
+
+/*
+ ***************************************************************************
+ *                  RESOURCE Play
+ ***************************************************************************
+ */
+
+@start PLAY, data;
+
+@ifdef I8N_DE
+@chunk byte ScreenLoad[] = {
+  TSPOS(6, 30),
+  TSD_T_TEXT, 18,
+    '.', ':', ':', ' ', 'L', 'A', 'D', 'E', ' ',
+    'L', 'E', 'V', 'E', 'L', ' ', ':', ':', '.',
+  TSPOS(9, 23),
+  TSD_T_CHAR + 3, '<', // Text "<<<"
+  TSPOS(9, 53),
+  TSD_T_CHAR + 3, '>', // Text ">>>"
+  TSPOS(12, 34),
+  TSD_T_TEXT + 6,
+    'R', 'u', 'n', 'd', 'e', ':',
+  TSPOS(13, 34),
+  TSD_T_TEXT + 6,
+    'L', 'e', 'v', 'e', 'l', ':',
+  TSPOS(16, 32),
+  TSD_T_TEXT + 12,
+    'B', 'i', 't', 't', 'e', ' ', 'w', 'a', 'r', 't', 'e', 'n',
+  TSD_T_CHAR + 3, '.' // Text "..."
+};
+@endif
+@ifdef I8N_EN
+@chunk byte ScreenLoad[] = {
+  TSPOS(6, 29),
+  TSD_T_TEXT, 21,
+    '.', ':', ':', ' ', 'L', 'O', 'A', 'D', 'I', 'N', 'G', ' ',
+    'L', 'E', 'V', 'E', 'L', ' ', ':', ':', '.',
+  TSPOS(9, 23),
+  TSD_T_CHAR + 3, '<', // Text "<<<"
+  TSPOS(9, 53),
+  TSD_T_CHAR + 3, '>', // Text ">>>"
+  TSPOS(12, 34),
+  TSD_T_TEXT + 6,
+    'R', 'o', 'u', 'n', 'd', ':',
+  TSPOS(13, 34),
+  TSD_T_TEXT + 6,
+    'L', 'e', 'v', 'e', 'l', ':',
+  TSPOS(16, 32),
+  TSD_T_TEXT + 11,
+    'P', 'l', 'e', 'a', 's', 'e', ' ', 'w', 'a', 'i', 't',
+  TSD_T_CHAR + 3, '.' // Text "..."
+};
+@endif
+
+@ifdef I8N_DE
+@chunk byte ScreenPlay[] = {
+  TSPOS(20, 1),
+  TSD_T_TEXT + 4,
+    'L', 'a', 'd', 's',
+  TSP_T_MOVE + 10,
+  TSD_T_TEXT + 5,
+    'R', 'u', 'n', 'd' ,'e',
+  TSP_T_MOVE + 10,
+  TSD_T_TEXT + 6,
+    'P', 'u', 'n', 'k', 't', 'e',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSP_T_MOVE, 19,
+  TSD_T_TEXT + 9,
+    'B', 'o', 'n', 'u', 's', 'z', 'e', 'i', 't',
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, '0' // Text "00"
+};
+@endif
+@ifdef I8N_EN
+@chunk byte ScreenPlay[] = {
+  TSPOS(20, 1),
+  TSD_T_TEXT + 4,
+    'L', 'a', 'd', 's',
+  TSP_T_MOVE + 10,
+  TSD_T_TEXT + 5,
+    'R', 'o', 'u', 'n' ,'d',
+  TSP_T_MOVE + 10,
+  TSD_T_TEXT + 5,
+    'S', 'c', 'o', 'r', 'e',
+  TSP_T_MOVE + 6,
+  TSD_T_CHAR + 2, '0', // Text "00"
+  TSP_T_MOVE, 19,
+  TSD_T_TEXT + 10,
+    'B', 'o', 'n', 'u', 's', ' ', 't', 'i', 'm', 'e',
+  TSP_T_MOVE + 4,
+  TSD_T_CHAR + 2, '0' // Text "00"
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char TextPlayReady[] = {
+  'B', 'e', 'r', 'e', 'i', 't', 'm', 'a', 'c', 'h', 'e', 'n', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char TextPlayReady[] = {
+  'G', 'e', 't', ' ', 'r', 'e', 'a', 'd', 'y', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char TextPlayHooka[] = {
+  'S', 'h', 'i', 's', 'h', 'a', '!'
+};
+@endif
+@ifdef I8N_EN
+@chunk char TextPlayHooka[] = {
+  'H', 'o', 'o', 'k', 'a', '!'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char TextPlayCont[] = {
+  'D', 'r', C_LU_DIERESIS, 'c', 'k', ' ', 'E', 'N', 'T', 'E', 'R', ' ',
+  'u', 'm', ' ',
+  // XXX: -> "Warning fixing up unused space in lmem resource play" without last space !!!
+  'w', 'e', 'i', 't', 'e', 'r', 'z', 'u', 'm', 'a', 'c', 'h', 'e', 'n', ':', ' '
+};
+@endif
+@ifdef I8N_EN
+@chunk char TextPlayCont[] = {
+  'T', 'y', 'p', 'e', ' ', 'R', 'E', 'T', 'U', 'R', 'N', ' ', 't', 'o', ' ',
+  'c', 'o', 'n', 't', 'i', 'n', 'u', 'e', ':'
+};
+@endif
+
+// Name, Bonus Time, Lad Start Position,
+// { Number of Emitters, { Positions of Emitters} },
+// Maximum Ders,
+// Level Data
+@chunkArray Level Levels = {
+  {
+    @LevelName1, 35, 5 + 18 * LVL_COLS,
+    {
+      1, { 39 }
+    },
+    5,
+    @LevelData1
+  },
+  {
+    @LevelName2, 45, 17 + 18 * LVL_COLS,
+    {
+      2, { 13 + 2 * LVL_COLS, 67 + 2 * LVL_COLS }
+    },
+    8,
+    @LevelData2
+  },
+  {
+    @LevelName3, 33, 5 + 2 * LVL_COLS,
+    {
+      3, { 28, 44, 56 }
+    },
+    5,
+    @LevelData3
+  },
+  {
+    @LevelName4, 32, 77 + 16 * LVL_COLS,
+    {
+      2, { 44, 68 }
+    },
+    5,
+    @LevelData4
+  },
+  {
+    @LevelName5, 29, 74 + 3 * LVL_COLS,
+    {
+      2, { 61 + LVL_COLS, 29 + 4 * LVL_COLS }
+    },
+    7,
+    @LevelData5
+  },
+  {
+    @LevelName6, 29, 33 + 8 * LVL_COLS,
+    {
+      2, { 63, 44 + 4 * LVL_COLS }
+    },
+    6,
+    @LevelData6
+  },
+  {
+    @LevelName7, 22, 6 + 2 * LVL_COLS,
+    {
+      2, { 60, 6 + 4 * LVL_COLS }
+    },
+    6,
+    @LevelData7
+  }
+};
+
+@ifdef I8N_DE
+@chunk char LevelName1[] = {
+  'E', 'i', 'n', 'f', 'a', 'c', 'h', 'e', ' ', 'S', 't', 'r', 'a', 's', 's', 'e'
+};
+@endif
+@ifdef I8N_EN
+@chunk char LevelName1[] = {
+  'E', 'a', 's', 'y', ' ', 'S', 't', 'r', 'e', 'e', 't'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char LevelName2[] = {
+  'L', 'a', 'n', 'g', 'e', ' ', 'I', 'n', 's', 'e', 'l'
+};
+@endif
+@ifdef I8N_EN
+@chunk char LevelName2[] = {
+  'L', 'o', 'n', 'g', ' ', 'I', 's', 'l', 'a', 'n', 'd'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char LevelName3[] = {
+  'G', 'e', 'i', 's', 't', 'e', 'r', ' ', 'D', 'o', 'r', 'f'
+};
+@endif
+@ifdef I8N_EN
+@chunk char LevelName3[] = {
+  'G', 'h', 'o', 's', 't', ' ', 'T', 'o', 'w', 'n'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char LevelName4[] = {
+ 'T', 'u', 'n', 'n', 'e', 'l', ' ', 'V', 'i', 's', 'i', 'o', 'n'
+};
+@endif
+@ifdef I8N_EN
+@chunk char LevelName4[] = {
+ 'T', 'u', 'n', 'n', 'e', 'l', ' ', 'V', 'i', 's', 'i', 'o', 'n'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char LevelName5[] = {
+  'P', 'u', 'n', 'k', 't', ' ', 'o', 'h', 'n', 'e', ' ',
+  'W', 'i', 'e', 'd', 'e', 'r', 'k', 'e', 'h', 'r'
+};
+@endif
+@ifdef I8N_EN
+@chunk char LevelName5[] = {
+  'P', 'o', 'i', 'n', 't', ' ', 'o', 'f', ' ', 'N', 'o', ' ',
+  'R', 'e', 't', 'u', 'r', 'n'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char LevelName6[] = {
+  'K', C_LA_DIERESIS, 'f', 'e', 'r', ' ', 'S', 't', 'a', 'd', 't'
+};
+@endif
+@ifdef I8N_EN
+@chunk char LevelName6[] = {
+  'B', 'u', 'g', ' ', 'C', 'i', 't', 'y'
+};
+@endif
+
+@ifdef I8N_DE
+@chunk char LevelName7[] = {
+  'R', 'o', 't', 't', 'e', 'n', ' ', 'L', 'a', 'n', 'd'
+};
+@endif
+@ifdef I8N_EN
+@chunk char LevelName7[] = {
+  'G', 'a', 'n', 'g', ' ', 'L', 'a', 'n', 'd'
+};
+@endif
+
+// Data of Level 1
+@chunk byte LevelData1[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 39),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 7),
+  LSD_T_BASE, 60,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 0),
+  LSD_T_BASE, 46,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE, 30,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 68),
+  LSD_T_WALL + 1,
+  LSP_T_MOVE + 7,
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 67),
+  LSD_T_TEXT + 11, 'E', 'a', 's', 'y', ' ', 'S', 't', 'r', 'e', 'e', 't',
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 7),
+  LSD_T_BASE, 30,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE, 23,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 0),
+  LSD_T_BASE, 23,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 22,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 24,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 78),
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 16),
+  LSD_T_LADDER + 6,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 27),
+  LSD_T_LADDER + 3,
+  LSP_T_MOVE + 2,
+  LSD_T_LADDER + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 0, 57),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 2,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5
+};
+
+// Data of Level 2
+@chunk byte LevelData2[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 67),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 12),
+  LSD_T_WALL + 1,
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 67),
+  LSD_T_EMIT + 1,
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 0),
+  LSD_T_BASE, 28,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 25,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 22,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 25),
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 53),
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_BALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 0),
+  LSD_T_BASE, 26,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE + 6,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE, 19,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE, 22,
+  LSPOS(LSP_T_SET | LSO_T_H, 10, 52),
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_BALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 0),
+  LSD_T_BASE, 26,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE + 6,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE, 16,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE, 22,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 52),
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 3,
+  LSD_T_BALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 0),
+  LSD_T_BASE, 25,
+  LSP_T_MOVE + 2,
+  LSD_T_BASE + 8,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 14,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE, 21,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 0),
+  LSD_T_BASE + 14,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 1),
+  LSD_T_TEXT + 11, 'L', 'o', 'n', 'g', ' ', 'I', 's', 'l', 'a', 'n', 'd',
+  LSP_T_MOVE + 1,
+  LSD_T_WALL + 1,
+  LSP_T_MOVE + 13,
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 54),
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 4),
+  LSD_T_LADDER + 5,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 13, 27),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 9, 34),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 17, 36),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 0, 74),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 2,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 5
+};
+
+// Data of Level 3
+@chunk byte LevelData3[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 28),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 44),
+  LSD_T_EMIT + 1,
+  LSP_T_MOVE + 11,
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 72),
+  LSD_T_EXIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 71),
+  LSD_T_EXIT + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 70),
+  LSD_T_EXIT + 5,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 0),
+  LSD_T_BASE + 14,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 62),
+  LSD_T_BASE, 16,
+  LSPOS(LSP_T_SET | LSO_T_H, 5, 41),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 5),
+  LSD_T_BASE + 14,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE + 4,
+  LSP_T_MOVE + 5,
+  LSD_T_BASE + 1,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 6,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 1,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE + 4,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 11,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 19),
+  LSD_T_TRAP + 3,
+  LSP_T_MOVE + 4,
+  LSD_T_TRAP + 5,
+  LSP_T_MOVE + 1,
+  LSD_T_TRAP + 4,
+  LSP_T_MOVE + 6,
+  LSD_T_TRAP + 4,
+  LSP_T_MOVE + 1,
+  LSD_T_TRAP + 3,
+  LSP_T_MOVE + 4,
+  LSD_T_TRAP + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 10),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 62),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 10, 10),
+  LSD_T_BASE, 53,
+  LSP_T_MOVE + 1,
+  LSD_T_BASE + 11,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 13),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 13, 14),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 14),
+  LSD_T_BASE, 64,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 32),
+  LSD_T_TRAP + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 31),
+  LSD_T_TRAP + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 78),
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 4),
+  LSD_T_TEXT + 5, 'G', 'h', 'o', 's', 't',
+  LSP_T_MOVE + 2,
+  LSD_T_TEXT + 4, 'T', 'o', 'w', 'n',
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 10),
+  LSD_T_LADDER + 4,
+  LSPOS(LSP_T_SET | LSO_T_V, 9, 32),
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 13, 50),
+  LSD_T_LADDER + 3,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 63),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 8, 70),
+  LSD_T_WALL + 2,
+  LSP_T_MOVE + 3,
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 78),
+  LSD_T_LADDER + 5,
+  LSD_T_EXIT + 1
+};
+
+// Data of Level 4
+@chunk byte LevelData4[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 44),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 68),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 45),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 0),
+  LSD_T_BASE + 11,
+  LSD_T_BASE2 + 2,
+  LSD_T_BASE, 33,
+  LSP_T_MOVE + 5,
+  LSD_T_BASE + 3,
+  LSD_T_BASE2 + 4,
+  LSD_T_BASE, 16,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 36),
+  LSD_T_WALL + 1,
+  LSD_T_GOLD + 2,
+  LSPOS(LSP_T_SET | LSO_T_H, 5, 36),
+  LSD_T_BASE, 18,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 43),
+  LSD_T_TEXT + 6, 'T', 'u', 'n', 'n', 'e', 'l',
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 17),
+  LSD_T_BASE + 7,
+  LSD_T_BASE2 + 3,
+  LSD_T_BASE + 3,
+  LSD_T_BASE2 + 4,
+  LSD_T_BASE, 19,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 15),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 43),
+  LSD_T_TEXT + 6, 'V', 'i', 's', 'i', 'o', 'n',
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 15),
+  LSD_T_BASE + 9,
+  LSD_T_BASE2 + 3,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 6,
+  LSD_T_BASE2 + 5,
+  LSD_T_BASE + 12,
+  LSPOS(LSP_T_SET | LSO_T_H, 10, 53),
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 18),
+  LSD_T_BASE + 9,
+  LSD_T_BASE2 + 4,
+  LSD_T_BASE + 3,
+  LSD_T_BASE2 + 4,
+  LSD_T_BASE, 16,
+  LSP_T_MOVE + 11,
+  LSD_T_BASE + 14,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 0),
+  LSD_T_BASE + 4,
+  LSD_T_BASE2 + 3,
+  LSD_T_BASE + 4,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 15),
+  LSD_T_BASE, 16,
+  LSD_T_BASE2 + 3,
+  LSD_T_BASE + 3,
+  LSD_T_BASE2 + 3,
+  LSD_T_BASE, 19,
+  LSPOS(LSP_T_SET | LSO_T_H, 16, 4),
+  LSD_T_BASE + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 5),
+  LSD_T_EXIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 68),
+  LSD_T_BASE + 11,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 1),
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_EXIT + 3,
+  LSP_T_MOVE + 2,
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 4,
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 31),
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 7,
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 61),
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 8,
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 15, 0),
+  LSD_T_WALL + 4,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 5),
+  LSD_T_LADDER + 10,
+  LSPOS(LSP_T_SET | LSO_T_V, 15, 10),
+  LSD_T_WALL + 4,
+  LSPOS(LSP_T_SET | LSO_T_V, 10, 17),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 19),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 51),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 12, 58),
+  LSD_T_GOLD + 1,
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 62),
+  LSD_T_LADDER, 17,
+  LSPOS(LSP_T_SET | LSO_T_V, 16, 71),
+  LSD_T_LADDER + 3,
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 74),
+  LSD_T_LADDER + 4
+};
+
+// Data of Level 5
+@chunk byte LevelData5[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 61),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 10),
+  LSD_T_LADDER + 12,
+  LSP_T_MOVE + 5,
+  LSD_T_BALL + 1,
+  LSD_T_LADDER + 13,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 29),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 66),
+  LSD_T_BASE + 13,
+  LSPOS(LSP_T_SET | LSO_T_H, 6, 50),
+  LSD_T_BALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 0),
+  LSD_T_BASE, 18,
+  LSD_T_BASE2 + 11,
+  LSD_T_BASE, 17,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 53),
+  LSD_T_BASE, 20,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 18),
+  LSD_T_GOLD + 1,
+  LSD_T_BALL + 2,
+  LSD_T_TRAP + 3,
+  LSD_T_BALL + 5,
+  LSD_T_TRAP + 1,
+  LSD_T_BALL + 2,
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_TRAP + 2,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 2,
+  LSD_T_BASE2 + 9,
+  LSPOS(LSP_T_SET | LSO_T_H, 12, 13),
+  LSD_T_BASE, 28,
+  LSP_T_MOVE + 5,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 13, 13),
+  LSD_T_BASE + 3,
+  LSP_T_MOVE + 6,
+  LSD_T_BASE + 3,
+  LSP_T_MOVE + 6,
+  LSD_T_BASE + 3,
+  LSP_T_MOVE + 12,
+  LSD_T_BASE2 + 9,
+  LSD_T_BASE, 24,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 30),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 52),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 16, 3),
+  LSD_T_BASE + 10,
+  LSD_T_BASE2, 25,
+  LSD_T_BASE + 7,
+  LSD_T_BASE2 + 10,
+  LSD_T_BASE, 19,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_TRAP + 3,
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 9,
+  LSD_T_TRAP, 25,
+  LSD_T_RECV + 1,
+  LSP_T_MOVE + 5,
+  LSD_T_RECV + 1,
+  LSD_T_TRAP + 10,
+  LSD_T_RECV + 1,
+  LSD_T_TEXT, 18, 'P', 'o', 'i', 'n', 't', ' ', 'o', 'f', ' ', 'N', 'o', ' ', 'R', 'e', 't', 'u', 'r', 'n',
+  LSD_T_RECV + 1,
+  LSD_T_TRAP + 4,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 3),
+  LSD_T_LADDER + 10,
+  LSPOS(LSP_T_SET | LSO_T_V, 0, 9),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 3,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 3, 41),
+  LSD_T_LADDER + 5,
+  LSP_T_MOVE + 2,
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 8, 58),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 3, 68),
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 12, 72),
+  LSD_T_LADDER + 4
+};
+
+// Data of Level 6
+@chunk byte LevelData6[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 8),
+  LSD_T_TEXT + 8, 'B', 'u', 'g', ' ', 'C', 'i', 't', 'y',
+  LSP_T_MOVE + 13,
+  LSD_T_LADDER + 8,
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 63),
+  LSD_T_EMIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 27),
+  LSD_T_LADDER + 3,
+  LSP_T_MOVE + 6,
+  LSD_T_LADDER + 3,
+  LSPOS(LSP_T_SET_AND_DRAW | LSO_T_H, 2, 46), '>',
+  LSD_T_CHAR + 8, 'm',
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 4),
+  LSD_T_BASE + 15,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 38),
+  LSD_T_BASE, 20,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 18),
+  LSD_T_WALL + 1,
+  LSD_T_BASE + 5,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 63),
+  LSD_T_BASE, 16,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 11),
+  LSD_T_BASE + 12,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 45),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 29),
+  LSD_T_BASE, 22,
+  LSP_T_MOVE + 12,
+  LSD_T_BASE + 6,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 67),
+  LSD_T_BASE + 10,
+  LSPOS(LSP_T_SET | LSO_T_H, 12, 0),
+  LSD_T_BASE + 7,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 15,
+  LSD_T_BASE, 21,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 9),
+  LSD_T_BASE + 10,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE + 7,
+  LSP_T_MOVE + 9,
+  LSD_T_TEXT + 2, '<', '>',
+  LSPOS(LSP_T_SET | LSO_T_H, 16, 34),
+  LSD_T_BASE + 10,
+  LSP_T_MOVE + 7,
+  LSD_T_BASE + 5,
+  LSP_T_MOVE + 5,
+  LSD_T_BASE + 1,
+  LSP_T_MOVE + 5,
+  LSD_T_BASE + 12,
+  LSPOS(LSP_T_SET_AND_DRAW | LSO_T_H, 17, 5), 'i',
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 78),
+  LSD_T_RECV + 1,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 3),
+  LSD_T_LADDER + 11,
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 15),
+  LSD_T_LADDER + 9,
+  LSPOS(LSP_T_SET | LSO_T_V, 10, 22),
+  LSD_T_GOLD + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 10, 23),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 4, 33),
+  LSD_T_CHAR + 2, '/',
+  LSPOS(LSP_T_SET | LSO_T_V, 15, 33),
+  LSD_T_LADDER + 4,
+  LSPOS(LSP_T_SET | LSO_T_V, 4, 44),
+  LSD_T_EMIT + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_WALL + 3,
+  LSP_T_MOVE + 2,
+  LSD_T_LADDER + 4,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 46),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 8, 51),
+  LSD_T_LADDER + 6,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 3, 68),
+  LSD_T_LADDER + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 10, 72),
+  LSD_T_LADDER + 6
+};
+
+// Data of Level 7
+@chunk byte LevelData7[] = {
+  // Horizontal drawings
+  LSPOS(LSP_T_SET | LSO_T_H, 0, 20),
+  LSD_T_BASE + 1,
+  LSD_T_TEXT + 9, 'G', 'a', 'n', 'g', ' ', 'L', 'a', 'n', 'd',
+  LSD_T_BASE + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 1, 19),
+  LSD_T_BASE + 2,
+  LSP_T_MOVE + 9,
+  LSD_T_BASE + 2,
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 23),
+  LSD_T_TEXT + 2, '[', ']',
+  LSPOS(LSP_T_SET | LSO_T_H, 2, 49),
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 0),
+  LSD_T_BASE + 11,
+  LSPOS(LSP_T_SET | LSO_T_H, 3, 48),
+  LSD_T_BASE + 3,
+  LSP_T_MOVE + 3,
+  LSD_T_BASE, 19,
+  LSPOS(LSP_T_SET | LSO_T_H, 4, 6),
+  LSD_T_EMIT + 1,
+  LSP_T_MOVE + 13,
+  LSD_T_BASE + 13,
+  LSP_T_MOVE + 6,
+  LSD_T_BASE + 6,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 20),
+  LSD_T_TRAP + 3,
+  LSD_T_GOLD + 2,
+  LSD_T_TRAP + 3,
+  LSP_T_MOVE + 1,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 1,
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_TRAP + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 7, 60),
+  LSD_T_BASE + 13,
+  LSPOS(LSP_T_SET | LSO_T_H, 8, 5),
+  LSD_T_BASE + 6,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE, 41,
+  LSP_T_MOVE + 10,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 9, 65),
+  LSD_T_GOLD + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 10, 64),
+  LSD_T_GOLD + 5,
+  LSPOS(LSP_T_SET | LSO_T_H, 11, 60),
+  LSD_T_BASE + 13,
+  LSPOS(LSP_T_SET | LSO_T_H, 12, 14),
+  LSD_T_BASE + 5,
+  LSD_T_BASE2 + 6,
+  LSD_T_BASE, 17,
+  LSPOS(LSP_T_SET | LSO_T_H, 12, 63),
+  LSD_T_EXIT + 1,
+  LSP_T_MOVE + 5,
+  LSD_T_EXIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 13, 62),
+  LSD_T_EXIT + 3,
+  LSP_T_MOVE + 3,
+  LSD_T_EXIT + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 0),
+  LSD_T_BASE + 4,
+  LSD_T_BASE2 + 6,
+  LSD_T_BASE + 3,
+  LSPOS(LSP_T_SET | LSO_T_H, 14, 61),
+  LSD_T_EXIT + 5,
+  LSP_T_MOVE + 1,
+  LSD_T_EXIT + 5,
+  LSPOS(LSP_T_SET | LSO_T_H, 15, 43),
+  LSD_T_BASE + 13,
+  LSP_T_MOVE + 4,
+  LSD_T_BASE + 12,
+  LSPOS(LSP_T_SET | LSO_T_H, 16, 42),
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 10,
+  LSD_T_GOLD + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 13),
+  LSD_T_TRAP + 14,
+  LSPOS(LSP_T_SET | LSO_T_H, 17, 50),
+  LSD_T_BASE + 6,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 0),
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 20),
+  LSD_T_BALL + 1,
+  LSP_T_MOVE + 6,
+  LSD_T_GOLD + 1,
+  LSP_T_MOVE + 3,
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_RECV + 1,
+  LSPOS(LSP_T_SET | LSO_T_H, 18, 56),
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 2,
+  LSD_T_TRAP + 1,
+  LSP_T_MOVE + 7,
+  LSD_T_TRAP + 12,
+  // Vertical drawings
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 4),
+  LSD_T_LADDER + 5,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 11),
+  LSD_T_LADDER + 7,
+  LSPOS(LSP_T_SET | LSO_T_V, 15, 12),
+  LSD_T_WALL + 3,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 20),
+  LSD_T_WALL + 2,
+  LSP_T_MOVE + 11,
+  LSD_T_BASE + 1,
+  LSD_T_EXIT + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 26),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 1, 27),
+  LSD_T_CHAR + 3, '_',
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 28),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 30),
+  LSD_T_WALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 17, 33),
+  LSD_T_EXIT + 1,
+  LSD_T_LADDER + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 17, 35),
+  LSD_T_TRAP + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 3, 38),
+  LSD_T_LADDER + 9,
+  LSPOS(LSP_T_SET | LSO_T_V, 13, 41),
+  LSD_T_WALL + 3,
+  LSPOS(LSP_T_SET | LSO_T_V, 7, 50),
+  LSD_T_LADDER + 8,
+  LSPOS(LSP_T_SET | LSO_T_V, 6, 55),
+  LSD_T_WALL + 2,
+  LSP_T_MOVE + 1,
+  LSD_T_WALL + 6,
+  LSPOS(LSP_T_SET | LSO_T_V, 0, 60),
+  LSD_T_EMIT + 1,
+  LSP_T_MOVE + 4,
+  LSD_T_GOLD + 1,
+  LSD_T_WALL + 1,
+  LSPOS(LSP_T_SET | LSO_T_V, 1, 70),
+  LSD_T_BALL + 2,
+  LSPOS(LSP_T_SET | LSO_T_V, 2, 72),
+  LSD_T_LADDER + 10
+};
+
+// This chunk is only a place holder. It will be resized during startup.
+@chunk char LevelBuffer[] = {
+  ""
+};
+
+@end PLAY;
+
+
+/* End of APPUI.GOC */

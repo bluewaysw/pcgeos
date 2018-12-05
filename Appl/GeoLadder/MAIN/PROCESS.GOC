@@ -1,0 +1,945 @@
+/*
+ ***************************************************************************
+ * Copyright (c) 2010-2013 by YoYu-Productions
+ *
+ * PROJECT:     GeoLadder
+ * MODULE:      GOC code file
+ * FILE:        MAIN\PROCESS.GOC
+ *
+ * AUTHOR:      Andreas Bollhalder
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ *                  INCLUDE FILES
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+@include <ladder.goh>
+@include <ui/appui.goh>
+
+#include "initfile.h"
+#include <sound.h>
+#include <ansi/ctype.h>
+#include <ansi/string.h>
+
+
+/*
+ ***************************************************************************
+ *                  EXTERNAL DECLARATIONS (see LADPALY.GOC)
+ ***************************************************************************
+ */
+
+extern Globals g;
+
+extern word _pascal Random(word max);
+
+
+/*
+ ***************************************************************************
+ *                  LOCAL DECLARATIONS
+ ***************************************************************************
+ */
+
+static const char ICL[] = INI_CATEGORY;
+static const char IKS[] = INI_KEY_STATE;
+static const char IKL[] = INI_KEY_LAST;
+
+// Lookup table for stimulis
+static const optr LST[STMS] =
+{
+  @Stim1, @Stim2, @Stim3, @Stim4
+};
+// Lookup table for score of compliments
+static const word LHS[CMPS] =
+{
+  0, 100, 200, 500, 1000, 2000, 5000
+};
+// Lookup table for text of compliments
+static const optr LHT[CMPS] =
+{
+  @Comp1, @Comp2, @Comp3, @Comp4, @Comp5, @Comp6, @Comp7
+};
+
+void _pascal StopTimer(void);
+static word _pascal TicksByDifficulty(word diff);
+
+
+/*
+ ***************************************************************************
+ *                  FUNCTIONS
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *                  TimerStop
+ ***********************************************************************
+ * SYNOPSIS:        Stop a running timer and reset the global variables
+ *                  of the timer.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    We do not flush the message queue which could
+ *                  contain an already sent message.
+ *
+ * STRATEGY:        1/ Check if the global TimerHandle is not a
+ *                     NullHandle.
+ *                  2/ Stop the timer referenced by the global
+ *                     TimerHandle.
+ *                  3/ Set the global TimerHandle to a NullHandle.
+ *                  4/ Set the global TimerID to 0.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+void _pascal StopTimer(void)
+{
+  if (g.timerHandle != NullHandle)
+  {
+    TimerStop(g.timerHandle, g.timerId);
+    g.timerHandle = NullHandle;
+    g.timerId = 0;
+  }
+}
+
+/***********************************************************************
+ *                  StopAndFreeNoise
+ ***********************************************************************
+ * SYNOPSIS:        Stop a running noise and reset the global variables
+ *                  of the noise.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( void )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    We do not flush the message queue which could
+ *                  contain an already sent message.
+ *
+ * STRATEGY:        1/ Check if the global TimerHandle is not a
+ *                     NullHandle.
+ *                  2/ Stop the timer referenced by the global
+ *                     TimerHandle.
+ *                  3/ Set the global TimerHandle to a NullHandle.
+ *                  4/ Set the global TimerID to 0.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2013-01-07    Initial Revision
+ *
+ ***********************************************************************/
+void _pascal StopAndFreeNoise(void)
+{
+  if (g.noiseHandle != NullHandle)
+  {
+    SoundStopMusicNote(g.noiseHandle);
+    SoundFreeMusicNote(g.noiseHandle);
+    g.noiseHandle = NullHandle;
+  }
+}
+
+/***********************************************************************
+ *                  TicksByDifficulty
+ ***********************************************************************
+ * SYNOPSIS:        Calculate the ticks between two frames from the
+ *                  difficulty set by the user.
+ * FORMULA:         ticks = abs(diff - PLY_DIFF_MAX) + 4
+ * CALLED BY:       Internal
+ * PARAMETERS:      word ( word diff )
+ * RETURN:          A word containing the number of ticks.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Implement the formula without FP usage.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+static word _pascal TicksByDifficulty(word diff)
+{
+  sword d;
+  d = diff - PLY_DIFF_MAX;
+  if (d < 0)
+  {
+    d = -d;
+  }
+  return d + 4;
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderProcessClass
+ ***************************************************************************
+ */
+
+@classdecl LadderProcessClass, neverSaved;
+
+@extern method LadderProcessClass, MSG_LAD_GAME_LOAD_INFO;
+@extern method LadderProcessClass, MSG_LAD_GAME_LOAD_DATA;
+@extern method LadderProcessClass, MSG_LAD_GAME_INIT;
+@extern method LadderProcessClass, MSG_LAD_GAME_READY;
+@extern method LadderProcessClass, MSG_LAD_GAME_START;
+@extern method LadderProcessClass, MSG_LAD_GAME_EXEC;
+@extern method LadderProcessClass, MSG_LAD_GAME_WAIT;
+@extern method LadderProcessClass, MSG_LAD_GAME_FAIL;
+@extern method LadderProcessClass, MSG_LAD_GAME_DIES;
+@extern method LadderProcessClass, MSG_LAD_GAME_CLEAR;
+@extern method LadderProcessClass, MSG_LAD_GAME_HOOKA;
+@extern method LadderProcessClass, MSG_LAD_GAME_NEXT;
+
+
+/***********************************************************************
+ *                  MSG_GEN_PROCESS_OPEN_APPLICATION
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Setup the memory and initialize values.
+ * CALLED BY:       Startup
+ * PARAMETERS:      void ( AppAttachFlags attachFlags,
+ *                         MemHandle launchBlock,
+ *                         MemHandle extraState )
+ * RETURN:          nothing
+ * SUPER:           Must be called before any visible actions.
+ * SIDE EFFECTS:    If the reallocation of memory for the level buffer
+ *                  fails, unexpected behaviour will happen.
+ *
+ * STRATEGY:        1/ Reallocate the full space for the level buffer.
+ *                  2/ Allocate a MemHandle for playing noises.
+ *                  3/ Load the difficulty, sound and last score from
+ *                     the INI file and set the objects to display them.
+ *                     If the values can't be read from the INI file,
+ *                     set default values.
+ *                  4/ Send message to the LadderRank object to read in
+ *                     the ranking list from his file.
+ *                  5/ Call super to do the default behaviour.
+ *                  6/ Start the menu.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION  // 280 Bytes
+{
+  word state;
+  // Lock and dereference the level buffer
+  MemLock(OptrToHandle(@LevelBuffer));
+  // Resize the level buffer
+  LMemReAlloc(@LevelBuffer, LVL_M_SIZE);
+  // Unlock the level buffer
+  MemUnlock(OptrToHandle(@LevelBuffer));
+  // Allocate a MemHandle for the noise
+  SoundAllocMusicNote(0, 0, 0, 0, 0, 0, &g.noiseHandle);
+  // Get the state from the INI file
+  if (InitFileReadInteger(&ICL, &IKS, &state))
+  {
+    g.game.diff = 1;
+    g.game.sound = PLY_SND_OFF;
+  }
+  else
+  {
+    // Get the difficulty from the high byte
+    g.game.diff = state >> 8;
+    // Set the value
+    @send LadderMenuDiff::MSG_VAL_SET_VALUE(g.game.diff);
+    // Get the sound from the low byte
+    g.game.sound = state & 0x0F;
+    if (g.game.sound == PLY_SND_ON)
+    {
+      // Set the text
+      @send LadderMenuSound::MSG_TXT_SET_TEXT(@TextMenuOn);
+    }
+  }
+  // Get the last score from the INI file
+  if (InitFileReadInteger(&ICL, &IKL, &g.game.score))
+  {
+    g.game.score = 0;
+  }
+  else
+  {
+    // Set the value
+    @send LadderMenuLastScore::MSG_VAL_SET_VALUE(g.game.score);
+  }
+  // Load the scores from the file
+  @send LadderMenuRank::MSG_RNK_LOAD();
+  // Do super
+  @callsuper();
+  // Start the menu
+  @send process::MSG_LAD_MENU();
+}
+
+/***********************************************************************
+ *                  MSG_GEN_PROCESS_CLOSE_APPLICATION
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Stop and release self allocated resources, save
+ *                  state values.
+ * CALLED BY:       Shutdown
+ * PARAMETERS:      MemHandle ( void )
+ * RETURN:          NullHandle
+ * SUPER:           Must be called after releasing any self allocated
+ *                  resources.
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any potentially running timer.
+ *                  2/ Stop and free the MemHandle for playing noises.
+ *                  3/ Save the difficulty, sound and last score to the
+ *                     INI file.
+ *                  4/ Call super to do the default behaviour.
+ *                  5/ Return a NullHandle to indicate we don't have
+ *                     any extra state.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION  // 91 Bytes
+{
+  // Stop the current timer
+  StopTimer();
+  // Stop the noise
+  StopAndFreeNoise();
+  // Write the state to the INI file
+  InitFileWriteInteger(&ICL, &IKS, (g.game.diff << 8) | (g.game.sound & 0x0F));
+  // Write the last score to the INI file
+  InitFileWriteInteger(&ICL, &IKL, g.game.score);
+  // Do super
+  @callsuper();
+  // We do not have an extra state
+  return NullHandle;
+}
+
+/***********************************************************************
+ *                  MSG_LAD_MENU
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Initialize and load the menu screen.
+ * CALLED BY:       Startup or when returning from help or play.
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set the global states.
+ *                  2/ Clear the info line.
+ *                  3/ Set the content.
+ *                  4/ Start the stimuli.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_MENU  // 54 Bytes
+{
+  // Set the application state for the handling of key presses
+  g.appState = APP_I_MENU;
+  // Reset the tri state
+  g.triState = TRI_S_NONE;
+  // XXX: -> Really needed ??? Or switch the last 2 ones.
+  // Clear the text in the info line
+  @send LadderMenuInfo::MSG_TXT_UPDATE_TEXT(NullOptr);
+  // Show the menu screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderMenu);
+  // Start the stimulus
+  @send oself::MSG_LAD_MENU_STIM();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_MENU_DIFF, MSG_LAD_MENU_SOUND
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Change the difficulty or enable/disable the sound.
+ * CALLED BY:       User by pressing the key 'd' or 's' in the menu.
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop the stimuli.
+ *                  2/ (a) MSG_LAD_MENU_DIFF:
+ *                         Increase the difficulty. If we are over the
+ *                         maximum difficulty, set it to the minimum.
+ *                         Update the screen.
+ *                  3/ (b) MSG_LAD_MENU_SOUND:
+ *                         Enable or disable the sound.
+ *                         Update the screen.
+ *                  4/ Start the stimuli.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_MENU_DIFF,  // 120 Bytes
+                            MSG_LAD_MENU_SOUND
+{
+  // Stop the stimulus
+  @send process::MSG_LAD_MENU_STIM_END();
+  // Handle the message
+  if (message == MSG_LAD_MENU_DIFF)
+  {
+    // Increase the difficulty
+    g.game.diff++;
+    // On overflow set it to the minimum
+    if (g.game.diff > PLY_DIFF_MAX)
+    {
+      g.game.diff = PLY_DIFF_MIN;
+    }
+    // Update the value on screen
+    @send LadderMenuDiff::MSG_VAL_UPDATE_VALUE(g.game.diff);
+  }
+  else  // MSG_LAD_MENU_SOUND
+  {
+    // Switch the sound state
+    if (g.game.sound == PLY_SND_OFF)
+    {
+      // Set the sound state
+      g.game.sound = PLY_SND_ON;
+      // Update the text on screen
+      @send LadderMenuSound::MSG_TXT_UPDATE_TEXT(@TextMenuOn);
+    }
+    else  // PLY_SND_ON
+    {
+      // Set the sound state
+      g.game.sound = PLY_SND_OFF;
+      // Update the text on screen
+      @send LadderMenuSound::MSG_TXT_UPDATE_TEXT(@TextMenuOff);
+    }
+  }
+  // Start the stimulus
+  @send process::MSG_LAD_MENU_STIM();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_MENU_EXIT
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Close the application.
+ * CALLED BY:       User by pressing the key 'e' in the menu.
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any running timer.
+ *                  2/ Set the application state.
+ *                  3/ Set the text in the info line.
+ *                  4/ Use a timer to send MSG_META_QUIT to the
+ *                     application.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_MENU_EXIT  // 57 Bytes
+{
+  // Stop the stimulus
+  StopTimer();
+  // Set the application state for the handling of key presses
+  g.appState = APP_I_EXIT;
+  // Update the info line with the exit text
+  @send LadderMenuInfo::MSG_TXT_UPDATE_TEXT(@TextMenuExit);
+  // Start the timer for the exit
+  TimerStart(TIMER_EVENT_ONE_SHOT, @LadderApplication, DLY_T_EXIT, MSG_META_QUIT, 0, &g.timerId);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_MENU_STIM
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Show a random message in the info line.
+ * CALLED BY:       Internal or by our self
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Depending on the global state, show a random
+ *                     message in the info line or clear it.
+ *                     When called the first time, we wait a longer
+ *                     time.
+ *                  2/ Use a timer to call our self.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_MENU_STIM  // 131 Bytes
+{
+  word d;
+  optr o;
+  // Calculate the default delay
+  d = 151 + Random(113);
+  // Set the default text of the info line
+  o = NullOptr;
+  switch (g.triState)
+  {
+  case TRI_S_ON:
+    // Set the tri state
+    g.triState = TRI_S_OFF;
+    // Set the text of the stimulus
+    o = LST[Random(STMS)];
+    break;
+  case TRI_S_NONE:
+    // We are called the first time
+    d = DLY_T_STIM;
+//  break;
+  default:  // TRI_S_NONE | TRI_S_OFF
+    g.triState = TRI_S_ON;
+//  break;
+  }
+  @send LadderMenuInfo::MSG_TXT_UPDATE_TEXT(o);
+  // Start the timer for the stimulus
+  g.timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, d, message, 0, &g.timerId);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_MENU_STIM_END
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Stop the stimuli.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set the global state.
+ *                  2/ Stop any potentially running timer.
+ *                  3/ Clear the info line.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_MENU_STIM_END  // 32 Bytes
+{
+  // Reset the stimulus state
+  g.triState = TRI_S_NONE;
+  // Stop the stimulus timer
+  StopTimer();
+  // Clear the text in the info line
+  @send LadderMenuInfo::MSG_TXT_UPDATE_TEXT(NullOptr);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_HELP
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Load the instruction screen.
+ * CALLED BY:       User by pressing the key 'i' in the menu.
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any potentially running timer.
+ *                  2/ Set the application state.
+ *                  3/ Set the content.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_HELP  // 30 Bytes
+{
+  // Stop the stimulus
+  StopTimer();
+  // Set the application state for the handling of key presses
+  g.appState = APP_I_HELP;
+  // Show the help screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderHelp);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_PLAY
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Start a new game.
+ * CALLED BY:       User by pressing the key 'p' in the menu.
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any potentially running timer.
+ *                  2/ Set the application state.
+ *                  3/ Initialize the global variabels.
+ *                  4/ Start loading the level info.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_PLAY  // 78 Bytes
+{
+  // Stop the stimulus
+  StopTimer();
+  // Set the appplication state for the handling of key presses
+  g.appState = APP_I_PLAY;
+  // Initialize the game
+  g.game.lads = LAD_D_LIVES;
+  g.game.round = 1; // 1, 2, 5, 9, 14, 20, 27
+  g.game.level = 1; // 1, 2, 3, 4, 5, 6, 7
+  g.game.score = PNT_TIME;
+  g.game.delay = TicksByDifficulty(g.game.diff);
+  // Start the first level
+  @send oself::MSG_LAD_GAME_LOAD_INFO();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_GAME_QUIT
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Abort a game.
+ * CALLED BY:       User by pressing the key 'ESC' during the game or
+ *                  when returning from a finished game.
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Stop any potentially running timer.
+ *                  2/ Update the last score.
+ *                  3/ Load the menu screen.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_GAME_QUIT  // 46 Bytes
+{
+  // Stop the play timer
+  StopTimer();
+  // Update last score
+  @send LadderMenuLastScore::MSG_VAL_SET_VALUE(g.game.score);
+  // Show main menu
+  @send oself::MSG_LAD_MENU();
+}
+
+/***********************************************************************
+ *                  MSG_LAD_LAST
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        The user finished the last level.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set the application state.
+ *                  2/ Load the game end screen.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_LAST  // 30 Bytes
+{
+  // Set the application state for the handling of key presses
+  g.appState = APP_I_LAST;
+  // Show the game last screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderLast);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_OVER
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        The user lost the game.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set the application state.
+ *                  2/ Load the game over screen.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_OVER  // 30 Bytes
+{
+  // Set the application state for the handling of key presses
+  g.appState = APP_I_OVER;
+  // Show the game over screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderOver);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_HIGH
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        We have a new high score.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Set the application state.
+ *                  2/ Reset the input which reads the name.
+ *                  3/ Clear the info line.
+ *                  4/ Show the compliment for the score.
+ *                  5/ Load the high score screen.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_HIGH  // 132 Bytes
+{
+  word i;
+  // Set the application state for the handling of key presses
+  g.appState = APP_I_HIGH;
+  // Reset the input
+  @send LadderHighName::MSG_INP_RESET();
+  // Clear the info line
+  @send LadderInfo::MSG_TXT_SET_TEXT(NullOptr);
+  // Find the compliment message for the score
+  for (i = CMPS; i > 0; i--)
+  {
+    if (g.game.score >= LHS[i - 1])
+    {
+      // Set the text of the compliment
+      @send LadderHighComp::MSG_TXT_SET_TEXT(LHT[i - 1]);
+      break;
+    }
+  }
+  // Show the high score screen
+  @send LadderView::MSG_GEN_VIEW_SET_CONTENT(@LadderHigh);
+}
+
+/***********************************************************************
+ *                  MSG_LAD_HIGH_SAVE
+ *                  for LadderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Save the high score.
+ * CALLED BY:       User by pressing the key 'ENTER' in the high score.
+ * PARAMETERS:      void (  )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Update the info line.
+ *                  2/ Copy the name from the input und update the
+ *                     ranking list.
+ *                  3/ Start a timer to return to the menu.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderProcessClass, MSG_LAD_HIGH_SAVE  // 104 Bytes
+{
+  static char lhs[RNK_NAME_LEN];
+  // Set the text of the info line
+  @send LadderInfo::MSG_TXT_UPDATE_TEXT(@TextHighSave);
+  // Get the name from the imput
+  @call LadderHighName::MSG_INP_GET_INPUT(&lhs);
+  // Add the rank to the ranks
+  @call LadderMenuRank::MSG_RNK_SAVE_RANK(g.game.score, &lhs);
+  // Start the timer to quit to main menu
+  g.timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, DLY_T_SAVE, MSG_LAD_GAME_QUIT, 0, &g.timerId);
+}
+
+
+/*
+ ***************************************************************************
+ *                  CODE for LadderApplicationClass
+ ***************************************************************************
+ */
+
+@classdecl LadderApplicationClass;
+
+/***********************************************************************
+ *                  MSG_META_KBD_CHAR
+ *                  for LadderApplicationClass
+ ***********************************************************************
+ * SYNOPSIS:        Handle key presses sent to our application object.
+ * CALLED BY:       Internal
+ * PARAMETERS:      void ( word character,
+ *                         word flags,
+ *                         word state )
+ * RETURN:          nothing
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:        1/ Check if we have a key press and not a release.
+ *                  2/ Handle the escape key globaly.
+ *                  3/ Handle the other keys depending the application
+ *                     state.
+ *                  4/ If the key press has not been handled, put it
+ *                     upward.
+ *
+ * REVISION HISTORY:
+ *      Name    Date          Description
+ *      ----    ----          -----------
+ *      boa     2011-01-18    Initial Revision
+ *
+ ***********************************************************************/
+@method LadderApplicationClass, MSG_META_KBD_CHAR  // 491 Bytes
+{
+  Message msg;
+  // Handle only key presses
+  if (!(flags & CF_RELEASE) && (g.appState != APP_I_NONE) && (g.appState != APP_I_EXIT))
+  {
+    // Set the default message to nothing
+    msg = NULL;
+    // Handle escape key if not in menu
+    if ((character == 0xFF1B) && (g.appState != APP_I_MENU))
+    {
+      if (g.appState == APP_I_HELP)
+      {
+        msg = MSG_LAD_MENU;
+      }
+      else
+      {
+        msg = MSG_LAD_GAME_QUIT;
+      }
+    }
+    // Handle the keys according the application states
+    switch (g.appState)
+    {
+    case APP_I_EXEC:
+      // Handle the key press
+      switch (character)
+      {
+      // Key 'Arrow Up'
+      case 0xFF90:
+        g.lad.ndir = DIR_N;
+        return;
+      // Key 'Arrow Right'
+      case 0xFF92:
+        g.lad.ndir = DIR_E;
+        return;
+      // Key 'Arrow Down'
+      case 0xFF91:
+        g.lad.ndir = DIR_S;
+        return;
+      // Key 'Arrow Left'
+      case 0xFF93:
+        g.lad.ndir = DIR_W;
+        return;
+      case C_SPACE:
+        g.lad.njump = L_TRUE;
+        return;
+      case C_SMALL_P:
+      case C_CAP_P:
+        msg = MSG_LAD_GAME_WAIT;
+        break;
+      // Any other key
+      default:
+        // Check for printable character
+        if ((character < 255) && isprint(character))
+        {
+          g.lad.ndir = DIR_NONE;
+          return;
+        }
+//      break;
+      }
+      break;
+    case APP_I_MENU:
+      // Handle the key press
+      switch (tolower(character))
+      {
+      case C_SMALL_D:
+        msg = MSG_LAD_MENU_DIFF;
+        break;
+      case C_SMALL_S:
+        msg = MSG_LAD_MENU_SOUND;
+        break;
+      case C_SMALL_P:
+        msg = MSG_LAD_PLAY;
+        break;
+      case C_SMALL_I:
+        msg = MSG_LAD_HELP;
+        break;
+      case C_SMALL_E:
+        msg = MSG_LAD_MENU_EXIT;
+//      break;
+      }
+      break;
+    case APP_I_WAIT:
+      // Key 'Enter'
+      if (character == 0xFF0D)
+      {
+        msg = MSG_LAD_GAME_START;
+      }
+      break;
+    case APP_I_HIGH:
+      // Handle the key press
+      switch (character)
+      {
+      // Key 'Enter'
+      case 0xFF0D:
+        msg = MSG_LAD_HIGH_SAVE;
+        break;
+      // Key 'Backspace'
+      case 0xFF08:
+      case C_DELETE:
+        @send LadderHighName::MSG_INP_DEL_CHAR();
+        return;
+      default:
+        // Check for printable character
+        if ((character < 255) && isprint(character))
+        {
+          @send LadderHighName::MSG_INP_ADD_CHAR(character);
+          return;
+        }
+//      break;
+      }
+      break;
+    case APP_I_LAST:
+    case APP_I_OVER:
+      // Key 'Enter'
+      if (character == 0xFF0D)
+      {
+        // Check for new high score
+        if (@call LadderMenuRank::MSG_RNK_IS_NEW_RANK(g.game.score) == L_TRUE)
+        {
+          msg = MSG_LAD_HIGH;
+        }
+        else
+        {
+          msg = MSG_LAD_GAME_QUIT;
+        }
+      }
+//    break;
+    }
+    // 
+    if (msg != NULL)
+    {
+      @send process:: {MSG_LAD_PROTO} msg();
+      return;
+    }
+  }
+  // Not handled, put the key press upstream
+  @send oself::MSG_META_FUP_KBD_CHAR(character, flags, state);
+}
+
+
+/* End of PROCESS.GOC */
