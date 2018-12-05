@@ -707,7 +707,7 @@ MkmfScanDir(const char	    	*dir,	    	/* Directory to scan */
 			char    *fname;
 			
 			fname = (char *)Lst_Datum(ln);
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(_LINUX)
 			/*
 			 * case insensitive search
 			 */
@@ -1910,7 +1910,7 @@ MkmfConfirmLargeModel(Lst   subdirs,	    /* Directories to search */
      * care about the presence of these files, not their names, nor segregating
      * them into their own lists, so they all use the list we just created.
      */
-#if defined(unix) || defined(_WIN32)
+#if defined(unix) || defined(_WIN32) || defined(_LINUX)
     searchPatterns[0].pattern = "*Manager.asm";
 #else
     searchPatterns[0].pattern = "manager.asm";
@@ -2300,7 +2300,8 @@ main(int argc, char **argv)
 {
     Lst	    subdirs;
     Lst	    modules;
-    char   *cp;
+    char    *cp;
+    char    *oldcp;
     char    branchFile[MAX_PATH_LENGTH] = {0};
     char    cwd[MAX_PATH_LENGTH];
     Lst	    geodeName;
@@ -2466,6 +2467,14 @@ main(int argc, char **argv)
 		"(no path separator in current directory)\n");
 	return(1);
     }
+    
+    oldcp = cp;
+    while(*cp) {
+	*cp = (char) tolower(*cp);
+	cp++;
+    }
+    cp = oldcp;
+    
     geodeName = Lst_Init(FALSE);
     (void)Lst_AtEnd(geodeName, (ClientData)(cp + 1));
     MkmfAddVar("GEODE", geodeName);

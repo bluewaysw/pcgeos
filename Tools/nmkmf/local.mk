@@ -1,3 +1,4 @@
+NAME = mkmf
 
 .PATH.h		:
 .PATH.h		: . $(INSTALL_DIR) \
