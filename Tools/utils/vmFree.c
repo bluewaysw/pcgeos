@@ -87,7 +87,6 @@ VMFree(VMHandle	    	vmHandle,
      */
     hdr->VMH_numUsed -= 1;
 
-		printf("FREE: %x\n", vmBlock); fflush(stdout);
     block->VMB_sig = 0;	/* So we don't think it's in-use... */
 
     /*
