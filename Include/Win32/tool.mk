@@ -178,7 +178,7 @@ INSTALLALL	:= $(MACHINES:S/^/install/g)
 win32	: ${.TARGET:S%$%.md/$(NAME).exe%}    	    .JOIN
 ${MACHINES:S%$%.md/$(NAME).exe%g} : $(win32OBJS) $(win32LIBS) 
 	$(WLINK) $(CLINKFLAGS)  \
-			DEBUG WATCOM ALL \
+			DEBUG ALL \
 			$(.ALLSRC:M*.obj:S/^/file /g) \
 			$(.ALLSRC:M*.lib:S/^/lib /g) \
 			library kernel32 \
