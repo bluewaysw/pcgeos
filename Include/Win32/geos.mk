@@ -692,7 +692,7 @@ ASSEMBLE	: .USE
 	    $(.TARGET:X*\\[eobj\\]:S/eobj/-DDO_ERROR_CHECKING/) \
 	    $(.TARGET:X*\\[gobj\\]:S/gobj/-DGCM/) \
 	    $(.TARGET:X\\[*\\]/*:S|^|-I|) $(-IFLAGS) $(.ALLSRC:M*Manager.asm) \
-	    -o $(.TARGET)
+	    -o $(.TARGET) 
 
 #
 # This is a general rule for linking things using glue. It uses the name of the
@@ -754,7 +754,11 @@ GPFILE		= $(GEODE).gp
 SETLIBFLAG	?=
 #if $(PRODUCT) != "NDO2000"
 LINK		: .USE
+#if defined(linux)
+	rm -f $(.TARGET)
+#else
 	del -f $(.TARGET:S|/|\\|g)
+#endif
 	$(LINK) \
 	  $(.TARGET:M*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
 	  $(.TARGET:M*.geo:N*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
@@ -768,15 +772,19 @@ LINK		: .USE
 	  $(LINKFLAGS) -o $(.TARGET) $(.ALLSRC:N*.gp:N*.ldf) $(OPTIONAL_LIB) $(GEOERRFL)
 #else
 LINK		: .USE
+#if defined(linux)
+	rm -f $(.TARGET)
+#else
 	del -f $(.TARGET:S|/|\\|g)
+#endif
 	$(LINK) \
-	  $(.TARGET:M*EC.GEO:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
-	  $(.TARGET:M*.GEO:N*EC.GEO:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
-	  $(.TARGET:M*.VM:S/$(.TARGET)/-Ov -P $(_PROTO) -R $(_REL)/)\
-	  $(.TARGET:M*.COM:S/$(.TARGET)/-Oc/)\
-	  $(.TARGET:M*.EXE:S/$(.TARGET)/-Oe/)\
-	  $(.TARGET:M*.FNT:S/$(.TARGET)/-Of/)\
-	  $(.TARGET:M*.BIN:S/$(.TARGET)/-Of/)\
+	  $(.TARGET:M*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
+	  $(.TARGET:M*.geo:N*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -z/)\
+	  $(.TARGET:M*.vm:S/$(.TARGET)/-Ov -P $(_PROTO) -R $(_REL)/)\
+	  $(.TARGET:M*.com:S/$(.TARGET)/-Oc/)\
+	  $(.TARGET:M*.exe:S/$(.TARGET)/-Oe/)\
+	  $(.TARGET:M*.fnt:S/$(.TARGET)/-Of/)\
+	  $(.TARGET:M*.bin:S/$(.TARGET)/-Of/)\
 	  $(SETLIBFLAG) \
 	  $(LINKFLAGS) -o $(.TARGET) $(.ALLSRC:N*.gp:N*.ldf) $(OPTIONAL_LIB) $(GEOERRFL)
 #endif
@@ -857,14 +865,22 @@ LINK		: .USE
 	$(GOC) $(GOCFLAGS) -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)
 	$(CCOM) $(CCOMFLAGS) -fo=$(.TARGET:S/\//\\/g) $(.TARGET:R:S/\//\\/g).nc $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
+#if defined(linux)
+	rm $(.TARGET:R:S|/|\\|g).nc
+#else
 	del $(.TARGET:R:S|/|\\|g).nc
+#endif
 #endif
 
 .goc.eobj	:
 	$(GOC) -DDO_ERROR_CHECKING $(GOCFLAGS) -o $(.TARGET:R).ec $(.IMPSRC) $(GEOERRFL)
 	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo=$(.TARGET:S/\//\\/g) $(.TARGET:R:S/\//\\/g).ec $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
+#if defined(linux)
+	rm $(.TARGET:R:S|/|\\|g).ec
+#else
 	del $(.TARGET:R:S|/|\\|g).ec
+#endif
 #endif
 
 clean	: .NOTMAIN
