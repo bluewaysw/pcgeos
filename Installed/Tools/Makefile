@@ -1,65 +1,44 @@
 
+#if defined(linux)
 MK_SET = 
 MK_MAKE = mkdir -p $PARAM ; \
 		cd $PARAM ; \
 		$(MAKE) -k -I$PARAM
+#else
+MK_SET = set
+MK_MAKE = mkdir %PARAM% & \
+		cd %PARAM% & \
+		$(MAKE) -k -I%PARAM%
+MK_SEP = \	
+
+#endif
 
 
+BINS = Tools/esp Tools/uicpp Tools/goc Tools/grev Tools/loc Tools/nmkmf Tools/pmake/makedpnd \
+		Tools/glue Tools/uic Tools/pmake/findlbdr
+LIBS = Tools/utils Tools/compat
 
-install		: binEsp binUicpp binGoc binGrev binLoc binMkmf \
-		  binMakedpnd binGlue binUic binFindlbdr
+install		: $(LIBS) $(BINS)
 
-libUtils	:	
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/utils ; \
-	$(MK_MAKE) all
+$(LIBS) : 
+#if defined(linux)
+	mkdir -p $(ROOT_DIR)/Installed/$(.TARGET) & \
+	cd $(ROOT_DIR)/Installed/$(.TARGET) & \
+	$(MAKE) -k -I$(ROOT_DIR)/Installed/$(.TARGET) all
+#else
+	mkdir $(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) & \
+	cd $(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) & \
+	$(MAKE) -k -I$(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) all
+#endif
 
-libCompat	:	
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/compat ; \
-	$(MK_MAKE) all
+$(BINS) : $(LIBS)
+#if defined(linux)
+	mkdir -p $(ROOT_DIR)/Installed/$(.TARGET) & \
+	cd $(ROOT_DIR)/Installed/$(.TARGET) & \
+	$(MAKE) -k -I$(ROOT_DIR)/Installed/$(.TARGET) install
+#else
+	mkdir $(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) & \
+	cd $(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) & \
+	$(MAKE) -k -I$(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) install
+#endif
 
-binEsp	:	libUtils libCompat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/esp ; \
-	$(MK_MAKE) install
-
-binUicpp	: 	utils compat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/uicpp ; \
-	$(MK_MAKE) install
-
-binGoc	:	libUtils libCompat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/goc ; \
-	$(MK_MAKE) installlinux ;\
-	$(MK_MAKE) installwin32
-
-binGrev	:	libCompat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/grev ; \
-	$(MK_MAKE) install
-
-binLoc	:	libUtils libCompat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/loc ; \
-	$(MK_MAKE) install
-
-binMkmf	:	libUtils libCompat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/nmkmf ; \
-	$(MK_MAKE) installlinux ; \
-	$(MK_MAKE) installwin32
-
-binMakedpnd	:	libCompat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/pmake/makedpnd ; \
-	$(MK_MAKE) installlinux ; \
-	$(MK_MAKE) installwin32
-
-binGlue	:	libUtils libCompat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/glue ; \
-	$(MK_MAKE) install
-	
-binUic	:	libUtils libCompat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/uic ; \
-	$(MK_MAKE) installlinux ; \
-	$(MK_MAKE) installwin32
-
-binFindlbdr	:	libUtils libCompat
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Tools/pmake/findlbdr ; \
-	$(MK_MAKE) install
-	
-	
-	
