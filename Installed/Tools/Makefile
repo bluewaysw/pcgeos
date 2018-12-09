@@ -22,8 +22,8 @@ install		: $(LIBS) $(BINS)
 
 $(LIBS) : 
 #if defined(linux)
-	mkdir -p $(ROOT_DIR)/Installed/$(.TARGET) & \
-	cd $(ROOT_DIR)/Installed/$(.TARGET) & \
+	mkdir -p $(ROOT_DIR)/Installed/$(.TARGET) ; \
+	cd $(ROOT_DIR)/Installed/$(.TARGET) ; \
 	$(MAKE) -k -I$(ROOT_DIR)/Installed/$(.TARGET) all
 #else
 	mkdir $(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) & \
@@ -33,9 +33,10 @@ $(LIBS) :
 
 $(BINS) : $(LIBS)
 #if defined(linux)
-	mkdir -p $(ROOT_DIR)/Installed/$(.TARGET) & \
-	cd $(ROOT_DIR)/Installed/$(.TARGET) & \
-	$(MAKE) -k -I$(ROOT_DIR)/Installed/$(.TARGET) install
+	mkdir -p $(ROOT_DIR)/Installed/$(.TARGET) ; \
+	cd $(ROOT_DIR)/Installed/$(.TARGET) ; \
+	$(MAKE) -k -I$(ROOT_DIR)/Installed/$(.TARGET) installlinux \
+	$(MAKE) -k -I$(ROOT_DIR)/Installed/$(.TARGET) installwin32
 #else
 	mkdir $(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) & \
 	cd $(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) & \
