@@ -12,6 +12,51 @@ MK_MAKE = mkdir -p $PARAM ; \
 
 #endif
 
+MAKELIB	:	.USE 
+#if defined(linux)
+	mkdir -p ../$(.TARGET) 
+	cd ../$(.TARGET) 
+	$(MAKE) -k -I../$(.TARGET) full lib
+#else
+	mkdir -p ..\$(.TARGET:S/\//\\/g) 
+	cd ..\$(.TARGET:S/\//\\/g) 
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full lib
+#endif
+
+MAKETOOL:	.USE 
+#if defined(linux)
+	mkdir -p ../$(.TARGET) 
+	cd ../$(.TARGET) 
+	$(MAKE) -k -I../$(.TARGET) full 
+#else
+	mkdir -p ..\$(.TARGET:S/\//\\/g) 
+	cd ..\$(.TARGET:S/\//\\/g) 
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full 
+#endif
+
+MAKEDRV:	.USE 
+#if defined(linux)
+	mkdir -p ../$(.TARGET) 
+	cd ../$(.TARGET) 
+	$(MAKE) -k -I../$(.TARGET) full 
+#else
+	mkdir -p ..\$(.TARGET:S/\//\\/g) 
+	cd ..\$(.TARGET:S/\//\\/g) 
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full 
+#endif
+
+MAKEAPPL:	.USE 
+#if defined(linux)
+	mkdir -p ../$(.TARGET) 
+	cd ../$(.TARGET) 
+	$(MAKE) -k -I../$(.TARGET) full 
+#else
+	mkdir -p ..\$(.TARGET:S/\//\\/g) 
+	cd ..\$(.TARGET:S/\//\\/g) 
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full 
+#endif
+
+
 minimal		: minimalLoader minimalLibrary minimalDriver minimalAppl \
 		  otherEnsemble
 
@@ -111,121 +156,94 @@ printerDriver	: deskjet dj500c lbp mercury pcl4 quietjet canon48 \
 
 #faxDriver	: class1in class1out class2in class2out
 
-textLoader	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Loader/Text ; \
-	$(MK_MAKE) full
+textLoader	:	Installed/Loader/Text
+Installed/Loader/Text	:	MAKETOOL
 
-VGALoader	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Loader/VGA ; \
-	$(MK_MAKE) full
+VGALoader	:	Installed/Loader/VGA
+Installed/Loader/VGA	: 	MAKETOOL
 
-kernel	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Kernel ; \
-	$(MK_MAKE) full lib
+kernel	:	Installed/Library/Kernel
+Installed/Library/Kernel 	:	MAKELIB
 
-swap	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Swap ; \
-	$(MK_MAKE) full lib
+swap	:	Installed/Library/Swap
+Installed/Library/Swap	:	MAKELIB
 
-sound	: stream
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Sound ; \
-	$(MK_MAKE) full lib
+sound	: Installed/Library/Sound
+Installed/Library/Sound	: stream MAKELIB
 
 # Cannot state true dependency for PCMCIA & Net (they both rely
 # upon the UI library), as we would have a circular dependency.
 
-#pcmcia	:
-#	mdcd %ROOT_DIR%\Installed\Library\PCMCIA
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\PCMCIA lib full
+#pcmcia	:	Installed\Library\PCMCIA
+#Installed\Library\PCMCIA : MAKELIB
 
-net	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Net ; \
-	$(MK_MAKE) full lib
+net	:	Installed/Library/Net
+Installed/Library/Net :	MAKELIB
 
 # removed pcmcia
-ui	: sound compress net wav
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/User ; \
-	$(MK_MAKE) full lib
+ui	: Installed/Library/User
+Installed/Library/User	:	sound compress net wav MAKELIB
 
-isui	: text
-	mdcd %ROOT_DIR%\Installed\Library\SpecUI\isui
-	$(MAKE)  -k -I$(ROOT_DIR)\Library\SpecUI\isui lib full
+isui	: Installed/Library/SpecUI/isui
+Installed/Library/SpecUI/isui	:	text MAKELIB
 
-motif	: text
-	mdcd %ROOT_DIR%\Installed\Library\SpecUI\Motif
-	$(MAKE) -k -I$(ROOT_DIR)\Library\SpecUI\Motif lib full
+motif	: Installed/Library/SpecUI/Motif
+Installed/Library/SpecUI/Motif:	text MAKELIB
 
-spool	: text
-	mdcd %ROOT_DIR%\Installed\Library\Spool
-	$(MAKE) -k  -I$(ROOT_DIR)\Library\Spool lib full
+spool	: Installed/Library/Spool
+Installed/Library/Spool:	text MAKELIB
 
-text	: ui styles color ruler bitmap
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Text ; \
-	$(MK_MAKE) full lib
+text	: Installed/Library/Text
+Installed/Library/Text:	ui styles color ruler bitmap MAKELIB
 
-styles	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Styles ; \
-	$(MK_MAKE) full lib
+styles	: Installed/Library/Styles
+Installed/Library/Styles:	ui MAKELIB
 
-color	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Color ; \
-	$(MK_MAKE) full lib
+color	: Installed/Library/Color
+Installed/Library/Color: 	ui MAKELIB
 
-mailbox	: ui spool
-	mdcd %ROOT_DIR%\Installed\Library\Mailbox
-	$(MAKE)  -k -I$(ROOT_DIR)\Library\Mailbox lib full
+mailbox	: Installed/Library/Mailbox
+Installed/Library/Mailbox:	ui spool MAKELIB
 
-compress	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Compress ; \
-	$(MK_MAKE) full lib
+compress	: Installed/Library/Compress
+Installed/Library/Compress:	makelib
 
-ruler	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Ruler ; \
-	$(MK_MAKE) full lib
+ruler	: Installed/Library/Ruler
+Installed/Library/Ruler:	ui MAKELIB
 
-bitmap	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Bitmap ; \
-	$(MK_MAKE) full lib
+bitmap	: Installed/Library/Bitmap
+Installed/Library/Bitmap: 	ui MAKELIB
 
-pen	: ui text
-	mdcd %ROOT_DIR%\Installed\Library\Pen
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pen lib full
+pen	: Installed/Library/Pen
+Installed/Library/Pen:	ui text MAKELIB
 
-genpc	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/GDI/GenPC ; \
-	$(MK_MAKE) full lib
+genpc	: Installed/Library/GDI/GenPC
+Installed/Library/GDI/GenPC: MAKELIB
 
-shell	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Shell ; \
-	$(MK_MAKE) full lib
+shell	: Installed/Library/Shell
+Installed/Library/Shell: 	ui MAKELIB
 
-ansic	: math borlandc
-	mdcd %ROOT_DIR%\Installed\Library\AnsiC
-	$(MAKE) -k -I$(ROOT_DIR)\Library\AnsiC lib full
+ansic	: Installed/Library/AnsiC
+Installed/Library/AnsiC: math borlandc MAKELIB
 
-cell	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Cell ; \
-	$(MK_MAKE) full lib
+cell	: Installed/Library/Cell
+Installed/Library/Cell: 	MAKELIB
 
-chart	: ui grobj spline text
-	mdcd %ROOT_DIR%\Installed\Library\Chart
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Chart lib full
+chart	: Installed/Library/Chart
+Installed/Library/Chart:	ui grobj spline text MAKELIB
 
-config	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Config ; \
-	$(MK_MAKE) full lib
+config	: Installed/Library/Config
+Installed/Library/Config: 	ui MAKELIB
 
-grobj	: ui text bitmap ruler spline color styles impex
-	mdcd %ROOT_DIR%\Installed\Library\GrObj
-	$(MAKE) -k -I$(ROOT_DIR)\Library\GrObj lib full
+grobj	: Installed/Library/GrObj
+Installed/Library/GrObj:	ui text bitmap ruler spline color \
+				styles impex MAKELIB
 
-hash	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Hash ; \
-	$(MK_MAKE) full lib
+hash	: Installed/Library/Hash
+Installed/Library/Hash:	MAKELIB	
 
-impex	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Impex ; \
-	$(MK_MAKE) full lib
+impex	: Installed/Library/Impex
+Installed/Library/Impex: 	ui MAKELIB
 
 # Don't compile import yet because the unix files haven't
 # converted to dos files.
@@ -233,480 +251,368 @@ impex	: ui
 #	mdcd %ROOT_DIR%\Installed\Library\Import
 #	$(MAKE) -k -I$(ROOT_DIR)\Library\Import lib full
 
-lot123ss	: ui ansic impex math ssmeta
-	mdcd %ROOT_DIR%\Installed\Library\Trans\SSheet\Lotus123
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\SSheet\Lotus123 lib full
+lot123ss	: Installed/Library/Trans/SSheet/Lotus123
+Installed/Library/Trans/SSheet/Lotus123: ui ansic impex math ssmeta MAKELIB
 
-csv	: ui impex ssmeta
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Database\CSV
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Database\CSV lib full
+csv	: Installed/Library/Trans/Database/CSV
+Installed/Library/Trans/Database/CSV:	ui impex ssmeta MAKELIB
 
-rtf	: ui impex text ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Impex\RTF
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Impex\RTF lib full
+rtf	: Installed/Library/Breadbox/Impex/RTF
+INstalled/Library/Breadbox/Impex/RTF: 	ui impex text ansic MAKELIB
 
-jpeg	: ui impex ansic ijgjpeg math
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Impex\JPEG
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Impex\JPEG lib full
+jpeg	: Installed/Library/Breadbox/Impex/JPEG
+Installed/Library/Breadbox/Impex/JPEG: ui impex ansic ijgjpeg math MAKELIB
 
-gif : ui impex ansic extgraph giflib
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Impex\GIF
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Impex\GIF lib full
+gif : Installed/Library/Breadbox/Impex/GIF
+Installed/Library/Breadbox/Impex/GIF: ui impex ansic extgraph giflib MAKELIB
 
-wmf : ui impex ansic
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Graphics\Vector\Wmf
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Graphics\Vector\Wmf lib full
+wmf : Installed/Library/Trans/Graphics/Vector/Wmf
+Installed/Library/Trans/Graphics/Vector/Wmf: ui impex ansic MAKELIB
 
-ascii	: ui text
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Text\Ascii
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Text\Ascii lib full
+ascii	: Installed/Library/Trans/Text/Ascii
+Installed/Library/Trans/Text/Ascii: 	ui text MAKELIB
 
-msword	: ui ansic impex msmfile
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Text\MicrosoftWord
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Text\MicrosoftWord lib full
+msword	: Installed/Library/Trans/Text/MicrosoftWord
+Installed/Library/Trans/Text/MicrosoftWord: 	ui ansic impex msmfile MAKELIB
 
-htmlpars : ansic text
-	mdcd %ROOT_DIR%\Installed\Library\BreadBox\HtmlPars
-	$(MAKE) -k -I$(ROOT_DIR)\Library\BreadBox\HtmlPars lib full
+htmlpars : Installed/Library/BreadBox/HtmlPars
+Installed/Library/BreadBox/HtmlPars: ansic text MAKELIB
 
-htmlimpx : htmlpars ansic text impex ui
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Web\HtmlImpx
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Web\HtmlImpx lib full
+htmlimpx : Installed/Library/Trans/Web/HtmlImpx
+Installed/Library/Trans/Web/HtmlImpx: htmlpars ansic text impex ui MAKELIB
 
-sstor	: ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\SStor
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\SStor lib full
+sstor	: Installed/Library/Breadbox/SStor
+Installed/Library/Breadbox/SStor: 	ansic MAKELIB
 
-wfwlib	: text ansic sstor
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Impex\WFWLib
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Impex\WFWLib lib full
+wfwlib	: Installed/Library/Breadbox/Impex/WFWLib
+Installed/Library/Breadbox/Impex/WFWLib:	text ansic sstor MAKELIB
 
-winword8 : impex ansic text sstor wfwlib
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Impex\WinWord8
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Impex\WinWord8 lib full
+winword8 : Installed/Library/Breadbox/Impex/WinWord8
+Installed/Library/Breadbox/Impex/WinWord8: impex ansic text sstor wfwlib MAKELIB
 
 borlandrtl	:
 #	No need to do this because this is sync'ed by morning make script.
 #	p4 sync -f //depot/pcgeos/Installed/Library/BorlandRTL/...
 
-borlandc	: math
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Math/Compiler/BorlandC ; \
-	$(MK_MAKE) full lib -k
+borlandc	: Installed/Library/Math/Compiler/BorlandC
+Installed/Library/Math/Compiler/BorlandC: math MAKELIB
 
-math	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Math ; \
-	$(MK_MAKE) full lib
+math	: Installed/Library/Math
+Installed/Library/Math:	ui MAKELIB
 
-resolver	: netutils ui socket accpnt
-	mdcd %ROOT_DIR%\Installed\Library\Resolver
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Resolver lib full
+resolver	: Installed/Library/Resolver
+Installed/Library/Resolver:	netutils ui socket accpnt MAKELIB
 
-spline	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Spline ; \
-	$(MK_MAKE) full lib
+spline	: Installed/Library/Spline
+Installed/Library/Spline:	ui MAKELIB
 
-ssmeta	: ui math
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/SSMeta ; \
-	$(MK_MAKE) full lib -k
+ssmeta	: Installed/Library/SSMeta
+Installed/Library/SSMeta:	ui math MAKELIB
 
 # bsnwav will only be compiled (and is only referenced in WAV) if PRODUCT==NDO2000
-wav	: sound bsnwav
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Wav ; \
-	$(MK_MAKE) full lib
+wav	: Installed/Library/Wav
+Installed/Library/Wav:	sound bsnwav MAKELIB
 
-game	: ui wav
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Game ; \
-	$(MK_MAKE) full lib
+game	: Installed/Library/Game
+Installed/Library/Game:	ui wav MAKELIB
 
-cards	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Cards ; \
-	$(MK_MAKE) full lib
+cards	: Installed/Library/Cards
+Installed/Library/Cards:	ui MAKELIB
 
-parse	: cell math ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Parse ; \
-	$(MK_MAKE) full lib -k
+parse	: Installed/Library/Parse
+Installed/Library/Parse:	cell math ui MAKELIB
 
-spreadsheet	: ui ruler cell math parse chart text color ssmeta
-	mdcd %ROOT_DIR%\Installed\Library\Spreadsheet
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Spreadsheet lib full
+spreadsheet	: Installed/Library/Spreadsheet
+Installed/Library/Spreadsheet:	ui ruler cell math parse chart \
+				text color ssmeta MAKELIB
 
-spell	: ansic ui text
-	mdcd %ROOT_DIR%\Installed\Library\Spell
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Spell lib full
+spell	: Installed/Library/Spell
+Installed/Library/Spell:	ansic ui text MAKELIB
+	
 #EC version link arguments is too long, so link manually
 #	pmake -u > args1
 #	perl fixArgs.pl args1
 #	glue @args1
 #	del args1
 
-convert	: ui grobj
-	mdcd %ROOT_DIR%\Installed\Library\Convert
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Convert lib full
+convert	: Installed/Library/Convert
+Installed/Library/Convert:	ui grobj MAKELIB
 
-saver	: ui grobj net
-	mdcd %ROOT_DIR%\Installed\Library\Saver
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Saver lib full
+saver	: Installed/Library/Saver
+Installed/Library/Saver:	ui grobj net MAKELIB
 
-#faxfile	: ui text
-#	mdcd %ROOT_DIR%\Installed\Library\Fax\File
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Fax\File lib full
+#faxfile	: Installed/Library/Fax/File
+#Installed/Library/Fax/File:	ui text MAKELIB
 
-#faxctrl	: ui text faxfile mailbox
-#	mdcd %ROOT_DIR%\Installed\Library\Fax\Ctrl
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Fax\Ctrl lib full
+#faxctrl	: Installed/Library/Fax/Ctrl
+#Installed/Library/Fax/Ctrl:	ui text faxfile mailbox MAKELIB
 
-accpnt	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/AccPnt ; \
-	$(MK_MAKE) full lib
+accpnt	: Installed/Library/AccPnt
+Installed/Library/AccPnt:	ui MAKELIB
 
-netutils	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/NetUtils ; \
-	$(MK_MAKE) full lib
+netutils	: Installed/Library/NetUtils
+Installed/Library/NetUtils:	ui MAKELIB
 
-eps	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Trans/Graphics/Vector/EPS ; \
-	$(MK_MAKE) full lib
+eps	: Installed/Library/Trans/Graphics/Vector/EPS
+Installed/Library/Trans/Graphics/Vector/EPS:	ui MAKELIB
 
-ps2pdf	: ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\ps2pdf
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\ps22pdf lib full
+ps2pdf	: Installed/Library/Breadbox/ps2pdf
+Installed/Library/Breadbox/ps2pdf:	ansic MAKELIB
 
-socket	: ui netutils
-	mdcd %ROOT_DIR%\Installed\Library\Socket
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Socket lib full
+socket	: Installed/Library/Socket
+Installed/Library/Socket:	ui netutils MAKELIB
 
-dhcp	: socket ui accpnt
-	mdcd %ROOT_DIR%\Installed\Library\dhcp
-	$(MAKE) -k -I$(ROOT_DIR)\Library\dhcp lib full
+dhcp	: Installed/Library/dhcp
+Installed/Library/dhcp:	socket ui accpnt MAKELIB
 
-ffile	: cell ui spreadsheet parse ansic math text grobj spool ssmeta
+ffile	: Installed/Library/FlatFile
+Installed/Library/FlatFile:	cell ui spreadsheet parse ansic math \
+				text grobj spool ssmeta MAKELIB
 #	No need to do this because this is sync'ed by morning make script.
 #	p4 sync -f //depot/pcgeos/Installed/Library/FlatFile/...
 #	build it anyway, because p4 sync does not work if not connected
 #	while making the build (I know, all these warnings are annoying, and some
 #	are definitely the cause of instabilities, but no reason to hide this :)
-	mdcd %ROOT_DIR%\Installed\Library\FlatFile
-	$(MAKE) -k -I$(ROOT_DIR)\Library\FlatFile lib full
 
-streamc : ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/StreamC ; \
-	$(MK_MAKE) full lib
+streamc : Installed/Library/StreamC
+Installed/Library/StreamC:	ui MAKELIB
 
-mailhub : socket ansic
-	mdcd %ROOT_DIR%\Installed\Library\Mail\MailHub
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Mail\MailHub lib full
+mailhub : Installed/Library/Mail/MailHub
+Installed/Library/Mail/MailHub:	socket ansic MAKELIB
 
-bbxmlib	: socket ansic
-	mdcd %ROOT_DIR%\Installed\Library\dil\bbxmail
-	$(MAKE) -k -I$(ROOT_DIR)\Library\dil\bbxmail lib full
+bbxmlib	: Installed/Library/dil/bbxmail
+Installed/Library/dil/bbxmail:	socket ansic MAKELIB
 
-mailsmtp : socket ansic mailhub
-	mdcd %ROOT_DIR%\Installed\Library\Mail\MailSMTP
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Mail\MailSMTP lib full
+mailsmtp : Installed/Library/Mail/MailSMTP
+Installed/Library/Mail/MailSMTP:	socket ansic mailhub MAKELIB
 
-mailpop3 : socket ansic mailhub
-	mdcd %ROOT_DIR%\Installed\Library\Mail\MailPOP3
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Mail\MailPOP3 lib full
+mailpop3 : Installed/Library/Mail/MailPOP3
+Installed/Library/Mail/MailPOP3:	socket ansic mailhub MAKELIB
 
-#bckrst : ui ansic
-#	mdcd %ROOT_DIR%\Installed\Library\BckRst
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\BckRst lib full
+#bckrst : Installed/Library/BckRst
+#Installed/Library/BckRst: 	ui ansic MAKELIB
 
-filestr	: stream
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Stream/Filestr ; \
-	$(MK_MAKE) full lib
+filestr	: Installed/Driver/Stream/Filestr
+Installed/Driver/Stream/Filestr:	stream MAKEDRV
 
-nonts	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Task/NonTS ; \
-	$(MK_MAKE) full lib
+nonts	: Installed/Driver/Task/NonTS
+Installed/Driver/Task/NonTS:	MAKEDRV
 
-sblaster	: stream
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Sound/SoundBlaster ; \
-	$(MK_MAKE) full lib
+sblaster	: Installed/Driver/Sound/SoundBlaster
+Installed/Driver/Sound/SoundBlaster:	stream MAKEDRV
 
-comm	: net
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Net/Comm ; \
-	$(MK_MAKE) full lib
+comm	: Installed/Driver/Net/Comm
+Installed/Driver/Net/Comm:	net MAKEDRV
 
-spooltd	: ui mailbox spool
-	mdcd %ROOT_DIR%\Installed\Driver\Mailbox\Transport\SpoolTD
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\Mailbox\Transport\SpoolTD full
+spooltd	: Installed/Driver/Mailbox/Transport/SpoolTD
+Installed/Driver/Mailbox/Transport/SpoolTD:	ui mailbox spool MAKEDRV
 
-vmtree	: mailbox
-	mdcd %ROOT_DIR%\Installed\Driver\Mailbox\Data\VMTree
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\Mailbox\Data\VMTree full
+vmtree	: Installed/Driver/Mailbox/Data/VMTree
+Installed/Driver/Mailbox/Data/VMTree:	mailbox MAKEDRV
 
-filedd	: mailbox serial
-	mdcd %ROOT_DIR%\Installed\Driver\Mailbox\Data\FileDD
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\Mailbox\Data\FileDD full
+filedd	: Installed/Driver/Mailbox/Data/FileDD
+Installed/Driver/Mailbox/Data/FileDD:	mailbox serial MAKEDRV
 
-parentc : ui config
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/ParentC ; \
-	$(MK_MAKE) full lib
+parentc : Installed/Library/ParentC
+Installed/Library/ParentC:	ui config MAKELIB
 
-wmlib	: ansic compress
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\WMLib
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\WMLib lib full
+wmlib	: Installed/Library/Breadbox/WMLib
+Installed/Library/Breadbox/WMLib:	ansic compress MAKELIB
 
-n2txt	: ui ansic text math
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\N2Txt
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\N2Txt lib full
+n2txt	: Installed/Library/Breadbox/N2Txt
+Installed/Library/Breadbox/N2Txt:	ui ansic text math MAKELIB
 
-inetmsg : ui ansic extui
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\INetMsg
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\INetMsg lib full
+inetmsg : Installed/Library/Breadbox/INetMsg
+Installed/Library/Breadbox/INetMsg:	ui ansic extui MAKELIB
 
-extui   : ui ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\ExtUI
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\ExtUI lib full
+extui   : Installed/Library/Breadbox/ExtUI
+Installed/Library/Breadbox/ExtUI:	ui ansic MAKELIB
 
-sitelist	: ui ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\sitelist
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\sitelist lib full
+sitelist	: Installed/Library/Breadbox/sitelist
+Installed/Library/Breadbox/sitelist: 	ui ansic MAKELIB
 
-flllib	: ui ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\flllib
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\flllib lib full
+flllib	: Installed/Library/Breadbox/flllib
+Installed/Library/Breadbox/flllib:	ui ansic MAKELIB
 
-ftplib	: ui ansic socket
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\ftplib
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\ftplib lib full
+ftplib	: Installed/Library/Breadbox/ftplib
+Installed/Library/Breadbox/ftplib:	 ui ansic socket MAKELIB
 
-idialc	: ui socket
-	mdcd %ROOT_DIR%\Installed\Library\IDialC
-	$(MAKE) -k -I$(ROOT_DIR)\Library\IDialC lib full
+idialc	: Installed/Library/IDialC
+Installed/Library/IDialC:	ui socket MAKELIB
 
-thumbdb : ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Thumbdb
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Thumbdb lib full
+thumbdb : Installed/Library/Breadbox/Thumbdb
+Installed/Library/Breadbox/Thumbdb:	ansic MAKELIB
 
 # the EduApp libs
-basicdb : ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Basicdb
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Basicdb lib full
+basicdb : Installed/Library/Breadbox/Basicdb
+Installed/Library/Breadbox/Basicdb:	ansic MAKELIB
 
-gridlib : ui ansic text
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Gridlib
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Gridlib lib full
+gridlib : Installed/Library/Breadbox/Gridlib
+Installed/Library/Breadbox/Gridlib:	ui ansic text MAKELIB
 
-treplib : ui ansic text spool
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Treplib
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Treplib lib full
+treplib : Installed/Library/Breadbox/Treplib
+Installed/Library/Breadbox/Treplib:	ui ansic text spool MAKELIB
 
-gsol	: ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Gsol
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Gsol lib full
+gsol	: Installed/Library/Breadbox/Gsol
+Installed/Library/Breadbox/Gsol:	ansic MAKELIB
 
 # Preference libraries
 
-configui	: ui config ansic
-	mdcd %ROOT_DIR%\Installed\Library\Pref\ConfigUI
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\ConfigUI configui.rdef
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\ConfigUI lib full
+configui	: Installed/Library/Pref/ConfigUI
+Installed/Library/Pref/ConfigUI:	ui config ansic MAKELIB
 
-prefbg	: ui config color convert
-	mdcd %ROOT_DIR%\Installed\Library\Pref\Prefbg
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Prefbg lib full
+prefbg	: Installed/Library/Pref/Prefbg
+Installed/Library/Pref/Prefbg:	ui config color convert MAKELIB
 
-prefcomp	: ui config serial parallel
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Pref/Prefcomp ; \
-	$(MK_MAKE) full lib
+prefcomp	: Installed/Library/Pref/Prefcomp
+Installed/Library/Pref/Prefcomp:	ui config serial parallel MAKELIB
 
-preffont	: ui config ansic
-	mdcd %ROOT_DIR%\Installed\Library\Pref\Preffont
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Preffont lib full
+preffont	: Installed/Library/Pref/Preffont
+Installed/Library/Pref/Preffont:	ui config ansic MAKELIB
 
-prefintl	: ui config
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Pref/Prefintl ; \
-	$(MK_MAKE) full lib
+prefintl	: Installed/Library/Pref/Prefintl
+Installed/Library/Pref/Prefintl:	ui config MAKELIB
 
-prefkbd	: ui config
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Pref/Prefkbd ; \
-	$(MK_MAKE) full lib
+prefkbd	: Installed/Library/Pref/Prefkbd
+Installed/Library/Pref/Prefkbd:		ui config MAKELIB
 
-#preflang	: ui config
-#	mdcd %ROOT_DIR%\Installed\Library\Pref\Preflang
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Preflang lib full
+#preflang	: Installed/Library/Pref/Preflang
+#Installed/Library/Pref/Preflang:	ui config MAKELIB
 
-preflf	: ui config
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Pref/Preflf ; \
-	$(MK_MAKE) full lib
+preflf	: Installed/Library/Pref/Preflf
+Installed/Library/Pref/Preflf:		ui config MAKELIB
 
-#preflink	: ui config
-#	mdcd %ROOT_DIR%\Installed\Library\Pref\Preflink
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Preflink lib full
+#preflink	: Installed/Library/Pref/Preflink
+#Installed/Library/Pref/Preflink:	ui config MAKELIB
 
-preflo	: ui config saver net
-	mdcd %ROOT_DIR%\Installed\Library\Pref\Preflo
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Preflo lib full
+preflo	: Installed/Library/Pref/Preflo
+Installed/Library/Pref/Preflo:		ui config saver net MAKELIB
 
-#preflvl	: ui config
-#	mdcd %ROOT_DIR%\Installed\Library\Pref\Preflvl
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Preflvl lib full
+#preflvl	: Installed/Library/Pref/Preflvl
+#Installed/Library/Pref/Preflvl:	ui config MAKELIB
 
-prefmous	: ui config
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Pref/Prefmous ; \
-	$(MK_MAKE) full lib
+prefmous	: Installed/Library/Pref/Prefmous
+Installed/Library/Pref/Prefmous:	ui config MAKELIB
 
-prefos	: ui config
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Pref/Prefos ; \
-	$(MK_MAKE) full lib
+prefos	: Installed/Library/Pref/Prefos
+Installed/Library/Pref/Prefos:		ui config MAKELIB
 
-#prefpag	: ui config
-#	mdcd %ROOT_DIR%\Installed\Library\Pref\Prefpag
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Prefpag lib full
+#prefpag	: Installed/Library/Pref/Prefpag
+#Installed/Library/Pref/Prefpag:	ui config MAKELIB
 
-prefsnd	: ui config
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Pref/Prefsnd ; \
-	$(MK_MAKE) full lib
+prefsnd	: Installed/Library/Pref/Prefsnd
+Installed/Library/Pref/Prefsnd:		ui config MAKELIB
 
-#prefsock	: ui config
-#	mdcd %ROOT_DIR%\Installed\Library\Pref\Prefsock
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Prefsock lib full
+#prefsock	: Installed/Library/Pref/Prefsock
+#Installed/Library/Pref/Prefsock:	ui config MAKELIB
 
-#prefspui	: ui config
-#	mdcd %ROOT_DIR%\Installed\Library\Pref\Prefspui
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Prefspui lib full
+#prefspui	: Installed/Library/Pref/Prefspui
+#Installed/Library/Pref/Prefspui:	ui config MAKELIB
 
-preftd	: ui config
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Pref/Preftd ; \
-	$(MK_MAKE) full lib
+preftd	: Installed/Library/Pref/Preftd
+Installed/Library/Pref/Preftd:		ui config MAKELIB
 
-#prefts	: ui config
-#	mdcd %ROOT_DIR%\Installed\Library\Pref\Prefts
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Prefts lib full
+#prefts	: Installed/Library/Pref/Prefts
+#Installed/Library/Pref/Prefts:		ui config MAKELIB
 
-#prefui	: ui config
-#	mdcd %ROOT_DIR%\Installed\Library\Pref\Prefui
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Prefui lib full
+#prefui	: Installed/Library/Pref/Prefui
+#Installed/Library7Pref/Prefui:		ui config MAKELIB
 
-#prefuic	: ui config
-#	mdcd %ROOT_DIR%\Installed\Library\Pref\Prefuic
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Prefuic lib full
+#prefuic	: Installed/Library/Pref/Prefuic
+#Installed/Library/Pref/Prefuic:	ui config MAKELIB
 
-prefvid	: ui config
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Pref/Prefvid ; \
-	$(MK_MAKE) full lib
+prefvid	: Installed/Library/Pref/Prefvid
+Installed/Library/Pref/Prefvid:		ui config MAKELIB
 
-prefpntc	: ui config parentc
-	mdcd %ROOT_DIR%\Installed\Library\Pref\Prefpntc
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Prefpntc lib full
-
+prefpntc	: Installed/Library/Pref/Prefpntc
+Installed/Library/Pref/Prefpntc:	ui config parentc MAKELIB
 
 
 #driver
 
-stream	: kernel
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Stream ; \
-	$(MK_MAKE) full lib
+stream	: Installed/Driver/Stream
+Installed/Driver/Stream:		kernel MAKEDRV
 
-nimbus	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Font/Nimbus ; \
-	$(MK_MAKE) full lib
+nimbus	: Installed/Driver/Font/Nimbus
+Installed/Driver/Font/Nimbus:		MAKEDRV
 
-ms4	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/IFS/DOS/MS4 ; \
-	$(MK_MAKE) full lib
+ms4	: Installed/Driver/IFS/DOS/MS4
+Installed/Driver/IFS/DOS/MS4:		MAKEDRV
 
-os2	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/IFS/DOS/OS2 ; \
-	$(MK_MAKE) full lib
+os2	: Installed/Driver/IFS/DOS/OS2
+Installed/Driver/IFS/DOS/OS2:		MAKEDRV
 
-ntfat	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/IFS/DOS/NTFat ; \
-	$(MK_MAKE) full lib
+ntfat	: Installed/Driver/IFS/DOS/NTFat
+Installed/Driver/IFS/DOS/NTFat:		MAKEDRV
 
-dri	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/IFS/DOS/DRI ; \
-	$(MK_MAKE) full lib
+dri	: Installed/Driver/IFS/DOS/DRI
+Installed/Driver/IFS/DOS/DRI:		MAKEDRV
 
-mslf	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/IFS/DOS/MSLF ; \
-	$(MK_MAKE) full lib
+mslf	: Installed/Driver/IFS/DOS/MSLF
+Installed/Driver/IFS/DOS/MSLF:		MAKEDRV
 
-cdrom     :
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/IFS/DOS/CDROM ; \
-	$(MK_MAKE) full lib
+cdrom     : Installed/Driver/IFS/DOS/CDROM
+Installed/Driver/IFS/DOS/CDROM:		MAKEDRV
 
-gdi	: genpc
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/GDI ; \
-	$(MK_MAKE) full lib
+gdi	: Installed/Driver/Keyboard/GDI
+Installed/Driver/Keyboard/GDI:		genpc MAKEDRV
 
-msnet     :
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/IFS/DOS/MSNet ; \
-	$(MK_MAKE) full lib
+msnet     : Installed/Driver/IFS/DOS/MSNet
+Installed/Driver/IFS/DOS/MSNet:		MAKEDRV
 
-keyboard	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard ; \
-	$(MK_MAKE) full lib
+keyboard	: Installed/Driver/Keyboard
+Installed/Driver/Keyboard:		MAKEDRV
 
-modem	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Modem ; \
-	$(MK_MAKE) full lib
+modem	: Installed/Driver/Modem
+Installed/Driver/Modem:			MAKEDRV
 
-gdipointer	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/GDIPointer ; \
-	$(MK_MAKE) full lib
+gdipointer	: Installed/Driver/Mouse/GDIPointer
+Installed/Driver/Mouse/GDIPointer:	MAKEDRV
 
-standard	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Sound/Standard ; \
-	$(MK_MAKE) full lib
+standard	: Installed/Driver/Sound/Standard
+Installed/Driver/Sound/Standard:	MAKEDRV
 
-winnt	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Sound/WinNT ; \
-	$(MK_MAKE) full lib
+winnt	: Installed/Driver/Sound/WinNT
+Installed/Driver/Sound/WinNT:		MAKEDRV
 
-parallel	: stream
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Stream/Parallel ; \
-	$(MK_MAKE) full lib
+parallel	: Installed/Driver/Stream/Parallel
+Installed/Driver/Stream/Parallel:	stream MAKEDRV
 
-serial	: stream
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Stream/Serial ; \
-	$(MK_MAKE) full lib
+serial	: Installed/Driver/Stream/Serial
+Installed/Driver/Stream/Serial:		stream MAKEDRV
 
-disk	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Swap/Disk ; \
-	$(MK_MAKE) full lib
+disk	: Installed/Driver/Swap/Disk
+Installed/Driver/Swap/Disk:		MAKEDRV
 
-emm	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Swap/EMS/EMM ; \
-	$(MK_MAKE) full lib
+emm	: Installed/Driver/Swap/EMS/EMM
+Installed/Driver/Swap/EMS/EMM:		MAKEDRV
 
-extmem	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Swap/ExtMem ; \
-	$(MK_MAKE) full lib
+extmem	: Installed/Driver/Swap/ExtMem
+Installed/Driver/Swap/ExtMem:		MAKEDRV
 
-xms	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Swap/XMS ; \
-	$(MK_MAKE) full lib
+xms	: Installed/Driver/Swap/XMS
+Installed/Driver/Swap/XMS:		MAKEDRV
 
-att6300	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/Dumb/ATT6300 ; \
-	$(MK_MAKE) full lib
+att6300	: Installed/Driver/Video/Dumb/ATT6300
+Installed/Driver/Video/Dumb/ATT6300:	MAKEDRV
 
-vidmem	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/Dumb/VidMem ; \
-	$(MK_MAKE) full lib
+vidmem	: Installed/Driver/Video/Dumb/VidMem
+Installed/Driver/Video/Dumb/VidMem:	MAKEDRV
 
-svga	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/VGAlike/SVGA ; \
-	$(MK_MAKE) full lib
+svga	: Installed/Driver/Video/VGAlike/SVGA
+Installed/Driver/Video/VGAlike/SVGA:	MAKEDRV
 
-vga	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/VGAlike/VGA ; \
-	$(MK_MAKE) full lib
+vga	: Installed/Driver/Video/VGAlike/VGA
+Installed/Driver/Video/VGAlike/VGA:	MAKEDRV
 
-vga8	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/VGAlike/VGA8 ; \
-	$(MK_MAKE) full lib
+vga8	: Installed/Driver/Video/VGAlike/VGA8
+Installed/Driver/Video/VGAlike/VGA8:	MAKEDRV
 
-vga16	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/VGAlike/VGA16 ; \
-	$(MK_MAKE) full lib
+vga16	: Installed/Driver/Video/VGAlike/VGA16
+Installed/Driver/Video/VGAlike/VGA16:	MAKEDRV
 
-etherodi	: socket accpnt
-	mdcd %ROOT_DIR%\Installed\Driver\Socket\EtherODI
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\Socket\EtherODI lib full
+etherodi	: Installed/Driver/Socket/EtherODI
+Installed/Driver/Socket/EtherODI:	socket accpnt MAKEDRV
 
 # International Keyboard Drivers
 kbd_drivers : kbdb_cf kbde_cf kbd_csa kbde_df kbdn_df kbde_be kbd_dvrk  \
@@ -714,284 +620,215 @@ kbd_drivers : kbdb_cf kbde_cf kbd_csa kbde_df kbdn_df kbde_be kbd_dvrk  \
 	kbdn_sg kbde_it kbdn_it kbde_no kbdn_no kbde_po kbde_sp kbdn_sp	\
 	kbde_sv kbdn_sv kbdt_sv kbde_uk lbdn_uk t1000
 
-kbd_dvrk	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Dvorak ; \
-	$(MK_MAKE) full lib
+kbd_dvrk	: Installed/Driver/Keyboard/Dvorak
+Installed/Driver/Keyboard/Dvorak:	MAKEDRV
 
-kbdb_cf	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Canadian/Bilingual ; \
-	$(MK_MAKE) full lib
-kbde_cf	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Canadian/FrenchExtended ; \
-	$(MK_MAKE) full lib
+kbdb_cf	: Installed/Driver/Keyboard/Canadian/Bilingual
+Installed/Driver/Keyboard/Canadian/Bilingual:	MAKEDRV
 
-kbd_csa	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Canadian/CSA-z243.200-91 ; \
-	$(MK_MAKE) full lib
+kbde_cf	: Installed/Driver/Keyboard/Canadian/FrenchExtended
+Installed/Driver/Keyboard/Canadian/FrenchExtended:	MAKEDRV
 
-kbde_df	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Danish/Extended ; \
-	$(MK_MAKE) full lib
+kbd_csa	: Installed/Driver/Keyboard/Canadian/CSA-z243.200-91
+Installed/Driver/Keyboard/Canadian/CSA-z243.200-91:	MAKEDRV
 
-kbdn_df	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Danish/NonExtended ; \
-	$(MK_MAKE) full lib
+kbde_df	: Installed/Driver/Keyboard/Danish/Extended
+Installed/Driver/Keyboard/Danish/Extended:		MAKEDRV
 
-kbde_be	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Dutch/Extended ; \
-	$(MK_MAKE) full lib
+kbdn_df	: Installed/Driver/Keyboard/Danish/NonExtended
+Installed/Driver/Keyboard/Danish/NonExtended:		MAKEDRV
 
-kbde_fr	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/French/Extended ; \
-	$(MK_MAKE) full lib
+kbde_be	: Installed/Driver/Keyboard/Dutch/Extended
+Installed/Driver/Keyboard/Dutch/Extended:		MAKEDRV
 
-kbdn_fr	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/French/NonExtended ; \
-	$(MK_MAKE) full lib
+kbde_fr	: Installed/Driver/Keyboard/French/Extended
+Installed/Driver/Keyboard/French/Extended:		MAKEDRV
 
-kps1_fr	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/French/Ps1 ; \
-	$(MK_MAKE) full lib
+kbdn_fr	: Installed/Driver/Keyboard/French/NonExtended
+Installed/Driver/Keyboard/French/NonExtended:		MAKEDRV
 
-kbde_sf :
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/French/SwissExtended ; \
-	$(MK_MAKE) full lib
+kps1_fr	: Installed/Driver/Keyboard/French/Ps1
+Installed/Driver/Keyboard/French/Ps1:			MAKEDRV
 
-kbde_gr :
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/German/Extended ; \
-	$(MK_MAKE) full lib
+kbde_sf : Installed/Driver/Keyboard/French/SwissExtended
+Installed/Driver/Keyboard/French/SwissExtended:		MAKEDRV
 
-kbdn_gr :
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/German/NonExtended ; \
-	$(MK_MAKE) full lib
+kbde_gr : Installed/Driver/Keyboard/German/Extended
+Installed/Driver/Keyboard/German/Extended:		MAKEDRV
 
-kbde_sg	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/German/SwissExtended ; \
-	$(MK_MAKE) full lib
+kbdn_gr : Installed/Driver/Keyboard/German/NonExtended
+Installed/Driver/Keyboard/German/NonExtended:		MAKEDRV
 
-kbdn_sg	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/German/SwissNonExtended ; \
-	$(MK_MAKE) full lib
+kbde_sg	: Installed/Driver/Keyboard/German/SwissExtended
+Installed/Driver/Keyboard/German/SwissExtended:		MAKEDRV
 
-kbde_it	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Italian/Extended ; \
-	$(MK_MAKE) full lib
+kbdn_sg	: Installed/Driver/Keyboard/German/SwissNonExtended
+Installed/Driver/Keyboard/German/SwissNonExtended :	MAKEDRV
 
-kbdn_it	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Italian/NonExtended ; \
-	$(MK_MAKE) full lib
+kbde_it	: Installed/Driver/Keyboard/Italian/Extended
+Installed/Driver/Keyboard/Italian/Extended:		MAKEDRV
 
-kbde_no	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Norwegian/Extended ; \
-	$(MK_MAKE) full lib
+kbdn_it	: Installed/Driver/Keyboard/Italian/NonExtended
+Installed/Driver/Keyboard/Italian/NonExtended:		MAKEDRV
 
-kbdn_no	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Norwegian/NonExtended ; \
-	$(MK_MAKE) full lib
+kbde_no	: Installed/Driver/Keyboard/Norwegian/Extended
+Installed/Driver/Keyboard/Norwegian/Extended:		MAKEDRV
 
-kbde_po	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Portuguese/Extended ; \
-	$(MK_MAKE) full lib
+kbdn_no	: Installed/Driver/Keyboard/Norwegian/NonExtended
+Installed/Driver/Keyboard/Norwegian/NonExtended:	MAKEDRV
 
-kbde_sp	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Spanish/Extended ; \
-	$(MK_MAKE) full lib
+kbde_po	: Installed/Driver/Keyboard/Portuguese/Extended
+Installed/Driver/Keyboard/Portuguese/Extended:		MAKEDRV
 
-kbdn_sp	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Spanish/NonExtended ; \
-	$(MK_MAKE) full lib
+kbde_sp	: Installed/Driver/Keyboard/Spanish/Extended
+Installed/Driver/Keyboard/Spanish/Extended:		MAKEDRV
 
-kbde_sv	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Swedish/Extended ; \
-	$(MK_MAKE) full lib
+kbdn_sp	: Installed/Driver/Keyboard/Spanish/NonExtended
+Installed/Driver/Keyboard/Spanish/NonExtended:		MAKEDRV
 
-kbdn_sv	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Swedish/NonExtended ; \
-	$(MK_MAKE) full lib
+kbde_sv	: Installed/Driver/Keyboard/Swedish/Extended
+Installed/Driver/Keyboard/Swedish/Extended:		MAKEDRV
 
-kbdt_sv	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Swedish/Typewriter ; \
-	$(MK_MAKE) full lib
+kbdn_sv	: Installed/Driver/Keyboard/Swedish/NonExtended
+Installed/Driver/Keyboard/Swedish/NonExtended:		MAKEDRV
 
-kbde_uk	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/UK/Extended ; \
-	$(MK_MAKE) full lib
+kbdt_sv	: Installed/Driver/Keyboard/Swedish/Typewriter
+Installed/Driver/Keyboard/Swedish/Typewriter:		MAKEDRV
 
-lbdn_uk	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/UK/NonExtended ; \
-	$(MK_MAKE) full lib
+kbde_uk	: Installed/Driver/Keyboard/UK/Extended
+Installed/Driver/Keyboard/UK/Extended:			MAKEDRV
 
-t1000	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Keyboard/Tandy1000 ; \
-	$(MK_MAKE) full lib
+lbdn_uk	: Installed/Driver/Keyboard/UK/NonExtended
+Installed/Driver/Keyboard/UK/NonExtended:		MAKEDRV
+
+t1000	: Installed/Driver/Keyboard/Tandy1000
+Installed/Driver/Keyboard/Tandy1000:			MAKEDRV
 
 #mousedrivers
-genmouse	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/GenMouse ; \
-	$(MK_MAKE) full lib
+genmouse	: Installed/Driver/Mouse/GenMouse
+Installed/Driver/Mouse/GenMouse:	MAKEDRV
 
-absgen	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/AbsGen ; \
-	$(MK_MAKE) full lib
+absgen	: Installed/Driver/Mouse/AbsGen
+Installed/Driver/Mouse/AbsGen:		MAKEDRV
 
-kbmouse	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/KBMouse ; \
-	$(MK_MAKE) full lib
+kbmouse	: Installed/Driver/Mouse/KBMouse
+Installed/Driver/Mouse/KBMouse:		MAKEDRV
 
-msbus	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/MSBus ; \
-	$(MK_MAKE) full lib
+msbus	: Installed/Driver/Mouse/MSBus
+Installed/Driver/Mouse/MSBus:		MAKEDRV
 
-msser	: serial
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/MSSer ; \
-	$(MK_MAKE) full lib
+msser	: Installed/Driver/Mouse/MSSer
+Installed/Driver/Mouse/MSSer:		serial MAKEDRV
 
-logibus	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/LogiBus ; \
-	$(MK_MAKE) full lib
+logibus	: Installed/Driver/Mouse/LogiBus
+Installed/Driver/Mouse/LogiBus:		MAKEDRV
 
-logiser	: serial
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/LogiSer ; \
-	$(MK_MAKE) full lib
+logiser	: Installed/Driver/Mouse/LogiSer
+Installed/Driver/Mouse/LogiSer:		serial MAKEDRV
 
-dma	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/DMA/DOSReal ; \
-	$(MK_MAKE) full lib
+dma	: Installed/Driver/DMA/DOSReal
+Installed/Driver/DMA/DOSReal:		MAKEDRV
 
-msys	:  serial
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/MSys ; \
-	$(MK_MAKE) full lib
+msys	:  Installed/Driver/Mouse/MSys
+Installed/Driver/Mouse/MSys:		serial MAKEDRV
 
-ps2	: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Mouse/PS2 ; \
-	$(MK_MAKE) full lib
+ps2	: Installed/Driver/Mouse/PS2
+Installed/Driver/Mouse/PS2:		ui MAKEDRV
 
 # Printer Drivers
 
-deskjet	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\HP\Deskjet
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\HP\Deskjet full
+deskjet	: Installed/Driver/Printer/HP/Deskjet
+Installed/Driver/Printer/HP/Deskjet:	spool MAKEDRV
 
-dj500c	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\HP\Dj500c
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\HP\Dj500c full
+dj500c	: Installed/Driver/Printer/HP/Dj500c
+Installed/Driver/Printer/HP/Dj500c:	spool MAKEDRV
 
-lbp	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\HP\Lbp
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\HP\Lbp full
+lbp	: Installed/Driver/Printer/HP/Lbp
+Installed/Driver/Printer/HP/Lbp:	spool MAKEDRV
 
-mercury	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\HP\Mercury
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\HP\Mercury full
+mercury	: Installed/Driver/Printer/HP/Mercury
+Installed/Driver/Printer/HP/Mercury:	spool MAKEDRV
 
+pcl4	: Installed/Driver/Printer/HP/Pcl4
+Installed/Driver/Printer/HP/Pcl4:	spool MAKEDRV
 
-pcl4	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\HP\Pcl4
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\HP\Pcl4 full
+quietjet	: Installed/Driver/Printer/HP/QuietJet
+Installed/Driver/Printer/HP/QuietJet:	spool MAKEDRV
 
-quietjet	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\HP\QuietJet
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\HP\QuietJet full
+canon48	: Installed/Driver/Printer/DotMatrix/Canon48
+Installed/Driver/Printer/DotMatrix/Canon48:	spool MAKEDRV
 
-canon48	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Canon48
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Canon48 full
+canonbjc	: Installed/Driver/Printer/DotMatrix/CanonBJC
+Installed/Driver/Printer/DotMatrix/CanonBJC:	spool MAKEDRV
 
-canonbjc	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\CanonBJC
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\CanonBJC full
+canonrgb	: Installed/Driver/Printer/DotMatrix/CanonRGB
+Installed/Driver/Printer/DotMatrix/CanonRGB:	spool MAKEDRV
 
-canonrgb	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\CanonRGB
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\CanonRGB full
+epshi24	: Installed/Driver/Printer/DotMatrix/Epshi24
+Installed/Driver/Printer/DotMatrix/Epshi24:	spool MAKEDRV
 
-epshi24	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Epshi24
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Epshi24 full
+epson24	: Installed/Driver/Printer/DotMatrix/Epson24
+Installed/Driver/Printer/DotMatrix/Epson24:	spool MAKEDRV
 
-epson24	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Epson24
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Epson24 full
+epson48	: Installed/Driver/Printer/DotMatrix/Epson48
+Installed/Driver/Printer/DotMatrix/Epson48:	spool MAKEDRV
 
-epson48	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Epson48
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Epson48 full
+escp2	: Installed/Driver/Printer/DotMatrix/Escp2
+Installed/Driver/Printer/DotMatrix/Escp2:	spool MAKEDRV
 
-escp2	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Escp2
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Escp2 full
+nec24	: Installed/Driver/Printer/DotMatrix/Nec24
+Installed/Driver/Printer/DotMatrix/Nec24:	spool MAKEDRV
 
-nec24	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Nec24
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Nec24 full
+ppds24	: Installed/Driver/Printer/DotMatrix/Ppds24
+Installed/Driver/Printer/DotMatrix/Ppds24:	spool MAKEDRV
 
-ppds24	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Ppds24
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Ppds24 full
+tosh24	: Installed/Driver/Printer/DotMatrix/Tosh24
+Installed/Driver/Printer/DotMatrix/Tosh24:	spool MAKEDRV
 
-tosh24	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Tosh24
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Tosh24 full
+pscript	: Installed\Driver\Printer\PScript
+Installed\Driver\Printer\PScript:		spool eps ps2pdf MAKEDRV
 
-pscript	: spool eps ps2pdf
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\PScript
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\PScript full
+dumb	: Installed/Driver/Printer/Ascii/Dumb
+Installed/Driver/Printer/Ascii/Dumb:		spool MAKEDRV
 
-dumb	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\Ascii\Dumb
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\Ascii\Dumb full
+diablo	: Installed/Driver/Printer/Ascii/Diablo
+Installed/Driver/Printer/Ascii/Diablo:		spool MAKEDRV
 
-diablo	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\Ascii\Diablo
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\Ascii\Diablo full
+citoh9	: Installed/Driver/Printer/DotMatrix/Citoh9
+Installed/Driver/Printer/DotMatrix/Citoh9:	spool MAKEDRV
 
-citoh9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Citoh9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Citoh9 full
+prop9	: Installed/Driver/Printer/DotMatrix/Prop9
+Installed/Driver/Printer/DotMatrix/Prop9:	spool MAKEDRV
 
-prop9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Prop9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Prop9 full
+diconix9	: Installed/Driver/Printer/DotMatrix/Diconix9
+Installed/Driver/Printer/DotMatrix/Diconix9:	spool MAKEDRV
 
-diconix9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Diconix9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Diconix9 full
+eplx9	: Installed/Driver/Printer/DotMatrix/Eplx9
+Installed/Driver/Printer/DotMatrix/Eplx9:	spool MAKEDRV
 
-eplx9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Eplx9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Eplx9 full
+epmx9	: Installed/Driver/Printer/DotMatrix/Epmx9
+Installed/Driver/Printer/DotMatrix/Epmx9:	spool MAKEDRV
 
-epmx9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Epmx9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Epmx9 full
+eprx9	: Installed/Driver/Printer/DotMatrix/Eprx9
+Installed/Driver/Printer/DotMatrix/Eprx9:	spool MAKEDRV
 
-eprx9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Eprx9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Eprx9 full
+bchip9	: Installed/Driver/Printer/DotMatrix/Bchip9
+Installed/Driver/Printer/DotMatrix/Bchip9:	spool MAKEDRV
 
-bchip9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Bchip9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Bchip9 full
+star9	: Installed/Driver/Printer/DotMatrix/Star9
+Installed/Driver/Printer/DotMatrix/Star9:	spool MAKEDRV
 
-star9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Star9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Star9 full
+oki9	: Installed/Driver/Printer/DotMatrix/Oki9
+Installed/Driver/Printer/DotMatrix/Oki9:	spool MAKEDRV
 
-oki9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Oki9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Oki9 full
+grpr9	: Installed/Driver/Printer/DotMatrix/Grpr9
+Installed/Driver/Printer/DotMatrix/Grpr9:	spool MAKEDRV
 
-grpr9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Grpr9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Grpr9 full
+epson9	: Installed/Driver/Printer/DotMatrix/Epson9
+Installed/Driver/Printer/DotMatrix/Epson9:	spool MAKEDRV
 
-epson9	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Epson9
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Epson9 full
-
-propx24	: spool
-	mdcd %ROOT_DIR%\Installed\Driver\Printer\DotMatrix\Propx24
-	$(MAKE) -I$(ROOT_DIR)\Driver\Printer\DotMatrix\Propx24 full
+propx24	: Installed/Driver/Printer/DotMatrix/Propx24
+Installed/Driver/Printer/DotMatrix/Propx24:	spool MAKEDRV
 
 
 #appl
@@ -1047,321 +884,268 @@ email: ui text ansic socket spell spool  borlandc
 #	No need to do this because this is sync'ed by morning make script.
 #	p4 sync -f //depot/pcgeos/Installed/Appl/Email/...
 
-manager: ui shell spool
-	mdcd %ROOT_DIR%\Installed\Appl\FileMgrs2\GeoManager
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\FileMgrs2\Geomanager full
+manager: Installed/Appl/FileMgrs2/GeoManager
+Installed/Appl/FileMgrs2/GeoManager:	ui shell spool MAKEAPPL
 
-isdesk: ui shell spool wav shell
-	mdcd %ROOT_DIR%\Installed\Appl\FileMgrs2\ISDesk
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\FileMgrs2\ISDesk full
+isdesk: Installed/Appl/FileMgrs2/ISDesk
+Installed/Appl/FileMgrs2/ISDesk:	ui shell spool wav shell MAKEAPPL
 
-sclock:	ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/SysTray/SClock ; \
-	$(MK_MAKE) full lib
+sclock:	Installed/Appl/SysTray/SClock
+Installed/Appl/SysTray/SClock:		ui MAKEAPPL
 
-linktool: ui shell
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/FMTools/Linktool ; \
-	$(MK_MAKE) full lib
+linktool: Installed/Library/FMTools/Linktool
+Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL
 
 homebase:
 #	No need to do this because this is sync'ed by morning make script.
 #	p4 sync -f //depot/pcgeos/Appl/BreadBox/Homebase/...
 
-newsread: ui socket ansic text spool spell inetmsg extui parentc idialc
-	mdcd %ROOT_DIR%\Installed\Appl\BreadBox\NewsRead
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\BreadBox\NewsRead full
+newsread: Installed/Appl/BreadBox/NewsRead
+Installed/Appl/BreadBox/NewsRead:	ui socket ansic text spool spell \
+	 				inetmsg extui parentc idialc \
+					MAKEAPPL
 
-ftpc	: ui flllib extui ansic ftplib
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\ftpc
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\ftpc full
+ftpc	: Installed/Appl/Breadbox/ftpc
+Installed/Appl/Breadbox/ftpc:		ui flllib extui ansic ftplib MAKEAPPL
 
 # Utilities
 
-setup:	ui spool config serial parallel
-	mdcd %ROOT_DIR%\Installed\Appl\Preferences\Setup
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Preferences\Setup full
+setup:	Installed/Appl/Preferences/Setup
+Installed/Appl/Preferences/Setup:	ui spool config serial parallel MAKEAPPL
 
-launcher: ui
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/Launcher ; \
-	$(MK_MAKE) full lib
+launcher: Installed/Appl/Launcher
+Installed/Appl/Launcher:	ui MAKEAPPL
 
-prefmgr	: ui spool text spell config serial
-	mdcd %ROOT_DIR%\Installed\Appl\Preferences\PrefMgr
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Preferences\PrefMgr full
+prefmgr	: Installed/Appl/Preferences/PrefMgr
+Installed/Appl/Preferences/PrefMgr:	ui spool text spell config serial \
+					MAKEAPPL
 
-charm	: ui text ansic
-	mdcd %ROOT_DIR%\Installed\Appl\Charm
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Charm full
+charm	: Installed/Appl/Charm
+Installed/Appl/Charm:		ui text ansic MAKEAPPL
 
-wordmat	: ui ansic wmlib
-	mdcd %ROOT_DIR%\Installed\Appl\WordMat
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\WordMat full
+wordmat	: Installed/Appl/WordMat
+Installed/Appl/WordMat:		ui ansic wmlib MAKEAPPL
 
 # Tools
 
-prntscrn	: ui spool
-	mdcd %ROOT_DIR%\Installed\Appl\Tools\PrntScrn
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Tools\PrntScrn full
+prntscrn	: Installed/Appl/Tools/PrntScrn
+Installed/Appl/Tools/PrntScrn:	ui spool MAKEAPPL
 
 # Games
 
-solitaire	: ui cards geodeck wav
-	mdcd %ROOT_DIR%\Installed\Appl\Games\Solitaire
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Games\Solitaire full
+solitaire	: Installed/Appl/Games/Solitaire
+Installed/Appl/Games/Solitaire:	ui cards geodeck wav MAKEAPPL
 
-cword	: ui wav
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/Games/CWord ; \
-	$(MK_MAKE) full lib
+cword	: Installed/Appl/Games/CWord
+Installed/Appl/Games/CWord:	ui wav MAKEAPPL
 
-amateur	: ui sound game
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/Games/Amateur ; \
-	$(MK_MAKE) full lib
+amateur	: Installed/Appl/Games/Amateur
+Installed/Appl/Games/Amateur:	ui sound game MAKEAPPL
 
-bjack	: ui sound game wav cards
-	mdcd %ROOT_DIR%\Installed\Appl\Games\Bjack
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Games\Bjack full
+bjack	: Installed/Appl/Games/Bjack
+Installed/Appl/Games/Bjack:	ui sound game wav cards MAKEAPPL
 
-gwpoker	: ui sound game wav cards
-	mdcd %ROOT_DIR%\Installed\Appl\Games\GWPoker
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Games\GWPoker full
+gwpoker	: Installed/Appl/Games/GWPoker
+Installed/Appl/Games/GWPoker:	ui sound game wav cards MAKEAPPL
 
-hearts	: ui sound wav cards
-	mdcd %ROOT_DIR%\Installed\Appl\Games\Hearts
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Games\Hearts full
+hearts	: Installed/Appl/Games/Hearts
+Installed/Appl/Games/Hearts:	ui sound wav cards MAKEAPPL
 
-mine	: ui game
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/Games/Mine ; \
-	$(MK_MAKE) full lib
+mine	: Installed/Appl/Games/Mine
+Installed/Appl/Games/Mine:	ui game MAKEAPPL
 
-pyramid	: ui cards
-	mdcd %ROOT_DIR%\Installed\Appl\Games\Pyramid
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Games\Pyramid full
+pyramid	: Installed/Appl/Games/Pyramid
+Installed/Appl/Games/Pyramid:	ui cards MAKEAPPL
 
-sokoban	: ui game
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/Games/Sokoban ; \
-	$(MK_MAKE) full lib
+sokoban	: Installed/Appl/Games/Sokoban
+Installed/Appl/Games/Sokoban:	ui game MAKEAPPL
 
-taipei	: ui game
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/Games/Taipei ; \
-	$(MK_MAKE) full lib
+taipei	: Installed/Appl/Games/Taipei
+Installed/Appl/Games/Taipei:	ui game MAKEAPPL
 
-uki	: ui sound text
-	mdcd %ROOT_DIR%\Installed\Appl\Games\Uki
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Games\Uki full
+uki	: Installed/Appl/Games/Uki
+Installed/Appl/Games/Uki:	ui sound text MAKEAPPL
 
-column	: ui game
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\Column
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\Column full
+column	: Installed/Appl/Breadbox/Column
+Installed/Appl/Breadbox/Column:	ui game MAKEAPPL
 
 
 
 
-idialup : ui ansic socket accpnt
-	mdcd %ROOT_DIR%\Installed\Appl\IDialup
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\IDialup full
+idialup : Installed/Appl/IDialup
+Installed/Appl/IDialup:		ui ansic socket accpnt MAKEAPPL
 
-gpcmail : ui ansic spell text mailhub mailsmtp mailpop3 config spool idialc
-	mdcd %ROOT_DIR%\Installed\Appl\GPCMail
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\GPCMail full
+gpcmail : Installed/Appl/GPCMail
+Installed/Appl/GPCMail:		ui ansic spell text mailhub mailsmtp \
+				mailpop3 config spool idialc MAKEAPPL
 
-bbxmail : ui ansic spell text bbxmlib config spool
-	mdcd %ROOT_DIR%\Installed\Appl\dil\bbxmail
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\dil\bbxmail full
+bbxmail : Installed/Appl/dil/bbxmail
+Installed/Appl/dil/bbxmail:	ui ansic spell text bbxmlib config spool \
+				MAKEAPPL
 
-bbxchat : ui text ansic socket accpnt parentc
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\BbxChat
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\BbxChat full
+bbxchat : Installed/Appl/Breadbox/BbxChat
+Installed/Appl/Breadbox/BbxChat:	ui text ansic socket accpnt parentc \
+					MAKEAPPL
 
-bnkr30 : ui ansic text spool math n2txt
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\Bnkr30
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\Bnkr30 full
+bnkr30 : Installed/Appl/Breadbox/Bnkr30
+Installed/Appl/Breadbox/Bnkr30:		ui ansic text spool math n2txt MAKEAPPL
 
-hmbase : ui ansic text spool math
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\HmBase
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\HmBase full
+hmbase : Installed/Appl/Breadbox/HmBase
+Installed/Appl/Breadbox/HmBase:		ui ansic text spool math MAKEAPPL
 
 # Savers
 
 # currently does not make
-# album	: saver config
-#	mdcd %ROOT_DIR%\Installed\Appl\Saver\Album
-#	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Album full
+# album	: Installed/Appl/Saver/Album
+#Installed/Appl/Saver/Album:	saver config MAKEAPPL
 
-lol	: saver
-	mdcd %ROOT_DIR%\Installed\Appl\LOL
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\LOL full
+lol	: Installed/Appl/LOL
+Installed/Appl/LOL:		saver MAKEAPPL
 
-blackhole	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\BlackHole
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\BlackHole full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\BlackHole\BlackHolePref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\BlackHole\BlackHolePref full
+blackhole	: 	Installed/Appl/Saver/BlackHole \
+			Installed/Appl/Saver/BlackHole/BlackHolePref
+Installed/Appl/Saver/BlackHole:			saver config MAKEAPPL
+Installed/Appl/Saver/BlackHole/BlackHolePref:	saver config MAKEAPPL
 
-blank	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Blank
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Blank full
+blank	: Installed/Appl/Saver/Blank
+Installed/Appl/Saver/Blank:	saver config MAKEAPPL
 
-bobbin	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Bobbin
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Bobbin full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Bobbin\BobbinPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Bobbin\BobbinPref  full
+bobbin	: 	Installed/Appl/Saver/Bobbin \
+		Installed/Appl/Saver/Bobbin/BobbinPref
+Installed/Appl/Saver/Bobbin: 			saver config MAKEAPPL
+Installed/Appl/Saver/Bobbin/BobbinPref:		saver config MAKEAPPL
 
-circles	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Circles
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Circles full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Circles\CirclesPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Circles\CirclesPref full
+circles	: 	Installed/Appl/Saver/Circles \
+		Installed/Appl/Saver/Circles/CirclesPref
+Installed/Appl/Saver/Circles:			saver config MAKEAPPL
+Installed/Appl/Saver/Circles/CirclesPref:	saver config MAKEAPPL
 
-dribble	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Dribble
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Dribble full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Dribble\DribblePref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Dribble\DribblePref full
+dribble	: 	Installed/Appl/Saver/Dribble \
+		Installed/Appl/Saver/Dribble/DribblePref
+Installed/Appl/Saver/Dribble:			saver config MAKEAPPL
+Installed/Appl/Saver/Dribble/DribblePref:	saver config MAKEAPPL
 
-dust	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Dust
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Dust full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Dust\DustPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Dust\DustPref full
+dust	: 	Installed/Appl/Saver/Dust \
+		Installed/Appl/Saver/Dust/DustPref
+Installed/Appl/Saver/Dust:			saver config MAKEAPPL
+Installed/Appl/Saver/Dust/DustPref:		saver config MAKEAPPL
 
-fades	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Fades
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Fades full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Fades\FadesPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Fades\FadesPref full
+fades	: 	Installed/Appl/Saver/Fades \
+		Installed/Appl/Saver/Fades/FadesPref
+Installed/Appl/Saver/Fades:			saver config MAKEAPPL
+Installed/Appl/Saver/Fades/FadesPref:		saver config MAKEAPPL
 
-flame	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Flame
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Flame full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Flame\FlamePref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Flame\FlamePref full
+flame	: 	Installed/Appl/Saver/Flame \
+		Installed/Appl/Saver/Flame/FlamePref
+Installed/Appl/Saver/Flame:			saver config MAKEAPPL
+Installed/Appl/Saver/Flame/FlamePref:		saver config MAKEAPPL
 
-hopalong	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Hopalong
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Hopalong full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Hopalong\HopalongPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Hopalong\HopalongPref full
+hopalong	: 	Installed/Appl/Saver/Hopalong \
+			Installed/Appl/Saver/Hopalong/HopalongPref
+Installed/Appl/Saver/Hopalong:			saver config MAKEAPPL
+Installed/Appl/Saver/Hopalong/HopalongPref:	saver config MAKEAPPL
 
-lastwords	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\LastWords
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\LastWords full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\LWPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\LWPref full
+lastwords	: 	Installed/Appl/Saver/LastWords \
+			Installed/Appl/Saver/LWPref
+Installed/Appl/Saver/LastWords:			saver config MAKEAPPL
+Installed/Appl/Saver/LWPref:			saver config MAKEAPPL
 
-letter	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Letter
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Letter full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Letter\LetterPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Letter\LetterPref full
+letter	: 	Installed/Appl/Saver/Letter \
+		Installed/Appl/Saver/Letter/LetterPref
+Installed/Appl/Saver/Letter:			saver config MAKEAPPL
+Installed/Appl/Saver/Letter/LetterPref:		saver config MAKEAPPL
 
-logo	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\logo
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\logo full
+logo	: Installed/Appl/Saver/logo
+Installed/Appl/Saver/logo:		saver config MAKEAPPL
 
-maze	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Maze
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Maze full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Maze\MazePref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Maze\MazePref full
+maze	: 	Installed/Appl/Saver/Maze \
+		Installed/Appl/Saver/Maze/MazePref
+Installed/Appl/Saver/Maze:		saver config MAKEAPPL
+Installed/Appl/Saver/Maze/MazePref:	saver config MAKEAPPL
 
-melt	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Melt
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Melt full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Melt\MeltPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Melt\MeltPref full
+melt	: 	Installed/Appl/Saver/Melt \
+		Installed/Appl/Saver/Melt/MeltPref
+Installed/Appl/Saver/Melt:		saver config MAKEAPPL
+Installed/Appl/Saver/Melt/MeltPref:	saver config MAKEAPPL
 
-noodle	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Noodle
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Noodle full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Noodle\NoodlePref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Noodle\NoodlePref full
+noodle	: 	Installed/Appl/Saver/Noodle \
+		Installed/Appl/Saver/Noodle/NoodlePref
+Installed/Appl/Saver/Noodle:		saver config MAKEAPPL
+Installed/Appl/Saver/Noodle/NoodlePref:	saver config MAKEAPPL
 
-palette	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Palette
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Palette full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Palette\PalettePref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Palette\PalettePref full
+palette	: 	Installed/Appl/Saver/Palette \
+		Installed/Appl/Saver/Palette/PalettePref
+Installed/Appl/Saver/Palette:			saver config MAKEAPPL
+Installed/Appl/Saver/Palette/PalettePref:	saver config MAKEAPPL
 
-pieces	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Pieces
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Pieces full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Pieces\PiecesPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Pieces\PiecesPref full
+pieces	: 	Installed/Appl/Saver/Pieces \
+		Installed/Appl/Saver/Pieces/PiecesPref
+Installed/Appl/Saver/Pieces:		saver config MAKEAPPL
+Installed/Appl/Saver/Pieces/PiecesPref:	saver config MAKEAPPL
 
-pith	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Pith
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Pith full
+pith	: Installed/Appl/Saver/Pith
+Installed/Appl/Saver/Pith:	saver config MAKEAPPL
 
-qix	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Qix
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Qix full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Qix\QixPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Qix\QixPref full
+qix	: 	Installed/Appl/Saver/Qix \
+		Installed/Appl/Saver/Qix/QixPref
+Installed/Appl/Saver/Qix:		saver config MAKEAPPL
+Installed/Appl/Saver/Qix/QixPref:	saver config MAKEAPPL
 
-rotate	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Rotate
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Rotate full
+rotate	: Installed/Appl/Saver/Rotate
+Installed/Appl/Saver/Rotate:	saver config MAKEAPPL
 
-sand	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Sand
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Sand full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Sand\SandPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Sand\SandPref full
+sand	: 	Installed/Appl/Saver/Sand \
+		Installed/Appl/Saver/Sand/SandPref
+Installed/Appl/Saver/Sand:		saver config MAKEAPPL
+Installed/Appl/Saver/Sand/SandPref:	saver config MAKEAPPL
 
-spotlight	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Spotlight
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Spotlight full
+spotlight	: 	Installed/Appl/Saver/Spotlight \
+			Installed/Appl/Saver/Spotlight/SpotlightPref
+Installed/Appl/Saver/Spotlight:			saver config MAKEAPPL
+Installed/Appl/Saver/Spotlight/SpotlightPref:	saver config MAKEAPPL
 #ifndef	NO_NEC
-	copy %ROOT_DIR%\Installed\Appl\Saver\Spotlight\Spotlight.geo %ROOT_DIR%\Installed\Appl\Saver\Spotlight\spotligh.geo
+#	copy %ROOT_DIR%\Installed\Appl\Saver\Spotlight\Spotlight.geo %ROOT_DIR%\Installed\Appl\Saver\Spotlight\spotligh.geo
 #endif
 #ifndef	NO_EC
-	copy %ROOT_DIR%\Installed\Appl\Saver\Spotlight\Spotlightec.geo %ROOT_DIR%\Installed\Appl\Saver\Spotlight\spotlighec.geo
+#	copy %ROOT_DIR%\Installed\Appl\Saver\Spotlight\Spotlightec.geo %ROOT_DIR%\Installed\Appl\Saver\Spotlight\spotlighec.geo
 #endif
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Spotlight\SpotlightPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Spotlight\SpotlightPref full
 #ifndef	NO_NEC
-	copy %ROOT_DIR%\Installed\Appl\Saver\Spotlight\SpotlightPref\SpotlightPref.geo %ROOT_DIR%\Installed\Appl\Saver\Spotlight\SpotlightPref\slpref.geo
+#	copy %ROOT_DIR%\Installed\Appl\Saver\Spotlight\SpotlightPref\SpotlightPref.geo %ROOT_DIR%\Installed\Appl\Saver\Spotlight\SpotlightPref\slpref.geo
 #endif
 #ifndef	NO_EC
-	copy %ROOT_DIR%\Installed\Appl\Saver\Spotlight\SpotlightPref\SpotlightPrefEC.geo %ROOT_DIR%\Installed\Appl\Saver\Spotlight\SpotlightPref\slprefec.geo
+#	copy %ROOT_DIR%\Installed\Appl\Saver\Spotlight\SpotlightPref\SpotlightPrefEC.geo %ROOT_DIR%\Installed\Appl\Saver\Spotlight\SpotlightPref\slprefec.geo
 #endif
 
-stars	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Stars
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Stars full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Stars\StarsPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Stars\StarsPref full
+stars	: 	Installed/Appl/Saver/Stars \
+		Installed/Appl/Saver/Stars/StarsPref
+Installed/Appl/Saver/Stars:		saver config MAKEAPPL
+Installed/Appl/Saver/Stars7StarsPref:	saver config MAKEAPPL
 
-string	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\String
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\String full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\String\StringPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\String\StringPref full
+string	: 	Installed/Appl/Saver/String \
+		Installed/Appl/Saver/String/StringPref
+Installed/Appl/Saver/String:		saver config MAKEAPPL
+Installed/Appl/Saver/String/StringPref:	saver config MAKEAPPL
 
-swarm	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Swarm
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Swarm full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Swarm\SwarmPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Swarm\SwarmPref full
+swarm	: 	Installed/Appl/Saver/Swarm \
+		Installed/Appl/Saver/Swarm/SwarmPref
+Installed/Appl/Saver/Swarm:		saver config MAKEAPPL
+Installed/Appl/Saver/Swarm/SwarmPref:	saver config MAKEAPPL
 
-tickertape	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Tickertape
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Tickertape full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Tickertape\TickertapePref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Tickertape\TickertapePref full
+tickertape	: 	Installed/Appl/Saver/Tickertape \
+			Installed/Appl/Saver/Tickertape/TickertapePref
+Installed/Appl/Saver/Tickertape:		saver config MAKEAPPL
+Installed/Appl/Saver/Tickertape/TickertapePref:	saver config MAKEAPPL
 
-tiles	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Tiles
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Tiles full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Tiles\TilesPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Tiles\TilesPref full
+tiles	: 	Installed/Appl/Saver/Tiles \
+		Installed/Appl/Saver/Tiles/TilesPref
+Installed/Appl/Saver/Tiles:		saver config MAKEAPPL
+Installed/Appl/Saver/Tiles/TilesPref:	saver config MAKEAPPL
 
-worms	: saver config
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Worms
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Worms full
-	mdcd %ROOT_DIR%\Installed\Appl\Saver\Worms\WormsPref
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Saver\Worms\WormsPref full
+worms	: 	Installed/Appl/Saver/Worms \
+		Installed/Appl/Saver/Worms/WormsPref
+Installed\Appl\Saver\Worms:		saver config MAKEAPPL
+Installed\Appl\Saver\Worms\WormsPref:	saver config MAKEAPPL
+
 
 # infoserv app
 
@@ -1433,25 +1217,36 @@ worms	: saver config
 
 # infosrv drvs
 
-tcpip	: netutils socket ansic resolver accpnt
-	mdcd %ROOT_DIR%\Installed\Driver\Socket\TCPIP
-	$(MAKE) -I$(ROOT_DIR)\Driver\Socket\TCPIP lib full
+tcpip	: Installed/Driver/Socket/TCPIP
+Installed/Driver/Socket/TCPIP:	netutils socket ansic resolver accpnt \
+				MAKELIB
 
-ppp	: netutils ansic accpnt
-	mdcd %ROOT_DIR%\Installed\Driver\Socket\PPP
-	$(MAKE) -I$(ROOT_DIR)\Driver\Socket\PPP lib full
+ppp	: Installed/Driver/Socket/PPP
+Installed/Driver/Socket/PPP:	netutils ansic accpnt MAKELIB
 
 # WebMagick app
 
-webmagick	: ui ansic text spool html4par \
-		  wmg3http wmg3ftp wmg3ext \
-		  impgraph impdoc \
-		  tcpip ppp modem \
-                  ibms parentc wav mailhub socket \
-                  js netutils cookies idialc
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\bbxbrow\JS
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\bbxbrow\AB
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\bbxbrow
+webmagick	: 	Installed/Appl/Breadbox/bbxbrow/JS \
+			Installed/Appl/Breadbox/bbxbrow/AB \
+			Installed/Appl/Breadbox/bbxbrow
+Installed/Appl/Breadbox/bbxbrow/JS:	ui ansic text spool html4par \
+		  			wmg3http wmg3ftp wmg3ext \
+		  			impgraph impdoc \
+		  			tcpip ppp modem \
+                  			ibms parentc wav mailhub socket \
+                  			js netutils cookies idialc MAKEAPPL
+Installed/Appl/Breadbox/bbxbrow/AB:	ui ansic text spool html4par \
+		  			wmg3http wmg3ftp wmg3ext \
+		  			impgraph impdoc \
+		  			tcpip ppp modem \
+                  			ibms parentc wav mailhub socket \
+                  			js netutils cookies idialc MAKEAPPL
+Installed/Appl/Breadbox/bbxbrow:	ui ansic text spool html4par \
+		  			wmg3http wmg3ftp wmg3ext \
+		  			impgraph impdoc \
+		  			tcpip ppp modem \
+                  			ibms parentc wav mailhub socket \
+                  			js netutils cookies idialc MAKEAPPL
 
 # sorry, executing CLEAN in the global makefile is not only bad style, it forces
 # EVERYONE, even people not working on the browser, to compile the whole stuff
@@ -1481,292 +1276,240 @@ html4par	: ui ansic text extgraph
 	mdcd %ROOT_DIR%\Installed\Library\Breadbox\html4par
 	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\html4par lib full
 
-profpnt		: ansic
-	mdcd %ROOT_DIR%\Installed\Library\profpnt
-	$(MAKE) -I$(ROOT_DIR)\Library\profpnt lib full
+profpnt		: Installed/Library/profpnt
+Installed/Library/profpnt:		ansic MAKELIB
 
-js              : ansic math borlandc mapheap profpnt
-	mdcd %ROOT_DIR%\Installed\Library\js
-	$(MAKE) -I$(ROOT_DIR)\Library\js lib full
+js              : Installed/Library/js
+Installed/Library/js:		ansic math borlandc mapheap profpnt MAKELIB
 
-ibms    : ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\ibms
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\ibms lib full
+ibms    : Installed/Library/Breadbox/ibms
+Installed/Library/Breadbox/ibms:	ansic MAKELIB
 
-extgraph	: ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\extgraph
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\extgraph lib full
+extgraph	: Installed/Library/Breadbox/extgraph
+Installed/Library/Breadbox/extgraph:	ansic MAKELIB
 
-wmg3http	: ansic socket ui ssl netutils cookies
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\urldrv\wmg3http
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\urldrv\wmg3http lib full
+wmg3http	: Installed/Library/Breadbox/urldrv/wmg3http
+Installed/Library/Breadbox/urldrv/wmg3http:	ansic socket ui ssl netutils \
+						cookies MAKELIB
 
-wmg3ftp	: ansic html4par socket ui
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\urldrv\wmg3ftp
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\urldrv\wmg3ftp lib full
+wmg3ftp	: 	Installed/Library/Breadbox/urldrv/wmg3ftp
+Installed/Library/Breadbox/urldrv/wmg3ftp:	ansic html4par socket ui \
+						MAKELIB
 
-wmg3ext	: ansic ui
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\urldrv\wmg3ext
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\urldrv\wmg3ext lib full
+wmg3ext	: 	Installed/Library/Breadbox/urldrv/wmg3ext
+Installed/Library/Breadbox/urldrv/wmg3ext:	ansic ui MAKELIB
 
-cookies : ansic netutils
-	mdcd %ROOT_DIR%\Installed\Library\Cookies
-	$(MAKE) -I$(ROOT_DIR)\Library\Cookies lib full
+cookies : 	Installed/Library/Cookies
+Installed/Library/Cookies:			ansic netutils MAKELIB
 
-mapheap :
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/MapHeap ; \
-	$(MK_MAKE) full lib
+mapheap :	Installed/Library/MapHeap
+Installed/Library/MapHeap:			MAKELIB
 
-ssl	: ansic socket mapheap
-	mdcd %ROOT_DIR%\Installed\Library\ssl
-	$(MAKE) -I$(ROOT_DIR)\Library\ssl lib full
+ssl	: 	Installed/Library/ssl
+Installed/Library/ssl:				ansic socket mapheap MAKELIB
 
 # product-specific dependency on fjpeg
-impgraph	: ansic ijgjpeg #fjpeg
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\impgraph
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\impgraph lib full
+impgraph	: Installed/Library/Breadbox/impgraph
+Installed/Library/Breadbox/impgraph:		ansic ijgjpeg MAKELIB #fjpeg
 
-ijgjpeg	: ui ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\ijgjpeg
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\ijgjpeg lib full
+ijgjpeg	: 	Installed/Library/Breadbox/ijgjpeg
+Installed/Library/Breadbox/ijgjpeg:		ui ansic MAKELIB
 
-#fjpeg	: ui ansic
-#	mdcd %ROOT_DIR%\Installed\Library\Breadbox\fjpeg
+#fjpeg	: 	Installed/Library/Breadbox/fjpeg
+#Installed/Library/Breadbox/fjpeg:		ui ansic MAKELIB
+#	mdcd %ROOT_DIR%\
 #	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\fjpeg lib full
 
-impdoc	: ui ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\impdoc
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\impdoc lib full
+impdoc	: 	Installed/Library/Breadbox/impdoc
+Installed/Library/Breadbox/impdoc:		ui ansic MAKELIB
 
-pdfvu	: ui ansic spool borlandc
-	mdcd %ROOT_DIR%\Installed\Appl\PDFViewer
-	$(MAKE) -I$(ROOT_DIR)\Appl\PDFViewer full
+pdfvu	: 	Installed/Appl/PDFViewer
+Installed/Appl/PDFViewer:			ui ansic spool borlandc \
+						MAKEAPPL
 
-#wavplay	: ui ansic wav
-#	mdcd %ROOT_DIR%\Installed\Appl\WavPlay
-#	$(MAKE) -I$(ROOT_DIR)\Appl\WavPlay full
+#wavplay	: Installed/Appl/WavPlay
+#Installed/Appl/WavPlay:				ui ansic wav MAKELIB
 
-giflib  : ansic extgraph
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Giflib
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\Giflib lib full
+giflib  : 	Installed/Library/Breadbox/Giflib
+Installed/Library/Breadbox/Giflib:		ansic extgraph MAKELIB
 
 #
 # GeoZip application & libraries
 #
-zlib    : ansic
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\zlib
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\zlib lib full
+zlib    : 	Installed/Library/Breadbox/zlib
+Installed/Library/Breadbox/zlib:		ansic MAKELIB
 
 
-dirlist : ansic ui
 #if defined(PRODUCT) && $(PRODUCT) == "NDO2000"
 #else
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\dirlist
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\dirlist lib full
+dirlist : 	Installed/Library/Breadbox/dirlist
+Installed/Library/Breadbox/dirlist:		ansic ui MAKELIB
 #endif
 
-minizip : ansic ui zlib
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\minizip
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\minizip lib full
+minizip : 	Installed/Library/Breadbox/minizip
+Installed/Library/Breadbox/minizip:		ansic ui zlib MAKELIB
 
-geozip  : minizip dirlist
 #if defined(PRODUCT) && $(PRODUCT) == "NDO2000"
 #else
-	mdcd %ROOT_DIR%\Installed\Appl\BreadBox\GEOZIP
-	$(MAKE) -I$(ROOT_DIR)\Appl\BreadBox\GEOZIP full
+geozip  : 	Installed/Appl/BreadBox/GEOZIP
+Installed/Appl/BreadBox/GEOZIP:			minizip dirlist MAKEAPPL
 # endif
 
 #
 # PicAlbum application & libraries
 #
-#photopc : streamc ansic
-#	mdcd %ROOT_DIR%\Installed\Library\PhotoPC
+#photopc : 	Installed/Library/PhotoPC
+#Installed/Library/PhotoPC:			streamc ansic MAKEAPPL
+#	mdcd %ROOT_DIR%\
 #	$(MAKE) -I$(ROOT_DIR)\Library\PhotoPC full
 
-#picalbum : ui spool ansic extgraph photopc
-#	mdcd %ROOT_DIR%\Installed\Appl\PicAlbum
-#	$(MAKE) -I$(ROOT_DIR)\Appl\PicAlbum full
+#picalbum : 	Installed/Appl/PicAlbum
+#Installed/Appl/PicAlbum:		ui spool ansic extgraph photopc \
+					MAKEAPPL
 
 # Geos impex libraries
 
-dib	: ui ansic impex
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Graphics\Bitmap\Dib
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Graphics\Bitmap\Dib lib full
+dib	: 	Installed/Library/Trans/Graphics/Bitmap/Dib
+Installed/Library/Trans/Graphics/Bitmap/Dib:	ui ansic impex MAKELIB
 
-msmfile : text
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Text\MSMFile
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Text\MSMFile lib full
+msmfile : 	Installed/Library/Trans/Text/MSMFile
+Installed/Library/Trans/Text/MSMFile:		text MAKELIB
 
-bmp	: math dib
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Graphics\Bitmap\Bmp
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Graphics\Bitmap\Bmp lib full
+bmp	: 	Installed/Library/Trans/Graphics/Bitmap/Bmp
+Installed/Library/Trans/Graphics/Bitmap/Bmp:	math dib MAKELIB
 
-clp	: math dib
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Graphics\Bitmap\Clp
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Graphics\Bitmap\Clp lib full
+clp	: 	Installed/Library/Trans/Graphics/Bitmap/Clp
+Installed/Library/Trans/Graphics/Bitmap/Clp:	math dib MAKELIB
 
-ico	: math dib
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Graphics\Bitmap\Ico
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Graphics\Bitmap\Ico lib full
+ico	: 	Installed/Library/Trans/Graphics/Bitmap/Ico
+Installed/Library/Trans/Graphics/Bitmap/Ico:	math dib MAKELIB
 
-pcx	: math dib
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Graphics\Bitmap\Pcx
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Graphics\Bitmap\Pcx lib full
+pcx	: 	Installed/Library/Trans/Graphics/Bitmap/Pcx
+Installed/Library/Trans/Graphics/Bitmap/Pcx:	math dib MAKELIB
 
-tif	: math dib
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Graphics\Bitmap\Tif
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Graphics\Bitmap\Tif lib full
+tif	: 	Installed/Library/Trans/Graphics/Bitmap/Tif
+Installed/Library/Trans/Graphics/Bitmap/Tif:	math dib MAKELIB
 
-#lot123	: ansic impex msmfile
-#	mdcd %ROOT_DIR%\Installed\Library\Trans\Text\Lotus123
-#	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Text\Lotus123 lib full
+#lot123	: 	Installed/Library/Trans/Text/Lotus123
+Installed/Library/Trans/Text/Lotus123:		ansic impex msmfile MAKELIB
 
-wordperf5 : ansic impex msmfile
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Text\WordPerfect5X
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Text\WordPerfect5X lib full
+wordperf5 : 	Installed/Library/Trans/Text/WordPerfect5X
+Installed/Library/Trans/Text/WordPerfect5X:	ansic impex msmfile MAKELIB
 
-dbase3	: ansic impex
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Database\DBase3
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Database\DBase3 lib full
+dbase3	:	Installed/Library/Trans/Database/DBase3
+Installed/Library/Trans/Database/DBase3:	ansic impex MAKELIB
 
-dbase4	: ansic impex
-	mdcd %ROOT_DIR%\Installed\Library\Trans\Database\DBase4
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Trans\Database\DBase4 lib full
+dbase4	: 	Installed/Library/Trans/Database/DBase4
+Installed/Library/Trans/Database/DBase4:	ansic impex MAKELIB
 
 # Other Geos stuff (not in GPC)
-conview	: ui spool
-	mdcd %ROOT_DIR%\Installed\Library\Conview
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Conview lib full
+conview	: 	Installed/Library/Conview
+Installed/Library/Conview:			ui spool MAKELIB
 
-reader	: ui text conview
-	mdcd %ROOT_DIR%\Installed\Appl\Reader
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Reader full
+reader	: 	Installed/Appl/Reader	
+Installed/Appl/Reader:				ui text conview MAKEAPPL
 
-term	: ui text
-	mdcd %ROOT_DIR%\Installed\Appl\Term
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Term lib full
+term	: 	Installed/Appl/Term
+Installed/Appl/Term:				ui text MAKEAPPL
 
-tedit	: ui text mailbox
-	mdcd %ROOT_DIR%\Installed\Appl\Tedit
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Tedit full
+tedit	: 	Installed/Appl/Tedit
+Installed/Appl/Tedit:				ui text mailbox MAKEAPPL
 
-geofile	: ui grobj spool parse cell ruler spline math spreadsheet \
-	  text	ansic bitmap ffile impex
-	mdcd %ROOT_DIR%\Installed\Appl\Geofile
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Geofile full
+geofile	: 	Installed/Appl/Geofile
+Installed/Appl/Geofile:				ui grobj spool parse cell \
+						ruler spline math spreadsheet \
+	  					text ansic bitmap ffile impex \
+						MAKEAPPL
 
-dirls	: ui ansic text spool
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\Dirlist
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\Dirlist full
+dirls	: Installed/Appl/Breadbox/Dirlist
+Installed/Appl/Breadbox/Dirlist:		ui ansic text spool MAKEAPPL
 
-bim	: ui ansic socket sound
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\bim
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\bim full
+bim	: Installed/Appl/Breadbox/bim
+Installed/Appl/Breadbox/bim:			ui ansic socket sound MAKEAPPL
 
-ffind	: ui ansic text
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\Ffind
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\Ffind full
+ffind	: Installed/Appl/Breadbox/Ffind
+Installed/Appl/Breadbox/Ffind:			ui ansic text MAKEAPPL
 
-cdaudio	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/Breadbox/CDAudio ; \
-	$(MK_MAKE) full lib
+cdaudio	: Installed/Library/Breadbox/CDAudio
+Installed/Library/Breadbox/CDAudio:		MAKELIB
 
-cdados	:
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\Cdados
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Breadbox\Cdados full
+cdados	: Installed/Library/Breadbox/Cdados
+Installed/Library/Breadbox/Cdados:		MAKELIB
 
-bbxcd	: ui ansic sound cdaudio
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\Bbxcd
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\Bbxcd full
+bbxcd	: Installed/Appl/Breadbox/Bbxcd
+Installed/Appl/Breadbox/Bbxcd:			ui ansic sound cdaudio MAKEAPPL
 
-webbox	: ui ansic text spool spell
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\Webbox
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\Webbox full
+webbox	: Installed/Appl/Breadbox/Webbox	
+Installed/Appl/Breadbox/Webbox:			ui ansic text spool spell
+						MAKEAPPL
 
-#geocon3	: ui ansic color
-#	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\Geocon3
-#	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\Geocon3 full
+#geocon3	: Installed/Appl/Breadbox/Geocon3
+#Installed/Appl/Breadbox/Geocon3:		ui ansic color MAKEAPPL
 
-graphvwr : ui ansic extui giflib thumbdb ijgjpeg
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\Graphvwr
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\Graphvwr full
+graphvwr : Installed/Appl/Breadbox/Graphvwr
+Installed/Appl/Breadbox/Graphvwr:	ui ansic extui giflib thumbdb ijgjpeg \
+					MAKEAPPL
 
-macror	: ui ansic
-	mdcd %ROOT_DIR%\Installed\Appl\Breadbox\Macror
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Breadbox\Macror full
+macror	: Installed/Appl/Breadbox/Macror
+Installed/Appl/Breadbox/Macror:		ui ansic MAKEAPPL
 
-perf	: ui color
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/Perf ; \
-	$(MK_MAKE) full lib
+perf	: Installed/Appl/Perf		
+Installed/Appl/Perf:			ui color MAKEAPPL
 
-dump	: spool ijgjpeg giflib
-	mdcd %ROOT_DIR%\Installed\Appl\Dump
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Dump full
+dump	: Installed/Appl/Dump
+Installed/Appl/Dump:			spool ijgjpeg giflib MAKEAPPL
 
 # Edu Apps
-flash	: ui ansic text math
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\flash
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\flash full
+flash	: Installed/Appl/EduApps/flash
+Installed/Appl/EduApps/flash:		ui ansic text math MAKEAPPL
 
-fontmgck : ui ansic text color gsol
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\fontmgck
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\fontmgck full
+fontmgck : Installed/Appl/EduApps/fontmgck
+Installed/Appl/EduApps/fontmgck:	ui ansic text color gsol MAKEAPPL
 
-hangman	: ui ansic math wmlib
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\hangman
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\hangman full
+hangman	: Installed/Appl/EduApps/hangman
+Installed/Appl/EduApps/hangman:		ui ansic math wmlib MAKEAPPL
 
-laserl	: ui ansic
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\laserl
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\laserl full
+laserl	: Installed/Appl/EduApps/laserl
+Installed/Appl/EduApps/laserl:		ui ansic MAKEAPPL
 
-mflash	: ui ansic text treplib
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\mflash
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\mflash full
+mflash	: Installed/Appl/EduApps/mflash
+Installed/Appl/EduApps/mflash:		ui ansic text treplib MAKEAPPL
 
-numbers	: ui ansic math
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\numbers
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\numbers full
+numbers	: Installed/Appl/EduApps/numbers
+Installed/Appl/EduApps/numbers:		ui ansic math MAKEAPPL
 
-pvault	: ui ansic
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\pvault
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\pvault full
+pvault	: Installed/Appl/EduApps/pvault
+Installed/Appl/EduApps/pvault:		ui ansic MAKEAPPL
 
-taide	: ui ansic text math spool basicdb gridlib treplib
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\taide
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\taide full
+taide	: Installed/Appl/EduApps/taide
+Installed/Appl/EduApps/taide:		ui ansic text math spool basicdb \
+					gridlib treplib MAKEAPPL
 
-thinker	: ui ansic
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\thinker
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\thinker full
+thinker	: Installed/Appl/EduApps/thinker
+Installed/Appl/EduApps/thinker:		ui ansic MAKEAPPL
 
-ttype	: ui ansic text treplib
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\Ttype
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\Ttype full
+ttype	: Installed/Appl/EduApps/Ttype
+Installed/Appl/EduApps/Ttype:		ui ansic text treplib MAKEAPPL
 
-wsm	: ui ansic spool
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\wsm
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\wsm full
+wsm	: Installed/Appl/EduApps/wsm
+Installed/Appl/EduApps/wsm:		ui ansic spool MAKEAPPL
 
-wsplay	: ui ansic spool
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\wsplay
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\wsplay full
+wsplay	: Installed/Appl/EduApps/wsplay
+Installed/Appl/EduApps/wsplay:		ui ansic spool MAKEAPPL
 
-xwm	: ui ansic spool compress
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\xwm
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\xwm full
+xwm	: Installed/Appl/EduApps/xwm
+Installed/Appl/EduApps/xwm:		ui ansic spool compress MAKEAPPL
 
-tgen	: ui ansic text math spool basicdb treplib
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\tgen
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\tgen full
+tgen	: Installed/Appl/EduApps/tgen
+Installed/Appl/EduApps/tgen:		ui ansic text math spool basicdb \
+					treplib MAKEAPPL
 
-ttkr	: ui ansic text math basicdb
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\ttkr
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\ttkr full
+ttkr	: Installed/Appl/EduApps/ttkr
+Installed/Appl/EduApps/ttkr:		ui ansic text math basicdb MAKEAPPL
 
-oliner	: ui ansic text math spool basicdb treplib spell
-	mdcd %ROOT_DIR%\Installed\Appl\EduApps\oliner
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\EduApps\oliner full
+oliner	: Installed/Appl/EduApps/oliner
+Installed/Appl/EduApps/oliner:		ui ansic text math spool basicdb \
+					treplib spell MAKEAPPL
 
 
 #=======================================================================
@@ -1788,9 +1531,8 @@ ndo2000	: borlandobj minimalLoader minimalLibrary minimalDriver \
 # after a clean of the Installed directory.  The kernel and other
 # essential libraries will not compile without it.
 
-borlandobj :
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/BorlandRTL ; \
-	$(MK_MAKE) borland.obj
+borlandobj : Installed/Library/BorlandRTL
+Installed/Library/BorlandRTL:
 
 ndorest:  regis run legos 	\
 	  ms3 ntfat int8087 intx87 netware	\
@@ -1800,103 +1542,81 @@ ndorest:  regis run legos 	\
 	  print_drivers extras taskmax cvttool more_prefs	\
 	  faxsendtd geosafari slides
 
-ms3     :
-	mdcd %ROOT_DIR%\Installed\Driver\IFS\DOS\MS3
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\IFS\DOS\MS3 lib full
+ms3     : Installed/Driver/IFS/DOS/MS3
+Installed/Driver/IFS/DOS/MS3:			MAKEDRV
 
-ms7     :
-	mdcd %ROOT_DIR%\Installed\Driver\IFS\DOS\MS7
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\IFS\DOS\MS7 lib full
+ms7     : Installed/Driver/IFS/DOS/MS7
+Installed/Driver/IFS/DOS/MS7:			MAKEDRV
 
-netware     :
-	mdcd %ROOT_DIR%\Installed\Driver\IFS\DOS\NETWARE
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\IFS\DOS\NETWARE lib full
+netware     : Installed/Driver/IFS/DOS/NETWARE
+Installed/Driver/IFS/DOS/NETWARE:		MAKEDRV
 
-rfsd     : net ui
-	mdcd %ROOT_DIR%\Installed\Driver\IFS\RFSD
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\IFS\RFSD lib full
+rfsd     : Installed/Driver/IFS/RFSD
+Installed/Driver/IFS/RFSD:			net ui MAKEDRV
 
-int8087	: math
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/CoProcessor/Int8087 ; \
-	$(MK_MAKE) full lib -k
+int8087	: Installed/Library/CoProcessor/Int8087
+Installed/Library/CoProcessor/Int8087:		math MAKELIB
 
-intx87	: math
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Library/CoProcessor/Intx87 ; \
-	$(MK_MAKE) full lib -k
+intx87	: Installed/Library/CoProcessor/Intx87
+Installed/Library/CoProcessor/Intx87:		math MAKELIB
 
-taskmax	: ui text
-	mdcd %ROOT_DIR%\Installed\Driver\Task\Taskmax
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\Task\Taskmax lib full
+taskmax	: Installed/Driver/Task/Taskmax
+Installed/Driver/Task/Taskmax:			ui text MAKEDRV
 
-cvttool	: ui convert
-	mdcd %ROOT_DIR%\Installed\Library\FMTools\CvtTool
-	$(MAKE) -k -I$(ROOT_DIR)\Library\FMTools\CvtTool lib full
+cvttool	: Installed/Library/FMTools/CvtTool
+Installed/Library/FMTools/CvtTool:		ui convert MAKELIB
 
-faxsendtd	: mailbox faxfile faxctrl ui spool
-	mdcd %ROOT_DIR%\Installed\Driver\Mailbox\Transport\Faxsendtd
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\Mailbox\Transport\Faxsendtd lib full
+faxsendtd	: Installed/Driver/Mailbox/Transport/Faxsendtd
+Installed/Driver/Mailbox/Transport/Faxsendtd:	mailbox faxfile faxctrl ui \
+						spool MAKEDRV
 
 
 # NewDeal socket drivers
-irlap		: socket serial
-	mdcd %ROOT_DIR%\Installed\Driver\Socket\Irlap
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\Socket\Irlap lib full
+irlap		: Installed/Driver/Socket/Irlap
+Installed/Driver/Socket/Irlap:			socket serial MAKEDRV
 
-loopback	: socket
-	mdcd %ROOT_DIR%\Installed\Driver\Socket\Loopback
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\Socket\Loopback lib full
+loopback	: Installed/Driver/Socket/Loopback
+Installed/Driver/Socket/Loopback:		socket MAKEDRV
 
-slip	: netutils
-	mdcd %ROOT_DIR%\Installed\Driver\Socket\Slip
-	$(MAKE) -k -I$(ROOT_DIR)\Driver\Socket\Slip lib full
+slip	: Installed/Driver/Socket/Slip
+Installed/Driver/Socket/Slip:			netutils MAKEDRV
 
 # NewDeal video drivers
 vid_drivers: ega mcga hgc att6300
 
-ega	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/VGAlike/EGA ; \
-	$(MK_MAKE) full lib
+ega	: Installed/Driver/Video/VGAlike/EGA
+Installed/Driver/Video/VGAlike/EGA:		MAKEDRV
 
-cga	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/Dumb/CGA ; \
-	$(MK_MAKE) full lib
+cga	: Installed/Driver/Video/Dumb/CGA
+Installed/Driver/Video/Dumb/CGA:		MAKEDRV
 
-dscga	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/Dumb/DSCGA ; \
-	$(MK_MAKE) full lib
+dscga	: Installed/Driver/Video/Dumb/DSCGA
+Installed/Driver/Video/Dumb/DSCGA:		MAKEDRV
 
-mcga	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/Dumb/MCGA ; \
-	$(MK_MAKE) full lib
+mcga	: Installed/Driver/Video/Dumb/MCGA
+Installed/Driver/Video/Dumb/MCGA:		MAKEDRV
 
-hgc	:
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Driver/Video/Dumb/HGC ; \
-	$(MK_MAKE) full lib
+hgc	: Installed/Driver/Video/Dumb/HGC
+Installed/Driver/Video/Dumb/HGC:		MAKEDRV
 
 # Terminal application
-regis	: ui
-	mdcd %ROOT_DIR%\Installed\Appl\Regis
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Regis lib full
+regis	: Installed/Appl/Regis
+Installed/Appl/Regis:				ui MAKEAPPL
 
-run	: ui
-	mdcd %ROOT_DIR%\Installed\Appl\Run
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Run lib full
+run	: Installed/Appl/Run
+Installed/Appl/Run:				ui MAKEAPPL
 
-sprite	: ui
-	mdcd %ROOT_DIR%\Installed\Library\Sprite
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Sprite lib full
+sprite	: Installed/Library/Sprite
+Installed/Library/Sprite:			ui MAKELIB
 
-tree	: ansic
-	mdcd %ROOT_DIR%\Installed\Library\Tree
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Tree lib full
+tree	: Installed/Library/Tree
+Installed/Library/Tree:				ansic MAKELIB
 
-datax	: ui
-	mdcd %ROOT_DIR%\Installed\Library\DataX
-	$(MAKE) -k -I$(ROOT_DIR)\Library\DataX lib full
+datax	: Installed/Library/DataX
+Installed/Library/DataX:			ui MAKELIB
 
-datastore	:  text datax
-	mdcd %ROOT_DIR%\Installed\Library\Datastore
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Datastore lib full
+datastore	:  Installed/Library/Datastore
+Installed/Library/Datastore:			text datax MAKELIB
 
 
 # Printer Drivers
@@ -1907,73 +1627,56 @@ datastore	:  text datax
 # Additional Preferences Modules
 more_prefs: tweakui hprefcn prefsndn
 
-tweakui	: ui config color
-	mdcd %ROOT_DIR%\Installed\Library\Pref\Tweakui
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Tweakui lib full
+tweakui	: Installed/Library/Pref/Tweakui
+Installed/Library/Pref/Tweakui:			ui config color MAKELIB
 
-hprefcn	: ui config serial
-	mdcd %ROOT_DIR%\Installed\Library\Pref\Hprefcn
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Hprefcn lib full
+hprefcn	: Installed/Library/Pref/Hprefcn
+Installed/Library/Pref/Hprefcn:			ui config serial MAKELIB
 
-prefsndn	: ui ansic config sound
-	mdcd %ROOT_DIR%\Installed\Library\Pref\Prefsndn
-	$(MAKE) -k -I$(ROOT_DIR)\Library\Pref\Prefsndn lib full
+prefsndn	: Installed/Library/Pref/Prefsndn
+Installed/Library/Pref/Prefsndn:		ui ansic config sound MAKELIB
 
 # BestSound - supplemental sound API.
 bestsnd	: bsnwav mixlib bsd16 bsd8st bsqp sndchk
 
-bsnwav	: kernel
-#if defined(PRODUCT) && $(PRODUCT) == "NDO2000"
-	mdcd %ROOT_DIR%\Installed\Library\Audio\BSNWav
-	$(MAKE) -k  -I$(ROOT_DIR)\Library\Audio\BSNWav lib full
-#endif
+bsnwav	: Installed/Library/Audio/BSNWav
+Installed/Library/Audio/BSNWav:			kernel MAKELIB
 
-mixlib	: bsnwav sound ui ansic
-	mdcd %ROOT_DIR%\Installed\Library\Audio\MixLib
-	$(MAKE) -k  -I$(ROOT_DIR)\Library\Audio\MixLib lib full
+mixlib	: Installed/Library/Audio/MixLib
+Installed/Library/Audio/MixLib:			bsnwav sound ui ansic MAKELIB
 
-bsd16	: stream
-	mdcd %ROOT_DIR%\Installed\Driver\Sound\BSD16
-	$(MAKE) -k  -I$(ROOT_DIR)\Driver\Sound\BSD16 lib full
+bsd16	: Installed/Driver/Sound/BSD16
+Installed/Driver/Sound/BSD16:			stream MAKEDRV
 
-bsd8st	: stream
-	mdcd %ROOT_DIR%\Installed\Driver\Sound\BSD8ST
-	$(MAKE) -k  -I$(ROOT_DIR)\Driver\Sound\BSD8ST lib full
+bsd8st	: Installed/Driver/Sound/BSD8ST
+Installed/Driver/Sound/BSD8ST:			stream MAKEDRV
 
-bsqp	: bsnwav ansic ui
-	mdcd %ROOT_DIR%\Installed\Appl\Audio\Bsqp
-	$(MAKE) -k  -I$(ROOT_DIR)\Appl\Audio\Bsqp lib full
+bsqp	: Installed/Appl/Audio/Bsqp
+Installed/Appl/Audio/Bsqp:			bsnwav ansic ui MAKEDRV
 
-sndchk	: bsnwav wav ansic ui
-	mdcd %ROOT_DIR%\Installed\Appl\Audio\SndChk
-	$(MAKE) -k  -I$(ROOT_DIR)\Appl\Audio\SndChk lib full
+sndchk	: Installed/Appl/Audio/SndChk
+Installed/Appl/Audio/SndChk:			bsnwav wav ansic ui MAKEAPPL
 
 # MP3 - audio format decoder
 mp3snd	: mp3 mp3play
 
-mp3	: math ansic
-	mdcd %ROOT_DIR%\Installed\Library\Audio\Mp3
-	$(MAKE) -k  -I$(ROOT_DIR)\Library\Audio\Mp3  lib full
+mp3	: Installed/Library/Audio/Mp3
+Installed/Library/Audio/Mp3:			math ansic MAKELIB
 
-mp3play	: ui sound mp3
-	mdcd %ROOT_DIR%\Installed\Appl\Audio\Mp3Play
-	$(MAKE) -k  -I$(ROOT_DIR)\Appl\Audio\Mp3Play lib full
+mp3play	: Installed/Appl/Audio/Mp3Play
+Installed/Appl/Audio/Mp3Play:			ui sound mp3 MAKEAPPL
 
 # Extras apps
 extras : bounce spintext timer
 
-bounce	: ui
-	mdcd %ROOT_DIR%\Installed\Appl\Bounce
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Bounce full
+bounce	: Installed/Appl/Bounce
+Installed/Appl/Bounce:				ui MAKEAPPL
 
-spintext	: ui
-	mdcd %ROOT_DIR%\Installed\Appl\Spintext
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Spintext full
+spintext	: Installed/Appl/Spintext
+Installed/Appl/Spintext:			ui MAKEAPPL
 
-timer	: ui text
-	mdcd %ROOT_DIR%\Installed\Appl\Tools\Timer
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Tools\Timer full
+timer	: Installed/Appl/Tools/Timer
+Installed/Appl/Tools/Timer:			ui text MAKEAPPL
 
-slides	: ui text impex convert
-	mdcd %ROOT_DIR%\Installed\Appl\Slides
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Slides full
+slides	: Installed/Appl/Slides
+Installed/Appl/Slides:				ui text impex convert MAKEAPPL
