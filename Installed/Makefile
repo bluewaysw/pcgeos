@@ -206,7 +206,7 @@ mailbox	: Installed/Library/Mailbox
 Installed/Library/Mailbox:	ui spool MAKELIB
 
 compress	: Installed/Library/Compress
-Installed/Library/Compress:	makelib
+Installed/Library/Compress:	MAKELIB
 
 ruler	: Installed/Library/Ruler
 Installed/Library/Ruler:	ui MAKELIB

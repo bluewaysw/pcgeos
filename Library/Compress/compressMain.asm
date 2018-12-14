@@ -199,10 +199,10 @@ alloc_block:
 	;
 	; pick the right routine to call
 	;
-	call	IMPLODE
+	;call	IMPLODE
 	jmp	cl_cleanup
 cl_explode:
-	call	EXPLODE
+	;call	EXPLODE
 cl_cleanup:
 
 EC <	cmp	ax, PKZE_NO_ERROR					>

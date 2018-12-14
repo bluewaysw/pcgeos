@@ -46,9 +46,9 @@ library	geos
 # Define resources other than standard discardable code
 #
 nosort
-resource PK_TEXT code fixed read-only
-resource _TEXT code fixed read-only
-resource CRC325_DATA fixed
+#resource PK_TEXT code fixed read-only
+#resource _TEXT code fixed read-only
+#resource CRC325_DATA fixed
 resource CompressCode code read-only shared
 #
 # Exported routines (and classes)

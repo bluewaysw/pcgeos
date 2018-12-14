@@ -581,7 +581,15 @@ CCOM_MODEL	?= -ml
 # O ->
 #
 # s -> no stack checking
-
+#if defined(linux)
+CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
+			-os -ol -ol+ -hc -s -ecc \
+		   	$(CCOM_MODEL) \
+            $(.INCLUDES:N*/Include*:S/\\/\//g:S/^-I/-i=/g) \
+						-i="$(WATCOM)/h" \
+		   	 		`$(PRODUCT_FLAGS) highc $(PRODUCT)` \
+					$(XCCOMFLAGS)
+#else
 CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
 			-os -ol -ol+ -hc -s -ecc \
 		   	$(CCOM_MODEL) \
@@ -589,6 +597,7 @@ CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
 						-i="$(WATCOM)/h" \
 		   	 		`$(PRODUCT_FLAGS) highc $(PRODUCT)` \
 					$(XCCOMFLAGS)
+#endif
 
 #if $(PRODUCT) == "NDO2000"
 #else
