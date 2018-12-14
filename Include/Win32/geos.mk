@@ -580,10 +580,14 @@ CCOM_MODEL	?= -ml
 # Z ->
 # O ->
 #
-# s -> no stack checking
+# s   -> no stack checking
+# ecc -> __cdecl calling convention
+# zp1 -> byte alignment of structures (no padding)
+# ei  -> enums are at least int-sized
+
 #if defined(linux)
 CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
-			-os -ol -ol+ -hc -s -ecc \
+			-os -ol -ol+ -hc -s -ecc -zp1 -ei \
 		   	$(CCOM_MODEL) \
             $(.INCLUDES:N*/Include*:S/\\/\//g:S/^-I/-i=/g) \
 						-i="$(WATCOM)/h" \
@@ -591,7 +595,7 @@ CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
 					$(XCCOMFLAGS)
 #else
 CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
-			-os -ol -ol+ -hc -s -ecc \
+			-os -ol -ol+ -hc -s -ecc -zp1 -ei \
 		   	$(CCOM_MODEL) \
             $(.INCLUDES:N*/Include*:S/\//\\/g:S/^-I/-i=/g) \
 						-i="$(WATCOM)/h" \
