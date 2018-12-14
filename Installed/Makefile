@@ -2,15 +2,6 @@
 # there is a circular dependency between pcmcia and ui, so you need to have
 # an old ui.ldf to start with.
 #
-#if defined(win32)
-#else
-MK_SET =
-MK_MAKE = mkdir -p $PARAM ; \
-		cd $PARAM ; \
-		$(MAKE) -k -I$PARAM
-
-
-#endif
 
 MAKELIB	:	.USE 
 #if defined(linux)
@@ -18,7 +9,7 @@ MAKELIB	:	.USE
 	cd ../$(.TARGET) 
 	$(MAKE) -k -I../$(.TARGET) full lib
 #else
-	mkdir -p ..\$(.TARGET:S/\//\\/g) 
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g) 
 	cd ..\$(.TARGET:S/\//\\/g) 
 	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full lib
 #endif
@@ -29,7 +20,7 @@ MAKETOOL:	.USE
 	cd ../$(.TARGET) 
 	$(MAKE) -k -I../$(.TARGET) full 
 #else
-	mkdir -p ..\$(.TARGET:S/\//\\/g) 
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g) 
 	cd ..\$(.TARGET:S/\//\\/g) 
 	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full 
 #endif
@@ -40,7 +31,7 @@ MAKEDRV:	.USE
 	cd ../$(.TARGET) 
 	$(MAKE) -k -I../$(.TARGET) full 
 #else
-	mkdir -p ..\$(.TARGET:S/\//\\/g) 
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g) 
 	cd ..\$(.TARGET:S/\//\\/g) 
 	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full 
 #endif
@@ -51,7 +42,7 @@ MAKEAPPL:	.USE
 	cd ../$(.TARGET) 
 	$(MAKE) -k -I../$(.TARGET) full 
 #else
-	mkdir -p ..\$(.TARGET:S/\//\\/g) 
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g) 
 	cd ..\$(.TARGET:S/\//\\/g) 
 	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full 
 #endif
@@ -71,13 +62,13 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  wav game cards spreadsheet parse spell convert \
 		  saver prefLibs accpnt netutils \
 		  socket dhcp borlandrtl ffile streamc mailhub mailsmtp \
-		  mailpop3 rtf ascii lot123ss csv \
+		  mailpop3 ascii lot123ss csv \
 		  parentc wmlib \
 		  jpeg giflib gif htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
 		  basicdb gridlib gsol treplib
-# cdaudio
+# cdaudio rtf
 
 prefLibs	: prefvid preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
@@ -834,46 +825,41 @@ Installed/Driver/Printer/DotMatrix/Propx24:	spool MAKEDRV
 #appl
 
 #calendar	: ui text spool config pen
-calendar	: ui text spool config
-	mdcd %ROOT_DIR%\Installed\Appl\Calendar
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Calendar full
+calendar	: Installed/Appl/Calendar
+Installed/Appl/Calendar:	ui text spool config MAKEAPPL
 
-geodex	: ui text spool impex ssmeta convert mailhub serial
-	mdcd %ROOT_DIR%\Installed\Appl\GeoDex
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\GeoDex full
+geodex	: Installed/Appl/GeoDex
+Installed/Appl/GeoDex:	ui text spool impex ssmeta convert \
+			mailhub serial MAKEAPPL
 
-geocalc	: ui spool cell parse math spreadsheet ruler text impex spline grobj chart bitmap
-	mdcd %ROOT_DIR%\Installed\Appl\GeoCalc
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\GeoCalc full
+geocalc	: Installed/Appl/GeoCalc
+Installed/Appl/GeoCalc:		ui spool cell parse math spreadsheet \
+				ruler text impex spline grobj chart bitmap \
+				MAKEAPPL
 
-geodraw	: ui spool ruler text spline grobj chart bitmap spell color convert
-	mdcd %ROOT_DIR%\Installed\Appl\GeoDraw
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\GeoDraw full
+geodraw	: Installed/Appl/GeoDraw
+Installed/Appl/GeoDraw:		ui spool ruler text spline grobj chart \
+				bitmap spell color convert MAKEAPPL
 
-geowrite	: ui spool ruler text spline grobj chart bitmap spell color impex styles ssmeta convert compress
-	mdcd %ROOT_DIR%\Installed\Appl\GeoWrite
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\GeoWrite full
+geowrite	: Installed/Appl/GeoWrite
+Installed/Appl/GeoWrite:	ui spool ruler text spline grobj chart \
+				bitmap spell color impex styles ssmeta \
+				convert compress MAKEAPPL
 
-banner	: ui spool
-	mdcd %ROOT_DIR%\Installed\Appl\Banner
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\Banner full
+banner	: Installed/Appl/Banner
+Installed/Appl/Banner:		ui spool MAKEAPPL
 
-geodeck	:
-#	p4 sync -f //depot/pcgeos/Installed/Appl/Art/Decks/GeoDeck/geodeck.vm
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/Art/Decks/GeoDeck ; \
-	$(MK_MAKE) full lib
+geodeck	: Installed/Appl/Art/Decks/GeoDeck
+Installed/Appl/Art/Decks/GeoDeck:	MAKEAPPL
 
-scrapbk	: ui text impex convert
-	mdcd %ROOT_DIR%\Installed\Appl\ScrapBk
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\ScrapBk full
+scrapbk	: Installed/Appl/ScrapBk
+Installed/Appl/ScrapBk:		ui text impex convert MAKEAPPL
 
-bigcalc	: ui math parse
-	mdcd %ROOT_DIR%\Installed\Appl\BigCalc
-	$(MAKE) -k -I$(ROOT_DIR)\Appl\BigCalc full
+bigcalc	: Installed/Appl/BigCalc
+Installed/Appl/BigCalc:		ui math parse MAKEAPPL
 
-clock	: ui color
-	$(MK_SET) PARAM=$(ROOT_DIR)/Installed/Appl/Clock ; \
-	$(MK_MAKE) full lib
+clock	: Installed/Appl/Clock
+Installed/Appl/Clock:		ui color MAKEAPPL
 
 #
 # For now we can not remake mailtool or stcache or email
@@ -1119,7 +1105,7 @@ Installed/Appl/Saver/Spotlight/SpotlightPref:	saver config MAKEAPPL
 stars	: 	Installed/Appl/Saver/Stars \
 		Installed/Appl/Saver/Stars/StarsPref
 Installed/Appl/Saver/Stars:		saver config MAKEAPPL
-Installed/Appl/Saver/Stars7StarsPref:	saver config MAKEAPPL
+Installed/Appl/Saver/Stars/StarsPref:	saver config MAKEAPPL
 
 string	: 	Installed/Appl/Saver/String \
 		Installed/Appl/Saver/String/StringPref
@@ -1143,8 +1129,8 @@ Installed/Appl/Saver/Tiles/TilesPref:	saver config MAKEAPPL
 
 worms	: 	Installed/Appl/Saver/Worms \
 		Installed/Appl/Saver/Worms/WormsPref
-Installed\Appl\Saver\Worms:		saver config MAKEAPPL
-Installed\Appl\Saver\Worms\WormsPref:	saver config MAKEAPPL
+Installed/Appl/Saver/Worms:		saver config MAKEAPPL
+Installed/Appl/Saver/Worms/WormsPref:	saver config MAKEAPPL
 
 
 # infoserv app
@@ -1440,7 +1426,7 @@ bbxcd	: Installed/Appl/Breadbox/Bbxcd
 Installed/Appl/Breadbox/Bbxcd:			ui ansic sound cdaudio MAKEAPPL
 
 webbox	: Installed/Appl/Breadbox/Webbox	
-Installed/Appl/Breadbox/Webbox:			ui ansic text spool spell
+Installed/Appl/Breadbox/Webbox:			ui ansic text spool spell \
 						MAKEAPPL
 
 #geocon3	: Installed/Appl/Breadbox/Geocon3

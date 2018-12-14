@@ -596,7 +596,7 @@ CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
             $(.INCLUDES:N*/Include*:S/\//\\/g:S/^-I/-i=/g) \
 						-i="$(WATCOM)/h" \
 		   	 		`$(PRODUCT_FLAGS) highc $(PRODUCT)` \
-					$(XCCOMFLAGS)
+					$(XCCOMFLAGS:S/\//\\/g:S/^-I/-i=/g)
 #endif
 
 #if $(PRODUCT) == "NDO2000"
