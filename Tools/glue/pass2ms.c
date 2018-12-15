@@ -879,6 +879,7 @@ Pass2MS_ProcessObject(const char *file,
 
     MSObj_Init(f);
     CV_Init(file, f);
+    CV32_Init(file, f);
     if (segSizes == NULL) {
 	segSizes = Vector_Create(sizeof(long), ADJUST_ADD, 10, 10);
     } else {

@@ -170,11 +170,12 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
 	     * is stupid enough to set the convention that way, they'll be
 	     * scrod, but maybe if enough people complain to MetaWare about
 	     * it, something'll happen...yeah right. -- ardeb
-	     */
+	     *
+	     * 12/4/18: need to bring case-insensitve comparison back
+	     * due to upper casing of some names by Watcom C -- mgroeber
+ 	     */
 	    if (((*bp == namelen) &&
-		 (geosRelease >= 2 ?
-		  (strncmp((char *)bp+1, namestr, namelen) == 0) :
-		  (ustrncmp((char *)bp+1, namestr, namelen) == 0))) ||
+		(ustrncmp((char *)bp+1, namestr, namelen) == 0)) ||
 		((bp[1] == '_') && (*bp == namelen+1) &&
 		 (strncmp(namestr, (char *)bp+2, namelen) == 0)))
 	    {
