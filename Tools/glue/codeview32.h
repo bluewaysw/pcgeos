@@ -172,6 +172,7 @@
 #define CST2_BLOCK16	0x0107
 
 
+#define CSTT2_VOID	0x0003
 #define CSTT2_CHAR		0x0010
 #define CSTT2_SHORT     0x0011
 #define CSTT2_LONG     0x0012

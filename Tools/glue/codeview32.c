@@ -1704,6 +1704,9 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
     if (index <= CST_LAST_PREDEF) {
 
 		switch (index) {
+		case CSTT2_VOID:
+			retval = OTYPE_VOID | OTYPE_SPECIAL;
+			break;
 		case CSTT2_RCHAR:
 		case CSTT2_CHAR:
 			retval = OTYPE_CHAR | OTYPE_SPECIAL | (0 << 1);
@@ -1992,6 +1995,9 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 				break;
 			case 1: //CTL_FAR_PTR:
 				retval = OTYPE_PTR | OTYPE_PTR_FAR | OTYPE_SPECIAL;
+				break;
+			case 9: //based on self
+				retval = OTYPE_INT | OTYPE_SPECIAL | (2 << 1);
 				break;
 			default:
 				Notify(NOTIFY_ERROR,
@@ -4108,6 +4114,20 @@ CV32_Check(const char *file,
 	case MO_PUBDEF:
 	printf("MO_PUBDEF\r\n");
 	    if (pass == 1) {
+		GroupDesc *gd;
+		SegDesc *sd;
+
+		/*
+		 * Watcom C: Fixup targets in LMem heaps need to be entered
+		 * in pass 1 already so they are available for LMem layout.
+		 */
+		gd = MSObj_GetGroup(&bp);
+		sd = MSObj_GetSegment(&bp);
+		if ((sd->combine == SEG_LMEM) &&
+		    (MSObj_GetLMemSegOrder(sd) == LMEM_HEAP))
+		{
+		    return(FALSE);
+		}
 		MSObj_SaveRecord(rectype, reclen, &pubHead);
 	    }
 	    break;

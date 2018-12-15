@@ -1595,6 +1595,7 @@ MSObjMapExternal(const char	*file,	    /* Name of object file being read */
 	    ObjSymHeader    *osh;   	/* Header of block holding external */
 	    ObjSym  	    *os;    	/* External symbol */
 	    VMBlockHandle   symBlock;	/* Block holding symbol */
+	    word	    symOff;
 	    VMBlockHandle   mapBlock;	/* Block holding hdr */
 	    int	    	    i;
 
@@ -1602,7 +1603,21 @@ MSObjMapExternal(const char	*file,	    /* Name of object file being read */
 	     * Locate the symbol and map blocks.
 	     */
 	    symBlock = VMP_BLOCK(fdataPtr->external);
+	    symOff = VMP_OFFSET(fdataPtr->external);
 	    mapBlock = VMGetMapBlock(symbols);
+
+	    if (pass == 1) {
+		/*
+		 * Watcom C: we encounter this type of fixup in pass 1
+		 * when the symbol list still contains references to
+		 * names, not ObjSym records. So we nede to look up
+		 * the fixup target ourselves.
+		 */
+
+		if (!Sym_Find(symbols, 0, fdataPtr->external, &symBlock, &symOff, TRUE)) {
+		    return FPED_FALSE;
+		}
+	    }
 
 	    /*
 	     * Lock them both down.
@@ -1614,43 +1629,36 @@ MSObjMapExternal(const char	*file,	    /* Name of object file being read */
 	     * two blocks. We know the segment because the symbol block has
 	     * its map-block offset in the symbol block's header.
 	     */
-	    os = (ObjSym *)((genptr)osh + VMP_OFFSET(fdataPtr->external));
+	    os = (ObjSym *)((genptr)osh + symOff);
+
 
 	    /*
 	     * Locate the appropriate internal descriptor -- it better be here.
 	     *
 	     * HACK HACK HACKmapBlock
-			 *. We don't use private segments around here, and
+	     *. We don't use private segments around here, and
 	     * certainly don't have relocations to them, but this here
 	     * MetaWare library does, so we've got to go seeking for the
 	     * thing based on the offset of the segment in the output file's
 	     * map block, not the name and class.
+	     * For Watcom C, we are in pass 1 and can only try a lookup ny name.
 	     */
 	    fdataPtr->segment = NULL;
-			printf("seg_NumSegs %d\n", seg_NumSegs);
 	    for (i = 0; i < seg_NumSegs; i++) {
-
-				printf("seg_%d  %d %d\n", i, seg_Segments[i]->offset, osh->seg);
-
-				{
-					ObjHeader* hdr;
-					if(seg_Segments[i]->name) {
-						char* str = ST_Lock(symbols, seg_Segments[i]->name);
-						printf("seg_%d  %s\n", i, str);fflush(stdout);
-						ST_Unlock(symbols, seg_Segments[i]->name);
-					}
-					if(mapBlock) {
-				  	hdr = (ObjHeader*) VMLock(symbols, mapBlock, (MemHandle *)NULL);
-						//printf("numSeg %d\n", hdr->numSeg)
-						VMUnlock(symbols, mapBlock);
-					}
-				}
-		if (seg_Segments[i]->offset == osh->seg) {
-		    fdataPtr->segment = seg_Segments[i];
-		    break;
+		if (pass==1) {
+		    if (seg_Segments[i]->name == sd->name) {
+			fdataPtr->segment = seg_Segments[i];
+			break;
+		    }
+		}
+		else {
+		    if (seg_Segments[i]->offset == osh->seg) {
+			fdataPtr->segment = seg_Segments[i];
+			break;
+		    }
 		}
 	    }
-fflush(stdout);
+
 	    pass2_assert((fdataPtr->segment != NULL), sd, fixOff);
 
 	    /*
@@ -1741,6 +1749,13 @@ fflush(stdout);
 	    *osPtr = os;
 	    *symBlockPtr = symBlock;
 
+	    /*
+	     * See below for why we need to add 2 to the offset in the handle table.
+	     */
+	    if (isLMemHandleSegment) {
+		*offsetPtr += 2;
+	    }
+
 	    if (!(os->flags & OSYM_REF)) {
 		/*
 		 * Mark symbol as referenced and block as dirty if not already
@@ -1752,6 +1767,7 @@ fflush(stdout);
 
 	    VMUnlock(symbols, mapBlock);
 	}
+
     } else {
 
 	/*
