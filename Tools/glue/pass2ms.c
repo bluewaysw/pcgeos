@@ -203,26 +203,24 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 
 		for (n = osh->num; n > 0; n--, os++) {
 		    if (Obj_IsAddrSym(os)) {
-			if (os->u.addrSym.address - heap->grpOff >=
-			    prevOldOff - LMEM_SIZE_SIZE)
+			if ((os->u.addrSym.address - heap->grpOff <
+			     prevOldOff - LMEM_SIZE_SIZE) &&
+			    (os->u.addrSym.address - heap->grpOff >=
+			     swaps(*oldHandle) - LMEM_SIZE_SIZE))
+
 			{
 			    /*
-			     * This one's beyond the current chunk, so get out
-			     * of here with our finalVarType, finalVarOff, and
-			     * finalVarTypesBlock variables as set on the
-			     * previous iteration.
-			     */
-			    foundFinalType = TRUE;
-			    break;
-			} else {
-			    /*
+			     * If this block is inside the current chunk:
 			     * Record the type and offset of this variable,
 			     * in case it's the last one in the chunk.
 			     */
 			    assert(os->type == OSYM_VAR);
-			    finalVarType = os->u.variable.type;
-			    finalVarOff = os->u.addrSym.address;
-			    finalVarTypesBlock = osh->types;
+			    if (os->u.addrSym.address > finalVarOff)
+			    {
+				finalVarType = os->u.variable.type;
+				finalVarOff = os->u.addrSym.address;
+				finalVarTypesBlock = osh->types;
+			    }			
 			}
 		    }
 		}

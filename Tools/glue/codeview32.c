@@ -1390,7 +1390,7 @@ CV32ProcessArray(const char    	*file,
 	    if (*bp != CTL_NIL) {
 		/*
 		 * Skip over the index type, but make sure it's a
-		 * signed or unsigned integer.
+		 * signed or unsigned integer or a char.
 		 */
 		word	idxType;
 
@@ -1398,7 +1398,8 @@ CV32ProcessArray(const char    	*file,
 
 		if (!(idxType & OTYPE_SPECIAL) ||
 		    (((idxType & OTYPE_TYPE) != OTYPE_INT) &&
-		     ((idxType & OTYPE_TYPE) != OTYPE_SIGNED)))
+		     ((idxType & OTYPE_TYPE) != OTYPE_SIGNED) &&
+		     ((idxType & OTYPE_TYPE) != OTYPE_CHAR)))
 		{
 		    Notify(NOTIFY_WARNING,
 			   "%s: array index types not supported -- defaulting to int",
@@ -1473,12 +1474,12 @@ CV32ProcessScalar(const char    	*file,  	/* Object file from which
 
     if (enumTypeIndex == CSTT2_CHAR) {
 	retval = OTYPE_SIGNED | (size << 1) | OTYPE_SPECIAL;
-    } /*else if (*bp == CTL_UNSIGNED_INT) {
-	retval = OTYPE_INT | ((size/8) << 1) | OTYPE_SPECIAL;
-    }*/ else {
+    } else if (*bp == CSTT2_SHORT) {
+	retval = OTYPE_INT | (2 << 1) | OTYPE_SPECIAL;
+    } else {
 	Notify(NOTIFY_ERROR,
 	       "%s: unknown scalar base type %02.2x",
-	       file, *bp);
+	       file, enumTypeIndex);
 error:
 	retval = OTYPE_VOID | OTYPE_SPECIAL;
 	goto done;
