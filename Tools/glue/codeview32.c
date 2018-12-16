@@ -1474,7 +1474,7 @@ CV32ProcessScalar(const char    	*file,  	/* Object file from which
 
     if (enumTypeIndex == CSTT2_CHAR) {
 	retval = OTYPE_SIGNED | (size << 1) | OTYPE_SPECIAL;
-    } else if (*bp == CSTT2_SHORT) {
+    } else if (enumTypeIndex == CSTT2_SHORT) {
 	retval = OTYPE_INT | (2 << 1) | OTYPE_SPECIAL;
     } else {
 	Notify(NOTIFY_ERROR,
