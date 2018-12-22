@@ -78,10 +78,8 @@ prefLibs	: prefvid preftd \
 
 # Geos impex libraries
 impex_libs: dib bmp clp ico pcx tif \
-	    msmword msword \
-	    wordperf5 \
 	    dbase3 dbase4 htmlpars htmlimpx
-#lot123
+#lot123 msmword msword wordperf5
 
 
 # Extra Pref libs - don't bother making these
