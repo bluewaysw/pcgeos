@@ -3,26 +3,26 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Mailbox
-ADMIN           = adminC.asm adminCode.asm adminInit.asm adminManager.asm\
+GEODE           = mailbox
+Admin           = adminC.asm adminCode.asm adminInit.asm adminManager.asm\
                   adminConstant.def adminVariable.def
 DBQ             = dbqCode.asm dbqEC.asm dbqManager.asm dbqConstant.def
-DMAP            = dmapCode.asm dmapManager.asm dmapConstant.def
-INBOX           = inboxApplicationList.asm inboxAppToken.asm\
+DMap            = dmapCode.asm dmapManager.asm dmapConstant.def
+Inbox           = inboxApplicationList.asm inboxAppToken.asm\
                   inboxControlPanel.asm inboxDetails.asm inboxFetch.asm\
                   inboxInit.asm inboxManager.asm inboxMessageList.asm\
                   inboxRegister.asm inboxTransWin.asm inboxUtils.asm\
                   inboxConstant.def inboxVariable.def
-MAIN            = mainLibrary.asm mainManager.asm mainNotify.asm\
+Main            = mainLibrary.asm mainManager.asm mainNotify.asm\
                   mainProcess.asm mainThread.asm mainVariable.def
-MEDIA           = mediaC.asm mediaInit.asm mediaManager.asm mediaStatus.asm\
+Media           = mediaC.asm mediaInit.asm mediaManager.asm mediaStatus.asm\
                   mediaTransport.asm mediaConstant.def
-MESSAGE         = messageC.asm messageControlPanel.asm messageDetails.asm\
+Message         = messageC.asm messageControlPanel.asm messageDetails.asm\
                   messageGlyph.asm messageInfo.asm messageList.asm\
                   messageManager.asm messageMoniker.asm messageRegister.asm\
                   messageSendableNotifyDialog.asm messageUtils.asm\
                   messageConstant.def messageVariable.def
-OUTBOX          = outboxC.asm outboxConfirmation.asm\
+Outbox          = outboxC.asm outboxConfirmation.asm\
                   outboxControlMessageList.asm outboxControlPanel.asm\
                   outboxDetails.asm outboxErrorRetry.asm\
                   outboxFeedbackGlyph.asm outboxFeedbackNote.asm\
@@ -45,11 +45,11 @@ UI              = uiAddressControl.asm uiApplication.asm uiC.asm uiEMOM.asm\
                   uiOutLostConnection.ui uiOutPanel.ui uiOutProgress.ui\
                   uiOutTransWin.ui uiPoof.ui uiSendControl.ui\
                   uiUnsendable.ui
-UTILS           = utilsC.asm utilsCode.asm utilsEC.asm utilsGlobal.asm\
+Utils           = utilsC.asm utilsCode.asm utilsEC.asm utilsGlobal.asm\
                   utilsManager.asm utilsResident.asm
-VMSTORE         = vmstoreC.asm vmstoreCode.asm vmstoreInit.asm\
+VMStore         = vmstoreC.asm vmstoreCode.asm vmstoreInit.asm\
                   vmstoreManager.asm vmstoreConstant.def
-UI_TO_RDFS      = UIMAIN.UI
+UI_TO_RDFS      = uiMain.ui
 OBJS            =
 COMMON          = mailboxAdmin.def mailboxConstant.def mailboxDBQ.def\
                   mailboxDMap.def mailboxGeode.def mailboxInbox.def\
@@ -60,8 +60,8 @@ COMMON          = mailboxAdmin.def mailboxConstant.def mailboxDBQ.def\
 MODULES         = Admin DBQ DMap Inbox Main Media Message Outbox UI Utils\
                   VMStore
 CMODULES        =
-SRCS            = $(ADMIN) $(DBQ) $(DMAP) $(INBOX) $(MAIN) $(MEDIA)\
-                  $(MESSAGE) $(OUTBOX) $(UI) $(UTILS) $(VMSTORE) $(COMMON)
+SRCS            = $(Admin) $(DBQ) $(DMap) $(Inbox) $(Main) $(Media)\
+                  $(Message) $(Outbox) $(UI) $(Utils) $(VMStore) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = mailbox
