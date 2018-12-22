@@ -166,7 +166,7 @@ sword _pascal
 			}
 		    }
 		    if (mych == _TEXT('w')) {
-	            	UtilHex32ToAscii(cptr, (dword) WWFixedToInt(d),
+	            	UtilHex32ToAscii((char*)cptr, (dword) WWFixedToInt(d),
 					    	    UHTAF_NULL_TERMINATE);
 			while (*cptr != _TEXT('\0')) {
 			    cptr++;
@@ -181,10 +181,10 @@ sword _pascal
 			    if (d < 10) { *cptr++ = _TEXT('0'); }
 			    if (d < 100) { *cptr++ = _TEXT('0'); }
 			    if (d < 1000) { *cptr++ = _TEXT('0'); }
-	            	    UtilHex32ToAscii(cptr, d, UHTAF_NULL_TERMINATE);
+	            	    UtilHex32ToAscii((char*)cptr, d, UHTAF_NULL_TERMINATE);
 			}
 		    } else {
-	            	UtilHex32ToAscii(cptr, d, UHTAF_NULL_TERMINATE);
+	            	UtilHex32ToAscii((char*)cptr, d, UHTAF_NULL_TERMINATE);
 		    }
 		    break;
 		}
@@ -195,7 +195,7 @@ sword _pascal
 		    } else {
 			d = va_arg(args, word);
 		    }
-	            UtilHex32ToAscii(fieldBuf, d, UHTAF_NULL_TERMINATE);
+	            UtilHex32ToAscii((char*)fieldBuf, d, UHTAF_NULL_TERMINATE);
 		    break;
 		}
 		case _TEXT('x') :

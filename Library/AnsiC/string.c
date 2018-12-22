@@ -116,7 +116,7 @@ void _pascal
 	__s[i++] = '-';
 
     __s[i] = '\0';
-    strrev(__s);
+    strrev((TCHAR*)__s);
 }
 
 void _pascal
