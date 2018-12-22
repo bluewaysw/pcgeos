@@ -1826,7 +1826,6 @@ main(int argc, char **argv)
     	fclose(fp);
     	return;
 #endif
-printf("TEST\n");fflush(stdout);
     if ((argc == 2) && HAS_ARGS_FILE(argv)) {
 	GetFileArgs(ARGS_FILE(argv), &argc, &argv);
     }
