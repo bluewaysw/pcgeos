@@ -654,11 +654,14 @@ Targ_FmtTime (long time)
 	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     };
+    static int          year = 1900; //grev's "year 0"
 
     parts = localtime(&time);
 
-    sprintf (buf, "%d:%02d:%02d %s %d, 19%d",
+    year += parts->tm_year;
+	
+    sprintf (buf, "%d:%02d:%02d %s %d, %d",
 	     parts->tm_hour, parts->tm_min, parts->tm_sec,
-	     months[parts->tm_mon], parts->tm_mday, parts->tm_year);
+	     months[parts->tm_mon], parts->tm_mday, year);
     return(buf);
 }
