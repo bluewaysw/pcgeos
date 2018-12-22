@@ -3,8 +3,8 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = FlatFile
-DATABASE        = ffDExtrn.h ffDatabase.goc ffDatabaseCreate.goc\
+GEODE           = flatfile
+Database        = ffDExtrn.h ffDatabase.goc ffDatabaseCreate.goc\
                   ffDatabaseFieldOrder.goc ffDatabaseFields.goc\
                   ffDatabaseFloatController.goc ffDatabaseImpex.goc\
                   ffDatabaseLabels.goc ffDatabaseLayout.goc\
@@ -12,13 +12,13 @@ DATABASE        = ffDExtrn.h ffDatabase.goc ffDatabaseCreate.goc\
                   ffDatabasePaste.goc ffDatabaseRCP.goc ffDatabaseSort.goc\
                   ffDatabaseSubset.goc ffDatabaseText.goc\
                   ffPageLayoutRect.goc
-EXPRBUILDER     = ffExprBuilder.goc
-FFMANAGER       = ffmanagerManager.asm
-FIELDPROPERTIES = ffFieldEdges.goc ffFieldProperties.goc ffFpText.goc
-GROBJ           = ffGrObjBody.goc
-LOCALIZATION    = ffStrings.goc
-RECORDCONTROL   = ffRCPValue.goc ffRecordControl.goc ffRecordControlUI.goc
-TREASURECHEST   = ffTreasureChest.goc
+ExprBuilder     = ffExprBuilder.goc
+FFManager       = ffmanagerManager.asm
+FieldProperties = ffFieldEdges.goc ffFieldProperties.goc ffFpText.goc
+GrObj           = ffGrObjBody.goc
+Localization    = ffStrings.goc
+RecordControl   = ffRCPValue.goc ffRecordControl.goc ffRecordControlUI.goc
+TreasureChest   = ffTreasureChest.goc
 UI_TO_RDFS      =
 OBJS            = ffDatabase.obj ffDatabaseCreate.obj\
                   ffDatabaseFieldOrder.obj ffDatabaseFields.obj\
@@ -35,9 +35,9 @@ COMMON          = extern.h ffFatal.h
 MODULES         = FFManager
 CMODULES        = Database ExprBuilder FieldProperties GrObj Localization\
                   RecordControl TreasureChest
-SRCS            = $(DATABASE) $(EXPRBUILDER) $(FFMANAGER)\
-                  $(FIELDPROPERTIES) $(GROBJ) $(LOCALIZATION)\
-                  $(RECORDCONTROL) $(TREASURECHEST) $(COMMON)
+SRCS            = $(Database) $(ExprBuilder) $(FFManager)\
+                  $(FieldProperties) $(GrObj) $(Localization)\
+                  $(RecordControl) $(TreasureChest) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = ffile
