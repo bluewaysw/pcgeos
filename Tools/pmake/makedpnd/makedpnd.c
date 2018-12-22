@@ -636,7 +636,7 @@ ApplyCommand(char    **argv,
         case FT_UI:
 #endif
         //case FT_BORLAND: /* no redirection here */
-	    break;
+	    //break;
 
 	/* now our good friends microblam in there highly advanced and much
 	 * acclaimed version 6.0 compiler don't have a f*cking clue.  they
