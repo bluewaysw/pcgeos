@@ -3,39 +3,39 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = TERM
-FILE            = fileLocal.asm fileMain.asm fileManager.asm\
-                  fileConstant.def fileImport.def fileInclude.def\
+GEODE           = term
+Script          = scriptMain.asm scriptManager.asm scriptLocal.asm\
+                  scriptConstant.def scriptMacro.def scriptImport.def\
+                  scriptVariable.def scriptInclude.def
+FSM             = fsmManager.asm fsmMakeTables.asm fsmMain.asm\
+                  fsmImport.def fsmMacro.def fsmConstant.def\
+                  fsmVariable.def fsmInclude.def
+File            = fileManager.asm fileLocal.asm fileMain.asm\
+                  fileInclude.def fileConstant.def fileImport.def\
                   fileMacro.def fileVariable.def file.ui
-FSM             = fsmMain.asm fsmMakeTables.asm fsmManager.asm\
-                  fsmConstant.def fsmImport.def fsmInclude.def fsmMacro.def\
-                  fsmVariable.def
-MAIN            = dove.asm doveDs.asm mainConnection.asm mainEci.asm\
-                  mainLocal.asm mainMain.asm mainManager.asm\
-                  mainProtocol.asm mainTimedDialog.asm scriptEdit.asm\
-                  termKeyMacro.asm mainConstant.def mainImport.def\
-                  mainInclude.def mainMacro.def mainVariable.def main.ui
-SCREEN          = screenLocal.asm screenMain.asm screenManager.asm\
-                  screenConstant.def screenImport.def screenInclude.def\
-                  screenMacro.def screenVariable.def
-SCRIPT          = scriptLocal.asm scriptMain.asm scriptManager.asm\
-                  scriptConstant.def scriptImport.def scriptInclude.def\
-                  scriptMacro.def scriptVariable.def
-SERIAL          = serialIn.asm serialMain.asm serialManager.asm\
-                  serialScript.asm serialConstant.def serialImport.def\
-                  serialInclude.def serialMacro.def serialScriptVar.def\
-                  serialVariable.def
-UTILS           = utilsLocal.asm utilsMain.asm utilsManager.asm\
-                  utilsConstant.def utilsImport.def utilsInclude.def\
-                  utilsMacro.def utilsVariable.def utils.ui
-UI_TO_RDFS      = TERMUI.UI
+Screen          = screenManager.asm screenLocal.asm screenMain.asm\
+                  screenMacro.def screenVariable.def screenConstant.def\
+                  screenImport.def screenInclude.def
+Utils           = utilsLocal.asm utilsMain.asm utilsManager.asm\
+                  utilsImport.def utilsVariable.def utilsMacro.def\
+                  utilsInclude.def utilsConstant.def utils.ui
+Main            = mainMain.asm mainTimedDialog.asm mainManager.asm\
+                  scriptEdit.asm dove.asm mainEci.asm mainProtocol.asm\
+                  mainLocal.asm mainConnection.asm termKeyMacro.asm\
+                  doveDs.asm mainConstant.def mainVariable.def\
+                  mainInclude.def mainImport.def mainMacro.def main.ui
+Serial          = serialIn.asm serialScript.asm serialManager.asm\
+                  serialMain.asm serialVariable.def serialScriptVar.def\
+                  serialConstant.def serialInclude.def serialImport.def\
+                  serialMacro.def
+UI_TO_RDFS      = termui.ui
 OBJS            =
-COMMON          = dove.def termConstant.def termInclude.def\
-                  termKeyMacro.def termMacro.def termResource.def
-MODULES         = File FSM Main Screen Script Serial Utils
+COMMON          = termMacro.def termKeyMacro.def termInclude.def\
+                  termConstant.def termResource.def dove.def
+MODULES         = Script FSM File Screen Utils Main Serial
 CMODULES        =
-SRCS            = $(FILE) $(FSM) $(MAIN) $(SCREEN) $(SCRIPT) $(SERIAL)\
-                  $(UTILS) $(COMMON)
+SRCS            = $(Script) $(FSM) $(File) $(Screen) $(Utils) $(Main)\
+                  $(Serial) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

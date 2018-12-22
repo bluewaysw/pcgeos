@@ -1,38 +1,38 @@
-HEARTS.rdef: GENERIC.UIH PRODUCT.UIH CARDS.UIH ART/MKHEART.UI
-HEARTS.obj \
-HEARTS.eobj: GEOS.DEF GEODE.DEF EC.DEF MYMACROS.DEF LIBRARY.DEF \
-                RESOURCE.DEF OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF \
-                OBJECTS/WINC.DEF WIN.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF HEAP.DEF TIMER.DEF TIMEDATE.DEF SYSTEM.DEF \
-                LOCALIZE.DEF SLLANG.DEF FILE.DEF FILEENUM.DEF VM.DEF \
-                HUGEARR.DEF OBJECTS/INPUTC.DEF INITFILE.DEF DBASE.DEF \
-                UI.DEF INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF GCNLIST.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SOUND.DEF DRIVER.DEF INTERNAL/SOUNDFMT.DEF \
-                INTERNAL/SEMINT.DEF CARDS.DEF OBJECTS/VTEXTC.DEF \
-                SPOOL.DEF PRINT.DEF INTERNAL/PRODFEATURES.DEF WAV.DEF \
-                HEARTSGAME.DEF HEARTSDECK.DEF HEARTSHAND.DEF \
-                HEARTSSOUND.ASM HEARTSGAME.ASM HEARTSDECK.ASM \
-                HEARTSHAND.ASM HEARTS.RDEF
+hearts.rdef: hearts.ui generic.uih product.uih cards.uih Art/mkheart.ui
+hearts.obj \
+hearts.eobj: geos.def geode.def ec.def myMacros.def library.def \
+                resource.def object.def lmem.def graphics.def fontID.def \
+                font.def color.def gstring.def text.def char.def \
+                Objects/winC.def win.def Objects/metaC.def chunkarr.def \
+                geoworks.def heap.def timer.def timedate.def system.def \
+                localize.def sllang.def file.def fileEnum.def vm.def \
+                hugearr.def Objects/inputC.def initfile.def dbase.def \
+                ui.def input.def hwr.def Objects/processC.def gcnlist.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                sound.def driver.def Internal/soundFmt.def \
+                Internal/semInt.def cards.def Objects/vTextC.def \
+                spool.def print.def Internal/prodFeatures.def wav.def \
+                heartsGame.def heartsDeck.def heartsHand.def \
+                heartsSound.asm heartsGame.asm heartsDeck.asm \
+                heartsHand.asm hearts.rdef
 
-HEARTSEC.geo HEARTS.geo : GEOS.LDF UI.LDF SOUND.LDF WAV.LDF CARDS.LDF 
+heartsEC.geo hearts.geo : geos.ldf ui.ldf sound.ldf wav.ldf cards.ldf 

@@ -3,12 +3,12 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = GWPOKER
+GEODE           = gwpoker
 ASM_TO_OBJS     = gwpoker.asm
-UI_TO_RDFS      = GWPOKER.UI
-SRCS            = gwpoker.asm payoffDisplay.asm pokerGame.asm\
-                  pokerSound.asm myMacros.def sizes.def gwpoker.ui\
-                  mkrHearts.ui
+UI_TO_RDFS      = gwpoker.ui
+SRCS            = pokerGame.asm payoffDisplay.asm pokerSound.asm\
+                  gwpoker.asm sizes.def myMacros.def mkrHearts.ui\
+                  gwpoker.ui
 OBJS            = gwpoker.obj
 LOBJS           =
 

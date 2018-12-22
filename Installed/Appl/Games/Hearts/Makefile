@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = HEARTS
+GEODE           = hearts
 ASM_TO_OBJS     = hearts.asm
-UI_TO_RDFS      = HEARTS.UI
-SRCS            = hearts.asm heartsDeck.asm heartsGame.asm heartsHand.asm\
-                  heartsSound.asm heartsDeck.def heartsGame.def\
+UI_TO_RDFS      = hearts.ui
+SRCS            = heartsDeck.asm heartsGame.asm hearts.asm heartsHand.asm\
+                  heartsSound.asm heartsGame.def heartsDeck.def\
                   heartsHand.def myMacros.def hearts.ui
 OBJS            = hearts.obj
 LOBJS           =

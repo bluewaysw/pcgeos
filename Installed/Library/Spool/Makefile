@@ -3,36 +3,37 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Spool
-LIB             = libC.asm libDriver.asm libIBM850Tab.asm libIBM860Tab.asm\
-                  libIBM863Tab.asm libIBM865Tab.asm libIBM8bitTab.asm\
-                  libInit.asm libLatin8bitTab.asm libManager.asm\
-                  libMisc.asm libPaper.asm libPrintControl.asm\
-                  libPrinter.asm libRoman8bitTab.asm libTables.asm\
-                  libVentura8bitTab.asm libWindows8bitTab.asm\
-                  libConstant.def libMacro.def libStrings.ui
-PROCESS         = processApp.asm processC.asm processControlPanel.asm\
-                  processCustom.asm processDualThread.asm processError.asm\
-                  processFile.asm processGraphics.asm processLabel.asm\
-                  processLockQueue.asm processLoop.asm processManager.asm\
-                  processNothing.asm processParallel.asm processPDL.asm\
-                  processPort.asm processQueue.asm processRestart.asm\
-                  processSerial.asm processTables.asm processText.asm\
-                  processThread.asm processUtils.asm processConstant.def
-UI              = uiC.asm uiManager.asm uiPageSizeCtrl.asm\
-                  uiPrintControl.asm uiPrintControlUtils.asm\
-                  uiSpoolSummons.asm uiSpoolSummonsExternal.asm\
-                  uiSpoolSummonsPrint.asm uiSpoolSummonsUtils.asm\
-                  uiConstant.def uiGlobal.def uiMain.ui uiPageSizeCtrl.ui\
+GEODE           = spool
+UI              = uiPageSizeCtrl.asm uiPrintControlUtils.asm\
+                  uiPrintControl.asm uiSpoolSummons.asm\
+                  uiSpoolSummonsPrint.asm uiC.asm uiManager.asm\
+                  uiSpoolSummonsExternal.asm uiSpoolSummonsUtils.asm\
+                  uiConstant.def uiGlobal.def uiSpoolError.ui uiStrings.ui\
                   uiPrintControl.ui uiPrinterControlPanel.ui uiSpoolApp.ui\
-                  uiSpoolError.ui uiStrings.ui
-UI_TO_RDFS      = LIBSTRINGS.UI UIMAIN.UI
+                  uiPageSizeCtrl.ui uiMain.ui
+Process         = processManager.asm processPort.asm processText.asm\
+                  processParallel.asm processFile.asm processSerial.asm\
+                  processLabel.asm processDualThread.asm\
+                  processControlPanel.asm processNothing.asm\
+                  processQueue.asm processThread.asm processLockQueue.asm\
+                  processCustom.asm processLoop.asm processPDL.asm\
+                  processTables.asm processGraphics.asm processC.asm\
+                  processUtils.asm processApp.asm processRestart.asm\
+                  processError.asm processConstant.def
+Lib             = libDriver.asm libIBM865Tab.asm libIBM850Tab.asm\
+                  libWindows8bitTab.asm libPrintControl.asm\
+                  libVentura8bitTab.asm libTables.asm libManager.asm\
+                  libIBM8bitTab.asm libPrinter.asm libPaper.asm\
+                  libIBM860Tab.asm libRoman8bitTab.asm libC.asm libMisc.asm\
+                  libInit.asm libLatin8bitTab.asm libIBM863Tab.asm\
+                  libMacro.def libConstant.def libStrings.ui
+UI_TO_RDFS      = uiMain.ui libStrings.ui
 OBJS            =
-COMMON          = spoolConstant.def spoolGeode.def spoolGlobal.def\
-                  spoolVariable.def
-MODULES         = Lib Process UI
+COMMON          = spoolConstant.def spoolGlobal.def spoolVariable.def\
+                  spoolGeode.def
+MODULES         = UI Process Lib
 CMODULES        =
-SRCS            = $(LIB) $(PROCESS) $(UI) $(COMMON)
+SRCS            = $(UI) $(Process) $(Lib) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = spool

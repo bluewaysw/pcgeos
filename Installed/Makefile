@@ -62,13 +62,13 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  wav game cards spreadsheet parse spell convert \
 		  saver prefLibs accpnt netutils \
 		  socket dhcp borlandrtl ffile streamc mailhub mailsmtp \
-		  mailpop3 ascii lot123ss csv \
+		  mailpop3 lot123ss csv \
 		  parentc wmlib \
 		  jpeg giflib gif htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
 		  basicdb gridlib gsol treplib
-# cdaudio rtf
+# cdaudio rtf ascii
 
 prefLibs	: prefvid preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
@@ -78,7 +78,7 @@ prefLibs	: prefvid preftd \
 
 # Geos impex libraries
 impex_libs: dib bmp clp ico pcx tif \
-	    msmfile msword \
+	    msmword msword \
 	    wordperf5 \
 	    dbase3 dbase4 htmlpars htmlimpx
 #lot123
@@ -1358,8 +1358,9 @@ Installed/Appl/BreadBox/GEOZIP:			minizip dirlist MAKEAPPL
 dib	: 	Installed/Library/Trans/Graphics/Bitmap/Dib
 Installed/Library/Trans/Graphics/Bitmap/Dib:	ui ansic impex MAKELIB
 
-msmfile : 	Installed/Library/Trans/Text/MSMFile
-Installed/Library/Trans/Text/MSMFile:		text MAKELIB
+msmfile : 	
+#Installed/Library/Trans/Text/MSMFile
+#Installed/Library/Trans/Text/MSMFile:		text MAKELIB
 
 bmp	: 	Installed/Library/Trans/Graphics/Bitmap/Bmp
 Installed/Library/Trans/Graphics/Bitmap/Bmp:	math dib MAKELIB

@@ -869,10 +869,10 @@ LINK		: .USE
 
 
 .c.eobj		:
-	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo=$(.TARGET:S/\//\\/g) $(.IMPSRC:S/\//\\/g) $(GEOERRFL)
+	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo=$(.TARGET:S/\//\\/g) "$(.IMPSRC)" $(GEOERRFL)
 
 .c.obj		:
-	$(CCOM) $(CCOMFLAGS) -fo=$(.TARGET:S/\//\\/g) $(.IMPSRC:S/\//\\/g) $(GEOERRFL)
+	$(CCOM) $(CCOMFLAGS) -fo=$(.TARGET:S/\//\\/g) "$(.IMPSRC)" $(GEOERRFL)
 
 .goc.obj	:
 	$(GOC) $(GOCFLAGS) -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)

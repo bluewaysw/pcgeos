@@ -1,36 +1,39 @@
-DBCS/SCANF.obj \
-DBCS/SCANF.eobj: GEOS.H FILE.H SYSTEM.H GEODE.H ANSI/STRING.H ANSI/STDIO.H
-DBCS/STDIO.obj \
-DBCS/STDIO.eobj: GEOS.H GRAPHICS.H FONTID.H FONT.H COLOR.H SYSTEM.H GEODE.H \
-                ANSI/STRING.H ANSI/STDIO.H
-DBCS/STRING.obj \
-DBCS/STRING.eobj: GEOS.H ANSI/STRING.H GEOMISC.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H FILE.H SLLANG.H
-DBCS/ANSIC.obj \
-DBCS/ANSIC.eobj: ANSICGEODE.DEF GEOS.DEF FILE.DEF HEAP.DEF EC.DEF LMEM.DEF \
-                LIBRARY.DEF GEODE.DEF RESOURCE.DEF CHUNKARR.DEF \
-                LOCALIZE.DEF SLLANG.DEF ANSIC.DEF ANSICERRORS.DEF
-DBCS/BCC_RTL.obj \
-DBCS/BCC_RTL.eobj: 
-DBCS/MALLOC_ASM.obj \
-DBCS/MALLOC_ASM.eobj: ANSICGEODE.DEF GEOS.DEF FILE.DEF HEAP.DEF EC.DEF LMEM.DEF \
-                LIBRARY.DEF GEODE.DEF RESOURCE.DEF CHUNKARR.DEF \
-                LOCALIZE.DEF SLLANG.DEF ANSIC.DEF ANSICERRORS.DEF
-DBCS/MEMORY_ASM.obj \
-DBCS/MEMORY_ASM.eobj: ANSICGEODE.DEF GEOS.DEF FILE.DEF HEAP.DEF EC.DEF LMEM.DEF \
-                LIBRARY.DEF GEODE.DEF RESOURCE.DEF CHUNKARR.DEF \
-                LOCALIZE.DEF SLLANG.DEF ANSIC.DEF ANSICERRORS.DEF
-DBCS/STDIO_ASM.obj \
-DBCS/STDIO_ASM.eobj: ANSICGEODE.DEF GEOS.DEF FILE.DEF HEAP.DEF EC.DEF LMEM.DEF \
-                LIBRARY.DEF GEODE.DEF RESOURCE.DEF CHUNKARR.DEF \
-                LOCALIZE.DEF SLLANG.DEF ANSIC.DEF ANSICERRORS.DEF
-DBCS/STDLIB_ASM.obj \
-DBCS/STDLIB_ASM.eobj: ANSICGEODE.DEF GEOS.DEF FILE.DEF HEAP.DEF EC.DEF LMEM.DEF \
-                LIBRARY.DEF GEODE.DEF RESOURCE.DEF CHUNKARR.DEF \
-                LOCALIZE.DEF SLLANG.DEF ANSIC.DEF ANSICERRORS.DEF
-DBCS/STRING_ASM.obj \
-DBCS/STRING_ASM.eobj: ANSICGEODE.DEF GEOS.DEF FILE.DEF HEAP.DEF EC.DEF LMEM.DEF \
-                LIBRARY.DEF GEODE.DEF RESOURCE.DEF CHUNKARR.DEF \
-                LOCALIZE.DEF SLLANG.DEF ANSIC.DEF ANSICERRORS.DEF
+DBCS/string.obj \
+DBCS/string.eobj: string.c geos.h object.h geode.h lmem.h Ansi/string.h \
+                geoMisc.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h
+DBCS/stdio.obj \
+DBCS/stdio.eobj: stdio.c geos.h object.h geode.h lmem.h graphics.h fontID.h \
+                font.h color.h system.h Ansi/string.h Ansi/stdio.h
+DBCS/scanf.obj \
+DBCS/scanf.eobj: scanf.c geos.h object.h geode.h lmem.h file.h system.h \
+                math.h Ansi/string.h Ansi/stdio.h
+DBCS/memory_asm.obj \
+DBCS/memory_asm.eobj: ansicGeode.def geos.def file.def heap.def ec.def lmem.def \
+                library.def geode.def resource.def chunkarr.def \
+                localize.def sllang.def ansic.def ansicErrors.def \
+                product.def
+DBCS/ansic.obj \
+DBCS/ansic.eobj: ansicGeode.def geos.def file.def heap.def ec.def lmem.def \
+                library.def geode.def resource.def chunkarr.def \
+                localize.def sllang.def ansic.def ansicErrors.def
+DBCS/bcc_rtl.obj \
+DBCS/bcc_rtl.eobj: 
+DBCS/string_asm.obj \
+DBCS/string_asm.eobj: ansicGeode.def geos.def file.def heap.def ec.def lmem.def \
+                library.def geode.def resource.def chunkarr.def \
+                localize.def sllang.def ansic.def ansicErrors.def
+DBCS/stdlib_asm.obj \
+DBCS/stdlib_asm.eobj: ansicGeode.def geos.def file.def heap.def ec.def lmem.def \
+                library.def geode.def resource.def chunkarr.def \
+                localize.def sllang.def ansic.def ansicErrors.def
+DBCS/malloc_asm.obj \
+DBCS/malloc_asm.eobj: ansicGeode.def geos.def file.def heap.def ec.def lmem.def \
+                library.def geode.def resource.def chunkarr.def \
+                localize.def sllang.def ansic.def ansicErrors.def
+DBCS/stdio_asm.obj \
+DBCS/stdio_asm.eobj: ansicGeode.def geos.def file.def heap.def ec.def lmem.def \
+                library.def geode.def resource.def chunkarr.def \
+                localize.def sllang.def ansic.def ansicErrors.def
 
-DBCS/AnsiCEC.geo DBCS/AnsiC.geo : GEOS.LDF 
+DBCS/ansicEC.geo DBCS/ansic.geo : geos.ldf math.ldf 

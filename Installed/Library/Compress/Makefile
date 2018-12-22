@@ -32,7 +32,7 @@ OBJS            = compressManager.obj
 SRCS            = compressIO.asm compressMain.asm compressManager.asm\
                   compressConstant.def compressMacro.def\
                   compressVariable.def
-LOBJS           = crc32.lobj implode.lobj
+LOBJS           = 
 
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = compress

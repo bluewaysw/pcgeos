@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Solitaire
+GEODE           = solitaire
 ASM_TO_OBJS     = solitaire.asm
-UI_TO_RDFS      = SOLITAIRE.UI
-SRCS            = solitaire.asm solitaireGame.asm solitaireHand.asm\
-                  solitaireTalon.asm solitaireMacros.def solitaireSizes.def\
+UI_TO_RDFS      = solitaire.ui
+SRCS            = solitaire.asm solitaireHand.asm solitaireTalon.asm\
+                  solitaireGame.asm solitaireMacros.def solitaireSizes.def\
                   solitaire.ui
 OBJS            = solitaire.obj
 LOBJS           =

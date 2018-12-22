@@ -1,243 +1,279 @@
-FILE.obj \
-FILE.eobj: File/FileMANAGER.ASM \
-                
+Script.obj \
+Script.eobj: Script/scriptManager.asm \
+                scriptInclude.def termInclude.def geos.def heap.def \
+                geode.def resource.def ec.def object.def lmem.def \
+                graphics.def fontID.def font.def color.def input.def \
+                char.def hwr.def timer.def timedate.def thread.def \
+                gstring.def text.def file.def system.def localize.def \
+                sllang.def library.def assert.def disk.def drive.def \
+                win.def Objects/inputC.def Objects/metaC.def chunkarr.def \
+                geoworks.def Objects/winC.def Internal/semInt.def \
+                Internal/im.def Objects/processC.def Internal/fileInt.def \
+                fileEnum.def Internal/dos.def Internal/driveInt.def \
+                ui.def vm.def gcnlist.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                sound.def driver.def Internal/soundFmt.def \
+                Internal/serialDr.def Internal/streamDr.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                termConstant.def termMacro.def termResource.def \
+                scriptConstant.def scriptMacro.def scriptImport.def \
+                scriptVariable.def scriptMain.asm scriptLocal.asm
 FSM.obj \
-FSM.eobj: FSM/FSMMANAGER.ASM \
-                FSMINCLUDE.DEF TERMINCLUDE.DEF GEOS.DEF HEAP.DEF GEODE.DEF \
-                RESOURCE.DEF EC.DEF OBJECT.DEF LMEM.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF INPUT.DEF CHAR.DEF HWR.DEF \
-                TIMER.DEF TIMEDATE.DEF THREAD.DEF GSTRING.DEF TEXT.DEF \
-                FILE.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF LIBRARY.DEF \
-                ASSERT.DEF DISK.DEF DRIVE.DEF WIN.DEF OBJECTS/INPUTC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF \
-                OBJECTS/WINC.DEF INTERNAL/SEMINT.DEF INTERNAL/IM.DEF \
-                OBJECTS/PROCESSC.DEF INTERNAL/FILEINT.DEF FILEENUM.DEF \
-                INTERNAL/DOS.DEF INTERNAL/DRIVEINT.DEF UI.DEF VM.DEF \
-                GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SOUND.DEF DRIVER.DEF INTERNAL/SOUNDFMT.DEF \
-                INTERNAL/SERIALDR.DEF INTERNAL/STREAMDR.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF \
-                TERMCONSTANT.DEF TERMMACRO.DEF TERMRESOURCE.DEF \
-                FSMCONSTANT.DEF FSMMACRO.DEF FSMIMPORT.DEF \
-                FSMVARIABLE.DEF FSMMAIN.ASM FSMMAKETABLES.ASM
-MAIN.obj \
-MAIN.eobj: Main/MainMANAGER.ASM \
-                MAININCLUDE.DEF TERMINCLUDE.DEF GEOS.DEF HEAP.DEF \
-                GEODE.DEF RESOURCE.DEF EC.DEF OBJECT.DEF LMEM.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF INPUT.DEF \
-                CHAR.DEF HWR.DEF TIMER.DEF TIMEDATE.DEF THREAD.DEF \
-                GSTRING.DEF TEXT.DEF FILE.DEF SYSTEM.DEF LOCALIZE.DEF \
-                SLLANG.DEF LIBRARY.DEF ASSERT.DEF DISK.DEF DRIVE.DEF \
-                WIN.DEF OBJECTS/INPUTC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF OBJECTS/WINC.DEF INTERNAL/SEMINT.DEF \
-                INTERNAL/IM.DEF OBJECTS/PROCESSC.DEF INTERNAL/FILEINT.DEF \
-                FILEENUM.DEF INTERNAL/DOS.DEF INTERNAL/DRIVEINT.DEF \
-                UI.DEF VM.DEF GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SOUND.DEF DRIVER.DEF INTERNAL/SOUNDFMT.DEF \
-                INTERNAL/SERIALDR.DEF INTERNAL/STREAMDR.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF \
-                TERMCONSTANT.DEF TERMMACRO.DEF TERMRESOURCE.DEF \
-                INITFILE.DEF MAINCONSTANT.DEF MAINMACRO.DEF \
-                MAINIMPORT.DEF MAINVARIABLE.DEF TERMUI.RDEF MAINMAIN.ASM \
-                MAINLOCAL.ASM MAINPROTOCOL.ASM MAINCONNECTION.ASM \
-                MAINECI.ASM MAINTIMEDDIALOG.ASM
-SCREEN.obj \
-SCREEN.eobj: Screen/ScreenMANAGER.ASM \
-                SCREENINCLUDE.DEF TERMINCLUDE.DEF GEOS.DEF HEAP.DEF \
-                GEODE.DEF RESOURCE.DEF EC.DEF OBJECT.DEF LMEM.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF INPUT.DEF \
-                CHAR.DEF HWR.DEF TIMER.DEF TIMEDATE.DEF THREAD.DEF \
-                GSTRING.DEF TEXT.DEF FILE.DEF SYSTEM.DEF LOCALIZE.DEF \
-                SLLANG.DEF LIBRARY.DEF ASSERT.DEF DISK.DEF DRIVE.DEF \
-                WIN.DEF OBJECTS/INPUTC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF OBJECTS/WINC.DEF INTERNAL/SEMINT.DEF \
-                INTERNAL/IM.DEF OBJECTS/PROCESSC.DEF INTERNAL/FILEINT.DEF \
-                FILEENUM.DEF INTERNAL/DOS.DEF INTERNAL/DRIVEINT.DEF \
-                UI.DEF VM.DEF GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SOUND.DEF DRIVER.DEF INTERNAL/SOUNDFMT.DEF \
-                INTERNAL/SERIALDR.DEF INTERNAL/STREAMDR.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF \
-                TERMCONSTANT.DEF TERMMACRO.DEF TERMRESOURCE.DEF \
-                SCREENCONSTANT.DEF SCREENMACRO.DEF SCREENIMPORT.DEF \
-                SCREENVARIABLE.DEF SCREENMAIN.ASM SCREENLOCAL.ASM
-SCRIPT.obj \
-SCRIPT.eobj: Script/ScriptMANAGER.ASM \
-                SCRIPTINCLUDE.DEF TERMINCLUDE.DEF GEOS.DEF HEAP.DEF \
-                GEODE.DEF RESOURCE.DEF EC.DEF OBJECT.DEF LMEM.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF INPUT.DEF \
-                CHAR.DEF HWR.DEF TIMER.DEF TIMEDATE.DEF THREAD.DEF \
-                GSTRING.DEF TEXT.DEF FILE.DEF SYSTEM.DEF LOCALIZE.DEF \
-                SLLANG.DEF LIBRARY.DEF ASSERT.DEF DISK.DEF DRIVE.DEF \
-                WIN.DEF OBJECTS/INPUTC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF OBJECTS/WINC.DEF INTERNAL/SEMINT.DEF \
-                INTERNAL/IM.DEF OBJECTS/PROCESSC.DEF INTERNAL/FILEINT.DEF \
-                FILEENUM.DEF INTERNAL/DOS.DEF INTERNAL/DRIVEINT.DEF \
-                UI.DEF VM.DEF GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SOUND.DEF DRIVER.DEF INTERNAL/SOUNDFMT.DEF \
-                INTERNAL/SERIALDR.DEF INTERNAL/STREAMDR.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF \
-                TERMCONSTANT.DEF TERMMACRO.DEF TERMRESOURCE.DEF \
-                SCRIPTCONSTANT.DEF SCRIPTMACRO.DEF SCRIPTIMPORT.DEF \
-                SCRIPTVARIABLE.DEF SCRIPTMAIN.ASM SCRIPTLOCAL.ASM
-SERIAL.obj \
-SERIAL.eobj: Serial/SerialMANAGER.ASM \
-                SERIALINCLUDE.DEF TERMINCLUDE.DEF GEOS.DEF HEAP.DEF \
-                GEODE.DEF RESOURCE.DEF EC.DEF OBJECT.DEF LMEM.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF INPUT.DEF \
-                CHAR.DEF HWR.DEF TIMER.DEF TIMEDATE.DEF THREAD.DEF \
-                GSTRING.DEF TEXT.DEF FILE.DEF SYSTEM.DEF LOCALIZE.DEF \
-                SLLANG.DEF LIBRARY.DEF ASSERT.DEF DISK.DEF DRIVE.DEF \
-                WIN.DEF OBJECTS/INPUTC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF OBJECTS/WINC.DEF INTERNAL/SEMINT.DEF \
-                INTERNAL/IM.DEF OBJECTS/PROCESSC.DEF INTERNAL/FILEINT.DEF \
-                FILEENUM.DEF INTERNAL/DOS.DEF INTERNAL/DRIVEINT.DEF \
-                UI.DEF VM.DEF GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SOUND.DEF DRIVER.DEF INTERNAL/SOUNDFMT.DEF \
-                INTERNAL/SERIALDR.DEF INTERNAL/STREAMDR.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF \
-                TERMCONSTANT.DEF TERMMACRO.DEF TERMRESOURCE.DEF \
-                SERIALCONSTANT.DEF SERIALMACRO.DEF SERIALIMPORT.DEF \
-                SERIALVARIABLE.DEF SERIALSCRIPTVAR.DEF SERIALMAIN.ASM \
-                SERIALIN.ASM SERIALSCRIPT.ASM
-UTILS.obj \
-UTILS.eobj: Utils/UtilsMANAGER.ASM \
-                UTILSINCLUDE.DEF TERMINCLUDE.DEF GEOS.DEF HEAP.DEF \
-                GEODE.DEF RESOURCE.DEF EC.DEF OBJECT.DEF LMEM.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF INPUT.DEF \
-                CHAR.DEF HWR.DEF TIMER.DEF TIMEDATE.DEF THREAD.DEF \
-                GSTRING.DEF TEXT.DEF FILE.DEF SYSTEM.DEF LOCALIZE.DEF \
-                SLLANG.DEF LIBRARY.DEF ASSERT.DEF DISK.DEF DRIVE.DEF \
-                WIN.DEF OBJECTS/INPUTC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF OBJECTS/WINC.DEF INTERNAL/SEMINT.DEF \
-                INTERNAL/IM.DEF OBJECTS/PROCESSC.DEF INTERNAL/FILEINT.DEF \
-                FILEENUM.DEF INTERNAL/DOS.DEF INTERNAL/DRIVEINT.DEF \
-                UI.DEF VM.DEF GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SOUND.DEF DRIVER.DEF INTERNAL/SOUNDFMT.DEF \
-                INTERNAL/SERIALDR.DEF INTERNAL/STREAMDR.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF \
-                TERMCONSTANT.DEF TERMMACRO.DEF TERMRESOURCE.DEF \
-                UTILSCONSTANT.DEF UTILSMACRO.DEF UTILSIMPORT.DEF \
-                UTILSVARIABLE.DEF UTILSMAIN.ASM UTILSLOCAL.ASM
-TERMUI.rdef: GENERIC.UIH PRODUCT.UIH ART/MKRGEOCOMM.UI \
-                ART/MKRGEOCOMMTINY.UI ART/MKRGEOCOMMDOC.UI
+FSM.eobj: FSM/fsmManager.asm \
+                fsmInclude.def termInclude.def geos.def heap.def geode.def \
+                resource.def ec.def object.def lmem.def graphics.def \
+                fontID.def font.def color.def input.def char.def hwr.def \
+                timer.def timedate.def thread.def gstring.def text.def \
+                file.def system.def localize.def sllang.def library.def \
+                assert.def disk.def drive.def win.def Objects/inputC.def \
+                Objects/metaC.def chunkarr.def geoworks.def \
+                Objects/winC.def Internal/semInt.def Internal/im.def \
+                Objects/processC.def Internal/fileInt.def fileEnum.def \
+                Internal/dos.def Internal/driveInt.def ui.def vm.def \
+                gcnlist.def Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                sound.def driver.def Internal/soundFmt.def \
+                Internal/serialDr.def Internal/streamDr.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                termConstant.def termMacro.def termResource.def \
+                fsmConstant.def fsmMacro.def fsmImport.def \
+                fsmVariable.def fsmMain.asm fsmMakeTables.asm
+File.obj \
+File.eobj: File/fileManager.asm \
+                fileInclude.def termInclude.def geos.def heap.def \
+                geode.def resource.def ec.def object.def lmem.def \
+                graphics.def fontID.def font.def color.def input.def \
+                char.def hwr.def timer.def timedate.def thread.def \
+                gstring.def text.def file.def system.def localize.def \
+                sllang.def library.def assert.def disk.def drive.def \
+                win.def Objects/inputC.def Objects/metaC.def chunkarr.def \
+                geoworks.def Objects/winC.def Internal/semInt.def \
+                Internal/im.def Objects/processC.def Internal/fileInt.def \
+                fileEnum.def Internal/dos.def Internal/driveInt.def \
+                ui.def vm.def gcnlist.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                sound.def driver.def Internal/soundFmt.def \
+                Internal/serialDr.def Internal/streamDr.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                termConstant.def termMacro.def termResource.def \
+                fileConstant.def fileMacro.def fileImport.def \
+                fileVariable.def fileMain.asm fileLocal.asm
+Screen.obj \
+Screen.eobj: Screen/screenManager.asm \
+                screenInclude.def termInclude.def geos.def heap.def \
+                geode.def resource.def ec.def object.def lmem.def \
+                graphics.def fontID.def font.def color.def input.def \
+                char.def hwr.def timer.def timedate.def thread.def \
+                gstring.def text.def file.def system.def localize.def \
+                sllang.def library.def assert.def disk.def drive.def \
+                win.def Objects/inputC.def Objects/metaC.def chunkarr.def \
+                geoworks.def Objects/winC.def Internal/semInt.def \
+                Internal/im.def Objects/processC.def Internal/fileInt.def \
+                fileEnum.def Internal/dos.def Internal/driveInt.def \
+                ui.def vm.def gcnlist.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                sound.def driver.def Internal/soundFmt.def \
+                Internal/serialDr.def Internal/streamDr.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                termConstant.def termMacro.def termResource.def \
+                screenConstant.def screenMacro.def screenImport.def \
+                screenVariable.def screenMain.asm screenLocal.asm
+Utils.obj \
+Utils.eobj: Utils/utilsManager.asm \
+                utilsInclude.def termInclude.def geos.def heap.def \
+                geode.def resource.def ec.def object.def lmem.def \
+                graphics.def fontID.def font.def color.def input.def \
+                char.def hwr.def timer.def timedate.def thread.def \
+                gstring.def text.def file.def system.def localize.def \
+                sllang.def library.def assert.def disk.def drive.def \
+                win.def Objects/inputC.def Objects/metaC.def chunkarr.def \
+                geoworks.def Objects/winC.def Internal/semInt.def \
+                Internal/im.def Objects/processC.def Internal/fileInt.def \
+                fileEnum.def Internal/dos.def Internal/driveInt.def \
+                ui.def vm.def gcnlist.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                sound.def driver.def Internal/soundFmt.def \
+                Internal/serialDr.def Internal/streamDr.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                termConstant.def termMacro.def termResource.def \
+                utilsConstant.def utilsMacro.def utilsImport.def \
+                utilsVariable.def utilsMain.asm utilsLocal.asm
+Main.obj \
+Main.eobj: Main/mainManager.asm \
+                mainInclude.def termInclude.def geos.def heap.def \
+                geode.def resource.def ec.def object.def lmem.def \
+                graphics.def fontID.def font.def color.def input.def \
+                char.def hwr.def timer.def timedate.def thread.def \
+                gstring.def text.def file.def system.def localize.def \
+                sllang.def library.def assert.def disk.def drive.def \
+                win.def Objects/inputC.def Objects/metaC.def chunkarr.def \
+                geoworks.def Objects/winC.def Internal/semInt.def \
+                Internal/im.def Objects/processC.def Internal/fileInt.def \
+                fileEnum.def Internal/dos.def Internal/driveInt.def \
+                ui.def vm.def gcnlist.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                sound.def driver.def Internal/soundFmt.def \
+                Internal/serialDr.def Internal/streamDr.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                termConstant.def termMacro.def termResource.def \
+                initfile.def mainConstant.def mainMacro.def \
+                mainImport.def mainVariable.def termui.rdef mainMain.asm \
+                mainLocal.asm mainProtocol.asm mainConnection.asm \
+                mainEci.asm mainTimedDialog.asm
+Serial.obj \
+Serial.eobj: Serial/serialManager.asm \
+                serialInclude.def termInclude.def geos.def heap.def \
+                geode.def resource.def ec.def object.def lmem.def \
+                graphics.def fontID.def font.def color.def input.def \
+                char.def hwr.def timer.def timedate.def thread.def \
+                gstring.def text.def file.def system.def localize.def \
+                sllang.def library.def assert.def disk.def drive.def \
+                win.def Objects/inputC.def Objects/metaC.def chunkarr.def \
+                geoworks.def Objects/winC.def Internal/semInt.def \
+                Internal/im.def Objects/processC.def Internal/fileInt.def \
+                fileEnum.def Internal/dos.def Internal/driveInt.def \
+                ui.def vm.def gcnlist.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                sound.def driver.def Internal/soundFmt.def \
+                Internal/serialDr.def Internal/streamDr.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                termConstant.def termMacro.def termResource.def \
+                serialConstant.def serialMacro.def serialImport.def \
+                serialVariable.def serialScriptVar.def serialMain.asm \
+                serialIn.asm serialScript.asm
+termui.rdef: termui.ui generic.uih product.uih Art/mkrGeoComm.ui \
+                Art/mkrGeoCommTiny.ui Art/mkrGeoCommDoc.ui
 
-TERMEC.geo TERM.geo : GEOS.LDF UI.LDF TEXT.LDF 
+termEC.geo term.geo : geos.ldf ui.ldf text.ldf 

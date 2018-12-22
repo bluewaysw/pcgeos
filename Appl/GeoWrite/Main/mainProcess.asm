@@ -25,7 +25,7 @@ endif
 ifdef _SUPER_IMPEX
 include fileEnum.def
 include library.def
-include Internal\xlatLib.def
+include Internal/xlatLib.def
 endif
 
 GeoWriteClassStructures	segment	resource

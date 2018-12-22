@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = UKI
+GEODE           = uki
 ASM_TO_OBJS     = ukiCommon.asm
 UI_TO_RDFS      =
-SRCS            = uki.asm ukiCommon.asm ukiKbd.asm ukiMouse.asm uki.def\
-                  ukiCommon.def uki.ui ukihelp.ui
+SRCS            = ukiCommon.asm uki.asm ukiKbd.asm ukiMouse.asm\
+                  ukiCommon.def uki.def ukihelp.ui uki.ui
 OBJS            = ukiCommon.obj
 LOBJS           =
 
