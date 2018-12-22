@@ -114,7 +114,7 @@ extern TCHAR
  */
 #ifdef DO_DBCS
 extern word
-  _pascal strlensbcs (const char *__str);
+  _pascal strlensbcs (const TCHAR *__str);
 extern word
   _pascal STRLENSBCS (const char *__str);
 extern char

@@ -235,7 +235,7 @@ sword _pascal
 		case _TEXT('S') :	    /* SBCS string */
 #endif
 		case _TEXT('s') : {	    /* string */
-		    fieldPtr = va_arg(args, char *);
+		    fieldPtr = va_arg(args, TCHAR *);
 		    if (fieldPtr == NULL) {
 			fieldPtr = fieldBuf;
 			fieldBuf[0] = _TEXT('\0');
@@ -274,7 +274,7 @@ sword _pascal
 
 
 #ifdef DO_DBCS
-	    padLength = fieldWidth - (mych=='S' ? strlensbcs((char *)fieldPtr) :
+	    padLength = fieldWidth - (mych=='S' ? strlensbcs(fieldPtr) :
 		strlen(fieldPtr));
 #else
 	    padLength = fieldWidth - strlen(fieldPtr);
@@ -375,9 +375,9 @@ sword _pascal
 /*    word precision; */ /* never used, value calculated but ignored */
     word longSize;
 
-    char *cptr;
-    char fieldBuf[200];
-    char  *fieldPtr;
+    TCHAR *cptr;
+    TCHAR fieldBuf[200];
+    TCHAR  *fieldPtr;
     sword padLength;
 
 

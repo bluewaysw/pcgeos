@@ -196,10 +196,10 @@ typedef enum /* word */ {
 } UtilAsciiToHexError;
 
 extern word 	/* Returns the length of the string (w/o NULL) */
-    _pascal UtilHex32ToAscii(char *buffer, dword value, UtilHexToAsciiFlags flags);
+    _pascal UtilHex32ToAscii(TCHAR *buffer, dword value, UtilHexToAsciiFlags flags);
 
 extern Boolean	/*XXX*/
-    _pascal UtilAsciiToHex32(const char *string, sdword *value);
+    _pascal UtilAsciiToHex32(const TCHAR *string, sdword *value);
 
 /***/
 

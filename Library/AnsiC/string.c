@@ -99,7 +99,7 @@ int _pascal
 
 
 void _pascal
-  ITOASBCS(int __n, char *__s)
+  ITOASBCS(int __n, TCHAR *__s)
 {
     int	i, sign;
 
