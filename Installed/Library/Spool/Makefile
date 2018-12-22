@@ -3,15 +3,15 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Spool
-LIB             = libC.asm libDriver.asm libIBM850Tab.asm libIBM860Tab.asm\
+GEODE           = spool
+Lib             = libC.asm libDriver.asm libIBM850Tab.asm libIBM860Tab.asm\
                   libIBM863Tab.asm libIBM865Tab.asm libIBM8bitTab.asm\
                   libInit.asm libLatin8bitTab.asm libManager.asm\
                   libMisc.asm libPaper.asm libPrintControl.asm\
                   libPrinter.asm libRoman8bitTab.asm libTables.asm\
                   libVentura8bitTab.asm libWindows8bitTab.asm\
                   libConstant.def libMacro.def libStrings.ui
-PROCESS         = processApp.asm processC.asm processControlPanel.asm\
+Process         = processApp.asm processC.asm processControlPanel.asm\
                   processCustom.asm processDualThread.asm processError.asm\
                   processFile.asm processGraphics.asm processLabel.asm\
                   processLockQueue.asm processLoop.asm processManager.asm\
@@ -26,13 +26,13 @@ UI              = uiC.asm uiManager.asm uiPageSizeCtrl.asm\
                   uiConstant.def uiGlobal.def uiMain.ui uiPageSizeCtrl.ui\
                   uiPrintControl.ui uiPrinterControlPanel.ui uiSpoolApp.ui\
                   uiSpoolError.ui uiStrings.ui
-UI_TO_RDFS      = LIBSTRINGS.UI UIMAIN.UI
+UI_TO_RDFS      = libStrings.ui uiMain.ui
 OBJS            =
 COMMON          = spoolConstant.def spoolGeode.def spoolGlobal.def\
                   spoolVariable.def
 MODULES         = Lib Process UI
 CMODULES        =
-SRCS            = $(LIB) $(PROCESS) $(UI) $(COMMON)
+SRCS            = $(Lib) $(Process) $(UI) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = spool
