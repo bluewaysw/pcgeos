@@ -2644,10 +2644,8 @@ get_filename:
 
       /* For -M, add this file to the dependencies.  */
       if (print_deps > (system_header_p || (system_include_depth > 0))) {
-      deps_output (fbeg, fend - fbeg);
-	  //deps_output (" ", 0);	
-	  //deps_output (fname, strlen (fname));
-	deps_output (" ", 0);
+	  deps_output (fname, strlen (fname));
+	  deps_output (" ", 0);
       }
     }
 
