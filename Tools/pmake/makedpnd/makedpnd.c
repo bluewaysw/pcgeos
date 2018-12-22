@@ -948,10 +948,10 @@ FindRelativePath(char *buf, int *end)
     /*
      * See if it's already a relative path.
      */
-    if (buf[1] != ':' || IS_PATHSEP(buf[0])) {
+    if (buf[1] != ':' && !IS_PATHSEP(buf[0])) {
 	return;
     }
-
+    
     oldlength = strlen(buf);
 
     /*
@@ -1012,9 +1012,13 @@ FindRelativePath(char *buf, int *end)
      * in the dependency list at all.
      */
     goc_compiler_dir = getenv("GOC_COMPILER_DIR");
+    if(!goc_compiler_dir) 
+    {
+	goc_compiler_dir = getenv("WATCOM");
+    }
     if(goc_compiler_dir)
     {
-      sprintf(path, "%s/INCLUDE/", goc_compiler_dir);
+      sprintf(path, "%s/", goc_compiler_dir);
       for(i=0; path[i]; i++)
         if(path[i]=='\\')
           path[i] = '/';
