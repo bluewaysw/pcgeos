@@ -631,71 +631,35 @@ ApplyCommand(char    **argv,
      * spawn, unless its borland which outputs the useful info to a .i file
      */
 
-    switch (filetype) {
-#ifndef _LINUX
-        case FT_UI:
-#endif
-        //case FT_BORLAND: /* no redirection here */
-	    break;
+	strcpy(outfile, "TMPXXXXXX");
+#ifdef _LINUX
+	fd = mkstemp(outfile);
+	if (fd == -1) {
+	fprintf(stderr, "makedpnd: ");
+	perror(outfile);
+	outfile[0] = '\0';
 
-	/* now our good friends microblam in there highly advanced and much
-	 * acclaimed version 6.0 compiler don't have a f*cking clue.  they
-	 * don't take argument files, so the only way to pass more than 128
-	 * characters is through the CL enviroment variable, what a hunk of
-	 * sh*t!, since I jammed all the variables into a file earlier, I
-	 * just read them back out and stuff them into the CL enviroment
-	 * variable, not optimal, but since every other type of file I deal
-	 * with works using the argument file this was easier... */
-	case FT_MICROSOFT6:
-	{
-	    long fpos;
-	    int	 len;
-
-	    len = strlen("CL=");
-	    fseek(fp, 0L, SEEK_END);
-	    fpos = ftell(fp);
-	    fseek(fp, 0L, SEEK_SET);
-	    Malloc(cl, fpos + len + 1, char *);
-	    strcpy(cl, "CL=");
-	    fread(cl + len, 1, fpos, fp);
-	    cl[fpos + len] = '\0';
-	    putenv(cl);
-	    fclose(fp);
+	return outfile;
 	}
-#ifdef _LINUX
-	case FT_UI:
-	case FT_BORLAND: /* no redirection here */
-#endif
-		/* FALLTHRU! */
-	default:
-	    strcpy(outfile, "TMPXXXXXX");
-#ifdef _LINUX
-	    fd = mkstemp(outfile);
-	    if (fd == -1) {
-		fprintf(stderr, "makedpnd: ");
-		perror(outfile);
-		outfile[0] = '\0';
-
-		return outfile;
-	    }
-	    close(fd);
-	    fptr = open(outfile, O_CREAT | O_RDWR, S_IREAD | S_IWRITE);
+	close(fd);
+	fptr = open(outfile, O_CREAT | O_RDWR, S_IREAD | S_IWRITE);
 #else
-	    mktemp(outfile);
-	    fptr = open(outfile, O_CREAT | O_RDWR, S_IREAD | S_IWRITE);
+	mktemp(outfile);
+	fptr = open(outfile, O_CREAT | O_RDWR, S_IREAD | S_IWRITE);
 #endif
-	    if (!fptr) {
+	if (!fptr) {
 		fprintf(stderr, "makedpnd: ");
 		perror(outfile);
 		outfile[0] = '\0';
-
 		return outfile;
-	    }
-	    fflush(stdout);
-	    oldstdout = dup(STDOUT);	/* save old STDOUT descriptor */
-	    dup2(fptr, STDOUT);	        /* redirect STDOUT to our file */
-	    close(fptr);
-    }
+	}
+
+	fflush(stdout);
+	oldstdout = dup(STDOUT);	/* save old STDOUT descriptor */
+	dup2(fptr, STDOUT);	        /* redirect STDOUT to our file */
+	close(fptr);
+
+	//fprintf(stderr, "DEBUG: %s %s\n", command, cmdline );
 
     *cpid = spawnlp(P_WAIT, command, command, /*cl ? cl+3:*/cmdline, NULL);
 
@@ -707,7 +671,6 @@ ApplyCommand(char    **argv,
 	    break;
 
 	case FT_UI:
-        case FT_BORLAND:
 	case FT_GOC:
 	case FT_ESP:
 	    /* let error go through for makedpnd mode */
