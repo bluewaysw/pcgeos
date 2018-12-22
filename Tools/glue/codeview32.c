@@ -175,8 +175,9 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
 	     * due to upper casing of some names by Watcom C -- mgroeber
  	     */
 	    if (((*bp == namelen) &&
-		(ustrncmp((char *)bp+1, namestr, namelen) == 0)) ||
-		((bp[1] == '_') && (*bp == namelen+1) &&
+		 (ustrncmp((char *)bp+1, namestr, namelen) == 0)) ||
+		((aliasPtr != NULL) &&
+		 (bp[1] == '_') && (*bp == namelen+1) &&
 		 (strncmp(namestr, (char *)bp+2, namelen) == 0)))
 	    {
 		if (aliasPtr != NULL) {
@@ -191,7 +192,7 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
 			*aliasPtr = ST_Enter(symbols, strings,
 					     (char *)bp+1, *bp);
 
-							 printf("*** %x\r\n", *aliasPtr);
+							 printf("*** %x %s\r\n", *aliasPtr, (char *)bp+1);
 		    } else {
 			*aliasPtr = name;
 		    }
@@ -2967,9 +2968,15 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 			&real, &alias) && real)
 		{
 			os->flags |= OSYM_GLOBAL;
+			/*
+			 * Do not enter alias for variables to avoid
+			 * conflicts between ChunkHandle and chunk in LMem
+			 */
+#if 0
 			if (alias != name) {
-				Sym_Enter(symbols, sd->syms, name, tsymBlock, symOff);
+				Sym_Enter(symbols, sd->syms, alias, tsymBlock, symOff);
 			}
+#endif
 		}
 		else if ((sd->combine == SEG_LMEM) &&
 			(MSObj_GetLMemSegOrder(sd) == 1))
@@ -4116,20 +4123,6 @@ CV32_Check(const char *file,
 	case MO_PUBDEF:
 	printf("MO_PUBDEF\r\n");
 	    if (pass == 1) {
-		GroupDesc *gd;
-		SegDesc *sd;
-
-		/*
-		 * Watcom C: Fixup targets in LMem heaps need to be entered
-		 * in pass 1 already so they are available for LMem layout.
-		 */
-		gd = MSObj_GetGroup(&bp);
-		sd = MSObj_GetSegment(&bp);
-		if ((sd->combine == SEG_LMEM) &&
-		    (MSObj_GetLMemSegOrder(sd) == LMEM_HEAP))
-		{
-		    return(FALSE);
-		}
 		MSObj_SaveRecord(rectype, reclen, &pubHead);
 	    }
 	    break;
