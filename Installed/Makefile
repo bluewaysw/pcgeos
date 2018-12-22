@@ -302,7 +302,7 @@ Installed/Library/SSMeta:	ui math MAKELIB
 
 # bsnwav will only be compiled (and is only referenced in WAV) if PRODUCT==NDO2000
 wav	: Installed/Library/Wav
-Installed/Library/Wav:	sound bsnwav MAKELIB
+Installed/Library/Wav:	sound MAKELIB
 
 game	: Installed/Library/Game
 Installed/Library/Game:	ui wav MAKELIB
@@ -1623,13 +1623,13 @@ prefsndn	: Installed/Library/Pref/Prefsndn
 Installed/Library/Pref/Prefsndn:		ui ansic config sound MAKELIB
 
 # BestSound - supplemental sound API.
-bestsnd	: bsnwav mixlib bsd16 bsd8st bsqp sndchk
+bestsnd	: mixlib bsd16 bsd8st bsqp sndchk
 
-bsnwav	: Installed/Library/Audio/BSNWav
-Installed/Library/Audio/BSNWav:			kernel MAKELIB
+#bsnwav	: Installed/Library/Audio/BSNWav
+#Installed/Library/Audio/BSNWav:			kernel MAKELIB
 
 mixlib	: Installed/Library/Audio/MixLib
-Installed/Library/Audio/MixLib:			bsnwav sound ui ansic MAKELIB
+Installed/Library/Audio/MixLib:			sound ui ansic MAKELIB
 
 bsd16	: Installed/Driver/Sound/BSD16
 Installed/Driver/Sound/BSD16:			stream MAKEDRV
@@ -1638,10 +1638,10 @@ bsd8st	: Installed/Driver/Sound/BSD8ST
 Installed/Driver/Sound/BSD8ST:			stream MAKEDRV
 
 bsqp	: Installed/Appl/Audio/Bsqp
-Installed/Appl/Audio/Bsqp:			bsnwav ansic ui MAKEDRV
+Installed/Appl/Audio/Bsqp:			ansic ui MAKEDRV
 
 sndchk	: Installed/Appl/Audio/SndChk
-Installed/Appl/Audio/SndChk:			bsnwav wav ansic ui MAKEAPPL
+Installed/Appl/Audio/SndChk:			wav ansic ui MAKEAPPL
 
 # MP3 - audio format decoder
 mp3snd	: mp3 mp3play
