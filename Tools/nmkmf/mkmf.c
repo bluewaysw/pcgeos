@@ -1319,7 +1319,7 @@ MkmfScanForRdfIncludesCallback(FILE *stream,
 	     */
 	    cp = buf;
 	    while(*cp) {
-		*cp = (char) toupper(*cp);
+		*cp = (char) /*toupper*/(*cp);
 		cp++;
 	    }
 #endif /* defined(_WIN32) */
@@ -1327,7 +1327,7 @@ MkmfScanForRdfIncludesCallback(FILE *stream,
 	     * If unix, just set the suffix to .UI
 	     */
 	    cp = strrchr(buf, '.');
-	    strcpy(cp, ".UI");
+	    strcpy(cp, ".ui");
 #endif /* defined(_MSDOS) */
 	    /*
 	     * Add the .ui file to the rdfFiles list.
@@ -1621,13 +1621,13 @@ MkmfScanForAsmIncludesCallback(FILE *stream,
 #    else /* _WIN32 */
 	    /* don't need to truncate to 8.3, but we do upcase */
 	    while (*cp && *cp != '.') {
-		*cp = (char) toupper(*cp);
+		*cp = (char) /*toupper*/(*cp);
 		cp++;
 	    }
 #    endif /* defined(_MSDOS) */
 	    
 	    if (*cp != '\0') {
-		strcpy(cp, ".ASM");
+		strcpy(cp, ".asm");
 	    }
 
 #endif /* !defined(unix) */
@@ -2128,7 +2128,15 @@ MkmfPrintPRODUCTS (FILE *outFile)
 {
     DIR           *dir;
     struct dirent *dp;
-
+    char    installedDir[MAX_PATH_LENGTH];
+    char    cwd[MAX_PATH_LENGTH];
+    
+    Compat_GetCwd(cwd, MAX_PATH_LENGTH);
+    sprintf(installedDir,
+	    "%s/%s",
+	    rootDir,
+	    Compat_GetTrailingPath(finalRootComponent, cwd));
+	    
     if ((dir = opendir(".")) == NULL) {
 	fprintf(stderr, "mkmf: \".\": ");
 	perror("");
@@ -2139,11 +2147,15 @@ MkmfPrintPRODUCTS (FILE *outFile)
 	if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0) {
 	    DIR  *subDir;
 
-	    if ((subDir = opendir(dp->d_name)) != NULL) {
+    	    if ((subDir = opendir(dp->d_name)) != NULL) {
 		char  file[MAX_PATH_LENGTH];
+		char  fileInstalled[MAX_PATH_LENGTH];
 		
 		sprintf(file, "%s/is_a_product", dp->d_name);
-		if (FILE_EXISTS(file)) {
+		sprintf(fileInstalled, "%s/%s/is_a_product", 
+						installedDir, dp->d_name);
+
+		if (FILE_EXISTS(file) || FILE_EXISTS(fileInstalled)) {
 		    if (strlen(products) == 1023) {
 			fprintf(stderr,
 				"mkmf: error: product definition exceeds 1024"
@@ -2301,9 +2313,11 @@ main(int argc, char **argv)
     Lst	    subdirs;
     Lst	    modules;
     char    *cp;
+    char    *cp2;
     char    *oldcp;
     char    branchFile[MAX_PATH_LENGTH] = {0};
     char    cwd[MAX_PATH_LENGTH];
+    char    geode[MAX_PATH_LENGTH];
     Lst	    geodeName;
     int	    args;
     char   *envRootDir;
@@ -2469,14 +2483,17 @@ main(int argc, char **argv)
     }
     
     oldcp = cp;
+    cp2 = geode;
     while(*cp) {
-	*cp = (char) tolower(*cp);
+	*cp2 = (char) tolower(*cp);
+	cp2++;
 	cp++;
     }
+    *cp2 = 0;
     cp = oldcp;
     
     geodeName = Lst_Init(FALSE);
-    (void)Lst_AtEnd(geodeName, (ClientData)(cp + 1));
+    (void)Lst_AtEnd(geodeName, (ClientData)(geode + 1));
     MkmfAddVar("GEODE", geodeName);
     
     /*
