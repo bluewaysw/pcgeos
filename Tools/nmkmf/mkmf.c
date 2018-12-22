@@ -1103,7 +1103,7 @@ MkmfConvertToModuleVar(ClientData datum)
      * as necessary.
      */
     while (*cp1 != '\0') {
-	*cp2++ = (char) toupper(*cp1);
+	*cp2++ = *cp1;
 	cp1 += 1;
     }
 
@@ -1313,21 +1313,11 @@ MkmfScanForRdfIncludesCallback(FILE *stream,
 		strcpy(cp, ".UI");
 	    }
 #else
-#if defined(_WIN32)
 	    /*
-	     * don't need to truncate to 8.3 like in DOS, but upcase alphas
-	     */
-	    cp = buf;
-	    while(*cp) {
-		*cp = (char) toupper(*cp);
-		cp++;
-	    }
-#endif /* defined(_WIN32) */
-	    /*
-	     * If unix, just set the suffix to .UI
+	     * If unix, or win32 just set the suffix to .UI
 	     */
 	    cp = strrchr(buf, '.');
-	    strcpy(cp, ".UI");
+	    strcpy(cp, ".ui");
 #endif /* defined(_MSDOS) */
 	    /*
 	     * Add the .ui file to the rdfFiles list.
@@ -1493,7 +1483,7 @@ MkmfCreateLargeModel(Lst    modules)	    /* List of directories
 	     */
 	    varName = (char *)malloc(strlen(subdir) + 1);
 	    for (cp1 = subdir, cp2 = varName; *cp1 != '\0'; cp1++) {
-		*cp2++ = (char) toupper(*cp1);
+		*cp2++ = (char) *cp1;
 	    }
 	    *cp2 = '\0';
 	    /*
@@ -1621,13 +1611,12 @@ MkmfScanForAsmIncludesCallback(FILE *stream,
 #    else /* _WIN32 */
 	    /* don't need to truncate to 8.3, but we do upcase */
 	    while (*cp && *cp != '.') {
-		*cp = (char) toupper(*cp);
 		cp++;
 	    }
 #    endif /* defined(_MSDOS) */
 	    
 	    if (*cp != '\0') {
-		strcpy(cp, ".ASM");
+		strcpy(cp, ".asm");
 	    }
 
 #endif /* !defined(unix) */
