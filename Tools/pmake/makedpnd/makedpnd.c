@@ -1477,10 +1477,16 @@ GetDependsFromCppOutput_Uicpp(FILE *depfile, char *filename)
     }
 
     /* first get the first line, this is the name of the source file */
+    /* file.o : file.cpp => 3 elements to skip */
     i = 0;
     c = ScanNextWord(fp, buf, &i);  /* scan in filename */
+    buf[i]=0;
     i = 0;
     c = ScanNextWord(fp, buf, &i);  /* scan in filename */
+    buf[i]=0;
+    i = 0;
+    c = ScanNextWord(fp, buf, &i);  /* scan in filename */
+    buf[i]=0;
 
 
     lasti = 0;
