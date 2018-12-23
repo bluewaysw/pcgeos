@@ -1571,26 +1571,24 @@ MSObjMapExternal(const char	*file,	    /* Name of object file being read */
 {
 	printf("MSObjMapExternal\n"); fflush(stderr);
     if (targMethod == TFM_EXTERNAL) {
-	if (fdataPtr->external & MO_EXT_UNDEFINED) {
-	    /*
-	     * The thing was undefined when it was encountered in its EXTDEF
-	     * record -- bitch now, so we can tell the user where s/he screwed
-	     * up...
-	     */
-	    if (pass == 2)
-	    {
-		FloatingPointExtDef f;
+		if (fdataPtr->external & MO_EXT_UNDEFINED) {
+			/*
+			* The thing was undefined when it was encountered in its EXTDEF
+			* record -- bitch now, so we can tell the user where s/he screwed
+			* up...
+			*/
+			if (pass == 2) {
+				FloatingPointExtDef f;
 
-		f = MSObj_IsFloatingPointExtDef(fdataPtr->external &
-					       	~MO_EXT_UNDEFINED);
+				f = MSObj_IsFloatingPointExtDef(fdataPtr->external &
+									~MO_EXT_UNDEFINED);
 
-		if (f == FPED_FALSE)
-		{
-		    Pass2_RelocError(sd, fixOff, "%i undefined2",
-				 fdataPtr->external & ~MO_EXT_UNDEFINED);
-		}
-		return f;
-	    }
+				if (f == FPED_FALSE) {
+					Pass2_RelocError(sd, fixOff, "%i undefined2",
+						fdataPtr->external & ~MO_EXT_UNDEFINED);
+				}
+			return f;
+			}
 	} else {
 	    ObjSymHeader    *osh;   	/* Header of block holding external */
 	    ObjSym  	    *os;    	/* External symbol */
@@ -1607,27 +1605,24 @@ MSObjMapExternal(const char	*file,	    /* Name of object file being read */
 	    mapBlock = VMGetMapBlock(symbols);
 
 	    if (pass == 1) {
-		/*
-		 * Watcom C: we encounter this type of fixup in pass 1
-		 * when the symbol list still contains references to
-		 * names, not ObjSym records. So we need to look up
-		 * the fixup target ourselves.
-		 */
-		if (!Sym_Find(symbols, 0, fdataPtr->external, &symBlock, &symOff, TRUE)) {
-		    char* str = ST_Lock(symbols, fdataPtr->external);
-		    ID newName = ST_LookupNoLen(symbols, strings, str+1);
-		    ST_Unlock(symbols, fdataPtr->external);
-		    if (newName != NullID) {
-			if (!Sym_Find(symbols, 0, newName, &symBlock, &symOff, TRUE))
-			{
+			/*
+			* Watcom C: we encounter this type of fixup in pass 1
+			* when the symbol list still contains references to
+			* names, not ObjSym records. So we need to look up
+			* the fixup target ourselves.
+			*/
+			if (!Sym_Find(symbols, 0, fdataPtr->external, &symBlock, &symOff, TRUE)) {
+				char* str = ST_Lock(symbols, fdataPtr->external);
+				ID newName = ST_LookupNoLen(symbols, strings, str+1);
+				ST_Unlock(symbols, fdataPtr->external);
+				if (newName != NullID) {
+					if (!Sym_Find(symbols, 0, newName, &symBlock, &symOff, TRUE)) {
+						return FPED_FALSE;
+					}
+				} else {
 				return FPED_FALSE;
+				}
 			}
-		    }
-		    else
-		    {
-			return FPED_FALSE;
-		    }
-		}
 	    }
 
 	    /*

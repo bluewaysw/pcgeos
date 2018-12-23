@@ -174,46 +174,46 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
 	     * 12/4/18: need to bring case-insensitve comparison back
 	     * due to upper casing of some names by Watcom C -- mgroeber
  	     */
-	    if (((*bp == namelen) &&
-		 (ustrncmp((char *)bp+1, namestr, namelen) == 0)) ||
+	    if (((*bp == namelen) && (ustrncmp((char *)bp+1, namestr, namelen) == 0)) ||
 		((aliasPtr != NULL) &&
 		 (bp[1] == '_') && (*bp == namelen+1) &&
-		 (strncmp(namestr, (char *)bp+2, namelen) == 0)))
-	    {
-		if (aliasPtr != NULL) {
-		    /*
-		     * Caller is interested in the alias for the beast. If
-		     * the name in the PUBDEF record differs, enter it into
-		     * the string table.
-		     * XXX: might it just be faster to do the ST_Enter? We'd
-		     * get  name  back if the string's not aliased...
-		     */
-		    if (strncmp((char *)bp+1, namestr, namelen) != 0) {
-			*aliasPtr = ST_Enter(symbols, strings,
-					     (char *)bp+1, *bp);
+		 (strncmp(namestr, (char *)bp+2, namelen) == 0))) {
+			if (aliasPtr != NULL) {
+				/*
+				* Caller is interested in the alias for the beast. If
+				* the name in the PUBDEF record differs, enter it into
+				* the string table.
+				* XXX: might it just be faster to do the ST_Enter? We'd
+				* get  name  back if the string's not aliased...
+				*/
+				if (strncmp((char *)bp+1, namestr, namelen) != 0) {
+				*aliasPtr = ST_Enter(symbols, strings,
+							(char *)bp+1, *bp);
 
-							 printf("*** %x %s\r\n", *aliasPtr, (char *)bp+1);
-		    } else {
-			*aliasPtr = name;
-		    }
+								printf("*** %x %s\r\n", *aliasPtr, (char *)bp+1);
+				} else {
+				*aliasPtr = name;
+				}
+			}
+			ST_Unlock(symbols, name);
+			if (offsetPtr != NULL) {
+				bp += *bp + 1;
+				MSObj_GetWord(*offsetPtr, bp);
+			}
+			if (sdPtr != NULL) {
+				*sdPtr = sd;
+			}
+			/*
+			* The thing is real only if it it's defined inside a PUBDEF
+			* record.
+			*/
+			if (realPtr != NULL) {
+				*realPtr = ((srp->type == MO_PUBDEF) ||
+						    (srp->type == MO_LPUBDEF1) ||
+							(srp->type == MO_LPUBDEF2));
+			}
+			return(TRUE);
 		}
-		ST_Unlock(symbols, name);
-		if (offsetPtr != NULL) {
-		    bp += *bp + 1;
-		    MSObj_GetWord(*offsetPtr, bp);
-		}
-		if (sdPtr != NULL) {
-		    *sdPtr = sd;
-		}
-		/*
-		 * The thing is real only if it it's defined inside a PUBDEF
-		 * record.
-		 */
-		if (realPtr != NULL) {
-		    *realPtr = (srp->type == MO_PUBDEF);
-		}
-		return(TRUE);
-	    }
 
 	    /*
 	     * Skip string and offset, then skip over
@@ -2756,7 +2756,7 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 	MSObj_GetWord(len, bp);
 	base = bp;
 	MSObj_GetWord(recType, bp);
-	printf("recType: %d\n", recType); fflush(stdout);
+	printf("recType: 0x%x\n", recType); fflush(stdout);
 	switch(recType) {
 	case CST2_END:
 	{
@@ -2855,23 +2855,8 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 			bp = base + len;
 		}
 		else {
-			/*
-			* XXX: MetaWare puts out the offset of the block start
-			* plus the offset of the procedure, here, so as a hack,
-			* until we support something else with codeview symbols,
-			* subtract off the offset of the procedure
-			*/
 			int	    i;
 			word	blockSeg;
-
-			for (i = scopeTop - 1; i >= 0; i--) {
-				if (((ObjSym *)(symBase + scopeStack[i]))->type ==
-					OSYM_PROC)
-				{
-					extraOffset -= ((ObjSym *)(symBase + scopeStack[i]))->u.proc.address;
-					break;
-				}
-			}
 
 			os = CV32AllocLocalSym(symBlock, mem, scopeStack[scopeTop - 1],
 				&lastLocal, &symBase);
@@ -2972,11 +2957,9 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 			 * Do not enter alias for variables to avoid
 			 * conflicts between ChunkHandle and chunk in LMem
 			 */
-#if 0
 			if (alias != name) {
 				Sym_Enter(symbols, sd->syms, alias, tsymBlock, symOff);
 			}
-#endif
 		}
 		else if ((sd->combine == SEG_LMEM) &&
 			(MSObj_GetLMemSegOrder(sd) == 1))
@@ -3175,7 +3158,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 					scopeStack[scopeTop - 1]);
 			}
 		}
-
 		/*
 		* Enter the symbol into the table for the segment.
 		*/
