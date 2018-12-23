@@ -16,4 +16,4 @@ Document is work in progress.... stay tuned!
 
 # Collaboration
 
-We are on https://bluewaysw.slack.com/ for more efficient collaboration. If you are an collaborator by issuing an pull request and you are registered at blog.bluewaysw.de for MyGEOS you will be invided to join us. Welcome!
+We are on https://bluewaysw.slack.com/ for more efficient collaboration. If you are a collaborator by issuing a pull request and you are registered at blog.bluewaysw.de for MyGEOS you will be invited to join us. Welcome!
