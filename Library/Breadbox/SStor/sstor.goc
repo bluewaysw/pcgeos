@@ -40,6 +40,22 @@
 
 #endif
 
+#ifdef __WATCOMC__
+
+#ifndef PUSHDS
+void _PUSHDS();
+#pragma aux _PUSHDS = "push ds";
+#define PUSHDS  _PUSHDS();
+#endif
+
+#ifndef POPDS
+void _POPDS();
+#pragma aux _POPDS = "pop ds";
+#define POPDS   _POPDS();
+#endif
+
+#endif
+
 #ifndef SET_DS_LIB_DGROUP
 #define SET_DS_LIB_DGROUP GeodeLoadDGroup (GeodeGetCodeProcessHandle())
                                 /* destroys ds! */
@@ -557,8 +573,8 @@ void DirGetEntry(StgStream ds, SID sid, StructuredStorageDirectoryEntry *pDir)
 {
     StgStreamStruct *pDS = SStreamLock(ds);
 
-    if (!SStreamSeek(pDS, (dword)sid * SSDE_PADDED_SIZE))
-        SStreamRead(pDS, pDir, sizeof(StructuredStorageDirectoryEntry));
+    if (!SStreamSeek(pDS, (dword) sid * SSDE_PADDED_SIZE))
+        SStreamRead(pDS, (byte*) pDir, sizeof(StructuredStorageDirectoryEntry));
 
     SStreamUnlock(pDS);
 }
@@ -618,7 +634,7 @@ StgError StorageFindDirEntry(StgStorage stg, char *name,
 
                     if (diff == 0)
                         /* The secondary sort is by string comparison. */
-                        diff = DirNameCmp(name, pDir->SSDE_ab,
+                        diff = DirNameCmp(name, (wchar*) pDir->SSDE_ab,
                           pDir->SSDE_cb - 2);
                     if (diff < 0)
                         sid = pDir->SSDE_sidLeftSib;
@@ -1230,7 +1246,7 @@ SECT SStreamReadMiniFat(struct _StgStreamStruct *ps, SECT s)
     SECT retval = FREESECT;
 
     if (!SStreamSeek(ps, s * sizeof(SECT)))
-        SStreamRead(ps, &retval, sizeof(SECT));
+        SStreamRead(ps, (byte*) &retval, sizeof(SECT));
     return retval;
 }
 

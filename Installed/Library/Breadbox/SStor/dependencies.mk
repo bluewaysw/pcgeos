@@ -1,9 +1,7 @@
-SSTOR.obj \
-SSTOR.eobj: 
-SSTOR.obj \
-SSTOR.eobj: SSTOR.GOC GEOS.H  \
-                HEAP.H FILE.H LMEM.H \
-                CHUNKARR.H OBJECT.H GEODE.H EC.H RESOURCE.H ANSI/STRING.H \
-                SSTOR.H INTSSTOR.H
+sstor.obj \
+sstor.eobj: 
+sstor.obj \
+sstor.eobj: geos.h heap.h file.h lmem.h chunkarr.h object.h geode.h \
+                ec.h resource.h Ansi/string.h sstor.h intsstor.h
 
-SStorEC.geo SStor.geo : GEOS.LDF ANSIC.LDF 
+sstorEC.geo sstor.geo : geos.ldf ansic.ldf 
