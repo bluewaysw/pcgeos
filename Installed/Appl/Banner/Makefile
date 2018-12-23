@@ -3,10 +3,10 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Banner
+GEODE           = banner
 ASM_TO_OBJS     = banner.asm
-UI_TO_RDFS      = BANNER.UI
-SRCS            = banner.asm bannerDraw.asm bannerPrint.asm bannerUI.asm\
+UI_TO_RDFS      = banner.ui
+SRCS            = bannerPrint.asm banner.asm bannerDraw.asm bannerUI.asm\
                   bannerConstants.def banner.ui
 OBJS            = banner.obj
 LOBJS           =

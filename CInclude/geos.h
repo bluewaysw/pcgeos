@@ -277,6 +277,18 @@ typedef struct _ClassStruct ClassStruct;
 # define SegmentOf(ptr) 	((Segment) (void __seg *)(void __far *)(ptr))
 # define PtrToOffset(ptr) 	((word) (ptr))
 
+#else 
+#if defined(__WATCOMC__)
+
+# define OptrToHandle(op) ((MemHandle) ((op) >> 16))
+# define OptrToChunk(op) ((ChunkHandle) (op))
+
+# define ConstructOptr(han,ch) ((((optr) (han)) << 16) | ((dword) (ch)))
+
+# define PtrToSegment(ptr) 	((Segment) (((dword) (ptr)) >> 16))
+# define SegmentOf(ptr) 		((Segment) (((dword) (ptr)) >> 16))
+# define PtrToOffset(ptr) 	((word) ((dword) (ptr)))
+
 #else
 
   /*
@@ -290,6 +302,7 @@ typedef struct _ClassStruct ClassStruct;
 # define PtrToSegment(ptr) 	((Segment) (((dword) (ptr)) >> 16))
 # define SegmentOf(ptr) 		((Segment) (((dword) (ptr)) >> 16))
 # define PtrToOffset(ptr) 	((word) ((dword) (ptr)))
+#endif
 #endif
 
 /* The following macros are obsolete. */

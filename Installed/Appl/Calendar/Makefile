@@ -3,45 +3,45 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Calendar
-ALARM           = alarmAlarm.asm alarmManager.asm alarmReminder.asm
-DAYEVENT        = dayeventAlarm.asm dayeventDraw.asm dayeventMain.asm\
-                  dayeventManager.asm dayeventMisc.asm\
-                  dayeventSentToList.asm
-DAYPLAN         = dayplanApi.asm dayplanBuffer.asm dayplanInit.asm\
-                  dayplanMailbox.asm dayplanMain.asm dayplanManager.asm\
-                  dayplanPreference.asm dayplanPrint.asm dayplanRange.asm\
-                  dayplanUtils.asm
-HOLIDAY         = holidayData.asm holidayFile.asm holidayManager.asm\
-                  holidaySetting.asm holidayUtils.asm
-MAIN            = mainAddressCtrl.asm mainApi.asm mainApp.asm\
-                  mainBookEvent.asm mainCalc.asm mainCalendar.asm\
-                  mainConfirmDlg.asm mainDatabase.asm mainEventsContent.asm\
-                  mainFile.asm mainGeometry.asm mainMailbox.asm\
-                  mainManager.asm mainMenu.asm mainRecvEvent.asm\
-                  mainUndo.asm mainUpdateEvent.asm mainUtils.asm\
-                  mainVersitStrings.asm mainMailbox.def
-MISC            = miscCustomSpin.asm miscDateArrows.asm miscManager.asm\
-                  miscMonthValue.asm miscPrint.asm miscSearch.asm
-REPEAT          = repeatCreate.asm repeatDatabase.asm repeatDynamic.asm\
-                  repeatGenerate.asm repeatManager.asm repeatTable.asm\
-                  repeatUtils.asm
-UI              = uiManager.asm uiDialog.ui uiMain.ui uiManager.ui\
-                  uiMenu.ui uiStrings.ui
-WEEK            = weekDateTextContent.asm weekEventTextContentClass.asm\
-                  weekManager.asm weekScheduleContentClass.asm\
-                  weekViewInteractionClass.asm
-YEAR            = yearManager.asm yearMonth.asm yearYearMain.asm\
-                  yearYearMouse.asm yearYearPrint.asm
-UI_TO_RDFS      = UIMANAGER.UI
+GEODE           = calendar
+ALARM           = alarmReminder.asm alarmManager.asm alarmAlarm.asm
+DAYEVENT        = dayeventManager.asm dayeventAlarm.asm\
+                  dayeventSentToList.asm dayeventMisc.asm dayeventDraw.asm\
+                  dayeventMain.asm
+UI              = uiManager.asm uiStrings.ui uiDialog.ui uiMenu.ui\
+                  uiManager.ui uiMain.ui
+MAIN            = mainManager.asm mainEventsContent.asm mainApi.asm\
+                  mainDatabase.asm mainApp.asm mainFile.asm\
+                  mainConfirmDlg.asm mainUndo.asm mainMenu.asm mainCalc.asm\
+                  mainAddressCtrl.asm mainUtils.asm mainVersitStrings.asm\
+                  mainUpdateEvent.asm mainBookEvent.asm mainMailbox.asm\
+                  mainRecvEvent.asm mainGeometry.asm mainCalendar.asm\
+                  mainMailbox.def
+YEAR            = yearYearMouse.asm yearYearMain.asm yearYearPrint.asm\
+                  yearMonth.asm yearManager.asm
+WEEK            = weekManager.asm weekScheduleContentClass.asm\
+                  weekViewInteractionClass.asm weekDateTextContent.asm\
+                  weekEventTextContentClass.asm
+REPEAT          = repeatManager.asm repeatCreate.asm repeatDynamic.asm\
+                  repeatUtils.asm repeatDatabase.asm repeatTable.asm\
+                  repeatGenerate.asm
+MISC            = miscPrint.asm miscSearch.asm miscMonthValue.asm\
+                  miscCustomSpin.asm miscDateArrows.asm miscManager.asm
+DAYPLAN         = dayplanBuffer.asm dayplanMailbox.asm dayplanInit.asm\
+                  dayplanPreference.asm dayplanUtils.asm dayplanManager.asm\
+                  dayplanApi.asm dayplanPrint.asm dayplanMain.asm\
+                  dayplanRange.asm
+HOLIDAY         = holidayFile.asm holidayManager.asm holidayUtils.asm\
+                  holidaySetting.asm holidayData.asm
+UI_TO_RDFS      = uiManager.ui
 OBJS            =
-COMMON          = calendarConstant.def calendarGeode.def calendarGlobal.def\
-                  calendarMacro.def data.def
-MODULES         = Alarm DayEvent DayPlan Holiday Main Misc Repeat UI Week\
-                  Year
+COMMON          = calendarConstant.def calendarGlobal.def calendarMacro.def\
+                  calendarGeode.def data.def
+MODULES         = Alarm DayEvent UI Main Year Week Repeat Misc DayPlan\
+                  Holiday
 CMODULES        =
-SRCS            = $(ALARM) $(DAYEVENT) $(DAYPLAN) $(HOLIDAY) $(MAIN)\
-                  $(MISC) $(REPEAT) $(UI) $(WEEK) $(YEAR) $(COMMON)
+SRCS            = $(ALARM) $(DAYEVENT) $(UI) $(MAIN) $(YEAR) $(WEEK)\
+                  $(REPEAT) $(MISC) $(DAYPLAN) $(HOLIDAY) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

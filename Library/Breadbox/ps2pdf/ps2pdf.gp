@@ -28,7 +28,7 @@ library ui
 library ansic
 library text
 
-resource STRINGS data object
+resource Strings data object
 
 
 export CONVERTTOPDF

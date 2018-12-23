@@ -1,365 +1,373 @@
-ALARM.obj \
-ALARM.eobj: Alarm/AlarmMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF SOUND.DEF DRIVER.DEF \
-                INTERNAL/SOUNDFMT.DEF INTERNAL/SEMINT.DEF RTCM.DEF \
-                ALARMALARM.ASM ALARMREMINDER.ASM
-DAYEVENT.obj \
-DAYEVENT.eobj: DayEvent/DayEventMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF DAYEVENTALARM.ASM DAYEVENTDRAW.ASM \
-                SYSTEM.DEF DAYEVENTMAIN.ASM DAYEVENTMISC.ASM \
-                DAYEVENTSENTTOLIST.ASM
-DAYPLAN.obj \
-DAYPLAN.eobj: DayPlan/DayPlanMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF INITFILE.DEF DAYPLANINIT.ASM \
-                DAYPLANBUFFER.ASM DAYPLANMAIN.ASM FOAM.DEF \
-                INTERNAL/RSPCOLOR.DEF DAYPLANRANGE.ASM DAYPLANPRINT.ASM \
-                DAYPLANPREFERENCE.ASM DAYPLANMAILBOX.ASM DAYPLANAPI.ASM \
-                DAYPLANUTILS.ASM
-HOLIDAY.obj \
-HOLIDAY.eobj: Holiday/HolidayMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF
-MAIN.obj \
-MAIN.eobj: Main/MainMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF SYSTEM.DEF ROLODEX.DEF INITFILE.DEF \
-                MAINMAILBOX.DEF INTERNAL/GSTATE.DEF INTERNAL/TMATRIX.DEF \
-                INTERNAL/FONTDR.DEF DRIVER.DEF MAINAPP.ASM MAINCALC.ASM \
-                DATA.DEF MAINCALENDAR.ASM MAINDATABASE.ASM MAINFILE.ASM \
-                MAINGEOMETRY.ASM MAINUNDO.ASM MAINUTILS.ASM \
-                MAINMAILBOX.ASM MAINVERSITSTRINGS.ASM MAINBOOKEVENT.ASM \
-                MAINRECVEVENT.ASM MAINEVENTSCONTENT.ASM \
-                MAINCONFIRMDLG.ASM MAINADDRESSCTRL.ASM MAINMENU.ASM \
-                MAINAPI.ASM MAINUPDATEEVENT.ASM
-MISC.obj \
-MISC.eobj: Misc/MiscMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF SYSTEM.DEF INITFILE.DEF \
-                MISCCUSTOMSPIN.ASM MISCDATEARROWS.ASM MISCMONTHVALUE.ASM \
-                MISCPRINT.ASM MISCSEARCH.ASM
-REPEAT.obj \
-REPEAT.eobj: Repeat/RepeatMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF REPEATCREATE.ASM REPEATDATABASE.ASM \
-                REPEATDYNAMIC.ASM REPEATGENERATE.ASM REPEATTABLE.ASM \
-                REPEATUTILS.ASM
+Alarm.obj \
+Alarm.eobj: Alarm/alarmManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def sound.def driver.def \
+                Internal/soundFmt.def Internal/semInt.def rtcm.def \
+                alarmAlarm.asm alarmReminder.asm
+DayEvent.obj \
+DayEvent.eobj: DayEvent/dayeventManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def dayeventAlarm.asm dayeventDraw.asm \
+                system.def dayeventMain.asm dayeventMisc.asm \
+                dayeventSentToList.asm
 UI.obj \
-UI.eobj: UI/UIMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF UIMANAGER.RDEF
-WEEK.obj \
-WEEK.eobj: Week/WeekMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF OBJECTS/INPUTC.DEF \
-                WEEKVIEWINTERACTIONCLASS.ASM WEEKDATETEXTCONTENT.ASM \
-                WEEKSCHEDULECONTENTCLASS.ASM \
-                WEEKEVENTTEXTCONTENTCLASS.ASM
-YEAR.obj \
-YEAR.eobj: Year/YearMANAGER.ASM \
-                CALENDARGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                DBASE.DEF ASSERT.DEF DISK.DEF DRIVE.DEF UI.DEF VM.DEF \
-                INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF RULER.DEF OBJECTS/COLORC.DEF \
-                OBJECTS/STYLES.DEF CONFIG.DEF CALENDARCONSTANT.DEF \
-                PRODUCT.DEF CALENDAR.DEF CALENDARGLOBAL.DEF \
-                CALENDARMACRO.DEF OBJECTS/INPUTC.DEF YEARMONTH.ASM \
-                YEARYEARMAIN.ASM YEARYEARMOUSE.ASM YEARYEARPRINT.ASM
-UIMANAGER.rdef: 
+UI.eobj: UI/uiManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def uiManager.rdef
+Main.obj \
+Main.eobj: Main/mainManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def system.def rolodex.def initfile.def \
+                mainMailbox.def Internal/gstate.def Internal/tmatrix.def \
+                Internal/fontDr.def driver.def mainApp.asm mainCalc.asm \
+                data.def mainCalendar.asm mainDatabase.asm mainFile.asm \
+                mainGeometry.asm mainUndo.asm mainUtils.asm \
+                mainMailbox.asm mainVersitStrings.asm mainBookEvent.asm \
+                mainRecvEvent.asm mainEventsContent.asm \
+                mainConfirmDlg.asm mainAddressCtrl.asm mainMenu.asm \
+                mainApi.asm mainUpdateEvent.asm
+Year.obj \
+Year.eobj: Year/yearManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def Objects/inputC.def yearMonth.asm \
+                yearYearMain.asm yearYearMouse.asm yearYearPrint.asm
+Week.obj \
+Week.eobj: Week/weekManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def Objects/inputC.def \
+                weekViewInteractionClass.asm weekDateTextContent.asm \
+                weekScheduleContentClass.asm \
+                weekEventTextContentClass.asm
+Repeat.obj \
+Repeat.eobj: Repeat/repeatManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def repeatCreate.asm repeatDatabase.asm \
+                repeatDynamic.asm repeatGenerate.asm repeatTable.asm \
+                repeatUtils.asm
+Misc.obj \
+Misc.eobj: Misc/miscManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def system.def initfile.def \
+                miscCustomSpin.asm miscDateArrows.asm miscMonthValue.asm \
+                miscPrint.asm miscSearch.asm
+DayPlan.obj \
+DayPlan.eobj: DayPlan/dayplanManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def initfile.def dayplanInit.asm \
+                dayplanBuffer.asm dayplanMain.asm foam.def \
+                Internal/rspcolor.def dayplanRange.asm dayplanPrint.asm \
+                dayplanPreference.asm dayplanMailbox.asm dayplanApi.asm \
+                dayplanUtils.asm
+Holiday.obj \
+Holiday.eobj: Holiday/holidayManager.asm \
+                calendarGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                dbase.def assert.def disk.def drive.def ui.def vm.def \
+                input.def hwr.def Objects/processC.def Objects/metaC.def \
+                chunkarr.def geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def \
+                Objects/Text/tCtrlC.def ruler.def Objects/colorC.def \
+                Objects/styles.def config.def calendarConstant.def \
+                product.def calendar.def calendarGlobal.def \
+                calendarMacro.def
+uiManager.rdef: Internal/prodFeatures.uih generic.uih product.uih \
+                spool.uih config.uih Objects/colorC.uih ink.uih \
+                Objects/Text/tCtrl.uih ruler.uih Objects/styles.uih \
+                gpcCalendarSC.ui gpcCalendarDocSC.ui gpcCalendarTC.ui \
+                gpcCalendarDocTC.ui UI/uiMain.ui UI/uiMenu.ui \
+                UI/uiDialog.ui usrLevel.uih UI/uiStrings.ui \
+                alarmIconOn.ui alarmIconOff.ui repeatIcon.ui
+
+geoplanEC.geo geoplan.geo : geos.ldf ui.ldf text.ldf spool.ldf config.ldf pen.ldf 

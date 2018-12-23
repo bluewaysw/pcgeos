@@ -3,20 +3,20 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = BigCalc
+GEODE           = bigcalc
 ASM_TO_OBJS     = bigcalcDCtrl.asm bigcalcMainCode.asm
-UI_TO_RDFS      = BIGCALCMAIN.UI
-SRCS            = bigcalcApplication.asm bigcalcBuildFixedArgsPCF.asm\
-                  bigcalcBuildPCF.asm bigcalcBuildVariableArgsPCF.asm\
-                  bigcalcCalc.asm bigcalcDCtrl.asm bigcalcFiniteState.asm\
+UI_TO_RDFS      = bigcalcMain.ui
+SRCS            = bigcalcCalc.asm bigcalcProcess.asm bigcalcMath.asm\
+                  bigcalcPCF.asm bigcalcFiniteState.asm bigcalcDCtrl.asm\
+                  bigcalcVariableArgsPCF.asm bigcalcBuildPCF.asm\
+                  bigcalcApplication.asm bigcalcMemory.asm\
+                  bigcalcUnaryCvt.asm bigcalcBuildFixedArgsPCF.asm\
+                  bigcalcBuildVariableArgsPCF.asm bigcalcMainCode.asm\
                   bigcalcFixedArgsPCF.asm bigcalcHolder.asm\
-                  bigcalcMainCode.asm bigcalcMath.asm bigcalcMemory.asm\
-                  bigcalcPCF.asm bigcalcProcess.asm bigcalcUnaryCvt.asm\
-                  bigcalcVariableArgsPCF.asm bigcalcCalc.def\
-                  bigcalcMain.def bigcalcMath.def bigcalcPCF.def\
-                  bigcalcProcess.def ROADMAP.def bigcalcCalc.ui\
-                  bigcalcData.ui bigcalcExtraMain.ui bigcalcMain.ui\
-                  bigcalcMath.ui bigcalcPCF.ui bigcalcTemplate.ui
+                  bigcalcProcess.def bigcalcMain.def bigcalcCalc.def\
+                  bigcalcMath.def ROADMAP.def bigcalcPCF.def bigcalcMain.ui\
+                  bigcalcCalc.ui bigcalcTemplate.ui bigcalcMath.ui\
+                  bigcalcData.ui bigcalcExtraMain.ui bigcalcPCF.ui
 OBJS            = bigcalcDCtrl.obj bigcalcMainCode.obj
 LOBJS           =
 
