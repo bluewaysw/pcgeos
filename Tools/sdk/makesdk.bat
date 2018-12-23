@@ -9,6 +9,8 @@ mkdir %SDK_TARGET%\Include\Appl\SDK_C\
 mkdir %SDK_TARGET%\Include\Appl\SDK_Asm\
 mkdir %SDK_TARGET%\Include\Library\SDK_C\
 mkdir %SDK_TARGET%\Tools\swat\lib.new\
+mkdir %SDK_TARGET%\bin\
+
 xcopy /s %ROOT_DIR%\Installed\*.geo %SDK_TARGET%\Installed\ 
 xcopy /s %ROOT_DIR%\Installed\*.sym %SDK_TARGET%\Installed\
 xcopy /s %ROOT_DIR%\Installed\*.gym %SDK_TARGET%\Installed\
@@ -20,6 +22,8 @@ xcopy /s %ROOT_DIR%\Installed\Include\*.ldf %SDK_TARGET%\Installed\Include\
 
 xcopy %ROOT_DIR%\Include\*.* %SDK_TARGET%\Include\ 
 xcopy %ROOT_DIR%\CInclude\*.* %SDK_TARGET%\CInclude\ 
+xcopy %ROOT_DIR%\bin\*.* %SDK_TARGET%\bin\
+
 xcopy /s %ROOT_DIR%\CInclude\Objects\*.* %SDK_TARGET%\CInclude\Objects\
 xcopy /s %ROOT_DIR%\CInclude\Mailbox\*.* %SDK_TARGET%\CInclude\Mailbox\
 xcopy /s %ROOT_DIR%\Include\Mailbox\*.* %SDK_TARGET%\Include\Mailbox\
