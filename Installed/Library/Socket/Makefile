@@ -3,13 +3,13 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Socket
+GEODE           = socket
 ASM_TO_OBJS     = socketManager.asm
 UI_TO_RDFS      =
-SRCS            = socketApi.asm socketCApi.asm socketConnection.asm\
-                  socketControl.asm socketError.asm socketLink.asm\
-                  socketLoad.asm socketManager.asm socketMisc.asm\
-                  socketPacket.asm socketStrategy.asm socketConstant.def\
+SRCS            = socketCApi.asm socketError.asm socketStrategy.asm\
+                  socketPacket.asm socketLink.asm socketLoad.asm\
+                  socketConnection.asm socketMisc.asm socketManager.asm\
+                  socketControl.asm socketApi.asm socketConstant.def\
                   socketMacro.def
 OBJS            = socketManager.obj
 LOBJS           =

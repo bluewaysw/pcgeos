@@ -3,17 +3,17 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = CSV
-EXPORT          = exportFile.asm exportManager.asm
+GEODE           = csv
+LIB             = libManager.asm libFormat.asm libMain.asm libMain.ui\
+                  libImport.ui libExport.ui
 IMPORT          = importFile.asm importManager.asm
-LIB             = libFormat.asm libMain.asm libManager.asm libExport.ui\
-                  libImport.ui libMain.ui
-UI_TO_RDFS      = LIBMAIN.UI
+EXPORT          = exportFile.asm exportManager.asm
+UI_TO_RDFS      = libMain.ui
 OBJS            =
-COMMON          = csvConstant.def csvGlobal.def
-MODULES         = Export Import Lib
+COMMON          = csvGlobal.def csvConstant.def
+MODULES         = Lib Import Export
 CMODULES        =
-SRCS            = $(EXPORT) $(IMPORT) $(LIB) $(COMMON)
+SRCS            = $(LIB) $(IMPORT) $(EXPORT) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = csv

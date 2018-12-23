@@ -1,538 +1,538 @@
-AXIS.obj \
-AXIS.eobj: Axis/AxisMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF AXISBUILD.ASM AXISGEOMETRY.ASM \
-                AXISPOSITION.ASM AXISREALIZE.ASM AXISATTRS.ASM \
-                AXISLABELS.ASM AXISUTILS.ASM AXISRANGE.ASM AXISFLOAT.ASM \
-                AXISVALUE.ASM AXISCATEGORY.ASM AXISGROBJ.ASM
-CBODY.obj \
-CBODY.eobj: CBody/CBodyMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF CBODYCREATE.ASM CBODYCOMPOSITE.ASM \
-                CBODYGROBJ.ASM CBODYNOTIFY.ASM CBODYRELOCATE.ASM \
-                CBODYSELECT.ASM CBODYSUSPEND.ASM CBODYTARGET.ASM \
-                CBODYTRANSFER.ASM CBODYUI.ASM
-CCOMP.obj \
-CCOMP.eobj: CComp/CCompMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF CCOMPCOMPOSITE.ASM CCOMPGEOMETRY.ASM \
-                CCOMPPOSITION.ASM CCOMPUTILS.ASM CCOMPBUILD.ASM \
-                CCOMPREALIZE.ASM CCOMPSTATE.ASM
-CGROBJ.obj \
-CGROBJ.eobj: CGrObj/CGrObjMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF CGROBJRECT.ASM CGROBJSPLINE.ASM
-CGROUP.obj \
-CGROUP.eobj: CGroup/CGroupMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF CGROUPATTRS.ASM CGROUPBUILD.ASM \
-                CGROUPGEOMETRY.ASM CGROUPGROBJ.ASM CGROUPDATA.ASM \
-                CGROUPPOSITION.ASM CGROUPREALIZE.ASM CGROUPSELECT.ASM \
-                CGROUPSTATE.ASM CGROUPUTILS.ASM CGROUPORDER.ASM
-COBJECT.obj \
-COBJECT.eobj: CObject/CObjectMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF COBJECTATTRS.ASM COBJECTBUILD.ASM \
-                COBJECTEVENT.ASM COBJECTGEOMETRY.ASM COBJECTGROBJ.ASM \
-                COBJECTPOSITION.ASM COBJECTREALIZE.ASM COBJECTUTILS.ASM \
-                COBJECTMULTIPLE.ASM COBJECTDUAL.ASM COBJECTNOTIFY.ASM \
-                COBJECTSTATE.ASM
-LEGEND.obj \
-LEGEND.eobj: Legend/LegendMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF LEGENDATTRS.ASM LEGENDBUILD.ASM \
-                LEGENDGEOMETRY.ASM LEGENDSELECT.ASM LEGENDPAIR.ASM \
-                LEGENDITEM.ASM
-MAIN.obj \
-MAIN.eobj: Main/MainMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF MAINCREATE.ASM
-PAREA.obj \
-PAREA.eobj: PArea/PAreaMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF PAREABUILD.ASM PAREAGEOMETRY.ASM \
-                PAREAPOSITION.ASM PAREAREALIZE.ASM
-SERIES.obj \
-SERIES.eobj: Series/SeriesMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF SERIESAREA.ASM SERIESCOLUMN.ASM SERIESDUAL.ASM \
-                SERIESLINE.ASM SERIESPIE.ASM SERIESREALIZE.ASM \
-                SERIESSCATTER.ASM SERIESLEGENDREALIZE.ASM \
-                SERIESGROUPREALIZE.ASM SERIESUTILS.ASM SERIESHIGHLOW.ASM
-SGROUP.obj \
-SGROUP.eobj: SGroup/SGroupMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF SGROUPBUILD.ASM SGROUPGEOMETRY.ASM \
-                SGROUPSELECT.ASM SGROUPFIND.ASM SGROUPRELOCATE.ASM
-TITLE.obj \
-TITLE.eobj: Title/TitleMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF TITLEBUILD.ASM TITLEGEOMETRY.ASM \
-                TITLEREALIZE.ASM TITLEGROBJ.ASM
+Legend.obj \
+Legend.eobj: Legend/legendManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def legendAttrs.asm legendBuild.asm \
+                legendGeometry.asm legendSelect.asm legendPair.asm \
+                legendItem.asm
+Utils.obj \
+Utils.eobj: Utils/utilsManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def utilsFile.asm utilsFloat.asm utilsGrObj.asm \
+                utilsGroup.asm utilsObject.asm utilsStrings.asm \
+                utilsText.asm utilsUI.asm
+Title.obj \
+Title.eobj: Title/titleManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def titleBuild.asm titleGeometry.asm \
+                titleRealize.asm titleGrObj.asm
+Main.obj \
+Main.eobj: Main/mainManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def mainCreate.asm
+CObject.obj \
+CObject.eobj: CObject/cobjectManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def cobjectAttrs.asm cobjectBuild.asm \
+                cobjectEvent.asm cobjectGeometry.asm cobjectGrObj.asm \
+                cobjectPosition.asm cobjectRealize.asm cobjectUtils.asm \
+                cobjectMultiple.asm cobjectDual.asm cobjectNotify.asm \
+                cobjectState.asm
+CGroup.obj \
+CGroup.eobj: CGroup/cgroupManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def cgroupAttrs.asm cgroupBuild.asm \
+                cgroupGeometry.asm cgroupGrObj.asm cgroupData.asm \
+                cgroupPosition.asm cgroupRealize.asm cgroupSelect.asm \
+                cgroupState.asm cgroupUtils.asm cgroupOrder.asm
+CComp.obj \
+CComp.eobj: CComp/ccompManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def ccompComposite.asm ccompGeometry.asm \
+                ccompPosition.asm ccompUtils.asm ccompBuild.asm \
+                ccompRealize.asm ccompState.asm
+Series.obj \
+Series.eobj: Series/seriesManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def seriesArea.asm seriesColumn.asm seriesDual.asm \
+                seriesLine.asm seriesPie.asm seriesRealize.asm \
+                seriesScatter.asm seriesLegendRealize.asm \
+                seriesGroupRealize.asm seriesUtils.asm seriesHighLow.asm
 UI.obj \
-UI.eobj: UI/UIMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF UIMANAGER.RDEF UICONTROL.ASM UITYPE.ASM \
-                UIGROUP.ASM UIAXIS.ASM UIGRID.ASM
-UTILS.obj \
-UTILS.eobj: Utils/UtilsMANAGER.ASM \
-                CHARTGEODE.DEF GEOS.DEF RESOURCE.DEF EC.DEF LIBRARY.DEF \
-                LMEM.DEF VM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                HEAP.DEF WIN.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF GEODE.DEF \
-                OBJECT.DEF GEOWORKS.DEF INTERNAL/PRODFEATURES.DEF \
-                INTERNAL/THREADIN.DEF UI.DEF FILE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF HUGEARR.DEF \
-                DBASE.DEF MATH.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CHART.DEF CHARTCONSTANTS.DEF CHARTMACROS.DEF \
-                CHARTGLOBAL.DEF COBJECT.DEF CCOMP.DEF CGROUP.DEF AXIS.DEF \
-                PAREA.DEF SGROUP.DEF SERIES.DEF LEGEND.DEF TITLE.DEF \
-                CGROBJ.DEF UTILSFILE.ASM UTILSFLOAT.ASM UTILSGROBJ.ASM \
-                UTILSGROUP.ASM UTILSOBJECT.ASM UTILSSTRINGS.ASM \
-                UTILSTEXT.ASM UTILSUI.ASM
-UIMANAGER.rdef: GENERIC.UIH PRODUCT.UIH GROBJ.UIH OBJECTS/COLORC.UIH \
-                OBJECTS/STYLES.UIH BITMAP.UIH CHART.UIH UI/UITEMPLATE.UI \
-                UI/UISTRINGS.UI UI/UITYPE.UI ART/MKRAREA.UI \
-                ART/MKRLINE.UI ART/MKRBAR.UI ART/MKRCOLUMN.UI \
-                ART/MKRPIE.UI ART/MKRSCATTER.UI ART/MKRHIGHLOW.UI \
-                UI/UIGROUP.UI UI/UIAXIS.UI UI/UIGRID.UI
+UI.eobj: UI/uiManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def uiManager.rdef uiControl.asm uiType.asm \
+                uiGroup.asm uiAxis.asm uiGrid.asm
+SGroup.obj \
+SGroup.eobj: SGroup/sgroupManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def sgroupBuild.asm sgroupGeometry.asm \
+                sgroupSelect.asm sgroupFind.asm sgroupRelocate.asm
+CBody.obj \
+CBody.eobj: CBody/cbodyManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def cbodyCreate.asm cbodyComposite.asm \
+                cbodyGrObj.asm cbodyNotify.asm cbodyRelocate.asm \
+                cbodySelect.asm cbodySuspend.asm cbodyTarget.asm \
+                cbodyTransfer.asm cbodyUI.asm
+Axis.obj \
+Axis.eobj: Axis/axisManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def axisBuild.asm axisGeometry.asm \
+                axisPosition.asm axisRealize.asm axisAttrs.asm \
+                axisLabels.asm axisUtils.asm axisRange.asm axisFloat.asm \
+                axisValue.asm axisCategory.asm axisGrObj.asm
+CGrObj.obj \
+CGrObj.eobj: CGrObj/cgrobjManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def cgrobjRect.asm cgrobjSpline.asm
+PArea.obj \
+PArea.eobj: PArea/pareaManager.asm \
+                chartGeode.def geos.def resource.def ec.def library.def \
+                lmem.def vm.def system.def localize.def sllang.def \
+                heap.def win.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def geode.def \
+                object.def geoworks.def Internal/prodFeatures.def \
+                Internal/threadIn.def ui.def file.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def hugearr.def \
+                dbase.def math.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                chart.def chartConstants.def chartMacros.def \
+                chartGlobal.def cobject.def ccomp.def cgroup.def axis.def \
+                parea.def sgroup.def series.def legend.def title.def \
+                cgrobj.def pareaBuild.asm pareaGeometry.asm \
+                pareaPosition.asm pareaRealize.asm
+uiManager.rdef: UI/uiManager.ui generic.uih product.uih grobj.uih \
+                Objects/colorC.uih Objects/styles.uih bitmap.uih \
+                chart.uih UI/uiTemplate.ui UI/uiStrings.ui UI/uiType.ui \
+                Art/mkrArea.ui Art/mkrLine.ui Art/mkrBar.ui \
+                Art/mkrColumn.ui Art/mkrPie.ui Art/mkrScatter.ui \
+                Art/mkrHighLow.ui UI/uiGroup.ui UI/uiAxis.ui UI/uiGrid.ui
 
-ChartEC.geo Chart.geo : GEOS.LDF UI.LDF MATH.LDF TEXT.LDF GROBJ.LDF SPLINE.LDF 
+chartEC.geo chart.geo : geos.ldf ui.ldf math.ldf text.ldf grobj.ldf spline.ldf 
