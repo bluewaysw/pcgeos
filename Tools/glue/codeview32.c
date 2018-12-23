@@ -209,8 +209,8 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
 			*/
 			if (realPtr != NULL) {
 				*realPtr = ((srp->type == MO_PUBDEF) ||
-						    (srp->type == MO_LPUBDEF1) ||
-							(srp->type == MO_LPUBDEF2));
+						(srp->type == MO_LPUBDEF1) ||
+						(srp->type == MO_LPUBDEF2));
 			}
 			return(TRUE);
 		}
@@ -2957,9 +2957,11 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 			 * Do not enter alias for variables to avoid
 			 * conflicts between ChunkHandle and chunk in LMem
 			 */
+#if 0
 			if (alias != name) {
 				Sym_Enter(symbols, sd->syms, alias, tsymBlock, symOff);
 			}
+#endif
 		}
 		else if ((sd->combine == SEG_LMEM) &&
 			(MSObj_GetLMemSegOrder(sd) == 1))
