@@ -4,15 +4,15 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = ansic
-ASM_TO_OBJS     = memory_asm.asm ansic.asm bcc_rtl.asm string_asm.asm\
-                  stdlib_asm.asm malloc_asm.asm stdio_asm.asm
+ASM_TO_OBJS     = stdlib_asm.asm stdio_asm.asm string_asm.asm ansic.asm\
+                  malloc_asm.asm memory_asm.asm wcc_rtl.asm
 UI_TO_RDFS      =
-SRCS            = memory_asm.asm ansic.asm bcc_rtl.asm string_asm.asm\
-                  stdlib_asm.asm malloc_asm.asm stdio_asm.asm ansic.def\
-                  ansicErrors.def ansicGeode.def string.c stdio.c scanf.c
-OBJS            = memory_asm.obj ansic.obj bcc_rtl.obj string_asm.obj\
-                  stdlib_asm.obj malloc_asm.obj stdio_asm.obj string.obj\
-                  stdio.obj scanf.obj
+SRCS            = stdlib_asm.asm stdio_asm.asm string_asm.asm ansic.asm\
+                  malloc_asm.asm memory_asm.asm wcc_rtl.asm ansicErrors.def\
+                  ansicGeode.def ansic.def scanf.c stdio.c string.c
+OBJS            = stdlib_asm.obj stdio_asm.obj string_asm.obj ansic.obj\
+                  malloc_asm.obj memory_asm.obj wcc_rtl.obj scanf.obj\
+                  stdio.obj string.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = ansic
