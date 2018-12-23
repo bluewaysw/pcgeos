@@ -1,41 +1,41 @@
-SAVER.rdef: GENERIC.UIH PRODUCT.UIH SAVER.UIH
-SAVERMANAGER.obj \
-SAVERMANAGER.eobj: STDAPP.DEF GEOS.DEF GEODE.DEF RESOURCE.DEF EC.DEF LMEM.DEF \
-                OBJECT.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF \
-                GSTRING.DEF TEXT.DEF CHAR.DEF HEAP.DEF UI.DEF FILE.DEF \
-                VM.DEF WIN.DEF INPUT.DEF HWR.DEF LOCALIZE.DEF SLLANG.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                LIBRARY.DEF THREAD.DEF BACKGRND.DEF TIMER.DEF \
-                OBJECTS/INPUTC.DEF OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF \
-                INITFILE.DEF SAVERCONSTANT.DEF NET.DEF INTERNAL/NETDR.DEF \
-                DRIVER.DEF INTERNAL/SERIALDR.DEF INTERNAL/STREAMDR.DEF \
-                INTERNAL/SOCKETID.DEF NETWARE.DEF INTERNAL/SEMINT.DEF \
-                INTERNAL/IM.DEF SAVER.DEF SAVER.RDEF SAVERAPPLICATION.ASM \
-                SAVERBITMAP.ASM SAVERCRYPT.ASM SAVERFADES.ASM \
-                SAVERINPUT.ASM SAVERPASSWORD.ASM SAVERRANDOM.ASM \
-                SAVERSTRINGS.ASM SAVERUTILS.ASM SAVERVECTOR.ASM \
-                SAVERC.ASM
+saver.rdef: saver.ui generic.uih product.uih saver.uih
+saverManager.obj \
+saverManager.eobj: stdapp.def geos.def geode.def resource.def ec.def lmem.def \
+                object.def graphics.def fontID.def font.def color.def \
+                gstring.def text.def char.def heap.def ui.def file.def \
+                vm.def win.def input.def hwr.def localize.def sllang.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                library.def thread.def backgrnd.def timer.def \
+                Objects/inputC.def Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                initfile.def saverConstant.def net.def Internal/netDr.def \
+                driver.def Internal/serialDr.def Internal/streamDr.def \
+                Internal/socketID.def netware.def Internal/semInt.def \
+                Internal/im.def saver.def saver.rdef saverApplication.asm \
+                saverBitmap.asm saverCrypt.asm saverFades.asm \
+                saverInput.asm saverPassword.asm saverRandom.asm \
+                saverStrings.asm saverUtils.asm saverVector.asm \
+                saverC.asm
 
-SaverEC.geo Saver.geo : GEOS.LDF UI.LDF NET.LDF 
+saverEC.geo saver.geo : geos.ldf ui.ldf net.ldf 

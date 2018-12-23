@@ -3,19 +3,19 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = PEN
-FILE            = fileAccess.asm fileC.asm fileManager.asm fileConstant.def\
+GEODE           = pen
+INK             = inkCursors.asm inkBackspace.asm inkSelection.asm\
+                  inkMP.asm inkControlClass.asm inkClassEdit.asm\
+                  inkManager.asm inkClassCommon.asm inkMouse.asm\
+                  inkMacro.def inkConstant.def inkControl.ui
+FILE            = fileManager.asm fileC.asm fileAccess.asm fileConstant.def\
                   fileMacro.def fileStrings.ui
-INK             = inkBackspace.asm inkClassCommon.asm inkClassEdit.asm\
-                  inkControlClass.asm inkCursors.asm inkManager.asm\
-                  inkMouse.asm inkMP.asm inkSelection.asm inkConstant.def\
-                  inkMacro.def inkControl.ui
-UI_TO_RDFS      = FILESTRINGS.UI INKCONTROL.UI
+UI_TO_RDFS      = inkControl.ui fileStrings.ui
 OBJS            =
-COMMON          = penConstant.def penGeode.def
-MODULES         = File Ink
+COMMON          = penGeode.def penConstant.def
+MODULES         = Ink File
 CMODULES        =
-SRCS            = $(FILE) $(INK) $(COMMON)
+SRCS            = $(INK) $(FILE) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = pen

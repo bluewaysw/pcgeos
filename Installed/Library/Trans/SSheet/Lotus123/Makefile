@@ -3,24 +3,23 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Lotus123
-EXPORT          = export.asm exportExport.asm exportHeader.asm\
-                  exportInfixToPostfix.asm exportManager.asm\
-                  exportUtils.asm
-IMPORT          = import.asm importCell.asm importManager.asm\
-                  importPostfixToInfix.asm importTraverseTree.asm\
-                  importUtils.asm
+GEODE           = lotus123
+IMPORT          = importUtils.asm importPostfixToInfix.asm\
+                  importManager.asm import.asm importTraverseTree.asm\
+                  importCell.asm
 INIT            = init.asm initManager.asm
-SHARED          = sharedCache.asm sharedDataChain.asm sharedFile.asm\
-                  sharedManager.asm sharedCacheConstant.def
-UI              = uiMain.asm uiManager.asm uiExport.ui uiImport.ui\
-                  uiMain.ui
-UI_TO_RDFS      = UIMAIN.UI
+SHARED          = sharedFile.asm sharedCache.asm sharedManager.asm\
+                  sharedDataChain.asm sharedCacheConstant.def
+EXPORT          = exportExport.asm exportUtils.asm exportInfixToPostfix.asm\
+                  exportHeader.asm exportManager.asm export.asm
+UI              = uiMain.asm uiManager.asm uiImport.ui uiMain.ui\
+                  uiExport.ui
+UI_TO_RDFS      = uiMain.ui
 OBJS            =
-COMMON          = lotus123Constant.def lotus123Geode.def lotus123Macro.def
-MODULES         = Export Import Init Shared UI
+COMMON          = lotus123Constant.def lotus123Macro.def lotus123Geode.def
+MODULES         = Import Init Shared Export UI
 CMODULES        =
-SRCS            = $(EXPORT) $(IMPORT) $(INIT) $(SHARED) $(UI) $(COMMON)
+SRCS            = $(IMPORT) $(INIT) $(SHARED) $(EXPORT) $(UI) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = lot123ss

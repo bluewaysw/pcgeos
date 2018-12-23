@@ -3,67 +3,68 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Chart
-AXIS            = axisAttrs.asm axisBuild.asm axisCategory.asm axisEC.asm\
-                  axisFloat.asm axisGeometry.asm axisGrObj.asm\
-                  axisLabels.asm axisManager.asm axisMisc.asm\
-                  axisPosition.asm axisRange.asm axisRealize.asm\
-                  axisSpider.asm axisTicks.asm axisUtils.asm axisValue.asm
-CBODY           = cbodyComposite.asm cbodyCreate.asm cbodyGrObj.asm\
-                  cbodyManager.asm cbodyNotify.asm cbodyRelocate.asm\
-                  cbodySelect.asm cbodySuspend.asm cbodyTarget.asm\
+GEODE           = chart
+LEGEND          = legendSelect.asm legendItem.asm legendAttrs.asm\
+                  legendBuild.asm legendGeometry.asm legendManager.asm\
+                  legendPair.asm
+UTILS           = utilsGroup.asm utilsEC.asm utilsObject.asm\
+                  utilsTextObject.asm utilsText.asm utilsManager.asm\
+                  utilsStrings.asm utilsFloat.asm utilsUI.asm utilsFile.asm\
+                  utilsGrObj.asm
+TITLE           = titleRealize.asm titleGeometry.asm titleMessages.asm\
+                  titleManager.asm titleBuild.asm titleGrObj.asm
+MAIN            = mainCreate.asm mainManager.asm mainUpdate.asm\
+                  mainDelete.asm
+COBJECT         = cobjectUtils.asm cobjectMultiple.asm cobjectGrObj.asm\
+                  cobjectAttrs.asm cobjectRealize.asm cobjectDual.asm\
+                  cobjectEvent.asm cobjectEC.asm cobjectGeometry.asm\
+                  cobjectNotify.asm cobjectManager.asm cobjectBuild.asm\
+                  cobjectState.asm cobjectPosition.asm
+CGROUP          = cgroupGeometry.asm cgroupAttrs.asm cgroupOrder.asm\
+                  cgroupBuild.asm cgroupState.asm cgroupEC.asm\
+                  cgroupManager.asm cgroupSelect.asm cgroupUtils.asm\
+                  cgroupPosition.asm cgroupRealize.asm cgroupData.asm\
+                  cgroupGrObj.asm
+CCOMP           = ccompGeometry.asm ccompComposite.asm ccompUtils.asm\
+                  ccompRealize.asm ccompState.asm ccompPosition.asm\
+                  ccompBuild.asm ccompManager.asm
+SERIES          = seriesEC.asm seriesRealize.asm seriesSpider.asm\
+                  seriesPie.asm seriesManager.asm seriesArea.asm\
+                  seriesDual.asm seriesLine.asm seriesUtils.asm\
+                  seriesGroupRealize.asm seriesColumn.asm\
+                  seriesLegendRealize.asm seriesHighLow.asm\
+                  seriesScatter.asm
+UI              = uiAxis.asm uiControl.asm uiType.asm uiManager.asm\
+                  uiGrid.asm uiGroup.asm uiGrid.ui uiManager.ui\
+                  uiTemplate.ui uiAxis.ui uiStrings.ui uiBody.ui uiGroup.ui\
+                  strings.ui uiType.ui
+SGROUP          = sgroupRelocate.asm sgroupBuild.asm sgroupSelect.asm\
+                  sgroupManager.asm sgroupFind.asm sgroupEC.asm\
+                  sgroupGeometry.asm
+CBODY           = cbodyRelocate.asm cbodyComposite.asm cbodyGrObj.asm\
+                  cbodySelect.asm cbodyCreate.asm cbodyNotify.asm\
+                  cbodyManager.asm cbodySuspend.asm cbodyTarget.asm\
                   cbodyTransfer.asm cbodyUI.asm
-CCOMP           = ccompBuild.asm ccompComposite.asm ccompGeometry.asm\
-                  ccompManager.asm ccompPosition.asm ccompRealize.asm\
-                  ccompState.asm ccompUtils.asm
-CGROBJ          = cgrobjManager.asm cgrobjRect.asm cgrobjSpline.asm
-CGROUP          = cgroupAttrs.asm cgroupBuild.asm cgroupData.asm\
-                  cgroupEC.asm cgroupGeometry.asm cgroupGrObj.asm\
-                  cgroupManager.asm cgroupOrder.asm cgroupPosition.asm\
-                  cgroupRealize.asm cgroupSelect.asm cgroupState.asm\
-                  cgroupUtils.asm
-COBJECT         = cobjectAttrs.asm cobjectBuild.asm cobjectDual.asm\
-                  cobjectEC.asm cobjectEvent.asm cobjectGeometry.asm\
-                  cobjectGrObj.asm cobjectManager.asm cobjectMultiple.asm\
-                  cobjectNotify.asm cobjectPosition.asm cobjectRealize.asm\
-                  cobjectState.asm cobjectUtils.asm
-LEGEND          = legendAttrs.asm legendBuild.asm legendGeometry.asm\
-                  legendItem.asm legendManager.asm legendPair.asm\
-                  legendSelect.asm
-MAIN            = mainCreate.asm mainDelete.asm mainManager.asm\
-                  mainUpdate.asm
-PAREA           = pareaBuild.asm pareaEC.asm pareaGeometry.asm\
-                  pareaManager.asm pareaPosition.asm pareaRealize.asm
-SERIES          = seriesArea.asm seriesColumn.asm seriesDual.asm\
-                  seriesEC.asm seriesGroupRealize.asm seriesHighLow.asm\
-                  seriesLegendRealize.asm seriesLine.asm seriesManager.asm\
-                  seriesPie.asm seriesRealize.asm seriesScatter.asm\
-                  seriesSpider.asm seriesUtils.asm
-SGROUP          = sgroupBuild.asm sgroupEC.asm sgroupFind.asm\
-                  sgroupGeometry.asm sgroupManager.asm sgroupRelocate.asm\
-                  sgroupSelect.asm
-TITLE           = titleBuild.asm titleGeometry.asm titleGrObj.asm\
-                  titleManager.asm titleMessages.asm titleRealize.asm
-UI              = uiAxis.asm uiControl.asm uiGrid.asm uiGroup.asm\
-                  uiManager.asm uiType.asm strings.ui uiAxis.ui uiBody.ui\
-                  uiGrid.ui uiGroup.ui uiManager.ui uiStrings.ui\
-                  uiTemplate.ui uiType.ui
-UTILS           = utilsEC.asm utilsFile.asm utilsFloat.asm utilsGrObj.asm\
-                  utilsGroup.asm utilsManager.asm utilsObject.asm\
-                  utilsStrings.asm utilsText.asm utilsTextObject.asm\
-                  utilsUI.asm
-UI_TO_RDFS      = UIMANAGER.UI
+AXIS            = axisBuild.asm axisLabels.asm axisManager.asm axisEC.asm\
+                  axisTicks.asm axisPosition.asm axisValue.asm\
+                  axisCategory.asm axisRealize.asm axisMisc.asm\
+                  axisGeometry.asm axisUtils.asm axisSpider.asm\
+                  axisRange.asm axisGrObj.asm axisFloat.asm axisAttrs.asm
+CGROBJ          = cgrobjRect.asm cgrobjManager.asm cgrobjSpline.asm
+PAREA           = pareaManager.asm pareaEC.asm pareaPosition.asm\
+                  pareaGeometry.asm pareaBuild.asm pareaRealize.asm
+UI_TO_RDFS      = uiManager.ui
 OBJS            =
-COMMON          = axis.def ccomp.def cgrobj.def cgroup.def\
-                  chartConstants.def chartGeode.def chartGlobal.def\
-                  chartMacros.def cobject.def legend.def parea.def\
-                  sarea.def series.def sgroup.def title.def
-MODULES         = Axis CBody CComp CGrObj CGroup CObject Legend Main PArea\
-                  Series SGroup Title UI Utils
+COMMON          = title.def cgroup.def axis.def series.def chartGeode.def\
+                  chartGlobal.def cobject.def sarea.def sgroup.def\
+                  chartConstants.def ccomp.def cgrobj.def chartMacros.def\
+                  parea.def legend.def
+MODULES         = Legend Utils Title Main CObject CGroup CComp Series UI\
+                  SGroup CBody Axis CGrObj PArea
 CMODULES        =
-SRCS            = $(AXIS) $(CBODY) $(CCOMP) $(CGROBJ) $(CGROUP) $(COBJECT)\
-                  $(LEGEND) $(MAIN) $(PAREA) $(SERIES) $(SGROUP) $(TITLE)\
-                  $(UI) $(UTILS) $(COMMON)
+SRCS            = $(LEGEND) $(UTILS) $(TITLE) $(MAIN) $(COBJECT) $(CGROUP)\
+                  $(CCOMP) $(SERIES) $(UI) $(SGROUP) $(CBODY) $(AXIS)\
+                  $(CGROBJ) $(PAREA) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = chart

@@ -3,13 +3,13 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Saver
+GEODE           = saver
 ASM_TO_OBJS     = saverManager.asm
-UI_TO_RDFS      = SAVER.UI
-SRCS            = saverApplication.asm saverBitmap.asm saverC.asm\
-                  saverCrypt.asm saverFades.asm saverInput.asm\
-                  saverManager.asm saverPassword.asm saverRandom.asm\
-                  saverStrings.asm saverUtils.asm saverVector.asm\
+UI_TO_RDFS      = saver.ui
+SRCS            = saverStrings.asm saverPassword.asm saverUtils.asm\
+                  saverManager.asm saverVector.asm saverCrypt.asm\
+                  saverRandom.asm saverBitmap.asm saverApplication.asm\
+                  saverFades.asm saverInput.asm saverC.asm\
                   saverConstant.def saver.ui
 OBJS            = saverManager.obj
 LOBJS           =

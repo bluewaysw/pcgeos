@@ -3,10 +3,10 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = IDIALC
+GEODE           = idialc
 ASM_TO_OBJS     = idialcManager.asm
-UI_TO_RDFS      = IDIALCONTROL.UI
-SRCS            = idialcManager.asm idialControl.asm idialConstant.def\
+UI_TO_RDFS      = idialControl.ui
+SRCS            = idialControl.asm idialcManager.asm idialConstant.def\
                   idialControl.ui
 OBJS            = idialcManager.obj
 LOBJS           =

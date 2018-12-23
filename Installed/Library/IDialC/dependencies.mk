@@ -1,35 +1,36 @@
-IDIALCONTROL.rdef: GENERIC.UIH PRODUCT.UIH ART/MKRAUIOFFLINEC8.UI \
-                ART/MKRAUIONLINEC8.UI ART/MKRAUIONLINEFLASHC8.UI
-IDIALCMANAGER.obj \
-IDIALCMANAGER.eobj: GEOS.DEF GEODE.DEF RESOURCE.DEF LMEM.DEF HEAP.DEF \
-                OBJECT.DEF EC.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF TIMER.DEF \
-                THREAD.DEF UI.DEF FILE.DEF VM.DEF WIN.DEF INPUT.DEF \
-                HWR.DEF LOCALIZE.DEF SLLANG.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF \
-                TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF \
-                IACP.DEF OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF \
-                OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF \
-                OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SOCKET.DEF SOCKMISC.DEF INTERNAL/PPP.DEF \
-                INTERNAL/SOCKETDR.DEF DRIVER.DEF MEDIUM.DEF \
-                OBJECTS/IDIALCC.DEF IDIALCONSTANT.DEF IDIALCONTROL.RDEF \
-                IDIALCONTROL.ASM
+idialControl.rdef: idialControl.ui generic.uih product.uih \
+                Art/mkrAUIOfflineC8.ui Art/mkrAUIOnlineC8.ui \
+                Art/mkrAUIOnlineFlashC8.ui
+idialcManager.obj \
+idialcManager.eobj: geos.def geode.def resource.def lmem.def heap.def \
+                object.def ec.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def timer.def \
+                thread.def ui.def file.def vm.def win.def input.def \
+                hwr.def localize.def sllang.def Objects/processC.def \
+                Objects/metaC.def chunkarr.def geoworks.def gcnlist.def \
+                timedate.def Objects/Text/tCommon.def stylesh.def \
+                iacp.def Objects/uiInputC.def Objects/visC.def \
+                Objects/vCompC.def Objects/vCntC.def Internal/vUtils.def \
+                Objects/genC.def disk.def drive.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                socket.def sockmisc.def Internal/ppp.def \
+                Internal/socketDr.def driver.def medium.def \
+                Objects/iDialCC.def idialConstant.def idialControl.rdef \
+                idialControl.asm
 
-IDIALCEC.geo IDIALC.geo : GEOS.LDF UI.LDF SOCKET.LDF 
+idialcEC.geo idialc.geo : geos.ldf ui.ldf socket.ldf 
