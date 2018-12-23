@@ -1,54 +1,65 @@
-# DO NOT DELETE THIS LINE
-canonBJC.rdef    : generic.uih canonBJC.ui UI/uiOptions1ASFCanonBJC.ui
-canonBJCManager.eobj \
-canonBJCManager.obj: canonBJCControlCodes.asm canonBJCDialog.asm\
-                  canonBJCDriverInfo.asm canonBJCManager.asm\
-                  canonBJCcmykInfo.asm canonBJCcmyInfo.asm\
-                  canonBJCmonoInfo.asm UI/UIGetNoMain.asm\
-                  UI/UIGetOptions.asm UI/UIEval.asm UI/UIEvalDummyASF.asm\
-                  printcomEntry.asm printcomInfo.asm printcomAdmin.asm\
-                  printcomTables.asm printcomNoEscapes.asm\
-                  printcomCanonBJCJob.asm printcomASFOnlyPage.asm\
-                  printcomCanonBJCCursor.asm printcomStream.asm\
-                  printcomCanonBJCColor.asm printcomCanonBJCGraphics.asm\
-                  printcomNoStyles.asm printcomNoText.asm\
-                  Buffer/bufferCreate.asm Buffer/bufferDestroy.asm\
-                  canonBJCConstant.def canonBJC.rdef\
-		  Internal/fontDr.def Internal/gUtils.def\
-                  Internal/gstate.def Internal/heapInt.def\
-                  Internal/interrup.def Internal/parallDr.def\
-                  Internal/printDr.def Internal/semInt.def\
-                  Internal/serialDr.def Internal/spoolInt.def\
-                  Internal/streamDr.def Internal/tmatrix.def\
-                  Internal/uProcC.def Internal/vUtils.def\
-                  Internal/videoDr.def Internal/window.def\
-                  Objects/clipbrd.def Objects/eMenuC.def\
-                  Objects/emTrigC.def Objects/emomC.def Objects/gAppC.def\
-                  Objects/gBoolC.def Objects/gBoolGC.def Objects/gContC.def\
-                  Objects/gCtrlC.def Objects/gDCtrlC.def\
-                  Objects/gDListC.def Objects/gDispC.def Objects/gDocC.def\
-                  Objects/gDocCtrl.def Objects/gDocGrpC.def\
-                  Objects/gEditCC.def Objects/gFSelC.def\
-                  Objects/gFieldC.def Objects/gGadgetC.def\
-                  Objects/gGlyphC.def Objects/gInterC.def\
-                  Objects/gItemC.def Objects/gItemGC.def\
-                  Objects/gPageCC.def Objects/gPenICC.def\
-                  Objects/gPrimC.def Objects/gProcC.def\
-                  Objects/gScreenC.def Objects/gSysC.def Objects/gTextC.def\
-                  Objects/gToolCC.def Objects/gToolGC.def\
-                  Objects/gTrigC.def Objects/gValueC.def Objects/gViewC.def\
-                  Objects/gViewCC.def Objects/genC.def Objects/helpCC.def\
-                  Objects/metaC.def Objects/processC.def\
-                  Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
-                  Objects/visC.def Page/pageEndLFSetLength.asm\
-                  char.def\
-		  chunkarr.def color.def disk.def drive.def driver.def\
-                  ec.def file.def font.def fontID.def gcnlist.def geode.def\
-                  geos.def geoworks.def graphics.def gstring.def heap.def\
-                  hugearr.def hwr.def iacp.def input.def lmem.def\
-                  localize.def object.def print.def\
-                  resource.def\
-                  sem.def sllang.def spool.def stylesh.def sysstats.def\
-                  system.def text.def timer.def token.def uDialog.def\
-                  ui.def vm.def win.def
-canonBJCec.geo canonBJC.geo: geos.ldf ui.ldf spool.ldf
+canonBJC.rdef: generic.uih product.uih \
+                /home/frehwagen/workspace/pcgeos/Driver/Printer/DotMatrix/../PrintCom/UI/uiOptions1ASFCanonBJC.ui
+canonBJCManager.obj \
+canonBJCManager.eobj: printcomInclude.def geos.def heap.def geode.def \
+                resource.def ec.def driver.def lmem.def file.def sem.def \
+                graphics.def fontID.def font.def color.def gstring.def \
+                text.def char.def win.def localize.def sllang.def \
+                chunkarr.def hugearr.def timer.def system.def \
+                Internal/interrup.def Internal/gstate.def \
+                Internal/tmatrix.def Internal/fontDr.def \
+                Internal/window.def Internal/heapInt.def \
+                Internal/semInt.def sysstats.def Internal/printDr.def \
+                print.def Internal/spoolInt.def Internal/serialDr.def \
+                Internal/streamDr.def Internal/parallDr.def \
+                Internal/videoDr.def ui.def vm.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def object.def \
+                geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                spool.def Internal/prodFeatures.def printcomConstant.def \
+                printcomMacro.def canonBJCConstant.def canonBJC.rdef \
+                printcomEntry.asm printcomInfo.asm printcomAdmin.asm \
+                printcomTables.asm printcomNoEscapes.asm \
+                printcomCanonBJCJob.asm Job/jobStartCanonBJC.asm \
+                Job/jobEndCanonBJC.asm Job/jobPaperPathNoASFControl.asm \
+                Job/jobPaperInfo.asm Job/jobResetPrinterAndWait.asm \
+                printcomASFOnlyPage.asm Page/pageStartASFOnly.asm \
+                Page/pageEndASFOnly.asm printcomCanonBJCCursor.asm \
+                Cursor/cursorDotMatrixCommon.asm \
+                Cursor/cursorSetCursorAbsCanonBJC.asm \
+                Cursor/cursorPrLineFeedCanonBJC.asm \
+                Cursor/cursorPrFormFeedGuess.asm \
+                Cursor/cursorConvert360.asm printcomStream.asm \
+                Stream/streamWrite.asm Stream/streamWriteByte.asm \
+                Stream/streamSendCodeOut.asm printcomCanonBJCColor.asm \
+                Color/colorGetFormat.asm Color/colorSetNone.asm \
+                printcomCanonBJCGraphics.asm Graphics/graphicsCommon.asm \
+                Graphics/graphicsCanonBJC.asm canonBJCDialog.asm \
+                UI/uiGetNoMain.asm UI/uiGetOptions.asm UI/uiEval.asm \
+                UI/uiEvalDummyASF.asm canonBJCControlCodes.asm \
+                printcomNoStyles.asm printcomNoText.asm \
+                Text/textPrintRaw.asm Buffer/bufferCreate.asm \
+                Buffer/bufferDestroy.asm canonBJCDriverInfo.asm \
+                canonBJCmonoInfo.asm canonBJCcmyInfo.asm \
+                canonBJCcmykInfo.asm
+
+canonbjcEC.geo canonbjc.geo : geos.ldf ui.ldf spool.ldf 

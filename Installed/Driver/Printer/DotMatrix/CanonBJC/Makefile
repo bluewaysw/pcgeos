@@ -3,15 +3,13 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = CANONBJC
-LIBNAME         = print
-PROTOCONST      = PRINT
+GEODE           = canonbjc
 ASM_TO_OBJS     = canonBJCManager.asm
 UI_TO_RDFS      = canonBJC.ui
-SRCS            = canonBJCControlCodes.asm canonBJCDialog.asm\
-                  canonBJCDriverInfo.asm canonBJCManager.asm\
-                  canonBJCcmykInfo.asm canonBJCcmyInfo.asm\
-                  canonBJCmonoInfo.asm UI/uiGetNoMain.asm\
+SRCS            = canonBJCDriverInfo.asm canonBJCmonoInfo.asm\
+                  canonBJCDialog.asm canonBJCManager.asm\
+                  canonBJCcmyInfo.asm canonBJCcmykInfo.asm\
+                  canonBJCControlCodes.asm UI/uiGetNoMain.asm\
                   UI/uiGetOptions.asm UI/uiEval.asm UI/uiEvalDummyASF.asm\
                   printcomEntry.asm printcomInfo.asm printcomAdmin.asm\
                   printcomTables.asm printcomNoEscapes.asm\
@@ -19,10 +17,12 @@ SRCS            = canonBJCControlCodes.asm canonBJCDialog.asm\
                   printcomCanonBJCCursor.asm printcomStream.asm\
                   printcomCanonBJCColor.asm printcomCanonBJCGraphics.asm\
                   printcomNoStyles.asm printcomNoText.asm\
-                  Buffer/bufferCreate.asm Buffer/BufferDestroy.asm\
+                  Buffer/bufferCreate.asm Buffer/bufferDestroy.asm\
                   canonBJCConstant.def canonBJC.ui
 OBJS            = canonBJCManager.obj
 LOBJS           =
+LIBNAME         = print
+PROTOCONST      = PRINT
 
 SYSMAKEFILE     = geode.mk
 

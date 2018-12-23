@@ -1,63 +1,65 @@
-canonRGB.rdef    : generic.uih canonRGB.ui UI/uiOptions1ASFCanonRGB.ui
-CANONRGBMANAGER.obj \
-CANONRGBMANAGER.eobj: PRINTCOMINCLUDE.DEF GEOS.DEF HEAP.DEF GEODE.DEF \
-                RESOURCE.DEF EC.DEF DRIVER.DEF LMEM.DEF FILE.DEF SEM.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF \
-                TEXT.DEF CHAR.DEF WIN.DEF LOCALIZE.DEF SLLANG.DEF \
-                CHUNKARR.DEF HUGEARR.DEF TIMER.DEF SYSTEM.DEF \
-                INTERNAL/INTERRUP.DEF INTERNAL/GSTATE.DEF \
-                INTERNAL/TMATRIX.DEF INTERNAL/FONTDR.DEF \
-                INTERNAL/WINDOW.DEF INTERNAL/HEAPINT.DEF \
-                INTERNAL/SEMINT.DEF SYSSTATS.DEF INTERNAL/PRINTDR.DEF \
-                PRINT.DEF INTERNAL/SPOOLINT.DEF INTERNAL/SERIALDR.DEF \
-                INTERNAL/STREAMDR.DEF INTERNAL/PARALLDR.DEF \
-                INTERNAL/VIDEODR.DEF UI.DEF VM.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF OBJECT.DEF \
-                GEOWORKS.DEF GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SPOOL.DEF INTERNAL/PRODFEATURES.DEF RGB2CMYK.DEF \
-                PRINTCOMCONSTANT.DEF PRINTCOMMACRO.DEF \
-                CANONRGBCONSTANT.DEF PRINTCOMENTRY.ASM PRINTCOMINFO.ASM \
-                PRINTCOMADMIN.ASM PRINTCOMTABLES.ASM \
-                PRINTCOMNOESCAPES.ASM JOB/JOBSTARTCANONRGB.ASM \
-                JOB/JOBENDCANONRGB.ASM JOB/JOBPAPERPATHNOASFCONTROL.ASM \
-                JOB/JOBPAPERINFO.ASM JOB/JOBRESETPRINTERANDWAIT.ASM \
-                CANONRGBCOLOR.ASM PRINTCOMCANONRGBPAGE.ASM \
-                PAGE/PAGESTARTCANONRGB.ASM PAGE/PAGEENDCANONRGB.ASM \
-                PRINTCOMCANONBJCCURSOR.ASM \
-                CURSOR/CURSORDOTMATRIXCOMMON.ASM \
-                CURSOR/CURSORSETCURSORABSCANONBJC.ASM \
-                CURSOR/CURSORPRLINEFEEDCANONBJC.ASM \
-                CURSOR/CURSORPRFORMFEEDGUESS.ASM \
-                CURSOR/CURSORCONVERT360.ASM PRINTCOMSTREAM.ASM \
-                STREAM/STREAMWRITE.ASM STREAM/STREAMWRITEBYTE.ASM \
-                STREAM/STREAMSENDCODEOUT.ASM PRINTCOMCANONBJCCOLOR.ASM \
-                COLOR/COLORGETFORMAT.ASM COLOR/COLORSETNONE.ASM \
-                GRAPHICS/GRAPHICSCOMMON.ASM GRAPHICS/GRAPHICSCANONRGB.ASM \
-                CANONRGBDIALOG.ASM UI/UIGETNOMAIN.ASM UI/UIGETOPTIONS.ASM \
-                UI/UIEVAL.ASM UI/UIEVALDUMMYASF.ASM \
-                CANONRGBCONTROLCODES.ASM PRINTCOMNOSTYLES.ASM \
-                PRINTCOMNOTEXT.ASM TEXT/TEXTPRINTRAW.ASM \
-                BUFFER/BUFFERCREATECANONRGB.ASM BUFFER/BUFFERDESTROY.ASM \
-                CANONRGBDRIVERINFO.ASM CANONRGBINFO.ASM CANONRGBMONOINFO.ASM \
-		CANONRGBMONO2INFO.ASM CANONRGB.RDEF
+canonRGB.rdef: generic.uih product.uih \
+                /home/frehwagen/workspace/pcgeos/Driver/Printer/DotMatrix/../PrintCom/UI/uiOptions1ASFCanonRGB.ui
+canonRGBManager.obj \
+canonRGBManager.eobj: printcomInclude.def geos.def heap.def geode.def \
+                resource.def ec.def driver.def lmem.def file.def sem.def \
+                graphics.def fontID.def font.def color.def gstring.def \
+                text.def char.def win.def localize.def sllang.def \
+                chunkarr.def hugearr.def timer.def system.def \
+                Internal/interrup.def Internal/gstate.def \
+                Internal/tmatrix.def Internal/fontDr.def \
+                Internal/window.def Internal/heapInt.def \
+                Internal/semInt.def sysstats.def Internal/printDr.def \
+                print.def Internal/spoolInt.def Internal/serialDr.def \
+                Internal/streamDr.def Internal/parallDr.def \
+                Internal/videoDr.def ui.def vm.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def object.def \
+                geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                spool.def Internal/prodFeatures.def rgb2cmyk.def \
+                printcomConstant.def printcomMacro.def \
+                canonRGBConstant.def canonRGB.rdef printcomEntry.asm \
+                printcomInfo.asm printcomAdmin.asm printcomTables.asm \
+                printcomNoEscapes.asm Job/jobStartCanonRGB.asm \
+                Job/jobEndCanonRGB.asm Job/jobPaperPathNoASFControl.asm \
+                Job/jobPaperInfo.asm Job/jobResetPrinterAndWait.asm \
+                canonRGBColor.asm printcomCanonRGBPage.asm \
+                Page/pageStartCanonRGB.asm Page/pageEndCanonRGB.asm \
+                printcomCanonBJCCursor.asm \
+                Cursor/cursorDotMatrixCommon.asm \
+                Cursor/cursorSetCursorAbsCanonBJC.asm \
+                Cursor/cursorPrLineFeedCanonBJC.asm \
+                Cursor/cursorPrFormFeedGuess.asm \
+                Cursor/cursorConvert360.asm printcomStream.asm \
+                Stream/streamWrite.asm Stream/streamWriteByte.asm \
+                Stream/streamSendCodeOut.asm printcomCanonBJCColor.asm \
+                Color/colorGetFormat.asm Color/colorSetNone.asm \
+                Graphics/graphicsCommon.asm Graphics/graphicsCanonRGB.asm \
+                canonRGBDialog.asm UI/uiGetNoMain.asm UI/uiGetOptions.asm \
+                UI/uiEval.asm canonRGBControlCodes.asm \
+                printcomNoStyles.asm printcomNoText.asm \
+                Text/textPrintRaw.asm Buffer/bufferCreateCanonRGB.asm \
+                Buffer/bufferDestroy.asm canonRGBDriverInfo.asm \
+                canonRGBInfo.asm canonRGBmonoInfo.asm \
+                canonRGBmono2Info.asm
 
-CANONRGBEC.geo CANONRGB.geo : GEOS.LDF UI.LDF SPOOL.LDF RGB2CMYK.LDF 
+canonrgbEC.geo canonrgb.geo : geos.ldf ui.ldf spool.ldf rgb2cmyk.ldf 

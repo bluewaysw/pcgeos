@@ -3,27 +3,28 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = CANONRGB
-LIBNAME		= print
-PROTOCONST	= PRINT
+GEODE           = canonrgb
 ASM_TO_OBJS     = canonRGBManager.asm
 UI_TO_RDFS      = canonRGB.ui
-SRCS            = canonRGBControlCodes.asm canonRGBDialog.asm\
-                  canonRGBDriverInfo.asm canonRGBManager.asm\
-                  canonRGBInfo.asm canonRGBColor.asm UI/UIGETNOMAIN.ASM\
-                  UI/UIGETOPTIONS.ASM UI/UIEVAL.ASM UI/UIEVALDUMMYASF.ASM\
-                  PRINTCOMENTRY.ASM PRINTCOMINFO.ASM PRINTCOMADMIN.ASM\
-                  PRINTCOMTABLES.ASM PRINTCOMNOESCAPES.ASM\
-                  Job/JOBSTARTCANONRGB.ASM Job/JOBENDCANONRGB.ASM\
-                  Job/JOBPAPERPATHNOASFCONTROL.ASM Job/JOBPAPERINFO.ASM\
-                  Job/JOBRESETPRINTERANDWAIT.ASM PRINTCOMASFONLYPAGE.ASM\
-                  PRINTCOMCANONBJCCURSOR.ASM PRINTCOMSTREAM.ASM\
-                  PRINTCOMCANONBJCCOLOR.ASM Graphics/GRAPHICSCOMMON.ASM\
-                  Graphics/GRAPHICSCANONRGB.ASM PRINTCOMNOSTYLES.ASM\
-                  PRINTCOMNOTEXT.ASM Buffer/BUFFERCREATE.ASM\
-                  Buffer/BUFFERDESTROY.ASM canonRGBConstant.def
+SRCS            = canonRGBInfo.asm canonRGBmono2Info.asm canonRGBDialog.asm\
+                  canonRGBmonoInfo.asm canonRGBManager.asm\
+                  canonRGBDriverInfo.asm canonRGBControlCodes.asm\
+                  canonRGBColor.asm UI/uiGetNoMain.asm UI/uiGetOptions.asm\
+                  UI/uiEval.asm printcomEntry.asm printcomInfo.asm\
+                  printcomAdmin.asm printcomTables.asm\
+                  printcomNoEscapes.asm Job/jobStartCanonRGB.asm\
+                  Job/jobEndCanonRGB.asm Job/jobPaperPathNoASFControl.asm\
+                  Job/jobPaperInfo.asm Job/jobResetPrinterAndWait.asm\
+                  printcomCanonRGBPage.asm printcomCanonBJCCursor.asm\
+                  printcomStream.asm printcomCanonBJCColor.asm\
+                  Graphics/graphicsCommon.asm Graphics/graphicsCanonRGB.asm\
+                  printcomNoStyles.asm printcomNoText.asm\
+                  Buffer/bufferCreateCanonRGB.asm Buffer/bufferDestroy.asm\
+                  canonRGBConstant.def canonRGB.ui
 OBJS            = canonRGBManager.obj
 LOBJS           =
+LIBNAME         = print
+PROTOCONST      = PRINT
 
 SYSMAKEFILE     = geode.mk
 
