@@ -174,9 +174,7 @@ incminor
 #publish F_PSUB@
 #publish F_SCOPY@
 #publish F_SPUSH@
-
-publish __U4M
-publish __U4D
+skip 19
 
 #
 # For DBCS, SBCS routines
@@ -206,3 +204,8 @@ export ITOASBCS
 else
 skip 21
 endif
+
+incminor
+
+publish __U4M
+publish __U4D
