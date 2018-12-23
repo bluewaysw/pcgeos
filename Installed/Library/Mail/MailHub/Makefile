@@ -3,13 +3,13 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = MAILHUB
+GEODE           = mailhub
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = mail64.goc mailacct.goc mailhub.goc mailqp.goc\
-                  mailStrings.goc mailfatals.goh
-OBJS            = mail64.obj mailacct.obj mailhub.obj mailqp.obj\
-                  mailStrings.obj
+SRCS            = mailacct.goc mail64.goc mailqp.goc mailStrings.goc\
+                  mailhub.goc mailfatals.goh
+OBJS            = mailacct.obj mail64.obj mailqp.obj mailStrings.obj\
+                  mailhub.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = mailhub
