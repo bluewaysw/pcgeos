@@ -30,6 +30,9 @@
 #ifdef __BORLANDC__
 #pragma codeseg MAINCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("MAINCODE")
+#endif
 
 int _pascal
   ATOI(const TCHAR *__s)
@@ -83,7 +86,7 @@ void _pascal
  */
 #ifdef DO_DBCS
 
-#pragma codeseg STRINGCODESBCS
+#pragma code_seg ("STRINGCODESBCS")
 
 int _pascal
   atoisbcs(const char *__s)

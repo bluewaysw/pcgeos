@@ -48,7 +48,7 @@ resource MAINCODE	code read-only shared fixed
 resource InitCode	preload, shared, read-only, code, discard-only
 resource FORMAT		code read-only shared
 resource STRINGCODE	code read-only shared fixed
-resource BCC_TEXT       code read-only shared fixed
+resource WCC_TEXT       code read-only shared fixed
 ifdef DO_DBCS
 resource FORMATSBCS	code read-only shared
 resource STRINGCODESBCS	code read-only shared
@@ -156,24 +156,27 @@ export fscanf	as _fscanf
 
 incminor
 
-publish F_LDIV@
-publish F_LMOD@
-publish F_LUDIV@
-publish F_LUMOD@
-publish F_LXLSH@
-publish F_LXMUL@
-publish F_LXRSH@
-publish F_LXURSH@
-publish F_PADA@
-publish F_PADD@
-publish F_PCMP@
-publish F_PDEA@
-publish F_PINA@
-publish F_PSBA@
-publish F_PSBP@
-publish F_PSUB@
-publish F_SCOPY@
-publish F_SPUSH@
+#publish F_LDIV@
+#publish F_LMOD@
+#publish F_LUDIV@
+#publish F_LUMOD@
+#publish F_LXLSH@
+#publish F_LXMUL@
+#publish F_LXRSH@
+#publish F_LXURSH@
+#publish F_PADA@
+#publish F_PADD@
+#publish F_PCMP@
+#publish F_PDEA@
+#publish F_PINA@
+#publish F_PSBA@
+#publish F_PSBP@
+#publish F_PSUB@
+#publish F_SCOPY@
+#publish F_SPUSH@
+
+publish __U4M
+publish __U4D
 
 #
 # For DBCS, SBCS routines

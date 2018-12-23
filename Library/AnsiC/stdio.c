@@ -355,7 +355,7 @@ sword
  * For DBCS, we have SBCS versions
  */
 
-#pragma codeseg FORMATSBCS
+#pragma code_seg ("FORMATSBCS");
 
 sword _pascal
   VSPRINTFSBCS(
