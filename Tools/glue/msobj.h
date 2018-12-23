@@ -155,6 +155,17 @@
  *	    - type index (0 => symbol is untyped)
  *	- checksum (byte)
  */
+
+/**
+ * Reference: http://www.fileformat.info/format/ms-obj/corion.htm
+ *
+ * Watcom uses LPUBDEF1 for NEAR modules instead of PUBDEF. The specification
+ * defines b6 and b7 as both LPUBDEF but doesn't state the difference so we'll
+ * just treat them both as real symbols for now - mcasadevall
+ */
+
+#define MO_LPUBDEF1 0xb6
+#define MO_LPUBDEF2 0xb7
 #define MO_PUBDEF   0x90
 
 /*
