@@ -21,15 +21,14 @@ ffFpText.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/FlatFile/ffFpTxt.goh
 ffFpText.obj \
-ffFpText.eobj: ffFpText.cpp geos.h stddef.h _comdef.h heap.h geode.h \
-                resource.h ec.h object.h lmem.h graphics.h fontID.h \
-                font.h color.h gstring.h timer.h vm.h dbase.h localize.h \
-                Ansi/ctype.h timedate.h file.h sllang.h system.h \
-                geoworks.h chunkarr.h Objects/helpCC.h disk.h drive.h \
-                input.h char.h hwr.h win.h uDialog.h Objects/gInterC.h \
-                Objects/Text/tCommon.h stylesh.h driver.h thread.h \
-                print.h Internal/spoolInt.h serialDr.h parallDr.h \
-                hugearr.h fileEnum.h Ansi/string.h
+ffFpText.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h
 ffFieldEdges.obj \
 ffFieldEdges.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -63,17 +62,17 @@ ffFieldEdges.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffRcpVC.goh \
                 Objects/FlatFile/ffFldEdg.goh
 ffFieldEdges.obj \
-ffFieldEdges.eobj: ffFieldEdges.cpp geos.h stddef.h _comdef.h heap.h geode.h \
-                resource.h ec.h object.h lmem.h graphics.h fontID.h \
-                font.h color.h gstring.h timer.h vm.h dbase.h localize.h \
-                Ansi/ctype.h timedate.h file.h sllang.h system.h \
-                geoworks.h chunkarr.h Objects/helpCC.h disk.h drive.h \
-                input.h char.h hwr.h win.h uDialog.h Objects/gInterC.h \
-                Objects/Text/tCommon.h stylesh.h driver.h thread.h \
-                print.h Internal/spoolInt.h serialDr.h parallDr.h \
-                hugearr.h fileEnum.h Ansi/string.h math.h parse.h cell.h \
-                extern.h ieCommon.h xlatLib.h Objects/FlatFile/ffKbd.h \
-                Objects/FlatFile/ffDPaste.h ffFatal.h
+ffFieldEdges.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h math.h \
+                parse.h cell.h extern.h ieCommon.h xlatLib.h \
+                Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
+                ffFatal.h
 ffFieldProperties.obj \
 ffFieldProperties.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -106,12 +105,11 @@ ffFieldProperties.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh Objects/FlatFile/ffFpTxt.goh
 ffFieldProperties.obj \
-ffFieldProperties.eobj: ffFieldProperties.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffFieldProperties.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h math.h \
@@ -151,17 +149,16 @@ ffGrObjBody.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffRcpVC.goh \
                 Objects/FlatFile/ffGrObjC.goh
 ffGrObjBody.obj \
-ffGrObjBody.eobj: ffGrObjBody.cpp geoworks.h geos.h stddef.h _comdef.h \
-                heap.h geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h chunkarr.h Objects/helpCC.h disk.h drive.h \
-                input.h char.h hwr.h win.h uDialog.h Objects/gInterC.h \
-                Objects/Text/tCommon.h stylesh.h driver.h thread.h \
-                print.h Internal/spoolInt.h serialDr.h parallDr.h \
-                hugearr.h fileEnum.h Ansi/string.h math.h parse.h cell.h \
-                ieCommon.h xlatLib.h Objects/FlatFile/ffKbd.h \
-                Objects/FlatFile/ffDPaste.h
+ffGrObjBody.eobj: geoworks.h geos.h heap.h geode.h resource.h ec.h object.h \
+                lmem.h graphics.h fontID.h font.h color.h gstring.h \
+                timer.h vm.h dbase.h localize.h Ansi/ctype.h timedate.h \
+                file.h sllang.h system.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h math.h \
+                parse.h cell.h ieCommon.h xlatLib.h \
+                Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h
 ffStrings.obj \
 ffStrings.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -182,15 +179,14 @@ ffStrings.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh
 ffStrings.obj \
-ffStrings.eobj: ffStrings.cpp geos.h stddef.h _comdef.h heap.h geode.h \
-                resource.h ec.h object.h lmem.h graphics.h fontID.h \
-                font.h color.h gstring.h timer.h vm.h dbase.h localize.h \
-                Ansi/ctype.h timedate.h file.h sllang.h system.h \
-                geoworks.h chunkarr.h Objects/helpCC.h disk.h drive.h \
-                input.h char.h hwr.h win.h uDialog.h Objects/gInterC.h \
-                Objects/Text/tCommon.h stylesh.h driver.h thread.h \
-                print.h Internal/spoolInt.h serialDr.h parallDr.h \
-                hugearr.h fileEnum.h
+ffStrings.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h
 ffDatabaseMeta.obj \
 ffDatabaseMeta.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -223,17 +219,16 @@ ffDatabaseMeta.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/bitmapC.goh Objects/FlatFile/ffPagLRC.goh \
                 Objects/FlatFile/ffRecC.goh Objects/FlatFile/ffRcpVC.goh
 ffDatabaseMeta.obj \
-ffDatabaseMeta.eobj: ffDatabaseMeta.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseMeta.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h math.h parse.h cell.h \
                 ieCommon.h xlatLib.h Objects/FlatFile/ffKbd.h \
-                Objects/FlatFile/ffDPaste.h ffFatal.h
+                Objects/FlatFile/ffDPaste.h Database/ffdExtrn.h ffFatal.h
 ffDatabaseFieldOrder.obj \
 ffDatabaseFieldOrder.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -266,17 +261,16 @@ ffDatabaseFieldOrder.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabaseFieldOrder.obj \
-ffDatabaseFieldOrder.eobj: ffDatabaseFieldOrder.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseFieldOrder.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h math.h parse.h cell.h \
                 ieCommon.h xlatLib.h Objects/FlatFile/ffKbd.h \
-                Objects/FlatFile/ffDPaste.h ffFatal.h
+                Objects/FlatFile/ffDPaste.h ffFatal.h Database/ffdExtrn.h
 ffDatabasePaste.obj \
 ffDatabasePaste.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -309,18 +303,17 @@ ffDatabasePaste.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabasePaste.obj \
-ffDatabasePaste.eobj: ffDatabasePaste.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabasePaste.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h math.h \
                 parse.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
-                ffFatal.h
+                ffFatal.h Database/ffdExtrn.h
 ffDatabaseLayout.obj \
 ffDatabaseLayout.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -353,18 +346,17 @@ ffDatabaseLayout.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabaseLayout.obj \
-ffDatabaseLayout.eobj: ffDatabaseLayout.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseLayout.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h cell.h Ansi/string.h \
-                Ansi/stdio.h stdarg.h math.h parse.h ffFatal.h ieCommon.h \
+                Ansi/stdio.h math.h parse.h ffFatal.h ieCommon.h \
                 xlatLib.h Objects/FlatFile/ffKbd.h \
-                Objects/FlatFile/ffDPaste.h
+                Objects/FlatFile/ffDPaste.h Database/ffdExtrn.h
 ffDatabaseSubset.obj \
 ffDatabaseSubset.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -397,18 +389,17 @@ ffDatabaseSubset.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabaseSubset.obj \
-ffDatabaseSubset.eobj: ffDatabaseSubset.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseSubset.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h cell.h math.h parse.h \
-                Ansi/stdio.h stdarg.h Ansi/string.h ieCommon.h xlatLib.h \
+                Ansi/stdio.h Ansi/string.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
-                ffFatal.h
+                ffFatal.h Database/ffdExtrn.h
 ffPageLayoutRect.obj \
 ffPageLayoutRect.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -440,15 +431,14 @@ ffPageLayoutRect.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffPageLayoutRect.obj \
-ffPageLayoutRect.eobj: ffPageLayoutRect.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffPageLayoutRect.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h stdarg.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h parse.h math.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h
 ffDatabaseImpex.obj \
@@ -483,18 +473,17 @@ ffDatabaseImpex.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabaseImpex.obj \
-ffDatabaseImpex.eobj: ffDatabaseImpex.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseImpex.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h ssmeta.h \
                 math.h parse.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
-                ffFatal.h extern.h
+                ffFatal.h extern.h Database/ffdExtrn.h
 ffDatabaseParse.obj \
 ffDatabaseParse.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -526,18 +515,18 @@ ffDatabaseParse.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabaseParse.obj \
-ffDatabaseParse.eobj: ffDatabaseParse.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseParse.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h math.h parse.h \
                 Ansi/string.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
-                Objects/FlatFile/ffTChst.h ffFatal.h extern.h
+                Objects/FlatFile/ffTChst.h ffFatal.h extern.h \
+                Database/ffdExtrn.h
 ffDatabaseFloatController.obj \
 ffDatabaseFloatController.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -569,17 +558,16 @@ ffDatabaseFloatController.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabaseFloatController.obj \
-ffDatabaseFloatController.eobj: ffDatabaseFloatController.cpp geos.h stddef.h _comdef.h \
-                heap.h geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseFloatController.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h parse.h math.h cell.h \
                 ieCommon.h xlatLib.h Objects/FlatFile/ffKbd.h \
-                Objects/FlatFile/ffDPaste.h ffFatal.h
+                Objects/FlatFile/ffDPaste.h Database/ffdExtrn.h ffFatal.h
 ffDatabaseFields.obj \
 ffDatabaseFields.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -612,18 +600,17 @@ ffDatabaseFields.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffRcpVC.goh \
                 Objects/FlatFile/ffGrObjC.goh Objects/Text/tCtrlC.goh
 ffDatabaseFields.obj \
-ffDatabaseFields.eobj: ffDatabaseFields.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseFields.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h stdarg.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h math.h parse.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
-                extern.h ffFatal.h
+                extern.h Database/ffdExtrn.h ffFatal.h
 ffDatabaseLabels.obj \
 ffDatabaseLabels.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -656,15 +643,14 @@ ffDatabaseLabels.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffRcpVC.goh \
                 Objects/FlatFile/ffGrObjC.goh Objects/Text/tCtrlC.goh
 ffDatabaseLabels.obj \
-ffDatabaseLabels.eobj: ffDatabaseLabels.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseLabels.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h stdarg.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h math.h parse.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
                 extern.h ffFatal.h
@@ -699,18 +685,17 @@ ffDatabaseRCP.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabaseRCP.obj \
-ffDatabaseRCP.eobj: ffDatabaseRCP.cpp geos.h stddef.h _comdef.h heap.h geode.h \
-                resource.h ec.h object.h lmem.h graphics.h fontID.h \
-                font.h color.h gstring.h timer.h vm.h dbase.h localize.h \
-                Ansi/ctype.h timedate.h file.h sllang.h system.h \
-                geoworks.h chunkarr.h Objects/helpCC.h disk.h drive.h \
-                input.h char.h hwr.h win.h uDialog.h Objects/gInterC.h \
-                Objects/Text/tCommon.h stylesh.h driver.h thread.h \
-                print.h Internal/spoolInt.h serialDr.h parallDr.h \
-                hugearr.h fileEnum.h Ansi/string.h Ansi/stdio.h stdarg.h \
-                parse.h math.h cell.h ieCommon.h xlatLib.h \
+ffDatabaseRCP.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h parse.h math.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
-                extern.h ffFatal.h
+                extern.h ffFatal.h Database/ffdExtrn.h
 ffDatabaseText.obj \
 ffDatabaseText.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -743,15 +728,14 @@ ffDatabaseText.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffRcpVC.goh \
                 Objects/FlatFile/ffGrObjC.goh Objects/Text/tCtrlC.goh
 ffDatabaseText.obj \
-ffDatabaseText.eobj: ffDatabaseText.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseText.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h stdarg.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h math.h parse.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
                 extern.h ffFatal.h
@@ -787,18 +771,17 @@ ffDatabaseSort.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabaseSort.obj \
-ffDatabaseSort.eobj: ffDatabaseSort.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseSort.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h stdarg.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h math.h parse.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
-                ffFatal.h
+                ffFatal.h Database/ffdExtrn.h
 ffDatabaseCreate.obj \
 ffDatabaseCreate.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -831,18 +814,17 @@ ffDatabaseCreate.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffDatabaseCreate.obj \
-ffDatabaseCreate.eobj: ffDatabaseCreate.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffDatabaseCreate.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h stdarg.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/string.h math.h parse.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
-                extern.h ffFatal.h
+                extern.h ffFatal.h Database/ffdExtrn.h
 ffDatabase.obj \
 ffDatabase.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -874,18 +856,18 @@ ffDatabase.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh Objects/Text/tCtrlC.goh
 ffDatabase.obj \
-ffDatabase.eobj: ffDatabase.cpp geos.h stddef.h _comdef.h heap.h geode.h \
-                resource.h ec.h object.h lmem.h graphics.h fontID.h \
-                font.h color.h gstring.h timer.h vm.h dbase.h localize.h \
-                Ansi/ctype.h timedate.h file.h sllang.h system.h \
-                geoworks.h chunkarr.h Objects/helpCC.h disk.h drive.h \
-                input.h char.h hwr.h win.h uDialog.h Objects/gInterC.h \
-                Objects/Text/tCommon.h stylesh.h driver.h thread.h \
-                print.h Internal/spoolInt.h serialDr.h parallDr.h \
-                hugearr.h fileEnum.h Ansi/stdio.h stdarg.h Ansi/string.h \
-                parse.h math.h cell.h ieCommon.h xlatLib.h \
+ffDatabase.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/string.h parse.h math.h cell.h ieCommon.h xlatLib.h \
                 Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
-                Objects/FlatFile/ffTChst.h extern.h ffFatal.h
+                Objects/FlatFile/ffTChst.h extern.h ffFatal.h \
+                Database/ffdExtrn.h
 ffTreasureChest.obj \
 ffTreasureChest.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -919,12 +901,11 @@ ffTreasureChest.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffRcpVC.goh Art/mkrRightArrowSC.goh \
                 Art/mkrLeftArrowSC.goh
 ffTreasureChest.obj \
-ffTreasureChest.eobj: ffTreasureChest.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffTreasureChest.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h parse.h math.h \
@@ -963,17 +944,17 @@ ffExprBuilder.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffExprBuilder.obj \
-ffExprBuilder.eobj: ffExprBuilder.cpp geos.h stddef.h _comdef.h heap.h geode.h \
-                resource.h ec.h object.h lmem.h graphics.h fontID.h \
-                font.h color.h gstring.h timer.h vm.h dbase.h localize.h \
-                Ansi/ctype.h timedate.h file.h sllang.h system.h \
-                geoworks.h chunkarr.h Objects/helpCC.h disk.h drive.h \
-                input.h char.h hwr.h win.h uDialog.h Objects/gInterC.h \
-                Objects/Text/tCommon.h stylesh.h driver.h thread.h \
-                print.h Internal/spoolInt.h serialDr.h parallDr.h \
-                hugearr.h fileEnum.h parse.h math.h Ansi/string.h cell.h \
-                ffFatal.h ieCommon.h xlatLib.h Objects/FlatFile/ffKbd.h \
-                Objects/FlatFile/ffDPaste.h Objects/FlatFile/ffExBld.h
+ffExprBuilder.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h parse.h math.h \
+                Ansi/string.h cell.h ffFatal.h ieCommon.h xlatLib.h \
+                Objects/FlatFile/ffKbd.h Objects/FlatFile/ffDPaste.h \
+                Objects/FlatFile/ffExBld.h
 ffRecordControl.obj \
 ffRecordControl.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -1006,15 +987,14 @@ ffRecordControl.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/FlatFile/ffPagLRC.goh Objects/FlatFile/ffRecC.goh \
                 Objects/FlatFile/ffRcpVC.goh
 ffRecordControl.obj \
-ffRecordControl.eobj: ffRecordControl.cpp geos.h stddef.h _comdef.h geode.h \
-                heap.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffRecordControl.eobj: geos.h geode.h heap.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h stdarg.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
                 Ansi/stdlib.h Ansi/string.h math.h parse.h cell.h \
                 ffFatal.h ieCommon.h xlatLib.h Objects/FlatFile/ffKbd.h \
                 Objects/FlatFile/ffDPaste.h
@@ -1038,16 +1018,15 @@ ffRCPValue.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/FlatFile/ffRcpVC.goh
 ffRCPValue.obj \
-ffRCPValue.eobj: ffRCPValue.cpp geos.h stddef.h _comdef.h geode.h heap.h \
-                resource.h ec.h object.h lmem.h graphics.h fontID.h \
-                font.h color.h gstring.h timer.h vm.h dbase.h localize.h \
-                Ansi/ctype.h timedate.h file.h sllang.h system.h \
-                geoworks.h chunkarr.h Objects/helpCC.h disk.h drive.h \
-                input.h char.h hwr.h win.h uDialog.h Objects/gInterC.h \
-                Objects/Text/tCommon.h stylesh.h driver.h thread.h \
-                print.h Internal/spoolInt.h serialDr.h parallDr.h \
-                hugearr.h fileEnum.h Ansi/stdio.h stdarg.h Ansi/stdlib.h \
-                Ansi/string.h
+ffRCPValue.eobj: geos.h geode.h heap.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h \
+                Ansi/stdlib.h Ansi/string.h
 ffRecordControlUI.obj \
 ffRecordControlUI.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -1083,12 +1062,11 @@ ffRecordControlUI.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Art/mkrDeleteRecordSCGA.goh Art/mkrMarkedRecordSC.goh \
                 Art/mkrMarkedRecordSM.goh Art/mkrMarkedRecordSCGA.goh
 ffRecordControlUI.obj \
-ffRecordControlUI.eobj: ffRecordControlUI.cpp geos.h stddef.h _comdef.h heap.h \
-                geode.h resource.h ec.h object.h lmem.h graphics.h \
-                fontID.h font.h color.h gstring.h timer.h vm.h dbase.h \
-                localize.h Ansi/ctype.h timedate.h file.h sllang.h \
-                system.h geoworks.h chunkarr.h Objects/helpCC.h disk.h \
-                drive.h input.h char.h hwr.h win.h uDialog.h \
+ffRecordControlUI.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h math.h parse.h cell.h

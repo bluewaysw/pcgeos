@@ -94,8 +94,13 @@ typedef struct _ClassStruct {
     word		Class_masterOffset;
     word		Class_methodCount;
     word		Class_instanceSize;
+#ifdef __WATCOMC__
+    void __based(void)*	Class_vdRelocTable;
+    void __based(void)*	Class_relocTable;
+#else
     word    	    	Class_vdRelocTable;
     word		Class_relocTable;
+#endif
     ClassFlags		Class_flags;
     byte		Class_masterMessages;
 } ClassStruct;

@@ -8,7 +8,7 @@ FIELDPROPERTIES = ffFpText.goc ffFieldEdges.goc ffFieldProperties.goc
 GROBJ           = ffGrObjBody.goc
 LOCALIZATION    = ffStrings.goc
 FFMANAGER       = ffmanagerManager.asm
-DATABASE        = ffDExtrn.h ffDatabaseMeta.goc ffDatabaseFieldOrder.goc\
+DATABASE        = ffdExtrn.h ffDatabaseMeta.goc ffDatabaseFieldOrder.goc\
                   ffDatabasePaste.goc ffDatabaseLayout.goc\
                   ffDatabaseSubset.goc ffPageLayoutRect.goc\
                   ffDatabaseImpex.goc ffDatabaseParse.goc\
