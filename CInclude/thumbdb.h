@@ -5,7 +5,7 @@
 #include <timedate.h>
 #include <library.h>
 #include <graphics.h>
-#include <ansi\string.h>
+#include <Ansi/string.h>
 #include <sem.h>
 #include <dbase.h>
 #include <heap.h>

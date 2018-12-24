@@ -6,7 +6,7 @@
 #include <thumbdb.h>
 #include <library.h>
 #include <graphics.h>
-#include <ansi\string.h>
+#include <Ansi/string.h>
 #include <sem.h>
 #include <dbase.h>
 #include <heap.h>
@@ -281,7 +281,7 @@ ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
         
             byte *p_data ;
 
-            HugeArrayLock(thumbDBFile, compact, loopCount, &p_data, &elemSize) ;
+            HugeArrayLock(thumbDBFile, compact, loopCount, (void**) &p_data, &elemSize) ;
 
             bitmapSize += elemSize ;
 
@@ -346,7 +346,7 @@ ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
         }
 
     /* transfer the bitmap data */
-    HugeArrayLock(thumbDBFile, thumbDBArray, newPlace, &elemPtr, &elemSize) ;
+    HugeArrayLock(thumbDBFile, thumbDBArray, newPlace, (void**) &elemPtr, &elemSize) ;
 
     elemPtr += sizeof(thumbDBItem)  ;
 
@@ -355,7 +355,7 @@ ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
 
         byte *p_data ;
 
-        HugeArrayLock(thumbDBFile, compact, loopCount, &p_data, &elemSize) ;
+        HugeArrayLock(thumbDBFile, compact, loopCount, (void**) &p_data, &elemSize) ;
 
         memcpy(elemPtr, p_data, elemSize) ;
         elemPtr += elemSize ;
@@ -415,7 +415,7 @@ ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
 
                 HugeArrayLock(
                     thumbDBFile, thumbDBArray, loopCount,
-                    &thisElem, &elemSize) ;
+                    (void**) &thisElem, &elemSize) ;
                                                     
                 itemDate = thisElem->TDBI_changed ;
 
@@ -577,7 +577,7 @@ ThumbDrawItem(GStateHandle gstate, int x, int y,
     }
 
     HugeArrayLock(thumbDBFile,
-                    thumbDBArray, index, &elemPtr, &elemSize) ;
+                    thumbDBArray, index, (void**) &elemPtr, &elemSize) ;
 
     width = elemPtr->TDBI_bitmap.B_width ;
     height = elemPtr->TDBI_bitmap.B_height ;
@@ -632,6 +632,7 @@ thumbLookForItem(FileLongName name, dword size, FileDateAndTime date,
     int found;
     thumbDBItem *itemptr;
     dword numItem;
+    word shortSize;
 
     *index = TDB_NO_ITEM_EXISTING;
 
@@ -652,7 +653,9 @@ thumbLookForItem(FileLongName name, dword size, FileDateAndTime date,
         return(2);
 
     HugeArrayLock(thumbDBFile, thumbDBArray, left,
-                            (void**) &itemptr, &size);
+                            (void**) &itemptr, &shortSize);
+    size = shortSize;
+    
     if(itemptr == 0)
         return(2);
 
@@ -667,7 +670,8 @@ thumbLookForItem(FileLongName name, dword size, FileDateAndTime date,
     }
 
     HugeArrayLock(thumbDBFile, thumbDBArray, right,
-                            (void**) &itemptr, &size);
+                            (void**) &itemptr, &shortSize);
+    size = shortSize;
     if(itemptr == 0)
         return(2);
 
@@ -689,7 +693,8 @@ thumbLookForItem(FileLongName name, dword size, FileDateAndTime date,
             return(2);
 
         HugeArrayLock(thumbDBFile, thumbDBArray, *index,
-                            (void**) &itemptr, &size);
+                            (void**) &itemptr, &shortSize);
+        size = shortSize;
         if(itemptr == 0)
             return(2);
 

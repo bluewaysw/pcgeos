@@ -429,8 +429,8 @@ Installed/Library/Breadbox/ftplib:	 ui ansic socket MAKELIB
 idialc	: Installed/Library/IDialC
 Installed/Library/IDialC:	ui socket MAKELIB
 
-thumbdb : Installed/Library/Breadbox/Thumbdb
-Installed/Library/Breadbox/Thumbdb:	ansic MAKELIB
+thumbdb : Installed/Library/Breadbox/ThumbDB
+Installed/Library/Breadbox/ThumbDB:	ansic MAKELIB
 
 # the EduApp libs
 basicdb : Installed/Library/Breadbox/Basicdb
