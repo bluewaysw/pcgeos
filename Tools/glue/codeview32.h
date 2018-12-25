@@ -181,7 +181,10 @@
 #define CSTT2_USHORT	0x0021
 #define CSTT2_ULONG		0x0022
 #define CSTT2_RCHAR		0x0070
+#define CSTT2_PRCHAR		0x0170 // RCHAR near pointer
+#define CSTT2_PFRCHAR		0x0270 // RCHAR far pointer
 #define CSTT2_INT2		0x0072
+#define CSTT2_UINT2		0x0073
 
 
 #define CCC2_C_NEAR 0

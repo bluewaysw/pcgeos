@@ -1718,6 +1718,7 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_SHORT:
 			retval = OTYPE_SIGNED | OTYPE_SPECIAL | (2 << 1);
 			break;
+		case CSTT2_UINT2:
 		case CSTT2_USHORT:
 			retval = OTYPE_INT | OTYPE_SPECIAL | (2 << 1);
 			break;
@@ -1729,6 +1730,12 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 			break;
 		case CSTT2_UCHAR:
 			retval = OTYPE_CHAR | OTYPE_SPECIAL | (0 << 1);
+			break;
+		case CSTT2_PRCHAR:
+			retval = OTYPE_PTR | OTYPE_PTR_NEAR | OTYPE_SPECIAL;
+			break;
+		case CSTT2_PFRCHAR:
+			retval = OTYPE_PTR | OTYPE_PTR_FAR | OTYPE_SPECIAL;
 			break;
 		default:
 			Notify(NOTIFY_ERROR,
