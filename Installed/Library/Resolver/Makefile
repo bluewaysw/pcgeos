@@ -3,12 +3,12 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Resolver
+GEODE           = resolver
 ASM_TO_OBJS     = resolverManager.asm
 UI_TO_RDFS      =
-SRCS            = resolver.asm resolverActions.asm resolverCache.asm\
-                  resolverCApi.asm resolverComm.asm resolverEvents.asm\
-                  resolverManager.asm resolverUtils.asm resolverInt.def
+SRCS            = resolverComm.asm resolverEvents.asm resolverUtils.asm\
+                  resolverActions.asm resolverManager.asm resolverCApi.asm\
+                  resolverCache.asm resolver.asm resolverInt.def
 OBJS            = resolverManager.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf

@@ -1,37 +1,37 @@
-RESOLVERMANAGER.obj \
-RESOLVERMANAGER.eobj: GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF EC.DEF SYSTEM.DEF \
-                LOCALIZE.DEF SLLANG.DEF OBJECT.DEF LMEM.DEF TIMER.DEF \
-                TIMEDATE.DEF DRIVER.DEF ASSERT.DEF DISK.DEF FILE.DEF \
-                DRIVE.DEF THREAD.DEF INTERNAL/SEMINT.DEF SEM.DEF \
-                INTERNAL/HEAPINT.DEF SYSSTATS.DEF INITFILE.DEF MEDIUM.DEF \
-                SOCKMISC.DEF INTERNAL/STREAMDR.DEF INTERNAL/SERIALDR.DEF \
-                UI.DEF VM.DEF TEXT.DEF FONTID.DEF GRAPHICS.DEF FONT.DEF \
-                COLOR.DEF CHAR.DEF WIN.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                INTERNAL/NETUTILS.DEF SAC.DEF SOCKET.DEF ACCPNT.DEF \
-                DHCP.DEF STDAPP.DEF GSTRING.DEF LIBRARY.DEF RESOLVER.DEF \
-                RESOLVERINT.DEF RESOLVER.ASM RESOLVEREVENTS.ASM \
-                RESOLVERACTIONS.ASM RESOLVERCOMM.ASM RESOLVERUTILS.ASM \
-                RESOLVERCAPI.ASM RESOLVERCACHE.ASM
+resolverManager.obj \
+resolverManager.eobj: geos.def heap.def geode.def resource.def ec.def system.def \
+                localize.def sllang.def object.def lmem.def timer.def \
+                timedate.def driver.def assert.def disk.def file.def \
+                drive.def thread.def Internal/semInt.def sem.def \
+                Internal/heapInt.def sysstats.def initfile.def medium.def \
+                sockmisc.def Internal/streamDr.def Internal/serialDr.def \
+                ui.def vm.def text.def fontID.def graphics.def font.def \
+                color.def char.def win.def input.def hwr.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                geoworks.def gcnlist.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Internal/netutils.def sac.def socket.def accpnt.def \
+                dhcp.def stdapp.def gstring.def library.def resolver.def \
+                resolverInt.def resolver.asm resolverEvents.asm \
+                resolverActions.asm resolverComm.asm resolverUtils.asm \
+                resolverCApi.asm resolverCache.asm
 
-ResolverEC.geo Resolver.geo : GEOS.LDF NETUTILS.LDF UI.LDF SOCKET.LDF ACCPNT.LDF 
+resolverEC.geo resolver.geo : geos.ldf netutils.ldf ui.ldf socket.ldf accpnt.ldf 
