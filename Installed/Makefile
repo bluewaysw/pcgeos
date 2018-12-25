@@ -513,7 +513,7 @@ Installed/Library/Pref/Preftd:		ui config MAKELIB
 prefvid	: Installed/Library/Pref/Prefvid
 Installed/Library/Pref/Prefvid:		ui config MAKELIB
 
-prefpntc	: Installed/Library/Pref/Prefpntc
+prefpntc	: Installed/Library/Pref/PrefPntC
 Installed/Library/Pref/Prefpntc:	ui config parentc MAKELIB
 
 

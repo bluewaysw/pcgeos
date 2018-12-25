@@ -1718,6 +1718,7 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_SHORT:
 			retval = OTYPE_SIGNED | OTYPE_SPECIAL | (2 << 1);
 			break;
+		case CSTT2_UINT2:
 		case CSTT2_USHORT:
 			retval = OTYPE_INT | OTYPE_SPECIAL | (2 << 1);
 			break;
@@ -1729,6 +1730,12 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 			break;
 		case CSTT2_UCHAR:
 			retval = OTYPE_CHAR | OTYPE_SPECIAL | (0 << 1);
+			break;
+		case CSTT2_PRCHAR:
+			retval = OTYPE_PTR | OTYPE_PTR_NEAR | OTYPE_SPECIAL;
+			break;
+		case CSTT2_PFRCHAR:
+			retval = OTYPE_PTR | OTYPE_PTR_FAR | OTYPE_SPECIAL;
 			break;
 		default:
 			Notify(NOTIFY_ERROR,
@@ -1920,6 +1927,7 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 	while (bp < endp) {
 
 		word leaf;
+		word argsCount;
 		MSObj_GetWord(leaf, bp);
 
 		printf("lead: %d\r\n", leaf); fflush(stdout);
@@ -1942,16 +1950,18 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 				* Skip over the return type.
 				*/
 				word rvType;
+				word argsCount;
+				word argsList;
 				MSObj_GetWord(rvType, bp);
 
 				//(void)CVProcessTypeRecord(file,
 				//	&bp,
 				//	bp[1] | (bp[2] << 8),
 				//	0);
-				if (*bp == 0) {
+				if ((*bp == CCC2_C_NEAR) || (*bp == CCC2_PASCAL_NEAR)) {
 					retval = OTYPE_NEAR | OTYPE_SPECIAL;
 				}
-				else if (*bp == 1) {
+				else if ((*bp == CCC2_C_FAR) || (*bp == CCC2_PASCAL_FAR)) {
 					retval = OTYPE_FAR | OTYPE_SPECIAL;
 				}
 				else {
@@ -1963,9 +1973,19 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 
 			/*
 			* Skip over the rest of the record.
+			*
+			* mcasadevall: THere's no length record anymore for procedures, so
+			* we calculate the length to jump based off the arg count and ignore
+			* the len variable.
 			*/
-			bp = dataBase + len;
-			break;
+
+			// Move bp past reserved value
+			bp += 2;
+			MSObj_GetWord(argsCount, bp);
+			printf("argsCount: %d\n", argsCount);
+			MSObj_GetWord(argsList, bp); // argsList pointer
+			*bpPtr = bp;
+			return(retval);
 		}
 
 		case CTL2_MODIFIER:
@@ -1977,6 +1997,7 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 
 			retval = CV32FetchType(file, typeBlock, index);
 
+			printf("VMUnlockDirty::CTL2_MODIFIER\n");fflush(stdout);
 			break;
 		}
 		case CTL2_POINTER:
@@ -2041,9 +2062,10 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 		break;
 		case CTL2_ARRAY:
 			retval = CV32ProcessArray(file, &bp, len - 2, typeBlock);
+			printf("CV32ProcessTypeRecord::CTL2_ARRAY\n");fflush(stdout);
 			break;
 		case CTL2_STRUCTURE:
-		printf("CV32ProcessTypeRecord::CTL2_STRUCTURE+++\n"); fflush(stdout);
+			printf("CV32ProcessTypeRecord::CTL2_STRUCTURE+++\n"); fflush(stdout);
 			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock);
 			printf("CV32ProcessTypeRecord::CTL2_STRUCTURE---\n"); fflush(stdout);
 			break;
@@ -2074,7 +2096,7 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			break;
 		}
 		default:
-			printf("ERROR\r\n");
+			printf("ERROR: Unable to parse 0%x type\r\n", leaf);
 		}
 	}
 
@@ -2364,6 +2386,7 @@ CV32ProcessUnprocessedTypeRecords(const char *file)
     bp = typeSeg;
     end = typeSeg + typeSize;
 
+    printf("CV32ProcessUnprocessedTypeRecords++\n");
     while (bp < end) {
 	len = bp[1] | (bp[2] << 8);
 
@@ -2382,6 +2405,7 @@ CV32ProcessUnprocessedTypeRecords(const char *file)
 		break;
 	}
     }
+    printf("CV32ProcessUnprocessedTypeRecords--\n");
 }
 
 /***********************************************************************
@@ -2898,6 +2922,7 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		* Deal with this some day.
 		*/
 		break;
+	case CST2_LDATA16:
 	case CST2_GDATA16:
 		/*
 		* Deal with this some day.
@@ -3181,6 +3206,7 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		os->type = OSYM_RETURN_TYPE;
 		os->flags = OSYM_NAMELESS;
 		ptype -= 2;
+		printf("ptype[0-4] %x %x %x %x\n", ptype[0], ptype[1], ptype[2], ptype[3]);
 		os->u.localVar.type =
 			CV32ProcessTypeRecord(file, &ptype,
 				ptype[2] | (ptype[3] << 8),
@@ -3191,7 +3217,10 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		* this in the procedure symbol. ptype's been advanced beyond
 		* the return type for us by CVProcessTypeRecord.
 		*/
-		ptype += 2;
+
+		printf("ptype: 0x%x\n", (int)ptype);
+		ptype -= 6; /* MC: CHECK ME: my math may be off */
+
 		switch (*ptype) {
 		case CCC2_PASCAL_NEAR:
 		case CCC2_PASCAL_FAR:

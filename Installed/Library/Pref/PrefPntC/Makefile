@@ -3,16 +3,14 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = resolver
-ASM_TO_OBJS     = resolverManager.asm
-UI_TO_RDFS      =
-SRCS            = resolverComm.asm resolverEvents.asm resolverUtils.asm\
-                  resolverActions.asm resolverManager.asm resolverCApi.asm\
-                  resolverCache.asm resolver.asm resolverInt.def
-OBJS            = resolverManager.obj
+GEODE           = prefpntc
+ASM_TO_OBJS     = prefpntc.asm
+UI_TO_RDFS      = prefpntc.ui
+SRCS            = prefpntc.asm prefpntc.def prefpntc.ui
+OBJS            = prefpntc.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
-LIBNAME         = resolver
+LIBNAME         = prefpntc
 
 SYSMAKEFILE     = geode.mk
 

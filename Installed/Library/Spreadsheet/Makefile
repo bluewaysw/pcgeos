@@ -3,58 +3,59 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Spreadsheet
-RULER           = rulerCommon.asm rulerHoriz.asm rulerManager.asm\
-                  rulerMouse.asm rulerVert.asm rulerConstant.def
-SPREADSHEET     = graphicsText.asm spreadsheetC.asm spreadsheetCell.asm\
-                  spreadsheetCellEdit.asm spreadsheetChart.asm\
-                  spreadsheetCutCopy.asm spreadsheetCutCopyDataChain.asm\
-                  spreadsheetCutCopyUtils.asm spreadsheetDraw.asm\
-                  spreadsheetDrawUtils.asm spreadsheetEditBar.asm\
-                  spreadsheetErrorCheck.asm spreadsheetExprMethods.asm\
-                  spreadsheetExtent.asm spreadsheetFill.asm\
-                  spreadsheetFormat.asm spreadsheetFormatDisplay.asm\
-                  spreadsheetFormatInit.asm spreadsheetFormatMethods.asm\
-                  spreadsheetFormulaCell.asm spreadsheetFunctions.asm\
-                  spreadsheetGeometry.asm spreadsheetHeaderFooter.asm\
-                  spreadsheetInit.asm spreadsheetKeyboard.asm\
-                  spreadsheetManager.asm spreadsheetMethodFocus.asm\
-                  spreadsheetMethodMouse.asm spreadsheetMethodMove.asm\
-                  spreadsheetMethodSelect.asm spreadsheetMethodStyle.asm\
-                  spreadsheetNameCtrlInterface.asm spreadsheetNameList.asm\
-                  spreadsheetNameMethods.asm spreadsheetNameUtils.asm\
-                  spreadsheetNotes.asm spreadsheetNotify.asm\
-                  spreadsheetOverlap.asm spreadsheetParse.asm\
-                  spreadsheetPaste.asm spreadsheetPasteName.asm\
-                  spreadsheetPasteTransTbl.asm spreadsheetPointer.asm\
-                  spreadsheetPrint.asm spreadsheetQuickMoveCopy.asm\
-                  spreadsheetRange.asm spreadsheetRecalc.asm\
-                  spreadsheetRowArray.asm spreadsheetRowColumn.asm\
-                  spreadsheetScroll.asm spreadsheetSearch.asm\
-                  spreadsheetSort.asm spreadsheetSpace.asm\
-                  spreadsheetStyleToken.asm spreadsheetTextScrap.asm\
-                  spreadsheetUtils.asm spreadsheetVariable.asm\
-                  graphicsText.def spreadsheetConstant.def\
-                  spreadsheetCutCopyConstant.def\
-                  spreadsheetFileConstant.def spreadsheetMacro.def\
-                  spreadsheetRowArray.def spreadsheetStyleToken.def
-UI              = uiBorder.asm uiBorderColor.asm uiChart.asm\
-                  uiChooseFunction.asm uiChooseName.asm uiDefineName.asm\
-                  uiEdit.asm uiEditBar.asm uiFill.asm uiHeader.asm\
-                  uiHeight.asm uiManager.asm uiNotes.asm uiOptions.asm\
-                  uiRecalc.asm uiSort.asm uiUtils.asm uiWidth.asm\
-                  uiConstant.def uiBorder.ui uiBorderColor.ui uiChart.ui\
-                  uiChooseFunction.ui uiChooseName.ui uiDefineName.ui\
-                  uiEdit.ui uiEditBar.ui uiFill.ui uiHeader.ui uiHeight.ui\
-                  uiManager.ui uiNotes.ui uiOptions.ui uiRecalc.ui\
-                  uiSort.ui uiWidth.ui
-UI_TO_RDFS      = UIMANAGER.UI
+GEODE           = spreadsheet
+SPREADSHEET     = spreadsheetMethodSelect.asm spreadsheetPasteName.asm\
+                  spreadsheetC.asm spreadsheetRowColumn.asm\
+                  spreadsheetRowArray.asm spreadsheetFormulaCell.asm\
+                  spreadsheetErrorCheck.asm spreadsheetMethodFocus.asm\
+                  spreadsheetMethodMouse.asm spreadsheetGeometry.asm\
+                  spreadsheetTextScrap.asm spreadsheetCutCopy.asm\
+                  spreadsheetFormatInit.asm spreadsheetNotes.asm\
+                  spreadsheetParse.asm spreadsheetFormat.asm\
+                  spreadsheetDrawUtils.asm spreadsheetNameUtils.asm\
+                  spreadsheetFill.asm spreadsheetSpace.asm\
+                  spreadsheetSort.asm spreadsheetNameMethods.asm\
+                  spreadsheetExtent.asm spreadsheetVariable.asm\
+                  spreadsheetCell.asm spreadsheetPaste.asm\
+                  spreadsheetMethodStyle.asm spreadsheetSearch.asm\
+                  spreadsheetPointer.asm spreadsheetHeaderFooter.asm\
+                  spreadsheetCutCopyUtils.asm spreadsheetUtils.asm\
+                  spreadsheetQuickMoveCopy.asm\
+                  spreadsheetCutCopyDataChain.asm spreadsheetChart.asm\
+                  spreadsheetFormatMethods.asm spreadsheetScroll.asm\
+                  spreadsheetCellEdit.asm spreadsheetNotify.asm\
+                  spreadsheetInit.asm spreadsheetOverlap.asm\
+                  spreadsheetRecalc.asm spreadsheetRange.asm\
+                  spreadsheetExprMethods.asm spreadsheetPrint.asm\
+                  spreadsheetPasteTransTbl.asm spreadsheetFunctions.asm\
+                  spreadsheetKeyboard.asm spreadsheetNameCtrlInterface.asm\
+                  spreadsheetMethodMove.asm spreadsheetManager.asm\
+                  spreadsheetEditBar.asm spreadsheetFormatDisplay.asm\
+                  spreadsheetNameList.asm graphicsText.asm\
+                  spreadsheetStyleToken.asm spreadsheetDraw.asm\
+                  spreadsheetConstant.def spreadsheetStyleToken.def\
+                  spreadsheetRowArray.def spreadsheetFileConstant.def\
+                  graphicsText.def spreadsheetMacro.def\
+                  spreadsheetCutCopyConstant.def
+UI              = uiEdit.asm uiBorder.asm uiBorderColor.asm uiRecalc.asm\
+                  uiWidth.asm uiOptions.asm uiFill.asm uiChooseName.asm\
+                  uiChart.asm uiSort.asm uiDefineName.asm uiHeader.asm\
+                  uiEditBar.asm uiHeight.asm uiChooseFunction.asm\
+                  uiManager.asm uiUtils.asm uiNotes.asm uiConstant.def\
+                  uiDefineName.ui uiChart.ui uiWidth.ui uiManager.ui\
+                  uiChooseFunction.ui uiFill.ui uiNotes.ui uiHeader.ui\
+                  uiSort.ui uiOptions.ui uiBorder.ui uiEdit.ui\
+                  uiChooseName.ui uiBorderColor.ui uiRecalc.ui uiHeight.ui\
+                  uiEditBar.ui
+RULER           = rulerManager.asm rulerMouse.asm rulerCommon.asm\
+                  rulerVert.asm rulerHoriz.asm rulerConstant.def
+UI_TO_RDFS      = uiManager.ui
 OBJS            =
 COMMON          = spreadsheetErrors.def spreadsheetGeode.def\
                   spreadsheetMacros.def
-MODULES         = Ruler Spreadsheet UI
+MODULES         = Spreadsheet UI Ruler
 CMODULES        =
-SRCS            = $(RULER) $(SPREADSHEET) $(UI) $(COMMON)
+SRCS            = $(SPREADSHEET) $(UI) $(RULER) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = ssheet
