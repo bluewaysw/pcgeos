@@ -81,21 +81,21 @@ ifdef DO_DBCS
 #resource FFRCPVA0_TEXT          code read-only shared            
 #resource FFGROBJ0_TEXT          code read-only shared           
 #resource _TEXT                  code read-only shared            
-resource FFEXPRESSIONBUILDERUI          shared, ui-object, read-only
-resource FFEDGECONTROLLERUI             object
-resource FFFIELDPROPERTIESUI            shared, ui-object, read-only
-resource WARNINGSTRINGS         lmem
-resource FIELDDISPLAYSTRINGS            shared, lmem, read-only
-resource PASTEERRORSTRINGS              lmem
-resource IMPEXERRORSTRINGS              lmem
-resource PARSEERRORSTRINGS              lmem
-resource ERRORSTRINGS                   shared, lmem, read-only
-resource CONTROLSTRINGS                 shared, lmem, read-only
-resource FFRECORDCONTROLTOOLBOXUI       shared, ui-object, read-only
-resource APPRCPICONMONIKERRESOURCE      lmem read-only shared
-resource FFRECORDCONTROLUI              shared, ui-object, read-only
-resource FFTREASURECHESTUI              shared, ui-object 
-resource APPICONMONIKERRESOURCE         lmem read-only shared
+resource FFExpressionBuilderUI          shared, ui-object, read-only
+resource FFEdgeControllerUI             object
+resource FFFieldPropertiesUI            shared, ui-object, read-only
+resource WarningStrings         lmem
+resource FieldDisplayStrings            shared, lmem, read-only
+resource PasteErrorStrings              lmem
+resource ImpExErrorStrings              lmem
+resource ParseErrorStrings              lmem
+resource ErrorStrings                   shared, lmem, read-only
+resource ControlStrings                 shared, lmem, read-only
+resource FFRecordControlToolboxUI       shared, ui-object, read-only
+resource AppRCPIconMonikerResource      lmem read-only shared
+resource FFRecordControlUI              shared, ui-object, read-only
+resource FFTreasureChestUI              shared, ui-object 
+resource AppIconMonikerResource         lmem read-only shared
 
 else
 #resource InitCode                     code read-only shared
@@ -138,21 +138,21 @@ else
 #resource FFRECORDCONTROL_GCONST_DATA          code read-only shared
 #resource FFTREASURECHEST_G            code read-only shared
 #resource FFTREASURECHEST_GCONST_DATA          code read-only shared
-resource FFEXPRESSIONBUILDERUI        shared, ui-object, read-only
-resource FFEDGECONTROLLERUI           object
-resource FFFIELDPROPERTIESUI          shared, ui-object, read-only
-resource WARNINGSTRINGS               lmem
-resource FIELDDISPLAYSTRINGS          shared, lmem, read-only
-resource PASTEERRORSTRINGS            lmem
-resource IMPEXERRORSTRINGS            lmem
-resource PARSEERRORSTRINGS            lmem
-resource ERRORSTRINGS                 shared, lmem, read-only
-resource CONTROLSTRINGS               shared, lmem, read-only
-resource FFRECORDCONTROLTOOLBOXUI     shared, ui-object, read-only
-resource APPRCPICONMONIKERRESOURCE    lmem read-only shared
-resource FFRECORDCONTROLUI            shared, ui-object, read-only
-resource FFTREASURECHESTUI            shared, ui-object 
-resource APPICONMONIKERRESOURCE               lmem read-only shared
+resource FFExpressionBuilderUI        shared, ui-object, read-only
+resource FFEdgeControllerUI           object
+resource FFFieldPropertiesUI          shared, ui-object, read-only
+resource WarningStrings               lmem
+resource FieldDisplayStrings          shared, lmem, read-only
+resource PasteErrorStrings            lmem
+resource ImpExErrorStrings            lmem
+resource ParseErrorStrings            lmem
+resource ErrorStrings                 shared, lmem, read-only
+resource ControlStrings               shared, lmem, read-only
+resource FFRecordControlToolboxUI     shared, ui-object, read-only
+resource AppRCPIconMonikerResource    lmem read-only shared
+resource FFRecordControlUI            shared, ui-object, read-only
+resource FFTreasureChestUI            shared, ui-object 
+resource AppIconMonikerResource               lmem read-only shared
 endif
 
 #
