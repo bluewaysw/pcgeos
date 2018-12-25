@@ -1,0 +1,2679 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ */
+
+/***************************************************************************
+ *  FILE:  FileList.goc
+ ***************************************************************************/
+
+/*
+       FileListClass:
+
+       The FileListClass object is used to display a list of files either
+       locally or remotely in an organized fashion.  The files are shown
+       as a list of items in a dynamic list.
+
+       The files are kept internally as a list of items ordered by the
+       append order.  There is a separate sort index that is used for
+       displaying the list.  
+
+       The items are uniquely determined by their append position.  If
+       items are deleted, all unique id's are shifted by that position.
+
+       Selection of files is simple:  Single or Multiple files can be
+       selected.  There is no filtering of directory or file selection
+       automatically.
+
+       The path is also tracked, but little support is in place to
+       control the parsing of the path.
+
+       Most users of this object will want to subclass it to modify
+       its functionality.  This particular object keeps track of a
+       simple list of files, but does not interact with the GEOS file
+       system directly (see GenGEOSFileListClass for that).
+
+       Because of the amount of data this object keeps in memory at one
+       time, there is a limit on the number of files it can handle (and
+       the amount of memory it will tolerate).  This is roughly 500
+       files or 8k of data.
+
+       Displaying of the files are simply the name given (maybe clipped
+       for viewing purposes), the date (localized for the language), and
+       the size (converted to Gigabyte, Megabyte, Kilobyte, or byte sizes).
+
+       Glossary:
+           directory:  An 'entry' that IS a file directory
+           entry: one of the array items in the GFLI_list block.
+           file:  An 'entry' that is NOT a 'directory'
+           folder:  Same as 'directory'
+           list:  The array of 'entry' items (GFLI_list chunk array).
+           sort position:  Index into the sort list referring to an entry
+*/
+
+@include <stdapp.goh>
+@include <Ansi/string.h>
+@include <Ansi/stdio.h>
+@include <geoMisc.h>
+@include <Objects/filelist.goh>
+
+@include "internal.goh"
+
+@include "fllui.goh"
+
+@start FolderMonikerResource, data;
+
+@chunk byte FolderBitmap[] = {
+        Bitmap (16,11,BMC_PACKBITS,(BMT_MASK | BMF_MONO)),
+        0x03, 0x7e, 0x00, 0x7e, 0x00, 0x03, 0x81, 0xfe,
+        0x81, 0xfe, 0x03, 0xbe, 0x01, 0xbe, 0x01, 0x03,
+        0x80, 0x01, 0x80, 0x01, 0x03, 0x80, 0x01, 0x80,
+        0x01, 0x03, 0x80, 0x01, 0x80, 0x01, 0x03, 0x80,
+        0x01, 0x80, 0x01, 0x03, 0x80, 0x01, 0x80, 0x01,
+        0x03, 0x80, 0x01, 0x80, 0x01, 0x03, 0x80, 0x01,
+        0x80, 0x01, 0x03, 0x7f, 0xfe, 0x7f, 0xfe,
+};
+
+@end FolderMonikerResource;
+
+/**************************************************************************
+ * Class Definition:  GenFileListClass
+ **************************************************************************/
+
+@classdecl GenFileListClass ;
+
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_CREATE_VOLUMES ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_APPEND_VOLUME ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_VOLUME_SELECTED ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_GET_VOLUME_NAME ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_FIND_VOLUME ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_VOLUME_SELECTED_INTERNAL ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_QUERY_VOLUME ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_SELECT_VOLUME ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_CONSTRUCT_PATH_STRING ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_APPLY_PARSED_PATH ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_PARSE_PATH ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_IS_STRING_FILTER ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_CONDENSE_PATH ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_VALIDATE_PATH ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_ACCEPT_PATH ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_DENY_PATH ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_SET_PATH ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_GET_PATH ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_MAP_VOLUME_NAME ;
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_REPORT_STANDARD_ERROR ;
+
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_TRAVEL
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Travel into a directory (or file) that is on the list.
+ |     Requests the new directory path after clearing the current list.
+ |
+ | Inputs:
+ |     T_fileListID index         -- Which file to travel into.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_TRAVEL
+{
+    DirPathHandle dir ;
+    TCHAR filename[FILE_LONGNAME_LENGTH+1] ;
+
+    @call oself::MSG_GEN_FILE_LIST_GET_INFO(
+             index, 
+             filename, 
+             sizeof(filename), 
+             NULL, 
+             NULL) ;
+
+    dir = DirPathCreate() ;
+    DirPathAppendFolder(dir, DirPathAllocSubString(dir, filename, 0)) ;
+    @call oself::MSG_GEN_FILE_LIST_APPLY_PARSED_PATH(dir, FALSE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_UP_DIRECTORY
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Travel up one directory level.
+ |     Clears the list and then requests a path up one level.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_UP_DIRECTORY
+{
+    DirPathHandle dir ;
+
+    /* Go up one directory */
+    if ((dir = pself->GFLI_parsedPath) != NullHandle)  {
+        if (DirPathGetNumFolders(dir))  {
+            dir = DirPathDuplicate(dir) ;
+            DirPathRemoveLastFolder(dir) ;
+            @call oself::MSG_GEN_FILE_LIST_APPLY_PARSED_PATH(
+                      dir,
+                      FALSE) ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_REMOVE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Remove a file from the listing.  Note that all file indexes past
+ |     this file are decremented and one less will be in the list.
+ |
+ | Inputs:
+ |     T_fileListID index         -- file to delete
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_REMOVE
+{
+    word sortEntry ;
+
+    /* Go ahead and try removing the entry in the low level code. */
+    sortEntry = IFileListFileEntryRemove(
+                    @D_BLOCK, 
+                    pself->GFLI_list, 
+                    pself->GFLI_orderList, 
+                    index) ;
+
+    /* If valid, then remove from the UI */
+    if (sortEntry != 0xFFFF)  {
+        if (pself->GFLI_suspendCount)  {
+            pself->GFLI_suspendFlags |= GEN_FILE_LIST_SUSPEND_FLAG_CHANGED_COUNT ;
+        } else {
+            @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(sortEntry, 1) ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_APPEND
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Add another file to the listing.  Internally, one more index will
+ |     be created (at the end).  However, the sorted list will be updated
+ |     and inserted correctly.
+ |
+ | Inputs:
+ |     TCHAR *p_filename          -- Name of file (zero terminated)
+ |     dword size                 -- Size of file
+ |     FileDateAndTime modified   -- Date and time of last modification
+ |     Boolean isDir              -- TRUE if directory, else FALSE
+ |
+ | Outputs:
+ |     T_fileListID               -- ID assigned to this entry, or returns
+ |                                   FILE_LIST_ID_BAD if failed.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_APPEND
+{
+    word sortEntry = 0xFFFF ;
+    T_fileListID fileID = FILE_LIST_ID_BAD ;
+    Boolean keep = TRUE ;
+
+    /* First, check to see if we should filter out the file */
+    @call oself::MSG_GEN_FILE_LIST_FILTER(
+                          p_filename,
+                          size,
+                          modified,
+                          isDir,
+                          &keep) ;
+
+    if (keep)  {
+        /* Do the low level appending */
+        fileID = IFileListFileEntryAdd(
+                     @D_BLOCK,
+                     pself->GFLI_list,
+                     pself->GFLI_orderList,
+                     p_filename,
+                     size,
+                     modified,
+                     isDir,
+                     &sortEntry,
+                     pself->GFLI_sortField,
+                     pself->GFLI_sortOrder) ;
+
+        if ((fileID != FILE_LIST_ID_BAD) && (sortEntry != 0xFFFF))  {
+            /* Add the entry to the UI list (if valid response) */
+            if (pself->GFLI_suspendCount)  {
+                pself->GFLI_suspendFlags |= GEN_FILE_LIST_SUSPEND_FLAG_CHANGED_COUNT ;
+            } else {
+                @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(sortEntry, 1) ;
+            }
+        }
+    }
+
+    return fileID ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_CHANGE_NAME
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the name of a file (and resort as necessary).
+ | Inputs:
+ |     T_fileListID file          -- File to change
+ |     TCHAR *p_newFilename       -- New filename to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_CHANGE_NAME
+{
+    word oldPosition, newPosition ;
+    Boolean wasSelected ;
+
+    wasSelected = @call oself::MSG_GEN_FILE_LIST_QUERY_SELECTED(file) ;
+
+    /* Do the actual data change */
+    IFileListFileChangeName(
+         @D_BLOCK,
+         pself->GFLI_list,
+         file,
+         p_newFilename) ;
+
+    /* Determine the new location */
+    IFileListEntryResort(
+         @D_BLOCK,
+         pself->GFLI_list,
+         pself->GFLI_orderList,
+         pself->GFLI_sortField,
+         pself->GFLI_sortOrder,
+         file,
+         &oldPosition,
+         &newPosition) ;
+
+    /* Update the UI for the change */
+    @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(oldPosition, 1) ;
+    @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(newPosition, 1) ;
+
+    /* Put back selection (if it was) */
+    if (wasSelected)
+        @call oself::MSG_GEN_FILE_LIST_SELECT_FILE(file) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_CHANGE_SIZE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the size of a file (and resort as necessary).
+ |
+ | Inputs:
+ |     T_fileListID file          -- File to change size
+ |     dword newSize              -- byte size of file
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_CHANGE_SIZE
+{
+    word oldPosition, newPosition ;
+    Boolean wasSelected ;
+
+    wasSelected = @call oself::MSG_GEN_FILE_LIST_QUERY_SELECTED(file) ;
+
+
+    /* Change size */
+    IFileListFileChangeSize(
+         @D_BLOCK,
+         pself->GFLI_list,
+         file,
+         newSize) ;
+
+    /* Resort this one entry */
+    IFileListEntryResort(
+         @D_BLOCK,
+         pself->GFLI_list,
+         pself->GFLI_orderList,
+         pself->GFLI_sortField,
+         pself->GFLI_sortOrder,
+         file,
+         &oldPosition,
+         &newPosition) ;
+
+    /* Update the UI for the change */
+    @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(oldPosition, 1) ;
+    @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(newPosition, 1) ;
+
+    /* Put back selection (if it was) */
+    if (wasSelected)
+        @call oself::MSG_GEN_FILE_LIST_SELECT_FILE(file) ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_CHANGE_MODIFIED
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the modification date and time of a file (and resort as
+ |     necessary).
+ |
+ | Inputs:
+ |     T_fileListID file          -- file to change modification date
+ |     FileDateAndTime modified   -- New date and time
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_CHANGE_MODIFIED
+{
+    word oldPosition, newPosition ;
+    Boolean wasSelected ;
+
+    wasSelected = @call oself::MSG_GEN_FILE_LIST_QUERY_SELECTED(file) ;
+
+    /* Change size */
+    IFileListFileChangeModified(
+         @D_BLOCK,
+         pself->GFLI_list,
+         file,
+         modified) ;
+
+    /* Resort this one entry */
+    IFileListEntryResort(
+         @D_BLOCK,
+         pself->GFLI_list,
+         pself->GFLI_orderList,
+         pself->GFLI_sortField,
+         pself->GFLI_sortOrder,
+         file,
+         &oldPosition,
+         &newPosition) ;
+
+    /* Update the UI for the change */
+    @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(oldPosition, 1) ;
+    @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(newPosition, 1) ;
+
+    /* Put back selection (if it was) */
+    if (wasSelected)
+        @call oself::MSG_GEN_FILE_LIST_SELECT_FILE(file) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_QUERY_IS_DIR
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Determine if an entry in the list is a directory.
+ |
+ | Inputs:
+ |     T_fileListID file          -- Entry to check
+ |
+ | Outputs:
+ |     Boolean                    -- TRUE if a directory
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_QUERY_IS_DIR
+{
+    Boolean isDir = FALSE ;
+    word size ;
+    T_fileListEntry *p_entry = NULL ;
+
+    MemLock(@D_BLOCK) ;
+    p_entry = ChunkArrayElementToPtrHandles(
+                  @D_BLOCK,
+                  pself->GFLI_list,
+                  file,
+                  &size) ;
+    if (p_entry)
+        isDir = p_entry->FLE_isDir ;
+
+    MemUnlock(@D_BLOCK) ;
+    return isDir ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_COUNT
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get the number of items in the directory list.
+ |
+ | Outputs:
+ |     word                       -- Number entries
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_GET_COUNT
+{
+    word count ;
+
+    MemLock(@D_BLOCK) ;
+    count = ChunkArrayGetCountHandles(@D_BLOCK, pself->GFLI_orderList) ;
+    MemUnlock(@D_BLOCK) ;
+
+    return count ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_SET_SORT_ORDER
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the sorting method in use.  If this is different then
+ |     currently used, a complete resort will occur.
+ |
+ | Inputs:
+ |     T_fileListField sortField  -- Which field to sort by
+ |     Boolean isDescending       -- TRUE is descend, else ascend.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_SET_SORT_ORDER
+{
+    word numItems ;
+    MemHandle mem ;
+    word *p_selectList ;
+    word num;
+    word i ;
+#define MAX_SELECTIONS_REMEMBERED    1000
+
+    if ((sortField != pself->GFLI_sortField) ||
+            (isDescending != pself->GFLI_sortOrder))  {
+        pself->GFLI_sortField = sortField ;
+        pself->GFLI_sortOrder = isDescending ;
+        @call oself::MSG_META_SUSPEND() ;
+
+        mem = MemAlloc(sizeof(word) * MAX_SELECTIONS_REMEMBERED, HF_DYNAMIC, 0) ;
+        p_selectList = MemLock(mem) ;
+        num = @call @UI_LIST::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
+                        p_selectList,
+                        MAX_SELECTIONS_REMEMBERED) ;
+        /* Convert all the sort positions into indexes */
+        for (i=0; i<num; i++)
+            p_selectList[i] = IFileListSortEntryGetNth(
+                                   @D_BLOCK,
+                                   pself->GFLI_orderList,
+                                   p_selectList[i]) ;
+        MemUnlock(mem) ;
+
+        numItems = IFileListResortAll(
+                       @D_BLOCK,
+                       pself->GFLI_list,
+                       pself->GFLI_orderList,
+                       sortField,
+                       isDescending) ;
+
+        /* Redo the UI completely */
+        @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numItems) ;
+
+        @call oself::MSG_META_UNSUSPEND() ;
+
+        /* Go back and reselect all the items */
+        p_selectList = MemLock(mem) ;
+        for (i=0; i<num; i++)
+            @call oself::MSG_GEN_FILE_LIST_SELECT_FILE(p_selectList[i]) ;
+        MemUnlock(mem) ;
+        MemFree(mem) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_CHOOSE_SORT_TAB
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Toggle a tab as if the user pressed it (actually, the UI calls
+ |     this routine for that).
+ |
+ | Inputs:
+ |     T_fileListField sortField  -- Which field to sort by
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/30/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_CHOOSE_SORT_TAB
+{
+    /* Different field or same? */
+    if (sortField != pself->GFLI_sortField)  {
+        /* Different field */
+        /* jump to the new sort field and start with ascending order */
+        @call oself::MSG_GEN_FILE_LIST_SET_SORT_ORDER(
+            sortField,
+            FALSE) ;
+    } else {
+        /* Same field */
+        /* Toggle from ascending to descending and visa-versa */
+        @call oself::MSG_GEN_FILE_LIST_SET_SORT_ORDER(
+            sortField,
+            (pself->GFLI_sortOrder)?FALSE:TRUE) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_SORT_ORDER
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get the current sort order being used.
+ |
+ | Inputs:
+ |     T_fileListField *p_sortField -- Return field being used to sort by
+ |
+ | Outputs:
+ |     Boolean                    -- TRUE if descent, else ascend.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_GET_SORT_ORDER
+{
+    if (p_sortField)
+        *p_sortField = pself->GFLI_sortField ;
+
+    return pself->GFLI_sortOrder ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_FIRST
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get the first sorted entry.
+ |
+ | Outputs:
+ |     T_fileListID               -- First entry
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_GET_FIRST
+{
+    /* Return the item in the sort list at position 0 */
+    return IFileListSortEntryGetNth(@D_BLOCK, pself->GFLI_orderList, 0) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_LAST
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get the last sorted entry.
+ |
+ | Outputs:
+ |     T_fileListID               -- Last entry in sorted list
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_GET_LAST
+{
+    word count ;
+
+    count = @call oself::MSG_GEN_FILE_LIST_GET_COUNT() ;
+    return ((count) ?
+              IFileListSortEntryGetNth(
+                  @D_BLOCK,
+                  pself->GFLI_orderList,
+                  count-1) :
+              FILE_LIST_ID_BAD) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_NEXT
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Given a file in the list, determine the next sorted entry
+ |
+ | Inputs:
+ |     T_fileListID id            -- id of previos item
+ |
+ | Outputs:
+ |     T_fileListID               -- Next sorted entry, or
+ |                                   FILE_LIST_ID_BAD
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_GET_NEXT
+{
+    word sortPos ;
+
+    sortPos = IFileListFileEntryGetSortPosition(
+                  @D_BLOCK,
+                  pself->GFLI_orderList,
+                  id) ;
+    return ((sortPos != 0xFFFF)?
+                IFileListSortEntryGetNth(
+                    @D_BLOCK,
+                    pself->GFLI_orderList,
+                    sortPos+1) :
+                FILE_LIST_ID_BAD) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_PREVIOUS
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Given a file in the list, determine the previous sorted entry.
+ |
+ | Inputs:
+ |     T_fileListID id            -- id of next item
+ |
+ | Outputs:
+ |     T_fileListID               -- Previous sorted entry, or
+ |                                   FILE_LIST_ID_BAD
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_GET_PREVIOUS
+{
+    word sortPos ;
+
+    sortPos = IFileListFileEntryGetSortPosition(
+                  @D_BLOCK,
+                  pself->GFLI_orderList,
+                  id) ;
+    return ((sortPos != 0xFFFF)?
+                IFileListSortEntryGetNth(
+                    @D_BLOCK,
+                    pself->GFLI_orderList,
+                    sortPos-1) :
+                FILE_LIST_ID_BAD) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_FIND_NTH
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Determine the nth position in the sorted array.
+ |
+ | Inputs:
+ |     word index                 -- Index position to find
+ |
+ | Outputs:
+ |     T_fileListID               -- id of file found, else
+ |                                   FILE_LIST_ID_BAD
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_FIND_NTH
+{
+    return IFileListSortEntryGetNth(
+                    @D_BLOCK,
+                    pself->GFLI_orderList,
+                    index) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_POSITION
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Determine the sorted position of a file.
+ |
+ | Inputs:
+ |     T_fileListID               -- id of file to find
+ |
+ | Outputs:
+ |     word                       -- Position of file, or 0xFFFF for none.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_GET_POSITION
+{
+    return IFileListFileEntryGetSortPosition(
+                  @D_BLOCK,
+                  pself->GFLI_orderList,
+                  id) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_CLEAR
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Completely clear the list of all entries.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_CLEAR
+{
+    /* Get rid of it ALL */
+    if (@D_BLOCK)
+        MemFree(@D_BLOCK) ;
+
+    /* Recreate the memory from scratch */
+    pself->GFLI_dataBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+    MemLock(@D_BLOCK) ;
+    pself->GFLI_list = ChunkArrayCreate(
+                           @D_BLOCK,
+                           sizeof(T_fileListEntry),
+                           0,
+                           0) ;
+    pself->GFLI_orderList = ChunkArrayCreate(
+                               @D_BLOCK,
+                               sizeof(T_fileListID),
+                               0,
+                               0) ;
+    MemUnlock(@D_BLOCK) ;
+    @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_SET_SELECTION_TYPE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Declare the type of selecting the user is allowed to do:
+ |     single file or multiple.
+ |
+ | Inputs:
+ |     T_fileListSelectionType selectType -- set the selection type.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_SET_SELECTION_TYPE
+{
+    switch (selectType)  {
+        case FILE_LIST_SELECT_SINGLE:
+            @call @UI_LIST::MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE(
+                      GIGBT_EXCLUSIVE) ;
+            break ;
+        case FILE_LIST_SELECT_MULTIPLE:
+            @call @UI_LIST::MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE(
+                      GIGBT_EXTENDED_SELECTION) ;
+            break ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_SELECTION_TYPE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Return the type of selections being executed.
+ |
+ | Outputs:
+ |     T_fileListSelectionType
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_GET_SELECTION_TYPE
+{
+    GenItemGroupBehaviorType behavior ;
+
+    behavior = @call @UI_LIST::MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE() ;
+
+    /* Only return single, if exclusive on the list. */
+    if (behavior == GIGBT_EXCLUSIVE)
+        return FILE_LIST_SELECT_SINGLE;
+
+    return FILE_LIST_SELECT_MULTIPLE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_SELECT_FILE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Declare a single file as selected.  If single selection mode is
+ |     used, only this file will now be selected.  If in multiple selection
+ |     mode, this file is now selected.
+ |
+ | Inputs:
+ |     T_fileListID file          -- File to select
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_SELECT_FILE
+{
+    /* NOTE:  THIs routine doesn't work well at ALL */
+    word sortPos ;
+
+    sortPos = IFileListFileEntryGetSortPosition(
+                  @D_BLOCK,
+                  pself->GFLI_orderList,
+                  file) ;
+    @call @UI_LIST::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(sortPos, TRUE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_UNSELECT_FILE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Declare a single file as unselected.  If in multiple selection
+ |     mode, all other selections are unaffected.
+ |
+ | Inputs:
+ |     T_fileListID file          -- file to select
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_UNSELECT_FILE
+{
+    /* NOTE:  THIs routine doesn't work well at ALL */
+    word sortPos ;
+
+    sortPos = IFileListFileEntryGetSortPosition(
+                  @D_BLOCK,
+                  pself->GFLI_orderList,
+                  file) ;
+    @call @UI_LIST::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(sortPos, FALSE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_QUERY_SELECTED
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Determine if the given file has been selected.  Multiple selection
+ |     mode users will make calls to this routine.
+ |
+ | Inputs:
+ |     T_fileListID file          -- File to check
+ |
+ | Outputs:
+ |     Boolean                    -- TRUE if selected, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_QUERY_SELECTED
+{
+    word sortPos ;
+
+    sortPos = IFileListFileEntryGetSortPosition(
+                  @D_BLOCK,
+                  pself->GFLI_orderList,
+                  file) ;
+    return @call @UI_LIST::MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(sortPos) ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_QUERY_SINGLE_SELECTION
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Determine the last selected file (and still selected).  Single
+ |     selection mode users will use this call to determine which file
+ |     has been called.  Multiple selection mode will always return
+ |     FILE_LIST_ID_BAD ;
+ | Outputs:
+ |     T_fileListID               -- file id of only file selected, else
+ |                                   FILE_LIST_ID_BAD
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_QUERY_SINGLE_SELECTION
+{
+    word item ;
+
+    item = @call @UI_LIST::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+
+    /* If nothing, then return nothing */
+    if (item == GIGS_NONE)
+          return FILE_LIST_ID_BAD ;
+
+    /* Otherwise, convert the location into a entry in the list */
+    return IFileListSortEntryGetNth(
+                @D_BLOCK,
+                pself->GFLI_orderList,
+                item) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_INFO
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Pull information about a file out of the list.  Pass NULL to any
+ |     of the parameters that you don't want to have returned.
+ |
+ | Inputs:
+ |     T_fileListID file          -- File to find
+ |     TCHAR *p_filename          -- Place to return filename if not NULL
+ |     word maxFilename           -- Size of buffer holding name (including
+ |                                   NULL character)
+ |     dword *p_size              -- Place to store file size if not NULL
+ |     FileDateAndTime *p_modified -- Place to store modification date if not
+ |                                   NULL.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_GET_INFO
+{
+    word num ;
+    T_fileListEntry *p_entry = NULL ;
+
+    MemLock(@D_BLOCK) ;
+    *p_filename = '\0' ;
+    *p_size = 0 ;
+    *p_modified = 0 ;
+    num = ChunkArrayGetCount(@D_LIST) ;
+    if (file < num)  {
+        p_entry = ChunkArrayElementToPtr(@D_LIST, file, NULL) ;
+        if (p_entry->FLE_name)
+            strncpy(
+                p_filename, 
+                LMemDerefHandles(@D_BLOCK, p_entry->FLE_name), 
+                maxFilename-1) ;
+        *p_size = p_entry->FLE_size ;
+        *p_modified = p_entry->FLE_modified ;
+    }
+    MemUnlock(@D_BLOCK) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_RELOAD
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Method called to clear the list and load a new group of list items.
+ |     Use this method also to reread the directory.
+ |     Special subclasses should intercept this message.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ | Last tested:  10/13/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_RELOAD
+{
+    @call oself::MSG_GEN_FILE_LIST_MARK_RELOAD_STARTED() ;
+    if (pself->GFLI_suspendCount)  {
+        pself->GFLI_suspendFlags |= GEN_FILE_LIST_SUSPEND_RELOAD_PENDING ;
+    } else {
+        /* Get rid of the old list */
+        @call oself::MSG_GEN_FILE_LIST_CLEAR() ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_META_RESOLVE_VARIANT_SUPERCLASS
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Need to create a UI tree out of this thing.  Instantiate the whole
+ |     UI object group from a resource template.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/27/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    MemHandle mem ;
+    optr child ;
+
+    if (!pself->GFLI_uiBlock)  {
+        pself->GFLI_uiBlock = mem = 
+                ObjDuplicateResource(OptrToHandle(@FileListUITop), 0, 0) ;
+        child = ConstructOptr(mem, OptrToChunk(@FileListUITop)) ;
+        @call oself::MSG_GEN_ADD_CHILD(child, CCO_LAST) ;
+        @call oself::MSG_GEN_FILE_LIST_UPDATE_UI() ;
+        @send ,forceQueue child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+        @send ,forceQueue child::MSG_META_SUSPEND() ;
+        @send ,forceQueue oself::MSG_GEN_FILE_LIST_SETUP() ;
+        @send ,forceQueue child::MSG_META_UNSUSPEND() ;
+        @call oself::MSG_GEN_FILE_LIST_CLEAR() ;
+    } else {
+        pself->GFLI_dataBlock = NullHandle ;
+        @call oself::MSG_GEN_FILE_LIST_CLEAR() ;
+        @call oself::MSG_GEN_FILE_LIST_UPDATE_UI() ;
+        @send ,forceQueue child::MSG_META_SUSPEND() ;
+        @send ,forceQueue oself::MSG_GEN_FILE_LIST_SETUP() ;
+        @send ,forceQueue child::MSG_META_UNSUSPEND() ;
+    }
+    
+    return @callsuper() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_SETUP
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Link all the objects in our duplicated resource together.
+ |     Basically do this to ensure everyone can send messages to each 
+ |     other.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/29/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_SETUP
+{
+    optr child ;
+
+    child = @CHILD(@FileListUIList) ;
+    @call child::MSG_FILE_LIST_SET_DESTINATION(oself) ;
+    @call child::MSG_FILE_LIST_SET_DRAW_MESSAGE(MSG_GEN_FILE_LIST_DRAW_ITEM) ;
+    @call @CHILD(@FileListUIName)::MSG_GEN_TRIGGER_SET_DESTINATION(oself) ;
+    @call @CHILD(@FileListUIModified)::MSG_GEN_TRIGGER_SET_DESTINATION(oself) ;
+    @call @CHILD(@FileListUISize)::MSG_GEN_TRIGGER_SET_DESTINATION(oself) ;
+    @call @CHILD(@FileListUIPath)::MSG_GEN_TEXT_SET_DESTINATION(oself) ;
+    @call @CHILD(@FileListUIVolumes)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(oself) ;
+    @call @CHILD(@FileListUIUp)::MSG_GEN_TRIGGER_SET_DESTINATION(oself) ;
+    @call @CHILD(@FileListUIUpNextToPath)::MSG_GEN_TRIGGER_SET_DESTINATION(oself) ;
+    @call @CHILD(@FileListUIList)::MSG_GEN_ITEM_GROUP_SET_DESTINATION(oself) ;
+    @call @CHILD(@FileListUIUp)::MSG_GEN_TRIGGER_SET_ACTION_MSG(
+        MSG_GEN_FILE_LIST_UP_DIRECTORY) ;
+    @call @CHILD(@FileListUIUpNextToPath)::MSG_GEN_TRIGGER_SET_ACTION_MSG(
+        MSG_GEN_FILE_LIST_UP_DIRECTORY) ;
+    if (ObjVarFindData(oself, HINT_GEN_FILE_LIST_MULTIPLE_SELECTION))
+        @call oself::MSG_GEN_FILE_LIST_SET_SELECTION_TYPE(
+            FILE_LIST_SELECT_MULTIPLE) ;
+
+    /* Setup the drive selector */
+    @send ,forceQueue oself::MSG_GEN_FILE_LIST_CREATE_VOLUMES() ;
+
+    /* Read the first directory */
+    @send ,forceQueue oself::MSG_GEN_FILE_LIST_RELOAD() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_DRAW_ITEM
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Draw an item in the file list.  Basically make it draw however it
+ |     needs to be.
+ |
+ | Inputs:
+ |     optr list                  -- List being referenced (sub-object)
+ |     word item                  -- Index to item needed to be drawn.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/29/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_DRAW_ITEM
+/* (optr list, word item) ; */
+{
+    T_fileListID entry ;
+    Boolean isDir ;
+    dword size ;
+    char filename[300] ;
+    FileDateAndTime modified ;
+    Rectangle bounds ;
+    sword left ;
+    char sizing[20] ;
+    char datetime[40] ;
+    MemHandle mem ;
+    GStateHandle gstring ;
+    ChunkHandle gchunk ;
+    word width ;
+    WWFixedAsDWord pointSize ;
+    FontID font ;
+
+    entry = @call oself::MSG_GEN_FILE_LIST_FIND_NTH(item) ;
+    if (entry != FILE_LIST_ID_BAD)  {
+        isDir = @call oself::MSG_GEN_FILE_LIST_QUERY_IS_DIR(entry) ;
+        @call oself::MSG_GEN_FILE_LIST_GET_INFO(
+                  entry,
+                  filename,
+                  sizeof(filename),
+                  &size,
+                  &modified) ;
+
+
+        mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
+        gstring = GrCreateGString(mem, GST_CHUNK, (word*) &gchunk) ;
+        font = GrGetFont(gstring, &pointSize);
+        @call @CHILD(FileListUIUp)::MSG_VIS_GET_BOUNDS(&bounds) ;
+        if (pself->GFLI_usableParts & GEN_FILE_LIST_PART_COLUMN_TABS)  {
+            @call oself::MSG_GEN_FILE_LIST_DRAW_ICON(
+                      gstring,
+                      2,
+                      2,
+                      1 + bounds.R_right - bounds.R_left,
+                      pointSize>>16,
+                      entry,
+                      isDir) ;
+
+            left = bounds.R_left - 2;
+
+            @call @CHILD(FileListUIName)::MSG_VIS_GET_BOUNDS(&bounds) ;
+            GrDrawText(gstring, bounds.R_left - left, 1, filename, 0) ;
+
+            if (pself->GFLI_usableParts & GEN_FILE_LIST_PART_SIZE_TAB)  {
+                if ((!isDir) || (size != 0))  {
+                    IConvertToSizing(size, sizing) ;
+                    width = IDetermineWidth(sizing, 0, font, pointSize) ;
+                    @call @CHILD(FileListUISize)::MSG_VIS_GET_BOUNDS(&bounds) ;
+                    GrDrawText(
+                        gstring, 
+                        bounds.R_right - width - left - 8 - 
+                            ((!(pself->GFLI_usableParts & GEN_FILE_LIST_PART_MODIFIED_TAB))?20:0), 
+                        1, 
+                        sizing, 
+                        0) ; 
+                }
+            }
+
+            if (pself->GFLI_usableParts & GEN_FILE_LIST_PART_MODIFIED_TAB)  {
+                if (modified)  {
+                    LocalFormatFileDateTime(
+                        datetime, 
+                        DTF_LONG_NO_WEEKDAY_CONDENSED,
+                        &modified) ;
+                    @call @CHILD(FileListUIModified)::MSG_VIS_GET_BOUNDS(&bounds) ;
+                    GrDrawText(gstring, bounds.R_left - left, 1, datetime, 0) ;
+                }
+            }
+        } else {
+            @call oself::MSG_GEN_FILE_LIST_DRAW_ICON(
+                      gstring,
+                      2,
+                      2,
+                      28,
+                      pointSize>>16,
+                      entry,
+                      isDir) ;
+            GrDrawText(gstring, 30, 1, filename, 0) ;
+        }
+
+        GrEndGString(gstring) ;
+        GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA) ;
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+                  item,
+                  0,
+                  20,
+                  2000,
+                  0,
+                  VMDT_GSTRING,
+                  VMST_OPTR,
+                  ConstructOptr(mem, gchunk)) ;
+        MemFree(mem) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_DRAW_ICON
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Icons can be drawn by the user here.  For now, the only thing drawn
+ |     is a folder for folders.  All else have no icons.
+ |
+ | Inputs:
+ |     GStateHandle gstate        -- Where to draw the icon
+ |     sword x, y                 -- coordinate location of top left
+ |     word width, height         -- Area reserved
+ |     T_fileListID file          -- identifier of file with icon
+ |     Boolean isDir              -- TRUE if a folder/directory, else
+ |                                   FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/01/99  Created
+ |
+ | Last tested:  10/01/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_DRAW_ICON
+/* (
+                          GStateHandle gstate,
+                          sword x,
+                          sword y,
+                          word width,
+                          word height,
+                          T_fileListID file,
+                          Boolean isDir) ; */
+{
+    if (isDir)  {
+        MemLock(OptrToHandle(@FolderBitmap)) ;
+        GrDrawBitmap(
+            gstate, 
+            x + (width-16)/2, 
+            y + (height-11),
+            LMemDeref(@FolderBitmap), 
+            NULL) ;
+        MemUnlock(OptrToHandle(@FolderBitmap)) ;
+    } else  {
+        /* Draw file icon */
+/*            GrDrawText(gstring, 2, 1, "F", 1) ; */
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_PATH_CHANGED
+ *-------------------------------------------------------------------------
+ | Description:
+ |     User has typedin a new path.  Take action.  Not intended to be
+ |     intercepted since the data is passed on to the parser.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_PATH_CHANGED
+{
+    MemHandle mem ;
+    char *p_text ;
+
+    /* Transfer the text in the text entry to the internal system */
+    /* This will cause the path to reload */
+    mem = @call @CHILD(@FileListUIPath)::MSG_VIS_TEXT_GET_ALL_BLOCK(0) ;
+    p_text = MemLock(mem) ;
+    @call oself::MSG_GEN_FILE_LIST_SET_PATH(p_text) ;
+    @call oself::MSG_GEN_FILE_LIST_SET_LAST_FOCUS(@CHILD(@FileListUIPath)) ;
+
+    MemUnlock(mem) ;
+    MemFree(mem) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_META_SUSPEND
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Mark the object as suspended to keep changes from occuring on the
+ |     UI object.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/04/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_META_SUSPEND
+{
+    pself->GFLI_suspendCount++ ;
+    if (pself->GFLI_suspendCount==1)  {
+        @call @CHILD(@FileListUIList)::MSG_META_SUSPEND() ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_META_UNSUSPEND
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Allow all the changes to the file list to be updated.  In 
+ |     particular, we now change the number of items in the dynamic list.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/04/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_META_UNSUSPEND
+{
+    word num ;
+
+    pself->GFLI_suspendCount-- ;
+    if (pself->GFLI_suspendCount == 0)  {
+        @call @CHILD(@FileListUIList)::MSG_META_UNSUSPEND() ;
+        if (pself->GFLI_suspendFlags & GEN_FILE_LIST_SUSPEND_FLAG_CHANGED_COUNT)  {
+            num = @call oself::MSG_GEN_FILE_LIST_GET_COUNT() ;
+            @call @UI_LIST::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num) ;
+            pself->GFLI_suspendFlags &= (~GEN_FILE_LIST_SUSPEND_FLAG_CHANGED_COUNT) ;
+        }
+        if (pself->GFLI_suspendFlags & GEN_FILE_LIST_SUSPEND_RELOAD_PENDING)  {
+            @send ,forceQueue oself::MSG_GEN_FILE_LIST_RELOAD() ;
+            pself->GFLI_suspendFlags &= (~GEN_FILE_LIST_SUSPEND_RELOAD_PENDING) ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_SET_USABLE_PARTS
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the flags by setting and clearing the given parts and then
+ |     update the UI.
+ |
+ | Inputs:
+ |     T_genFileListParts partsOn -- UI parts to turn on
+ |     T_genFileListParts partsOff -- UI parts to turn off
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_SET_USABLE_PARTS
+{
+    pself->GFLI_usableParts |= partsOn ;
+    pself->GFLI_usableParts &= (~partsOff) ;
+    @call oself::MSG_GEN_FILE_LIST_UPDATE_UI() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_SET_ENABLED_PARTS
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Activate or disactive the parts of the UI and handle immediately.
+ |
+ | Inputs:
+ |     T_genFileListParts partsOn -- UI parts to enable
+ |     T_genFileListParts partsOff -- UI parts to disable
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_SET_ENABLED_PARTS
+{
+    pself->GFLI_enabledParts |= partsOn ;
+    pself->GFLI_enabledParts &= (~partsOff) ;
+    @call oself::MSG_GEN_FILE_LIST_UPDATE_UI() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_UPDATE_UI  * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Go through a list of parts and enable/disable/show/hide the
+ |     various UI objects.  The Up trigger is handled in a special case
+ |     since it is really two objects.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_UPDATE_UI
+{
+    typedef struct {
+        T_genFileListParts part ;
+        ChunkHandle chunk ;
+    } T_usableTable ;
+    static T_usableTable usableTable[] = {
+        { GEN_FILE_LIST_PART_LIST,         OptrToChunk(@FileListUIList) },
+        { GEN_FILE_LIST_PART_COLUMN_TABS,  OptrToChunk(@FileListUITabs) },
+        { GEN_FILE_LIST_PART_UP_TRIGGER,   OptrToChunk(@FileListUIUp) },
+        { GEN_FILE_LIST_PART_PATH_ENTRY,   OptrToChunk(@FileListUIPath) },
+        { GEN_FILE_LIST_PART_VOLUME_LIST,  OptrToChunk(@FileListUIVolumes) },
+        { GEN_FILE_LIST_PART_SIZE_TAB,     OptrToChunk(@FileListUISize) },
+        { GEN_FILE_LIST_PART_MODIFIED_TAB, OptrToChunk(@FileListUIModified) },
+        { 0, 0 }
+    } ;
+    word i=0 ;
+    optr child ;
+
+    /* Setup usability and enability */
+    i=0 ;
+    while (usableTable[i].part)  {
+        child = ConstructOptr(pself->GFLI_uiBlock, usableTable[i].chunk) ;
+        if (usableTable[i].part & pself->GFLI_usableParts)  {
+            @call child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+            if (usableTable[i].part & pself->GFLI_enabledParts)  {
+                @call child::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+            } else {
+                @call child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+            }
+        } else {
+            @call child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+            @call child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+        i++ ;
+    }
+
+    /* Handle the special case of the double UP trigger */
+    child = ConstructOptr(pself->GFLI_uiBlock, OptrToChunk(@FileListUIUpNextToPath)) ;
+    if (pself->GFLI_usableParts & GEN_FILE_LIST_PART_UP_TRIGGER)  {
+        if (pself->GFLI_usableParts & GEN_FILE_LIST_PART_COLUMN_TABS)  {
+            @call child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+            @call child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+        } else {
+            @call child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+            if (pself->GFLI_enabledParts & GEN_FILE_LIST_PART_UP_TRIGGER)  {
+                @call child::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+            } else {
+                @call child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+            }
+        }
+    } else {
+        @call child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        @call child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+    @call @CHILD(@FileListUIList)::MSG_FILE_LIST_TABLE_RECALC() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::
+ |          MSG_GEN_FILE_LIST_ENTRY_SELECTED_INTERNAL        * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     The user has selected a file or directory.  Determine the type
+ |     and pass it on to the correct activity.
+ |
+ | Inputs:
+ |     word selection             -- first item selected
+ |     word numSelections         -- Number of items selected
+ |     GenItemGroupStateFlags     -- Status (ignored)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/13/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_ENTRY_SELECTED_INTERNAL
+{
+    T_fileListID file ;
+
+    /* Only care when activating one selection */
+    if (numSelections == 1)  {
+        file = @call oself::MSG_GEN_FILE_LIST_FIND_NTH(selection) ;
+        if (file != FILE_LIST_ID_BAD)  {
+            if (@call oself::MSG_GEN_FILE_LIST_QUERY_IS_DIR(file))  {
+                /* Travel along the directory */
+                @call oself::MSG_GEN_FILE_LIST_TRAVEL(file) ;
+            } else {
+                /* A file was selected/activated */
+                @call oself::MSG_GEN_FILE_LIST_ACTIVATE_FILE(file) ;
+            }
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_FOCUS
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Make the list of files the focus
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/13/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_UPDATE_FOCUS
+{
+    if (pself->GFLI_lastFocus)
+        @call pself->GFLI_lastFocus::MSG_META_GRAB_FOCUS_EXCL();
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_SET_LAST_FOCUS
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Declare what the last focus is and which should be activated by
+ |    MSG_GEN_FILE_LIST_UPDATE_FOCUS.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/13/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_SET_LAST_FOCUS
+{
+    pself->GFLI_lastFocus = lastFocus ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_MARK_RELOAD_STARTED
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Message to mark the GenFileList as reloading.
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_MARK_RELOAD_STARTED
+{
+    pself->GFLI_suspendFlags |= GEN_FILE_LIST_RELOAD_STARTED ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_MARK_RELOAD_ENDED
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Message to mark the GenFileList as done reloading
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_MARK_RELOAD_ENDED
+{
+    pself->GFLI_suspendFlags &= (~GEN_FILE_LIST_RELOAD_STARTED) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_IS_RELOADING
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Message to determine if reloading
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+@method GenFileListClass, MSG_GEN_FILE_LIST_IS_RELOADING
+{
+    return (pself->GFLI_suspendFlags & GEN_FILE_LIST_RELOAD_STARTED)?TRUE:FALSE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListFilenameAdd                          * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Simple routine to allocate memory in the file list data block and
+ |     copy over the filename.
+ |
+ | Inputs:
+ |     MemHandle data             -- LMem block to place file into
+ |     TCHAR *p_filename          -- Name to copy over
+ |
+ | Outputs:
+ |     ChunkHandle                -- Allocated slot, else NullHandle
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/10/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+ChunkHandle IFileListFilenameAdd(MemHandle data, TCHAR *p_filename)
+{
+    word len ;
+    ChunkHandle fileChunk = NullHandle ;
+    word size ;
+
+    /* Is there enough room? */
+    len = 1+strlen(p_filename) ;
+    MemLock(data) ;
+    LMemContract(data) ;
+    MemUnlock(data) ;
+    size = MemGetInfo(data, MGIT_SIZE) ;
+    if ((len + size) < FILE_LIST_MAX_DATA)  {
+        /* Allocate a spot and copy over the data */
+        MemLock(data) ;
+        fileChunk = LMemAlloc(data, len) ;
+        if (fileChunk)
+            strcpy(LMemDerefHandles(data, fileChunk), p_filename) ;
+        MemUnlock(data) ;
+    }
+
+    return fileChunk ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListFilenameRemove                       * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Simple routine to get rid of a filename in the database
+ |
+ | Inputs:
+ |     MemHandle data             -- LMem block to place file into
+ |     ChunkHandle fileChunk      -- Previously allocated file chunk
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void IFileListFilenameRemove(MemHandle data, ChunkHandle fileChunk)
+{
+    LMemFreeHandles(data, fileChunk) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListFileEntryRemove                      * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Delete a file entry and all its associated data
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle list           -- List of files (unsorted)
+ |     ChunkHandle sortList       -- Sorted index list
+ |     T_fileListID index         -- ID/Index into unsorted list
+ |
+ | Outputs:
+ |     word                       -- Sort entry that was deleted, else
+ |                                   0xFFFF if entry not found.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word IFileListFileEntryRemove(
+         MemHandle data,
+         ChunkHandle list,
+         ChunkHandle sortList,
+         T_fileListID index)
+{
+    word sortEntry = 0xFFFF ;
+    T_fileListEntry *p_entry ;
+    word size ;
+    ChunkHandle string ;
+
+    /* Remove the entry from the data base */
+    MemLock(data) ;
+    EC_ERROR_IF(index >= ChunkArrayGetCountHandles(data, list), -1) ;
+    if (index < ChunkArrayGetCountHandles(data, list))  {
+        /* Delete the file entry */
+        p_entry = ChunkArrayElementToPtr(data, index, &size) ;
+        sortEntry = IFileListFileEntryGetSortPosition(
+                         data,
+                         sortList,
+                         index) ;
+        string = p_entry->FLE_name ;
+        ChunkArrayDeleteHandle(data, p_entry) ;
+
+        /* Delete the filename string */
+        IFileListFilenameRemove(data, string) ;
+
+        /* Delete the sort entry */
+        IFileListSortEntryRemove(data, sortList, sortEntry) ;
+    }
+
+    MemUnlock(data) ;
+
+    return sortEntry ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListFileEntryAdd                         * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Add a new file entry, sort it into place, and return its index
+ |     and file location.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block everything is in
+ |     ChunkHandle list           -- List of indexes
+ |     ChunkHandle sortList       -- Sorted list chunk
+ |     TCHAR *p_filename          -- New entry's name
+ |     dword filesize             -- New file's size
+ |     FileDateAndTime modified   -- Last modification to file
+ |     Boolean isDir              -- TRUE if a folder
+ |     word *p_sortEntry          -- Pointer to sort location variable
+ |                                   (returned for sorting purposes)
+ |     T_fileListField sortField  -- Field to sort on
+ |     Boolean sortOrder          -- FALSE to sort ascending, else TRUE
+ |                                   for descending
+ |
+ | Outputs:
+ |     T_fileListID               -- New entry identifier/index in list.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/10/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+T_fileListID IFileListFileEntryAdd(
+         MemHandle data,
+         ChunkHandle list,
+         ChunkHandle sortList,
+         TCHAR *p_filename,
+         dword filesize,
+         FileDateAndTime modified,
+         Boolean isDir,
+         word *p_sortEntry,
+         T_fileListField sortField,
+         Boolean sortOrder)
+{
+    T_fileListID fileID = FILE_LIST_ID_BAD ;
+    ChunkHandle string ;
+    T_fileListEntry *p_entry ;
+
+    *p_sortEntry = 0xFFFF ;
+
+    /* Add the filename to the list (if there is room) */
+    string = IFileListFilenameAdd(data, p_filename) ;
+    if (string)  {
+        /* Add an entry at the end */
+        MemLock(data) ;
+
+        /* Put the new entry at the end of the list */
+        fileID = ChunkArrayGetCountHandles(data, list) ;
+        p_entry = ChunkArrayAppendHandles(data, list, sizeof(*p_entry)) ;
+        if (p_entry)  {
+            p_entry->FLE_name = string ;
+            p_entry->FLE_size = filesize ;
+            p_entry->FLE_modified = modified ;
+            p_entry->FLE_isDir = (isDir)?1:0 ;
+
+            /* Now sort in the entry and fixup the FLE_sortPosition */
+            *p_sortEntry = IFileListSortEntryInsert(
+                               data,
+                               list,
+                               sortList,
+                               fileID,
+                               sortField,
+                               sortOrder) ;
+        } else {
+            fileID = FILE_LIST_ID_BAD ;
+        }
+        MemUnlock(data) ;
+    }
+
+    return fileID ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListSortEntryRemove                      * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get rid of a sort entry by index.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle list           -- Entry list
+ |     ChunkHandle sortList       -- Sorted index list
+ |     word sortIndex             -- Index into the list
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/10/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void IFileListSortEntryRemove(
+         MemHandle data,
+         ChunkHandle sortList,
+         word sortIndex)
+{
+    word *p_sortEntry ;
+    word size ;
+
+    MemLock(data) ;
+
+    /* Make sure we correctly have a valid location */
+    EC_ERROR_IF(sortIndex >= ChunkArrayGetCountHandles(data, sortList), -1) ;
+    if (sortIndex < ChunkArrayGetCountHandles(data, sortList))  {
+        /* Delete the sort entry (making it shorter by one) */
+        p_sortEntry = ChunkArrayElementToPtrHandles(
+                          data,
+                          sortList,
+                          sortIndex,
+                          &size) ;
+        /* Delete the actual sort entry (just a word) */
+        ChunkArrayDeleteHandle(sortList, p_sortEntry) ;
+    }
+
+    MemUnlock(data) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListSortEntryInsert                      * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Insert sort the new entry into the sort list and return the new
+ |     index.
+ |     NOTE:  For now, we use a slow insert sort until we optimize later.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle list           -- List of file entries
+ |     ChunkHandle sortList       -- Sorted index list
+ |     T_fileListID fileID        -- File ID of entry being sorted
+ |     T_fileListField sortField  -- Field to sort on
+ |     Boolean sortOrder          -- FALSE for ascending, TRUE for
+ |                                   descending
+ |
+ | Outputs:
+ |     word                       -- New sort position
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/10/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+word IFileListSortEntryInsert(
+         MemHandle data,
+         ChunkHandle list,
+         ChunkHandle sortList,
+         T_fileListID fileID,
+         T_fileListField sortField,
+         Boolean sortOrder)
+{
+    word numSortEntries ;
+    T_fileListID index = 0 ;
+    T_fileListID *p_entry ;
+
+    MemLock(data) ;
+
+    /* Find the entry that fileID comes BEFORE! */
+    /* (Last entry that it is NOT after) */
+    numSortEntries = ChunkArrayGetCountHandles(data, sortList) ;
+    while (index < numSortEntries)  {
+        p_entry = ChunkArrayElementToPtrHandles(data, sortList, index, NULL) ;
+        if (IFileListCompareFiles(
+               data,
+               list,
+               fileID,
+               *p_entry,
+               sortField,
+               sortOrder) == FALSE)
+            break ;
+        index++ ;
+    }
+
+    if (index < numSortEntries)  {
+        p_entry = ChunkArrayInsertAtHandle(
+            sortList, 
+            ChunkArrayElementToPtrHandles(
+                data, 
+                sortList, 
+                index,
+                NULL), 
+            sizeof(T_fileListID));
+    } else {
+        p_entry = ChunkArrayAppendHandles(
+            data, 
+            sortList, 
+            sizeof(T_fileListID)) ;
+    }
+
+    if (p_entry)  {
+        *p_entry = fileID ;
+    } else {
+        index = 0xFFFF ;
+    }
+
+    MemUnlock(data) ;
+
+    return index ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListCompareFiles                         * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Compare two files and determine if fileA comes after fileB.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle list           -- List of file entries
+ |     T_fileListID fileA         -- first file to compare
+ |     T_fileListID fileB         -- Second file to compare
+ |     T_fileListField sortField  -- Field to sort on
+ |     Boolean sortOrder          -- FALSE for ascending, TRUE for
+ |                                   descending
+ |
+ | Outputs:
+ |     Boolean                    -- TRUE if fileA >= fileB, else FALSE.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/10/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+Boolean IFileListCompareFiles(
+            MemHandle data,
+            ChunkHandle list,
+            T_fileListID fileA,
+            T_fileListID fileB,
+            T_fileListField sortField,
+            Boolean sortOrder)
+{
+    T_fileListEntry *p_fileA ;
+    T_fileListEntry *p_fileB ;
+    Boolean isAfter = FALSE ;
+    TCHAR *p_filenameA ;
+    TCHAR *p_filenameB ;
+    dword valueA, valueB ;
+
+    MemLock(data) ;
+    EC_ERROR_IF(sortField >= FILE_LIST_FIELD_UNKNOWN, -1) ;
+
+    p_fileA = ChunkArrayElementToPtrHandles(data, list, fileA, NULL) ;
+    p_fileB = ChunkArrayElementToPtrHandles(data, list, fileB, NULL) ;
+
+    /* Assume we are comparing if sorted ascending (reverse later) */
+    switch (sortField)  {
+        case FILE_LIST_FIELD_FILENAME:
+            p_filenameA = LMemDerefHandles(data, p_fileA->FLE_name) ;
+            p_filenameB = LMemDerefHandles(data, p_fileB->FLE_name) ;
+            if (strcmpi(p_filenameA, p_filenameB) >= 0)
+                isAfter = TRUE ;
+            break ;
+        case FILE_LIST_FIELD_SIZE:
+            if (p_fileA->FLE_size >= p_fileB->FLE_size)
+                isAfter = TRUE ;
+            break ;
+        case FILE_LIST_FIELD_DATE:
+            /* Swap time and date so that date is the higher value */
+            valueA = (p_fileA->FLE_modified&0xFFFF0000)>>16 ;
+            valueA |= (p_fileA->FLE_modified&0x0000FFFF)<<16 ;
+            valueB = (p_fileB->FLE_modified&0xFFFF0000)>>16 ;
+            valueB |= (p_fileB->FLE_modified&0x0000FFFF)<<16 ;
+            if (valueA >= valueB)
+                isAfter = TRUE ;
+            break ;
+    }
+
+    /* However, sort order is over ridden when a folder */
+    if ((p_fileA->FLE_isDir) || (p_fileB->FLE_isDir))  {
+        if (p_fileA->FLE_isDir && (!p_fileB->FLE_isDir))  {
+            isAfter = FALSE ;
+        } else if ((!p_fileA->FLE_isDir) && p_fileB->FLE_isDir)  {
+            isAfter = TRUE ;
+        }
+    }
+
+    /* Reverse result if sort order is backwards */
+    if (sortOrder)
+        isAfter = (isAfter)?FALSE:TRUE ;
+
+    MemUnlock(data) ;
+
+    return isAfter ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListFileChangeName                       * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the filename stored on a file entry.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle list           -- List of file entries
+ |     T_fileListID index         -- Index to entry to change name on
+ |     TCHAR *p_newName           -- New name to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void IFileListFileChangeName(
+         MemHandle data,
+         ChunkHandle list,
+         T_fileListID index,
+         TCHAR *p_newName)
+{
+    ChunkHandle string ;
+    T_fileListEntry *p_entry ;
+    word size ;
+    TCHAR *p_name ;
+
+    MemLock(data) ;
+
+    p_entry = ChunkArrayElementToPtrHandles(data, list, index, &size) ;
+    if (p_entry->FLE_name)  {
+        LMemFreeHandles(data, p_entry->FLE_name) ;
+    }
+    p_entry = ChunkArrayElementToPtrHandles(data, list, index, &size) ;
+    p_entry->FLE_name = string = LMemAlloc(data, strlen(p_newName)+1) ;
+    if (string)  {
+        p_name = LMemDerefHandles(data, string) ;
+        strcpy(p_name, p_newName) ;
+    }
+
+    MemUnlock(data) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListFileChangeSize                       * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the file size stored on a file entry.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle list           -- List of file entries
+ |     T_fileListID index         -- Index to entry to change name on
+ |     dword newSize              -- New file size
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void IFileListFileChangeSize(
+         MemHandle data,
+         ChunkHandle list,
+         T_fileListID index,
+         dword newSize)
+{
+    T_fileListEntry *p_entry ;
+    word size ;
+
+    /* Lock and change */
+    MemLock(data) ;
+    p_entry = ChunkArrayElementToPtrHandles(data, list, index, &size) ;
+    p_entry->FLE_size = newSize ;
+    MemUnlock(data) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListFileChangeModified                   * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the modification date and time on a file entry.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle list           -- List of file entries
+ |     T_fileListID index         -- Index to entry to change name on
+ |     FileDateAndTime modified   -- New modification values
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void IFileListFileChangeModified(
+         MemHandle data,
+         ChunkHandle list,
+         T_fileListID index,
+         FileDateAndTime modified)
+{
+    T_fileListEntry *p_entry ;
+    word size ;
+
+    /* Lock and change */
+    MemLock(data) ;
+    p_entry = ChunkArrayElementToPtrHandles(data, list, index, &size) ;
+    p_entry->FLE_modified = modified ;
+    MemUnlock(data) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListEntryResort                          * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Called when an entry is changed and may be sorted to a new location.
+ |     This routine takes the entry out of the sort list and then reinserts
+ |     it at its correct location.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle list           -- List of file entries
+ |     ChunkHandle sortList       -- Sorted list of file entry indexes
+ |     T_fileListField sortField  -- Field to sort by
+ |     Boolean sortOrder          -- FALSE if ascending, TRUE for descend
+ |     T_fileListID index         -- Index to entry to resort
+ |     word *p_old                -- Original sorted position
+ |     word *p_new                -- New position
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void IFileListEntryResort(
+         MemHandle data,
+         ChunkHandle list,
+         ChunkHandle sortList,
+         T_fileListField sortField,
+         Boolean sortOrder,
+         T_fileListID index,
+         word *p_old,
+         word *p_new)
+{
+    word oldPosition ;
+    word newPosition ;
+
+    /* Remember where the entry was originally */
+    oldPosition = IFileListFileEntryGetSortPosition(data, sortList, index) ;
+  
+    /* Remove the entry from the sort list */
+    IFileListSortEntryRemove(data, sortList, oldPosition) ;
+
+    /* Resort in the entry */
+    newPosition = IFileListSortEntryInsert(
+                      data,
+                      list,
+                      sortList,
+                      index,
+                      sortField,
+                      sortOrder) ;
+
+    /* Record the movement */
+    *p_old = oldPosition ;
+    *p_new = newPosition ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListResortAll                            * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Clears out the sort list and resorts ALL the file entries.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle list           -- List of file entries
+ |     ChunkHandle sortList       -- Sorted list of file entry indexes
+ |     T_fileListField sortField  -- Field to sort by
+ |     Boolean sortOrder          -- FALSE if ascending, TRUE for descend
+ |
+ | Outputs:
+ |     word                       -- Number of sorted items
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+word IFileListResortAll(
+         MemHandle data,
+         ChunkHandle list,
+         ChunkHandle sortList,
+         T_fileListField sortField,
+         Boolean sortOrder)
+{
+    word numFiles ;
+    word i ;
+
+    MemLock(data) ;
+
+    /* Clear out the original sorted list */
+    ChunkArrayZeroHandles(data, sortList) ;
+
+    /* Go through all the indexes and sort them into proper places */
+    numFiles = ChunkArrayGetCountHandles(data, list) ;
+    for (i=0; i<numFiles; i++)  {
+        IFileListSortEntryInsert(
+            data,
+            list,
+            sortList,
+            i,
+            sortField,
+            sortOrder) ;
+    }
+    MemUnlock(data) ;
+
+    return numFiles ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListSortEntryGetNth                      * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Return the Nth item in the sort list.
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle sortList       -- Sorted list of file entry indexes
+ |     word index                 -- Index of entry to find
+ |
+ | Outputs:
+ |     T_fileListID               -- ID of file entry in that position
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+T_fileListID IFileListSortEntryGetNth(
+                 MemHandle mem,
+                 ChunkHandle sortList,
+                 word index)
+{
+    word num ;
+    T_fileListID file = FILE_LIST_ID_BAD ;
+    T_fileListID *p_entry ;
+    word size ;
+
+    MemLock(mem) ;
+    num = ChunkArrayGetCountHandles(mem, sortList) ;
+    if (index < num)  {
+        p_entry = ChunkArrayElementToPtrHandles(mem, sortList, index, &size) ;
+        file = *p_entry ;
+    }
+
+    MemUnlock(mem) ;
+
+    return file ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IFileListFileEntryGetSortPosition             * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get the sort position for a given file entry position
+ |
+ | Inputs:
+ |     MemHandle data             -- Data block to work within
+ |     ChunkHandle orderList           -- List of sorted file entries
+ |     T_fileListID file          -- Index of file entry to find
+ |
+ | Outputs:
+ |     word                       -- Sort position of file entry.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/12/99  Created
+ |    LES  10/05/99  Converted to search through the sort list so that
+ |                   file entries are smaller and less code is needed.
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+word IFileListFileEntryGetSortPosition(
+         MemHandle data,
+         ChunkHandle orderList,
+         T_fileListID file)
+{
+    word pos = 0xFFFF ;
+    word *p_entry ;
+    word num ;
+    word i ;
+
+    MemLock(data) ;
+    p_entry = ChunkArrayElementToPtrHandles(data, orderList, 0, NULL) ;
+    num = ChunkArrayGetCountHandles(data, orderList) ;
+    for (i=0; i<num; i++, p_entry++)  {
+        if (*p_entry == file)  {
+            pos = i ;
+            break ;
+        }
+    }
+    MemUnlock(data) ;
+
+    return pos ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IConvertToSizing                              * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Converts a dword size into a short hand version of the file info.
+ |     For example, 10,200,000 bytes becaomes 10.2 MB.
+ |
+ | Inputs:
+ |     dword size                 -- Size to convert
+ |     char *p_sizing             -- buffer to store data (should be at
+ |                                   least 10 bytes).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/29/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+void IConvertToSizing(dword size, char *p_sizing)
+{
+    word i = 0 ;
+    static char p_units[5][3] = {
+        " b",
+        "KB",
+        "MB",
+        "GB",
+        "TB"
+    } ;
+    word upper, lower ;
+
+    /* Find if we are talking kilos, megs, gigs, or terras. */
+    while (size >= 10000)  {
+        i++ ;
+        size /= 1000L ;
+    }
+
+    upper = ((word)size) / 1000 ;
+    lower = ((word)size) % 1000 ;
+
+    if (upper)  {
+        sprintf(
+            p_sizing,
+            "%d,%03d %s", 
+            upper,
+            lower,
+            p_units[i]) ;
+    } else {
+        sprintf(
+            p_sizing,
+            "%d %s", 
+            lower,
+            p_units[i]) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IDetermineWidth                               * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Determine the width taken by a text item given a font and string.
+ |
+ | Inputs:
+ |     char *p_string             -- String to use
+ |     word len                   -- Length of string, or 0 for null
+ |                                   terminated.
+ |     FontID font                -- Font of text
+ |     WWFixedAsDWord pointSize   -- Point size of text.
+ |
+ | Outputs:
+ |     word                       -- pixel width
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/29/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+word IDetermineWidth(
+         char *p_string, 
+         word len, 
+         FontID font, 
+         WWFixedAsDWord pointSize)
+{
+    GStateHandle gstate ;
+    word end ;
+
+    gstate = GrCreateState(0) ;
+    GrSetFont(gstate, font, pointSize) ;
+    GrDrawText(gstate, 0, 0, p_string, len) ;
+    end = DWORD_X(GrGetCurPos(gstate)) ;
+    GrDestroyState(gstate) ;
+
+    return end ;
+}
+
+
+/**************************************************************************
+ * Class Definition:  FileListTableClass
+ **************************************************************************/
+
+@classdecl FileListTableClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  FileListTableClass::MSG_FILE_LIST_SET_DESTINATION
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Declare where messages for querying are sent.
+ |
+ | Inputs:
+ |     optr dest                  -- Destination object.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/30/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method FileListTableClass, MSG_FILE_LIST_SET_DESTINATION
+{
+    pself->GIGI_destination = dest ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FileListTableClass::MSG_FILE_LIST_SET_DRAW_MESSAGE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Declare what messages for querying are sent.
+ |
+ | Inputs:
+ |     Message drawMsg            -- message to send to destination
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/30/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method FileListTableClass, MSG_FILE_LIST_SET_DRAW_MESSAGE
+{
+    pself->GDLI_queryMsg = drawMsg ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FileListTableClass::MSG_META_CONTENT_VIEW_SIZE_CHANGED
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Detect when the view of items changes size.  When this happens
+ |     force a recalcuation to occur.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/30/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method FileListTableClass, MSG_META_CONTENT_VIEW_SIZE_CHANGED
+{
+    @callsuper() ;
+    @send oself::MSG_FILE_LIST_TABLE_RECALC() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FileListTableClass::MSG_FILE_LIST_TABLE_RECALC
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Go through all the items in the GenDynamicList and force them
+ |     to recreate their moniker.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/30/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@method FileListTableClass, MSG_FILE_LIST_TABLE_RECALC
+{
+    word count, itemCount ;
+    optr childObj ;
+    word childIdentifier ;
+
+
+    /* invalidate all items shown */
+    itemCount = @call oself::MSG_GEN_COUNT_CHILDREN() ;
+
+    count = 0 ;
+    while(count < itemCount)  {
+        childObj = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(count) ;
+
+        @call childObj::MSG_GEN_ITEM_SET_INTERACTABLE_STATE(FALSE) ;
+        childIdentifier = @call childObj::MSG_GEN_ITEM_GET_IDENTIFIER() ;
+
+        if (childIdentifier < pself->GDLI_numItems)  {
+            @send ,forceQueue oself::
+                MSG_GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER(
+                                              oself, childIdentifier) ;
+        }
+        count++ ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FileListTableClass::MSG_META_FUP_KBD_CHAR
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Intercept keystrokes on the dynamic list to make different actions
+ |    occur (mainly for navigation).  Here is a list of the translations
+ |
+ |    ENTER, SPACE, or RIGHT = Go into the item
+ |    LEFT, BACKSPACE = Come out of the folder (Go up the folders)
+ |
+ | Inputs:
+ |    word character              -- character pressed
+ |    word flags                  -- Low byte = CharFlags, 
+ |                                   High byte = ShiftState
+ |    word state                  -- Low byte = ToggleState
+ |                                   high byte = Scan Code
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/13/99  Created
+ |
+ | Last tested:  10/13/99
+ *-----------------------------------------------------------------------*/
+@method FileListTableClass, MSG_META_FUP_KBD_CHAR
+{
+    Message *p_msg ;
+    word item ;
+    Message actionmessage ;
+    Boolean handled = FALSE ;
+    byte c = character & 0xFF ;
+
+    if (!(flags & CF_RELEASE))  {
+        if (((c == '\r') || 
+              (c == '\n') || 
+              (c == ' ') ||
+              (c == VC_ENTER) ||
+              (c == VC_RIGHT)))  {
+            item = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+            if (item != GIGS_NONE)  {
+                p_msg = ObjVarFindData(oself, ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS) ;
+                if ((p_msg) && (pself->GIGI_destination))  {
+                    actionmessage = *p_msg ;
+                    @send ,forceQueue (pself->GIGI_destination)::{GEN_ITEM_GROUP_APPLY_MSG}
+                                     (actionmessage)(item, 1, 0) ;
+                    handled = TRUE ;
+                }
+            }
+        } else if ((c == VC_BACKSPACE) || (c == VC_LEFT))  {
+            if (pself->GIGI_destination)  {
+                @send ,forceQueue (pself->GIGI_destination)::
+                           MSG_GEN_FILE_LIST_UP_DIRECTORY() ;
+                handled = TRUE ;
+            }
+        }
+    }
+
+    if (!handled)  {
+        return @callsuper() ;
+    } else {
+        @call (pself->GIGI_destination)::MSG_GEN_FILE_LIST_SET_LAST_FOCUS(oself) ;
+    }
+
+    return handled ;
+}
+
+/***************************************************************************
+ *  END OF FILE:  FileList.goc
+ ***************************************************************************/
+
