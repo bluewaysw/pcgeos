@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = N2TXT
+GEODE           = n2txt
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
 SRCS            = ckp_strs.goc n2txt.goc

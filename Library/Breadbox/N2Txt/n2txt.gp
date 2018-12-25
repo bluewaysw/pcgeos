@@ -36,7 +36,7 @@ library ansic
 library text
 library math
 
-resource NUMBERSTRINGS data object
+resource NumberStrings data object
 
 
 export NUMTOTEXT
