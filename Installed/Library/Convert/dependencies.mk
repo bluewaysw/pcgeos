@@ -1,44 +1,44 @@
-CONVERTMANAGER.obj \
-CONVERTMANAGER.eobj: STDAPP.DEF GEOS.DEF GEODE.DEF RESOURCE.DEF EC.DEF LMEM.DEF \
-                OBJECT.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF \
-                GSTRING.DEF TEXT.DEF CHAR.DEF HEAP.DEF UI.DEF FILE.DEF \
-                VM.DEF WIN.DEF INPUT.DEF HWR.DEF LOCALIZE.DEF SLLANG.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                LIBRARY.DEF OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF \
-                INTERNAL/CONVERT.DEF FMTOOL.DEF FILEENUM.DEF SYSTEM.DEF \
-                SYSSTATS.DEF INTERNAL/FILESTR.DEF INTERNAL/DBASEINT.DEF \
-                INTERNAL/HEAPINT.DEF INTERNAL/SEMINT.DEF \
-                INTERNAL/FILEINT.DEF INTERNAL/DOS.DEF \
-                INTERNAL/DRIVEINT.DEF INTERNAL/THREADIN.DEF \
-                CONVERTCONSTANT.DEF CONVERTDRAWDOCUMENT.DEF \
-                CONVERTGEOWRITE.DEF CONVERTTEXT.DEF CONVERTGSTRING.DEF \
-                CONVERTSCRAPBOOK.DEF CONVERTGEODEX.DEF CONVERTVM.ASM \
-                CONVERTDRAWDOCUMENT.ASM GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/STYLES.DEF BITMAP.DEF \
-                CONVERTGSTRING.ASM CONVERTGSTRINGTABLES.ASM \
-                CONVERTVMUTILS.ASM CONVERTGEOWRITE.ASM CONVERTTEXT.ASM \
-                CONVERTSCRAPBOOK.ASM CONVERTGEODEX.ASM
+convertManager.obj \
+convertManager.eobj: stdapp.def geos.def geode.def resource.def ec.def lmem.def \
+                object.def graphics.def fontID.def font.def color.def \
+                gstring.def text.def char.def heap.def ui.def file.def \
+                vm.def win.def input.def hwr.def localize.def sllang.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                library.def Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                Internal/convert.def fmtool.def fileEnum.def system.def \
+                sysstats.def Internal/fileStr.def Internal/dbaseInt.def \
+                Internal/heapInt.def Internal/semInt.def \
+                Internal/fileInt.def Internal/dos.def \
+                Internal/driveInt.def Internal/threadIn.def \
+                convertConstant.def convertDrawDocument.def \
+                convertGeoWrite.def convertText.def convertGString.def \
+                convertScrapbook.def convertGeoDex.def convertVM.asm \
+                convertDrawDocument.asm grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/styles.def bitmap.def \
+                convertGString.asm convertGStringTables.asm \
+                convertVMUtils.asm convertGeoWrite.asm convertText.asm \
+                convertScrapbook.asm convertGeoDex.asm
 
-ConvertEC.geo Convert.geo : GEOS.LDF UI.LDF GROBJ.LDF 
+convertEC.geo convert.geo : geos.ldf ui.ldf grobj.ldf 

@@ -3,17 +3,16 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Convert
+GEODE           = convert
 ASM_TO_OBJS     = convertManager.asm
 UI_TO_RDFS      =
-SRCS            = convertDrawDocument.asm convertGeoDex.asm\
-                  convertGeoWrite.asm convertGString.asm\
-                  convertGStringTables.asm convertManager.asm\
-                  convertScrapbook.asm convertText.asm convertVM.asm\
-                  convertVMUtils.asm convertConstant.def\
-                  convertDrawDocument.def convertGeoDex.def\
-                  convertGeoWrite.def convertGString.def\
-                  convertScrapbook.def convertText.def
+SRCS            = convertVM.asm convertVMUtils.asm convertText.asm\
+                  convertDrawDocument.asm convertGStringTables.asm\
+                  convertGString.asm convertGeoWrite.asm convertGeoDex.asm\
+                  convertManager.asm convertScrapbook.asm\
+                  convertGString.def convertScrapbook.def convertText.def\
+                  convertConstant.def convertDrawDocument.def\
+                  convertGeoDex.def convertGeoWrite.def
 OBJS            = convertManager.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
