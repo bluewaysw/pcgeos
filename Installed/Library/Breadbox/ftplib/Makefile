@@ -4,10 +4,10 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = ftplib
-CLASSES         = FTP.GOC
+CLASSES         = FTP.goc
 UI_TO_RDFS      =
 OBJS            = FTP.obj
-COMMON          = INTERNAL.H
+COMMON          = internal.h
 MODULES         =
 CMODULES        = Classes
 SRCS            = $(CLASSES) $(COMMON)

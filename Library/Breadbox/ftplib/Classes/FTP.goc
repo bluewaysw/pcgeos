@@ -1,0 +1,1954 @@
+
+/*************************************************************************
+
+               Copyright (c) Breadbox Computer Company 1998
+                        -- All Rights Reserved --
+
+  PROJECT:      FTP Client
+  MODULE:       FTP Class
+  FILE:         ftp.goc
+
+  AUTHOR:       Gerd Boerrigter
+
+  $Header: H:\\CVSROOT\\GEOS\\LIBRARY\\BREADBOX\\FTPLIB\\CLASSES\\RCS\\ftp.goc 1.2 1999/01/09 10:19:21 gerdb Exp $
+
+  DESCRIPTION:
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-08-31  GerdB     Initial version.
+
+*************************************************************************/
+
+@include <stdapp.goh>
+
+@include <socket.goh>
+#include <sockmisc.h>
+
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
+
+@include "Objects/ftpC.goh"
+
+
+#include "internal.h"
+#include "initfile.h"
+
+
+#define QUOTE "\""
+
+/*
+ * These are strings used for status messages
+ */
+@start StatusStringResource, data;
+
+@chunk TCHAR StatusOpenConnection[] =
+	 "Opening connection to ";
+	 @localize { "Show that a connection to the FTP server is initiated MUST BE EXACT SAME STRING IN FTPC" };
+
+@chunk TCHAR StatusLogin[] =
+	 "Logging on to ";
+	 @localize { "Show that we are trying to log on to the FTP server MUST BE EXACT SAME STRING IN FTPC" };
+
+@chunk TCHAR StatusReceiving[] =
+	 "Receiving... ";
+	 @localize { "." };
+
+@chunk TCHAR StatusSending[] =
+	 "Sending... ";
+    @localize { "." };
+
+@chunk TCHAR StatusConnected[] =
+    "Connection established.";
+    @localize { "Connected to a FTP server (connecting and log in was successful)." };
+
+@chunk TCHAR StatusCloseConnection[] =
+    "Closing connection.";
+    @localize { "The connection to the FTP server is going to close." };
+
+@chunk TCHAR StatusInitiateDownload[] =
+    "Initiating download.";
+    @localize { "The download is prepared." };
+
+@chunk TCHAR StatusInitiateUpload[] =
+    "Initiating upload.";
+    @localize { "The upload is prepared." };
+
+@chunk TCHAR StatusGetDirectory[] =
+    "Receiving directory.";
+    @localize { "Prepare to download the directory." };
+
+@chunk TCHAR StatusNoConnection[] =
+    "Connection closed.";
+    @localize { "Printed after a open connection is closed." };
+
+@chunk TCHAR StatusEmptyStatus[] =
+    "";
+    @localize { "To clear the status line." };
+
+@end StatusStringResource
+
+
+@classdecl FtpClass;
+
+/*************************************************************************
+    Useful routines
+
+    Some of them are probably useful in a general socket tools library.
+*************************************************************************/
+
+void SocketMyClose(Socket sock)
+{
+
+    SocketCloseSend(sock);
+    SocketReset(sock);
+
+    SocketClose(sock);
+}
+
+
+/*************************************************************************
+    atoi
+--------------------------------------------------------------------------
+    Translate an ascii string to a dword.
+
+    @param s A string representing a number.
+
+    @return The translated number as dword.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    ??-??-??  MGroeber  Initial version.
+
+*************************************************************************/
+dword atol( char *s )
+{
+     dword n = 0;
+
+	  while(isdigit(*s))
+     {
+       n *= 10;
+       n += (*s - '0');
+       s++;
+     }
+
+     return n;
+}
+
+
+/*************************************************************************
+    GetIpAddress
+--------------------------------------------------------------------------
+    Get's the local IP address used for a specific socket.
+
+    Note: I have no clue what is returned, if this socket doesn't
+          belog to an TCP/IP connection.
+
+    @param sock    The Socket from which to get the address.
+    @param ipAddr  Pointer to a dword to store the IP is.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-28  GerdB     Initial version.
+
+*************************************************************************/
+SocketError
+GetIpAddress( Socket sock, dword *ipAddr )
+{
+    /* This should move somewhere else, but is used only internally. */
+    typedef struct {
+        SocketAddress       IAS_sa;
+        dword               IAS_ip;
+    } IpAddressStruct;
+
+    SocketError error;
+    IpAddressStruct addr;
+    TCHAR   domain[ 10 ];
+
+    EC( ECCheckSocket( sock ) );
+    EC( ECCheckBounds( ipAddr ) );
+
+    addr.IAS_sa.SA_domainSize   = sizeof( domain );
+    addr.IAS_sa.SA_domain       = domain;
+    addr.IAS_sa.SA_addressSize  = sizeof( dword );
+    addr.IAS_ip = 0;
+
+    error = SocketGetSocketName( sock, &addr.IAS_sa );
+
+    *ipAddr = addr.IAS_ip;
+
+    return error;
+
+} /* GetIpAddress */
+
+
+/*************************************************************************
+    SocketPrintf
+--------------------------------------------------------------------------
+    Prints the string to the current control connection.
+
+    Note: Uses the GEOS implementation of C<vsprintf>.
+
+    @param logDest  The optr of the text object which shows the
+                    communication on the control connection.
+	 @param logFileHan
+
+	 @param sock     The Socket where to print to.
+    @param format   A character string controls how the arguments are
+                    converted, formated and printed.
+    @param ...      The arguments printed to the socket.
+
+    @return
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-01  GerdB     Initial version.
+
+*************************************************************************/
+word SocketPrintf
+    (
+	 optr logDest,
+    FileHandle logFileHan,
+    Socket sock,
+    const char* format,
+    ...
+    )
+{
+    va_list arg;
+    char    buf[ FTP_MAX_STRING_SIZE+1 ];
+
+    EC( ECCheckSocket( sock ) );
+    EC( ECCheckBounds( (void*) format ) );
+
+    va_start( arg, format );
+    vsprintf( buf, format, arg );
+    va_end( arg );
+
+    /* Check if we have an buffer overflow.  */
+    if ( strlen(buf) > FTP_MAX_STRING_SIZE )
+    {
+        FatalError( FTP_STRING_BUFFER_SIZE_EXCEEDED );
+    }
+
+    SocketSend( sock, buf, strlen( buf ), NULL, 0 );
+
+	 if (logDest || logFileHan)
+    {
+        /* Hide the password in the log */
+        if (strncmp(buf, "PASS", 4) == 0)  {
+				if (logDest)
+					@call logDest::MSG_VIS_TEXT_APPEND_PTR( "Password sent.\r", 0) ;
+				if (logFileHan)
+					FileWrite( logFileHan, "Password sent.\r", 15, 0 );
+		  } else {
+				if (logDest)
+					@call logDest::MSG_VIS_TEXT_APPEND_PTR( buf, strlen( buf ) - 1 );
+				if (logFileHan)
+					FileWrite( logFileHan, buf, strlen(buf), 0 );
+		  }
+
+	 }
+
+    return 0;
+
+} /* SocketPrintf */
+
+
+
+/*************************************************************************
+	 MSG_FTP_SEND_COMMAND
+--------------------------------------------------------------------------
+    Prints the string to the current control connection.
+
+    @param format   A character string controls how the arguments are
+                    converted, formated and printed.
+    @param param    The arguments printed to the socket.
+                    (NULL is allowed)
+
+    @return The C<FtpReplyCode>, or just '\0' if a transmission
+            error occured.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-14  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_SEND_COMMAND
+/*  FtpReplyCode
+    (
+    const char* format,
+    const char* param
+    ) */
+{
+    EC( ECCheckSocket( pself->FI_controlSock ) );
+    EC( ECCheckBounds( (void*) format ) );
+    EC( if (param) ECCheckBounds( (void*) param ) );
+
+	 SocketPrintf( pself->FI_logDest, pself->FI_logFileHan, pself->FI_controlSock, format, param );
+
+    return @call self::MSG_FTP_GET_REPLY();
+
+} /* MSG_FTP_SEND_COMMAND */
+
+
+/*************************************************************************
+    SocketGetLine
+--------------------------------------------------------------------------
+    Get a single line including the final '\r'.
+
+	 @param logDest The optr of the text object which shows the
+						 communication on the control connection.
+	 logFileHan
+    @param sock    The Socket from which to receive the data.
+    @param buffer  A pointer to a buffer for the read characters.
+    @param len     A integer giving the size of the buffer.
+    @param timeout A integer giving the timeout value for the socket.
+
+    @return Number of characters in the line.  The final '\0' is not
+            counted.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-01  GerdB     Initial version.
+
+*************************************************************************/
+#pragma argsused
+int
+SocketGetLine(
+	 optr logDest,
+    FileHandle logFileHan,
+    Socket sock,
+    char* buffer,
+    int len,
+    int timeout
+    )
+{
+    int                 i;
+    char                ch;
+/*#ifdef LOGFILE */
+	 char* buf = buffer;
+/*#endif*/
+
+    EC( ECCheckSocket( sock ) );
+    EC( ECCheckBounds( buffer ) );
+
+    for (i = 0, --len; i <= len &&
+                    SocketRecv( sock, &ch, 1, timeout, 0, NULL ) > 0; )
+    {
+        if ( ch == '\n' ) {
+            break;
+        }
+        else
+        {
+            *buffer++ = ch;
+            ++i;
+        }
+    }
+
+    *buffer = '\0';
+
+@if 0
+    if ( NullHandle != logDest )
+    {
+        @call logDest::MSG_VIS_TEXT_APPEND_PTR( buf, 0 );
+    }
+@endif
+
+/*#ifdef LOGFILE */
+	 if (logFileHan)
+    		FileWrite( logFileHan, buf, strlen( buf ), 0 );
+/*#endif  */
+
+    return i;
+
+} /* SocketGetLine */
+
+
+
+/*************************************************************************
+	 MSG_FTP_GET_REPLY
+--------------------------------------------------------------------------
+    Receives the reply code from the control connection.
+    This method only returns the reply code.  The whole message can be
+    received, by defining C<FI_statusDest> and C<FI_statusMsg>.
+    It is possible that a multi-line reply is returned.  All end-of-line
+    codes are translated to the GEOS code '\r'.
+
+    @return The C<FtpReplyCode>, or just '\0' if a transmission
+            error occured.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-01  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_GET_REPLY
+/*  FtpReplyCode
+    (
+    void
+    ) */
+{
+	 FtpReplyCode        replyCode = 0;
+	 MemHandle           memHandle= NullHandle ;
+    char*               memPtr;
+    word                replyLen;
+
+    char                line[ FTP_MAX_STRING_SIZE+1 ];
+    static char         timeoutLine[] = "500 Timeout\r" ;
+
+
+    /* XXX: This stuff could need some more work.  Should handle the text
+            blockwise and not character by character. */
+
+    /* Read the first line. */
+	 if ( SocketGetLine(
+				pself->FI_logDest,
+            pself->FI_logFileHan,
+            pself->FI_controlSock,
+            line, sizeof( line ),
+            pself->FI_timeout ) != 0 )
+    {
+        /* We have one line in the buffer, so create the MemBlock and
+           add the first line. */
+        memHandle = MemAlloc( 1+strlen( line ), HF_SWAPABLE, HAF_LOCK );
+        if ( NullHandle != memHandle ) {
+				strcpy( MemDeref( memHandle ), line );
+				MemUnlock( memHandle );
+        }
+
+        memcpy( &replyCode, line, 3 );
+
+        /* Setup total length of reply (plus 1 to include '\0'). */
+        replyLen = strlen( line ) + 1;
+
+        if ( '-' == line[ 3 ] )
+        {
+            /* It is a multi line comment. */
+				while( SocketGetLine(
+						  pself->FI_logDest,
+                    pself->FI_logFileHan,
+                    pself->FI_controlSock,
+                    line,
+                    sizeof( line ),
+                    pself->FI_timeout ) != 0 )
+            {
+                MemReAlloc( memHandle, replyLen + strlen( line ), 0 );
+                memPtr = MemLock( memHandle );
+                strcpy( memPtr + replyLen - 1, line );
+                MemUnlock( memHandle );
+                replyLen += strlen( line );
+
+                if ( strcmp( (char*) &replyCode, line ) && ( ' ' == line[ 3 ] ))
+                {
+                    /* End of the multi-line reply. */
+                    break;
+                }
+            } /* read multiple lines */
+        } /* multi-line comment */
+    } else { /* first line */
+        memHandle = MemAlloc(1+strlen(timeoutLine), HF_SWAPABLE, HAF_LOCK) ;
+        strcpy(MemDeref(memHandle), timeoutLine) ;
+        MemUnlock(memHandle) ;
+    }
+
+    /* XXX: HACK: Send text to TextObject given in FI_logDest.
+            Should be more general!  But is better than nothing. */
+    if ( NullHandle != memHandle )
+    {
+        if ( NullHandle != pself->FI_logDest )
+        {
+            @call pself->FI_logDest::MSG_VIS_TEXT_APPEND_BLOCK(
+                    memHandle, replyLen - 1 );
+        }
+
+    }
+
+    if (pself->FI_lastMessage)  {
+        MemFree(pself->FI_lastMessage) ;
+        pself->FI_lastMessage = NullHandle ;
+    }
+
+    if (memHandle)
+		  pself->FI_lastMessage = memHandle ;
+
+    return replyCode;
+
+} /* MSG_FTP_GET_REPLY */
+
+
+/*************************************************************************
+    MSG_FTP_LOGIN
+--------------------------------------------------------------------------
+    Takes care of the login procedure.  Opens the connection to the server
+    and sends the username and password.
+
+    @param  host        A Telnet string giving the name of the remote
+                        host to which a FTP connection is required.
+    @param  user        A Telnet string identifying the user.
+    @param  password    A Telnet string specifying the user's password.
+
+    @return The C<FtpReplyCode>.  If '332' is returned, the server is
+            expecting the account information.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-01  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_LOGIN
+/*  FtpReplyCode
+    (
+    const char* host,
+    const char* user,
+    const char* password
+    ) */
+{
+    FtpReplyCode replyCode;
+
+
+    EC( ECCheckBounds( (void*) host ) );
+    EC( ECCheckBounds( (void*) user ) );
+    EC( ECCheckBounds( (void*) password ) );
+
+	 replyCode = @call self::MSG_FTP_OPEN_CONNECTION( host );
+
+    /* XXX: replyCode 120 should be handled, too. */
+    if ( replyCode == MAKEFOURCC( '2','2','0', 0 ))
+    {
+        @call self::MSG_FTP_SET_STATUS_TEXT( @StatusLogin );
+        replyCode = @call self::MSG_FTP_SEND_USER( user );
+
+		  if ( replyCode == MAKEFOURCC( '3','3','1', 0 ))
+		  {
+            replyCode = @call self::MSG_FTP_SEND_PASS( password );
+		  }
+
+	 }
+
+    return replyCode;
+
+} /* MSG_FTP_LOGIN */
+
+
+
+/*************************************************************************
+    MSG_FTP_OPEN_CONNECTION
+--------------------------------------------------------------------------
+    Opens the connection to the FTP server.
+
+    @param  host A Telnet string giving the name of the remote host
+                 to which a FTP connection is required.
+
+    @return The C<FtpReplyCode>, if just '\0' is returned,
+            a socket error occured.  ThreadGetError()
+            will return the reason.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-09  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_OPEN_CONNECTION
+/*  FtpReplyCode
+    (
+    const char* host
+    ) */
+{
+    FtpReplyCode replyCode;
+    SocketError  err;
+	 char *       p;
+	 Boolean		initError, logging;
+
+    EC( ECCheckBounds( (void*) host ) );
+
+	initError = InitFileReadBoolean("ftp", "logging", &logging);
+	if (!initError && logging) {
+
+//	 if (pself->FI_logDest) {
+			FilePushDir();
+			FileSetStandardPath( SP_DOCUMENT);
+			pself->FI_logFileHan = FileCreate( "ftplog.txt", ( FILE_CREATE_NO_TRUNCATE |
+                      FCF_NATIVE | FILE_ACCESS_RW | FILE_DENY_NONE ), 0 );
+			FilePos(pself->FI_logFileHan, 0, FILE_POS_END );
+	 		FilePopDir();
+		}
+	else pself->FI_logFileHan = 0;
+
+    @call self::MSG_FTP_SET_STATUS_TEXT( @StatusOpenConnection );
+
+    /* Initiate instance data for new connection. */
+    pself->FI_controlSock = 0;
+    pself->FI_listenSock = 0;
+    pself->FI_dataSock = 0;
+
+    /* try to split port number from host name */
+    p = strchr( host, ':' );
+    if ( p )
+    {
+        pself->FI_hostaddr.RTA_sock.SA_port.SP_port = atoi( p + 1 );
+        *p = 0;
+    }
+    else
+    {
+        pself->FI_hostaddr.RTA_sock.SA_port.SP_port = FTP;
+    }
+    pself->FI_hostaddr.RTA_sock.SA_port.SP_manuf =
+            MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    pself->FI_hostaddr.RTA_sock.SA_domainSize  = sizeof( FTP_DOMAIN ) - 1;
+    pself->FI_hostaddr.RTA_sock.SA_domain      = FTP_DOMAIN;
+    pself->FI_hostaddr.RTA_sock.SA_addressSize = 0;
+
+    /* store link info into raw address buffer */
+    pself->FI_hostname.UTA_link.TAPEA_linkSize =
+            sizeof( pself->FI_hostname.UTA_link.TAPEA_linkType ) +
+            sizeof( pself->FI_hostname.UTA_link.TAPEA_accPntID );
+
+    /* Use of access point #1 is shorthand for the active accPnt */
+    pself->FI_hostname.UTA_link.TAPEA_linkType = LT_ID;
+    pself->FI_hostname.UTA_link.TAPEA_accPntID = 1;
+
+    strncpy( pself->FI_hostname.UTA_ip, host, MAX_IP_ADDR_STRING_LENGTH );
+
+    pself->FI_listenPort.SP_port  = 0x5000;
+    pself->FI_listenPort.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+
+    pself->FI_ftpState = FS_RESOLVING;
+
+    pself->FI_hostaddr.RTA_sock.SA_addressSize = SocketResolve(
+            FTP_DOMAIN,
+            (byte*) &pself->FI_hostname,
+            sizeof( pself->FI_hostname.UTA_link ) + strlen( pself->FI_hostname.UTA_ip ),
+            (byte*) &pself->FI_hostaddr.RTA_addr,
+            sizeof( pself->FI_hostaddr.RTA_addr ));
+
+@if 0
+    if(aborted)                         /* abort signal? */
+      return URL_RET_ABORTED;
+@endif
+
+    if ( !pself->FI_hostaddr.RTA_sock.SA_addressSize )
+    {
+        /* Socket could not be resolved.  This means in most of the
+           cases, that we couldn't dial in. */
+        pself->FI_ftpState = FS_UNCONNECTED;
+        return 0;
+    }
+
+    /* We are having a connection! /*
+    pself->FI_ftpState = FS_CONNECTING;
+
+    /* So create socket. */
+    pself->FI_controlSock = SocketCreate( SDT_STREAM );
+	 err = SocketConnect( pself->FI_controlSock, &pself->FI_hostaddr.RTA_sock, pself->FI_timeout );
+
+    if ( err != SE_NORMAL )
+    {
+        pself->FI_ftpState = FS_UNCONNECTED;
+        return 0;
+    }
+
+    pself->FI_ftpState = FS_CONNECTED;
+    replyCode = @call self::MSG_FTP_GET_REPLY();
+
+    @call self::MSG_FTP_SET_STATUS_TEXT( @StatusConnected );
+
+    return replyCode;
+
+} /* MSG_FTP_OPEN_CONNECTION */
+
+
+/*************************************************************************
+    MSG_FTP_CLOSE_CONNECTION
+--------------------------------------------------------------------------
+    Close the connection to the FTP server.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-09  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_CLOSE_CONNECTION
+/*  void
+    (
+    void
+    ) */
+{
+    if (pself->FI_ftpState == FS_UNCONNECTED)  {
+        @call self::MSG_FTP_SET_STATUS_TEXT( @StatusNoConnection );
+    } else {
+        @call self::MSG_FTP_SET_STATUS_TEXT( @StatusCloseConnection );
+
+        EC_ERROR_IF( pself->FI_ftpState < FS_CONNECTED,
+                FTP_NOT_CONNECTED );
+
+        pself->FI_ftpState = FS_UNCONNECTING;
+
+        if ( 0 != pself->FI_controlSock )
+        {
+            /* If we have a control connection, close listen and data
+               connection if available. */
+            @call self::MSG_FTP_STOP_DATA_SOCKET();
+
+            /* Close the download sockets. */
+            @call self::MSG_FTP_SEND_COMMAND( "QUIT\r\n", NULL );
+
+            TimerSleep(3*60) ;
+            SocketMyClose(pself->FI_controlSock );
+            pself->FI_controlSock = 0;
+        }
+
+        pself->FI_ftpState = FS_UNCONNECTED;
+        @call self::MSG_FTP_SET_STATUS_TEXT( @StatusNoConnection );
+
+
+		  if (pself->FI_logFileHan) {
+				FileWrite(pself->FI_logFileHan, "\r\n", 2, 0 );
+				FileClose(pself->FI_logFileHan, 0 );
+				pself->FI_logFileHan = 0;
+		  }
+
+	 }
+} /* MSG_FTP_CLOSE_CONNECTION */
+
+
+/*************************************************************************
+    MSG_FTP_DOWNLOAD_FILE
+--------------------------------------------------------------------------
+    Do the download of a file.
+
+    @param  pathname   A string containing the path and name of the file
+                       to download.
+    @param  file       A FileHandle to which the transfered data is
+                       appended.
+
+    @return The C<FtpReplyCode>, if just '\0' is returned,
+            a socket error occured.  ThreadGetError()
+            will return the reason.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-01  GerdB     Initial version.
+	 02/07/02  jfh			added abort if user cancelled
+*************************************************************************/
+@method FtpClass, MSG_FTP_DOWNLOAD_FILE
+/*  FtpReplyCode
+    (
+    const char* pathname,
+    const FileHandle file
+    ) */
+{
+    FtpReplyCode replyCode = 0;
+	 char command[ FTP_MAX_STRING_SIZE+1 ], lenStr[15];
+	 sdword length = -1;
+	 Boolean xferCancelled;
+	 word		i, j;
+    Boolean	foundParen = FALSE;
+ MemHandle			mhStr;
+ char					str[FTP_MAX_STRING_SIZE+1];
+
+
+    EC( ECCheckBounds( (void*) pathname ) );
+    EC( ECCheckFileHandle( file ) );
+
+    @call self::MSG_FTP_SET_STATUS_TEXT( @StatusInitiateDownload );
+
+	 SocketPrintf( pself->FI_logDest, pself->FI_logFileHan,
+													  pself->FI_controlSock, "TYPE I\r\n" );
+	 replyCode = @call self::MSG_FTP_GET_REPLY();
+
+    sprintf( command, "RETR %s\r\n", pathname );
+	 replyCode = @call self::MSG_FTP_START_DATA_SOCKET(&command, file);
+
+	 if ( replyCode == MAKEFOURCC( '1','5','0', 0 ))
+	 {
+        /* We are downloading a file, so try to get length. */
+		  mhStr = @call self::MSG_FTP_GET_LAST_MESSAGE();
+		  MemLock(mhStr);
+		  strcpy(str, MemDeref(mhStr));
+		  MemUnlock(mhStr);
+		  /* the file size is in ( ) */
+		  for (i = 4; i < strlen(str); i++) {
+			 if (str[i] == '(') {
+				foundParen = TRUE;
+				break;
+				}
+			 }
+		  if (foundParen) {
+			 j = 0;
+          i++;
+			 while (isdigit(str[i])) {
+				lenStr[j] = str[i];
+				i++;
+				j++;
+				}
+			 lenStr[j] = 0;
+			 UtilAsciiToHex32(lenStr, &length);
+			 }
+
+		  xferCancelled = @call self::MSG_FTP_RECEIVE_FILE( file, length );
+    }
+	 else replyCode = 0;
+
+/*	 if (xferCancelled)
+			SocketPrintf( pself->FI_logDest, pself->FI_controlSock, "ABOR\r\n" ); */
+
+
+	 /* Stop listen and data connection. */
+    TimerSleep(3*60) ;
+    @call self::MSG_FTP_STOP_DATA_SOCKET();
+
+	 if ( replyCode == MAKEFOURCC( '1','5','0', 0 ))
+	 {
+		  /* check and see if the upload was successful...
+			  we're looking for a 226 (transfer complete) */
+		  replyCode = @call self::MSG_FTP_GET_REPLY();
+		  if (replyCode != MAKEFOURCC( '2','2','6', 0 )) replyCode = 0;
+	 }
+
+	 if (xferCancelled) {
+			/* stop the process regardless */
+			replyCode = 1;
+			}
+
+	 @call self::MSG_FTP_SET_STATUS_TEXT( @StatusEmptyStatus );
+
+    return replyCode;
+
+} /* MSG_FTP_DOWNLOAD_FILE */
+
+
+/*************************************************************************
+    MSG_FTP_DOWNLOAD_DIRECTORY
+--------------------------------------------------------------------------
+    Do the download of the directory into a file.
+
+    @param  pathname   A string containing the path of the directory
+                       to download.
+    @param  file       A FileHandle to which the transfered data is
+                       appended.
+
+    @return The C<FtpReplyCode>, if just '\0' is returned,
+            a socket error occured.  ThreadGetError()
+            will return the reason.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-01  GerdB     Initial version.
+	 02/12/04	jfh		added PASV
+*************************************************************************/
+@method FtpClass, MSG_FTP_DOWNLOAD_DIRECTORY
+/*  FtpReplyCode
+    (
+    const char* pathname,
+    const FileHandle file
+    ) */
+{
+    FtpReplyCode replyCode = 0;
+    char command[ FTP_MAX_STRING_SIZE+1 ];
+//    char response[ FTP_MAX_STRING_SIZE+1 ];
+
+    EC( ECCheckBounds( (void*) pathname ) );
+    EC( ECCheckFileHandle( file ) );
+
+	 @call self::MSG_FTP_SET_STATUS_TEXT( @StatusGetDirectory );
+
+	 SocketPrintf( pself->FI_logDest, pself->FI_logFileHan, pself->FI_controlSock, "TYPE A\r\n" );
+    replyCode = @call self::MSG_FTP_GET_REPLY();
+
+    if ( NULL != pathname )
+    {
+        size_t len = strlen( pathname );
+
+        if ( len != 0 )
+        {
+				sprintf( command, "LIST %s\r\n", pathname );
+        }
+        else
+        {
+            sprintf( command, "LIST\r\n" );
+        }
+    }
+    else
+    {
+        sprintf( command, "LIST\r\n" );
+    }
+
+	 replyCode = @call self::MSG_FTP_START_DATA_SOCKET(
+				&command, file/*,
+				response, sizeof( response )*/ );
+
+	 if ( replyCode == MAKEFOURCC( '1','5','0', 0 ))
+	 {
+		  @call self::MSG_FTP_RECEIVE_FILE( file, -1 );
+
+	 }
+	 /* Stop listen and data connection. */
+	 @call self::MSG_FTP_STOP_DATA_SOCKET();
+
+//	 pself->FI_dataResponse[0] = 0;
+
+	 @call self::MSG_FTP_SET_STATUS_TEXT( @StatusEmptyStatus );
+
+		  replyCode = @call self::MSG_FTP_GET_REPLY();
+
+
+    return replyCode;
+
+} /* MSG_FTP_DOWNLOAD_DIRECTORY */
+
+
+/*************************************************************************
+	 MSG_FTP_START_DATA_SOCKET
+--------------------------------------------------------------------------
+    Do the download of the directory into a file.
+
+    @param  command    A string containing the complete command needed
+                       for the download.
+    @param  file       A FileHandle to which the transfered data is
+                       appended.
+    @param  response   A pointer to a buffer to store the return message.
+
+    @param len         A integer giving the size of the reponse buffer.
+
+    @return The C<FtpReplyCode>, if just '\0' is returned,
+            a socket error occured.  ThreadGetError()
+            will return the reason.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-11-28  GerdB     Initial version.
+	 02/12/04	jfh		changed to implement PASV changes
+*************************************************************************/
+@method FtpClass, MSG_FTP_START_DATA_SOCKET
+/*  FtpReplyCode
+    (
+    const char* command,
+    const FileHandle file,
+    char* response,
+    int   len
+    ) */
+{
+    FtpReplyCode replyCode = 0;
+    SocketCheckRequest requests[ 2 ];
+    int activeSock;
+//    byte ipAddr[ 4 ];
+
+    EC( ECCheckBounds( (void*) command ) );
+    EC( ECCheckFileHandle( file ) );
+
+	 @call self::MSG_FTP_SEND_PASV();
+
+
+//	 ++pself->FI_listenPort.SP_port;
+//	 GetIpAddress( pself->FI_controlSock, &ipAddr );
+/*	 SocketPrintf( pself->FI_logDest,
+						pself->FI_controlSock, "PORT %d,%d,%d,%d,%d,%d\r\n",
+						ipAddr[ 0 ], ipAddr[ 1 ],
+						ipAddr[ 2 ], ipAddr[ 3 ],
+						( pself->FI_listenPort.SP_port >> 8 ) & 0xff,
+						pself->FI_listenPort.SP_port & 0xff );
+
+	 replyCode = @call self::MSG_FTP_GET_REPLY();
+	 if ( replyCode == MAKEFOURCC( '2','0','0', 0 ))
+	 {
+		  /* Port command was succesfull. */
+		  pself->FI_dataSock = SocketCreate( SDT_STREAM );
+		  if ( 0 == pself->FI_dataSock )
+        {
+            /* Socket create error. */
+            return 0;
+        }
+
+//		  if ( SE_NORMAL != SocketBindInDomain( pself->FI_listenSock, pself->FI_listenPort, 0, "tcpip" )
+//          || SE_NORMAL != SocketListen( pself->FI_listenSock, 1 ) )
+		  /* the new port filled in by PASV */
+		  pself->FI_hostaddr.RTA_sock.SA_port.SP_port = pself->FI_listenPort.SP_port;
+			if (SE_NORMAL != SocketConnect( pself->FI_dataSock,
+												&pself->FI_hostaddr.RTA_sock, pself->FI_timeout ))
+		  {
+            /* We couldn't create the socket. */
+            SocketClose(pself->FI_dataSock );
+            return 0;
+        }
+
+//		  requests[ 0 ].SCR_socket    = pself->FI_listenSock;
+//		  requests[ 0 ].SCR_condition = SC_ACCEPT;
+		  requests[ 0 ].SCR_socket    = pself->FI_dataSock;
+		  requests[ 0 ].SCR_condition = SC_READ;
+		  requests[ 0 ].SCR_reserved  = 0;
+        requests[ 1 ].SCR_socket    = pself->FI_controlSock;
+		  requests[ 1 ].SCR_condition = SC_READ;
+        requests[ 1 ].SCR_reserved  = 0;
+
+		  SocketPrintf( pself->FI_logDest, pself->FI_logFileHan, pself->FI_controlSock, command );
+
+        activeSock = SocketCheckReady( requests, 2, pself->FI_timeout );
+        if ( activeSock == 0 )
+        {
+            /* Our listenSock has something to accept, so start receiving. */
+			//   pself->FI_dataSock = SocketAccept( pself->FI_listenSock, pself->FI_timeout );
+				SocketSetIntSocketOption(pself->FI_dataSock, SO_RECV_BUF,
+								  (SIZE_DOWNLOAD_BLOCK>1024)?SIZE_DOWNLOAD_BLOCK:1024);
+
+            pself->FI_ftpState = FS_RETRIEVE_DATA;
+        }
+        else if ( activeSock == 1 )
+        {
+            /* Some data on the control connection -> Error. */
+				replyCode = @call self::MSG_FTP_GET_REPLY();
+				return replyCode;
+        } else {
+            /* Timed out */
+            return 0 ;
+        }
+
+		  /* Get download message from remote server. */
+/*		  if ( SocketGetLine(
+					 @self->FI_logDest,
+					 @self->FI_controlSock,
+					 @self->FI_dataResponse, FTP_MAX_STRING_SIZE+1,
+                @self->FI_timeout ) == 0 )
+        {
+            /* We do not have any message, also an error occured. */
+/*            return 0;
+        }
+
+		  memcpy( &replyCode, pself->FI_dataResponse, 3 );
+*/
+		  replyCode = @call self::MSG_FTP_GET_REPLY();
+
+//    }
+    return replyCode;
+
+} /* MSG_FTP_START_DATA_SOCKET */
+
+
+/*************************************************************************
+    MSG_FTP_STOP_DATA_SOCKET
+--------------------------------------------------------------------------
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-11-28  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_STOP_DATA_SOCKET
+/*  void
+    (
+    void
+    ) */
+{
+    if ( 0 != pself->FI_dataSock ) {
+        SocketClose(pself->FI_dataSock );
+        pself->FI_dataSock = 0;
+    }
+
+} /* MSG_FTP_STOP_DATA_SOCKET */
+
+
+/*************************************************************************
+    MSG_FTP_RECEIVE_FILE
+--------------------------------------------------------------------------
+    Recives data from the data connection and stores it into the given
+    file.
+
+    @param file         A FileHandle to which the transfered data is
+                        appended.
+    @param totalLenght  The total number of bytes of this file.
+                        -1 if unknown.
+
+	Return TRUE if user cancelled the transfer by clicking Cancel in the
+	status dialog box.
+
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-01  GerdB     Initial version.
+	 02/07/02  jfh			added boolean return
+*************************************************************************/
+@method FtpClass, MSG_FTP_RECEIVE_FILE
+/*  Boolean
+    (
+    const FileHandle file,
+    const long totalLength
+    ) */
+{
+    byte  *buffer ;
+    MemHandle bufferMem ;
+    long  length;
+    int   i;
+    Boolean doCancel = FALSE ;
+
+    EC( ECCheckFileHandle( file ) );
+    bufferMem = MemAlloc(SIZE_DOWNLOAD_BLOCK, HF_DYNAMIC, 0) ;
+    buffer = MemLock(bufferMem) ;
+
+    if ( file )
+    {
+        length = 0;
+        i = 0;
+
+        do {
+            if ( i )                 /* already got some data? write it */
+            {
+                if ( FileWrite( file, buffer, i, FALSE ) != i )
+                {
+                    break;
+                }
+                length += i;
+            }
+
+            /* Send status. */
+            if ( ( pself->FI_statusDest != NullOptr ) &&
+                 ( pself->FI_statusMsg != 0 ) )
+            {
+                doCancel = @call pself->FI_statusDest::
+                        {FTP_STATUS_TEXT_MSG}( pself->FI_statusMsg ) (
+                                @StatusReceiving,
+                                length,
+                                ( totalLength == -1 ) ? -1 : totalLength,
+                                0 );
+            }
+
+        } while ( (!doCancel) &&
+                  ( i = SocketRecv(
+                            pself->FI_dataSock,
+                            buffer,
+                            SIZE_DOWNLOAD_BLOCK,
+                            pself->FI_timeout,
+                            0,
+                            NULL ) ) != 0 );
+    }
+
+    MemUnlock(bufferMem) ;
+	 MemFree(bufferMem) ;
+
+	 return(doCancel);
+
+} /* MSG_FTP_RECEIVE_FILE */
+
+
+/*************************************************************************
+    MSG_FTP_GET_WORKING_DIR
+--------------------------------------------------------------------------
+    Get the absolute name of the current working directory.
+
+    @param pathHandle  Stores the MemHandle of the block containing the
+                       pathname.
+
+    @return The C<FtpReplyCode>, or just '\0' if a transmission
+            error occured.  if C<257> is returned, the buffer contains
+            a valid pathname.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-09-20  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_GET_WORKING_DIR
+/*  FtpReplyCode
+    (
+    MemHandle* pathHandle,
+    word  size
+    ) */
+{
+    FtpReplyCode replyCode = 0;
+    MemHandle           memHandle;
+    char*               memPtr;
+
+    SocketPrintf( pself->FI_logDest, pself->FI_logFileHan, pself->FI_controlSock, "PWD\r\n" );
+
+    memHandle = MemAlloc( FTP_MAX_HOST_NAME+1, HF_SWAPABLE, HAF_LOCK );
+    if ( NullHandle != memHandle )
+    {
+        memPtr = MemDeref( memHandle );
+		  if ( SocketGetLine(
+					 pself->FI_logDest,
+                pself->FI_logFileHan,
+                pself->FI_controlSock, memPtr, FTP_MAX_HOST_NAME,
+                pself->FI_timeout*5  ) != 0 )
+        {
+            /* No error, so figure out working dir. */
+            char* start;
+            char* end;
+
+            if ( NullHandle != pself->FI_logDest )
+            {
+					 @call pself->FI_logDest::MSG_VIS_TEXT_APPEND_PTR(
+                        memPtr, 0);
+				}
+
+            /* Copy reply code from line. */
+            memcpy( &replyCode, memPtr, 3 );
+
+            /* copy the string between the first two quotes as pathname */
+            start = strchr( memPtr, '\"' );
+            if ( NULL != start )
+            {
+                start++;
+                end   = strchr( start, '\"' );
+                *end  = '\0';
+                memmove( memPtr, start, end - start + 1 );
+            }
+		  }
+
+        MemUnlock( memHandle );
+    }
+
+    *pathHandle = memHandle;
+
+    return replyCode;
+
+} /* MSG_FTP_GET_WORKING_DIR */
+
+
+
+/*************************************************************************
+    MSG_FTP_UPLOAD_FILE
+--------------------------------------------------------------------------
+    Do the upload of a file.
+
+    @param  pathname   A string containing the path and name where
+                       to upload the file.
+    @param  file       A FileHandle to the file to transfer.
+
+    @return The C<FtpReplyCode>, if just '\0' is returned,
+            a socket error occured.  ThreadGetError()
+            will return the reason.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-10-28  GerdB     Initial version.
+	 02/07/02  jfh			added user cancelled stuff
+*************************************************************************/
+@method FtpClass, MSG_FTP_UPLOAD_FILE
+/*  FtpReplyCode
+    (
+    const char* pathname,
+    const FileHandle file
+    ) */
+{
+    FtpReplyCode replyCode = 0;
+	 char command[ FTP_MAX_STRING_SIZE+1 ];
+	 GeosFileType type ;
+	 Boolean xferCancelled = FALSE;
+
+    EC( ECCheckBounds( (void*) pathname ) );
+    EC( ECCheckFileHandle( file ) );
+
+    @call self::MSG_FTP_SET_STATUS_TEXT( @StatusInitiateUpload );
+
+	 SocketPrintf( pself->FI_logDest, pself->FI_logFileHan,
+												  pself->FI_controlSock, "TYPE I\r\n" );
+	 replyCode = @call self::MSG_FTP_GET_REPLY();
+	 /* we'll assume that we got in to binary mode */
+
+    sprintf( command, "STOR %s\r\n", pathname );
+	 replyCode = @call self::MSG_FTP_START_DATA_SOCKET( &command, file);
+
+	 if ( replyCode == MAKEFOURCC( '1','5','0', 0 ))
+	 {
+		  /* OK - we have a good connection to the server, send it up */
+        type = GFT_NOT_GEOS_FILE ;
+        FileGetHandleExtAttributes(file, FEA_FILE_TYPE, &type, sizeof(type)) ;
+        if (type == GFT_NOT_GEOS_FILE)  {
+				xferCancelled = @call self::MSG_FTP_SEND_FILE( file, FileSize(file) );
+        } else {
+            /* If a GEOS file, be sure to send the header (backup 256 bytes) */
+            FilePos(file, 0, FILE_POS_START) ;
+            FilePos(file, -256, FILE_POS_START) ;
+            xferCancelled = @call self::MSG_FTP_SEND_FILE( file, 256 + FileSize(file) );
+		  }
+	 }
+	 else replyCode = 0;
+
+	 /* Stop data connection, if available. */
+    TimerSleep(3*60) ;
+    @call self::MSG_FTP_STOP_DATA_SOCKET();
+
+	 if ( replyCode == MAKEFOURCC( '1','5','0', 0 ))
+	 {
+		  /* check and see if the upload was successful...
+			  we're looking for a 226 (transfer complete) */
+		  replyCode = @call self::MSG_FTP_GET_REPLY();
+		  if (replyCode != MAKEFOURCC( '2','2','6', 0 )) replyCode = 0;
+
+	 }
+
+	 /* get rid of the partly uploaded file */
+	 if (xferCancelled) {
+			@call self::MSG_FTP_SEND_COMMAND( "DELE %s\r\n", pathname );
+			/* and stop the process regardless   */
+			replyCode = 0;
+			}
+
+	 return replyCode;
+
+
+} /* MSG_FTP_UPLOAD_FILE */
+
+
+/*************************************************************************
+    MSG_FTP_SEND_FILE
+--------------------------------------------------------------------------
+    Send data from the given file to the data connection.  The remote
+    server is storing that.
+
+    @param file         A FileHandle to the file to transfer
+                        to the server.
+
+    @param totalLenght  The total number of bytes of this file.
+                        0 if unknown.
+
+	Return TRUE if user cancelled the transfer by clicking Cancel in the
+	status dialog box.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-10-28  GerdB     Initial version.
+	 02/07/02  jfh			added boolean return
+*************************************************************************/
+@method FtpClass, MSG_FTP_SEND_FILE
+/*  Boolean
+    (
+    const FileHandle file,
+    const long totalLength
+    ) */
+{
+	 MemHandle bufferMem ;
+    byte  *buffer ;
+    long  length = 0;
+    int   i;
+    SocketError error = SE_NORMAL;
+    Boolean doCancel = FALSE ;
+
+    EC( ECCheckFileHandle( file ) );
+
+    bufferMem = MemAlloc(SIZE_UPLOAD_BLOCK, HF_DYNAMIC, 0) ;
+    buffer = MemLock(bufferMem) ;
+
+    do {
+        i = FileRead( file, buffer, SIZE_UPLOAD_BLOCK, FALSE );
+        length += i;
+
+        if ( i != 0 )
+        {
+            /* We were able to read some data from the file, so send them. */
+            error = SocketSend( pself->FI_dataSock, buffer, i, 0, NULL );
+
+            /* Send status. */
+            if ( ( pself->FI_statusDest != NullOptr ) &&
+                 ( pself->FI_statusMsg != 0 ) )
+            {
+                doCancel = @call pself->FI_statusDest::
+                        {FTP_STATUS_TEXT_MSG}( pself->FI_statusMsg ) (
+                                @StatusSending,
+                                length,
+                                ( totalLength == -1 ) ? -1 : totalLength,
+                                0 );
+            }
+        }
+    } while ( ( i != 0 ) && ( error == SE_NORMAL ) && (!doCancel));
+
+    MemUnlock(bufferMem) ;
+    MemFree(bufferMem) ;
+
+	 return doCancel;
+
+} /* MSG_FTP_SEND_FILE */
+
+
+/*************************************************************************
+	 MSG_FTP_SEND_USER
+--------------------------------------------------------------------------
+    Transmit the user identification to the FTP server for
+    access to its file system.
+
+    @param  user        A Telnet string identifying the user.
+
+    @return The C<FtpReplyCode>, if just '\0' is returned,
+            a socket error occured.  ThreadGetError()
+            will return the reason.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-08-31  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_SEND_USER
+/*  FtpReplyCode
+    (
+    const char* user
+    ) */
+{
+    return @call self::MSG_FTP_SEND_COMMAND( "USER %s\r\n", user );
+
+} /* MSG_FTP_SEND_USER */
+
+
+/*************************************************************************
+    MSG_FTP_DELETE_FILE
+--------------------------------------------------------------------------
+    Request to delete a file on the server.
+
+    @param  pathname    Name of file (with possible path)
+
+    @return The C<FtpReplyCode>, if just '\0' is returned,
+            a socket error occured.  ThreadGetError()
+            will return the reason.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    99-03-23  LysleS    Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_DELETE_FILE
+{
+	 return @call self::MSG_FTP_SEND_COMMAND( "DELE %s\r\n", pathname );
+} /* MSG_FTP_DELETE_FILE */
+
+
+/*************************************************************************
+    MSG_FTP_RENAME_FILE
+--------------------------------------------------------------------------
+    Request to rename a file on the server.
+
+    @param  pathname    Name of file (with possible path)
+            newname     New name (without path)
+
+    @return The C<FtpReplyCode>, if just '\0' is returned,
+            a socket error occured.  ThreadGetError()
+            will return the reason.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    99-03-23  LysleS    Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_RENAME_FILE
+{
+    FtpReplyCode replyCode ;
+
+    replyCode = @call self::MSG_FTP_SEND_COMMAND( "RNFR %s\r\n", pathname);
+    if ( replyCode == MAKEFOURCC( '3','5','0', 0 ))
+    {
+        replyCode = @call self::MSG_FTP_SEND_COMMAND( "RNTO %s\r\n", newname);
+    }
+
+    return replyCode ;
+} /* MSG_FTP_DELETE_FILE */
+
+
+/*************************************************************************
+    MSG_FTP_SEND_PASS
+--------------------------------------------------------------------------
+    Transmit the user's password to the FTP server for
+    access to its file system.
+
+    This command must be immediately preceded by the user name command,
+    and, for some sites, completes the user's identification for
+    access control.
+
+    @param  password    A Telnet string specifying the user's password.
+
+    @return
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-08-31  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_SEND_PASS
+/*  FtpReplyCode
+    (
+    const char* password
+    ) */
+{
+    return @call self::MSG_FTP_SEND_COMMAND( "PASS %s\r\n", password );
+
+} /* MSG_FTP_SEND_PASS */
+
+
+/*************************************************************************
+    MSG_FTP_SEND_ACCT
+--------------------------------------------------------------------------
+    Transmit the user's account to the FTP server for
+    access to its file system.
+
+    The command is not necessarily related to the USER command, as
+    some sites may require an account for login and others only for
+    specific access, such as storing files.  In the latter case the
+    command may arrive at any time.
+
+    @param  account     A Telnet string identifying the user's account.
+
+    @return
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-08-31  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_SEND_ACCT
+/*  FtpReplyCode
+    (
+    const char* account
+    ) */
+{
+    return @call self::MSG_FTP_SEND_COMMAND( "ACCT %s\r\n", account );
+
+} /* MSG_FTP_SEND_ACCT */
+
+
+
+/*************************************************************************
+    MSG_FTP_SEND_CWD
+--------------------------------------------------------------------------
+    This command allows the user to work with a different
+    directory or dataset for file storage or retrieval without
+    altering his login or accounting information.  Transfer
+    parameters are similarly unchanged.
+
+    @param pathname A string specifying a directory or other system
+                    dependent file group designator.
+
+    @return
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-08-31  GerdB     Initial version.
+	 01-??-02  les			added QUOTE
+	 02-02-02  jfh			removed 	QUOTE - with quotes the server returns
+								error 550 No such directory.
+*************************************************************************/
+@method FtpClass, MSG_FTP_SEND_CWD
+/*  FtpReplyCode
+    (
+    const char* pathname
+    ) */
+{
+  //	 return @call self::MSG_FTP_SEND_COMMAND( "CWD " QUOTE "%s" QUOTE "\r\n", pathname );
+	return @call self::MSG_FTP_SEND_COMMAND( "CWD %s\r\n", pathname );
+
+} /* MSG_FTP_SEND_CWD */
+
+
+/*************************************************************************
+    MSG_FTP_SEND_CDUP
+--------------------------------------------------------------------------
+    This command is a special case of CWD, and is included to
+    simplify the implementation of programs for transferring
+    directory trees between operating systems having different
+    syntaxes for naming the parent directory.  The reply codes
+    shall be identical to the reply codes of CWD.  See
+    {{REF:RFC959}} Appendix II for further details.
+
+    {{Optional}}
+
+    @return
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-08-31  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_SEND_CDUP
+/*  FtpReplyCode
+    (
+    void
+    ) */
+{
+    return @call self::MSG_FTP_SEND_COMMAND( "CDUP\r\n", NULL );
+
+} /* MSG_FTP_SEND_CDUP */
+
+
+/*************************************************************************
+    MSG_FTP_SEND_MKD
+--------------------------------------------------------------------------
+    This command causes the directory specified in the pathname
+    to be created as a directory (if the pathname is absolute)
+    or as a subdirectory of the current working directory (if
+    the pathname is relative).
+
+    @param pathname A string specifying a directory or other system
+                    dependent file group designator.
+
+    @return
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-08-31  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_SEND_MKD
+/*  FtpReplyCode
+    (
+    const char* pathname
+    ) */
+{
+    return @call self::MSG_FTP_SEND_COMMAND( "MKD %s\r\n", pathname );
+
+} /* MSG_FTP_SEND_MKD */
+
+
+
+/*************************************************************************
+	 MSG_FTP_DELETE_DIR
+--------------------------------------------------------------------------
+	 Request to delete a directory on the server.
+
+	 @param  pathname    Name of directory (with possible path)
+
+	 @return The C<FtpReplyCode>, if just '\0' is returned,
+            a socket error occured.  ThreadGetError()
+				will return the reason.
+
+  REVISION HISTORY:
+	 Date      Name      Description
+    --------  --------  -----------
+	 02/16/02  jfh			Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_DELETE_DIR
+{
+	 return @call self::MSG_FTP_SEND_COMMAND( "RMD %s\r\n", pathname );
+}
+
+
+/*************************************************************************
+    MSG_FTP_SET_STATUS_TEXT
+--------------------------------------------------------------------------
+    Takes care of the login procedure.  Opens the connection to the server
+    and sends the username and password.
+
+    @param  statusText  An optr to the status text to use.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-11-26  GerdB     Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_SET_STATUS_TEXT
+/*  void
+    (
+    const optr statusText
+    ) */
+{
+    if ( ( pself->FI_statusDest != NullOptr ) &&
+         ( pself->FI_statusMsg != 0 ) )
+    {
+        @send pself->FI_statusDest::
+                {FTP_STATUS_TEXT_MSG}( pself->FI_statusMsg ) (
+                        statusText, -1, 0, 0 );
+    }
+} /* MSG_FTP_SET_STATUS_TEXT */
+
+
+/***************************************************************************
+    MSG_FTP_SET_STATUS_MESSAGE
+----------------------------------------------------------------------------
+    Sets a new destination object, as specified in FI_statusDest.
+    Apply messages and status messags are sent out to this object.
+
+    @param dest destination object
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-10-30  GerdB     Initial version.
+
+***************************************************************************/
+@method FtpClass, MSG_FTP_SET_STATUS_MESSAGE
+/*  void
+    (
+    Message statusMsg
+    ) */
+{
+    pself->FI_statusMsg = statusMsg;
+
+} /* MSG_FTP_SET_STATUS_MESSAGE */
+
+
+/***************************************************************************
+    MSG_FTP_SET_STATUS_DESTINATION
+----------------------------------------------------------------------------
+    Sets a new destination object, as specified in FI_statusDest.
+    Apply messages and status messags are sent out to this object.
+
+    @param dest destination object
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-10-30  GerdB     Initial version.
+
+***************************************************************************/
+@method FtpClass, MSG_FTP_SET_STATUS_DESTINATION
+/*  void
+    (
+    optr dest
+    ) */
+{
+    pself->FI_statusDest = dest;
+
+} /* MSG_FTP_SET_STATUS_DESTINATION */
+
+
+/***************************************************************************
+    MSG_FTP_SET_LOGGING_DESTINATION
+----------------------------------------------------------------------------
+    Sets a new destination object, as specified in FI_statusDest.
+    Apply messages and status messags are sent out to this object.
+
+    @param dest destination object
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-10-30  GerdB     Initial version.
+
+***************************************************************************/
+@method FtpClass, MSG_FTP_SET_LOGGING_DESTINATION
+/*  void
+    (
+    optr dest
+    ) */
+{
+	 pself->FI_logDest = dest;
+
+} /* MSG_FTP_SET_LOGGING_DESTINATION */
+
+
+/***************************************************************************
+    MSG_FTP_GET_SOCKET_ERROR
+----------------------------------------------------------------------------
+    Returns the value of ThreadGetError for the FTP objects' thread.
+
+    @return A word which is error of the thread.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-11-29  GerdB     Initial version.
+
+***************************************************************************/
+@method FtpClass, MSG_FTP_GET_SOCKET_ERROR
+/*  word
+    (
+    void
+    ) */
+{
+    return ThreadGetError();
+
+} /* MSG_FTP_GET_SOCKET_ERROR */
+
+
+/***************************************************************************
+    MSG_META_DETACH
+----------------------------------------------------------------------------
+    When about to destroy this object, delete its related mem block.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    99-03-30  LysleS    Initial version.
+
+***************************************************************************/
+@method FtpClass, MSG_META_DETACH
+/* void (word callerID = cx, optr caller = dx:bp); */
+{
+    if (pself->FI_lastMessage)  {
+        MemFree(pself->FI_lastMessage) ;
+        pself->FI_lastMessage = NullHandle ;
+    }
+    @callsuper() ;
+}
+
+
+/***************************************************************************
+    MSG_FTP_GET_LAST_MESSAGE
+----------------------------------------------------------------------------
+    Return a copy of the last message received (if any).
+
+    @return A MemHandle to the new block with zero terminated status string.
+            Still has the reply code at the beginning.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    99-03-30  LysleS    Initial version.
+
+***************************************************************************/
+@method FtpClass, MSG_FTP_GET_LAST_MESSAGE
+{
+	 MemHandle text = NullHandle ;
+	 word size ;
+
+    if (pself->FI_lastMessage)  {
+        size = MemGetInfo(pself->FI_lastMessage, MGIT_SIZE) ;
+        text = MemAlloc(size, HF_DYNAMIC | HF_SHARABLE, 0) ;
+        if (text)  {
+            /* Copy the block */
+            MemLock(text) ;
+            MemLock(pself->FI_lastMessage) ;
+            memcpy(MemDeref(text), MemDeref(pself->FI_lastMessage), size) ;
+            MemUnlock(pself->FI_lastMessage) ;
+            MemUnlock(text) ;
+        }
+    }
+
+    return text ;
+}
+
+
+/***************************************************************************
+    MSG_FTP_REPORT_LAST_ERROR_IF_ANY
+----------------------------------------------------------------------------
+    Checks to see if the last error message was a 4xx or 5xx error and if
+    so display an error dialog with the returned text.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    99-03-30  LysleS    Initial version.
+
+***************************************************************************/
+@method FtpClass, MSG_FTP_REPORT_LAST_ERROR_IF_ANY
+{
+    MemHandle text ;
+    char *p_text ;
+
+    text = @call oself::MSG_FTP_GET_LAST_MESSAGE() ;
+    if (text)  {
+        p_text = MemLock(text) ;
+        if (p_text)  {
+            if ((*p_text == '4') || (*p_text == '5'))  {
+                UserStandardDialog(
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    p_text,
+                    (CDT_ERROR<<CDBF_DIALOG_TYPE_OFFSET) |
+                        (GIT_COMMAND<<CDBF_INTERACTION_TYPE_OFFSET)) ;
+            }
+        }
+        MemUnlock(text) ;
+        MemFree(text) ;
+    }
+}
+
+/*************************************************************************
+	 MSG_FTP_SEND_PASV
+--------------------------------------------------------------------------
+	 Ask the server to go to passive mode
+
+	 I'm basing this on WS_FTP where a passive command gets sent to the
+	 server before any action command
+
+    sets FI_isPasv TRUE if successful
+
+  REVISION HISTORY:
+	 Date      Name      Description
+    --------  --------  -----------
+	 02/12/04  jfh			Initial version.
+
+*************************************************************************/
+@method FtpClass, MSG_FTP_SEND_PASV
+{
+ FtpReplyCode		replyCode;
+ MemHandle			mhStr;
+ char					str[FTP_MAX_STRING_SIZE+1];
+ word					i, j, commas = 0;
+ char					portH[4], portL[4];
+ word					port;
+
+ 
+	SocketPrintf(pself->FI_logDest, pself->FI_logFileHan, pself->FI_controlSock, "PASV\r\n");
+
+	replyCode = @call self::MSG_FTP_GET_REPLY();
+
+	if (replyCode == MAKEFOURCC( '2','2','7', 0 )) {
+		/* the server is sending us data port */
+		mhStr = @call self::MSG_FTP_GET_LAST_MESSAGE();
+		MemLock(mhStr);
+		strcpy(str, MemDeref(mhStr));
+		MemUnlock(mhStr);
+		/* parse the URL & port info - skip over the reply code and then get
+			past the first 4 commas (the URL) */
+		for (i = 4; i < strlen(str); i++) {
+			if (str[i] == ',') {
+				commas++;
+				if (commas == 4) break;
+				}
+			}
+
+		/* get to the high byte */
+		while (!isdigit(str[i])) {
+			i++;
+			}
+		j = 0;
+		while (isdigit(str[i])) {
+			portH[j] = str[i];
+			i++;
+			j++;
+			}
+		portH[j] = 0;
+		/* get to the low byte */
+		while (!isdigit(str[i])) {
+			i++;
+			}
+		j = 0;
+		while (isdigit(str[i])) {
+			portL[j] = str[i];
+			i++;
+			j++;
+			}
+		portL[j] = 0;
+
+		/* and save the port poop */
+		port = atoi(portH) * 256;
+		port += atoi(portL);
+		pself->FI_listenPort.SP_port = port;
+
+		pself->FI_isPasv = TRUE;
+		}
+
+	else {
+		pself->FI_isPasv = FALSE;
+		}
+
+}
+
+
+
+/* ftp.goc */
