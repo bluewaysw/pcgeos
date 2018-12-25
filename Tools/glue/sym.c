@@ -735,7 +735,7 @@ Sym_Enter(VMHandle  	file,    	/* Output file */
 	 * are iffy, but we allow them. When they start congregating
 	 * in the same segment, though, we get upset.
 	 */
-	Notify(NOTIFY_ERROR, "%i multiply defined in a single segment", id);
+	Notify(NOTIFY_WARNING, "%i multiply defined in a single segment", id);
     }
     /*
      * table and block were left locked by SymLookup
