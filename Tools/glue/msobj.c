@@ -3001,14 +3001,17 @@ MSObj_ExpandIData(byte	    **dataPtr,	    /* Iterated data block */
     MSObj_GetWord(blockCount, *dataPtr);
 
     if (blockCount == 0) {
+	int 	j;
 	/*
 	 * No nested blocks. Copy the data to the buffer and advance both
 	 * pointers.
 	 */
 	contentSize = **dataPtr;
-	bcopy(*dataPtr + 1, *bufPtr, contentSize);
+	for (j = repCount; j > 0; j--) {
+	    bcopy(*dataPtr + 1, *bufPtr, contentSize);
+	    *bufPtr += contentSize;
+	}
 	*dataPtr += contentSize + 1;
-	*bufPtr += contentSize;
     } else {
 	int 	j;
 	byte	*base;
