@@ -1269,8 +1269,8 @@ Installed/Library/js:		ansic math borlandc mapheap profpnt MAKELIB
 ibms    : Installed/Library/Breadbox/ibms
 Installed/Library/Breadbox/ibms:	ansic MAKELIB
 
-extgraph	: Installed/Library/Breadbox/extgraph
-Installed/Library/Breadbox/extgraph:	ansic MAKELIB
+extgraph	: Installed/Library/Breadbox/ExtGraph
+Installed/Library/Breadbox/ExtGraph:	ansic MAKELIB
 
 wmg3http	: Installed/Library/Breadbox/urldrv/wmg3http
 Installed/Library/Breadbox/urldrv/wmg3http:	ansic socket ui ssl netutils \
