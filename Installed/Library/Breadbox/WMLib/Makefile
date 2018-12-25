@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = WMLib
+GEODE           = wmlib
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = WMLIB.GOC
-OBJS            = WMLIB.obj
+SRCS            = wmlib.goc
+OBJS            = wmlib.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = wmlib
