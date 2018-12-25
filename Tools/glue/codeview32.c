@@ -253,8 +253,9 @@ static Boolean
 CV32LocateFixup(const char *file,	    	/* Object file being processed */
 	      word  	fixOff, 	/* Offset of needed fixup */
 	      SegDesc	**sdPtr,    	/* Target segment of fixup */
-	      word  	*extraOffPtr)  	/* Extra offset for fixup (to be
+	      word  	*extraOffPtr,  	/* Extra offset for fixup (to be
 					 * added to existing offset) */
+	      ID	*realName)
 {
     MSSaveFixupRec  *sfp;	/* Current FIXUPP record being searched */
     byte    	    *bp;	/* General record pointer */
@@ -267,6 +268,7 @@ CV32LocateFixup(const char *file,	    	/* Object file being processed */
     word    	    reclen;	/* Length of the fixup record */
 
 printf("CV32LocateFixup\n");
+    *realName = NullID;
     /*
      * First find the right fixup record.
      */
@@ -337,6 +339,7 @@ printf("CV32LocateFixup\n");
 printf("CV32LocateFixup----\n");
 				return(FALSE);
 			    }
+			    *realName = target.external;
 			    break;
 			}
 		    }
@@ -2501,8 +2504,9 @@ CV32AllocLocalSym(VMBlockHandle	    symBlock,
 static Boolean
 CV32DetermineSymbolBlock(const char    	*file,	    	/* Object file being
 							 * read */
-		       ID   	    	name,	    	/* Name of symbol being
+		       char   	    	*name,	    	/* Name of symbol being
 							 * defined */
+		       word             nameLen,
 		       char 	    	*symType,   	/* String telling type
 							 * of symbol, for error
 							 * messages */
@@ -2523,8 +2527,12 @@ CV32DetermineSymbolBlock(const char    	*file,	    	/* Object file being
 							 * type block */
 		       MemHandle    	*memPtr,    	/* Storage for memory
 							 * handle of symBlock */
-		       genptr 	    	*symBasePtr)	/* Storage for base of
+		       genptr 	    	*symBasePtr,	/* Storage for base of
 							 * locked symBlock */
+		       ID               *realName)      /* Public name under
+							 * which symbol was
+							 * found, NullID if
+							 * none */
 {
     VMBlockHandle   symBlock;
     VMBlockHandle   typeBlock;
@@ -2536,14 +2544,15 @@ CV32DetermineSymbolBlock(const char    	*file,	    	/* Object file being
      * points to the offset field of the symbol record. First
      * find a fixup for this position
      */
-    if (!CV32LocateFixup(file, bp-symSeg, sdPtr, addrPtr)) {
+    *realName = NullID;
+    if (!CV32LocateFixup(file, bp-symSeg, sdPtr, addrPtr, realName)) {
 	/*
 	 * No fixup around, so see if there's a public definition
 	 * for the damn thing.
 	 */
 	Boolean	real;
-
-	if (!CV32LocatePublic(name, sdPtr, addrPtr, &real, (ID *)NULL)) {
+        *realName = ST_Enter(symbols, strings, name, nameLen);
+	if (!CV32LocatePublic(*realName, sdPtr, addrPtr, &real, (ID *)NULL)) {
 #if 0	/* HighC likes to generate codeview symbols for external arrays, so
 	 * we can't bitch about this... */
 	    Notify(NOTIFY_ERROR,
@@ -2552,6 +2561,9 @@ CV32DetermineSymbolBlock(const char    	*file,	    	/* Object file being
 #endif
 	    return(FALSE);
 	}
+    }
+    if (*realName==NullID) {
+	*realName = ST_Enter(symbols, strings, name, nameLen);
     }
 
     assert (*sdPtr != NULL);
@@ -2840,6 +2852,7 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		SegDesc	*sd;
 		dword	pParent;
 		dword	pEnd;
+		ID      name;
 
 		MSObj_GetDWord(pParent, bp);
 		MSObj_GetDWord(pEnd, bp);
@@ -2858,7 +2871,7 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 			break;
 		}
 
-		if (CV32LocateFixup(file, bp - symSeg, &sd, &extraOffset)) {
+		if (CV32LocateFixup(file, bp - symSeg, &sd, &extraOffset, &name)) {
 			extraOffset += MSObj_GetWordImm(bp);
 		}
 		else {
@@ -2942,16 +2955,14 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		char            *segName;
 		byte 			data;
 
-		name = ST_Enter(symbols, strings, (char *)bp + 7, bp[6]);
-
 		data = bp[7 + bp[6]];
 		bp[7 + bp[6]] = NULL;
 		printf("name %s\r\n", (char *)bp + 7);
 		bp[7 + bp[6]] = data;
 
-		if (!CV32DetermineSymbolBlock(file, name, "variable", bp, procSD,
+		if (!CV32DetermineSymbolBlock(file, (char *)bp + 7, bp[6], "variable", bp, procSD,
 			&sd, &addr, &tsymBlock, &ttypeBlock,
-			&tmem, &tsymBase))
+			&tmem, &tsymBase, &name))
 		{
 			break;
 		}
@@ -2975,7 +2986,7 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		printf("CST2_GDATA16--\n");fflush(stdout);
 		printf("CHECK GLOBAL %i\r\n", name);
 		if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
-			&real, &alias) && real)
+			&real, (ID *)NULL) && real)
 		{
 			os->flags |= OSYM_GLOBAL;
 			/*
@@ -3098,11 +3109,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		Boolean	    	real;
 		word			leaf;
 
-		/*
-		* Figure the name of the procedure -- we may need it soon.
-		*/
-		name = ST_Enter(symbols, strings, (char *)bp + 26, bp[25]);
-
 		if (scopeTop != 0) {
 			Notify(NOTIFY_ERROR,
 				"%s: procedure %i may not be nested inside another scope",
@@ -3110,9 +3116,9 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 			break;
 		}
 
-		if (!CV32DetermineSymbolBlock(file, name, "procedure", bp +18, NULL,
+		if (!CV32DetermineSymbolBlock(file, (char *)bp + 26, bp[25], "procedure", bp +18, NULL,
 			&sd, &addr, &symBlock, &typeBlock,
-			&mem, (genptr *)&symBase))
+			&mem, (genptr *)&symBase, &name))
 		{
 			break;
 		}
@@ -3176,14 +3182,16 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		*/
 		printf("CHECK GLOBAL %i\r\n", name);
 		if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
-			&real, &alias) && real)
+			&real, (ID *)NULL) && real)
 		{
 			printf("CHECK GLOBAL %i TRUE\r\n", name);
 			os->flags |= OSYM_GLOBAL;
+#if 0
 			if (alias != name) {
 				Sym_Enter(symbols, sd->syms, alias, symBlock,
 					scopeStack[scopeTop - 1]);
 			}
+#endif
 		}
 		/*
 		* Enter the symbol into the table for the segment.
