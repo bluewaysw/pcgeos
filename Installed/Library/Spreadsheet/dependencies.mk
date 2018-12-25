@@ -1,161 +1,161 @@
-RULER.obj \
-RULER.eobj: Ruler/RulerMANAGER.ASM \
-                SPREADSHEETGEODE.DEF GEOS.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF ASSERT.DEF DISK.DEF FILE.DEF DRIVE.DEF LIBRARY.DEF \
-                LMEM.DEF DBASE.DEF HEAP.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF WIN.DEF \
-                OBJECTS/WINC.DEF OBJECT.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/INPUTC.DEF THREAD.DEF TIMER.DEF TIMEDATE.DEF \
-                VM.DEF LOCALIZE.DEF SLLANG.DEF SYSTEM.DEF INITFILE.DEF \
-                INTERNAL/PRODFEATURES.DEF UI.DEF INPUT.DEF HWR.DEF \
-                GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                CELL.DEF MATH.DEF PARSE.DEF RULER.DEF CHART.DEF GROBJ.DEF \
-                OBJECTS/SPLINE.DEF OBJECTS/COLORC.DEF OBJECTS/VTEXTC.DEF \
-                SPOOL.DEF PRINT.DEF HUGEARR.DEF OBJECTS/STYLES.DEF \
-                BITMAP.DEF OBJECTS/TEXT/TCTRLC.DEF SSMETA.DEF SSHEET.DEF \
-                OBJECTS/SSHEET/SCTRLC.DEF SPREADSHEETMACROS.DEF \
-                SPREADSHEETERRORS.DEF RULERCONSTANT.DEF RULERHORIZ.ASM \
-                RULERVERT.ASM RULERCOMMON.ASM RULERMOUSE.ASM
-SPREADSHEET.obj \
-SPREADSHEET.eobj: Spreadsheet/SpreadsheetMANAGER.ASM \
-                SPREADSHEETGEODE.DEF GEOS.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF ASSERT.DEF DISK.DEF FILE.DEF DRIVE.DEF LIBRARY.DEF \
-                LMEM.DEF DBASE.DEF HEAP.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF WIN.DEF \
-                OBJECTS/WINC.DEF OBJECT.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/INPUTC.DEF THREAD.DEF TIMER.DEF TIMEDATE.DEF \
-                VM.DEF LOCALIZE.DEF SLLANG.DEF SYSTEM.DEF INITFILE.DEF \
-                INTERNAL/PRODFEATURES.DEF UI.DEF INPUT.DEF HWR.DEF \
-                GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                CELL.DEF MATH.DEF PARSE.DEF RULER.DEF CHART.DEF GROBJ.DEF \
-                OBJECTS/SPLINE.DEF OBJECTS/COLORC.DEF OBJECTS/VTEXTC.DEF \
-                SPOOL.DEF PRINT.DEF HUGEARR.DEF OBJECTS/STYLES.DEF \
-                BITMAP.DEF OBJECTS/TEXT/TCTRLC.DEF SSMETA.DEF SSHEET.DEF \
-                OBJECTS/SSHEET/SCTRLC.DEF SPREADSHEETMACROS.DEF \
-                SPREADSHEETERRORS.DEF SPREADSHEETSTYLETOKEN.DEF \
-                SPREADSHEETROWARRAY.DEF SPREADSHEETFILECONSTANT.DEF \
-                SPREADSHEETMACRO.DEF SPREADSHEETCONSTANT.DEF \
-                SPREADSHEETVARIABLE.ASM GRAPHICSTEXT.ASM \
-                SPREADSHEETINIT.ASM SPREADSHEETDRAW.ASM \
-                SPREADSHEETDRAWUTILS.ASM SPREADSHEETUTILS.ASM \
-                SPREADSHEETEDITBAR.ASM SPREADSHEETKEYBOARD.ASM \
-                SPREADSHEETSTYLETOKEN.ASM SPREADSHEETROWARRAY.ASM \
-                SPREADSHEETCELL.ASM SPREADSHEETRANGE.ASM \
-                SPREADSHEETMETHODSTYLE.ASM SPREADSHEETNOTIFY.ASM \
-                SPREADSHEETMETHODMOVE.ASM SPREADSHEETMETHODSELECT.ASM \
-                SPREADSHEETMETHODMOUSE.ASM SPREADSHEETGEOMETRY.ASM \
-                SPREADSHEETSCROLL.ASM SPREADSHEETERRORCHECK.ASM \
-                SPREADSHEETNAMEUTILS.ASM SPREADSHEETNAMELIST.ASM \
-                SPREADSHEETNAMEMETHODS.ASM \
-                SPREADSHEETNAMECTRLINTERFACE.ASM SPREADSHEETPARSE.ASM \
-                SPREADSHEETRECALC.ASM SPREADSHEETFORMULACELL.ASM \
-                SPREADSHEETEXPRMETHODS.ASM SPREADSHEETCELLEDIT.ASM \
-                SPREADSHEETNOTES.ASM SPREADSHEETSPACE.ASM \
-                SPREADSHEETPRINT.ASM SPREADSHEETFORMATINIT.ASM \
-                SPREADSHEETFORMAT.ASM SPREADSHEETHEADERFOOTER.ASM \
-                SPREADSHEETEXTENT.ASM SPREADSHEETCUTCOPYCONSTANT.DEF \
-                SPREADSHEETCUTCOPY.ASM SPREADSHEETCUTCOPYUTILS.ASM \
-                SPREADSHEETPASTE.ASM SPREADSHEETPASTETRANSTBL.ASM \
-                SPREADSHEETPASTENAME.ASM SPREADSHEETQUICKMOVECOPY.ASM \
-                SPREADSHEETTEXTSCRAP.ASM SPREADSHEETSEARCH.ASM \
-                SPREADSHEETSORT.ASM SPREADSHEETFUNCTIONS.ASM \
-                SPREADSHEETMETHODFOCUS.ASM SPREADSHEETPOINTER.ASM \
-                SPREADSHEETCHART.ASM SPREADSHEETFILL.ASM \
-                SPREADSHEETROWCOLUMN.ASM SPREADSHEETOVERLAP.ASM \
-                SPREADSHEETC.ASM
+Spreadsheet.obj \
+Spreadsheet.eobj: Spreadsheet/spreadsheetManager.asm \
+                spreadsheetGeode.def geos.def geode.def resource.def \
+                ec.def assert.def disk.def file.def drive.def library.def \
+                lmem.def dbase.def heap.def graphics.def fontID.def \
+                font.def color.def gstring.def text.def char.def win.def \
+                Objects/winC.def object.def Objects/metaC.def \
+                chunkarr.def geoworks.def Objects/processC.def \
+                Objects/inputC.def thread.def timer.def timedate.def \
+                vm.def localize.def sllang.def system.def initfile.def \
+                Internal/prodFeatures.def ui.def input.def hwr.def \
+                gcnlist.def Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                cell.def math.def parse.def ruler.def chart.def grobj.def \
+                Objects/spline.def Objects/colorC.def Objects/vTextC.def \
+                spool.def print.def hugearr.def Objects/styles.def \
+                bitmap.def Objects/Text/tCtrlC.def ssmeta.def ssheet.def \
+                Objects/SSheet/sCtrlC.def spreadsheetMacros.def \
+                spreadsheetErrors.def spreadsheetStyleToken.def \
+                spreadsheetRowArray.def spreadsheetFileConstant.def \
+                spreadsheetMacro.def spreadsheetConstant.def \
+                spreadsheetVariable.asm graphicsText.asm \
+                spreadsheetInit.asm spreadsheetDraw.asm \
+                spreadsheetDrawUtils.asm spreadsheetUtils.asm \
+                spreadsheetEditBar.asm spreadsheetKeyboard.asm \
+                spreadsheetStyleToken.asm spreadsheetRowArray.asm \
+                spreadsheetCell.asm spreadsheetRange.asm \
+                spreadsheetMethodStyle.asm spreadsheetNotify.asm \
+                spreadsheetMethodMove.asm spreadsheetMethodSelect.asm \
+                spreadsheetMethodMouse.asm spreadsheetGeometry.asm \
+                spreadsheetScroll.asm spreadsheetErrorCheck.asm \
+                spreadsheetNameUtils.asm spreadsheetNameList.asm \
+                spreadsheetNameMethods.asm \
+                spreadsheetNameCtrlInterface.asm spreadsheetParse.asm \
+                spreadsheetRecalc.asm spreadsheetFormulaCell.asm \
+                spreadsheetExprMethods.asm spreadsheetCellEdit.asm \
+                spreadsheetNotes.asm spreadsheetSpace.asm \
+                spreadsheetPrint.asm spreadsheetFormatInit.asm \
+                spreadsheetFormat.asm spreadsheetHeaderFooter.asm \
+                spreadsheetExtent.asm spreadsheetCutCopyConstant.def \
+                spreadsheetCutCopy.asm spreadsheetCutCopyUtils.asm \
+                spreadsheetPaste.asm spreadsheetPasteTransTbl.asm \
+                spreadsheetPasteName.asm spreadsheetQuickMoveCopy.asm \
+                spreadsheetTextScrap.asm spreadsheetSearch.asm \
+                spreadsheetSort.asm spreadsheetFunctions.asm \
+                spreadsheetMethodFocus.asm spreadsheetPointer.asm \
+                spreadsheetChart.asm spreadsheetFill.asm \
+                spreadsheetRowColumn.asm spreadsheetOverlap.asm \
+                spreadsheetC.asm
 UI.obj \
-UI.eobj: UI/UIMANAGER.ASM \
-                SPREADSHEETGEODE.DEF GEOS.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF ASSERT.DEF DISK.DEF FILE.DEF DRIVE.DEF LIBRARY.DEF \
-                LMEM.DEF DBASE.DEF HEAP.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF WIN.DEF \
-                OBJECTS/WINC.DEF OBJECT.DEF OBJECTS/METAC.DEF \
-                CHUNKARR.DEF GEOWORKS.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/INPUTC.DEF THREAD.DEF TIMER.DEF TIMEDATE.DEF \
-                VM.DEF LOCALIZE.DEF SLLANG.DEF SYSTEM.DEF INITFILE.DEF \
-                INTERNAL/PRODFEATURES.DEF UI.DEF INPUT.DEF HWR.DEF \
-                GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                CELL.DEF MATH.DEF PARSE.DEF RULER.DEF CHART.DEF GROBJ.DEF \
-                OBJECTS/SPLINE.DEF OBJECTS/COLORC.DEF OBJECTS/VTEXTC.DEF \
-                SPOOL.DEF PRINT.DEF HUGEARR.DEF OBJECTS/STYLES.DEF \
-                BITMAP.DEF OBJECTS/TEXT/TCTRLC.DEF SSMETA.DEF SSHEET.DEF \
-                OBJECTS/SSHEET/SCTRLC.DEF SPREADSHEETMACROS.DEF \
-                SPREADSHEETERRORS.DEF UICONSTANT.DEF UIMANAGER.RDEF \
-                UIUTILS.ASM UIEDITBAR.ASM UISORT.ASM UICHOOSEFUNCTION.ASM \
-                UIDEFINENAME.ASM UICHOOSENAME.ASM UIWIDTH.ASM \
-                UIHEIGHT.ASM UIEDIT.ASM UIHEADER.ASM UIBORDER.ASM \
-                UIBORDERCOLOR.ASM UIRECALC.ASM UIOPTIONS.ASM UINOTES.ASM \
-                UIFILL.ASM UICHART.ASM
-UIMANAGER.rdef: GENERIC.UIH PRODUCT.UIH OBJECTS/TEXT/TCTRL.UIH RULER.UIH \
-                OBJECTS/COLORC.UIH OBJECTS/STYLES.UIH \
-                INTERNAL/PRODFEATURES.UIH UI/UIEDITBAR.UI \
-                ART/MKRBACKSPACE.UI ART/MKRNUMERIC.UI \
-                ART/MKRALPHABETIC.UI UI/UISORT.UI ART/MKRSORTASCEND.UI \
-                ART/MKRSORTDESCEND.UI UI/UICHOOSEFUNCTION.UI \
-                UI/UIDEFINENAME.UI UI/UICHOOSENAME.UI UI/UIWIDTH.UI \
-                UI/UIHEIGHT.UI UI/UIEDIT.UI ART/MKRINSERTROW.UI \
-                ART/MKRINSERTCOLUMN.UI ART/MKRDELETEROW.UI \
-                ART/MKRDELETECOLUMN.UI UI/UIHEADER.UI UI/UIBORDER.UI \
-                UI/UIBORDERCOLOR.UI UI/UIRECALC.UI ART/MKRRECALC.UI \
-                UI/UIOPTIONS.UI UI/UINOTES.UI UI/UIFILL.UI UI/UICHART.UI \
-                ART/MKRAREA.UI ART/MKRLINE.UI ART/MKRBAR.UI \
-                ART/MKRCOLUMN.UI ART/MKRPIE.UI ART/MKRSCATTER.UI \
-                ART/MKRHIGHLOW.UI
+UI.eobj: UI/uiManager.asm \
+                spreadsheetGeode.def geos.def geode.def resource.def \
+                ec.def assert.def disk.def file.def drive.def library.def \
+                lmem.def dbase.def heap.def graphics.def fontID.def \
+                font.def color.def gstring.def text.def char.def win.def \
+                Objects/winC.def object.def Objects/metaC.def \
+                chunkarr.def geoworks.def Objects/processC.def \
+                Objects/inputC.def thread.def timer.def timedate.def \
+                vm.def localize.def sllang.def system.def initfile.def \
+                Internal/prodFeatures.def ui.def input.def hwr.def \
+                gcnlist.def Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                cell.def math.def parse.def ruler.def chart.def grobj.def \
+                Objects/spline.def Objects/colorC.def Objects/vTextC.def \
+                spool.def print.def hugearr.def Objects/styles.def \
+                bitmap.def Objects/Text/tCtrlC.def ssmeta.def ssheet.def \
+                Objects/SSheet/sCtrlC.def spreadsheetMacros.def \
+                spreadsheetErrors.def uiConstant.def uiManager.rdef \
+                uiUtils.asm uiEditBar.asm uiSort.asm uiChooseFunction.asm \
+                uiDefineName.asm uiChooseName.asm uiWidth.asm \
+                uiHeight.asm uiEdit.asm uiHeader.asm uiBorder.asm \
+                uiBorderColor.asm uiRecalc.asm uiOptions.asm uiNotes.asm \
+                uiFill.asm uiChart.asm
+Ruler.obj \
+Ruler.eobj: Ruler/rulerManager.asm \
+                spreadsheetGeode.def geos.def geode.def resource.def \
+                ec.def assert.def disk.def file.def drive.def library.def \
+                lmem.def dbase.def heap.def graphics.def fontID.def \
+                font.def color.def gstring.def text.def char.def win.def \
+                Objects/winC.def object.def Objects/metaC.def \
+                chunkarr.def geoworks.def Objects/processC.def \
+                Objects/inputC.def thread.def timer.def timedate.def \
+                vm.def localize.def sllang.def system.def initfile.def \
+                Internal/prodFeatures.def ui.def input.def hwr.def \
+                gcnlist.def Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                cell.def math.def parse.def ruler.def chart.def grobj.def \
+                Objects/spline.def Objects/colorC.def Objects/vTextC.def \
+                spool.def print.def hugearr.def Objects/styles.def \
+                bitmap.def Objects/Text/tCtrlC.def ssmeta.def ssheet.def \
+                Objects/SSheet/sCtrlC.def spreadsheetMacros.def \
+                spreadsheetErrors.def rulerConstant.def rulerHoriz.asm \
+                rulerVert.asm rulerCommon.asm rulerMouse.asm
+uiManager.rdef: generic.uih product.uih Objects/Text/tCtrl.uih ruler.uih \
+                Objects/colorC.uih Objects/styles.uih \
+                Internal/prodFeatures.uih UI/uiEditBar.ui \
+                Art/mkrBackspace.ui Art/mkrNumeric.ui \
+                Art/mkrAlphabetic.ui UI/uiSort.ui Art/mkrSortAscend.ui \
+                Art/mkrSortDescend.ui UI/uiChooseFunction.ui \
+                UI/uiDefineName.ui UI/uiChooseName.ui UI/uiWidth.ui \
+                UI/uiHeight.ui UI/uiEdit.ui Art/mkrInsertRow.ui \
+                Art/mkrInsertColumn.ui Art/mkrDeleteRow.ui \
+                Art/mkrDeleteColumn.ui UI/uiHeader.ui UI/uiBorder.ui \
+                UI/uiBorderColor.ui UI/uiRecalc.ui Art/mkrRecalc.ui \
+                UI/uiOptions.ui UI/uiNotes.ui UI/uiFill.ui UI/uiChart.ui \
+                Art/mkrArea.ui Art/mkrLine.ui Art/mkrBar.ui \
+                Art/mkrColumn.ui Art/mkrPie.ui Art/mkrScatter.ui \
+                Art/mkrHighLow.ui
 
-ssheetEC.geo ssheet.geo : GEOS.LDF UI.LDF CELL.LDF PARSE.LDF MATH.LDF RULER.LDF CHART.LDF TEXT.LDF COLOR.LDF SSMETA.LDF 
+ssheetEC.geo ssheet.geo : geos.ldf ui.ldf cell.ldf parse.ldf math.ldf ruler.ldf chart.ldf text.ldf color.ldf ssmeta.ldf 
