@@ -4,11 +4,11 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = basicdb
-ASM_TO_OBJS     = PATCH.ASM
+ASM_TO_OBJS     = PATCH.asm
 UI_TO_RDFS      =
-SRCS            = PATCH.ASM INTERNAL.H PATCH.H BDBTYPES.H BASICDB.H\
-                  BASICDB.GOC DBCLASS.GOC BASICDB.GOH
-OBJS            = PATCH.obj BASICDB.obj DBCLASS.obj
+SRCS            = PATCH.asm internal.h basicDB.h bdbtypes.h patch.h\
+                  dbclass.goc basicdb.goc basicdb.goh
+OBJS            = PATCH.obj dbclass.obj basicdb.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = basicdb

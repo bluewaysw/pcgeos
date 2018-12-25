@@ -1,0 +1,347 @@
+/***************************************************************************
+
+                Copyright (c) Breadbox Computer Company 1998
+                         -- All Rights Reserved --
+
+  PROJECT:      Generic Database System
+  MODULE:       Basic Database System / DataBaseClass
+  FILE:         basicDB.goh
+
+  AUTHOR:       Gerd Boerrigter
+
+  $Header: /Home Bulletin Board/Includes/Objects/BASICDB.GOH 7     7/21/97 18:25 Gerdb $
+
+  DESCRIPTION:
+    This file contains the declaration of the DataBaseClass.
+
+***************************************************************************/
+
+@deflib basicdb
+
+
+/***********************************************************************
+    DataBaseClass Definitions
+***********************************************************************/
+
+/**
+   This class
+
+ */
+@class DataBaseClass, MetaClass;
+
+/**
+    Specifies the database to use.
+
+    @return The Error
+
+    @param  file        contains our database.
+    @param  dirBlock    database directory block.
+ */
+@message BasicDBError MSG_DATABASE_USE_DATABASE(
+    VMFileHandle file, VMBlockHandle dirBlock );
+
+/**
+    Frees all resources used for the current database.
+
+    @return The Error
+ */
+@message BasicDBError MSG_DATABASE_EXIT_DATABASE();
+
+
+
+/*==========================================================================
+    Working with records:
+==========================================================================*/
+
+/**
+    Create a new empty record in memory.  And will be the current record
+    for all other messages.
+    The record is not added to a database, this happens only with
+    C<MSG_DATABASE_SAVE_RECORD>.
+    The recordID is also assigned during saving.
+
+    @return The Error
+*/
+@message BasicDBError MSG_DATABASE_CREATE_RECORD();
+
+
+/**
+    Saves the current record in the memory to the database file and
+    frees the memory block.  If the recordID is C<0>, then a new unique
+    recordID is assigned to this record.  If the record was deleted
+    meanwhile, it will be saved into the DB again.
+
+    @param recordID
+*/
+@message BasicDBError MSG_DATABASE_SAVE_RECORD(
+    BasicDBRecordID* recordID );
+
+
+/**
+    Frees the memory block without saving it to the database.  The
+    database is completly unchanged.
+*/
+@message void MSG_DATABASE_DISCARD_RECORD();
+
+
+/**
+    Get a record -- given its ID -- from the database into memory.
+    The record will be the current record.
+
+    @param recordID         ID of the record.
+*/
+@message BasicDBError MSG_DATABASE_GET_RECORD(
+    BasicDBRecordID recordID );
+
+
+/**
+    Get a record -- given its element number in the HugeArray -- from the
+    database into memory.
+    The record will be the current record.
+
+    @return The Error
+
+    @param elemNum          index in HugeArray of the record.
+*/
+@message BasicDBError MSG_DATABASE_GET_RECORD_BY_ELEM_NUM(
+    dword elemNum );
+
+/**
+    Get a record -- given a position in an index -- from the database into
+    memory.
+    The record will be the current record.
+
+    @return The Error
+
+    @param indexArray       HugeArray of the index array to use.
+    @param elemNum          element to get from the index.
+*/
+@message BasicDBError MSG_DATABASE_GET_RECORD_BY_INDEX(
+    VMBlockHandle indexArray, dword elemNum );
+
+/**
+    Deletes the current record from the database.  If the record was
+    actually never saved to the database, it frees the memory block
+    without saving it to the database and the database is completly
+    unchanged.
+
+    @return The Error
+*/
+@message BasicDBError MSG_DATABASE_DELETE_RECORD();
+
+
+/**
+    Deletes the record given by its record ID from the database.
+
+    @param recordID        record ID of record to delete.
+*/
+@message BasicDBError MSG_DATABASE_DELETE_RECORD_BY_ID(
+    BasicDBRecordID recordID );
+
+/**
+    Returns the recordID of the current record.  If the return value is
+    C<0> the record is not yet saved into the database.
+
+    @return The Error
+*/
+@message BasicDBRecordID MSG_DATABASE_GET_RECORD_ID();
+
+
+/*==========================================================================
+    Working with fields:
+==========================================================================*/
+
+/**
+    Adds a new (empty) field to the current record.  The returned
+    BasicDBFieldID is the unique ID to identify this field in this record.
+    For simplicity we add every new field to the end of the record.
+
+    @param fieldCategory
+    @param fieldType
+    @param fieldName        Namestring of the field.
+    @param fieldID          ID assigned to that field.
+*/
+@message BasicDBError MSG_DATABASE_ADD_FIELD(
+    BasicDBFieldCategory    fieldCategory,
+    BasicDBFieldType        fieldType,
+    TCHAR *         fieldName,
+    BasicDBFieldID* fieldID );
+
+
+/**
+    Deletes the field with the given field ID from the current record.
+
+    @param fieldID
+*/
+@message BasicDBError MSG_DATABASE_DELETE_FIELD(
+    BasicDBFieldID  fieldID );
+
+
+/**
+    Stores data in the specified field of the current record.
+
+    When storing ASCII data (strings), the strings should I<not> be null
+    terminated. For example, if you want to store the string "ABCD", then
+    pass a pointer to the string, and dataSize = 4.
+
+    @param fieldID
+    @param data
+    @param dataSize
+*/
+@message BasicDBError MSG_DATABASE_SET_FIELD_DATA(
+    BasicDBFieldID  fieldID,
+    void *          data,
+    word            dataSize );
+
+
+/**
+    Gets data of a field.  Returns the number of bytes used for the data.
+    If C<0> is returned, the field does not exist or is empty.  If the
+    return value is greater than C<destSize> it indicates, that not all
+    data could be copied.
+
+    Note: The standard (most efficient) way to store string data is
+          I<without> a null terminator, so callers will need to use the
+          returned data size.
+
+    @param fieldID
+    @param dest
+    @param maxBytesToGet
+
+    @return size of data.
+*/
+@message word MSG_DATABASE_GET_FIELD_DATA(
+    BasicDBFieldID  fieldID,
+    void *          dest,
+    word            maxBytesToGet );
+
+/**
+    Returns the number of bytes used for the data.
+    If C<0> is returned, the field does not exist or is empty.
+
+    @param fieldID
+
+    @return size of data.
+*/
+@message word MSG_DATABASE_GET_FIELD_DATA_SIZE(
+    BasicDBFieldID  fieldID );
+
+
+/**
+    Changes the name of the specified field.
+
+    @param fieldID
+    @param fieldName        New name of the field.
+
+*/
+@message BasicDBError MSG_DATABASE_SET_FIELD_NAME(
+    BasicDBFieldID  fieldID,
+    TCHAR *         fieldName );
+
+/**
+    Gets the name of the specified field.
+
+    @param fieldID
+    @param fieldName        buffer for name string.
+    @param maxBytesToGet    size of buffer for the null terminated name string.
+*/
+@message BasicDBError MSG_DATABASE_GET_FIELD_NAME(
+    BasicDBFieldID fieldID, TCHAR * fieldName, word maxBytesToGet );
+
+/**
+    Gets the fieldID of the field with the given C<value>
+    If C<nth> is greater than 1, the fieldID of the nth found field is
+    returned, otherwise the first found field is returned.
+
+    If the field could not be found in the record, C<BDBE_FIELD_NOT_FOUND>
+    is returned and the field ID is C<0>.
+
+    @param searchFor A BasicDBFieldHeaderElement to search for.
+    @param value     A word to which need to be in that header element.
+    @param nth
+    @param fieldId   The address, where the event ID will be stored.
+*/
+@message BasicDBError MSG_DATABASE_GET_FIELD_ID(
+    BasicDBFieldHeaderElement searchFor,
+    word value, int nth, BasicDBFieldID* fieldId );
+
+/*==========================================================================
+    Indices:
+==========================================================================*/
+
+/**
+    Creates a new index.
+
+    If the flag C<BDBILF_AUTO_UPDATE> is set, the index will be
+    automatically updated, if records are added or deleted.
+
+    @param indexArray       HugeArray of the index array.
+*/
+@message BasicDBError MSG_DATABASE_INDEX_CREATE(
+    BasicDBIndexListFlags flags,
+    word valueForCallback,
+    VMBlockHandle *  indexArray );
+
+/**
+    Destroys an index by destroying the HugeArray containing it and to free
+    the element in the index list, if the index was present there.
+
+    @param indexToDestroy       HugeArray of the index array.
+*/
+@message BasicDBError MSG_DATABASE_INDEX_DESTROY(
+    VMBlockHandle       indexToDestroy );
+
+/**
+    Adds a record to an index.
+
+    @param recordID         ID of the record.
+    @param indexArray       HugeArray of the index array to use.
+    @param valueForCallback
+    @param Callback         Callback function for sorting indices.
+*/
+@message BasicDBError MSG_DATABASE_INDEX_ELEMENT_ADD(
+    BasicDBRecordID recordID, VMBlockHandle indexArray,
+    word valueForCallback, BasicDBCallback Callback );
+
+/**
+    Deletes a record from an index.
+
+    @param recordID         ID of the record.
+    @param indexArray       HugeArray of the index array to use.
+    @param valueForCallback
+    @param Callback         Callback function for sorting indices.
+*/
+@message BasicDBError MSG_DATABASE_INDEX_ELEMENT_DELETE(
+    BasicDBRecordID recordID, VMBlockHandle indexArray,
+    word valueForCallback, BasicDBCallback Callback );
+
+/**
+    Get the number of elements in the index.
+
+    @param indexArray       HugeArray of the index array to use.
+    @param count            elements in the index.
+*/
+@message BasicDBError MSG_DATABASE_INDEX_GET_COUNT(
+    VMBlockHandle indexArray, dword *  count );
+
+
+/** contains our database. */
+@instance VMFileHandle      DBI_file;
+
+/** database directory block. */
+@instance VMBlockHandle     DBI_dir;
+
+/** the current record. */
+@instance MemHandle         DBI_record;
+
+/** The ID of the current record.  If the record is never saved before,
+    this value is C<0>. */
+@instance BasicDBRecordID   DBI_recordID;
+
+/** pointer to current sort callback */
+@instance BasicDBCallback   DBI_callback;
+
+@endc; /* DataBaseClass */
+
+@endlib /* basicdb */
+
