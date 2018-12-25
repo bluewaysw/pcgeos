@@ -1605,24 +1605,15 @@ MSObjMapExternal(const char	*file,	    /* Name of object file being read */
 	    mapBlock = VMGetMapBlock(symbols);
 
 	    if (pass == 1) {
-			/*
-			* Watcom C: we encounter this type of fixup in pass 1
-			* when the symbol list still contains references to
-			* names, not ObjSym records. So we need to look up
-			* the fixup target ourselves.
-			*/
-			if (!Sym_Find(symbols, 0, fdataPtr->external, &symBlock, &symOff, TRUE)) {
-				char* str = ST_Lock(symbols, fdataPtr->external);
-				ID newName = ST_LookupNoLen(symbols, strings, str+1);
-				ST_Unlock(symbols, fdataPtr->external);
-				if (newName != NullID) {
-					if (!Sym_Find(symbols, 0, newName, &symBlock, &symOff, TRUE)) {
-						return FPED_FALSE;
-					}
-				} else {
-				return FPED_FALSE;
-				}
-			}
+		/*
+		 * Watcom C: we encounter this type of fixup in pass 1
+		 * when the symbol list still contains references to
+		 * names, not ObjSym records. So we need to look up
+		 * the fixup target ourselves.
+		 */
+		if (!Sym_Find(symbols, 0, fdataPtr->external, &symBlock, &symOff, TRUE)) {
+		    return FPED_FALSE;
+		}
 	    }
 
 	    /*
