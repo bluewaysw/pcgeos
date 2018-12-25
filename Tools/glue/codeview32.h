@@ -166,6 +166,7 @@
 #define CST2_END		0x0006
 
 #define CST2_BPREL16	0x0100
+#define CST2_LDATA16    0x0101
 #define CST2_GDATA16	0x0102
 #define CST2_LPROC16	0x0104
 #define CST2_GPROC16	0x0105
@@ -183,6 +184,8 @@
 #define CSTT2_INT2		0x0072
 
 
+#define CCC2_C_NEAR 0
+#define CCC2_C_FAR 1
 #define CCC2_PASCAL_NEAR	2
 #define CCC2_PASCAL_FAR	    3
 
@@ -197,6 +200,7 @@
 #define CTL2_POINTER		0x02
 #define CTL2_ARRAY			0x03
 #define CTL2_STRUCTURE		0x05
+#define CTL2_UNION              0x06
 #define CTL2_ENUMERATION	0x07
 #define CTL2_PROCEDURE		0x08
 #define CTL2_ID	    	    0xffff
