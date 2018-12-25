@@ -514,7 +514,7 @@ prefvid	: Installed/Library/Pref/Prefvid
 Installed/Library/Pref/Prefvid:		ui config MAKELIB
 
 prefpntc	: Installed/Library/Pref/PrefPntC
-Installed/Library/Pref/Prefpntc:	ui config parentc MAKELIB
+Installed/Library/Pref/PrefPntC:	ui config parentc MAKELIB
 
 
 #driver
