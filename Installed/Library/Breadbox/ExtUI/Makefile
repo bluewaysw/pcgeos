@@ -3,21 +3,21 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = EXTUI
-HDDNBTN         = HddnBtn.goc
-STATBAR         = STATBAR.GOC
-TABLE           = Table.goc TblItemC.goc TblItemC.goh
-TITLMKR         = TitlMkrC.goc
-TREE            = tree.goc
+GEODE           = extui
 UTILS           = Utils.goc
+TITLMKR         = TitlMkrC.goc
+TABLE           = Table.goc TblItemC.goc TblItemC.goh
+TREE            = tree.goc
+HDDNBTN         = HddnBtn.goc
+STATBAR         = StatBar.goc
 UI_TO_RDFS      =
-OBJS            = HddnBtn.obj STATBAR.obj Table.obj TblItemC.obj\
-                  TitlMkrC.obj tree.obj Utils.obj
+OBJS            = Utils.obj TitlMkrC.obj Table.obj TblItemC.obj tree.obj\
+                  HddnBtn.obj StatBar.obj
 COMMON          =
 MODULES         =
-CMODULES        = HddnBtn StatBar TABLE TitlMkr TREE UTILS
-SRCS            = $(HDDNBTN) $(STATBAR) $(TABLE) $(TITLMKR) $(TREE)\
-                  $(UTILS) $(COMMON)
+CMODULES        = UTILS TitlMkr Table TREE HddnBtn StatBar
+SRCS            = $(UTILS) $(TITLMKR) $(TABLE) $(TREE) $(HDDNBTN)\
+                  $(STATBAR) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = extui
