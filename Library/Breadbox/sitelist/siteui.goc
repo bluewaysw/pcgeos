@@ -35,8 +35,8 @@
  ***************************************************************************/
 
 @include <stdapp.goh>
-@include <Objects\treport.goh>
-@include <Ansi\String.h>
+@include <Objects/treport.goh>
+@include <Ansi/string.h>
 @include <sitelist.goh>
 @include "internal.goh"
 
@@ -151,7 +151,7 @@
         GTXI_maxLength = SITE_ENTRY_PASSWORD_LIMIT ;
         GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
         HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
-        ATTR_GEN_TEXT_CHAR_ATTR = @UserPasswordFont ;
+        ATTR_GEN_TEXT_CHAR_ATTR = ChunkOf(@UserPasswordFont) ;
         HINT_FIXED_SIZE = { 0,
                             SST_LINES_OF_TEXT | 1,
                             0 } ;
@@ -262,7 +262,7 @@
         GTXI_maxLength = SITE_ENTRY_PASSWORD_LIMIT ;
         GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
         HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
-        ATTR_GEN_TEXT_CHAR_ATTR = @UserPasswordFont ;
+        ATTR_GEN_TEXT_CHAR_ATTR = ChunkOf(@UserPasswordFont) ;
         HINT_FIXED_SIZE = { 0,
                             SST_LINES_OF_TEXT | 1,
                             0 } ;
@@ -745,19 +745,19 @@
     } enableDisableEntry ;
 
     static enableDisableEntry children[] = {
-        { SITE_SEL_PART_LIST,               FALSE, @SiteListList,                    NullHandle },
-        { SITE_SEL_PART_ADD_DEL,            FALSE, @SiteListAddTrigger,              NullHandle },
-        { SITE_SEL_PART_ADD_DEL,            TRUE,  @SiteListDeleteTrigger,           NullHandle },
-        { SITE_SEL_PART_MODIFY,             TRUE,  @SiteListModifyTrigger,           NullHandle },
-        { SITE_SEL_PART_NAME_PASS,          FALSE, @SiteListBottom,                  NullHandle },
-        { SITE_SEL_PART_NAME_PASS,          FALSE, @SiteEditPasswordNameAndPassword, NullHandle },
-        { SITE_SEL_PART_MAIN_ADD_ON,        FALSE, @SiteListMainAddOn,               NullHandle },
-        { SITE_SEL_PART_MODIFY_ADD_ON,      FALSE, @SiteEditAddon,                   NullHandle },
-        { SITE_SEL_PART_EDIT_PORT,          FALSE, @SiteEditPortAndDescription,      NullHandle },
-        { SITE_SEL_PART_NAME_PASS,          FALSE, @SiteListPasswordName,            @SiteListPasswordOnOff },
-        { SITE_SEL_PART_NAME_PASS,          FALSE, @SiteListPasswordPassword,        @SiteListPasswordOnOff },
-        { SITE_SEL_PART_NAME_PASS,          FALSE, @SiteEditPasswordName,            @SiteEditPasswordOnOff },
-        { SITE_SEL_PART_NAME_PASS,          FALSE, @SiteEditPasswordPassword,        @SiteEditPasswordOnOff },
+        { SITE_SEL_PART_LIST,               FALSE, ChunkOf(@SiteListList),                    NullHandle },
+        { SITE_SEL_PART_ADD_DEL,            FALSE, ChunkOf(@SiteListAddTrigger),              NullHandle },
+        { SITE_SEL_PART_ADD_DEL,            TRUE,  ChunkOf(@SiteListDeleteTrigger),           NullHandle },
+        { SITE_SEL_PART_MODIFY,             TRUE,  ChunkOf(@SiteListModifyTrigger),           NullHandle },
+        { SITE_SEL_PART_NAME_PASS,          FALSE, ChunkOf(@SiteListBottom),                  NullHandle },
+        { SITE_SEL_PART_NAME_PASS,          FALSE, ChunkOf(@SiteEditPasswordNameAndPassword), NullHandle },
+        { SITE_SEL_PART_MAIN_ADD_ON,        FALSE, ChunkOf(@SiteListMainAddOn),               NullHandle },
+        { SITE_SEL_PART_MODIFY_ADD_ON,      FALSE, ChunkOf(@SiteEditAddon),                   NullHandle },
+        { SITE_SEL_PART_EDIT_PORT,          FALSE, ChunkOf(@SiteEditPortAndDescription),      NullHandle },
+        { SITE_SEL_PART_NAME_PASS,          FALSE, ChunkOf(@SiteListPasswordName),            ChunkOf(@SiteListPasswordOnOff) },
+        { SITE_SEL_PART_NAME_PASS,          FALSE, ChunkOf(@SiteListPasswordPassword),        ChunkOf(@SiteListPasswordOnOff) },
+        { SITE_SEL_PART_NAME_PASS,          FALSE, ChunkOf(@SiteEditPasswordName),            ChunkOf(@SiteEditPasswordOnOff) },
+        { SITE_SEL_PART_NAME_PASS,          FALSE, ChunkOf(@SiteEditPasswordPassword),        ChunkOf(@SiteEditPasswordOnOff) },
         { 0, FALSE, NullHandle, NullHandle }
     } ;
     word i ;
@@ -846,10 +846,10 @@
     SiteFieldGet(site, SITE_FIELD_SITE, buffer, sizeof(buffer)) ;
     @call @CHILD(@SiteEditSite)::MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0) ;
 
-    SiteFieldGet(site, SITE_FIELD_PORT, &value, sizeof(value)) ;
+    SiteFieldGet(site, SITE_FIELD_PORT, (byte*) &value, sizeof(value)) ;
     @call @CHILD(@SiteEditPort)::MSG_GEN_VALUE_SET_INTEGER_VALUE(value, FALSE) ;
 
-    SiteFieldGet(site, SITE_FIELD_ENTRY_TYPE, &entryType, sizeof(entryType)) ;
+    SiteFieldGet(site, SITE_FIELD_ENTRY_TYPE, (byte*) &entryType, sizeof(entryType)) ;
     if (entryType)  {
         /* Use passwords */
         @call @CHILD(@SiteEditPasswordOnOff)::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
@@ -1091,14 +1091,14 @@
     SiteFieldSet(site, SITE_FIELD_SITE, buffer, 0) ;
 
     value = @call @CHILD(@SiteEditPort)::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
-    SiteFieldSet(site, SITE_FIELD_PORT, &value, sizeof(value)) ;
+    SiteFieldSet(site, SITE_FIELD_PORT, (byte*) &value, sizeof(value)) ;
 
     value = @call @CHILD(@SiteEditPasswordOnOff)::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() ;
     entryType = 
         (value & SITE_LIST_PASSWORD_ON_BIT) ? 
             SITE_ENTRY_TYPE_PASSWORD : 
             SITE_ENTRY_TYPE_ANONYMOUS ;
-    SiteFieldSet(site, SITE_FIELD_ENTRY_TYPE, &entryType, sizeof(entryType)) ;
+    SiteFieldSet(site, SITE_FIELD_ENTRY_TYPE, (byte*) &entryType, sizeof(entryType)) ;
 
     @call @CHILD(@SiteEditPasswordName)::MSG_VIS_TEXT_GET_ALL_PTR(buffer) ;
     SiteFieldSet(site, SITE_FIELD_USERNAME, buffer, 0) ;

@@ -6,8 +6,8 @@
 GEODE           = sitelist
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = siteDB.goc siteui.goc internal.goh
-OBJS            = siteDB.obj siteui.obj
+SRCS            = siteui.goc siteDB.goc internal.goh
+OBJS            = siteui.obj siteDB.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = sitelist

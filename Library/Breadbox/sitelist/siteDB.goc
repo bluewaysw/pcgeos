@@ -42,8 +42,8 @@
  ***************************************************************************/
 
 @include <stdapp.goh>
-@include <Objects\treport.goh>
-@include <Ansi\String.h>
+@include <Objects/treport.goh>
+@include <Ansi/string.h>
 @include <sitelist.goh>
 @include "internal.goh"
 
@@ -278,7 +278,8 @@ T_siteEntryID SiteListFindNth(T_siteList list, word n)
     p_list = MemLock(list) ;
     EC_ERROR_IF(n >= SiteListGetCount(list), SITE_LIST_BAD_SORT_INDEX) ;
 
-    HugeArrayLock(p_list->SLB_file, p_list->SLB_sortArray, n, &p_id, &size) ;
+    HugeArrayLock(p_list->SLB_file, p_list->SLB_sortArray, 
+    						n, (void**) &p_id, &size) ;
     if (p_id)  {
         id = *p_id ;
         HugeArrayUnlock(p_id) ;
@@ -358,7 +359,8 @@ T_siteEntryID SiteEntryCreate(T_siteList list)
     /* If we have a free index, use that first */
     if (HugeArrayGetCount(p_list->SLB_file, p_list->SLB_freeList))  {
         /* Take the first item from the the free list */
-        HugeArrayLock(p_list->SLB_file, p_list->SLB_freeList, 0, &p_id, &size) ;
+        HugeArrayLock(p_list->SLB_file, p_list->SLB_freeList, 
+						0, (void**) &p_id, &size) ;
         id = *p_id ;
         HugeArrayUnlock(p_id) ;
 
@@ -431,7 +433,7 @@ Boolean SiteEntryDestroy(T_siteList list, T_siteEntryID id)
 
     isRemoved = IRemoveFromSortList(p_list, id) ;
     entry = SiteEntryLock(list, id) ;
-    SiteFieldGet(entry, SITE_FIELD_VMCHAIN, &chain, sizeof(chain)) ;
+    SiteFieldGet(entry, SITE_FIELD_VMCHAIN, (byte*) &chain, sizeof(chain)) ;
     SiteEntryUnlock(entry) ;
 
     /* Resize the record to zero and put on the free list */
@@ -713,7 +715,7 @@ Boolean IRemoveFromSortList(T_siteListBlock *p_list, T_siteEntryID id)
             p_list->SLB_file, 
             p_list->SLB_sortArray,
 	    i, 
-            &p_id, 
+            (void**) &p_id, 
             &size);
         if (*p_id == id)  {
             HugeArrayUnlock(p_id) ;
@@ -772,7 +774,7 @@ word IAddToSortList(
             p_list->SLB_file, 
             p_list->SLB_sortArray,
 	    i, 
-            &p_id, 
+            (void**) &p_id, 
             &size);
         compareID = *p_id ;
         HugeArrayUnlock(p_id) ;
@@ -784,7 +786,7 @@ word IAddToSortList(
             p_list->SLB_file,
             p_list->SLB_array,
             compareID,
-            &p_entry,
+            (void**) &p_entry,
             &size) ;
         offsets = (word *)(((byte *)p_entry) + (p_entry->SEH_meta.CAH_offset)) ;
         p_element = ((byte *)p_entry) + offsets[SITE_FIELD_NAME] ;
