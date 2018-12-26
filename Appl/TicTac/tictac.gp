@@ -72,9 +72,9 @@ library	ui
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource BOARDBLOCK object
+resource AppResource ui-object
+resource Interface ui-object
+resource BoardBlock object
 
 #
 # Other classes
