@@ -43,8 +43,8 @@ library ansic
 #
 nosort
 #resource PREFFONT_G		code read-only shared
-resource DIALOGRESOURCE ui-object
-resource STRINGS		shared lmem read-only
+resource DialogResource ui-object
+resource Strings		shared lmem read-only
 resource APPLCMONIKERRESOURCE	shared lmem read-only
 resource APPLMMONIKERRESOURCE	shared lmem read-only
 resource APPLCGAMONIKERRESOURCE	shared lmem read-only

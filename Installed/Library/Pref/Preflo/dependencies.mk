@@ -1,39 +1,39 @@
-PREFLO.rdef: GENERIC.UIH PRODUCT.UIH CONFIG.UIH OBJECTS/COLORC.UIH \
-                ART/MKRLIGHTSOUT.UI
-PREFLO.obj \
-PREFLO.eobj: GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF EC.DEF \
-                LIBRARY.DEF OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF WIN.DEF \
-                OBJECTS/INPUTC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF INITFILE.DEF UI.DEF FILE.DEF VM.DEF \
-                INPUT.DEF HWR.DEF LOCALIZE.DEF SLLANG.DEF \
-                OBJECTS/PROCESSC.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                CONFIG.DEF OBJECTS/COLORC.DEF SAVER.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF \
-                INTERNAL/IM.DEF INTERNAL/SEMINT.DEF NET.DEF \
-                INTERNAL/NETDR.DEF DRIVER.DEF INTERNAL/SERIALDR.DEF \
-                INTERNAL/STREAMDR.DEF INTERNAL/SOCKETID.DEF NETWARE.DEF \
-                PREFLO.DEF PREFLO.RDEF
+preflo.rdef: generic.uih product.uih config.uih Objects/colorC.uih \
+                Art/mkrLightsOut.ui
+preflo.obj \
+preflo.eobj: geos.def heap.def geode.def resource.def ec.def \
+                library.def object.def lmem.def graphics.def fontID.def \
+                font.def color.def gstring.def text.def char.def win.def \
+                Objects/inputC.def Objects/metaC.def chunkarr.def \
+                geoworks.def initfile.def ui.def file.def vm.def \
+                input.def hwr.def localize.def sllang.def \
+                Objects/processC.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                config.def Objects/colorC.def saver.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def \
+                Internal/im.def Internal/semInt.def net.def \
+                Internal/netDr.def driver.def Internal/serialDr.def \
+                Internal/streamDr.def Internal/socketID.def netware.def \
+                preflo.def preflo.rdef
 
-PrefloEC.geo Preflo.geo : GEOS.LDF UI.LDF CONFIG.LDF SAVER.LDF NET.LDF 
+prefloEC.geo preflo.geo : geos.ldf ui.ldf config.ldf saver.ldf net.ldf 

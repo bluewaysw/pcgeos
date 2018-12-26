@@ -3,14 +3,13 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = CONFIGUI
+GEODE           = configui
 ASM_TO_OBJS     = configui.asm
-UI_TO_RDFS      = CONFIGUI.UI
-SRCS            = configui.asm configuiFileAssoc.asm configuiProgList.asm\
-                  prefMinuteValue.asm configui.def configui.ui\
-                  configuiAdvanced.ui configuiApp.ui configuiAppearance.ui\
-                  configuiExpress.ui configuiFileMgr.ui\
-                  configuiInterface.ui
+UI_TO_RDFS      = configui.ui
+SRCS            = configuiFileAssoc.asm configui.asm prefMinuteValue.asm\
+                  configuiProgList.asm configui.def configuiAdvanced.ui\
+                  configuiApp.ui configuiAppearance.ui configuiFileMgr.ui\
+                  configui.ui configuiInterface.ui configuiExpress.ui
 OBJS            = configui.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf

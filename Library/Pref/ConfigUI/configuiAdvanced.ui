@@ -1,0 +1,232 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * FILE:	  configuiAdvanced.ui
+ *
+ ***********************************************************************/
+
+class	PrefMinuteValue = PrefValue {
+}
+
+start ConfigUIUI;
+
+AdvancedSettings = PrefInteraction vardataReloc {
+    genStates = default -usable;
+    prefInteractionAttrs = default 	+loadOptionsOnInitiate,
+					+saveOptionsOnApply;
+    children =
+	AdvancedTopGroup,
+	AdvancedBottomGroup;
+    hints = {
+	ATTR_PREF_REBOOT_STRING {
+	    UN_OPTR	ConfigUIAdvancedSettingsRebootString
+	},
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+    }
+}
+
+AdvancedTopGroup = PrefInteraction {
+    children =
+	AdvancedOptionsList,
+	AutosaveGroup;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	HINT_ORIENT_CHILDREN_HORIZONTALLY
+    }
+}
+
+AdvancedBottomGroup = PrefInteraction {
+    children =
+	StartupGroup;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	HINT_ORIENT_CHILDREN_HORIZONTALLY
+    }
+}
+
+AdvancedOptionsList = PrefBooleanGroup {
+    prefAttrs = default +rebootIfChanged;
+    moniker = "Options:";
+    selectedBooleans = "mask CUIA_CONFIRM_SHUTDOWN or mask CUIA_REBOOT_3";
+    children =
+	AOLAutoReset,
+	AOLConfirmShutdown,
+	AOLReboot3,
+	AOLEnableHelpEditor;
+    hints = {
+	HINT_ORIENT_CHILDREN_VERTICALLY,
+	ATTR_GEN_INIT_FILE_CATEGORY { char "ui", 0},
+	ATTR_PREF_BOOLEAN_GROUP_SEPARATE_BOOLEAN_KEYS
+    }
+}
+
+AOLAutoReset = PrefBoolean {
+    moniker = 'R', "Reset State Files After Crash";
+    identifier = "mask CUIA_AUTO_RESET";
+    hints = {
+	ATTR_GEN_INIT_FILE_KEY { char "doNotDisplayResetBox",0 }
+    }
+}
+
+AOLConfirmShutdown = PrefBoolean {
+    moniker = 'C', "Confirm Shutdown";
+    identifier = "mask CUIA_CONFIRM_SHUTDOWN";
+    hints = {
+	ATTR_GEN_INIT_FILE_KEY { char "confirmShutDown",0 }
+    }
+}
+
+AOLReboot3 = PrefBoolean {
+    moniker = 'b', "Reboot on CTRL-ALT-DEL";
+    identifier = "mask CUIA_REBOOT_3";
+    hints = {
+	ATTR_GEN_INIT_FILE_CATEGORY { char "input",0 },
+	ATTR_GEN_INIT_FILE_KEY { char "rebootOnReset",0 }
+    }
+}
+
+AOLEnableHelpEditor = PrefBoolean {
+    moniker = 'n', "Enable Help Editor";
+    identifier = "mask CUIA_HELP_EDITOR";
+    hints = {
+	ATTR_GEN_INIT_FILE_CATEGORY { char "configure",0 },
+	ATTR_GEN_INIT_FILE_KEY { char "helpEditor",0 }
+    }
+}
+
+/***********************************************************************/
+
+StartupGroup = PrefInteraction {
+    moniker = "Execute on Startup";
+    prefInteractionAttrs = default 	+saveOptionsOnApply;
+    children =
+	ProgStartupList,
+	AddRemoveGroup;
+    hints = {
+	HINT_DRAW_IN_BOX,
+	HINT_PLACE_MONIKER_ABOVE,
+	HINT_CENTER_CHILDREN_HORIZONTALLY
+    }
+}
+
+ProgStartupList = StartupList {
+    destination = "TO_SELF";
+    hints = {
+	HINT_ITEM_GROUP_SCROLLABLE,
+	HINT_FIXED_SIZE {
+	    SpecWidth <SST_AVG_CHAR_WIDTHS, 24>
+	    SpecHeight <SST_LINES_OF_TEXT, 3>
+	    word	3
+	},
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+	    word MSG_SL_STARTUP_PROGRAM_SELECTED
+	}
+    }
+}
+
+AddRemoveGroup = PrefInteraction {
+    children =
+	AddAppDialog,
+	RemoveAppTrigger;
+    hints = {
+	HINT_ORIENT_CHILDREN_HORIZONTALLY
+    }
+}
+
+AddAppDialog = PrefInteraction {
+    moniker = 'd', "Add";
+    visibility = dialog;
+    attributes = default +modal;
+    type = command;
+    children =
+	AddAppSelector,
+	AddAppTrigger;
+}
+
+AddAppSelector = GenFileSelector {
+    fileCriteria =
+	dirs,
+	geosExecutables;
+    hints = {
+	ATTR_GEN_PATH_DATA {
+	    GenFilePath <SP_APPLICATION, 0>
+	}
+    }
+}
+
+AddAppTrigger = GenTrigger {
+    moniker = "Add";
+    action = MSG_SL_ADD_PROGRAM, ProgStartupList;
+    hints = {
+	HINT_SEEK_REPLY_BAR,
+	HINT_DEFAULT_DEFAULT_ACTION
+    }
+}
+
+RemoveAppTrigger = GenTrigger {
+    genStates = default -enabled;
+    moniker = 'm', "Remove";
+    action = MSG_SL_DELETE_PROGRAM, ProgStartupList;
+}
+
+/***********************************************************************/
+
+AutosaveGroup = PrefInteraction vardataReloc {
+    moniker = "Document Safeguarding";
+    children = AutosaveEnableItemGroup, AutosaveSpin;
+    hints = {
+	HINT_ORIENT_CHILDREN_VERTICALLY,
+	HINT_PLACE_MONIKER_ABOVE,
+	HINT_DRAW_IN_BOX,
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	HINT_CUSTOM_CHILD_SPACING {
+	    SpecSizeSpec <SST_PIXELS, 1>
+	},
+	ATTR_GEN_INIT_FILE_CATEGORY {
+	    char "ui",0
+	}
+    }
+}
+
+AutosaveEnableItemGroup = PrefItemGroup {
+	numSelections  = 1;
+	selection = TRUE;
+	moniker = 'S',"Safeguarding:";
+	children = AutosaveEnable, AutosaveDisable;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_INIT_FILE_KEY {
+			char "autosave",0
+		},
+		ATTR_PREF_ITEM_GROUP_ENABLE {
+			PrefEnableData <TRUE,AutosaveSpin>
+		},
+		ATTR_GEN_ITEM_GROUP_INIT_FILE_BOOLEAN
+	}
+}
+
+AutosaveEnable = GenItem {
+    moniker = "On";
+    identifier = TRUE;
+}
+
+AutosaveDisable = GenItem {
+    moniker = "Off";
+    identifier = FALSE;
+}
+
+AutosaveSpin = PrefMinuteValue {
+    moniker = 'T',"Time (minutes):";
+    value = 1;
+    minimum = 1;
+    maximum = 15;
+    increment = 1;
+    hints = {
+	ATTR_GEN_INIT_FILE_KEY {
+	    char "autosaveTime",0
+	}
+    }
+}
+
+end ConfigUIUI;

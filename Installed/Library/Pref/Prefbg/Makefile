@@ -3,10 +3,10 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Prefbg
+GEODE           = prefbg
 ASM_TO_OBJS     = prefbg.asm
-UI_TO_RDFS      = PREFBG.UI
-SRCS            = prefbg.asm prefbgChooseList.asm prefbgDialog.asm\
+UI_TO_RDFS      = prefbg.ui
+SRCS            = prefbg.asm prefbgDialog.asm prefbgChooseList.asm\
                   prefbg.def prefbgChooseList.def prefbgDialog.def\
                   prefbg.ui
 OBJS            = prefbg.obj

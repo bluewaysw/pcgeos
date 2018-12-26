@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Preflo
+GEODE           = preflo
 ASM_TO_OBJS     = preflo.asm
-UI_TO_RDFS      = PREFLO.UI
+UI_TO_RDFS      = preflo.ui
 SRCS            = preflo.asm preflo.def preflo.ui
 OBJS            = preflo.obj
 LOBJS           =
