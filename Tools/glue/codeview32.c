@@ -1541,15 +1541,20 @@ error:
 	     * the thing, even if we mark the beggar as nameless.
 	     */
 	    if (name == NullID) {
+		word leaf;
+
+		mlistp = mlistBase;
+		leaf = MSObj_GetWordImm(mlistp);
 		/*
 		 * If the beggar is nameless, see if we've encountered the type
 		 * before by looking for the first element of the type in the
 		 * global segment.
 		 */
-		if (FALSE/**mlistBase == CTL_STRING*/) {
+		if (leaf == CTL2_ENUMERATIO) {
 		    ID	first;
 
-		    mlistp = mlistBase;
+		    MSObj_GetWordImm(mlistp);	/* attr */
+		    MSObj_GetWordImm(mlistp);	/* value */
 		    first = CV32GetString(&mlistp);
 		    if ((first != NullID) && Sym_Find(symbols, globalSeg->syms,
 						      first, &tsymBlock,
