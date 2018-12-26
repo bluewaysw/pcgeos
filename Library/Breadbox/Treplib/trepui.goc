@@ -1,0 +1,192 @@
+/***************************************************************************
+ *  FILE:  TREPORT.GOC
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Module:  TextReport TextReport Generator Library
+ *-------------------------------------------------------------------------
+ |
+ | Objective:
+ |    Encapsulates a commonly used library to generate text reports
+ |    that are shown in a dialog.  Main features:
+ |        * User previews report as a text object
+ |        * User can cut and copy the text elsewhere
+ |        * Additional UI objects can be added as needed
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/13/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+/***************************************************************************
+ *      Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/treport.goh>
+@include <Objects/gViewCC.goh>
+@include "internal.goh"
+
+/*=========================================================================*/
+
+@start TextReportTemplate ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TextReportTop = {
+        GI_states = @default & (~GS_USABLE) ;
+        GI_comp =
+            @TextReportWindowMenu,
+            @TextReportView;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_DEFAULT_TARGET;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TextReportWindowMenu = {
+        GI_attrs = @default
+                   | GA_TARGETABLE
+                   | GA_KBD_SEARCH_PATH;
+        GI_comp =
+            @TextReportPrintControl,
+            @TextReportEditControl,
+            @TextReportViewControl ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object PrintControlClass TextReportPrintControl = {
+        GI_states = (@default | GS_ENABLED) ;
+        PCI_attrs = ((@default) & (~PCA_PAGE_CONTROLS))
+                  | PCA_MARK_APP_BUSY;
+        PCI_output = @TextReportText ;
+        PCI_docSizeInfo   =
+            {
+                (6.5*72),     /* width less margins */
+                (9*72),       /* height less margins */
+                PT_PAPER,     /* layout */
+                {
+                    (1*72),   /* L,T,R,B margins */
+                    (1)*72,
+                    (1)*72,
+                    (1)*72
+                }
+            };
+        ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_PRINT_GROUP;
+        ATTR_GEN_CONTROL_PROHIBIT_UI = PRINTCF_FAX_TRIGGER;
+        ATTR_PRINT_CONTROL_APP_UI = @TextReportPrinterOptions;
+        HINT_AVOID_MENU_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenEditControlClass TextReportEditControl = {
+        GI_attrs = @default
+                   | GA_TARGETABLE
+                   | GA_KBD_SEARCH_PATH;
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_EDIT_MENU;
+/*        ATTR_GEN_CONTROL_PROHIBIT_UI = GECF_UNDO; */
+        ATTR_GEN_CONTROL_PROHIBIT_UI = (~(GECF_COPY|GECF_SELECT_ALL)) ;
+        HINT_AVOID_MENU_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenViewClass TextReportView = {
+        GI_attrs = @default
+                   | GA_TARGETABLE
+                   | GA_KBD_SEARCH_PATH;
+        GVI_vertAttrs  = @default
+                         | GVDA_SCROLLABLE;
+        GVI_horizAttrs  = @default
+                         | GVDA_SCROLLABLE;
+        GVI_attrs = @default
+                    | GVA_DRAG_SCROLLING
+                    | GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+                    | GVA_DONT_SEND_KBD_RELEASES
+                    | GVA_FOCUSABLE
+                    | GVA_CONTROLLED ;
+        GVI_content = @TextReportContent;
+        ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+        HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_TARGET;
+        HINT_MINIMUM_SIZE = {SST_PIXELS | 500, 0, 0};
+        ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X;
+    }
+    /*---------------------------------------------------------------------*/
+    @object VisTextReportContentClass TextReportContent = {
+        VCNI_attrs = @default
+                     | VCNA_LARGE_DOCUMENT_MODEL
+                     | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+                     | VCNA_SAME_WIDTH_AS_VIEW;
+    }
+    /*---------------------------------------------------------------------*/
+    @object VisReportTextClass TextReportText = {
+        VTI_state = @default
+                    | VTS_SELECTABLE
+                    | VTS_EDITABLE
+                    | VTS_TARGETABLE;
+        VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES;
+        VLTI_attrs = VLTA_EXACT_HEIGHT;
+        VLTI_regionArray = @TextReportVLTextReportRegionArray;
+        VTI_charAttrRuns = ((VTDS_12 << VTDCA_SIZE_OFFSET) || VTDF_URW_SANS);
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk ChunkArrayHeader TextReportVLTextReportRegionArray = {
+        0,
+        sizeof(VisLargeTextRegionArrayElement),
+        0,
+        sizeof(ChunkArrayHeader)
+    };
+    /*---------------------------------------------------------------------*/
+    /* to add BW printing */
+    @object GenInteractionClass TextReportPrinterOptions = {
+        GI_visMoniker = "Color Options";
+        @localize "title of color section of reports print dialog box";
+        GI_comp = @BWPrintOpts;
+        GI_states = ((@default) & ~GS_USABLE);
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_CENTER_MONIKER;
+        HINT_DRAW_IN_BOX;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass BWPrintOpts = {
+        GI_comp = @BWChoice;
+        GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass BWChoice = {
+        GI_visMoniker = "Print in Black & White";
+        @localize "option to allow report printing in B & W";
+        GII_identifier = 1;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenViewControlClass TextReportViewControl = {
+        GVCI_maxZoom = 400 ;
+        HINT_GEN_CONTROL_MODIFY_INITIAL_UI
+                   = { GCUF_USER_UI,
+                       0 /*GVCF_REDRAW*/,
+                       GVCF_ADJUST_ASPECT_RATIO |
+/*
+                       GVCF_MAIN_SCALE_TO_FIT |
+                       GVCF_SCALE_TO_FIT |
+*/
+                       GVCF_APPLY_TO_ALL |
+                       GVCF_SHOW_HORIZONTAL|
+                       GVCF_SHOW_VERTICAL,
+                       0,
+                       0} ;
+        GI_attrs = @default
+                   | GA_TARGETABLE
+                   | GA_KBD_SEARCH_PATH;
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_VIEW_MENU;
+        HINT_AVOID_MENU_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+@end TextReportTemplate ;
+
+/*=========================================================================*/
+
+
+/***************************************************************************
+ *  END OF FILE:  TREPORT.GOC
+ ***************************************************************************/

@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = TREPLIB
+GEODE           = treplib
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = TREPUI.GOC TREPCODE.GOC INTERNAL.GOH EXTERNS.GOH
-OBJS            = TREPUI.obj TREPCODE.obj
+SRCS            = trepui.goc trepcode.goc internal.goh externs.goh
+OBJS            = trepui.obj trepcode.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = treplib
