@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = GSOL
-ASM_TO_OBJS     = GSPARSE.ASM
+GEODE           = gsol
+ASM_TO_OBJS     = gsparse.asm
 UI_TO_RDFS      =
-SRCS            = GSPARSE.ASM GSOL.H GSOL.GOC
-OBJS            = GSPARSE.obj GSOL.obj
+SRCS            = gsparse.asm gsol.h gsol.goc
+OBJS            = gsparse.obj gsol.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = gsol

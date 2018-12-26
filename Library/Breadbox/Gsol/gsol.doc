@@ -1,0 +1,95 @@
+            GSOL - <G>raphics <S>tring <O>wner <L>ink specification
+                            (preliminary version)
+                            by Marcus Groeber 1996
+                      email: 100712.270@compuserve.com
+
+
+*** Description of calls in the GSOL library:
+
+
+- Creating GSOL-marked GStrings:
+
+word _pascal GSOLMarkGStringStart(
+  GStateHandle gs, GeodeToken *token, word PN_major, word PN_minor);
+
+should be the first command to be executed on a newly created GString. This
+includes a standard GSOL comment ("owner tag") into the string, containing the
+passed token and protocol number.
+
+If desired, an application specific comment describing the contents of the
+GString may be inserted after this call by using the GrComment() call. The
+data block passed to this comment can be retrieved automatically later when
+scanning the GString with GSOLCheckGString().
+
+
+word _pascal GSOLMarkGStringEnd(
+  GStateHandle gs, GeodeToken *token, word PN_major, word PN_minor);
+
+should be called at the end of the GString, before invoking GrEndGString().
+This includes an "end" tag into the GString, thus allowing nested GStrings
+containing multiple objects by different creators.
+
+
+- Testing received GStrings for GSOL information
+
+word _pascal GSOLCheckGString(
+  GStateHandle gs, GeodeToken *token, ProtocolNumber *prot,
+  void *retbuf, word bufsize);
+
+tests a given GString for presence of GSOL tags of a specific application. The
+routine must be passed the token of the application to look for. If a GString
+"tagged" for this application is found, the protocol number of the first
+matching owner tag is returned. If a return buffer is specified, the data
+block of any GrComment immediately following the owner tag is copied into that
+buffer if its size is less than or equal to bufsize.
+
+*Note:* In the current version, checking for multiple/nested GSOL objects in a
+single GString is not implemented.
+
+
+word _pascal GSOLIdentifyGString(
+  GStateHandle gs, GeodeToken *token, ProtocolNumber *prot);
+
+tests a given GString for presence of any GSOL tags: If a tagged GString is
+passed, the token and protocol number of the first owner tag is returned.
+
+*Note:* In the current version, checking for multiple/nested GSOL objects in a
+single GString is not implemented.
+
+
+*** Pseudocode examples:
+
+- Creating a GString:
+
+    gstate = GrCreateGString(...);
+    GSOLMarkGStringStart(gstate,&token,PROTO_MAJOR,PROTO_MINOR);
+
+    /* draw to gstring */
+
+    GSOLMarkGStringEnd(gstate,&token,PROTO_MAJOR,PROTO_MINOR);
+    GrEndGString(gstate);
+
+
+- Checking a GString for data of a specific application:
+
+    if( GSOLCheckGString(gs,&token,&prot,&appdata,sizeof(appdata))==0 )
+    {                                 /* see if GString contains GSOL info */
+      if( prot.PN_major==PROTO_MAJOR && prot.PN_minor==PROTO_MINOR )
+      {                               /* yes: our version? */
+          /* yes: use data passed in appdata */
+      }
+      else
+      {
+          /* not compatible: notify user or convert data from older version */
+      }
+    }
+
+
+- Checking a GString for data of any application:
+
+    gs = GrLoadGString(...);
+    if( GSOLIdentifyGString(gs,&token,&prot)==0 )
+    {
+        /* process returned token and protocol */
+    }
+
