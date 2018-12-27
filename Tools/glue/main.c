@@ -54,6 +54,7 @@ static char *rcsid =
 #endif
 #include    <ctype.h>
 #include    <compat/stdlib.h>
+#include    <string.h>
 
 #if defined _WIN32
 unsigned long __stdcall GetTickCount(void);
@@ -1995,6 +1996,10 @@ main(argc, argv)
 		} else {
 		    char    *src, *dest;
 
+		    if (strnlen_s((char*)argv[i+1], COPYRIGHT_SIZE) == COPYRIGHT_SIZE) {
+			    Notify(NOTIFY_ERROR, "copyright notice is too long!");
+			    exit(1);
+		    }
 		    dest = copyright;
 		    src = argv[i+1];
 /*		    strncpy(copyright, argv[i+1], sizeof(copyright));
@@ -2020,6 +2025,7 @@ main(argc, argv)
 			}
 			dest++;
 			src++;
+
 		    }
 		    i++;
 		}
