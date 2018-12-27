@@ -1478,7 +1478,7 @@ CV32ProcessScalar(const char    	*file,  	/* Object file from which
 
     if (enumTypeIndex == CSTT2_CHAR) {
 	retval = OTYPE_SIGNED | (size << 1) | OTYPE_SPECIAL;
-    } else if (enumTypeIndex == CSTT2_SHORT) {
+    } else if ((enumTypeIndex == CSTT2_SHORT) || (enumTypeIndex == CSTT2_USHORT)) {
 	retval = OTYPE_INT | (2 << 1) | OTYPE_SPECIAL;
     } else {
 	Notify(NOTIFY_ERROR,
@@ -1739,10 +1739,24 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_UCHAR:
 			retval = OTYPE_CHAR | OTYPE_SPECIAL | (0 << 1);
 			break;
+		case CSTT2_PVOID:
+		case CSTT2_PCHAR:
+		case CSTT2_PSHORT:
+		case CSTT2_PLONG:
+		case CSTT2_PUSHORT:
+		case CSTT2_PULONG:
 		case CSTT2_PRCHAR:
+		case CSTT2_PUCHAR:
 			retval = OTYPE_PTR | OTYPE_PTR_NEAR | OTYPE_SPECIAL;
 			break;
+		case CSTT2_PFVOID:
+		case CSTT2_PFCHAR:
+		case CSTT2_PFSHORT:
+		case CSTT2_PFLONG:
+		case CSTT2_PFUSHORT:
+		case CSTT2_PFULONG:
 		case CSTT2_PFRCHAR:
+		case CSTT2_PFUCHAR:
 			retval = OTYPE_PTR | OTYPE_PTR_FAR | OTYPE_SPECIAL;
 			break;
 		default:
