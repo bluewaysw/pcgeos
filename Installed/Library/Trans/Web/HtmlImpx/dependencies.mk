@@ -1,5 +1,5 @@
-HTMLIMPT.obj \
-HTMLIMPT.eobj: HTMLIMPT/htmlimptManager.asm \
+htmlimpt.obj \
+htmlimpt.eobj: htmlimpt/htmlimptManager.asm \
                 stdapp.def geos.def geode.def resource.def ec.def lmem.def \
                 object.def graphics.def fontID.def font.def color.def \
                 gstring.def text.def char.def heap.def ui.def file.def \
@@ -27,8 +27,8 @@ HTMLIMPT.eobj: HTMLIMPT/htmlimptManager.asm \
                 Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
                 impex.def ieCommon.def htmlimpt.rdef
-EXPTPROC.obj \
-EXPTPROC.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+imptproc.obj \
+imptproc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -47,8 +47,8 @@ EXPTPROC.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh impex.goh htmlpars.goh \
                 Objects/vLTextC.goh
-EXPTPROC.obj \
-EXPTPROC.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+imptproc.obj \
+imptproc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -56,9 +56,9 @@ EXPTPROC.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
-                Ansi/string.h Ansi/stdio.h htmlopt.h
-IMPTPROC.obj \
-IMPTPROC.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                Ansi/string.h fixes.h _impex.h htmlopt.h
+exptproc.obj \
+exptproc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -77,8 +77,8 @@ IMPTPROC.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh impex.goh htmlpars.goh \
                 Objects/vLTextC.goh
-IMPTPROC.obj \
-IMPTPROC.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+exptproc.obj \
+exptproc.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -86,7 +86,7 @@ IMPTPROC.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
-                Ansi/string.h htmlopt.h
+                Ansi/string.h Ansi/stdio.h fixes.h _impex.h htmlopt.h
 htmlimpt.rdef: generic.uih product.uih
 
 htmlimpxEC.geo htmlimpx.geo : geos.ldf ui.ldf impex.ldf text.ldf ansic.ldf htmlpars.ldf 

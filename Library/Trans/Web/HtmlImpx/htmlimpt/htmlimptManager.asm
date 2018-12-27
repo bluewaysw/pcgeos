@@ -1,7 +1,7 @@
 include stdapp.def
 include vm.def
 include impex.def
-include objects\gCtrlC.def
+include Objects/gCtrlC.def
 
 ; segment must be "public 'CODE'" to ensure that it combines
 ; properly with the C segment of the same name.

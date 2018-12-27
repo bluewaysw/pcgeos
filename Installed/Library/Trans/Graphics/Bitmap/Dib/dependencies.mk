@@ -1,74 +1,74 @@
-EXPORT.obj \
-EXPORT.eobj: Export/ExportMANAGER.ASM \
-                DIBGEODE.DEF GEOS.DEF GEODE.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF OBJECT.DEF LMEM.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF FILE.DEF LIBRARY.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF WIN.DEF \
-                SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF RESOURCE.DEF HEAP.DEF \
-                EC.DEF TIMEDATE.DEF INPUT.DEF HWR.DEF TIMER.DEF \
-                INITFILE.DEF VM.DEF HUGEARR.DEF OBJECTS/WINC.DEF \
-                OBJECTS/INPUTC.DEF SEM.DEF UI.DEF GCNLIST.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                IMPEX.DEF IECOMMON.DEF ANSIC.DEF OBJECTS/VTEXTC.DEF \
-                SPOOL.DEF PRINT.DEF INTERNAL/PRODFEATURES.DEF DBASE.DEF \
-                INTERNAL/XLATLIB.DEF INTERNAL/DIB.DEF GRAPHICSMACRO.DEF \
-                DIBCONSTANT.DEF DIBGLOBAL.DEF DIBMACRO.DEF THREAD.DEF \
-                INTERNAL/VIDEODR.DEF DRIVER.DEF EXPORTMAIN.ASM \
-                EXPORTDIB.ASM
-IMPORT.obj \
-IMPORT.eobj: Import/ImportMANAGER.ASM \
-                DIBGEODE.DEF GEOS.DEF GEODE.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF OBJECT.DEF LMEM.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF FILE.DEF LIBRARY.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF WIN.DEF \
-                SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF RESOURCE.DEF HEAP.DEF \
-                EC.DEF TIMEDATE.DEF INPUT.DEF HWR.DEF TIMER.DEF \
-                INITFILE.DEF VM.DEF HUGEARR.DEF OBJECTS/WINC.DEF \
-                OBJECTS/INPUTC.DEF SEM.DEF UI.DEF GCNLIST.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                IMPEX.DEF IECOMMON.DEF ANSIC.DEF OBJECTS/VTEXTC.DEF \
-                SPOOL.DEF PRINT.DEF INTERNAL/PRODFEATURES.DEF DBASE.DEF \
-                INTERNAL/XLATLIB.DEF INTERNAL/DIB.DEF GRAPHICSMACRO.DEF \
-                DIBCONSTANT.DEF DIBGLOBAL.DEF DIBMACRO.DEF \
-                DIBSTRINGS.RDEF IMPORTMAIN.ASM IMPORTDIB.ASM
-DIBSTRINGS.rdef: DIB/IMPORT/DIBSTRINGS.UI
+Import.obj \
+Import.eobj: Import/importManager.asm \
+                dibGeode.def geos.def geode.def Objects/processC.def \
+                Objects/metaC.def object.def lmem.def chunkarr.def \
+                geoworks.def file.def library.def graphics.def fontID.def \
+                font.def color.def gstring.def text.def char.def win.def \
+                system.def localize.def sllang.def resource.def heap.def \
+                ec.def timedate.def input.def hwr.def timer.def \
+                initfile.def vm.def hugearr.def Objects/winC.def \
+                Objects/inputC.def sem.def ui.def gcnlist.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                impex.def ieCommon.def ansic.def Objects/vTextC.def \
+                spool.def print.def Internal/prodFeatures.def dbase.def \
+                Internal/xlatLib.def Internal/dib.def graphicsMacro.def \
+                dibConstant.def dibGlobal.def dibMacro.def \
+                dibStrings.rdef importMain.asm importDIB.asm
+Export.obj \
+Export.eobj: Export/exportManager.asm \
+                dibGeode.def geos.def geode.def Objects/processC.def \
+                Objects/metaC.def object.def lmem.def chunkarr.def \
+                geoworks.def file.def library.def graphics.def fontID.def \
+                font.def color.def gstring.def text.def char.def win.def \
+                system.def localize.def sllang.def resource.def heap.def \
+                ec.def timedate.def input.def hwr.def timer.def \
+                initfile.def vm.def hugearr.def Objects/winC.def \
+                Objects/inputC.def sem.def ui.def gcnlist.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                impex.def ieCommon.def ansic.def Objects/vTextC.def \
+                spool.def print.def Internal/prodFeatures.def dbase.def \
+                Internal/xlatLib.def Internal/dib.def graphicsMacro.def \
+                dibConstant.def dibGlobal.def dibMacro.def thread.def \
+                Internal/videoDr.def driver.def exportMain.asm \
+                exportDIB.asm
+dibStrings.rdef: /staff/pcgeos/Library/Trans/Graphics/Bitmap/Dib/Import/dibStrings.ui
 
-DibEC.geo Dib.geo : GEOS.LDF UI.LDF ANSIC.LDF IMPEX.LDF 
+dibEC.geo dib.geo : geos.ldf ui.ldf ansic.ldf impex.ldf 
