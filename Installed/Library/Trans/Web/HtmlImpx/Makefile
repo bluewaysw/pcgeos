@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = HTMLIMPX
+GEODE           = htmlimpx
 EXPTPROC        = EXPTPROC.GOC
-HTMLIMPT        = htmlimptManager.asm HTMLIMPT.UI
+HTMLIMPT        = htmlimptManager.asm htmlimpt.ui
 IMPTPROC        = IMPTPROC.GOC
-UI_TO_RDFS      = HTMLIMPT.UI
+UI_TO_RDFS      = htmlimpt.ui
 OBJS            = EXPTPROC.obj IMPTPROC.obj
 COMMON          =
 MODULES         = HTMLIMPT
