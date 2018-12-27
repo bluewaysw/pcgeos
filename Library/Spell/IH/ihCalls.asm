@@ -64,6 +64,8 @@ HyphenOpen	proc	far
 	uses	bx,cx,dx,si,di,bp,ds,es
  	.enter
 
+	jmp	markStatusError
+	
 	call	HyphenSetPath			; set the directory
 
 	;
@@ -162,7 +164,7 @@ NOFXIP<	pushdw	csdi			;push ptr -> null string	>
 	
 	clr	di
 	pushdw	esdi				; push ptr -> anIHBuff on stack
-	call	IHhyp				; ax = non-zero if error
+	;call	IHhyp				; ax = non-zero if error
 FXIP <	pop	di				; restore the stack	>
 
 	;
@@ -448,7 +450,7 @@ LONG	jl	dontHyphenate
 	mov	ax, PC_TO_DEC			; direction to convert
 	push	ax
 
-	call	SLcnv
+	;call	SLcnv
 
 	;
 	; Set up the parameters to call IHhyp() - lock the IHBuff
@@ -471,7 +473,7 @@ LONG	jl	dontHyphenate
 	clr	ax
 	push	ax
 
-	call	IHhyp				; ax = success/fail
+	;call	IHhyp				; ax = success/fail
 	tst	ax				;
 	jnz	errorExit
 
@@ -613,7 +615,7 @@ NOFXIP<	push	di						>
 	clr	ax
 	push	ax
 
-	call	IHhyp				; ax = success/fail indicator
+	;call	IHhyp				; ax = success/fail indicator
 FXIP <	pop	di						>
 	;
 	; Free the IHBuff block

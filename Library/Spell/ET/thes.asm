@@ -65,6 +65,10 @@ ThesaurusOpen	proc	far
 	mov	dx, offset thesPathName
 	call	FileSetCurrentPath	
 
+	mov     ax, ET_FILE_OPEN_ERROR
+	jmp	markFlagDisabled
+
+
 	;
 	; Set up the initial et_ctrl structure:
 	;
@@ -104,9 +108,9 @@ ThesaurusOpen	proc	far
 	push	ax	
 
 ifdef __BORLANDC__
-	call	_et_load
+	;call	_et_load
 else
-	call	et_load			; ax = 1 for success
+	;call	et_load			; ax = 1 for success
 endif
 
 	;
@@ -383,9 +387,9 @@ else
 endif
 
 ifdef __BORLANDC__
-	call	_et
+	;call	_et
 else
-	call	et		; H-M's electronic thesaurus "get meanings"
+	;call	et		; H-M's electronic thesaurus "get meanings"
 				; returns # of meanings found in ax (?)
 endif
 
@@ -917,9 +921,9 @@ else
 endif
 	
 ifdef __BORLANDC__
-	call	_et
+	;call	_et
 else
-	call	et				; ax = number of meanings found
+	;call	et				; ax = number of meanings found
 endif
 
 	add	sp, 18		; take parameters off stack (9words = 18 bytes)
@@ -966,9 +970,9 @@ else
 endif
 	
 ifdef __BORLANDC__
-	call	_et
+	;call	_et
 else
-	call	et		; H-M's electronic thesaurus "get meanings"
+	;call	et		; H-M's electronic thesaurus "get meanings"
 				; returns # of synonyms found in ax (?)
 endif
 
@@ -1210,9 +1214,9 @@ allocBuffer:
 	push	si
 	
 ifdef __BORLANDC__
-	call	_et
+	;call	_et
 else
-	call	et				; ax = number of meanings found
+	;call	et				; ax = number of meanings found
 endif
 
 	add	sp, 18		; take parameters off stack (9words = 18 bytes)
@@ -1255,9 +1259,9 @@ endif
 	push	si
 	
 ifdef __BORLANDC__
-	call	_et
+	;call	_et
 else
-	call	et		; H-M's electronic thesaurus "get meanings"
+	;call	et		; H-M's electronic thesaurus "get meanings"
 				; returns # of synonyms found in ax (?)
 endif
 
@@ -1495,9 +1499,9 @@ ThesaurusClose	proc	far
 	push	ax
 	
 ifdef __BORLANDC__
-	call	_et_close
+	;call	_et_close
 else
-	call	et_close			; ax = success/failure
+	;call	et_close			; ax = success/failure
 endif
 
 	add 	sp, 4				; 2 words = 4 bytes off stack 

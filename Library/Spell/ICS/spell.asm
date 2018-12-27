@@ -126,7 +126,7 @@ SpellEntry	proc	far
 ;	Don't do this call on the spell thread, as this may be from a dirty
 ;	shutdown, and if so, we don't want to have to start a thread, etc.
 
-	call	ICGEOSplExit	;Exit from the spell check library.
+	;call	ICGEOSplExit	;Exit from the spell check library.
 
 ;	IF DETACH, FREE SEMAPHORES
 
@@ -435,7 +435,7 @@ endif
 	mov	fullWidthFlag, ax
 ;if ICGEOGetAlternate actually used the source string, we'd need to convert
 ;it to SBCS from DBCS (see CallCSpell) - brianc 4/25/94
-	call	ICGEOGetAlternate
+	;call	ICGEOGetAlternate
 	pop	bp
 	popdw	esdi
 	segmov	ds, ss
@@ -485,7 +485,7 @@ endif
 	pushdw	dssi
 	push	bx
 	push	ax
-	call	ICGEOGetAlternate
+	;call	ICGEOGetAlternate
 endif
 	.leave
 	ret

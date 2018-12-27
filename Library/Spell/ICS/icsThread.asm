@@ -243,7 +243,7 @@ SpellThreadInitICBuff	method	SpellThreadClass,
 					MSG_SPELL_THREAD_INIT_IC_BUFF
 	.enter
 	push	cx
-	call	ICGEOSplInitICBuff	;Returns error code in AX	
+	;call	ICGEOSplInitICBuff	;Returns error code in AX	
 	.leave
 	ret
 SpellThreadInitICBuff	endm
@@ -275,7 +275,7 @@ SpellThreadExitICBuff	method	SpellThreadClass,
 					MSG_SPELL_THREAD_EXIT_IC_BUFF
 	push	cx
 	push	cx
-	call	ICGEOSplExitICBuff
+	;call	ICGEOSplExitICBuff
 	pop	bx
 	call	MemFree			;Free up the IC buff
 
@@ -322,7 +322,7 @@ REVISION HISTORY:
 if FLOPPY_BASED_USER_DICT
 SpellThreadFreeUserDict	method	SpellThreadClass, \
 				MSG_SPELL_THREAD_FREE_USER_DICT
-	call	ICGEOSplExit
+	;call	ICGEOSplExit
 	ret
 
 SpellThreadFreeUserDict	endm
@@ -359,7 +359,7 @@ SpellThreadGetAlternate	method	SpellThreadClass,
 	pushdw	ss:[bp].ICGAP_srcString
 	push	cx
 	push	ss:[bp].ICGAP_index
-	call	ICGEOGetAlternate
+	;call	ICGEOGetAlternate
 DBCS <PrintMessage <fix for DBCS>>
 	.leave
 	ret
@@ -391,7 +391,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SpellThreadSpell	method	SpellThreadClass,
 					MSG_SPELL_THREAD_SPELL
-	CallCSpell	ICGEOSpl, ax
+	;CallCSpell	ICGEOSpl, ax
 	ret
 SpellThreadSpell	endm
 
@@ -426,7 +426,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SpellThreadAddToUserDictionary	method	SpellThreadClass,
 					MSG_SPELL_THREAD_ADD_TO_USER_DICTIONARY
-	CallCSpell	IPGEOAddUser, axdx
+	;CallCSpell	IPGEOAddUser, axdx
 	ret
 SpellThreadAddToUserDictionary	endm
 
@@ -456,7 +456,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SpellThreadRemoveFromUserDictionary	method	SpellThreadClass,
 				MSG_SPELL_THREAD_REMOVE_FROM_USER_DICTIONARY
-	CallCSpell	IPGEODeleteUser, ax
+	;CallCSpell	IPGEODeleteUser, ax
 	ret
 SpellThreadRemoveFromUserDictionary	endm
 
@@ -487,7 +487,7 @@ SpellThreadUpdateUserDictionary	method	SpellThreadClass,
 				MSG_SPELL_THREAD_UPDATE_USER_DICTIONARY
 	.enter
 	push	cx
-	call	UpdateUserDictionary
+	;call	UpdateUserDictionary
 	.leave
 	ret
 SpellThreadUpdateUserDictionary	endm
@@ -519,7 +519,7 @@ SpellThreadBuildUserList	method	SpellThreadClass,
 				MSG_SPELL_THREAD_BUILD_USER_LIST
 	.enter
 	push	cx
-	call	IPGEOBuildUserList
+	;call	IPGEOBuildUserList
 	.leave
 	ret
 SpellThreadBuildUserList	endm
@@ -551,7 +551,7 @@ SpellThreadResetIgnoreList	method	SpellThreadClass,
 				MSG_SPELL_THREAD_RESET_IGNORE_LIST
 	.enter
 	push	cx
-	call	ICResetIgnoreUserDict
+	;call	ICResetIgnoreUserDict
 	.leave
 	ret
 SpellThreadResetIgnoreList	endm
@@ -582,7 +582,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SpellThreadIgnoreWord	method	SpellThreadClass,
 				MSG_SPELL_THREAD_IGNORE_WORD
-	CallCSpell	ICGEOIgnoreString, NONE
+	;CallCSpell	ICGEOIgnoreString, NONE
 	ret
 SpellThreadIgnoreWord	endm
 

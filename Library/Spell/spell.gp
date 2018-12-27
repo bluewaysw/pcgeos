@@ -57,41 +57,42 @@ resource HyphenCode	code read-only shared
 resource SpellInit	code read-only shared
 resource SpellControlCode	code read-only shared
 resource TextControlCode	code read-only shared
-resource ETCODE	code read-only shared
-resource IPCODE	code read-only shared
-resource ICS1	code read-only shared
-resource INIT	code read-only shared
-resource EXIT	code read-only shared
-resource IPPRINT	code read-only shared
-resource CODE	code read-only shared
-resource IHCODE	code read-only shared
-resource STDLIB	code read-only shared
-resource ETINFLEC	code read-only shared
-resource ETSEARCH	code read-only shared
-resource ETUNFLEC	code read-only shared
-resource ETUTIL	code read-only shared
-resource ACCENT	code read-only shared
-resource CORRECT	code read-only shared
-resource ICGETSEG	code read-only shared
-resource CAPCOD	code read-only shared
-resource CACHE	code read-only shared
-resource CLITIC	code read-only shared
-resource CLITICCAP	code read-only shared
-resource CLITIC2	code read-only shared
-resource COMPOUND	code read-only shared
-resource COMPOUND2	code read-only shared
-resource COMPOUND3	code read-only shared
-resource COMPOUND4	code read-only shared
-resource CORQUAD2	code read-only shared
-resource CORQUAD	code read-only shared
-resource PARSE	code read-only shared
-resource IPCORRECT	code read-only shared
-resource IHINIT	code read-only shared
-resource IPD1	code read-only shared
-resource IPHYPHEN	code read-only shared
-resource IPSRCH	code read-only shared
-resource IPD2	code read-only shared
-resource WILD	code read-only shared
+
+#resource ETCODE	code read-only shared
+#resource IPCODE	code read-only shared
+#resource ICS1	code read-only shared
+#resource INIT	code read-only shared
+#resource EXIT	code read-only shared
+#resource IPPRINT	code read-only shared
+#resource CODE	code read-only shared
+#resource IHCODE	code read-only shared
+#resource STDLIB	code read-only shared
+#resource ETINFLEC	code read-only shared
+#resource ETSEARCH	code read-only shared
+#resource ETUNFLEC	code read-only shared
+#resource ETUTIL	code read-only shared
+#resource ACCENT	code read-only shared
+#resource CORRECT	code read-only shared
+#resource ICGETSEG	code read-only shared
+#resource CAPCOD	code read-only shared
+#resource CACHE	code read-only shared
+#resource CLITIC	code read-only shared
+#resource CLITICCAP	code read-only shared
+#resource CLITIC2	code read-only shared
+#resource COMPOUND	code read-only shared
+#resource COMPOUND2	code read-only shared
+#resource COMPOUND3	code read-only shared
+#resource COMPOUND4	code read-only shared
+#resource CORQUAD2	code read-only shared
+#resource CORQUAD	code read-only shared
+#resource PARSE	code read-only shared
+#resource IPCORRECT	code read-only shared
+#resource IHINIT	code read-only shared
+#resource IPD1	code read-only shared
+#resource IPHYPHEN	code read-only shared
+#resource IPSRCH	code read-only shared
+#resource IPD2	code read-only shared
+#resource WILD	code read-only shared
 resource Strings shared lmem read-only
 resource EditUserDictControlUI ui-object read-only shared
 resource SpellControlToolboxUI ui-object read-only shared
@@ -118,27 +119,27 @@ endif
 
 # are these resources automatically created by the C compiler?  Not for BC45!
 ifdef __BORLANDC__
-resource GRAMMAR_SEG shared fixed read-only
-resource GRAM_ADD_SEG shared fixed read-only
-resource DEF_ORD_SEG shared fixed read-only
-resource SYN_ORD_SEG shared fixed read-only
-resource SPEC_GRAM_SEG shared fixed read-only
-resource EXC_ORDN_SEG shared fixed read-only
-resource EXC_GRAM_SEG shared fixed read-only
+#resource GRAMMAR_SEG shared fixed read-only
+#resource GRAM_ADD_SEG shared fixed read-only
+#resource DEF_ORD_SEG shared fixed read-only
+#resource SYN_ORD_SEG shared fixed read-only
+#resource SPEC_GRAM_SEG shared fixed read-only
+#resource EXC_ORDN_SEG shared fixed read-only
+#resource EXC_GRAM_SEG shared fixed read-only
 else
-resource GRAMMAR shared fixed read-only
-resource GRAM_ADD shared fixed read-only
-resource DEF_ORD shared fixed read-only
-resource SYN_ORD shared fixed read-only
-resource SPEC_GRAM shared fixed read-only
-resource EXC_ORDN shared fixed read-only
-resource EXC_GRAM shared fixed read-only
+#resource GRAMMAR shared fixed read-only
+#resource GRAM_ADD shared fixed read-only
+#resource DEF_ORD shared fixed read-only
+#resource SYN_ORD shared fixed read-only
+#resource SPEC_GRAM shared fixed read-only
+#resource EXC_ORDN shared fixed read-only
+#resource EXC_GRAM shared fixed read-only
 endif
 
 #
 # This is locked down on the fly...
 #
-resource ATT_TABLE shared read-only
+#resource ATT_TABLE shared read-only
 
 
 #
