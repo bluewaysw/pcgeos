@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Giflib
-MAIN            = EXPFILE.GOC EXPSTR.GOC IMPFILE.GOC IMPSTR.GOC UTILS.GOC
+GEODE           = giflib
+MAIN            = EXPSTR.goc IMPFILE.goc EXPFILE.goc
 UI_TO_RDFS      =
-OBJS            = EXPFILE.obj EXPSTR.obj IMPFILE.obj IMPSTR.obj UTILS.obj
-COMMON          = CONFIG.H
+OBJS            = EXPSTR.obj IMPFILE.obj EXPFILE.obj
+COMMON          = config.h
 MODULES         =
 CMODULES        = Main
 SRCS            = $(MAIN) $(COMMON)

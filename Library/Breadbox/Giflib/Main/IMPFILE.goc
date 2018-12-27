@@ -1,0 +1,1073 @@
+#include <geos.h>
+#include <heap.h>
+@include "giflib.goh"
+#include <vm.h>
+#include <file.h>
+#include <hugearr.h>
+#include <Ansi/string.h>
+#include <graphics.h>
+#include "config.h"
+@include <extgraph.goh>
+
+/**********************************************************************
+*	LOCAL TYPE DEFINITION
+**********************************************************************/
+
+#define GIF_HEADER_GLOB_PAL(fh)			(((fh)->GH_resFlag & 0x80) == 0x80)
+#define GIF_HEADER_COL_MAP_SIZE(fh)	(((word)1)<<(1+((fh)->GH_resFlag & 0x07)))
+#define GIF_PIC_DESCRIPTOR_LOCAL_PAL(pd)	(((pd)->GPD_flags & 0x80) == 0x80)
+#define GIF_PIC_DESCRIPTOR_PIX_SIZE(pd)	((((pd)->GPD_flags)&0x07)+1)
+
+
+typedef union
+{
+	long int	val;
+	word		single[2];
+} gifImpInBuffer;
+
+typedef struct
+{
+  byte				GIS_blockCount;
+  byte				GIS_inCount;
+  gifImpInBuffer	GIS_inBuffer;
+  byte				GIS_max;
+  byte				*GIS_mem;
+  word				GIS_size;
+  FileHandle		GIS_file;
+  word				GIS_count;
+  word				GIS_index;
+} gifImpStream;
+
+typedef struct
+{
+	word	Prefix[4097];
+	byte	Suffix[4097];
+	byte	Outcode[1025];
+} gifImpTables;
+
+typedef struct
+{
+  VMFileHandle		GIOS_file;
+  VMBlockHandle		GIOS_block;
+  word				GIOS_width;
+  word				GIOS_height;
+  word				GIOS_x;
+  word				GIOS_y;
+  BMFormat			GIOS_format;
+  byte				GIOS_outByte;
+  byte				GIOS_inCount;
+  word				GIOS_index;
+  MemHandle			GIOS_mem;
+  Boolean			GIOS_interlace;
+  byte				GIOS_pass;
+  word				GIOS_ycount;
+  word				GIOS_maskoff;
+  byte				GIOS_mask;
+  byte				GIOS_maskCount;
+  word				GIOS_maskIndex;
+  word				GIOS_transparent;
+  Boolean			GIOS_inverse;
+  Boolean			GIOS_finished;
+} gifImpOutStream;
+
+typedef RGBValue gifImpPalette[256];
+
+
+/**********************************************************************
+*	LOCAL FUNCTION DEFINITION
+**********************************************************************/
+
+GifError 
+gifImpReadSimpleByte(FileHandle file, byte *read);
+
+GifError 
+gifImpProcessExtentions(FileHandle file, word *transparent);
+
+GifError
+gifImpGetHeader(FileHandle source, GifHeader *fh);
+
+GifError 
+gifImpGetPicDesc(FileHandle source, GifPicDescriptor *pd);
+
+GifError 
+gifImpGetPalette(FileHandle source,	MemHandle palmem, word size);
+
+GifError 
+gifImpGetRawByte(gifImpStream *stream, byte *value);
+
+GifError  
+gifImpReadCode(gifImpStream *stream, word *code, byte csize);
+
+GifError  
+gifImpPutPixel(gifImpOutStream *stream, byte pixel);
+
+GifError 
+gifImpReadPic(FileHandle file, 
+		gifImpOutStream *out_stream, word pixSize);
+
+/**********************************************************************
+*	LOCAL FUNCTION DECLARATION
+**********************************************************************/
+
+GifError 
+gifImpReadSimpleByte(FileHandle file, byte *read)
+{
+	int result;
+
+	result = FileRead(file, read, 1, 0);
+  
+	if(result == -1)
+		return(GE_INVALID_FILE);
+	if(result != 1)
+		return(GE_WRONG_FILE_FORMAT); 
+ 
+	return(GE_NO_ERROR);
+};
+
+//*********************************************************************
+
+GifError 
+gifImpProcessExtentions(FileHandle file, word *transparent)
+{
+	GifError stat;
+	byte read, count, count2;
+	byte buffer[256];
+
+	stat = gifImpReadSimpleByte(file, &read);
+	
+	while((read == '!') && (stat == GE_NO_ERROR))
+	{
+		stat = gifImpReadSimpleByte(file, &read);
+	 
+		if(stat == GE_NO_ERROR)
+			stat = gifImpReadSimpleByte(file, &count);
+
+		if(read == 0xF9)
+		{
+	
+			count2 = 0;
+			do
+			{
+				stat = gifImpReadSimpleByte(file, &buffer[count2]);
+				count2++;
+				count--;
+			} while ((count != 0) && (stat == GE_NO_ERROR));
+
+			if(stat == GE_NO_ERROR)
+			{
+				if(buffer[0] & 0x01)
+					 *transparent = buffer[3];
+				gifImpReadSimpleByte(file, &count);
+			}
+
+			while((count != 0)&&(stat == GE_NO_ERROR))
+			{
+				do
+				{
+					stat = gifImpReadSimpleByte(file, &read);
+					count--;
+				} 
+				while ((count != 0) && (stat == GE_NO_ERROR));
+
+				if(stat == GE_NO_ERROR)
+					stat = gifImpReadSimpleByte(file, &count);
+			}
+
+		}
+		else
+		{
+			while((count != 0) && (stat == GE_NO_ERROR))
+			{
+				do
+				{
+					stat = gifImpReadSimpleByte(file, &read);
+					count--;
+				} 
+				while ((count != 0) && (stat == GE_NO_ERROR));
+
+				if(stat == GE_NO_ERROR)
+					stat = gifImpReadSimpleByte(file, &count);
+			};
+		}
+
+		if(stat == GE_NO_ERROR)
+			stat = gifImpReadSimpleByte(file, &read);
+	};
+
+	FilePos(file, -1, FILE_POS_RELATIVE);
+  
+	return(stat);
+};
+
+//*********************************************************************
+
+GifError
+gifImpGetHeader(FileHandle source, GifHeader *fh)
+{
+	int result; /* normally word */
+
+	result = FileRead(source, fh, sizeof(GifHeader), 0);
+  
+	if(result == -1)
+		return(GE_INVALID_FILE);
+  
+	if(result != sizeof(GifHeader))
+		return(GE_WRONG_FILE_FORMAT);
+	if(strncmp(fh->GH_id, "GIF", 3) != 0)
+		return(GE_WRONG_FILE_FORMAT);
+
+	if(strncmp(&fh->GH_id[3], "87a", 3) != 0)
+		if(strncmp(&fh->GH_id[3], "89a", 3) != 0)
+			return(GE_WRONG_FILE_FORMAT);
+
+	return(GE_NO_ERROR);
+};
+
+//*********************************************************************
+
+GifError 
+gifImpGetPicDesc(FileHandle source, GifPicDescriptor *pd)
+{
+	int result; /*normally word */
+
+	result = FileRead(source, pd, sizeof(GifPicDescriptor), 0);
+  
+	if(result == -1)
+		return(GE_INVALID_FILE);
+  
+	if(result != sizeof(GifPicDescriptor))
+		return(GE_WRONG_FILE_FORMAT);
+  
+	if(pd->GPD_header != ',')
+		return(GE_WRONG_FILE_FORMAT);
+  
+	return(GE_NO_ERROR);
+};
+
+//*********************************************************************
+
+GifError 
+gifImpGetPalette(FileHandle source,	MemHandle palmem, word size)
+{
+	int result;
+	gifImpPalette *pal;
+
+	pal = MemLock(palmem);
+	result = FileRead(source, pal, size*3, 0);
+	MemUnlock(palmem);
+  
+	if(result == -1)
+		return(GE_INVALID_FILE);
+	if(result != size*3)
+		return(GE_WRONG_FILE_FORMAT);
+  
+	return(GE_NO_ERROR);
+};
+
+//*********************************************************************
+
+GifError 
+gifImpGetRawByte(gifImpStream *stream, byte *value)
+{
+	byte *buffer;
+	int result;
+	GifError stat = GE_NO_ERROR;
+
+	buffer = stream->GIS_mem;
+	stat = GE_NO_ERROR;
+
+	if(stream->GIS_count == 0)
+	{
+		result = FileRead(stream->GIS_file, buffer, stream->GIS_size, 0);
+	 
+		if(result == -1)
+			stat = GE_INVALID_FILE;
+		if(result == 0)
+			stat = GE_OUT_OF_DATA;
+	 
+		if (stat == GE_NO_ERROR)
+		{
+			stream->GIS_index = 0;
+			stream->GIS_count = result;
+		};
+	};
+  
+	*value = buffer[stream->GIS_index];
+	stream->GIS_index++;
+	stream->GIS_count--;
+  
+	return(stat);
+};
+
+//*********************************************************************
+
+GifError  
+gifImpGetByte(gifImpStream *stream,	byte *value)
+{
+	GifError stat = GE_NO_ERROR;
+
+	if(stream->GIS_blockCount == 0)
+		stat = gifImpGetRawByte(stream, &stream->GIS_blockCount);
+
+	if(stat == GE_NO_ERROR)
+	{
+		if(stream->GIS_blockCount != 0)
+		{
+			stream->GIS_blockCount--;
+			stat = gifImpGetRawByte(stream, value);
+		}
+		else
+			return(GE_OUT_OF_DATA);
+	};
+  
+	return(stat);
+}
+
+//*********************************************************************
+
+GifError  
+gifImpReadCode(gifImpStream *stream, word *code, byte csize)
+{
+	GifError stat = GE_NO_ERROR;
+	word mask[] = { 0x0000, 0x0001, 0x0003, 0x0007, 0x000f, 0x001f, 0x003f, 0x007f,
+						0x00ff, 0x01ff, 0x03ff, 0x07ff, 0x0fff};
+	byte value;
+	word value2;
+
+	if(stream->GIS_inCount >= 8)
+	{
+		if(stream->GIS_inCount >= 16)
+		{
+			stream->GIS_inBuffer.val = stream->GIS_inBuffer.val >> 16;
+			stat = gifImpGetByte(stream, &value);
+			value2 = value;
+			stream->GIS_inBuffer.single[0] =
+			(stream->GIS_inBuffer.single[0] & 0x00ff)|(value2*256);
+			stream->GIS_inCount -= 16;
+		}
+		else
+		{
+			stream->GIS_inBuffer.val = stream->GIS_inBuffer.val >> 8;
+			stream->GIS_inCount -= 8;
+		};
+
+		if(stat == GE_NO_ERROR)
+		{
+			stat = gifImpGetByte(stream,(byte *) &stream->GIS_inBuffer.single[1]);
+			if(stat == GE_OUT_OF_DATA)
+			{
+				stream->GIS_max = 16;
+				stat = GE_NO_ERROR;
+			};
+		}
+		else
+			if(stat == GE_OUT_OF_DATA)
+			{
+				stream->GIS_max = 8;
+				stat = GE_NO_ERROR;
+			};
+	};
+
+	if(csize > stream->GIS_max)
+	{
+		return(GE_OUT_OF_DATA);
+	}
+
+	*code = (stream->GIS_inBuffer.val >> stream->GIS_inCount)
+					& mask[csize];
+	stream->GIS_inCount += csize;
+
+	return(stat);
+};
+
+//*********************************************************************
+
+GifError  
+gifImpPutPixel(gifImpOutStream *stream, byte pixel)
+{
+	struct
+	{
+		byte inc;
+		byte nextY;
+	} INTERLACE[4] = {{8,4},{8,2},{4,1},{2,0}};
+	byte MASK[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
+	word size;
+	void *lineptr;
+	Boolean outflag;
+	byte *array;
+
+	if(stream->GIOS_transparent != 0xFFFF)
+	{
+		if(pixel != stream->GIOS_transparent)
+		{
+			stream->GIOS_mask |= MASK[stream->GIOS_maskCount]; 
+		}
+		stream->GIOS_maskCount++;
+		if(stream->GIOS_maskCount == 8)
+		{
+			array = MemLock(stream->GIOS_mem);
+			array[stream->GIOS_maskIndex] = stream->GIOS_mask;
+			stream->GIOS_maskIndex++;
+			MemUnlock(stream->GIOS_mem);
+			stream->GIOS_maskCount = 0;
+			stream->GIOS_mask = 0;
+		}
+	}
+
+	outflag = FALSE;
+
+	/* set pixel */
+	if(stream->GIOS_format == BMF_MONO)
+	{
+		stream->GIOS_outByte = stream->GIOS_outByte << 1;
+
+		if(stream->GIOS_inverse == FALSE)
+			stream->GIOS_outByte = stream->GIOS_outByte | (pixel&0x01);
+		else
+			stream->GIOS_outByte = stream->GIOS_outByte | ((pixel&0x01)^0x01);
+			stream->GIOS_inCount++;
+		if(stream->GIOS_inCount == 8)
+		{
+			outflag = TRUE;
+			stream->GIOS_inCount = 0;
+		};
+	};
+	
+	if(stream->GIOS_format == BMF_4BIT)
+	{
+		stream->GIOS_outByte = stream->GIOS_outByte << 4;
+		stream->GIOS_outByte = stream->GIOS_outByte | (pixel&0x0f);
+		stream->GIOS_inCount++;
+		if(stream->GIOS_inCount == 2)
+		{
+			outflag = TRUE;
+			stream->GIOS_inCount = 0;
+		};
+	};
+  
+	if(stream->GIOS_format == BMF_8BIT)
+	{
+		outflag = TRUE;
+		stream->GIOS_outByte = pixel;
+	};
+
+	/* put byte into bitmap line */
+	if(outflag == TRUE)
+	{
+		array = MemLock(stream->GIOS_mem);
+		array[stream->GIOS_index] = stream->GIOS_outByte;
+		stream->GIOS_index++;
+		MemUnlock(stream->GIOS_mem);
+	};
+
+	/* next point */
+	stream->GIOS_x++;
+
+	/* if end of line then save line, next line or error if pic ready */
+	if(stream->GIOS_x == stream->GIOS_width)
+	{
+		if(stream->GIOS_inCount!=0)
+		{
+			if(stream->GIOS_format == BMF_MONO)
+			{
+				stream->GIOS_outByte = stream->GIOS_outByte <<
+									  (8 - stream->GIOS_inCount);
+			}
+			else
+			{
+				stream->GIOS_outByte = stream->GIOS_outByte << 4;
+			};
+			array = MemLock(stream->GIOS_mem);
+			array[stream->GIOS_index]=stream->GIOS_outByte;
+			stream->GIOS_index++;
+			MemUnlock(stream->GIOS_mem);
+		};
+   
+		if(stream->GIOS_maskCount != 0)
+		{
+			array = MemLock(stream->GIOS_mem);
+			array[stream->GIOS_maskIndex]= stream->GIOS_mask;
+			MemUnlock(stream->GIOS_mem);
+		}
+	
+		stream->GIOS_index = stream->GIOS_maskoff;
+		stream->GIOS_x = 0;
+		stream->GIOS_inCount = 0;
+		stream->GIOS_mask = 0;
+		stream->GIOS_maskCount = 0;
+		stream->GIOS_maskIndex = 0;
+
+		if(stream->GIOS_ycount < stream->GIOS_height)
+		{
+			if(HAL_COUNT(HugeArrayLock(stream->GIOS_file,stream->GIOS_block,
+						(dword) stream->GIOS_y,&lineptr,&size))!=0)
+			{
+				array = MemLock(stream->GIOS_mem);
+				memcpy(lineptr, array, size);
+				MemUnlock(stream->GIOS_mem);
+				HugeArrayDirty(lineptr);
+				HugeArrayUnlock(lineptr);
+			}
+			else
+			{
+				stream->GIOS_finished = TRUE;
+				return(GE_NO_ERROR);
+			}
+
+			if(stream->GIOS_interlace == FALSE)
+				stream->GIOS_y++;
+			else
+			{
+				stream->GIOS_y += INTERLACE[stream->GIOS_pass].inc;
+				while(stream->GIOS_y >= stream->GIOS_height)
+				{
+					stream->GIOS_y = INTERLACE[stream->GIOS_pass].nextY;
+					stream->GIOS_pass++;
+				};
+
+			};
+			stream->GIOS_ycount++;
+
+// PROGRESS UPDATE VALUE here
+//			if(status != NULL)
+//			{
+//				flag = @call status::MSG_SB_SET_STATUS_VALUE(((dword)stream->GIOS_ycount)*100/stream->GIOS_height);
+//		
+//				if(flag == FALSE)
+//					return(IBS_IMPORT_STOPPED);
+//			}
+		}
+		else
+		{
+			stream->GIOS_finished = TRUE;
+		}
+	}
+
+	return(GE_NO_ERROR);
+};
+
+//*********************************************************************
+
+GifError 
+gifImpReadPic(FileHandle file, 
+		gifImpOutStream *out_stream, word pixSize) /* status param needed here */
+{
+	byte CodeMask[] = {1, 3, 7, 15, 31, 63, 127, 255};
+	word PowersOf2[] = {1, 2, 4, 8, 16, 32, 64, 128, 256};
+
+	word ClearCode, EOFCode, OutCount, MaxCode;
+	word Code, CurCode, OldCode, InCode;
+	word FirstFree, FreeCode;
+	byte CodeSize, InitCodeSize, FinChar, BitMask;
+	int i;
+	MemHandle buffermem, tablemem;
+
+	GifError stat = GE_NO_ERROR;
+
+	gifImpStream in_stream;
+	gifImpTables *table;
+
+	/* buffer for reading gif file */
+	buffermem = MemAlloc(GIF_IMPORT_READ_BUF_SIZE, HF_FIXED, 0);
+	if(buffermem == NULL)
+		return(GE_OUT_OF_MEMORY);
+
+	/* buffer for tables */
+	tablemem = MemAlloc(sizeof(gifImpTables), HF_FIXED, 0);
+	if(tablemem == NULL)
+	{
+		MemFree(buffermem);
+		return(GE_OUT_OF_MEMORY);
+	};
+	table = MemDeref(tablemem);
+
+	/* define file stream */
+	in_stream.GIS_mem = MemDeref(buffermem);
+	in_stream.GIS_size = GIF_IMPORT_READ_BUF_SIZE;
+	in_stream.GIS_file = file;
+	in_stream.GIS_count = 0;
+
+	/* define bit stream */
+	in_stream.GIS_blockCount = 0;
+	in_stream.GIS_max = 24;
+	stat = gifImpGetRawByte(&in_stream, &CodeSize);
+	if(stat != GE_NO_ERROR)
+	{
+		MemFree(buffermem);
+		MemFree(tablemem);
+		return(stat);
+	};
+	stat = gifImpGetByte(&in_stream,(byte *)
+			 &(in_stream.GIS_inBuffer.single[1]));
+	if(stat != GE_NO_ERROR)
+	{
+		MemFree(buffermem);
+		MemFree(tablemem);
+		return(stat);
+	};
+	in_stream.GIS_inCount = 16;
+
+	/* define codes */
+	ClearCode = PowersOf2[CodeSize];
+	EOFCode = ClearCode + 1;
+	FirstFree = ClearCode + 2;
+	FreeCode = FirstFree;
+	CodeSize = CodeSize + 1;
+	InitCodeSize = CodeSize;
+	MaxCode = ClearCode*2;
+	BitMask = CodeMask[pixSize-1];
+	OutCount = 0;
+
+	do
+	{
+		stat = gifImpReadCode(&in_stream, &Code, CodeSize);
+
+		if(stat == GE_OUT_OF_DATA)
+		{
+			if(OutCount)
+			{
+				for(i = OutCount-1; 
+				((i >= 0)&&(stat == GE_NO_ERROR)&&(out_stream->GIOS_finished == FALSE)); i--)
+				{
+					stat = gifImpPutPixel(out_stream, table->Outcode[i]);
+										// status parameter needed here
+				};
+				OutCount = 0;
+			}
+			stat = GE_NO_ERROR;
+			break;
+		}
+
+		if((Code != EOFCode) && (stat == GE_NO_ERROR))
+		{
+			if(Code == ClearCode)
+			{
+				for(i = 0; i < ClearCode; ++i)
+				{
+					table->Prefix[i]=0;
+					table->Suffix[i]=i;
+				};
+
+				for(;i < (1<<12); ++i)
+				{
+					table->Prefix[i] = table->Suffix[i] = 0;
+				};
+	
+				CodeSize = InitCodeSize;
+				MaxCode = ClearCode*2;
+				FreeCode = FirstFree;
+				
+				do
+				{
+					stat = gifImpReadCode(&in_stream, &Code, CodeSize);
+				}
+				while((stat == GE_NO_ERROR)&&(Code == ClearCode));
+
+				if(stat == GE_OUT_OF_DATA)
+				{
+					stat = GE_NO_ERROR;
+					break;
+				}
+
+				if(stat == GE_NO_ERROR)
+				{
+					CurCode = Code;
+					OldCode = Code;
+					FinChar = Code & BitMask;
+					stat = gifImpPutPixel(out_stream, 
+							FinChar);
+				};
+			}
+			else
+			{
+				CurCode = Code;
+				InCode = Code;
+
+				if(Code >= FreeCode)
+				{
+					CurCode = OldCode;
+
+					table->Outcode[OutCount] = FinChar;
+					OutCount++;
+				};
+
+				while(CurCode >= ClearCode)
+				{
+					table->Outcode[OutCount] = table->Suffix[CurCode];
+					OutCount++;
+					CurCode = table->Prefix[CurCode];
+				};
+			
+				FinChar = CurCode & BitMask;
+
+				table->Outcode[OutCount] = FinChar;
+				OutCount++;
+  
+				for(i = OutCount-1; 
+					((i >= 0)&&(stat == GE_NO_ERROR)&&(out_stream->GIOS_finished == FALSE)); i--)
+				{
+					stat = gifImpPutPixel(out_stream, table->Outcode[i]);
+				};
+				OutCount = 0;
+				
+				if(FreeCode < (1 << 12))
+				{
+					table->Prefix[FreeCode] = OldCode;
+					table->Suffix[FreeCode] = FinChar;
+					FreeCode++;
+				
+					if((FreeCode>=MaxCode)&&(CodeSize<12))
+					{
+						CodeSize++;
+						MaxCode=MaxCode<<1;
+					};
+				};
+			 
+				OldCode = InCode;
+			};
+		 };
+	} 
+	while ((Code!=EOFCode)&&(stat == GE_NO_ERROR)&&
+	   (out_stream->GIOS_finished == FALSE));
+
+	/* free tables */
+	MemFree(tablemem);
+	/* free buffer */
+	MemFree(buffermem);
+
+	return(stat);
+};
+
+/**********************************************************************
+*	GLOBAL FUNCTIONS
+**********************************************************************/
+
+VMBlockHandle _pascal _export
+GifImportBitmapFName(PathName srcname, VMFileHandle destfile, 
+				GifError *error)
+{
+	FileHandle srcfile;
+	GifError stat = GE_NO_ERROR;
+	VMBlockHandle bmblock;
+
+	// create/open the file here
+	srcfile = FileOpen(srcname, FILE_ACCESS_W | FILE_DENY_RW);
+
+	if(srcfile)
+	{
+		bmblock = GifImportBitmapFHandle(srcfile, destfile, &stat);
+
+		// close the file
+		FileClose(srcfile, 0);
+	}
+	else
+		stat = GE_CANT_OPEN_SOURCE_FILE;
+	
+	if(error)
+		*error = stat;
+	
+	if(stat != GE_NO_ERROR)
+		bmblock = 0;
+
+	return(bmblock);
+}
+
+//*********************************************************************
+
+VMBlockHandle _pascal _export
+GifImportBitmapFHandle(FileHandle srcfile, VMFileHandle destfile, 
+				GifError *error)
+{
+	GifError stat = GE_NO_ERROR;
+	GifHeader fh;
+	GifPicDescriptor pd;
+	gifImpOutStream out_stream;
+	word transparent;
+
+	MemHandle palmem;
+	GStateHandle bmstate;
+	BMFormat bmformat;
+	byte pixsize;
+	RGBValue *palette;
+	word pixSize, colMapSize;
+
+// PROGRESS START NOTIFICATION here
+//	if(params->IBP_status != NULL)
+//		@call params->IBP_status::MSG_SB_START_PROCESS();
+
+	/* file position at start */
+	if(FilePos(srcfile, 0, FILE_POS_START) != 0)
+	{
+// PROGRESS END NOTIFICATION here
+//		if(params->IBP_status != NULL)
+//			@call params->IBP_status::MSG_SB_STOP_PROCESS();
+
+		stat = GE_INVALID_FILE;
+		goto end;
+	};
+
+	/* read gif header */
+	stat = gifImpGetHeader(srcfile, &fh);
+
+	if(stat != GE_NO_ERROR)
+	{
+// PROGRESS END NOTIFICATION here
+//		if(params->IBP_status != NULL)
+//			@call params->IBP_status::MSG_SB_STOP_PROCESS();
+		goto end;
+	};
+
+	/* read palette */
+	palmem = MemAlloc(3*256, HF_SWAPABLE, 0);
+
+	if(palmem == NULL)
+	{
+// PROGRESS END NOTIFICATION here
+//		if(params->IBP_status != NULL)
+//			@call params->IBP_status::MSG_SB_STOP_PROCESS();
+		stat = GE_OUT_OF_MEMORY;
+		goto end;
+	};
+
+	if(GIF_HEADER_GLOB_PAL(&fh))
+	{
+		stat = gifImpGetPalette(srcfile, palmem, 
+					GIF_HEADER_COL_MAP_SIZE(&fh));
+		if(stat != GE_NO_ERROR)
+		{
+			MemFree(palmem);
+
+// PROGRESS END NOTIFICATION here
+//			if(params->IBP_status != NULL)
+//				@call params->IBP_status::MSG_SB_STOP_PROCESS();
+			goto end;
+		};
+	};
+
+	/* process extention blocks */
+	transparent = 0xFFFF;     /* setup to be not transparent */
+	stat = gifImpProcessExtentions(srcfile, &transparent);
+
+	if(stat == GE_NO_ERROR)
+		/* read pic descriptor */
+		stat = gifImpGetPicDesc(srcfile, &pd);
+
+	if(stat != GE_NO_ERROR)
+	{
+		MemFree(palmem);
+// PROGRESS END NOTIFICATION here
+//		if(params->IBP_status != NULL)
+//			@call params->IBP_status::MSG_SB_STOP_PROCESS();
+		goto end;
+	};
+
+	pixSize = GIF_PIC_DESCRIPTOR_PIX_SIZE(&pd);
+	colMapSize = 1 << pixSize;
+	if((pd.GPD_flags & 0x80) == 0)
+	{
+		pixSize = 1 + (fh.GH_resFlag & 0x07);
+		colMapSize = GIF_HEADER_COL_MAP_SIZE(&fh);
+	}
+
+	/* read optional palette */
+	if(GIF_PIC_DESCRIPTOR_LOCAL_PAL(&pd))
+	{
+		stat = gifImpGetPalette(srcfile, palmem, colMapSize);
+		if(stat != GE_NO_ERROR)
+		{
+// PROGRESS END NOTIFICATION here
+//			if(params->IBP_status != NULL)
+//				@call params->IBP_status::MSG_SB_STOP_PROCESS();
+			MemFree(palmem);
+			goto end;
+		};
+	};
+
+	if(pixSize == 1)
+	{
+		palette = MemLock(palmem);
+
+		if((palette[0].RGB_red == 0) &&
+			(palette[0].RGB_green == 0) &&
+			(palette[0].RGB_blue == 0) &&
+			(palette[1].RGB_red == 255) &&
+			(palette[1].RGB_green == 255) &&
+			(palette[1].RGB_blue == 255))
+		{
+			bmformat = BMF_MONO;
+			pixsize = 1;
+			out_stream.GIOS_inverse = TRUE;
+		}
+		else
+			if((palette[0].RGB_red == 255) &&
+				(palette[0].RGB_green == 255) &&
+				(palette[0].RGB_blue == 255) &&
+				(palette[1].RGB_red == 0) &&
+				(palette[1].RGB_green == 0) &&
+				(palette[1].RGB_blue == 0))
+			{
+				bmformat = BMF_MONO;
+				pixsize = 1;
+				out_stream.GIOS_inverse = FALSE;
+			}
+			else
+			{
+				bmformat = BMF_4BIT;
+				pixsize = 4;
+			}
+
+		MemUnlock(palmem);
+	}
+	else
+		if(pixSize <= 4)
+		{
+			bmformat = BMF_4BIT;
+			pixsize = 4;
+		}
+		else
+			if(pixSize <= 8)
+			{
+				bmformat = BMF_8BIT;
+				pixsize = 8;
+			};
+
+	if(transparent != 0xFFFF)
+		bmformat |= BMT_MASK;
+
+	out_stream.GIOS_block = 
+		GrCreateBitmap(bmformat|BMT_PALETTE|BMT_COMPLEX,
+			pd.GPD_width, pd.GPD_height,
+			destfile, 0, &bmstate);
+
+	/* destroy bitmap gstate */
+	GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
+
+	/* save palette only for 16 or 256 color bmps */
+	if(
+		((bmformat & 7) >= 1) && 
+		((GIF_HEADER_GLOB_PAL(&fh) != FALSE) ||
+		(GIF_PIC_DESCRIPTOR_LOCAL_PAL(&pd) != FALSE)))
+	{
+		EGError egstat = EGE_NO_ERROR;
+		
+		palette = MemLock(palmem);
+
+		if(palette)
+		{
+			egstat = BmpSetBitmapPalette(destfile, out_stream.GIOS_block, 
+						palette, 0, colMapSize);
+
+			if(egstat != EGE_NO_ERROR)
+				stat = GE_PALETTE_WRITE_FAILURE;
+		}
+		else
+			stat = GE_BLOCK_LOCK_FAILURE;
+
+		MemUnlock(palmem);
+	};
+
+	/* free palette */
+	MemFree(palmem);
+
+	/* create out stream */
+	out_stream.GIOS_finished = FALSE;
+	out_stream.GIOS_width = pd.GPD_width;
+	out_stream.GIOS_height = pd.GPD_height;
+	out_stream.GIOS_x = 0;
+	out_stream.GIOS_y = 0;
+	out_stream.GIOS_ycount = 0;
+	out_stream.GIOS_pass = 0;
+	out_stream.GIOS_interlace = ((pd.GPD_flags & 0x40) == 0x40);
+	out_stream.GIOS_mem = MemAlloc(((pixsize*pd.GPD_width)+7)/8 +
+		((transparent != 0xFFFF) ? ((pd.GPD_width+7)/8): 0),
+		HF_SWAPABLE, 0);
+	out_stream.GIOS_file = destfile;
+	out_stream.GIOS_format = bmformat & ~BMT_MASK;
+	out_stream.GIOS_inCount = 0;
+	out_stream.GIOS_index = out_stream.GIOS_maskoff =
+		((transparent != 0xFFFF)?((pd.GPD_width+7)/8):0);
+	out_stream.GIOS_maskIndex = 0;
+	out_stream.GIOS_maskCount = 0;
+	out_stream.GIOS_transparent = transparent;
+	out_stream.GIOS_mask = 0;
+
+	if(out_stream.GIOS_mem == NULL)
+		stat = GE_OUT_OF_MEMORY;
+
+	/* read pic data */
+	if(stat == GE_NO_ERROR)
+		stat = gifImpReadPic(srcfile, &out_stream, pixSize); 
+									/* status param needed here */
+
+	if(stat != GE_NO_ERROR)
+		VMFreeVMChain(destfile, 
+			VMCHAIN_MAKE_FROM_VM_BLOCK(out_stream.GIOS_block));
+
+	/* free buffer line */
+	if(out_stream.GIOS_mem != NULL)
+		MemFree(out_stream.GIOS_mem);
+
+// PROGRESS END NOTIFICATION here
+//	if(params->IBP_status != NULL)
+//		@call params->IBP_status::MSG_SB_END_PROCESS();
+
+end:
+	if(error)
+		*error = stat;
+
+	if(stat != GE_NO_ERROR)
+		return(0);
+
+	return(out_stream.GIOS_block);
+}
+
+//*********************************************************************
+
+GifError _pascal _export
+GifImportTestBitmapFName(PathName srcname)
+{
+	FileHandle srcfile;
+	GifError stat = GE_NO_ERROR;
+
+	// create/open the file here
+	srcfile = FileOpen(srcname, FILE_ACCESS_W | FILE_DENY_RW);
+
+	if(srcfile)
+	{
+		stat = GifImportTestBitmapFHandle(srcfile);
+
+		// close the file
+		FileClose(srcfile, 0);
+	}
+	else
+		stat = GE_CANT_OPEN_SOURCE_FILE;
+	
+	return(stat);
+};
+
+//*********************************************************************
+
+GifError _pascal _export
+GifImportTestBitmapFHandle(FileHandle srcfile)
+{
+	int result;
+	byte read[3];
+
+	if(FilePos(srcfile, 0, FILE_POS_START) != 0)
+		return(GE_INVALID_FILE);
+
+	result = FileRead(srcfile, &read, 3, 0);
+
+	if(result == -1)
+		return(GE_WRONG_FILE_FORMAT);
+
+	if(result != 3)
+		return(GE_WRONG_FILE_FORMAT);
+
+	if(strncmp((char*) read, "GIF", 3) == 0)
+		return(GE_NO_ERROR);
+
+	return(GE_WRONG_FILE_FORMAT);
+};
+
+//*********************************************************************
