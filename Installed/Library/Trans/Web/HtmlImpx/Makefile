@@ -3,16 +3,16 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = HTMLIMPX
-EXPTPROC        = EXPTPROC.GOC
-HTMLIMPT        = htmlimptManager.asm HTMLIMPT.UI
-IMPTPROC        = IMPTPROC.GOC
-UI_TO_RDFS      = HTMLIMPT.UI
-OBJS            = EXPTPROC.obj IMPTPROC.obj
+GEODE           = htmlimpx
+HTMLIMPT        = htmlimptManager.asm htmlimpt.ui
+IMPTPROC        = imptproc.goc
+EXPTROC         = exptproc.goc
+UI_TO_RDFS      = htmlimpt.ui
+OBJS            = imptproc.obj exptproc.obj
 COMMON          =
-MODULES         = HTMLIMPT
-CMODULES        = EXPTPROC IMPTPROC
-SRCS            = $(EXPTPROC) $(HTMLIMPT) $(IMPTPROC) $(COMMON)
+MODULES         = htmlimpt
+CMODULES        = imptproc exptroc
+SRCS            = $(HTMLIMPT) $(IMPTPROC) $(EXPTROC) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = htmlimpx

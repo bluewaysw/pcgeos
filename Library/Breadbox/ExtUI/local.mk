@@ -7,5 +7,6 @@ XGOCFLAGS = -L extui
 #XCCOMFLAGS = -WDE
 
 # Set Copyright notice
-XLINKFLAGS = -N \(C\)97\20Breadbox\20Computer\20Company
+# Copyright is too long! - mcasadevall
+#XLINKFLAGS = -N \(C\)97\20Breadbox\20Computer\20Company
 

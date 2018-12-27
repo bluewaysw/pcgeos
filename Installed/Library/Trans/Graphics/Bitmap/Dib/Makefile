@@ -3,16 +3,16 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Dib
-EXPORT          = exportDIB.asm exportMain.asm exportManager.asm
-IMPORT          = importDIB.asm importMain.asm importManager.asm\
+GEODE           = dib
+IMPORT          = importDIB.asm importManager.asm importMain.asm\
                   dibStrings.ui
-UI_TO_RDFS      = DIBSTRINGS.UI
+EXPORT          = exportMain.asm exportDIB.asm exportManager.asm
+UI_TO_RDFS      = dibStrings.ui
 OBJS            =
-COMMON          = dibConstant.def dibGeode.def dibGlobal.def dibMacro.def
-MODULES         = Export Import
+COMMON          = dibConstant.def dibMacro.def dibGeode.def dibGlobal.def
+MODULES         = Import Export
 CMODULES        =
-SRCS            = $(EXPORT) $(IMPORT) $(COMMON)
+SRCS            = $(IMPORT) $(EXPORT) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = dib

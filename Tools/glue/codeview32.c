@@ -1478,7 +1478,7 @@ CV32ProcessScalar(const char    	*file,  	/* Object file from which
 
     if (enumTypeIndex == CSTT2_CHAR) {
 	retval = OTYPE_SIGNED | (size << 1) | OTYPE_SPECIAL;
-    } else if (enumTypeIndex == CSTT2_SHORT) {
+    } else if ((enumTypeIndex == CSTT2_SHORT) || (enumTypeIndex == CSTT2_USHORT)) {
 	retval = OTYPE_INT | (2 << 1) | OTYPE_SPECIAL;
     } else {
 	Notify(NOTIFY_ERROR,
@@ -1739,10 +1739,24 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_UCHAR:
 			retval = OTYPE_CHAR | OTYPE_SPECIAL | (0 << 1);
 			break;
+		case CSTT2_PVOID:
+		case CSTT2_PCHAR:
+		case CSTT2_PSHORT:
+		case CSTT2_PLONG:
+		case CSTT2_PUSHORT:
+		case CSTT2_PULONG:
 		case CSTT2_PRCHAR:
+		case CSTT2_PUCHAR:
 			retval = OTYPE_PTR | OTYPE_PTR_NEAR | OTYPE_SPECIAL;
 			break;
+		case CSTT2_PFVOID:
+		case CSTT2_PFCHAR:
+		case CSTT2_PFSHORT:
+		case CSTT2_PFLONG:
+		case CSTT2_PFUSHORT:
+		case CSTT2_PFULONG:
 		case CSTT2_PFRCHAR:
+		case CSTT2_PFUCHAR:
 			retval = OTYPE_PTR | OTYPE_PTR_FAR | OTYPE_SPECIAL;
 			break;
 		default:
@@ -2072,6 +2086,7 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			retval = CV32ProcessArray(file, &bp, len - 2, typeBlock);
 			printf("CV32ProcessTypeRecord::CTL2_ARRAY\n");fflush(stdout);
 			break;
+		case CTL2_CLASS:
 		case CTL2_STRUCTURE:
 			printf("CV32ProcessTypeRecord::CTL2_STRUCTURE+++\n"); fflush(stdout);
 			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock);
@@ -2096,6 +2111,31 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			* Skip over left-over bytes
 			*/
 			bp = *bpPtr + len;
+			break;
+		}
+		case CTL2_UNION:
+		{
+			word count;
+			word baseType;
+			word properties;
+			unsigned long size;
+			ID name;   	    /* Name of the union */
+
+			printf("CV32ProcessTypeRecord::CTL2_UNION+++\n"); fflush(stdout);
+
+			MSObj_GetWord(count, bp);
+			MSObj_GetWord(baseType, bp);
+			MSObj_GetWord(properties, bp);
+
+			size = CV32GetInteger(&bp);
+			printf("union size: %ld\n", size);
+
+			name = NullID;
+			if ((bp - *bpPtr) < len) {
+				name = CV32GetString(&bp);
+			}
+			printf("union: %s\n", name);
+			printf("CV32ProcessTypeRecord::CTL2_UNION---\n"); fflush(stdout);
 			break;
 		}
 		case CTL2_ENUMERATION:

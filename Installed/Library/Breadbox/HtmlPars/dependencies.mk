@@ -1,5 +1,5 @@
-fl_local.obj \
-fl_local.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+htmlexpt.obj \
+htmlexpt.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -16,19 +16,21 @@ fl_local.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh Ansi/string.h Ansi/stdio.h geoMisc.h \
-                Objects/filelist.goh DirPath.goh internal.goh
-fl_local.obj \
-fl_local.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                Objects/helpCC.goh fixes.goh htmlpars.goh \
+                Objects/vLTextC.goh
+htmlexpt.obj \
+htmlexpt.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
-filelist.obj \
-filelist.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h xlatLib.h fixes.h \
+                htmlopt.h
+wwwtools.obj \
+wwwtools.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -45,19 +47,21 @@ filelist.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh Ansi/string.h Ansi/stdio.h geoMisc.h \
-                Objects/filelist.goh DirPath.goh internal.goh fllui.goh
-filelist.obj \
-filelist.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                Objects/helpCC.goh fixes.goh htmlpars.goh \
+                Objects/vLTextC.goh
+wwwtools.obj \
+wwwtools.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
-fl_path.obj \
-fl_path.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                parallDr.h hugearr.h fileEnum.h initfile.h library.h \
+                geoMisc.h Ansi/string.h Ansi/stdio.h Ansi/stdlib.h \
+                fixes.h htmlopt.h
+htmlpars.obj \
+htmlpars.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -74,19 +78,20 @@ fl_path.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh Ansi/string.h Ansi/stdio.h geoMisc.h \
-                Objects/filelist.goh DirPath.goh internal.goh
-fl_path.obj \
-fl_path.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                Objects/helpCC.goh fixes.goh htmlpars.goh \
+                Objects/vLTextC.goh htmlsty.goh
+htmlpars.obj \
+htmlpars.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
-fl_vol.obj \
-fl_vol.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h geoMisc.h fixes.h htmlopt.h
+htmlclas.obj \
+htmlclas.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -103,16 +108,18 @@ fl_vol.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh Ansi/string.h Ansi/stdio.h geoMisc.h \
-                Objects/filelist.goh DirPath.goh internal.goh
-fl_vol.obj \
-fl_vol.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                Objects/helpCC.goh Objects/Text/tCtrlC.goh ruler.goh \
+                Objects/colorC.goh Objects/styles.goh fixes.goh \
+                htmlpars.goh Objects/vLTextC.goh
+htmlclas.obj \
+htmlclas.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
+                parallDr.h hugearr.h fileEnum.h initfile.h Ansi/string.h \
+                Ansi/stdio.h Ansi/stdlib.h fixes.h htmlopt.h
 
-flllibEC.geo flllib.geo : geos.ldf ui.ldf ansic.ldf 
+htmlparsEC.geo htmlpars.geo : geos.ldf ansic.ldf text.ldf 

@@ -7,5 +7,6 @@ XGOCFLAGS = -L thumbdb
 #XCCOMFLAGS = -WDE
 
 # Set Copyright notice
-XLINKFLAGS = -N \(C\)97\20Breadbox\20Computer\20Company
+# too long
+#XLINKFLAGS = -N \(C\)97\20Breadbox\20Computer\20Company
 

@@ -8,7 +8,7 @@ XGOCFLAGS = -L htmlpars
 
 # -WDE: Make sure that SS!=DS situation in library is observed
 # -d:   Merge duplicate strings
-XCCOMFLAGS = -d -Z -Os -O -WDE -3
+#XCCOMFLAGS = -d -Z -Os -O -WDE -3
 
 # Set Copyright notice
 XLINKFLAGS = -N by\20Marcus\20Groeber

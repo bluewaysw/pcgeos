@@ -174,16 +174,40 @@
 
 
 #define CSTT2_VOID	0x0003
+#define CSTT2_PVOID     0x0103
+#define CSTT2_PFVOID    0x0203
+
 #define CSTT2_CHAR		0x0010
+#define CSTT2_PCHAR		0x0110
+#define CSTT2_PFCHAR		0x0210
+
 #define CSTT2_SHORT     0x0011
+#define CSTT2_PSHORT    0x0111
+#define CSTT2_PFSHORT   0x0211
+
+
 #define CSTT2_LONG     0x0012
+#define CSTT2_PLONG    0x0112
+#define CSTT2_PFLONG   0x0212
+
 #define CSTT2_UCHAR     0x0020
+#define CSTT2_PUCHAR    0x0120
+#define CSTT2_PFUCHAR   0x0220
+
 #define CSTT2_USHORT	0x0021
+#define CSTT2_PUSHORT	0x0121
+#define CSTT2_PFUSHORT	0x0221
+
 #define CSTT2_ULONG		0x0022
+#define CSTT2_PULONG		0x0122
+#define CSTT2_PFULONG		0x0222
+
 #define CSTT2_RCHAR		0x0070
 #define CSTT2_PRCHAR		0x0170 // RCHAR near pointer
 #define CSTT2_PFRCHAR		0x0270 // RCHAR far pointer
+
 #define CSTT2_INT2		0x0072
+
 #define CSTT2_UINT2		0x0073
 
 
@@ -202,6 +226,7 @@
 #define CTL2_MODIFIER		0x01
 #define CTL2_POINTER		0x02
 #define CTL2_ARRAY			0x03
+#define CTL2_CLASS              0x04
 #define CTL2_STRUCTURE		0x05
 #define CTL2_UNION              0x06
 #define CTL2_ENUMERATION	0x07

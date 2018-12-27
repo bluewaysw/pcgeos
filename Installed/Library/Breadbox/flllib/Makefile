@@ -6,9 +6,9 @@
 GEODE           = flllib
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = filelist.goc FL_VOL.goc FL_PATH.goc FL_LOCAL.goc\
-                  fllui.goh internal.goh
-OBJS            = filelist.obj FL_VOL.obj FL_PATH.obj FL_LOCAL.obj
+SRCS            = fl_local.goc filelist.goc fl_path.goc fl_vol.goc\
+                  internal.goh fllui.goh
+OBJS            = fl_local.obj filelist.obj fl_path.obj fl_vol.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = flllib
