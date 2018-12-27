@@ -6,8 +6,8 @@
 GEODE           = dirlist
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = DIRLIST.GOC FILEPIC.GOC
-OBJS            = DIRLIST.obj FILEPIC.obj
+SRCS            = dirlist.goc filepic.goc
+OBJS            = dirlist.obj filepic.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = dirlist

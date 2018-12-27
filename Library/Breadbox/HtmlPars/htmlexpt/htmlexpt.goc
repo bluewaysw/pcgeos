@@ -1,0 +1,110 @@
+/***********************************************************************
+ *
+ * PROJECT:       HTMLPars
+ * FILE:          htmlexpt.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ * NOTE:          To compile properly, this file requires the INCLUDE
+ *                files from the OmniGo SDK or later, because the
+ *                VisTextParaAttr structure is declared incorrectly in
+ *                earlier versions.
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/ctype.h>
+#include <geoMisc.h>
+
+#include <xlatLib.h>
+
+@include <fixes.goh>
+@include "htmlpars.goh"
+
+
+typedef struct {
+  unsigned char num;
+  char name[7];
+  unsigned char c;
+} HTMLEntityTable;
+
+#define NUM_XLATE_ENTRIES 90
+@extern chunk xlateTable;
+
+
+#define HTML_FILE_PROLOG "<HTML>\r\n"
+#define HTML_FILE_PARA "<P>\r\n"
+#define HTML_FILE_EPILOG "\r\n</HTML>\r\n"
+
+
+void UnTranslateChar(int ch,char *buf)
+{
+    HTMLEntityTable *xlate_table;
+    int i;
+
+    *buf = 0;
+
+    MemLock( OptrToHandle(@xlateTable) );
+    xlate_table = LMemDeref(@xlateTable);
+
+    for(i=0; i<NUM_XLATE_ENTRIES; i++)
+      if( ch==xlate_table[i].c )
+      {
+        sprintf( buf, "&%s;", xlate_table[i].name );
+        break;
+      }
+
+    if(!*buf && ch>=32 && ch<128)
+    {
+      buf[0] = (char)ch;
+      buf[1] = 0;
+    }
+
+    MemUnlock( OptrToHandle(@xlateTable) );
+}
+
+int _export _pascal CreateHTMLFile(optr obj, FileHandle out)
+{
+    dword len,pos,diff;
+    int i;
+    char buf[512],cbuf[20];
+
+    FileWrite( out, HTML_FILE_PROLOG, sizeof(HTML_FILE_PROLOG)-1, FALSE);
+
+    len = @call obj::MSG_VIS_TEXT_GET_TEXT_SIZE();
+
+    pos = 0;
+    while(len)
+    {
+      diff = (len>sizeof(buf))?sizeof(buf):len;
+      @call obj::MSG_VIS_TEXT_SELECT_RANGE( pos+diff, pos );
+      @call obj::MSG_VIS_TEXT_GET_SELECTION_PTR( buf );
+      for(i=0; i<(int)diff; i++)
+      {
+        if(buf[i]=='\r')
+          FileWrite( out, HTML_FILE_PARA, sizeof(HTML_FILE_PARA)-1, FALSE );
+        else if(buf[i]<='A' || buf[i]>='z')
+        {
+          UnTranslateChar( (unsigned char)buf[i], cbuf );
+          FileWrite( out, cbuf, strlen(cbuf), FALSE );
+        }
+        else
+          FileWrite( out, &(buf[i]), 1, FALSE );
+      }
+      pos+=diff;
+      len-=diff;
+    }
+
+    FileWrite( out, HTML_FILE_EPILOG, sizeof(HTML_FILE_EPILOG)-1, FALSE);
+
+    return TE_NO_ERROR;                 /* export was successful */
+}

@@ -1,43 +1,29 @@
-EXPFILE.obj \
-EXPFILE.eobj: OBJECTS/WINC.GOH OBJECTS/METAC.GOH OBJECT.GOH \
-                OBJECTS/INPUTC.GOH OBJECTS/UIINPUTC.GOH OBJECTS/VISC.GOH \
-                GIFLIB.GOH EXTGRAPH.GOH
-EXPFILE.obj \
-EXPFILE.eobj: MAIN/EXPFILE.GOC GEOS.H  \
-                 \
-                 CHUNKARR.H OBJECT.H \
-                GEODE.H LMEM.H OBJECTS/HELPCC.H FILE.H INPUT.H CHAR.H \
-                GRAPHICS.H FONTID.H FONT.H COLOR.H HWR.H WIN.H VM.H \
-                GSTRING.H CONFIG.H ANSI/STRING.H HEAP.H HUGEARR.H
 EXPSTR.obj \
-EXPSTR.eobj: OBJECTS/WINC.GOH OBJECTS/METAC.GOH OBJECT.GOH \
-                OBJECTS/INPUTC.GOH OBJECTS/UIINPUTC.GOH OBJECTS/VISC.GOH \
-                GIFLIB.GOH EXTGRAPH.GOH
+EXPSTR.eobj: Objects/winC.goh Objects/metaC.goh object.goh \
+                Objects/inputC.goh Objects/uiInputC.goh Objects/visC.goh \
+                giflib.goh extgraph.goh
 EXPSTR.obj \
-EXPSTR.eobj: MAIN/EXPSTR.GOC GEOS.H  \
-                 \
-                 CHUNKARR.H OBJECT.H \
-                GEODE.H LMEM.H OBJECTS/HELPCC.H FILE.H INPUT.H CHAR.H \
-                GRAPHICS.H FONTID.H FONT.H COLOR.H HWR.H WIN.H VM.H \
-                GSTRING.H CONFIG.H ANSI/STRING.H HEAP.H HUGEARR.H
+EXPSTR.eobj: geos.h chunkarr.h object.h geode.h lmem.h Objects/helpCC.h \
+                file.h input.h char.h graphics.h fontID.h font.h color.h \
+                hwr.h win.h vm.h gstring.h config.h Ansi/string.h heap.h \
+                hugearr.h
 IMPFILE.obj \
-IMPFILE.eobj: GIFLIB.GOH EXTGRAPH.GOH OBJECTS/WINC.GOH OBJECTS/METAC.GOH \
-                OBJECT.GOH OBJECTS/INPUTC.GOH OBJECTS/UIINPUTC.GOH \
-                OBJECTS/VISC.GOH
+IMPFILE.eobj: giflib.goh extgraph.goh Objects/winC.goh Objects/metaC.goh \
+                object.goh Objects/inputC.goh Objects/uiInputC.goh \
+                Objects/visC.goh
 IMPFILE.obj \
-IMPFILE.eobj: MAIN/IMPFILE.GOC GEOS.H  \
-                 \
-                 HEAP.H VM.H LMEM.H \
-                FILE.H GRAPHICS.H FONTID.H FONT.H COLOR.H HUGEARR.H \
-                ANSI/STRING.H CONFIG.H GSTRING.H CHUNKARR.H OBJECT.H \
-                GEODE.H OBJECTS/HELPCC.H INPUT.H CHAR.H HWR.H WIN.H
-IMPSTR.obj \
-IMPSTR.eobj: 
-IMPSTR.obj \
-IMPSTR.eobj: MAIN/IMPSTR.GOC
-UTILS.obj \
-UTILS.eobj: 
-UTILS.obj \
-UTILS.eobj: MAIN/UTILS.GOC
+IMPFILE.eobj: geos.h heap.h vm.h lmem.h file.h graphics.h fontID.h \
+                font.h color.h hugearr.h Ansi/string.h config.h gstring.h \
+                chunkarr.h object.h geode.h Objects/helpCC.h input.h \
+                char.h hwr.h win.h
+EXPFILE.obj \
+EXPFILE.eobj: Objects/winC.goh Objects/metaC.goh object.goh \
+                Objects/inputC.goh Objects/uiInputC.goh Objects/visC.goh \
+                giflib.goh extgraph.goh
+EXPFILE.obj \
+EXPFILE.eobj: geos.h chunkarr.h object.h geode.h lmem.h Objects/helpCC.h \
+                file.h input.h char.h graphics.h fontID.h font.h color.h \
+                hwr.h win.h vm.h gstring.h config.h Ansi/string.h heap.h \
+                hugearr.h
 
-GiflibEC.geo Giflib.geo : GEOS.LDF ANSIC.LDF EXTGRAPH.LDF 
+giflibEC.geo giflib.geo : geos.ldf ansic.ldf extgraph.ldf 

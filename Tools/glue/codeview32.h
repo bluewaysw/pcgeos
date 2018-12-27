@@ -226,6 +226,7 @@
 #define CTL2_MODIFIER		0x01
 #define CTL2_POINTER		0x02
 #define CTL2_ARRAY			0x03
+#define CTL2_CLASS              0x04
 #define CTL2_STRUCTURE		0x05
 #define CTL2_UNION              0x06
 #define CTL2_ENUMERATION	0x07
