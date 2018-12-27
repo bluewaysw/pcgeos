@@ -24,7 +24,7 @@ library 	ui
 
 
 
-resource BITMAPRESOURCE lmem, read-only, shared
+resource BitmapResource lmem, read-only, shared
 
 
 export DClickGenDynamicListClass

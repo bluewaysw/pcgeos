@@ -7,7 +7,7 @@ XGOCFLAGS = -L dirlist
 # -WDE   compile for SS != DS
 # -w-stu turn off "undefined structure" warning
 #XCCOMFLAGS = -d -Z -O -1- -2- -3- -WDE -w-stu
-XCCOMFLAGS = -d -WDE -w-stu
+#XCCOMFLAGS = -d -WDE -w-stu
 
 # Create a Copyrigth-notice
 #LINKFLAGS += -N (c)\20by\20RABE-Soft\2010/99
