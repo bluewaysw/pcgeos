@@ -6,14 +6,14 @@ include Objects/gCtrlC.def
 ; segment must be "public 'CODE'" to ensure that it combines
 ; properly with the C segment of the same name.
 
-IMPTPROC_TEXT   segment word public 'CODE'
-  extrn  IMPORTPROCEDURE: far
+imptproc_TEXT   segment byte public 'CODE'
+  extrn  IMPROTPROCEDURE: far
   extrn  GETFORMAT: far
-IMPTPROC_TEXT   ends
+imptproc_TEXT   ends
 
-EXPTPROC_TEXT   segment word public 'CODE'
+exptproc_TEXT   segment byte public 'CODE'
   extrn  EXPORTPROCEDURE: far
-EXPTPROC_TEXT   ends
+exptproc_TEXT   ends
 
 
 global  LibraryEntry: far
@@ -53,7 +53,7 @@ TransExport proc far
         .enter
           push    ds                    ; arg 1: pointer to export data block
           push    si
-          call    EXPORTPROCEDURE       ; Call high-level procedure to do work
+          call    EXPORTPROCEDURE      ; Call high-level procedure to do work
                                         ; AX returns error code
         .leave
         ret
@@ -68,7 +68,7 @@ _vmc    local   dword
           push    ss                    ; arg 2: pointer to vm chain return buf
           lea     ax,_vmc
           push    ax
-          call    IMPORTPROCEDURE       ; Call high-level procedure to do work
+          call    EXPORTPROCEDURE       ; Call high-level procedure to do work
           mov     bx,dx                 ; BX:AX returns error code or format ID
           movdw   dxcx,_vmc             ; VMChain of object returned in DX:CX
         .leave
