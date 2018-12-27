@@ -6,7 +6,7 @@
 GEODE           = treplib
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = trepui.goc trepcode.goc internal.goh externs.goh
+SRCS            = trepui.goc trepcode.goc externs.goh internal.goh
 OBJS            = trepui.obj trepcode.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
