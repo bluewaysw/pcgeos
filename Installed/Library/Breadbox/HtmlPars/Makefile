@@ -3,17 +3,17 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = HTMLPARS
-HTMLCLAS        = HTMLCLAS.GOC
-HTMLEXPT        = HTMLEXPT.GOC
-HTMLPARS        = HTMLPARS.GOC
-WWWTOOLS        = WWWTOOLS.GOC
+GEODE           = htmlpars
+HTMLEXPT        = htmlexpt.goc
+WWWTOOLS        = wwwtools.goc
+HTMLPARS        = htmlpars.goc
+HTMLCLAS        = htmlclas.goc
 UI_TO_RDFS      =
-OBJS            = HTMLCLAS.obj HTMLEXPT.obj HTMLPARS.obj WWWTOOLS.obj
-COMMON          = HTMLSTY.GOH
+OBJS            = htmlexpt.obj wwwtools.obj htmlpars.obj htmlclas.obj
+COMMON          = htmlsty.goh
 MODULES         =
-CMODULES        = HTMLCLAS HTMLEXPT HTMLPARS WWWTOOLS
-SRCS            = $(HTMLCLAS) $(HTMLEXPT) $(HTMLPARS) $(WWWTOOLS) $(COMMON)
+CMODULES        = htmlexpt wwwtools htmlpars htmlclas
+SRCS            = $(HTMLEXPT) $(WWWTOOLS) $(HTMLPARS) $(HTMLCLAS) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = htmlpars

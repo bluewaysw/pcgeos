@@ -2086,6 +2086,7 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			retval = CV32ProcessArray(file, &bp, len - 2, typeBlock);
 			printf("CV32ProcessTypeRecord::CTL2_ARRAY\n");fflush(stdout);
 			break;
+		case CTL2_CLASS:
 		case CTL2_STRUCTURE:
 			printf("CV32ProcessTypeRecord::CTL2_STRUCTURE+++\n"); fflush(stdout);
 			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock);
@@ -2110,6 +2111,31 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			* Skip over left-over bytes
 			*/
 			bp = *bpPtr + len;
+			break;
+		}
+		case CTL2_UNION:
+		{
+			word count;
+			word baseType;
+			word properties;
+			unsigned long size;
+			ID name;   	    /* Name of the union */
+
+			printf("CV32ProcessTypeRecord::CTL2_UNION+++\n"); fflush(stdout);
+
+			MSObj_GetWord(count, bp);
+			MSObj_GetWord(baseType, bp);
+			MSObj_GetWord(properties, bp);
+
+			size = CV32GetInteger(&bp);
+			printf("union size: %ld\n", size);
+
+			name = NullID;
+			if ((bp - *bpPtr) < len) {
+				name = CV32GetString(&bp);
+			}
+			printf("union: %s\n", name);
+			printf("CV32ProcessTypeRecord::CTL2_UNION---\n"); fflush(stdout);
 			break;
 		}
 		case CTL2_ENUMERATION:
