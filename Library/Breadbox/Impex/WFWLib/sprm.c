@@ -58,7 +58,7 @@ static Boolean _Seek(StgStream s, dword o, StgPosMode m)
 /* Converts a W6 SPRM opcode to a W8 SPRM opcode. */
 word SprmUpgradeOpcode(byte sprm)
 {
-    static const _far word SprmOpcodeW6ToW8Table[] = {
+    static const /*_far*/ word SprmOpcodeW6ToW8Table[] = {
         0,      0,      0x4600, 0xc601, 0x2602, 0x2403, 0x2404, 0x2405,
         0x2406, 0x2407, 0x2408, 0x2409, 0,      0,      0x240c, 0xc60d,
         0x840e, 0x840f, 0x4610, 0x8411, 0x6412, 0xa413, 0xa414, 0xc615,

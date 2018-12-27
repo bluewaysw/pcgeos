@@ -19,10 +19,10 @@
 #define __GLOBAL_H
 
 #include <graphics.h>
-#include <Objects/Text/tcommon.h>
+#include <Objects/Text/tCommon.h>
 #include <file.h>
 #include <sstor.h>
-#include <xlatlib.h>
+#include <xlatLib.h>
 #include "structs.h"
 
 extern TransError G_WFWError;

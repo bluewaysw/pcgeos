@@ -1,152 +1,119 @@
-CHARSET.obj \
-CHARSET.eobj: 
-CHARSET.obj \
-CHARSET.eobj: CHARSET.GOC GEOS.H  \
-                 \
-                 HEAP.H LMEM.H CHAR.H \
-                EC.H LOCALIZE.H ANSI/CTYPE.H TIMEDATE.H FILE.H SLLANG.H \
-                WARNINGS.H CHARSET.H CODEPAGE.H
-DEBUG.obj \
-DEBUG.eobj: OBJECTS/GPROCC.GOH UI.GOH OBJECTS/METAC.GOH OBJECT.GOH \
-                OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VTEXTC.GOH OBJECTS/VISC.GOH OBJECTS/GCTRLC.GOH \
-                OBJECTS/GINTERC.GOH OBJECTS/GENC.GOH GCNLIST.GOH \
-                OBJECTS/GVIEWC.GOH SPOOL.GOH
-DEBUG.obj \
-DEBUG.eobj: DEBUG.GOC GEOS.H  \
-                 \
-                 FILE.H OBJECT.H GEODE.H \
-                LMEM.H ANSI/STDLIB.H ANSI/STDIO.H \
-                 ANSI/STRING.H \
-                ANSI/CTYPE.H VM.H CHUNKARR.H OBJECTS/HELPCC.H DISK.H \
-                DRIVE.H GEOWORKS.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                INPUT.H CHAR.H HWR.H WIN.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H SLLANG.H OBJECTS/GINTERC.H TIMEDATE.H DRIVER.H \
-                THREAD.H PRINT.H INTERNAL/SPOOLINT.H SERIALDR.H \
-                PARALLDR.H HUGEARR.H DBASE.H
-FONT.obj \
-FONT.eobj: 
-FONT.obj \
-FONT.eobj: FONT.GOC GEOS.H  \
-                 \
-                 HEAP.H LMEM.H CHUNKARR.H \
-                OBJECT.H GEODE.H EC.H ANSI/STRING.H SYSTEM.H CHAR.H \
-                GLOBAL.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                OBJECTS/TEXT/TCOMMON.H STYLESH.H SLLANG.H FILE.H SSTOR.H \
-                XLATLIB.H VM.H GEOWORKS.H STRUCTS.H PRINT.H WARNINGS.H \
-                CHARSET.H LOCALIZE.H ANSI/CTYPE.H TIMEDATE.H CODEPAGE.H \
-                RTFDEFS.H DEBUG.H
-GLOBAL.obj \
-GLOBAL.eobj: STDAPP.GOH OBJECT.GOH UI.GOH OBJECTS/METAC.GOH \
-                OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH IMPEX.GOH
-GLOBAL.obj \
-GLOBAL.eobj: GLOBAL.GOC GEOS.H  \
-                 \
-                 HEAP.H GEODE.H \
-                RESOURCE.H EC.H OBJECT.H LMEM.H GRAPHICS.H FONTID.H \
-                FONT.H COLOR.H GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H \
-                ANSI/CTYPE.H TIMEDATE.H FILE.H SLLANG.H SYSTEM.H \
-                GEOWORKS.H CHUNKARR.H OBJECTS/HELPCC.H DISK.H DRIVE.H \
-                INPUT.H CHAR.H HWR.H WIN.H UDIALOG.H OBJECTS/GINTERC.H \
-                OBJECTS/TEXT/TCOMMON.H STYLESH.H DRIVER.H THREAD.H \
-                PRINT.H INTERNAL/SPOOLINT.H SERIALDR.H PARALLDR.H \
-                HUGEARR.H FILEENUM.H ANSI/STRING.H IECOMMON.H XLATLIB.H \
-                WARNINGS.H GLOBAL.H SSTOR.H STRUCTS.H TEXT.H
-TEXT.obj \
-TEXT.eobj: STDAPP.GOH OBJECT.GOH UI.GOH OBJECTS/METAC.GOH \
-                OBJECTS/INPUTC.GOH OBJECTS/CLIPBRD.GOH \
-                OBJECTS/UIINPUTC.GOH IACP.GOH OBJECTS/WINC.GOH \
-                OBJECTS/GPROCC.GOH ALB.GOH OBJECTS/PROCESSC.GOH \
-                OBJECTS/VISC.GOH OBJECTS/VCOMPC.GOH OBJECTS/VCNTC.GOH \
-                OBJECTS/GAPPC.GOH OBJECTS/GENC.GOH OBJECTS/GINTERC.GOH \
-                OBJECTS/GPRIMC.GOH OBJECTS/GDISPC.GOH OBJECTS/GTRIGC.GOH \
-                OBJECTS/GVIEWC.GOH OBJECTS/GTEXTC.GOH OBJECTS/VTEXTC.GOH \
-                OBJECTS/GCTRLC.GOH GCNLIST.GOH SPOOL.GOH \
-                OBJECTS/GFSELC.GOH OBJECTS/GGLYPHC.GOH \
-                OBJECTS/GDOCCTRL.GOH OBJECTS/GDOCGRPC.GOH \
-                OBJECTS/GDOCC.GOH OBJECTS/GCONTC.GOH OBJECTS/GDCTRLC.GOH \
-                OBJECTS/GEDITCC.GOH OBJECTS/GBOOLGC.GOH \
-                OBJECTS/GITEMGC.GOH OBJECTS/GDLISTC.GOH \
-                OBJECTS/GITEMC.GOH OBJECTS/GBOOLC.GOH \
-                OBJECTS/GGADGETC.GOH OBJECTS/GTOOLCC.GOH \
-                OBJECTS/GVALUEC.GOH OBJECTS/GTOOLGC.GOH \
-                OBJECTS/HELPCC.GOH
-TEXT.obj \
-TEXT.eobj: TEXT.GOC GEOS.H  \
-                 \
-                 HEAP.H GEODE.H \
-                RESOURCE.H EC.H OBJECT.H LMEM.H GRAPHICS.H FONTID.H \
-                FONT.H COLOR.H GSTRING.H TIMER.H VM.H DBASE.H LOCALIZE.H \
-                ANSI/CTYPE.H TIMEDATE.H FILE.H SLLANG.H SYSTEM.H \
-                GEOWORKS.H CHUNKARR.H OBJECTS/HELPCC.H DISK.H DRIVE.H \
-                INPUT.H CHAR.H HWR.H WIN.H UDIALOG.H OBJECTS/GINTERC.H \
-                OBJECTS/TEXT/TCOMMON.H STYLESH.H DRIVER.H THREAD.H \
-                PRINT.H INTERNAL/SPOOLINT.H SERIALDR.H PARALLDR.H \
-                HUGEARR.H FILEENUM.H TEXT.H GLOBAL.H SSTOR.H XLATLIB.H \
-                STRUCTS.H WARNINGS.H ANSI/STRING.H DEBUG.H
-IMPORT.obj \
-IMPORT.eobj: GEOS.H  \
-                 \
-                 XLATLIB.H FILE.H VM.H \
-                LMEM.H GEODE.H GEOWORKS.H RESOURCE.H WFWINPUT.H STRUCTS.H \
-                GLOBAL.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                OBJECTS/TEXT/TCOMMON.H STYLESH.H CHUNKARR.H OBJECT.H \
-                SLLANG.H SSTOR.H PRINT.H TEXT.H WARNINGS.H CHARSET.H \
-                LOCALIZE.H ANSI/CTYPE.H TIMEDATE.H CODEPAGE.H STYLE.H \
-                WFWLIB.H ANSI/STRING.H DEBUG.H
-LIST.obj \
-LIST.eobj: GEOS.H  \
-                 \
-                 HEAP.H LMEM.H CHUNKARR.H \
-                OBJECT.H GEODE.H EC.H ANSI/STRING.H SYSTEM.H CHAR.H \
-                GLOBAL.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                OBJECTS/TEXT/TCOMMON.H STYLESH.H SLLANG.H FILE.H SSTOR.H \
-                XLATLIB.H VM.H GEOWORKS.H STRUCTS.H PRINT.H SPRM.H \
-                WARNINGS.H WFWINPUT.H CHARSET.H LOCALIZE.H ANSI/CTYPE.H \
-                TIMEDATE.H CODEPAGE.H RTFDEFS.H DEBUG.H
-SPRM.obj \
-SPRM.eobj: GEOS.H  \
-                 \
-                 HEAP.H RESOURCE.H \
-                ANSI/STRING.H EC.H SPRM.H STRUCTS.H SSTOR.H WARNINGS.H \
-                GLOBAL.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                OBJECTS/TEXT/TCOMMON.H STYLESH.H CHUNKARR.H OBJECT.H \
-                GEODE.H LMEM.H SLLANG.H FILE.H XLATLIB.H VM.H GEOWORKS.H \
-                PRINT.H STYLE.H LIST.H SPRM.TBL
-STYLE.obj \
-STYLE.eobj: GEOS.H  \
-                 \
-                 HEAP.H LMEM.H CHUNKARR.H \
-                OBJECT.H GEODE.H EC.H ANSI/STRING.H STRUCTS.H GLOBAL.H \
-                GRAPHICS.H FONTID.H FONT.H COLOR.H OBJECTS/TEXT/TCOMMON.H \
-                STYLESH.H SLLANG.H FILE.H SSTOR.H XLATLIB.H VM.H \
-                GEOWORKS.H PRINT.H SPRM.H WARNINGS.H
-WFWINPUT.obj \
-WFWINPUT.eobj: GEOS.H  \
-                 \
-                 HEAP.H RESOURCE.H EC.H \
-                CHAR.H SSTOR.H ANSI/STRING.H WFWINPUT.H FILE.H STRUCTS.H \
-                WARNINGS.H GLOBAL.H GRAPHICS.H FONTID.H FONT.H COLOR.H \
-                OBJECTS/TEXT/TCOMMON.H STYLESH.H CHUNKARR.H OBJECT.H \
-                GEODE.H LMEM.H SLLANG.H XLATLIB.H VM.H GEOWORKS.H PRINT.H \
-                CHARSET.H LOCALIZE.H ANSI/CTYPE.H TIMEDATE.H CODEPAGE.H \
-                SPRM.H TEXT.H STYLE.H LIST.H WFWFONT.H DEBUG.H
+text.obj \
+text.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh
+text.obj \
+text.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h text.h global.h sstor.h \
+                structs.h warnings.h Ansi/string.h debug.h
+debug.obj \
+debug.eobj: Objects/gProcC.goh ui.goh Objects/metaC.goh object.goh \
+                Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh alb.goh Objects/processC.goh \
+                Objects/vTextC.goh Objects/visC.goh Objects/gCtrlC.goh \
+                Objects/gInterC.goh Objects/genC.goh gcnlist.goh \
+                Objects/gViewC.goh spool.goh
+debug.obj \
+debug.eobj: geos.h file.h object.h geode.h lmem.h Ansi/stdlib.h \
+                Ansi/stdio.h Ansi/string.h Ansi/ctype.h vm.h chunkarr.h \
+                Objects/helpCC.h disk.h drive.h geoworks.h graphics.h \
+                fontID.h font.h color.h input.h char.h hwr.h win.h \
+                Objects/Text/tCommon.h stylesh.h sllang.h \
+                Objects/gInterC.h timedate.h driver.h thread.h print.h \
+                Internal/spoolInt.h serialDr.h parallDr.h hugearr.h \
+                dbase.h
+font.obj \
+font.eobj: 
+font.obj \
+font.eobj: geos.h heap.h lmem.h chunkarr.h object.h geode.h ec.h \
+                Ansi/string.h system.h char.h global.h graphics.h \
+                fontID.h font.h color.h file.h sstor.h structs.h vm.h \
+                print.h warnings.h charset.h localize.h Ansi/ctype.h \
+                timedate.h sllang.h codepage.h rtfdefs.h debug.h
+charset.obj \
+charset.eobj: 
+charset.obj \
+charset.eobj: geos.h heap.h lmem.h char.h ec.h localize.h Ansi/ctype.h \
+                timedate.h file.h sllang.h warnings.h charset.h \
+                codepage.h
+global.obj \
+global.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                Objects/inputC.goh Objects/clipbrd.goh \
+                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
+                Objects/gProcC.goh alb.goh Objects/processC.goh \
+                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
+                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
+                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
+                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
+                Objects/gCtrlC.goh gcnlist.goh spool.goh \
+                Objects/gFSelC.goh Objects/gGlyphC.goh \
+                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
+                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
+                Objects/gEditCC.goh Objects/gBoolGC.goh \
+                Objects/gItemGC.goh Objects/gDListC.goh \
+                Objects/gItemC.goh Objects/gBoolC.goh \
+                Objects/gGadgetC.goh Objects/gToolCC.goh \
+                Objects/gValueC.goh Objects/gToolGC.goh \
+                Objects/helpCC.goh impex.goh
+global.obj \
+global.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
+                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
+                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
+                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
+                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
+                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
+                parallDr.h hugearr.h fileEnum.h Ansi/string.h ieCommon.h \
+                xlatLib.h warnings.h global.h sstor.h structs.h text.h
+list.obj \
+list.eobj: geos.h heap.h lmem.h chunkarr.h object.h geode.h ec.h \
+                Ansi/string.h system.h char.h global.h graphics.h \
+                fontID.h font.h color.h file.h sstor.h structs.h vm.h \
+                print.h sprm.h warnings.h wfwinput.h charset.h localize.h \
+                Ansi/ctype.h timedate.h sllang.h codepage.h rtfdefs.h \
+                debug.h
+style.obj \
+style.eobj: geos.h heap.h lmem.h chunkarr.h object.h geode.h ec.h \
+                Ansi/string.h structs.h global.h graphics.h fontID.h \
+                font.h color.h file.h sstor.h vm.h print.h sprm.h \
+                warnings.h
+import.obj \
+import.eobj: geos.h resource.h wfwinput.h file.h structs.h global.h \
+                graphics.h fontID.h font.h color.h sstor.h vm.h lmem.h \
+                print.h text.h warnings.h charset.h localize.h \
+                Ansi/ctype.h timedate.h sllang.h codepage.h style.h \
+                wfwlib.h Ansi/string.h debug.h
+sprm.obj \
+sprm.eobj: geos.h heap.h resource.h Ansi/string.h ec.h sprm.h \
+                structs.h sstor.h warnings.h global.h graphics.h fontID.h \
+                font.h color.h file.h vm.h lmem.h print.h style.h list.h \
+                sprm.tbl
+wfwinput.obj \
+wfwinput.eobj: geos.h heap.h resource.h ec.h char.h sstor.h Ansi/string.h \
+                wfwinput.h file.h structs.h warnings.h global.h \
+                graphics.h fontID.h font.h color.h vm.h lmem.h print.h \
+                charset.h localize.h Ansi/ctype.h timedate.h sllang.h \
+                codepage.h sprm.h text.h style.h list.h wfwfont.h debug.h
 
-WFWLibEC.geo WFWLib.geo : GEOS.LDF TEXT.LDF ANSIC.LDF SSTOR.LDF 
+wfwlibEC.geo wfwlib.geo : geos.ldf text.ldf ansic.ldf sstor.ldf 

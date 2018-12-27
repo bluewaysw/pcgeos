@@ -382,8 +382,8 @@ void StyleUnload(ushort istd)
     word cb;
     
     // Simply truncate the element to the unloaded size.
-    if (ChunkArrayElementToPtrHandles(hStyles, cStyleArray, istd, &cb)
-      > STYLE_ELEMENT_SIZE_UNLOADED)
+    ChunkArrayElementToPtrHandles(hStyles, cStyleArray, istd, &cb);
+    if ( cb > STYLE_ELEMENT_SIZE_UNLOADED)
         ChunkArrayElementResizeHandles(hStyles, cStyleArray, istd,
           STYLE_ELEMENT_SIZE_UNLOADED);
 }
@@ -559,7 +559,7 @@ Boolean StyleGetChar(ushort istd, CHP *pChp)
 
             // Apply UPE#1 to CHP
             cb -= STYLE_ELEMENT_SIZE_UNLOADED;
-            retval = SprmReadGrpprlMem(PSE_CHPX(pstd), cb, pChp, SGC_CHP);
+            retval = SprmReadGrpprlMem((byte*) PSE_CHPX(pstd), cb, pChp, SGC_CHP);
       
             MemUnlock(hStyles);
         }
