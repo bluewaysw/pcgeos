@@ -1,0 +1,823 @@
+/* zip.c -- IO on .zip files using zlib
+   Version 0.15 beta, Mar 19th, 1998,
+
+   Read zip.h for more info
+*/
+
+@include <stdapp.goh>
+#include <hugearr.h>
+#include <vm.h>
+
+#include <stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
+#include "zlib.h"
+#include "zip.h"
+
+#include "file.h"
+#include "heap.h"
+
+
+#ifdef STDC
+#  include <stddef.h>
+#  include <string.h>
+#  include <stdlib.h>
+#endif
+#ifdef NO_ERRNO_H
+    extern int errno;
+#else
+#   include <errno.h>
+#endif
+
+#ifndef local
+#  define local static
+#endif
+/* compile with -Dlocal if your debugger can't find static symbols */
+
+
+/* include some local structures. They are in an external file to allow an
+	Application while debugging to access this structures GEOS-R.B. */
+@include "zip_s.goh"
+
+/*********************************** GEOS *************************************/
+local void Ziplocal_backslashToSlash(char * path);
+
+local void Ziplocal_backslashToSlash(char * path) {
+  int n,x;
+  n = strlen(path);
+  x = 0;
+  while ( x< n )
+	{
+	if ( path[x] == '\\' ) path[x] = '/';
+	x++;
+	}
+  }
+
+
+
+
+/****************************************************************************
+  Create a Descriptor for use by all other Zip*-routines
+  Returns a Handle to an internal structure usable with other functions of
+  this zip package.
+  If append is TRUE, all files written into the archive will be appended
+  after any data allready stored in the file. This is usefull for SFX'x
+  If append is FALSE, first file wirtten to the archive will start at the
+  beginning of the archive, so all allready existing data will be lost.
+
+  Note that this routine is NOT ABLE TO START TO ADD files to a existing
+  Archive!
+*/
+extern MemHandle ZEXPORT ZipCreateNewZipDesc (FileHandle fh, Boolean append)
+{
+    int posMode,n;
+    MemHandle mh;
+    zip_internal* zi;
+    FileHandle tfh;
+
+    mh = MemAlloc(sizeof(zip_internal),HF_SHARABLE| HF_SWAPABLE, HAF_ZERO_INIT);
+    zi = MemLock(mh);
+
+/* data buffer for deflate stream */
+    zi->ci.data_buffer = malloc(Z_BUFSIZE);
+    if ( ! (zi->ci.data_buffer) ) {
+	MemFree(mh);
+	return 0;
+	}
+/* temporary VM-file holding a Huge array for central header entries */
+    FilePushDir();
+    FileSetStandardPath(SP_PUBLIC_DATA);
+    for ( n=0; n<sizeof(FileLongName); n++) (zi->tempName)[n] =0;
+    zi->tempHandle = VMOpen( zi->tempName,
+		VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
+		VMO_TEMP_FILE , 0 );
+
+    FilePopDir();
+    if ( ! (zi->tempHandle) ) {
+	MemFree(mh);
+	return 0;
+	}
+    zi->centralArray = HugeArrayCreate(zi->tempHandle,0,0);
+	/* 0,0 means: variable sized elements and no extra space in ArrayHeader */
+
+    zi->zfh = fh;
+    if (append)		posMode = FILE_POS_END;
+		else	posMode = FILE_POS_START;
+    zi->begin_pos = FilePos(fh,0,posMode);
+    zi->in_opened_file_inzip = 0;
+    zi->ci.stream_initialised = 0;
+    zi->number_entry = 0;
+    MemUnlock(mh);
+    return (mh);
+}
+
+
+/***************************************************************************
+  Open a file in the ZIP for writing into the archive. Writes the local header
+  zipDesc: MemHandle returned by ZipCreateNewZipDesc()
+  filename : the filename to store in zip archive (if NULL, '-' without quote
+	will be used). No access to this file is done by this routine.
+  *zipfi contain supplemental information
+  if extrafield_local!=NULL and size_extrafield_local>0, extrafield_local
+    contains the extrafield data the the local header
+  if extrafield_global!=NULL and size_extrafield_global>0, extrafield_global
+    contains the extrafield data the the global header
+  if comment != NULL, comment contain the comment string (local header)
+  method contain the compression method (0 for store, Z_DEFLATED for deflate)
+  level contain the level of compression (can be Z_DEFAULT_COMPRESSION)
+*/
+
+extern int ZEXPORT ZipOpenNewFileInZip (MemHandle zipDesc, const char* filename,
+	   const zip_fileinfo* zipfi,
+	   const void* extrafield_local, uInt size_extrafield_local,
+	   const void* extrafield_global, uInt size_extrafield_global,
+	   const char* comment,
+	   int method,  int level)
+{
+    zip_internal* zi;
+    uInt size_filename;
+    uInt size_comment;
+    uInt i;
+    int err = ZIP_OK, wBits, mLev;
+    LocalHeader locHeader;
+    CentralHeader * cHeader;
+    char * appendixPtr;
+    char  fileNameLocal[]="-";
+
+    if (zipDesc == NULL)
+	return ZIP_PARAMERROR;
+    if ((method!=0) && (method!=Z_DEFLATED))
+	return ZIP_PARAMERROR;
+
+    zi = MemLock(zipDesc);
+
+    if (zi->in_opened_file_inzip == 1)
+	{
+	err = ZipCloseFileInZip (zipDesc);
+	if (err != ZIP_OK) {
+	    MemUnlock(zipDesc);
+	    return err;
+	    }
+	}
+
+    if ( extrafield_local==NULL ) size_extrafield_local = 0;
+    if ( extrafield_global==NULL ) size_extrafield_global = 0;
+
+    if (filename==NULL)	{
+		filename=fileNameLocal;
+		}
+
+    if (comment==NULL)	size_comment = 0;
+	else	size_comment = strlen(comment);
+
+    size_filename = strlen(filename);
+
+    if (zipfi == NULL)	zi->ci.dosDate = 0;
+	else ZipFdatToDosDate(zipfi->fDaT,&(zi->ci.dosDate));
+
+    /*----------------------------------------------------------------
+	ci.flag => general purpose bit flag
+	for deflating:	0x0 : normal compression
+			0x2 : maximum compression
+			0x4 : fast compresson
+			0x6 : super fast compression
+	bit 0 (0x1) indicates an encrypted file, if set
+      -----------------------------------------------------------------*/
+    zi->ci.flag = 0;
+    if ((level==8) || (level==9))
+      zi->ci.flag |= 2;
+    if ((level==2))
+      zi->ci.flag |= 4;
+    if ((level==1))
+      zi->ci.flag |= 6;
+
+    zi->ci.crc32 = 0;
+    zi->ci.method = method;
+    zi->ci.stream_initialised = 0;
+    zi->ci.pos_in_buffered_data = 0;
+    zi->ci.pos_local_header = FilePos(zi->zfh,0,FILE_POS_RELATIVE);
+    zi->ci.size_centralheader = SIZECENTRALHEADER + size_filename +
+				      size_extrafield_global + size_comment;
+    zi->ci.central_header = cHeader = malloc(zi->ci.size_centralheader);
+    if (zi->ci.central_header == NULL){
+	MemUnlock(zipDesc);
+	return ZIP_INTERNALERROR;
+	}
+
+    /* write data to central header in memory */
+    cHeader = zi->ci.central_header;
+    cHeader->central_magic = CENTRALHEADERMAGIC;
+    cHeader->version_made_by = VERSIONMADEBY;
+    cHeader->version_need = 20;
+    cHeader->gpb_flag = zi->ci.flag;
+    cHeader->compression_method = zi->ci.method;
+    cHeader->last_mod_dosDate = zi->ci.dosDate;
+    cHeader->crc32 = 0;			/* currently unknown */
+    cHeader->compressed_size = 0;	/* currently unknown */
+    cHeader->uncompressed_size = 0;	/* currently unknown */
+    cHeader->filename_len = size_filename;
+    cHeader->extrafield_len = size_extrafield_global;
+    cHeader->file_comment_len = size_comment;
+    cHeader->disk_number_start = 0;	/* multiple dikes currently not supprted*/
+    if (zipfi==NULL) {
+	cHeader->internal_file_attrs = 0;
+	cHeader->external_file_attrs = 0;
+	}
+    else {
+	cHeader->internal_file_attrs = zipfi->internal_fa;
+	cHeader->external_file_attrs = zipfi->external_fa;
+	}
+    cHeader->local_header_offset = zi->ci.pos_local_header;
+
+/* write filename, extra field and comment to central header */
+    appendixPtr = (char*)cHeader;
+    appendixPtr += SIZECENTRALHEADER;
+    if ( size_filename > 0 ) memcpy(appendixPtr,filename,size_filename);
+    if ( size_extrafield_global > 0  )	memcpy(appendixPtr+size_filename,
+				extrafield_global,size_extrafield_global);
+    if( size_comment > 0 ) memcpy(appendixPtr+size_filename+
+				size_extrafield_global,comment,	size_comment);
+
+    /* write the local header */
+    locHeader.local_magic = LOCALHEADERMAGIC;
+    locHeader.version_need = 20;
+    locHeader.gpb_flag = zi->ci.flag;
+    locHeader.compression_method = zi->ci.method;
+    locHeader.last_mod_dosDate = zi->ci.dosDate;
+    locHeader.crc32 = 0;		/* currently unknown */
+    locHeader.compressed_size = 0;	/* currently unknown */
+    locHeader.uncompressed_size = 0;	/* currently unknown */
+    locHeader.filename_len = size_filename;
+    locHeader.extrafield_len = size_extrafield_local;
+
+/* write local header, filename and extra filed to archive file */
+    CheckAndWriteToFile(zi->zfh,&locHeader,sizeof(locHeader),err);
+    CheckAndWriteToFile(zi->zfh,filename,size_filename,err);
+    CheckAndWriteToFile(zi->zfh,extrafield_local,size_extrafield_local,err);
+
+/* reset inflate stream */
+    zi->ci.stream.avail_in = (uInt)0;
+    zi->ci.stream.avail_out = (uInt)Z_BUFSIZE;
+    zi->ci.stream.next_out = zi->ci.data_buffer;
+    zi->ci.stream.total_in = 0;
+    zi->ci.stream.total_out = 0;
+
+    if ((err==ZIP_OK) && (zi->ci.method == Z_DEFLATED))
+    {
+	zi->ci.stream.zalloc = (alloc_func)0;
+	zi->ci.stream.zfree = (free_func)0;
+	zi->ci.stream.opaque = (voidpf)0;
+
+	wBits = MAX_WBITS;
+	mLev = 7;
+	do {
+	do {
+	    err = deflateInit2(&(zi->ci.stream), level,
+		Z_DEFLATED, /*-MAX_WBITS*/-wBits, /*DEF_MEM_LEVEL*//*7*/mLev, 0);
+	    wBits -= 1;
+	   } while ( (err != Z_OK) && (wBits >= 8) );
+	   mLev -=1;
+	   } while ( (err != Z_OK) && (mLev >= 1) );
+
+
+	if (err==Z_OK)
+	    zi->ci.stream_initialised = 1;
+    }
+
+    if (err==Z_OK) {
+		zi->in_opened_file_inzip = 1;
+		}
+	else	{
+		zi->in_opened_file_inzip = 0;	// be absolute sure
+		free(zi->ci.central_header);
+		}
+
+    MemUnlock(zipDesc);
+    return err;
+}
+
+/****************************************************************************
+  Write data into the zipfile.
+*/
+extern int ZEXPORT ZipWriteInFileInZip (MemHandle zipDesc,
+				   const voidp buf, unsigned len)
+
+{
+    zip_internal* zi;
+    int err=ZIP_OK, werr = ZIP_OK;
+
+    if (zipDesc == NULL)
+	return ZIP_PARAMERROR;
+    zi = MemLock(zipDesc);
+
+    if (zi->in_opened_file_inzip == 0) {
+	MemUnlock(zipDesc);
+	return ZIP_PARAMERROR;
+	}
+
+    zi->ci.stream.next_in = buf;
+    zi->ci.stream.avail_in = len;
+    zi->ci.crc32 = crc32(zi->ci.crc32,buf,len);
+
+    while (( (err|werr)==ZIP_OK) && (zi->ci.stream.avail_in>0))
+	{
+	if (zi->ci.stream.avail_out == 0)
+	    {
+	    if (FileWrite(zi->zfh,zi->ci.data_buffer,zi->ci.pos_in_buffered_data,FALSE)
+			!= zi->ci.pos_in_buffered_data)	werr = ZIP_ERRNO;
+
+	    zi->ci.pos_in_buffered_data = 0;
+	    zi->ci.stream.avail_out = (uInt)Z_BUFSIZE;
+	    zi->ci.stream.next_out = zi->ci.data_buffer;
+	    }
+
+	if (zi->ci.method == Z_DEFLATED)
+	    {
+	    uLong uTotalOutBefore = zi->ci.stream.total_out;
+	    err=deflate(&zi->ci.stream,  Z_NO_FLUSH);
+	    zi->ci.pos_in_buffered_data += zi->ci.stream.total_out-uTotalOutBefore;
+	    }
+	else
+	    {
+	    uInt copy_this,i;
+	    if (zi->ci.stream.avail_in < zi->ci.stream.avail_out)
+		copy_this = zi->ci.stream.avail_in;
+	    else
+		copy_this = zi->ci.stream.avail_out;
+	    for (i=0;i<copy_this;i++)
+		*(((char*)zi->ci.stream.next_out)+i) =
+		    *(((const char*)zi->ci.stream.next_in)+i);
+		{
+		zi->ci.stream.avail_in -= copy_this;
+		zi->ci.stream.avail_out-= copy_this;
+		zi->ci.stream.next_in+= copy_this;
+		zi->ci.stream.next_out+= copy_this;
+		zi->ci.stream.total_in+= copy_this;
+		zi->ci.stream.total_out+= copy_this;
+		zi->ci.pos_in_buffered_data += copy_this;
+		}
+	    }
+	}
+    MemUnlock(zipDesc);
+    return (err | werr);
+}
+
+/***************************************************************************
+Close the current file in the zipfile, flush current data and update local header
+*/
+extern int ZEXPORT ZipCloseFileInZip (MemHandle zipDesc)
+{
+    zip_internal* zi;
+    CentralHeader * cHeader;
+    int err=ZIP_OK;
+    word size;
+    dword count;
+    void * vptr;
+
+    if (zipDesc == 0)	return ZIP_PARAMERROR;
+    zi = MemLock(zipDesc);
+
+    if (zi->in_opened_file_inzip == 0)
+	{
+	MemUnlock(zipDesc);
+	return ZIP_PARAMERROR;
+	}
+    zi->ci.stream.avail_in = 0;
+
+    if (zi->ci.method == Z_DEFLATED)
+      while (err==ZIP_OK)
+	{
+	uLong uTotalOutBefore;
+	if (zi->ci.stream.avail_out == 0)
+	    {
+	    if (FileWrite(zi->zfh,zi->ci.data_buffer,zi->ci.pos_in_buffered_data,
+		FALSE) != zi->ci.pos_in_buffered_data) err = ZIP_ERRNO;
+
+	    zi->ci.pos_in_buffered_data = 0;
+	    zi->ci.stream.avail_out = (uInt)Z_BUFSIZE;
+	    zi->ci.stream.next_out = zi->ci.data_buffer;
+	    }
+	uTotalOutBefore = zi->ci.stream.total_out;
+	err=deflate(&zi->ci.stream,  Z_FINISH);
+	zi->ci.pos_in_buffered_data += zi->ci.stream.total_out - uTotalOutBefore ;
+	}
+
+    if (err==Z_STREAM_END)	err=ZIP_OK; /* this is normal */
+
+    if ((zi->ci.pos_in_buffered_data>0) && (err==ZIP_OK))
+	if (FileWrite(zi->zfh,zi->ci.data_buffer,zi->ci.pos_in_buffered_data,
+		FALSE)	!= zi->ci.pos_in_buffered_data) err = ZIP_ERRNO;
+
+    if ((zi->ci.method == Z_DEFLATED) && (err==ZIP_OK))
+	{
+	err=deflateEnd(&zi->ci.stream);
+	zi->ci.stream_initialised = 0;
+	}
+
+/* Update CRC, compressed and uncompressed file size in central header */
+    cHeader = zi->ci.central_header;
+    cHeader->crc32 = zi->ci.crc32;
+    cHeader->compressed_size = zi->ci.stream.total_out;
+    cHeader->uncompressed_size = zi->ci.stream.total_in;
+
+/* add current central header block to huge array */
+/* current count is equal to index of new element */
+{
+  count = HugeArrayGetCount(zi->tempHandle, zi->centralArray);
+}
+
+  HugeArrayAppend(zi->tempHandle, zi->centralArray,zi->ci.size_centralheader, 0);
+  HugeArrayLock(zi->tempHandle, zi->centralArray,count, &vptr,&size);
+
+  memcpy(vptr,zi->ci.central_header,zi->ci.size_centralheader);
+  HugeArrayDirty(vptr);
+  HugeArrayUnlock(vptr);
+
+  free(zi->ci.central_header);
+
+/* Update CRC, compressed and uncompressed file size in central header */
+    if (err==ZIP_OK)
+	{
+	long cur_pos_inzip = FilePos(zi->zfh,0,FILE_POS_RELATIVE);
+	FilePos(zi->zfh,zi->ci.pos_local_header + 14,FILE_POS_START);
+
+	CheckAndWriteToFile(zi->zfh,&(zi->ci.crc32),4,err);
+	CheckAndWriteToFile(zi->zfh,&(zi->ci.stream.total_out),4,err);
+	CheckAndWriteToFile(zi->zfh,&(zi->ci.stream.total_in),4,err);
+
+	FilePos(zi->zfh,  cur_pos_inzip,FILE_POS_START);
+	}
+
+    zi->number_entry ++;
+    zi->in_opened_file_inzip = 0;
+
+    MemUnlock(zipDesc);
+    return err;
+}
+
+/****************************************************************************
+	Flush data, write central directory, end-of-central-dir-record and
+	global comment (if any, pass NULL for none)
+	Free zipDesc-struture and all accociated memory
+	If closeArchive is TRUE, close the ziparchive. In this case, FileHandle
+		passed to ZipCreateNewZipDesc()	will be invalid!
+	If closeArchive is FALSE, you have to close the file yourself!
+*/
+extern int ZEXPORT ZipCloseArchive (MemHandle zipDesc, int *entriesCount,
+		const char* global_comment, Boolean closeArchive)
+
+{
+    zip_internal* zi;
+    int err = 0;
+    uLong size_centraldir = 0;
+    uLong centraldir_pos_inzip ;
+    uInt size_global_comment;
+    EndOfDirRecord	endRec;
+    dword count,n;
+    word size;
+    CentralHeader * chptr;
+
+    if (zipDesc == 0)	return ZIP_PARAMERROR;
+    zi = MemLock(zipDesc);
+
+    if (zi->in_opened_file_inzip == 1)	err = ZipCloseFileInZip (zipDesc);
+
+    if (global_comment==NULL)
+	size_global_comment = 0;
+    else
+	size_global_comment = strlen(global_comment);
+
+    centraldir_pos_inzip = FilePos(zi->zfh,0,FILE_POS_RELATIVE);
+
+  count = HugeArrayGetCount(zi->tempHandle, zi->centralArray);
+
+  size_centraldir = 0;
+  if ( count > 0 )
+     for ( n = 0; n<count; n++ )
+	{
+	HugeArrayLock(zi->tempHandle, zi->centralArray,n, (void**)&chptr,&size);
+	/* because of Huge arrays are chunk array-structures and chunks are
+	   dword aligned, I'm not sure, that the size is returned correctly.
+	   Therefore, I will recalculate the size */
+	size = sizeof(CentralHeader) + chptr->filename_len + chptr->extrafield_len
+			+ chptr->file_comment_len;
+	CheckAndWriteToFile(zi->zfh,chptr,size,err);
+	size_centraldir += (uLong)size;
+	HugeArrayUnlock(chptr);
+	if ( err != ZIP_OK ) break;
+	}
+
+
+    endRec.end_of_dir_magic = ENDHEADERMAGIC;
+    endRec.number_this_disk = 0;	/* multiple Diskes are not supported */
+    endRec.number_disk_starting_central_dir = 0;
+    endRec.number_entries_this_disk = zi->number_entry;
+    endRec.number_entries_central_dir = zi->number_entry;
+    endRec.size_central_dir = size_centraldir;
+    endRec.offset_central_dir_respecting_disk_number = centraldir_pos_inzip;
+    endRec.zip_file_comment_len = size_global_comment;
+
+/* return nuber of files in the Archive. If null, extracors may fail */
+    *entriesCount = endRec.number_entries_central_dir;
+
+/* write end of dir record and global comment to archive file */
+    CheckAndWriteToFile(zi->zfh,&endRec,sizeof(endRec),err);
+    CheckAndWriteToFile(zi->zfh,global_comment,size_global_comment,err);
+
+/* clean up memory */
+    if ( closeArchive ) FileClose(zi->zfh,FALSE);
+    free(zi->ci.data_buffer);
+
+/* destroy tempfile and its huge array */
+
+    HugeArrayDestroy(zi->tempHandle,zi->centralArray);
+    VMClose ( zi->tempHandle , FALSE);
+    zi->tempHandle = 0;	// be save
+    FilePushDir();
+    FileSetStandardPath(SP_PUBLIC_DATA);
+    FileDelete(zi->tempName);
+    FilePopDir();
+
+    MemFree(zipDesc);
+    return err;
+}
+
+/****************************************************************************
+	Read zip_fileinfo structure for a given file or directory.
+	If name referes a link, som informations may be invalid.
+*/
+extern void ZEXPORT ZipGetZipFileInfo ( char * name, zip_fileinfo * zfi)
+  {
+  FileAttrs attr;
+
+  FileGetPathExtAttributes(name, FEA_MODIFICATION,
+			&(zfi->fDaT),sizeof(FileDateAndTime));
+  attr = FileGetAttributes(name);
+
+  zfi->internal_fa = 0;
+  zfi->external_fa = (dword) attr;
+  }
+
+
+
+/****************************************************************************
+	Open a file for writing to zip-archive.
+	- name is the GEOS or DOS filename, relative to the current directory
+	- zfi will be filled with informations, usable by ZipOpenNewFileInZip()
+	- Use dosPath as file name for ZipOpenNewFileInZip()
+	- parentPathLen should contain the len of path, not to store in zip
+	  Example:
+	  If a dos-filePath is
+		c:\geos\document\examples.000\myfile.000
+	  and parentPathLen is 17, dosPath will be
+		examples.000/myfile.000
+	  (this is ready to store in zip file)
+	  Note that there is a slash, not a backslash.
+
+	return zero, if the file cannot be opened
+		In this case, the dosPath will be set so good as possible
+		If file referes a directory, dosPath will be correct
+		If file referes a link, dosPath will end with a '/'
+		If you have not the read access to the a file, dosPath
+			may be correct or not.
+*/
+extern FileHandle ZEXPORT ZipOpenFileForZip (char * name, zip_fileinfo * zfi,
+		char * dosPath, int parentPathLen)
+{
+  char path[210], *p, *sp;
+  char dosName[34];
+
+  ZipGetZipFileInfo(name, zfi);		/* set structure properly */
+
+/* DOS-Path konstruieren:
+   check up, ob name einen Pfad enth�lt, wenn ja vorher wechseln
+   dann erst vollen DOS-Pfad holen, und zur�ckwechseln */
+
+  FilePushDir();
+  strcpy(path,name);		/* nicht mit original arbeiten */
+  p=path;	sp = 0;
+  while ( *p != 0 )
+	{
+	if ( *p == '\\' ) sp = p;	/* sp auf letztes '\', if any */
+	p++;
+	}
+  if ( sp != 0 )
+	{		/* name enth�lt einen Pfad, sp zeigt auf letztes '\' */
+	*sp = 0;	/* reduzieren auf pfad */
+	FileSetCurrentPath(0,path);
+	}
+  ZipGetFullDosPath(path,FALSE);
+  FilePopDir();
+
+  if ( strlen(path) < parentPathLen ) *dosPath = 0;
+	else  strcpy(dosPath,&path[parentPathLen]);
+
+  FileGetPathExtAttributes(name,FEA_DOS_NAME, dosName, 34);
+
+  strcat(dosPath,dosName);
+
+  Ziplocal_backslashToSlash(dosPath);
+
+  return FileOpen(name,FILE_ACCESS_R | FILE_DENY_NONE | 0x80 );
+  }
+
+
+
+/****************************************************************************
+	Calculate the full DOS-path of the current directory.
+	The path will contain the drive letter and an slash (or Backslash)
+	at its end.
+	useSlash causes C:\DOS\TOOLS\ to switch to C:/DOS/TOOLS/
+*/
+typedef struct {
+	char fullGeosPath[256];
+	char fullPath[128];
+	char tempPath[128];
+	} pathMem;
+
+extern void ZEXPORT ZipGetFullDosPath (char * path , Boolean useSlash)
+  {
+  pathMem *pm;
+  char * p, * elem, curDir[34], dosName[34];
+  int err;
+
+  FilePushDir();
+  pm = malloc(sizeof(pathMem));
+/*
+  if ( !pm ) return ZIP_INTERNALERROR;
+*/
+  pm->fullPath[0] = 0;
+/* vollen Pfadnamen konstruieren */
+  p = pm->fullGeosPath;
+  FileConstructFullPath(&p,255,0,".",TRUE);
+
+  while ( strlen(pm->fullGeosPath) > 3 )	/* "C:\" und "C:" nicht bearbeiten */
+     {
+     /* letztes Element isolieren, 1x '\' ist sicher enthalten */
+     elem = pm->fullGeosPath + strlen(pm->fullGeosPath);	/* zeigt auf 00 */
+     while ( *elem != '\\' ) elem--;	/* zeigt auf '\' */
+     *elem = 0;                         /* fullGeosPath eink�rzen */
+     elem++; strcpy(curDir,elem);	/* GeosName kopiert */
+
+     FileSetCurrentPath(0,"..");	/* cd .. */
+
+     /* Dos-Name holen. Bei Fehler: Link -> ersetzen */
+     err = FileGetPathExtAttributes(curDir,FEA_DOS_NAME, dosName, 34);
+     if ( err ) strcpy(dosName, "_LINK_");
+
+     /* Pfad einf�gen */
+     strcat(dosName,"\\");		/* "any_dir.000\" */
+     strcpy(pm->tempPath,pm->fullPath);	/* sichern */
+     strcpy(pm->fullPath,dosName);
+     strcat(pm->fullPath,pm->tempPath);	/* anh�ngen "any_dir.000\old_path.000\ */
+     }
+
+  /* Laufwerk einf�gen. pm->fullGeosPath enth�lt "C:" oder "C:\" */
+  pm->fullGeosPath[2] = '\\';
+  pm->fullGeosPath[3] = 0;		/* sicher "C:\" */
+
+  strcpy(path,pm->fullGeosPath);	/* Parameter path als letztes Ziel! */
+  strcat(path,pm->fullPath);		/* C:\any_dir.000\old_path.000\ */
+
+  free(pm);
+  FilePopDir();
+  if (useSlash) Ziplocal_backslashToSlash(path);
+  }
+
+
+/****************************************************************************
+	Write a complete file to zip.
+	The archive is refered by zipDesc, the file is refererd by a FileHandle.
+	nameInZip should be a valid DOS-Path to the file, not containig a
+		drive letter, wasting parent paths and leading slash.
+	zfi contains informations, such like dosDate and attributes
+	ZipOpenFileForZip() is designed to tell you the FileHandle, the
+		Dos-Path (including drive-Letter!) and all reqiured zip_fileinfo
+	if store == FALSE, the file will be deflated, it it is TRUE,
+		the file will by stored (withot compression)
+	All comments and extra files will be set to zero.
+*/
+extern int ZEXPORT ZipWriteFileToZip (MemHandle zipDesc, FileHandle fh,
+		char * nameInZip, zip_fileinfo *zfi, Boolean store)
+  {
+  int err = ZIP_OK, err2 =ZIP_OK;
+  int method, read, bufSize;
+  char * buf;
+
+  if ( store ) method = 0;
+	  else method = Z_DEFLATED;
+
+  err = ZipOpenNewFileInZip(zipDesc, nameInZip, zfi, 0,0, 0,0, 0,
+			method, Z_DEFAULT_COMPRESSION);
+  if (err) {
+	ZipCancelCloseFileInZip(zipDesc);
+	return err;
+	}
+
+  bufSize = 8*1024;
+  do {
+	bufSize >>= 1;
+	buf = malloc(bufSize);
+	} while ( !buf && (bufSize>=128) );
+
+  if ( !buf ) return ZIP_INTERNALERROR;
+
+  read = FileRead(fh, buf, bufSize, FALSE);
+  err = ThreadGetError();
+
+  while ( (read > 0) && (err == ZIP_OK) )
+	{
+	err = ZipWriteInFileInZip(zipDesc, buf, read);
+	if (err) break;
+	read = FileRead(fh, buf, bufSize, FALSE);
+	err = ThreadGetError();
+	}
+
+  if (err)   err2 = ZipCancelCloseFileInZip(zipDesc);
+    else     err2 = ZipCloseFileInZip(zipDesc);
+
+  free(buf);
+
+  if (err) return err;
+  return err2;
+  }
+/****************************************************************************
+	Store a directory path in zip.
+	The archive is refered by zipDesc, the path is referd by its name.
+	name should be a valid DOS-Path, without drive letter and leading
+		slash. Backslashes shoud be replaced by slashes, a slash
+		should be the last character of the path.
+	Use ZipGetZipFileInfo() for proper setting zfi-structure
+	All comments and extra files will be set to zero.
+*/
+extern int ZEXPORT ZipWritePathToZip( MemHandle zipDesc, char * name, zip_fileinfo * zfi)
+  {
+  int err = ZIP_OK;
+
+  err = ZipOpenNewFileInZip(zipDesc, name, zfi, 0,0, 0,0, 0,
+				0, Z_DEFAULT_COMPRESSION);  /* Store */
+  err |= ZipCloseFileInZip(zipDesc);
+  return err;
+  }
+
+
+
+
+
+/****************************************************************************
+	Convert a FileDateAndTime structure to a dword dos-Date
+*/
+extern void ZEXPORT ZipFdatToDosDate (FileDateAndTime fdat,dword * dosDate)
+ {
+ dword tmp;
+
+ tmp = (dword)fdat;
+ *dosDate = ( tmp << 16 ) | ( tmp >> 16 );
+ }
+
+/****************************************************************************
+	Convert a dword dos-Date to a FileDateAndTime structure
+*/
+extern void ZEXPORT UnzDosDateToFdat (dword dosDate,FileDateAndTime *fdat)
+ {
+ *fdat = (FileDateAndTime) (
+		( dosDate >> 16 )
+	      | (dosDate << 16));
+ }
+
+
+
+/****************************************************************************
+	Close a opened File, but destroy it. Any data of the current file
+	written zo Zip-Archive will be lost.
+	Use this routine to cancel writing of a file.
+	Data of all other files in the archive (written previous or later)
+	will not be affected.
+*/
+extern int     ZEXPORT ZipCancelCloseFileInZip ( MemHandle zipDesc )
+{
+    zip_internal* zi;
+
+    if (zipDesc == 0)	return ZIP_PARAMERROR;
+    zi = MemLock(zipDesc);
+
+    if (zi->in_opened_file_inzip == 0)
+	{
+	MemUnlock(zipDesc);
+	return ZIP_PARAMERROR;
+	}
+
+  free(zi->ci.central_header);		// destroy it
+
+  // destroy data of the currently opened file
+  FileTruncate(zi->zfh,zi->ci.pos_local_header,FALSE);
+
+  zi->in_opened_file_inzip = 0;		// no longer open
+
+  MemUnlock(zipDesc);
+  return 0;
+  }
+
+
+
+/* end of file ZIP.C */
