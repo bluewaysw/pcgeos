@@ -85,8 +85,9 @@ History
 /*
 #include "Internal/prodFeatures.uih"
 */ 
-
+#ifndef __WATCOMC__
 #pragma Comment("@" __FILE__);
+#endif
 #pragma Code ("MainImportC");
 
 #include "hsimem.h"

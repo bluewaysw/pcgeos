@@ -58,7 +58,9 @@ History
    04/14/90    Start to work on DIB as input file format.
  
 \**************************************************************/
+#ifndef __WATCOMC__
 #pragma Comment( "@" __FILE__);
+#endif
 
 #pragma Code ("MainExportC");
 

@@ -76,7 +76,7 @@ char   *src, *dst, *cp;
    main program
 */
 
-#ifdef __BORLANDC__
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 short EXPORT
 #else
 short 
@@ -100,21 +100,21 @@ ExportPcx(FILE * dibfile,FILE * pcxfile)
 
    _settextcolor(15);
    _setbkcolor(3);
-   _outtext(" ษอออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป \n");
-   _outtext(" บ              Copyright(c) 1990-91,  Halcyon Software        (408)984-1464 บ \n");
-   _outtext(" ฬอออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออน \n");
-   _outtext(" บ                                                                           บ \n");
-   _outtext(" บ   Description: This program converts Windows 3.0 Device Independent       บ \n");
-   _outtext(" บ                Bitmap (DIB) to PaintBrush (PCX) format.                   บ \n");
-   _outtext(" บ                                                                           บ \n");
-   _outtext(" บ   Usage:       dib2pcx {-v, -h}  <Infile> <outfile>                       บ \n");
-1   _outtext(" บ                                                                           บ \n");
-   _outtext(" บ       -v       : Verbose (optional)                                       บ \n");
-   _outtext(" บ       -h       : Display help screen                                      บ \n");
-   _outtext(" บ       <infile> : DIB input file name                                      บ \n");
-   _outtext(" บ       <outfile>: PCX output file name                                     บ \n");
-   _outtext(" บ                                                                           บ \n");
-   _outtext(" ศอออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ \n");
+   _outtext(" ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอป \n");
+   _outtext(" ๏ฟฝ              Copyright(c) 1990-91,  Halcyon Software        (408)984-1464 ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอน \n");
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ   Description: This program converts Windows 3.0 Device Independent       ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ                Bitmap (DIB) to PaintBrush (PCX) format.                   ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ   Usage:       dib2pcx {-v, -h}  <Infile> <outfile>                       ๏ฟฝ \n");
+1   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ       -v       : Verbose (optional)                                       ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ       -h       : Display help screen                                      ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ       <infile> : DIB input file name                                      ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ       <outfile>: PCX output file name                                     ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอผ \n");
    _settextcolor(oldfgd);
    _setbkcolor(oldbgd);
    exit(1);
