@@ -53,7 +53,7 @@ dword startTime;
 PPPStatus pppStatus;
 
 //unsigned int tHours, tMinutes, tSeconds;
-unsigned int idleTime, idleTimeout, delayTimeout;
+word idleTime, idleTimeout, delayTimeout;
 
 MemHandle connectionHandle;
 ChunkHandle connectionChunk;
@@ -428,8 +428,9 @@ void IDialupEnsureDefaultConnection(void);
     }
 
   if(connectionHandle) MemFree(connectionHandle);
-  connectionHandle = connectionChunk = 0;
-
+  connectionHandle = 0;
+  connectionChunk = (ChunkHandle) 0;
+  
   GCNListRemove(@IDialupApp, MANUFACTURER_ID_GEOWORKS, GCNSLT_PPP_STATUS_NOTIFICATIONS);
   GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), NullChunk),
 	       MANUFACTURER_ID_GEOWORKS,
@@ -541,14 +542,14 @@ void IDialupEnsureDefaultConnection(void);
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_PHONE, name, &datalen))
+					 (char*)APSP_PHONE, name, (int*) &datalen))
 	 {
       @call IDEditPhoneNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
     }
 
   if(!AccessPointGetIntegerPropertyDirect(currentAccpnt,
 					  (char*)APSP_LOCAL_DIALING_OPTIONS,
-					  &dialOptionsProp))
+					  (int*) &dialOptionsProp))
   {
 		if (dialOptionsProp & APLDO_OMIT_ONE_FOR_LONG_DISTANCE)
 	  dialOptions &= ~IDEDO_ONE_FOR_LD;
@@ -561,7 +562,7 @@ void IDialupEnsureDefaultConnection(void);
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_USER, name, &datalen))
+					 (char*)APSP_USER, name, (int*) &datalen))
     {
       @call IDEditUserName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
     }
@@ -569,7 +570,7 @@ void IDialupEnsureDefaultConnection(void);
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_SECRET, name, &datalen))
+					 (char*)APSP_SECRET, name, (int*) &datalen))
   {
       @call IDEditPassword::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
   }
@@ -581,7 +582,7 @@ void IDialupEnsureDefaultConnection(void);
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_NAME, name, &datalen))
+					 (char*)APSP_NAME, name, (int*) &datalen))
     {
       @call IDEditConnectionName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
     }
@@ -590,7 +591,7 @@ void IDialupEnsureDefaultConnection(void);
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_ADDRESS, name, &datalen))
+					 (char*)APSP_ADDRESS, name, (int*) &datalen))
     {
       @call IDEditIP::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
     } else {
@@ -599,7 +600,7 @@ void IDialupEnsureDefaultConnection(void);
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_GATEWAY, name, &datalen))
+					 (char*)APSP_GATEWAY, name, (int*) &datalen))
     {
       @call IDEditGateway::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
     } else {
@@ -608,7 +609,7 @@ void IDialupEnsureDefaultConnection(void);
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_MASK, name, &datalen))
+					 (char*)APSP_MASK, name, (int*) &datalen))
     {
       @call IDEditMask::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
     } else {
@@ -619,7 +620,7 @@ void IDialupEnsureDefaultConnection(void);
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_DNS1, name, &datalen))
+					 (char*)APSP_DNS1, name, (int*) &datalen))
     {
       @call IDEditDNS1::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
     } else {
@@ -628,7 +629,7 @@ void IDialupEnsureDefaultConnection(void);
   datalen = MAX_TEXT_LEN*sizeof(TCHAR);
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_DNS2, name, &datalen))
+					 (char*)APSP_DNS2, name, (int*) &datalen))
     {
       @call IDEditDNS2::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
     } else {
@@ -663,7 +664,7 @@ void IDialupEnsureDefaultConnection(void);
 
   creatingConnection = FALSE;
 
-  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", &type))
+  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &type))
 	  type = 0 ;
   @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(type, FALSE) ;
   @call oself::MSG_IDP_EDIT_TYPE_UPDATE() ;
@@ -744,7 +745,7 @@ Boolean CheckValidIPAddress(MemHandle mh)
                     }
                     /* ok lets check the number... */
                     nBuffer[nCount] = 0;
-                    UtilAsciiToHex32(nBuffer, &URLNum);
+                    UtilAsciiToHex32(nBuffer, (long*) &URLNum);
                     if (URLNum > 255)
                     {
                         isBadIP = TRUE;
@@ -762,7 +763,7 @@ Boolean CheckValidIPAddress(MemHandle mh)
             } /* end of step thru buffer for loop */
             /* and check the last number... */
             nBuffer[nCount] = 0;
-            UtilAsciiToHex32(nBuffer, &URLNum);
+            UtilAsciiToHex32(nBuffer, (long*) &URLNum);
             if (URLNum > 255)
                 isBadIP = TRUE;
 
@@ -1188,8 +1189,8 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   TCHAR *tptr;
   word datalen = NAME_LEN;
 
-  if(AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_NAME, name, &datalen))
-    AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_PHONE, name, &datalen);
+  if(AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_NAME, name, (int*) &datalen))
+    AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_PHONE, name, (int*) &datalen);
 
   MemLock(OptrToHandle(@deleteStr1));
   tptr = LMemDeref(@deleteStr1);
@@ -1316,7 +1317,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 					tmpItem = i;
 					}
 
-				if(!AccessPointGetIntegerPropertyDirect(*id, DEFAULT_KEY, &datalen)
+				if(!AccessPointGetIntegerPropertyDirect(*id, DEFAULT_KEY, (int*) &datalen)
 																	&& datalen != 0)
 					{
 					defaultAccpnt = *id;
@@ -1327,7 +1328,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
 			// just in case signup crashes and fails to clean up after itself.
 			// The actual removal occurs in MSG_GEN_PROCESS_OPEN_APPLICATION.
 			// (dhunter 1/13/2000)
-				if (!AccessPointGetIntegerPropertyDirect(*id, TEMPORARY_KEY, &datalen)
+				if (!AccessPointGetIntegerPropertyDirect(*id, TEMPORARY_KEY, (int*) &datalen)
 																	&& datalen == 1)
 					tempAccpnt = *id;
 				}
@@ -1431,7 +1432,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   TCHAR name[MAX_TEXT_LEN];
   MemHandle mh;
 
-  if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, &datalen) 
+  if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, (int*) &datalen) 
      && datalen != 0) 
     {
       @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE
@@ -1447,7 +1448,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   @send IDConnectionUserName::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
   if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_USER, name, &datalen))
+					 (char*)APSP_USER, name, (int*) &datalen))
     {
       @call IDConnectionUserName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
     }
@@ -1480,7 +1481,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
   mh = NULL;
   @send IDConnectionPhoneNumber::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-  if ( AccessPointGetPhoneStringWithOptions( currentAccpnt, &mh, &datalen ) )
+  if ( AccessPointGetPhoneStringWithOptions( currentAccpnt, &mh, (int*) &datalen ) )
   {
       TCHAR *str;
       str = MemLock( mh );
@@ -1495,7 +1496,7 @@ AccessPointLocalDialingOptions GetLocalDialingOptions (void)
   }
 
   else if( !AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
-					 (char*)APSP_PHONE, name, &datalen) )
+					 (char*)APSP_PHONE, name, (int*) &datalen) )
   {
       @call IDConnectionPhoneNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
   }
@@ -1886,7 +1887,7 @@ void IDialupUpdateEditOKButton(void)
   AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
   AccessPointCommit();
 
-  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", &netType))
+  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", (int*) &netType))
 	  netType = 0 ;
   InitFileReadStringBuffer("tcpip", "link", buffer, sizeof(buffer)-1, &size) ;
   buffer[size] = '\0' ;
@@ -2113,8 +2114,8 @@ void IDialupUpdateEditOKButton(void)
   word datalen = NAME_LEN;
   Boolean iAppWasRunning = iAppRunning;
 
-  if(AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_NAME, name, &datalen))
-    AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_PHONE, name, &datalen);
+  if(AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_NAME, name, (int*) &datalen))
+    AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_PHONE, name, (int*) &datalen);
 
   iAppRunning = IAppRunning();
 
