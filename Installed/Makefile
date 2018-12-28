@@ -1330,8 +1330,8 @@ dirlist : 	Installed/Library/Breadbox/dirlist
 Installed/Library/Breadbox/dirlist:		ansic ui MAKELIB
 #endif
 
-minizip : 	Installed/Library/Breadbox/minizip
-Installed/Library/Breadbox/minizip:		ansic ui zlib MAKELIB
+minizip : 	Installed/Library/Breadbox/MiniZip
+Installed/Library/Breadbox/MiniZip:		ansic ui zlib MAKELIB
 
 #if defined(PRODUCT) && $(PRODUCT) == "NDO2000"
 #else
