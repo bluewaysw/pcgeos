@@ -1490,7 +1490,7 @@ printf("Pass1MS_ProcessObject %s\n", file);
 		 */
 		done = TRUE;
 		break;
-            case MO_CVEXT:
+            case MO_LEXTDEF:
 	    case MO_EXTDEF:
 	    {
 		/*
@@ -1547,11 +1547,12 @@ printf("Pass1MS_ProcessObject %s\n", file);
 		 * Do something with these beasties for the non-CV case...
 		 */
 		break;
-            case MO_CVPUB:
                 /*
                  * Handle "hidden" publics for static symbols the same way
                  * regular ones...
                  */
+	    case MO_LPUBDEF1:
+	    case MO_LPUBDEF2:
             case MO_PUBDEF:
 	    {
 		SegDesc	    	*sd;

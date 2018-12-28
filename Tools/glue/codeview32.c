@@ -1747,6 +1747,8 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_PULONG:
 		case CSTT2_PRCHAR:
 		case CSTT2_PUCHAR:
+		case CSTT2_PINT2:
+		case CSTT2_PUINT2:
 			retval = OTYPE_PTR | OTYPE_PTR_NEAR | OTYPE_SPECIAL;
 			break;
 		case CSTT2_PFVOID:
@@ -1757,6 +1759,8 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_PFULONG:
 		case CSTT2_PFRCHAR:
 		case CSTT2_PFUCHAR:
+		case CSTT2_PFINT2:
+		case CSTT2_PFUINT2:
 			retval = OTYPE_PTR | OTYPE_PTR_FAR | OTYPE_SPECIAL;
 			break;
 		default:
@@ -2143,8 +2147,22 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			retval = CV32ProcessScalar(file, &bp, len - 2, typeBlock);
 			break;
 		}
+		case CTL2_BITFIELD:
+		{
+			byte length;
+			byte position;
+			word baseType;
+			bp++;
+			length = *bp;
+			bp++;
+			position = *bp;
+
+			MSObj_GetWord(baseType, bp);
+			retval = OTYPE_BITFIELD | OTYPE_SPECIAL;
+			break;
+		}
 		default:
-			printf("ERROR: Unable to parse 0%x type\r\n", leaf);
+			printf("ERROR: Unable to parse %x type\r\n", leaf);
 		}
 	}
 
@@ -3225,19 +3243,28 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		/*
 		* Mark the thing global if it's really declared public.
 		*/
-		printf("CHECK GLOBAL %i\r\n", name);
-		if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
-			&real, (ID *)NULL) && real)
-		{
-			printf("CHECK GLOBAL %i TRUE\r\n", name);
-			os->flags |= OSYM_GLOBAL;
+		if (recType == CST2_GPROC16) {
+			printf("CHECK GLOBAL %i\r\n", name);
+			if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
+				&real, (ID *)NULL) && real)
+			{
+				printf("CHECK GLOBAL %i TRUE\r\n", name);
+				os->flags |= OSYM_GLOBAL;
 #if 0
-			if (alias != name) {
-				Sym_Enter(symbols, sd->syms, alias, symBlock,
-					scopeStack[scopeTop - 1]);
-			}
+				if (alias != name) {
+					Sym_Enter(symbols, sd->syms, alias, symBlock,
+						scopeStack[scopeTop - 1]);
+				}
 #endif
+			}
+		} else {
+			printf("CHECK LOCAL %i\r\n", name);
+			if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
+				&real, (ID *)NULL) && real) {
+					printf("CHECK LOCAL %i TRUE\r\n", name);
+			}
 		}
+
 		/*
 		* Enter the symbol into the table for the segment.
 		*/
@@ -4185,7 +4212,8 @@ CV32_Check(const char *file,
 		    (sd != CV_TYPES_SEGMENT));
 	    return(FALSE);
 	}
-	case MO_CVPUB:
+	case MO_LPUBDEF1:
+	case MO_LPUBDEF2:
 	case MO_PUBDEF:
 	printf("MO_PUBDEF\r\n");
 	    if (pass == 1) {

@@ -761,9 +761,11 @@ Sym_Enter(VMHandle  	file,    	/* Output file */
  *	ardeb	10/20/89	Initial Revision
  *
  ***********************************************************************/
+
 int
-Sym_FindWithSegment(VMHandle   	    file,	   /* File in which to
+Sym_FindWithSegmentAndFile(VMHandle   	    file,	   /* File in which to
 						    * search */
+		    const char*     fileName,      /* Acceptable filename, may be null */
 		    ID 	    	    id, 	   /* Name of symbol to find */
 		    VMBlockHandle   *symBlockPtr,   /* Place to store handle of
 					            * block holding the symbol
@@ -788,7 +790,7 @@ Sym_FindWithSegment(VMHandle   	    file,	   /* File in which to
     for (i = 0; i < seg_NumSegs; i++) {
 	sd = seg_Segments[i];
 
-	if (SymLookup(file, sd->syms, id, &bucket, &block, &hb, &he))
+	if (SymLookup(file, sd->syms, id, &bucket, &block, &hb, &he) == 1)
 	{
 	    int 	    	isglobal;
 	    ObjSym	    	*os;
@@ -809,8 +811,12 @@ Sym_FindWithSegment(VMHandle   	    file,	   /* File in which to
 	    VMUnlock(file, sd->syms);
 	    VMUnlock(file, he->block);
 
-	    if (isglobal || !globalOnly) {
+	    if (isglobal || (!globalOnly && fileName == NULL)) {
 		break;
+	    } else if (fileName != NULL && !globalOnly) {
+		if (strncmp(fileName, sd->file, strlen(fileName)) == 0) {
+			break;
+		}
 	    } else {
 		VMUnlock(file, block);
 	    }
@@ -825,7 +831,8 @@ Sym_FindWithSegment(VMHandle   	    file,	   /* File in which to
     if (sd != NULL) {
 	/*
 	 * If sd is non-null, we broke out of the loop when we found a
-	 * global symbol of the proper name.
+	 * global symbol of the proper name, or a local symbol in the
+	 * right file
 	 */
 	retval = 1;
     } else {
@@ -838,8 +845,10 @@ Sym_FindWithSegment(VMHandle   	    file,	   /* File in which to
 
     if (retval) {
 	*sdPtr = sd;
-	*symBlockPtr = he->block;
-	*symOffPtr = he->offset;
+	if (he != NULL) {
+		*symBlockPtr = he->block;
+		*symOffPtr = he->offset;
+	}
     }
     if (block != 0) {
 	VMUnlock(file, block);
@@ -848,6 +857,54 @@ Sym_FindWithSegment(VMHandle   	    file,	   /* File in which to
     return(retval);
 }
 
+int
+Sym_FindWithSegment(VMHandle file,
+		    ID id,
+		    VMBlockHandle *symBlockPtr,
+		    word *symOffPtr,
+		    int globalOnly,
+		    SegDesc **sdPtr)
+{
+    return Sym_FindWithSegmentAndFile(file, 0,id, symBlockPtr, symOffPtr, globalOnly,sdPtr);
+}
+
+/***********************************************************************
+ *				Sym_FindWithFile
+ ***********************************************************************
+ * SYNOPSIS:	    Find a symbol in from a given object file, if it's there if non-Global.
+ *                  Filename search only takes effect if isGlobal is false
+ * CALLED BY:	    EXTERNAL
+ * RETURN:	    non-zero and block/offset if defined. 0 if not.
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mcasadevall	12/27/18	Initial Revision
+ *
+ ***********************************************************************/
+
+int
+Sym_FindWithFile(VMHandle   	file,	    	/* File in which to search */
+		const char*     fileName,       /* Filename the segment came from */
+		 VMBlockHandle	table,	    	/* Table in which to look. If NULL,
+						 * searches through the tables of all
+						 * known segments */
+		 ID 	    	id, 	    	/* Name of symbol to find */
+	 	VMBlockHandle	*symBlockPtr,	/* Place to store handle of block
+						 * holding the symbol */
+	 	word	    	*symOffPtr, 	/* Place to store the offset into the
+						 * block at which the symbol lies */
+		 int	    	globalOnly) 	/* TRUE if only a global symbol is
+						 * acceptable */
+{
+	// Junk variable
+	SegDesc	    *sd;    	/* Junk variable */
+	return Sym_FindWithSegmentAndFile(file, fileName, id, symBlockPtr, symOffPtr, globalOnly, &sd);
+}
+
 /***********************************************************************
  *				Sym_Find
  ***********************************************************************

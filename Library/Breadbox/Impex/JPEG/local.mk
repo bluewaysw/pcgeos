@@ -3,8 +3,8 @@
 # futher linking information
 
 #include <$(SYSMAKEFILE)>
-LINKFLAGS += -N (C)98\20Breadbox\20Computer\20Company
-GOCFLAGS += -L JPEG
-XCCOMFLAGS = -d -w-stu -O -O2 -Oa -k
+#LINKFLAGS += -N (C)98\20Breadbox\20Computer\20Company
+GOCFLAGS += -L jpeg
+#XCCOMFLAGS = -d -w-stu -O -O2 -Oa -k
 
 _PROTO = 4.0

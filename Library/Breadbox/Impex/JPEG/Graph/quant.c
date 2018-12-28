@@ -1,5 +1,5 @@
-#include <ansi\string.h>
-#include "graph\quant.h"
+#include <Ansi/string.h>
+#include "Graph/quant.h"
 #include <heap.h>
 
 byte QuantCompactBox(RGBValue *pal, word size)

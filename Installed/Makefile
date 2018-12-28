@@ -1296,8 +1296,8 @@ Installed/Library/ssl:				ansic socket mapheap MAKELIB
 impgraph	: Installed/Library/Breadbox/impgraph
 Installed/Library/Breadbox/impgraph:		ansic ijgjpeg MAKELIB #fjpeg
 
-ijgjpeg	: 	Installed/Library/Breadbox/ijgjpeg
-Installed/Library/Breadbox/ijgjpeg:		ui ansic MAKELIB
+ijgjpeg	: 	Installed/Library/Breadbox/Ijgjpeg
+Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
 
 #fjpeg	: 	Installed/Library/Breadbox/fjpeg
 #Installed/Library/Breadbox/fjpeg:		ui ansic MAKELIB

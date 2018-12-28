@@ -41,6 +41,14 @@ extern int  	    	    Sym_Find(VMHandle	    file,
 				     VMBlockHandle  *symBlockPtr,
 				     word   	    *symOffPtr,
 				     int    	    globalOnly);
+extern int  	    	    Sym_FindWithFile(VMHandle	    file,
+					     const char*    fileName,
+				     	     VMBlockHandle  table,
+				     	     ID	    	    id,
+				     	     VMBlockHandle  *symBlockPtr,
+				     	     word   	    *symOffPtr,
+				     	     int    	    globalOnly);
+
 extern int  	    	    Sym_FindWithSegment(VMHandle	file,
 						ID	    	id,
 						VMBlockHandle  	*symBlockPtr,
