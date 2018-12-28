@@ -1,45 +1,45 @@
-ADLER32.obj \
-ADLER32.eobj: ZLIB.H ZCONF.H GEOS.H FILE.H EC.H
-COMPRESS.obj \
-COMPRESS.eobj: ZLIB.H ZCONF.H GEOS.H FILE.H EC.H
-CRC32.obj \
-CRC32.eobj: ZLIB.H ZCONF.H GEOS.H FILE.H EC.H
-DEFLATE.obj \
-DEFLATE.eobj: DEFLATE.H ZUTIL.H ZLIB.H ZCONF.H GEOS.H FILE.H EC.H \
-                RESOURCE.H ANSI/STRING.H ANSI/STDLIB.H
-GZIO.obj \
-GZIO.eobj: ANSI/STDIO.H GEOS.H ZUTIL.H ZLIB.H ZCONF.H FILE.H EC.H \
-                RESOURCE.H ANSI/STRING.H ANSI/STDLIB.H
-INFBLOCK.obj \
-INFBLOCK.eobj: ZUTIL.H ZLIB.H ZCONF.H GEOS.H FILE.H EC.H RESOURCE.H \
-                ANSI/STRING.H ANSI/STDLIB.H INFBLOCK.H INFTREES.H \
-                INFCODES.H INFUTIL.H
-INFCODES.obj \
-INFCODES.eobj: ZUTIL.H ZLIB.H ZCONF.H GEOS.H FILE.H EC.H RESOURCE.H \
-                ANSI/STRING.H ANSI/STDLIB.H INFTREES.H INFBLOCK.H \
-                INFCODES.H INFUTIL.H INFFAST.H
 INFFAST.obj \
-INFFAST.eobj: ZUTIL.H ZLIB.H ZCONF.H GEOS.H FILE.H EC.H RESOURCE.H \
-                ANSI/STRING.H ANSI/STDLIB.H INFTREES.H INFBLOCK.H \
-                INFCODES.H INFUTIL.H INFFAST.H
+INFFAST.eobj: zutil.h zlib.h zconf.h geos.h file.h ec.h resource.h \
+                Ansi/string.h Ansi/stdlib.h inftrees.h infblock.h \
+                infcodes.h infutil.h inffast.h
+CRC32.obj \
+CRC32.eobj: zlib.h zconf.h geos.h file.h ec.h
 INFLATE.obj \
-INFLATE.eobj: ZUTIL.H ZLIB.H ZCONF.H GEOS.H FILE.H EC.H RESOURCE.H \
-                ANSI/STRING.H ANSI/STDLIB.H INFBLOCK.H INFTREES.H \
-                INFCODES.H INFUTIL.H
+INFLATE.eobj: zutil.h zlib.h zconf.h geos.h file.h ec.h resource.h \
+                Ansi/string.h Ansi/stdlib.h infblock.h inftrees.h \
+                infcodes.h infutil.h
 INFTREES.obj \
-INFTREES.eobj: ZUTIL.H ZLIB.H ZCONF.H GEOS.H FILE.H EC.H RESOURCE.H \
-                ANSI/STRING.H ANSI/STDLIB.H INFTREES.H INFFIXED.H
-INFUTIL.obj \
-INFUTIL.eobj: ZUTIL.H ZLIB.H ZCONF.H GEOS.H FILE.H EC.H RESOURCE.H \
-                ANSI/STRING.H ANSI/STDLIB.H INFBLOCK.H INFTREES.H \
-                INFCODES.H INFUTIL.H
-TREES.obj \
-TREES.eobj: DEFLATE.H ZUTIL.H ZLIB.H ZCONF.H GEOS.H FILE.H EC.H \
-                RESOURCE.H ANSI/STRING.H ANSI/STDLIB.H TREES.H
-UNCOMPR.obj \
-UNCOMPR.eobj: ZLIB.H ZCONF.H GEOS.H FILE.H EC.H
+INFTREES.eobj: zutil.h zlib.h zconf.h geos.h file.h ec.h resource.h \
+                Ansi/string.h Ansi/stdlib.h inftrees.h inffixed.h
+INFBLOCK.obj \
+INFBLOCK.eobj: zutil.h zlib.h zconf.h geos.h file.h ec.h resource.h \
+                Ansi/string.h Ansi/stdlib.h infblock.h inftrees.h \
+                infcodes.h infutil.h
+INFCODES.obj \
+INFCODES.eobj: zutil.h zlib.h zconf.h geos.h file.h ec.h resource.h \
+                Ansi/string.h Ansi/stdlib.h inftrees.h infblock.h \
+                infcodes.h infutil.h inffast.h
 ZUTIL.obj \
-ZUTIL.eobj: ZUTIL.H ZLIB.H ZCONF.H GEOS.H FILE.H EC.H RESOURCE.H \
-                ANSI/STRING.H ANSI/STDLIB.H TIMER.H
+ZUTIL.eobj: zutil.h zlib.h zconf.h geos.h file.h ec.h resource.h \
+                Ansi/string.h Ansi/stdlib.h timer.h
+INFUTIL.obj \
+INFUTIL.eobj: zutil.h zlib.h zconf.h geos.h file.h ec.h resource.h \
+                Ansi/string.h Ansi/stdlib.h infblock.h inftrees.h \
+                infcodes.h infutil.h
+GZIO.obj \
+GZIO.eobj: Ansi/stdio.h geos.h zutil.h zlib.h zconf.h file.h ec.h \
+                resource.h Ansi/string.h Ansi/stdlib.h
+UNCOMPR.obj \
+UNCOMPR.eobj: zlib.h zconf.h geos.h file.h ec.h
+ADLER32.obj \
+ADLER32.eobj: zlib.h zconf.h geos.h file.h ec.h
+TREES.obj \
+TREES.eobj: deflate.h zutil.h zlib.h zconf.h geos.h file.h ec.h \
+                resource.h Ansi/string.h Ansi/stdlib.h trees.h
+DEFLATE.obj \
+DEFLATE.eobj: deflate.h zutil.h zlib.h zconf.h geos.h file.h ec.h \
+                resource.h Ansi/string.h Ansi/stdlib.h
+COMPRESS.obj \
+COMPRESS.eobj: zlib.h zconf.h geos.h file.h ec.h
 
-zlibEC.geo zlib.geo : GEOS.LDF ANSIC.LDF 
+zlibEC.geo zlib.geo : geos.ldf ansic.ldf 

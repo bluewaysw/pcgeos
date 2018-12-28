@@ -1,0 +1,188 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	Spell library
+FILE:		spellConstant.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	atw	9/28/92		Initial revision
+
+
+DESCRIPTION:
+	Constants for spell asm code. 
+		
+	$Id: spellConstant.def,v 1.1 97/04/07 11:07:33 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+include	Internal/prodFeatures.def
+
+;
+; Spell-specific feature constants:
+;
+; FLOPPY_BASED_USER_DICT:
+;	Set if the product needs to have a user dictionary set on the floppy.
+;	This currently will only work in conjunction with SINGLE_DISK_DOCUMENT
+;	DIR being set in prodFeatures.def.  Will look for the user dictionary
+;	on the document floppy, put up dialog boxes to query the user whenever
+;	a spell session is started, and will nuke the dictionary when a spell
+;	session is ended.   This stuff also works poorly with multiple spell
+;	checks going on in different apps, so the spell dialog is made sys-
+;	modal.
+;
+; DEFINITIONLESS_THESAURUS:
+;	Do definitions in the thesaurus, for space reasons.   UI is a little
+; 	different as a result, but it's all extremely usable.
+;
+
+ifidn PRODUCT, <DWP>
+	FLOPPY_BASED_USER_DICT		equ	TRUE
+	DEFINITIONLESS_THESAURUS	equ	FALSE
+else
+
+
+	FLOPPY_BASED_USER_DICT		equ	FALSE
+	DEFINITIONLESS_THESAURUS	equ	FALSE
+endif
+
+;
+; Set TRUE to keep user dictionary consistent on disk and in all
+; simulatenously active instances of edit-user-dictionary dialog
+; (Writer, Preferences)
+;
+CONSISTENT_USER_DICT equ TRUE
+
+;
+;	Fatal Errors
+;
+
+IGNORED_WORD_ADDED_TO_LIBRARY_TWICE			       enum FatalErrors
+APPLICATION_CALLED_ICINIT_WITHOUT_CALLING_ICEXIT	       enum FatalErrors
+APPLICATION_CALLED_ICEXIT_WITHOUT_CALLING_ICINIT	       enum FatalErrors
+BAD_APP_COUNT						       enum FatalErrors
+BLOCK_NOT_IN_DGROUP					       enum FatalErrors
+BAD_GEOS_LSEEK_FLAGS					       enum FatalErrors
+COULD_NOT_CREATE_SPELL_THREAD				       enum FatalErrors
+
+CONTROLLER_OBJECT_INTERNAL_ERROR			       enum FatalErrors
+NO_IC_BUFF						       enum FatalErrors
+BAD_SPELL_CHECK_RESULTS					       enum FatalErrors
+SPELL_SEARCH_STRING_TOO_LARGE				       enum FatalErrors
+NO_SPELL_REPLACE_STRING					       enum FatalErrors
+SPELL_REPLACE_STRING_TOO_LARGE				       enum FatalErrors
+JUST_ADDED_WORD_NOT_FOUND_IN_USER_DICT_LIST		       enum FatalErrors
+MUST_HAVE_EITHER_SKIP_OR_REPLACE_CURRENT_FEATURE_ENABLED       enum FatalErrors
+NOT_GEN_CONTROL_OBJECT					       enum FatalErrors
+NO_CONTEXT_FEATURE_SET					       enum FatalErrors
+NO_WHITESPACE_IN_DOUBLE_WORD_ERROR			       enum FatalErrors
+ANAGRAMS_AND_WILDCARDS_NOT_SUPPORTED			       enum FatalErrors
+
+; This indicates an internal error in the spell check code, where the code
+; thinks there was a double-word error, but the unknown word passed to the
+; spell check controller did not contain any whitespace.
+if ERROR_CHECK
+NOT_DGROUP						enum FatalErrors
+endif
+SPELL_CHECKING_WORD_WITH_DBCS_CHAR				enum Warnings
+
+SpellCode	segment	resource
+SpellCode	ends
+
+;IPCODE	segment word public 'CODE'
+IPCODE	segment public 'CODE'
+global	ICAddUser:far
+global	ICDeleteUser:far
+global	ICBuildUserList:far
+global	ICUpdateUser:far
+global	ICIgnore:far
+global	ICResetIgnore:far
+IPCODE	ends
+
+;ICS1	segment word public 'CODE'
+ICS1	segment public 'CODE'
+ICS1	ends
+
+SpellControlCommon	segment resource
+global	CheckIfSpellAvailable:far
+SpellControlCommon	ends
+
+;INIT	segment word public 'CODE'
+INIT	segment public 'CODE'
+INIT	ends
+
+;EXIT	segment word public 'CODE'
+EXIT	segment public 'CODE'
+EXIT	ends
+
+;IPPRINT	segment word public 'CODE'
+IPPRINT	segment public 'CODE'
+IPPRINT	ends
+
+;CODE	segment	word public 'CODE'
+CODE	segment	public 'CODE'
+CODE	ends
+
+SpellCode	segment	resource
+global	ICInit:far
+global	ICExit:far
+global	ICGetAlternate:far
+global	ICSpl:far
+global	ICGetNumAlts:far
+global	ICSetTask:far
+global	ICCheckForEmbeddedPunctuation:far
+global	ICGetLeftTextOffset:far
+global	ICGetRightTextOffset:far
+global	ICGetLanguage:far
+global	ICGetErrorFlags:far
+global	ICResetSpellCheck:far
+global	ICStopCheck:far
+
+if FLOPPY_BASED_USER_DICT
+global  ICFreeUserDict:far
+endif
+
+SpellCode	ends
+
+Strings	segment	lmem
+global no_save_user_error:chunk
+global no_save_user_error2:chunk
+global no_load_user_error:chunk
+global no_load_user_error2:chunk
+global load_user_proto_error:chunk
+global load_user_proto_error2:chunk
+global load_user_mem_error:chunk
+global load_user_mem_error2:chunk
+Strings	ends
+
+;
+; global Thesaurus stuff
+;
+
+global et:far
+global et_load:far
+global et_close:far
+
+ThesaurusCode segment resource
+	global ThesaurusOpen:far
+	global ThesaurusClose:far
+	global ThesaurusGetMeanings:far
+	global ThesaurusGetSynonyms:far
+	global ThesaurusCheckAvailable:far
+ThesaurusCode ends
+
+HyphenCode segment resource
+	global HyphenOpen:far
+	global Hyphenate:far
+	global HyphenClose:far
+HyphenCode ends
+
+global IHhyp:far
+
+global thesaurusSem:hptr
+
+

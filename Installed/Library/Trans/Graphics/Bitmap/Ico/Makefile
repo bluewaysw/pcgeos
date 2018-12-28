@@ -3,21 +3,21 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Ico
-COMMON          = dib.c fixshort.c hsiport.c packbit.c
-EXPORT          = exportMain.asm exportManager.asm
+GEODE           = ico
 EXPORTC         = dib2ico.c
+LIB             = libFormat.asm libMain.asm libManager.asm libExport.ui
+EXPORT          = exportManager.asm exportMain.asm
 IMPORT          = importMain.asm importManager.asm
 IMPORTC         = ico2dib.c icoload.c
-LIB             = libFormat.asm libMain.asm libManager.asm libExport.ui
-UI_TO_RDFS      = LIBEXPORT.UI
-OBJS            = dib.obj fixshort.obj hsiport.obj packbit.obj dib2ico.obj\
-                  ico2dib.obj icoload.obj
-COMMON          = ico.def icoGeode.def icoGlobal.def
-MODULES         = Export Import Lib
-CMODULES        = Common ExportC ImportC
-SRCS            = $(COMMON) $(EXPORT) $(EXPORTC) $(IMPORT) $(IMPORTC)\
-                  $(LIB) $(COMMON)
+COMMON          = packbit.c fixshort.c hsiport.c dib.c
+UI_TO_RDFS      = libExport.ui
+OBJS            = dib2ico.obj ico2dib.obj icoload.obj packbit.obj\
+                  fixshort.obj hsiport.obj dib.obj
+COMMON          = icoGeode.def icoGlobal.def ico.def
+MODULES         = Lib Export Import
+CMODULES        = ExportC ImportC Common
+SRCS            = $(EXPORTC) $(LIB) $(EXPORT) $(IMPORT) $(IMPORTC)\
+                  $(COMMON) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = ico

@@ -69,7 +69,7 @@ CNVOPTION  opt;    /* conversion option record. Reside in HSIERROR.H*/
 /*
    main program
 */
-#ifdef __BORLANDC__
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 short EXPORT
 #else
 short 
@@ -96,22 +96,22 @@ ExportTif(FILE * dibFile,FILE * tifFile,short compressOption)
 
    _settextcolor(15);
    _setbkcolor(3);
-   _outtext(" ษอออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป \n");
-   _outtext(" บ                 Copyright(c) 1990,  Halcyon Software        (408)984-1464 บ \n");
-   _outtext(" ฬอออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออน \n");
-   _outtext(" บ                                                                           บ \n");
-   _outtext(" บ   Description: This program converts Windows 3.0 Device Independent       บ \n");
-   _outtext(" บ                Bitmap (DIB) to Tag Image File Format (TIFF).              บ \n");
-   _outtext(" บ                                                                           บ \n");
-   _outtext(" บ   Usage:       dib2tif {-v -c -h} <Infile> <outfile>                      บ \n");
-   _outtext(" บ                                                                           บ \n");
-   _outtext(" บ       -v       : Verbose (optional)                                       บ \n");
-   _outtext(" บ       -c       : Compressed TIFF (optional; default to uncompressed)      บ \n");
-   _outtext(" บ       -h       : Display help screen                                      บ \n");
-   _outtext(" บ       <infile> : DIB input file name                                      บ \n");
-   _outtext(" บ       <outfile>: TIFF output file name                                    บ \n");
-   _outtext(" บ                                                                           บ \n");
-   _outtext(" ศอออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ \n");
+   _outtext(" ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอป \n");
+   _outtext(" ๏ฟฝ                 Copyright(c) 1990,  Halcyon Software        (408)984-1464 ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอน \n");
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ   Description: This program converts Windows 3.0 Device Independent       ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ                Bitmap (DIB) to Tag Image File Format (TIFF).              ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ   Usage:       dib2tif {-v -c -h} <Infile> <outfile>                      ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ       -v       : Verbose (optional)                                       ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ       -c       : Compressed TIFF (optional; default to uncompressed)      ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ       -h       : Display help screen                                      ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ       <infile> : DIB input file name                                      ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ       <outfile>: TIFF output file name                                    ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n");
+   _outtext(" ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอผ \n");
    _settextcolor(oldfgd);
    _setbkcolor(oldbgd);
    exit( 1 );

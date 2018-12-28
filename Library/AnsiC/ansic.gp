@@ -211,3 +211,4 @@ publish __U4M
 publish __U4D
 publish __I4M
 publish __I4D
+publish __CHP

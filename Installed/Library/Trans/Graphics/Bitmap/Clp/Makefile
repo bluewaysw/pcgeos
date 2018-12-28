@@ -3,21 +3,21 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Clp
-COMMON          = dib.c fixshort.c hsiport.c packbit.c
-EXPORT          = exportMain.asm exportManager.asm
-EXPORTC         = clpsave.c dib2clp.c
-IMPORT          = importMain.asm importManager.asm
-IMPORTC         = clp2dib.c clpload.c
+GEODE           = clp
+EXPORTC         = dib2clp.c clpsave.c
 LIB             = libFormat.asm libMain.asm libManager.asm libExport.ui
-UI_TO_RDFS      = LIBEXPORT.UI
-OBJS            = dib.obj fixshort.obj hsiport.obj packbit.obj clpsave.obj\
-                  dib2clp.obj clp2dib.obj clpload.obj
-COMMON          = clp.def clpGeode.def clpGlobal.def
-MODULES         = Export Import Lib
-CMODULES        = Common ExportC ImportC
-SRCS            = $(COMMON) $(EXPORT) $(EXPORTC) $(IMPORT) $(IMPORTC)\
-                  $(LIB) $(COMMON)
+EXPORT          = exportManager.asm exportMain.asm
+IMPORT          = importMain.asm importManager.asm
+IMPORTC         = clpload.c clp2dib.c
+COMMON          = packbit.c fixshort.c hsiport.c dib.c
+UI_TO_RDFS      = libExport.ui
+OBJS            = dib2clp.obj clpsave.obj clpload.obj clp2dib.obj\
+                  packbit.obj fixshort.obj hsiport.obj dib.obj
+COMMON          = clpGlobal.def clpGeode.def clp.def
+MODULES         = Lib Export Import
+CMODULES        = ExportC ImportC Common
+SRCS            = $(EXPORTC) $(LIB) $(EXPORT) $(IMPORT) $(IMPORTC)\
+                  $(COMMON) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = clp

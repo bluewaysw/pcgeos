@@ -54,7 +54,9 @@ DESCRIPTION:
                bitmap size for each one.
 
 \**************************************************************/
+#ifndef __WATCOMC__
 #pragma Comment("@"__FILE__);
+#endif
 
 #pragma Code ("MainImportC");
 

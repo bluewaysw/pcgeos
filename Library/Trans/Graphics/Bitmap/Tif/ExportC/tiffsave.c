@@ -46,7 +46,9 @@ HISTORY
    05/04/90 Ported to Windows 3.0 DIB
 
 *************************************************************************/
+#ifndef __WATCOMC__
 #pragma Comment("@" __FILE__);
+#endif
 
 #include "hsimem.h"
 #include "hsierror.h"

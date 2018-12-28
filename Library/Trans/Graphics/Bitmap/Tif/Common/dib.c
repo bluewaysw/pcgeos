@@ -25,8 +25,9 @@
 /*************************************************************************\
    DIB.C - Routines used for manipulate DIB file.
 \*************************************************************************/
-
+#ifndef __WATCOMC__
 #pragma Comment("@" __FILE__)
+#endif
  
 /**
 #include <fcntl.h>

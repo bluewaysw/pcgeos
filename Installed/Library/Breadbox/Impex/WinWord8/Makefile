@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = WinWord8
+GEODE           = winword8
 ASM_TO_OBJS     = Manager.asm
 UI_TO_RDFS      =
-SRCS            = Manager.asm TRANSLIBENTRY.ASM libfmt.h imptproc.goc
-OBJS            = Manager.obj imptproc.obj
+SRCS            = Manager.asm transLibEntry.asm libFmt.h IMPTPROC.goc
+OBJS            = Manager.obj IMPTPROC.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = winword8

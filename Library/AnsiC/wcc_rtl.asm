@@ -5,6 +5,7 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 	public __U4D
 	public __I4M
 	public __I4D
+	public __CHP
 
 	__U4M proc near
 		push bp
@@ -34,5 +35,11 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 		ret
 	__I4D endp
 	
+	__CHP proc near
+		push bp
+		mov sp, bp
+
+		ret
+	__CHP endp	
 WCC_TEXT        ENDS
 

@@ -1,0 +1,608 @@
+
+/*
+ *
+ * Project:	Search/Spell Library
+ * File:	uiSpell.ui
+ *
+ * Author:	Andrew Wilson
+ *
+ *	This file contains the user Interface description for the 
+ * spell box.
+ *
+ *	$Id: uiSpell.ui,v 1.1 97/04/07 11:08:06 newdeal Exp $
+ *
+ */
+
+#ifdef GPC_SPELL
+start AppTCMonikerResource, data;
+#include "Art/mkrSpellTC.ui"
+end AppTCMonikerResource;
+#else
+#include "Art/mkrSpell.ui"
+#endif
+
+class SuggestList = GenDynamicList {
+	static hptrComp : null;
+}
+start SpellControlUI, notDetachable;
+
+/*
+ * grouping
+ */
+#ifdef GPC_SPELL
+SpellTopGroup = GenInteraction {
+	genStates = default -usable;
+	children =
+		SpellContextGroup,
+		SpellUserDictGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY
+	}
+}
+SpellContextGroup = GenInteraction {
+	children =
+		SpellStatusText,
+		SpellContext;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+SpellBottomGroup = GenInteraction {
+	genStates = default -usable;
+	children =
+		SpellReplaceText,
+		SpellSuggestList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+SpellTriggerGroup = GenInteraction {
+	genStates = default -usable;
+	children =
+		SpellReplaceTrigger,
+		SpellReplaceAllTrigger,
+		SpellSkipTrigger,
+		SpellSkipAllTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING
+	}
+}
+#endif
+
+#ifndef GPC_SPELL
+SpellMiscGroup = GenInteraction {
+	genStates = default -usable;
+	children = SpellUnknownText, SpellReplaceText;
+}
+#endif
+SpellContext = GenText {
+#ifndef GPC_SPELL
+	genStates = default -usable;
+#endif
+	genAttributes = readOnly;
+	hints = {
+#ifdef GPC_SPELL
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_MINIMUM_SIZE {
+		        SpecWidth <SST_AVG_CHAR_WIDTHS, 45>
+			SpecHeight <SST_LINES_OF_TEXT,2>
+		},
+#else
+#if DO_DBCS
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 60>
+			SpecHeight <SST_LINES_OF_TEXT,5>
+		},
+#else
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 60>
+			SpecHeight <SST_LINES_OF_TEXT,3>
+		},
+#endif
+#endif
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+SpellStatusText = GenText {
+#ifndef GPC_SPELL
+	genStates = default -usable;
+#endif
+	genAttributes = readOnly;
+#ifndef GPC_SPELL
+	moniker = "Status:";
+#endif
+	text = "No spelling check active";
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		  HINT_PLACE_MONIKER_TO_LEFT,
+#ifdef GPC_SPELL
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT
+#else
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 60>
+			SpecHeight <>
+		  }
+#endif
+	}
+}
+#ifndef GPC_SPELL
+SpellTriggerGroup = GenInteraction {
+	genStates = default -usable;
+	children =
+		SpellSkipReplaceSuggestGroup,
+		SpellAllGroup,
+		SpellUserDictGroup;	  
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+SpellSkipReplaceSuggestGroup = GenInteraction {
+	children =
+		SpellSkipGroup,
+		SpellReplaceGroup,
+		SpellSuggestGroup,
+		SpellSuggestList;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY
+	}
+}
+SpellAllGroup = GenInteraction {
+	children = SpellSkipAllTrigger, SpellReplaceAllTrigger;      
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY      
+	}
+}
+#endif
+SpellUserDictGroup = GenInteraction {
+#ifndef GPC_SPELL
+	genStates = default -usable;
+#endif
+	children = 
+#ifdef GPC_SPELL
+		SpellAddToUserDictTrigger,
+		SpellEditUserDictTrigger,
+		SpellEditUserDictionaryControl;
+#else
+		SpellAddToUserDictTrigger,
+		SpellEditUserDictionaryControl;
+#endif
+	hints = {
+#ifdef GPC_SPELL
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+#endif
+		HINT_ORIENT_CHILDREN_VERTICALLY      
+	}
+}
+SpellSuggestBox = GenInteraction {
+	moniker = 'S', "Suggest";
+	visibility = dialog;
+	attributes = default +modal;
+	type = properties;
+	children = SpellSeparateSuggestList, SpellSuggestTrigger;
+	hints = {
+		HINT_ENSURE_TEMPORARY_DEFAULT,
+		ATTR_GEN_HELP_CONTEXT { char "dbSpSug", 0 }
+	}
+}
+SpellReplyBar = GenInteraction {
+	genStates = default -usable;
+	hints = {
+			HINT_MAKE_REPLY_BAR,
+			HINT_ALLOW_CHILDREN_TO_WRAP,
+			HINT_WRAP_AFTER_CHILD_COUNT_IF_VERTICAL_SCREEN {
+				word	2
+			}
+	
+	}      
+}
+SpellSuggestTrigger = GenTrigger {
+	moniker = "Use This Suggestion";
+	genAttributes = signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_APPLY}
+		}
+}
+SpellSeparateSuggestList = SuggestList {
+	moniker = "Suggested Spellings:";
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ITEM_GROUP_SCROLLABLE,
+ 		HINT_FIXED_SIZE {
+			SpecWidth	<SST_AVG_CHAR_WIDTHS, 32>
+			SpecHeight	<SST_LINES_OF_TEXT, 5>
+			word	5
+		},
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+		ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED
+	}
+	queryMsg = MSG_SUGGEST_LIST_GET_SUGGESTION;
+	applyMsg = MSG_SUGGEST_LIST_SELECT_ENTRY;
+}
+
+SpellSuggestList = SuggestList {
+	moniker = 'S', "Suggestions";
+	hints = {
+		HINT_ENSURE_TEMPORARY_DEFAULT,
+/*
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word	MSG_SUGGEST_LIST_SELECT_ENTRY
+		},
+*/
+		ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED,
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+		HINT_ITEM_GROUP_MINIMIZE_SIZE
+	}
+	queryMsg = MSG_SUGGEST_LIST_GET_SUGGESTION;
+	applyMsg = MSG_SUGGEST_LIST_SELECT_ENTRY;
+	genStates = default -enabled;
+}
+
+SpellUnknownText = GenText {
+       genAttributes = readOnly;
+       genStates = default -usable;
+       moniker = "Unknown Word:";
+       textDisplayAttributes = default +singleLineText;
+       hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 32>
+			SpecHeight <>
+		  }
+       	       }
+}
+SpellReplaceText = GenText {
+#ifdef GPC_SPELL
+	moniker = 'T', "Change To:";
+#else
+	moniker = 'C', "Change To:";
+#endif
+	textDisplayAttributes = default +singleLineText;
+	maxLength = "SPELL_MAX_WORD_LENGTH-1";
+	genStates = default -enabled;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		  HINT_DEFAULT_FOCUS,
+#ifdef GPC_SPELL
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT
+#else
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 32>
+			SpecHeight <>
+		  }
+#endif
+	}
+}
+
+SpellCheckAllTrigger = GenTrigger {
+	moniker = 'C', "Check All";
+ 	genStates = default -usable;
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SC_CHECK_ENTIRE_DOCUMENT, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_SEEK_REPLY_BAR
+		}
+}
+SpellCheckToEndTrigger = GenTrigger {
+#ifdef GPC_SPELL
+ 	moniker = 'R', "Resume Spell Check";
+#else
+ 	moniker = 'E', "Check to End";
+#endif
+ 	genStates = default -usable;
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SC_CHECK_TO_END, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {HINT_SEEK_REPLY_BAR}
+}
+
+SpellCheckSelectionTrigger = GenTrigger {
+	moniker = 'l', "Check Selection";
+ 	genStates = default -usable;
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SC_CHECK_SELECTION, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {HINT_SEEK_REPLY_BAR}
+}
+/*
+SpellStopSpellCheckTrigger = GenTrigger {
+	moniker = 'Q', "Quit Spell Checking";
+	genStates = default -usable;
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_ABORT_ACTIVE_SPELL, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {HINT_SEEK_REPLY_BAR}
+}
+*/
+SpellCloseTrigger = GenTrigger {
+	genStates = default -usable;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word	IC_DISMISS
+		}
+	}
+}
+SpellReplaceTrigger = GenTrigger {
+#ifdef GPC_SPELL
+	moniker = 'C', "Change";
+#else
+	moniker = 'R', "Replace";
+#endif
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SC_REPLACE_WORD, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ENSURE_TEMPORARY_DEFAULT
+	}
+}
+SpellReplaceAllTrigger = GenTrigger {
+	genStates = default -enabled;
+#ifdef GPC_SPELL
+	moniker = 'A', "Change All";
+#else
+	moniker = 'A', "Replace All";
+#endif
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SC_REPLACE_ALL, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ENSURE_TEMPORARY_DEFAULT
+	}
+}
+SpellSkipAllTrigger = GenTrigger {
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+	moniker = 'p', "Skip All";
+	action = MSG_SC_IGNORE_WORD, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ENSURE_TEMPORARY_DEFAULT
+	}
+}
+
+#ifndef GPC_SPELL
+SpellSkipGroup = GenInteraction {
+	children = SpellSkipTrigger, SpellSkipExplain;
+	genStates = default -enabled;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+SpellReplaceGroup = GenInteraction {
+	children = SpellReplaceTrigger, SpellReplaceExplain;	  
+	genStates = default -enabled;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+/*		HINT_EXPAND_WIDTH_TO_FIT_PARENT, */
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+#endif
+
+SpellSuggestGroup = GenInteraction {
+	children = SpellSuggestBox, SpellSuggestExplain;
+	genStates = default -enabled;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+/*		HINT_EXPAND_WIDTH_TO_FIT_PARENT, */
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+SpellReplaceExplain = GenText {
+#ifdef GPC_SPELL
+	genStates = default -usable;
+#endif
+	genAttributes = readOnly;
+	text = "Replace misspelling with new text";
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		  }
+		}
+}
+SpellSkipExplain = GenText {
+#ifdef GPC_SPELL
+	genStates = default -usable;
+#endif
+	genAttributes = readOnly;
+	text = "Leave this word as it is";
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		  }
+		}
+}
+SpellSuggestExplain = GenText {
+	genAttributes = readOnly;
+	text = "Get spelling suggestions for the misspelled word";
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <>
+		  }
+		}
+}
+SpellSkipTrigger = GenTrigger {
+	genAttributes = default +initiatesInputIgnore;
+	moniker = 'k', "Skip";
+	action = MSG_SC_SKIP_WORD, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ENSURE_TEMPORARY_DEFAULT
+	}
+}
+
+SpellAddToUserDictTrigger = GenTrigger {
+	genStates = default -enabled;
+#ifdef GPC_SPELL
+	moniker = 'D', "Add to Dictionary";
+#else
+	moniker = 'U', "Add to User Dictionary";
+#endif
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_SC_ADD_UNKNOWN_WORD_TO_USER_DICTIONARY, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+#ifdef GPC_SPELL
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_MONIKER,
+#endif
+		HINT_ENSURE_TEMPORARY_DEFAULT
+	}
+}
+#ifdef GPC_SPELL
+SpellEditUserDictTrigger= GenTrigger {
+	moniker = 'E', "Edit Dictionary";
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_GEN_INTERACTION_INITIATE, SpellEditUserDictionaryControl;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_MONIKER,
+		HINT_ENSURE_TEMPORARY_DEFAULT,
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+#endif
+SpellEditUserDictionaryControl = EditUserDictionaryControl {
+#ifdef GPC_SPELL
+	moniker = 'E', "Edit Dictionary";
+	attributes = default +notUserInitiatable;
+#else
+	moniker = 'D', "Edit User Dictionary";
+#endif
+	output = "TO_OBJ_BLOCK_OUTPUT";
+	genStates = default +enabled;
+	visibility = dialog;
+	hints = {
+		HINT_ENSURE_TEMPORARY_DEFAULT
+	}
+}
+end	SpellControlUI;
+
+start SpellControlToolboxUI, notDetachable;
+SpellToolTrigger = GenTrigger {
+#ifdef GPC_SPELL
+	moniker = list { SpellTCMoniker }
+#else
+	TOOL_MONIKER_LIST(Spell)
+#endif
+	genStates = default -usable;
+	genAttributes = default +initiatesBusyState;
+	action = MSG_GEN_INTERACTION_INITIATE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { ATTR_GEN_FOCUS_HELP { optr SCHelp } }
+}
+end SpellControlToolboxUI;
+
+start ControlStrings, data;
+chunk SCName = "Spell Check";
+chunk SCHelp = "Check spelling in current document";
+chunk SpellName = "Check Spelling";
+chunk EditUserDictionaryName = "Edit User Dictionary";
+chunk StatusName = "Spell Status Line";
+chunk AddToUserDictionaryName = "Add Word to User Dictionary";
+chunk ReplaceAllName = "Replace All";
+chunk ReplaceCurrentName = "Replace";
+chunk SkipAllName = "Skip All";
+chunk SkipCurrentName = "Skip";
+chunk CheckSelectionName = "Spell Check Selected Text";
+#ifdef GPC_SPELL
+chunk CheckToEndName = "Resume Spell Check to End of Text";
+#else
+chunk CheckToEndName = "Spell Check to End of Text";
+#endif
+chunk CheckAllName = "Spell Check All Text";
+chunk PopupSuggestName = "Small Suggest List";
+chunk SimpleBoxName = "Simple Spell Check Box";
+chunk SpellContextName = "Display Portion of Document";
+chunk SpellCloseName = "Close Spell Box";
+end ControlStrings;
+
+start Strings, data;
+
+chunk SpellInitGenericErrString = {Unable to access the spelling dictionary. The file may be missing. You may need to reinstall the software.\r\rError Code: SP-04.}
+
+chunk SpellInitOpenErrString = {Unable to open the spelling dictionary. The file may be missing. You may need to reinstall the software.\r\rError Code: SP-05.}
+
+chunk SpellInitNoMemString = {Unable to allocate enough memory to load the dictionary. Try closing some applications.\r\rError Code: SP-06.}
+
+chunk SpellInitNoUserDictString = {Unable to load the user dictionary into memory. Try closing some applications.\r\rError Code: SP-07.}
+
+chunk SpellInitBadLangString = {The spelling dictionary did not contain the desired language. You may need to change your dictionary preferences.\r\rError Code: SP-08.}
+
+#ifdef GPC_SPELL
+chunk SpellQueryString = {\1 is done checking your selection. Would you like to continue to check the spelling of the rest of your document?}
+chunk SpellEntireDocumentCompletedString = {Your spell check is complete.}
+#else
+chunk SpellEntireDocumentCompletedString = {End of document reached.\rSpelling check completed.}
+#endif
+chunk SpellSelectionCompletedString = {Finished checking selection.}
+chunk SpellWordCompletedString = {Finished checking selection.}
+
+chunk SpellNoSuggestionsString = {No Suggestions Found}
+chunk SpellExplicitNoSuggestionsString = {Could not find any spelling suggestions.}
+
+chunk SpellUserDictFullString = {The dictionary is full. You must delete some words from the dictionary before more words can be added.\r\rError Code: SP-09.}
+
+chunk SpellUserDictAddGenericString = {Unable to add this word to the user dictionary.\rThe user dictionary file may be corrupted.\r\rError Code: SP-10}
+
+chunk SpellUserDictAddWildcardString = {Unable to add this word to the user dictionary.\rThe '?' and '*' characters are not supported.\r\rError Code: SP-15}
+
+#if FLOPPY_BASED_USER_DICT
+chunk SpellFloppyUserDictString = {If you have a floppy disk with a user dictionary, please insert it now.}
+chunk SpellFloppySaveUserDictString = {If you wish to change a user dictionary on a floppy disk, please insert the disk to use now.}
+#endif
+
+/*
+ *	Spell Check Status Strings
+ */
+#ifdef GPC_SPELL
+chunk SpellNotFoundString = {The underlined word is not in the dictionary:}
+#else
+chunk SpellNotFoundString = {Misspelled or unknown word}
+#endif
+chunk SpellNotFreeString = {Word cannot stand alone}
+chunk SpellAccentMisplacedString = {Incorrectly placed accent}
+chunk SpellInvalidTrailingHyphenString = {Invalid trailing hyphen}
+chunk SpellInvalidLeadingHyphenString = {Invalid leading hyphen}
+chunk SpellCompoundErrorString = {Incorrectly compounded words}
+chunk SpellCapErrorString = {Possible incorrect capitalization}
+chunk SpellAErrorString = {Incorrect use of \"a\"}
+chunk SpellAnErrorString = {Incorrect use of \"an\"}
+chunk SpellDblWordString = {Duplicate word}
+chunk SpellNoCheckString = {No spelling check active}
+
+/*
+ *	Various error strings
+ */
+#if FLOPPY_BASED_USER_DICT
+chunk	no_save_user_error = {Unable to save the user dictionary,}
+chunk	no_save_user_error2 = {possibly due to a full disk. (SP-11)}
+#else
+chunk	no_save_user_error = {Unable to save the user dictionary.}
+chunk	no_save_user_error2 = {Will restore from the last saved version. (SP-11)}
+#endif
+
+chunk	no_load_user_error = {Unable to load the user dictionary.}
+chunk	no_load_user_error2 = {The user dictionary file may be damaged. (SP-12)}
+
+chunk	load_user_proto_error = {This version of the user dictionary will not work}
+chunk	load_user_proto_error2 = {with this version of the software. (SP-13)}
+
+chunk	load_user_mem_error = {Unable to allocate enough memory to load the}
+chunk	load_user_mem_error2 = {user dictionary. Try closing some applications. (SP-14)}
+
+end Strings;
+
+

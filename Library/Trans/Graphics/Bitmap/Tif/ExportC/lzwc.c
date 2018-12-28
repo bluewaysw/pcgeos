@@ -39,7 +39,9 @@ Description
    LZW compression routines
  
 */
+#ifndef __WATCOMC__
 #pragma Comment("@" __FILE__);
+#endif
 
 #include "hsimem.h"
 #include "hsierror.h"

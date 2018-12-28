@@ -3,16 +3,16 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = WFWLib
+GEODE           = wfwlib
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = import.c list.c sprm.c style.c wfwinput.c charset.h\
-                  codepage.h debug.h global.h libFmt.h list.h rtfdefs.h\
-                  sprm.h structs.h style.h text.h warnings.h wfwfont.h\
-                  wfwinput.h wfwlib.h charset.goc debug.goc font.goc\
-                  global.goc text.goc
-OBJS            = import.obj list.obj sprm.obj style.obj wfwinput.obj\
-                  charset.obj debug.obj font.obj global.obj text.obj
+SRCS            = list.c style.c import.c sprm.c wfwinput.c rtfdefs.h\
+                  sprm.h libFmt.h text.h structs.h wfwinput.h style.h\
+                  wfwfont.h wfwlib.h warnings.h codepage.h debug.h list.h\
+                  charset.h global.h text.goc debug.goc font.goc\
+                  charset.goc global.goc
+OBJS            = list.obj style.obj import.obj sprm.obj wfwinput.obj\
+                  text.obj debug.obj font.obj charset.obj global.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = wfwlib

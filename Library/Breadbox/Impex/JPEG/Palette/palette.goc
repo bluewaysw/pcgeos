@@ -1,0 +1,311 @@
+@include <stdapp.goh>
+@include "Palette/palette.goh"
+#include "Graph/quant.h"
+#include <Ansi/string.h>
+
+MemHandle PalParseGString(GStateHandle gstring, word palsize)
+{
+  MemHandle mem, mem2;
+  GStateHandle gstate;
+  PalTable *pal;
+  byte *pal2;
+
+  /* allocation palette */
+  mem = MemAlloc(32*3+4,HF_SWAPABLE,0);
+  if(mem == 0)
+    return(0);
+
+  /* init palette memory */
+  pal = MemLock(mem);
+  if(pal == 0)
+  {
+    MemFree(mem);
+    return(0);
+  }
+  pal->PT_size = 32;
+  pal->PT_used = 16;
+  MemUnlock(mem);
+
+  /* create gstate */
+  gstate = GrCreateState(0);
+
+  if(gstate == 0)
+    return(0);
+  else
+  {
+    /* parsing gstrings palette */
+    My_GrParseGString(gstate, gstring, GSC_OUTPUT, mem);
+  }
+
+  GrDestroyState(gstate);
+
+  /* downsizing or copying palette */
+  mem2 = MemAlloc(palsize*3, HF_SWAPABLE, 0);
+  if(mem2 != 0)
+  {
+    pal = MemLock(mem);
+    if(pal == 0)
+    {
+      MemFree(mem2);
+      MemFree(mem);
+      return(0);
+    }
+
+    pal2 = MemLock(mem2);
+    if(pal2 == 0)
+    {
+      MemUnlock(mem);
+      MemFree(mem2);
+      MemFree(mem);
+      return(0);
+    }
+
+    if(pal->PT_used > palsize)
+      QuantPalette((RGBValue *) &pal->PT_entry, pal->PT_used,
+                   (RGBValue *) pal2, palsize);
+    else 
+      memcpy(pal2, &pal->PT_entry, 3*pal->PT_used);
+
+    MemUnlock(mem2);
+    MemUnlock(mem);
+  }
+  MemFree(mem);
+  return(mem2);
+}
+
+Boolean PalAddColor(MemHandle mem, RGBValue  *entry)
+{
+    MemHandle mem2;
+    PalTable *pal;
+    word loopCount ;
+    Boolean colorFound = FALSE ;
+
+    pal = MemLock(mem);
+
+    if(pal == 0)
+        return(TRUE);
+
+    /* check if the color is already in there */
+    loopCount = 0 ;
+    while(loopCount < pal->PT_used) {
+    
+        if( (entry->RGB_red == pal->PT_entry[loopCount].RGB_red) &&
+            (entry->RGB_green == pal->PT_entry[loopCount].RGB_green) &&
+            (entry->RGB_blue == pal->PT_entry[loopCount].RGB_blue)    ) {
+        
+            colorFound = TRUE ;
+            break ;
+        }
+
+        loopCount++ ;
+    }
+
+    if(colorFound) {
+
+		MemUnlock(mem);
+		return(FALSE);
+    }
+
+  if(pal->PT_size == pal->PT_used)
+  {
+    if(pal->PT_size > 3000)
+    {
+      MemUnlock(mem);
+      return(TRUE);
+    }
+
+    mem2 = MemReAlloc(mem, 4+(pal->PT_size+32)*3, 0);
+    if(mem2 == 0)
+    {
+      MemUnlock(mem);
+      return(TRUE);
+    }
+
+    mem = mem2;
+    pal = MemDeref(mem);
+    pal->PT_size+=32;
+  }
+
+  pal->PT_entry[pal->PT_used] = *entry;
+  pal->PT_used++;
+
+  MemUnlock(mem);
+  return(FALSE);
+}
+
+Boolean PalAddColorRange(MemHandle mem, RGBValue  *entry, word count)
+{
+  word count2;
+  Boolean stat;
+  PalTable *pal;
+
+  pal = MemLock(mem);
+  if(pal == 0)
+    return(TRUE);
+
+  count2 = 0;
+  stat = FALSE;
+  while((count != count2)&(stat == FALSE))
+  {
+    stat = PalAddColor(mem, &entry[count2]);
+    count2++;
+  }
+
+  MemUnlock(mem);
+
+  return(stat);
+}
+
+Boolean PalAddBitmapPal(MemHandle mem, byte *ptr)
+{
+  byte type;
+  word offset;
+    RGBValue white = {255, 255, 255}, black = {0, 0, 0} ;
+
+  type = ptr[5];
+
+  if((type && BMT_FORMAT) == BMF_MONO)
+  {
+    /* black and white */
+        PalAddColor(mem, &white) ;
+        PalAddColor(mem, &black) ;
+  }
+  else
+    if( ((type & BMT_COMPLEX) == 0)||
+        ((type & BMT_PALETTE) == 0)||
+        ((type & BMT_FORMAT) == BMF_24BIT))
+    {
+        GStateHandle gstate ;
+
+        gstate = GrCreateState(0) ;
+
+        if(gstate) {
+
+            MemHandle palmem ;
+            word numEntries ;
+
+            palmem = GrGetPalette(gstate, GPT_DEFAULT) ; 
+
+            GrDestroyState(gstate) ;
+
+            if(palmem) {
+
+                numEntries = (*((word*) MemLock(palmem))) ;
+
+                /* user system palette */
+                if(((type & BMT_FORMAT) == BMF_4BIT) || (numEntries < 256)) {
+
+                    if(numEntries >= 16) {
+
+                        PalAddColorRange(mem, (RGBValue *) MemDeref(palmem) + 2, 16);
+                    }
+
+                } else {
+
+                    if(numEntries >= 256) {
+
+                        PalAddColorRange(mem, (RGBValue *) MemDeref(palmem) + 2, 256);
+                    }
+                }
+
+                MemFree(palmem) ;
+            }
+        }
+
+    }
+    else
+    {
+      /* user bitmap palette */
+      offset = ptr[14]+256*(ptr[15]);
+      if((type & BMT_FORMAT) == BMF_4BIT)
+        PalAddColorRange(mem, (RGBValue*)&ptr[offset], 16);
+      else
+        PalAddColorRange(mem, (RGBValue*)&ptr[offset], 256);
+    }
+}
+
+Boolean PalAddColorQuad(MemHandle mem, RGBColorAsDWord color)
+{
+  RGBValue value;
+  Boolean stat;
+  word avg;
+
+  value.RGB_red = RGB_RED(color);
+  value.RGB_green = RGB_GREEN(color);
+  value.RGB_blue = RGB_BLUE(color);
+  stat = PalAddColor(mem, &value);
+
+  return(stat);
+}
+
+Boolean _far _pascal PalGStringColElement(
+  byte *elm, GStateHandle gstate, MemHandle mem)
+{
+  Boolean stat;
+  RGBValue color;
+  RGBColorAsDWord col2;
+  byte *ptr;
+  optr obj;
+
+  stat = FALSE;
+
+  if(((*elm >= 0x20)&&(*elm <= 0x39))||(*elm == 0x41))
+  {
+    /* line color used */
+    col2 = GrGetLineColor(gstate);
+    stat = PalAddColorQuad(mem, col2);
+  }
+  else
+    if((*elm >= 0x3a) && (*elm <= 0x40))
+    {
+      /* text color */
+      col2 = GrGetTextColor(gstate);
+      stat = PalAddColorQuad(mem, col2);
+    }
+    else
+      if((*elm >= 0x42) && (*elm <= 0x4F))
+      {
+        /* area color */
+        col2 = GrGetAreaColor(gstate);
+        stat = PalAddColorQuad(mem, col2);
+      }
+      else
+        if(*elm == 0x50)
+        {
+          /* bitmap with position */
+          ptr = &elm[7];
+          stat = PalAddBitmapPal(mem, ptr);
+        }
+        else
+          if(*elm == 0x51)
+          {
+            /* bitmap without pos */
+            ptr = &elm[3];
+            stat = PalAddBitmapPal(mem, ptr);
+          }
+          else
+            if(*elm == 0x52)
+            {
+              /* bitmap at optr */
+
+              obj = (dword) *(&elm[5]);
+              ptr = MemLock(HandleOf(obj));
+              if(ptr == 0)
+                stat = TRUE;
+              else
+              {
+                ptr = LMemDeref(obj);
+                stat = PalAddBitmapPal(mem, ptr);
+                MemUnlock(HandleOf(obj));
+              }
+            }
+            else
+              if(*elm == 0x53)
+              {
+                /* bitmap at ptr */
+                ptr = (dword) *(&elm[5]);
+                stat = PalAddBitmapPal(mem, ptr);
+              }
+
+  return stat;   /* FALSE if no error accures */
+}

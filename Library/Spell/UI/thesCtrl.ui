@@ -1,0 +1,485 @@
+/*
+ * Project:	PC GEOS
+ * Module:	Spell
+ * File:	thesCtrl.ui
+ *
+ * Author:	Ty Johnson
+ *
+ *	This file contains the UI description for a thesaurus control
+ *
+ *	$Id: thesCtrl.ui,v 1.1 97/04/07 11:08:11 newdeal Exp $
+ *
+ */
+
+/*
+ * Thesaurus Control 
+ */
+
+start ThesControlUI, notDetachable;
+
+/* Non-Redwood-specific version */
+
+#if !DEFINITIONLESS_THESAURUS	
+
+ThesControlGroup = GenInteraction {
+	genStates 	= default -usable;
+	children 	= ThesTopGroup, ThesBottomGroup;
+	hints= 	{
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_NO_TALLER_THAN_CHILDREN_REQUIRE,
+		HINT_NO_WIDER_THAN_CHILDREN_REQUIRE,
+		}  
+}
+
+ThesTopGroup = GenInteraction {
+	children = ThesTopLeftGroup, ThesTopRightGroup;
+	hints 	= {
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		  HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, EXTRA_SPACING>
+			}
+	}
+}
+
+ThesBottomGroup = GenInteraction {
+	children = ThesDefinitionText, ThesSynonymList;
+	hints 	= {
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		  HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, EXTRA_SPACING>
+			}
+	}
+}
+
+ThesTopLeftGroup = GenInteraction {
+	children = ThesMeaningMonikerText1, ThesMeaningList;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+	}
+}
+
+ThesMeaningMonikerText1	= GenText {
+	moniker	 	= "Definitions for:";
+	genAttributes 	= default +readOnly; 
+	textDisplayAttributes =	default +singleLineText;
+	maxLength 	= 	MAX_ENTRY_LENGTH;
+	destination	= 	"TO_OBJ_BLOCK_OUTPUT";
+	hints 		= 	{
+				HINT_PLACE_MONIKER_ABOVE,
+				HINT_SHOW_ENTIRE_MONIKER, 
+				HINT_FIXED_SIZE {
+				   SpecWidth <SST_AVG_CHAR_WIDTHS, 
+				       	 	MAX_ENTRY_LENGTH>
+				   SpecHeight <SST_LINES_OF_TEXT, 1>
+				}
+	}
+}
+
+ThesReplaceText = GenText {
+	moniker		= 	"Replace:";
+	genAttributes 	= default +readOnly; 
+	textDisplayAttributes =	default +singleLineText;
+	maxLength 	= 	MAX_ENTRY_LENGTH;
+	destination	= 	"TO_OBJ_BLOCK_OUTPUT";
+	genStates 	= 	default - enabled;
+	hints 		= 	{
+				HINT_PLACE_MONIKER_ABOVE,
+				HINT_SHOW_ENTIRE_MONIKER, 
+				HINT_FIXED_SIZE {
+				   SpecWidth <SST_AVG_CHAR_WIDTHS, 
+						MAX_ENTRY_LENGTH>
+				   SpecHeight <>
+				}
+	}
+}
+
+ThesMeaningList = GenDynamicList {
+	queryMsg	= MSG_TC_GET_MEANING_MONIKER;
+	destination 	= "TO_OBJ_BLOCK_OUTPUT";
+	applyMsg 	= MSG_TC_MEANING_SELECTED;
+	behaviorType 	= exclusive;
+	hints 		= {
+			  	HINT_FIXED_SIZE {
+				   SpecWidth <SST_AVG_CHAR_WIDTHS, 
+						MAX_ENTRY_LENGTH+5>
+				   /* Width here must match width for
+				      ThesDefinitionText, and the value used
+				      in ThesControlFitStringWithEllipses */
+				   SpecHeight <>
+				},
+				HINT_ITEM_GROUP_SCROLLABLE,
+				HINT_ORIENT_CHILDREN_VERTICALLY,
+				ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+				ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+					word MSG_TC_MEANING_SELECTED
+				}
+	}	
+}
+
+ThesDefinitionText = GenText {
+	moniker 	= 	"Full Text of Definition";
+	genAttributes 	= default +readOnly;
+	textDisplayAttributes = default -tailOriented, +initScrolling,
+				-dontScrollToChanges;
+	maxLength 	= 	MAX_DEFINITION_SIZE;
+	destination	= 	"TO_OBJ_BLOCK_OUTPUT";
+	hints 		= 	{
+				HINT_PLACE_MONIKER_ABOVE,
+				HINT_SHOW_ENTIRE_MONIKER,
+				HINT_FIXED_SIZE {
+				   SpecWidth <SST_AVG_CHAR_WIDTHS, 
+				       	       MAX_ENTRY_LENGTH+5>
+				   /* Width here must match width for
+				      ThesMeaningList, and also the value used
+				      in ThesControlFitStringWithEllipses */
+				   SpecHeight <>
+				},
+				HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+ThesTopRightGroup = GenInteraction {
+	children = ThesReplaceText, ThesMidRightGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+	}
+}
+
+ThesMidRightGroup = GenInteraction {
+	children = ThesTriggerGroup, ThesNextText;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		  HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, EXTRA_SPACING>
+			}
+	}
+}
+
+ThesTriggerGroup = GenInteraction {
+	children = ThesLookupTrigger, ThesReplaceTrigger, ThesBackupList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, EXTRA_SPACING>
+			}
+	}
+}
+
+ThesNextText = GenText {
+	textDisplayAttributes =	default +singleLineText;
+	maxLength 	= 	MAX_ENTRY_LENGTH; 
+	destination	= 	"TO_OBJ_BLOCK_OUTPUT";
+	hints 		= 	{
+				HINT_DEFAULT_FOCUS,
+				HINT_FIXED_SIZE {
+				   SpecWidth <SST_AVG_CHAR_WIDTHS, 
+						MAX_ENTRY_LENGTH>
+				   SpecHeight <>
+				}
+	}
+}
+
+ThesBackupList = GenDynamicList {
+	moniker		= 'B', "Back";
+	genStates 	= default - enabled;
+	destination 	= "TO_OBJ_BLOCK_OUTPUT";
+	applyMsg 	= MSG_TC_BACKUP_SELECTED;
+	queryMsg	= MSG_TC_GET_BACKUP_MONIKER;
+	hints 		= {
+			  HINT_ITEM_GROUP_MINIMIZE_SIZE,
+			  HINT_ORIENT_CHILDREN_VERTICALLY,
+		 	  ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+				word MSG_TC_BACKUP_SELECTED
+			        },
+			  ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+				word MSG_TC_BACKUP_SELECTED
+				},
+			  ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION
+	}	
+}
+
+ThesSynonymList = GenDynamicList {
+	moniker 	= "Synonyms for This Definition:";
+	queryMsg	= MSG_TC_GET_SYNONYM_MONIKER;
+	destination 	= "TO_OBJ_BLOCK_OUTPUT";
+	applyMsg	= MSG_TC_SYNONYM_SELECTED;
+	behaviorType 	= exclusive;
+	hints 		= {
+				HINT_FIXED_SIZE {
+				  SpecWidth <SST_AVG_CHAR_WIDTHS,
+						MAX_SYNONYM_SIZE>
+				  SpecHeight<>
+				},
+				HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+				HINT_PLACE_MONIKER_ABOVE,
+				HINT_SHOW_ENTIRE_MONIKER,
+				HINT_ITEM_GROUP_SCROLLABLE,
+				HINT_ORIENT_CHILDREN_VERTICALLY,
+				ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+				ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+					word MSG_TC_SYNONYM_DOUBLE_CLICK
+				}
+	}	
+}
+
+ThesLookupTrigger = GenTrigger {
+	genAttributes 	= 	default +initiatesInputIgnore;
+	moniker 	= 	'L', "Lookup";
+	action		= 	MSG_TC_LOOKUP,  "TO_OBJ_BLOCK_OUTPUT";
+	hints		= {
+				HINT_DEFAULT_DEFAULT_ACTION
+	}
+}
+
+ThesReplaceTrigger = GenTrigger {
+	genStates 	= 	default - enabled; 
+	genAttributes 	= 	default +initiatesInputIgnore;
+	moniker 	= 	'R', "Replace";
+	action		= 	MSG_TC_REPLACE,  "TO_OBJ_BLOCK_OUTPUT";
+}
+
+#endif
+
+/* Redwood-specific version -- definitionless thesaurus */
+
+#if DEFINITIONLESS_THESAURUS	
+
+ThesControlGroup = GenInteraction {
+	genStates 	= default -usable;
+	children 	= ThesTopGroup, ThesBottomGroup;
+	hints= 	{
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_NO_TALLER_THAN_CHILDREN_REQUIRE,
+		HINT_NO_WIDER_THAN_CHILDREN_REQUIRE,
+		}  
+}
+
+ThesTopGroup = GenInteraction {
+	children = ThesTopLeftGroup, ThesTopRightGroup;
+	hints 	= {
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		  HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, EXTRA_SPACING>
+			}
+	}
+}
+
+ThesTopLeftGroup = GenInteraction {
+	children = ThesReplaceText, ThesMidLeftGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+	}
+}
+
+ThesReplaceText = GenText {
+	moniker		= 	"Replace:";
+	genAttributes 	= default +readOnly; 
+	textDisplayAttributes =	default +singleLineText;
+	maxLength 	= 	MAX_ENTRY_LENGTH;
+	destination	= 	"TO_OBJ_BLOCK_OUTPUT";
+	genStates 	= 	default - enabled;
+	hints 		= 	{
+				HINT_PLACE_MONIKER_ABOVE,
+				HINT_SHOW_ENTIRE_MONIKER, 
+				HINT_FIXED_SIZE {
+				   SpecWidth <SST_AVG_CHAR_WIDTHS, 
+						MAX_ENTRY_LENGTH>
+				   SpecHeight <>
+				}
+	}
+}
+
+ThesMidLeftGroup = GenInteraction {
+	children = ThesTriggerGroup, ThesNextText;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		  HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, EXTRA_SPACING>
+			}
+	}
+}
+
+ThesTriggerGroup = GenInteraction {
+	children = ThesLookupTrigger, ThesReplaceTrigger, ThesBackupList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, EXTRA_SPACING>
+			}
+	}
+}
+
+ThesLookupTrigger = GenTrigger {
+	genAttributes 	= 	default +initiatesInputIgnore;
+	moniker 	= 	'L', "Lookup";
+	action		= 	MSG_TC_LOOKUP,  "TO_OBJ_BLOCK_OUTPUT";
+	hints		= {
+				HINT_DEFAULT_DEFAULT_ACTION
+	}
+}
+
+ThesReplaceTrigger = GenTrigger {
+	genStates 	= 	default - enabled; 
+	genAttributes 	= 	default +initiatesInputIgnore;
+	moniker 	= 	'R', "Replace";
+	action		= 	MSG_TC_REPLACE,  "TO_OBJ_BLOCK_OUTPUT";
+}
+
+ThesBackupList = GenDynamicList {
+	moniker		= 'B', "Back";
+	genStates 	= default - enabled;
+	destination 	= "TO_OBJ_BLOCK_OUTPUT";
+	applyMsg 	= MSG_TC_BACKUP_SELECTED;
+	queryMsg	= MSG_TC_GET_BACKUP_MONIKER;
+	hints 		= {
+			  HINT_ITEM_GROUP_MINIMIZE_SIZE,
+			  HINT_ORIENT_CHILDREN_VERTICALLY,
+		 	  ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+				word MSG_TC_BACKUP_SELECTED
+			        },
+			  ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+				word MSG_TC_BACKUP_SELECTED
+				},
+			  ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION
+	}	
+}
+
+ThesNextText = GenText {
+	moniker = 'W', "Word: ";
+	textDisplayAttributes =	default +singleLineText;
+	maxLength 	= 	MAX_ENTRY_LENGTH; 
+	destination	= 	"TO_OBJ_BLOCK_OUTPUT";
+	hints 		= 	{
+				HINT_DEFAULT_FOCUS,
+				HINT_FIXED_SIZE {
+				   SpecWidth <SST_AVG_CHAR_WIDTHS, 
+						MAX_ENTRY_LENGTH>
+				   SpecHeight <>
+				}
+	}
+}
+
+ThesTopRightGroup = GenInteraction {
+	children = ThesDefinitionText;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+	}
+}
+
+ThesDefinitionText = GenText {
+	genAttributes 	=	default +readOnly;
+	textDisplayAttributes = default -tailOriented,
+				-dontScrollToChanges;
+	maxLength 	= 	MAX_DEFINITION_SIZE;
+	destination	= 	"TO_OBJ_BLOCK_OUTPUT";
+	hints 		= 	{
+				HINT_PLACE_MONIKER_ABOVE,
+				HINT_SHOW_ENTIRE_MONIKER,
+				HINT_FIXED_SIZE {
+				   SpecWidth <SST_AVG_CHAR_WIDTHS, 
+				       	       MAX_ENTRY_LENGTH+5>
+				   /* Width here must match width for
+				      ThesMeaningList, and also the value used
+				      in ThesControlFitStringWithEllipses */
+				   SpecHeight <>
+				},
+				HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+
+ThesBottomGroup = GenInteraction {
+	children = ThesMeaningList, ThesSynonymList;
+	hints 	= {
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		  HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, EXTRA_SPACING>
+			}
+	}
+}
+
+
+
+ThesMeaningList = GenDynamicList {
+	moniker	 	= 'M', "Meaning for this word:";
+	queryMsg	= MSG_TC_GET_MEANING_MONIKER;
+	destination 	= "TO_OBJ_BLOCK_OUTPUT";
+	applyMsg 	= MSG_TC_MEANING_SELECTED;
+	behaviorType 	= exclusive;
+	hints 		= {
+			  	HINT_FIXED_SIZE {
+				   SpecWidth <SST_AVG_CHAR_WIDTHS, 
+						MAX_ENTRY_LENGTH+5>
+				   /* Width here must match width for
+				      ThesDefinitionText, and the value used
+				      in ThesControlFitStringWithEllipses */
+				   SpecHeight <>
+				},
+				HINT_PLACE_MONIKER_ABOVE,
+				HINT_ITEM_GROUP_SCROLLABLE,
+				HINT_ORIENT_CHILDREN_VERTICALLY,
+				ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+				ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+					word MSG_TC_MEANING_SELECTED
+				}
+	}	
+}
+
+
+ThesSynonymList = GenDynamicList {
+	moniker 	= 'S', "Synonyms for this Meaning";
+	queryMsg	= MSG_TC_GET_SYNONYM_MONIKER;
+	destination 	= "TO_OBJ_BLOCK_OUTPUT";
+	applyMsg	= MSG_TC_SYNONYM_SELECTED;
+	behaviorType 	= exclusive;
+	hints 		= {
+				HINT_FIXED_SIZE {
+				  SpecWidth <SST_AVG_CHAR_WIDTHS,
+						MAX_SYNONYM_SIZE>
+				  SpecHeight<>
+				},
+				HINT_PLACE_MONIKER_ABOVE,
+				HINT_SHOW_ENTIRE_MONIKER,
+				HINT_ITEM_GROUP_SCROLLABLE,
+				HINT_ORIENT_CHILDREN_VERTICALLY,
+				ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+				ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+					word MSG_TC_SYNONYM_DOUBLE_CLICK
+				}
+	}	
+}
+
+#endif
+
+end ThesControlUI;
+
+/*---------------------------------------------*/
+
+start ThesControlToolboxUI, notDetachable;
+
+ThesToolTrigger = GenTrigger {
+	moniker = {
+	    cachedSize = 24, 16;
+	    gstring {
+		GSBeginString |
+		GSEndString
+	    }
+	}
+	genStates = default -usable;
+	action = MSG_GEN_INTERACTION_INITIATE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { ATTR_GEN_FOCUS_HELP { optr TCName } }
+}
+
+end ThesControlToolboxUI;
+
+/*
+ * Strings for controllers
+ */
+
+start ControlStrings, data;
+
+chunk TCName = "Thesaurus";
+
+end ControlStrings;

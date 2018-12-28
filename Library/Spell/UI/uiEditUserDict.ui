@@ -1,0 +1,216 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	Spell Library
+ * FILE:	uiEditUserDict.ui
+ *
+ *
+ * REVISION HISTORY:
+ *	
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	atw	9/27/92		Initial revision
+ *
+ *
+ * DESCRIPTION:
+ *	Contains UI for EditUserDictionaryControl
+ *		
+ *	$Id: uiEditUserDict.ui,v 1.1 97/04/07 11:08:14 newdeal Exp $
+ *
+ ***********************************************************************/
+
+
+start	EditUserDictControlUI, notDetachable;
+/*
+ *	Edit user dictionary UI
+ */
+
+EditDictionaryGroup = GenInteraction {
+	genStates = default -usable;	    
+	children = EditDictionaryListGroup, EditDictionaryNewWordGroup;
+	hints = {
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+			HINT_CENTER_CHILDREN_HORIZONTALLY
+		}
+}
+EditDictionaryListGroup = GenInteraction {
+#if !DEFINITIONLESS_THESAURUS	
+	moniker = "Words in User Dictionary";
+#endif
+	children = EditDictionaryList, EditDictionaryDeleteSelectedWordTrigger;
+	hints = {
+#if !DEFINITIONLESS_THESAURUS	
+		 HINT_DRAW_IN_BOX,
+#endif
+		 HINT_CENTER_CHILDREN_HORIZONTALLY,
+		}
+}
+EditDictionaryList = GenDynamicList {
+#if DEFINITIONLESS_THESAURUS	
+	moniker = 'W', "Words in User Dictionary";
+#endif
+	queryMsg = MSG_EUDC_GET_USER_DICTIONARY_LIST_MONIKER;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+#if DEFINITIONLESS_THESAURUS	
+		HINT_DRAW_IN_BOX,
+#endif
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_FIXED_SIZE {
+			SpecWidth	<SST_AVG_CHAR_WIDTHS, 25>
+			SpecHeight	<SST_LINES_OF_TEXT, 5>
+			word	5
+		},
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word	MSG_EUDC_UPDATE_SELECTED_WORD;
+		}
+	}
+
+}
+
+EditDictionaryDeleteSelectedWordTrigger = GenTrigger {
+	moniker = 'D',"Delete Selected Word";
+	genAttributes = default +initiatesInputIgnore;
+	genStates = default -enabled;
+	action = MSG_EUDC_DELETE_SELECTED_WORD_FROM_USER_DICTIONARY, "TO_OBJ_BLOCK_OUTPUT";
+}
+EditDictionaryNewWordGroup = GenInteraction {
+	children = EditDictionaryNewWord, EditDictionaryAddWordTrigger, 
+#if FLOPPY_BASED_USER_DICT
+		   EditDictionaryLoadTrigger, 
+#endif
+		   EditDictionaryCloseTrigger;
+	hints = {
+		 HINT_ORIENT_CHILDREN_VERTICALLY,
+		 HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		 HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		 HINT_CENTER_CHILDREN_HORIZONTALLY,
+		 HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+		}
+}
+EditDictionaryNewWord = GenText {
+	moniker = "New Word:";
+	textDisplayAttributes = default +singleLineText;
+	maxLength = "SPELL_MAX_WORD_LENGTH-1";
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+			ATTR_GEN_TEXT_NO_SPACES,
+			ATTR_GEN_TEXT_CUSTOM_FILTER {
+				lptr	CharsToFilter
+			},
+			HINT_DEFAULT_FOCUS,
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT
+		}
+}
+
+#ifdef DO_DBCS
+/*
+ * Filter out all the characters that aren't in the DEC character set.
+ * In DBCS, the DEC character set happens to match the first 256 characters,
+ * as both are based on the ISO Latin-1 character set.  There are some
+ * additional non-letter characters that may need to be filtered, however.
+ *
+ */
+chunk CharsToFilter = data {
+	VisTextCustomFilterData <C_LATIN_SMALL_LETTER_Y_DIAERESIS+1, C_LAST_UNICODE_CHARACTER>
+}
+
+#else
+
+chunk CharsToFilter = data {
+/*
+ * Filter out all the characters that aren't in the DEC character set, and
+ * so will get mapped to D_GEN_CURRENCY when added in. If we don't filter these
+ * out, if the user tries to add a word with one of these characters, we'll
+ * add it, but be unable to find it in the list of words, since it'll be mapped
+ * to GEN_CURRENCY instead...
+ */
+
+      	VisTextCustomFilterData	<C_DAGGER,C_DAGGER>,
+				<C_BULLET, C_BULLET>,
+				<C_REGISTERED,C_REGISTERED>,
+				<C_TRADEMARK,C_NOTEQUAL>,
+				<C_INFINITY,C_INFINITY>,
+				<C_LESSEQUAL,C_GREATEREQUAL>,
+				<C_L_DELTA, C_INTEGRAL>,
+				<C_U_OMEGA, C_U_OMEGA>,
+				<C_LOGICAL_NOT, C_U_DELTA>,
+				<C_DIVISION, C_DIAMONDBULLET>,
+				<C_FRACTION, C_FRACTION>,
+				<C_DBLDAGGER, C_DBLDAGGER>,
+				<C_PERTHOUSAND, C_PERTHOUSAND>,
+				<C_LOGO, C_LOGO>,
+				<C_LI_DOTLESS, C_CARON>
+}
+
+#endif
+
+EditDictionaryAddWordTrigger = GenTrigger {
+	moniker = 'A', "Add New Word";
+	action = MSG_EUDC_ADD_NEW_WORD_TO_USER_DICTIONARY, "TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputIgnore;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+EditDictionaryCloseTrigger = GenTrigger {
+	CLOSE_TRIGGER_VALUES
+	action = MSG_EUDC_CLOSE_EDIT_BOX, "TO_OBJ_BLOCK_OUTPUT"; 
+	genAttributes = signalInteractionComplete; 
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS} 
+	}
+}
+
+#if FLOPPY_BASED_USER_DICT 
+
+EditDictionaryLoadTrigger = GenTrigger{
+	moniker = 'L', "Load Dictionary";
+	action = MSG_EUDC_LOAD_DICTIONARY, "TO_OBJ_BLOCK_OUTPUT" ;
+	hints  = {
+		HINT_SEEK_REPLY_BAR
+	}
+} 
+#endif 
+
+end EditUserDictControlUI;
+
+start SpellControlToolboxUI, notDetachable;
+
+EditUserDictToolTrigger = GenTrigger {
+	moniker = { \
+	    cachedSize = 15, 15; \
+	    gstring { \
+		GSBeginString | \
+		GSRelMoveTo 3, 0 | \
+		GSDrawTextAtCP  <EUD> | \
+		GSEndString \
+	    } \
+	} 
+	genStates = default -usable;
+	action = MSG_GEN_INTERACTION_INITIATE, "TO_OBJ_BLOCK_OUTPUT";
+}
+
+end SpellControlToolboxUI;
+
+
+start	Strings,	data;
+chunk SpellUserDictDeleteGenericString = {Unable to delete this word from the user dictionary. The user dictionary may contain errors or be damaged. \r\rError Code: SP-01.}
+chunk SpellNoNewWordString = {You must enter the word to be added to the user dictionary first.\r\rError Code: SP-02}
+chunk SpellUserDictWordAlreadyAddedString = {This word already exists in the user dictionary.\r\rError Code: SP-03}
+
+
+
+#if FLOPPY_BASED_USER_DICT
+visMoniker DiskNotFound_OK = "OK";
+visMoniker DiskNotFound_Cancel = "VMO_CANCEL", "Esc - Cancel";
+visMoniker LoadDictionaryCancel = 'C', "Cancel";
+chunk LoadUserDictConfirmString = "Insert the disk containing your User Dictionary and press OK.";
+#endif
+
+end	Strings;

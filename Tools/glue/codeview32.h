@@ -207,9 +207,14 @@
 #define CSTT2_PFRCHAR		0x0270 // RCHAR far pointer
 
 #define CSTT2_INT2		0x0072
+#define CSTT2_PINT2             0x0172
+#define CSTT2_PFINT2            0x0272
+
 
 #define CSTT2_UINT2		0x0073
-
+#define CSTT2_PUINT2            0x0173
+#define CSTT2_PFUINT2           0x0273
+#define CSTT2_BITFIELD          0x0206
 
 #define CCC2_C_NEAR 0
 #define CCC2_C_FAR 1
@@ -234,6 +239,7 @@
 #define CTL2_ID	    	    0xffff
 
 #define CTL2_FIELDLIST		0x0204
+#define CTL2_BITFIELD           0x0206
 #define CTL2_MEMBER			0x0406
 #define CTL2_ENUMERATIO		0x0403
 

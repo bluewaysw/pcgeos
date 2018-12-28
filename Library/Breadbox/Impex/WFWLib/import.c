@@ -16,7 +16,7 @@
  ***************************************************************************/
 
 #include <geos.h>
-#include <xlatlib.h>
+#include <xlatLib.h>
 #include <resource.h>
 #include "wfwinput.h"
 #include "global.h"

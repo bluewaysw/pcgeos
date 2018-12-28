@@ -1,144 +1,144 @@
-EXPORT.obj \
-EXPORT.eobj: Export/ExportMANAGER.ASM \
-                ICOGEODE.DEF GRAPHICSGEODE.DEF GEOS.DEF GEODE.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF OBJECT.DEF \
-                LMEM.DEF CHUNKARR.DEF GEOWORKS.DEF FILE.DEF LIBRARY.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF \
-                TEXT.DEF CHAR.DEF WIN.DEF SYSTEM.DEF LOCALIZE.DEF \
-                SLLANG.DEF RESOURCE.DEF HEAP.DEF TIMEDATE.DEF INPUT.DEF \
-                HWR.DEF TIMER.DEF INITFILE.DEF VM.DEF OBJECTS/WINC.DEF \
-                SEM.DEF EC.DEF UI.DEF GCNLIST.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                MATH.DEF IMPEX.DEF IECOMMON.DEF ANSIC.DEF \
-                INTERNAL/DIB.DEF INTERNAL/XLATLIB.DEF \
-                TRANSCOMMONGLOBAL.DEF GRAPHICSMACRO.DEF ICOGLOBAL.DEF \
-                ICO.DEF EXPORTCOMMON.ASM EXPORTMAIN.ASM
-IMPORT.obj \
-IMPORT.eobj: Import/ImportMANAGER.ASM \
-                ICOGEODE.DEF GRAPHICSGEODE.DEF GEOS.DEF GEODE.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF OBJECT.DEF \
-                LMEM.DEF CHUNKARR.DEF GEOWORKS.DEF FILE.DEF LIBRARY.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF \
-                TEXT.DEF CHAR.DEF WIN.DEF SYSTEM.DEF LOCALIZE.DEF \
-                SLLANG.DEF RESOURCE.DEF HEAP.DEF TIMEDATE.DEF INPUT.DEF \
-                HWR.DEF TIMER.DEF INITFILE.DEF VM.DEF OBJECTS/WINC.DEF \
-                SEM.DEF EC.DEF UI.DEF GCNLIST.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                MATH.DEF IMPEX.DEF IECOMMON.DEF ANSIC.DEF \
-                INTERNAL/DIB.DEF INTERNAL/XLATLIB.DEF \
-                TRANSCOMMONGLOBAL.DEF GRAPHICSMACRO.DEF ICOGLOBAL.DEF \
-                ICO.DEF IMPORTCOMMON.ASM IMPORTMAIN.ASM
-LIB.obj \
-LIB.eobj: Lib/LibMANAGER.ASM \
-                ICOGEODE.DEF GRAPHICSGEODE.DEF GEOS.DEF GEODE.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF OBJECT.DEF \
-                LMEM.DEF CHUNKARR.DEF GEOWORKS.DEF FILE.DEF LIBRARY.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF \
-                TEXT.DEF CHAR.DEF WIN.DEF SYSTEM.DEF LOCALIZE.DEF \
-                SLLANG.DEF RESOURCE.DEF HEAP.DEF TIMEDATE.DEF INPUT.DEF \
-                HWR.DEF TIMER.DEF INITFILE.DEF VM.DEF OBJECTS/WINC.DEF \
-                SEM.DEF EC.DEF UI.DEF GCNLIST.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                MATH.DEF IMPEX.DEF IECOMMON.DEF ANSIC.DEF \
-                INTERNAL/DIB.DEF INTERNAL/XLATLIB.DEF \
-                TRANSCOMMONGLOBAL.DEF GRAPHICSMACRO.DEF ICOGLOBAL.DEF \
-                ICO.DEF LIBEXPORT.RDEF LIBFORMAT.ASM LIBMAIN.ASM \
-                TRANSUI.ASM TRANSLIBENTRY.ASM TRANSSEMAPHORE.ASM
-DIB2ICO.obj \
-DIB2ICO.eobj: \
-                ../GRAPHICSCOMMONH/HSIMEM.H \
-                ../GRAPHICSCOMMONH/HSIPORT.H \
-                GEOS.H \
-                ../GRAPHICSCOMMONH/HSIWIN.H \
-                HEAP.H ANSI/STDLIB.H \
-                ../GRAPHICSCOMMONH/FILEIO.H \
-                FILE.H \
-                ../GRAPHICSCOMMONH/HSIERROR.H \
-                INTERNAL/XLATLIB.H ANSI/STDIO.H \
-                ../GRAPHICSCOMMONH/HSIDIB.H \
-                ANSI/STRING.H
-ICO2DIB.obj \
-ICO2DIB.eobj: \
-                ../GRAPHICSCOMMONH/HSIMEM.H \
-                ../GRAPHICSCOMMONH/HSIPORT.H \
-                GEOS.H \
-                ../GRAPHICSCOMMONH/HSIWIN.H \
-                HEAP.H ANSI/STDLIB.H \
-                ../GRAPHICSCOMMONH/FILEIO.H \
-                FILE.H \
-                ../GRAPHICSCOMMONH/HSIERROR.H \
-                INTERNAL/XLATLIB.H ANSI/STDIO.H \
-                ../GRAPHICSCOMMONH/HSIDIB.H \
-                ANSI/STRING.H
-ICOLOAD.obj \
-ICOLOAD.eobj: \
-                ../GRAPHICSCOMMONH/HSIMEM.H \
-                ../GRAPHICSCOMMONH/HSIPORT.H \
-                GEOS.H \
-                ../GRAPHICSCOMMONH/HSIWIN.H \
-                HEAP.H ANSI/STDLIB.H \
-                ../GRAPHICSCOMMONH/FILEIO.H \
-                FILE.H \
-                ../GRAPHICSCOMMONH/HSIERROR.H \
-                INTERNAL/XLATLIB.H ANSI/STDIO.H \
-                ../GRAPHICSCOMMONH/HSIDIB.H
-LIBEXPORT.rdef: GENERIC.UIH PRODUCT.UIH IMPEX.UIH
+Lib.obj \
+Lib.eobj: Lib/libManager.asm \
+                icoGeode.def graphicsGeode.def geos.def geode.def \
+                Objects/processC.def Objects/metaC.def object.def \
+                lmem.def chunkarr.def geoworks.def file.def library.def \
+                graphics.def fontID.def font.def color.def gstring.def \
+                text.def char.def win.def system.def localize.def \
+                sllang.def resource.def heap.def timedate.def input.def \
+                hwr.def timer.def initfile.def vm.def Objects/winC.def \
+                sem.def ec.def ui.def gcnlist.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                math.def impex.def ieCommon.def ansic.def \
+                Internal/dib.def Internal/xlatLib.def \
+                transCommonGlobal.def graphicsMacro.def icoGlobal.def \
+                ico.def libExport.rdef libFormat.asm libMain.asm \
+                transUI.asm transLibEntry.asm transSemaphore.asm
+Export.obj \
+Export.eobj: Export/exportManager.asm \
+                icoGeode.def graphicsGeode.def geos.def geode.def \
+                Objects/processC.def Objects/metaC.def object.def \
+                lmem.def chunkarr.def geoworks.def file.def library.def \
+                graphics.def fontID.def font.def color.def gstring.def \
+                text.def char.def win.def system.def localize.def \
+                sllang.def resource.def heap.def timedate.def input.def \
+                hwr.def timer.def initfile.def vm.def Objects/winC.def \
+                sem.def ec.def ui.def gcnlist.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                math.def impex.def ieCommon.def ansic.def \
+                Internal/dib.def Internal/xlatLib.def \
+                transCommonGlobal.def graphicsMacro.def icoGlobal.def \
+                ico.def exportCommon.asm exportMain.asm
+Import.obj \
+Import.eobj: Import/importManager.asm \
+                icoGeode.def graphicsGeode.def geos.def geode.def \
+                Objects/processC.def Objects/metaC.def object.def \
+                lmem.def chunkarr.def geoworks.def file.def library.def \
+                graphics.def fontID.def font.def color.def gstring.def \
+                text.def char.def win.def system.def localize.def \
+                sllang.def resource.def heap.def timedate.def input.def \
+                hwr.def timer.def initfile.def vm.def Objects/winC.def \
+                sem.def ec.def ui.def gcnlist.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                math.def impex.def ieCommon.def ansic.def \
+                Internal/dib.def Internal/xlatLib.def \
+                transCommonGlobal.def graphicsMacro.def icoGlobal.def \
+                ico.def importCommon.asm importMain.asm
+dib2ico.obj \
+dib2ico.eobj: \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
+                geos.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
+                heap.h Ansi/stdlib.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
+                file.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
+                Ansi/string.h
+ico2dib.obj \
+ico2dib.eobj: \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
+                geos.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
+                heap.h Ansi/stdlib.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
+                file.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
+                Ansi/string.h
+icoload.obj \
+icoload.eobj: \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
+                geos.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
+                heap.h Ansi/stdlib.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
+                file.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h \
+                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h
+libExport.rdef: generic.uih product.uih impex.uih
 
-IcoEC.geo Ico.geo : GEOS.LDF UI.LDF ANSIC.LDF MATH.LDF IMPEX.LDF DIB.LDF 
+icoEC.geo ico.geo : geos.ldf ui.ldf ansic.ldf math.ldf impex.ldf dib.ldf 

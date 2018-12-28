@@ -3,14 +3,14 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = IDIALUP
+GEODE           = idialup
 ASM_TO_OBJS     = IDialppp.asm
 UI_TO_RDFS      =
-SRCS            = IDialppp.asm IDialppp.def IDialppp.h IDialapp.goc\
-                  IDialUI.goc IDialup.goc IDInfo.goc IDialUI.goh\
+SRCS            = IDialppp.asm IDialppp.def IDialppp.h IDialup.goc\
+                  IDialapp.goc IDInfo.goc IDialUI.goc IDialUI.goh\
                   IDialup.goh
-OBJS            = IDialppp.obj IDialapp.obj IDialUI.obj IDialup.obj\
-                  IDInfo.obj
+OBJS            = IDialppp.obj IDialup.obj IDialapp.obj IDInfo.obj\
+                  IDialUI.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

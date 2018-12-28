@@ -7,4 +7,4 @@ XGOCFLAGS = -L ijgjpeg
 # -w-  turn off some warnings
 #XCCOMFLAGS = -d -Z -Os -O -w-stu -w-par -WDE
 
-XLINKFLAGS = -N \(C\)98\20Breadbox\20Computer\20Company
+#XLINKFLAGS = -N \(C\)98\20Breadbox\20Computer\20Company

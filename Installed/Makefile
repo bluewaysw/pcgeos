@@ -264,8 +264,8 @@ Installed/Library/Trans/Text/Ascii: 	ui text MAKELIB
 msword	: Installed/Library/Trans/Text/MicrosoftWord
 Installed/Library/Trans/Text/MicrosoftWord: 	ui ansic impex msmfile MAKELIB
 
-htmlpars : Installed/Library/BreadBox/HtmlPars
-Installed/Library/BreadBox/HtmlPars: ansic text MAKELIB
+htmlpars : Installed/Library/Breadbox/HtmlPars
+Installed/Library/Breadbox/HtmlPars: ansic text MAKELIB
 
 htmlimpx : Installed/Library/Trans/Web/HtmlImpx
 Installed/Library/Trans/Web/HtmlImpx: htmlpars ansic text impex ui MAKELIB
@@ -1296,8 +1296,8 @@ Installed/Library/ssl:				ansic socket mapheap MAKELIB
 impgraph	: Installed/Library/Breadbox/impgraph
 Installed/Library/Breadbox/impgraph:		ansic ijgjpeg MAKELIB #fjpeg
 
-ijgjpeg	: 	Installed/Library/Breadbox/ijgjpeg
-Installed/Library/Breadbox/ijgjpeg:		ui ansic MAKELIB
+ijgjpeg	: 	Installed/Library/Breadbox/Ijgjpeg
+Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
 
 #fjpeg	: 	Installed/Library/Breadbox/fjpeg
 #Installed/Library/Breadbox/fjpeg:		ui ansic MAKELIB
@@ -1330,8 +1330,8 @@ dirlist : 	Installed/Library/Breadbox/dirlist
 Installed/Library/Breadbox/dirlist:		ansic ui MAKELIB
 #endif
 
-minizip : 	Installed/Library/Breadbox/minizip
-Installed/Library/Breadbox/minizip:		ansic ui zlib MAKELIB
+minizip : 	Installed/Library/Breadbox/MiniZip
+Installed/Library/Breadbox/MiniZip:		ansic ui zlib MAKELIB
 
 #if defined(PRODUCT) && $(PRODUCT) == "NDO2000"
 #else

@@ -1,12 +1,12 @@
 include stdapp.def
 include vm.def
-include objects\gCtrlC.def
+include Objects/gCtrlC.def
 include library.def
 include resource.def    ; idata/udata, ProcCallFixedOrMovable etc.
 include gstring.def
 
 UseLib math.def
-DefLib main\jpeg.def
+DefLib Main/jpeg.def
 
 include Internal/heapInt.def
 
