@@ -28,13 +28,13 @@ library text
 library accpnt
 library parentc
 
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource CHANDISPLAYRESOURCE ui-object
+resource AppResource ui-object
+resource Interface ui-object
+resource ChanDisplayResource ui-object
 resource ICONS data object
-#resource LOGORESOURCE data object
-resource PRIVDBOXRESOURCE ui-object
-resource TEXTSTRINGS data object
+#resource LogoResource data object
+resource PrivDboxResource ui-object
+resource TextStrings data object
 
 export IRCApplicationClass
 export GenTextLimitClass

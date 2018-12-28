@@ -3,14 +3,14 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = BBXCHAT
+GEODE           = bbxchat
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = miscpro.goc Interfac.goc process.goc routines.goc\
-                  sortlis.goc textlim.goc TXT_STRS.GOC APPICONS.GOH\
-                  BBOX.GOH BBXREG.GOH externs.goh gpcchat.goh APPCOLOR.GOH
-OBJS            = miscpro.obj Interfac.obj process.obj routines.obj\
-                  sortlis.obj textlim.obj TXT_STRS.obj
+SRCS            = sortlis.goc miscpro.goc routines.goc Interfac.goc\
+                  process.goc textlim.goc txt_strs.goc bbox.goh bbxreg.goh\
+                  appcolor.goh externs.goh appicons.goh gpcchat.goh
+OBJS            = sortlis.obj miscpro.obj routines.obj Interfac.obj\
+                  process.obj textlim.obj txt_strs.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
