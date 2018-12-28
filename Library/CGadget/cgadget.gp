@@ -42,10 +42,10 @@ tokenid		0
 #resource GadgetsControlInfo		read-only shared
 #resource GadgetsClassStructures		fixed read-only shared
 #resource DateSelectorUI 		ui-object read-only shared
-resource DATEINPUTUI			ui-object read-only shared
+resource DateInputUI			ui-object read-only shared
 #resource StopwatchUI			ui-object read-only shared
-resource TIMEINPUTUI			ui-object read-only shared
-resource CONTROLSTRINGS 		lmem
+resource TimeInputUI			ui-object read-only shared
+resource ControlStrings 		lmem
 #resource GadgetsStrings			lmem read-only shared
 #resource GadgetsBatteryIndicatorCode	read-only code shared
 
