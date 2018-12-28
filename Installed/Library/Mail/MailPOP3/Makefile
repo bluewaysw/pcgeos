@@ -3,12 +3,12 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = MailPOP3
+GEODE           = mailpop3
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = buffer.h buffer.goc mailpop3.goc mime.goc mailfatals.goh\
-                  mime.goh
-OBJS            = buffer.obj mailpop3.obj mime.obj
+SRCS            = buffer.h mailpop3.goc buffer.goc mime.goc mime.goh\
+                  mailfatals.goh
+OBJS            = mailpop3.obj buffer.obj mime.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = mailpop3

@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = MailSMTP
+GEODE           = mailsmtp
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = mailmsg.goc mailsmtp.goc mailfatals.goh
-OBJS            = mailmsg.obj mailsmtp.obj
+SRCS            = mailsmtp.goc mailmsg.goc mailfatals.goh
+OBJS            = mailsmtp.obj mailmsg.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = mailsmtp

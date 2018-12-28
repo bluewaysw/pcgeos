@@ -173,8 +173,8 @@ Installed/Library/Net :	MAKELIB
 ui	: Installed/Library/User
 Installed/Library/User	:	sound compress net wav MAKELIB
 
-isui	: Installed/Library/SpecUI/isui
-Installed/Library/SpecUI/isui	:	text MAKELIB
+isui	: Installed/Library/SpecUI/ISUI
+Installed/Library/SpecUI/ISUI	:	text MAKELIB
 
 motif	: Installed/Library/SpecUI/Motif
 Installed/Library/SpecUI/Motif:	text MAKELIB
@@ -636,8 +636,8 @@ Installed/Driver/Keyboard/French/Extended:		MAKEDRV
 kbdn_fr	: Installed/Driver/Keyboard/French/NonExtended
 Installed/Driver/Keyboard/French/NonExtended:		MAKEDRV
 
-kps1_fr	: Installed/Driver/Keyboard/French/Ps1
-Installed/Driver/Keyboard/French/Ps1:			MAKEDRV
+kps1_fr	: Installed/Driver/Keyboard/French/PS1
+Installed/Driver/Keyboard/French/PS1:			MAKEDRV
 
 kbde_sf : Installed/Driver/Keyboard/French/SwissExtended
 Installed/Driver/Keyboard/French/SwissExtended:		MAKEDRV
