@@ -879,7 +879,7 @@ LINK		: .USE
 	$(CCOM) $(CCOMFLAGS) -fo=$(.TARGET) $(.TARGET:R).nc $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)
-	rm $(.TARGET:R:S|/|\\|g).nc
+	rm $(.TARGET:R).nc
 #else
 	del $(.TARGET:R:S|/|\\|g).nc
 #endif
@@ -890,7 +890,7 @@ LINK		: .USE
 	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo=$(.TARGET) $(.TARGET:R).ec $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)
-	rm $(.TARGET:R:S|/|\\|g).ec
+	rm $(.TARGET:R).ec
 #else
 	del $(.TARGET:R:S|/|\\|g).ec
 #endif
