@@ -56,4 +56,4 @@ extern struct strFilterList flFaxExportFilter[];
 #define FAX_GAMMA      "GammaLink"
 #define FAX_FRECOM     "Frecom Fax/9600"
 #define FAX_TELEFAX    "Telefax"
-
+

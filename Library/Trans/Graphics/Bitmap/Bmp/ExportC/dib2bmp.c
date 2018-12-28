@@ -76,7 +76,7 @@ static char szDefault[20]=".BMP";
    main program 
 */ 
  
-#ifdef __BORLANDC__
+#if defined(__BORLANDC__) || defined(__WATCOMC__)
 short EXPORT
 #else
 short 
@@ -101,26 +101,26 @@ ExportBmp(FILE * dibfile, FILE * bmpfile,short formatOption)
  
    _settextcolor(15); 
    _setbkcolor(3); 
-   _outtext(" ษอออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป \n"); 
-   _outtext(" บ              Copyright(c) 1990-92,  Halcyon Software        (408)378-9898 บ \n"); 
-   _outtext(" ฬอออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออน \n"); 
-   _outtext(" บ                                                                           บ \n"); 
-   _outtext(" บ   Description: This program converts Windows 3.0 Device Independent       บ \n"); 
-   _outtext(" บ                Bitmap (DIB) to one of the BMP file format.                บ \n"); 
-   _outtext(" บ                                                                           บ \n"); 
-   _outtext(" บ   Usage:       DIB2BMP {-v, -h, -f<n>}  <Infile> <outfile>                บ \n"); 
-   _outtext(" บ                                                                           บ \n"); 
-   _outtext(" บ       -v       : Verbose (optional)                                       บ \n"); 
-   _outtext(" บ       -h       : Display help screen                                      บ \n"); 
-   _outtext(" บ       -f<n>    : Output file format options                               บ \n"); 
-   _outtext(" บ          n = 1 : OS/2 Device Independent Bitmap                           บ \n"); 
-   _outtext(" บ          n = 2 : Windows 2.x Device Dependent Bitmap                      บ \n"); 
-   _outtext(" บ          n = 3 : Windows 3.0 Device Independent Bitmap                    บ \n"); 
-   _outtext(" บ          n = 4 : Windows 3.0 compressed DIB (RLE)                         บ \n"); 
-   _outtext(" บ       <infile> : DIB input file name                                      บ \n"); 
-   _outtext(" บ       <outfile>: BMP output file name                                     บ \n"); 
-   _outtext(" บ                                                                           บ \n"); 
-   _outtext(" ศอออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ \n"); 
+   _outtext(" ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอป \n"); 
+   _outtext(" ๏ฟฝ              Copyright(c) 1990-92,  Halcyon Software        (408)378-9898 ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอน \n"); 
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ   Description: This program converts Windows 3.0 Device Independent       ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ                Bitmap (DIB) to one of the BMP file format.                ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ   Usage:       DIB2BMP {-v, -h, -f<n>}  <Infile> <outfile>                ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ       -v       : Verbose (optional)                                       ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ       -h       : Display help screen                                      ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ       -f<n>    : Output file format options                               ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ          n = 1 : OS/2 Device Independent Bitmap                           ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ          n = 2 : Windows 2.x Device Dependent Bitmap                      ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ          n = 3 : Windows 3.0 Device Independent Bitmap                    ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ          n = 4 : Windows 3.0 compressed DIB (RLE)                         ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ       <infile> : DIB input file name                                      ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ       <outfile>: BMP output file name                                     ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ                                                                           ๏ฟฝ \n"); 
+   _outtext(" ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอผ \n"); 
    _settextcolor(oldfgd); 
    _setbkcolor(oldbgd); 
    exit(1); 
