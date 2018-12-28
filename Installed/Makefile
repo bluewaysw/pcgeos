@@ -300,7 +300,7 @@ Installed/Library/SSMeta:	ui math MAKELIB
 
 # bsnwav will only be compiled (and is only referenced in WAV) if PRODUCT==NDO2000
 wav	: Installed/Library/Wav
-Installed/Library/Wav:	sound bsnwav MAKELIB
+Installed/Library/Wav:	sound MAKELIB
 
 game	: Installed/Library/Game
 Installed/Library/Game:	ui wav MAKELIB
