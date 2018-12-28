@@ -16,7 +16,8 @@
 #include <$(SYSMAKEFILE)>
 
 GOCFLAGS += -DPRODUCT_$(PRODUCT) -L inetmsg
-LINKFLAGS += -DPRODUCT_$(PRODUCT) -N (C)99\20Breadbox\20Computer\20Company
+LINKFLAGS += -DPRODUCT_$(PRODUCT) 
+#LINKFLAGS += -N \(C\)99\20Breadbox\20Computer\20Company
 CCOMFLAGS += -DPRODUCT_$(PRODUCT)
 
 

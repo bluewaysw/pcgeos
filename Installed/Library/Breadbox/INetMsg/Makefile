@@ -3,16 +3,16 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = INetMsg
-ADL             = adlMain.goc
+GEODE           = inetmsg
 AEL             = ael.goc
 UICLASS         = MsgCompC.goc
+ADL             = adlMain.goc
 UI_TO_RDFS      =
-OBJS            = adlMain.obj ael.obj MsgCompC.obj
+OBJS            = ael.obj MsgCompC.obj adlMain.obj
 COMMON          =
 MODULES         =
-CMODULES        = ADL AEL UIClass
-SRCS            = $(ADL) $(AEL) $(UICLASS) $(COMMON)
+CMODULES        = AEL UIClass ADL
+SRCS            = $(AEL) $(UICLASS) $(ADL) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = inetmsg
