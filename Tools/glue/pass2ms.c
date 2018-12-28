@@ -957,12 +957,12 @@ Pass2MS_ProcessObject(const char *file,
 		 */
 		if (rectype == MO_LEXTDEF) {
 			isGlobal = FALSE;
+			printf("Looking for %s\n", (char*)bp+1);
 		}
 		endRecord = bp+reclen;
-
 		while (bp < endRecord) {
 		    name = ST_Lookup(symbols, strings, (char *)bp+1, *bp);
-		    if (Sym_Find(symbols, 0, name, &symBlock, &symOff, isGlobal))
+		    if (Sym_FindWithFile(symbols, file, 0, name, &symBlock, &symOff, isGlobal))
 		    {
 			/*
 			 * Got it -- store the block and offset.
@@ -979,8 +979,8 @@ Pass2MS_ProcessObject(const char *file,
 					    (*bp) - 1);
 
 			if ((newname == NullID) ||
-			    !Sym_Find(symbols, 0, newname, &symBlock, &symOff,
-				      TRUE))
+			    !Sym_FindWithFile(symbols, file, 0, newname, &symBlock, &symOff,
+				      isGlobal))
 			{
 			    /*
 			     * Couldn't find it -- store the name with the
