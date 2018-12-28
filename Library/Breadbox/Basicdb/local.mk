@@ -24,5 +24,5 @@
 #include <$(SYSMAKEFILE)>
 
 XGOCFLAGS += -L basicdb
-XLINKFLAGS += -N \(C\)98\20Breadbox\20Computer\20Company
+#XLINKFLAGS += -N \(C\)98\20Breadbox\20Computer\20Company
 
