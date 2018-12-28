@@ -1490,7 +1490,7 @@ printf("Pass1MS_ProcessObject %s\n", file);
 		 */
 		done = TRUE;
 		break;
-            case MO_CVEXT:
+            case MO_LEXTDEF:
 	    case MO_EXTDEF:
 	    {
 		/*

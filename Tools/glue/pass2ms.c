@@ -937,7 +937,7 @@ Pass2MS_ProcessObject(const char *file,
 		}
 		done = TRUE;
 		break;
-            case MO_CVEXT:
+            case MO_LEXTDEF:
 	    case MO_EXTDEF:
 	    {
 		/*
@@ -950,12 +950,19 @@ Pass2MS_ProcessObject(const char *file,
 		word	    	symOff;
 		VMPtr	    	sym;
 		byte	    	*endRecord;
+		int             isGlobal = TRUE;
 
+		/**
+		 * If we're LEXTDEF, we search within this file only
+		 */
+		if (rectype == MO_LEXTDEF) {
+			isGlobal = FALSE;
+		}
 		endRecord = bp+reclen;
 
 		while (bp < endRecord) {
 		    name = ST_Lookup(symbols, strings, (char *)bp+1, *bp);
-		    if (Sym_Find(symbols, 0, name, &symBlock, &symOff, TRUE))
+		    if (Sym_Find(symbols, 0, name, &symBlock, &symOff, isGlobal))
 		    {
 			/*
 			 * Got it -- store the block and offset.

@@ -3225,18 +3225,27 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		/*
 		* Mark the thing global if it's really declared public.
 		*/
-		printf("CHECK GLOBAL %i\r\n", name);
-		if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
-			&real, (ID *)NULL) && real)
-		{
-			printf("CHECK GLOBAL %i TRUE\r\n", name);
-			os->flags |= OSYM_GLOBAL;
+		if (recType == CST2_GPROC16) {
+			printf("CHECK GLOBAL %i\r\n", name);
+			if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
+				&real, (ID *)NULL) && real)
+			{
+				printf("CHECK GLOBAL %i TRUE\r\n", name);
+				os->flags |= OSYM_GLOBAL;
 #if 0
-			if (alias != name) {
-				Sym_Enter(symbols, sd->syms, alias, symBlock,
-					scopeStack[scopeTop - 1]);
-			}
+				if (alias != name) {
+					Sym_Enter(symbols, sd->syms, alias, symBlock,
+						scopeStack[scopeTop - 1]);
+				}
 #endif
+			}
+		} else {
+			printf("CHECK LOCAL %i\r\n", name);
+			if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
+				&real, (ID *)NULL) && real)
+			{
+				printf("CHECK LOCAL %i TRUE\r\n", name);
+			}
 		}
 		/*
 		* Enter the symbol into the table for the segment.

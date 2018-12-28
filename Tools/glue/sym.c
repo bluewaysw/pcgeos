@@ -761,9 +761,11 @@ Sym_Enter(VMHandle  	file,    	/* Output file */
  *	ardeb	10/20/89	Initial Revision
  *
  ***********************************************************************/
+
 int
-Sym_FindWithSegment(VMHandle   	    file,	   /* File in which to
+Sym_FindWithSegmentAndFile(VMHandle   	    file,	   /* File in which to
 						    * search */
+		    const char*     fileName,      /* Acceptable filename, may be null */
 		    ID 	    	    id, 	   /* Name of symbol to find */
 		    VMBlockHandle   *symBlockPtr,   /* Place to store handle of
 					            * block holding the symbol
@@ -848,6 +850,17 @@ Sym_FindWithSegment(VMHandle   	    file,	   /* File in which to
     return(retval);
 }
 
+int
+Sym_FindWithSegment(VMHandle file,
+		    ID id,
+		    VMBlockHandle *symBlockPtr,
+		    word *symOffPtr,
+		    int globalOnly,
+		    SegDesc **sdPtr)
+{
+    return Sym_FindWithSegmentAndFile(file, 0,id, symBlockPtr, symOffPtr, globalOnly,sdPtr);
+}
+
 /***********************************************************************
  *				Sym_Find
  ***********************************************************************

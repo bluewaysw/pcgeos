@@ -469,7 +469,7 @@
  * same as for MO_EXTDEF with the symbols being stored in the "externals"
  * vector, but they are not actually external.
  */
-#define MO_CVEXT    0xb4
+#define MO_LEXTDEF    0xb4
 
 /*
  * Special PUBDEF record for use by fixups for CodeView symbols. Format is
