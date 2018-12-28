@@ -3,17 +3,17 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = JPEG
-GRAPH           = QUANT.C QUANT.H
-MAIN            = mainManager.asm JPEG.DEF
-PALETTE         = PALETTE.GOC PALETTE.GOH
-XLAT            = EXPJPEG.GOC IMPJPEG.GOC
-UI_TO_RDFS      = MANAGER.UI
-OBJS            = QUANT.obj PALETTE.obj EXPJPEG.obj IMPJPEG.obj
+GEODE           = jpeg
+MAIN            = mainManager.asm jpeg.def
+GRAPH           = quant.c quant.h
+PALETTE         = palette.goc palette.goh
+XLAT            = impjpeg.goc exjpeg.goc
+UI_TO_RDFS      = manager.ui
+OBJS            = quant.obj palette.obj impjpeg.obj exjpeg.obj
 COMMON          =
 MODULES         = Main
 CMODULES        = Graph Palette Xlat
-SRCS            = $(GRAPH) $(MAIN) $(PALETTE) $(XLAT) $(COMMON)
+SRCS            = $(MAIN) $(GRAPH) $(PALETTE) $(XLAT) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = jpeg
