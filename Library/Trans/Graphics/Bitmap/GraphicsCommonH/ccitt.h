@@ -33,4 +33,4 @@ typedef struct S_T4
 extern int whtcnt, blkcnt;
 extern T4 wht[], blk[], whtsrt[], blksrt[];
 extern T4 whttbl[], blktbl[];
-
+

@@ -70,7 +70,9 @@ HISTORY
             compatible compression, where type 2 is modified G3 compression.
 
 **********************************************************************/
+#ifndef __WATCOMC__
 #pragma Comment("@" __FILE__);
+#endif
 
 #include "hsimem.h"
 #include "hsierror.h"

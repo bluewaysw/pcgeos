@@ -61,4 +61,4 @@
 
 #define    TIF_INVERT      0x20    // bit 5, 1:invert, 
 #define    TIF_NOINVERT    0x00    //        0:no invert
-
+

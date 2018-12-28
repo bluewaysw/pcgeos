@@ -3,23 +3,23 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Tif
-COMMON          = dib.c fixshort.c hsiport.c packbit.c
+GEODE           = tif
 COMMONC         = ccitt.c
-EXPORT          = cpt.asm exportMain.asm exportManager.asm
-EXPORTC         = cpt4.c dib2tif.c lzwc.c tiffsave.c tif.h
-IMPORT          = importMain.asm importManager.asm
-IMPORTC         = dcpt4.c lzw.c lzw1.c t4.c tif2dib.c tiffload.c
+EXPORTC         = cpt4.c tiffsave.c lzwc.c dib2tif.c tif.h
 LIB             = libFormat.asm libMain.asm libManager.asm libExport.ui
-UI_TO_RDFS      = LIBEXPORT.UI
-OBJS            = dib.obj fixshort.obj hsiport.obj packbit.obj ccitt.obj\
-                  cpt4.obj dib2tif.obj lzwc.obj tiffsave.obj dcpt4.obj\
-                  lzw.obj lzw1.obj t4.obj tif2dib.obj tiffload.obj
+EXPORT          = cpt.asm exportManager.asm exportMain.asm
+IMPORT          = importMain.asm importManager.asm
+IMPORTC         = tif2dib.c tiffload.c dcpt4.c lzw.c t4.c lzw1.c
+COMMON          = packbit.c fixshort.c hsiport.c dib.c
+UI_TO_RDFS      = libExport.ui
+OBJS            = ccitt.obj cpt4.obj tiffsave.obj lzwc.obj dib2tif.obj\
+                  tif2dib.obj tiffload.obj dcpt4.obj lzw.obj t4.obj\
+                  lzw1.obj packbit.obj fixshort.obj hsiport.obj dib.obj
 COMMON          = tif.def tifGeode.def tifGlobal.def
-MODULES         = Export Import Lib
-CMODULES        = Common CommonC ExportC ImportC
-SRCS            = $(COMMON) $(COMMONC) $(EXPORT) $(EXPORTC) $(IMPORT)\
-                  $(IMPORTC) $(LIB) $(COMMON)
+MODULES         = Lib Export Import
+CMODULES        = CommonC ExportC ImportC Common
+SRCS            = $(COMMONC) $(EXPORTC) $(LIB) $(EXPORT) $(IMPORT)\
+                  $(IMPORTC) $(COMMON) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = tif
