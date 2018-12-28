@@ -3,17 +3,17 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = HMBASE
+GEODE           = hmbase
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = DOC_MTDS.GOC DTA_MTDS.GOC Exp_mtds.goc FLD_MTDS.GOC\
-                  gbas_ui.goc Imp_mtds.goc NAV_MTDS.GOC RPT_MTDS.GOC\
-                  Sch_mtds.goc SRT_MTDS.GOC TXT_STRS.GOC BBOX.GOH\
-                  BBXREG.GOH BTNS.GOH externs.goh FINDICON.GOH gpcbase.goh\
-                  HBICONS.GOH appicons.goh rpticons.goh
-OBJS            = DOC_MTDS.obj DTA_MTDS.obj Exp_mtds.obj FLD_MTDS.obj\
-                  gbas_ui.obj Imp_mtds.obj NAV_MTDS.obj RPT_MTDS.obj\
-                  Sch_mtds.obj SRT_MTDS.obj TXT_STRS.obj
+SRCS            = TXT_STRS.goc NAV_MTDS.goc Imp_mtds.goc DTA_MTDS.goc\
+                  RPT_MTDS.goc gbas_ui.goc Exp_mtds.goc SRT_MTDS.goc\
+                  FLD_MTDS.goc DOC_MTDS.goc Sch_mtds.goc rpticons.goh\
+                  gpcbase.goh bbox.goh findicon.goh bbxreg.goh btns.goh\
+                  externs.goh appicons.goh hbicons.goh
+OBJS            = TXT_STRS.obj NAV_MTDS.obj Imp_mtds.obj DTA_MTDS.obj\
+                  RPT_MTDS.obj gbas_ui.obj Exp_mtds.obj SRT_MTDS.obj\
+                  FLD_MTDS.obj DOC_MTDS.obj Sch_mtds.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

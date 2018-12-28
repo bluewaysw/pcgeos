@@ -1,0 +1,666 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/*
+ **************************************************************************
+ *  FILE:			doc_mtds.goc
+ *  PROJECT:		Breadbox GPCBase
+ *  DESCRIPTION:	This file has methods for document management
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "gpcbase.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Code for GPCBaseProcessClass   document handling
+ ***************************************************************************
+ */
+
+  /* initialize things */
+  FileHandle  GPCBFile = NullHandle;
+  optr GPCBDoc = 0;
+  
+  word  numRecords = 0;
+  word  numFields = MAX_FIELDS;
+  word  firstGroup = 99;
+  word  lastGroup = 99;
+  word  currentRecord = /*0*/GIGS_NONE;
+  Boolean isMod = FALSE;
+  Boolean checkMod = TRUE;
+  Boolean closing = FALSE;
+  Boolean g_done = FALSE;
+  word viewField = 0;
+  word sortField = 0;
+  word sortDir = S_UP;
+  word sortField2 = 0;
+  word sortDir2 = S_UP;
+  word sortField3 = 0;
+  word sortDir3 = S_UP;
+  word numChecks = 0;
+  Boolean dataMayHaveChanged = FALSE;
+
+  MemHandle   sortListHeapHandle = NullHandle;
+  VMBlockHandle  sortListVMBHandle = NullHandle;
+  ChunkHandle    sortListChunkArray = NullHandle;
+
+
+ @extern visMoniker HBDocIconMonikerList; 
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for GPCBaseProcessClass
+ *
+ * DESCRIPTION:
+ *
+ ***********************************************************************/
+@extern method GPCBaseProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+
+
+@ifdef COMPILEGPC
+    /* see which mode were in */
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY)  {
+	  @call GPCBasePrimary::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	  @call GPCBasePrimary::MSG_META_DELETE_VAR_DATA(
+		HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD);
+	  @call GPCBasePrimary::MSG_META_DELETE_VAR_DATA(
+		HINT_CENTER_WINDOW);
+	  @call GPCBasePrimary::MSG_META_ADD_VAR_DATA(
+		(HINT_PRIMARY_FULL_SCREEN | VDF_SAVE_TO_STATE),
+		0, 
+		NULL);
+	  @call GPCBasePrimary::MSG_GEN_SET_USABLE(VUM_NOW);
+	  }
+@endif
+
+    /* set ImpEx file sel behavior */
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY)  {
+	  @call ImpFileSel::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+					  FSFC_MASK_CASE_INSENSITIVE |
+					  FSFC_NON_GEOS_FILES);
+	  @call ImpFileSel::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+					  FSA_USE_VIRTUAL_ROOT |
+					  FSA_HAS_DOCUMENT_BUTTON |
+					  FSA_HAS_CHANGE_DRIVE_LIST |
+					  FSA_HAS_FILE_LIST);
+	  @call ExpFileSel::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+					  FSFC_MASK_CASE_INSENSITIVE |
+					  FSFC_NON_GEOS_FILES);
+	  @call ExpFileSel::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+					  FSA_USE_VIRTUAL_ROOT |
+					  FSA_HAS_DOCUMENT_BUTTON |
+					  FSA_HAS_CHANGE_DRIVE_LIST |
+					  FSA_HAS_FILE_LIST |
+					  FSA_SHOW_FILES_DISABLED);
+	  }
+
+    @callsuper();
+
+    /* needed to install app tiny token in newUI */
+    @call GPCBaseApp::MSG_GEN_APPLICATION_INSTALL_TOKEN(); 
+
+    /* needed to install doc token */
+    @call process::MSG_GEN_PROCESS_INSTALL_TOKEN(); 
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE for
+ *                                    GPCBaseDocumentClass
+ *
+ *
+ * DESCRIPTION:	Called to initialize a newly opened document.
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBaseDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+{
+ DBGroupAndItem	mapItem;
+ GroupStruct		*group;
+ DBMapStruct*		mapPtr;
+ VMMapStruct		*VMmapPtr;
+ MemHandle		mh;
+ VMBlockHandle		vmbh;
+ word			i;
+ optr defFieldNameOptr[MAX_FIELDS] = {
+		@f1Str,
+		@f2Str,
+		@f3Str,
+		@f4Str,
+		@f5Str,
+		@f6Str,
+		@f7Str,
+		@f8Str,
+		@f9Str,
+		@f10Str
+} ;
+
+
+    closing = FALSE;
+    GPCBFile = pself->GDI_fileHandle;
+
+    /* Create an ungrouped item to use for map item */
+    mapItem = DBAllocUngrouped(GPCBFile, sizeof(DBMapStruct));
+    /* Set the map item to our new item */
+    DBSetMapUngrouped(GPCBFile, mapItem);
+    /* Now initialize the map item.  */
+    mapPtr = DBLockMap(GPCBFile);
+    mapPtr->MS_numRecords = 0;
+    mapPtr->MS_firstGroup = 99;
+    mapPtr->MS_lastGroup = 99;
+    /* Mark the map item as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* increase the map item for the group array */
+    DBReAllocUngrouped(GPCBFile, mapItem,
+		       sizeof(DBMapStruct) + (37 * sizeof(GroupStruct)));
+
+    /* initialize the groups in the map */
+    /* Lock the map */
+    mapPtr = DBLockMap(GPCBFile);
+    group = (GroupStruct *) (mapPtr + 1);
+
+
+    /* loop thru */
+    for (i = 0; i < 37; i++)  {
+       group[i].GS_group = 0;
+       group[i].GS_numGroupRecs = 0;
+       group[i].GS_indexStart = 0;
+       }
+
+    /* Mark the map item as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* Create a VM block for the sort list ------------------ */
+    sortListVMBHandle = VMAlloc(GPCBFile, 512, SORTLIST);
+    /* create a mem block to attach to it */
+    sortListHeapHandle = MemAlloc(
+			    512,
+			    HF_SWAPABLE,
+			    HAF_LOCK);
+    LMemInitHeap(sortListHeapHandle,
+			    LMEM_TYPE_GENERAL,
+			    0,
+			    sizeof(LMemBlockHeader),
+			    STD_INIT_HANDLES,
+			    STD_INIT_HEAP);
+
+    /* create the chunk array  */
+    sortListChunkArray = ChunkArrayCreate(
+				sortListHeapHandle,
+				sizeof(SortStruct),
+				0,
+				0);  /* ObjChunkFlags */
+    MemUnlock(sortListHeapHandle);
+    /* and attach the block to the VM -
+	  done like this to keep VM block ID so that
+	  we can retrieve the block later */
+    VMAttach(GPCBFile, sortListVMBHandle, sortListHeapHandle);
+
+    /* now a VM Map Block for field names  & sort list handle */
+    vmbh = VMAlloc(GPCBFile, sizeof(VMMapStruct), 0);
+    VMSetMapBlock(GPCBFile, vmbh);
+
+    VMmapPtr = VMLock(GPCBFile, vmbh, &mh);
+
+    VMmapPtr->VMS_numFields = MAX_FIELDS;
+
+    /* enter the default field names and types */
+    MemLock (OptrToHandle(@DelRecMsg));
+    for (i = 0; i < MAX_FIELDS; i++)  {
+	  strcpy(VMmapPtr->VMS_fieldName[i], LMemDeref(defFieldNameOptr[i]));
+	  VMmapPtr->VMS_fieldType[i] = T_GEN;
+	  }
+    MemUnlock (OptrToHandle(@DelRecMsg));
+    VMmapPtr->VMS_sortChunkHan = sortListChunkArray;
+    VMmapPtr->VMS_viewField = 0;
+    VMmapPtr->VMS_sortField = 0;
+    VMmapPtr->VMS_sortField2 = 0;
+    VMmapPtr->VMS_sortField3 = 0;
+    VMmapPtr->VMS_sortDir = S_UP;
+    VMmapPtr->VMS_sortDir2 = S_UP;
+    VMmapPtr->VMS_sortDir3 = S_UP;
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    return(FALSE);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT for GPCBaseDocumentClass
+ *
+ *
+ * DESCRIPTION:	Put the doc file data into the right places.
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBaseDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+{
+ DBMapStruct        *mapPtr;
+ VMBlockHandle		vmbh;
+ VMMapStruct		*VMmapPtr;
+ MemHandle		mh;
+
+
+    closing = FALSE;
+
+    GPCBFile = pself->GDI_fileHandle;
+    GPCBDoc = oself;
+
+    /* Just lock the map item */
+    mapPtr = (DBMapStruct *) DBLockMap(GPCBFile);
+
+    /* Get the number of records*/
+    numRecords = mapPtr->MS_numRecords;
+    firstGroup = mapPtr->MS_firstGroup;
+    lastGroup = mapPtr->MS_lastGroup;
+
+    DBUnlock(mapPtr);
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(GPCBFile);
+    VMmapPtr = (VMMapStruct *) VMLock(GPCBFile, vmbh, &mh);
+
+    /* and the number of fields etc. */
+    numFields = VMmapPtr->VMS_numFields;
+    viewField = VMmapPtr->VMS_viewField;
+    sortField = VMmapPtr->VMS_sortField;
+    sortField2 = VMmapPtr->VMS_sortField2;
+    sortField3 = VMmapPtr->VMS_sortField3;
+    sortDir = VMmapPtr->VMS_sortDir;
+    sortDir2 = VMmapPtr->VMS_sortDir2;
+    sortDir3 = VMmapPtr->VMS_sortDir3;
+    sortListChunkArray = VMmapPtr->VMS_sortChunkHan;
+    VMUnlock(mh);
+
+    /* initialize */
+    numChecks = 0;
+    isMod = FALSE;
+    currentRecord = 0;
+
+    /* update the fields shown in create new & attrs db*/
+    @call process::MSG_DISPLAY_FIELDS(numFields);
+
+    /* Show the field names */
+    @call process::MSG_DISPLAY_NAMES();
+
+    /* show the number of records */
+    UpdateNumRecords();
+
+    /* initialize the records list */
+    @call RecordsDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numRecords);
+
+    /* Show first record data if it exists */
+    if (numRecords)  {
+	  checkMod = FALSE;
+	  @call process::MSG_NAV_RECORDS(FIRST);
+       }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT for GPCBaseDocumentClass
+ *
+ * DESCRIPTION:	Called when file is closed.
+ *
+ *
+ ***********************************************************************/
+
+@extern method GPCBaseDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+{
+ optr fieldOptr[MAX_FIELDS] = {
+		@Field1,
+		@Field2,
+		@Field3,
+		@Field4,
+		@Field5,
+		@Field6,
+		@Field7,
+		@Field8,
+		@Field9,
+		@Field10};
+ optr defFieldNameOptr[MAX_FIELDS] = {
+		@f1Str,
+		@f2Str,
+		@f3Str,
+		@f4Str,
+		@f5Str,
+		@f6Str,
+		@f7Str,
+		@f8Str,
+		@f9Str,
+    		@f10Str};
+ word		i;
+
+
+    /* reset globals in case another file is opened. */
+    numRecords = 0;
+    firstGroup = 99;
+    lastGroup = 99;
+    currentRecord = /*0*/GIGS_NONE;
+    isMod = FALSE;
+    SNChar = 0;
+    SNField = 1;
+    SNRecord = 0;
+    viewField = 0;
+    sortField = 0;
+    sortDir = S_UP;
+    sortField2 = 0;
+    sortDir2 = S_UP;
+    sortField3 = 0;
+    sortDir3 = S_UP;  
+
+    /* and the display... */
+    ClearData();
+    UpdateNumRecords();
+    UpdateCurRecord();
+
+    @send FirstButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send NextButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send PrevButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send LastButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* display the default field names */
+    MemLock (OptrToHandle(@f1Str));
+    for (i = 0; i < MAX_FIELDS; i++)  {
+	  @call fieldOptr[i]::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(defFieldNameOptr[i]),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    MemUnlock (OptrToHandle(@f1Str));
+
+    /* initialize the records list */
+    @call RecordsDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+
+    GPCBFile = NullHandle;
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_CLOSE for GPCBaseDocumentClass
+ *
+ * DESCRIPTION:	Called on doc close before detatch from UI
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBaseDocumentClass, MSG_GEN_DOCUMENT_CLOSE
+{
+
+    /* check for changes in displayed data */
+    closing = TRUE;
+    if (CheckForChanges()) {
+       closing = FALSE;
+	  return(DQS_CANCEL); /* user needs to fix input */
+	  }
+    @callsuper();
+
+
+}
+
+@classdecl	GPCBasePrimaryClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DISPLAY_CLOSE for GPCBasePrimaryClass
+ *
+ * DESCRIPTION:	Calls the Done routine in CUI
+ *
+ *
+ ***********************************************************************/
+@method GPCBasePrimaryClass, MSG_GEN_DISPLAY_CLOSE
+{
+ word	error;
+
+
+    /* if we're in the CUI we need to check for changes before
+	* the Done dialog box gets displayed.
+	*/
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY)  {
+	  g_done = TRUE;
+	  error = CheckForChanges();
+	  if (error == CFC_EMPTY)  NotifyDBox (0, @NoModEntryDataMsg);
+	  if (error == CFC_DATE)  NotifyDBox (0, @BadDateMsgCUIDone);
+	  if (error == CFC_NUM)  NotifyDBox (0, @BadNumMsgCUIDone);
+	  if (error) {
+		g_done = FALSE;
+		return; /* user needs to fix input */
+		}
+	  }
+
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED for GPCBaseDocumentClass
+ *
+ * DESCRIPTION:	Called on Save As.
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBaseDocumentClass, MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED
+{
+
+    GPCBFile = pself->GDI_fileHandle;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_INSTALL_TOKEN for GPCBaseProcessClass
+ *
+ * DESCRIPTION:	Associates token with docs
+ *               
+ *              needs token.h include
+ ***********************************************************************/
+@extern method GPCBaseProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+    dword	GPCBTokenChars;
+    TokenFlags	GPCBTokenFlags;
+
+    @callsuper();
+
+    GPCBTokenChars = TOKEN_CHARS('H', 'B', (dword) 'D', (dword) 'A');
+    if (!TokenGetTokenInfo(GPCBTokenChars, 16431, &GPCBTokenFlags)) {
+	  TokenDefineToken(GPCBTokenChars,
+		16431,
+		@HBDocIconMonikerList,
+		0);
+    }
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetGroupAndItem
+ *                (DBGroup *groupGroup, DBItem *recordItem, word which)
+ * CALLED BY:
+ *      		ShowData, and lots more...
+ *
+ *
+ * STRATEGY:   sends the DBGroup and DBItem back to the calling routine
+ *		     given the index in the sort array
+ *
+ ***********************************************************************/
+
+void GetGroupAndItem (DBGroup *groupGroup, DBItem *recordItem, word which)
+{
+ GroupStruct	*group;
+ DBGroup		gGroup;
+ DBItem		*index;
+ DBMapStruct* 	mapPtr;
+ DBItem		indexItem;
+ word		currentGroup, currentGroupRec;
+ SortStruct	*sortArrayElement;
+ MemHandle	mh;
+
+
+    /* get the group and item  */
+    sortListVMBHandle = VMFind(GPCBFile, NullHandle, SORTLIST);
+    VMLock(GPCBFile, sortListVMBHandle ,&mh);
+    sortArrayElement = ChunkArrayElementToPtrHandles(
+			 mh,
+			 sortListChunkArray,
+			 which,
+			 0);
+    currentGroup = sortArrayElement->SS_group;
+    currentGroupRec = sortArrayElement->SS_index;;
+    VMUnlock(mh);
+
+    /* Get the record info */
+    mapPtr = DBLockMap(GPCBFile);
+    group = (GroupStruct *) (mapPtr + 1);
+    *groupGroup = group[currentGroup].GS_group;
+    gGroup = *groupGroup;
+    /* Extract the item handle for the record. */
+    indexItem = group[currentGroup].GS_indexStart;
+    DBUnlock(mapPtr);
+
+    /* get the index array address */
+    index = DBLock(GPCBFile, gGroup, indexItem);
+    *recordItem = index[currentGroupRec];
+    DBUnlock(index);
+
+    return;
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	AckDBox
+ *              (char* string1, optr ackMsg)
+ * CALLED BY:	
+ *      	
+ *
+ * STRATEGY:    returns user's Yes or No response
+ *		
+ *
+ ***********************************************************************/
+
+word AckDBox (char* string1, optr ackMsg)
+{
+
+
+    MemLock (OptrToHandle(@DelRecMsg));
+    /* put up an Are you sure box */
+    if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    string1,
+			    LMemDeref(ackMsg),
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+			    ) != IC_YES))  {
+       MemUnlock (OptrToHandle(@DelRecMsg));
+       return(ACK_NO);
+       }
+      else  {
+       MemUnlock (OptrToHandle(@DelRecMsg));
+       return(ACK_YES);
+       }
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox
+ *              (char* string1, optr notifyMsg)
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    Puts up selected notification box
+ *
+ *
+ ***********************************************************************/
+void NotifyDBox (char* string1, optr notifyMsg)
+{
+
+
+    /* put up a notification box */
+    MemLock (OptrToHandle(@DelRecMsg));
+    UserStandardDialog((char*)0,
+			  (char*)0,
+			  (char*)0,
+			  string1,
+			  LMemDeref(notifyMsg),
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+    MemUnlock (OptrToHandle(@DelRecMsg));
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	ConvFromDateNum
+ *              (char* dateNum, char* dateString)
+ * CALLED BY:   ShowData(), 
+ *
+ *
+ * STRATEGY:    converts yyyymmdd ascii string to local short date string
+ *              caller passes in dateNum and routine fills dateString
+ *
+ ***********************************************************************/
+void ConvFromDateNum (char* dateNum, char* dateString)
+{
+ TimerDateAndTime	date;
+ char			tempStr[5];
+ dword			year, month, day;
+
+
+    if (strlen(dateNum)) {
+	  /* get the date values */
+	  strncpy(tempStr, dateNum, 4);
+	  tempStr[4] = NULL;
+	  UtilAsciiToHex32(tempStr, &year);
+	  tempStr[0] = dateNum[4];
+	  tempStr[1] = dateNum[5];
+	  tempStr[2] = NULL;
+	  UtilAsciiToHex32(tempStr, &month);
+	  tempStr[0] = dateNum[6];
+	  tempStr[1] = dateNum[7];
+	  tempStr[2] = NULL;
+	  UtilAsciiToHex32(tempStr, &day);
+
+	  /* put the date values into struct */
+	  date.TDAT_year = (word) year;
+	  date.TDAT_month = (word) month;
+	  date.TDAT_day = (word) day;
+    
+	  /* format it */
+	  LocalFormatDateTime(dateString, DTF_SHORT, &date);
+	  } /* end of "valid" input string */
+
+    else  dateString[0] = 0;
+
+    return;
+
+}
+
+

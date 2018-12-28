@@ -1,0 +1,1048 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/*
+ **************************************************************************
+ *  FILE:			dta_mtds.goc
+ *  PROJECT:		Breadbox GPCBase
+ *  DESCRIPTION:	This file has methods for data management
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include "gpcbase.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Code for GPCBaseProcessClass   data management
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * FUNCTION:	NumCheck
+ *                   (char numString[DATA_LEN])
+ * CALLED BY:  MSG_ENTER_DATA, CheckForChanges(), ConvertGenToNum()
+ *
+ *
+ * STRATEGY:   makes sure the string will parse out as a valid number
+ *             returns TRUE if number will work
+ *
+ ***********************************************************************/
+Boolean NumCheck(char numStr[DATA_LEN])
+{
+word		i, numDigits = 0;
+Boolean	checksOK = TRUE, foundDec = FALSE;
+
+
+    for (i = 0; i < strlen(numStr); i++)  {
+	  if (!LocalIsDigit((word) numStr[i])) {
+		/* is it a - in position 0? */
+		if (((numStr[i] == '-') && i) || ((numStr[i] == '+') && i)) {
+		   checksOK = FALSE;
+		   break;
+		   }
+		/* is it a multiple decimal separator? */
+		if (numStr[i] == '.')  {
+		   if (foundDec)  {
+			 checksOK = FALSE;
+			 break;
+			 }
+		   else {
+			 foundDec = TRUE;
+			 }
+		   }
+		}  /* end of not a digit */
+	  else numDigits++;
+	  } /* end of for loop */
+
+    /* test for no digits  */
+    if (!numDigits)  checksOK = FALSE;
+
+    return(checksOK);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	Boolean CheckForChanges
+ *              (void)
+ * CALLED BY:	MSG...DETATCH_UI_FROM..., MSG_OPEN_NEW_RECORD, MSG_NAV_RECORDS
+ *             MSG_OPEN_SORT, MSG_SEARCH_FIELDS, MSG_OPEN_EXPORT
+ *			MSG_IMPORT_CSV, MSG_RECORDS_DLIST_APPLY, MSG_SEARCH_FIELDS
+ *
+ * STRATEGY:   compare screen to database
+ *             returns 0 if all changes were OK, # if
+ *             the user needs to fix a change (made for intercepting
+ *			the primary closing in the CUI - if this rtn puts up
+ *			the notify box then things get too hairy)
+ *
+ ***********************************************************************/
+word CheckForChanges ()
+{
+ RecordStruct	*record;
+ DBItem		recordItem;
+ DBGroup		groupGroup;
+ word		i, length;
+ word		bufCount, fieldCount;
+ char		fieldString[DATA_LEN];
+ char		dataString[DATA_LEN], dateString[DATA_LEN];
+ Boolean		changed = FALSE;
+ Boolean		goodDate = TRUE, goodNum = TRUE;
+ MemHandle	mh;
+ VMBlockHandle	vmbh;
+ VMMapStruct	*VMmapPtr;
+ optr fieldOptr[MAX_FIELDS] = {
+    @Field1,
+    @Field2,
+    @Field3,
+    @Field4,
+    @Field5,
+    @Field6,
+    @Field7,
+    @Field8,
+    @Field9,
+    @Field10
+} ;
+ optr newDataOptr[MAX_FIELDS] = {
+    @NewData1,
+    @NewData2,
+    @NewData3,
+    @NewData4,
+    @NewData5,
+    @NewData6,
+    @NewData7,
+    @NewData8,
+    @NewData9,
+    @NewData10
+} ;
+ Boolean		empty = TRUE;
+
+
+    checkMod = TRUE;
+    if(!numRecords) return(FALSE);
+    if (!dataMayHaveChanged) return(FALSE);
+
+    /* before we do anything make sure that at least
+	* one field has an entry  */
+    for (i = 0; i < numFields; i++)  {
+	  length = @call fieldOptr[i]::MSG_VIS_TEXT_GET_ALL_PTR(fieldString);
+	  if (length)  {
+		empty = FALSE;
+		i = numFields;
+		}
+	  }
+    if (empty)  {
+	  if (!g_done) NotifyDBox (0, @NoModEntryDataMsg);
+	  return(CFC_EMPTY);
+	  }
+
+    /* get the group and item  */
+    GetGroupAndItem (&groupGroup, &recordItem, currentRecord);
+
+    /* get the record struct address */
+    record = DBLock(GPCBFile, groupGroup, recordItem);
+
+    /* now cycle thru comparing data */
+    bufCount = 0;
+    for (i = 0; i < numFields; i++)  {
+	  for (fieldCount = 0; fieldCount < DATA_LEN; fieldCount++)  {
+		if (record->RS_data[bufCount] != (char) FIELD_SEP)  {
+		   dataString[fieldCount] = record->RS_data[bufCount];
+		   bufCount++;
+		   }
+		else  {
+		   dataString[fieldCount] = NULL;
+		   bufCount++;
+		   /* grab the text on the screen */
+		   @call fieldOptr[i]::MSG_VIS_TEXT_GET_ALL_PTR(fieldString);
+		   /* do we need to compare a date? */
+		   vmbh = VMGetMapBlock(GPCBFile);
+		   VMmapPtr = VMLock(GPCBFile, vmbh, &mh);
+		   if ((VMmapPtr->VMS_fieldType[i] == T_DAT) && strlen(fieldString))  {
+			 ConvFromDateNum (dataString, dateString);
+			 strcpy(dataString, dateString);
+			 goodDate = DateCheck(fieldString);
+			 }
+		   if ((VMmapPtr->VMS_fieldType[i] == T_NUM) && strlen(fieldString))  {
+			 goodNum = NumCheck(fieldString);
+			 }
+		   VMUnlock(mh);
+		   /* do the comparison */
+		   if (strcmp(dataString, fieldString)) changed = TRUE;
+		   fieldCount = DATA_LEN; /* force exit loop */
+		   }  /* end show it else */
+		} /* end this field for */
+	  if ((changed && !goodDate) || (changed && !goodNum))
+		i = numFields;  /* no need to keep going */
+	  } /* end cycle thru fields for */
+    DBUnlock(record);
+
+    if (!goodDate)  {
+	  if (!g_done) NotifyDBox (fieldString, @BadDateMsg);
+	  return (CFC_DATE);
+	  }
+    if (!goodNum)  {
+	  if (!g_done) NotifyDBox (fieldString, @BadNumMsg);
+	  return (CFC_NUM);
+	  }
+
+    if (changed)  {
+	  /* copy the new (modified) info into the new record fields */
+	  for (i = 0; i < numFields; i++)  {
+		@call fieldOptr[i]::MSG_VIS_TEXT_GET_ALL_PTR(fieldString);
+		@call newDataOptr[i]::MSG_VIS_TEXT_REPLACE_ALL_PTR(fieldString, 0);
+		}
+       /* and do the delete/re-enter */
+	  /* put up an Are you sure box */
+    	/*  if (AckDBox(0, @ModRecMsg) == ACK_NO) return(TRUE); */
+	  isMod = TRUE;
+	  /* delete it */
+	  DeleteRecord();
+	  /* add back as new */
+	  if (g_done) {
+		@send, forceQueue, insertAtFront process::MSG_ENTER_DATA();
+		}
+	  else
+		@call process::MSG_ENTER_DATA();
+	  isMod = FALSE;
+	  }
+
+    dataMayHaveChanged = FALSE;  
+
+    return(FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	DeleteRecord
+ *              (void)
+ * CALLED BY:	MSG_DELETE_DATA, CheckForChanges()
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+void DeleteRecord ()
+{
+ GroupStruct	*group;
+ DBItem		*index;
+ DBMapStruct*	mapPtr;
+ DBItem		recordItem, indexItem;
+ DBGroup		groupGroup;
+ word		currentGroup, currentNumGroupRecs;
+ word		currentGroupRec, i;
+ SortStruct	*sortArrayElement;
+ MemHandle	mh;
+
+
+    /* get the group and item info */
+    sortListVMBHandle = VMFind(GPCBFile, NullHandle, SORTLIST);
+    VMLock(GPCBFile, sortListVMBHandle ,&mh);
+    sortArrayElement = ChunkArrayElementToPtrHandles(
+			 mh,
+			 sortListChunkArray,
+			 currentRecord,
+			 0);
+    currentGroup = sortArrayElement->SS_group;
+    currentGroupRec = sortArrayElement->SS_index;
+
+    /* now delete element from the sort list */
+    ChunkArrayDeleteHandle(sortListChunkArray, sortArrayElement);
+    /* since cGR points to the nth element we need to readjust
+	* those in the group to reflect the deletion
+	*/
+    for (i = 0; i < numRecords - 1; i++)  {
+	  sortArrayElement = ChunkArrayElementToPtrHandles(
+			 mh,
+			 sortListChunkArray,
+			 i,
+			 0);
+	  if (sortArrayElement->SS_group == currentGroup)  {
+		if (sortArrayElement->SS_index > currentGroupRec)
+		   sortArrayElement->SS_index--;
+		}
+	  }
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* Get the record info */
+    mapPtr = DBLockMap(GPCBFile);
+    group = (GroupStruct *) (mapPtr + 1);
+    groupGroup = group[currentGroup].GS_group;
+    /* decrement the total number of records */
+    (mapPtr->MS_numRecords)--;
+    numRecords--;
+    /* decrement the number of records in the group */
+    group[currentGroup].GS_numGroupRecs--;
+    currentNumGroupRecs = group[currentGroup].GS_numGroupRecs;
+    /* Extract the index item handle. */
+    indexItem = group[currentGroup].GS_indexStart;
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* get the index struct address */
+    index = DBLock(GPCBFile, groupGroup, indexItem);
+    /* and the record item handle */
+    recordItem = index[currentGroupRec];
+    /* resize the index array */
+    DBDeleteAt(GPCBFile, groupGroup, indexItem,
+	       currentGroupRec * sizeof(DBItem),
+	       sizeof(DBItem));
+    DBDirty(index);
+    DBUnlock(index);
+
+    /* delete the record DBItem */
+    DBFree(GPCBFile, groupGroup, recordItem);
+
+    /* more to do if we just deleted the only record in the group */
+    if (currentNumGroupRecs == 0)  {
+       /* Update the group info */
+       mapPtr = DBLockMap(GPCBFile);
+       group = (GroupStruct *) (mapPtr + 1);
+       group[currentGroup].GS_indexStart = 0;
+       group[currentGroup].GS_group = 0;
+       DBDirty(mapPtr);
+       DBUnlock(mapPtr);
+       /* free the group and its index item */
+       DBGroupFree(GPCBFile, groupGroup);
+
+       /* now adjust first/lastGroup if necessary */
+	  if (numRecords == 0)  {
+		firstGroup = 99;
+          lastGroup = 99;
+          }
+	  else if (currentGroup == firstGroup)  {
+		for (i = currentGroup + 1; i <= lastGroup; i++)  {
+		   mapPtr = DBLockMap(GPCBFile);
+             group = (GroupStruct *) (mapPtr + 1);
+		   currentNumGroupRecs = group[i].GS_numGroupRecs;
+             DBUnlock(mapPtr);
+		   if (currentNumGroupRecs != 0)  {
+			 firstGroup = i;
+			 i = 37;
+			 }
+		   }
+          }  /* end of firstGroup if */
+	  if (currentGroup == lastGroup)  {
+		i = currentGroup - 1;
+		while (i != 0xffff) {
+		    mapPtr = DBLockMap(GPCBFile);
+              group = (GroupStruct *) (mapPtr + 1);
+		    currentNumGroupRecs = group[i].GS_numGroupRecs;
+              DBUnlock(mapPtr);
+		    if (currentNumGroupRecs != 0)  {
+			  lastGroup = i;
+			  i = 0xffff;
+			  }
+                else i--;
+		   }
+		}  /* end of firstGroup if */
+	  } /* end of more to do if */
+
+    if (!isMod)  {
+	  /* reset record if necessary (last record deleted) */
+       if (currentRecord == numRecords) currentRecord = numRecords - 1;
+
+	  /* update the number of records display */
+       UpdateNumRecords();
+
+	  /* re-init the index list */
+	  @call RecordsDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numRecords);
+	  }
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	ToggleFieldsRO
+ *              (Boolean onOff)   TRUE goes to ReadOnly
+ * CALLED BY:	MSG_ENTER_DATA, MSG_DELETE_DATA
+ *
+ *
+ * STRATEGY:   Sets the fields to read only when there are no records
+ *             in the database.  Even though the group is not enabled
+ *             the user can still enter greyed text.
+ ***********************************************************************/
+
+void ToggleFieldsRO (Boolean onOff)
+{
+ word	i;
+ byte	curAttrs;
+ optr fieldOptr[MAX_FIELDS] = {
+    @Field1,
+    @Field2,
+    @Field3,
+    @Field4,
+    @Field5,
+    @Field6,
+    @Field7,
+    @Field8,
+    @Field9,
+    @Field10
+} ;
+
+
+    curAttrs = @call Field1::MSG_GEN_GET_ATTRIBUTES();
+    /* only go thru this if we need to */
+    if ((onOff && (!(curAttrs & GA_READ_ONLY))) ||
+	    (!onOff && (curAttrs & GA_READ_ONLY))) {
+	  for (i = 0; i < MAX_FIELDS; i++) {
+		@send fieldOptr[i]::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		if (onOff)
+		   @call fieldOptr[i]::MSG_GEN_SET_ATTRS(GA_READ_ONLY, 0);
+		else
+		   @call fieldOptr[i]::MSG_GEN_SET_ATTRS(0, GA_READ_ONLY);
+		if (i < numFields)
+		   @send fieldOptr[i]::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	  }
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	UpdateNumRecords
+ *              (void)
+ * CALLED BY:	MSG_ENTER_DATA, MSG_DELETE_DATA
+ *
+ *
+ * STRATEGY:
+ *		
+ *
+ ***********************************************************************/
+
+void UpdateNumRecords ()
+{
+ char		numRecString[30];
+ char		numString[11];
+
+
+    /* get the number of records */
+    UtilHex32ToAscii(numString, (sdword) numRecords, UHTAF_NULL_TERMINATE);
+    /* set up the new moniker */
+    MemLock (OptrToHandle(@DelRecMsg));
+    strcpy(numRecString, LMemDeref(@NumRecsMoniker1));
+    strcat(numRecString, numString);
+    strcat(numRecString, LMemDeref(@NumRecsMoniker2));
+    MemUnlock (OptrToHandle(@DelRecMsg));
+    /* and show it */
+    @call RecordsGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    numRecString,
+		    VUM_NOW);
+
+    /* en-disable some UI stuff */
+    if (numRecords)  {
+	  @send ExportSMenu::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send DuplicateRecordItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send DeleteRecordItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send SortRecordsItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send FindRecordItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send CreateReportItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send FieldsGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send DeleteButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send FindButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  ToggleFieldsRO(FALSE);
+	  }
+    else  {
+	  @send ExportSMenu::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send DuplicateRecordItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send DeleteRecordItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send SortRecordsItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send FindRecordItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send CreateReportItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send FieldsGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send DeleteButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send FindButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  ToggleFieldsRO(TRUE);
+	  }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	UpdateCurRecord
+ *              (void)
+ * CALLED BY:	MSG_ENTER_DATA, MSG_DELETE_DATA
+ *      	
+ *
+ * STRATEGY:    
+ *		
+ *
+ ***********************************************************************/
+
+void UpdateCurRecord ()
+{
+ char		recNumString[30];
+ char		numString[11];
+
+
+    /* get the number of records */
+    UtilHex32ToAscii(numString,
+			(sdword) (currentRecord + 1),
+			UHTAF_NULL_TERMINATE);
+
+    /* set up the new moniker */
+    MemLock (OptrToHandle(@DelRecMsg));
+    strcpy(recNumString, LMemDeref(@RecNumMoniker));
+    if (numRecords)  strcat(recNumString, numString);
+    MemUnlock (OptrToHandle(@DelRecMsg));
+    /* and show it */
+    @call FieldsGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    recNumString,
+		    VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	DateCheck
+ *
+ * CALLED BY:  MSG_ENTER_DATA, CheckForChanges()
+ *
+ * STRATEGY:   returns TRUE if date is good
+ *
+ *
+ ***********************************************************************/
+Boolean DateCheck(char dateString[DATA_LEN])
+{
+ TimerDateAndTime	date;
+ word		daysInMonth;
+ Boolean		isValid;
+
+
+    /* parse the date string */
+    isValid = LocalParseDateTime(dateString, DTF_SHORT, &date);
+
+    /* check for # of days in month */
+    if (isValid == -1)
+	  daysInMonth = LocalCalcDaysInMonth(date.TDAT_year, date.TDAT_month);
+    else return (FALSE);
+
+    /* is it a good date? */
+    if((isValid == -1) && ((date.TDAT_day) <= daysInMonth)) return (TRUE);
+    else  return (FALSE);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_NEW_RECORD for GPCBaseProcessClass
+ *             (GEN_TRIGGER_ACTION_MSG)
+ *              optr  trigger
+ *
+ * DESCRIPTION:	Opens the new Record dialog box.
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBaseProcessClass, MSG_OPEN_NEW_RECORD
+{
+ VMBlockHandle		vmbh;
+ VMMapStruct		*VMmapPtr;
+ MemHandle		mh;
+ word			i;
+ char			fieldString[DATA_LEN];
+ optr newDataOptr[MAX_FIELDS] = {
+    @NewData1,
+    @NewData2,
+    @NewData3,
+    @NewData4,
+    @NewData5,
+    @NewData6,
+    @NewData7,
+    @NewData8,
+    @NewData9,
+    @NewData10
+} ;
+ optr fieldOptr[MAX_FIELDS] = {
+    @Field1,
+    @Field2,
+    @Field3,
+    @Field4,
+    @Field5,
+    @Field6,
+    @Field7,
+    @Field8,
+    @Field9,
+    @Field10
+} ;
+
+
+    /* check for changes in displayed data */
+    if(CheckForChanges()) return;
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(GPCBFile);
+    VMmapPtr = (VMMapStruct *) VMLock(GPCBFile, vmbh, &mh);
+
+    /* display the field names */
+    for (i = 0; i < MAX_FIELDS; i++)  {
+	  /* first the field names */
+	  @call newDataOptr[i]::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+			  VMmapPtr->VMS_fieldName[i],
+			  VUM_DELAYED_VIA_APP_QUEUE);
+	  if (trigger == @DuplicateRecordItem) {
+		/* fill in the current record data */
+		@call fieldOptr[i]::MSG_VIS_TEXT_GET_ALL_PTR(fieldString);
+		@call newDataOptr[i]::MSG_VIS_TEXT_REPLACE_ALL_PTR(fieldString, 0);
+		}
+	  else {
+		@call newDataOptr[i]::MSG_VIS_TEXT_DELETE_ALL();
+		}
+
+	  }  /* end of loop thru fields for loop */
+
+    VMUnlock(mh);
+
+    if(trigger == @DuplicateRecordItem) {
+	  @send SaveNewButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    else  {
+	  @send SaveNewButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+
+    /* Open the dialog box */
+    @call NewRecDBox::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ENTER_DATA for GPCBaseProcessClass
+ *
+ *
+ * DESCRIPTION:	Enters record into data base.
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBaseProcessClass, MSG_ENTER_DATA
+{
+RecordStruct		*record;
+GroupStruct		*group;
+DBMapStruct*		mapPtr;
+DBItem			recordItem, indexItem;
+DBItem			*index;
+DBGroup			groupGroup;
+word				length, totalLength, groupRecNum, lexVal;
+byte				lexArg;
+word				i, whichGroup;
+char				fieldString[DATA_LEN], tempString[3], dateString[DATA_LEN];
+SortStruct		*sortArrayElement;
+SortStruct		*insertSortArrayElement;
+MemHandle			mh;
+optr newDataOptr[MAX_FIELDS] = {
+    @NewData1,
+    @NewData2,
+    @NewData3,
+    @NewData4,
+    @NewData5,
+    @NewData6,
+    @NewData7,
+    @NewData8,
+    @NewData9,
+    @NewData10
+} ;
+ VMBlockHandle	vmbh;
+ VMMapStruct	*VMmapPtr;
+ Boolean		badDateOrNum = FALSE;
+ TimerDateAndTime	date;
+ Boolean		empty = TRUE;
+
+    /* before we do anything make sure that there is at least
+	* one field that has an entry  */
+    for (i = 0; i < numFields; i++)  {
+	  length = @call newDataOptr[i]::MSG_VIS_TEXT_GET_ALL_PTR(fieldString);
+	  if (length)  {
+		empty = FALSE;
+		i = numFields;
+		}
+	  }
+    if (empty)  {
+	  NotifyDBox (0, @NoEntryDataMsg);
+	  return;
+	  }
+
+    /* check on limit */
+    if (numRecords == 4899) NotifyDBox(0, @RecNumWarnMsg);
+    if (numRecords == 5000) {
+	  NotifyDBox(0, @RecNumStopMsg);
+	  return;
+	  }
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(GPCBFile);
+    VMmapPtr = (VMMapStruct *) VMLock(GPCBFile, vmbh, &mh);
+
+    /* first check that there is an entry in Field1 */
+    length = @call NewData1::MSG_VIS_TEXT_GET_ALL_PTR(fieldString);
+    /* to get it into a DBGroup */
+    if (!length)  {
+	  if ((VMmapPtr->VMS_fieldType[0]) == T_DAT)  {
+		strcpy(fieldString, "0");
+		}
+	  else strcpy(fieldString, " ");
+	  }
+
+    /* before we do anything else make sure any dates are valid */
+    /* get the field types */
+    for (i = 0; i < numFields; i++)  {
+	  if ((VMmapPtr->VMS_fieldType[i]) == T_DAT)  {
+		length = @call newDataOptr[i]::MSG_VIS_TEXT_GET_ALL_PTR(dateString);
+		if (!length)  ;/* ignore a blank entry */
+		else if (!DateCheck(dateString)) {
+		   badDateOrNum = TRUE;
+		   NotifyDBox (dateString, @BadDateMsg);
+		   }
+		}
+	  else if ((VMmapPtr->VMS_fieldType[i]) == T_NUM)  {
+		length = @call newDataOptr[i]::MSG_VIS_TEXT_GET_ALL_PTR(dateString);
+		if (!length)  ;/* ignore a blank entry */
+		else if (!NumCheck(dateString)) {
+		   badDateOrNum = TRUE;
+		   NotifyDBox (dateString, @BadNumMsg);
+		   }
+		}
+	  } /* end of cycle thru for loop (i) */
+    VMUnlock(mh);
+    /* bail out leaving the entry box on screen */
+    if (badDateOrNum) return;
+
+
+    /* dismiss the dailog box now */
+    @send NewRecDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    
+    /* figger out which group this puppy goes in... */
+ //   if (isdigit(fieldString[0])) {
+	 if (fieldString[0] >= '0' && fieldString[0] <= '9') {
+	  /* 0 thru 9 */
+	  whichGroup = fieldString[0] - 48;
+	  }
+    else  {
+	  lexArg = fieldString[0];
+//	  lexVal = LocalLexicalValueNoCase((word)fieldString[0]);
+	  lexVal = LocalLexicalValueNoCase((word)lexArg);
+	  /* lexVal of a is 41 and lexVal of z is 66 */
+	  if ((lexVal > 40) && (lexVal < 67)) {
+		/*  A - Z */
+		whichGroup = (lexVal) - 30;
+		}
+	  else if ((lexVal >= 65340) && (lexVal <= 65354)) {
+		/* accented a's */
+		whichGroup = 11;
+		}
+	  else if ((lexVal >= 65358) && (lexVal <= 65360)) {
+		/* accented c's */
+		whichGroup = 13;
+		}
+	  else if ((lexVal >= 65364) && (lexVal <= 65371)) {
+		/* accented e's */
+		whichGroup = 15;
+		}
+	  else if ((lexVal >= 65380) && (lexVal <= 65389)) {
+		/* accented i's */
+		whichGroup = 19;
+		}
+	  else if ((lexVal >= 65399) && (lexVal <= 65401)) {
+		/* accented n's */
+		whichGroup = 24;
+		}
+	  else if ((lexVal >= 65403) && (lexVal <= 65417)) {
+		/* accented o's */
+		whichGroup = 25;
+		}
+	  else if (lexVal == 65426) {
+		/* german double s */
+		whichGroup = 29;
+		}
+	  else if ((lexVal >= 65430) && (lexVal <= 65438)) {
+		/* accented u's */
+		whichGroup = 31;
+		}
+	  else if ((lexVal >= 65447) && (lexVal <= 65450)) {
+		/* accented y's */
+		whichGroup = 35;
+		}
+	  else {
+		/* other */
+		whichGroup = 10;
+		}
+	  } /* end of not a digit else */
+
+    /* update 1st/last group if necc */
+    if (firstGroup == 99)  {
+       firstGroup = whichGroup;
+       lastGroup = whichGroup;
+       }
+      else if (whichGroup < firstGroup)  {
+       firstGroup = whichGroup;
+       }
+      else if (whichGroup > lastGroup) {
+       lastGroup = whichGroup;
+       }
+
+    /* Lock the map */
+    mapPtr = DBLockMap(GPCBFile);
+
+    group = (GroupStruct *) (mapPtr + 1);
+    groupGroup = group[whichGroup].GS_group;
+    groupRecNum = group[whichGroup].GS_numGroupRecs;
+    group[whichGroup].GS_numGroupRecs++;
+
+    /* allocate the group if we need to */
+    if (groupGroup == 0)  {
+       groupGroup = DBGroupAlloc(GPCBFile);
+       group[whichGroup].GS_group = groupGroup;
+       /* and the index item */
+       indexItem = DBAlloc(GPCBFile, groupGroup, sizeof(DBItem));
+       group[whichGroup].GS_indexStart = indexItem;
+       }
+      else { /* just get the index item */
+       indexItem = group[whichGroup].GS_indexStart;
+       }
+
+    /* Increase the number of records */
+    (mapPtr->MS_numRecords)++;
+    numRecords++;
+    /* and save 1st/last group info */
+    mapPtr->MS_firstGroup = firstGroup;
+    mapPtr->MS_lastGroup = lastGroup;
+    /* Mark the map item as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* create the new record DBItem */
+    /* first - see how big to make it - thx Marcus :-) */
+    vmbh = VMGetMapBlock(GPCBFile);
+    VMmapPtr = (VMMapStruct *) VMLock(GPCBFile, vmbh, &mh);
+    totalLength = 0;
+    for (i = 0; i < numFields; i++)  {
+	  /* get the field entry data */
+	  length = @call newDataOptr[i]::MSG_VIS_TEXT_GET_ALL_PTR(fieldString);
+	  /* update the total length */
+	  if (((VMmapPtr->VMS_fieldType[i]) == T_DAT) && length) {
+		totalLength += 9; /* 8 for date, 1 for separator */
+		}
+	  else totalLength += (length + 1); /* 1 for separator */
+	  }
+    VMUnlock(mh);
+    /* and the unused fields */
+    totalLength += (MAX_FIELDS - numFields) + 4;
+
+    recordItem = DBAlloc(GPCBFile, groupGroup, totalLength);
+
+    /* If it is the only record in the group just put it in...
+     * the index item has just been allocated with the first
+     * DBItem place waiting...
+     */
+    if (groupRecNum == 0) {
+       index = DBLock(GPCBFile, groupGroup, indexItem);
+       index[groupRecNum] = recordItem;
+       DBDirty(index);
+       DBUnlock(index);
+	  }
+
+    /* otherwise put it at the end */
+    else  {
+	  DBReAlloc(GPCBFile, groupGroup, indexItem,
+		      ((groupRecNum + 1) * sizeof(DBItem)));
+	  index = DBLock(GPCBFile, groupGroup, indexItem);
+	  index[groupRecNum] = recordItem;
+	  DBDirty(index);
+	  DBUnlock(index);
+	  }  /* end insert else */
+
+
+    /* update the sort list */
+    sortListVMBHandle = VMFind(GPCBFile, NullHandle, SORTLIST);
+    VMLock(GPCBFile, sortListVMBHandle ,&mh);
+  /*  if (currentRecord != numRecords - 1)  { */
+    if (isMod && (currentRecord != numRecords - 1))  {  /* put it back where it was */
+	  sortArrayElement = ChunkArrayElementToPtrHandles(
+						  mh,
+						  sortListChunkArray,
+						  currentRecord,
+						  0);
+	  insertSortArrayElement = ChunkArrayInsertAtHandle(
+						    sortListChunkArray,
+						    sortArrayElement,
+						    0);
+	  insertSortArrayElement->SS_group = whichGroup;
+	  insertSortArrayElement->SS_index = groupRecNum;
+	  insertSortArrayElement->SS_check = FALSE;
+	  }
+    else  { /* add to the end of the sort list  */
+	  sortArrayElement = ChunkArrayAppendHandles(
+		      mh,
+			 sortListChunkArray,
+			 0);
+	  sortArrayElement->SS_group = whichGroup;
+	  sortArrayElement->SS_index = groupRecNum;
+	  sortArrayElement->SS_check = FALSE;
+
+       currentRecord = numRecords - 1;
+  	  } 
+    VMDirty(mh);
+    VMUnlock(mh);
+
+
+
+    /* Now that we have the record alloc'd we can
+     * retrieve the field info to put in it.
+     * Do this in a loop to get all the fields...
+     */
+    /* get the record struct address */
+    record = DBLock(GPCBFile, groupGroup, recordItem);
+    record->RS_data[0] = 0;
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(GPCBFile);
+    VMmapPtr = (VMMapStruct *) VMLock(GPCBFile, vmbh, &mh);
+    for (i = 0; i < numFields; i++)  {
+	  length = @call newDataOptr[i]::MSG_VIS_TEXT_GET_ALL_PTR(fieldString);
+	  /* convert if date field type */
+	  if (((VMmapPtr->VMS_fieldType[i]) == T_DAT) && length) {
+		/* parse the date string */
+		LocalParseDateTime(fieldString, DTF_SHORT, &date);
+		UtilHex32ToAscii(fieldString, (sdword) date.TDAT_year, UHTAF_NULL_TERMINATE);
+		UtilHex32ToAscii(tempString, (sdword) date.TDAT_month, UHTAF_NULL_TERMINATE);
+		if (strlen(tempString) == 1)  strcat(fieldString, "0");
+		strcat(fieldString, tempString);
+		UtilHex32ToAscii(tempString, (sdword) date.TDAT_day, UHTAF_NULL_TERMINATE);
+		if (strlen(tempString) == 1)  strcat(fieldString, "0");
+		strcat(fieldString, tempString);
+		}
+	  else if (!length)  fieldString[0] = NULL;
+
+	  /* add the ith field to the record */
+	  strcat(record->RS_data, fieldString);
+	  /* add the end of field marker */
+	  strcat(record->RS_data, FIELD_SEP_STRING);
+
+	  } /* end of field entry for */
+    VMUnlock(mh);
+
+    /* now fill in unused fields */
+    for (i = (numFields + 1); i <= MAX_FIELDS; i++)  {
+	  /* add the end of field marker */
+	  strcat(record->RS_data, FIELD_SEP_STRING);
+	  } /* end of blank field entry for */
+
+    /* Mark the record item as dirty and unlock it. */
+    DBDirty(record);
+    DBUnlock(record);
+
+    /* if were NOT importing ... */
+    if (!isImport) {
+	  /* update the number of records display */
+	  UpdateNumRecords();
+	  if (numRecords > 1) @call process::MSG_SORT_DATA();
+	  else if (numRecords == 1) ShowData();
+	  if (!closing)
+		@call RecordsDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numRecords);
+	  }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_DATA for GPCBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	Deletes a record from the data base.
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBaseProcessClass, MSG_DELETE_DATA
+{
+
+
+    /* put up an Are you sure box */
+    if (AckDBox(0, @DelRecMsg) == ACK_NO) return;
+
+    /* delete it */
+    DeleteRecord();
+
+    if (numRecords == 0)  {
+	  /* clear the field display */
+	  ClearData();
+	  }
+	 else  {
+	  /* show the new currentRecord */
+	  ShowData();
+       }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_TEXT_SET_MODIFIED_STATE for GPCBaseEnterTextClass
+ *
+ * PARAMETERS:
+ *
+ * DESCRIPTION:	enables save button as soon as any
+ *                  change is made while text fields have the focus
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBaseEnterTextClass, MSG_GEN_TEXT_SET_MODIFIED_STATE
+{
+
+
+    if(!@call SaveNewButton::MSG_GEN_GET_ENABLED())
+	   @send SaveNewButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    @callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_TEXT_SET_USER_MODIFIED for GPCBaseEnterTextClass
+ *
+ * PARAMETERS:   	
+ *
+ * DESCRIPTION:
+ *                   traps for para symbol - which is the
+ *                      field separator
+ *
+ ***********************************************************************/
+@extern method GPCBaseEnterTextClass, MSG_VIS_TEXT_SET_USER_MODIFIED
+{
+word		length, i;
+char		fieldString[DATA_LEN];
+Boolean	changed = FALSE;
+
+
+    @callsuper();
+
+    length = @call self::MSG_VIS_TEXT_GET_ALL_PTR(fieldString);
+    for (i = 0; i < length; i++) {
+	  if (fieldString[i] == (char) FIELD_SEP) {
+		fieldString[i] = '-';
+		changed = TRUE;
+		}
+	  }
+    if (changed) @call self::MSG_VIS_TEXT_REPLACE_ALL_PTR(fieldString, 0);
+    @send self::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+}
+
+
+
