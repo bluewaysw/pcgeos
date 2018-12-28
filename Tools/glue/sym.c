@@ -787,21 +787,8 @@ Sym_FindWithSegmentAndFile(VMHandle   	    file,	   /* File in which to
     int 	    i;
     SegDesc 	    *sd = NULL;
 
-printf("Looking for %ld\n", id);
     for (i = 0; i < seg_NumSegs; i++) {
 	sd = seg_Segments[i];
-
-	if (fileName != NULL && !globalOnly) {
-		printf("Segment came from: %s vs %s\n", fileName, sd->file); fflush(stdout);
-		if (sd->file == NULL) {
-			continue;
-		}
-		if (strncmp(fileName, sd->file, strlen(fileName)) != 0) {
-			continue;
-		} else {
-			printf("Found!\n");
-		}
-	}
 
 	if (SymLookup(file, sd->syms, id, &bucket, &block, &hb, &he) == 1)
 	{
@@ -824,8 +811,12 @@ printf("Looking for %ld\n", id);
 	    VMUnlock(file, sd->syms);
 	    VMUnlock(file, he->block);
 
-	    if (isglobal || !globalOnly) {
+	    if (isglobal || (!globalOnly && fileName == NULL)) {
 		break;
+	    } else if (fileName != NULL && !globalOnly) {
+		if (strncmp(fileName, sd->file, strlen(fileName)) == 0) {
+			break;
+		}
 	    } else {
 		VMUnlock(file, block);
 	    }
@@ -863,7 +854,6 @@ printf("Looking for %ld\n", id);
 	VMUnlock(file, block);
     }
 
-    printf("Returning %d\n", retval);
     return(retval);
 }
 

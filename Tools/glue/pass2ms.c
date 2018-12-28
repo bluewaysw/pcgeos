@@ -957,7 +957,6 @@ Pass2MS_ProcessObject(const char *file,
 		 */
 		if (rectype == MO_LEXTDEF) {
 			isGlobal = FALSE;
-			printf("Looking for %s\n", (char*)bp+1);
 		}
 		endRecord = bp+reclen;
 		while (bp < endRecord) {
