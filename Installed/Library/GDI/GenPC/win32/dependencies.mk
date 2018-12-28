@@ -1,19 +1,19 @@
-GENPCMAIN.obj \
-GENPCMAIN.eobj: GEOS.DEF GEODE.DEF LIBRARY.DEF RESOURCE.DEF OBJECT.DEF \
-                LMEM.DEF INTERNAL/INTERRUP.DEF INITFILE.DEF \
-                INTERNAL/POWERDR.DEF DRIVER.DEF INTERNAL/KBDMAP.DEF \
-                CHAR.DEF INPUT.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF HWR.DEF OBJECTS/UIINPUTC.DEF LOCALIZE.DEF \
-                SLLANG.DEF GDI.DEF GENPCCONSTANT.DEF GENPCCONFIG.DEF \
-                GENPCVARIABLE.DEF GENPCMACRO.DEF \
-                ../COMMON/GDICONSTANT.DEF ../COMMON/GDIVARIABLE.DEF \
-                ../COMMON/GDIPOINTER.ASM ../COMMON/GDIKEYBOARD.ASM \
-                ../COMMON/GDIPOWER.ASM ../COMMON/GDIEXT.ASM \
-                ../COMMON/GDIUTILS.ASM GENPCMOUSE.ASM WIN.DEF \
-                INTERNAL/GRWININT.DEF INTERNAL/VIDEODR.DEF HUGEARR.DEF \
-                INTERNAL/IM.DEF INTERNAL/SEMINT.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF TIMER.DEF \
-                EC.DEF HEAP.DEF ASSERT.DEF DISK.DEF FILE.DEF DRIVE.DEF \
-                GENPCKBD.ASM GENPCPWR.ASM
+win32/genpcMain.obj \
+win32/genpcMain.eobj: geos.def geode.def library.def resource.def object.def \
+                lmem.def Internal/interrup.def initfile.def \
+                Internal/powerDr.def driver.def Internal/kbdMap.def \
+                char.def input.def graphics.def fontID.def font.def \
+                color.def hwr.def Objects/uiInputC.def localize.def \
+                sllang.def gdi.def genpcConstant.def genpcConfig.def \
+                genpcVariable.def genpcMacro.def \
+                ../Common/gdiConstant.def ../Common/gdiVariable.def \
+                ../Common/gdiPointer.asm ../Common/gdiKeyboard.asm \
+                ../Common/gdiPower.asm ../Common/gdiExt.asm \
+                ../Common/gdiUtils.asm genpcMouse.asm win.def \
+                Internal/grWinInt.def Internal/videoDr.def hugearr.def \
+                Internal/im.def Internal/semInt.def Objects/processC.def \
+                Objects/metaC.def chunkarr.def geoworks.def timer.def \
+                ec.def heap.def assert.def disk.def file.def drive.def \
+                genpcKbd.asm genpcPwr.asm
 
-gdiEC.geo gdi.geo : GEOS.LDF 
+win32/gdiEC.geo win32/gdi.geo : geos.ldf 

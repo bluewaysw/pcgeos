@@ -6,18 +6,17 @@
 GEODE           = genpc
 ASM_TO_OBJS     = genpcMain.asm
 UI_TO_RDFS      =
-SRCS            = genpcKbd.asm genpcMain.asm genpcMouse.asm genpcPwr.asm\
-                  ../Common/GDIPOINTER.ASM ../Common/GDIKEYBOARD.ASM\
-                  ../Common/GDIPOWER.ASM ../Common/GDIEXT.ASM\
-                  ../Common/GDIUTILS.ASM genpcConfig.def\
-                  genpcConfigDBCS.def genpcConstant.def genpcMacro.def\
-                  genpcVariable.def
+SRCS            = genpcMain.asm genpcMouse.asm genpcKbd.asm genpcPwr.asm\
+                  ../Common/gdiPointer.asm ../Common/gdiKeyboard.asm\
+                  ../Common/gdiPower.asm ../Common/gdiExt.asm\
+                  ../Common/gdiUtils.asm genpcVariable.def genpcConfig.def\
+                  genpcMacro.def genpcConfigDBCS.def genpcConstant.def
 OBJS            = genpcMain.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = gdi
 
-PRODUCTS        = win32 win32dbcs 
+PRODUCTS        = win32 
 
 SYSMAKEFILE     = geode.mk
 
@@ -36,8 +35,4 @@ SYSMAKEFILE     = geode.mk
 
 #if exists(win32/$(DEPFILE))
 #include "win32/$(DEPFILE)"
-#endif
-
-#if exists(WIN32DBCS/$(DEPFILE))
-#include "WIN32DBCS/$(DEPFILE)"
 #endif
