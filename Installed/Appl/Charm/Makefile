@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = CHARM
+GEODE           = charm
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = APPUI.GOC MAP.GOC PROCESS.GOC TEXT.GOC APP.GOH GLOBAL.GOH
-OBJS            = APPUI.obj MAP.obj PROCESS.obj TEXT.obj
+SRCS            = PROCESS.goc APPUI.goc MAP.goc TEXT.goc app.goh global.goh
+OBJS            = PROCESS.obj APPUI.obj MAP.obj TEXT.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
