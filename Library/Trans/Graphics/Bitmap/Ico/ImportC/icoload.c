@@ -49,8 +49,9 @@ DESCRIPTION:
    Histroy :
       01/21/91 Created. -DH
 **************************************************************************/
-
+#ifndef __WATCOMC__
 #pragma Comment("@" __FILE__);
+#endif
 #pragma Code ("MainImportC");
 
 #include "hsimem.h"
