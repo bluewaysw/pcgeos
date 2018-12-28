@@ -351,8 +351,8 @@ Installed/Library/Breadbox/ps2pdf:	ansic MAKELIB
 socket	: Installed/Library/Socket
 Installed/Library/Socket:	ui netutils MAKELIB
 
-dhcp	: Installed/Library/dhcp
-Installed/Library/dhcp:	socket ui accpnt MAKELIB
+dhcp	: Installed/Library/DHCP
+Installed/Library/DHCP:	socket ui accpnt MAKELIB
 
 ffile	: Installed/Library/FlatFile
 Installed/Library/FlatFile:	cell ui spreadsheet parse ansic math \
