@@ -181,7 +181,7 @@ void DispHex(char *s,unsigned char *p,int n)
 void DispFile(FILE *f,long pos,unsigned len,unsigned ofs,long hdl)
 {
         char buf[80],adr[16];
-        unsigned x,bs;
+        unsigned short x,bs;
 
         if(pos!=-1)                     // Position angebgen?
           fseek(f,pos,SEEK_SET);        // Ja: zum Anfang des Blocks
@@ -206,8 +206,8 @@ void DisplayHeap(FILE *f,long pos,unsigned size)
         GEOSlocalheap lh;               // Kopf des lokalen Heaps
         GEOSObjLMemBlockHeader oh;      // additional obj block header
         GEOSlocallist *hdl;             // Maximal 256 Handles pro Heap
-        unsigned i;
-        unsigned blksize;
+        unsigned short i;
+        unsigned short blksize;
         struct { unsigned blksize; unsigned nextofs; } freehead;
         unsigned ofs;
 
@@ -266,8 +266,8 @@ void DisassembleHeap(FILE *f,long pos,unsigned size,char *segname,
         GEOSlocalheap lh;               // Kopf des lokalen Heaps
         GEOSObjLMemBlockHeader oh;      // additional obj block header
         GEOSlocallist *hdl;             // Maximal 256 Handles pro Heap
-        unsigned i;
-        unsigned blksize;
+        unsigned short i;
+        unsigned short blksize;
 
         GetStructP(lh,pos);             // Kopf des lokalen Heaps holen
 
@@ -321,9 +321,9 @@ void DisplaySegment(FILE *f,unsigned n,unsigned i)
 {
         GEOSfixup *fix;                 // Fixup-Eintrag
         GEOSlocalheap lh;               // Kopf des lokalen Heaps
-        unsigned x;
+        unsigned short x;
         char buf[128],segname[32];
-        unsigned data_ofs,data_len;
+        unsigned short data_ofs,data_len;
 
         struct MaskDesc_s segFlagMask[]={
           {(unsigned)(HAF_ZERO_INIT<<8),(unsigned)(HAF_ZERO_INIT<<8),"ZERO_INIT"},

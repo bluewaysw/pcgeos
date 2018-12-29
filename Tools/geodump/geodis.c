@@ -37,10 +37,10 @@ void disassemble(unsigned char *c,unsigned len,unsigned ofs,int all_silent);
 static unsigned code_fixlen;
 static GEOSfixup *code_fixup;
 static FILE *code_file;
-static unsigned this_seg;       // Segment number that is currently processed
+static unsigned short this_seg;       // Segment number that is currently processed
 
 struct {
-  unsigned seg,ofs;
+  unsigned short seg,ofs;
   int size;
 } *global_jmp_map;
 char **global_jmp_label;
@@ -100,8 +100,8 @@ int test_data_map(unsigned ofs)
 
 
 struct {
-  unsigned seg,ofs;                     // location of jump list
-  unsigned len;                         // size of list
+  unsigned short seg,ofs;                     // location of jump list
+  unsigned short len;                         // size of list
   unsigned char size;                   // size of each entry
 } jmplist[256];
 unsigned n_jmplist;                     // number of jumplists
@@ -168,7 +168,7 @@ void add_jmplist(unsigned seg,unsigned ofs,unsigned len,unsigned size)
 struct s_libsymbol {
   struct s_libsymbol *next;             // next symbol in chain
   char lib[8];                          // name of library
-  unsigned ord;
+  unsigned short ord;
   char name[1];
 } *symbol_list;
 
@@ -193,7 +193,7 @@ char *create_libref(char *buf,char *lib,unsigned ord)
 char *create_label(unsigned seg,unsigned ofs,char type)
 {
         static char buffer[32];
-        unsigned i;
+        unsigned short i;
 
         if(engine_silent) return "*";   // return dummy in silent mode
         if(seg==0xFFFF) seg=this_seg;   // segment 0xFFFF means: current segment
@@ -230,7 +230,7 @@ char *create_label(unsigned seg,unsigned ofs,char type)
 char *test_fixup(unsigned ofs,int type,char *buf,int addinfo)
 {
   static char buffer[32],buf2[GEOS_FNAME+1];
-  unsigned i,j;
+  unsigned short i,j;
   int dist;
 
   *buffer=0;
@@ -387,7 +387,7 @@ void deinit_disasm(void)
 char *DispFix(char *buf,FILE *f,long pos,GEOSfixup *fix)
 {
         long old;
-        unsigned w1,w2;
+        unsigned short w1,w2;
         char *p;
 
         old=ftell(f);                   // Position merken
@@ -481,13 +481,12 @@ void DisplayUdata(unsigned start,unsigned seglen)
           printf("    db   %5u dup (?)%21s; %04X\n",len,"",ofs-len);
 }
 
-void DispCode(FILE *f,long pos,unsigned size,
-              GEOSfixup *fix,unsigned fixlen,
-              unsigned seg,unsigned ofs,
-              unsigned disasm_silent)
+void DispCode(FILE *f,long pos,unsigned int size,
+              GEOSfixup *fix,unsigned short fixlen,
+              unsigned short seg,unsigned int ofs,
+              unsigned int disasm_silent)
 {
-        unsigned char *p=malloc(size);
-
+	unsigned char p[1024*64];
         if(pos!=-1)
           fseek(f,pos,SEEK_SET);
         fread(p,size,1,f);
@@ -496,7 +495,6 @@ void DispCode(FILE *f,long pos,unsigned size,
         code_file=f;
         this_seg=seg;                   // make segment publicly available
         disassemble(p,size,ofs,disasm_silent);
-        free(p);
 }
 
 /******************************************************************************/
@@ -505,7 +503,7 @@ void disasm_info(char *fname)
         FILE *f;
         char buf[256],label[256],*env;
         int line=0,n;
-        unsigned seg,ofs,len;
+        unsigned short seg,ofs,len;
         char type;
 
         if( (env=getenv("GEODUMP"))==NULL)
@@ -564,7 +562,7 @@ void load_symbols(char *fname)
 {
         FILE *f;
         char buf[256],lib[256],name[256],*env;
-        unsigned ord;
+        unsigned short ord;
         struct s_libsymbol *p,**q;
 
         if( (env=getenv("GEODUMP"))==NULL)

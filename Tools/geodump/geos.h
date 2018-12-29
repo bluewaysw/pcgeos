@@ -191,14 +191,14 @@ typedef struct {                        /*** Entry in handle table */
 //   array immediately following the header
 
 typedef struct {                        /*** Header of block with LMem heap */
-  unsigned seg;                         // same as GEOSvmfdirrec.hdl
-  unsigned hdllistofs;                  // block rel offset of local handle list
-  unsigned LMBH_flags;                  // flags
-  unsigned LMBH_lmemType;               // type of data in block
-  unsigned blocksize;                   // number of bytes under heap control
-  unsigned hdllistnum;                  // number of entries in handle list
-  unsigned freeofs;                     // offset of first free block
-  unsigned freesize;                    // free heap memory in this block
+  unsigned short seg;                         // same as GEOSvmfdirrec.hdl
+  unsigned short hdllistofs;                  // block rel offset of local handle list
+  unsigned short LMBH_flags;                  // flags
+  unsigned short LMBH_lmemType;               // type of data in block
+  unsigned short blocksize;                   // number of bytes under heap control
+  unsigned short hdllistnum;                  // number of entries in handle list
+  unsigned short freeofs;                     // offset of first free block
+  unsigned short freesize;                    // free heap memory in this block
 //unsigned hdl_block;                   // global handle of this block
 //unsigned dbblock;                     // block index in group, if dbman file
 } GEOSlocalheap;

@@ -83,7 +83,7 @@ Any comments/updates/bug reports to:
  * main program to adapt the disassembler for the various possibles uses...
  */
 char *   create_label(unsigned short seg,unsigned short ofs,char type);
-char *   test_fixup(unsigned short ofs,short type,char *buf,int addinfo);
+char *   test_fixup(unsigned short ofs, unsigned short type, unsigned char *buf,int addinfo);
 unsigned test_jmplist(unsigned ofs,unsigned *label,int *addinfo);
 unsigned enumerate_global_jmp(unsigned short n,unsigned short *ofs);
 int      test_data_map(unsigned short ofs);
@@ -685,7 +685,7 @@ static void percent(char type, char subtype)
   int32 vofs;
   char *name;
   int extend = (addrsize == 32) ? 4 : 2;
-  char c;
+  unsigned char c;
 
   switch (type) {
   case 'A':                          /* direct address */
@@ -1144,7 +1144,7 @@ static word8 unassemble(word16 ofs)
 }
 
 
-void disassemble(char *c,unsigned short len,unsigned short offset,int all_silent)
+void disassemble(unsigned char *c,unsigned int len,unsigned int offset,int all_silent)
 {
   word16 instr_len,ofs;
   word16 old_jmp_count;
