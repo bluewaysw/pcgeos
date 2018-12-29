@@ -81,7 +81,7 @@ GOCFLAGS	+= -DLOGGING_ENABLED
 # - BorlandC doesn't support this, so we use full Pascal convention
 #   and use uppercase name equates in pppGlobal.def
 #
-CCOMFLAGS	+= -p
+#CCOMFLAGS	+= -p
 ASMFLAGS	+= -DPASCAL_CONV
 
 #
