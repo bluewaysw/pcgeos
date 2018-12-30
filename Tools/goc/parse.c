@@ -5428,9 +5428,9 @@ yyreduce:
 		}
 		GenerateComplexPrototype((yyvsp[-13].mit),passMsg,retMsg,(yyvsp[-9].od));
 		
-		Output("CObjMessage)(");
+		Output("CObjMessage_Watcom)(");
 		OutputSubst((yyvsp[-2].string), "@", "(optr)&");
-		Output("%s 0x%x, %s, (Message) %s, %s)",
+		Output("%s 0x%x, %s, (Message) %s, %s, 0xffff)",
 		       (strlen((yyvsp[-2].string))!=0) ? ", " : "",    	  
 		       ((yyvsp[-11].num) | RECORD_FLAG((yyvsp[-13].mit),(yyvsp[-9].od)) | CALL_FLAG((yyvsp[-13].mit))), /* flags */
 		       DEST((yyvsp[-9].od)), 	    	    	    	  /* dest */
@@ -5542,13 +5542,13 @@ yyreduce:
 		SET_OBJ_DEST(&objDest,"",PROTO_ONE_PARAM,"");
 	    	GeneratePrototype(MIT_CALLSUPER, curMethod->message, &objDest);
 
-	    	Output("CObjCallSuper)(");
+	    	Output("CObjCallSuper_Watcom)(");
 		for (pp = curMethod->message->data.symMessage.firstParam;
 			    pp != NullParam; pp = pp->next) {
 		    Output("%s, ", pp->name);
 		}
 	    	Output("&%s, oself", curMethod->class->name);
-	    	Output(", message, %s)%s",
+	    	Output(", message, %s, 0xffff)%s",
 		   GenerateMPDString(curMethod->message, 
 				     PARAM_ENUM(MIT_CALLSUPER)), 
 		       (yyvsp[0].num)?";":"");  /* XXX should go away */
@@ -8210,7 +8210,7 @@ GenerateComplexPrototype(MsgInvocType mit,/* record/call/send/callsuper */
 	Output("MemHandle, ChunkHandle,");
     }
 
-    Output("Message,word))");
+    Output("Message,word,word))");
 }
 
 /***********************************************************************
