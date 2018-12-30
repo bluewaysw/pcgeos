@@ -15,8 +15,7 @@ MK_SEP = \
 
 
 BINS = Tools/esp Tools/uicpp Tools/goc Tools/grev Tools/loc Tools/nmkmf Tools/pmake/makedpnd \
-		Tools/glue Tools/uic Tools/pmake/findlbdr Tools/geodump Tools/ldf2sls \
-                Tools/sym2dis
+		Tools/glue Tools/uic Tools/pmake/findlbdr
 LIBS = Tools/utils Tools/compat
 
 install		: $(LIBS) $(BINS)
