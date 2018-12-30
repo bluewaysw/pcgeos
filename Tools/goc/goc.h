@@ -38,9 +38,11 @@
 #define bcopy(source,dest,count) memcpy(dest,source,count)
 #endif
 
-#if !defined(_LINUX) && !defined(_WIN32)
+#if !defined(_LINUX) && !defined(_WIN32)
+
 /* MetaBlam's alloca trashes the stack and leads to death. */
-#define alloca(size) alloca_isnt_portable_you_goob_so_dont_use_it()
+#define alloca(size) alloca_isnt_portable_you_goob_so_dont_use_it()
+
 #endif
 
 /*
@@ -218,7 +220,7 @@ extern Boolean localizationRequired;
  * Exported function definitions.
  */
 
-extern void yyerror(char *fmt, ...);
+extern void yyerror(const char *fmt, ...);
 extern void yywarning(char *fmt, ...);
 extern int Output(char *fmt, ...);
 extern void OutputChar(char c);

@@ -20,7 +20,6 @@ static char *rcsid =
 
 #define YYERROR_VERBOSE	/* Give the follow set in parse error messages */
 
-
 #include <ctype.h>
 
 #include "goc.h"
@@ -31,10 +30,20 @@ static char *rcsid =
 #include "symbol.h"
 #include <config.h>
 
+// Required for void type def
+#undef __WATCOMC__
 #include <malloc.h>
+#define __WATCOMC__
+
 #include <compat/string.h> 
 
 #include <symbol.h>
+
+#define bison_malloc(x) (void*)malloc((size_t)x)
+#define YYMALLOC bison_malloc
+
+#define bison_free(x) (void)free(x)
+#define YYFREE bison_free
 
 /* Initial size of gstring buffer. If this changes, change */
 /* GET_NEW_GS_BUF_SIZE() */
@@ -217,7 +226,7 @@ static void ErrCheck (void);
 
 #define REMOVE_LOCALIZATION_DATA(c) 	     do{      \
     if(CHUNK_LOC(c)){                                 \
-	free((malloc_t)CHUNK_LOC(c));                 \
+	free(CHUNK_LOC(c));                 \
         CHUNK_LOC(c) = NULL;                          \
     }                                                 \
 }while(0)
@@ -243,20 +252,6 @@ static void ErrCheck (void);
       class->data.symClass.nextMessageElementPtr =                       \
 	&(symbolPtr->data.symMessage.nextMessage);                       \
       symbolPtr->data.symMessage.nextMessage = (Symbol *)NULL; } while(0)
-
-
-
-/*
- * Provide our own handler for the parser-stack overflow so the default one
- * that uses "alloca" isn't used, since alloca is forbidden to us owing to
- * the annoying hidden non-support of said function by our dearly beloved
- * HighC from MetaWare, A.M.D.G.
- */
-#define yyoverflow(m,s,S,v,V,d) ParseStackOverflow(m,s,S,(void **)v,V,d)
-static void ParseStackOverflow(char *,
-			       short **, size_t,
-			       void **, size_t,
-			       int *);
 
 static int oldContext;
 
@@ -722,7 +717,7 @@ endlibLine  	:
 	    	node = deflibPtr;
 	    	deflibPtr = node->next;
 		free(node->name);
-		free((malloc_t)node);
+		free(node);
 	    }
 	    SWITCH_CONTEXT( LC_NONE);
 	}
@@ -2559,6 +2554,8 @@ methodMessage	:
 	    }
  	    $$ = meth;
 	skip_the_methodMessageProduction:
+	// Null semicolom required for watcom
+	;
 	    
 	}
 	| IDENT
@@ -2729,9 +2726,9 @@ sendOrCallOrRecordLine:
 		}
 		GenerateComplexPrototype($1,passMsg,retMsg,$5);
 		
-		Output("CObjMessage)(");
+		Output("CObjMessage_Watcom)(");
 		OutputSubst($12, "@", "(optr)&");
-		Output("%s 0x%x, %s, (Message) %s, %s)",
+		Output("%s 0x%x, %s, (Message) %s, %s, 0xffff)",
 		       (strlen($12)!=0) ? ", " : "",    	  
 		       ($3 | RECORD_FLAG($1,$5) | CALL_FLAG($1)), /* flags */
 		       DEST($5), 	    	    	    	  /* dest */
@@ -2829,13 +2826,13 @@ callsuperStuff	:
 		SET_OBJ_DEST(&objDest,"",PROTO_ONE_PARAM,"");
 	    	GeneratePrototype(MIT_CALLSUPER, curMethod->message, &objDest);
 
-	    	Output("CObjCallSuper)(");
+	    	Output("CObjCallSuper_Watcom)(");
 		for (pp = curMethod->message->data.symMessage.firstParam;
 			    pp != NullParam; pp = pp->next) {
 		    Output("%s, ", pp->name);
 		}
 	    	Output("&%s, oself", curMethod->class->name);
-	    	Output(", message, %s)%s",
+	    	Output(", message, %s, 0xffff)%s",
 		   GenerateMPDString(curMethod->message, 
 				     PARAM_ENUM(MIT_CALLSUPER)), 
 		       $1?";":"");  /* XXX should go away */
@@ -4605,7 +4602,7 @@ String_EnterZT(char *s)
  *
  ***********************************************************************/
 void
-yyerror(char *fmt, ...)
+yyerror(const char *fmt, ...)
 {
     va_list	args;
 
@@ -4698,7 +4695,7 @@ GenerateReturnType(MsgInvocType mit, Symbol *msgSym, Boolean children)
 	}
     }else if(IS_CALL_TYPE(mit)){
 	assert(msgSym);
-	Output("%s", msgSym->data.symMessage.returnType);
+	Output("%s _pascal ", msgSym->data.symMessage.returnType);
     }else{
 	Output("void");
     }
@@ -4807,7 +4804,7 @@ GenerateComplexPrototype(MsgInvocType mit,/* record/call/send/callsuper */
 	Output("MemHandle, ChunkHandle,");
     }
 
-    Output("Message,word))");
+    Output("Message,word,word))");
 }
 
 /***********************************************************************
@@ -5184,7 +5181,7 @@ NoReloc(Symbol *instance)    /* Name of instance variable/field within vardata
 		/*
 		 * Free the relocation
 		 */
-		free((malloc_t)rel);
+		free(rel);
 	    }
 	}
     }
@@ -5411,6 +5408,7 @@ static void AddStringToCurrentGstringBuffer(char *ptr)
  *	ardeb	8/31/88		Initial Revision
  *
  ***********************************************************************/
+#if 0
 static void
 ParseStackOverflow(char		*msg,	    /* Message if we decide not to */
 		   short	**state,    /* Current state stack */
@@ -5445,7 +5443,7 @@ ParseStackOverflow(char		*msg,	    /* Message if we decide not to */
     }
 }
 
-
+#endif
 
 /***********************************************************************
  *				ErrCheck

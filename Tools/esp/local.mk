@@ -143,6 +143,8 @@ isipoOBJS	= isi.md/printobj.o isi.md/isinf.o
 sparcpoOBJS	= sparc.md/printobj.o
 win32poOBJS	= win32.md/printobj.obj
 linuxpoOBJS	= linux.md/printobj.o
+win32pslsOBJS   = win32.md/printsls.obj
+linuxpslsOBJS   = win32.md/printsls.o
 
 #if defined(unix)
 $(MACHINES)	: ${.TARGET:S%$%.md/printobj%}	    	    .JOIN
@@ -153,6 +155,17 @@ ${MACHINES:S%$%.md/printobj%g}	: MAKETOOL \
 
 win32	: ${.TARGET:S%$%.md/printobj.exe%}    	    .JOIN
 ${MACHINES:S%$%.md/printobj.exe%g} : $(win32poOBJS) $(win32LIBS) 
+	$(WLINK) $(CLINKFLAGS)  \
+			DEBUG WATCOM ALL \
+			$(.ALLSRC:M*.obj:S/^/file /g) \
+			$(.ALLSRC:M*.lib:S/^/lib /g) \
+			library kernel32 \
+			SYSTEM NT_WIN \
+			RU CON \
+			$(XLINKFLAGS)
+
+win32	: ${.TARGET:S%$%.md/printsls.exe%}    	    .JOIN
+${MACHINES:S%$%.md/printsls.exe%g} : $(win32pslsOBJS) $(win32LIBS) 
 	$(WLINK) $(CLINKFLAGS)  \
 			DEBUG WATCOM ALL \
 			$(.ALLSRC:M*.obj:S/^/file /g) \
@@ -173,6 +186,18 @@ ${MACHINES:S%$%.md/printobj.%g} : $(linuxpoOBJS) $(linuxLIBS)
 			library $(WATCOM)/lib386/linux/emu387.lib \
 			FORMAT ELF \
 			$(XLINKFLAGS)
+linux	: ${.TARGET:S%$%.md/printsls.%}    	    .JOIN
+${MACHINES:S%$%.md/printsls.%g} : $(linuxpslsOBJS) $(linuxLIBS) 
+	$(WLINK) $(CLINKFLAGS)  \
+			DEBUG ALL \
+			$(.ALLSRC:M*.o:S/^/file /g) \
+			$(.ALLSRC:M*.a:S/^/lib /g) \
+			library $(WATCOM)/lib386/linux/clib3r.lib \
+			library $(WATCOM)/lib386/math387r.lib \
+			library $(WATCOM)/lib386/linux/emu387.lib \
+			FORMAT ELF \
+			$(XLINKFLAGS)
+
 #endif
 
 
