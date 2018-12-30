@@ -790,7 +790,7 @@ malloc(register size_t	nbytes)
  *	If the ptr is not from the sbrk'ed space, return.
  *	If the block size is invalid, return.
  */
-int
+void
 free(malloc_t ptr)
 {
     register unsigned 	 nbytes; /* Size of node to be released */
@@ -812,7 +812,7 @@ free(malloc_t ptr)
      */
     if ( misaligned(ptr) ) {
 	error("free: illegal address (%#x)\n", ptr);
-	return(0);
+	return;
     }
 
     /*
@@ -821,7 +821,7 @@ free(malloc_t ptr)
      */
     if( ptr < _lbound || ptr > _ubound ) {
 	errno = EINVAL;
-	return(0);
+	return;
     }
 
     /*
@@ -839,7 +839,7 @@ free(malloc_t ptr)
     if (badblksize(oldblk,nbytes)) {
 	error("free: bad block size (%d) at %#x\n",
 	      (int)nbytes, (int)oldblk );
-	return 0;
+	return;
     }
 
     /* maintain statistics */
@@ -874,7 +874,7 @@ free(malloc_t ptr)
 		 */
 		error("free: blocks %#x, %#x overlap\n",
 		      (int)oldblk, (int)neighbor_blk);
-		return 0;
+		return;
 	    } else {
 		/*
 		 * Search to the left
@@ -909,7 +909,7 @@ free(malloc_t ptr)
 		 */
 		error("free: block %#x was already free\n",
 		      (int)ptr);
-		return 0;
+		return;
 	    } else {
 		/*
 		 * search to the right
@@ -922,7 +922,7 @@ free(malloc_t ptr)
 	     * as "oldblk == neighbor_blk"
 	     */
 	    error("free: block %#x was already free\n", (int)ptr);
-	    return 0;
+	    return;
 	}			/*else*/
 
 	/*
@@ -943,7 +943,7 @@ free(malloc_t ptr)
 #endif /* MEM_TRACE */
     oldblk->tag = -1;
 
-    return 1;
+    return;
 
 }				/*free*/
 

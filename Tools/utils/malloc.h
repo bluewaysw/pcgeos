@@ -42,7 +42,7 @@ typedef	void 	*malloc_t;
 #endif
 
 extern	malloc_t	calloc(size_t, size_t);
-extern	int		free(malloc_t);
+extern	void		free(malloc_t);
 extern	malloc_t	malloc(size_t size);
 extern	malloc_t	realloc(malloc_t, size_t);
 #define realloc_tagged(p,s) realloc((p), (s))
