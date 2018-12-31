@@ -292,6 +292,7 @@ typedef dword XYValueAsDWord;
 #define DWORD_Y(val) ((sword)( ((val) >> 16) & 0xffff ))
 #define ERROR_COORD 	0x8000
 
+#define MAKE_XY_DWORD(x,y) ((((dword) (y)) << 16) | (word)(x))
 
 /* standard structure for an X,Y pair */
 
