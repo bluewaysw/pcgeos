@@ -93,9 +93,10 @@ word timerID = 0;                       /* active timer ID */
      @message void MSG_CB_PUSH_GSTATE();
      @message void MSG_CB_POP_GSTATE();
      @message void MSG_CB_SCORE();
-	  @message Point MSG_CB_GET_TEXT_BOX_BOUNDS(GStateHandle gstate,
-//		 char *string, Rectangle *box);
-		 optr strOptr, Rectangle *box);
+	@message XYValueAsDWord MSG_CB_GET_TEXT_BOX_BOUNDS(
+		Rectangle *retValue,
+		GStateHandle gstate,
+		optr strOptr);
 /*     @message void MSG_CB_INVALIDATE_TEXT_BOX(char *string);*/
 //	  @message void MSG_CB_DRAW_TEXT_BOX(GStateHandle gstate, char *string);
 	  @message void MSG_CB_DRAW_TEXT_BOX(GStateHandle gstate, optr strOptr);
@@ -285,8 +286,8 @@ void SetAndDrawBlock(GStateHandle gstate, ColumnsBlockType t, int x, int y) {
 
 @method ColumnsBoardClass, MSG_CB_DRAW_TEXT_BOX {
      Rectangle box;
-     Point text = @call self::MSG_CB_GET_TEXT_BOX_BOUNDS(gstate, 
-		 strOptr, &box);
+     XYValueAsDWord text = @call self::MSG_CB_GET_TEXT_BOX_BOUNDS(&box, gstate, 
+		 strOptr);
 
      GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
      GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
@@ -294,7 +295,7 @@ void SetAndDrawBlock(GStateHandle gstate, ColumnsBlockType t, int x, int y) {
      GrFillRect(gstate, box.R_left, box.R_top, box.R_right, box.R_bottom);
 	  GrDrawRect(gstate, box.R_left, box.R_top, box.R_right, box.R_bottom);
 	  MemLock (OptrToHandle(strOptr));
-	  GrDrawText(gstate, text.P_x, text.P_y, LMemDeref(strOptr), 0);
+	  GrDrawText(gstate, DWORD_X(text), DWORD_Y(text), LMemDeref(strOptr), 0);
 	  MemUnlock (OptrToHandle(strOptr));
 }
 
@@ -681,11 +682,11 @@ void DropColumn(GStateHandle gs, int x, int y) {
 	  MemUnlock (OptrToHandle(strOptr));
 	  trans.P_x = BOARD_BOUND_X(blockSize) / 2 - width / 2;
      trans.P_y = BOARD_BOUND_Y(blockSize) / 2 - height / 2;
-     box->R_left = trans.P_x - 4;
-     box->R_top = trans.P_y - 4;
-     box->R_right = trans.P_x + width + 3;
-     box->R_bottom = trans.P_y + height + 3;
-     return trans;
+     retValue->R_left = trans.P_x - 4;
+     retValue->R_top = trans.P_y - 4;
+     retValue->R_right = trans.P_x + width + 3;
+     retValue->R_bottom = trans.P_y + height + 3;
+     return MAKE_XY_DWORD(trans.P_x, trans.P_y);
 }
 /*
 @method ColumnsBoardClass, MSG_CB_INVALIDATE_TEXT_BOX {
@@ -693,7 +694,7 @@ void DropColumn(GStateHandle gs, int x, int y) {
      Rectangle box;
 
      gstate = GrCreateState(pself->CBCI_viewWin);
-	  @call self::MSG_CB_GET_TEXT_BOX_BOUNDS(gstate, string, &box);
+	  @call self::MSG_CB_GET_TEXT_BOX_BOUNDS(&box, gstate, string);
      GrInvalRect(gstate, box.R_left, box.R_top, box.R_right, box.R_bottom);
      GrDestroyState(gstate);
 }
