@@ -584,10 +584,13 @@ CCOM_MODEL	?= -ml
 # ecc -> __cdecl calling convention
 # zp1 -> byte alignment of structures (no padding)
 # ei  -> enums are at least int-sized
+# zu ->  SS != DGROUP (i.e., do not assume stack is in data segment)
+# -of -> always output stack frames (helps SWAT, may be necessary in general)
+# -of+ -> The above but more agressive
 
 #if defined(linux)
 CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
-			-os -ol -ol+ -hc -s -ecc -zp1 -ei \
+			-zu -of -of+ -os -ol -ol+ -hc -s -ecc -zp1 -ei \
 		   	$(CCOM_MODEL) \
             $(.INCLUDES:N*/Include*:S/\\/\//g:S/^-I/-i=/g) \
 						-i="$(WATCOM)/h" \
