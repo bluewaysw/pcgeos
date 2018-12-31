@@ -4782,7 +4782,7 @@ GenerateComplexPrototype(MsgInvocType mit,/* record/call/send/callsuper */
 
     Output("((");
     GenerateReturnType(mit,retMsg,HAS_CHILDREN(od));
-    Output("(*)(");
+    Output(" _pascal (*)(");
     /* pump out the params for the msg */
 
     assert(passMsg != NullSymbol);
