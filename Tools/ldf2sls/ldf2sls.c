@@ -18,22 +18,25 @@ int main(int argc,char *argv[])
         {
           if(strncmp(buf,"Segment ",8)==0)
           {
-            p=strtok(buf," \t,:LINE_ENDING");
-            p=strtok(NULL," \t,:LINE_ENDING");
-            p=strtok(NULL," \t,:LINE_ENDING");
-            p=strtok(NULL," \t,:LINE_ENDING"); // fourth word is lib name
+            p=strtok(buf," \t,:" LINE_ENDING);
+            p=strtok(NULL," \t,:" LINE_ENDING);
+            p=strtok(NULL," \t,:" LINE_ENDING);
+            p=strtok(NULL," \t,:" LINE_ENDING); // fourth word is lib name
+            if (p == NULL) continue;
             strcpy(lib,p);              // store library name
           }
           else if(strncmp(buf,"protocol:",9)==0)
           {
             p=strtok(buf,LINE_ENDING);
+            if (p == NULL) continue;
             printf("; %s\n",p);
           }
           else
           {
-            label=strtok(buf," \tLINE_ENDING");
+            label=strtok(buf," \t:" LINE_ENDING);
                                         // first word in line
-            p=strtok(NULL,"\tLINE_ENDING");    // remainder of line
+            p=strtok(NULL,"\t" LINE_ENDING);    // remainder of line
+            if (p == NULL) continue;
             proc=strstr(p,"procedure at ");
             cls=strstr(p,"class at ");
             if(*lib && (proc || cls) && strstr(p,"global entry"))
