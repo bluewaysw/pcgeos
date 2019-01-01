@@ -4,14 +4,17 @@
 
 int main(int argc,char *argv[])
 {
-        char buf[256],*p;
+        char *buf;
         char *label,*proc;
-        unsigned seg,seg_valid;
-        unsigned ofs;
+	size_t len = 0;
+        unsigned short seg,seg_valid;
+        unsigned short ofs;
+	int nread = 0;
+	FILE *f = fopen(argv[1], "r");
 
         seg=0;                          // No segment read yet
         seg_valid=0;
-        while(fgets(buf,sizeof(buf),stdin))
+        while((nread = getline(&buf,&len,f)) != -1)
         {
           if(strncmp(buf,"Segment ",8)==0)
           {
@@ -26,31 +29,33 @@ int main(int argc,char *argv[])
           }
           else if(strncmp(buf,"protocol:",9)==0)
           {
-            p=strtok(buf,"\n\r");
-            printf("; %s\n",p);
+            strtok(buf,"\n");
+            printf("; %s\n", buf);
           }
           else
           {
-            label=strtok(buf," :\t\n\r");
-                                        // first word in line
-            p=strtok(NULL,"\t\n\r");    // remainder of line
-            proc=strstr(p,"procedure at ");
+            label=strtok(buf," : ");
+	    buf = strtok(NULL, "\n");
+	    if (buf == NULL) continue;
+
+            proc=strstr(buf,"procedure at ");
 
             /* translate procedure entries */
             if(seg_valid && proc)
             {
-              ofs=(unsigned)strtol(proc+13,&p,16);
+              ofs=(unsigned)strtol(proc+13,&buf,16);
               printf("C %u %x %s\n",seg_valid,ofs,label);
             }
 
             /* translate variable entries */
-            proc=strstr(p,"variable at ");
+            proc=strstr(buf,"variable at ");
             if(seg_valid && proc)
             {
-              ofs=(unsigned)strtol(proc+12,&p,16);
+              ofs=(unsigned)strtol(proc+12,&buf,16);
               printf("D %u %x %s\n",seg_valid,ofs,label);
             }
           }
+	  fflush(stdout);
         }
         return 0;                       // no error
 }
