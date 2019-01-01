@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Cookies
+GEODE           = cookies
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
 SRCS            = Cookies.goc Cookies.goh

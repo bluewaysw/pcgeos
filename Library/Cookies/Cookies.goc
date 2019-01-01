@@ -53,7 +53,7 @@ static HugeLMemHandle cookieData = 0;
 static Boolean cookieDirty = FALSE;
 
 static const TCHAR HTCOOKIE_FILE[] = _TEXT("cookies.txt");
-static const char nullString[] = "";
+static const char* nullString = "";
 static const char G_localString[] = "~~local~~" ;
 
 #define EXPORT _pascal _export
@@ -489,7 +489,7 @@ HTScanCookie (char **pp, char **thisWord, CookieDelimiter delim)
 	    /* eat empty value, return null */
 	    if (*p)
 		p++;
-	    *thisWord = &nullString;
+	    *thisWord = (char*) nullString;
 	    thisSym = HTST_UNKNOWN;
 	    break;
 	} else if (!*p) {
@@ -1031,7 +1031,8 @@ void EXPORT CookiesWrite(void)
     TCHAR *e;
 @endif
 
-    int i, count, elSize;
+    int i, count;
+    word elSize;
 
     if (cookieList == 0) return;
 
@@ -1143,7 +1144,8 @@ void _pascal CookiesCleanup (void)
     /* Write all cookies back to cookies.txt */
     optr cks;
     CookieStruct *cp;
-    int i, count, elSize;
+    int i, count;
+    word elSize;
 
     CookiesWrite();
 
@@ -1192,7 +1194,8 @@ HTRemoveCookie (CookieStruct *cp)
     CookieStruct *p;
     char *name, *path, *domain;
 
-    int i=0, count, elSize;
+    int i=0, count;
+    word elSize;
 
     if (MemLock(OptrToHandle(cookieList)) == 0) return;
     count = ChunkArrayGetCount(cookieList);
@@ -1292,7 +1295,8 @@ GarbageCollectCookies (void)
     optr ck;
     CookieStruct *cp;
 
-    int i, count, elSize;
+    int i, count;
+    word elSize;
     if (MemLock(OptrToHandle(cookieList)) == 0) return;
     count = ChunkArrayGetCount(cookieList);
     if (count > GARBAGE_COLLECT_COOKIE_THRESHOLD) {
@@ -1349,7 +1353,8 @@ SortCookies (optr list)
     count = ChunkArrayGetCount(list);
 
     while (count) {
-	int longest=0, index=0, elSize;
+	int longest=0, index=0;
+	word elSize;
 	for (i=0; i<count; i++) {
 	    HLMGETITEM(list, i, &unsorted, sizeof(CookieSort));
 	    if (unsorted.CS_pathLength > longest) {
@@ -1413,7 +1418,7 @@ void EXPORT CookieSet(
     HLMALLOCSTR(cp->CS_name, name);
     HLMALLOCSTR(cp->CS_value, value);
     if (expires && *expires) {
-	CookieParseTime(expires, &(cp->CS_expires));
+	CookieParseTime((char*) expires, &(cp->CS_expires));
 	/* flag expired cookies immediately */
 	if (CookieExpires(cp)) {
 	    cp->CS_expires.TDAT_year = EXPIRED_COOKIE;
@@ -1596,7 +1601,8 @@ optr EXPORT CookieFind(TCHAR *anchorPath, TCHAR *anchorHost, Boolean secure)
 {
     optr ret; /* of CookieSort */
     CookieSort unsorted;
-    int i, count, elSize;
+    int i, count;
+    word elSize;
     optr tmp;
     CookieStruct *cks;
     MemHandle retBlock;
