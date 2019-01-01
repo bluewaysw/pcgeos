@@ -6,11 +6,11 @@
 GEODE           = numbers
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = Content.goc Main.goc Peditor.goc Process.goc DOCUMENT.GOC\
-                  SCREEN.GOC Vis.goc PASSWORD.GOC sounds.goc Hlapp.goh\
-                  Numbers.goh PASSWDUI.GOH PASSWORD.GOH BBOXREG.GOH
-OBJS            = Content.obj Main.obj Peditor.obj Process.obj DOCUMENT.obj\
-                  SCREEN.obj Vis.obj PASSWORD.obj sounds.obj
+SRCS            = Main.goc Process.goc Content.goc SCREEN.goc sounds.goc\
+                  PASSWORD.goc Vis.goc Peditor.goc DOCUMENT.goc hlapp.goh\
+                  bboxreg.goh password.goh passwdui.goh numbers.goh
+OBJS            = Main.obj Process.obj Content.obj SCREEN.obj sounds.obj\
+                  PASSWORD.obj Vis.obj Peditor.obj DOCUMENT.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

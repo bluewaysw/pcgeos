@@ -1,0 +1,394 @@
+/***********************************************************************
+ *
+ *  Copyright (c) Cool Lava Productions 1998 -- All Rights Reserved
+ *                Breadbox Computer Company
+ * PROJECT:   Kid NUMBERS
+ * MODULE:    global header
+ * FILE:      numbers.goh
+ *
+ * AUTHOR:    Duane E. Char
+ *
+ * REVISION HISTORY:
+ *  Date        Name                Description
+ *  ----        ----                -----------
+
+ ************************************************************************/
+
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+/*
+ ***************************************************************************
+ *      Constants and structures
+ ***************************************************************************
+ */
+
+#define MANUFACTURER_ID_BREADBOX    16431
+
+#define FILE_TOKEN                  "KNd1"
+#define FILE_ID                     MANUFACTURER_ID_BREADBOX
+#define FILE_PROTOCOL_MAJOR         1
+#define FILE_PROTOCOL_MINOR         0
+
+#define MAX_PAGES   20
+
+#define SOUND_ID_START_QUIZ         1
+#define SOUND_ID_WRONG              3
+#define SOUND_ID_RIGHT              2
+#define SOUND_ID_SUMMARY            4
+#define SOUND_ID_NEXT               5
+
+/* this next struct needs to match the VM file struct */
+typedef struct {
+	DBGroup VME_group;  /* DB Group ID  */
+	DBItem  VME_head;   /* First item (page) in the group */
+	int             VME_size;   /* Number of pages, not used yet  */
+} PageStruct;
+
+/* the next structure is the item itself. It's a big one, but it
+ * should not be a problem because it forces a max of 480 bytes 
+ * into a chunk and that is legal
+ */
+typedef struct {
+	char                    word1[20];
+	char                    def1[40];
+	char                    word2[20];
+	char                    def2[40];
+	char                    word3[20];
+	char                    def3[40];
+	char                    word4[20];
+	char                    def4[40];
+	char                    word5[20];
+	char                    def5[40];
+	char                    word6[20];
+	char                    def6[40];
+	char                    word7[20];
+	char                    def7[40];
+	ChunkHandle             LN_next;
+} ListNode; 
+
+
+
+
+/*
+ ***************************************************************************
+ *      Global variables
+ ***************************************************************************
+ *The idea for this app is to have global values that can be called to
+ *compare with what is currently selected.  Thus, 2 values must be known
+ *at all times..the wordbox selected and the def selected.  This requires
+ *a whole bunch of globals.
+ *Because of the previous version of this program, the left column are called
+ *words and the right column is called defs.  In this case the Words are the 
+ *number, and the defs are the answer.
+ */
+
+extern char g_fileName[FILE_LONGNAME_BUFFER_SIZE];
+extern VMFileHandle    g_dbFileHan;
+extern int	g_numPages;
+extern Boolean g_appOpening;
+extern Boolean g_wordBoxPressed;
+extern Boolean g_defBoxPressed;
+extern int g_selectedWordBox;
+extern int g_selectedDefBox;
+extern sword g_defboxVertMidpoint;
+extern sword g_defboxHorizMidpoint;
+extern sword g_wordboxVertMidpoint;
+extern sword g_wordboxHorizMidpoint;
+extern int g_defbox1Val;
+extern int g_defbox2Val;
+extern int g_defbox3Val;
+extern int g_defbox4Val;
+extern int g_defbox5Val;
+extern int g_defbox6Val;
+extern int g_defbox7Val;
+extern char g_dbWord1[20];
+extern char g_dbWord2[20];
+extern char g_dbWord3[20];
+extern char g_dbWord4[20];
+extern char g_dbWord5[20];
+extern char g_dbWord6[20];
+extern char g_dbWord7[20];
+extern char g_dbDef1[40];
+extern char g_dbDef2[40];
+extern char g_dbDef3[40];
+extern char g_dbDef4[40];
+extern char g_dbDef5[40];
+extern char g_dbDef6[40];
+extern char g_dbDef7[40];
+extern dword g_randomX;
+extern int g_whatShape;
+extern int g_linesDrawn;
+extern word g_pageNumber;
+extern int g_correct;
+extern int g_incorrect;
+extern Boolean g_flashMessage;
+extern Boolean g_playingGame;
+extern Boolean g_onYago;
+extern Boolean g_isColor;
+extern byte g_shuffledPages[MAX_PAGES];
+extern byte g_color;
+extern Boolean g_rightAns;
+extern Boolean G_soundIsOn;
+extern Boolean G_soundIsRunning;
+extern TimerHandle G_soundTimer;
+extern word G_soundTimerId;
+/*
+ ***************************************************************************
+ *      Function Prototypes
+ ***************************************************************************
+ */
+ void ShufflePages(void);
+ void VMELoadFileCommon(void);
+ void GetRandomColor(void);
+ void GetRandomShape(void);
+
+void LoadSounds(void) ;
+void SoundStart(void) ;
+void SoundStop(void) ;
+void PlaySimpleSound(word soundId, word priority) ;
+void UpdateSound(void) ;
+
+/*
+ ***************************************************************************
+ *      Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class  NumbersProcessClass, GenProcessClass ;
+	 @message void MSG_PROCESS_GET_DB_INFO(Boolean fromEditor);
+	 @message void MSG_RESTART_SAME_DRILL();
+
+    @message void MSG_OPEN_PWORD_TO_EDITOR();
+
+	@message (GEN_VALUE_APPLY_MSG) MSG_VME_VALUE_APPLY;
+	@message void MSG_VME_SEND_A_MESSAGE(int msgflag);
+	@message void MSG_VME_LOAD_PAGE(WWFixedAsDWord pagevalue);
+	@message void MSG_VME_ADD_PAGE();
+	@message void MSG_VME_DELETE_PAGE();
+	@message void MSG_VME_SAVE_PAGE();
+	@message (GEN_TEXT_STATUS_MSG) MSG_VME_TEXT_STATUS;
+
+@message void MSG_KN_PROCESS_UPDATE_SOUND() ;
+@message void MSG_KN_PROCESS_TOGGLE_SOUND_ON_OFF() ;
+
+@endc;
+
+/*
+ *In order keep the screen refreshes easy, need the values to be
+ *a part of the VisContentClass, so lots of instance vars needed.
+ */
+@class  NumbersVisContentClass, VisContentClass;
+@message void MSG_VIS_RESET_BOXES(byte wordbox);
+@message void MSG_VIS_CONTENT_SET_LINE(word lineno);
+@message void MSG_VIS_CONTENT_NEW_PAGE(Boolean flash);
+@message void MSG_VIS_CONTENT_FLASH_MESSAGE();
+@message void MSG_VIS_CONTENT_END_FLASH_MESSAGE();
+@message void MSG_VIS_CONTENT_LOAD_PAGE();
+@message void MSG_VIS_CONTENT_SHOW_SCORE();
+@message void MSG_VIS_CONTENT_BEGIN_GAME();
+@message void MSG_VIS_CONTENT_END_GAME();
+@instance word NumbersC_firstline = 0;
+@instance word NumbersC_secondline = 0;
+@instance word NumbersC_thirdline = 0;
+@instance word NumbersC_fourthline = 0;
+@instance word NumbersC_fifthline = 0;
+@instance word NumbersC_sixthline = 0;
+@instance word NumbersC_seventhline = 0;
+@instance sword DEFBOX1_HORZ_MIDPOINT = 0;
+@instance sword DEFBOX1_VERT_MIDPOINT = 0;
+@instance sword DEFBOX2_HORZ_MIDPOINT = 0;
+@instance sword DEFBOX2_VERT_MIDPOINT = 0;
+@instance sword DEFBOX3_HORZ_MIDPOINT = 0;
+@instance sword DEFBOX3_VERT_MIDPOINT = 0;
+@instance sword DEFBOX4_HORZ_MIDPOINT = 0;
+@instance sword DEFBOX4_VERT_MIDPOINT = 0;
+@instance sword DEFBOX5_HORZ_MIDPOINT = 0;
+@instance sword DEFBOX5_VERT_MIDPOINT = 0;
+@instance sword DEFBOX6_HORZ_MIDPOINT = 0;
+@instance sword DEFBOX6_VERT_MIDPOINT = 0;
+@instance sword DEFBOX7_HORZ_MIDPOINT = 0;
+@instance sword DEFBOX7_VERT_MIDPOINT = 0;
+@instance sword WORDBOX1_HORZ_MIDPOINT = 0;
+@instance sword WORDBOX1_VERT_MIDPOINT = 0;
+@instance sword WORDBOX2_HORZ_MIDPOINT = 0;
+@instance sword WORDBOX2_VERT_MIDPOINT = 0;
+@instance sword WORDBOX3_HORZ_MIDPOINT = 0;
+@instance sword WORDBOX3_VERT_MIDPOINT = 0;
+@instance sword WORDBOX4_HORZ_MIDPOINT = 0;
+@instance sword WORDBOX4_VERT_MIDPOINT = 0;
+@instance sword WORDBOX5_HORZ_MIDPOINT = 0;
+@instance sword WORDBOX5_VERT_MIDPOINT = 0;
+@instance sword WORDBOX6_HORZ_MIDPOINT = 0;
+@instance sword WORDBOX6_VERT_MIDPOINT = 0;
+@instance sword WORDBOX7_HORZ_MIDPOINT = 0;
+@instance sword WORDBOX7_VERT_MIDPOINT = 0;
+@instance char *word1;
+@instance char *word2;
+@instance char *word3;
+@instance char *word4;
+@instance char *word5;
+@instance char *word6;
+@instance char *word7;
+@instance char *def1;
+@instance char *def2;
+@instance char *def3;
+@instance char *def4;
+@instance char *def5;
+@instance char *def6;
+@instance char *def7;
+@instance word wordcolor=0;
+@instance byte VC_FLASH_MESSAGE_SIZE;
+@instance byte VC_DROP_NUMBER_SIZE;
+@instance word VC_DROP_NUMBER_X;
+@instance word VC_DROP_NUMBER_Y_STEP;
+@instance byte VC_TITLE_SIZE;
+@instance word VC_TITLE_Y;
+@instance byte VC_LABEL_SIZE;
+@instance byte VC_LINE_WIDTH;
+@instance word VC_WORDX;
+@instance word VC_DEFX;
+@instance word VC_LINEY[7];
+
+@endc;
+
+
+@class  VisBoxClass, VisClass ;
+/* state flags */
+/*  in the future, extra monikers will be defined here */
+#define VBC_MOUSE_DOWN 0x80
+#define VBC_SELECTED   0x40
+@message void MSG_VIS_BOX_RESET_PRESSED(byte wordbox);
+@message void MSG_VIS_UNDETECT_BOXES(byte alldefs, 
+						byte selected, byte allwords);
+@message void MSG_VIS_DRAW_FACE_ONLY();
+@instance byte VBI_state = 0;
+@instance byte VBI_isPressed = 0;
+@instance byte VBI_isWord = 0;
+@instance byte VBI_isFace = 0;
+@instance byte VBI_line_no = 0;
+@instance int VBI_value = 0;
+@instance @visMoniker VBC_moniker;
+@instance Point VBI_diamond_points[4];
+@endc;
+
+/* to intercept closing editor with X and close buttons */
+@class VMEEditorClass, GenInteractionClass;
+@endc;
+
+@class TextEnableClass, GenTextClass;
+    @instance optr TE_button;
+@endc;
+
+@class TextModifiedClass, GenTextClass;
+@endc;
+
+/* This class is for our documents */
+@class KNDocumentClass, GenDocumentClass;
+@endc
+
+/* This is to intercept doc stuff for save to folder */
+@class KNDocCtrlClass, GenDocumentControlClass;
+@endc
+
+/************************************************************************/
+/*                                                                                            
+/*      external Files                                                                  
+/*                                                                                          
+/************************************************************************/
+
+/************************************************************************/
+/*
+/*      PROCESS
+/*
+/************************************************************************/
+@ifndef __NUMBERS_PROCESS_GOC
+@define __NUMBERS_PROCESS_GOC
+
+@endif
+/************************************************************************/
+/*
+/*      DOCUMENT
+/*
+/************************************************************************/
+@ifndef __NUMBERS_DOCUMENT_GOC
+@define __NUMBERS_DOCUMENT_GOC
+
+@endif
+/************************************************************************/
+/*                                                                                       
+/*      VIS                                                                    
+/*                                                                                              
+/************************************************************************/
+@ifndef __NUMBERS_VIS_GOC
+@define __NUMBERS_VIS_GOC
+
+@endif
+
+/************************************************************************/
+/*                                                                                              
+/*      CONTENT                                                                 
+/*                                                                                              
+/************************************************************************/
+@ifndef __NUMBERS_CONTENT_GOC
+@define __NUMBERS_CONTENT_GOC
+
+@endif
+
+
+/************************************************************************/
+/*                                                                                              
+/*      UI/MAIN                                                                         
+/*                                                                                              
+/************************************************************************/
+@ifndef __NUMBERS_MAIN_GOC
+@define __NUMBERS_MAIN_GOC
+
+	@extern object NumbersApp;
+	@extern visMoniker NumbersDocIconList;
+	@extern object NumbersPrimary;
+	@extern object NumbersView;
+	@extern object ScoreDialog;
+	@extern object SDStaticCorrect;
+	@extern object SDStaticIncorrect;
+	@extern object SDStaticFinal;
+	@extern object SDCorrectText;
+	@extern object SDIncorrectText;
+	@extern object SDFinalText;
+	@extern object NumbersSoundOnOff;
+	@extern visMoniker SoundOnMoniker;
+	@extern visMoniker SoundOffMoniker;
+
+    @extern object VMEEditor;
+    
+    @extern chunk WrongPasswordText;
+    @extern chunk PasswordChangedText;
+    @extern chunk PasswordMismatchText;
+    @extern chunk WrongOldPasswordText;
+    @extern chunk KNFolderTxt;
+    @extern chunk YagoKNFolder;
+	 @extern chunk YagoDocFolder;
+    @extern chunk fakeoutString;
+	 @extern chunk MessageTxt;
+	 @extern chunk ofString;
+
+@endif 
+
+/************************************************************************/
+/*                                                                                              
+/*      UI/SCREEN
+/*                                                                                              
+/************************************************************************/
+@ifndef __NUMBERS_SCREEN_GOC
+@define __NUMBERS_SCREEN_GOC
+
+    @extern object NumbersContentLS;
+    @extern object NumbersContentSS;
+
+@endif
+
