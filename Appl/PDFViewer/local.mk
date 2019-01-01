@@ -34,7 +34,7 @@ CCOMFLAGS   += -DCOPY_PAGE
 # Borland C compiler option to merge duplicate strings
 # (see gfxFont2.goh)
 #
-CCOMFLAGS   += -d
+#CCOMFLAGS   += -d
 
 #
 # PDF viewer:

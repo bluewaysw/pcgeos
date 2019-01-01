@@ -45,17 +45,17 @@ library ansic
 library spool
 #
 #
-resource DISPLAYUI object shared read-only
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource DOCUMENTUI object
+resource DisplayUI object shared read-only
+resource AppResource ui-object
+resource Interface ui-object
+resource DocumentUI object
 
 resource ENCODINGS lmem read-only shared
 resource OPTABLE   lmem read-only shared
 resource FAXCODES  lmem read-only shared
 
-resource APPSCICONRESOURCE lmem read-only shared
-resource APPTCICONRESOURCE lmem read-only shared
+resource AppSCIconResource lmem read-only shared
+resource AppTCIconResource lmem read-only shared
 #
 #
 export PDFDocumentClass
