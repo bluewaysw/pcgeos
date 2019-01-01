@@ -182,9 +182,9 @@ void ip_print (struct iphdr *iph,
 	    tcpseq = (unsigned long *)&prot_hdr[4];
 	    tcpack = (unsigned long *)&prot_hdr[8];
 	    tcpwin = (unsigned short *)&prot_hdr[14];
-	    sprintf(logbuf2, "\n\t\tseq %lu ack %lu win %u",
+	    sprintf((char*) logbuf2, "\n\t\tseq %lu ack %lu win %u",
 		    ntohl(*tcpseq), ntohl(*tcpack), ntohs(*tcpwin));
-	    strcat(logbuf, logbuf2);
+	    strcat((char*) logbuf, (const char*) logbuf2);
 	}
     }
     else sprintf(logbuf, "%s %s %s %s %d%s",
