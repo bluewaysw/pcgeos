@@ -26,9 +26,9 @@
 /* Include "graphics.h" for definition of Rectangle */
 #include <graphics.h>
 
-/***********************************************************************/
-/* HWR Library Protocol
-/***********************************************************************/
+/***********************************************************************
+ * HWR Library Protocol
+ ***********************************************************************/
 /*
  * All hwr libraries will need to have the following line in their
  * local.mk file:

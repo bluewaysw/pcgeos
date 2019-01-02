@@ -1,60 +1,60 @@
-GEODECK.obj \
-GEODECK.eobj: GEOS.DEF GEODE.DEF PRODUCT.DEF EC.DEF LIBRARY.DEF \
-                RESOURCE.DEF OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF \
-                OBJECTS/WINC.DEF WIN.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF HEAP.DEF VM.DEF VMDEF.DEF DBASE.DEF \
-                HUGEARR.DEF OBJECTS/INPUTC.DEF DECKMAP.DEF LCJOKER.ASM \
-                LCWIN.ASM LCGEOBACK.ASM LCNEFERTITE.ASM LCGRAPES.ASM \
-                LCCLASSIC.ASM LCPYRAMID.ASM LCEAGLE.ASM LCHINGE.ASM \
-                LCBUBBLES.ASM LCMASKS.ASM LCFLOWERS.ASM LCCHEESE.ASM \
-                LCFRACTAL1.ASM LCFRACTAL2.ASM LCCLUBJ.ASM LCCLUBK.ASM \
-                LCCLUBQ.ASM LCDIAMONDJ.ASM LCDIAMONDK.ASM LCDIAMONDQ.ASM \
-                LCHEARTJ.ASM LCHEARTK.ASM LCHEARTQ.ASM LCSPADEJ.ASM \
-                LCSPADEK.ASM LCSPADEQ.ASM LCDIAMOND2.ASM LCDIAMOND3.ASM \
-                LCDIAMOND4.ASM LCDIAMOND5.ASM LCDIAMOND6.ASM \
-                LCDIAMOND7.ASM LCDIAMOND8.ASM LCDIAMOND9.ASM \
-                LCDIAMONDA.ASM LCDIAMONDT.ASM LCHEART2.ASM LCHEART3.ASM \
-                LCHEART4.ASM LCHEART5.ASM LCHEART6.ASM LCHEART7.ASM \
-                LCHEART8.ASM LCHEART9.ASM LCHEARTA.ASM LCHEARTT.ASM \
-                LCCLUB2.ASM LCCLUB3.ASM LCCLUB4.ASM LCCLUB5.ASM \
-                LCCLUB6.ASM LCCLUB7.ASM LCCLUB8.ASM LCCLUB9.ASM \
-                LCCLUBA.ASM LCCLUBT.ASM LCSPADE2.ASM LCSPADE3.ASM \
-                LCSPADE4.ASM LCSPADE5.ASM LCSPADE6.ASM LCSPADE7.ASM \
-                LCSPADE8.ASM LCSPADE9.ASM LCSPADEA.ASM LCSPADET.ASM \
-                LMJOKER.ASM LMWIN.ASM LMGEOBACK.ASM LMNEFERTITE.ASM \
-                LMGRAPES.ASM LMCLASSIC.ASM LMPYRAMID.ASM LMEAGLE.ASM \
-                LMHINGE.ASM LMBUBBLES.ASM LMMASKS.ASM LMFLOWERS.ASM \
-                LMCHEESE.ASM LMFRACTAL1.ASM LMFRACTAL2.ASM LMCLUBJ.ASM \
-                LMCLUBK.ASM LMCLUBQ.ASM LMDIAMONDJ.ASM LMDIAMONDK.ASM \
-                LMDIAMONDQ.ASM LMHEARTJ.ASM LMHEARTK.ASM LMHEARTQ.ASM \
-                LMSPADEJ.ASM LMSPADEK.ASM LMSPADEQ.ASM LMDIAMOND2.ASM \
-                LMDIAMOND3.ASM LMDIAMOND4.ASM LMDIAMOND5.ASM \
-                LMDIAMOND6.ASM LMDIAMOND7.ASM LMDIAMOND8.ASM \
-                LMDIAMOND9.ASM LMDIAMONDA.ASM LMDIAMONDT.ASM LMCLUB2.ASM \
-                LMCLUB3.ASM LMCLUB4.ASM LMCLUB5.ASM LMCLUB6.ASM \
-                LMCLUB7.ASM LMCLUB8.ASM LMCLUB9.ASM LMCLUBA.ASM \
-                LMCLUBT.ASM LMSPADE2.ASM LMSPADE3.ASM LMSPADE4.ASM \
-                LMSPADE5.ASM LMSPADE6.ASM LMSPADE7.ASM LMSPADE8.ASM \
-                LMSPADE9.ASM LMSPADEA.ASM LMSPADET.ASM LMHEART2.ASM \
-                LMHEART3.ASM LMHEART4.ASM LMHEART5.ASM LMHEART6.ASM \
-                LMHEART7.ASM LMHEART8.ASM LMHEART9.ASM LMHEARTA.ASM \
-                LMHEARTT.ASM CGAJOKER.ASM CGAWIN.ASM CGAGEOBACK.ASM \
-                CGANEFERTITE.ASM CGAGRAPES.ASM CGACLASSIC.ASM \
-                CGAPYRAMID.ASM CGAEAGLE.ASM CGAHINGE.ASM CGABUBBLES.ASM \
-                CGAMASKS.ASM CGAFLOWERS.ASM CGACHEESE.ASM CGAFRACTAL1.ASM \
-                CGAFRACTAL2.ASM CGACLUBJ.ASM CGACLUBK.ASM CGACLUBQ.ASM \
-                CGADIAMONDJ.ASM CGADIAMONDK.ASM CGADIAMONDQ.ASM \
-                CGAHEARTJ.ASM CGAHEARTK.ASM CGAHEARTQ.ASM CGASPADEJ.ASM \
-                CGASPADEK.ASM CGASPADEQ.ASM CGADIAMOND2.ASM \
-                CGADIAMOND3.ASM CGADIAMOND4.ASM CGADIAMOND5.ASM \
-                CGADIAMOND6.ASM CGADIAMOND7.ASM CGADIAMOND8.ASM \
-                CGADIAMOND9.ASM CGADIAMONDA.ASM CGADIAMONDT.ASM \
-                CGACLUB2.ASM CGACLUB3.ASM CGACLUB4.ASM CGACLUB5.ASM \
-                CGACLUB6.ASM CGACLUB7.ASM CGACLUB8.ASM CGACLUB9.ASM \
-                CGACLUBA.ASM CGACLUBT.ASM CGASPADE2.ASM CGASPADE3.ASM \
-                CGASPADE4.ASM CGASPADE5.ASM CGASPADE6.ASM CGASPADE7.ASM \
-                CGASPADE8.ASM CGASPADE9.ASM CGASPADEA.ASM CGASPADET.ASM \
-                CGAHEART2.ASM CGAHEART3.ASM CGAHEART4.ASM CGAHEART5.ASM \
-                CGAHEART6.ASM CGAHEART7.ASM CGAHEART8.ASM CGAHEART9.ASM \
-                CGAHEARTA.ASM CGAHEARTT.ASM
+geodeck.obj \
+geodeck.eobj: geos.def geode.def product.def ec.def library.def \
+                resource.def object.def lmem.def graphics.def fontID.def \
+                font.def color.def gstring.def text.def char.def \
+                Objects/winC.def win.def Objects/metaC.def chunkarr.def \
+                geoworks.def heap.def vm.def vmdef.def dbase.def \
+                hugearr.def Objects/inputC.def deckMap.def LCJoker.asm \
+                LCWin.asm LCGeoback.asm LCNefertite.asm LCGrapes.asm \
+                LCClassic.asm LCPyramid.asm LCEagle.asm LCHinge.asm \
+                LCBubbles.asm LCMasks.asm LCFlowers.asm LCCheese.asm \
+                LCFractal1.asm LCFractal2.asm LCClubJ.asm LCClubK.asm \
+                LCClubQ.asm LCDiamondJ.asm LCDiamondK.asm LCDiamondQ.asm \
+                LCHeartJ.asm LCHeartK.asm LCHeartQ.asm LCSpadeJ.asm \
+                LCSpadeK.asm LCSpadeQ.asm LCDiamond2.asm LCDiamond3.asm \
+                LCDiamond4.asm LCDiamond5.asm LCDiamond6.asm \
+                LCDiamond7.asm LCDiamond8.asm LCDiamond9.asm \
+                LCDiamondA.asm LCDiamondT.asm LCHeart2.asm LCHeart3.asm \
+                LCHeart4.asm LCHeart5.asm LCHeart6.asm LCHeart7.asm \
+                LCHeart8.asm LCHeart9.asm LCHeartA.asm LCHeartT.asm \
+                LCClub2.asm LCClub3.asm LCClub4.asm LCClub5.asm \
+                LCClub6.asm LCClub7.asm LCClub8.asm LCClub9.asm \
+                LCClubA.asm LCClubT.asm LCSpade2.asm LCSpade3.asm \
+                LCSpade4.asm LCSpade5.asm LCSpade6.asm LCSpade7.asm \
+                LCSpade8.asm LCSpade9.asm LCSpadeA.asm LCSpadeT.asm \
+                LMJoker.asm LMWin.asm LMGeoback.asm LMNefertite.asm \
+                LMGrapes.asm LMClassic.asm LMPyramid.asm LMEagle.asm \
+                LMHinge.asm LMBubbles.asm LMMasks.asm LMFlowers.asm \
+                LMCheese.asm LMFractal1.asm LMFractal2.asm LMClubJ.asm \
+                LMClubK.asm LMClubQ.asm LMDiamondJ.asm LMDiamondK.asm \
+                LMDiamondQ.asm LMHeartJ.asm LMHeartK.asm LMHeartQ.asm \
+                LMSpadeJ.asm LMSpadeK.asm LMSpadeQ.asm LMDiamond2.asm \
+                LMDiamond3.asm LMDiamond4.asm LMDiamond5.asm \
+                LMDiamond6.asm LMDiamond7.asm LMDiamond8.asm \
+                LMDiamond9.asm LMDiamondA.asm LMDiamondT.asm LMClub2.asm \
+                LMClub3.asm LMClub4.asm LMClub5.asm LMClub6.asm \
+                LMClub7.asm LMClub8.asm LMClub9.asm LMClubA.asm \
+                LMClubT.asm LMSpade2.asm LMSpade3.asm LMSpade4.asm \
+                LMSpade5.asm LMSpade6.asm LMSpade7.asm LMSpade8.asm \
+                LMSpade9.asm LMSpadeA.asm LMSpadeT.asm LMHeart2.asm \
+                LMHeart3.asm LMHeart4.asm LMHeart5.asm LMHeart6.asm \
+                LMHeart7.asm LMHeart8.asm LMHeart9.asm LMHeartA.asm \
+                LMHeartT.asm CGAJoker.asm CGAWin.asm CGAGeoback.asm \
+                CGANefertite.asm CGAGrapes.asm CGAClassic.asm \
+                CGAPyramid.asm CGAEagle.asm CGAHinge.asm CGABubbles.asm \
+                CGAMasks.asm CGAFlowers.asm CGACheese.asm CGAFractal1.asm \
+                CGAFractal2.asm CGAClubJ.asm CGAClubK.asm CGAClubQ.asm \
+                CGADiamondJ.asm CGADiamondK.asm CGADiamondQ.asm \
+                CGAHeartJ.asm CGAHeartK.asm CGAHeartQ.asm CGASpadeJ.asm \
+                CGASpadeK.asm CGASpadeQ.asm CGADiamond2.asm \
+                CGADiamond3.asm CGADiamond4.asm CGADiamond5.asm \
+                CGADiamond6.asm CGADiamond7.asm CGADiamond8.asm \
+                CGADiamond9.asm CGADiamondA.asm CGADiamondT.asm \
+                CGAClub2.asm CGAClub3.asm CGAClub4.asm CGAClub5.asm \
+                CGAClub6.asm CGAClub7.asm CGAClub8.asm CGAClub9.asm \
+                CGAClubA.asm CGAClubT.asm CGASpade2.asm CGASpade3.asm \
+                CGASpade4.asm CGASpade5.asm CGASpade6.asm CGASpade7.asm \
+                CGASpade8.asm CGASpade9.asm CGASpadeA.asm CGASpadeT.asm \
+                CGAHeart2.asm CGAHeart3.asm CGAHeart4.asm CGAHeart5.asm \
+                CGAHeart6.asm CGAHeart7.asm CGAHeart8.asm CGAHeart9.asm \
+                CGAHeartA.asm CGAHeartT.asm
