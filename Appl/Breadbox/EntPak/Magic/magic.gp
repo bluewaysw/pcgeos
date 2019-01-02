@@ -24,15 +24,15 @@ exempt borlandc
 exempt game
 exempt sound
 
-resource  APPRESOURCE              ui-object
-#resource  DIALOGRESOURCE           ui-object
-resource  INTERFACERESOURCE        ui-object
-resource  BOARDRESOURCE            ui-object
-#resource  HIGHSCOREGLYPHRESOURCE   ui-object
-resource  GAMEENDRESOURCE          ui-object
-resource  ICONRESOURCE             ui-object
-resource STRINGSRESOURCE data object
-resource QTIPSRESOURCE ui-object
+resource  AppResource              ui-object
+#resource  DialogResource          ui-object
+resource  InterfaceResource        ui-object
+resource  BoardResource            ui-object
+#resource  HighScoreGlyphResource  ui-object
+resource  GameEndResource          ui-object
+resource  IconResource             ui-object
+resource StringsResource data object
+resource QTipsResource ui-object
 
 export    MagicContentClass
 export    MagicPieceClass
