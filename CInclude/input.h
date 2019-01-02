@@ -328,4 +328,4 @@ typedef ByteFlags ScrSaverStatus;
 #define SSS_ENABLED    0x80
 #define SSS_ACTIVE     0x40
 
-#endif ; __INPUT_H
+#endif ; /* __INPUT_H */
