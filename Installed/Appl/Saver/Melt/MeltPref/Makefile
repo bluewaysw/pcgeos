@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = MeltPref
+GEODE           = meltpref
 ASM_TO_OBJS     = meltpref.asm
-UI_TO_RDFS      = MELTPREF.UI
+UI_TO_RDFS      = meltpref.ui
 SRCS            = meltpref.asm meltpref.ui
 OBJS            = meltpref.obj
 LOBJS           =

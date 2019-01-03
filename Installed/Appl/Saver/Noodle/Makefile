@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Noodle
+GEODE           = noodle
 ASM_TO_OBJS     = noodle.asm
-UI_TO_RDFS      = NOODLE.UI
+UI_TO_RDFS      = noodle.ui
 SRCS            = noodle.asm noodle.def noodle.ui
 OBJS            = noodle.obj
 LOBJS           =

@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Sand
+GEODE           = sand
 ASM_TO_OBJS     = sand.asm
-UI_TO_RDFS      = SAND.UI
+UI_TO_RDFS      = sand.ui
 SRCS            = sand.asm sand.def sand.ui
 OBJS            = sand.obj
 LOBJS           =

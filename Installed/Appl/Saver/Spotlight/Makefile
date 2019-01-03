@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Spotlight
+GEODE           = spotlight
 ASM_TO_OBJS     = spotlight.asm
-UI_TO_RDFS      = SPOTLIGHT.UI
+UI_TO_RDFS      = spotlight.ui
 SRCS            = spotlight.asm spotlight.def spotlight.ui
 OBJS            = spotlight.obj
 LOBJS           =

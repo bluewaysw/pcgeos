@@ -6,9 +6,9 @@
 GEODE           = pvault
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = PVAULT.GOC CEXPIRE.GOH EXPIREUI.GOH IEXPIRE.GOH\
-                  OPTIONS.GOH
-OBJS            = PVAULT.obj
+SRCS            = pvault.goc cexpire.goh expireui.goh iexpire.goh\
+                  options.goh
+OBJS            = pvault.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

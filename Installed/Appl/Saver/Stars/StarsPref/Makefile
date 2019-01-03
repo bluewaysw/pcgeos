@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = StarsPref
+GEODE           = starspref
 ASM_TO_OBJS     = starspref.asm
-UI_TO_RDFS      = STARSPREF.UI
+UI_TO_RDFS      = starspref.ui
 SRCS            = starspref.asm starspref.ui
 OBJS            = starspref.obj
 LOBJS           =

@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = BobbinPref
+GEODE           = bobbinpref
 ASM_TO_OBJS     = bobbinpref.asm
-UI_TO_RDFS      = BOBBINPREF.UI
+UI_TO_RDFS      = bobbinpref.ui
 SRCS            = bobbinpref.asm bobbinpref.ui
 OBJS            = bobbinpref.obj
 LOBJS           =

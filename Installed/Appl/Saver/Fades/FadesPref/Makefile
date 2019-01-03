@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = FadesPref
+GEODE           = fadespref
 ASM_TO_OBJS     = fadespref.asm
-UI_TO_RDFS      = FADESPREF.UI
+UI_TO_RDFS      = fadespref.ui
 SRCS            = fadespref.asm fadespref.ui
 OBJS            = fadespref.obj
 LOBJS           =

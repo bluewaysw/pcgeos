@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Fades
+GEODE           = fades
 ASM_TO_OBJS     = fades.asm
-UI_TO_RDFS      = FADES.UI
+UI_TO_RDFS      = fades.ui
 SRCS            = fades.asm fades.def fades.ui
 OBJS            = fades.obj
 LOBJS           =

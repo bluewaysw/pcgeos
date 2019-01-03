@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = CirclesPref
+GEODE           = circlespref
 ASM_TO_OBJS     = circlespref.asm
-UI_TO_RDFS      = CIRCLESPREF.UI
+UI_TO_RDFS      = circlespref.ui
 SRCS            = circlespref.asm circlespref.ui
 OBJS            = circlespref.obj
 LOBJS           =

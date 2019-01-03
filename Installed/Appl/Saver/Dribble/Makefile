@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Dribble
+GEODE           = dribble
 ASM_TO_OBJS     = dribble.asm
-UI_TO_RDFS      = DRIBBLE.UI
+UI_TO_RDFS      = dribble.ui
 SRCS            = dribble.asm dribble.def dribble.ui
 OBJS            = dribble.obj
 LOBJS           =

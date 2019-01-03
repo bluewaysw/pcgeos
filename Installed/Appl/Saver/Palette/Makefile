@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Palette
+GEODE           = palette
 ASM_TO_OBJS     = palette.asm
-UI_TO_RDFS      = PALETTE.UI
+UI_TO_RDFS      = palette.ui
 SRCS            = palette.asm palette.def palette.ui
 OBJS            = palette.obj
 LOBJS           =

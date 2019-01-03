@@ -3,10 +3,10 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Bobbin
+GEODE           = bobbin
 ASM_TO_OBJS     = bobbin.asm
-UI_TO_RDFS      = BOBBIN.UI
-SRCS            = bobbin.asm bobbin.def bobbin.ui bobbinHelp.ui
+UI_TO_RDFS      = bobbin.ui
+SRCS            = bobbin.asm bobbin.def bobbinHelp.ui bobbin.ui
 OBJS            = bobbin.obj
 LOBJS           =
 

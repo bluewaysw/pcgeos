@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Blank
+GEODE           = blank
 ASM_TO_OBJS     = blank.asm
-UI_TO_RDFS      = BLANK.UI
+UI_TO_RDFS      = blank.ui
 SRCS            = blank.asm blank.ui
 OBJS            = blank.obj
 LOBJS           =

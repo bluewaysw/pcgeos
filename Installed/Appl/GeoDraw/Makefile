@@ -3,26 +3,26 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = GeoDraw
-DOCUMENT        = BackupdocumentDocument.asm documentBody.asm\
-                  documentConvert.asm documentDisplay.asm\
-                  documentDocument.asm documentErrorCheck.asm\
-                  documentManager.asm documentPrint.asm documentUtils.asm\
+GEODE           = geodraw
+UI              = uiTemplate.asm uiMain.asm uiDrawApplication.asm\
+                  uiGifImage.asm uiManager.asm uiGifImage.def\
+                  uiConstant.def uiTemplate.ui uiLevel.ui uiDocument.ui\
+                  uiManager.ui uiMain.ui
+DOCUMENT        = documentUtils.asm documentPrint.asm documentManager.asm\
+                  BackupdocumentDocument.asm documentBody.asm\
+                  documentDisplay.asm documentDocument.asm\
+                  documentConvert.asm documentErrorCheck.asm\
                   document12XConversionConstant.def documentConstant.def\
                   documentData.ui documentManager.ui
-MAIN            = mainInit.asm mainManager.asm
-UI              = uiDrawApplication.asm uiGifImage.asm uiMain.asm\
-                  uiManager.asm uiTemplate.asm uiConstant.def\
-                  uiGifImage.def uiDocument.ui uiLevel.ui uiMain.ui\
-                  uiManager.ui uiTemplate.ui
-UI_TO_RDFS      = DOCUMENTMANAGER.UI UIMANAGER.UI
+MAIN            = mainManager.asm mainInit.asm
+UI_TO_RDFS      = uiManager.ui documentManager.ui
 OBJS            =
-COMMON          = drawApplication.def drawConstant.def drawDisplay.def\
-                  drawDocument.def drawGeode.def drawGlobal.def\
-                  drawGrObjBody.def drawLevel.def
-MODULES         = Document Main UI
+COMMON          = drawDocument.def drawGrObjBody.def drawGlobal.def\
+                  drawApplication.def drawLevel.def drawDisplay.def\
+                  drawConstant.def drawGeode.def
+MODULES         = UI Document Main
 CMODULES        =
-SRCS            = $(DOCUMENT) $(MAIN) $(UI) $(COMMON)
+SRCS            = $(UI) $(DOCUMENT) $(MAIN) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

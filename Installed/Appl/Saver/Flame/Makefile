@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Flame
+GEODE           = flame
 ASM_TO_OBJS     = flame.asm
-UI_TO_RDFS      = FLAME.UI
+UI_TO_RDFS      = flame.ui
 SRCS            = flame.asm flame.def flame.ui
 OBJS            = flame.obj
 LOBJS           =

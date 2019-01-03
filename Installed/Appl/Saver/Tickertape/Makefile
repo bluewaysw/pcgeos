@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Tickertape
+GEODE           = tickertape
 ASM_TO_OBJS     = tickertape.asm
-UI_TO_RDFS      = TICKERTAPE.UI
+UI_TO_RDFS      = tickertape.ui
 SRCS            = tickertape.asm tickertape.def tickertape.ui\
                   tickertapeHelp.ui
 OBJS            = tickertape.obj

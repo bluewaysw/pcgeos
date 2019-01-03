@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Rotate
+GEODE           = rotate
 ASM_TO_OBJS     = rotate.asm
-UI_TO_RDFS      = ROTATE.UI
+UI_TO_RDFS      = rotate.ui
 SRCS            = rotate.asm rotate.def rotate.ui
 OBJS            = rotate.obj
 LOBJS           =

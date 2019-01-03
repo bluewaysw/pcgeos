@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Tiles
+GEODE           = tiles
 ASM_TO_OBJS     = tiles.asm
-UI_TO_RDFS      = TILES.UI
+UI_TO_RDFS      = tiles.ui
 SRCS            = tiles.asm tiles.def tiles.ui
 OBJS            = tiles.obj
 LOBJS           =

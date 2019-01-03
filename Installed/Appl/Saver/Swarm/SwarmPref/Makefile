@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = SwarmPref
+GEODE           = swarmpref
 ASM_TO_OBJS     = swarmpref.asm
-UI_TO_RDFS      = SWARMPREF.UI
+UI_TO_RDFS      = swarmpref.ui
 SRCS            = swarmpref.asm swarmpref.ui
 OBJS            = swarmpref.obj
 LOBJS           =

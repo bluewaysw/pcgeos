@@ -1,53 +1,26 @@
-##############################################################################
 #
-# 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+# THIS FILE HAS BEEN GENERATED AUTOMATICALLY.
 #
-# PROJECT:	PC GEOS
-# MODULE:	SpotlightPref -- Makefile
-# FILE: 	Makefile
-# AUTHOR: 	, Mon Apr  7 19:10:49 PDT 1997
+# If you edit it, you will lose your changes, should it be regenerated.
 #
-# TARGETS:
-# 	Name			Description
-#	----			-----------
-#	spotlightprefec.geo		create an error-checking version
-#	spotlightpref.geo		create a non error-checking version
-#	full			create both of the above, plus tags
-#	part			create only the error-checking version
-#	tags			create a tags file from all the sources
-#	depend			generate source file dependencies
-#
-# DESCRIPTION:
-#	This makefile was automatically generated from:
-#	    /staff/pcgeos/Tools/mkmf/Makefile.geode
-#
-#	DO NOT EDIT IT, AS YOU MAY LOSE YOUR CHANGES WHEN IT IS REGENERATED
-#
-#	$Id: Makefile.geode,v 1.4 92/01/03 20:17:45 johnm Exp $
-#
-###############################################################################
-
 GEODE           = spotlightpref
-OBJS            = spotlightpref.obj
+ASM_TO_OBJS     = spotlightpref.asm
+UI_TO_RDFS      = spotlightpref.ui
 SRCS            = spotlightpref.asm spotlightpref.ui
+OBJS            = spotlightpref.obj
 LOBJS           =
 
-SUBDIRS         =
+SYSMAKEFILE     = geode.mk
 
-#include	<geos.mk>		# system directory definitions
-#include	<gpath.mk>		# set search paths for files
-
-MAKEFILE	= Makefile
-SYSMAKEFILE	= geode.mk
+#include <geos.mk>
+#include <gpath.mk>
 
 #if exists(local.mk)
-#	include	"local.mk"
+#include "local.mk"
 #else
-#	include	<$(SYSMAKEFILE)>
+#include <$(SYSMAKEFILE)>
 #endif
 
-#if 	exists($(DEPFILE))
-#include	"$(DEPFILE)"
+#if exists($(DEPFILE))
+#include "$(DEPFILE)"
 #endif
-
-# Allow mkmf

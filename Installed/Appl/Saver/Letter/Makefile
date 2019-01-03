@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Letter
+GEODE           = letter
 ASM_TO_OBJS     = letter.asm
-UI_TO_RDFS      = LETTER.UI
+UI_TO_RDFS      = letter.ui
 SRCS            = letter.asm letter.def letter.ui
 OBJS            = letter.obj
 LOBJS           =

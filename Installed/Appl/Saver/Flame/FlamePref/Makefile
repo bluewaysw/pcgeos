@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = FlamePref
+GEODE           = flamepref
 ASM_TO_OBJS     = flamepref.asm
-UI_TO_RDFS      = FLAMEPREF.UI
+UI_TO_RDFS      = flamepref.ui
 SRCS            = flamepref.asm flamepref.ui
 OBJS            = flamepref.obj
 LOBJS           =

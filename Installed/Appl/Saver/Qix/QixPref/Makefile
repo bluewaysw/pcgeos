@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = QixPref
+GEODE           = qixpref
 ASM_TO_OBJS     = qixpref.asm
-UI_TO_RDFS      = QIXPREF.UI
+UI_TO_RDFS      = qixpref.ui
 SRCS            = qixpref.asm qixpref.ui
 OBJS            = qixpref.obj
 LOBJS           =

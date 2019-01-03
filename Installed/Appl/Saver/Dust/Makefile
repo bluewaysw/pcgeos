@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Dust
+GEODE           = dust
 ASM_TO_OBJS     = dust.asm
-UI_TO_RDFS      = DUST.UI
+UI_TO_RDFS      = dust.ui
 SRCS            = dust.asm dust.def dust.ui
 OBJS            = dust.obj
 LOBJS           =

@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = LastWords
+GEODE           = lastwords
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
 SRCS            = lastwords.goc lastwords.goh

@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Melt
+GEODE           = melt
 ASM_TO_OBJS     = melt.asm
-UI_TO_RDFS      = MELT.UI
+UI_TO_RDFS      = melt.ui
 SRCS            = melt.asm melt.def melt.ui
 OBJS            = melt.obj
 LOBJS           =

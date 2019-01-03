@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = PiecesPref
+GEODE           = piecespref
 ASM_TO_OBJS     = piecespref.asm
-UI_TO_RDFS      = PIECESPREF.UI
+UI_TO_RDFS      = piecespref.ui
 SRCS            = piecespref.asm piecespref.ui
 OBJS            = piecespref.obj
 LOBJS           =

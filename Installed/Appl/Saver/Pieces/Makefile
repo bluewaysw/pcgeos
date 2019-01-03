@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Pieces
+GEODE           = pieces
 ASM_TO_OBJS     = pieces.asm
-UI_TO_RDFS      = PIECES.UI
+UI_TO_RDFS      = pieces.ui
 SRCS            = pieces.asm pieces.def pieces.ui
 OBJS            = pieces.obj
 LOBJS           =

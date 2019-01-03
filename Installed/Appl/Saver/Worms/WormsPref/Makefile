@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = WormsPref
+GEODE           = wormspref
 ASM_TO_OBJS     = wormspref.asm
-UI_TO_RDFS      = WORMSPREF.UI
+UI_TO_RDFS      = wormspref.ui
 SRCS            = wormspref.asm wormspref.ui
 OBJS            = wormspref.obj
 LOBJS           =

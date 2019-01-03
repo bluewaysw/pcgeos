@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = DribblePref
+GEODE           = dribblepref
 ASM_TO_OBJS     = dribblepref.asm
-UI_TO_RDFS      = DRIBBLEPREF.UI
+UI_TO_RDFS      = dribblepref.ui
 SRCS            = dribblepref.asm dribblepref.ui
 OBJS            = dribblepref.obj
 LOBJS           =

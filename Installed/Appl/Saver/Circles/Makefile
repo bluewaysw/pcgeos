@@ -3,10 +3,10 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Circles
+GEODE           = circles
 ASM_TO_OBJS     = circles.asm
-UI_TO_RDFS      = CIRCLES.UI
-SRCS            = circles.asm circles.def circles.ui circlesHelp.ui
+UI_TO_RDFS      = circles.ui
+SRCS            = circles.asm circles.def circlesHelp.ui circles.ui
 OBJS            = circles.obj
 LOBJS           =
 

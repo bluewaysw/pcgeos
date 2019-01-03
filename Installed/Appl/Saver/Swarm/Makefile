@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Swarm
+GEODE           = swarm
 ASM_TO_OBJS     = swarm.asm
-UI_TO_RDFS      = SWARM.UI
+UI_TO_RDFS      = swarm.ui
 SRCS            = swarm.asm swarm.def swarm.ui
 OBJS            = swarm.obj
 LOBJS           =

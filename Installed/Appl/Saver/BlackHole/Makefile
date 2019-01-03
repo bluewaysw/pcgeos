@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = BlackHole
+GEODE           = blackhole
 ASM_TO_OBJS     = blackhole.asm
-UI_TO_RDFS      = BLACKHOLE.UI
+UI_TO_RDFS      = blackhole.ui
 SRCS            = blackhole.asm blackhole.def blackhole.ui
 OBJS            = blackhole.obj
 LOBJS           =

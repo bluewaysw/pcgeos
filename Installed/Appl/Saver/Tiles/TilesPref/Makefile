@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = TilesPref
+GEODE           = tilespref
 ASM_TO_OBJS     = tilespref.asm
-UI_TO_RDFS      = TILESPREF.UI
+UI_TO_RDFS      = tilespref.ui
 SRCS            = tilespref.asm tilespref.ui
 OBJS            = tilespref.obj
 LOBJS           =

@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = TickertapePref
+GEODE           = tickertapepref
 ASM_TO_OBJS     = tickertapepref.asm
-UI_TO_RDFS      = TICKERTAPEPREF.UI
+UI_TO_RDFS      = tickertapepref.ui
 SRCS            = tickertapepref.asm tickertapepref.ui
 OBJS            = tickertapepref.obj
 LOBJS           =

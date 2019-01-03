@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = SandPref
+GEODE           = sandpref
 ASM_TO_OBJS     = sandpref.asm
-UI_TO_RDFS      = SANDPREF.UI
+UI_TO_RDFS      = sandpref.ui
 SRCS            = sandpref.asm sandpref.ui
 OBJS            = sandpref.obj
 LOBJS           =

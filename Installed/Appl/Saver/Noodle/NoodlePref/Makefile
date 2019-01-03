@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = NoodlePref
+GEODE           = noodlepref
 ASM_TO_OBJS     = noodlepref.asm
-UI_TO_RDFS      = NOODLEPREF.UI
+UI_TO_RDFS      = noodlepref.ui
 SRCS            = noodlepref.asm noodlepref.ui
 OBJS            = noodlepref.obj
 LOBJS           =

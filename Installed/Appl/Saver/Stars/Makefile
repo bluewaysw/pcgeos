@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Stars
+GEODE           = stars
 ASM_TO_OBJS     = stars.asm
-UI_TO_RDFS      = STARS.UI
+UI_TO_RDFS      = stars.ui
 SRCS            = stars.asm stars.def stars.ui
 OBJS            = stars.obj
 LOBJS           =

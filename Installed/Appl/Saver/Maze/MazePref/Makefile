@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = MazePref
+GEODE           = mazepref
 ASM_TO_OBJS     = mazepref.asm
-UI_TO_RDFS      = MAZEPREF.UI
+UI_TO_RDFS      = mazepref.ui
 SRCS            = mazepref.asm mazepref.ui
 OBJS            = mazepref.obj
 LOBJS           =

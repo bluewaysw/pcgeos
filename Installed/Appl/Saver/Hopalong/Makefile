@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Hopalong
+GEODE           = hopalong
 ASM_TO_OBJS     = hopalong.asm
-UI_TO_RDFS      = HOPALONG.UI
+UI_TO_RDFS      = hopalong.ui
 SRCS            = hopalong.asm hopalong.def hopalong.ui
 OBJS            = hopalong.obj
 LOBJS           =

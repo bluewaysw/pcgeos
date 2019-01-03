@@ -3,10 +3,10 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Maze
+GEODE           = maze
 ASM_TO_OBJS     = maze.asm
-UI_TO_RDFS      = MAZE.UI
-SRCS            = maze.asm mazeScreenSave.asm mzsolve.asm maze.def maze.ui
+UI_TO_RDFS      = maze.ui
+SRCS            = mzsolve.asm maze.asm mazeScreenSave.asm maze.def maze.ui
 OBJS            = maze.obj
 LOBJS           =
 

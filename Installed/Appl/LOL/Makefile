@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = LOL
+GEODE           = lol
 ASM_TO_OBJS     = lol.asm
-UI_TO_RDFS      = LOL.UI
+UI_TO_RDFS      = lol.ui
 SRCS            = lol.asm lol.ui
 OBJS            = lol.obj
 LOBJS           =

@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = PalettePref
+GEODE           = palettepref
 ASM_TO_OBJS     = palettepref.asm
-UI_TO_RDFS      = PALETTEPREF.UI
+UI_TO_RDFS      = palettepref.ui
 SRCS            = palettepref.asm palettepref.ui
 OBJS            = palettepref.obj
 LOBJS           =

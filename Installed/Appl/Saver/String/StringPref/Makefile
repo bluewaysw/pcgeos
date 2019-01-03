@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = StringPref
+GEODE           = stringpref
 ASM_TO_OBJS     = stringpref.asm
-UI_TO_RDFS      = STRINGPREF.UI
+UI_TO_RDFS      = stringpref.ui
 SRCS            = stringpref.asm stringpref.ui
 OBJS            = stringpref.obj
 LOBJS           =

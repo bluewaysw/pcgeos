@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = String
+GEODE           = string
 ASM_TO_OBJS     = string.asm
-UI_TO_RDFS      = STRING.UI
+UI_TO_RDFS      = string.ui
 SRCS            = string.asm string.def string.ui
 OBJS            = string.obj
 LOBJS           =

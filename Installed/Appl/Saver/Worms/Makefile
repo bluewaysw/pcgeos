@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Worms
+GEODE           = worms
 ASM_TO_OBJS     = worms.asm
-UI_TO_RDFS      = WORMS.UI
+UI_TO_RDFS      = worms.ui
 SRCS            = worms.asm worms.def worms.ui
 OBJS            = worms.obj
 LOBJS           =
