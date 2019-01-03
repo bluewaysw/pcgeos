@@ -21,20 +21,20 @@ exempt sound
 
 # Resources
 
-resource APPRESOURCE object
-resource INTERFACE object
-resource WINMONIKERRESOURCE object
-resource LOSEMONIKERRESOURCE object
-resource BADGUESSMONIKERRESOURCE object
-#resource INTERFACEHIGHSCORES object
-resource INTERFACEBADGUESS object
-resource INTERFACELOSE object
-resource INTERFACEWIN object
-#resource INTERFACEPLACE object
-resource INTERFACEOPTIONS object
-#resource INTERFACEVIEW object
-resource STRINGSRESOURCE data lmem read-only shared discardable
-resource QTIPSRESOURCE object
+resource AppResource object
+resource Interface object
+resource WinMonikerResource object
+resource LoseMonikerResource object
+resource BadGuessMonikerResource object
+#resource InterfaceHighscores object
+resource InterfaceBadGuess object
+resource InterfaceLose object
+resource InterfaceWin object
+#resource InterfacePlace object
+resource InterfaceOptions object
+#resource InterfaceView object
+resource StringsResource data lmem read-only shared discardable
+resource QTipsResource object
 
 # exports
 
