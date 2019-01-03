@@ -52,19 +52,19 @@ exempt sound
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE object
-resource INTERFACE object
-resource WINMONIKERRESOURCE object
-resource LOSEMONIKERRESOURCE object
-#resource INTERFACESCORES object
-#resource INTERFACEABOUT object
-resource INTERFACEOPTIONS object
-resource INTERFACEVIEW object
-resource INTERFACEDIALOG1 object
-resource INTERFACEDIALOG2 object
-#resource STRINGSRESOURCE lmem read-only shared discardable
-resource QTIPSRESOURCE object
-resource GRAPHICSRESOURCE data
+resource AppResource object
+resource Interface object
+resource WinMonikerResource object
+resource LoseMonikerResource object
+#resource InterfaceScores object
+#resource InterfaceAbout object
+resource InterfaceOptions object
+resource InterfaceView object
+resource InterfaceDialog1 object
+resource InterfaceDialog2 object
+#resource StringResource lmem read-only shared discardable
+resource QTipsResource object
+resource GraphicsResource data
 
 export HiHoProcessClass
 export HiHoViewClass
