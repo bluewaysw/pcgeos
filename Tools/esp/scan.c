@@ -735,7 +735,7 @@ static char
 input(void)
 {
 	char ret;
-	do {
+	//do {
     if (yysptr > yysbot) {
 			/*
 			 * Stuff pushed back -- fetch the next character
@@ -744,7 +744,7 @@ input(void)
     } else {
 			ret = (*yyinput)();
     }
-	} while(ret == '\r');
+	//} while(ret == '\r');
 	return ret;
 }
 
