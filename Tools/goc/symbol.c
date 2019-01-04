@@ -199,6 +199,7 @@ Symbol_OutputProtoMinorRelocations(char *inFileName)
 	    Output("pragma Code(\"_BOGUS_PROTOMINORRELOCS\");");
 	    Output("\nvoid\n%s_ProtoMinorRoutine()\n{", cp);
 	    break;
+	case COM_WATCOM :
 	case COM_MSC :
 	    Output("#pragma code_seg(\"_BOGUS_PROTOMINORRELOCS\")\n");
 	    OutputLineNumber(yylineno, curFile->name);
@@ -249,6 +250,7 @@ Symbol_OutputProtoMinorRelocations(char *inFileName)
 	    Output("\n}\n");
 	    Output("pragma Code();");
 	    break;
+	case COM_WATCOM :
 	case COM_MSC :
 	    Output("\n}\n");
 	    Output("\n#pragma code_seg()\n");

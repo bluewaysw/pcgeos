@@ -548,7 +548,7 @@ file	:
 	       */
 	      Output("pragma Comment(\"@%s\");\n", inFile);
 	      break;
-	    case COM_BORL: case COM_MSC:
+	    case COM_BORL: case COM_MSC: case COM_WATCOM:
 	      break;
 	    }
 	    /* output our first line directive */
@@ -3124,7 +3124,8 @@ newDispatchOrDispatchCallLine:	newDispatchOrDispatchCall
 
 compilerLine	:
     	COMPILER HIGHC { compiler = COM_HIGHC; SWITCH_CONTEXT( LC_NONE); }
-    	| COMPILER MSC { compiler = COM_MSC; SWITCH_CONTEXT( LC_NONE); }
+    	| COMPILER MSC { compiler = COM_MSC; SWITCH_CONTEXT( LC_NONE);}
+	| COMPILER WATCOM { compiler = COM_WATCOM; SWITCH_CONTEXT( LC_NONE);}
  	;
 
 /*
@@ -3154,11 +3155,21 @@ startLine   :
 
 	    if (curResource->flags & SYM_OBJECT_BLOCK) {
 		CompilerStartSegment("__HANDLES_", curResource->name);
-		Output("extern %s %s _%s_Flags%s;",
-		       compilerOffsetTypeName,
-		       compilerFarKeyword, 
-		       curResource->name,
-		       _ar);
+		if(compiler == COM_WATCOM) {
+		    Output("extern %s "
+		    	"__based(__segname(\"__HANDLES_%s\")) _%s_Flags%s;",
+    			compilerOffsetTypeName,
+    			curResource->name, 
+    			curResource->name,
+    			_ar);
+		}
+		else { 
+		    Output("extern %s %s _%s_Flags%s;",
+			compilerOffsetTypeName,
+			compilerFarKeyword, 
+			curResource->name,
+			_ar);
+		}
 		CompilerEndSegment("__HANDLES_", curResource->name);
 	    }
 
@@ -4480,11 +4491,21 @@ AddChunkToCurResourceAndOutputExtern(Symbol *chunk)
      */
     if (curResource != NULL) {
 	CompilerStartSegment("__HANDLES_", curResource->name);
-	Output("extern %s %s %s%s;", 
-	       compilerOffsetTypeName,
-	       compilerFarKeyword,
-	       chunk->name,
-	       _ar);
+	if(compiler == COM_WATCOM) {
+		Output("extern %s "
+		"__based(__segname(\"__HANDLES_%s\")) %s%s;", 
+    		compilerOffsetTypeName,
+    		curResource->name,
+    		chunk->name,
+    		_ar);
+	}
+	else {
+	    Output("extern %s %s %s%s;", 
+		compilerOffsetTypeName,
+		compilerFarKeyword,
+		chunk->name,
+		_ar);
+        }
 	CompilerEndSegment("__HANDLES_", curResource->name);
     }
 

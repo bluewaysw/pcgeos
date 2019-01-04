@@ -130,7 +130,7 @@ extern char *compilerFarKeyword;
 extern char *compilerOffsetTypeName;
 extern char *compilerCastForOffset;
 
-typedef enum { COM_HIGHC, COM_MSC, COM_BORL } Compilers;
+typedef enum { COM_HIGHC, COM_MSC, COM_BORL, COM_WATCOM } Compilers;
 
 extern Compilers compiler;
 

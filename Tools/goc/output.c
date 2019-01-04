@@ -1185,6 +1185,7 @@ OutputLineNumberWithCount(int lineNumber, char *fileName,Boolean print)
 	sprintf(outputLineNumberBuf,"\n# %d \"%s\"\n", lineNumber, fileName);
     	break;
 
+      case COM_WATCOM:
       case COM_MSC:
       case COM_BORL:
 	if(fileName == prevFile){/* assumes fileName is in the string table */
@@ -1196,7 +1197,8 @@ OutputLineNumberWithCount(int lineNumber, char *fileName,Boolean print)
 		to = &outputLineNumberBuf[strlen(outputLineNumberBuf)];
 		*from;
 		from++,to++){
-		*to = (*from =='\\' && compiler==COM_MSC)? '/' : *from;
+		*to = (*from =='\\' && 
+			((compiler==COM_MSC) || (compiler==COM_WATCOM)))? '/' : *from;
 	    }
 	    strcpy(to,"\"\n");
 	    prevFile =  fileName;
@@ -1953,6 +1955,7 @@ void OutputMethodAntiWarningCode(Method *meth)
 
   }
     break;
+  case COM_WATCOM:
   case COM_MSC:
     break;
   default:
@@ -2061,10 +2064,16 @@ OutputResource(Symbol *resource)
      * If this block is an object block then output the handle for the flags
      * chunk
      */
+    if(compiler == COM_WATCOM) {
+	sprintf(buf, "__based(__segname(\"__HANDLES_%s\"))", resource->name);
+    } 
+    else {
+	buf[0] = 0;
+    }
     if (flagsChunk) {
     	Output("%s %s _%s_Flags%s = %s%s&__%s_Flags%s;",
 	       compilerOffsetTypeName,
-	       compilerFarKeyword,
+	       compiler == COM_WATCOM ? buf : compilerFarKeyword,
 	       resource->name,
 	       _ar,
 	       _op,
@@ -2081,7 +2090,7 @@ OutputResource(Symbol *resource)
 	 */
 	Output("%s %s %s%s =%s%s",
 	       compilerOffsetTypeName,
-	       compilerFarKeyword,
+	       compiler == COM_WATCOM ? buf : compilerFarKeyword,
 	       chunk->name,
 	       _ar,
 	       _op,
@@ -2099,7 +2108,7 @@ OutputResource(Symbol *resource)
     if ((resource->data.symResource.numberOfChunks+flagsChunk) & 1) {
 	Output("%s %s _pad_%sHandles%s=%s0%s;",
 	       compilerOffsetTypeName,
-	       compilerFarKeyword,
+	       compiler == COM_WATCOM ? buf : compilerFarKeyword,
 	       resource->name,
 	       _ar,
 	       _op,
@@ -2228,7 +2237,7 @@ DoFinalOutput(void)
 	  case COM_HIGHC:
 	    Output("pragma Off(Warn);\n");
 	    break;
-	  case COM_MSC: case COM_BORL:
+	  case COM_MSC: case COM_BORL: case COM_WATCOM:
 	    break;
 	  default:
 	    assert(0);

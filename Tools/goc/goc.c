@@ -263,7 +263,8 @@ Usage(char *fmt, ...)
 	    "\n"
 	    "Usage: goc @argfile | goc [args] <file>\n"
 	    "Valid arguments:\n"
-	    "\t-c[mbh]\t\toutput Microsoft or Borland or HighC output\n"
+	    "\t-c[mbhw]\t"
+		"output Microsoft or Borland or HighC or Watcom output\n"
 	    "\t-C<segment>\tput class structures in <segment>\n"
 	    "\t-d[ylsoumLOd]\toutput debugging information\n"
 	    "\t-D<name>=<val>\tdefine the goc macro <name> to be <val>\n"
@@ -467,8 +468,15 @@ CompilerStartSegment(char *prefix, char *name)
     Output("pragma Data(Common, \"%s%s\");", prefix, name);
     break;
   case COM_MSC :
-     Output("#pragma data_seg(\"%s%s\")\n",prefix,name);
+    Output("#pragma data_seg(\"%s%s\")\n",prefix,name);
     OutputLineNumber(yylineno, curFile->name);
+    break;
+  case COM_WATCOM :
+    if(strcmp(prefix, "__HANDLES_") != 0)
+    {
+      Output("#pragma data_seg(\"%s%s\")\n",prefix,name);
+      OutputLineNumber(yylineno, curFile->name);
+    }
     break;
   case COM_BORL:
     /*
@@ -507,8 +515,9 @@ CompilerEndSegment(char *prefix, char *name)
 	    Output("pragma Data();");
 	    break;
 	case COM_MSC :
-	         Output("\n#pragma data_seg()\n");
-	         OutputLineNumber(yylineno, curFile->name);
+	case COM_WATCOM :
+	    Output("\n#pragma data_seg()\n");
+	    OutputLineNumber(yylineno, curFile->name);
 	    break;
 	  case COM_BORL:
 	    /*
@@ -961,6 +970,13 @@ ParseArgs(int argc, char **argv)
 		    break;
 		case 'c':
 		    switch (argv[ac][2]){
+		    case 'w':
+		      /* lms = */
+		      compilerFarKeyword = microSoftFarString;
+		      compilerOffsetTypeName = microsoftOffsetTypeName;
+		      compilerCastForOffset = microsoftCastForOffset;
+		      compiler = COM_WATCOM;
+		      break;
 		    case 'm':
 		      /* lms = */
 		      compilerFarKeyword = microSoftFarString;
