@@ -45,11 +45,11 @@ exempt wmlib
 platform geos201
 #
 # Resources:
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
+resource AppResource ui-object
+resource Interface ui-object
 resource LOGORESOURCE data object
-resource APPICONS data object
-resource STRINGS data object
+resource Appicons data object
+resource Strings data object
 #
 # Other classes
 export	HangManViewClass
