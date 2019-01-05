@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = WORDMAT
+GEODE           = wordmat
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = WORDMAT.GOC PASSWORD.GOC PASSWORD.GOH PASSWDUI.GOH
-OBJS            = WORDMAT.obj PASSWORD.obj
+SRCS            = password.goc wordmat.goc password.goh passwdui.goh
+OBJS            = password.obj wordmat.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
