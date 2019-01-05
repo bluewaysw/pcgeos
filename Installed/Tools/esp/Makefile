@@ -59,7 +59,7 @@ linuxOBJS       = linux.md/assert.o linux.md/code.o linux.md/data.o\
                   linux.md/main.o linux.md/object.o linux.md/parse.o\
                   linux.md/printobj.o linux.md/scan.o linux.md/symbol.o\
                   linux.md/table.o linux.md/type.o
-sparcLIBS       =
+linuxLIBS       =
 
 win32SRCS       = $(MISRCS) win32.md/
 win32OBJS       = win32.md/assert.obj win32.md/code.obj win32.md/data.obj\
