@@ -1,0 +1,616 @@
+/***************************************************************************
+ *  FILE:  TTKEYHAN.GOC  (Key handling routines)
+ ***************************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+@include "ttclass.goh"
+@include "ttdefs.goh"
+@include "externs.goh"
+
+/***************************************************************************
+ *      Data tables:
+ ***************************************************************************/
+
+optr G_fourKeys[5] = {
+    @Step1FirstChar,
+    @Step1SecondChar,
+    @Step1ThirdChar,
+    @Step1FourthChar,
+    @Step1SpaceBar
+} ;
+
+extern void Step3UnderlineChar(word index) ;
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  Step1EntryTextClass
+ *=========================================================================*/
+
+@classdecl Step1EntryTextClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  Step1EntryTextClass::MSG_META_KBD_CHAR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Intercept the single keystrokes entered by the user and keep track
+ |    of the four somes of keys that are used.  Mistakes are counted.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   ??/??/??  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method Step1EntryTextClass, MSG_META_KBD_CHAR
+{
+GStateHandle gstate ;
+WindowHandle win ;
+
+    if (state & TS_CAPSLOCK) {
+	  UserStandardDialogOptr(0, 0, 0, 0,
+                @CapsLockMsg,
+			 ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			 (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	  return;
+	  }
+
+    /* Let's create a gstate for key redraw handling */
+
+    if (G_inputPosition2 >= 5)  {
+        G_inputPosition2 = 0 ;
+        G_letterDataPosition = G_letterDataPosition + 5 ;
+
+        /* If we have reached the end, stop immediately. */
+        if (G_letterDataPosition+4 >= strlen(G_exerciseString))  {
+            @send ,forceQueue process::MSG_TYPE_END_OF_ROUND() ;
+            return ;
+        } else {
+            Step1TypeLetters(G_exerciseString, G_letterDataPosition) ;
+        }
+    }
+    if ((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE) ||
+			 ((flags>>8) & (SS_LALT|SS_RALT)))  {
+	   @call self::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+    } else {
+	   /* We need only 4 characters + a hard coded space to be displayed
+		 in the separate boxes (Step1...Char). When these 4 letters are
+		 processed, the next for are displayed... */
+
+	   /* the current key is the character retrieved from buf[250] */
+	 //  G_currentKey = G_exerciseString[G_inputPosition] ;
+	   /* jfh - this should be pointing to the next key since it draws
+	    * the key to press on the kbd and spells it out above */
+	   G_currentKey = G_exerciseString[G_inputPosition + 1] ;
+
+	   /* Get access to the keyboard view */
+  //      win = @call KeyboardView::MSG_GEN_VIEW_GET_WINDOW() ;
+  //      gstate = GrCreateState(win) ;
+
+	   /* WhichKey inverts the key to press on the keyboard layout and */
+	   /* re-inverts the pressed key. */
+	   /* WhichKey also calculates which finger is used to press */
+	   /* the highlighted key */
+  //      WhichKey(gstate) ;
+
+	   /* We don't need the gstate anymore in this method */
+  //      GrDestroyState(gstate) ;
+
+	   /* Start the timer after the first keypress */
+	   if ((G_canIncTime) && (character >= 7) && (character <= 221))  {
+		  G_displayTimer = TimerStart(
+						   TIMER_EVENT_CONTINUAL,
+						   HandleToOptr(GeodeGetProcessHandle()),
+						   1,
+						   MSG_TYPE_UPDATE_TIMER,
+						   60,
+						   &G_displayTimerID) ;
+
+		  /* The timer will be started on the first keypress only */
+		  G_canIncTime = FALSE ;
+	   }
+
+	   /* change an unsigned char into to a normal char */
+	   G_typedCharacter = character ;
+
+	   /* Did we typed a correct letter... */
+	   if ((G_canType) &&
+			 (G_typedCharacter == G_goalLine[G_inputPosition2]) &&
+				(((character >= 7) && (character <= 221)) ||
+				    (character == C_ENTER)))  {
+		  /* Don't react on repeat press or release of key */
+		  if ((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE))  {
+			 /* ... but let the system have control over the navigation keys */
+			 @call self::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+		  } else  {
+			 G_typedCharacter = '\0' ;
+			 @call G_fourKeys[G_inputPosition2]::MSG_VIS_TEXT_REPLACE_ALL_PTR(" ", 0) ;
+			 G_inputPosition++ ;
+			 G_inputPosition2++ ;
+			 G_shiftState = TT_SHIFT_STATE_NONE ;
+
+			 /* jfh moved this into the correct press if/else since it
+			  * tells the user which key to press next */
+			 /* Get access to the keyboard view */
+			 win = @call KeyboardView::MSG_GEN_VIEW_GET_WINDOW() ;
+			 gstate = GrCreateState(win) ;
+
+			 /* WhichKey inverts the key to press on the keyboard layout and */
+			 /* re-inverts the pressed key. */
+			 /* WhichKey also calculates which finger is used to press */
+			 /* the highlighted key */
+			 WhichKey(gstate) ;
+
+			 /* We don't need the gstate anymore in this method */
+			 GrDestroyState(gstate) ;
+	   
+		  }
+	   } else  {
+		  /* ... or a wrong one? */
+		  @call self::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+		  if ((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE))  {
+			 G_typedCharacter = '\0' ;
+		  } else  {
+			 if (((character >= 7) && (character <= 221)) ||
+				    (character == C_ENTER))  {
+				UserStandardSound(SST_ERROR) ;
+
+				/* Keeping track of the number of missed letters */
+				/* to calculate the accuracy */
+				G_numMistakes++ ;
+
+				/* Add the missed letter to the missed letters string */
+				@call MissedLettersBox::MSG_VIS_TEXT_APPEND_PTR(
+						&G_charType,
+						0) ;
+			 }
+		  }
+	   } /* end of maybe wrong press else */
+
+    } /* end of first press else */
+}
+
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  Step2EntryTextClass
+ *=========================================================================*/
+
+@classdecl Step2EntryTextClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  Step2EntryTextClass::MSG_META_KBD_CHAR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    For step two lessons, a 50 character line is shown and typed into.
+ |    This method handles the keys received and typed.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   ??/??/??  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method Step2EntryTextClass, MSG_META_KBD_CHAR
+{
+    GStateHandle gstate ;
+    WindowHandle win ;
+
+    /* Get the next line if we are done with this one */
+    if (G_inputPosition2 >= strlen(G_goalLine))  {
+        G_inputPosition2 = 0 ;
+        if (G_inputPosition < strlen(G_exerciseString))  {
+            G_letterDataPosition = G_letterDataPosition + 50 ;
+            @call Step2TextToTypeBox::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0) ;
+            @call Step2EnteredTextBox::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0) ;
+            Step2TypeLetters(G_exerciseString, G_letterDataPosition) ;
+        }
+    }
+    if ((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE) ||
+                ((flags>>8) & (SS_LALT|SS_RALT)))  {
+        @call self::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+    } else {
+
+        /* What is the next key */
+   //	   G_currentKey = G_exerciseString[G_inputPosition] ;
+	   /* jfh - this should be pointing to the next key since it draws
+	    * the key to press on the kbd and spells it out above */
+	   G_currentKey = G_exerciseString[G_inputPosition + 1] ;
+
+	   /* Update the onscreen keyboard */
+   //	   win = @call KeyboardView::MSG_GEN_VIEW_GET_WINDOW() ;
+   //	   gstate = GrCreateState(win) ;
+   //	   WhichKey(gstate) ;
+   //	   GrSetClipRect(gstate, 0, PCT_REPLACE, 0, 334, 114) ;
+   //	   GrDestroyState(gstate) ;
+
+	   /* Start the timer if it has not already started */
+        if ((G_canIncTime) && (character >= 7) && (character <= 221))  {
+            G_displayTimer = TimerStart(
+                                 TIMER_EVENT_CONTINUAL,
+                                 HandleToOptr(GeodeGetProcessHandle()),
+                                 1,
+                                 MSG_TYPE_UPDATE_TIMER,
+                                 60,
+                                 &G_displayTimerID) ;
+            G_canIncTime = FALSE ;
+        }
+
+        /* Record which character was used to type with */
+        G_typedCharacter = character ;
+
+        /* See if this is a correct key press */
+        if ((G_canType) &&
+                 (G_typedCharacter == G_exerciseString[G_inputPosition]))  {
+            if ((flags & CF_REPEAT_PRESS)||(flags & CF_RELEASE))  {
+                /* On releases, go up the chain */
+                @call self::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+            } else {
+                /* It is correct, add to the end and update our position */
+                @call self::MSG_VIS_TEXT_APPEND_PTR(&G_typedCharacter, 1) ;
+                G_inputPosition++ ;
+                G_inputPosition2++ ;
+			 G_shiftState = TT_SHIFT_STATE_NONE ;
+        /* jfh same as in Ste1... */
+	   /* Update the onscreen keyboard */
+	   win = @call KeyboardView::MSG_GEN_VIEW_GET_WINDOW() ;
+	   gstate = GrCreateState(win) ;
+	   WhichKey(gstate) ;
+	   GrSetClipRect(gstate, 0, PCT_REPLACE, 0, 334, 114) ;
+	   GrDestroyState(gstate) ;
+
+
+            }
+        } else  {
+            /* Incorrect key press.  Pass it up */
+            @call self::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+            if ((flags & CF_REPEAT_PRESS)||(flags & CF_RELEASE))  {
+                G_typedCharacter = '\0' ;
+            } else {
+                /* If the key was valid, play a mistake sound */
+                if ((character >= 7) && (character <= 221))  {
+                    UserStandardSound(SST_WARNING) ;
+                    G_numMistakes++ ;
+                    @call MissedLettersBox::MSG_VIS_TEXT_APPEND_PTR(
+                              &G_charType,
+                              0) ;
+                }
+            }
+        }
+    }
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  Step3EntryTextClass
+ *=========================================================================*/
+
+@classdecl Step3EntryTextClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  Step3EntryTextClass::MSG_META_KBD_CHAR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Step 3 of any lesson requires the user to type a full paragraph or
+ |    two of text.  This method handles those keystrokes in a similar
+ |    fashion.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   ??/??/??  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method Step3EntryTextClass, MSG_META_KBD_CHAR
+{
+    if ((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE) ||
+                ((flags>>8) & (SS_LALT|SS_RALT)))  {
+        @call self::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+    } else {
+        G_currentKey = G_exerciseString[G_inputPosition+1] ;
+
+		  MemLock(OptrToHandle(@SpaceBrktKey));
+		  /* Special characters to type?  Convert it to a string */
+        switch ((unsigned char)G_currentKey)  {
+            case C_SPACE:
+					 strcpy(G_charType, LMemDeref(@SpaceBrktKey));
+                break ;
+            case C_ENTER:
+					 strcpy(G_charType, LMemDeref(@EnterBrktKey));
+                break ;
+            case C_TAB:
+					 strcpy(G_charType, LMemDeref(@TabBrktKey));
+                break ;
+            default:
+                sprintf(G_charType, "%c", G_exerciseString[G_inputPosition+1]) ;
+                break ;
+        }
+		  MemUnlock(OptrToHandle(@SpaceBrktKey));
+
+        /* Start the timer if not already running */
+        if ((G_canIncTime) && ((character >= 7) && (character <= 221)))  {
+            G_displayTimer = TimerStart(
+                                 TIMER_EVENT_CONTINUAL,
+                                 HandleToOptr(GeodeGetProcessHandle()),
+                                 1,
+                                 MSG_TYPE_UPDATE_TIMER,
+                                 60,
+                                 &G_displayTimerID) ;
+            G_canIncTime = FALSE ;
+        }
+
+        /* Record the character actually typed */
+        G_typedCharacter = character ;
+
+        /* Typed char must be the same as char to type */
+        if ((G_canType) &&
+                (G_typedCharacter == G_exerciseString[G_inputPosition]))  {
+            /* only press is checked */
+            if ((flags & CF_REPEAT_PRESS)||(flags & CF_RELEASE))  {
+                @call self::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+            } else  {
+                /* Ok, correct character and a 'press' action. */
+                /* Show the character on the screen and update position */
+                @call self::MSG_VIS_TEXT_APPEND_PTR(&G_typedCharacter, 1) ;
+                @call Step3CharToTypeGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(G_charType, VUM_NOW) ;
+                G_inputPosition++ ;
+            }
+        } else {
+            /* Not the right character, pass up the keystroke */
+            @call self::MSG_META_FUP_KBD_CHAR(character, flags, state) ;
+            if ((flags & CF_REPEAT_PRESS)||(flags & CF_RELEASE))  {
+                G_typedCharacter = '\0' ;
+            } else  {
+                /* If the key was valid, go ahead and output an error sound */
+                if ((character >= 7) && (character <= 221))  {
+                    UserStandardSound(SST_WARNING) ;
+                    G_numMistakes++ ;
+                    @call MissedLettersBox::MSG_VIS_TEXT_APPEND_PTR(&G_charType, 0) ;
+                }
+            }
+        }
+
+        /* If the typing goes past the end, show that position */
+        @call Step3TextToTypeBox::MSG_VIS_TEXT_SHOW_POSITION(G_inputPosition) ;
+        Step3UnderlineChar(G_inputPosition) ;
+        @call Step3TextToTypeBox::MSG_VIS_TEXT_SELECT_RANGE(G_inputPosition, G_inputPosition);
+    }
+}
+
+
+/*=========================================================================*
+ *  Routines:
+ *=========================================================================*/
+
+/*-------------------------------------------------------------------------
+ | Routine:  Step1TypeLetters
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Fill the UI with the four characters that make up step 1 given
+ |    the text and position in the text.
+ |
+ | Inputs:
+ |    char currenttext[]          -- String to get data from
+ |    word letterDataPosition     -- Position in string to start
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   ??/??/??  Created.
+ |
+ *-----------------------------------------------------------------------*/
+void Step1TypeLetters(
+         char currenttext[MAX_EXERCISE_LEN],
+         word letterDataPosition)
+{
+    word i ;
+    word len = strlen(currenttext) ;
+    word p = letterDataPosition ;
+
+    for (i=0; (i<4) && (p<len); i++)  {
+        /* Grab the four letters */
+        G_goalLine[i] = currenttext[letterDataPosition+i] ;
+        @call G_fourKeys[i]::MSG_VIS_TEXT_REPLACE_ALL_PTR(&currenttext[letterDataPosition+i], 1) ;
+    }
+
+    /* Clear the rest with spaces (if any) */
+    for (; i<4; i++)  {
+        @call G_fourKeys[i]::MSG_VIS_TEXT_REPLACE_ALL_PTR(" ", 1) ;
+        G_goalLine[i] = '\0' ;
+    }
+
+    /* Put in the space if we will have more after this */
+    if (p < len)  {
+		  @call Step1SpaceBar::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@SpaceKey, 0) ;
+		  G_goalLine[4] = ' ' ;
+        G_goalLine[5] = '\0' ;
+    } else {
+        @call Step1SpaceBar::MSG_VIS_TEXT_REPLACE_ALL_PTR(" ", 0) ;
+        G_goalLine[4] = '\0' ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  Step2TypeLetters
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Fill the UI with the 50 characters that make up a line of text
+ |    for step 2 of the lessons.
+ |
+ | Inputs:
+ |    char currenttext[]          -- String to get data from
+ |    word letterDataPosition     -- Position in string to start
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   ??/??/??  Created.
+ |
+ *-----------------------------------------------------------------------*/
+void Step2TypeLetters(
+         char currenttext[MAX_EXERCISE_LEN],
+         word letterDataPosition)
+{
+    word a, i=0 ;
+    word max ;
+
+    /* Make sure we are in range */
+    max = strlen(currenttext) ;
+    if (letterDataPosition <= max)  {
+        /* Copy up to 50 characters (50th should be a space) */
+        for (a=letterDataPosition; (a<max) && (i<50); )
+            G_goalLine[i++] = currenttext[a++] ;
+    }
+
+    /* Correctly terminate the string */
+    G_goalLine[i] = '\0' ;
+
+    @call Step2TextToTypeBox::MSG_VIS_TEXT_DELETE_ALL() ;
+    @call Step2TextToTypeBox::MSG_VIS_TEXT_REPLACE_ALL_PTR(G_goalLine, 0) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  WhichKey
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Based on G_currentKey, show the instructions for which finger to
+ |    use when typing the key.  Also correctly inverts the shift key
+ |    if necessary.
+ |
+ | Inputs:
+ |    GStateHandle gstate         -- Where to draw.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   ??/??/??  Created.
+ |    jfh  10/21/99  replaced 2 instances of G_exerciseString[G_inputPosition]
+ |                   with G_currentKey
+ *-----------------------------------------------------------------------*/
+void WhichKey(GStateHandle gstate)
+{
+ word row ;
+ word position ;
+ static word lastrow = 0 ;
+ static word lastPosition = 0 ;
+ static char lastChar[20] ;
+ char finger[20] ;
+ char fingerName[30] = "???" ;
+ optr fingerTable[9] = {@FingerName1, @FingerName2, @FingerName3,
+								@FingerName4, @FingerName5, @FingerName6,
+								@FingerName7, @FingerName8, @FingerName9};
+
+
+    MemLock(OptrToHandle(@FingerName1));
+	 if ((lastPosition != 0) || (lastrow != 0))
+        DrawButton(
+            gstate,
+            G_leftPositions[lastrow] + (lastPosition * 22),
+            2 + ((lastrow) * 22),
+            G_leftPositions[lastrow] + (lastPosition * 22) + 20,
+            2 + ((lastrow) * 22) + 20,
+            lastChar[lastPosition],
+            C_WHITE,
+            C_BLACK,
+            C_BLACK) ;
+    DrawSpecialButton(
+        gstate,
+        84, 90,
+        236, 110,
+        "",
+        C_WHITE, C_BLACK, C_BLACK) ;
+    DrawSpecialButton(
+        gstate,
+        2, 68,
+        49, 88,
+		  LMemDeref(@ShiftKey),
+		  C_WHITE, C_BLACK, C_BLACK) ;
+    DrawSpecialButton(
+        gstate,
+        271, 68,
+        318, 88,
+		  LMemDeref(@ShiftKey),
+        C_WHITE, C_BLACK, C_BLACK) ;
+    if (G_inputPosition < strlen(G_exerciseString))  {
+        /* Special characters to type? */
+        switch ((unsigned char)G_currentKey)  {
+            case C_SPACE:
+					 strcpy(G_charType, LMemDeref(@SpaceBrktKey)) ;
+                DrawSpecialButton(
+                    gstate,
+						  84, 90,
+                    236, 110,
+                    "",
+                    C_BLACK, C_BLACK, C_WHITE) ;
+					 strcpy(fingerName, LMemDeref(@FingerName9)) ;
+                break ;
+            case C_ENTER:
+					 strcpy(G_charType, LMemDeref(@EnterBrktKey)) ;
+					 strcpy(fingerName, LMemDeref(@FingerName8)) ;
+                break ;
+            case C_TAB:
+					 strcpy(G_charType, LMemDeref(@TabBrktKey)) ;
+					 break ;
+            default:
+	 //		 sprintf(G_charType, "%c", G_exerciseString[G_inputPosition]) ;
+			 sprintf(G_charType, "%c", G_currentKey) ;
+			 for (row = 0; row < 8; row++)  {
+                    strcpy (lastChar, &G_keyboardLayout[row]) ;
+                    strcpy (finger, &G_fingerLayout[row]) ;
+
+                    for (position = 0;
+                         position <= strlen(G_keyboardLayout[row]);
+                         position++)  {
+				 //   if (G_exerciseString[G_inputPosition] == lastChar[position])  {
+				    if (G_currentKey == lastChar[position])  {
+						strcpy(fingerName, LMemDeref(fingerTable[finger[position]-'0'])) ;
+                            lastPosition = position ;
+                            if (row>3)  {
+                                if (finger[lastPosition] > '3')  {
+                                    G_shiftState = TT_SHIFT_STATE_LEFT ;
+                                    DrawSpecialButton(
+                                        gstate,
+                                        2, 68,
+                                        49, 88,
+													 LMemDeref(@ShiftKey),
+                                        C_BLACK, C_BLACK, C_WHITE) ;
+                                } else {
+                                    G_shiftState = TT_SHIFT_STATE_RIGHT ;
+                                    DrawSpecialButton(
+                                        gstate,
+                                        271, 68,
+                                        318, 88,
+                                        LMemDeref(@ShiftKey),
+                                        C_BLACK, C_BLACK, C_WHITE) ;
+                                }
+                                row = row - 4 ;
+                            }
+                            lastrow = row ;
+                            DrawButton(
+                                gstate,
+                                G_leftPositions[row] + (position * 22),
+                                2 + (row * 22),
+                                G_leftPositions[row] + (position * 22) + 20,
+                                2 + (row * 22) + 20,
+                                lastChar[position],
+                                C_BLACK, C_BLACK, C_WHITE) ;
+                            row = 8 ;
+                        }
+                    }
+                }
+                break ;
+        }
+        @call Step1FingerGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(fingerName, VUM_NOW) ;
+    }
+    MemUnlock(OptrToHandle(@FingerName1));
+}
+
+/***************************************************************************
+ *  END OF FILE:  TTKEYHAN.GOC  (Key handling routines)
+ ***************************************************************************/
+
+

@@ -1,0 +1,163 @@
+/***************************************************************************
+ *  FILE:  TTRESULT.GOC  (ResultsVisClass for displaying results)
+ ***************************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+@include "ttclass.goh"
+@include "ttdefs.goh"
+@include "externs.goh"
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  ResultsVisClass
+ *=========================================================================*/
+
+@classdecl ResultsVisClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  ResultsVisClass::MSG_VIS_DRAW
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Draw the results of a lesson in a vis object.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   ??/??/??  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method ResultsVisClass, MSG_VIS_DRAW
+{
+    Rectangle *p_rect = &pself->VI_bounds ;
+    word left, top ;
+    char ResultsLine1[100], ResultsLine2[100], ResultsLine3[100] ;
+    char buffer[30] ;
+    T_studentInfo info ;
+    word x ;
+    word value ;
+
+    /* Get the student information */
+    GetStudentInfo(G_currentStudent, &info) ;
+
+    left = p_rect->R_left + 10 ;
+    top = p_rect->R_top + 10 ;
+
+    GrSetLineWidth(gstate, MakeWWFixed(1)) ;
+    GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+    GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(12)) ;
+
+    /* Which Results are shown here? */
+	 /* The G_wordsPerMinute Results */
+	 MemLock(OptrToHandle(@SpeedString));
+	 GrDrawText(gstate, left, top, LMemDeref(@SpeedString), 0) ;
+	 GrDrawText(gstate, 302, top, LMemDeref(@WPMString), 0) ;
+    /* And the G_accuracy Results */
+	 GrDrawText(gstate, left, top + 30, LMemDeref(@AccuracyString), 0) ;
+    GrDrawText(gstate, 302, top + 30, "%", 0) ;
+
+    GrDrawRect(gstate, 100, top, 300, top + 14); /* this is the main rectangle for the speed results*/
+    GrDrawRect(gstate, 100, top + 30, 300, top + 30 + 14); /* this is the main rectangle for the accuracy results*/
+
+    GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0); /* fill the result bars with black */
+    GrFillRect(gstate, 101, top +  1, 100 +((G_wordsPerMinute * 10)>>2), top + 14    ); /* G_wordsPerMinute * 2.5, the maximum speed is 80 wpm */
+    GrFillRect(gstate, 101, top + 31, 100 +(G_accuracy * 2  ), top + 30 +14); /* G_accuracy * 2, because the bar is 200 pts long */
+
+    /* Show the results also with text and numbers */
+    GrSetTextColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+    GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(10)) ;
+	 sprintf(buffer, LMemDeref(@wpmSPFString), G_wordsPerMinute) ;
+	 MemUnlock(OptrToHandle(@SpeedString));
+	 GrDrawText(gstate, 105, top, buffer, 0) ;
+    sprintf(buffer, "%u", G_accuracy) ;
+    GrDrawText(gstate, 105, top+30, buffer, 0) ;
+
+    /* The personal goal settings are shown too */
+    /* To organise the LineColor, I have to compare the goal settings with the result : */
+    /* If result < goal => color = black, else color = white */
+    GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+    GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+    GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(8)) ;
+
+    /* for the speed */
+    value = info.SI_wpmGoal ;
+    GrSetLineColor(
+        gstate,
+        CF_INDEX,
+        (value < G_wordsPerMinute)?C_WHITE:C_BLACK,
+        0,
+        0) ;
+    x = ((value * 10)>>2) ;  /* multiply by 2.5 */
+    if (x > 200)
+        x = 200 ;
+    sprintf(buffer, "%u", value) ;
+    GrDrawVLine(gstate, 100+x, top+1, top+14) ;
+    GrDrawText(gstate, 100+x-((buffer[1])?5:2), top+14, buffer, 0) ;
+
+    /* and for the accuracy */
+    value = info.SI_accuracyGoal ;
+    GrSetLineColor(
+        gstate,
+        CF_INDEX,
+        (value < G_accuracy)?C_WHITE:C_BLACK,
+        0,
+        0) ;
+    x = value*2 ;
+    if (x > 200)
+        x = 200 ;
+    sprintf(buffer, "%u", value) ;
+    GrDrawVLine(gstate, 100+x, top+31, top+44) ;
+    GrDrawText(gstate, 100+x-((buffer[1])?5:2), top+44, buffer, 0) ;
+
+    /* Finally a word of advice to the student */
+    GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(12)) ;
+    @call process::MSG_TYPE_EVALUATE(
+             ResultsLine1,
+             ResultsLine2,
+             ResultsLine3) ;
+    GrDrawText(gstate, left, 70, ResultsLine1, 0) ;
+    GrDrawText(gstate, left, 85, ResultsLine2, 0) ;
+    GrDrawText(gstate, left, 100, ResultsLine3, 0) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ResultsVisClass::MSG_VIS_GET_SIZE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the size of the vis object as a static size.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   05/13/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method ResultsVisClass, MSG_VIS_GET_SIZE
+{
+    return MAKE_SIZE_DWORD(440, 140) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ResultsVisClass::MSG_VIS_RECALC_SIZE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the size of the vis object as a static size.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/13/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method ResultsVisClass, MSG_VIS_RECALC_SIZE
+{
+    return MAKE_SIZE_DWORD(440, 140) ;
+}
+
+/***************************************************************************
+ *  END OF FILE:  TTRESULT.GOC  (ResultsVisClass for displaying results)
+ ***************************************************************************/
+

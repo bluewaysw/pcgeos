@@ -1,0 +1,1034 @@
+/***************************************************************************
+ *  FILE:  TTDB.GOC  (Database functions)
+ ***************************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+@include "ttdefs.goh"
+@include "ttclass.goh"
+@include "externs.goh"
+@include "options.goh"
+
+/*-------------------------------------------------------------------------
+ | Routines:  StudentDatabaseOpen
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Open up a student database (or create if not there).
+ |
+ | Outpus:
+ |    word                        -- Number of students in database.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/17/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+word StudentDatabaseOpen(void)
+{
+    T_studentDBMapBlock *p_map ;
+    DBGroupAndItem dbMap ;
+    word numItems ;
+
+    /* Go into our private data file */
+    FileSetStandardPath(TTYPE_STUDENT_DB_STANDARD_PATH) ;
+    FileCreateDir(TTYPE_STUDENT_DB_PATH_NAME) ;
+    FileSetCurrentPath(
+        TTYPE_STUDENT_DB_STANDARD_PATH,
+        TTYPE_STUDENT_DB_PATH_NAME) ;
+
+    /* Open up the student database */
+    G_studentDBFile = VMOpen(STUDENT_DATABASE_FILENAME, 0, VMO_CREATE, 0) ;
+    dbMap = DBGetMap(G_studentDBFile) ;
+
+    /* Open up a database map */
+    if (dbMap == NULL)  {
+        /* Database doesn't exist.  Need to create it */
+        dbMap = DBAllocUngrouped(G_studentDBFile, sizeof(word)) ;
+        DBSetMapUngrouped(G_studentDBFile, dbMap) ;
+        p_map = (T_studentDBMapBlock*) DBLockUngrouped(G_studentDBFile, dbMap) ;
+        p_map->SMB_numberStudents = 0 ;
+        DBDirty(p_map) ;
+        DBUnlock(p_map) ;
+
+        VMSave(G_studentDBFile) ;
+
+		  MemLock(OptrToHandle(@VisitorString));
+		  /* Visitor is always the first one */
+		  AddNewStudent(LMemDeref(@VisitorString)) ;
+
+        /* Now add a Teacher as the next student */
+        AddNewStudent(LMemDeref(@TeacherString)) ;
+		  MemUnlock(OptrToHandle(@VisitorString));
+
+        VMSave(G_studentDBFile) ;
+    }
+
+    /* Get the database information */
+    p_map = (T_studentDBMapBlock *) DBLockMap(G_studentDBFile) ;
+    numItems = p_map->SMB_numberStudents ;
+    DBUnlock(p_map);
+
+    return numItems ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  StudentDBGetCount
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the number of students in the database.
+ |
+ | Outputs:
+ |    word                        -- Number of students in the database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/20/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+word StudentDBGetCount(void)
+{
+    word numStudents ;
+    T_studentDBMapBlock *p_map ;
+
+    p_map = (T_studentDBMapBlock *) DBLockMap(G_studentDBFile) ;
+    numStudents = p_map->SMB_numberStudents ;
+    DBUnlock(p_map);
+
+    return numStudents ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  AddNewStudent
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Add a new student given the student's name.
+ |
+ | Inputs:
+ |    char ns_name[]              -- String containing new student name
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   ??/??/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean AddNewStudent(char ns_name[MAX_NAME_LEN+1])
+{
+    T_studentHeader *p_student ;
+    DBGroupAndItem dbMap ;
+    T_studentDBMapBlock *p_map ;
+    word dbMapSize ;
+    Boolean isSuccess = FALSE ;
+    T_studentInfo *p_info ;
+    word numStudents ;
+
+    if (strlen(ns_name) > 0)  {
+        /* lock the map item, read the array size and unlock it */
+        dbMap = DBGetMap(G_studentDBFile) ;
+        p_map = DBLockUngrouped(G_studentDBFile, dbMap) ;
+        dbMapSize = p_map->SMB_numberStudents ;
+        DBUnlock(p_map) ;
+
+        if (dbMapSize < MAX_STUDENTS)  {
+            /* Expand the map item */
+            DBReAllocUngrouped(G_studentDBFile, dbMap, sizeof(word)+((dbMapSize+1)*sizeof(T_studentHeader))) ;
+
+            /* lock the map again */
+            p_map = DBLockUngrouped(G_studentDBFile, dbMap) ;
+
+            /* Get access to that student */
+            p_student = p_map->SMB_students+dbMapSize ;
+
+            /* Create the G_isNewExercise DB group */
+            p_student->ST_group = DBGroupAlloc(G_studentDBFile) ;
+            p_student->ST_info = DBAlloc(
+                                     G_studentDBFile,
+                                     p_student->ST_group,
+                                     sizeof(T_studentInfo)) ;
+            p_student->ST_head = NULL ;
+
+            /* Fill in the student's info header */
+            p_info = (T_studentInfo *)DBLock(
+                                          G_studentDBFile,
+                                          p_student->ST_group,
+                                          p_student->ST_info) ;
+            memset(p_info, 0, sizeof(*p_info)) ;
+            strcpy(p_info->SI_name, ns_name) ;
+            p_info->SI_password[0] = '\0' ;
+            p_info->SI_timeGoal = DEFAULT_TIME_GOAL ;
+            p_info->SI_wpmGoal = DEFAULT_WPM_GOAL ;
+            p_info->SI_accuracyGoal = DEFAULT_ACCURACY_GOAL ;
+            p_info->SI_lastExercise = 0 ;
+            DBDirty(p_info) ;
+            DBUnlock(p_info) ;
+
+            /* Increase the array size */
+            p_map->SMB_numberStudents++ ;
+            numStudents = p_map->SMB_numberStudents ;
+            isSuccess = TRUE ;
+            DBDirty(p_map) ;
+            DBUnlock(p_map) ;
+
+            /* Make sure this is recorded */
+            VMSave(G_studentDBFile) ;
+
+            /* Let the list in on the whole affair */
+            @call NameSelectionBox::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(dbMapSize, 1) ;
+            @call SPStudentList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(dbMapSize, 1) ;
+            @call NameSelectionBox::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                      numStudents-1, FALSE) ;
+            @call NewNameEntry::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+            if (numStudents >= MAX_STUDENTS)
+                @call NewNameBox::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+
+            @call NewNameOkButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+            @call PPNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(ns_name, 0) ;
+        }
+    }
+
+    return isSuccess ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  DeleteStudentRecord
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Delete a student's record.
+ |
+ | Inputs:
+ |    word studentNumber          -- Index number of the student
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student found in database
+ |                                   or FALSE if the student doesn't exist
+ |                                   or FALSE if illegal (Teacher or Visitor)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/17/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean DeleteStudentRecord(word studentNumber)
+{
+    Boolean foundStudent = FALSE ;
+    T_studentHeader header ;
+    T_studentDBMapBlock *p_map ;
+    DBGroupAndItem dbMap ;
+    word dbMapSize ;
+    word i ;
+
+    /* Don't delete the visitor or teacher slot */
+    if (studentNumber == TTYPE_VISITOR_SLOT)
+        return FALSE ;
+    if (studentNumber == TTYPE_TEACHER_SLOT)
+        return FALSE ;
+
+    if (GetStudentHeader(studentNumber, &header))  {
+        /* Delete the associated group of data reports */
+        DBGroupFree(G_studentDBFile, header.ST_group) ;
+
+        /* Now we just squeeze up the data */
+        dbMap = DBGetMap(G_studentDBFile) ;
+        p_map = DBLockUngrouped(G_studentDBFile, dbMap) ;
+        dbMapSize = p_map->SMB_numberStudents ;
+        for (i=studentNumber+1; i<dbMapSize; i++)
+            p_map->SMB_students[i-1] = p_map->SMB_students[i] ;
+        p_map->SMB_numberStudents-- ;
+        DBDirty(p_map) ;
+        DBUnlock(p_map) ;
+        VMUpdate(G_studentDBFile) ;
+        foundStudent = TRUE ;
+    }
+
+    return foundStudent ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  GetStudentHeader
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Finds a student header in the student database and returns
+ |    the whole header data.
+ |
+ | Inputs:
+ |    word num                    -- Index number of the student
+ |    T_studentHeader *p_header   -- Place to put found header.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student found in database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/17/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean GetStudentHeader(word num, T_studentHeader *p_header)
+{
+    T_studentHeader *p_student ;
+    DBGroupAndItem dbMap ;
+    T_studentDBMapBlock *p_map ;
+    word dbMapSize ;
+    Boolean isFound = FALSE ;
+
+    dbMap = DBGetMap(G_studentDBFile) ;
+    p_map = DBLockUngrouped(G_studentDBFile, dbMap) ;
+    dbMapSize = p_map->SMB_numberStudents ;
+    if (num < dbMapSize)  {
+        p_student = p_map->SMB_students + num ;
+        memcpy(p_header, p_student, sizeof(*p_header)) ;
+        isFound = TRUE ;
+    }
+    DBUnlock(p_map) ;
+
+    return isFound ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  SetStudentHeader
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Finds a student header in the student database and replaces
+ |    the whole header data.
+ |
+ | Inputs:
+ |    word num                    -- Index number of the student
+ |    T_studentHeader *p_header   -- Place to put found header.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student found in database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean SetStudentHeader(word num, T_studentHeader *p_header)
+{
+    T_studentHeader *p_student ;
+    DBGroupAndItem dbMap ;
+    T_studentDBMapBlock *p_map ;
+    word dbMapSize ;
+    Boolean isFound = FALSE ;
+
+    dbMap = DBGetMap(G_studentDBFile) ;
+    p_map = DBLockUngrouped(G_studentDBFile, dbMap) ;
+    dbMapSize = p_map->SMB_numberStudents ;
+    if (num < dbMapSize)  {
+        p_student = p_map->SMB_students + num ;
+        memcpy(p_student, p_header, sizeof(*p_student)) ;
+        isFound = TRUE ;
+        DBDirty(p_map) ;
+        VMUpdate(G_studentDBFile) ;
+    }
+    DBUnlock(p_map) ;
+
+    return isFound ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  StudentUpdateStats
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Store the 3 pieces of given information in the student's file.
+ |
+ | Inputs:
+ |    word num                    -- Index number of the student
+ |    word lastTime               -- Last amount of time taken
+ |    word lastWPM                -- Last WPM calculated
+ |    word lastAccuracy           -- Accuracy of that calculation
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student found in database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean StudentUpdateStats(
+          word num,
+          word lastTime,
+          word lastWPM,
+          word lastAccuracy)
+{
+    T_studentInfo info ;
+    Boolean gotStudent = FALSE ;
+
+    if (GetStudentInfo(num, &info))  {
+        gotStudent = TRUE ;
+        info.SI_wpmLast = lastWPM ;
+        info.SI_accuracyLast = lastAccuracy ;
+        info.SI_timeLast = lastTime ;
+        SetStudentInfo(num, &info) ;
+        VMUpdate(G_studentDBFile) ;
+    }
+
+    return gotStudent ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  ClearVisitorStats
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    When using the visitor slot, the stats are cleared out each time.
+ |    THis routine does the work in the database.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/24/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+void ClearVisitorStats(void)
+{
+    T_studentInfo info ;
+    DBItem item, next ;
+    T_studentHeader header ;
+    T_studentReport *p_report ;
+
+    if (GetStudentInfo(TTYPE_VISITOR_SLOT, &info))  {
+        info.SI_wpmLast = 0 ;
+        info.SI_accuracyLast = 0 ;
+        info.SI_timeLast = 0 ;
+        info.SI_timeGoal = DEFAULT_TIME_GOAL ;
+        info.SI_wpmGoal = DEFAULT_WPM_GOAL ;
+        info.SI_accuracyGoal = DEFAULT_ACCURACY_GOAL ;
+        info.SI_lastExercise = 0 ;
+        info.SI_password[0] = '\0' ;
+        SetStudentInfo(TTYPE_VISITOR_SLOT, &info) ;
+
+        GetStudentHeader(TTYPE_VISITOR_SLOT, &header) ;
+        item = header.ST_head ;
+        while (item)  {
+            p_report = DBLock(G_studentDBFile, header.ST_group, item) ;
+            next = p_report->RS_next ;
+            DBUnlock(p_report) ;
+            DBFree(G_studentDBFile, header.ST_group, item) ;
+            item = next ;
+        }
+        header.ST_head = NULL ;
+        SetStudentHeader(TTYPE_VISITOR_SLOT, &header) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  GetStudentInfo
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Finds a student's info in the student database and returns
+ |    the whole structure
+ |
+ | Inputs:
+ |    word num                    -- Index number of the student
+ |    T_studentInfo *p_info       -- Place to put found data.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student found in database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean GetStudentInfo(word num, T_studentInfo *p_info)
+{
+    T_studentHeader header ;
+    T_studentInfo *p_studentInfo ;
+    Boolean isFound = FALSE ;
+
+    /* See if the student exists and grab the header info */
+    if (GetStudentHeader(num, &header))  {
+        /* Lock in the info item */
+        p_studentInfo = DBLock(
+                            G_studentDBFile,
+                            header.ST_group,
+                            header.ST_info) ;
+
+        /* Copy over the whole block */
+        memcpy(p_info, p_studentInfo, sizeof(*p_info)) ;
+        isFound = TRUE ;
+        DBUnlock(p_studentInfo) ;
+    }
+
+    return isFound ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  SetStudentInfo
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Finds a student's info in the student database and replaces
+ |    the whole structure
+ |
+ | Inputs:
+ |    word num                    -- Index number of the student
+ |    T_studentInfo *p_info       -- Information to store
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student found in database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean SetStudentInfo(word num, T_studentInfo *p_info)
+{
+    T_studentHeader header ;
+    T_studentInfo *p_studentInfo ;
+    Boolean isFound = FALSE ;
+
+    /* See if the student exists and grab the header info */
+    if (GetStudentHeader(num, &header))  {
+        /* Lock in the info item */
+        p_studentInfo = DBLock(
+                            G_studentDBFile,
+                            header.ST_group,
+                            header.ST_info) ;
+
+        /* Copy over the whole block */
+        memcpy(p_studentInfo, p_info, sizeof(*p_studentInfo)) ;
+        isFound = TRUE ;
+        DBDirty(p_studentInfo) ;
+        DBUnlock(p_studentInfo) ;
+        VMUpdate(G_studentDBFile) ;
+    }
+
+    return isFound ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  SetStudentPassword
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Lock in the student in the database and change his password.
+ |
+ | Inputs:
+ |    word num                    -- Index number of the student
+ |    char *p_newPassword         -- New password to become.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student found in database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/17/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean SetStudentPassword(word num, char *p_newPassword)
+{
+    Boolean isFound = FALSE ;
+    T_studentHeader header ;
+    T_studentInfo *p_studentInfo ;
+
+    /* Don't change passwords on the Visitor */
+    if (num == TTYPE_VISITOR_SLOT)
+        return TRUE ;
+
+    /* Make sure that student exists and get access to it */
+    if (GetStudentHeader(num, &header))  {
+        /* Now lock in the info block */
+        p_studentInfo = DBLock(
+                            G_studentDBFile,
+                            header.ST_group,
+                            header.ST_info) ;
+
+        /* Copy over the password */
+        strncpy(
+            p_studentInfo->SI_password,
+            p_newPassword,
+            MAX_PASSWORD_CHARS-1) ;
+        isFound = TRUE ;
+        DBDirty(p_studentInfo) ;
+        DBUnlock(p_studentInfo) ;
+        VMUpdate(G_studentDBFile) ;
+    }
+
+    return isFound ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  IStudentReportLock                           * INTERNAL *
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Find a student report in the database and lock it.
+ |
+ | Inputs:
+ |    word studentNum             -- Index number of the student
+ |    word exercise               -- Recorded execise number
+ |
+ | Outputs:
+ |    T_studentReport *           -- Locked student record
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+T_studentReport *IStudentReportLock(
+            word studentNum,
+            word exercise)
+{
+    T_studentHeader header ;
+    DBItem item ;
+    T_studentReport *p_record = NULL ;
+
+    if (GetStudentHeader(studentNum, &header))  {
+        item = header.ST_head ;
+        while (item)  {
+            p_record = DBLock(G_studentDBFile, header.ST_group, item) ;
+            if (p_record->RS_exercise == exercise)  {
+                /* Found a match.  Return with this locked pointer */
+                break ;
+            }
+            DBUnlock(p_record) ;
+            item = p_record->RS_next ;
+            p_record = NULL ;
+        }
+    }
+
+    return p_record ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  IStudentReportAdd                            * INTERNAL *
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Add another student report to the student record.
+ |
+ | Inputs:
+ |    word studentNum             -- Index number of the student
+ |    word exercise               -- Recorded execise number
+ |
+ | Outputs:
+ |    T_studentReport *           -- Locked student record, or NULL
+ |                                   if couldn't create.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+T_studentReport *IStudentReportAdd(word studentNum, word exercise)
+{
+    T_studentHeader header ;
+    DBItem item ;
+    T_studentReport *p_record = NULL ;
+
+    /* Get the student's header */
+    if (GetStudentHeader(studentNum, &header))  {
+        /* Create and fill the record */
+        item = DBAlloc(
+                   G_studentDBFile,
+                   header.ST_group,
+                   sizeof(T_studentReport)) ;
+        p_record = DBLock(G_studentDBFile, header.ST_group, item) ;
+        memset(p_record, 0, sizeof(*p_record)) ;
+        p_record->RS_next = header.ST_head ;
+        p_record->RS_exercise = exercise ;
+
+        /* Make the head of the list point to this guy */
+        header.ST_head = item ;
+        SetStudentHeader(studentNum, &header) ;
+
+        /* We'll now return the locked record */
+        VMUpdate(G_studentDBFile) ;
+    }
+
+    return p_record ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  StudentReportGet
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Copies a student report from the database to memory.
+ |
+ | Inputs:
+ |    word studentNum             -- Index number of the student
+ |    word exercise               -- Recorded execise number
+ |    T_studentReport *p_report   -- Return report
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student record found in
+ |                                   database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean StudentReportGet(
+            word studentNum,
+            word exercise,
+            T_studentReport *p_report)
+{
+    Boolean isFound = FALSE ;
+    T_studentReport *p_record ;
+
+    /* Find the record (if any) */
+    p_record = IStudentReportLock(studentNum, exercise) ;
+    if (p_record)  {
+        /* Copy it and then unlock it */
+        memcpy(p_report, p_record, sizeof(*p_report)) ;
+        isFound = TRUE ;
+        DBUnlock(p_record) ;
+    } else {
+        memset(p_report, 0, sizeof(*p_report)) ;
+    }
+
+    return isFound ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  StudentReportSet
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Writes over a previously recorded exercise entry or appends a new
+ |    one.
+ |
+ | Inputs:
+ |    word studentNum             -- Index number of the student
+ |    word exercise               -- Recorded execise number
+ |    T_studentReport *p_report   -- Report to store
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student record found in
+ |                                   database
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean StudentReportSet(
+            word studentNum,
+            word exercise,
+            T_studentReport *p_report)
+{
+    Boolean isFound = FALSE ;
+    T_studentReport *p_record ;
+    DBItem next ;
+
+    /* Find the record (if any) */
+    p_record = IStudentReportLock(studentNum, exercise) ;
+
+    /* If not found, try adding one */
+    if (!p_record)
+        p_record = IStudentReportAdd(studentNum, exercise) ;
+
+    if (p_record)  {
+        /* Copy it into the database, mark dirty, and then unlock it */
+        /* (but don't overwrite the next field of the record) */
+        next = p_record->RS_next ;
+        memcpy(p_record, p_report, sizeof(*p_record)) ;
+        p_record->RS_next = next ;
+        isFound = TRUE ;
+        DBDirty(p_record) ;
+        DBUnlock(p_record) ;
+        VMUpdate(G_studentDBFile) ;
+    }
+
+    return isFound ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  StudentUpdateReport
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Create or save the given values on the given student for the
+ |    appropriate exercise.
+ |
+ | Inputs:
+ |    word num                    -- Index number of the student
+ |    word exercise               -- Recorded execise number
+ |    word time                   -- Time the exercise took
+ |    word wpm                    -- Words per minute of the exercise
+ |    word accuracy               -- Accuracy of the exercise
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student record found in
+ |                                   database, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean StudentUpdateReport(
+            word num,
+            word exercise,
+            word time,
+            word wpm,
+            word accuracy)
+{
+    T_studentReport report ;
+    Boolean isFound ;
+
+    /* Set up the structure and then save it out */
+    report.RS_time = time ;
+    report.RS_wpm = wpm ;
+    report.RS_accuracy = accuracy ;
+    report.RS_exercise = exercise ;
+    isFound = StudentReportSet(num, exercise, &report) ;
+
+    return isFound ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routines:  StudentGenerateReport
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Go through a student's list of reports and average out all the
+ |    scores to create a summary report.
+ |
+ | Inputs:
+ |    word studentNum             -- Index number of the student
+ |    T_studentSummary *p_summary -- Block to setup summary in
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if student record found in
+ |                                   database, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/18/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean StudentGenerateReport(word studentNum, T_studentSummary *p_summary)
+{
+    Boolean isFound = FALSE ;
+    T_studentHeader header ;
+    T_studentInfo info ;
+    DBItem report ;
+    T_studentReport *p_report ;
+    word index ;
+    word i ;
+    word num ;
+
+    /* Clear out the summary */
+    memset(p_summary, 0, sizeof(*p_summary)) ;
+
+    /* Get access to the student's header */
+    if (GetStudentHeader(studentNum, &header))  {
+        /* Got a header, good enough for me */
+        isFound = TRUE ;
+
+        GetStudentInfo(studentNum, &info) ;
+        memcpy(p_summary->SS_name, info.SI_name, sizeof(p_summary->SS_name)) ;
+        p_summary->SS_hasPassword = (info.SI_password[0])?TRUE:FALSE ;
+
+        p_summary->SS_goalWPM = info.SI_wpmGoal ;
+        p_summary->SS_goalAccuracy = info.SI_accuracyGoal ;
+        p_summary->SS_lastWPM = info.SI_wpmLast ;
+        p_summary->SS_lastAccuracy = info.SI_accuracyLast ;
+        p_summary->SS_lastTime = info.SI_timeLast ;
+
+        /* Now go through all the student reports and add up */
+        /* all the scores */
+        report = header.ST_head ;
+        while (report)  {
+            p_report = DBLock(G_studentDBFile, header.ST_group, report) ;
+
+            /* Determine which of the 10 slots to use. */
+            /* They are grouped by 3's and all after 10 use lesson 10 */
+            index = p_report->RS_exercise / NUM_EXERCISES ;
+            if (index > 9)
+                index = 9 ;
+
+            /* Tally up the information for an average later */
+            p_summary->SS_time[index] += p_report->RS_time ;
+            p_summary->SS_wpm[index] += p_report->RS_wpm ;
+            p_summary->SS_accuracy[index] += p_report->RS_accuracy ;
+            p_summary->SS_numReports[index]++ ;
+
+            /* Done with this one, on to the next */
+            report = p_report->RS_next ;
+            DBUnlock(p_report) ;
+        }
+
+        /* Ok, we now have all the data tallied in totals.  We need */
+        /* the averages */
+        for (i=0; i<10; i++)  {
+            num = p_summary->SS_numReports[i] ;
+            if (num)  {
+                p_summary->SS_wpm[i] /= num ;
+                p_summary->SS_accuracy[i] /= num ;
+                p_summary->SS_time[i] /= num ;
+            }
+        }
+    }
+
+    return isFound ;
+}
+
+
+void RetrieveExercise(word index)
+{
+    MemHandle memMap ;
+    VMBlockHandle mapBlock ;
+    T_exerciseDatabaseMap *p_map ;
+    MemHandle mem ;
+    T_exerciseRecord *p_exercise ;
+
+    /* LES #27:  Again, let's keep the bounds in check or fatal error */
+    if (index < MAX_EXERCISES)  {
+        /* LES #28:  Again, we can't do anything without the map block.
+           It is tempting to keep the map block locked, but in
+           GEOS it is not good to keep ANY block locked for
+           an extended period of time (read more than 1 second). */
+        mapBlock = VMGetMapBlock(G_exerciseDBFile) ;
+        p_map = VMLock(G_exerciseDBFile, mapBlock, &memMap) ;
+
+        /* LES #29:  Here things are a little different.  If the block
+           has not been allocated, I'm going to just make the strings
+           null as a safety measure.  Let's assume this is not a bug
+           but actually a feature we want. */
+        if (p_map->MS_exercises[index] == NullHandle)
+            {
+            G_titleString[0] = G_exerciseString[0] = '\0' ;
+            }
+        else
+            {
+            /* LES #30:  If we actually have an exercise, just copy out
+               the data after locking (and finally unlocking) */
+            p_exercise = VMLock(G_exerciseDBFile, p_map->MS_exercises[index], &mem) ;
+            strcpy(G_titleString, p_exercise->ES_title) ;
+            strcpy(G_exerciseString, p_exercise->ES_exercise) ;
+            VMUnlock(mem) ;
+            }
+
+        /* LES #31  Ok, now let go of the map.  We're done here, on to 32 */
+        VMUnlock(memMap) ;
+    } else {
+        EC(        FatalError(-1) ; )
+    }
+}
+
+
+void StoreExercise(word index)
+{
+    MemHandle memMap ;
+    VMBlockHandle mapBlock ;
+    T_exerciseDatabaseMap *p_map ;
+    MemHandle mem ;
+    T_exerciseRecord *p_exercise ;
+
+    /* LES #14  If we get a bad index, we just ignore it.  In truth
+            I should set up a FatalError if that ever happens. */
+    if (index < MAX_EXERCISES)  {
+        /* LES #16  We have to lock in the map block to get at the
+                array of VMBlock handles */
+        mapBlock = VMGetMapBlock(G_exerciseDBFile) ;
+        p_map = VMLock(G_exerciseDBFile, mapBlock, &memMap) ;
+
+        /* LES #17  Now I'm going to do a bit of a trick.  I'm going
+                see if we have a block.  If we don't, we'll allocate
+                it here in this routine and then fall down later
+                into the regular code to store the data */
+        if (p_map->MS_exercises[index] == NullHandle)  {
+            p_map->MS_exercises[index] = VMAlloc(G_exerciseDBFile, sizeof(T_exerciseRecord), 0) ;
+            p_map->MS_number++ ;
+            G_numExercises++ ;
+            VMDirty(memMap) ;
+        }
+
+        /* LES #18  At this point, we know we have a previously existing
+                exercise block.  Lock and fill the block. */
+        p_exercise = VMLock(G_exerciseDBFile, p_map->MS_exercises[index], &mem) ;
+        strcpy(p_exercise->ES_title, G_titleString) ;
+        strcpy(p_exercise->ES_exercise, G_exerciseString) ;
+        VMDirty(mem) ;
+        VMUnlock(mem) ;
+
+        /* LES #19  Ok, now let go of the map.  We're done here, on to 20 */
+        VMUnlock(memMap) ;
+    } else  {
+        /* LES #15  Ok, to help debug the program, yeah, we'll put in
+                a fatal error if passed a bad value.  But I'll
+                enclose it with the EC() macro to make the crash
+                only occur in the EC version. */
+        EC(        FatalError(-1) ; )
+    }
+}
+
+
+void DeleteExercise(word index)
+{
+    MemHandle memMap ;
+    VMBlockHandle mapBlock ;
+    T_exerciseDatabaseMap *p_map ;
+    word i ;
+
+    /* LES #42:  Notice that I used G_numExercises instead of MAX_EXERCISES
+       here because we are assuming that all array entries before
+       G_numExercises are filled, and all after are empty. */
+    if (index < G_numExercises)   {
+        mapBlock = VMGetMapBlock(G_exerciseDBFile) ;
+        p_map = VMLock(G_exerciseDBFile, mapBlock, &memMap) ;
+
+    /* LES #43: We just free that block and null it out.  (I like to null
+       out entries in case I screw up in the future.  Its going to
+       be overwritten anyways.  Also decrement the count stored. */
+        VMFree(G_exerciseDBFile, p_map->MS_exercises[index]) ;
+        p_map->MS_exercises[index] = NullHandle ;
+        p_map->MS_number-- ;
+
+    /* LES #44:  Ok, now we need to shrink up the array and move all
+       the good records over.  I'll do this the nice slow way (instead
+       of using memcpy) to make it it is done right.  This is not
+       usually many items. */
+        for (i=index+1; i<G_numExercises; i++)
+            p_map->MS_exercises[i-1] = p_map->MS_exercises[i] ;
+
+    /* LES #45:  But the last couple of things we do is null out the
+       last item and update the number of exercises */
+        G_numExercises-- ;
+        p_map->MS_exercises[G_numExercises] = NullHandle ;
+
+    /* LES #46:  Delete always dirtys the p_map block.  Back to where
+             we were at 47 */
+        VMDirty(memMap) ;
+        VMUnlock(memMap) ;
+    } else  {
+        EC(        FatalError(-1) ; )
+    }
+}
+
+
+/***************************************************************************
+ *  END OF FILE:  TTDB.GOC  (Database functions)
+ ***************************************************************************/

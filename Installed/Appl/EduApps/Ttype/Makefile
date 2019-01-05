@@ -3,14 +3,14 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = TTYPE
+GEODE           = ttype
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = TTDB.GOC TTEDIT.GOC TTKEYHAN.GOC TTKEYOBJ.GOC\
-                  TTRESULT.GOC TTUI.GOC TTYPE.GOC BBOXREG.GOH EXTERNS.GOH\
-                  OPTIONS.GOH TTCLASS.GOH TTDEFS.GOH TTICONS.GOH
-OBJS            = TTDB.obj TTEDIT.obj TTKEYHAN.obj TTKEYOBJ.obj\
-                  TTRESULT.obj TTUI.obj TTYPE.obj
+SRCS            = ttresult.goc ttype.goc ttui.goc ttdb.goc ttedit.goc\
+                  ttkeyobj.goc ttkeyhan.goc options.goh ttclass.goh\
+                  bboxreg.goh ttdefs.goh externs.goh tticons.goh
+OBJS            = ttresult.obj ttype.obj ttui.obj ttdb.obj ttedit.obj\
+                  ttkeyobj.obj ttkeyhan.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

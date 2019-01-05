@@ -1,0 +1,1576 @@
+/***************************************************************************
+ *  FILE:  TTUI.GOC
+ ***************************************************************************/
+
+
+@include <stdapp.goh>
+@include <ttclass.goh>
+@include <tticons.goh>
+@include "ttdefs.goh"
+@include "options.goh"
+@include <Objects/treport.goh>
+@include "bboxreg.goh"
+
+/***************************************************************************
+ *      UI Objects
+ ***************************************************************************/
+
+
+
+/*=========================================================================*/
+
+
+
+@start AppResource;
+    /*---------------------------------------------------------------------*/
+    @object GenApplicationClass TypeApp =  {
+        GI_visMoniker = list {
+                            @TypeIcon,
+                            @TypeMoniker,
+                            @Moniker1,
+                            @Moniker6,
+                            @Moniker2};
+        GI_comp = @TypePrimary ;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+            @TypePrimary ;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+            @EditorEditControl ;
+        ATTR_GEN_HELP_FILE = "tthelp";
+    }
+    /*---------------------------------------------------------------------*/
+    @visMoniker TypeMoniker = "Typing Tutor";
+    /*---------------------------------------------------------------------*/
+@end AppResource;
+
+
+
+/*=========================================================================*/
+
+
+
+@start Interface;
+    /*---------------------------------------------------------------------*/
+    @object GenPrimaryClass TypePrimary =  {
+        GI_comp =
+            @TTFileMenu,
+            @TTOptionsMenu,
+            @SelectLessonMenuInteraction,
+            @MainInteraction,
+            @ExerciseEnd,
+            @WelcomeDialog,
+            @ResultsDialog,
+            @AskPasswordDialog,
+            @EditPrefsDialog ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_SIZE_WINDOW_AS_DESIRED;
+        HINT_KEEP_ENTIRELY_ONSCREEN;
+        HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_TARGET ;
+        ATTR_GEN_HELP_CONTEXT = "TOC";
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TTFileMenu =  {
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+		  GI_comp = @ChangeStudentButton, @AboutDBox ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ChangeStudentButton = {
+        GI_visMoniker = 'C', "Change Student" ;
+        GTI_destination = @WelcomeDialog ;
+        GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE ;
+    }
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'b', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Typing Tutor";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2001 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+	 /*---------------------------------------------------------------------*/
+    @object ExerciseEditorClass ExercizeEditor =  {
+        GI_attrs = @default | GA_TARGETABLE ;
+        GI_visMoniker = "Exercise Editor";
+        GI_comp =
+/*            @EditorEditControl, */
+            @LessonTitleField,
+            @TTExMainInteraction,
+            @ReplyBar ;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL ;
+        GII_type = GIT_COMMAND ;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_KEEP_ENTIRELY_ONSCREEN;
+        HINT_SIZE_WINDOW_AS_DESIRED;
+        HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_TARGET ;
+        ATTR_GEN_HELP_CONTEXT = "Exercise Editor";
+        HINT_ALWAYS_ADOPT_MENUS;
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass EditorMenuBar = {
+        GI_comp = @EditorEditMenu ;
+//        GII_visibility = GIV_CONTROL_GROUP ;
+//        HINT_ALWAYS_ADOPT_MENUS;
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass EditorEditMenu =  {
+//        GI_comp = @EditorEditControl ;
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+/*
+        HINT_SYS_MENU;
+        HINT_SEEK_MENU_BAR;
+        HINT_SEEK_TITLE_BAR_LEFT;
+*/
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenEditControlClass EditorEditControl = {
+        GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_EDIT_MENU;
+/*
+        ATTR_GEN_CONTROL_REQUIRE_UI =
+            GECF_CUT | GECF_COPY | GECF_PASTE | GECF_SELECT_ALL | GECF_DELETE ;
+        ATTR_GEN_CONTROL_PROHIBIT_UI =
+            ~(GECF_CUT | GECF_COPY | GECF_PASTE | GECF_SELECT_ALL | GECF_DELETE) ;
+*/
+        HINT_AVOID_MENU_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object TTExTextClass LessonTitleField =  {
+        GI_visMoniker = "Exercise Title: ";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = 50;
+        HINT_TEXT_WHITE_WASH_COLOR ;
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TTExMainInteraction =  {
+        GI_comp =
+            @ListHolder,
+            @ExerciseField;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_TARGET ;
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        HINT_MINIMUM_SIZE = {SST_PIXELS | 440, SST_PIXELS | 135};
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ListHolder =  {
+        GI_comp = @ExerciseList;
+        HINT_FIXED_SIZE = {SST_PIXELS | 180, 0};
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+
+    /*---------------------------------------------------------------------*/
+    @object GenDynamicListClass ExerciseList =  {
+        GIGI_applyMsg = MSG_EXERCISELIST_APPLY;
+        GIGI_destination = process;
+        GDLI_numItems = 0;
+        GDLI_queryMsg = MSG_EXERCISELIST_MONIKER_QUERY;
+
+        HINT_ITEM_GROUP_SCROLLABLE;
+        HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_PLACE_MONIKER_ABOVE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object TTExTextClass ExerciseField =  {
+        GTXI_attrs = @default | GTA_INIT_SCROLLING;
+        GTXI_maxLength = MAX_TEXT_LENGTH-1;
+/*
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_BLACK)<<VTDCA_COLOR_OFFSET )|(VTDS_14<<VTDCA_SIZE_OFFSET) | (VTDF_URW_SANS<<VTDCA_FONT_OFFSET) );
+*/
+        HINT_TEXT_WASH_COLOR = {C_WHITE, CF_INDEX, 0,0};
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_TARGET ;
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_BLACK)<<VTDCA_COLOR_OFFSET )|(VTDS_14<<VTDCA_SIZE_OFFSET) | (VTDF_URW_MONO<<VTDCA_FONT_OFFSET));
+        GI_attrs = @default | GA_KBD_SEARCH_PATH | GA_TARGETABLE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ReplyBar =  {
+        GI_comp =
+            @NewButton,
+            @DeleteButton,
+            @SaveButton,
+            @EECloseButton ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass NewButton =  {
+        GI_visMoniker = "New Exercise";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TTEX_NEW_EXERCISE;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DeleteButton =  {
+        GI_visMoniker = "Delete Exercise";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TTEX_DELETE_EXERCISE;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SaveButton =  {
+        GI_visMoniker = "Save This Exercise";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TTEX_SAVE_EXERCISE;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass EECloseButton =  {
+        GI_visMoniker = 'C', "Close";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS} ;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SelectLessonMenuInteraction =  {
+        GI_visMoniker = 'l',"Select a lesson";
+        GI_comp =
+            @Lesson1Button,
+            @Lesson2Button,
+            @Lesson3Button,
+            @Lesson4Button,
+            @Lesson5Button,
+            @Lesson6Button,
+            @Lesson7Button,
+            @Lesson8Button,
+            @Lesson9Button,
+            @Lesson10Button;
+        GII_visibility = GIV_POPUP;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson1Button =  {
+        GI_visMoniker = "Lesson 1 : Home row";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 1 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson2Button =  {
+        GI_visMoniker = "Lesson 2 : Letters e i r u ";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 2 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson3Button =  {
+        GI_visMoniker = "Lesson 3 : Letters g h t y";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 3 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson4Button =  {
+        GI_visMoniker = "Lesson 4 : Letters o p q w";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 4 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson5Button =  {
+        GI_visMoniker = "Lesson 5 : Letters v m b n";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 5 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson6Button =  {
+        GI_visMoniker = "Lesson 6 : Letters z x c . ,";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 6 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson7Button =  {
+        GI_visMoniker = "Lesson 7 : Capitals";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 7 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson8Button =  {
+        GI_visMoniker = "Lesson 8 : Numbers";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 8 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson9Button =  {
+        GI_visMoniker = "Lesson 9 : Special characters";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 9 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass Lesson10Button =  {
+        GI_visMoniker = "Lesson 10 : Paragraphs";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_NEW_LESSON;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 10 ;
+    }
+@end Interface;
+
+
+/*=========================================================================*/
+
+
+@start KeyboardResource;
+    /*---------------------------------------------------------------------*/
+    @object VisContentClass KeyboardContent =  {
+        VI_bounds = {0,0,334,114};
+        VCI_comp = @KeyboardObj ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object KeyVisClass KeyboardObj = {
+    }
+    /*---------------------------------------------------------------------*/
+@end KeyboardResource;
+
+
+/*=========================================================================*/
+
+
+@start ResultsResource;
+    /*---------------------------------------------------------------------*/
+    @object VisContentClass ResultsContent =  {
+        VI_bounds = {0, 0, 440, 140};
+        VCI_comp = @ResultsVis ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object ResultsVisClass ResultsVis = {
+    }
+    /*---------------------------------------------------------------------*/
+@end ResultsResource;
+
+
+/*=========================================================================*/
+
+
+@start WelcomeDialogResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass WelcomeDialog =  {
+        GI_comp =
+            @LeftMainInteraction,
+            @RightMainInteraction;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        ATTR_GEN_HELP_CONTEXT = "Welcome";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass LeftMainInteraction =  {
+        GI_comp =
+            @LogoInteraction,
+            @SelectNameInteraction;
+
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass LogoInteraction =  {
+        GI_visMoniker = list{ @TypeIcon };
+        GI_comp = @MainTitleText;
+
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass MainTitleText =  {
+        GI_attrs = @default | GA_READ_ONLY;
+        GTXI_text = "Typing Tutor";
+
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_BLACK)<<VTDCA_COLOR_OFFSET )|(VTDS_24<<VTDCA_SIZE_OFFSET) | (VTDF_URW_MONO<<VTDCA_FONT_OFFSET));
+        HINT_FIXED_SIZE = {SST_PIXELS | 300,SST_LINES_OF_TEXT | 3};
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SelectNameInteraction =  {
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_DRAW_IN_BOX;
+        GI_comp =
+            @NameSelectionBox,
+            @NewNameBox;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenDynamicListClass NameSelectionBox =  {
+        GI_visMoniker = "Your name : ";
+        GDLI_numItems = 1;
+        GIGI_selection = 0;
+        GIGI_destination = process;
+        GIGI_applyMsg = MSG_PICKLIST_APPLY;
+        GDLI_queryMsg = MSG_PICKLIST_MONIKER_QUERY;
+        HINT_ITEM_GROUP_SCROLLABLE;
+        HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = MSG_TYPE_STEP1_INITIALIZER;
+        HINT_DEFAULT_FOCUS;
+        HINT_PLACE_MONIKER_ABOVE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass NewNameBox =  {
+        GI_comp =
+            @NewNameButton,
+            @NewNameEntry,
+            @NewNameOkButton;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass NewNameButton =  {
+        GI_visMoniker = "New Name";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_OPEN_NEW_NAME_ENTRY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass NewNameEntry =  {
+        GI_states = @default & -GS_USABLE;
+        GTXI_text = "";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = MAX_NAME_LEN-1;
+
+        HINT_TEXT_WHITE_WASH_COLOR ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass NewNameOkButton =  {
+        GI_visMoniker = "Ok";
+        GI_states = @default & -GS_USABLE;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_NEW_STUDENT;
+/*        HINT_DEFAULT_DEFAULT_ACTION; */
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass RightMainInteraction =  {
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        GI_comp =
+            @TypeReplyBar,
+            @TypeExitBar;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TypeReplyBar =  {
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        GI_comp = @TypeTutorButton;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass TypeTutorButton =  {
+        GI_visMoniker = "Start Tutor";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_START_TUTOR;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TypeExitBar =  {
+        GI_comp = @TypeExitButton;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass TypeExitButton =  {
+        GI_visMoniker = "Exit";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        GTI_destination = TypeApp;
+        GTI_actionMsg = MSG_META_QUIT;
+        HINT_SEEK_REPLY_BAR;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS} ;
+    }
+    /*---------------------------------------------------------------------*/
+@end WelcomeDialogResource ;
+
+
+/*=========================================================================*/
+
+
+@start ResultsDialogResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ResultsDialog =  {
+        GI_visMoniker = "Results";
+        GI_comp =
+            @ResultsView,
+/*            @ResultsOverviewButton, */
+            @ResultsAgainButton,
+            @ResultsNextButton;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        ATTR_GEN_HELP_CONTEXT = "Results";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenViewClass ResultsView =  {
+        GVI_content = @ResultsContent;
+        HINT_FIXED_SIZE = {SST_PIXELS | 440, 140};
+        GVI_color = {C_WHITE,0,0,0};
+        GVI_attrs = @default & ~GVA_FOCUSABLE;
+        ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ResultsOverviewButton =  {
+        GI_visMoniker = "More results";
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ResultsAgainButton =  {
+        GI_visMoniker = "Repeat Lesson";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_NAVIGATOR;
+        GI_attrs = GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ResultsNextButton =  {
+        GI_attrs = GA_SIGNAL_INTERACTION_COMPLETE;
+        GI_visMoniker = "Start New Lesson";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_NAVIGATOR;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+@end ResultsDialogResource ;
+
+
+/*=========================================================================*/
+
+
+@start OptionsMenuResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TTOptionsMenu =  {
+        GI_comp =
+            @PersonalPrefs,
+            @MyProgress,
+            @ChangePassword,
+            @TeachersCorner;
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+        HINT_DEFAULT_TARGET ;
+        GI_attrs = @default | GA_TARGETABLE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PersonalPrefs =  {
+        GI_visMoniker = "Personal Preferences";
+        GI_comp =
+            @PPNameText,
+            @PPGoalsInteraction,
+            @PPOkButton ;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL ;
+        GII_type = GIT_PROPERTIES;
+        HINT_INTERACTION_REQUIRES_VALIDATION;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        ATTR_GEN_HELP_CONTEXT = "Personal Prefs";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass PPNameText =  {
+        GI_visMoniker = "Your name: ";
+        GI_attrs = @default | GA_READ_ONLY;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = MAX_NAME_LEN-1;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PPGoalsInteraction =  {
+        GI_visMoniker = "Set your goals";
+        GI_comp =
+            @PPGWordsPerMinute,
+            @PPGAccuracy,
+            @PPGTimeToSpend;
+        HINT_DRAW_IN_BOX;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass PPGWordsPerMinute =  {
+        GI_visMoniker = "Words Per Minute: ";
+        GVLI_value = MakeWWFixed(DEFAULT_WPM_GOAL);
+        GVLI_minimum = MakeWWFixed(5.0);
+        GVLI_maximum= MakeWWFixed(80.0);
+        GVLI_increment = MakeWWFixed(5.0);
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass PPGAccuracy =  {
+        GI_visMoniker = "Accuracy in %: ";
+        GVLI_value = MakeWWFixed(DEFAULT_ACCURACY_GOAL);
+        GVLI_minimum = MakeWWFixed(30.0);
+        GVLI_maximum= MakeWWFixed(100.0);
+        GVLI_increment = MakeWWFixed(5.0);
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass PPGTimeToSpend =  {
+        GI_visMoniker = "Time for each exercise: ";
+        GVLI_value = MakeWWFixed(DEFAULT_TIME_GOAL);
+        GVLI_minimum = MakeWWFixed(60.0);
+        GVLI_maximum= MakeWWFixed(1200.0);
+        GVLI_increment = MakeWWFixed(1.0);
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass PPOkButton = {
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TTYPE_STORE_PREFERENCES ;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_APPLY} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass MyProgress =  {
+        GI_comp = @ProgressView, @MyProgressButtons, @MyProgressClose;
+        GI_visMoniker = "My Progress";
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL ;
+        GII_type = GIT_PROPERTIES ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        ATTR_GEN_HELP_CONTEXT = "My Progress";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenViewClass ProgressView =  {
+        /*GVI_content = @ProgressContent;*/
+        GVI_color = {C_WHITE, 0, 0, 0};
+        GVI_content = process;
+        HINT_FIXED_SIZE = {SST_PIXELS | 440, 140};
+        GVI_color = {C_WHITE,0,0,0};
+        GVI_attrs = @default & ~GVA_FOCUSABLE;
+        ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass MyProgressButtons =  {
+        GI_comp =
+            @MPSpeedButton,
+            @MPAccuracyButton ;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass MPSpeedButton =  {
+        GI_visMoniker = 'W', "Words per minute";
+        GTI_destination = process ;
+        GTI_actionMsg = MSG_TYPE_SET_PROGRESS_VIEW_MODE ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        ATTR_GEN_TRIGGER_ACTION_DATA = PROGRESS_VIEW_MODE_WPM ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass MPAccuracyButton =  {
+        GI_visMoniker = 'A', "Accuracy in %";
+        GTI_destination = process ;
+        GTI_actionMsg = MSG_TYPE_SET_PROGRESS_VIEW_MODE ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        ATTR_GEN_TRIGGER_ACTION_DATA = PROGRESS_VIEW_MODE_ACCURACY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass MyProgressClose =  {
+        GI_visMoniker = 'C', "Close";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ChangePassword =  {
+        GI_comp =
+            @NewPassword,
+            @ConfirmPassword,
+            @ChangePasswordOKTrigger;
+        GI_visMoniker = "Change Password";
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL ;
+        GII_type = GIT_PROPERTIES;
+        ATTR_GEN_HELP_CONTEXT = "Change Password";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass NewPassword =  {
+        GI_visMoniker = "Enter your new password: ";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = 9;
+        ATTR_GEN_TEXT_CHAR_ATTR = @UserPasswordFont ;
+        HINT_FIXED_SIZE = { 0,
+                            SST_LINES_OF_TEXT | 1,
+                            0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk VisTextCharAttr UserPasswordFont =
+                               CHAR_ATTR_FONT_SIZE(FID_BISON, 13) ;
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass ConfirmPassword =  {
+        GI_visMoniker = "Reenter your new password: ";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = 9;
+        ATTR_GEN_TEXT_CHAR_ATTR = @UserPasswordFont ;
+        HINT_FIXED_SIZE = { 0,
+                            SST_LINES_OF_TEXT | 1,
+                            0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ChangePasswordOKTrigger = {
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_CHANGE_PASSWORD ;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_APPLY} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TeachersCorner =  {
+        GI_comp =
+            @StudentProgress,
+            @ExercizeEditor;
+        GI_visMoniker = 'T', "Teacher's Corner";
+        GII_visibility = GIV_POPUP;
+        HINT_DEFAULT_TARGET ;
+        GI_attrs = @default | GA_TARGETABLE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass StudentProgress =  {
+        GI_comp =
+            @StudentProgressBlock ;
+        GI_visMoniker = "Student's progress";
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL ;
+        GII_type = GIT_COMMAND ;
+        ATTR_GEN_HELP_CONTEXT = "Student's progress";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass StudentProgressBlock =  {
+        GI_comp =
+            @StudentProgressView,
+            @SPRight,
+            @SPErasePassword,
+            @SPDeleteStudent,
+            @SPProgressClose,
+            @SPPrint ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenViewClass StudentProgressView =  {
+        GVI_content = process;
+        HINT_FIXED_SIZE = {SST_PIXELS | 440, 140};
+        GVI_color = {C_WHITE,0,0,0};
+        GVI_attrs = @default & ~GVA_FOCUSABLE;
+        ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SPRight = {
+        GI_comp = @SPStudentList, @SPButtons ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SPButtons =  {
+        GI_comp =
+            @SPEditPref,
+            @SPSpeedButton,
+            @SPAccuracyButton ;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SPEditPref =  {
+        GI_visMoniker = 'E', "Edit Preferences";
+        GTI_destination = process ;
+        GTI_actionMsg = MSG_TTYPE_EDIT_STUDENT_PREFERENCES;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SPSpeedButton =  {
+        GI_visMoniker = 'W', "Words per minute";
+        GTI_destination = process ;
+        GTI_actionMsg = MSG_TYPE_SET_PROGRESS_VIEW_MODE ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        ATTR_GEN_TRIGGER_ACTION_DATA = PROGRESS_VIEW_MODE_WPM ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SPAccuracyButton =  {
+        GI_visMoniker = 'A', "Accuracy in %";
+        GTI_destination = process ;
+        GTI_actionMsg = MSG_TYPE_SET_PROGRESS_VIEW_MODE ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        ATTR_GEN_TRIGGER_ACTION_DATA = PROGRESS_VIEW_MODE_ACCURACY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenDynamicListClass SPStudentList =  {
+        GI_visMoniker = 'S', "Student:" ;
+        GIGI_destination = process;
+        GDLI_numItems = 0;
+        GDLI_queryMsg = MSG_PICKLIST_MONIKER_QUERY;
+        GIGI_applyMsg = MSG_PICKLIST_CHANGE_VIEW;
+
+        HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SPProgressClose =  {
+        GI_visMoniker = 'C', "Close";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SPErasePassword = {
+        GI_visMoniker = 'E', "Erase password" ;
+        GTI_actionMsg = MSG_TTYPE_ERASE_PASSWORD ;
+        GTI_destination = process ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SPDeleteStudent = {
+        GI_visMoniker = 'D', "Delete Student" ;
+        GTI_actionMsg = MSG_TTYPE_DELETE_STUDENT ;
+        GTI_destination = process ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextReportDialogClass SPPrint = {
+        GI_comp = @SPRCloseButton ;
+        GI_visMoniker = 'P', "Print Report" ;
+        GI_attrs = @default
+                   | GA_TARGETABLE
+                   | GA_KBD_SEARCH_PATH ;
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs = @default | GIA_MODAL ;
+        GII_type = GIT_COMMAND ;
+        ATTR_GEN_HELP_CONTEXT = "Report";
+        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+          SWSS_RATIO | PCT_10, SWSS_RATIO | PCT_10};
+        HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+          SWSS_RATIO | PCT_80, SWSS_RATIO | PCT_80};
+        HINT_SEEK_REPLY_BAR ;
+        GTRDI_destination = process ;
+        GTRDI_generateMsg = MSG_TTYPE_GENERATE_REPORT;
+    } ;
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SPRCloseButton =  {
+        GI_visMoniker = 'C', "Close";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS} ;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+@end OptionsMenuResource ;
+
+
+/*=========================================================================*/
+
+
+@start AskPasswordResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass AskPasswordDialog =  {
+        GI_visMoniker = "Your Password?";
+        GI_comp = @AskPasswordText;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        GII_visibility = GIV_DIALOG;
+        GII_type = GIT_PROPERTIES;
+        GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+        ATTR_GEN_HELP_CONTEXT = "Your Password?";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass AskPasswordText =  {
+        GI_visMoniker = "Please enter your password: ";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = 9;
+        ATTR_GEN_TEXT_CHAR_ATTR = @AskPasswordFont ;
+        HINT_FIXED_SIZE = { 0,
+                            SST_LINES_OF_TEXT | 1,
+                            0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk VisTextCharAttr AskPasswordFont =
+                               CHAR_ATTR_FONT_SIZE(FID_BISON, 13) ;
+    /*---------------------------------------------------------------------*/
+@end AskPasswordResource ;
+
+
+/*=========================================================================*/
+
+
+@start MainInteractionResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass MainInteraction =  {
+        GI_comp = @TopMainInteraction;
+        HINT_DEFAULT_FOCUS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TopMainInteraction =  {
+        GI_comp =
+            @LeftArea,
+            @RightArea;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass LeftArea =  {
+        GI_comp =
+            @PractiseArea,
+            @KeyboardView;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_DRAW_IN_BOX;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PractiseArea =  {
+        GI_comp =
+            @Step1Interaction,
+            @Step2Interaction,
+            @Step3Interaction;
+        HINT_FIXED_SIZE = {SST_PIXELS | 440, 45};
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Step1Interaction =  {
+        GI_comp =
+            @Step1TopBox,
+            @Step1MiddleBox;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_DEFAULT_FOCUS;
+        ATTR_GEN_HELP_CONTEXT = "Step1";
+    }
+
+    @chunk char CapsLockMsg[] = "Please release the Caps Lock key.";
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Step1TopBox =  {
+        GI_comp =
+            @Step1FirstChar,
+            @Step1SecondChar,
+            @Step1ThirdChar,
+            @Step1FourthChar,
+            @Step1SpaceBar;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS | 13 };
+        HINT_DRAW_IN_BOX;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass Step1FirstChar =  {
+        GTXI_text = "";
+        GTXI_maxLength = 1;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	   HINT_TEXT_FRAME;
+        /*ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ((VTDS_14<<VTDCA_SIZE_OFFSET) | (VTDF_URW_SANS<<VTDCA_FONT_OFFSET) )  );*/
+        ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = (J_CENTER<<VTDPA_JUSTIFICATION_OFFSET);
+        GI_attrs = @default | GA_READ_ONLY;
+        HINT_FIXED_SIZE = {SST_PIXELS | 18, SST_PIXELS | 20 };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass Step1SecondChar =  {
+        GTXI_text = "";
+        GTXI_maxLength = 1;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	   HINT_TEXT_FRAME;
+        /*ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ((VTDS_14<<VTDCA_SIZE_OFFSET) | (VTDF_URW_SANS<<VTDCA_FONT_OFFSET) )  );*/
+        ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = (J_CENTER<<VTDPA_JUSTIFICATION_OFFSET);
+        GI_attrs = @default | GA_READ_ONLY;
+        HINT_FIXED_SIZE = {SST_PIXELS | 18, SST_PIXELS | 20 };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass Step1ThirdChar =  {
+        GTXI_text = "";
+        GTXI_maxLength = 1;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	   HINT_TEXT_FRAME;
+        /*ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ((VTDS_14<<VTDCA_SIZE_OFFSET) | (VTDF_URW_SANS<<VTDCA_FONT_OFFSET) )  );*/
+        ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = (J_CENTER<<VTDPA_JUSTIFICATION_OFFSET);
+        GI_attrs = @default | GA_READ_ONLY;
+        HINT_FIXED_SIZE = {SST_PIXELS | 18, SST_PIXELS | 20 };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass Step1FourthChar =  {
+        GTXI_text = "";
+        GTXI_maxLength = 1;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	   HINT_TEXT_FRAME;
+        /*ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ((VTDS_14<<VTDCA_SIZE_OFFSET) | (VTDF_URW_SANS<<VTDCA_FONT_OFFSET) )  );*/
+        ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = (J_CENTER<<VTDPA_JUSTIFICATION_OFFSET);
+        GI_attrs = @default | GA_READ_ONLY;
+        HINT_FIXED_SIZE = {SST_PIXELS | 18, SST_PIXELS | 20 };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass Step1SpaceBar =  {
+        GTXI_text = "Space";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	   /*ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ((VTDS_14<<VTDCA_SIZE_OFFSET) | (VTDF_URW_SANS<<VTDCA_FONT_OFFSET) )  );*/
+        ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = (J_CENTER<<VTDPA_JUSTIFICATION_OFFSET);
+        GI_attrs = @default | GA_READ_ONLY;
+        HINT_TEXT_FRAME;
+        HINT_FIXED_SIZE = {SST_PIXELS | 55, SST_PIXELS | 20 };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Step1MiddleBox =  {
+        GI_comp =
+            @Step1FingerGlyph,
+            @Step1DummyText;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+		  HINT_DEFAULT_FOCUS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass Step1FingerGlyph =  {
+        GI_visMoniker = "";
+    }
+    /*---------------------------------------------------------------------*/
+    @object Step1EntryTextClass Step1DummyText =  {
+	//   GI_states = @default & (~GS_USABLE);
+		GTXI_text = "";
+	   GTXI_maxLength = 1;
+  	   ATTR_GEN_TEXT_NO_CURSOR;
+		HINT_FIXED_SIZE = {SST_PIXELS | 15, SST_PIXELS | 12 };
+		  HINT_TEXT_NO_FRAME;
+		HINT_DEFAULT_FOCUS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Step2Interaction =  {
+	   GI_states = @default & GS_ENABLED & -GS_USABLE;
+	   GI_comp = @Step2TopBox;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        ATTR_GEN_HELP_CONTEXT = "Step2";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Step2TopBox =  {
+        GI_comp =
+            @Step2TextToTypeBox,
+            @Step2EnteredTextBox;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass Step2TextToTypeBox =  {
+        GI_attrs = @default | GA_READ_ONLY;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    //    HINT_FIXED_SIZE = {SST_PIXELS | 435, SST_PIXELS | 14};
+	   HINT_FIXED_SIZE = {SST_PIXELS | 435, SST_PIXELS | 20};
+	   ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_BLACK)<<VTDCA_COLOR_OFFSET )|(VTDS_14<<VTDCA_SIZE_OFFSET) | (VTDF_URW_MONO<<VTDCA_FONT_OFFSET) );
+        HINT_TEXT_WASH_COLOR = {C_WHITE, CF_INDEX, 0,0};
+        HINT_TEXT_FRAME;
+    }
+    /*---------------------------------------------------------------------*/
+    @object Step2EntryTextClass Step2EnteredTextBox =  {
+        GTXI_text = "";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    //    HINT_FIXED_SIZE = {SST_PIXELS | 435, SST_PIXELS | 14};
+	   HINT_FIXED_SIZE = {SST_PIXELS | 435, SST_PIXELS | 20};
+	   ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_WHITE)<<VTDCA_COLOR_OFFSET )|(VTDS_14<<VTDCA_SIZE_OFFSET) | (VTDF_URW_MONO<<VTDCA_FONT_OFFSET) );
+        HINT_TEXT_WASH_COLOR = {C_BLACK, CF_INDEX, 0,0};
+        HINT_TEXT_FRAME;
+        HINT_DEFAULT_FOCUS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Step3Interaction =  {
+        GI_states = @default & GS_ENABLED & -GS_USABLE;
+        GI_comp =
+            @Step3TextToTypeBox,
+            @Step3CharToTypeGlyph,
+            @Step3EnteredTextBox;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        /*HINT_EXPAND_WIDTH_TO_FIT_PARENT;*/
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        /*HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS | 5 };*/
+        ATTR_GEN_HELP_CONTEXT = "Step3";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass Step3TextToTypeBox =  {
+        GI_attrs = @default | GA_READ_ONLY;
+        HINT_FIXED_SIZE = {SST_PIXELS | 435, SST_PIXELS | 120};
+/*
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_BLACK)<<VTDCA_COLOR_OFFSET )|(VTDS_12<<VTDCA_SIZE_OFFSET) | (VTDF_URW_MONO<<VTDCA_FONT_OFFSET)  );
+*/
+        HINT_TEXT_WASH_COLOR = {C_WHITE, CF_INDEX, 0,0};
+        HINT_TEXT_FRAME;
+        ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS = (ChunkHandle)@Step3CharAttrs ;
+    }
+    /*---------------------------------------------------------------------*/
+    @CHAR_ATTR_ELEMENT_ARRAY_HEADER CharAttrElements = {
+        CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_MONO, 12, 0)
+    } ;
+    /*---------------------------------------------------------------------*/
+    @RUN_ARRAY_HEADER(CharAttrElements) Step3CharAttrs = {
+        TRAE_ABS(0, 0),
+        TRAE_END
+    } ;
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass Step3CharToTypeGlyph =  {
+        GI_visMoniker = "";
+        HINT_CENTER_MONIKER;
+    }
+    /*---------------------------------------------------------------------*/
+    @object Step3EntryTextClass Step3EnteredTextBox =  {
+        GTXI_text = "";
+        GTXI_attrs = @default | GTA_INIT_SCROLLING;
+        HINT_FIXED_SIZE = {SST_PIXELS | 435, SST_PIXELS | 25};
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_WHITE)<<VTDCA_COLOR_OFFSET )|(VTDS_12<<VTDCA_SIZE_OFFSET) | (VTDF_URW_MONO<<VTDCA_FONT_OFFSET) );
+        HINT_TEXT_WASH_COLOR = {C_BLACK, CF_INDEX, 0,0};
+        HINT_TEXT_FRAME;
+        HINT_DEFAULT_FOCUS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass RightArea =  {
+        GI_comp =
+            @DataArea,
+            @ButtonArea;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DataArea =  {
+        GI_comp =
+            @TickerText,
+            @SpeedText,
+            @AccuracyText;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_DRAW_IN_BOX;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass TickerText =  {
+        GI_visMoniker = "Time";
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_CENTER_MONIKER;
+        GI_attrs = @default | GA_READ_ONLY;
+        GTXI_text = "00:00";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 10,0,0};
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_WHITE)<<VTDCA_COLOR_OFFSET ) | (VTDS_8<<VTDCA_SIZE_OFFSET) | (VTDF_LED<<VTDCA_FONT_OFFSET)  );
+        ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = (J_CENTER<<VTDPA_JUSTIFICATION_OFFSET);
+        HINT_TEXT_WASH_COLOR = {C_BLACK, CF_INDEX, 0,0};
+        HINT_TEXT_FRAME;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass SpeedText =  {
+        GI_visMoniker = "Words/min.";
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_CENTER_MONIKER;
+        GI_attrs = @default | GA_READ_ONLY;
+        GTXI_text = "0";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 10,0,0};
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_BLACK)<<VTDCA_COLOR_OFFSET ) | (VTDS_8<<VTDCA_SIZE_OFFSET) | (VTDF_LED<<VTDCA_FONT_OFFSET)  );
+        ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = (J_CENTER<<VTDPA_JUSTIFICATION_OFFSET);
+        HINT_TEXT_WASH_COLOR = {C_WHITE, CF_INDEX, 0,0};
+        HINT_TEXT_FRAME;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass AccuracyText =  {
+        GI_visMoniker = "Accuracy %";
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_CENTER_MONIKER;
+        GI_attrs = @default | GA_READ_ONLY;
+        GTXI_text = "100";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 10,0,0};
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( 0 | ( (C_BLACK)<<VTDCA_COLOR_OFFSET ) | (VTDS_8<<VTDCA_SIZE_OFFSET) | (VTDF_LED<<VTDCA_FONT_OFFSET)  );
+        ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = (J_CENTER<<VTDPA_JUSTIFICATION_OFFSET);
+        HINT_TEXT_WASH_COLOR = {C_WHITE, CF_INDEX, 0,0};
+        HINT_TEXT_FRAME;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ButtonArea =  {
+        GI_comp =
+            @AgainButton,
+            @NextButton
+@ifdef COMPILE_OPTION_TEST_SHORTCUT_BUTTON
+            , @TestButton
+@endif
+            ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass AgainButton =  {
+        GI_visMoniker = "Again";
+        HINT_CENTER_MONIKER;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_NAVIGATOR;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass NextButton =  {
+        GI_visMoniker = "Next";
+        HINT_CENTER_MONIKER;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_NAVIGATOR;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef COMPILE_OPTION_TEST_SHORTCUT_BUTTON
+    @object GenTriggerClass TestButton =  {
+        GI_visMoniker = "Test";
+        HINT_CENTER_MONIKER;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_NAVIGATOR;
+        HINT_SEEK_REPLY_BAR;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass MissedLettersBox =  { /* Not used currently in UI */
+        GI_visMoniker = "Missed Letters : ";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GI_attrs = @default | GA_READ_ONLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 48,0,0};
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass StopButton =  { /* Not used currently in UI */
+        GI_visMoniker = "Stop";
+        HINT_CENTER_MONIKER;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_TYPE_NAVIGATOR;
+        HINT_DEFAULT_FOCUS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ExerciseEnd =  {
+        GI_visMoniker = "End of exercise";
+        GI_comp =
+            @SpeedResultGlyph,
+            @AccuracyResultGlyph,
+            @ResultTextGlyph;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        GII_visibility = GIV_DIALOG;
+        GII_type = GIT_NOTIFICATION ;
+        GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+        ATTR_GEN_HELP_CONTEXT = "End of exercise";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass SpeedResultGlyph =  {
+        GI_visMoniker = "";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass AccuracyResultGlyph =  {
+        GI_visMoniker = "";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ResultTextGlyph =  {
+        GI_visMoniker = "";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenViewClass KeyboardView =  {
+        GVI_content = KeyboardContent;
+        /*GVI_docBounds = {0,0,334,114};*/
+        GVI_color = {C_WHITE,0,0,0};
+        /*GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT | GVDA_NO_SMALLER_THAN_CONTENT;
+        GVI_vertAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT | GVDA_NO_LARGER_THAN_CONTENT | GVDA_KEEP_ASPECT_RATIO;*/
+        GVI_attrs = @default & ~GVA_FOCUSABLE;
+		  ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+        HINT_FIXED_SIZE = {SST_PIXELS | 320, 112};
+    }
+    /*---------------------------------------------------------------------*/
+@end MainInteractionResource ;
+
+/***************************************************************************
+ *      Strings
+ ***************************************************************************/
+
+@start TTStrings, data;
+
+@chunk char VisitorText[] =
+    "Welcome to Typing Tutor.\rA visitor's goals and results will not be saved.";
+@chunk char PasswordHasChanged[] =
+    "Your password has now been changed." ;
+@chunk char PasswordBadRetype[] =
+    "You have entered in two different passwords.  Please try again." ;
+@chunk char PasswordIncorrectText[] =
+    "The password you have entered is incorrect.  Please try again." ;
+@chunk char ErasePasswordText[] =
+    "Are you sure you want to erase this student's password?" ;
+@chunk char ErasePasswordInvalidText[] =
+    "You cannot erase the password on either the Teacher or the Visitor." ;
+@chunk char DeleteStudentText[] =
+    "Are you sure you want to delete this student's record?" ;
+@chunk char DeleteStudentInvalidText[] =
+    "You are not allowed to delete the Teacher or Visitor slot." ;
+@chunk char DeleteStudentNotFoundText[] =
+	 "Interal Error!  Cannot find student to delete!\r\rCode: TTI-01" ;
+@chunk char DeleteExerciseConfirmText[] =
+	"Do you really want to delete this exercise?";
+@chunk char VisitorString[] = "Visitor";
+@chunk char TeacherString[] = "Teacher";
+@chunk char SpeedString[] = "Speed";
+@chunk char AccuracyString[] = "Accuracy";
+@chunk char WPMString[] = "WPM";
+@chunk char wpmSPFString[] = "%u wpm";
+@localize "translate only the wpm part of this string";
+@chunk char WordsPerString[] = "Words per Minute";
+@chunk char PctAccuracyString[] = "Percent Accuracy";
+@chunk char LastGoalString[] = "Last Goal";
+@chunk char LastResultString[] = "Last Result";
+@chunk char WPMSPFString[] = "%u WPM";
+@localize "translate only the WPM part of this string";
+@chunk char PctAccString[] = "%Acc";
+@chunk char LessonString[] = "Lesson: ";
+
+@chunk char BackspaceKey[] = "<-";
+@chunk char TabKey[] = "Tab";
+@chunk char CapsKey[] = "Caps";
+@chunk char EnterKey[] = "Enter";
+@chunk char ShiftKey[] = "Shift";
+@chunk char CtrlKey[] = "Ctrl";
+@chunk char MenuKey[] = "Menu";
+@localize "this is only for GeoBook";
+@chunk char AltKey[] = "Alt";
+@chunk char NumKey[] = "Num";
+@localize "this is only for GeoBook";
+@chunk char TabBrktKey[] = "<tab>";
+@chunk char SpaceBrktKey[] = "<space>";
+@chunk char EnterBrktKey[] = "<enter>";
+@chunk char SpaceKey[] = "Space";
+
+/* Standard keyboard layout */
+@chunk char KeyLayout1[] = "`1234567890-=";
+@chunk char KeyLayout2[] = "qwertyuiop[]\\";
+@chunk char KeyLayout3[] = "asdfghjkl;\'";
+@chunk char KeyLayout4[] = "zxcvbnm,./";
+@chunk char KeyLayout5[] = "~!@#$%^&*()_+";
+@chunk char KeyLayout6[] = "QWERTYUIOP{}|";
+@chunk char KeyLayout7[] = "ASDFGHJKL:\"";
+@chunk char KeyLayout8[] = "ZXCVBNM<>?";
+
+/* Standard fingering layout */
+@chunk char FingerLayout1[] = "0001233445677";
+@chunk char FingerLayout2[] = "0123344567777";
+@chunk char FingerLayout3[] = "01233445677";
+@chunk char FingerLayout4[] = "0123344567";
+@chunk char FingerLayout5[] = "0001233445677";
+@chunk char FingerLayout6[] = "0123344567777";
+@chunk char FingerLayout7[] = "01233445677";
+@chunk char FingerLayout8[] = "0123344567";
+
+/* Default names of the lessons */
+@chunk char LessonName1[] = "Lesson 1 : Home row";
+@chunk char LessonName2[] = "Lesson 2 : e r u i";
+@chunk char LessonName3[] = "Lesson 3 : g t h y";
+@chunk char LessonName4[] = "Lesson 4 : q w o p";
+@chunk char LessonName5[] = "Lesson 5 : v b n m";
+@chunk char LessonName6[] = "Lesson 6 : z x c , .";
+@chunk char LessonName7[] = "Lesson 7 : Capitals";
+@chunk char LessonName8[] = "Lesson 8 : Numbers";
+@chunk char LessonName9[] = "Lesson 9 : Special characters";
+@chunk char LessonName10[] = "Lesson 10 : Paragraphs";
+
+@chunk char FingerName1[] = "Left little finger";
+@chunk char FingerName2[] = "Left third finger";
+@chunk char FingerName3[] = "Left second finger";
+@chunk char FingerName4[] = "Left first finger";
+@chunk char FingerName5[] = "Right first finger";
+@chunk char FingerName6[] = "Right second finger";
+@chunk char FingerName7[] = "Right third finger";
+@chunk char FingerName8[] = "Right little finger";
+@chunk char FingerName9[] = "Thumb";
+
+@chunk char ExTitle1[] = "Lesson 1 - Home Row (Step 1)";
+@chunk char ExString1[] = "Example : jjjj ffff jjjj ffff, step 1";
+@chunk char ExTitle2[] = "Lesson 1 - Home Row (Step 2)";
+@chunk char ExString2[] = "Example : jjjj ffff jjjj ffff, step 2";
+@chunk char ExTitle3[] = "Lesson 1 - Home Rom (Step 3)";
+@chunk char ExString3[] = "Example : jjjj ffff jjjj ffff, step 3";
+
+@chunk char MissingString[] = "**Missing**";
+@chunk char Speed1[] = "You type very fast";
+@chunk char Speed2[] = "You type fast enough";
+@chunk char Speed3[] = "You type rather slow";
+@chunk char Speed4[] = "You type very slow";
+@chunk char Accuracy1[] = "and very accurate!";
+@chunk char Accuracy2[] = "and missed some letters.";
+@chunk char Accuracy3[] = "and missed a lot of letters.";
+@chunk char Accuracy4[] = "and missed quite a lot of letters.";
+@chunk char Result1[] = "You are an expert! Up to the next level!";
+@chunk char Result2[] = "You're quite good! Repeat this session to get more accurate!";
+@chunk char Result3[] = "You're quite good! Type slower and try to be more accurate!";
+@chunk char Result4[] = "Great job! You can go to the next level!";
+@chunk char Result5[] = "Great job! Repeat this session and try to be more accurate!";
+@chunk char Result6[] = "Great job! Type slower and try to be more accurate!";
+@chunk char Result7[] = "Good! And now you can go for more speed!";
+@chunk char Result8[] = "Good! Don't be tempted to type faster, but try to be more accurate!";
+@chunk char Result9[] = "Good! Repeat this session until you can type faster and more accurately!";
+@chunk char Result10[] = "Give it another try!";
+
+@chunk char ReportTitle[] = "Student Typing Tutor Report\r\r";
+@chunk char ReportTimeAcc[] = "\tTime:\tWPM:\tAccuracy:\r";
+@localize "translate only Time, WPM, and Accuracy";
+@chunk char ReportGoals[] = "  Goals\t\t%d\t%d%%\r";
+@localize "translate only Goals";
+@chunk char ReportLast[] = "  Last results\t%d sec\t%d\t%d%%\r\r";
+@localize "translate only Last results";
+@chunk char ReportLesson[] = "  Lesson %d\t%d sec\t%d\t%d%%\r";
+@localize "translate only Lesson";
+@end TTStrings;
+
+
+@start EditPrefsResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass EditPrefsDialog =  {
+        GI_visMoniker = "Personal Preferences";
+        GI_comp =
+            @EPNameText,
+            @EPGoalsInteraction,
+            @EPOkButton ;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+        GII_type = GIT_COMMAND ;
+        HINT_INTERACTION_REQUIRES_VALIDATION;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        ATTR_GEN_HELP_CONTEXT = "Edit Prefs";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass EPNameText =  {
+        GI_visMoniker = "Student: ";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = MAX_NAME_LEN-1;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass EPGoalsInteraction =  {
+        GI_visMoniker = "Set goals";
+        GI_comp =
+            @EPGWordsPerMinute,
+            @EPGAccuracy,
+            @EPGTimeToSpend;
+        HINT_DRAW_IN_BOX;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass EPGWordsPerMinute =  {
+        GI_visMoniker = "Words Per Minute: ";
+        GVLI_value = MakeWWFixed(DEFAULT_WPM_GOAL);
+        GVLI_minimum = MakeWWFixed(5.0);
+        GVLI_maximum= MakeWWFixed(80.0);
+        GVLI_increment = MakeWWFixed(5.0);
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass EPGAccuracy =  {
+        GI_visMoniker = "Accuracy in %: ";
+        GVLI_value = MakeWWFixed(DEFAULT_ACCURACY_GOAL);
+        GVLI_minimum = MakeWWFixed(30.0);
+        GVLI_maximum= MakeWWFixed(100.0);
+        GVLI_increment = MakeWWFixed(5.0);
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass EPGTimeToSpend =  {
+        GI_visMoniker = "Time for each exercise: ";
+        GVLI_value = MakeWWFixed(DEFAULT_TIME_GOAL);
+        GVLI_minimum = MakeWWFixed(60.0);
+        GVLI_maximum= MakeWWFixed(1200.0);
+        GVLI_increment = MakeWWFixed(1.0);
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass EPOkButton = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_APPLY} ;
+    }
+    /*---------------------------------------------------------------------*/
+@end EditPrefsResource ;
+
+/***************************************************************************
+ *  END OF FILE:  TTUI.GOC
+ ***************************************************************************/
+
