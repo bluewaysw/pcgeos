@@ -1,0 +1,270 @@
+/***************************************************************************
+ *  FILE:           mod_mtds.goc
+ *  PROJECT:        Breadbox Teacher's Aide
+ *  DESCRIPTION:    This file has methods for module manipulation
+ *
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include "taide.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *      Class & Message Definitions
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *      Code for Module Manipulation
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_CHANGE_MODULE for TADocumentClass
+ *               ( word whichMod)
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@define DISP_CHILD(CHILD)   ConstructOptr(pself->GDI_display, OptrToChunk(@CHILD))
+@extern method TADocumentClass, MSG_CHANGE_MODULE
+{
+ char           	periodStr[NAME_SIZE], string[NAME_SIZE];
+ VisUpdateModeAsWord	update;
+ DimensionAttrsToSetClear	hAttrs, vAttrs;
+
+
+    update.VUMAW_mode = VUM_DELAYED_VIA_UI_QUEUE;
+
+	 MemLock(OptrToHandle(@GradePdStr));
+	 if (pself->TADI_curGradePd < MAX_GRADE_PDS) {
+	  UtilHex32ToAscii(periodStr,
+				    (dword) (pself->TADI_curGradePd + 1),
+				    UHTAF_NULL_TERMINATE);
+	  strcpy(string, "\t");
+	  strcat(string, LMemDeref(@GradePdStr));
+	  strcat(string, " ");
+	  strcat(string, periodStr);
+	  }
+	 else {
+	  strcpy(string, "\t");
+	  strcat(string, LMemDeref(@SummaryStr));
+	  strcat(string, " ");
+	  }
+    pself->TADI_curModule = whichMod;
+	 MemUnlock(OptrToHandle(@GradePdStr));
+
+    hAttrs.DATSC_attrsToSet = 0;
+    hAttrs.DATSC_attrsToClear = 0;
+    vAttrs.DATSC_attrsToSet = GVDA_DONT_DISPLAY_SCROLLBAR;
+    vAttrs.DATSC_attrsToClear = 0;
+
+	 MemLock(OptrToHandle(@AttModStr));
+	 if (whichMod == MOD_ATTENDANCE) {
+	 @call @DISP_CHILD(@TANamesView)::MSG_GEN_VIEW_SET_DIMENSION_ATTRS(
+					hAttrs, vAttrs, update);
+	 @call @DISP_CHILD(@TAMainView)::MSG_GEN_VIEW_SET_CONTENT(
+                            @DISP_CHILD(@ModuleContentAttend));
+      @call @DISP_CHILD(@TATitlesView)::MSG_GEN_SET_USABLE(
+                                    VUM_DELAYED_VIA_APP_QUEUE);
+      @call @DISP_CHILD(@TATitlesView)::MSG_GEN_VIEW_SET_CONTENT(
+                            @DISP_CHILD(@ModuleAttTitlesContent));
+      @call @DISP_CHILD(@MCCornerText)::MSG_VIS_TEXT_REPLACE_ALL_PTR
+						 (LMemDeref(@AttModStr), 0);
+      @call @DISP_CHILD(@MCCornerGPText)::MSG_VIS_TEXT_REPLACE_ALL_PTR
+                             (string, 0);
+      @call @DISP_CHILD(@SeatingOptions)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+	 @call LayoutMenu::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+	 @send @DISP_CHILD(@MCAttendGrid)::MSG_VIS_GRID_SELECT_CELL(
+					  VIS_GRID_SELECTION_NONE,
+					  VIS_GRID_SELECTION_NONE);
+	 @call TASeatingPrintControl::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+	 }
+    else if (whichMod == MOD_GRADES) {
+	 @call @DISP_CHILD(@TANamesView)::MSG_GEN_VIEW_SET_DIMENSION_ATTRS(
+					hAttrs, vAttrs, update);
+	 @call @DISP_CHILD(@TAMainView)::MSG_GEN_VIEW_SET_CONTENT(
+                            @DISP_CHILD(@ModuleContentGrades));
+      @call @DISP_CHILD(@TATitlesView)::MSG_GEN_SET_USABLE(
+                                    VUM_DELAYED_VIA_APP_QUEUE);
+      @call @DISP_CHILD(@TATitlesView)::MSG_GEN_VIEW_SET_CONTENT(
+                            @DISP_CHILD(@ModuleGradeTitlesContent));
+      @call @DISP_CHILD(@MCCornerText)::MSG_VIS_TEXT_REPLACE_ALL_PTR
+						 (LMemDeref(@GradeModStr), 0);
+      @call @DISP_CHILD(@MCCornerGPText)::MSG_VIS_TEXT_REPLACE_ALL_PTR
+                             (string, 0);
+      @call @DISP_CHILD(@SeatingOptions)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+      @call LayoutMenu::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+	 @send @DISP_CHILD(@MCGradesGrid)::MSG_VIS_GRID_SELECT_CELL(
+					  VIS_GRID_SELECTION_NONE,
+					  VIS_GRID_SELECTION_NONE);
+	 @call TASeatingPrintControl::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+	 }
+    else  {
+	 vAttrs.DATSC_attrsToSet = 0;
+	 vAttrs.DATSC_attrsToClear = GVDA_DONT_DISPLAY_SCROLLBAR;
+	 @call @DISP_CHILD(@TANamesView)::MSG_GEN_VIEW_SET_DIMENSION_ATTRS(
+					hAttrs, vAttrs, update);
+	 @call @DISP_CHILD(@TAMainView)::MSG_GEN_VIEW_SET_CONTENT(
+					   @DISP_CHILD(@ModuleContentSeating));
+      @call @DISP_CHILD(@TATitlesView)::MSG_GEN_SET_NOT_USABLE(
+							 VUM_DELAYED_VIA_APP_QUEUE);
+      @call @DISP_CHILD(@MCCornerText)::MSG_VIS_TEXT_REPLACE_ALL_PTR
+									  (LMemDeref(@SeatModStr), 0);
+      @call @DISP_CHILD(@MCCornerGPText)::MSG_VIS_TEXT_DELETE_ALL();
+      @call @DISP_CHILD(@SeatingOptions)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+      @call LayoutMenu::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+	 /* do this one by itself since it doesn't relate to the other grids */
+	 @call ConstructOptr(pself->GDI_display, OptrToChunk(@ModuleContentSeating))::
+			MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID,
+						  VUM_DELAYED_VIA_APP_QUEUE);
+	 @call TASeatingPrintControl::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+	 }
+	 MemUnlock(OptrToHandle(@AttModStr));
+
+    /* Update the related UI for changing modules */
+    @call @DISP_CHILD(@TADisplay)::MSG_TA_DISPLAY_UPDATE_RELATED_UI() ;
+
+    @call self::MSG_TADOC_UPDATE_GRID_CONTENTS();
+    /* open at top left */
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TAMainView))::
+			MSG_GEN_VIEW_SCROLL_LEFT_EDGE();
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TAMainView))::
+			MSG_GEN_VIEW_SCROLL_TOP();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_VIS_DRAW for VisModuleCompClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method VisModuleCompClass, MSG_VIS_DRAW
+{
+
+    @send @visChildren::MSG_VIS_DRAW(drawFlags, gstate);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_TA_DISPLAY_UPDATE_RELATED_UI for TADisplayClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@define ODISP_CHILD(CHILD)   ConstructOptr(OptrToHandle(oself), OptrToChunk(@CHILD))
+@extern method TADisplayClass, MSG_TA_DISPLAY_UPDATE_RELATED_UI
+{
+ optr       content;
+ ChunkHandle    ch;
+
+    content = @call @ODISP_CHILD(@TAMainView)::MSG_GEN_VIEW_GET_CONTENT() ;
+    ch = OptrToChunk(content) ;
+
+    if (ch == OptrToChunk(@ModuleContentAttend))  {
+      @call AttendModuleItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      @call GradesModuleItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      @call SeatingModuleItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	 @call GPMenu::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	 }
+    else if (ch == OptrToChunk(@ModuleContentGrades)){
+      @call AttendModuleItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      @call GradesModuleItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      @call SeatingModuleItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	 @call GPMenu::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	 }
+    else {
+      @call AttendModuleItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      @call GradesModuleItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	 @call SeatingModuleItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	 @call GPMenu::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	 }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_GAINED_TARGET_EXCL for TADisplayClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method TADisplayClass, MSG_META_GAINED_TARGET_EXCL
+{
+
+
+    /* If we switched windows, we need the correct activity in the windows */
+    @call oself::MSG_TA_DISPLAY_UPDATE_RELATED_UI() ;
+
+    @callsuper() ;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_TADOC_UPDATE_GRID_CONTENTS for TADocumentClass
+ *
+ * DESCRIPTION:  invalidates the grids when they've resized to
+ *               get the view scrollbars set correctly
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_TADOC_UPDATE_GRID_CONTENTS
+{
+
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_SUSPEND();
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@ModuleNamesContent))::
+			MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID,
+						  VUM_NOW);
+	//					  VUM_DELAYED_VIA_APP_QUEUE);
+	 /* for some reason the names grid sometimes dissapears with the above in */
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@ModuleAttTitlesContent))::
+			MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID,
+						  VUM_NOW);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@ModuleContentAttend))::
+			MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID,
+						  VUM_NOW);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@ModuleGradeTitlesContent))::
+			MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID,
+						  VUM_NOW);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@ModuleContentGrades))::
+			MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID,
+						  VUM_NOW);
+	 @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+				 MSG_META_UNSUSPEND();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PRINT_START_PRINTING for TADocumentClass
+ *                 (optr		printControlOD,
+ *	               GStateHandle		gstate)
+ *
+ * DESCRIPTION:	passes the print msg on to the seating object
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_PRINT_START_PRINTING
+{
+
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCSeating))::
+			MSG_PRINT_START_PRINTING(@TASeatingPrintControl, gstate);
+
+
+}
+
