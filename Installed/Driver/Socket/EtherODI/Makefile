@@ -3,20 +3,20 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = EtherODI
+GEODE           = etherodi
 ASM_TO_OBJS     = ethodiManager.asm
 UI_TO_RDFS      =
-SRCS            = ethodiArp.asm ethodiInit.asm ethodiManager.asm\
-                  ethodiProtocol.asm ethodiTransceive.asm\
-                  ../EtherCom/ETHERCOMUTIL.ASM\
-                  ../EtherCom/ETHERCOMSTRATEGY.ASM\
-                  ../EtherCom/ETHERCOMGETINFO.ASM\
-                  ../EtherCom/ETHERCOMTRANSCEIVE.ASM\
-                  ../EtherCom/ETHERCOMLINK.ASM\
-                  ../EtherCom/ETHERCOMCLIENT.ASM\
-                  ../EtherCom/ETHERCOMOPTION.ASM\
-                  ../EtherCom/ETHERCOMMEDIUM.ASM\
-                  ../EtherCom/ETHERCOMPROCESS.ASM arp.def\
+SRCS            = ethodiTransceive.asm ethodiInit.asm ethodiManager.asm\
+                  ethodiProtocol.asm ethodiArp.asm\
+                  ../EtherCom/ethercomUtil.asm\
+                  ../EtherCom/ethercomStrategy.asm\
+                  ../EtherCom/ethercomGetInfo.asm\
+                  ../EtherCom/ethercomTransceive.asm\
+                  ../EtherCom/ethercomLink.asm\
+                  ../EtherCom/ethercomClient.asm\
+                  ../EtherCom/ethercomOption.asm\
+                  ../EtherCom/ethercomMedium.asm\
+                  ../EtherCom/ethercomProcess.asm arp.def\
                   ethodiConstant.def ethodiVariable.def
 OBJS            = ethodiManager.obj
 LOBJS           =
