@@ -1763,6 +1763,9 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_PFUINT2:
 			retval = OTYPE_PTR | OTYPE_PTR_FAR | OTYPE_SPECIAL;
 			break;
+		case CSTT2_REAL64:
+    			retval = OTYPE_FLOAT | OTYPE_SPECIAL | (4 << 1);
+    			break;
 		default:
 			Notify(NOTIFY_ERROR,
 				"%s: unsupported special type %02.2x",
