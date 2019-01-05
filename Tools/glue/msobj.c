@@ -941,7 +941,7 @@ MSObj_SaveRecord(byte	    	rectype,
  *
  ***********************************************************************/
 void
-MSObj_SaveFixups(word	    	startOff,   /* Starting offset of data record */
+MSObj_SaveFixups(dword	    	startOff,   /* Starting offset of data record */
 		 word	    	reclen,	    /* Length of data record */
 		 word	    	datalen,    /* Number of bytes of real data in
 					     * the data record */
@@ -1466,6 +1466,7 @@ static char *SpecialStringsFromBorland[] =
     "FJC",
     "FJS",
     "FJA",
+    "FIC",
     NULL
 };
 
@@ -1479,7 +1480,8 @@ static char SpecialTokensFromBorland[] =
     FPED_FIDRQQ,
     FPED_FJCRQQ,
     FPED_FJSRQQ,
-    FPED_FJARQQ
+    FPED_FJARQQ,
+    FPED_FICRQQ
 };
 
 

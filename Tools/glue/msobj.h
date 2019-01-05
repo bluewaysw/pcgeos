@@ -644,8 +644,8 @@ typedef struct _MSSaveRec {
 
 typedef struct _MSSaveFixupRec {
     MSSaveRecLinks  links;
-    word    	    startOff;
-    word    	    endOff;
+    dword    	    startOff;
+    dword    	    endOff;
     MSThread	    threads[MS_MAX_THREADS];
     byte    	    data[LABEL_IN_STRUCT];
 } MSSaveFixupRec;
@@ -659,7 +659,7 @@ extern void 	    MSObj_SaveRecord(byte   rectype,
 
 extern void 	    MSObj_FreeSaved(MSSaveRecLinks *head);
 
-extern void 	    MSObj_SaveFixups(word   startOff,
+extern void 	    MSObj_SaveFixups(dword   startOff,
 				     word   reclen,
 				     word   datalen,
 				     MSSaveRecLinks *head);
