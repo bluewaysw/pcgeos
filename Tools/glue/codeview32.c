@@ -251,7 +251,7 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
  ***********************************************************************/
 static Boolean
 CV32LocateFixup(const char *file,	    	/* Object file being processed */
-	      word  	fixOff, 	/* Offset of needed fixup */
+	      dword  	fixOff, 	/* Offset of needed fixup */
 	      SegDesc	**sdPtr,    	/* Target segment of fixup */
 	      word  	*extraOffPtr,  	/* Extra offset for fixup (to be
 					 * added to existing offset) */

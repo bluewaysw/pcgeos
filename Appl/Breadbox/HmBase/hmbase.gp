@@ -60,17 +60,17 @@ library math
 #
 #
 # Resources:
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource NAVBUTTONS ui-object
-resource MENU ui-object
-resource DOCUMENTUI object
-resource DIALOGS ui-object
-resource IMPEXDIALOGS ui-object
-resource CHANGEATTRSDIALOG ui-object
-resource CREATEREPDIALOG ui-object
-resource HBAPPICONS data lmem read-only shared
-resource TEXTSTRINGS data lmem
+resource AppResource ui-object
+resource Interface ui-object
+resource NavButtons ui-object
+resource Menu ui-object
+resource DocumentUI object
+resource Dialogs ui-object
+resource ImpExDialogs ui-object
+resource ChangeAttrsDialog ui-object
+resource CreateRepDialog ui-object
+resource HBAppIcons data lmem read-only shared
+resource TextStrings data lmem
 resource HBASEBUTTONRESOURCE data
 #resource LOGORESOURCE  data lmem            
 resource FINDBUTTONRESOURCE data lmem read-only shared

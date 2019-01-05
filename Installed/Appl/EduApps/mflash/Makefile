@@ -6,11 +6,11 @@
 GEODE           = mflash
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = MATHFLSH.GOC PASSWORD.GOC SOUND.GOC STUD_DB.GOC\
-                  MAPBOARD.GOC CLASSES.GOH EQUATION.GOH MAPBOARD.GOH\
-                  MATHFLSH.GOH PASSWDUI.GOH PASSWORD.GOH STUD_DB.GOH
-OBJS            = MATHFLSH.obj PASSWORD.obj SOUND.obj STUD_DB.obj\
-                  MAPBOARD.obj
+SRCS            = STUD_DB.goc MAPBOARD.goc PASSWORD.goc SOUND.goc\
+                  MATHFLSH.goc classes.goh mapboard.goh mathflsh.goh\
+                  stud_db.goh password.goh passwdui.goh
+OBJS            = STUD_DB.obj MAPBOARD.obj PASSWORD.obj SOUND.obj\
+                  MATHFLSH.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

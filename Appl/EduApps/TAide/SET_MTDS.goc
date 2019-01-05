@@ -1,0 +1,574 @@
+/***************************************************************************
+ *  FILE:			set_mtds.goc
+ *  PROJECT:		Breadbox Teacher's Aide
+ *  DESCRIPTION:	This file has methods for set-up stuff
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "taide.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *		Code for set up stuff
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_GRADE_PERIODS for TADocumentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_OPEN_GRADE_PERIODS
+{
+ word			i;
+ optr	gPItem[MAX_GRADE_PDS - 1] = {
+    @GPSUGPSItem2,
+    @GPSUGPSItem3,
+    @GPSUGPSItem4,
+    @GPSUGPSItem5,
+    @GPSUGPSItem6};
+
+
+    @call GPSUGPItemShowGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+						 pself->TADI_curGradePd,
+						 FALSE);
+
+    /* disable grade pds that don't have dates */
+    for (i = 0; i < (MAX_GRADE_PDS - 1); i++)  {
+	   if ((i + 1) < (pself->TADI_numGradePds))
+		 @send gPItem[i]::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	   else
+		 @send gPItem[i]::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	   }
+
+    /* Open the dialog box */
+    @call GradePdSetUpGroup::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SET_GRADE_PERIOD for TADocumentClass
+ *                   (word whichGP)
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_SET_GRADE_PERIOD
+{
+ VMMapStruct		*VMmapPtr;
+ MemHandle		mh;
+ VMBlockHandle		vmbh;
+ word			prevGPDays, endDateNum, startDateNum, i, prevGradePd;
+ word			prevItems, numItems;
+ char			periodStr[NAME_SIZE], string[NAME_SIZE];
+
+
+    prevGradePd = pself->TADI_curGradePd;
+    prevGPDays = pself->TADI_curNumAttDays;
+    /* get which gp to show */
+    if (whichGP == FROM_GEN_ITEM)
+	  pself->TADI_curGradePd = @call GPSUGPItemShowGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    else pself->TADI_curGradePd = whichGP;
+
+    /* FOR THE ATTENDANCE STUFF */
+
+    /* see if it is the summary period */
+    if (pself->TADI_curGradePd == MAX_GRADE_PDS)  {
+	  pself->TADI_curNumAttDays = 0;
+	  @send SUGradeElemsItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send SUGradeTypesItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send ReportModuleItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    else {
+	  @send SUGradeElemsItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send SUGradeTypesItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send ReportModuleItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  /* get the start and end of the gp */
+	  vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+	  VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+	  startDateNum = VMmapPtr->VMMS_gpStart[pself->TADI_curGradePd];
+	  endDateNum = VMmapPtr->VMMS_gpEnd[pself->TADI_curGradePd];
+	  VMUnlock(mh);
+
+	  /* now lets count the days between (inclusive) */
+	  pself->TADI_curNumAttDays = CountDays(startDateNum,
+									endDateNum,
+									pself->TADI_showWeekends);
+       }  /* end of regular gp else */
+
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_SUSPEND();
+    /* now add or delete columns as needed */
+    if (pself->TADI_curNumAttDays > prevGPDays)  {
+	  /* del cols for summary if prev was summary view */
+	  if (prevGradePd == MAX_GRADE_PDS)  {
+		for (i = 0; i < (pself->TADI_numGradePds - 1); i++)  {
+		   @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(0);
+		   @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(0);
+		   }
+		}
+	  /* add some columns */
+	  for (i = 0; i < (pself->TADI_curNumAttDays - prevGPDays); i++) {
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(prevGPDays + i, ATT_WIDTH);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(prevGPDays + i, ATT_WIDTH);
+		}
+	  }
+    else if (prevGPDays > pself->TADI_curNumAttDays) {
+	  /* delete some columns */
+	  for (i = 0; i < (prevGPDays - pself->TADI_curNumAttDays); i++) {
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(0);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(0);
+		}
+	  /* now add cols for summary if summary view */
+	  if (pself->TADI_curGradePd == MAX_GRADE_PDS)  {
+		for (i = 0; i < (pself->TADI_numGradePds - 1); i++)  {
+		   @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, ATT_SUMMARY_WIDTH);
+		   @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, ATT_SUMMARY_WIDTH);
+		   }
+		}
+	  }
+
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_UNSUSPEND();
+
+
+    /* FOR THE GRADES STUFF */
+
+    /* find out how many grade things before */
+    if (prevGradePd < MAX_GRADE_PDS)  {
+	  prevItems = pself->TADI_numElements[prevGradePd]
+			    + pself->TADI_numTypes
+			    + 1;
+	  }
+    else {  /* prev gp was summary */
+	  prevItems = ((pself->TADI_numGradePds) + 1);
+	  /* and semesters if selected */
+	  if (pself->TADI_showSemesters) prevItems += 2;
+	  }
+
+    /* and how many in the selected period */
+    if (pself->TADI_curGradePd < MAX_GRADE_PDS) {
+	  /* a regular grade period = E + T + F */
+	  numItems = pself->TADI_numElements[pself->TADI_curGradePd]
+				+ pself->TADI_numTypes
+				+ 1;
+	  }
+    else  {  /* the summary pd = gps + F */
+	  numItems = pself->TADI_numGradePds + 1;
+	  /* and semesters if selected */
+	  if (pself->TADI_showSemesters) numItems += 2;
+	  }
+
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_SUSPEND();
+    /* now add or delete columns as needed */
+    if (numItems > prevItems)  {
+	  /* add some columns */
+	  for (i = 0; i < (numItems - prevItems); i++) {
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, GRADE_WIDTH);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, GRADE_WIDTH);
+		}
+	  }
+    else if (prevItems > numItems) {
+	  /* delete some columns */
+	  for (i = 0; i < (prevItems - numItems); i++) {
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(0);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(0);
+		}
+	  }
+
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_UNSUSPEND();
+
+	 /* and update the corner text */
+	 MemLock(OptrToHandle(@GradePdStr));
+	 if (pself->TADI_curGradePd < MAX_GRADE_PDS) {
+	  UtilHex32ToAscii(periodStr,
+				    (dword) (pself->TADI_curGradePd + 1),
+					 UHTAF_NULL_TERMINATE);
+	  strcpy(string, "\t");
+	  strcat(string, LMemDeref(@GradePdStr));
+	  strcat(string, " ");
+	  strcat(string, periodStr);
+	  }
+	 else {
+	  strcpy(string, "\t");
+	  strcat(string, LMemDeref(@SummaryStr));
+	  strcat(string, " ");
+	  }
+	 MemUnlock(OptrToHandle(@GradePdStr));
+	 @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCCornerGPText))::
+			 MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+    /* make sure selections don't carry over */
+    @send ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+		   MSG_VIS_GRID_SELECT_CELL(VIS_GRID_SELECTION_NONE,
+							   VIS_GRID_SELECTION_NONE);
+    @send ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+		   MSG_VIS_GRID_SELECT_CELL(VIS_GRID_SELECTION_NONE,
+							   VIS_GRID_SELECTION_NONE);
+
+    @call self::MSG_TADOC_UPDATE_GRID_CONTENTS();
+    /* open at top left */
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TAMainView))::
+			MSG_GEN_VIEW_SCROLL_LEFT_EDGE();
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TAMainView))::
+			MSG_GEN_VIEW_SCROLL_TOP();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_SCHOOL_YEAR for TADocumentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_OPEN_SCHOOL_YEAR
+{
+ VMMapStruct		*VMmapPtr;
+ MemHandle		mh;
+ VMBlockHandle		vmbh;
+ TimerDateAndTime	date;
+ char			dateString[DATE_TIME_BUFFER_SIZE + 1];
+ word			dateNum, i;
+ byte			month, day;
+ optr oStart[MAX_GRADE_PDS] = {@YSUGP1Start, @YSUGP2Start, @YSUGP3Start,
+						 @YSUGP4Start, @YSUGP5Start, @YSUGP6Start};
+ optr oEnd[MAX_GRADE_PDS] = {@YSUGP1End, @YSUGP2End, @YSUGP3End,
+					    @YSUGP4End, @YSUGP5End, @YSUGP6End};
+
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+    VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+    for (i = 0; i < MAX_GRADE_PDS; i++) {
+
+    dateNum = VMmapPtr->VMMS_gpStart[i];
+    if (dateNum)  {
+	  /* fill in the start date */
+	  FloatDwordToFloat((dword)dateNum);  /* FloatWordToFloat is broken */
+	  date.TDAT_year = FloatDateNumberGetYear();
+	  FloatDwordToFloat((dword)dateNum);
+	  FloatDateNumberGetMonthAndDay(&month, &day);
+	  date.TDAT_month = (word)month;
+	  date.TDAT_day = (word)day;
+	  LocalFormatDateTime(dateString, DTF_SHORT, &date);
+	  @call oStart[i]::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateString, 0);
+	  /* and the end date */
+	  dateNum = VMmapPtr->VMMS_gpEnd[i];
+	  FloatDwordToFloat((dword)dateNum);
+	  date.TDAT_year = FloatDateNumberGetYear();
+	  FloatDwordToFloat((dword)dateNum);
+	  FloatDateNumberGetMonthAndDay(&month, &day);
+	  date.TDAT_month = (word)month;
+	  date.TDAT_day = (word)day;
+	  LocalFormatDateTime(dateString, DTF_SHORT, &date);
+	  @call oEnd[i]::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateString, 0);
+	  }
+    else  {
+	  /* clear the fields */
+	  @call oStart[i]::MSG_VIS_TEXT_DELETE_ALL();
+	  @call oEnd[i]::MSG_VIS_TEXT_DELETE_ALL();
+	  }
+    } /* end of gp for loop */
+
+    /* show the school info */
+    @call YSUSITeacher::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMMS_teacher, 0);
+    @call YSUSISchool::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMMS_school, 0);
+    @call YSUSISystem::MSG_VIS_TEXT_REPLACE_ALL_PTR(VMmapPtr->VMMS_system, 0);
+    VMUnlock(mh);
+
+    /* set the booleans */
+    @call YSUChoicesGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+						    YSU_WEEKENDS, pself->TADI_showWeekends);
+    @call YSUChoicesGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+						    YSU_SEMESTERS, pself->TADI_showSemesters);
+
+    /* Open the dialog box */
+    @call YearSetUpGroup::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SET_SCHOOL_YEAR for TADocumentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_SET_SCHOOL_YEAR
+{
+ VMMapStruct		*VMmapPtr;
+ MemHandle		mh;
+ VMBlockHandle		vmbh;
+ char			startDateString[DATE_TIME_BUFFER_SIZE + 1];
+ char			endDateString[DATE_TIME_BUFFER_SIZE + 1];
+ word			i, days, curGPDays, gp, sem1Col, sem2Col;
+ dword			startDateNum, endDateNum;
+ optr oStart[MAX_GRADE_PDS] = {@YSUGP1Start, @YSUGP2Start, @YSUGP3Start,
+						 @YSUGP4Start, @YSUGP5Start, @YSUGP6Start};
+ optr oEnd[MAX_GRADE_PDS] = {@YSUGP1End, @YSUGP2End, @YSUGP3End,
+					    @YSUGP4End, @YSUGP5End, @YSUGP6End};
+ char			attString[ATT_STRING_SIZE];
+ BasicDBFieldID	fieldID;
+ BasicDBRecordID	recordID;
+ BasicDBError		error;
+ optr	gPItem[MAX_GRADE_PDS - 1] = {
+    @GP2Trigger,
+    @GP3Trigger,
+    @GP4Trigger,
+    @GP5Trigger,
+    @GP6Trigger};
+ Boolean			showSemesters;
+
+
+    curGPDays = 0;
+    attString[0] = 0;
+    pself->TADI_numGradePds = 0;
+
+    /* what to do about weekends */
+    pself->TADI_showWeekends = @call YSUChoicesGroup::
+				MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(YSU_WEEKENDS);
+    /* and semesters */
+    showSemesters = @call YSUChoicesGroup::
+				MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(YSU_SEMESTERS);
+
+    for (gp = 0; gp < MAX_GRADE_PDS; gp++)  {
+	  /* if start is blank we'll assume no such gp */
+	  if (@call oStart[gp]::MSG_VIS_TEXT_GET_ALL_PTR(startDateString)) {
+		if (!DateCheck(startDateString)) {
+		   @call oStart[gp]::MSG_VIS_TEXT_SELECT_ALL();
+		   @call oStart[gp]::MSG_META_GRAB_FOCUS_EXCL();
+		   return;
+		   }
+		@call oEnd[gp]::MSG_VIS_TEXT_GET_ALL_PTR(endDateString);
+		if (!DateCheck(endDateString)) {
+	        @call oEnd[gp]::MSG_VIS_TEXT_SELECT_ALL();
+		   @call oEnd[gp]::MSG_META_GRAB_FOCUS_EXCL();
+		   return;
+		   }
+
+		/* get the date numbers */
+		FloatStringGetDateNumber(startDateString);
+		startDateNum = FloatFloatToDword();
+		FloatStringGetDateNumber(endDateString);
+		endDateNum = FloatFloatToDword();
+
+		/* need to check for end after start */
+		if (startDateNum > endDateNum)  {
+		   NotifyDBox(0, @ErrMsgEndBeforeStartDate);
+		   @call oStart[gp]::MSG_META_GRAB_FOCUS_EXCL();
+		   return;
+		   }
+
+		/* now lets count the days between (inclusive) */
+		days = CountDays(startDateNum, endDateNum, pself->TADI_showWeekends);
+
+		/* if this is the one to show save the days info */
+		if (gp == pself->TADI_curGradePd)  curGPDays = days;
+
+		pself->TADI_numGradePds++;
+		}  /* end of filled in start date */
+	  else  {
+		/* no start date filled in so store zeros */
+		startDateNum = 0;
+		endDateNum = 0;
+		days = 0;
+		}
+
+	  /* and save the dates */
+	  vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+	  VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+	  VMmapPtr->VMMS_gpStart[gp] = (word)startDateNum;
+	  VMmapPtr->VMMS_gpEnd[gp] = (word)endDateNum;
+	  if (gp == pself->TADI_curGradePd)  {
+		VMmapPtr->VMMS_curNumAttDays = curGPDays;
+		}
+	  VMDirty(mh);
+	  VMUnlock(mh);
+
+	  /* now initialize the att string if there are any students */
+	  if (pself->TADI_numStudents) {
+		for (i = 0; i < days; i++)  {
+		   strcat(attString, " ");
+		   }
+		strcat(attString, "*"); /* end of gp marker */
+		}
+
+	  }  /* end of gp for loop */
+
+    /* check for showSemesters only for 4 or 6 gps */
+    if(showSemesters) {
+	  if ((pself->TADI_numGradePds != 4) && (pself->TADI_numGradePds != 6)) {
+		/* show can't do that msg */
+		NotifyDBox(0, @ErrMsgCantShowSemesters);
+		/* and reset showSemensters */
+		showSemesters = FALSE;
+		}
+	  }
+
+    /* now initialize the dates in each stu record (if any) */
+    if (pself->TADI_numStudents) {
+	  /* free up any previous record in memory */
+	  if (pself->TADI_openStuRecMH) BasicDBDiscardRecord(pself->TADI_openStuRecMH);
+	  pself->TADI_openStuRecMH = 0;
+
+	  for (i = 0; i < (word) pself->TADI_numStudents; i++) {
+		error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   pself->TADI_stuDBHan,
+					   pself->TADI_curStuIndex,
+					   i,
+					   &mh);
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, STU_ATTENDANCE, 1);
+		error = BasicDBSetFieldData(mh, fieldID, attString, strlen(attString));
+		/* and store the record */
+		error = BasicDBSaveRecord(pself->GDI_fileHandle,
+					   pself->TADI_stuDBHan,
+					   mh,
+					   StudentsCallback,
+					   &recordID);
+		}
+	  }  /* end of init dates in stu recs if */
+
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_SUSPEND();
+    /* now add or delete columns as needed ATTENDANCE */
+    if (curGPDays > pself->TADI_curNumAttDays)  {
+	  /* add some columns */
+	  for (i = 0; i < (curGPDays - pself->TADI_curNumAttDays); i++) {
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(pself->TADI_curNumAttDays + i, ATT_WIDTH);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(pself->TADI_curNumAttDays + i, ATT_WIDTH);
+		}
+	  }
+    else if (pself->TADI_curNumAttDays > curGPDays) {
+	  /* delete some columns */
+	  for (i = 0; i < (pself->TADI_curNumAttDays - curGPDays); i++) {
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(0);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(0);
+		}
+	  }
+    if (pself->TADI_curNumAttDays != curGPDays) 
+		   @call self::MSG_TADOC_UPDATE_GRID_CONTENTS();
+
+    pself->TADI_curNumAttDays = curGPDays;
+
+    /* and redraw the att grids */
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+			MSG_VIS_GRID_INVALIDATE_CELL_RANGE(0,
+										0,
+										pself->TADI_curNumAttDays - 1,
+										0);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+			MSG_VIS_GRID_INVALIDATE_CELL_RANGE(0,
+										0,
+										pself->TADI_curNumAttDays - 1,
+										pself->TADI_numStudents - 1);
+
+    /* re-do GRADES columns if necessary */
+    if ((showSemesters != pself->TADI_showSemesters)
+		  && (pself->TADI_curGradePd == MAX_GRADE_PDS)) {
+	  if (pself->TADI_numGradePds == 4)  {
+		sem1Col = 2;
+		sem2Col = 5;
+		}
+	  else {
+		sem1Col = 3;
+		sem2Col = 7;
+		}
+	  if (showSemesters)  {
+		/* add 2 columns */
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(sem1Col, GRADE_WIDTH);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(sem2Col, GRADE_WIDTH);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(sem1Col, GRADE_WIDTH);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+			 MSG_VIS_GRID_ADD_COLUMN(sem2Col, GRADE_WIDTH);
+		}
+	  else {
+		/* delete two columns */
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(sem2Col);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(sem1Col);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(sem2Col);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+			 MSG_VIS_GRID_DELETE_COLUMN(sem1Col);
+		}
+	  @call self::MSG_TADOC_UPDATE_GRID_CONTENTS();
+	  }
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_UNSUSPEND();
+
+    pself->TADI_showSemesters = showSemesters;
+
+    @call YearSetUpGroup::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /* save the number of grade periods, booleans & school info */
+    vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+    VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+    VMmapPtr->VMMS_numGradePds = pself->TADI_numGradePds;
+    VMmapPtr->VMMS_showWeekends = pself->TADI_showWeekends;
+    VMmapPtr->VMMS_showSemesters = pself->TADI_showSemesters;
+    @call YSUSITeacher::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMMS_teacher);
+    @call YSUSISchool::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMMS_school);
+    @call YSUSISystem::MSG_VIS_TEXT_GET_ALL_PTR(VMmapPtr->VMMS_system);
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /* disable grade pd menu items that don't have dates */
+    for (i = 0; i < (MAX_GRADE_PDS - 1); i++)  {
+	   if ((i + 1) < (pself->TADI_numGradePds))
+		 @send gPItem[i]::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	   else
+		 @send gPItem[i]::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	   }
+
+}
+
+
+
+
+
+

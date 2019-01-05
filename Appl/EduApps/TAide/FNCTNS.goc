@@ -1,0 +1,1045 @@
+/*
+ **************************************************************************
+ *  FILE:			fnctns.goc
+ *  PROJECT:		Breadbox Teacher's Aide
+ *  DESCRIPTION:	This file has the various functions
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "taide.goh"
+@include "seating.goh"
+@include "externs.goh"
+
+/***********************************************************************
+ *
+ * FUNCTION:	MakeNewStuRec (VMBlockHandle whichDB)
+ *
+ * CALLED BY:  MSG_NEW_STUDENT for the stu dbase
+ *             MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE for the defaults dbase
+ *
+ * STRATEGY:    returns the mh of the record created or 0 if a problem
+ *
+ *
+ ***********************************************************************/
+MemHandle MakeNewStuRec (FileHandle docFile, VMBlockHandle whichDB)
+{
+ MemHandle		mh;
+ BasicDBError		error;
+ BasicDBFieldID	fieldID;
+ word			i;
+
+
+    /* OK create the record */
+    mh = BasicDBCreateRecord();
+    /* and the fields - the category constants are sequential
+	* so we can do this in a loop */
+    for (i = 1; i < STU_LAST_CAT; i++) {
+	  error = BasicDBAddField(docFile,
+					   whichDB,
+					   mh,
+					   i,
+					   0,
+					   0,
+					   &fieldID);
+	  if(error) {
+		mh = 0;
+		i = STU_LAST_CAT;
+		NotifyDBox(0, @BDBAddFieldError);
+		}
+	  }
+
+    return (mh);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FillInStuField (word  word size,
+ *                             optr fillField,
+ *                             char string[NAME_SIZE])
+ *
+ * CALLED BY:  ShowStuData,
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+void FillInStuField (word size, optr fillField, char string[NAME_SIZE])
+{
+
+    if (size) @call fillField::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, size);
+    else @call fillField::MSG_VIS_TEXT_DELETE_ALL();
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	ShowStuData (FileHandle docFile,
+ *                          VMBlockHandle whichDB,
+ *				        VMBlockHandle curStuIndex,
+ *                          Boolean isDefault,
+ *                          dword  whichStudent)
+ *
+ * CALLED BY:  MSG_OPEN_STUDENT, MSG_PREV_NEXT_STUDENT
+ *
+ *
+ * STRATEGY:   returns openStuRecMH if everything went OK - else 0
+ *
+ *
+ ***********************************************************************/
+MemHandle ShowStuData (FileHandle docFile,
+				 VMBlockHandle whichDB,
+				 VMBlockHandle curStuIndex,
+				 Boolean isDefault,
+				 dword  whichStudent)
+{
+ BasicDBError		error;
+ word			i, size;
+ char			nameString[NAME_SIZE];
+ BasicDBFieldID	fieldID;
+ MemHandle		openStuRecMH;
+
+
+    if (!isDefault)  /* show the student info */
+	  error = BasicDBGetRecordByIndex(docFile,
+					   whichDB,
+					   curStuIndex,
+					   whichStudent,
+					   &openStuRecMH);
+    else  /* show the defaults */
+	  error = BasicDBGetRecordByElemNum(docFile,
+					   whichDB,
+					   whichStudent,
+					   &openStuRecMH);
+
+    if (!error)  {
+	  for (i = 1; i < STU_LAST_CAT; i++) {
+		fieldID = BasicDBGetFieldID(openStuRecMH, BDBFHE_CATEGORY, i, 1);
+		size = BasicDBGetFieldData(openStuRecMH,
+						    fieldID,
+						    nameString,
+						    NAME_SIZE);
+		switch (i) {
+		   case (STU_L_NAME):
+			 FillInStuField(size, @MSDBLastName, nameString);
+			 break;
+		   case (STU_F_NAME):
+			 FillInStuField(size, @MSDBFirstName, nameString);
+			 break;
+		   case (STU_M_NAME):
+			 FillInStuField(size, @MSDBMiddleName, nameString);
+			 break;
+		   case (STU_NUMBER):
+			 FillInStuField(size, @MSDBStuNum, nameString);
+			 break;
+		   case (STU_GRADE):
+			 FillInStuField(size, @MSDBStuGrade, nameString);
+			 break;
+		   case (STU_TEAM):
+			 FillInStuField(size, @MSDBStuTeam, nameString);
+			 break;
+		   case (STU_BDAY):
+			 FillInStuField(size, @MSDBStuBirth, nameString);
+			 break;
+		   case (STU_AGE):
+			 FillInStuField(size, @MSDBStuAge, nameString);
+			 break;
+		   case (STU_MED):
+			 FillInStuField(size, @MSDBStuMed, nameString);
+			 break;
+		   case (STU_CAT):
+			 FillInStuField(size, @MSDBStuCat, nameString);
+			 break;
+		   case (STU_CLASS):
+			 FillInStuField(size, @MSDBStuClass, nameString);
+			 break;
+		   case (STU_ROOM):
+			 FillInStuField(size, @MSDBStuHRoom, nameString);
+			 break;
+		   case (STU_BUS):
+			 FillInStuField(size, @MSDBStuBus, nameString);
+			 break;
+		   case (STU_TEXT):
+			 FillInStuField(size, @MSDBStuText, nameString);
+			 break;
+		   case (STU_SPARE):
+			 FillInStuField(size, @MSDBStuSpare, nameString);
+			 break;
+		   case (STU_ADDR):
+			 FillInStuField(size, @MSDBStuAddress, nameString);
+			 break;
+		   case (STU_CITY):
+			 FillInStuField(size, @MSDBStuCity, nameString);
+			 break;
+		   case (STU_STATE):
+			 FillInStuField(size, @MSDBStuState, nameString);
+			 break;
+		   case (STU_ZIP):
+			 FillInStuField(size, @MSDBStuZip, nameString);
+			 break;
+		   case (STU_PHONE):
+			 FillInStuField(size, @MSDBStuPhone, nameString);
+			 break;
+		   case (STU_EMAIL):
+			 FillInStuField(size, @MSDBStuEmail, nameString);
+			 break;
+		   case (STU_MNAME):
+			 FillInStuField(size, @MSDBStuMName, nameString);
+			 break;
+		   case (STU_MHPHONE):
+			 FillInStuField(size, @MSDBStuMHPhone, nameString);
+			 break;
+		   case (STU_MWPHONE):
+			 FillInStuField(size, @MSDBStuMWPhone, nameString);
+			 break;
+		   case (STU_MEMAIL):
+			 FillInStuField(size, @MSDBStuMEmail, nameString);
+			 break;
+		   case (STU_FNAME):
+			 FillInStuField(size, @MSDBStuFName, nameString);
+			 break;
+		   case (STU_FHPHONE):
+			 FillInStuField(size, @MSDBStuFHPhone, nameString);
+			 break;
+		   case (STU_FWPHONE):
+			 FillInStuField(size, @MSDBStuFWPhone, nameString);
+			 break;
+		   case (STU_FEMAIL):
+			 FillInStuField(size, @MSDBStuFEmail, nameString);
+			 break;
+		   case (STU_EMERG_CONT):
+			 FillInStuField(size, @MSDBPDEmergContact, nameString);
+			 break;
+		   } /* end of cat switch */
+		}  /* end of for loop */
+	  }  /* end of found record if */
+    else openStuRecMH = 0;
+    return(openStuRecMH);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetAndSaveStuField (MemHandle openStuRecMH,
+ *                                 optr fillField,
+ *                                 word whichField)
+ *
+ * CALLED BY:  SaveStuData,
+ *
+ *
+ * STRATEGY:   returns TRUE if it saved OK
+ *
+ *
+ ***********************************************************************/
+Boolean GetAndSaveStuField (MemHandle openStuRecMH,
+					   optr fillField,
+					   word whichField)
+{
+ word			length;
+ char			nameString[NAME_SIZE];
+ BasicDBFieldID	fieldID;
+ BasicDBError		error;
+
+
+    length = @call fillField::MSG_VIS_TEXT_GET_ALL_PTR(nameString);
+    fieldID = BasicDBGetFieldID(openStuRecMH, BDBFHE_CATEGORY, whichField, 1);
+    error = BasicDBSetFieldData(openStuRecMH, fieldID, nameString, length);
+    if(error) return (FALSE);
+    else return (TRUE);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	SaveStuData (MemHandle openStuRecMH)
+ *
+ * CALLED BY:  MSG_SAVE_STUDENT_INFO,
+ *
+ *
+ * STRATEGY:   returns TRUE if everything went OK
+ *
+ *
+ ***********************************************************************/
+Boolean SaveStuData (MemHandle openStuRecMH)
+{
+ word			i;
+ Boolean			savedOK = TRUE;
+
+
+		for (i = 1; i < STU_LAST_CAT; i++) {
+		   switch (i) {
+			 case (STU_L_NAME):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBLastName, i)) savedOK = FALSE;
+			    break;
+			 case (STU_F_NAME):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBFirstName, i)) savedOK = FALSE;
+			    break;
+			 case (STU_M_NAME):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBMiddleName, i)) savedOK = FALSE;
+			    break;
+			 case (STU_NUMBER):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuNum, i)) savedOK = FALSE;
+			    break;
+			 case (STU_GRADE):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuGrade, i)) savedOK = FALSE;
+			    break;
+			 case (STU_TEAM):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuTeam, i)) savedOK = FALSE;
+			    break;
+			 case (STU_BDAY):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuBirth, i)) savedOK = FALSE;
+			    break;
+			 case (STU_AGE):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuAge, i)) savedOK = FALSE;
+			    break;
+			 case (STU_MED):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuMed, i)) savedOK = FALSE;
+			    break;
+			 case (STU_CAT):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuCat, i)) savedOK = FALSE;
+			    break;
+			 case (STU_CLASS):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuClass, i)) savedOK = FALSE;
+			    break;
+			 case (STU_ROOM):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuHRoom, i)) savedOK = FALSE;
+			    break;
+			 case (STU_BUS):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuBus, i)) savedOK = FALSE;
+			    break;
+			 case (STU_TEXT):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuText, i)) savedOK = FALSE;
+			    break;
+			 case (STU_SPARE):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuSpare, i)) savedOK = FALSE;
+			    break;
+			 case (STU_ADDR):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuAddress, i)) savedOK = FALSE;
+			    break;
+			 case (STU_CITY):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuCity, i)) savedOK = FALSE;
+			    break;
+			 case (STU_STATE):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuState, i)) savedOK = FALSE;
+			    break;
+			 case (STU_ZIP):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuZip, i)) savedOK = FALSE;
+			    break;
+			 case (STU_PHONE):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuPhone, i)) savedOK = FALSE;
+			    break;
+			 case (STU_EMAIL):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuEmail, i)) savedOK = FALSE;
+			    break;
+			 case (STU_MNAME):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuMName, i)) savedOK = FALSE;
+			    break;
+			 case (STU_MHPHONE):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuMHPhone, i)) savedOK = FALSE;
+			    break;
+			 case (STU_MWPHONE):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuMWPhone, i)) savedOK = FALSE;
+			    break;
+			 case (STU_MEMAIL):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuMEmail, i)) savedOK = FALSE;
+			    break;
+			 case (STU_FNAME):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuFName, i)) savedOK = FALSE;
+			    break;
+			 case (STU_FHPHONE):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuFHPhone, i)) savedOK = FALSE;
+			    break;
+			 case (STU_FWPHONE):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuFWPhone, i)) savedOK = FALSE;
+			    break;
+			 case (STU_FEMAIL):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBStuFEmail, i)) savedOK = FALSE;
+			    break;
+			 case (STU_EMERG_CONT):
+			    if (!GetAndSaveStuField(openStuRecMH, @MSDBPDEmergContact, i)) savedOK = FALSE;
+			    break;
+			 } /* end of cat switch */
+
+		   if (!savedOK) i = STU_LAST_CAT;
+		   }  /* end of for loop */
+
+
+	  return(savedOK);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	ShowStuNote (MemHandle openStuRecMH)
+ *
+ * CALLED BY:  MSG_PREV_NEXT_STUDENT, MSG_DELETE_STUDENT, MSG_STUDENT_TAB
+ *
+ *
+ * STRATEGY:   returns the current number of student notes
+ *
+ *
+ ***********************************************************************/
+dword ShowStuNote (MemHandle openStuRecMH)
+{
+BasicDBFieldID		fieldID;
+EventHandle		event;
+dword			curStuNote, curStuNumNotes;
+
+
+    fieldID = BasicDBGetFieldID(openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NUM_NOTES,
+							1);
+    BasicDBGetFieldData(openStuRecMH,
+						    fieldID,
+						    &curStuNumNotes,
+						    sizeof(dword));
+    @call MSDBNoteList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(curStuNumNotes);
+    if (curStuNumNotes) {
+	  curStuNote = curStuNumNotes - 1;
+	  event = @record TADocumentClass::MSG_NOTE_DLIST_APPLY(curStuNote, 1, 0);
+	  @call TAApp::MSG_META_SEND_CLASSED_EVENT(event, TO_MODEL);
+	  @call MSDBNoteList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+						   curStuNote, FALSE);
+	  }
+    else {
+	  event = @record TADocumentClass::MSG_NEW_STUDENT_NOTE();
+	  @call TAApp::MSG_META_SEND_CLASSED_EVENT(event, TO_MODEL);
+	  }
+
+    return(curStuNumNotes);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	StudentsCallBack
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+sword _pascal StudentsCallback (MemHandle m1,
+						  MemHandle m2,
+						  word valueForCallback )
+{
+void			*e1, *e2;
+BasicDBFieldID	fieldID;
+word			size1, size2;
+char *		string1;
+char *		string2;
+char			longNameString1[NAME_SIZE * 3];
+char			longNameString2[NAME_SIZE * 3];
+dword		num1, num2;
+
+
+    e1 = MemDeref(m1);
+    e2 = MemDeref(m2);
+
+    /* which sort are we doing? */
+    if (valueForCallback == VFC_NAME) {
+	  /* get the first rec name info */
+	  fieldID = BasicDBGetFieldIDPtr( e1, BDBFHE_CATEGORY, STU_L_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e1, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcpy(longNameString1, string1);
+	  fieldID = BasicDBGetFieldIDPtr( e1, BDBFHE_CATEGORY, STU_F_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e1, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcat(longNameString1, string1);
+	  fieldID = BasicDBGetFieldIDPtr( e1, BDBFHE_CATEGORY, STU_M_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e1, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcat(longNameString1, string1);
+
+	  /* and the second rec name info */
+	  fieldID = BasicDBGetFieldIDPtr( e2, BDBFHE_CATEGORY, STU_L_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e2, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcpy(longNameString2, string1);
+	  fieldID = BasicDBGetFieldIDPtr( e2, BDBFHE_CATEGORY, STU_F_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e2, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcat(longNameString2, string1);
+	  fieldID = BasicDBGetFieldIDPtr( e2, BDBFHE_CATEGORY, STU_M_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e2, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcat(longNameString2, string1);
+
+	  size1 = strlen(longNameString1);
+	  size2 = strlen(longNameString2);
+
+	  return LocalCmpStringsNoSpaceCase(longNameString1, longNameString2,
+				( size1 < size2) ? size1 : size2 );
+	  } /* end of name sort if */
+    else {  /* it's a number sort */
+	  /* get the first rec number info */
+	  fieldID = BasicDBGetFieldIDPtr( e1, BDBFHE_CATEGORY, STU_NUMBER, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e1, fieldID, &string1);
+	  string1[size1] = 0;
+	  UtilAsciiToHex32(string1, &num1);
+
+	  fieldID = BasicDBGetFieldIDPtr( e2, BDBFHE_CATEGORY, STU_NUMBER, 1 );
+	  size2 = BasicDBGetPtrToFieldData( e2, fieldID, &string2);
+	  string2[size2] = 0;
+	  UtilAsciiToHex32(string2, &num2);
+
+	  if (num1 > num2) return (1);
+	  else if (num1 < num2) return (-1);
+	  else return (0);
+
+	  }
+	  
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	StuDefaultsCallBack
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:	See if this stops the DC-06 -- NOPE
+ *
+ *
+ ***********************************************************************/
+sword _pascal StuDefaultsCallBack (MemHandle m1,
+						  MemHandle m2,
+						  word valueForCallback )
+{
+
+    return (0);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	CountDays
+ *
+ * CALLED BY:
+ *
+ * STRATEGY:
+ *		
+ *
+ ***********************************************************************/
+ word CountDays(word startDateNum, word endDateNum, Boolean showWeekends)
+ {
+ word		days, i;
+ dword		dayOfWeek;
+
+
+    /* lets count the days between (inclusive) */
+    days = endDateNum - startDateNum + 1;
+    /* what to do about weekends */
+    if (!showWeekends)  {
+	  /* subtract the weekend days */
+	  for (i = startDateNum; i <= endDateNum; i++) {
+		FloatDwordToFloat((dword)i);
+		FloatDateNumberGetWeekday();
+		dayOfWeek = FloatFloatToDword();
+		if ((dayOfWeek == 1) || (dayOfWeek == 7)) days--;
+		}
+	  }
+
+    return(days);
+
+ }
+
+/***********************************************************************
+ *
+ * FUNCTION:	DateCheck
+ *
+ * CALLED BY:
+ *
+ * STRATEGY:   returns TRUE if the date is a valid short date
+ *		
+ *
+ ***********************************************************************/
+ Boolean DateCheck(char dateString[12])
+ {
+ TimerDateAndTime	date;
+ word		daysInMonth;
+ Boolean		isValid;
+
+
+    /* parse the date string */
+    isValid = LocalParseDateTime(dateString, DTF_SHORT, &date);
+
+    /* check for # of days in month */
+    if (isValid == -1)
+	  daysInMonth = LocalCalcDaysInMonth(date.TDAT_year, date.TDAT_month);
+    else  {
+	  NotifyDBox(0, @BadDateMsg);
+	  return (FALSE);
+	  }
+
+    /* is it a good date? */
+    if((isValid == -1) && ((date.TDAT_day) <= daysInMonth)) return (TRUE);
+    else  {
+	  NotifyDBox(0, @BadDateMsg);
+	  return (FALSE);
+	  }
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	AckDBox (char* string1, char* string2, optr ackMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    returns user's Yes or No response
+ *
+ *
+ ***********************************************************************/
+word AckDBox (char* string1, char* string2, optr ackMsg)
+{
+
+    /* put up an Are you sure box */
+    MemLock (OptrToHandle(@BadDateMsg));
+    if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    string2,
+			    string1,
+			    LMemDeref(ackMsg),
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+			    ) != IC_YES))  {
+	  MemUnlock (OptrToHandle(@BadDateMsg));
+	  return(ACK_NO);
+	  }
+	 else  {
+	  MemUnlock (OptrToHandle(@BadDateMsg));
+	  return(ACK_YES);
+	  }
+
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox  (char* string1, optr notifyMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    Puts up selected notification box
+ *
+ *
+ ***********************************************************************/
+void NotifyDBox (char* string1, optr notifyMsg)
+{
+
+    /* put up a notification box */
+    MemLock (OptrToHandle(@BadDateMsg));
+    UserStandardDialog((char*)0,
+			  (char*)0,
+			  (char*)0,
+			  string1,
+			  LMemDeref(notifyMsg),
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+    MemUnlock (OptrToHandle(@BadDateMsg));
+
+}
+
+void StudentSeatingLabelDeclare(FileHandle docFile,
+						   VMBlockHandle stuDBHan,
+				 VMBlockHandle curStuIndex,
+	    MemHandle display,
+         dword value,
+         Boolean isIndex)
+{
+    BasicDBError    error;
+    word            size;
+    char            nameString[NAME_SIZE];
+    char            firstName[NAME_SIZE * 2];
+    char            lastName[NAME_SIZE];
+    BasicDBFieldID  fieldID;
+    MemHandle       mh;
+    BasicDBRecordID id ;
+
+    /* get the names */
+    if (isIndex)  {
+	   error = BasicDBGetRecordByIndex(docFile,
+						  stuDBHan,
+					       curStuIndex,
+					       value,
+					       &mh);
+    } else {
+        error = BasicDBGetRecord(docFile,
+						  stuDBHan,
+					       value,
+					       &mh);
+    }
+    if (!error)  {
+        /* Get the id we use in the seating */
+        id = BasicDBGetRecordID(mh) ;
+
+	    fieldID = BasicDBGetFieldID(mh,
+							  BDBFHE_CATEGORY,
+							  STU_L_NAME,
+							  1);
+	    size = BasicDBGetFieldData(mh,
+						      fieldID,
+						      lastName,
+						      NAME_SIZE);
+	    lastName[size] = 0;
+
+	    fieldID = BasicDBGetFieldID(mh,
+							  BDBFHE_CATEGORY,
+							  STU_F_NAME,
+							  1);
+	    size = BasicDBGetFieldData(mh,
+						      fieldID,
+						      firstName,
+						      NAME_SIZE);
+	    firstName[size] = 0;
+	    strcat(firstName, " ");
+
+	    fieldID = BasicDBGetFieldID(mh,
+							  BDBFHE_CATEGORY,
+							  STU_M_NAME,
+							  1);
+	    size = BasicDBGetFieldData(mh,
+						      fieldID,
+						      nameString,
+						      NAME_SIZE);
+	    nameString[size] = 0;
+	    strcat(firstName, nameString);
+	    BasicDBDiscardRecord(mh);
+	} else {
+		  MemLock(OptrToHandle(@ErrorStr));
+		  strcpy(firstName, LMemDeref(@ErrorStr));
+		  MemUnlock(OptrToHandle(@ErrorStr));
+		  lastName[0] = '\0' ;
+    }
+
+    @call ConstructOptr(display, OptrToChunk(@MCSeating))::MSG_SEATING_REPLACE_LABEL(
+              (dword)id,
+              firstName,
+              0,
+              lastName,
+              0) ;
+}
+
+void StudentSeatingLabelDeclareAll(FileHandle docFile,
+						   VMBlockHandle stuDBHan,
+				 VMBlockHandle curStuIndex,
+				  MemHandle display)
+{
+    dword num ;
+    dword i ;
+    BasicDBError    error;
+
+    error = BasicDBIndexGetCount(
+                       docFile,
+					   stuDBHan,
+					   curStuIndex,
+                       &num) ;
+
+    if (!error)  {
+       for (i=0; i<num; i++)
+           StudentSeatingLabelDeclare(docFile, stuDBHan, curStuIndex, display, i, TRUE) ;
+    }
+}
+
+void StudentSeatingLabelsReset(FileHandle docFile,
+						   VMBlockHandle stuDBHan,
+				 VMBlockHandle curStuIndex,
+				  MemHandle display)
+{
+    @send ConstructOptr(display, OptrToChunk(@MCSeating))::MSG_SEATING_DELETE_LABEL_LIST() ;
+    StudentSeatingLabelDeclareAll(docFile, stuDBHan, curStuIndex, display) ;
+}
+
+void StudentSeatingLabelDelete(
+         MemHandle display,
+         BasicDBRecordID recordID)
+{
+    @send ConstructOptr(display, OptrToChunk(@MCSeating))::
+              MSG_SEATING_DELETE_LABEL((dword)recordID) ;
+}
+
+void StudentSeatingSetCurrent(FileHandle docFile,
+						   VMBlockHandle stuDBHan,
+				 VMBlockHandle curStuIndex,
+					    MemHandle display,
+					    word index)
+{
+    BasicDBError    error;
+    MemHandle       mh;
+    BasicDBRecordID id ;
+
+    /* Convert the index into a recordID (aka StudentLabel) */
+    error = BasicDBGetRecordByIndex(docFile,
+					   stuDBHan,
+					   curStuIndex,
+					   index,
+					   &mh);
+    if (!error)  {
+        /* Get the id we use in the seating */
+        id = BasicDBGetRecordID(mh) ;
+	    BasicDBDiscardRecord(mh);
+        @send ConstructOptr(display, OptrToChunk(@MCSeating))::
+                  MSG_SEATING_SET_NEXT_LABEL((dword)id) ;
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	CalcTypeAvg
+ *
+ * CALLED BY:  SAVE_GRADE_GRID_DATA, NEW_GRADE_ELEMENT
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+WWFixedAsDWord CalcTypeAvg (word numElements,
+			   FileHandle fileHandle,
+			   word curGradePd,
+			   char* gTypeString,
+			   ChunkHandle gradeElemChunkArray,
+			   byte* grades)
+{
+ VMBlockHandle		vmbh;
+ MemHandle		mh;
+ word			count, i, numPropWeights;
+ byte			matches[MAX_ELEMENTS];
+ WWFixedAsDWord	weights[MAX_ELEMENTS];
+ WWFixedAsDWord	avg, totalWeight;
+ GradeElementStruct*    element;
+
+
+    vmbh = VMFind(fileHandle, NullHandle, GRADE_ELEM_1 + curGradePd);
+    VMLock(fileHandle, vmbh, &mh);
+    /* grab all the grades of this type
+    * for the selected student
+    */
+    /* now cycle thru the elements to find a match */
+    count = 0;
+    numPropWeights = 0;
+    for (i = 0; i < numElements; i++) {
+      /* get the info */
+      element = ChunkArrayElementToPtrHandles(
+                    mh,
+				gradeElemChunkArray,
+                    i,
+                    0);
+      if (!strcmp(gTypeString, element->GES_type)) {
+        /* found a match - add it if there is a valid grade AND
+         * if the element has a weight. */
+        if ((grades[i] != NO_GRADE) && (element->GES_weight)) {
+           /* put it into temp store */
+           matches[count] = grades[i];
+           if (element->GES_weight == EQUAL_WEIGHT) numPropWeights++;
+           weights[count] = MakeWWFixed(element->GES_weight);
+           count++;
+           }
+        }
+      } /* end of cycle thru for */
+    VMUnlock(mh);
+    /* now that we have all the selected type's grades and
+    * weights in the two arrays we just do the math
+    */
+    if (count) {
+      /* a weighted average */
+      /* total the weights */
+      totalWeight = MakeWWFixed(0);
+      for (i = 0; i < count; i++)  {
+        if (IntegerOf(weights[i]) != EQUAL_WEIGHT)
+           totalWeight += weights[i];
+        }
+      /* if total != 100 then normalize to 100 */
+      if ((totalWeight != 100) || (numPropWeights)){
+        for (i = 0; i < count; i++)  {
+           /* if no weights are proportional */
+           if (!numPropWeights)
+		   weights[i] = GrUDivWWFixed(
+		          GrMulWWFixed(weights[i], MakeWWFixed(100)), totalWeight);
+           /* if all weights are proportional */
+           else if (numPropWeights == count) {
+             weights[i] = GrUDivWWFixed(MakeWWFixed(100), MakeWWFixed(count));
+             }
+           /* if some weights are proportional */
+           else {
+             if (IntegerOf(weights[i]) == EQUAL_WEIGHT)
+                weights[i] = GrUDivWWFixed((MakeWWFixed(100) - totalWeight),
+                                     MakeWWFixed(numPropWeights));
+             /* else the weight is OK */
+             }
+           }
+        } /* end of normalize if */
+      /* and get the weighted avg */
+      avg = MakeWWFixed(0);
+      for (i = 0; i < count; i++)  {
+	   avg += GrUDivWWFixed(
+		 GrMulWWFixed(MakeWWFixed(matches[i]), weights[i]), MakeWWFixed(100));
+        }
+
+      } /* end of do the math if */
+    else avg = NO_SUMMARY; /* nothing to calculate */
+
+    return(avg);
+
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	CalcGPFinal
+ *
+ * CALLED BY:  SAVE_GRADE_GRID_DATA, NEW_GRADE_ELEMENT
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+WWFixedAsDWord CalcGPFinal (word numTypes,
+			   FileHandle fileHandle,
+			   word curGradePd,
+			   ChunkHandle gradeTypesChunkArray,
+			   dword* gradeSum)
+{
+ VMBlockHandle		vmbh;
+ MemHandle		mh;
+ word			count, i;
+ WWFixedAsDWord 	sums[MAX_GRADE_TYPES];
+ WWFixedAsDWord	weights[MAX_GRADE_TYPES];
+ WWFixedAsDWord	avg, totalWeight;
+ GradeTypeStruct*   type;
+
+
+    /* recalculate the final for that grade period */
+    count = 0;
+    vmbh = VMFind(fileHandle, NullHandle, GRADE_TYPES);
+    VMLock(fileHandle, vmbh, &mh);
+    /* get the type grades */
+    for (i = 0; i < numTypes; i++) {
+	 if (gradeSum[i] != NO_SUMMARY) {
+	   sums[count] = gradeSum[i];
+	   /* and its corresponding weight */
+	   type = ChunkArrayElementToPtrHandles(
+			 mh,
+			 gradeTypesChunkArray,
+			 i,
+			 0);
+	   weights[count] = MakeWWFixed(type->GTS_weight[curGradePd]);
+	   count++;
+	   }
+	 }
+    VMUnlock(mh);
+
+    /* calculate the final */
+	   /* a weighted average */
+    /* total the weights */
+    totalWeight = MakeWWFixed(0);
+    for (i = 0; i < count; i++)  {
+	 totalWeight += weights[i];
+	 }
+    if (totalWeight != 0) {
+      /* if total != 100 then normalize to 100 */
+      if (totalWeight != MakeWWFixed(100)) {
+        for (i = 0; i < count; i++)  {
+		 weights[i] = GrUDivWWFixed(
+		         GrMulWWFixed(weights[i], MakeWWFixed(100)), totalWeight);
+           }
+        } /* end of normalize if */
+      /* and get the weighted avg */
+	 avg = MakeWWFixed(0);
+	 for (i = 0; i < count; i++)  {
+	   avg += GrUDivWWFixed(
+				GrMulWWFixed(sums[i], weights[i]), MakeWWFixed(100));
+	   }
+      } /* end of != 0 if */
+    else avg = MakeWWFixed(0);
+
+    return (avg);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetLetterGrade(...)
+ *
+ * DESCRIPTION:  Converts the # grade to a letter
+ *               NOTE - the letter conv file must be open
+ *
+ ***********************************************************************/
+void GetLetterGrade(WWFixedAsDWord grade,
+				char* tempStr)
+{
+ LGVMMapStruct		*mapPtrL;
+ VMBlockHandle		vmbhL;
+ MemHandle		mhL;
+ word			i, letter = 0, end = 1;
+ Boolean			plus = FALSE, minus = FALSE;
+
+
+    vmbhL = VMGetMapBlock(g_letterFileHan);
+    mapPtrL = VMLock(g_letterFileHan, vmbhL, &mhL);
+    if (!mapPtrL->LGS_plusMinus) {
+	  /* no plus or minus grades */
+	  for (i = 1; i < 10; i++) {
+		if (grade >= mapPtrL->LGS_numVal[i]) {
+		   break;
+		   }
+		else {
+		   letter++;
+		   i++;
+		   }
+		}
+	  }
+    else {
+	  /* plus and minus grades */
+	  for (i = 1; i < 10; i++)  {
+		if (grade >= mapPtrL->LGS_numVal[i + 20]) {
+		   plus = TRUE;
+		   break;
+		   }
+		else if (grade >= mapPtrL->LGS_numVal[i]) {
+		   break;
+		   }
+		else if (grade >= mapPtrL->LGS_numVal[i + 10]) {
+		   minus = TRUE;
+		   break;
+		   }
+		else {
+		   letter++;
+		   i++;
+		   }
+		}
+	  }
+    tempStr[0] = mapPtrL->LGS_letters[letter];
+    if (mapPtrL->LGS_plusMinus) {
+	  if (plus) {
+		tempStr[1] = '+';
+		end++;
+		}
+	  if (minus) {
+		tempStr[1] = '-';
+		end++;
+		}
+	  }
+    tempStr[end] = 0;
+
+    VMUnlock(mhL);
+    return;
+    
+}
+
+

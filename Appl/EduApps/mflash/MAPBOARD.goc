@@ -1,0 +1,744 @@
+@include <stdapp.goh>
+@include <Ansi/string.h>
+@include <Ansi/stdio.h>
+@include <Ansi/stdlib.h>
+
+#include "mapboard.goh"
+#include "mathflsh.goh"
+#define abs(x)  ( ((x) < 0)?(-(x)):(x) )
+
+/***************************************************************************
+ *		Map Board functions
+ ***************************************************************************/
+void MapBoardInit(T_mapBoard *mapBoard)
+{
+    int i ;
+    memset(mapBoard->board, 0, sizeof(mapBoard->board)) ;
+    for (i=0; i<MAP_BOARD_HEIGHT; i++)  {
+        mapBoard->underline[i][0] = -1 ;
+    }
+    mapBoard->numSteps = 0 ;
+    mapBoard->stepIndex = 0 ;
+    MapBoardResetInvalidation(mapBoard) ;
+}
+
+T_step *MapBoardLookupStep(T_mapBoard *mapBoard, word n)
+{
+    return mapBoard->steps + n ;
+}
+
+void MapBoardAddStep(T_mapBoard *mapBoard, word x, word y, char digit)
+{
+    word n = mapBoard->numSteps ;
+    if (n < MAP_BOARD_MAX_STEPS)  {
+        T_step *p_step = MapBoardLookupStep(mapBoard, n) ;
+        p_step->digit = digit ;
+        p_step->x = x ;
+        p_step->y = y ;
+        mapBoard->numSteps++ ;
+    }
+}
+
+void MapBoardAddStepsForNumberLeftToRight(T_mapBoard *mapBoard, word x, word y)
+{
+    while (x < MAP_BOARD_WIDTH)  {
+        char c ;
+        c = MapBoardGetSquare(mapBoard, x, y) ;
+        if (c)
+            MapBoardAddStep(mapBoard, x, y, c) ;
+        x++ ;
+    }
+}
+
+void MapBoardAddStepsForNumberRightToLeft(T_mapBoard *mapBoard, word x, word y)
+{
+    while (x < MAP_BOARD_WIDTH)  {
+        char c ;
+        c = MapBoardGetSquare(mapBoard, x, y) ;
+        if (c)
+            MapBoardAddStep(mapBoard, x, y, c) ;
+        x-- ;
+    }
+}
+
+void MapBoardHideAllSteps(T_mapBoard *mapBoard)
+{
+    word i ;
+
+    for (i=0; i<mapBoard->numSteps; i++)  {
+        T_step *p_step = MapBoardLookupStep(mapBoard, i) ;
+        MapBoardSetSquare(mapBoard, p_step->x, p_step->y, 0) ;
+    }
+}
+
+void MapBoardPromptCurrentStep(T_mapBoard *mapBoard)
+{
+    if (mapBoard->stepIndex < mapBoard->numSteps)  {
+        T_step *p_step = MapBoardLookupStep(mapBoard, mapBoard->stepIndex) ;
+        MapBoardSetSquare(mapBoard, p_step->x, p_step->y, '?') ;
+    }
+}
+
+void MapBoardReplaceCurrentStep(T_mapBoard *mapBoard, char c)
+{
+    if (mapBoard->stepIndex < mapBoard->numSteps)  {
+        T_step *p_step = MapBoardLookupStep(mapBoard, mapBoard->stepIndex) ;
+        MapBoardSetSquare(mapBoard, p_step->x, p_step->y, c) ;
+        MapBoardSetCheckSquare(mapBoard, p_step->x, p_step->y, 0) ;
+    }
+}
+
+void MapBoardStartSteps(T_mapBoard *mapBoard)
+{
+    MapBoardHideAllSteps(mapBoard) ;
+    MapBoardSetupCheckBoard(mapBoard) ;
+    mapBoard->stepIndex = 0 ;
+    MapBoardPromptCurrentStep(mapBoard) ;
+}
+
+void MapBoardNextStep(T_mapBoard *mapBoard)
+{
+    if (mapBoard->stepIndex < mapBoard->numSteps)  {
+        mapBoard->stepIndex++ ;
+        MapBoardPromptCurrentStep(mapBoard) ;
+    }
+}
+
+void MapBoardPreviousStep(T_mapBoard *mapBoard)
+{
+    if (mapBoard->stepIndex > 0)  {
+        mapBoard->stepIndex-- ;
+        MapBoardPromptCurrentStep(mapBoard) ;
+    }
+}
+
+/* Pull out a number on the map's board */
+sdword MapBoardGetNum(T_mapBoard *mapBoard, sword x, sword y, word count)
+{
+    sdword v = 0 ;
+    Boolean isNegative = FALSE ;
+    if (x < MAP_BOARD_WIDTH)   {
+        while ((count--) && (x < MAP_BOARD_WIDTH))  {
+            char c = MapBoardGetSquare(mapBoard, x, y) ;
+            if (c == '-')  {
+                isNegative = TRUE ;
+            } else if (c == '+')  {
+                isNegative = FALSE ;
+            } else if (isdigit(c)) {
+                v *= 10 ;
+                v += c - '0';
+            }
+            x++ ;
+        }
+    }
+    return (isNegative)?-v:v ;
+}
+
+/* Write out a number on the map's board, right justified */
+void MapBoardSetNum(
+            T_mapBoard *mapBoard, 
+            sword x, 
+            sword y, 
+            sdword value, 
+            word width)
+{
+    char line[MAP_BOARD_WIDTH+2] ;
+    char *p ;
+    int len ;
+    int i ;
+    char sign = 0 ;
+
+    /* Convert to a number and note if we are + or - */
+    sprintf(line, "%ld", value) ;
+    if (line[0] == '-')  {
+        p = line+1 ;
+        sign = '-' ;
+    } else {
+        p = line ;
+    }
+
+    /* Make enough room */
+    len = strlen(p) ;
+    if (width < len)
+        width = len ;
+
+    /* Write out blanks */
+    for (i=0; i<(width-len); i++)
+        MapBoardSetSquare(mapBoard, x++, y, 0) ;
+
+    if (sign == '-')
+        MapBoardSetSquare(mapBoard, x-1, y, sign) ;
+
+    /* Now write out the number */
+    for (i=0; i<len; i++)
+        MapBoardSetSquare(mapBoard, x++, y, p[i]) ;
+}
+
+/* Set a single square on the board */
+void MapBoardSetSquare(T_mapBoard *mapBoard, word x, word y, char c)
+{
+    if ((x < MAP_BOARD_WIDTH) && (y < MAP_BOARD_HEIGHT))  {
+        if (c != mapBoard->board[y][x])  {
+            mapBoard->board[y][x] = c ;
+            MapBoardMarkForInvalidation(mapBoard, x, y) ;
+        }
+    }
+}
+
+/* Get a single square on the board */
+char MapBoardGetSquare(T_mapBoard *mapBoard, word x, word y)
+{
+    if ((x < MAP_BOARD_WIDTH) && (y < MAP_BOARD_HEIGHT))
+        return mapBoard->board[y][x] ;
+    return 0 ;
+}
+
+/* Get a single square on the board */
+char MapBoardGetCorrectSquare(T_mapBoard *mapBoard, word x, word y)
+{
+    if ((x < MAP_BOARD_WIDTH) && (y < MAP_BOARD_HEIGHT))
+        return mapBoard->correctBoard[y][x] ;
+    return 0 ;
+}
+
+/* Set a single square on the board */
+void MapBoardSetCheckSquare(T_mapBoard *mapBoard, word x, word y, char c)
+{
+    if ((x < MAP_BOARD_WIDTH) && (y < MAP_BOARD_HEIGHT))  {
+        if (c != mapBoard->checkBoard[y][x])  {
+            mapBoard->checkBoard[y][x] = c ;
+            MapBoardMarkForInvalidation(mapBoard, x, y) ;
+        }
+    }
+}
+
+/* Get a single square on the board */
+char MapBoardGetCheckSquare(T_mapBoard *mapBoard, word x, word y)
+{
+    if ((x < MAP_BOARD_WIDTH) && (y < MAP_BOARD_HEIGHT))
+        return mapBoard->checkBoard[y][x] ;
+    return 0 ;
+}
+
+/* Determine how much of the board is used */
+void MapBoardGetBounds(T_mapBoard *mapBoard, Rectangle *rect)
+{
+    char c, cc ;
+    sword x, y ;
+    int sx, ex ;
+
+    rect->R_bottom = -1 ;
+    rect->R_right = -1 ;
+    rect->R_left = MAP_BOARD_WIDTH+1 ;
+    rect->R_top = MAP_BOARD_HEIGHT+1 ;
+
+    for (y=0; y<MAP_BOARD_WIDTH; y++)  {
+        for (x=0; x<MAP_BOARD_HEIGHT; x++)  {
+            c = MapBoardGetSquare(mapBoard, x, y) ;
+            cc = MapBoardGetCorrectSquare(mapBoard, x, y) ;
+            if ((c) || (cc))  {
+                if (y > rect->R_bottom)
+                    rect->R_bottom = y ;
+                if (y < rect->R_top)
+                    rect->R_top = y ;
+                if (x < rect->R_left)
+                    rect->R_left = x ;
+                if (x > rect->R_right)
+                    rect->R_right = x ;
+            }
+        }
+        if (MapBoardIsUnderline(mapBoard, y))  {
+            if (y < rect->R_top)
+                rect->R_top = y ;
+            if (y > rect->R_bottom)
+                rect->R_bottom = y ;
+            MapBoardGetUnderline(mapBoard, y, (word*) &sx, (word*)&ex) ;
+            if (sx > rect->R_right)
+                rect->R_right = sx ;
+            if (ex > rect->R_right)
+                rect->R_right = ex ;
+            if (sx < rect->R_left)
+                rect->R_left = sx ;
+            if (ex < rect->R_left)
+                rect->R_left = ex ;
+        }
+    }
+}
+
+/* Draw the board on the given gstate in the upper left */
+void MapBoardDraw(T_mapBoard *mapBoard, GStateHandle gstate, word height, word width, word correctColor, word incorrectColor, word uncheckedColor)
+{
+    Rectangle rect ;
+    sword diffX, diffY ;
+    sword x, y ;
+    sword bx, by ;
+    char c, cc, ch ;
+    int numX, numY ;
+    int ratioX ;
+    int offsetX ;
+    int offsetY ;
+    sword underlineStart, underlineEnd ;
+    byte textColor ;
+    
+    MapBoardGetBounds(mapBoard, &rect) ;
+    if (rect.R_bottom != -1)  {
+        numX = 1 + rect.R_right - rect.R_left ;
+        numY = 1 + rect.R_bottom - rect.R_top ;
+        if (numY < numX)
+            numY = numX ;
+        GrSaveState(gstate) ;
+        diffX = width / numX ;
+        diffY = height / numY ;
+        ratioX = diffY * 3 / 4 ;
+        if (diffX > ratioX)
+            diffX = ratioX ;
+        offsetX = (width - (diffX * numX))>>1 ;
+        offsetY = (height - (diffY * (1 + rect.R_bottom - rect.R_top)))>>1 ;
+
+        GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(diffY-2)) ;
+        y = offsetY ;
+        for (by=rect.R_top; by<=rect.R_bottom; by++)  {
+            x = offsetX ;
+            for (bx=rect.R_left; bx<=rect.R_right; bx++)  {
+                c = MapBoardGetSquare(mapBoard, bx, by) ;
+                if (c)  {
+                    /* Determine a color for the checked/unchecked */
+                    textColor = uncheckedColor ;
+                    ch = MapBoardGetCheckSquare(mapBoard, bx, by) ;
+                    if (ch)  {
+                        cc = MapBoardGetCorrectSquare(mapBoard, bx, by) ;
+                        if (c!=cc)
+                            textColor = incorrectColor ;
+                        else
+                            textColor = correctColor ;
+                    }
+                    GrDrawShadowText(gstate, x+((c=='-')?(diffY/7):0), y-/*ADJUST_TEXT_UP*/(diffY/12)-((c==')')?diffY/6:0), &c, 1, textColor) ;
+                    if (c==')')  {
+                        GrSetTextColor(gstate, CF_INDEX, correctColor, 0, 0) ;
+                        GrDrawText(gstate, x+((c=='-')?(diffY/7):0), y-/*ADJUST_TEXT_UP*/(diffY/12)-1-((c==')')?diffY/6:0), &c, 1) ;
+                        GrDrawText(gstate, x+((c=='-')?(diffY/7):0)+1, y-/*ADJUST_TEXT_UP*/(diffY/12)-1-((c==')')?diffY/6:0), &c, 1) ;
+                    }
+                }
+
+                x += diffX ;
+            }
+            y += diffY ;
+            if (MapBoardIsUnderline(mapBoard, by))  {
+                MapBoardGetUnderline(mapBoard, by, &underlineStart, &underlineEnd) ;
+                underlineStart = offsetX + ((underlineStart-rect.R_left) * diffX) ;
+                underlineEnd = offsetX + (((underlineEnd-rect.R_left)+1) * diffX) ;
+                DrawUnderline(gstate, underlineStart, underlineEnd, y) ;
+            }
+        }
+
+        GrRestoreState(gstate) ;
+    }
+}
+
+/* Setup up the board in such a way we know if we have a valid set of code */
+void MapBoardSetupTest(T_mapBoard *mapBoard)
+{
+//    sdword v ;
+    MapBoardSetNum(mapBoard, 3, 3, 189, 4) ;
+    MapBoardSetNum(mapBoard, 3, 4,  21, 4) ;
+    MapBoardSetNum(mapBoard, 3, 5, 310, 4) ;
+    MapBoardSetSquare(mapBoard, 7, 6, '?') ;
+    MapBoardMakeUnderline(mapBoard, 5) ;
+
+/*
+    v = MapBoardGetNum(mapBoard, 2, 5, 5) ;
+    v = -v ;
+    MapBoardSetNum(mapBoard, 1, 7, v, 7, FALSE) ;
+    v = MapBoardGetNum(mapBoard, 8, 5, 3) ;
+    MapBoardSetNum(mapBoard, 1, 8, v, 3, FALSE) ;
+
+*/
+/*
+    MapBoardSetNum(mapBoard, 8, 6, 1000, 4, TRUE) ;
+    MapBoardSetNum(mapBoard, 0, 9, 1000, 4, TRUE) ;
+    MapBoardSetNum(mapBoard, 14, 9, 1000, 4, TRUE) ;
+*/
+
+//    MapBoardUnderlineOn(mapBoard, 8, 0, 3) ;
+//    MapBoardUnderlineOn(mapBoard, 5, 3, 7) ;
+//    MapBoardUnderlineOn(mapBoard, 5, 5, 7) ;
+
+//    EquationSetupAdd(mapBoard, 3, 7) ;
+    EquationSetupAdd(mapBoard, 42, -81) ;
+//    EquationSetupSubtract(mapBoard, 789, 31) ;
+//    EquationSetupMultiply(mapBoard, 345, -789) ;
+//    EquationSetupMultiply(mapBoard, 3, 9) ;
+//    EquationSetupDivide(mapBoard, 185208576, 7896) ;
+//    EquationSetupDivide(mapBoard, 534942, 678) ;
+//    EquationSetupDivide(mapBoard, 912, 12) ;
+//    EquationSetupDivide(mapBoard, 12, 3) ;
+
+    MapBoardSetCorrectBoardFromCurrentBoard(mapBoard) ;
+    MapBoardStartSteps(mapBoard) ;
+}
+
+/* Turn on the underline on a line with a given start and end X */
+void MapBoardUnderlineOn(T_mapBoard *mapBoard, word y, word startX, word endX)
+{
+    if (y < MAP_BOARD_HEIGHT)  {
+        mapBoard->underline[y][0] = startX ;
+        mapBoard->underline[y][1] = endX ;
+    }
+}
+
+/* Turn off the underline on a whole line */
+void MapBoardUnderlineOff(T_mapBoard *mapBoard, word y)
+{
+    if (y < MAP_BOARD_HEIGHT)  {
+        mapBoard->underline[y][0] = MAP_BOARD_UNDERLINE_OFF ;
+        mapBoard->underline[y][1] = MAP_BOARD_UNDERLINE_OFF ;
+    }
+}
+
+/* Determine if a line is underlined */
+Boolean MapBoardIsUnderline(T_mapBoard *mapBoard, word y)
+{
+    if (y < MAP_BOARD_HEIGHT)  {
+        if (mapBoard->underline[y][0] != MAP_BOARD_UNDERLINE_OFF)
+            return TRUE ;
+    }
+    return FALSE ;
+}
+
+/* Get the underline bounds of a line */
+void MapBoardGetUnderline(T_mapBoard *mapBoard, word y, word *startX, word *endX)
+{
+    if (y < MAP_BOARD_HEIGHT)  {
+        *startX = mapBoard->underline[y][0] ;
+        *endX = mapBoard->underline[y][1] ;
+    } else {
+        *startX = *endX = 0 ;
+    }
+}
+
+/* Look at a line of text and underline it appropriate using */
+/* the map board underline system */
+void MapBoardMakeUnderline(T_mapBoard *mapBoard, word y)
+{
+    sword sx, ex ;
+    char c ;
+    sword x;
+
+    sx = MAP_BOARD_WIDTH ;
+    ex = -1 ;
+
+    if (y < MAP_BOARD_HEIGHT)  {
+        for (x=0; x<MAP_BOARD_WIDTH; x++)  {
+            c = MapBoardGetSquare(mapBoard, x, y) ;
+            if (c)  {
+                if (x < sx)
+                    sx = x ;
+                if (x > ex)
+                    ex = x ;
+            }
+        }
+        if (sx != MAP_BOARD_WIDTH)  {
+            MapBoardUnderlineOn(mapBoard, y, sx, ex) ;
+        } else {
+            MapBoardUnderlineOff(mapBoard, y) ;
+        }
+    }
+}
+
+void MapBoardMakeUnderline2(T_mapBoard *mapBoard, word y, word y2)
+{
+    sword sx, ex ;
+    char c ;
+    sword x;
+
+    sx = MAP_BOARD_WIDTH ;
+    ex = -1 ;
+
+    if (y < MAP_BOARD_HEIGHT)  {
+        for (x=0; x<MAP_BOARD_WIDTH; x++)  {
+            c = MapBoardGetSquare(mapBoard, x, y) ;
+            if (c)  {
+                if (x < sx)
+                    sx = x ;
+                if (x > ex)
+                    ex = x ;
+            }
+            c = MapBoardGetSquare(mapBoard, x, y2) ;
+            if (c)  {
+                if (x < sx)
+                    sx = x ;
+                if (x > ex)
+                    ex = x ;
+            }
+        }
+        if (sx != MAP_BOARD_WIDTH)  {
+            MapBoardUnderlineOn(mapBoard, y, sx, ex) ;
+        } else {
+            MapBoardUnderlineOff(mapBoard, y) ;
+        }
+    }
+}
+
+void MapBoardSetCorrectBoardFromCurrentBoard(T_mapBoard *mapBoard)
+{
+    /* Copy over the board */
+    memcpy(
+        mapBoard->correctBoard, 
+        mapBoard->board, 
+        sizeof(mapBoard->correctBoard)) ;
+}
+
+void MapBoardResetInvalidation(T_mapBoard *mapBoard)
+{
+    mapBoard->needInval = FALSE ;
+}
+
+void MapBoardMarkForInvalidation(T_mapBoard *mapBoard, sword x, sword y)
+{
+    if (mapBoard->needInval)  {
+        if (x < mapBoard->inval.R_left)
+            mapBoard->inval.R_left = x ;
+        if (x > mapBoard->inval.R_right)
+            mapBoard->inval.R_right = x ;
+        if (y < mapBoard->inval.R_top)
+            mapBoard->inval.R_top = y ;
+        if (y > mapBoard->inval.R_bottom)
+            mapBoard->inval.R_bottom = y ;
+    } else {
+        mapBoard->inval.R_left = mapBoard->inval.R_right = x ;
+        mapBoard->inval.R_top = mapBoard->inval.R_bottom = y ;
+        mapBoard->needInval = TRUE ;
+    }
+}
+
+word NumWidth(T_number v)
+{
+    char line[20] ;
+    
+    sprintf(line, "%ld", abs(v)) ;
+    return 1+strlen(line) ;   
+}
+
+#define ADD_X  3
+#define ADD_Y  3
+void EquationSetupAdd(T_mapBoard *mapBoard, T_number v1, T_number v2)
+{
+    T_number sum ;
+    word width, width2 ;
+    width = NumWidth(v1) ;
+    width2 = NumWidth(v2) ;
+    if (width2 > width)
+        width = width2 ;
+    sum = v1+v2 ;
+    width2 = NumWidth(sum)-1 ;
+    if (width2 > width)
+        width = width2 ;
+    MapBoardInit(mapBoard) ;
+    MapBoardSetNum(mapBoard, ADD_X, ADD_Y, v1, width) ;
+    MapBoardSetNum(mapBoard, ADD_X, ADD_Y+1, v2, width) ;
+    MapBoardSetSquare(mapBoard, ADD_X-1, ADD_Y+1, '+') ;
+    MapBoardMakeUnderline(mapBoard, ADD_Y+1) ;
+    MapBoardSetNum(mapBoard, ADD_X-1, ADD_Y+2, sum, width+1) ;
+    MapBoardAddStepsForNumberRightToLeft(mapBoard, MAP_BOARD_WIDTH-1, ADD_Y+2) ;
+}
+
+#define SUB_X  3
+#define SUB_Y  3
+void EquationSetupSubtract(T_mapBoard *mapBoard, T_number v1, T_number v2)
+{
+    T_number diff ;
+    word width, width2 ;
+    width = NumWidth(v1) ;
+    width2 = NumWidth(v2) ;
+    if (width2 > width)
+        width = width2 ;
+    diff = v1-v2 ;
+    width2 = NumWidth(diff)-1 ;
+    if (width2 > width)
+        width = width2 ;
+    MapBoardInit(mapBoard) ;
+    MapBoardSetNum(mapBoard, SUB_X, SUB_Y, v1, width) ;
+    MapBoardSetNum(mapBoard, SUB_X, SUB_Y+1, v2, width) ;
+    MapBoardSetSquare(mapBoard, SUB_X-1, SUB_Y+1, '-') ;
+    MapBoardMakeUnderline(mapBoard, SUB_Y+1) ;
+    MapBoardSetNum(mapBoard, SUB_X-1, SUB_Y+2, diff, width+1) ;
+    MapBoardAddStepsForNumberRightToLeft(mapBoard, MAP_BOARD_WIDTH-1, SUB_Y+2) ;
+}
+
+#define MULT_X  3
+#define MULT_Y  3
+void EquationSetupMultiply(T_mapBoard *mapBoard, T_number v1, T_number v2)
+{
+    T_number product ;
+    word width1, width2, width3 ;
+    word width ;
+    word i ;
+    T_number digit, digitProd ;
+    word sx, ex ;
+    word numLines ;
+
+    product = v1*v2 ;
+    width1 = NumWidth(v1) ;
+    width2 = NumWidth(v2) ;
+    width3 = NumWidth(product)-1 ;
+    width = width1 ;
+    if (width2 > width)
+        width = width2 ;
+    if (width3 > width)
+        width = width3 ;
+
+    MapBoardInit(mapBoard) ;
+    MapBoardSetNum(mapBoard, MULT_X, MULT_Y, v1, width) ;
+    MapBoardSetNum(mapBoard, MULT_X, MULT_Y+1, v2, width) ;
+    MapBoardSetSquare(mapBoard, MULT_X-1, MULT_Y+1, 'x') ;
+    MapBoardMakeUnderline(mapBoard, MULT_Y+1) ;
+
+    numLines = width2-1 ;
+    if (numLines > 1)  {
+        for (i=0; i<(width2-1); i++)  {
+            digit = MapBoardGetNum(mapBoard, MULT_X+width-1-i, MULT_Y+1, 1) ;
+            digitProd = digit * abs(v1) ;
+            MapBoardSetNum(mapBoard, MULT_X-i, MULT_Y+2+i, digitProd, width) ;
+            MapBoardAddStepsForNumberRightToLeft(mapBoard, MAP_BOARD_WIDTH-1, MULT_Y+2+i) ;
+        }
+
+        MapBoardGetUnderline(mapBoard, MULT_Y+1, &sx, &ex) ;
+        MapBoardUnderlineOn(mapBoard, MULT_Y+2+i-1, sx, ex) ;
+        MapBoardSetNum(mapBoard, MULT_X-1, MULT_Y+2+i, product, width+1) ;
+        MapBoardAddStepsForNumberRightToLeft(mapBoard, MAP_BOARD_WIDTH-1, MULT_Y+2+i) ;
+    } else {
+        MapBoardSetNum(mapBoard, MULT_X-1, MULT_Y+2, product, width+1) ;
+        MapBoardAddStepsForNumberRightToLeft(mapBoard, MAP_BOARD_WIDTH-1, MULT_Y+2) ;
+    }
+}
+
+#define DIVIDE_X  7
+#define DIVIDE_Y  3
+void EquationSetupDivide(T_mapBoard *mapBoard, T_number v1, T_number v2)
+{
+    /* Deal with only positive numbers right now */
+    T_number v, big ;
+    sword digit ;
+    word width1, width2;
+    word sx, ex ;
+    word line ;
+    Boolean firstZeros = TRUE ;
+//    word lsx, lsy ;
+    char c ;
+    word downline ;
+
+    v1 = abs(v1) ;
+    if (v2 == 0)
+        v2 = 1 ;
+    v2 = abs(v2) ;
+
+    width1 = NumWidth(v1)-1 ;
+    width2 = NumWidth(v2)-1 ;
+//    width3 = NumWidth(quotient)-1 ;
+
+    MapBoardInit(mapBoard) ;
+    MapBoardSetNum(mapBoard, DIVIDE_X, DIVIDE_Y, v1, width1) ;
+    MapBoardSetNum(mapBoard, DIVIDE_X-width2-1, DIVIDE_Y, v2, width2) ;
+    MapBoardSetSquare(mapBoard, DIVIDE_X-1, DIVIDE_Y, ')') ;
+    MapBoardUnderlineOn(mapBoard, DIVIDE_Y-1, DIVIDE_X-1, DIVIDE_X+width1-1) ;
+    sx = ex = DIVIDE_X ;
+    line = DIVIDE_Y+1 ;
+    downline = DIVIDE_Y ;
+    for (;;)  {
+        /* Get the number at the top */
+        v = MapBoardGetNum(mapBoard, sx, downline, 1+ex-sx) ;
+        if (v >= v2)  {
+            /* Got enough digits.  Let's put in our biggest multiple */
+            for (digit=9; digit>=0; digit--)  {
+                big = digit * v2 ;
+                if (big <= v)
+                    break ;
+            }
+
+            /* Place the determined value */
+            MapBoardSetNum(mapBoard, sx, line, -big, 1+ex-sx) ;
+            MapBoardMakeUnderline(mapBoard, line) ;
+            MapBoardSetNum(mapBoard, sx, line+1, v-big, 1+ex-sx);
+            MapBoardSetSquare(mapBoard, ex, DIVIDE_Y-1, '0'+digit) ;
+            MapBoardAddStep(mapBoard, ex, DIVIDE_Y-1, '0'+digit) ;
+            MapBoardAddStepsForNumberRightToLeft(mapBoard, MAP_BOARD_WIDTH-1, line) ;
+            MapBoardAddStepsForNumberRightToLeft(mapBoard, MAP_BOARD_WIDTH-1, line+1) ;
+            downline = line+1 ;
+            line = downline+1 ;
+            while (MapBoardGetSquare(mapBoard, sx, downline)==0)  {
+                sx++ ;
+                if (sx >= MAP_BOARD_WIDTH)
+                    break ;
+            }
+            if (sx >= MAP_BOARD_WIDTH)
+                break ;
+            if (ex < sx)
+                ex = sx ;
+            firstZeros = FALSE ;
+        } else {
+            /* Not enough digits.  Get bigger (bring down a digit) */
+            if (!firstZeros)  {
+                if (MapBoardGetSquare(mapBoard, ex, DIVIDE_Y-1)==0)  {
+                    MapBoardSetSquare(mapBoard, ex, DIVIDE_Y-1, '0') ;
+                    MapBoardAddStep(mapBoard, ex, DIVIDE_Y-1, '0') ;
+                }
+            }
+            ex++ ;
+            c = MapBoardGetSquare(mapBoard, ex, DIVIDE_Y) ;
+            if (c==0)
+                break ;
+            MapBoardSetSquare(mapBoard, ex, downline, c) ;
+            if (downline != DIVIDE_Y)
+                MapBoardAddStep(mapBoard, ex, downline, c) ;
+        }
+    }
+}
+
+/* Draw the board on the given gstate in the upper left */
+void MapBoardInvalidate(T_mapBoard *mapBoard, GStateHandle gstate, word height, word width)
+{
+    Rectangle rect ;
+    sword diffX, diffY ;
+    int numX, numY ;
+    int ratioX ;
+    int offsetX ;
+    int offsetY ;
+    
+    if (mapBoard->needInval)  {
+        MapBoardGetBounds(mapBoard, &rect) ;
+        if (rect.R_bottom != -1)  {
+            numX = 1 + rect.R_right - rect.R_left ;
+            numY = 1 + rect.R_bottom - rect.R_top ;
+            if (numY < numX)
+                numY = numX ;
+
+            GrSaveState(gstate) ;
+
+            diffX = width / numX ;
+            diffY = height / numY ;
+            ratioX = diffY * 3 / 4 ;
+            if (diffX > ratioX)
+                diffX = ratioX ;
+            offsetX = (width - (diffX * numX))>>1 ;
+            offsetY = (height - (diffY * (1 + rect.R_bottom - rect.R_top)))>>1 ;
+
+            GrInvalRect(
+                gstate, 
+                offsetX + diffX * (mapBoard->inval.R_left-rect.R_left),
+                offsetY + diffY * (mapBoard->inval.R_top-rect.R_top),
+                offsetX + diffX * (mapBoard->inval.R_right-rect.R_left+1),
+                offsetY + diffY * (mapBoard->inval.R_bottom-rect.R_top+1)) ;
+
+            GrRestoreState(gstate) ;
+        }
+        MapBoardResetInvalidation(mapBoard) ;
+    }
+}
+
+Boolean MapBoardIsAllCorrect(T_mapBoard *mapBoard)
+{
+    if (memcmp(mapBoard->board, mapBoard->correctBoard, sizeof(mapBoard->board)) == 0)
+        return TRUE ;
+    return FALSE ;
+}
+

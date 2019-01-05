@@ -1,0 +1,2021 @@
+/***************************************************************************
+ *                                                                         *
+ *  MFlash                                                             *
+ *                                                                         *
+ ***************************************************************************/
+
+/*
+    TO DO:
+
+    * Command buffer to store the list of keystrokes
+    * Do an example addition, subtraction, multiplication, and division
+    * Center and lower text (so we can have carry text)
+    * Add in the carry system for the above (as an option)
+
+*/
+
+
+/***************************************************************************
+ *		Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi/string.h>
+@include <Ansi/stdio.h>
+@include <Ansi/stdlib.h>
+@include "stud_db.goh"
+@include "initfile.h"
+void PlaySimpleSound(word soundId, word priority) ;
+
+/***************************************************************************
+ *		Constants & Macros
+ ***************************************************************************/
+#define VIEW_WIDTH     600
+#define VIEW_HEIGHT    400
+#define UNDERLINE_WIDTH  3
+#define ADJUST_TEXT_UP  5
+#define DELAY_WHEN_RIGHT (1*60)
+#define PRIVATE_DIR "mathflsh"
+
+/***************************************************************************
+ *		Data types
+ ***************************************************************************/
+
+@include "mathflsh.goh"
+
+/***************************************************************************
+ *		Prototypes
+ ***************************************************************************/
+@include "mapboard.goh"
+
+void DrawUnderline(GStateHandle gstate, word underlineStart, word underlineEnd, word y) ;
+
+word MyRandom(void) ;
+
+void ProblemsSetup(T_problems *problems, word num, T_number low1, T_number high1, T_number low2, T_number high2, Boolean allowSigns, optr cardsObj, T_problemType type) ;
+void ProblemsDraw(GStateHandle gstate, T_problems *problems) ;
+void ProblemsNext(T_problems *problems) ;
+void ProblemsPrevious(T_problems *problems) ;
+void ProblemsInvalidateProblem(GStateHandle gstate, word card) ;
+void ProblemsSetBoard(T_problems *problems, T_mapBoard *mapBoard) ;
+void ProblemsMarkCurrent(T_problems *problems, T_problemState state) ;
+void ProblemsInvalidateCurrentCard(T_problems *problems) ;
+Boolean ProblemsCheckAllCorrect(T_problems *problems) ;
+
+void SetStatusText(optr text) ;
+
+/***************************************************************************
+ *		Globals
+ ***************************************************************************/
+T_mapBoard G_mapBoard ;
+T_problems G_problems ;
+TimerHandle G_timer = NullHandle ;
+word G_timerId ;
+Boolean G_inGame = FALSE ;
+StudentDB G_db ;
+StudentIndex G_studentIndex = BAD_STUDENT ;
+StudentHistoryEntry G_stats ;
+extern Boolean G_soundIsOn ;
+
+/***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************/
+
+@include "classes.goh"
+@classdecl MFlashProcessClass, neverSaved ;
+@classdecl MFlashAppClass ;
+@classdecl MFlashViewClass;
+@classdecl MFlashContentClass ;
+@classdecl MFlashPrimaryClass;
+@classdecl BoxClass ;
+@classdecl CardsClass ;
+@classdecl LargeDigitLinesClass ;
+@classdecl StatusTextClass ;
+@classdecl LoginDialogClass ;
+@classdecl OptionsDialogClass ;
+@extern method MFlashProcessClass, MSG_MATH_FLASH_UPDATE_SOUND ;
+
+/***************************************************************************
+ *		UI Objects
+ ***************************************************************************/
+
+
+
+/*=========================================================================*/
+
+
+
+@start	AppResource ;
+    /*---------------------------------------------------------------------*/
+    @object MFlashAppClass MFlashApp = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH | GA_TARGETABLE;
+    GI_visMoniker = list { @MFlashTextMoniker, @AppIcon48x30x16, @AppIcon15x15x16, @AppIcon48x30x2, @AppIcon15x15x2 } ;
+	 GI_comp       = @MFlashPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS)
+        = @MFlashPrimary;
+	 ATTR_GEN_HELP_FILE = "MFlash Help";
+    }
+	 /*---------------------------------------------------------------------*/
+    @visMoniker MFlashTextMoniker =
+        "Math Flash!" ;
+    /*---------------------------------------------------------------------*/
+@include "Art/Icons.goh"
+@end	AppResource
+
+
+
+/*=========================================================================*/
+
+@start	Interface		/* this resource is for misc UI objects */ ; ;
+    /*---------------------------------------------------------------------*/
+    @object MFlashPrimaryClass MFlashPrimary  = {
+        GI_attrs = @default | GA_KBD_SEARCH_PATH | GA_TARGETABLE;
+        GI_comp = 
+            @ViewHolder,
+            @MFlashFileMenu,
+            @MFlashDialogs ;
+        ATTR_GEN_HELP_CONTEXT = "TOC";
+        HINT_SIZE_WINDOW_AS_DESIRED ;
+        HINT_CENTER_WINDOW ;
+//        HINT_PRIMARY_NO_FILE_MENU ;
+//        HINT_PRIMARY_FULL_SCREEN ;
+    }
+	 /*---------------------------------------------------------------------*/
+    @object GenInteractionClass MFlashFileMenu = {
+        GI_visMoniker = 'F', "File" ;
+        GI_comp = 
+            @BringUpOptionsDialog,
+            @MFlashSoundOnOff,
+				@ChangeUserTrigger;
+        GII_visibility = GIV_POPUP ;
+		  ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass MFlashSoundOnOff = {
+		  GI_visMoniker = 'S', "Sound is ON";
+        GTI_actionMsg = MSG_MFLASH_TOGGLE_SOUND ;
+        GTI_destination = process;
+    }
+    /*---------------------------------------------------------------------*/
+	 @visMoniker SoundOnMoniker = 'S', "Sound is ON" ;
+	 @visMoniker SoundOffMoniker = 'S', "Sound is OFF" ;
+    /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass ChangeUserTrigger = {
+		  GI_visMoniker = 'C', "Change User" ;
+        GTI_actionMsg = MSG_STUDENT_DONE ;
+        GTI_destination = process ;
+		  HINT_TRIGGER_BRINGS_UP_WINDOW;
+	 }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass BringUpOptionsDialog = {
+        GI_visMoniker = 'O', "Options" ;
+        GTI_actionMsg = MSG_MATH_FLASH_OPTIONS_DIALOG ;
+        GTI_destination = process ;
+		  HINT_TRIGGER_BRINGS_UP_WINDOW;
+	 }
+    /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass MFlashDialogs = {
+        GI_comp = 
+            @PwdAskPasswordDialog,
+            @PwdChangePasswordDialog,
+            @LoginDialog,
+            @OptionsDialog,
+            @OptionsDialogGetName,
+            @ReportDialog ;
+        GII_type = GIT_ORGANIZATIONAL ;
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE ;
+	 }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ViewHolder = {
+        GI_comp = @MFlashView ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object MFlashViewClass MFlashView = {
+        GVI_horizAttrs   = @default |
+                           GVDA_DONT_DISPLAY_SCROLLBAR |
+                           GVDA_NO_SMALLER_THAN_CONTENT |
+                           GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_vertAttrs    = @default |
+                           GVDA_DONT_DISPLAY_SCROLLBAR |
+                           GVDA_NO_SMALLER_THAN_CONTENT |
+                           GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_content      = @MFlashContent;
+        GVI_docBounds    = {0, 0, VIEW_WIDTH+8, VIEW_HEIGHT};
+        GVI_color        = {C_BLACK, CF_INDEX, 0, 0} ;
+        GVI_attrs = @default | GVA_NO_WIN_FRAME;
+        HINT_DEFAULT_TARGET;
+        HINT_DEFAULT_FOCUS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object MFlashContentClass MFlashContent = {
+//        VCI_genView = MFlashView ;
+//        VCI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW | VCNA_SAME_HEIGHT_AS_VIEW ;
+//        HINT_WINDOW_WASH_COLOR = C_BLACK ;
+//        HINT_FIXED_SIZE = { VIEW_WIDTH, VIEW_HEIGHT } ;
+        VI_bounds = {0, 0, VIEW_WIDTH+8, VIEW_HEIGHT } ;
+        VCI_comp = @LeftRegion, @RightRegion ;
+        VCI_geoAttrs = @default | VCGA_HAS_MINIMUM_SIZE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object BoxClass LeftRegion = {
+        BI_width = VIEW_WIDTH/2 ;
+        BI_height = VIEW_HEIGHT ;
+        VCI_geoAttrs = @default | VCGA_HAS_MINIMUM_SIZE | VCGA_ORIENT_CHILDREN_VERTICALLY ;
+        VCI_geoDimensionAttrs = @default | HJ_BOTTOM_JUSTIFY_CHILDREN;
+        VCI_comp = @TopLeftRegion, @BottomLeftRegion ;
+        BI_borderThickness = 0 ;
+        BI_backgroundColor = { C_BLACK, CF_INDEX, 0, 0 } ;
+        BI_flags = BOX_FLAGS_NO_BACKGROUND ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object LargeDigitLinesClass RightRegion = {
+        BI_width = VIEW_WIDTH/2 ;
+        BI_height = VIEW_HEIGHT ;
+        VCI_geoAttrs = @default | VCGA_HAS_MINIMUM_SIZE ;
+        BI_backgroundColor = { C_BLUE, CF_INDEX, 0, 0 } ;
+        BI_borderThickness = 3 ;
+        VCI_geoDimensionAttrs = @default | HJ_CENTER_CHILDREN_VERTICALLY;
+/*
+        VCI_comp = 
+                @CarryLine,
+                @QuestionLine1, 
+                @QuestionLine2, 
+                @Bar1, 
+                @Line3, 
+                @Line4, 
+                @Line5, 
+                @Bar2, 
+                @AnswerLine ;
+*/
+    }
+    /*---------------------------------------------------------------------*/
+    @object CardsClass TopLeftRegion = {
+        BI_width = VIEW_WIDTH/2 ;
+        BI_height = VIEW_WIDTH/2 ;
+        VCI_geoAttrs = @default | VCGA_HAS_MINIMUM_SIZE | HJ_BOTTOM_JUSTIFY_CHILDREN;
+        BI_backgroundColor = { C_GREEN, CF_INDEX, 0, 0 } ;
+        BI_borderThickness = 2 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object BoxClass BottomLeftRegion = {
+        BI_width = VIEW_WIDTH/2 ;
+        BI_height = VIEW_HEIGHT - VIEW_WIDTH/2 ;
+        VCI_geoAttrs = @default | VCGA_HAS_MINIMUM_SIZE | HJ_BOTTOM_JUSTIFY_CHILDREN /* HJ_CENTER_CHILDREN_VERTICALLY */;
+        BI_backgroundColor = { C_YELLOW, CF_INDEX, 0, 0 } ;
+        BI_borderThickness = 4 ;
+        BI_bottomRightEdgeColor = { C_DARK_GRAY, CF_INDEX, 0, 0 } ;
+        BI_topLeftEdgeColor = { C_WHITE, CF_INDEX, 0, 0 } ;
+        VCI_comp = @StatusText ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object StatusTextClass StatusText = {
+        VTI_text = "\rWelcome to Math Flash!\rby Breadbox" ;
+        VI_bounds = {10, 10, 300, 90};
+        VTI_charAttrRuns = ((VTDS_18 << VTDCA_SIZE_OFFSET)
+                          | VTDF_URW_SANS)
+                          | VTDCA_BOLD
+                          | (C_BLACK<<VTDCA_COLOR_OFFSET);
+        VTI_paraAttrRuns =
+            (VisTextDefaultParaAttr) ((0*2) << VTDPA_LEFT_MARGIN_OFFSET) | \
+            ((0*2) << VTDPA_PARA_MARGIN_OFFSET) | \
+            ((0*2) << VTDPA_RIGHT_MARGIN_OFFSET) | \
+            (VTDDT_HALF_INCH << VTDPA_DEFAULT_TABS_OFFSET) | \
+            (J_CENTER << VTDPA_JUSTIFICATION_OFFSET);
+        VTI_features = @default | VTF_TRANSPARENT ;
+        VTI_washColor = { C_YELLOW, CF_INDEX, 0, 0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+@end    Interface ;
+
+@start  VariousJunk, data ;
+    /*---------------------------------------------------------------------*/
+    @chunk TCHAR placeholder1[] = "Empty" ;
+    @chunk TCHAR WelcomeMsg[] = "Welcome to Math Flash!\rby Breadbox" ;
+    @chunk TCHAR CorrectMsg[] = "Correct!" ;
+    @chunk TCHAR IncorrectMsg[] = "Incorrect!\rBackspace to correct,\ror TAB to skip" ;
+    @chunk TCHAR InstructionsMsg[] = "Enter digits or backspace.\rPress ENTER when done,\ror TAB to skip" ;
+    @chunk TCHAR CompleteMsg[] = "You have answered all the questions correctly!" ;
+    @chunk TCHAR IncorrectPasswordMsg[] = "Incorrect password!" ;
+    @chunk TCHAR PasswordChangedMsg[] = "Password changed." ;
+    @chunk TCHAR CannotDeleteStudent[] = "Cannot delete the students 'Teacher', 'Default', or 'Guest'." ;
+    @chunk TCHAR DeleteCheckMsg[] = "Are you sure you want to delete this student?" ;
+
+    @chunk TCHAR ReportTitle[] = "Progress Report for Student: " ;
+    @chunk TCHAR ReportSummaryLine[] = "Problems sets worked:\t%d\r" ;
+	 @localize "Please DO NOT touch the % signs and following letters";
+	 @chunk TCHAR ReportSubHeader[] = "\rSet #%d\r" ;
+	 @localize "Please DO NOT touch the % signs and following letters";
+	 @chunk TCHAR ReportStartTime[] = "Start time:\t" ;
+    @chunk TCHAR ReportNoStartTime[] = "Start time:\tNone!" ;
+    @chunk TCHAR ReportEndTime[] = "End time:\t" ;
+    @chunk TCHAR ReportNoEndTime[] = "End time:\tNone!\r" ;
+    @chunk TCHAR ReportNumProblems[] = "\tNumber problems:\t%d\r" ;
+	 @localize "Please DO NOT touch the % signs and following letters";
+	 @chunk TCHAR ReportSignsYes[] = "\tSigned math:\tYES\r" ;
+    @chunk TCHAR ReportSignsNo[] = "\tSigned math:\tYES\r" ;
+    @chunk TCHAR ReportNumericRange1[] = "\tNumeric range 1:\t%d - %d\r" ;
+	 @localize "Please DO NOT touch the % signs and following letters";
+	 @chunk TCHAR ReportNumericRange2[] = "\tNumeric range 2:\t%d - %d\r" ;
+	 @localize "Please DO NOT touch the % signs and following letters";
+	 @chunk TCHAR ReportAdd[] = "\tProblems type:\tAddition\r" ;
+    @chunk TCHAR ReportSubtract[] = "\tProblems type:\tSubtraction\r" ;
+    @chunk TCHAR ReportMultiply[] = "\tProblems type:\tMultiplication\r" ;
+    @chunk TCHAR ReportDivide[] = "\tProblems type:\tDivision\r" ;
+    @chunk TCHAR ReportMixed[] = "\tProblems type:\tMixed\r" ;
+    @chunk TCHAR ReportNumUnanswered[] = "\tNumber unanswered:\t%d (%d %%)\r" ;
+	 @localize "Please DO NOT touch the % signs and following letters";
+	 @chunk TCHAR ReportNumCorrect[] = "\tNumber correct:\t%d (%d %%)\r" ;
+	 @localize "Please DO NOT touch the % signs and following letters";
+	 @chunk TCHAR ReportNumIncorrect[] = "\tNumber incorrect:\t%d (%d %%)\r" ;
+	 @localize "Please DO NOT touch the % signs and following letters";
+	 @chunk TCHAR ReportNumCorrected[] = "\tNumber corrected:\t%d (%d %%)\r" ;
+	 @localize "Please DO NOT touch the % signs and following letters";
+	 @chunk Tab ReportTabGroup[] = {
+        SIMPLE_TAB(0.5),
+        SIMPLE_TAB(2.5),
+        SIMPLE_TAB(4.0),
+        TAB_GROUP_END
+	 } ;
+	 @chunk TCHAR AppName[] = "Math Flash!";
+	 @localize "This is the same as the program name";
+
+	 /* and some strings for the stu_db file */
+	 @chunk TCHAR DBDefault[] = "Default";
+	 @chunk TCHAR DBGuest[] = "Guest";
+	 @chunk TCHAR DBTeacher[] = "Teacher";
+	 @chunk TCHAR DBOpenErrMsg[] = "Cannot open student data file.";
+
+    /*---------------------------------------------------------------------*/
+@end    VariousJunk ;
+
+@start  OptionsDialogResource ;
+    /*---------------------------------------------------------------------*/
+    @object OptionsDialogClass OptionsDialog = {
+        GI_visMoniker = "Options" ;
+        GI_comp = @OptionsStudentsLeft,
+                  @OptionsValues,
+                  @OptionsOK ;
+        GII_visibility = GIV_DIALOG ;
+		GII_type = GIT_MULTIPLE_RESPONSE ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        GII_attrs = @default |
+                    GIA_MODAL |
+                    GIA_NOT_USER_INITIATABLE |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG ;
+        ATTR_GEN_HELP_CONTEXT = "Options";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass OptionsStudentsLeft = {
+        GI_visMoniker = "Student Directory:" ;
+        GI_comp = 
+            @OptionsStudents,
+            @OptionsTeacherButtons ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_DRAW_IN_BOX ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenDynamicListClass OptionsStudents = {
+        HINT_ITEM_GROUP_SCROLLABLE;
+        GIGI_destination = OptionsDialog ;
+        GDLI_queryMsg = MSG_OPTIONS_DIALOG_QUERY ;
+        HINT_FIXED_SIZE = {SST_PIXELS|200, 0} ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_OPTIONS_DIALOG_STUDENT_CHANGED ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass OptionsTeacherButtons = {
+        GI_comp = 
+            @TeacherAdd,
+            @TeacherDelete,
+            @TeacherReport ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass TeacherAdd = {
+        GI_visMoniker = 'A', "Add" ;
+        GTI_destination = OptionsDialog ;
+        GTI_actionMsg = MSG_OPTIONS_DIALOG_ADD ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass TeacherDelete = {
+        GI_visMoniker = 'D', "Delete" ;
+        GTI_destination = OptionsDialog ;
+        GTI_actionMsg = MSG_OPTIONS_DIALOG_DELETE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass TeacherReport = {
+        GI_visMoniker = 'H', "History" ;
+        GTI_destination = OptionsDialog ;
+        GTI_actionMsg = MSG_OPTIONS_DIALOG_REPORT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass OptionsValues = {
+        GI_comp = @OptionsUseDefaultBooleanGroup,
+                  @OptionsRange1,
+                  @OptionsRange2,
+                  @OptionsAllowNegatives,
+                  @OptionsTypeEquations,
+                  @OptionsNumProblems,
+                  @OptionsAllowStudentChangeGroup ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_CENTER_CHILDREN_ON_MONIKERS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanGroupClass OptionsUseDefaultBooleanGroup = {
+        GI_comp = @OptionsUseDefaultBoolean ;
+        GBGI_destination = @OptionsDialog ;
+        ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG = MSG_OPTIONS_DIALOG_UPDATE_UI ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass OptionsUseDefaultBoolean = {
+        GI_visMoniker = 'U', "Use 'Default'" ;
+        GBI_identifier = TRUE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanGroupClass OptionsAllowStudentChangeGroup = {
+        GI_comp = @OptionsAllowStudentChange ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass OptionsAllowStudentChange = {
+        GI_visMoniker = 'S', "Student modifiable" ;
+        GBI_identifier = TRUE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass OptionsRange1 = {
+        GI_visMoniker = '1', "Range 1:" ;
+        GI_comp = @OptionsRange1Low, @OptionsRange1High ;
+//        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass OptionsRange1Low = {
+        GI_visMoniker = "Low" ;
+        GVLI_value = MakeWWFixed(100.0) ;
+        GVLI_maximum = MakeWWFixed(999.0) ;
+        GVLI_destination = OptionsDialog ;
+        GVLI_applyMsg = MSG_OPTIONS_DIALOG_CHECK_SETTINGS ;
+//        ATTR_GEN_VALUE_STATUS_MSG = MSG_OPTIONS_DIALOG_CHECK_SETTINGS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass OptionsRange1High = {
+        GI_visMoniker = "High" ;
+        GVLI_value = MakeWWFixed(100.0) ;
+        GVLI_maximum = MakeWWFixed(999.0) ;
+        GVLI_destination = OptionsDialog ;
+        GVLI_applyMsg = MSG_OPTIONS_DIALOG_CHECK_SETTINGS ;
+//        ATTR_GEN_VALUE_STATUS_MSG = MSG_OPTIONS_DIALOG_CHECK_SETTINGS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass OptionsRange2 = {
+        GI_comp = @OptionsRange2Low, @OptionsRange2High ;
+        GI_visMoniker = '2', "Range 2:" ;
+//        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass OptionsRange2Low = {
+        GI_visMoniker = "Low" ;
+        GVLI_value = MakeWWFixed(100.0) ;
+        GVLI_maximum = MakeWWFixed(999.0) ;
+        GVLI_destination = OptionsDialog ;
+        GVLI_applyMsg = MSG_OPTIONS_DIALOG_CHECK_SETTINGS ;
+//        ATTR_GEN_VALUE_STATUS_MSG = MSG_OPTIONS_DIALOG_CHECK_SETTINGS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass OptionsRange2High = {
+        GI_visMoniker = "High" ;
+        GVLI_value = MakeWWFixed(100.0) ;
+        GVLI_maximum = MakeWWFixed(999.0) ;
+        GVLI_destination = OptionsDialog ;
+        GVLI_applyMsg = MSG_OPTIONS_DIALOG_CHECK_SETTINGS ;
+//        ATTR_GEN_VALUE_STATUS_MSG = MSG_OPTIONS_DIALOG_CHECK_SETTINGS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass OptionsAllowNegatives = {
+        GI_visMoniker = 'n', "Allow negatives" ;
+        GI_comp = 
+            @OptionNegativesYes,
+            @OptionNegativesNo ;
+        GIGI_selection = FALSE ;
+/*        HINT_ITEM_GROUP_MINIMIZE_SIZE ; */
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_ITEM_GROUP_RADIO_BUTTON_STYLE ;
+        HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION ;
+        HINT_PLACE_MONIKER_TO_LEFT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass OptionNegativesYes = {
+        GI_visMoniker = "Yes" ;
+        GII_identifier = TRUE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass OptionNegativesNo = {
+        GI_visMoniker = "No" ;
+        GII_identifier = FALSE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass OptionsTypeEquations = {
+        GI_visMoniker = 't', "Equations type" ;
+        GI_comp = 
+            @OptionAdd,
+            @OptionSubtract,
+            @OptionMultiply,
+            @OptionDivide,
+            @OptionMixed ;
+        GIGI_selection = PROBLEM_ADD ;
+/*        HINT_ITEM_GROUP_MINIMIZE_SIZE ; */
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_ITEM_GROUP_RADIO_BUTTON_STYLE ;
+        HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION ;
+        HINT_PLACE_MONIKER_TO_LEFT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass OptionAdd = {
+        GI_visMoniker = "Add" ;
+        GII_identifier = PROBLEM_ADD ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass OptionSubtract = {
+        GI_visMoniker = "Subtract" ;
+        GII_identifier = PROBLEM_SUBTRACT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass OptionMultiply = {
+        GI_visMoniker = "Multiply" ;
+        GII_identifier = PROBLEM_MULTIPLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass OptionDivide = {
+        GI_visMoniker = "Divide" ;
+        GII_identifier = PROBLEM_DIVIDE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass OptionMixed = {
+        GI_visMoniker = "Mixed" ;
+        GII_identifier = PROBLEM_MIXED ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass OptionsNumProblems = {
+        GI_visMoniker = 'N', "Number of problems" ;
+        GVLI_value = MakeWWFixed(100.0) ;
+        GVLI_maximum = MakeWWFixed(100.0) ;
+        GVLI_minimum = MakeWWFixed(5.0) ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass OptionsOK = {
+    	GI_attrs	= @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        GTI_destination = OptionsDialog ;
+        GTI_actionMsg   = MSG_OPTIONS_DIALOG_APPLY ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK} ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*---------------------------------------------------------------------*/
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass OptionsDialogGetName = {
+        GI_visMoniker = "Enter student name" ;
+        GI_comp = @OptionsGetNameStudentName, @OptionsGetNameOK ;
+        GII_visibility = GIV_DIALOG ;
+		GII_type = GIT_COMMAND ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        GII_attrs = @default |
+                    GIA_MODAL |
+                    GIA_NOT_USER_INITIATABLE |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG ;
+        ATTR_GEN_HELP_CONTEXT = "Get Name";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass OptionsGetNameStudentName = {
+        GI_visMoniker = "Name:" ;
+        GTXI_maxLength = MAX_STUDENT_NAME ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass OptionsGetNameOK = {
+    	GI_attrs	= @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK} ;
+        HINT_SEEK_REPLY_BAR ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextReportDialogClass ReportDialog = {
+        GI_comp = @ReportClose, @ReportClear ;
+        GI_visMoniker = "History" ;
+        GI_attrs = @default
+                   | GA_TARGETABLE
+                   | GA_KBD_SEARCH_PATH ;
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs = @default |
+                    GIA_MODAL |
+                    GIA_NOT_USER_INITIATABLE |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG ;
+        GII_type = GIT_COMMAND ;
+        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+          SWSS_RATIO | PCT_10, SWSS_RATIO | PCT_10};
+        HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+          SWSS_RATIO | PCT_80, SWSS_RATIO | PCT_80};
+        GTRDI_destination = OptionsDialog ;
+        GTRDI_generateMsg = MSG_OPTIONS_DIALOG_GENERATE_REPORT ;
+        ATTR_GEN_HELP_CONTEXT = "Review History";
+    } ;
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ReportClose =  {
+        GI_visMoniker = 'C', "Close";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS} ;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ReportClear =  {
+        GI_visMoniker = 'H', "Clear History";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        GTI_destination = OptionsDialog ;
+        GTI_actionMsg = MSG_OPTIONS_DIALOG_CLEAR_HISTORY ;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+@end    OptionsDialogResource ;
+
+@start  LoginDialogResource ;
+    /*---------------------------------------------------------------------*/
+    @object LoginDialogClass LoginDialog = {
+        GI_visMoniker = "Who are you?" ;
+        GII_type = GIT_NOTIFICATION ;
+        GI_comp = @LoginList, @LoginEnterTrigger, @LoginQuitTrigger ;
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs = @default |
+                    GIA_MODAL |
+                    GIA_NOT_USER_INITIATABLE |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG ;
+        ATTR_GEN_HELP_CONTEXT = "Who are you";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenDynamicListClass LoginList = {
+        HINT_ITEM_GROUP_SCROLLABLE;
+        GIGI_destination = @LoginDialog ;
+        GDLI_queryMsg = MSG_LOGIN_DIALOG_QUERY ;
+        HINT_FIXED_SIZE = {SST_PIXELS|300, 0} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass LoginEnterTrigger = {
+        GI_visMoniker = 'E', "Enter" ;
+        GTI_destination = LoginDialog ;
+        GTI_actionMsg = MSG_LOGIN_DIALOG_ENTER ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK} ;
+        HINT_SEEK_REPLY_BAR ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass LoginQuitTrigger = {
+        GI_visMoniker = 'Q', "Quit" ;
+        GTI_destination = @MFlashApp ;
+        GTI_actionMsg = MSG_META_QUIT ;
+/*        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS} ; */
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*---------------------------------------------------------------------*/
+@end    LoginDialogResource ;
+
+@include "password.goh"
+@include "passwdui.goh"
+
+
+/***************************************************************************
+ *		Global variables (ick, but oh well)
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Routine:  MyRandom
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Generators an ever changing 16 bit random number
+ |
+ | Outputs:
+ |    word                        -- Random number (full 0 to 65535)
+ |
+ | Revision History:
+ |    Who       Date:     Comments:
+ |    ------    --------  ---------
+ |    LES+JH    05/07/01  Created
+ |
+ *-----------------------------------------------------------------------*/
+word MyRandom()
+{
+    static word rand1 = 0xf32d ;
+    static word rand2 = 0x0103 ;
+    static word rand3 = 0x4326 ;
+    static word rand4 = 0x4878 ;
+    static word firstTime = 1 ;
+    word old ;
+
+    /* Seed the random number generator with the ticks since the OS */
+    /* started */
+    if (firstTime)  {
+        rand1 += TimerGetCount() ;
+        firstTime = 0 ;
+    }
+    old = rand1 ;
+    rand1 = rand2 ;
+    rand2 = rand3 ;
+    rand3 = rand4 ;
+    rand4 ^= old^rand1^rand2^rand3 ;
+    rand3 += rand1+rand2+rand4 ;
+    rand4 ^= TimerGetCount() ;
+    rand1 >>= 1 ;
+    return old ;
+}
+
+void DrawArea(
+    GStateHandle gstate, 
+    sword x1, dword y1, 
+    word x2, dword y2,
+    word backFlag, 
+    ColorQuad *cq)
+{
+    if(backFlag)
+    {
+      GrSetAreaColor(gstate,
+        cq->CQ_info, cq->CQ_redOrIndex, cq->CQ_green, cq->CQ_blue);
+      GrFillRect(gstate, x1, y1, x2, y2);
+    }
+}
+
+void DrawShadedRectangle(
+         GStateHandle gstate,
+         word left,
+         word top,
+         word right,
+         word bottom,
+         word thickness,
+         Boolean inverted,
+         ColorQuad *q1,
+         ColorQuad *q2)
+{
+    Point ul[6] ;
+    Point br[6] ;
+
+    #define COLOR_TOP_LEFT_QUAD       q1->CQ_info, q1->CQ_redOrIndex, q1->CQ_green, q1->CQ_blue
+    #define COLOR_BOTTOM_RIGHT_QUAD   q2->CQ_info, q2->CQ_redOrIndex, q2->CQ_green, q2->CQ_blue
+
+    if (thickness)  {
+        GrSaveState(gstate) ;
+        if (thickness > 1)  {
+            thickness-- ;
+
+            ul[0].P_x = left ;
+            ul[0].P_y = top ;
+            ul[1].P_x = right ;
+            ul[1].P_y = top ;
+            ul[2].P_x = right - thickness ;
+            ul[2].P_y = top + thickness ;
+            ul[3].P_x = left + thickness ;
+            ul[3].P_y = top + thickness ;
+            ul[4].P_x = left + thickness ;
+            ul[4].P_y = bottom - thickness ;
+            ul[5].P_x = left ;
+            ul[5].P_y = bottom ;
+
+            br[0].P_x = right ;
+            br[0].P_y = top ;
+            br[1].P_x = right ;
+            br[1].P_y = bottom ;
+            br[2].P_x = left ;
+            br[2].P_y = bottom ;
+            br[3].P_x = left + thickness ;
+            br[3].P_y = bottom - thickness ;
+            br[4].P_x = right - thickness ;
+            br[4].P_y = bottom - thickness ;
+            br[5].P_x = right - thickness ;
+            br[5].P_y = top + thickness ;
+
+            GrSetLineColor(gstate, COLOR_TOP_LEFT_QUAD) ;
+            GrSetAreaColor(gstate, COLOR_TOP_LEFT_QUAD) ;
+            if (inverted)
+                GrFillPolygon(gstate, ODD_EVEN, br, sizeof(br)/sizeof(br[0])) ;
+            else
+                GrFillPolygon(gstate, ODD_EVEN, ul, sizeof(ul)/sizeof(ul[0]));
+
+            GrSetLineColor(gstate, COLOR_BOTTOM_RIGHT_QUAD) ;
+            GrSetAreaColor(gstate, COLOR_BOTTOM_RIGHT_QUAD) ;
+            if (inverted)
+                GrFillPolygon(gstate, ODD_EVEN, ul, sizeof(ul)/sizeof(ul[0]));
+            else
+                GrFillPolygon(gstate, ODD_EVEN, br, sizeof(br)/sizeof(br[0])) ;
+        } else {
+            /* Thickness of 1 */
+            if (inverted)  {
+                GrSetLineColor(gstate, COLOR_BOTTOM_RIGHT_QUAD) ;
+            } else {
+                GrSetLineColor(gstate, COLOR_TOP_LEFT_QUAD) ;
+            }
+            GrDrawLine(gstate, left, top, right, top) ;
+            GrDrawLine(gstate, left, top, left, bottom) ;
+
+            if (inverted)  {
+                GrSetAreaColor(gstate, COLOR_BOTTOM_RIGHT_QUAD) ;
+                GrSetLineColor(gstate, COLOR_TOP_LEFT_QUAD) ;
+            }  else  {
+                GrSetLineColor(gstate, COLOR_BOTTOM_RIGHT_QUAD) ;
+                GrSetAreaColor(gstate, COLOR_TOP_LEFT_QUAD) ;
+            }
+            GrDrawLine(gstate, left, bottom, right, bottom) ;
+            GrDrawLine(gstate, right, top, right, bottom) ;
+            GrDrawRect(gstate, right, bottom, right+1, bottom+1) ;
+        }
+        GrRestoreState(gstate) ;
+    }
+}
+
+
+@method BoxClass, MSG_VIS_DRAW
+{
+    if (!(pself->BI_flags & BOX_FLAGS_NO_BACKGROUND))  {
+        DrawArea(
+            gstate,
+            pself->VI_bounds.R_left,
+            pself->VI_bounds.R_top,
+            pself->VI_bounds.R_right,
+            pself->VI_bounds.R_bottom,
+            TRUE,
+            &pself->BI_backgroundColor) ;
+    }
+    DrawShadedRectangle(
+        gstate,
+        pself->VI_bounds.R_left,
+        pself->VI_bounds.R_top,
+        pself->VI_bounds.R_right-1,
+        pself->VI_bounds.R_bottom-1,
+        pself->BI_borderThickness,
+        FALSE,
+        &pself->BI_topLeftEdgeColor,
+        &pself->BI_bottomRightEdgeColor) ;
+    @callsuper() ;
+}
+
+
+@method BoxClass, MSG_VIS_COMP_GET_MINIMUM_SIZE
+{
+    word mywidth, myheight ;
+    dword min = 0 ;
+
+    mywidth = pself->BI_width /*- 2*pself->BI_borderThickness */;
+    myheight = pself->BI_height /*- 2*pself->BI_borderThickness */;
+    min = @callsuper() ;
+    if (mywidth < DWORD_WIDTH(min))
+        mywidth = DWORD_WIDTH(min) ;
+    if (myheight < DWORD_HEIGHT(min))
+        myheight = DWORD_HEIGHT(min) ;
+
+    return MAKE_SIZE_DWORD(mywidth, myheight) ;
+}
+
+@method BoxClass, MSG_VIS_COMP_GET_MARGINS
+{
+    retValue->R_left = 
+        retValue->R_top =
+            retValue->R_bottom = 
+                retValue->R_right = pself->BI_borderThickness ;
+}
+
+@method BoxClass, MSG_VIS_COMP_GET_CHILD_SPACING
+{
+    return pself->BI_spacing ;
+}
+
+@method MFlashContentClass, MSG_VIS_COMP_GET_CHILD_SPACING
+{
+    return 0 ;
+}
+
+@method MFlashContentClass, MSG_VIS_COMP_GET_MARGINS
+{
+    retValue->R_left = 
+        retValue->R_top =
+            retValue->R_bottom = 
+                retValue->R_right = 0 ;
+}
+
+@method CardsClass, MSG_VIS_DRAW
+{
+#if 0
+    int x, y ;
+    int cx, cy ;
+    @callsuper() ;
+    GrSetFont(gstate, FID_DTC_URW_ROMAN /* FID_DTC_URW_SANS*/, MakeWWFixed(10.0)) ;
+    GrSetTextStyle(gstate, TS_BOLD, 0) ;
+    for (cy=0, y=6; cy<10; cy++, y+=29)  {
+        for (cx=0, x=6; cx<10; cx++, x+=29)  {
+            GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+            GrSetAreaColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0) ;
+            GrFillRect(gstate, x+1, y+1, x+27, y+27) ;
+            GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+            GrFillRect(gstate, x+1, y+1, x+25, y+25) ;
+            GrDrawRect(gstate, x, y, x+25, y+25) ;
+            GrDrawText(gstate, x+9, y+1, "987", 0) ;
+            GrDrawText(gstate, x+9, y+9, "111", 0) ;
+            GrDrawText(gstate, x+3, y+9, "+", 1) ;
+            GrDrawHLine(gstate, x+3, y+21, x+23) ;
+        }
+    }
+#else
+    @callsuper() ;
+    ProblemsDraw(gstate, &G_problems) ;
+#endif
+}
+
+@method LargeDigitLinesClass, MSG_VIS_DRAW
+{
+    word width, height ;
+    @callsuper() ;
+    GrApplyTranslationDWord(gstate, pself->VI_bounds.R_left+10, pself->VI_bounds.R_top+10);
+    width = pself->VI_bounds.R_right - pself->VI_bounds.R_left - 20 ;
+    height = pself->VI_bounds.R_bottom - pself->VI_bounds.R_top - 20 ;
+    MapBoardDraw(&G_mapBoard, gstate, height, width, C_WHITE, C_LIGHT_RED, C_LIGHT_GRAY) ;
+}
+
+@method LargeDigitLinesClass, MSG_MAP_BOARD_INVALIDATE
+{
+    word width, height ;
+    GStateHandle gstate ;
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE() ;
+
+    GrApplyTranslationDWord(gstate, pself->VI_bounds.R_left+10, pself->VI_bounds.R_top+10);
+    width = pself->VI_bounds.R_right - pself->VI_bounds.R_left - 20 ;
+    height = pself->VI_bounds.R_bottom - pself->VI_bounds.R_top - 20 ;
+    MapBoardInvalidate(&G_mapBoard, gstate, height, width) ;
+
+    GrDestroyState(gstate) ;
+}
+
+
+
+@method MFlashProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    WindowHandle win ;
+    optr viewObj = @MFlashView ;
+    Boolean isOn = TRUE ;
+
+    MapBoardInit(&G_mapBoard);
+    ProblemsSetup(&G_problems, 10, 0, 100, 0, 100, TRUE, @TopLeftRegion, PROBLEM_ADD) ;
+//    MapBoardSetupTest(&G_mapBoard) ;
+    ProblemsSetBoard(&G_problems, &G_mapBoard) ;
+    MapBoardResetInvalidation(&G_mapBoard) ;
+    @callsuper() ;
+//    @send ,forceQueue RightRegion::MSG_MAP_BOARD_INVALIDATE() ;
+
+    /* Make our window transparent so we don't get redraw flicker */
+    /* as much.  We just have to require that we draw the whole */
+    /* view (which we do with our boxes) */
+    win = @call viewObj::MSG_GEN_VIEW_GET_WINDOW();
+    if(win)                          /* set view's window to transparent */
+        WinSetInfo(win, WIT_COLOR, WCF_TRANSPARENT<<8);
+
+    G_db.SDB_file = 0 ;
+    if (StudentDBOpenOrCreate(STUDENT_DB_FILENAME, &G_db, PRIVATE_DIR))  {
+        @call OptionsDialog::MSG_OPTIONS_DIALOG_SET_DB(&G_db) ;
+        @send ,forceQueue LoginDialog::MSG_LOGIN_DIALOG_START(&G_db) ;
+    } else {
+        @send ,forceQueue MFlashApp::MSG_META_QUIT() ;
+    }
+    @call oself::MSG_GEN_PROCESS_INSTALL_TOKEN() ;
+    LoadSounds(PRIVATE_DIR) ;
+    SoundStart() ;
+    InitFileReadBoolean("mathflash", "soundOn", &isOn);
+    if (!isOn)
+	   @call oself::MSG_MFLASH_TOGGLE_SOUND() ;
+}
+
+@method MFlashProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    SoundStop() ;
+    /* Don't allow our timer to stay active */
+    if (G_timer)  {
+        TimerStop(G_timer, G_timerId) ;
+        G_timer = 0 ;
+    }
+
+    /* Make sure the student database is closed */
+    if (G_db.SDB_file)
+        StudentDBClose(&G_db) ;
+
+    return @callsuper() ;
+}
+
+@method MFlashProcessClass, MSG_MFLASH_TOGGLE_SOUND
+{
+    if (G_soundIsOn)  {
+        G_soundIsOn = FALSE ;
+        @call MFlashSoundOnOff::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                  @SoundOffMoniker,
+                  VUM_DELAYED_VIA_UI_QUEUE) ;
+    } else {
+        G_soundIsOn = TRUE ;
+        @call MFlashSoundOnOff::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                  @SoundOnMoniker,
+                  VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+    InitFileWriteBoolean("mathflash", "soundOn", G_soundIsOn);
+}
+
+@method MFlashContentClass, MSG_META_KBD_CHAR
+{
+    if ((flags & CF_RELEASE) && (!pself->MFCI_blockKeys))  {
+        character &= 0xFF ;
+        if (isdigit(character) || (character == '-'))  {
+            MapBoardReplaceCurrentStep(&G_mapBoard, character) ;
+            MapBoardNextStep(&G_mapBoard) ;
+            @call RightRegion::MSG_MAP_BOARD_INVALIDATE() ;
+        } else if ((character == VC_ENTER) && (G_inGame))  {
+            MapBoardSetupCheckBoard(&G_mapBoard) ;
+            @call RightRegion::MSG_MAP_BOARD_INVALIDATE() ;
+            if (MapBoardIsAllCorrect(&G_mapBoard))  {
+                ProblemsMarkCurrent(&G_problems, PROBLEM_STATE_CORRECT) ;
+                SetStatusText(@CorrectMsg) ;
+                G_timer = 
+                    TimerStart(
+                    TIMER_EVENT_ONE_SHOT,
+                    oself,
+                    DELAY_WHEN_RIGHT,
+                    MSG_MFLASH_TIMER_DONE,
+                    0,
+                    &G_timerId) ;
+                pself->MFCI_blockKeys = TRUE ;
+            } else {
+                ProblemsMarkCurrent(&G_problems, PROBLEM_STATE_INCORRECT) ;
+                SetStatusText(@IncorrectMsg) ;
+            }
+            ProblemsInvalidateCurrentCard(&G_problems) ;
+        } else if (character == VC_BACKSPACE)  {
+            MapBoardReplaceCurrentStep(&G_mapBoard, 0) ;
+            MapBoardPreviousStep(&G_mapBoard) ;
+            @call RightRegion::MSG_MAP_BOARD_INVALIDATE() ;
+        } else if (character == VC_TAB)  {
+            if ((flags>>8) & (SS_LSHIFT | SS_RSHIFT)) {
+                ProblemsPrevious(&G_problems) ;
+            } else {
+                ProblemsNext(&G_problems) ;
+            }
+            ProblemsSetBoard(&G_problems, &G_mapBoard) ;
+            @send ,forceQueue RightRegion::MSG_VIS_INVALIDATE() ;
+            PlaySimpleSound(SOUND_ID_NEXT, 4) ;
+        }
+    }
+}
+
+void GrDrawShadowText(GStateHandle gstate, sword x, sword y, char *text, word len, word color)
+{
+    GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+    GrSetTextStyle(gstate, TS_BOLD, 0) ;
+    GrDrawText(gstate, x-1, y-1, text, len) ;
+    GrDrawText(gstate, x-1, y+1, text, len) ;
+    GrDrawText(gstate, x+1, y-1, text, len) ;
+    GrDrawText(gstate, x+1, y+1, text, len) ;
+    GrDrawText(gstate, x+3, y+3, text, len) ;
+    GrSetTextColor(gstate, CF_INDEX, color, 0, 0) ;
+    GrDrawText(gstate, x, y, text, len) ;
+}
+
+void DrawUnderline(GStateHandle gstate, word underlineStart, word underlineEnd, word y)
+{
+    GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+    GrFillRect(gstate, underlineStart-1, y-1, underlineEnd-1, y+UNDERLINE_WIDTH-1) ;
+    GrFillRect(gstate, underlineStart+1, y-1, underlineEnd+1, y+UNDERLINE_WIDTH-1) ;
+    GrFillRect(gstate, underlineStart-1, y+1, underlineEnd-1, y+UNDERLINE_WIDTH+1) ;
+    GrFillRect(gstate, underlineStart+1, y+1, underlineEnd+1, y+UNDERLINE_WIDTH+1) ;
+    GrFillRect(gstate, underlineStart+3, y+3, underlineEnd+3, y+UNDERLINE_WIDTH+3) ;
+
+    GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+    GrFillRect(gstate, underlineStart, y, underlineEnd, y+UNDERLINE_WIDTH) ;
+}
+
+void ProblemCreateAdd(T_problem *problem, word low1, word high1, word low2, word high2, Boolean allowSigns)
+{
+    word diff1 = high1 - low1 ;
+    word diff2 = high2 - low2 ;
+    problem->a = low1 + MyRandom() % (diff1+1) ;
+    problem->b = low2 + MyRandom() % (diff2+1) ;
+    if (allowSigns)  {
+        if (MyRandom() & 1)
+            problem->a = -problem->a ;
+        if (MyRandom() & 1)
+            problem->b = -problem->b ;
+    }
+    problem->type = PROBLEM_ADD ;
+}
+
+void ProblemCreateSubtract(T_problem *problem, word low1, word high1, word low2, word high2, Boolean allowSigns)
+{
+    T_number n ;
+    word diff1 = high1 - low1 ;
+    word diff2 = high2 - low2 ;
+
+    problem->a = low1 + MyRandom() % (diff1+1) ;
+    problem->b = low2 + MyRandom() % (diff2+1) ;
+    if (allowSigns)  {
+        if (MyRandom() & 1)
+            problem->a = -problem->a ;
+        if (MyRandom() & 1)
+            problem->b = -problem->b ;
+    } else {
+        /* Swap if were to end up with a negative answer and */
+        /* not using signs */
+        if (problem->a < problem->b)  {
+            n = problem->a ;
+            problem->a = problem->b ;
+            problem->b = n ;
+        }
+    }
+    problem->type = PROBLEM_SUBTRACT ;
+}
+
+void ProblemCreateMultiply(T_problem *problem, word low1, word high1, word low2, word high2, Boolean allowSigns)
+{
+    word diff1 = high1 - low1 ;
+    word diff2 = high2 - low2 ;
+
+    problem->a = low1 + MyRandom() % (diff1+1) ;
+    problem->b = low2 + MyRandom() % (diff2+1) ;
+    if (allowSigns)  {
+        if (MyRandom() & 1)
+            problem->a = -problem->a ;
+        if (MyRandom() & 1)
+            problem->b = -problem->b ;
+    }
+    problem->type = PROBLEM_MULTIPLY ;
+}
+
+void ProblemCreateDivide(T_problem *problem, word low1, word high1, word low2, word high2, Boolean allowSigns)
+{
+    T_number a, b ;
+    word diff1 = high1 - low1 ;
+    word diff2 = high2 - low2 ;
+
+    a = low1 + MyRandom() % (diff1+1) ;
+    b = low2 + MyRandom() % (diff2+1) ;
+    if (allowSigns)  {
+        if (MyRandom() & 1)
+            problem->a = -problem->a ;
+        if (MyRandom() & 1)
+            problem->b = -problem->b ;
+    }
+    if (a == 0)
+        a = 1 ;
+    if (b == 0)
+        b = 1 ;
+    problem->a = a*b ;
+    problem->b = b ;
+    problem->type = PROBLEM_DIVIDE ;
+}
+
+void ProblemsSetup(T_problems *problems, word num, T_number low1, T_number high1, T_number low2, T_number high2, Boolean allowSigns, optr cardsObj, T_problemType type)
+{
+    int i ;
+    T_problem *p ;
+    T_problemType t = type ;
+    word l1, l2, h1, h2 ;
+
+    /* Be sure we are not over the limit.  0 is the limit */
+    if ((num > MAX_NUM_PROBLEMS) || (num == 0))
+        num = MAX_NUM_PROBLEMS ;
+    problems->numProblems = num ;
+    problems->cardsObj = cardsObj ;
+
+    /* Setup all the individual problems */
+    for (i=0; i<num; i++)  {
+        p = problems->list + i ;
+        p->state = PROBLEM_STATE_UNANSWERED ;
+        if (type == PROBLEM_MIXED)
+            t = MyRandom()&3 ;
+
+        /* Swap them around occassionally */
+#if 1
+            l1 = low1 ;
+            l2 = low2 ;
+            h1 = high1 ;
+            h2 = high2 ;
+#else
+        if (MyRandom()&1)  {
+            l1 = low1 ;
+            l2 = low2 ;
+            h1 = high1 ;
+            h2 = high2 ;
+        } else {
+            l2 = low1 ;
+            l1 = low2 ;
+            h2 = high1 ;
+            h1 = high2 ;
+        }
+#endif
+        switch (t)  {
+            case PROBLEM_ADD:
+                ProblemCreateAdd(p, l1, h1, l2, h2, allowSigns) ;
+                break ;
+            case PROBLEM_SUBTRACT:
+                ProblemCreateSubtract(p, l1, h1, l2, h2, allowSigns) ;
+                break ;
+            case PROBLEM_MULTIPLY:
+                ProblemCreateMultiply(p, l1, h1, l2, h2, allowSigns) ;
+                break ;
+            case PROBLEM_DIVIDE:
+                ProblemCreateDivide(p, l1, h1, l2, h2, allowSigns) ;
+                break ;
+        }
+    }   
+
+    /* Setup statistics */
+    problems->numCorrect = 0 ;
+    problems->numIncorrect = 0 ;
+    problems->numCorrected = 0 ;
+    problems->numUnanswered = num ;
+
+    problems->current = 0 ;
+    G_inGame = TRUE ;
+}
+
+/* Draw the problem cards on the screen */
+void ProblemsDraw(GStateHandle gstate, T_problems *problems)
+{
+    int x, y ;
+    int cx, cy ;
+    int i = 0 ;
+    T_problem *p = problems->list ;
+
+    GrSetFont(gstate, FID_DTC_URW_ROMAN /* FID_DTC_URW_SANS*/, MakeWWFixed(24.0)) ;
+    GrSetTextStyle(gstate, TS_BOLD, 0) ;
+    for (cy=0, y=6; cy<10; cy++, y+=29)  {
+        for (cx=0, x=6; cx<10; cx++, x+=29)  {
+            GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+            GrSetAreaColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0) ;
+            GrFillRect(gstate, x+1, y+1, x+27, y+27) ;
+
+            if (i == problems->current)  {
+                GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_BLUE, 0, 0) ;
+            } else {
+                GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+            }
+            GrFillRect(gstate, x+1, y+1, x+25, y+25) ;
+            GrDrawRect(gstate, x, y, x+25, y+25) ;
+
+            /* Really need bitmaps here! */
+            switch (p->state)  {
+                case PROBLEM_STATE_UNANSWERED:
+                    GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+                    GrDrawText(gstate, x+7, y-2, "?", 1) ;
+                    break ;
+                case PROBLEM_STATE_CORRECT:
+                    GrSetTextColor(gstate, CF_INDEX, C_BLUE, 0, 0) ;
+                    GrDrawText(gstate, x+9, y-2, "!", 1) ;
+                    break ;
+                case PROBLEM_STATE_INCORRECT:
+                    GrSetTextColor(gstate, CF_INDEX, C_RED, 0, 0) ;
+                    GrDrawText(gstate, x+4, y-2, "X", 1) ;
+                    break ;
+            }
+
+            p++ ;
+            i++ ;
+
+            if (i >= problems->numProblems)
+                break ;
+        }
+        if (i >= problems->numProblems)
+            break ;
+    }
+}
+
+void ProblemsInvalidateCurrentCard(T_problems *problems)
+{
+    @call (problems->cardsObj)::MSG_CARDS_INVALIDATE_SINGLE_CARD(problems->current) ;
+}
+
+/* Move to the next problem and invalidate appropriately */
+void ProblemsNext(T_problems *problems)
+{
+    int current = problems->current ;
+    int i = current+1 ;
+    for (; i<problems->numProblems; i++)  {
+        if (problems->list[i].state != PROBLEM_STATE_CORRECT)  {
+            problems->current = i ;
+            @call (problems->cardsObj)::MSG_CARDS_INVALIDATE_SINGLE_CARD(current) ;
+            @call (problems->cardsObj)::MSG_CARDS_INVALIDATE_SINGLE_CARD(i) ;
+            return ;
+        }
+    }
+
+    /* wrap around to the beginning */
+    for (i=0; i<current; i++)  {
+        if (problems->list[i].state != PROBLEM_STATE_CORRECT)  {
+            problems->current = i ;
+            @call (problems->cardsObj)::MSG_CARDS_INVALIDATE_SINGLE_CARD(current) ;
+            @call (problems->cardsObj)::MSG_CARDS_INVALIDATE_SINGLE_CARD(i) ;
+            break ;
+        }
+    }
+}
+
+/* Move to the next problem and invalidate appropriately */
+void ProblemsPrevious(T_problems *problems)
+{
+    int current = problems->current ;
+    int i = current-1 ;
+    for (; i>=0; i--)  {
+        if (problems->list[i].state != PROBLEM_STATE_CORRECT)  {
+            problems->current = i ;
+            @call (problems->cardsObj)::MSG_CARDS_INVALIDATE_SINGLE_CARD(current) ;
+            @call (problems->cardsObj)::MSG_CARDS_INVALIDATE_SINGLE_CARD(i) ;
+            return ;
+        }
+    }
+
+    /* Wrap around to the end */
+    for (i=problems->numProblems-1; i>current; i--)  {
+        if (problems->list[i].state != PROBLEM_STATE_CORRECT)  {
+            problems->current = i ;
+            @call (problems->cardsObj)::MSG_CARDS_INVALIDATE_SINGLE_CARD(current) ;
+            @call (problems->cardsObj)::MSG_CARDS_INVALIDATE_SINGLE_CARD(i) ;
+            break ;
+        }
+    }
+}
+
+void ProblemsInvalidateProblem(GStateHandle gstate, word card)
+{
+    /* Calc the location and invalidate */
+    word left, top, right, bottom ;
+    word row, column ;
+
+    row = card/10 ;
+    column = card%10 ;
+    left = column*29+6 ;
+    right = left + 28 ;
+    top = row*29+6 ;
+    bottom = top+28 ;
+    GrInvalRect(gstate, left, top, right, bottom) ;
+}
+
+@method CardsClass, MSG_CARDS_INVALIDATE_SINGLE_CARD
+{
+    /* word card */
+    GStateHandle gstate ;
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE() ;
+
+    ProblemsInvalidateProblem(gstate, card) ;
+
+    GrDestroyState(gstate) ;
+}
+
+void ProblemsSetBoard(T_problems *problems, T_mapBoard *mapBoard)
+{
+    T_problem *p ;
+    
+    p = problems->list + problems->current ;
+
+    switch (p->type)  {
+        case PROBLEM_ADD:
+            EquationSetupAdd(mapBoard, p->a, p->b) ;
+            break ;
+        case PROBLEM_SUBTRACT:
+            EquationSetupSubtract(mapBoard, p->a, p->b) ;
+            break ;
+        case PROBLEM_MULTIPLY:
+            EquationSetupMultiply(mapBoard, p->a, p->b) ;
+            break ;
+        case PROBLEM_DIVIDE:
+            EquationSetupDivide(mapBoard, p->a, p->b) ;
+            break ;
+    }
+    MapBoardSetCorrectBoardFromCurrentBoard(mapBoard) ;
+    MapBoardStartSteps(mapBoard) ;
+}
+
+void ProblemsMarkCurrent(T_problems *problems, T_problemState state)
+{
+    T_problem *p ;
+    p = problems->list + problems->current ;
+
+    /* update those stats */
+    if (p->state == PROBLEM_STATE_UNANSWERED)  {
+        /* Not answered yet. */
+        if (state == PROBLEM_STATE_CORRECT)  {
+            /* It's answered -- and correctly! */
+            problems->numUnanswered-- ;
+            problems->numCorrect++ ;
+            PlaySimpleSound(SOUND_ID_RIGHT, 5) ;
+        } else if (state == PROBLEM_STATE_INCORRECT)  {
+            /* It's answered but incorrectly */
+            problems->numUnanswered-- ;
+            problems->numIncorrect++ ;
+            PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+        }
+    } else {
+        /* Was incorrect.  */
+        if (state == PROBLEM_STATE_CORRECT)  {
+            /* No longer incorrect */
+            problems->numIncorrect-- ;
+            problems->numCorrect++ ;
+
+            /* But note we have corrected a problem */
+            problems->numCorrected++ ;
+            PlaySimpleSound(SOUND_ID_SUMMARY, 5) ;
+        } else {
+            PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+        }
+    }
+    p->state = state ;
+}
+
+Boolean ProblemsCheckAllCorrect(T_problems *problems)
+{
+    word num = problems->numProblems ;
+    word i ;
+    for (i=0; i<num; i++)
+        if (problems->list[i].state != PROBLEM_STATE_CORRECT)
+            return FALSE ;
+    return TRUE ;
+}
+
+void MapBoardSetupCheckBoard(T_mapBoard *mapBoard)
+{
+    word bx, by ;
+    char c ;
+
+    for (by=0; by<MAP_BOARD_HEIGHT; by++)  {
+        for (bx=0; bx<MAP_BOARD_WIDTH; bx++)  {
+            c = MapBoardGetSquare(mapBoard, bx, by) ;
+            MapBoardSetCheckSquare(mapBoard, bx, by, c) ;
+        }
+    }
+//    memcpy(mapBoard->checkBoard, mapBoard->board, sizeof(mapBoard->checkBoard)) ;
+}
+
+void SetStatusText(optr text)
+{
+    optr otext = @StatusText ;
+
+    @call otext::MSG_META_SUSPEND() ;
+    @call otext::MSG_VIS_TEXT_DELETE_ALL() ;
+    @call otext::MSG_VIS_TEXT_APPEND_PTR("\r", 1) ;
+    @call otext::MSG_VIS_TEXT_APPEND_OPTR(text, 0) ;
+    @call BottomLeftRegion::MSG_VIS_INVALIDATE() ;
+    @call otext::MSG_META_UNSUSPEND() ;
+}
+
+@method MFlashContentClass, MSG_MFLASH_TIMER_DONE
+{
+    /* done with the timer */
+    G_timer = 0 ;
+    pself->MFCI_blockKeys = FALSE ;
+    @send oself::MSG_MFLASH_NEXT_PROBLEM() ;
+}
+
+@method MFlashContentClass, MSG_MFLASH_NEXT_PROBLEM
+{
+    ProblemsNext(&G_problems) ;
+    ProblemsSetBoard(&G_problems, &G_mapBoard) ;
+    @call RightRegion::MSG_VIS_INVALIDATE() ;
+    MapBoardResetInvalidation(&G_mapBoard) ;
+    SetStatusText(@InstructionsMsg) ;
+
+    if (ProblemsCheckAllCorrect(&G_problems))  {
+        G_inGame = FALSE ;
+
+        /* We are done.  Record our stats */
+        @call oself::MSG_MFLASH_STORE_STATS() ;
+
+        /* Yep, all done! */
+        /* Display a notice */
+        UserStandardDialogOptr(
+            NullOptr,
+            NullOptr,
+            NullOptr,
+            NullOptr,
+		    @CompleteMsg,
+		    (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+		    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+            
+        @send ,forceQueue process::MSG_NEW_SETTINGS(oself) ;
+    }
+}
+
+@method MFlashContentClass, MSG_MFLASH_STORE_STATS
+{
+    /* Only record if we are a student (i.e. not a teacher and not a guest) */
+    if ((G_studentIndex != SIR_TEACHER) && (G_studentIndex != SIR_GUEST))  {
+        /* We are done with a set.  Record this fact. */
+        G_stats.SHE_numCorrect = G_problems.numCorrect ;
+        G_stats.SHE_numIncorrect = G_problems.numIncorrect ;
+        G_stats.SHE_numUnanswered = G_problems.numUnanswered ;
+        G_stats.SHE_numCorrected = G_problems.numCorrected ;
+        TimerGetDateAndTime(&G_stats.SHE_endTime) ;
+        StudentDBAppendHistoryEntryToStudent(&G_db, G_studentIndex, &G_stats) ;
+    }
+}
+
+@method MFlashProcessClass, MSG_NEW_SETTINGS
+{
+    word numProblems ;
+    word low1, low2, high1, high2 ;
+    Boolean allowNegs ;
+    T_problemType type ;
+
+    numProblems = @call OptionsNumProblems::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+    low1 = @call OptionsRange1Low::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+    low2 = @call OptionsRange2Low::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+    high1 = @call OptionsRange1High::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+    high2 = @call OptionsRange2High::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+    allowNegs = @call OptionsAllowNegatives::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+    type = @call OptionsTypeEquations::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+
+    /* Record our historical entry for now */
+    TimerGetDateAndTime(&G_stats.SHE_startTime) ;
+    G_stats.SHE_numProblems = numProblems ;
+    G_stats.SHE_allowSigns = allowNegs ;
+    G_stats.SHE_range1Low = low1 ;
+    G_stats.SHE_range2Low = low2 ;
+    G_stats.SHE_range1High = high1 ;
+    G_stats.SHE_range2High = high2 ;
+    G_stats.SHE_problemType = type ;
+    G_stats.SHE_numCorrect = 0 ;
+    G_stats.SHE_numIncorrect = 0 ;
+    G_stats.SHE_numUnanswered = numProblems ;
+
+    /* Setup the actual play area data. */
+    ProblemsSetup(&G_problems, numProblems, low1, high1, low2, high2, allowNegs, @TopLeftRegion, type) ;
+    ProblemsSetBoard(&G_problems, &G_mapBoard) ;
+    MapBoardResetInvalidation(&G_mapBoard) ;
+    SetStatusText(@InstructionsMsg) ;
+    @call MFlashContent::MSG_VIS_INVALIDATE() ;
+
+    PlaySimpleSound(SOUND_ID_START, 5) ;
+}
+
+@method LoginDialogClass, MSG_LOGIN_DIALOG_QUERY
+{
+	 char name[MAX_STUDENT_NAME+1] ;
+	 StudentDBGetName(pself->iDB, item+1, name) ;
+	 @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, name) ;
+}
+
+@method LoginDialogClass, MSG_LOGIN_DIALOG_START
+/* (StudentDB *db) */
+{
+    @call LoginList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(StudentDBGetCount(pself->iDB = db)-1) ;
+    @call LoginList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION((G_studentIndex == BAD_STUDENT)?0:G_studentIndex-1, FALSE) ;
+    @call oself::MSG_GEN_INTERACTION_INITIATE() ;
+}
+
+@method LoginDialogClass, MSG_LOGIN_DIALOG_ENTER
+{
+	 word item ;
+	 char name[MAX_STUDENT_NAME+1] ;
+	 char title[MAX_STUDENT_NAME+16] ;
+
+    /* Do we have anything selected? */
+    item = @call LoginList::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+    if (item != GIGS_NONE)  {
+        /* Close the dialog */
+        @call oself::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS) ;
+
+		  /* Add the name to the title bar - jfh */
+		  MemLock(OptrToHandle(@AppName));
+		  strcpy(title, LMemDeref(@AppName));
+		  MemUnlock(OptrToHandle(@AppName));
+		  strcat(title, " - ");
+		  StudentDBGetName(pself->iDB, item+1, name) ;
+        strcat(title, name);
+		  @call MFlashPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+				  title,
+				  VUM_NOW) ;
+
+		  /* Start up the student */
+        @send ,forceQueue process::MSG_SETUP_FOR_STUDENT(item+1) ;
+    }
+}
+
+@method MFlashProcessClass, MSG_SETUP_FOR_STUDENT
+/* (StudentIndex studentIndex) */
+{
+    Boolean valid = FALSE ;
+    StudentDBHeader *header ;
+    AskPasswordResult result ;
+    T_password pwd ;
+    Boolean allowOptions = FALSE ;
+
+    if (studentIndex == SIR_TEACHER)  {
+        header = StudentDBLockHeader(&G_db) ;
+        memcpy(pwd.P_hint, header->SDBH_password.P_hint, sizeof(pwd.P_hint)) ;
+        /* Need to check for a password! */
+        result = PwdAskPassword(&pwd, TRUE) ;
+        if (result == ASK_PASSWORD_RESULT_CHANGE)  {
+            if (PwdComparePasswords(&pwd, &header->SDBH_password))  {
+                if (PwdChangePassword(&header->SDBH_password, TRUE))  {
+                    GEOSMessageBox(@PasswordChangedMsg, CDT_NOTIFICATION, GIT_NOTIFICATION) ;
+                    StudentDBUnlockHeader(header, TRUE) ;
+                    header = StudentDBLockHeader(&G_db) ;
+                }
+            } else {
+                GEOSMessageBox(@IncorrectPasswordMsg, CDT_ERROR, GIT_NOTIFICATION) ;
+            }
+        } else if (result == ASK_PASSWORD_RESULT_OK)  {
+            /* Trying to get in.  Check */
+            if (PwdComparePasswords(&pwd, &header->SDBH_password))  {
+                /* Only way in is with the correct password! */
+                valid = TRUE ;
+            } else {
+                GEOSMessageBox(@IncorrectPasswordMsg, CDT_ERROR, GIT_NOTIFICATION) ;
+            }
+        }
+        StudentDBUnlockHeader(header, FALSE) ;
+        allowOptions = TRUE ;
+    } else {
+        valid = TRUE ;
+    }
+    if (valid)  {
+        /* Get the student record to see what settings to use */
+        G_studentIndex = studentIndex ;
+        if (G_studentIndex != BAD_STUDENT)  {
+            /* Only the teacher has the student list to modify */
+            if (G_studentIndex == SIR_TEACHER)  {
+                UITurnOn(@OptionsStudentsLeft) ;
+            } else {
+                UITurnOff(@OptionsStudentsLeft) ;
+            }
+            @call OptionsDialog::MSG_OPTIONS_DIALOG_LOAD_SETTINGS(G_studentIndex, (allowOptions)?NULL:&allowOptions) ;
+            @send ,forceQueue process::MSG_NEW_SETTINGS(oself) ;
+            if (studentIndex == SIR_TEACHER)  {
+                /* Teachers get the options */
+                @send ,forceQueue process::MSG_MATH_FLASH_OPTIONS_DIALOG(oself) ;
+            }
+        }
+    } else {
+        @send ,forceQueue LoginDialog::MSG_LOGIN_DIALOG_START(&G_db) ;
+    }
+    if (allowOptions)
+        @call BringUpOptionsDialog::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+    else
+        @call BringUpOptionsDialog::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+}
+
+@method MFlashProcessClass, MSG_STUDENT_DONE
+{
+
+	 /* Did the student try to answer any of the problems? */
+    if (G_problems.numUnanswered != G_problems.numProblems)  {
+        /* Did some problems.  Let's record the stats then */
+        @call MFlashContent::MSG_MFLASH_STORE_STATS() ;
+    }
+
+    /* Logout. */
+    G_studentIndex = BAD_STUDENT ;
+
+	 /* Remove the name from the title bar - jfh */
+	 MemLock(OptrToHandle(@AppName));
+	 @call MFlashPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+				  LMemDeref(@AppName),
+				  VUM_NOW) ;
+	 MemUnlock(OptrToHandle(@AppName));
+
+	 /* Go to login dialog */
+    @send ,forceQueue LoginDialog::MSG_LOGIN_DIALOG_START(&G_db) ;
+}
+
+@method MFlashProcessClass, MSG_MATH_FLASH_OPTIONS_DIALOG
+{
+    @send ,forceQueue OptionsDialog::MSG_OPTIONS_DIALOG_START() ;
+}
+
+@method MFlashAppClass, MSG_META_QUIT
+{
+	 /* instead of this, let's do the below stuff - jfh 7/18/02 */
+/*	 if (G_studentIndex == BAD_STUDENT)
+        @callsuper() ;
+    else
+		  @send ,forceQueue process::MSG_STUDENT_DONE(oself) ;
+
+	 /* Did the student try to answer any of the problems? */
+	 if ((G_problems.numUnanswered != G_problems.numProblems) &&
+			(G_studentIndex != BAD_STUDENT) ) {
+		  /* Did some problems.  Let's record the stats then */
+		  @call MFlashContent::MSG_MFLASH_STORE_STATS() ;
+	 }
+
+    @callsuper();
+
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_START
+{
+    @call OptionsStudents::MSG_GEN_DYNAMIC_LIST_INITIALIZE(StudentDBGetCount(pself->iDB)) ;
+    @call OptionsStudents::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(G_studentIndex, FALSE) ;
+    @call oself::MSG_GEN_INTERACTION_INITIATE() ;
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_QUERY
+{
+    char name[MAX_STUDENT_NAME+1] ;
+    StudentDBGetName(pself->iDB, item, name) ;
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, name) ;
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_ADD
+{
+    StudentIndex index ;
+    char name[MAX_STUDENT_NAME+1] ;
+
+    /* User requests to add a new student */
+    @call OptionsGetNameStudentName::MSG_VIS_TEXT_DELETE_ALL() ;
+    if (UserDoDialog(@OptionsDialogGetName) == IC_OK)  {
+        @call OptionsGetNameStudentName::MSG_VIS_TEXT_GET_ALL_PTR(name) ;
+        if (strlen(name))  {
+            index = StudentDBCreateStudent(pself->iDB) ;
+            StudentDBRename(pself->iDB, index, name) ;
+            @call OptionsStudents::MSG_GEN_DYNAMIC_LIST_INITIALIZE(StudentDBGetCount(pself->iDB)) ;
+            @call OptionsStudents::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(index, FALSE) ;
+            @call oself::MSG_OPTIONS_DIALOG_LOAD_SETTINGS(index, NULL) ;
+        }
+    }
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_DELETE
+{
+    StudentIndex index ;
+    word count ;
+
+    /* Deletes only if we are not one of the top three deafault types */
+    if ((G_studentIndex == SIR_TEACHER) && (pself->iCurrentRecord > SIR_TEACHER)) {
+        if (GEOSMessageBox(@DeleteCheckMsg, CDT_QUESTION, GIT_AFFIRMATION) == IC_YES)  {
+            /* Ok, we can delete this student entry */
+            if (pself->iCurrentRecord != BAD_STUDENT)  {
+                index = pself->iCurrentRecord ;
+                StudentDBDeleteStudent(pself->iDB, index) ;
+                pself->iCurrentRecord = BAD_STUDENT ;
+                @call OptionsStudents::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count = StudentDBGetCount(pself->iDB)) ;
+                @call OptionsStudents::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION((index>=count)?count-1:index, FALSE) ;
+                index = @call OptionsStudents::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+                if (index != GIGS_NONE)  {
+                    @call oself::MSG_OPTIONS_DIALOG_LOAD_SETTINGS(index, NULL) ;
+                }
+            }
+        }
+    } else {
+        /* Nope!  Can't delete it */
+        GEOSMessageBox(@CannotDeleteStudent, CDT_ERROR, GIT_NOTIFICATION) ;
+    }
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_CHECK_SETTINGS
+{
+    /* Make sure low is low and high is high */
+    word low, high ;
+
+    low = @call OptionsRange1Low::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+    high = @call OptionsRange1High::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+    if (high < low)  {
+        @call OptionsRange1Low::MSG_GEN_VALUE_SET_INTEGER_VALUE(high, FALSE) ;
+        @call OptionsRange1High::MSG_GEN_VALUE_SET_INTEGER_VALUE(low, FALSE) ;
+    }
+
+    low = @call OptionsRange2Low::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+    high = @call OptionsRange2High::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+    if (high < low)  {
+        @call OptionsRange2Low::MSG_GEN_VALUE_SET_INTEGER_VALUE(high, FALSE) ;
+        @call OptionsRange2High::MSG_GEN_VALUE_SET_INTEGER_VALUE(low, FALSE) ;
+    }
+}
+
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_SAVE_SETTINGS
+/* (StudentIndex student) */
+{
+    StudentRecord *record ;
+    if (pself->iCurrentRecord != BAD_STUDENT)  {
+        @call oself::MSG_OPTIONS_DIALOG_CHECK_SETTINGS() ;
+        /* Record the settings from a student */
+        record = StudentDBGetStudent(pself->iDB, pself->iCurrentRecord) ;
+        record->SR_numProblems = @call OptionsNumProblems::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+        record->SR_allowSigns = @call OptionsAllowNegatives::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+        record->SR_range1Low = @call OptionsRange1Low::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+        record->SR_range2Low = @call OptionsRange2Low::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+        record->SR_range1High = @call OptionsRange1High::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+        record->SR_range2High = @call OptionsRange2High::MSG_GEN_VALUE_GET_INTEGER_VALUE() ;
+        record->SR_problemType = @call OptionsTypeEquations::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+        record->SR_useDefault = @call OptionsUseDefaultBooleanGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() ;
+        record->SR_allowChanges = @call OptionsAllowStudentChangeGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() ;
+        StudentDBPutStudent(pself->iDB, pself->iCurrentRecord, record) ;
+    }
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_LOAD_SETTINGS
+/* (StudentIndex student) */
+{
+    StudentRecord *record ;
+
+    /* Record the settings from a student */
+    record = StudentDBGetStudent(pself->iDB, index) ;
+    @call OptionsUseDefaultBooleanGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(record->SR_useDefault, FALSE) ;
+    if (record->SR_useDefault)  {
+        StudentDBDiscardStudentRecord(record) ;
+        record = StudentDBGetStudent(pself->iDB, SIR_DEFAULT) ;
+    }
+    /* Note which one we have loaded */
+    pself->iCurrentRecord = index ;
+
+    if (p_allowOptions)  {
+        *p_allowOptions = record->SR_allowChanges ;
+    }
+
+    @call OptionsNumProblems::MSG_GEN_VALUE_SET_INTEGER_VALUE(record->SR_numProblems, FALSE) ;
+    @call OptionsAllowNegatives::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(record->SR_allowSigns, FALSE) ;
+    @call OptionsRange1Low::MSG_GEN_VALUE_SET_INTEGER_VALUE(record->SR_range1Low, FALSE) ;
+    @call OptionsRange2Low::MSG_GEN_VALUE_SET_INTEGER_VALUE(record->SR_range2Low, FALSE) ;
+    @call OptionsRange1High::MSG_GEN_VALUE_SET_INTEGER_VALUE(record->SR_range1High, FALSE) ;
+    @call OptionsRange2High::MSG_GEN_VALUE_SET_INTEGER_VALUE(record->SR_range2High, FALSE) ;
+    @call OptionsTypeEquations::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(record->SR_problemType, FALSE) ;
+    @call OptionsAllowStudentChangeGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(record->SR_allowChanges, FALSE) ;
+    StudentDBDiscardStudentRecord(record) ;
+    @call oself::MSG_OPTIONS_DIALOG_CHECK_SETTINGS() ;
+    @call oself::MSG_OPTIONS_DIALOG_UPDATE_UI() ;
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_UPDATE_UI
+{
+    word value ;
+    word selection ;
+    value = @call OptionsUseDefaultBooleanGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() ;
+    if (value)  {
+        UITurnOff(@OptionsNumProblems) ;
+        UITurnOff(@OptionsAllowNegatives) ;
+        UITurnOff(@OptionsRange1) ;
+        UITurnOff(@OptionsRange2) ;
+        UITurnOff(@OptionsTypeEquations) ;
+        UITurnOff(@OptionsAllowStudentChangeGroup) ;
+    } else {
+        UITurnOn(@OptionsNumProblems) ;
+        UITurnOn(@OptionsAllowNegatives) ;
+        UITurnOn(@OptionsRange1) ;
+        UITurnOn(@OptionsRange2) ;
+        UITurnOn(@OptionsTypeEquations) ;
+        if (G_studentIndex == SIR_TEACHER)  {
+            UITurnOn(@OptionsAllowStudentChangeGroup) ;
+        } else {
+            UITurnOff(@OptionsAllowStudentChangeGroup) ;
+        }
+    }
+
+    /* Default record NEVER shows default boolean option */
+    selection = @call OptionsStudents::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+    if (selection == SIR_DEFAULT)  {
+        UITurnOff(@OptionsUseDefaultBooleanGroup) ;
+    } else {
+        UITurnOn(@OptionsUseDefaultBooleanGroup) ;
+    }
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_SET_DB
+/* (StudentDB *db) ; */
+{
+    pself->iDB = db ;
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_APPLY
+{
+    @call oself::MSG_OPTIONS_DIALOG_SAVE_SETTINGS() ;
+    @call oself::MSG_OPTIONS_DIALOG_LOAD_SETTINGS(G_studentIndex, NULL) ;
+    @send ,forceQueue process::MSG_NEW_SETTINGS(oself) ;
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_STUDENT_CHANGED
+{
+    /* Get rid of the old */
+    @call oself::MSG_OPTIONS_DIALOG_SAVE_SETTINGS() ;
+    if (selection != GIGS_NONE)  {
+        @call oself::MSG_OPTIONS_DIALOG_LOAD_SETTINGS(selection, NULL) ;
+    }
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_REPORT
+{
+    @send ,forceQueue ReportDialog::MSG_GEN_INTERACTION_INITIATE() ;
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_CLEAR_HISTORY
+{
+    /* Request came in to clear the history of a student */
+    StudentDBClearHistory(pself->iDB, pself->iCurrentRecord) ;
+}
+
+@method OptionsDialogClass, MSG_OPTIONS_DIALOG_GENERATE_REPORT
+{
+    char line[100] ;
+    char date[100] ;
+    StudentRecord *record ;
+    word i ;
+    StudentHistoryEntry *p_entry ;
+    word percent ;
+
+    if (pself->iCurrentRecord != BAD_STUDENT)  {
+        record = StudentDBGetStudent(pself->iDB, pself->iCurrentRecord) ;
+        if (record)  {
+            MemLock(OptrToHandle(@ReportTitle)) ;
+            @RT_FONT(FID_DTC_URW_SANS) ;
+            @RT_TAB_GROUP(@ReportTabGroup);
+            @RT_SIZE(MakeWWFixed(14.0)) ;
+            @RT_STYLE(TS_BOLD) ;
+            @RT_JUST(J_CENTER) ;
+//            @RT_APPEND("\r") ;
+            @RT_APPEND(LMemDeref(@ReportTitle)) ;
+            @RT_APPEND("\r") ;
+            @RT_SIZE(MakeWWFixed(18.0)) ;
+            @RT_APPEND(record->SR_name) ;
+            @RT_APPEND("\r") ;
+            @RT_SIZE(MakeWWFixed(12.0)) ;
+            @RT_JUST(J_LEFT) ;
+            @RT_APPEND("\r") ;
+            sprintf(line, LMemDeref(@ReportSummaryLine), record->SR_numHistoryItems) ;
+            @RT_APPEND(line) ;
+            @RT_STYLE(0) ;
+            p_entry = (StudentHistoryEntry *)(record+1) ;
+            for (i=0; i<record->SR_numHistoryItems; i++, p_entry++)  {
+                @RT_APPEND("\r") ;
+                sprintf(line, LMemDeref(@ReportSubHeader), i+1) ;
+                if (p_entry->SHE_startTime.TDAT_year)  {
+                    @RT_APPEND(LMemDeref(@ReportStartTime)) ;
+                    LocalFormatDateTime(date, DTF_LONG, &p_entry->SHE_startTime) ;
+                    @RT_APPEND(date) ;
+                    LocalFormatDateTime(date, DTF_HMS, &p_entry->SHE_startTime) ;
+                    @RT_APPEND(" ") ;
+                    @RT_APPEND(date) ;
+                    @RT_APPEND("\r") ;
+                } else {
+                    @RT_APPEND(LMemDeref(@ReportNoStartTime)) ;
+                }
+
+                sprintf(line, LMemDeref(@ReportNumProblems), p_entry->SHE_numProblems) ;
+                @RT_APPEND(line) ;
+                if (p_entry->SHE_allowSigns)
+                    @RT_APPEND(LMemDeref(@ReportSignsYes)) ;
+                else
+                    @RT_APPEND(LMemDeref(@ReportSignsNo)) ;
+                sprintf(line, LMemDeref(@ReportNumericRange1), (word)p_entry->SHE_range1Low, (word)p_entry->SHE_range1High) ;
+                @RT_APPEND(line) ;
+                sprintf(line, LMemDeref(@ReportNumericRange2), (word)p_entry->SHE_range2Low, (word)p_entry->SHE_range2High) ;
+                @RT_APPEND(line) ;
+                switch (p_entry->SHE_problemType)  {
+                    case PROBLEM_ADD:
+                        @RT_APPEND(LMemDeref(@ReportAdd)) ;
+                        break ;
+                    case PROBLEM_SUBTRACT:
+                        @RT_APPEND(LMemDeref(@ReportSubtract)) ;
+                        break ;
+                    case PROBLEM_MULTIPLY:
+                        @RT_APPEND(LMemDeref(@ReportMultiply)) ;
+                        break ;
+                    case PROBLEM_DIVIDE:
+                        @RT_APPEND(LMemDeref(@ReportDivide)) ;
+                        break ;
+                    case PROBLEM_MIXED:
+                        @RT_APPEND(LMemDeref(@ReportMixed)) ;
+                        break ;
+                }
+                percent = (100*p_entry->SHE_numUnanswered)/p_entry->SHE_numProblems ;
+                sprintf(line, LMemDeref(@ReportNumUnanswered), p_entry->SHE_numUnanswered, percent) ;
+                @RT_APPEND(line) ;
+                percent = (100*p_entry->SHE_numCorrect)/p_entry->SHE_numProblems ;
+                sprintf(line, LMemDeref(@ReportNumCorrect), p_entry->SHE_numCorrect, percent) ;
+                @RT_APPEND(line) ;
+                percent = (100*p_entry->SHE_numIncorrect)/p_entry->SHE_numProblems ;
+                sprintf(line, LMemDeref(@ReportNumIncorrect), p_entry->SHE_numIncorrect, percent) ;
+                @RT_APPEND(line) ;
+                percent = (100*p_entry->SHE_numCorrected)/p_entry->SHE_numProblems ;
+                sprintf(line, LMemDeref(@ReportNumCorrected), p_entry->SHE_numCorrected, percent) ;
+                @RT_APPEND(line) ;
+
+                if (p_entry->SHE_endTime.TDAT_year)  {
+                    @RT_APPEND(LMemDeref(@ReportEndTime)) ;
+                    LocalFormatDateTime(date, DTF_LONG, &p_entry->SHE_endTime) ;
+                    @RT_APPEND(date) ;
+                    LocalFormatDateTime(date, DTF_HMS, &p_entry->SHE_endTime) ;
+                    @RT_APPEND(" ") ;
+                    @RT_APPEND(date) ;
+                    @RT_APPEND("\r") ;
+                } else {
+                    @RT_APPEND(LMemDeref(@ReportNoEndTime)) ;
+                }
+            }
+            MemUnlock(OptrToHandle(@ReportTitle)) ;
+            StudentDBDiscardStudentRecord(record) ;
+        }
+        /* BACK TO THE TOP PLEASE */
+        @call textObj::MSG_VIS_TEXT_SELECT_START() ;
+    }
+}

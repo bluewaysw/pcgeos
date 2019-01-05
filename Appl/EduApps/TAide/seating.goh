@@ -1,0 +1,216 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Breadbox Teacher's Aide
+ * FILE:	SEATING.GOH
+ * AUTHOR:	Lysle E. Shields III   6/1/99
+ *
+ * DESCRIPTION:
+ *	This is the code for handling the UI for the seating
+ *
+ * WHATS NEW:  Beginning of version 0.0
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+typedef dword StudentLabel ;
+#define STUDENT_LABEL_NONE          0
+
+typedef byte SeatingLayout ;
+#define SEATING_LAYOUT_A            0
+#define SEATING_LAYOUT_B            1
+#define SEATING_LAYOUT_C            2
+#define SEATING_LAYOUT_UNKNOWN      3
+
+#define SEATING_NUM_LAYOUTS     (SEATING_LAYOUT_UNKNOWN)
+
+typedef byte SeatingMode ;
+#define SEATING_MODE_ADD            0
+#define SEATING_MODE_REMOVE         1
+#define SEATING_MODE_MOVE           2
+#define SEATING_MODE_ROTATE         3
+#define SEATING_MODE_LABEL          4
+#define SEATING_MODE_UNKNOWN        5
+
+typedef byte SeatingDeskType ;
+#define SEATING_DESK_TYPE_SQUARE    0
+#define SEATING_DESK_TYPE_UNKNOWN   1
+
+typedef byte SeatingError ;
+#define SEATING_ERROR_NONE                           0
+#define SEATING_ERROR_ALREADY_MAX_DESKS              1
+#define SEATING_ERROR_ILLEGAL_INDEX                  2
+#define SEATING_ERROR_NO_DATA                        3
+
+/* Structure of a single desk (with or without a student attached) */
+typedef struct {
+    sword SDP_x, SDP_y ;         /* Position on page (center point) */
+    word SDP_angle ;             /* Angle desk is rotated (usually 0) */
+    SeatingDeskType SDP_type ;   /* Shape of desk (not really used) */
+    StudentLabel SDP_label ;            /* Unique Id of labeled desk */
+                                 /*    (used to identify student */
+                                 /*     and 0 is assumed to be no label) */
+} SeatingDeskPosition ;
+
+#define SEATING_DESK_NONE           0xFFFF
+
+#define SEATING_MAX_DESKS           100
+
+/* Structure of a layout of desks */
+typedef struct {
+    /* Number of used desks in deskArray */
+    word SDL_numDesks ;
+
+    /* The list of desks (and available slots) */
+    /* Items are shifted up as they are deleted */
+    SeatingDeskPosition SDL_deskArray[SEATING_MAX_DESKS] ;
+} SeatingDeskLayout ;
+
+/* A classroom structure is several layouts */
+typedef struct {
+    SeatingDeskLayout SCB_layoutArray[SEATING_NUM_LAYOUTS] ;
+    Boolean           SCB_isDirty ;
+} SeatingClassBlock ;
+
+/* ----------------------------------------------------------------- */
+/* Class for displaying and editing seating layouts */
+@class	StudentSeatingVisClass, VisClass ;
+    @default VI_bounds = { 0, 0, 72*8, 72*10.5 } ;
+
+    /* Which layout in a class to use */
+    @instance SeatingLayout SSI_currentLayout = SEATING_LAYOUT_A ;
+
+    /* Current edit mode (add/remove/move/etc.) */
+    @instance SeatingMode SSI_mode = SEATING_MODE_MOVE ;
+
+    /* Memory block holding current data */
+    @instance VMBlockHandle SSI_data = NullHandle ;
+    @instance VMFileHandle SSI_file = NullHandle ;
+
+    /* Memory block holding student labels */
+    @instance MemHandle SSI_studentLabels = NullHandle ;
+
+    /* Optr and message to decrypt and select labels */
+    @instance Message SSI_queryLabelMsg = NullHandle ;
+    @instance Message SSI_nextLabelMsg = NullHandle ;
+    @instance optr SSI_destination = NullHandle ;
+
+    /* Optr to a GenItemGroup of modes */
+    @instance optr SSI_modeGroup = NullHandle ;
+
+    /* Optr to a GenItemGroup of layout modes */
+    @instance optr SSI_layoutGroup = NullHandle ;
+
+    /* Optr to a GenItemGroup of grid modes */
+    @instance optr SSI_gridGroup = NullHandle ;
+
+    @instance StudentLabel SSI_nextLabel = STUDENT_LABEL_NONE ;
+
+    #define SEATING_DESK_SELECTION_NONE      0xFFFF
+    @instance word SSI_currentDesk = SEATING_DESK_SELECTION_NONE ;
+
+    /* Angle to use for all the desks from this point on */
+    @instance word SSI_lastAngle = 0 ;
+
+    /* Size of grid to draw and snap */
+    @instance word SSI_gridSize = 16 ;
+
+    /* Accessor functions */
+    @message SeatingMode MSG_SEATING_GET_MODE() ;
+    @message void MSG_SEATING_SET_MODE(SeatingMode mode) ;
+    @message SeatingLayout MSG_SEATING_GET_LAYOUT() ;
+    @message void MSG_SEATING_SET_LAYOUT(SeatingLayout layout) ;
+    @message optr MSG_SEATING_GET_DESTINATION() ;
+    @message void MSG_SEATING_SET_DESTINATION(optr dest) ;
+    @message optr MSG_SEATING_GET_MODE_GROUP() ;
+    @message void MSG_SEATING_SET_MODE_GROUP(optr modeGroup) ;
+    @message optr MSG_SEATING_GET_LAYOUT_GROUP() ;
+    @message void MSG_SEATING_SET_LAYOUT_GROUP(optr layoutGroup) ;
+
+    /* Block commands to load and save the data from whatever source
+       the outside system wants.  The data passed in is copied over
+       and must be checked per system save.  Its up to the caller to
+       do the actual work of actually making a system that saves. */
+    @message Boolean MSG_SEATING_QUERY_HAS_CHANGED() ;
+    @message void MSG_SEATING_LOAD_DATA(SeatingClassBlock *p_class) ;
+    @message void MSG_SEATING_SAVE_DATA(SeatingClassBlock *p_class) ;
+    @message void MSG_SEATING_LOAD_LAYOUT(SeatingDeskLayout *p_layout) ;
+    @message void MSG_SEATING_SAVE_LAYOUT(SeatingDeskLayout *p_layout) ;
+    @message void MSG_SEATING_SET_VM_SETTINGS(
+                      VMFileHandle file,
+                      VMBlockHandle block) ;
+
+    /* Control the mouse and keyboard clicking */
+    /* (if intercepting is necessary) */
+    @message void MSG_SEATING_XY_PRESS(
+                      sword x,
+                      sword y,
+                      Boolean isRightClick) ;
+    @message void MSG_SEATING_XY_RELEASE(sword x, sword y) ;
+    @message void MSG_SEATING_XY_DRAG(sword x, sword y) ;
+    @message Boolean MSG_SEATING_KEY_PRESSED(byte hotKey) ;
+
+    /* Prototypes for callback messages */
+    @prototype void PROTOMSG_SEATING_QUERY_LABEL(optr seatingObj, StudentLabel labelID) ;
+    @prototype void PROTOMSG_SEATING_NEXT_LABEL(optr seatingObj, StudentLabel oldLabel) ;
+
+    /* Messages called in the callback messages */
+    /* REPLACE_LABEL is called inside a QUERY_LABEL callback */
+    @message void MSG_SEATING_REPLACE_LABEL(
+                      StudentLabel labelID,
+                      char *p_labelTop,
+                      word sizeLabelTop,
+                      char *p_labelBottom,
+                      word sizeLabelBottom) ;
+    @message void MSG_SEATING_DELETE_LABEL(StudentLabel labelID) ;
+
+    /* SET_NEXT_LABEL is called inside a PROTOMSG_SEATING_NEXT_LABEL
+       callback */
+    @message void MSG_SEATING_SET_NEXT_LABEL(StudentLabel newLabel) ;
+
+    @message word MSG_SEATING_FIND_DESK(sword x, sword y) ;
+    @message word MSG_SEATING_FIND_STUDENT(StudentLabel labelID) ;
+
+    /* Data handling routines */
+    @message word MSG_SEATING_ADD_DESK(
+                         sword x,
+                         sword y,
+                         word angle,
+                         SeatingDeskType type) ;
+    @message void MSG_SEATING_REMOVE_DESK(
+                      word index,
+                      Boolean removeLabelAndDesk) ;
+    @message void MSG_SEATING_ROTATE_DESK(word index, word rotation) ;
+    @message void MSG_SEATING_LABEL_DESK(word index, StudentLabel label) ;
+    @message void MSG_SEATING_MOVE_DESK(word index, sword x, sword y) ;
+
+    @message void MSG_SEATING_INVALIDATE_DESK(word index) ;
+    @message void MSG_SEATING_INVALIDATE_STUDENT(StudentLabel labelID) ;
+
+    /* Move a desk from the middle to the top and return */
+    /* the new index number */
+    @message word MSG_SEATING_BRING_TO_TOP(word index) ;
+
+    /* Report an error */
+    @message void MSG_SEATING_ERROR(SeatingError errorNum) ;
+
+    @message void MSG_SEATING_UPDATE_UI() ;
+
+    @message void MSG_SEATING_DELETE_LABEL_LIST() ;
+    @message void MSG_SEATING_INTERNAL_FIND_MISSING_LABELS() ;
+
+    /* Grid related messages */
+    @message void MSG_SEATING_SET_GRID(word pixelSpacing) ;
+    @message word MSG_SEATING_GET_GRID() ;
+
+    @message word MSG_SEATING_GET_NUM_DESKS() ;
+
+    @message word MSG_SEATING_GET_SORTED_DESK_LIST(word *p_list, word max) ;
+@endc
+/* ----------------------------------------------------------------- */
