@@ -21,15 +21,15 @@ exempt treplib
 
 # Resources
 
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource VARIOUSJUNK lmem read-only
+resource AppResource ui-object
+resource Interface ui-object
+resource VariousJunk lmem read-only
 #resource LOGORESOURCE lmem read-only
-resource OPTIONSDIALOGRESOURCE ui-object
-resource LOGINDIALOGRESOURCE ui-object
-resource PASSWORDWITHHINTRESOURCE ui-object
-resource CHANGEPASSWORDRESOURCE ui-object
-resource PWDSTRINGS read-only lmem
+resource OptionsDialogResource ui-object
+resource LoginDialogResource ui-object
+resource PasswordWithHintResource ui-object
+resource ChangePasswordResource ui-object
+resource PwdStrings read-only lmem
 
 export MFlashAppClass
 export MFlashViewClass
