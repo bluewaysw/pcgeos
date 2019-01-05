@@ -4,28 +4,28 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = bbxmail
-ASMCODE         = asmcodeManager.asm parseTimezone.asm stylesStack.asm\
-                  stylesStyles.asm stylesStyles.def
-FOLDER          = folderAccount.goc folderList.goc folderMessage.goc\
-                  folderMove.goc folderRenameClass.goc
-MAIL            = mailAtt.goc mailComp.goc mailFile.goc mailList.goc\
-                  mailPrint.goc mailRead.goc mailSearch.goc\
-                  mailSendReceive.goc mailUIDL.goc styles.goc
-MAIN            = mainAddr.goc mainApp.goc mainMisc.goc mainPrimary.goc\
-                  mainProcess.goc mainUtils.goc
-UI              = uiIcons.goc uiMain.goc uiStrings.goc
+ASMCODE         = asmcodeManager.asm stylesStyles.asm parseTimezone.asm\
+                  stylesStack.asm stylesStyles.def
+UI              = uiStrings.goc uiIcons.goc uiMain.goc
+MAIN            = mainPrimary.goc mainUtils.goc mainMisc.goc\
+                  mainProcess.goc mainApp.goc mainAddr.goc
+MAIL            = mailPrint.goc mailUIDL.goc mailList.goc mailAtt.goc\
+                  mailComp.goc mailSendReceive.goc mailFile.goc styles.goc\
+                  mailSearch.goc mailRead.goc
+FOLDER          = folderMessage.goc folderList.goc folderRenameClass.goc\
+                  folderMove.goc folderAccount.goc
 UI_TO_RDFS      =
-OBJS            = folderAccount.obj folderList.obj folderMessage.obj\
-                  folderMove.obj folderRenameClass.obj mailAtt.obj\
-                  mailComp.obj mailFile.obj mailList.obj mailPrint.obj\
-                  mailRead.obj mailSearch.obj mailSendReceive.obj\
-                  mailUIDL.obj styles.obj mainAddr.obj mainApp.obj\
-                  mainMisc.obj mainPrimary.obj mainProcess.obj\
-                  mainUtils.obj uiIcons.obj uiMain.obj uiStrings.obj
-COMMON          = class.goh dex.goh global.goh mail.goh
+OBJS            = uiStrings.obj uiIcons.obj uiMain.obj mainPrimary.obj\
+                  mainUtils.obj mainMisc.obj mainProcess.obj mainApp.obj\
+                  mainAddr.obj mailPrint.obj mailUIDL.obj mailList.obj\
+                  mailAtt.obj mailComp.obj mailSendReceive.obj mailFile.obj\
+                  styles.obj mailSearch.obj mailRead.obj folderMessage.obj\
+                  folderList.obj folderRenameClass.obj folderMove.obj\
+                  folderAccount.obj
+COMMON          = class.goh mail.goh global.goh dex.goh
 MODULES         = asmcode
-CMODULES        = folder mail main ui
-SRCS            = $(ASMCODE) $(FOLDER) $(MAIL) $(MAIN) $(UI) $(COMMON)
+CMODULES        = ui main mail folder
+SRCS            = $(ASMCODE) $(UI) $(MAIN) $(MAIL) $(FOLDER) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

@@ -71,10 +71,10 @@ FormatListDate(TCHAR *buf, MailTime *time)
 {
     word i;
 
-    LocalFormatDateTime(buf, DTF_ZERO_PADDED_SHORT, time);
+    LocalFormatDateTime(buf, DTF_ZERO_PADDED_SHORT, (TimerDateAndTime*) time);
     strcat(buf, " ");
     i = strlen(buf);
-    LocalFormatDateTime(buf+i, DTF_HM, time);
+    LocalFormatDateTime(buf+i, DTF_HM, (TimerDateAndTime*) time);
 }
 
 
@@ -383,7 +383,7 @@ MessageSetMoniker(optr list,
       */
      fnh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(pself->MLI_folderNum);
      fnp = MemLock(fnh);
-     new = FolderGetMessages(fnp, pself->MLI_folderNum, &numMsgs, &vmf, &vmbh);	 
+     new = FolderGetMessages(fnp, pself->MLI_folderNum, (word*) &numMsgs, &vmf, &vmbh);	 
      pself->MLI_messageArray = vmbh;
      pself->MLI_vmf = vmf;
      MemFree(fnh);
@@ -439,9 +439,9 @@ _pascal CompareMessagesCB (void *el1, void *el2, word cbd)
     ie2 = el2;
 
     HugeArrayLock(data->CMCBD_vmf, data->CMCBD_vmbh,
-		  ie1->MIS_index, &e1, &elSize);
+		  ie1->MIS_index, (void**)&e1, &elSize);
     HugeArrayLock(data->CMCBD_vmf, data->CMCBD_vmbh,
-		  ie2->MIS_index, &e2, &elSize);
+		  ie2->MIS_index, (void**)&e2, &elSize);
 
     retValue = CompareMessages(e1, e2, data->CMCBD_sortType);
 
@@ -611,7 +611,7 @@ _pascal CompareMessagesCB (void *el1, void *el2, word cbd)
 	    rName = MemLock(retHan);
 	    indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
 	    mis = ChunkArrayElementToPtr(indexArray, msgNum, 0);
-	    HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+	    HugeArrayLock(vmf,vmbh,mis->MIS_index,(void**)&mlp, &elSize);
 	    strcpy(rName, mlp->MLS_filename);
 	    HugeArrayUnlock(mlp);
 	    MemUnlock(retHan);
@@ -650,7 +650,7 @@ _pascal CompareMessagesCB (void *el1, void *el2, word cbd)
 	LockStrings();
 	indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
 	mis = ChunkArrayElementToPtr(indexArray, item, 0);
-	haRet = HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+	haRet = HugeArrayLock(vmf,vmbh,mis->MIS_index,(void**)&mlp, &elSize);
 	VMUnlock(OptrToHandle(indexArray));
 
 	/*
@@ -1355,7 +1355,7 @@ exitError:
     indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
     mis = ChunkArrayElementToPtr(indexArray,msgNum,0);
     mis->MIS_flags = mis->MIS_flags | flag;
-    HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+    HugeArrayLock(vmf,vmbh,mis->MIS_index,(void**)&mlp, &elSize);
     mlp->MLS_flags = mlp->MLS_flags | flag;
     VMDirty(OptrToHandle(indexArray));
     VMUnlock(OptrToHandle(indexArray));
@@ -1381,7 +1381,7 @@ exitError:
     mis = ChunkArrayElementToPtr(indexArray,msgNum,0);
     mis->MIS_flags = mis->MIS_flags & (~flag);
     
-    HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+    HugeArrayLock(vmf,vmbh,mis->MIS_index,(void**)&mlp, &elSize);
     mlp->MLS_flags = mlp->MLS_flags & (~flag);
     VMDirty(OptrToHandle(indexArray));
     VMUnlock(OptrToHandle(indexArray));
@@ -1547,12 +1547,12 @@ TCHAR mlpSpace[] = "  ";
     prntHdrText = MemLock(prntHdr);
     indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
     mis = ChunkArrayElementToPtr(indexArray, selection, 0);
-    HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+    HugeArrayLock(vmf,vmbh,mis->MIS_index,(void**)&mlp, &elSize);
     VMUnlock(OptrToHandle(indexArray));
     LockStrings();
     LocalCustomFormatDateTime(dateBuf,
 			      LMemDeref(@dateFormatStr),
-			      &mlp->MLS_time);
+			      (TimerDateAndTime*)&mlp->MLS_time);
     UnlockStrings();
     strcpy(prntHdrText, mlp->MLS_mail);
     strcat(prntHdrText, mlpSpace);

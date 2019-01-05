@@ -375,7 +375,7 @@ ParseDateTimeWithTimezone(TCHAR *dateString, MailTime *timedate)
 		i++;
 		}
 	numStr[i] = 0;
-	UtilAsciiToHex32(numStr, &numVal);
+	UtilAsciiToHex32(numStr, (long*)&numVal);
 	timedate->MT_time.TDAT_day = (word)numVal;
 	/* suck up white space after day */
 	dateString += i;
@@ -418,7 +418,7 @@ ParseDateTimeWithTimezone(TCHAR *dateString, MailTime *timedate)
 		i++;
 		}
 	numStr[i] = 0;
-	UtilAsciiToHex32(numStr, &numVal);
+	UtilAsciiToHex32(numStr, (long*)&numVal);
    /* OK - I'll test for 2 digit year */
 	if (strlen(numStr) == 2) numVal += 2000;
 	timedate->MT_time.TDAT_year = (word)numVal;
@@ -568,7 +568,7 @@ DoYesNo(optr dlgMsg, char *optStr)
         retVal = UserStandardDialog(
 			   (char *) NULL,
 			   /* GIT_MULTIPLE_RESPONSE, so custom */
-			   &yesNoTrigs,
+			   (char*) &yesNoTrigs,
 			   /* 1 string argument */
 			   (char *) NULL,
 			   optStr,
@@ -761,7 +761,7 @@ _pascal DeleteAttachmentCB(void *el, void *retVal)
      * or forwarded attachments under SP_PRIVATE_DATA\Mail
      */
     p = p1->AFP_full;
-    stdPath = FileParseStandardPath(0, &p);
+    stdPath = FileParseStandardPath(0, (const char**)&p);
     mdName = MailLockStdString(MSS_MAIL_DIR);
     if (stdPath == SP_PRIVATE_DATA && !strncmp(p, mdName, strlen(mdName))) {
 	/*
@@ -1245,7 +1245,7 @@ Boolean GetMessageArrays(word folderNum, VMFileHandle *vmf, VMBlockHandle *vmbh,
 	*indexArray = LockIndexArray(*vmf,NULL);
     } else {
 	inuse = FALSE;
-	FolderGetMessages(p2,-1, &numMsgs, vmf, vmbh);   
+	FolderGetMessages(p2,-1, (word*) &numMsgs, vmf, vmbh);   
 	*indexArray = LockIndexArray(*vmf, NULL);
     }
     FilePopDir();
@@ -1332,13 +1332,13 @@ WarnFullFolder(word numMsgs, MailFolderID folderNum)
     switch (numMsgs) {
     case FOLDER_WARNING_LEVEL_1:
     case FOLDER_WARNING_LEVEL_2:
-	msgTab = warn1Table;
+	msgTab = (optr*) warn1Table;
 	break;
     case FOLDER_WARNING_LEVEL_3:
-	msgTab = warn3Table;
+	msgTab = (optr*)warn3Table;
 	break;
     default:
-	msgTab = NULL;
+	msgTab = (optr*)NULL;
 	break;
     }
     if (msgTab) {
@@ -1459,8 +1459,8 @@ Boolean _pascal InsertMessageCB(void* element, void *data)
     vmf = ims->IMS_vmf;
     vmbh = ims->IMS_vmbh;
 
-    HugeArrayLock(vmf,vmbh,ie->MIS_index,&e1,&elSize);
-    HugeArrayLock(vmf,vmbh,ims->IMS_elementIndex,&e2,&elSize);
+    HugeArrayLock(vmf,vmbh,ie->MIS_index,(void**)&e1,&elSize);
+    HugeArrayLock(vmf,vmbh,ims->IMS_elementIndex,(void**)&e2,&elSize);
 
     ims->IMS_ptr = ie;
 
@@ -1611,7 +1611,7 @@ Boolean _pascal FindMessageCB(void* element, void *data)
     vmf = fms->FMS_vmf;
     vmbh = fms->FMS_vmbh;
 
-    HugeArrayLock(vmf,vmbh,ie->MIS_index,&e,&elSize);
+    HugeArrayLock(vmf,vmbh,ie->MIS_index,(void**)&e,&elSize);
 
     fms->FMS_ptr = ie;
 
@@ -1775,7 +1775,7 @@ void UpdateMessageListArrayName(word folderNum, TCHAR *fileName)
     ChunkArrayEnum(indexArray,&fms,FindMessageCB);
     if (fms.FMS_ptr) {
 	lshs.LSH_folderNum = folderNum;
-	HugeArrayLock(vmf,vmbh,fms.FMS_ptr->MIS_index,&mls,0);
+	HugeArrayLock(vmf,vmbh,fms.FMS_ptr->MIS_index,(void**)&mls,0);
 	HugeArrayDirty(mls);
 	MailListScanHeaders(mls,&lshs);
 	fms.FMS_ptr->MIS_flags = mls->MLS_flags;
