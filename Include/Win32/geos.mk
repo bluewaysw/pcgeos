@@ -588,20 +588,18 @@ CCOM_MODEL	?= -ml
 # -of -> always output stack frames (helps SWAT, may be necessary in general)
 # -of+ -> The above but more agressive
 
-#if defined(linux)
 CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
-			-zu -of -of+ -os -ol -ol+ -hc -s -ecc -zp1 -ei \
-		   	$(CCOM_MODEL) \
-            $(.INCLUDES:N*/Include*:S/\\/\//g:S/^-I/-i=/g) \
-						-i="$(WATCOM)/h" \
+		   -zu -of -of+ -os -ol -ol+ -hc -s -ecc -zp1 -ei \
+		   $(CCOM_MODEL)
+
+#if defined(linux)
+CCOMFLAGS += $(.INCLUDES:N*/Include*:S/\\/\//g:S/^-I/-i=/g) \
+					-i="$(WATCOM)/h" \
 		   	 		`$(PRODUCT_FLAGS) highc $(PRODUCT)` \
 					$(XCCOMFLAGS)
 #else
-CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
-			-os -ol -ol+ -hc -s -ecc -zp1 -ei \
-		   	$(CCOM_MODEL) \
-            $(.INCLUDES:N*/Include*:S/\//\\/g:S/^-I/-i=/g) \
-						-i="$(WATCOM)/h" \
+CCOMFLAGS += $(.INCLUDES:N*/Include*:S/\//\\/g:S/^-I/-i=/g) \
+					-i="$(WATCOM)/h" \
 		   	 		`$(PRODUCT_FLAGS) highc $(PRODUCT)` \
 					$(XCCOMFLAGS:S/\//\\/g:S/^-I/-i=/g)
 #endif
