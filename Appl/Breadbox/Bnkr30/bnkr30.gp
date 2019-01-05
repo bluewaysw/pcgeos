@@ -66,27 +66,27 @@ library   n2txt
 exempt n2txt
 
 # Resources:
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource DIALOGS ui-object
-resource ACCOUNTDIALOGS ui-object
-resource CATPAYDIALOGS ui-object
-resource MULTISDIALOGS ui-object
-resource IMPEXDIALOGS ui-object
-resource RECONCILEDIALOGS ui-object
-resource REPORTDIALOGS ui-object
-resource CKPRINTRESOURCE ui-object
-resource MENU ui-object
-resource DOCUMENTUI object
-resource APPICONS data object
-#resource BTNICONS data object
+resource AppResource ui-object
+resource Interface ui-object
+resource Dialogs ui-object
+resource AccountDialogs ui-object
+resource CatPayDialogs ui-object
+resource MultisDialogs ui-object
+resource ImpExDialogs ui-object
+resource ReconcileDialogs ui-object
+resource ReportDialogs ui-object
+resource CkPrintResource ui-object
+resource Menu ui-object
+resource DocumentUI object
+resource AppIcons data object
+#resource BtnIcons data object
 #resource REPORTBUTTONRESOURCE data object
-resource CATSTRINGS data object
-resource TEXTSTRINGS data object
-#resource LOGORESOURCE  data object
-resource VIEWITEMTEMPLATERESOURCE ui-object
-resource XFERACCTITEMTEMPLATERESOURCE ui-object
-resource COPYCATSRESOURCE ui-object
+resource CatStrings data object
+resource TextStrings data object
+#resource LogoResource  data object
+resource ViewItemTemplateResource ui-object
+resource XferAcctItemTemplateResource ui-object
+resource CopyCatsResource ui-object
 
 # classes
 export GPCBnkrVLTextClass

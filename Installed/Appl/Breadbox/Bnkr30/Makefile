@@ -3,20 +3,20 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = BNKR30
+GEODE           = bnkr30
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = Act_mtds.goc BNKR_UI.GOC Catstrs.goc ckp_mtds.goc\
-                  DOC_MTDS.GOC Exp_mtds.goc Fnctns.goc Imp_mtds.goc\
-                  Lst_mtds.goc Mlt_mtds.goc Rcn_mtds.goc Reg_mtds.goc\
-                  Rpt_mtds.goc Sch_mtds.goc Trn_mtds.goc TXT_STRS.GOC\
-                  Xfr_mtds.goc appicons.goh APPTINY.GOH Bbicons.goh\
-                  BBOX.GOH bnkr30.goh DOCTINY.GOH externs.goh
-OBJS            = Act_mtds.obj BNKR_UI.obj Catstrs.obj ckp_mtds.obj\
-                  DOC_MTDS.obj Exp_mtds.obj Fnctns.obj Imp_mtds.obj\
-                  Lst_mtds.obj Mlt_mtds.obj Rcn_mtds.obj Reg_mtds.obj\
-                  Rpt_mtds.obj Sch_mtds.obj Trn_mtds.obj TXT_STRS.obj\
-                  Xfr_mtds.obj
+SRCS            = Mlt_mtds.goc TXT_STRS.goc Reg_mtds.goc Lst_mtds.goc\
+                  Rcn_mtds.goc Imp_mtds.goc Trn_mtds.goc Rpt_mtds.goc\
+                  Act_mtds.goc Exp_mtds.goc Catstrs.goc BNKR_UI.goc\
+                  ckp_mtds.goc Xfr_mtds.goc Fnctns.goc DOC_MTDS.goc\
+                  Sch_mtds.goc bnkr30.goh bbicons.goh bbox.goh apptiny.goh\
+                  doctiny.goh bbxreg.goh externs.goh appicons.goh
+OBJS            = Mlt_mtds.obj TXT_STRS.obj Reg_mtds.obj Lst_mtds.obj\
+                  Rcn_mtds.obj Imp_mtds.obj Trn_mtds.obj Rpt_mtds.obj\
+                  Act_mtds.obj Exp_mtds.obj Catstrs.obj BNKR_UI.obj\
+                  ckp_mtds.obj Xfr_mtds.obj Fnctns.obj DOC_MTDS.obj\
+                  Sch_mtds.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
