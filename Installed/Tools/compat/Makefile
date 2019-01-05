@@ -51,7 +51,7 @@ linuxOBJS       = linux.md/bcmp.o linux.md/bcopy.o linux.md/bzero.o\
                   linux.md/compat.o linux.md/dirent.o linux.md/ffs.o\
                   linux.md/getopt.o linux.md/mkstemp.o linux.md/pagesize.o\
                   linux.md/queue.o
-sparcLIBS       =
+linuxLIBS       =
 
 win32SRCS       = $(MISRCS) win32.md/
 win32OBJS       = win32.md/bcmp.obj win32.md/bcopy.obj win32.md/bzero.obj\

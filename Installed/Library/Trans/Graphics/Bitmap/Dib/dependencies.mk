@@ -69,6 +69,6 @@ Import.eobj: Import/importManager.asm \
                 Internal/xlatLib.def Internal/dib.def graphicsMacro.def \
                 dibConstant.def dibGlobal.def dibMacro.def \
                 dibStrings.rdef importMain.asm importDIB.asm
-dibStrings.rdef: /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/Dib/Import/dibStrings.ui
+dibStrings.rdef: dibStrings.ui
 
 dibEC.geo dib.geo : geos.ldf ui.ldf ansic.ldf impex.ldf 

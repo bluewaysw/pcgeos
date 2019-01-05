@@ -1,47 +1,47 @@
-ETHODIMANAGER.obj \
-ETHODIMANAGER.eobj: GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF EC.DEF THREAD.DEF \
-                SEM.DEF DRIVER.DEF LMEM.DEF SYSTEM.DEF LOCALIZE.DEF \
-                SLLANG.DEF MEDIUM.DEF ASSERT.DEF DISK.DEF FILE.DEF \
-                DRIVE.DEF INTERNAL/INTERRUP.DEF UI.DEF VM.DEF TEXT.DEF \
-                FONTID.DEF GRAPHICS.DEF FONT.DEF COLOR.DEF CHAR.DEF \
-                WIN.DEF INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF OBJECT.DEF CHUNKARR.DEF GEOWORKS.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                INTERNAL/NETUTILS.DEF SOCKET.DEF INTERNAL/SOCKETINT.DEF \
-                INTERNAL/HEAPINT.DEF INTERNAL/SEMINT.DEF SYSSTATS.DEF \
-                INTERNAL/IP.DEF INTERNAL/SOCKETDR.DEF SOCKMISC.DEF \
-                TIMER.DEF INTERNAL/IM.DEF ACCPNT.DEF \
-                ../ETHERCOM/ETHERCOMCONSTANT.DEF \
-                ../ETHERCOM/ETHERCOMMACRO.DEF ARP.DEF ETHODICONSTANT.DEF \
-                ../ETHERCOM/ETHERCOMVARIABLE.DEF ETHODIVARIABLE.DEF \
-                ../ETHERCOM/ETHERCOMUTIL.ASM \
-                ../ETHERCOM/ETHERCOMSTRATEGY.ASM \
-                ../ETHERCOM/ETHERCOMGETINFO.ASM \
-                ../ETHERCOM/ETHERCOMTRANSCEIVE.ASM \
-                ../ETHERCOM/ETHERCOMLINK.ASM \
-                ../ETHERCOM/ETHERCOMCLIENT.ASM \
-                ../ETHERCOM/ETHERCOMOPTION.ASM \
-                ../ETHERCOM/ETHERCOMMEDIUM.ASM \
-                ../ETHERCOM/ETHERCOMPROCESS.ASM ETHODIINIT.ASM \
-                ETHODIPROTOCOL.ASM ETHODITRANSCEIVE.ASM ETHODIARP.ASM
+ethodiManager.obj \
+ethodiManager.eobj: geos.def heap.def geode.def resource.def ec.def thread.def \
+                sem.def driver.def lmem.def system.def localize.def \
+                sllang.def medium.def assert.def disk.def file.def \
+                drive.def Internal/interrup.def ui.def vm.def text.def \
+                fontID.def graphics.def font.def color.def char.def \
+                win.def input.def hwr.def Objects/processC.def \
+                Objects/metaC.def object.def chunkarr.def geoworks.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Internal/netutils.def socket.def Internal/socketInt.def \
+                Internal/heapInt.def Internal/semInt.def sysstats.def \
+                Internal/ip.def Internal/socketDr.def sockmisc.def \
+                timer.def Internal/im.def accpnt.def \
+                ../EtherCom/ethercomConstant.def \
+                ../EtherCom/ethercomMacro.def arp.def ethodiConstant.def \
+                ../EtherCom/ethercomVariable.def ethodiVariable.def \
+                ../EtherCom/ethercomUtil.asm \
+                ../EtherCom/ethercomStrategy.asm \
+                ../EtherCom/ethercomGetInfo.asm \
+                ../EtherCom/ethercomTransceive.asm \
+                ../EtherCom/ethercomLink.asm \
+                ../EtherCom/ethercomClient.asm \
+                ../EtherCom/ethercomOption.asm \
+                ../EtherCom/ethercomMedium.asm \
+                ../EtherCom/ethercomProcess.asm ethodiInit.asm \
+                ethodiProtocol.asm ethodiTransceive.asm ethodiArp.asm
 
-EtherODIEC.geo EtherODI.geo : GEOS.LDF NETUTILS.LDF ACCPNT.LDF 
+etherodiEC.geo etherodi.geo : geos.ldf netutils.ldf accpnt.ldf 
