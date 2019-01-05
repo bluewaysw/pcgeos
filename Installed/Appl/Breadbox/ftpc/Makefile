@@ -4,12 +4,12 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = ftpc
-CLASSES         = FTPPROC.GOC ftplist.goh
-UI              = EXPIRE.GOC FTPUI.GOC ftpui.goh
+CLASSES         = FTPPROC.goc
+UI              = EXPIRE.goc FTPUI.goc ftpui.goh
 UI_TO_RDFS      =
 OBJS            = FTPPROC.obj EXPIRE.obj FTPUI.obj
-COMMON          = CTEXTLIM.GOH EXPIRE.GOH EXPIREUI.GOH INTERNAL.GOH\
-                  ITEXTLIM.GOH OPTIONS.GOH resource.goh
+COMMON          = expire.goh expireui.goh itextlim.goh ctextlim.goh\
+                  options.goh internal.goh resource.goh
 MODULES         =
 CMODULES        = Classes UI
 SRCS            = $(CLASSES) $(UI) $(COMMON)

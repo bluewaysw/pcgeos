@@ -25,7 +25,7 @@
 
 # GOCFLAGS +=
 
-LINKFLAGS += -r -N Copyright\20Breadbox\20Company\201998
+LINKFLAGS += -r -N \(C\)\20blueway.Softworks\201998
 
 #
 # Set this flag if you want to see the commands being passed to the 

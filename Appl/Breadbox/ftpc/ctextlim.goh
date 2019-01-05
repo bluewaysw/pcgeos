@@ -1,0 +1,153 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+
+    @classdecl GenTextLimitClass ;
+
+@method GenTextLimitClass, MSG_GEN_TEXT_LIMIT_TRIM_LINES
+{
+    word lines ;
+    word maxLines ;
+    word cutLines ;
+    optr lineInfo ;
+    VisTextInstance *p_vis ;
+    LineInfo *p_line ;
+    word size ;
+    word count ;
+    VisTextRange selection ;
+    dword numChars ;
+    word lineNum ;
+
+    maxLines = pself->GTXLI_maxLines ;
+    cutLines = pself->GTXLI_cutLines ;
+
+    /* Get the vis part and find our lines */
+    p_vis = ObjDerefVis(oself) ;
+    lineInfo = ConstructOptr(OptrToHandle(oself), p_vis->VTI_lines) ;
+
+    /* How many lines are there right now? */
+    lines = ChunkArrayGetCount(lineInfo) ;
+
+    if (lines > maxLines)  {
+        /* Don't show any changes until we are completely done */
+//        @call oself::MSG_META_SUSPEND() ;
+
+        numChars = 0 ;
+        lineNum = 0 ;
+        while (lines > cutLines)  {
+            /* We have at least one line over sized */
+            /* Delete the first line, but first find how long it is */
+            p_line = ChunkArrayElementToPtr(lineInfo, lineNum, &size) ;
+            count = p_line->LI_count.WAAH_low ;
+            if (count == 0)
+                break ;
+            numChars += count ;
+            lineNum++ ;
+            lines-- ;
+        }
+        if (numChars)  {
+            @call oself::MSG_VIS_TEXT_GET_SELECTION_RANGE(&selection);
+            @call oself::MSG_VIS_TEXT_SELECT_RANGE_SMALL(0, numChars) ;
+            @call oself::MSG_VIS_TEXT_DELETE_SELECTION();
+		  /* preserve any selection */
+		  if ((selection.VTR_end != selection.VTR_start) &&
+				(selection.VTR_start > numChars))
+			 @call oself::MSG_VIS_TEXT_SELECT_RANGE(
+					 selection.VTR_end - numChars,
+					 selection.VTR_start - numChars);
+		  else @call oself::MSG_VIS_TEXT_SELECT_END();
+        }
+
+//        @call oself::MSG_META_UNSUSPEND() ;
+    }
+}
+
+@method GenTextLimitClass, MSG_VIS_TEXT_APPEND_BLOCK
+{
+    @callsuper() ;
+    @call oself::MSG_GEN_TEXT_LIMIT_TRIM_LINES() ;
+}
+
+@method GenTextLimitClass, MSG_VIS_TEXT_APPEND_PTR
+{
+    @callsuper() ;
+    @call oself::MSG_GEN_TEXT_LIMIT_TRIM_LINES() ;
+}
+
+/***************************************************************************
+    MSG_META_KBD_CHAR
+----------------------------------------------------------------------------
+  DESCRIPTION:
+	the only reason this obj isn't read only is that the point & font
+	controls won't reflect the settings of the selected window when it
+	is read only.
+
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    10-17-98  JFH       Initial version.
+
+***************************************************************************/
+@method GenTextLimitClass, MSG_META_KBD_CHAR
+{
+
+    if ( ( ( 0x00ff & character ) == 0x91 ) &&
+	    !(flags & CF_RELEASE) )    /* up arrow */
+    {
+	   @callsuper();
+
+    }
+    else if ( ( ( 0x00ff & character ) == 0x90 ) &&
+	    !(flags & CF_RELEASE) )    /* down arrow */
+    {
+	   @callsuper();
+    }
+
+    else if ( ( ( 0x00ff & character ) == 0x92 ) &&
+	    !(flags & CF_RELEASE) )    /* right arrow */
+    {
+	   @callsuper();
+    }
+
+    else if ( ( ( 0x00ff & character ) == 0x93 ) &&
+	    !(flags & CF_RELEASE) )    /* left arrow */
+    {
+	   @callsuper();
+    }
+
+    /* ignore the rest - the only reason this obj isn't read only
+	* is that you can't scroll read only objects, so we let the
+	* up and down arrows do their thing. */
+
+} /* MSG_META_KBD_CHAR */
+
+
+@method GenTextLimitClass, MSG_VIS_TEXT_SET_POINT_SIZE
+{
+    rangeStart = 0;
+    rangeEnd = TEXT_ADDRESS_PAST_END;
+    @callsuper() ;
+    return;
+}
+
+
+@method GenTextLimitClass, MSG_VIS_TEXT_SET_FONT_ID
+{
+    rangeStart = 0;
+    rangeEnd = TEXT_ADDRESS_PAST_END;
+    @callsuper() ;
+    return;
+}
+
+

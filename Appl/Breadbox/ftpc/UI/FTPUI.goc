@@ -1,0 +1,645 @@
+/*************************************************************************
+
+               Copyright (c) Breadbox Computer Company 1998
+                        -- All Rights Reserved --
+
+  PROJECT:      FTP Client
+  MODULE:       Application UI
+  FILE:         ftpUI.goc
+
+  AUTHOR:       Gerd Boerrigter
+
+  $Id: ftpui.goc 1.1 1998/12/11 16:53:47 gerdb Exp $
+
+  DESCRIPTION:
+    This file contains all the UI elements used by this application.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-08-26  GerdB     Initial version.
+
+*************************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+
+@include "Objects/ftpC.goh"
+@include <ExtUI/StatBar.goh>
+@include <Objects/filelist.goh>
+@include "options.goh"
+@include "internal.goh"
+@include "itextlim.goh"
+@include "Art/appicon.goh"
+@include <sitelist.goh>
+@include <parentc.goh>
+@include "Art/tools.goh"
+
+
+/*************************************************************************
+    UI Object Resources
+*************************************************************************/
+@extern object FtpObject;
+
+/*************************************************************************
+    AppResource Resource
+*************************************************************************/
+@start  ApplicationResource;
+
+    @object GenApplicationClass FtpApp = {
+        GI_visMoniker = list {
+            @FTPIconVGAMoniker,
+            @FTPIconMonoMoniker,
+            @FTPIconCGAMoniker,
+            @FTPIconSmallVGAMoniker,
+          /*  @FTPIconSmallMonoMoniker, */
+            @FtpTextMoniker       /* simple text moniker */
+        }
+
+        GI_comp = @FtpPrimary;
+		  gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+            @FtpPrimary;
+		  gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS ) =
+            @FtpOpenConnectionGroup ;
+        ATTR_GEN_INIT_FILE_CATEGORY="bbox_ftp";
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        ATTR_GEN_HELP_FILE = "FTPHelp";
+	 }
+
+    @visMoniker FtpTextMoniker = "File Transfer";
+    @localize { "Name of the application." };
+
+@end ApplicationResource;
+
+/*************************************************************************
+    Interface Resource
+*************************************************************************/
+
+@start InterfaceResource;
+
+    @object GenPrimaryClass FtpPrimary = {
+		  GI_comp = @FtpFileMenu,
+                  @FtpConnectionMenu,
+                  @FtpCommandMenu,
+						@FtpOptionsMenu,
+                  @Toolbar,
+						@FtpFileSelectionGroup,
+                  @FtpStatusText, 
+@ifdef ALLOW_SHOW_LOGGING
+                 @FtpControlConnectionView, 
+@endif
+                  @PCRoot,
+						@FtpDialogs;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+        ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT;
+/*        HINT_SIZE_WINDOW_AS_DESIRED; */
+        ATTR_GEN_INIT_FILE_CATEGORY="bbox_ftp";
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        HINT_INITIAL_SIZE = { 500 | SST_PIXELS, 340 | SST_PIXELS, 0 } ;
+        HINT_SIZE_WINDOW_AS_DESIRED ;
+    }
+
+@object ParentalControlClass PCRoot = {
+}
+
+    /* Just for holding all of our GIA_NOT_USER_INITIATABLE dialogs. */
+    @object GenInteractionClass FtpDialogs = {
+        GI_comp =
+@ifdef TIMELOCK
+                  @FtpTimelockDialog,
+@endif
+                  @FtpTransferProgressDialog,
+@if @COMPILE_OPTION_EXPIRE_ON
+                  @ExpireDialog,
+@endif
+
+                  @FtpRenameDialog ;
+		  GII_type = GIT_ORGANIZATIONAL;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    }
+
+    /*
+     * EventTriggerGroup
+     */
+    @object GenInteractionClass FtpFileSelectionGroup = {
+		  GI_comp = @FtpRemoteFileSelectorGroup,
+                  @LocalFileSelectorGroup;
+		  HINT_ORIENT_CHILDREN_VERTICALLY;
+		  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_DIVIDE_HEIGHT_EQUALLY ;
+        HINT_INITIAL_SIZE = { 500 | SST_PIXELS, 340 | SST_PIXELS, 0 } ;
+    }
+
+    @object GenInteractionClass LocalFileSelectorGroup = {
+        GI_comp = @LocalFileSelector ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+		  HINT_DRAW_IN_BOX;
+	 }
+    @object GenLocalFileListClass LocalFileSelector = {
+        GI_visMoniker = "Local Directory:";
+        HINT_PLACE_MONIKER_ABOVE; 
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_GEN_FILE_LIST_MULTIPLE_SELECTION ;
+        HINT_GEN_FILE_LIST_ALWAYS_SHOW_FULL_PATH ;
+    }
+
+    @object GenInteractionClass FtpRemoteFileSelectorGroup = {
+        GI_comp = @FtpRemoteFileSelector ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+		  HINT_DRAW_IN_BOX;
+    }
+    @object FtpFileListClass FtpRemoteFileSelector = {
+        GI_visMoniker = "Remote Directory:";
+        GI_states = @default & (~GS_ENABLED) ;
+        GFLI_usableParts = 
+            @default & 
+            (~GEN_FILE_LIST_PART_VOLUME_LIST) /* & 
+            (~GEN_FILE_LIST_PART_SIZE_TAB) & 
+            (~GEN_FILE_LIST_PART_MODIFIED_TAB) */ ;
+        GFLI_parseRoot = '/' ;
+        GFLI_parseDivider = '/' ;
+        GFLI_parseVolume = 0 ;
+		  HINT_PLACE_MONIKER_ABOVE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_GEN_FILE_LIST_MULTIPLE_SELECTION ;
+        HINT_GEN_FILE_LIST_ALWAYS_SHOW_FULL_PATH ;
+    }
+
+    @object FtpStatusTextClass FtpStatusText = {
+        GTXI_text = "No connection." ;
+        GI_attrs = @default | GA_READ_ONLY;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+@ifdef ALLOW_SHOW_LOGGING
+	 @object GenTextClass FtpControlConnectionView = {
+        GI_states = @default & (~GS_USABLE) ;
+        GTXI_attrs = @default | GTA_INIT_SCROLLING;
+		  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
+@endif
+
+@end InterfaceResource;
+
+@start StatusStringResource, data;
+@chunk TCHAR StatusOpenConnection[] =
+	 "Opening connection to ";
+	 @localize { "Show that a connection to the FTP server is initiated MUST BE EXACT SAME STRING IN FTPLIB" };
+
+@chunk TCHAR StatusLogin[] =
+	 "Logging on to ";
+	 @localize { "Show that we are trying to log on to the FTP server MUST BE EXACT SAME STRING IN FTPLIB" };
+@end StatusStringResource;
+
+
+
+/*************************************************************************
+    Menu
+*************************************************************************/
+
+/*
+ * FileMenu
+ */
+@start InterfaceResource;
+
+	 @object GenInteractionClass FtpFileMenu = {
+        GI_comp = @FtpAboutGroup;
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_FILE_MENU );
+    }
+
+@end InterfaceResource
+
+@start MenuResource;
+	 @object GenInteractionClass FtpAboutGroup = {
+        GI_comp = @AboutDBox;
+        GII_visibility = GIV_SUB_GROUP;
+    }
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @AppName, @By, @BreadBoxLogo,
+				  @Visit, @Web, @AboutSpacer1,
+				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@end MenuResource;
+
+@start DialogResource;
+/********************** About dialog box **********************/
+
+@include "Art/bbxreg.goh"
+
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "File Transfer";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 36, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "by";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+@object GenGlyphClass AboutSpacer1 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2002";
+}
+@object GenGlyphClass BBoxLLC = {
+  GI_visMoniker = "Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Rights = {
+  GI_visMoniker = "All Rights Reserved";
+}
+@object GenGlyphClass AboutSpacer2 = {
+  GI_visMoniker = "   ";
+}
+@end DialogResource;
+
+/*
+ * ConnectionMenu
+ */
+@start InterfaceResource;
+    @object GenInteractionClass FtpConnectionMenu = {
+        GI_visMoniker = 'o', "Connection";
+        @localize { "Commands Menu." };
+        GI_comp = @FtpOpenConnectionTrigger,
+                  @FtpCloseConnectionTrigger;
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    }
+@end InterfaceResource
+
+@start MenuResource;
+    @object GenInteractionClass FtpOpenConnectionTrigger = {
+        GI_visMoniker = 'O', "Open Connection";
+        GI_comp = @FtpOpenConnectionGroup;
+        GII_type = GIT_COMMAND;
+        GII_visibility = GIV_DIALOG;
+		  ATTR_GEN_HELP_CONTEXT = "dbOpenConnection";
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_INTERACTION_SINGLE_USAGE;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    }
+    @object GenTriggerClass FtpCloseConnectionTrigger = {
+        GI_visMoniker =  'C', "Close Connection";
+        GI_states = @default & ~GS_ENABLED;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_FTP_PROCESS_DISCONNECT;
+    }
+@end MenuResource;
+
+@start DialogResource;
+    @object GenInteractionClass FtpOpenConnectionGroup = {
+		  GI_comp = @FTPSiteList,
+                  @FtpOpenConnectionConnectTrigger;
+        ATTR_GEN_INIT_FILE_CATEGORY="bbox_ftp";
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    }
+
+    @object SiteSelectionClass FTPSiteList = {
+        SSI_filename = "FTP Sites" ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_MINIMUM_SIZE = { SST_PIXELS | 400, SST_PIXELS | 300 } ;
+    }
+
+	 @object GenTriggerClass FtpOpenConnectionConnectTrigger = {
+        GI_visMoniker = 'o', "Connect";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_FTP_PROCESS_CONNECT;
+		  HINT_SEEK_REPLY_BAR;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+    }
+
+@end DialogResource;
+
+/*
+ * CommandMenu
+ */
+@start InterfaceResource;
+	 @object GenInteractionClass FtpCommandMenu = {
+		  GI_visMoniker = 'C', "Commands";
+		  @localize { "Commands Menu." };
+		  GI_states = @default & ~GS_ENABLED;
+		  GI_comp = @FtpTransferCommandsGroup,
+						@FtpModifyCommandsGroup ;
+		  GII_visibility = GIV_POPUP;
+	 }
+@end InterfaceResource
+
+@start MenuResource;
+    @object GenInteractionClass FtpTransferCommandsGroup = {
+        GI_comp = @FtpCommandDownloadTrigger,
+                  @FtpCommandUploadTrigger,
+						@FtpCommandReadDirTrigger;
+        GII_visibility = GIV_SUB_GROUP;
+    }
+
+    @object GenTriggerClass FtpCommandDownloadTrigger = {
+        GI_visMoniker = 'D', "Download";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_FTP_PROCESS_DOWNLOAD_SELECTION;
+	 }
+
+	 @object GenTriggerClass FtpCommandUploadTrigger = {
+        GI_visMoniker = 'U', "Upload";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_FTP_PROCESS_UPLOAD_SELECTION;
+	 }
+
+	 @object GenTriggerClass FtpCommandReadDirTrigger = {
+        GI_visMoniker = 'f', "Refresh Directory";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_FTP_PROCESS_READ_DIRECTORY;
+    }
+
+    @object GenInteractionClass FtpModifyCommandsGroup = {
+		  GI_comp = @FtpCommandDeleteTrigger,
+                  @FtpCommandRenameTrigger,
+						@FtpCommandMakeDirTrigger,
+						@FtpCommandDeleteDirTrigger;
+        GII_visibility = GIV_SUB_GROUP;
+    }
+
+	 @object GenTriggerClass FtpCommandDeleteTrigger = {
+		  GI_visMoniker = 'D', "Delete File(s)";
+		  GI_states = @default ;
+		  GTI_destination = process ;
+		  GTI_actionMsg = MSG_FTP_PROCESS_DELETE_SELECTION ;
+	 }
+	 @object GenTriggerClass FtpCommandRenameTrigger = {
+		  GI_visMoniker = 'R', "Rename File(s)";
+        GI_states = @default ;
+        GTI_destination = process ;
+		  GTI_actionMsg = MSG_FTP_PROCESS_RENAME_SELECTION ;
+        HINT_TRIGGER_BRINGS_UP_WINDOW;
+    }
+
+	 @object GenInteractionClass FtpCommandMakeDirTrigger = {
+		  GI_visMoniker = 'C', "Create Directory";
+        GI_states = @default ;
+        GI_comp = @FtpMakeDirGroup;
+        GII_type = GIT_COMMAND;
+        GII_visibility = GIV_DIALOG;
+		  ATTR_GEN_HELP_CONTEXT = "dbMakeDir";
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_INTERACTION_SINGLE_USAGE;
+	 }
+
+	 @object GenTriggerClass FtpCommandDeleteDirTrigger = {
+		  GI_visMoniker = 'l', "Delete Directory";
+		  GI_states = @default ;
+		  GTI_destination = process ;
+		  GTI_actionMsg = MSG_FTP_PROCESS_DELETE_SELECTION ;
+	 }
+@end MenuResource;
+
+@start InterfaceResource;
+@object GenInteractionClass FtpOptionsMenu = {
+	GI_visMoniker = 'O', "Options";
+	GI_comp = @ToolbarOptTrigger, @DetailWinOptTrigger;
+	GII_visibility = GIV_POPUP;
+}
+
+@visMoniker ShowDetailWinMoniker = "Show Detail Window";
+@visMoniker HideDetailWinMoniker = "Hide Detail Window";
+@object GenTriggerClass DetailWinOptTrigger = {
+	GI_visMoniker = @ShowDetailWinMoniker;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_FTP_PROCESS_TOGGLE_DETAIL_WINDOW;
+}
+
+@visMoniker ShowToolbarMoniker = "Show Toolbar";
+@visMoniker HideToolbarMoniker = "Hide Toolbar";
+@object GenTriggerClass ToolbarOptTrigger = {
+	GI_visMoniker = @HideToolbarMoniker;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_FTP_PROCESS_TOGGLE_TOOLBAR;
+}
+
+@object GenInteractionClass Toolbar = {
+	GI_comp = @ConnectToolGroup, @ToolSpacer1, @XferToolGroup;
+	GII_visibility = GIV_POPOUT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_TOOLBOX;
+}
+
+@object GenInteractionClass ConnectToolGroup = {
+	GI_comp = @ConnectTool, @DisconnectTool;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@object GenTriggerClass ConnectTool = {
+	GI_visMoniker = list {@FTPConnectToolMoniker};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_FTP_PROCESS_OPEN_CONNECT;
+	ATTR_GEN_FOCUS_HELP = @ConnEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @ConnDisabledBHelp;
+}
+@chunk char ConnEnabledBHelp[] = "Connect to an FTP site";
+@chunk char ConnDisabledBHelp[] = "Already connected to an FTP site";
+
+@object GenTriggerClass DisconnectTool = {
+	GI_visMoniker = list {@FTPDisconnectToolMoniker};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_FTP_PROCESS_DISCONNECT;
+	ATTR_GEN_FOCUS_HELP = @DisconnEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @DisconnDisabledBHelp;
+}
+@chunk char DisconnEnabledBHelp[] = "Disconnect from this FTP site";
+@chunk char DisconnDisabledBHelp[] = "Already disconnected from an FTP site";
+
+@object GenGlyphClass ToolSpacer1 = {
+	GI_visMoniker = "   ";   
+}
+
+@object GenInteractionClass XferToolGroup = {
+	GI_comp = @DownloadTool, @UploadTool;
+	GI_states = @default & ~GS_ENABLED;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+@object GenTriggerClass DownloadTool = {
+	GI_visMoniker = list {@FTPDownloadToolMoniker};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_FTP_PROCESS_DOWNLOAD_SELECTION;
+	ATTR_GEN_FOCUS_HELP = @DownEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @DownDisabledBHelp;
+}
+@chunk char DownEnabledBHelp[] = "Download from the FTP site";
+@chunk char DownDisabledBHelp[] = "Cannot download - not connected";
+
+@object GenTriggerClass UploadTool = {
+	GI_visMoniker = list {@FTPUploadToolMoniker};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_FTP_PROCESS_UPLOAD_SELECTION;
+	ATTR_GEN_FOCUS_HELP = @UpEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @UpDisabledBHelp;
+}
+@chunk char UpEnabledBHelp[] = "Upload to the FTP site";
+@chunk char UpDisabledBHelp[] = "Cannot upload - not connected";
+
+@end InterfaceResource
+
+/* Make Directory Dialog. */
+@start DialogResource;
+    @object GenInteractionClass FtpMakeDirGroup = {
+        GI_comp = @FtpMakeDirFilename,
+                  @FtpMakeDirTrigger;
+    }
+
+    @object GenTextClass FtpMakeDirFilename = {
+        GI_visMoniker = 'D', "Directory:";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = FTP_MAX_HOST_NAME;
+		  HINT_PLACE_MONIKER_TO_LEFT;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_DEFAULT_FOCUS;
+    }
+
+    @object GenTriggerClass FtpMakeDirTrigger = {
+        GI_visMoniker = 'r', "Create";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_FTP_PROCESS_MAKE_DIR;
+		  HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+    }
+
+@end DialogResource; /* Make Directory Dialog. */
+
+/* Transfer Process Dialog. */
+@start DialogResource;
+    @object GenInteractionClass FtpTransferProgressDialog = {
+        GI_visMoniker = "Transfer status";
+        GI_comp = @FtpStatusGroup ;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL
+                             | GIA_NOT_USER_INITIATABLE;
+    }
+
+    @object GenInteractionClass FtpStatusGroup = {
+        GI_comp =
+            @FtpStatusTitle,
+            @FtpStatusTransferText,
+            @FtpStatusBar,
+            @FtpStatusCancelButton ;
+		  HINT_MINIMUM_SIZE = { SST_PIXELS | 400, SST_PIXELS | 100 } ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY ;
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    }
+
+    @object GenTextClass FtpStatusTitle = {
+        GI_attrs = @default | GA_READ_ONLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object FtpStatusTextClass FtpStatusTransferText = {
+        GI_attrs = @default | GA_READ_ONLY;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+
+    @object ExtUIStatusBarClass FtpStatusBar = {
+        SBI_width = SST_PCT_OF_FIELD_WIDTH|PCT_60;
+    }
+
+    @object FtpCancelButtonClass FtpStatusCancelButton = {
+        GI_states = @default & ~GS_ENABLED;
+        GI_visMoniker = "Cancel" ;
+        GTI_destination = @FtpStatusCancelButton ;
+        GTI_actionMsg = MSG_FTP_CANCEL_BUTTON_CANCEL ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+
+@end DialogResource; /* Transfer Process Dialog. */
+
+@start DialogResource;
+	 @object GenInteractionClass FtpRenameDialog = {
+        GI_visMoniker = "Rename File";
+        GI_comp = @FtpRenameGroup;
+        GII_type = GIT_COMMAND;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default |
+                    GIA_MODAL |
+                    GIA_NOT_USER_INITIATABLE |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG ;
+		  ATTR_GEN_HELP_CONTEXT = "dbRename";
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_INTERACTION_SINGLE_USAGE;
+    }
+
+    @object GenInteractionClass FtpRenameGroup = {
+        GI_comp = @FtpRenameFilenameFrom,
+                  @FtpRenameFilenameTo,
+                  @FtpRenameTrigger;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_LEFT_JUSTIFY_CHILDREN ;
+    }
+
+    @object GenTextClass FtpRenameFilenameFrom = {
+        GI_attrs = @default | GA_READ_ONLY;
+        GI_visMoniker = "Old name:";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = FTP_MAX_HOST_NAME;
+		  HINT_PLACE_MONIKER_ABOVE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_DEFAULT_FOCUS;
+    }
+
+    @object GenTextClass FtpRenameFilenameTo = {
+        GI_visMoniker = 'N', "New name:";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = FTP_MAX_HOST_NAME;
+		  HINT_PLACE_MONIKER_ABOVE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_DEFAULT_FOCUS;
+    }
+
+    @object GenTriggerClass FtpRenameTrigger = {
+        GI_visMoniker = 'R', "Rename";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+		  HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+    }
+
+@end DialogResource; /* Change Directory Dialog. */
+
+@include "expireui.goh"
+
+@include "ctextlim.goh"
+
+/* ftpUI.goc */

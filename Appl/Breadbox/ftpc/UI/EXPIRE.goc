@@ -1,0 +1,111 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***************************************************************************
+ *  FILE:  Expire.GOC
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include "expire.goh"
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  ExpireDialogClass
+ *=========================================================================*/
+
+    @classdecl ExpireDialogClass ;
+
+@if @COMPILE_OPTION_EXPIRE_ON
+/*-------------------------------------------------------------------------
+ | Method:  ExpireDialogClass::MSG_EXPIRE_DIALOG_CHECK_DATE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Checks the current date.  If the current date is later than the
+ |    the expiration date, the current dialog does not allow the user
+ |    to continue -- making the only action being to quit the app.
+ |    Note that if expiration has not occured, the 'alwaysShowDialog' flag
+ |    determines if the dialog is to be shown.
+ |      Calling routines can also check the returned boolean to turn
+ |    on UI features should this dialog not be presented immediately.
+ |
+ | Inputs:
+ |    word month                  -- Expiration month (1-12)
+ |    word day                    -- Day of the month (1-31)
+ |    word year                   -- Year of expiration (1900+)
+ |    Boolean alwaysShowDialog    -- Flag declaring if dialog is to be
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if expired, else FALSE.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/05/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ExpireDialogClass, MSG_EXPIRE_DIALOG_CHECK_DATE
+{
+    TimerDateAndTime date ;
+    Boolean isLate = TRUE ;
+
+    /* Get the current date */
+    TimerGetDateAndTime(&date) ;
+
+    if (date.TDAT_year < year)  {
+        isLate = FALSE ;
+    } else if (date.TDAT_year == year)  {
+        /* Same year, check the months */
+        if (date.TDAT_month < month)  {
+            isLate = FALSE ;
+        } else if (date.TDAT_month == month)  {
+            /* Same month.  Check the day */
+            if (date.TDAT_day < day)  {
+                isLate = FALSE ;
+            } else {
+                /* Yep, reached that day or later -- has expired. */
+                isLate = TRUE ;
+            }
+        }
+    }
+
+    /* Enable the ok trigger (if we have one) */
+    if (pself->EDI_okTrigger)  {
+        if (isLate)  {
+            /* Can't continue if late */
+            @call (pself->EDI_okTrigger)::MSG_GEN_SET_NOT_ENABLED(
+                      VUM_DELAYED_VIA_UI_QUEUE) ;
+        } else {
+            /* Can continue if not late */
+            @call (pself->EDI_okTrigger)::MSG_GEN_SET_ENABLED(
+                      VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+    }
+
+    if ((isLate) || (alwaysShowDialog))  {
+        @send ,forceQueue oself::MSG_GEN_INTERACTION_INITIATE() ;
+    }
+
+    return isLate ;
+}
+@else
+@if 0
+@method ExpireDialogClass, MSG_EXPIRE_DIALOG_CHECK_DATE
+{
+    /* Never expires */
+    return FALSE ;
+}
+@endif
+@endif
+
+/***************************************************************************
+ *  END OF FILE:  Expire.GOC
+ ***************************************************************************/
