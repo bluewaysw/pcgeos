@@ -3,37 +3,37 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = GeoDex
-DB              = dbDisplay.asm dbInk.asm dbManager.asm dbRecord.asm\
-                  dbUpdate.asm dbUtils.asm dbVariable.def
-DIAL            = dialManager.asm dialModem.asm dialPhone.asm\
-                  dialQuickDial.asm dialUtils.asm dialVariable.def
-FILE            = fileDocument.asm fileManager.asm fileVariable.def
-IMPEX           = impexExport.asm impexImport.asm impexManager.asm\
+GEODE           = geodex
+DIAL            = dialManager.asm dialUtils.asm dialModem.asm dialPhone.asm\
+                  dialQuickDial.asm dialVariable.def
+FILE            = fileManager.asm fileDocument.asm fileVariable.def
+UI              = uiManager.asm uiStrings.ui uiDialog.ui uiMenu.ui\
+                  uiClavin.ui uiMain.ui
+MAIN            = mainManager.asm mainGeoDex.asm mainUtils.asm mainEdit.asm\
+                  mainExit.asm mainInit.asm mainClavin.asm mainVariable.def
+IMPEX           = impexManager.asm impexImport.asm impexExport.asm\
                   impexVariable.def
-MAIN            = mainClavin.asm mainEdit.asm mainExit.asm mainGeoDex.asm\
-                  mainInit.asm mainManager.asm mainUtils.asm\
-                  mainVariable.def
-MISC            = miscBottomBWBitmap.asm miscBottomBWBitmapPizza.asm\
-                  miscBottomColorBitmap.asm miscBottomColorBitmapPizza.asm\
-                  miscLetters.asm miscLettersDraw.asm\
-                  miscLetterTabInvert.asm miscManager.asm\
-                  miscMiddleBWBitmap.asm miscMiddleBWBitmapPizza.asm\
-                  miscMiddleCGABitmap.asm miscMiddleColorBitmap.asm\
-                  miscMiddleColorBitmapPizza.asm miscPrint.asm\
-                  miscSearch.asm miscTitle.asm miscTopBWBitmap.asm\
-                  miscTopBWBitmapPizza.asm miscTopColorBitmap.asm\
+MISC            = miscMiddleColorBitmapPizza.asm miscMiddleCGABitmap.asm\
+                  miscPrint.asm miscSearch.asm miscBottomBWBitmapPizza.asm\
+                  miscViewMenu.asm miscLetters.asm\
+                  miscBottomColorBitmapPizza.asm miscTopBWBitmap.asm\
                   miscTopColorBitmapPizza.asm miscUtils.asm\
-                  miscViewMenu.asm miscConstant.def miscVariable.def
-UI              = uiManager.asm uiClavin.ui uiDialog.ui uiMain.ui uiMenu.ui\
-                  uiStrings.ui
-UI_TO_RDFS      = UIMAIN.UI
+                  miscMiddleBWBitmap.asm miscTitle.asm\
+                  miscTopBWBitmapPizza.asm miscLettersDraw.asm\
+                  miscMiddleBWBitmapPizza.asm miscLetterTabInvert.asm\
+                  miscBottomColorBitmap.asm miscTopColorBitmap.asm\
+                  miscManager.asm miscBottomBWBitmap.asm\
+                  miscMiddleColorBitmap.asm miscConstant.def\
+                  miscVariable.def
+DB              = dbInk.asm dbManager.asm dbRecord.asm dbUpdate.asm\
+                  dbDisplay.asm dbUtils.asm dbVariable.def
+UI_TO_RDFS      = uiMain.ui
 OBJS            =
-COMMON          = geodexConstant.def geodexGeode.def geodexGlobal.def\
-                  geodexMacro.def
-MODULES         = DB Dial File Impex Main Misc UI
+COMMON          = geodexConstant.def geodexGlobal.def geodexMacro.def\
+                  geodexGeode.def
+MODULES         = Dial File UI Main Impex Misc DB
 CMODULES        =
-SRCS            = $(DB) $(DIAL) $(FILE) $(IMPEX) $(MAIN) $(MISC) $(UI)\
+SRCS            = $(DIAL) $(FILE) $(UI) $(MAIN) $(IMPEX) $(MISC) $(DB)\
                   $(COMMON)
 LOBJS           =
 
