@@ -102,43 +102,22 @@ Import.eobj: Import/importManager.asm \
                 transCommonGlobal.def graphicsMacro.def icoGlobal.def \
                 ico.def importCommon.asm importMain.asm
 dib2ico.obj \
-dib2ico.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
+dib2ico.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h \
+                geos.h ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h ../GraphicsCommonH/hsidib.h \
                 Ansi/string.h
 ico2dib.obj \
-ico2dib.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
+ico2dib.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h \
+                geos.h ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h ../GraphicsCommonH/hsidib.h \
                 Ansi/string.h
 icoload.obj \
-icoload.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h
+icoload.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h \
+                geos.h ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h ../GraphicsCommonH/hsidib.h
 libExport.rdef: generic.uih product.uih impex.uih
 
 icoEC.geo ico.geo : geos.ldf ui.ldf ansic.ldf math.ldf impex.ldf dib.ldf 
