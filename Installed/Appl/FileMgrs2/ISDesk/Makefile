@@ -83,7 +83,7 @@ UTIL            = cutilCommon.asm cutilDummyObj.asm cutilEC.asm\
                   cutilManager.asm cutilSpecialObj.asm cutilUtil.asm\
                   cutilGlobal.def cutilVariable.def
 VIEW            = cviewManager.asm
-COMMON          = cNDGeode.def cNDGlobal.def cISConstant.def\
+COMMON          = cndGeode.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def cdesktopToolManager.def\
                   copenfileClass.def

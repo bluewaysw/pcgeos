@@ -40,7 +40,7 @@ View.obj        : Internal/gUtils.def Internal/im.def Internal/netDr.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def char.def chunkarr.def color.def\
                   copenfileClass.def cviewManager.asm dbase.def disk.def\
@@ -79,7 +79,7 @@ Util.obj        : CFolder/cfolderConstant.def Internal/dos.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def char.def chunkarr.def color.def\
                   copenfileClass.def cutilCommon.asm cutilDummyObj.asm\
@@ -123,7 +123,7 @@ Folder.obj      : Internal/diskInt.def Internal/dos.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def cfolderActionObscure.asm\
                   cfolderButton.asm cfolderCode.asm cfolderConstant.def\
@@ -173,7 +173,7 @@ DeskDisplay.obj : Internal/gUtils.def Internal/grWinInt.def Internal/im.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDDesktopPrimaryClass.asm cNDGlobal.def\
+                  alb.def cNDDesktopPrimaryClass.asm cndGlobal.def\
                   cNDPrimaryClass.asm cNewDeskConstant.def\
                   cdeskdisplayApplication.asm cdeskdisplayConstant.def\
                   cdeskdisplayDriveLetter.asm cdeskdisplayFileOp.asm\
@@ -214,7 +214,7 @@ DeskVis.obj     : Internal/gUtils.def Internal/im.def Internal/netDr.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def cdeskvisClass.asm cdeskvisConstant.def\
                   cdeskvisManager.asm cdeskvisVariable.def char.def\
@@ -252,7 +252,7 @@ UI.obj          : Internal/gUtils.def Internal/im.def Internal/netDr.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def char.def chunkarr.def color.def\
                   copenfileClass.def cuiConstant.def cuiManager.asm\
@@ -295,7 +295,7 @@ Main.obj        : Internal/diskInt.def Internal/dos.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def char.def chunkarr.def\
                   cmainChangeDir.asm cmainConstant.def cmainDiskOps.asm\
@@ -337,7 +337,7 @@ ShObj.obj       : Internal/gUtils.def Internal/im.def Internal/netDr.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def char.def chunkarr.def color.def\
                   copenfileClass.def cshobjConstant.def cshobjDelete.asm\
@@ -376,7 +376,7 @@ Launcher.obj    : Internal/gUtils.def Internal/im.def Internal/netDr.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def char.def chunkarr.def\
                   clauncherManager.asm color.def copenfileClass.def\
@@ -413,7 +413,7 @@ Tree.obj        : Internal/gUtils.def Internal/im.def Internal/netDr.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def char.def chunkarr.def color.def\
                   copenfileClass.def ctreeManager.asm dbase.def disk.def\
@@ -450,7 +450,7 @@ Tool.obj        : Internal/gUtils.def Internal/im.def Internal/netDr.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def char.def chunkarr.def color.def\
                   copenfileClass.def ctoolManager.asm dbase.def disk.def\
@@ -487,7 +487,7 @@ Bitmap.obj      : Internal/gUtils.def Internal/im.def Internal/netDr.def\
                   Objects/inputC.def Objects/metaC.def Objects/processC.def\
                   Objects/uiInputC.def Objects/vCntC.def Objects/vCompC.def\
                   Objects/vTextC.def Objects/visC.def Objects/winC.def\
-                  alb.def cNDGlobal.def cNewDeskConstant.def\
+                  alb.def cndGlobal.def cNewDeskConstant.def\
                   cbitmapGeneric.asm cbitmapManager.asm\
                   cdesktopConstant.def cdesktopGeode.def cdesktopGlobal.def\
                   cdesktopMacro.def char.def chunkarr.def color.def\
