@@ -1,0 +1,831 @@
+/***********************************************************************
+ *
+ * PROJECT:       FontMagick
+ * FILE:          drawfont.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ * NOTE:          To compile properly, this file requires the INCLUDE
+ *                files from the OmniGo SDK or later, because the
+ *                TextAttr structure is declared incorrectly in
+ *                earlier versions.
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+#include <graphics.h>
+#include <gstring.h>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <file.h>
+#include <system.h>
+#include <math.h>
+
+#include "fontmagi.h"
+
+#define min(a,b) ( ((a)<(b))?(a):(b) )
+#define max(a,b) ( ((a)>(b))?(a):(b) )
+
+RGBColorAsDWord _pascal My_GrMapColorIndex(GStateHandle gs,Color c);
+
+
+static TextAttr currentAttr;
+static struct State_struct curEff;
+static RectDWord currentBounds;
+static GStateHandle curText_gs[MAX_TEXT+1],grid_gs;
+static MemHandle curText_block,grid_block;
+static char *curText;
+static int curText_len;
+static WWFixedAsDWord curText_size;
+static sword currentAscent;
+
+/*
+ * Draw a rectangle that is made up from as many line segments in horizontal
+ * direction as there are letters in the string. This allows large "bars"
+ * (underlines and strikethrus) to be distorted more smoothly.
+ */
+void DrawDistortableRectangle(
+  GStateHandle gs,sword x1,word y1,sword x2,sword y2,word letters)
+{
+      int i;
+
+      GrMoveTo(gs,x1,y1);
+      for(i=1; i<=letters; i++)
+        GrDrawHLineTo(gs,x1+(x2-x1)*i/letters);
+      GrDrawVLineTo(gs,y2);
+      for(i=letters-1; i>=0; i--)
+        GrDrawHLineTo(gs,x1+(x2-x1)*i/letters);
+      GrDrawVLineTo(gs,y1);
+}
+
+/*
+ * Another workaround:
+ * Determine size of text for perspective shadow calculations.
+ * The following block should be equivalent to a simple GrGetTextBounds,
+ * but apparently isn't because GrGetTextBounds will return invalid
+ * coordinates in many cases.
+ */
+void MyGetTextBounds(char *text,word len,TextAttr *ta,
+                     RectDWord *bounds,sword *ascent)
+{
+        GStateHandle gstate2;
+        MemHandle grblock;
+        ChunkHandle dataBlock;
+        char s[MAX_TEXT+2];
+        word blankwidth;
+
+        s[0]=' ';
+        if(!len)
+          strcpy(s+1,text);
+        else
+        {
+          strncpy(s+1,text,len);
+          s[len+1]=0;
+        }
+
+        grblock = MemAllocLMem(LMEM_TYPE_GSTRING,sizeof(LMemBlockHeader));
+
+        gstate2 = GrCreateGString(grblock, GST_CHUNK, (word*) &dataBlock);
+        GrSetTextAttr(gstate2,ta);
+        if(ascent)
+          *ascent = (sword)GrFontMetrics(gstate2,GFMI_ASCENT_ROUNDED);
+        GrDrawText(gstate2, 0, 0, s, 0);
+        GrEndGString(gstate2);
+        GrGetGStringBoundsDWord(gstate2, 0, 0, bounds);
+        blankwidth=(word)(GrCharWidth(gstate2,' ')>>16);
+        bounds->RD_right-=blankwidth;
+        GrDestroyGString(gstate2, 0, GSKT_LEAVE_DATA);
+
+        MemFree(grblock);
+}
+
+sdword scale(sdword l)
+{
+        return (sword)IntegerOf( GrMulWWFixed(MakeWWFixed(l),curText_size) );
+}
+
+void TextInitText(unsigned char *text,int text_len,TextAttr *ta)
+{
+      GStateHandle temp_gs;
+      MemHandle temp_block;
+      ChunkHandle dataBlock;
+      word px,i;
+      sword baseline,pos1,pos2,width,totalWidth;
+      RectDWord bounds,bounds2;
+      char s[3];
+      TextStyle styles;
+
+      curText=text;                     /* store current text */
+      curText_len=text_len;
+
+      MyGetTextBounds(text,text_len,&currentAttr,&bounds,&currentAscent);
+                                        /* get bounds for internal size */
+
+      corner1.PD_x=bounds.RD_left;      /* (required for distortions) */
+      corner1.PD_y=bounds.RD_top;
+      corner2.PD_x=bounds.RD_right;
+      corner2.PD_y=bounds.RD_bottom;
+
+      if(!curEff.embedFonts)            /* use system font engine? */
+        return;                         /* no further initialization required */
+
+      totalWidth = (sword)(bounds.RD_right-bounds.RD_left);
+                                        /* total width of effect */
+
+      temp_block = MemAllocLMem(LMEM_TYPE_GSTRING,sizeof(LMemBlockHeader));
+      curText_block = MemAllocLMem(LMEM_TYPE_GSTRING,sizeof(LMemBlockHeader));
+
+      for(px=0,i=0; i<text_len && text[i]; px+=width,i++)
+      {
+        /* create temporary outline of font (no distortion applied yet) */
+        temp_gs = GrCreateGString(temp_block, GST_CHUNK, (word*) &dataBlock);
+
+        GrSetTextAttr(temp_gs,&currentAttr);
+
+        baseline=(sword)GrFontMetrics(temp_gs,GFMI_BASELINE_ROUNDED);
+
+        if(i+1<text_len && text[i+1])
+        {
+          MyGetTextBounds(text+i,2,&currentAttr,&bounds,NULL);
+          MyGetTextBounds(text+i+1,1,&currentAttr,&bounds2,NULL);
+          width=(sword)(
+              (bounds.RD_right-bounds.RD_left)-
+              (bounds2.RD_right-bounds2.RD_left)
+            );
+        }
+        else {
+          width=0;                      /* don't need width of last char */
+        }
+        GrMoveTo(temp_gs,px,-baseline);
+        Font_Gen_Path(temp_gs, text[i], 0);
+        GrEndGString(temp_gs);          /* finish drawing the text */
+
+        /*
+         * Apply nonlinear transformation if necessary. We'll have to go
+         * through our DrawGStringNonlinearTransform() anyway, as this also
+         * fix some problems with curves in path outlines by "patching" the
+         * resulting GString...
+         */
+        if(text[i]!=' ')
+        {
+          curText_gs[i] = GrCreateGString(
+	  	curText_block, GST_CHUNK, (word*)&dataBlock);
+          DrawGStringNonlinearTransform(curText_gs[i],temp_gs,0,0,&curEff.dist);
+          GrEndGString(curText_gs[i]);  /* finish drawing the distorted text */
+        }
+        else
+          curText_gs[i] = 0;
+
+        /* remove temporary (undistorted, unpatched) outline */
+        GrDestroyGString(temp_gs, 0, GSKT_KILL_DATA);
+      }
+
+      styles = (ta->TA_styleSet&~ta->TA_styleClear);
+                                        /* get effective style states */
+      if(styles & (TS_UNDERLINE|TS_STRIKE_THRU))
+      {
+        temp_gs = GrCreateGString(temp_block, GST_CHUNK, (word*)&dataBlock);
+        GrSetTextAttr(temp_gs,&currentAttr);
+        baseline=(sword)GrFontMetrics(temp_gs,GFMI_BASELINE_ROUNDED);
+        if(styles & TS_UNDERLINE)
+        {
+          pos1=(sword)GrFontMetrics(temp_gs,GFMI_UNDER_POS_ROUNDED)-baseline;
+          pos2=pos1+(sword)GrFontMetrics(temp_gs,GFMI_UNDER_THICKNESS_ROUNDED);
+          DrawDistortableRectangle(temp_gs,0,pos1,totalWidth,pos2,curText_len);
+        }
+        if(styles & TS_STRIKE_THRU)
+        {
+          pos1=(sword)GrFontMetrics(temp_gs,GFMI_STRIKE_POS_ROUNDED)-baseline;
+          pos2=pos1+(sword)GrFontMetrics(temp_gs,GFMI_UNDER_THICKNESS_ROUNDED);
+          DrawDistortableRectangle(temp_gs,0,pos1,totalWidth,pos2,curText_len);
+        }
+        GrEndGString(temp_gs);
+        curText_gs[i] = GrCreateGString(
+			curText_block, GST_CHUNK, (word*)&dataBlock);
+        DrawGStringNonlinearTransform(curText_gs[i],temp_gs,0,0,&curEff.dist);
+        GrEndGString(curText_gs[i]);    /* finish drawing the distorted boxes */
+        GrDestroyGString(temp_gs, 0, GSKT_KILL_DATA);
+      }
+      else
+        curText_gs[i] = 0;              /* no underline/strikethrough gs */
+
+      MemFree(temp_block);
+}
+
+void TextLeaveText(void)
+{
+      int i;
+
+      if(!curEff.embedFonts)            /* use system font engine? */
+        return;                         /* no de-initialization required */
+      for(i=0; i<=curText_len; i++)
+        if(curText_gs[i])
+          GrDestroyGString(curText_gs[i], 0, GSKT_KILL_DATA);
+      MemFree(curText_block);
+}
+
+void ConvertToRGB(ColorQuad *cq)
+{
+    if(cq->CQ_info==CF_INDEX)           /* convert INDEX to "mixable" RGB */
+    {
+      RGBColorAsDWord c = My_GrMapColorIndex(0,cq->CQ_redOrIndex);
+
+      cq->CQ_info=CF_RGB;
+      cq->CQ_redOrIndex=RGB_RED(c);
+      cq->CQ_green=RGB_GREEN(c);
+      cq->CQ_blue=RGB_BLUE(c);
+    }
+    else if(cq->CQ_info==CF_GRAY)       /* convert GRAY to "mixable" RGB */
+    {
+      cq->CQ_info=CF_RGB;
+      cq->CQ_green=cq->CQ_blue=cq->CQ_redOrIndex;
+    }
+}
+
+void SetTextAttr(GStateHandle gstate,int i,int b)
+{
+    ColorQuad cq,cq2;
+    SystemDrawMask mask;
+
+    cq=curEff.e.item[i].col;            /* foreground color quad */
+    mask=curEff.e.item[i].mask;         /* possibly draw with mask */
+    if(b!=-1)                           /* background for mixing */
+    {
+      cq2=curEff.e.item[b].col;         /* background color quad */
+      ConvertToRGB(&cq);                /* make sure colors are in RGB */
+      ConvertToRGB(&cq2);
+      cq.CQ_redOrIndex=
+        (byte)((word)cq.CQ_redOrIndex*(SDM_0-mask)/(SDM_0-SDM_100)+
+          (word)cq2.CQ_redOrIndex*(mask-SDM_100)/(SDM_0-SDM_100));
+      cq.CQ_green=
+        (byte)((word)cq.CQ_green*(SDM_0-mask)/(SDM_0-SDM_100)+
+          (word)cq2.CQ_green*(mask-SDM_100)/(SDM_0-SDM_100));
+      cq.CQ_blue=
+        (byte)((word)cq.CQ_blue*(SDM_0-mask)/(SDM_0-SDM_100)+
+          (word)cq2.CQ_blue*(mask-SDM_100)/(SDM_0-SDM_100));
+                                        /* mix according to foreground mask */
+      mask=SDM_100;                     /* always draw with full mask */
+    }
+
+    if(!curEff.embedFonts)
+      GrSetTextColor(gstate,cq.CQ_info,cq.CQ_redOrIndex,cq.CQ_green,cq.CQ_blue);
+    else
+    {
+      GrSetAreaColor(gstate,cq.CQ_info,cq.CQ_redOrIndex,cq.CQ_green,cq.CQ_blue);
+      GrSetLineColor(gstate,cq.CQ_info,cq.CQ_redOrIndex,cq.CQ_green,cq.CQ_blue);
+    }
+
+    if(!curEff.embedFonts)
+      GrSetTextMaskSys(gstate,mask);
+    else
+    {
+      GrSetAreaMaskSys(gstate,mask);
+      GrSetLineMaskSys(gstate,mask);
+    }
+}
+
+void TextDrawForeBack(GStateHandle gstate,sword x,sword y,int itemb,int itemf)
+{
+      int i;
+
+      if(curEff.e.item[itemb].mask==SDM_0 && curEff.e.item[itemf].mask==SDM_0)
+        return;                         /* abort if both masks are null */
+
+      if(curEff.e.item[itemb].mask!=SDM_0 &&
+         curEff.e.item[itemf].mask!=SDM_100 && !curEff.mixedColors)
+      {                               /* Draw background if visible */
+        SetTextAttr(gstate,itemb,-1);
+        GrDrawText(gstate,x,y,curText,curText_len);
+      }
+      if(curEff.e.item[itemf].mask!=SDM_0 || curEff.mixedColors)
+      {
+        SetTextAttr(gstate,itemf,curEff.mixedColors?itemb:-1);
+        GrDrawText(gstate,x,y,curText,curText_len);
+      }
+}
+
+void
+TextDrawThick(GStateHandle gstate,sword x,sword y,int itemf,int itemb,
+              int th1,int th2,int half)
+{
+    int i,j;
+    int draw_center=0;
+
+    if(curEff.e.item[itemb].mask==SDM_0 && curEff.e.item[itemf].mask==SDM_0)
+      return;                           /* shortcut: disable all drawing */
+
+    if(th1<0 || th2==0)                 /* "from" distance -1 means: */
+    {
+      th1=0;                            /* ...draw the 0,0 position as well */
+      draw_center=1;
+    }
+
+    if(!curEff.embedFonts)              /* use system font engine? */
+    {
+      for(i=-th2;i<=th2;i++)
+        for(j=-th2;j<=th2;j++)
+          if((i*i+j*j>th1*th1 || draw_center)
+             && ((curEff.e.ShadowProperties & EFFECT_ROUND)
+                 || i*i>th1*th1 || j*j>th1*th1 || draw_center)
+             && ((curEff.e.ShadowProperties & EFFECT_ROUND)==0
+                 || i*i+j*j<=th2*th2)
+             && ( half== 0 ||
+                 (half==+1 &&  (i>=0 && j>=0)) ||
+                 (half==-1 && !(i>=0 && j>=0))) )
+            TextDrawForeBack(gstate,x+i,y+j,itemb,itemf);
+    }
+    else
+    {
+      if(th2>0)                         /* draw an outline? */
+      {
+        GrSetLineWidth(gstate,MakeWWFixed(th2*2+1));
+        GrSetLineStyle(gstate,LS_SOLID,0,NULL,0);
+
+        if(curEff.e.ShadowProperties & EFFECT_ROUND)
+        {
+          GrSetLineJoin(gstate,LJ_ROUND);
+          GrSetLineEnd(gstate,LE_ROUNDCAP);
+        }
+        else
+        {
+          GrSetLineJoin(gstate,LJ_MITERED);
+          GrSetLineEnd(gstate,LE_SQUARECAP);
+        }
+      }
+
+      GrSaveState(gstate);
+      GrApplyTranslation(gstate,MakeWWFixed(x),MakeWWFixed(y));
+                                        /* don't rescale vector to (0,0) */
+      GrApplyScale(gstate,curText_size,curText_size);
+                                        /* set correct text size */
+      for(i=0; i<=curText_len; i++)     /* draw letters individually */
+        if(curText_gs[i])               /* draw this letter at all? */
+        {
+          GrBeginPath(gstate,PCT_REPLACE);
+          GrDrawGString(gstate,curText_gs[i],0,0,0,0);
+          GrEndPath(gstate);            /* define path for text */
+
+          if(curEff.e.item[itemb].mask!=SDM_0 &&
+             curEff.e.item[itemf].mask!=SDM_100 && !curEff.mixedColors)
+          {                             /* Draw background if visible */
+            SetTextAttr(gstate,itemb,-1);
+            if(th2>0)                   /* draw outline */
+              GrDrawPath(gstate);
+            if(draw_center)             /* draw interior */
+              GrFillPath(gstate,WINDING);
+          }
+          if(curEff.e.item[itemf].mask!=SDM_0 || curEff.mixedColors)
+          {
+            SetTextAttr(gstate,itemf,curEff.mixedColors?itemb:-1);
+            if(th2>0)                   /* draw outline */
+              GrDrawPath(gstate);
+            if(draw_center)             /* draw interior */
+              GrFillPath(gstate,WINDING);
+          }
+        }
+      GrRestoreState(gstate);
+    }
+}
+
+void
+TextDrawOutline(GStateHandle gstate,sword x,sword y,
+                int item_shadow,int item_back)
+{
+    int i,j,outl=(int)(curEff.e.outl1_thickness+curEff.e.outl2_thickness),
+            outl1=(int)curEff.e.outl1_thickness;
+    int itemb,itemf;
+
+    if(curEff.e.outl2_thickness) {
+      if((curEff.e.ShadowProperties & EFFECT_EMBOSSED) && item_shadow<0) {
+
+        /* Draw one half of outline */
+        itemb=(item_back<0)?COLITEM_TEXT_BACK:item_back;
+                                        // Color item for background
+        TextDrawThick(gstate,x,y,COLITEM_OUTLINE2b,itemb,
+                      outl1,outl,-1);
+
+        /* Draw other half of outline */
+        itemb=(item_back<0)?COLITEM_TEXT_BACK:item_back;
+                                        // Color item for background
+        TextDrawThick(gstate,x,y,COLITEM_OUTLINE2a,itemb,
+                      outl1,outl,+1);
+      }
+      else {
+        /* Draw entire 2nd outline */
+        itemb=(item_back<0)?COLITEM_TEXT_BACK:item_back;
+                                        // Color item for background
+        itemf=(item_shadow<0)?COLITEM_OUTLINE2a:item_shadow;
+                                        // Color item for foreground
+        TextDrawThick(gstate,x,y,itemf,itemb,
+                      curEff.e.outl1_thickness,outl,0);
+      }
+    }
+
+    if(outl1) {
+      /* Draw entire 1st outline */
+      itemb=(item_back<0)?COLITEM_TEXT_BACK:item_back;
+                                        // Color item for background
+      TextDrawThick(gstate,x,y,COLITEM_OUTLINE1,itemb,
+                    0,outl1,0);
+    }
+}
+
+void GridVLineAt(GStateHandle gs,sword x,sword y_ascent,sword y_line)
+{
+      GrMoveTo(gs,x,(sword)corner1.PD_y);
+      if(corner1.PD_y<y_ascent && corner2.PD_y>y_ascent)
+        GrDrawVLineTo(gs,y_ascent);
+      if(corner1.PD_y<y_line && corner2.PD_y>y_line)
+        GrDrawVLineTo(gs,y_line);
+      GrDrawVLineTo(gs,(sword)corner2.PD_y);
+}
+
+void GridHLineAt(GStateHandle gs,sword y)
+{
+      int i;
+
+      GrMoveTo(gs,(sword)corner1.PD_x,y);
+      for(i=1; i<=curText_len; i++)
+        GrDrawHLineTo(gs,
+          (sword)(corner1.PD_x+(corner2.PD_x-corner1.PD_x)*i/curText_len));
+}
+
+void TextDrawGridLow(GStateHandle temp_gs)
+{
+      sword y_ascent,y_line,i;
+
+      y_ascent=-currentAscent;          /* get y position of ascender */
+      y_line=0;                         /* baseline is always at y=0 */
+
+      /* draw top line */
+      GridHLineAt(temp_gs,(sword)corner1.PD_y);
+
+      /* draw bottom line */
+      GridHLineAt(temp_gs,(sword)corner2.PD_y);
+
+      /* draw ascender line if visible */
+      if(corner1.PD_y<y_ascent && corner2.PD_y>y_ascent)
+        GridHLineAt(temp_gs,y_ascent);
+
+      /* draw baseline if visible */
+      if(corner1.PD_y<y_line && corner2.PD_y>y_line)
+        GridHLineAt(temp_gs,y_line);
+
+      /* draw separator lines between characters */
+      for(i=0; i<=curText_len; i++)
+        GridVLineAt(temp_gs,
+          (sword)(corner1.PD_x+(corner2.PD_x-corner1.PD_x)*i/curText_len),
+          y_ascent,y_line);
+}
+
+void TextDrawGrid(GStateHandle gstate)
+{
+      GStateHandle temp_gs;
+      MemHandle temp_block;
+      ChunkHandle dataBlock;
+
+      if(curText_len==0) return;
+
+      if(curEff.embedFonts)
+      {
+        temp_block = MemAllocLMem(LMEM_TYPE_GSTRING,sizeof(LMemBlockHeader));
+        temp_gs = GrCreateGString(temp_block, GST_CHUNK, (word*)&dataBlock);
+        TextDrawGridLow(temp_gs);
+        GrEndGString(temp_gs);
+
+        DrawGStringNonlinearTransform(gstate,temp_gs,0,0,&curEff.dist);
+
+        GrDestroyGString(temp_gs, 0, GSKT_KILL_DATA);
+        MemFree(temp_block);
+      }
+      else
+        TextDrawGridLow(gstate);
+}
+
+void FontInit(void)
+{
+      curText_len = 0;                  /* we have no data stored yet */
+}
+
+Boolean
+FontRecalc(struct State_struct *eff,RectDWord *boundsEstimate)
+{
+    ChunkHandle dataBlock;
+    TextAttr ta={C_BLACK,CF_INDEX,0,0,
+                 SDM_100,
+                 PT_SOLID,0,
+                 0,0,
+                 TM_DRAW_BASE|TM_DRAW_ACCENT, TM_DRAW_OPTIONAL_HYPHENS,
+                 0,0,
+                 0,
+                 0,0,
+                 0,
+                 0,
+                 0};
+
+    if(curText_len)
+    {
+      TextLeaveText();                  /* free memory used for caching */
+      GrDestroyGString(grid_gs, 0, GSKT_KILL_DATA);
+      MemFree(grid_block);
+      curText_len = 0;
+    }
+
+    if(eff==NULL)                       /* no new effect specified: abort */
+      return FALSE;
+
+    /*
+     * Store effect data and text to be used for the following operations.
+     * This should be an "atom" operation to avoid potential problems
+     * in a multithreaded environment...
+     */
+    curEff=*eff;
+
+    /*
+     * Set text attributes that can be chosen...
+     */
+    ta.TA_font = curEff.fid;
+    ta.TA_size.WBF_frac = (byte)(FractionOf(curEff.size)/256);
+    ta.TA_size.WBF_int = IntegerOf(curEff.size);
+    ta.TA_styleSet = curEff.style;
+    ta.TA_styleClear = ~curEff.style;
+    ta.TA_fontWeight = curEff.fontWeight;
+    ta.TA_fontWidth = curEff.fontWidth;
+    ta.TA_trackKern = curEff.trackKerning;
+
+    MyGetTextBounds(curEff.text,strlen(curEff.text),&ta, &currentBounds,NULL);
+                                        /* determine corners (real size) */
+
+    if(currentBounds.RD_top>0) currentBounds.RD_top=0;
+    if(currentBounds.RD_left>0) currentBounds.RD_left=0;
+
+    if(curEff.embedFonts)
+    {
+      curText_size=(((dword)ta.TA_size.WBF_int)<<8) + ta.TA_size.WBF_frac;
+                                        /* implicit division by 256 gives
+                                           scale factor for real text size */
+      ta.TA_size.WBF_frac=0;            /* internal: generate path for 256pt */
+      ta.TA_size.WBF_int=256;           /* font to reduce rounding errors */
+    }
+    else
+    {
+      curText_size=MakeWWFixed(1);      /* no scaling for non-embedded fonts */
+    }
+
+    memcpy(&currentAttr,&ta,sizeof(currentAttr));
+                                        /* store text attributes */
+
+    TextInitText(curEff.text, strlen(curEff.text), &ta);
+                                        /* prepare text image (required
+                                           for speeding up embedded fonts) */
+
+    grid_block = MemAllocLMem(LMEM_TYPE_GSTRING,sizeof(LMemBlockHeader));
+    grid_gs = GrCreateGString(grid_block, GST_CHUNK, (word*)&dataBlock);
+    TextDrawGrid(grid_gs);              /* create grid */
+    GrEndGString(grid_gs);              /* end grid gstring */
+
+    /*
+     * calculate size estimate (keeping it on the safe side) if requested
+     */
+    if(boundsEstimate)
+    {
+      sword addmarg,height;
+      Rectangle add;                    /* additional margin on all sides */
+
+      addmarg = curEff.e.outl1_thickness + curEff.e.outl2_thickness;
+                                        /* required margin due to outline */
+
+      add.R_left = add.R_right = add.R_top = add.R_bottom = addmarg;
+
+      GrGetGStringBoundsDWord(grid_gs, 0, 0, boundsEstimate);
+
+      boundsEstimate->RD_left = add.R_left =
+        (sword)scale(boundsEstimate->RD_left)-addmarg;
+      boundsEstimate->RD_top = add.R_top =
+        (sword)scale(boundsEstimate->RD_top)-addmarg;
+      boundsEstimate->RD_right = add.R_right =
+        (sword)scale(boundsEstimate->RD_right)+addmarg;
+      boundsEstimate->RD_bottom = add.R_bottom =
+        (sword)scale(boundsEstimate->RD_bottom)+addmarg;
+
+      if(curEff.e.type!=EFFECT_PLAIN && curEff.e.type!=EFFECT_OUTLINE)
+      {
+        add.R_left += curEff.e.shad_thickness * curEff.e.xdir;
+        add.R_top += curEff.e.shad_thickness * curEff.e.ydir;
+        add.R_right += curEff.e.shad_thickness * curEff.e.xdir *
+          ((curEff.e.ShadowProperties & EFFECT_HPERS)?-1:1);
+        add.R_bottom += curEff.e.shad_thickness * curEff.e.ydir *
+          ((curEff.e.ShadowProperties & EFFECT_VPERS)?-1:1);
+
+        if(curEff.e.type==EFFECT_SHADOW)  
+        {                               /* special handling of skewed shadows */
+          height = add.R_bottom-add.R_top;
+
+          addmarg = IntegerOf(GrMulWWFixed(
+            MakeWWFixed(height),
+            GrSDivWWFixed(
+              MakeWWFixed(curEff.squish_ratio),
+              MakeWWFixed(100)))) - height;
+          add.R_top -= addmarg;
+
+          addmarg = IntegerOf(GrMulWWFixed(
+            GrQuickTangent(MakeWWFixed(curEff.skew_angle)),
+            MakeWWFixed(height)));
+          if(addmarg>0)
+            add.R_right += addmarg;
+          else
+            add.R_left -= addmarg;
+        }
+
+        boundsEstimate->RD_left =
+          min(boundsEstimate->RD_left, add.R_left);
+        boundsEstimate->RD_top =
+          min(boundsEstimate->RD_top, add.R_top);
+        boundsEstimate->RD_right =
+          max(scale(boundsEstimate->RD_right), add.R_right);
+        boundsEstimate->RD_bottom =
+          max(scale(boundsEstimate->RD_bottom), add.R_bottom);
+      }
+    }
+
+    return TRUE;                        /* we had to recalculate the effect */
+}
+
+void FontExit(void)
+{
+    FontRecalc(NULL,NULL);              /* destroy font storage */
+}
+
+/***********************************************************************
+ *                              FontDraw
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Redraws the entire document, given a graphics state
+ *		    through which to draw.
+ *
+ ***********************************************************************/
+void
+FontDraw(GStateHandle gstate,Boolean export)
+{
+    int i,j;
+    int outl;           /* outline/shadow thickness */
+    word width,height;  /* size of current text item */
+    WWFixedAsDWord ratio;
+    TransMatrix tm;
+    Point p[3];
+    MemHandle mh;
+    SystemDrawMask mask;        /* buffer for draw mask */
+    int gridmode;
+
+    width = (word)(currentBounds.RD_right - currentBounds.RD_left);
+    height = (word)(currentBounds.RD_bottom - currentBounds.RD_top);
+
+    gridmode=export?curEff.exportGrid:curEff.drawGrid;
+
+    GrSetTextAttr(gstate,&currentAttr);
+
+    if(gridmode!=GRID_CHARONLY)         /* draw grid outline of text? */
+    {
+      GrSetLineColor(gstate,CF_INDEX,C_LIGHT_GRAY,0,0);
+      GrSetLineMaskSys(gstate,SDM_100);
+      GrSetLineStyle(gstate,LS_SOLID,0,NULL,0);
+      GrSetLineWidth(gstate,1);
+      GrSetLineEnd(gstate,LE_SQUARECAP);
+      GrSetLineJoin(gstate,LJ_MITERED);
+      GrSaveState(gstate);
+      GrApplyScale(gstate,curText_size,curText_size);
+      GrDrawGString(gstate,grid_gs,0,0,0,0);
+      GrRestoreState(gstate);
+    }
+
+    if(gridmode!=GRID_ONLY)             /* draw characters? */
+    {
+      switch(curEff.e.type) {           /* do the various shadow types */
+
+        case EFFECT_PLAIN:
+          break;
+
+        case EFFECT_OUTLINE:
+          if(curEff.embedFonts)         /* only works with embedded fonts */
+          {
+            GrSaveState(gstate);
+            GrApplyScale(gstate,curText_size,curText_size);
+                                        /* set correct text size */
+            for(i=0; i<=curText_len; i++)
+              if(curText_gs[i])         /* draw all letters */
+                GrDrawGString(gstate,curText_gs[i],0,0,0,0);
+            GrRestoreState(gstate);
+          }
+          break;
+
+        case EFFECT_SOLID:
+        case EFFECT_FOG:
+        case EFFECT_3D:
+          outl=(int)(curEff.e.outl1_thickness+curEff.e.outl2_thickness);
+          for(i=(int)curEff.e.shad_thickness; i>0; i--)
+          {
+            GrSaveTransform(gstate);
+            GrApplyTranslation(gstate,
+               0,MakeWWFixed((sword)currentBounds.RD_top+i*curEff.e.ydir));
+            GrApplyScale(gstate,
+                  (curEff.e.ShadowProperties & EFFECT_HPERS)?
+                     GrSDivWWFixed(
+                       MakeWWFixed(width-curEff.e.xdir*i*2),
+                       MakeWWFixed(width)):
+                     MakeWWFixed(1),
+                  (curEff.e.ShadowProperties & EFFECT_VPERS)?
+                     GrSDivWWFixed(
+                       MakeWWFixed(height-curEff.e.ydir*i*2),
+                       MakeWWFixed(height)):
+                     MakeWWFixed(1)
+              );
+            GrApplyTranslation(gstate,
+               0,MakeWWFixed(-((sword)currentBounds.RD_top+i*curEff.e.ydir)));
+
+            mask=curEff.e.item[COLITEM_SHADOW].mask;
+                                        /* store draw mask for shadow */
+
+            /* apply pattern modification onto current shadow "slice" */
+            if(curEff.e.type==EFFECT_FOG)
+              curEff.e.item[COLITEM_SHADOW].mask
+                = mask+(i*(SDM_0-mask)/(int)curEff.e.shad_thickness);
+            else if(curEff.e.type==EFFECT_3D)
+              curEff.e.item[COLITEM_SHADOW].mask
+                = SDM_0-(i*(SDM_0-mask)/(int)curEff.e.shad_thickness);
+
+            TextDrawThick(gstate,i*curEff.e.xdir,i*curEff.e.ydir,
+              COLITEM_SHADOW,COLITEM_SHADOW_BACK,
+              0,(curEff.e.ShadowProperties & EFFECT_OUTLSHAD)?outl:0,0);
+
+            GrRestoreTransform(gstate);
+            curEff.e.item[COLITEM_SHADOW].mask=mask;
+                                        /* restore draw mask for shadow */
+          }
+          break;
+
+        case EFFECT_SHADOW:
+          outl=(int)(curEff.e.outl1_thickness+curEff.e.outl2_thickness);
+
+          GrSaveTransform(gstate);
+
+/* vertical squish ratio: the following line applies a workaround that avoids
+   a scale of exactly 100% when a nonzero skew angle is specified, as no
+   scaling apparently inhibits the skewing mechanism. */
+          ratio=GrSDivWWFixed(
+              MakeWWFixed((curEff.squish_ratio==100 && curEff.skew_angle)?
+                99:curEff.squish_ratio),
+              MakeWWFixed(100));
+
+          GrApplyTranslation(gstate,
+              0,MakeWWFixed((sword)currentBounds.RD_bottom+curEff.e.shad_thickness*curEff.e.ydir));
+          GrApplyScale(gstate,MakeWWFixed(1),ratio);
+          memset(&tm,0,sizeof(TransMatrix));
+          tm.TM_e11.WWF_int = 1;
+          tm.TM_e22.WWF_int = 1;
+          *(dword *)&tm.TM_e21=GrQuickTangent(MakeWWFixed(-curEff.skew_angle));
+          GrApplyTransform(gstate,&tm);
+          GrApplyTranslation(gstate,
+              0,MakeWWFixed(-((sword)currentBounds.RD_bottom+curEff.e.shad_thickness*curEff.e.ydir)));
+
+          GrApplyTranslation(gstate,
+             0,MakeWWFixed((sword)currentBounds.RD_top+(int)curEff.e.shad_thickness*curEff.e.ydir));
+          GrApplyScale(gstate,
+              (curEff.e.ShadowProperties & EFFECT_HPERS)?
+                 GrSDivWWFixed(MakeWWFixed(width-curEff.e.xdir*curEff.e.shad_thickness*2),MakeWWFixed(width)):
+                 MakeWWFixed(1),
+              (curEff.e.ShadowProperties & EFFECT_VPERS)?
+                 GrSDivWWFixed(MakeWWFixed(height-curEff.e.ydir*curEff.e.shad_thickness*2),MakeWWFixed(height)):
+                 MakeWWFixed(1)
+            );
+          GrApplyTranslation(gstate,
+             0,MakeWWFixed(-((sword)currentBounds.RD_top+curEff.e.shad_thickness*curEff.e.ydir)));
+
+          TextDrawThick(gstate,curEff.e.shad_thickness*curEff.e.xdir,
+                               curEff.e.shad_thickness*curEff.e.ydir,
+            COLITEM_SHADOW,COLITEM_SHADOW_BACK,
+             -1,(curEff.e.ShadowProperties & EFFECT_OUTLSHAD)?outl:0,0);
+
+          GrRestoreTransform(gstate);
+          break;
+
+        case EFFECT_DOUBLE:
+          outl=(int)(curEff.e.outl1_thickness+curEff.e.outl2_thickness);
+          for(i=1;i<=(int)curEff.e.shad_thickness;i++) {
+            TextDrawThick(gstate,-i*curEff.e.xdir,-i*curEff.e.ydir,
+              COLITEM_SHADOW2,COLITEM_SHADOW_BACK,
+              0,(curEff.e.ShadowProperties & EFFECT_OUTLSHAD)?outl:0,0);
+            TextDrawThick(gstate,i*curEff.e.xdir,i*curEff.e.ydir,
+              COLITEM_SHADOW,COLITEM_SHADOW_BACK,
+              0,(curEff.e.ShadowProperties & EFFECT_OUTLSHAD)?outl:0,0);
+          }
+          break;
+      }
+
+      if(curEff.e.type!=EFFECT_OUTLINE || !curEff.embedFonts)
+      {
+        TextDrawOutline(gstate,0,0,-1,-1);
+                                        /* Draw text outline with background */
+        TextDrawThick(gstate,0,0,COLITEM_TEXT,COLITEM_TEXT_BACK,-1,0,0);
+                                        /* Finally: Draw main text */
+      }
+    }
+}

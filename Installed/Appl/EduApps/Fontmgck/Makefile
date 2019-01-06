@@ -3,20 +3,20 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = FONTMGCK
-ASMTOOLS        = asmToolsManager.asm
-CHARSET         = CHARSET.GOC
-DRAWFONT        = DRAWFONT.GOC
-FONTDRVR        = fontDrvrManager.asm
-FONTM           = FONTM.GOC FONT_UI.GOH
-NONLIN          = NONLIN.GOC
+GEODE           = fontmgck
+FONTM           = fontm.goc font_ui.goh
+NONLIN          = nonlin.goc
+ASMTOOLS        = asmtoolsManager.asm
+FONTDRVR        = fontdrvrManager.asm
+CHARSET         = charset.goc
+DRAWFONT        = drawfont.goc
 UI_TO_RDFS      =
-OBJS            = CHARSET.obj DRAWFONT.obj FONTM.obj NONLIN.obj
-COMMON          = CHARSET.GOH FONTMAGI.H GSOL.H
+OBJS            = fontm.obj nonlin.obj charset.obj drawfont.obj
+COMMON          = gsol.h charset.goh fontmagi.h
 MODULES         = ASMTOOLS FONTDRVR
-CMODULES        = CHARSET DRAWFONT FONTM NONLIN
-SRCS            = $(ASMTOOLS) $(CHARSET) $(DRAWFONT) $(FONTDRVR) $(FONTM)\
-                  $(NONLIN) $(COMMON)
+CMODULES        = FONTM NONLIN CHARSET DRAWFONT
+SRCS            = $(FONTM) $(NONLIN) $(ASMTOOLS) $(FONTDRVR) $(CHARSET)\
+                  $(DRAWFONT) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

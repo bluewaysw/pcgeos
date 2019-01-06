@@ -8,7 +8,7 @@ ASM_TO_OBJS     =
 UI_TO_RDFS      =
 SRCS            = STUD_DB.goc MAPBOARD.goc PASSWORD.goc SOUND.goc\
                   MATHFLSH.goc classes.goh mapboard.goh mathflsh.goh\
-                  stud_db.goh password.goh passwdui.goh
+                  stud_db.goh equation.goh password.goh passwdui.goh
 OBJS            = STUD_DB.obj MAPBOARD.obj PASSWORD.obj SOUND.obj\
                   MATHFLSH.obj
 LOBJS           =

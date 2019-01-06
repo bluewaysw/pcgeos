@@ -1,0 +1,134 @@
+/***********************************************************************
+ *
+ * PROJECT:       FontMagick
+ * FILE:          CharSet.goh
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+
+@include "charset.goh"
+
+#define COLS    (pself->CSI_columns)
+#define ROWS    (pself->CSI_rows)
+#define FIRST   (pself->CSI_firstChar)
+#define LAST    (pself->CSI_lastChar)
+#define SPACING 3/2
+
+@extern object EffectTextField;
+
+@classdecl CharsetClass;
+
+@method CharsetClass, MSG_VIS_RECALC_SIZE
+{
+    return MAKE_SIZE_DWORD(
+      pself->CSI_size*SPACING*COLS+1, pself->CSI_size*SPACING*ROWS+1);
+}
+
+
+LineAttr blackLine = {CF_INDEX,{C_BLACK,0,0},SDM_100,CMT_CLOSEST,
+  LE_BUTTCAP,LJ_MITERED,LS_SOLID,{0,1}};
+
+AreaAttr whiteBack = {CF_INDEX,{C_WHITE,0,0},SDM_100,CMT_CLOSEST};
+
+TextAttr blackText = {C_BLACK,CF_INDEX,0,0,
+                      SDM_100,
+                      PT_SOLID,0,
+                      0,0,
+                      TM_DRAW_BOTTOM|TM_DRAW_ACCENT, TM_DRAW_OPTIONAL_HYPHENS,
+                      0,0,
+                      0,
+                      0,0,
+                      0,
+                      100,
+                      100};
+
+@method CharsetClass, MSG_VIS_DRAW
+{
+    VisInstance *vself;
+    sword x,y,xw,yw,px,py,xo,yo;
+    word i;
+    char s[2]="*";
+
+    blackText.TA_font=pself->CSI_font;
+    blackText.TA_size.WBF_int=pself->CSI_size;
+
+    vself = ObjDerefVis(oself);
+    px=vself->VI_bounds.R_left;
+    py=vself->VI_bounds.R_top;
+    xw=vself->VI_bounds.R_right - vself->VI_bounds.R_left;
+    yw=vself->VI_bounds.R_bottom - vself->VI_bounds.R_top;
+
+    GrSaveState(gstate);                /* necessary to preserve UI font */
+    GrSetAreaAttr(gstate,&whiteBack);   /* set area mode */
+    GrFillRect(gstate,px,py,px+xw,py+yw);
+
+    GrSetLineAttr(gstate,&blackLine);   /* set line mode */
+    GrDrawRect(gstate,px,py,px+xw,py+yw);
+    for(i=1; i<COLS; i++)
+      GrDrawVLine(gstate,px+i*xw/COLS,py,py+yw);
+    for(i=1; i<ROWS; i++)
+      GrDrawHLine(gstate,px,py+i*yw/ROWS,px+xw);
+
+    GrSetTextAttr(gstate,&blackText);   /* text text mode */
+    xo=(xw/COLS-(sword)GrFontMetrics(gstate,GFMI_MAX_WIDTH_ROUNDED))/2;
+    yo=(yw/ROWS-(sword)GrFontMetrics(gstate,GFMI_HEIGHT_ROUNDED))/2;
+    for(i=FIRST; i<=LAST; i++)
+    {
+      x=px+(i-FIRST)/ROWS*xw/COLS;
+      y=py+(i-FIRST)%ROWS*yw/ROWS;
+      s[0]=(char)i;                     /* set character to draw */
+      GrDrawText(gstate,x+xo,y+yo,s,0);
+    }
+    GrRestoreState(gstate);             /* necessary to preserve UI font */
+}
+
+@method CharsetClass, MSG_CHARSET_SET_FONT
+{
+    pself->CSI_font=font;               /* set new font and force a redraw */
+    @send self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+}
+
+@method CharsetClass, MSG_CHARSET_SET_POINTSIZE
+{
+    pself->CSI_size=size;               /* set new size and force a redraw */
+    @send self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+}
+
+@method CharsetClass, MSG_CHARSET_SET_RANGE
+{
+    pself->CSI_firstChar=firstChar;     /* set new range and force a redraw */
+    pself->CSI_lastChar=lastChar;
+    pself->CSI_rows=rows;
+    pself->CSI_columns=columns;
+    @send self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+}
+
+@method CharsetClass, MSG_META_START_SELECT
+{
+    VisInstance *vself;
+    EventHandle key;
+    sword xw,yw;
+    word i;
+
+    /* identify field in which the user clicked */
+    vself = ObjDerefVis(oself);
+    xw=vself->VI_bounds.R_right - vself->VI_bounds.R_left;
+    yw=vself->VI_bounds.R_bottom - vself->VI_bounds.R_top;
+    i=((xPosition - vself->VI_bounds.R_left)*COLS/xw)*ROWS +
+      ((yPosition - vself->VI_bounds.R_top)*ROWS/yw) +
+      FIRST;
+
+    /* simulate pressing/releasing key */
+    if(i<=LAST)                         /* not hit empty field */
+    {
+      key=@record GenClass::MSG_META_KBD_CHAR(i,CF_FIRST_PRESS,0);
+      @send self::MSG_META_SEND_CLASSED_EVENT(key,pself->CSI_destination);
+      key=@record GenClass::MSG_META_KBD_CHAR(i,CF_RELEASE,0);
+      @send self::MSG_META_SEND_CLASSED_EVENT(key,pself->CSI_destination);
+    }
+
+    @callsuper();
+}
