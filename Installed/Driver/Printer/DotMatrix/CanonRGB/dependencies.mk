@@ -1,5 +1,4 @@
-canonRGB.rdef: generic.uih product.uih \
-                /home/frehwagen/workspace/pcgeos/Driver/Printer/DotMatrix/../PrintCom/UI/uiOptions1ASFCanonRGB.ui
+canonRGB.rdef: generic.uih product.uih ../../PrintCom/UI/uiOptions1ASFCanonRGB.ui
 canonRGBManager.obj \
 canonRGBManager.eobj: printcomInclude.def geos.def heap.def geode.def \
                 resource.def ec.def driver.def lmem.def file.def sem.def \
