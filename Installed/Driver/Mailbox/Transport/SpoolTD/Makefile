@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = SpoolTD
+GEODE           = spooltd
 ASM_TO_OBJS     = spooltdManager.asm
-UI_TO_RDFS      = SPOOLTD.UI
-SRCS            = spooltdAddress.asm spooltdEntry.asm spooltdManager.asm\
-                  spooltdMedium.asm spooltdMisc.asm spooltdTransmit.asm\
+UI_TO_RDFS      = spooltd.ui
+SRCS            = spooltdTransmit.asm spooltdMedium.asm spooltdMisc.asm\
+                  spooltdManager.asm spooltdAddress.asm spooltdEntry.asm\
                   spooltdConstant.def spooltdVariable.def spooltd.ui
 OBJS            = spooltdManager.obj
 LOBJS           =
