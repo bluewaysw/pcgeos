@@ -102,119 +102,60 @@ Import.eobj: Import/importManager.asm \
                 transCommonGlobal.def graphicsMacro.def tifGlobal.def \
                 tif.def importCommon.asm importMain.asm
 ccitt.obj \
-ccitt.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/ccitt.h
+ccitt.eobj: ../GraphicsCommonH/ccitt.h
 cpt4.obj \
-cpt4.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
-                Ansi/string.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/ccitt.h
+cpt4.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h geos.h \
+                ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h ../GraphicsCommonH/hsidib.h \
+                Ansi/string.h ../GraphicsCommonH/ccitt.h
 tiffsave.obj \
-tiffsave.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
-                Ansi/string.h math.h ExportC/tif.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/packbit.h \
+tiffsave.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h geos.h \
+                ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h ../GraphicsCommonH/hsidib.h \
+                Ansi/string.h math.h ExportC/tif.h ../GraphicsCommonH/packbit.h \
                 CommonH/lzwc.h CommonH/tiffopt.h
 lzwc.obj \
-lzwc.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h Ansi/string.h \
-                CommonH/lzwc.h
+lzwc.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h geos.h \
+                ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h Ansi/string.h CommonH/lzwc.h
 dib2tif.obj \
-dib2tif.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
+dib2tif.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h geos.h \
+                ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h ../GraphicsCommonH/hsidib.h \
                 Ansi/string.h
 tif2dib.obj \
-tif2dib.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
+tif2dib.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h geos.h \
+                ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h ../GraphicsCommonH/hsidib.h \
                 Ansi/string.h
 tiffload.obj \
-tiffload.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
+tiffload.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h geos.h \
+                ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h ../GraphicsCommonH/hsidib.h \
                 Ansi/string.h ExportC/tif.h CommonH/lzw.h
 dcpt4.obj \
-dcpt4.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
-                Internal/xlatLib.h Ansi/stdio.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsidib.h \
-                Ansi/string.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/ccitt.h \
-                ExportC/tif.h
+dcpt4.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h geos.h \
+                ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
+                Internal/xlatLib.h Ansi/stdio.h ../GraphicsCommonH/hsidib.h \
+                Ansi/string.h ../GraphicsCommonH/ccitt.h ExportC/tif.h
 lzw.obj \
-lzw.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsimem.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiport.h \
-                geos.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsiwin.h \
-                heap.h Ansi/stdlib.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/fileio.h \
-                file.h \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/hsierror.h \
+lzw.eobj: ../GraphicsCommonH/hsimem.h ../GraphicsCommonH/hsiport.h geos.h \
+                ../GraphicsCommonH/hsiwin.h heap.h Ansi/stdlib.h \
+                ../GraphicsCommonH/fileio.h file.h ../GraphicsCommonH/hsierror.h \
                 Internal/xlatLib.h Ansi/stdio.h CommonH/lzw.h
 t4.obj \
-t4.eobj: \
-                /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/GraphicsCommonH/ccitt.h
+t4.eobj: ../GraphicsCommonH/ccitt.h
+
 lzw1.obj \
-lzw1.eobj: /home/frehwagen/workspace/pcgeos/Library/Trans/Graphics/Bitmap/Tif/ImportC/lzw1.c
+lzw1.eobj: ImportC/lzw1.c
+
 libExport.rdef: generic.uih product.uih impex.uih
 
 tifEC.geo tif.geo : geos.ldf ui.ldf ansic.ldf impex.ldf dib.ldf math.ldf 

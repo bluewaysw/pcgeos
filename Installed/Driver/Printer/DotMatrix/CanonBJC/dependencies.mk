@@ -1,5 +1,4 @@
-canonBJC.rdef: generic.uih product.uih \
-                /home/frehwagen/workspace/pcgeos/Driver/Printer/DotMatrix/../PrintCom/UI/uiOptions1ASFCanonBJC.ui
+canonBJC.rdef: generic.uih product.uih ../../PrintCom/UI/uiOptions1ASFCanonBJC.ui
 canonBJCManager.obj \
 canonBJCManager.eobj: printcomInclude.def geos.def heap.def geode.def \
                 resource.def ec.def driver.def lmem.def file.def sem.def \

@@ -3,12 +3,12 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = VMTree
+GEODE           = vmtree
 ASM_TO_OBJS     = vmtreeManager.asm
 UI_TO_RDFS      =
-SRCS            = vmtreeCode.asm vmtreeEntry.asm vmtreeManager.asm\
-                  vmtreeRead.asm vmtreeStack.asm vmtreeUtils.asm\
-                  vmtreeWrite.asm vmtreeConstant.def vmtreeVariable.def
+SRCS            = vmtreeCode.asm vmtreeUtils.asm vmtreeRead.asm\
+                  vmtreeStack.asm vmtreeEntry.asm vmtreeWrite.asm\
+                  vmtreeManager.asm vmtreeVariable.def vmtreeConstant.def
 OBJS            = vmtreeManager.obj
 LOBJS           =
 

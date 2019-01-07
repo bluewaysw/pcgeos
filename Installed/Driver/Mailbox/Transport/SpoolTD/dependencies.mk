@@ -1,40 +1,40 @@
-SPOOLTD.rdef: GENERIC.UIH PRODUCT.UIH MAILBOX.UIH
-SPOOLTDMANAGER.obj \
-SPOOLTDMANAGER.eobj: STDAPP.DEF GEOS.DEF GEODE.DEF RESOURCE.DEF EC.DEF LMEM.DEF \
-                OBJECT.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF \
-                GSTRING.DEF TEXT.DEF CHAR.DEF HEAP.DEF UI.DEF FILE.DEF \
-                VM.DEF WIN.DEF INPUT.DEF HWR.DEF LOCALIZE.DEF SLLANG.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                INTERNAL/PRODFEATURES.DEF ASSERT.DEF INITFILE.DEF \
-                MEDIUM.DEF MAILBOX.DEF INTERNAL/MBOXINT.DEF SPOOL.DEF \
-                PRINT.DEF INTERNAL/SPOOLINT.DEF DRIVER.DEF \
-                INTERNAL/SERIALDR.DEF INTERNAL/STREAMDR.DEF \
-                INTERNAL/PARALLDR.DEF INTERNAL/MBTRNSDR.DEF \
-                MAILBOX/SPOOLTD.DEF MAILBOX/FILEDD.DEF \
-                INTERNAL/HEAPINT.DEF INTERNAL/SEMINT.DEF SYSSTATS.DEF \
-                SPOOLTDCONSTANT.DEF SPOOLTDVARIABLE.DEF SPOOLTD.RDEF \
-                SPOOLTDADDRESS.ASM SPOOLTDMEDIUM.ASM SPOOLTDMISC.ASM \
-                SPOOLTDTRANSMIT.ASM SPOOLTDENTRY.ASM
+spooltd.rdef: generic.uih product.uih mailbox.uih
+spooltdManager.obj \
+spooltdManager.eobj: stdapp.def geos.def geode.def resource.def ec.def lmem.def \
+                object.def graphics.def fontID.def font.def color.def \
+                gstring.def text.def char.def heap.def ui.def file.def \
+                vm.def win.def input.def hwr.def localize.def sllang.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Internal/prodFeatures.def assert.def initfile.def \
+                medium.def mailbox.def Internal/mboxInt.def spool.def \
+                print.def Internal/spoolInt.def driver.def \
+                Internal/serialDr.def Internal/streamDr.def \
+                Internal/parallDr.def Internal/mbTrnsDr.def \
+                Mailbox/spooltd.def Mailbox/filedd.def \
+                Internal/heapInt.def Internal/semInt.def sysstats.def \
+                spooltdConstant.def spooltdVariable.def spooltd.rdef \
+                spooltdAddress.asm spooltdMedium.asm spooltdMisc.asm \
+                spooltdTransmit.asm spooltdEntry.asm
 
-SpoolTDEC.geo SpoolTD.geo : GEOS.LDF UI.LDF MAILBOX.LDF 
+spooltdEC.geo spooltd.geo : geos.ldf ui.ldf mailbox.ldf 
