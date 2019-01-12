@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = BJACK
+GEODE           = bjack
 ASM_TO_OBJS     = bjack.asm
-UI_TO_RDFS      = BJACK.UI
-SRCS            = bjack.asm bjackGame.asm bjackSound.asm myMacros.def\
-                  sizes.def bjack.ui
+UI_TO_RDFS      = bjack.ui
+SRCS            = bjackGame.asm bjack.asm bjackSound.asm sizes.def\
+                  myMacros.def bjack.ui
 OBJS            = bjack.obj
 LOBJS           =
 
