@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = TEDIT
+GEODE           = tedit
 ASM_TO_OBJS     = tedit.asm
-UI_TO_RDFS      = TEDIT.UI
+UI_TO_RDFS      = tedit.ui
 SRCS            = tedit.asm tedit.ui
 OBJS            = tedit.obj
 LOBJS           =

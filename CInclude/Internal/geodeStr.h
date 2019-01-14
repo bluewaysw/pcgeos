@@ -393,7 +393,7 @@ typedef ByteEnum MethodPassReg;
 
 typedef WordFlags MethodPassRegisters;
 /* Reg to put 3rd parameter in */
-#define MPR_PARAM3	0x01c0	/* MethodPassReg 
+#define MPR_PARAM3	0x01c0	/* MethodPassReg */
 /* Reg to put 2nd parameter in */
 #define MPR_PARAM2	0x0038	/* MethodPassReg */
 /* Reg to put 1st parameter in */
