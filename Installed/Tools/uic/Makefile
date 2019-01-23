@@ -71,7 +71,7 @@ SUBDIRS         =
 #include	<$(SYSMAKEFILE)>
 #endif
 
-#if	exists(sparc.md/dependencies.mk)
+#if	exists(linux.md/dependencies.mk)
 #include	"linux.md/dependencies.mk"
 #endif
 
